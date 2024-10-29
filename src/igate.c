@@ -1071,6 +1071,8 @@ void igate_send_rec_packet (int chan, packet_t recv_pp)
  * Inputs:	pp 	- Packet object.
  *
  *		chan	- Radio channel where it was received.
+ *				This will be -1 if from a beacon with sendto=ig
+ *				so be careful if using as subscript.
  *
  * Description:	Duplicate detection is handled here.
  *		Suppress if same was sent recently.
@@ -1141,7 +1143,7 @@ static void send_packet_to_server (packet_t pp, int chan)
 	  strlcat (msg, ",qAO,", sizeof(msg));		// new for version 1.4.
 	}
 
-	strlcat (msg, save_audio_config_p->mycall[chan], sizeof(msg));
+	strlcat (msg, save_audio_config_p->mycall[chan>=0 ? chan : 0], sizeof(msg));
 	strlcat (msg, ":", sizeof(msg));
 
 
