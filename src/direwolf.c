@@ -339,6 +339,13 @@ int main (int argc, char *argv[])
 #endif
 
 
+// TODO: Display hardware and OS version to help with troubleshooting.
+// cat /proc/cpuinfo | grep ^Model
+// BSD, Deb?: /etc/os-release
+// /etc/issue
+
+
+
 /* 
  * Starting with version 0.9, the prebuilt Windows version 
  * requires a minimum of a Pentium 3 or equivalent so we can
@@ -1328,7 +1335,9 @@ void app_process_rec_packet (int chan, int subchan, int slice, packet_t pp, alev
 	if (alevel.rec > 110) {
 
 	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Audio input level is too high.  Reduce so most stations are around 50.\n");
+	  dw_printf ("Audio input level is too high. This may cause distortion and reduced decode performance.\n");
+	  dw_printf ("Solution is to decrease the audio input level.\n");
+	  dw_printf ("Setting audio input level so most stations are around 50 will provide good dyanmic range.\n");
 	}
 // FIXME: rather than checking for ichannel, how about checking medium==radio
 	else if (alevel.rec < 5 && chan != audio_config.igate_vchannel && subchan != -3) {
