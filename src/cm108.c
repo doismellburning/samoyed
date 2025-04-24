@@ -1061,8 +1061,12 @@ static int cm108_write (char *name, int iomask, int iodata)
 	    dw_printf ("    crw-rw---- 1 root audio 247, 0 Oct  6 19:24 %s\n", name);
 	    dw_printf ("rather than root-only access like this:\n");
 	    dw_printf ("    crw------- 1 root root 247, 0 Sep 24 09:40 %s\n", name);
+	    dw_printf ("This permission should be set by one of:\n");
+	    dw_printf ("/etc/udev/rules.d/99-direwolf-cmedia.rules\n");
+	    dw_printf ("/usr/lib/udev/rules.d/99-direwolf-cmedia.rules\n");
+	    dw_printf ("which should be created by the installation process.\n");
+	    dw_printf ("Your account must be in the 'audio' group.\n");
 	  }
-
 	  close (fd);
 	  return (-1);
 	}
