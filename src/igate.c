@@ -998,6 +998,7 @@ void igate_send_rec_packet (int chan, packet_t recv_pp)
 
 /*
  * Do not relay generic query.
+ * TODO:  Should probably block in other direction too, in case rf>is gateway did not drop.
  */
 	if (ax25_get_dti(pp) == '?') {
 	  if (s_debug >= 1) {
