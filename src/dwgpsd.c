@@ -68,7 +68,7 @@
 // 3.22		28		11	bullseye		OK.
 // 3.23		29		12				OK.
 // 3.25		30		14				OK, Jan. 2023
-
+// 3.25.1	30		14	bookworm		TBD, Feb. 2025
 
 // Previously the compilation would fail if the API version was later
 // than the last one tested.  Now it is just a warning because it changes so
@@ -201,7 +201,14 @@ static void * read_gpsd_thread (void *arg);
  * 	scons prefix=/usr libdir=lib/aarch64-linux-gnu
  *	[ scons check ]
  *	sudo scons udev-install
- *	
+ *
+ *   Start and test
+ *
+ *	sudo killall gpsd
+ *	cat /dev/ttyACM0
+ *
+ *	sudo gpsd /dev/ttyACM0 -F /var/run/gpsd.sock
+ *	cgps	
  */
 
 
@@ -536,7 +543,8 @@ int main (int argc, char *argv[])
 	while (1) {
 	  dwfix_t fix;
 
-	  fix = dwgps_read (&info);
+	  fix = dwgps_read (&info)
+;
 	  text_color_set (DW_COLOR_INFO);
 	  switch (fix) {
 	    case DWFIX_2D:
