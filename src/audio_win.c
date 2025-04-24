@@ -1,4 +1,4 @@
-
+// FIXME:  Add longer input timeout and more retries
 //
 //    This file is part of Dire Wolf, an amateur radio packet TNC.
 //
@@ -792,7 +792,8 @@ int audio_get (int a)
 	       * Wait if nothing available.
 	       * Could use an event to wake up but this is adequate.
 	       */
-	      int timeout = 25;
+	      // Issue 544: change from 25 to 200.  That's 2 seconds total with current buff time.
+	      int timeout = 200;
 
 	      while (A->in_headp == NULL) {
 	        //SLEEP_MS (ONE_BUF_TIME / 5);
