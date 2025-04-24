@@ -25,3 +25,4 @@ WantedBy=multi-user.target
 DefaultInstance=1
 
 # alternate version:  https://www.f4fxl.org/start-direwolf-at-boot-the-systemd-way/
+# or:  https://groups.io/g/direwolf/message/9883
