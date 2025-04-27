@@ -976,6 +976,14 @@ void server_send_monitored (int chan, packet_t pp, int own_xmit)
 // Format addresses in AGWPR monitoring format such as:
 //	 1:Fm ZL4FOX-8 To Q7P2U2 Via WIDE3-3
 
+// There is some disagreement, in the user community, about whether to:
+// * follow the lead of UZ7HO SoundModem and mark all of the used addresses, or
+// * follow the TNC-2 Monitoring format and mark only the last used, i.e. the station heard.
+
+// I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
+// rather than continuing to propagate historical inconsistencies.
+
+
 static void mon_addrs (int chan, packet_t pp, char *result, int result_size)
 {
 	char src[AX25_MAX_ADDR_LEN];
@@ -986,16 +994,25 @@ static void mon_addrs (int chan, packet_t pp, char *result, int result_size)
 	int num_digi = ax25_get_num_repeaters(pp);
 
 	if (num_digi > 0) {
+	  char via[AX25_MAX_REPEATERS*(AX25_MAX_ADDR_LEN+1)];	// complete via path
+	  strlcpy (via, "", sizeof(via));
 
-	  char via[AX25_MAX_REPEATERS*(AX25_MAX_ADDR_LEN+1)];
-	  char stemp[AX25_MAX_ADDR_LEN+1];
-	  int j;
+	  for (int j = 0; j < num_digi; j++) {
+	    char digiaddr[AX25_MAX_ADDR_LEN];
 
-	  ax25_get_addr_with_ssid (pp, AX25_REPEATER_1, via);
-	  for (j = 1; j < num_digi; j++) {
-	    ax25_get_addr_with_ssid (pp, AX25_REPEATER_1 + j, stemp);
-	    strlcat (via, ",", sizeof(via));
-	    strlcat (via, stemp, sizeof(via));
+	    if (j != 0) {
+	      strlcat (via, ",", sizeof(via));	// comma if not first address
+	    }
+	    ax25_get_addr_with_ssid (pp, AX25_REPEATER_1 + j, digiaddr);
+	    strlcat (via, digiaddr, sizeof(via));
+#if 0  // Mark each used with * as seen in UZ7HO SoundModem.
+	    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
+#else  // Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
+	    if (AX25_REPEATER_1 + j == ax25_get_heard(pp)) {
+#endif
+	      strlcat (via, "*", sizeof(via));
+	    }
+
 	  }
 	  snprintf (result, result_size, " %d:Fm %s To %s Via %s ",
 		chan+1, src, dst, via);
@@ -1413,7 +1430,7 @@ static THREAD_F cmd_listen_thread (void *arg)
 /*
  * Take some precautions to guard against bad data which could cause problems later.
  */
-	if (cmd.hdr.portx < 0 || cmd.hdr.portx >= MAX_CHANS) {
+	if (cmd.hdr.portx < 0 || cmd.hdr.portx >= MAX_TOTAL_CHANS) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("\nInvalid port number, %d, in command '%c', from AGW client application %d.\n",
 			cmd.hdr.portx, cmd.hdr.datakind, client);
@@ -1544,7 +1561,7 @@ static THREAD_F cmd_listen_thread (void *arg)
 		// No other place cares about total number.
 
 		count = 0;
-		for (j=0; j<MAX_CHANS; j++) {
+		for (j=0; j<MAX_TOTAL_CHANS; j++) {
 	          if (save_audio_config_p->chan_medium[j] == MEDIUM_RADIO ||
 	              save_audio_config_p->chan_medium[j] == MEDIUM_IGATE ||
 	              save_audio_config_p->chan_medium[j] == MEDIUM_NETTNC) {
@@ -1553,7 +1570,7 @@ static THREAD_F cmd_listen_thread (void *arg)
 		}
 		snprintf (reply.info, sizeof(reply.info), "%d;", count);
 
-		for (j=0; j<MAX_CHANS; j++) {
+		for (j=0; j<MAX_TOTAL_CHANS; j++) {
 
 	          switch (save_audio_config_p->chan_medium[j]) {
 
@@ -1752,7 +1769,11 @@ static THREAD_F cmd_listen_thread (void *arg)
 	          break;
 		}
 
-	        ax25_set_info (pp, (unsigned char*)p, data_len - ndigi * 10);
+		// Issue 550: Info part was one byte too long resulting in an extra nul character.
+		// Original calculation was data_len-ndigi*10 but we need to subtract one
+		// for first byte which is number of digipeaters.
+	        ax25_set_info (pp, (unsigned char*)p, data_len - ndigi * 10 - 1);
+
 	        // Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 	        ax25_set_pid (pp, pid);
 
@@ -1850,7 +1871,7 @@ static THREAD_F cmd_listen_thread (void *arg)
 
 	        // Connected mode can only be used with internal modems.
 
-		if (chan >= 0 && chan < MAX_CHANS && save_audio_config_p->chan_medium[chan] == MEDIUM_RADIO) {
+		if (chan >= 0 && chan < MAX_RADIO_CHANS && save_audio_config_p->chan_medium[chan] == MEDIUM_RADIO) {
 		  ok = 1;
 	          dlq_register_callsign (cmd.hdr.call_from, chan, client);
 	        }
@@ -1879,7 +1900,7 @@ static THREAD_F cmd_listen_thread (void *arg)
 
 	        // Connected mode can only be used with internal modems.
 
-		if (chan >= 0 && chan < MAX_CHANS && save_audio_config_p->chan_medium[chan] == MEDIUM_RADIO) {
+		if (chan >= 0 && chan < MAX_RADIO_CHANS && save_audio_config_p->chan_medium[chan] == MEDIUM_RADIO) {
 	          dlq_unregister_callsign (cmd.hdr.call_from, chan, client);
 	        }
 		else {
@@ -2066,7 +2087,7 @@ static THREAD_F cmd_listen_thread (void *arg)
 	        reply.hdr.data_len_NETLE = host2netle(4);
 
 	        int n = 0;
-	        if (cmd.hdr.portx >= 0 && cmd.hdr.portx < MAX_CHANS) {
+	        if (cmd.hdr.portx >= 0 && cmd.hdr.portx < MAX_RADIO_CHANS) {
 	          // Count both normal and expedited in transmit queue for given channel.
 		  n = tq_count (cmd.hdr.portx, -1, "", "", 0);
 		}

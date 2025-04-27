@@ -210,6 +210,7 @@ if (C_CLANG OR C_GCC)
   # TODO:
   # Try error checking -fsanitize=bounds-strict -fsanitize=leak
   # Requires libubsan and liblsan, respectively.
+  # Maybe -fstack-protector-all, -fstack-check
 
   ###set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Wvla -ffast-math -ftree-vectorize -D_XOPEN_SOURCE=600 -D_DEFAULT_SOURCE ${EXTRA_FLAGS}")
   if(FREEBSD)

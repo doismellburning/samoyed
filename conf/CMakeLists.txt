@@ -25,8 +25,18 @@ string(REGEX REPLACE "^%C%([^\n]*)" "\\1" file_content "${file_content}")
 file(WRITE "${CMAKE_BINARY_DIR}/direwolf.conf" "${file_content}")
 
 # install udev rules for CM108
+# There are two locations.  The one in /etc/udev/rules.d is meant for local customization and
+# takes precedence for the same name.
+# https://sources.debian.org/src/direwolf/1.7+dfsg-2/debian/patches/lib-udev-rules/
+# says that we should use the /usr/lib/udev/rules.d location when building a package.
+# TODO:  I think the proper solution is to select the location based on whether
+# the application installation location is /usr/local or /usr.
 if(LINUX)
-  install(FILES "${CUSTOM_CONF_DIR}/99-direwolf-cmedia.rules" DESTINATION /etc/udev/rules.d/)
+  if (CMAKE_INSTALL_PREFIX STREQUAL "/usr/local") 
+    install(FILES "${CUSTOM_CONF_DIR}/99-direwolf-cmedia.rules" DESTINATION /etc/udev/rules.d/)
+  else()
+    install(FILES "${CUSTOM_CONF_DIR}/99-direwolf-cmedia.rules" DESTINATION /usr/lib/udev/rules.d/)
+  endif()
 endif()
 
 install(FILES "${CMAKE_BINARY_DIR}/direwolf.conf" DESTINATION ${INSTALL_CONF_DIR})

@@ -16,7 +16,7 @@
 #include <hamlib/rig.h>
 #endif
 
-#include "direwolf.h"		/* for MAX_CHANS used throughout the application. */
+#include "direwolf.h"		/* for MAX_RADIO_CHANS and MAX_TOTAL_CHANS used throughout the application. */
 #include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
 #include "version.h"
 				
@@ -59,7 +59,7 @@ typedef enum retry_e {
 enum medium_e { MEDIUM_NONE = 0,	// Channel is not valid for use.
 		MEDIUM_RADIO,		// Internal modem for radio.
 		MEDIUM_IGATE,		// Access IGate as ordinary channel.
-		MEDIUM_NETTNC };	// Remote network TNC.  (possible future)
+		MEDIUM_NETTNC };	// Remote network TNC.  (new in 1.8)
 
 
 typedef enum sanity_e { SANITY_APRS, SANITY_AX25, SANITY_NONE } sanity_t;
@@ -115,12 +115,6 @@ struct audio_s {
 	float recv_ber;			/* Receive Bit Error Rate (BER). */
 					/* Probability of inverting a bit coming out of the modem. */
 
-	//int fx25_xmit_enable;		/* Enable transmission of FX.25.  */
-					/* See fx25_init.c for explanation of values. */
-					/* Initially this applies to all channels. */
-					/* This should probably be per channel. One step at a time. */
-					/* v1.7 - replaced by layer2_xmit==LAYER2_FX25 */
-
 	int fx25_auto_enable;		/* Turn on FX.25 for current connected mode session */
 					/* under poor conditions. */
 					/* Set to 0 to disable feature. */
@@ -139,9 +133,18 @@ struct audio_s {
 	/* originally a "channel" was always connected to an internal modem. */
 	/* In version 1.6, this is generalized so that a channel (as seen by client application) */
 	/* can be connected to something else.  Initially, this will allow application */
-	/* access to the IGate.  Later we might have network TNCs or other internal functions. */
+	/* access to the IGate.  In version 1.8 we add network KISS TNC. */
+
+	// Watch out for maximum number of channels.
+	//	MAX_CHANS - Originally, this was 6 for internal modem adio channels. Has been phased out.
+	// After adding virtual channels (IGate, network TNC), this is split into two different numbers:
+	//	MAX_RADIO_CHANNELS - For internal modems.
+	//	MAX_TOTAL_CHANNELS - limited by KISS channels/ports.  Needed for digipeating, filtering, etc.
 
 	// Properties for all channels.
+
+	char mycall[MAX_TOTAL_CHANS][AX25_MAX_ADDR_LEN];  /* Call associated with this radio channel. */
+							/* Could all be the same or different. */
 
 	enum medium_e chan_medium[MAX_TOTAL_CHANS];
 					// MEDIUM_NONE for invalid.
@@ -153,6 +156,14 @@ struct audio_s {
 					/* -1 for none. */
 					/* Redundant but it makes things quicker and simpler */
 					/* than always searching thru above. */
+
+	// Applies only to network TNC type channels.
+
+	char nettnc_addr[MAX_TOTAL_CHANS][80];		// Network TNC address:  hostname or IP addr.
+
+	int nettnc_port[MAX_TOTAL_CHANS];		// Network TNC TCP port.
+
+
 
 	/* Properties for each radio channel, common to receive and transmit. */
 	/* Can be different for each radio channel. */
@@ -171,8 +182,6 @@ struct audio_s {
 	    // int audio_source;	// Default would be [0,1,2,3,4,5]
 
 	    // What else should be moved out of structure and enlarged when NETTNC is implemented.  ???
-	    char mycall[AX25_MAX_ADDR_LEN];      /* Call associated with this radio channel. */
-                                	/* Could all be the same or different. */
 
 
 	    enum modem_t { MODEM_AFSK, MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_QPSK, MODEM_8PSK, MODEM_OFF, MODEM_16_QAM, MODEM_64_QAM, MODEM_AIS, MODEM_EAS } modem_type;
@@ -183,7 +192,7 @@ struct audio_s {
 					/* Might try MFJ-2400 / CCITT v.26 / Bell 201 someday. */
 					/* No modem.  Might want this for DTMF only channel. */
 
-	    enum layer2_t { LAYER2_AX25 = 0, LAYER2_FX25, LAYER2_IL2P } layer2_xmit;
+	    enum layer2_t { LAYER2_AX25 = 0, LAYER2_FX25, LAYER2_IL2P } layer2_xmit;	// Must keep in sync with layer2_tx, below.
 
 					// IL2P - New for version 1.7.
 					// New layer 2 with FEC.  Much less overhead than FX.25 but no longer backward compatible.
@@ -381,7 +390,7 @@ struct audio_s {
 
 	    int fulldup;		/* Full Duplex. */
 
-	} achan[MAX_CHANS];
+	} achan[MAX_RADIO_CHANS];
 
 #ifdef USE_HAMLIB
     int rigs;               /* Total number of configured rigs */
@@ -390,6 +399,9 @@ struct audio_s {
 
 };
 
+#if DEMOD_C
+	const static char *layer2_tx[3] = {"AX.25", "FX.25", "IL2P"};	// Must keep in sync with enum layer2_t above.
+#endif
 
 #if __WIN32__
 #define DEFAULT_ADEVICE	""		/* Windows: Empty string = default audio device. */

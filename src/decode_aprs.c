@@ -1,7 +1,7 @@
 //
 //    This file is part of Dire Wolf, an amateur radio packet TNC.
 //
-//    Copyright (C) 2011, 2012, 2013, 2014, 2015, 2017, 2022, 2023  John Langner, WB2OSZ
+//    Copyright (C) 2011, 2012, 2013, 2014, 2015, 2017, 2022, 2023, 2024  John Langner, WB2OSZ
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -206,9 +206,36 @@ void decode_aprs (decode_aprs_t *A, packet_t pp, int quiet, char *third_party_sr
 	A->g_footprint_lon = G_UNKNOWN;
 	A->g_footprint_radius = G_UNKNOWN;
 
-// TODO: Complain if obsolete WIDE or RELAY is found in via path.
 
-// TODO: complain if unused WIDEn is see in path.
+// Check for RFONLY or NOGATE in the destination field.
+// Actual cases observed.
+// W1KU-4>APDW15,W1IMD,WIDE1,KQ1L-8,N3LLO-3,WIDE2*:}EB1EBT-9>NOGATE,TCPIP,W1KU-4*::DF1AKR-9 :73{4
+// NE1CU-10>RFONLY,KB1AEV-15,N3LLO-3,WIDE2*:}W1HS-11>APMI06,TCPIP,NE1CU-10*:T#050,190,039,008,095,20403,00000000
+
+	char atemp[AX25_MAX_ADDR_LEN];
+	ax25_get_addr_no_ssid (pp, AX25_DESTINATION, atemp);
+	if ( ! quiet) {
+	  if (strcmp("RFONLY", atemp) == 0 || strcmp("NOGATE", atemp) == 0) {
+	    text_color_set(DW_COLOR_ERROR);
+	    dw_printf("RFONLY and NOGATE must not appear in the destination address field.\n");
+	    dw_printf("They should appear only at the end of the digi via path.\n");
+	  }
+	}
+
+// Complain if obsolete WIDE or RELAY is found in via path.
+
+	for (int i = 0; i < ax25_get_num_repeaters(pp); i++) {
+	  ax25_get_addr_no_ssid (pp, AX25_REPEATER_1 + i, atemp);
+	  if ( ! quiet) {
+	    if (strcmp("RELAY", atemp) == 0 || strcmp("WIDE", atemp) == 0 || strcmp("TRACE", atemp) == 0) {
+	      text_color_set(DW_COLOR_ERROR);
+	      dw_printf("RELAY, TRACE, and WIDE (not WIDEn) are obsolete.\n");
+	      dw_printf("Modern digipeaters will not recoginize these.\n");
+	    }
+	  }
+	}
+
+// TODO: complain if unused WIDEn-0 is see in path.
 // There is a report of UIDIGI decrementing ssid 1 to 0 and not marking it used.
 // http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2022-May/049397.html
 
@@ -1394,6 +1421,15 @@ static void aprs_mic_e (decode_aprs_t *A, packet_t pp, unsigned char *info, int 
 
 	strlcpy (A->g_data_type_desc, "MIC-E", sizeof(A->g_data_type_desc));
 
+	if (ilen < sizeof(struct aprs_mic_e_s)) {
+	  if ( ! A->g_quiet) {
+	    text_color_set(DW_COLOR_ERROR);
+	    dw_printf("MIC-E format must have at least %d characters in the information part.\n", (int)(sizeof(struct aprs_mic_e_s)));
+	  }
+	  return;
+	}
+	info[ilen] = '\0';
+
 	p = (struct aprs_mic_e_s *)info;
 
 /* Destination is really latitude of form ddmmhh. */
@@ -1622,12 +1658,26 @@ static void aprs_mic_e (decode_aprs_t *A, packet_t pp, unsigned char *info, int 
 
 // The rest is a comment which can have other information cryptically embedded.
 // Remove any trailing CR, which I would argue, violates the protocol spec.
-// It is essential to keep trailing spaces.  e.g. VX-8 suffix is "_ "
+// It is essential to keep trailing spaces.  e.g. VX-8 device id suffix is "_ "
+
+	if (ilen <= sizeof(struct aprs_mic_e_s)) {
+	  // Too short for a comment.  We are finished.
+	  strlcpy (A->g_mfr, "UNKNOWN vendor/model", sizeof(A->g_mfr));
+	  return;
+	}
 
 	char mcomment[256];
-	strlcpy (mcomment, info + sizeof(struct aprs_mic_e_s), sizeof(mcomment));
+	strlcpy (mcomment, ((char*)info) + sizeof(struct aprs_mic_e_s), sizeof(mcomment));
+
+	assert (strlen(mcomment) > 0);
+
 	if (mcomment[strlen(mcomment)-1] == '\r') {
 	  mcomment[strlen(mcomment)-1] = '\0';
+	  if (strlen(mcomment) == 0) {
+	    // Nothing left after removing trailing CR.
+	    strlcpy (A->g_mfr, "UNKNOWN vendor/model", sizeof(A->g_mfr));
+	    return;
+	  }
 	}
 
 /* Now try to pick out manufacturer and other optional items. */
@@ -1642,7 +1692,7 @@ static void aprs_mic_e (decode_aprs_t *A, packet_t pp, unsigned char *info, int 
 // Three base 91 characters followed by }
 
 
-	if (strlen(trimmed) >=4 &&
+	if (strlen(trimmed) >= 4 &&
 			isdigit91(trimmed[0]) &&
 			isdigit91(trimmed[1]) &&
 			isdigit91(trimmed[2]) &&
@@ -3848,7 +3898,7 @@ double get_longitude_9 (char *p, int quiet)
  *
  * Inputs:	p 	- Pointer to first byte.
  *
- * Returns:	time_t data type. (UTC)
+ * Returns:	time_t data type. (UTC)  Zero if error.
  *
  * Description:	
  *
@@ -3917,6 +3967,13 @@ time_t get_timestamp (decode_aprs_t *A, char *p)
 	  char tic;		/* Time indicator character. */
 				/* h = UTC. */
 	} *phms;
+
+	if ( ! (isdigit(p[0]) && isdigit(p[1]) && isdigit(p[2]) && isdigit(p[3]) && isdigit(p[4]) && isdigit(p[5]) &&
+		(p[6] == 'z' || p[6] == '/' || p[6] == 'h'))) {
+	    text_color_set(DW_COLOR_ERROR);
+	    dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n");
+	    return ((time_t)0);
+	}
 
 	struct tm *ptm;
 

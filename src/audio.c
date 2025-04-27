@@ -257,7 +257,7 @@ int audio_open (struct audio_s *pa)
 	  if (pa->adev[a].bits_per_sample == 0)
 	    pa->adev[a].bits_per_sample = DEFAULT_BITS_PER_SAMPLE;
 
-	  for (chan=0; chan<MAX_CHANS; chan++) {
+	  for (chan=0; chan<MAX_RADIO_CHANS; chan++) {
 	    if (pa->achan[chan].mark_freq == 0)
 	      pa->achan[chan].mark_freq = DEFAULT_MARK_FREQ;
 
@@ -1099,7 +1099,12 @@ int audio_get (int a)
 	        dw_printf ("Audio input device %d error code %d: %s\n", a, n, snd_strerror(n));
 
 	        if (n == (-EPIPE)) {
-	          dw_printf ("This is most likely caused by the CPU being too slow to keep up with the audio stream.\n");
+	          dw_printf ("If receiving is fine and strange things happen when transmitting, it is probably RF energy\n"); 
+	          dw_printf ("getting into your audio or digital wiring. This can cause USB to lock up or PTT to get stuck on.\n");
+	          dw_printf ("Move the radio, and especially the antenna, farther away from the computer.\n");
+	          dw_printf ("Use shieled cable and put ferrite beads on the cables to reduce RF going where it is not wanted.\n");
+	          dw_printf ("\n");
+	          dw_printf ("A less likely cause is the CPU being too slow to keep up with the audio stream.\n");
 	          dw_printf ("Use the \"top\" command, in another command window, to look at CPU usage.\n");
 	          dw_printf ("This might be a temporary condition so we will attempt to recover a few times before giving up.\n");
 	          dw_printf ("If using a very slow CPU, try reducing the CPU load by using -P- command\n");

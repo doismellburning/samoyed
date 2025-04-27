@@ -135,6 +135,10 @@ int main (int argc, char *argv[])
 	assert (strcmp(comment_out, "Comment") == 0);
 	assert (strcmp(device, "UNKNOWN vendor/model") == 0);
 
+	deviceid_decode_mice ("", comment_out, sizeof(comment_out), device, sizeof(device));
+	dw_printf ("%s %s\n", comment_out, device);
+	assert (strcmp(comment_out, "") == 0);
+	assert (strcmp(device, "UNKNOWN vendor/model") == 0);
 
 // Tocall
 
@@ -528,7 +532,7 @@ static int mice_cmp (const void *px, const void *py)
 
 void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 {
-	*device = '\0';
+	strlcpy (device, "UNKNOWN vendor/model", device_size);
 
 	if (ptocalls == NULL) {
 	  text_color_set(DW_COLOR_ERROR);
@@ -554,6 +558,7 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 	  }
 	}
 
+// Not found in table.
 	strlcpy (device, "UNKNOWN vendor/model", device_size);
 
 } // end deviceid_decode_dest
@@ -567,16 +572,18 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
  *
  * Inputs:	comment - MIC-E comment that might have vendor/model encoded as
  *			a prefix and/or suffix.
+ *			Any trailing CR has already been removed.
  *
  *		trimmed_size - Amount of space available for result to avoid buffer overflow.
  *
  *		device_size - Amount of space available for result to avoid buffer overflow.
  *
  * Outputs:	trimmed - Final comment with device vendor/model removed.
+ *				This would include any altitude.
  *
  *		device	- Vendor and model.
  *
- * Description:	This has a tortured history.
+ * Description:	MIC-E device identification has a tortured history.
  *
  *		The Kenwood TH-D7A  put ">" at the beginning of the comment.
  *		The Kenwood TM-D700 put "]" at the beginning of the comment.
@@ -592,7 +599,9 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
  *
  * References:	http://www.aprs.org/aprs12/mic-e-types.txt
  *		http://www.aprs.org/aprs12/mic-e-examples.txt
- *
+ *		https://github.com/wb2osz/aprsspec containing:
+ *			APRS Protocol Specification 1.2
+ *			Understanding APRS Packets
  *------------------------------------------------------------------*/
 
 // The strncmp documentation doesn't mention behavior if length is zero.
@@ -610,7 +619,11 @@ static inline int strncmp_z (char *a, char *b, size_t len)
 
 void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, char *device, size_t device_size)
 {
-	*device = '\0';
+	strlcpy (device, "UNKNOWN vendor/model", device_size);
+	strlcpy (trimmed, comment, trimmed_size);
+	if (strlen(comment) < 1) {
+	  return;
+	}
 
 	if (ptocalls == NULL) {
 	  text_color_set(DW_COLOR_ERROR);
@@ -662,6 +675,7 @@ void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, ch
 // Not found.
 
 	strlcpy (device, "UNKNOWN vendor/model", device_size);
+	strlcpy (trimmed, comment, trimmed_size);
 
 } // end deviceid_decode_mice
 
