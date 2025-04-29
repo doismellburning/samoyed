@@ -12,6 +12,8 @@
 
 - New direwolf icon.
 
+- Include the direwolf icon in the Windows executable.  Note:  When building from source, environment variable RC must point to windres location.
+
 ## Version 1.7  --  October 2023
 
 ### New Documentation:

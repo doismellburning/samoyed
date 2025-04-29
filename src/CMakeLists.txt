@@ -128,7 +128,7 @@ if(LINUX)
 
       # icon
       # require plain gcc binary or link
-      #${CMAKE_SOURCE_DIR}/cmake/cpack/direwolf.rc
+      ${CMAKE_SOURCE_DIR}/cmake/cpack/direwolf.rc
       )
     list(REMOVE_ITEM direwolf_SOURCES
       dwgpsd.c
