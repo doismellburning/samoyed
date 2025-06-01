@@ -212,7 +212,7 @@ static void send_packet (char *str)
 
 
 
-int main(int argc, char **argv)
+int gen_packets_main(int argc, char **argv)
 {
 	int c;
 	//int digit_optind = 0;

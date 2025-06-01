@@ -99,7 +99,7 @@ static char * ia_to_text (int  Family, void * pAddr, char * pStringBuf, size_t S
 
 
 
-int main (int argc, char *argv[])
+int ttcalc_main (int argc, char *argv[])
 {
 
 	int server_sock = -1;

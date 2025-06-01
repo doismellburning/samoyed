@@ -5054,7 +5054,7 @@ static void hex_dump (unsigned char *p, int len)
 #define MAXLINE 9000
 #define MAXBYTES 3000
 
-int main (int argc, char *argv[]) 
+int decode_aprs_main (int argc, char *argv[])
 {
 	char stuff[MAXLINE];
 	unsigned char bytes[MAXBYTES];

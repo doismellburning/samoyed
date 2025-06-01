@@ -177,7 +177,7 @@ static void trim (char *stuff)
  *
  *---------------------------------------------------------------*/
 
-int main (int argc, char *argv[])
+int kissutil_main (int argc, char *argv[])
 {
 	text_color_init (0);	// Turn off text color.
 				// It could interfere with trying to pipe stdout to some other application.
@@ -759,6 +759,8 @@ static THREAD_F tnc_listen_serial (void *arg)
  *
  *-----------------------------------------------------------------*/
 
+#ifdef KISSUTIL
+
 void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct kissport_status_s *kps, int client,
 			void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient))
 {
@@ -875,6 +877,8 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 	}
 
 } /* end kiss_process_msg */
+
+#endif  // ifdef KISSUTIL
 
 
 // TODO:  We have multiple copies of this.  Move to some misc file.

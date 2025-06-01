@@ -196,7 +196,7 @@ static int dcd_count = 0;
 static int dcd_missing_errors = 0;
 
 
-int main (int argc, char *argv[])
+int atest_main (int argc, char *argv[])
 {
 
 	int err;

@@ -20,7 +20,7 @@
 static void usage();
 
 
-int main (int argc, char *argv[]) 
+int ll2utm_main (int argc, char *argv[])
 {
 	double easting;
 	double northing;

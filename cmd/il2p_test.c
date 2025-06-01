@@ -50,7 +50,7 @@ static void decode_bitstream(void);
  *--------------------------------------------------------------*/
 
 
-int main ()
+int il2p_test_main ()
 {
 	int enable_color = 1;
 	text_color_init (enable_color);

@@ -264,7 +264,7 @@ static double start_dtime;
 
 static int max_count;
 
-int main (int argc, char *argv[])
+int tnctest_main (int argc, char *argv[])
 {
 	int j;
 	int timeout;

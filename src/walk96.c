@@ -61,7 +61,7 @@ static void walk96 (int fix, double lat, double lon, float knots, float course, 
 
 
 
-int main (int argc, char *argv[])
+int walk96_main (int argc, char *argv[])
 {
 	struct misc_config_s config;
 	char cmd[100];
