@@ -1,5 +1,13 @@
+# crocuta
 
-# Dire Wolf #
+Crocuta is a software "soundcard" modem/TNC and APRS encoder/decoder.
+
+It is based on [Dire Wolf](https://github.com/wb2osz/direwolf),
+ported to Go for increased tooling support,
+and with reduced platform scope to cut complexity.
+
+
+## Dire Wolf
 
 ### Decoded Information from Radio Emissions for Windows Or Linux Fans ###
 
