@@ -1,5 +1,15 @@
+.PHONY: all
+all: crocuta test
 
-all:
+crocuta:
+	go build ./cmd/crocuta
+
+.PHONY: test
+test:
+	go test ./cmd/...
+
+.PHONY: oldhelp
+oldhelp:
 	@echo "The build procedure has changed in version 1.6."
 	@echo "In general, it now looks like this:"
 	@echo " "
