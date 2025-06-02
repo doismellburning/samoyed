@@ -936,14 +936,18 @@ static void test_serdes (void)
 
 // Serializing calls this which then simulates the demodulator output.
 
-void tone_gen_put_bit (int chan, int data)
+void tone_gen_put_bit_fake (int chan, int data)
 {
 	il2p_rec_bit (chan, 0, 0, data);
 }
 
+#ifdef UNITTEST
+#define tone_gen_put_bit tone_gen_put_bit_fake
+#endif
+
 // This is called when a complete frame has been deserialized.
 
-void multi_modem_process_rec_packet (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, retry_t retries, fec_type_t fec_type)
+void multi_modem_process_rec_packet_fake (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, retry_t retries, fec_type_t fec_type)
 {
 	if (rec_count < 0) return;	// Skip check before serdes test.
 
@@ -967,11 +971,19 @@ void multi_modem_process_rec_packet (int chan, int subchan, int slice, packet_t 
 	ax25_delete (pp);
 }
 
-alevel_t demod_get_audio_level (int chan, int subchan)
+#ifdef UNITTEST
+#define multi_modem_process_rec_packet multi_modem_process_rec_packet_fake
+#endif
+
+alevel_t demod_get_audio_level_fake (int chan, int subchan)
 {
 	alevel_t alevel;
 	memset (&alevel, 0, sizeof(alevel));
 	return (alevel);
 }
+
+#ifdef UNITTEST
+#define demod_get_audio_level demod_get_audio_level_fake
+#endif
 
 // end il2p_test.c
