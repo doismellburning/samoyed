@@ -731,7 +731,7 @@ int atest_main (int argc, char *argv[])
  * Simulate sample from the audio device.
  */
 
-int audio_get (int a)
+int audio_get_fake (int a)
 {
 	int ch;
 
@@ -752,13 +752,16 @@ int audio_get (int a)
 	return (ch);
 }
 
+#ifdef ATEST_C
+#define audio_get audio_get_fake
+#endif
 
 
 /*
  * This is called when we have a good frame.
  */
 
-void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum)
+void dlq_rec_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum)
 {	
 	
 	char stemp[500];
@@ -918,8 +921,11 @@ void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alev
 
 } /* end fake dlq_append */
 
+#ifdef ATEST_C
+#define dlq_req_frame dlq_req_frame_fake
+#endif
 
-void ptt_set (int ot, int chan, int ptt_signal)
+void ptt_set_fake (int ot, int chan, int ptt_signal)
 {
 	// Should only get here for DCD output control.
 	static double dcd_start_time[MAX_RADIO_CHANS];
@@ -956,10 +962,18 @@ void ptt_set (int ot, int chan, int ptt_signal)
 	return;
 }
 
-int get_input (int it, int chan)
+#ifdef ATEST_C
+#define ptt_set ptt_set_fake
+#endif
+
+int get_input_fake (int it, int chan)
 {
 	return -1;
 }
+
+#ifdef ATEST_C
+#define get_input get_input_fake
+#endif
 
 static void usage (void) {
 
