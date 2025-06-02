@@ -4,8 +4,15 @@ Samoyed is a software "soundcard" modem/TNC and APRS encoder/decoder.
 
 It is based on [Dire Wolf](https://github.com/wb2osz/direwolf),
 ported to Go for increased tooling support,
-and with reduced platform scope to cut complexity.
+and with reduced platform scope to cut complexity and make it easier to extend.
 
+## Initial Port Goals
+
+* Near-straight port from C to Go with minimal changes except where necessary or practical
+* Improve testing and linting infrastructure to ensure consistency and benefit from tooling support
+* Lean on the Go stdlib to leverage existing tooling
+* Maintain broad-strokes compatibility with Dire Wolf to minimise switching costs
+* Reduce platform compatibility (drop win32 support, possibly Windows and Mac entirely, older versions of Linux etc) to reduce complexity
 
 ## Dire Wolf
 
