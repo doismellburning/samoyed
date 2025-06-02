@@ -139,15 +139,3 @@ jobs:
           if [ "$RUNNER_OS" == "Windows" ] ||  [ "$RUNNER_OS" == "macOS" ]; then
             make package
           fi
-      - name: archive binary
-        uses: actions/upload-artifact@v3
-        with:
-          name: direwolf_${{ matrix.config.os }}_${{ matrix.config.arch }}_${{ github.sha }}
-          path: |
-            ${{github.workspace}}/build/direwolf-*.zip
-            ${{github.workspace}}/build/direwolf.conf
-            ${{github.workspace}}/build/src/*
-            ${{github.workspace}}/build/CMakeCache.txt
-            !${{github.workspace}}/build/src/cmake_install.cmake
-            !${{github.workspace}}/build/src/CMakeFiles
-            !${{github.workspace}}/build/src/Makefile
