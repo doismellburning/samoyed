@@ -23,7 +23,7 @@
 static void usage();
 
 
-int main (int argc, char *argv[]) 
+int utm2ll_main (int argc, char *argv[])
 {
 	double easting;
 	double northing;

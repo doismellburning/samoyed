@@ -202,7 +202,7 @@ static int packet_count[MAX_CLIENTS];
 
 
 
-int main (int argc, char *argv[])
+int aclients_main (int argc, char *argv[])
 {
 	int j;
 	time_t start_time, now, next_print_time;

@@ -129,7 +129,7 @@ static void poll_timing_test (void);
  *---------------------------------------------------------------*/
 
 
-int main (int argc, char *argv[])
+int appserver_main (int argc, char *argv[])
 {
 	int c;
 	char *p;

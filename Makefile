@@ -1,7 +1,10 @@
+C_FILES = $(shell find * -name \*.c)
+GO_FILES = $(shell find * -name \*.go)
+
 .PHONY: all
 all: crocuta test
 
-crocuta:
+crocuta: $(C_FILES) $(GO_FILES)
 	go build ./cmd/crocuta
 
 .PHONY: test

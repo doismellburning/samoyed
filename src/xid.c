@@ -645,7 +645,7 @@ static unsigned char example[27] = {
 	/* PV */	0x03 	/* Parameter Variable - 3 retries */
 };
 
-int main (int argc, char *argv[]) {
+int xid_main (int argc, char *argv[]) {
 
 	struct xid_param_s param;
 	struct xid_param_s param2;

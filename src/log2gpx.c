@@ -56,7 +56,7 @@ static int compar(const void *a, const void *b);
 static void process_things (int first, int last);
 
 
-int main (int argc, char *argv[]) 
+int log2gpx_main (int argc, char *argv[])
 {
 	int first, last;
 	
