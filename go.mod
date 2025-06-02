@@ -1,3 +1,3 @@
-module github.com/doismellburning/crocuta
+module github.com/doismellburning/samoyed
 
 go 1.22.12

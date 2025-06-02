@@ -1,6 +1,6 @@
-# crocuta
+# samoyed
 
-Crocuta is a software "soundcard" modem/TNC and APRS encoder/decoder.
+Samoyed is a software "soundcard" modem/TNC and APRS encoder/decoder.
 
 It is based on [Dire Wolf](https://github.com/wb2osz/direwolf),
 ported to Go for increased tooling support,
