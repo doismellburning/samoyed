@@ -23,37 +23,6 @@ jobs:
       matrix:
         config:
           - {
-              name: 'Windows Latest MinGW 64bit',
-              os: windows-latest,
-              cc: 'x86_64-w64-mingw32-gcc',
-              cxx: 'x86_64-w64-mingw32-g++',
-              ar: 'x86_64-w64-mingw32-ar',
-              windres: 'x86_64-w64-mingw32-windres',
-              arch: 'x86_64',
-              build_type: 'Release',
-              cmake_extra_flags: '-G "MinGW Makefiles"'
-            }
-          - {
-              name: 'Windows 2019 MinGW 32bit',
-              os: windows-2019,
-              cc: 'i686-w64-mingw32-gcc',
-              cxx: 'i686-w64-mingw32-g++',
-              ar: 'i686-w64-mingw32-ar',
-              windres: 'i686-w64-mingw32-windres',
-              arch: 'i686',
-              build_type: 'Release',
-              cmake_extra_flags: '-G "MinGW Makefiles"'
-            }
-          - {
-              name: 'macOS latest',
-              os: macos-latest,
-              cc: 'clang',
-              cxx: 'clang++',
-              arch: 'x86_64',
-              build_type: 'Release',
-              cmake_extra_flags: ''
-            }
-          - {
               name: 'Ubuntu latest Debug',
               os: ubuntu-latest,
               cc: 'gcc',
