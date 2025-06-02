@@ -1012,7 +1012,7 @@ static int audio_file_open (char *fname, struct audio_s *pa)
  *----------------------------------------------------------------*/
 
 
-int audio_put (int a, int c)
+int audio_put_fake (int a, int c)
 {
 	static short sample16;
 	int s;
@@ -1057,11 +1057,19 @@ int audio_put (int a, int c)
 
 } /* end audio_put */
 
+#ifdef UNITTEST
+#define audio_put audio_put_fake
+#endif
 
-int audio_flush (int a)
+
+int audio_flush_fake (int a)
 {
 	return 0;
 }
+
+#ifdef UNITTEST
+#define audio_put audio_put_fake
+#endif
 
 /*------------------------------------------------------------------
  *
@@ -1121,6 +1129,10 @@ static int audio_file_close (void)
 
 #include "hdlc_rec.h"    // for dcd_change
 
-void dcd_change (int chan, int subchan, int slice, int state)
+void dcd_change_fake (int chan, int subchan, int slice, int state)
 {
 }
+
+#ifdef UNITTEST
+#define dcd_change dcd_change_fake
+#endif
