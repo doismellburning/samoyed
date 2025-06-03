@@ -1,6 +1,7 @@
+// Main entrypoint for Samoyed
 package main
 
-import "github.com/doismellburning/samoyed/src"
+import direwolf "github.com/doismellburning/samoyed/src"
 
 func main() {
 	direwolf.Main()
