@@ -13,7 +13,7 @@ test:
 	go test $(SRC_DIRS)
 
 .PHONY: check
-check: vet
+check: vet lint
 
 .PHONY: vet
 vet:
