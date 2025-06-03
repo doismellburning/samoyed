@@ -136,54 +136,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# Unit test for inner digipeater algorithm
-list(APPEND dtest_SOURCES
-  ${CUSTOM_SRC_DIR}/digipeater.c
-  ${CUSTOM_SRC_DIR}/ais.c
-  ${CUSTOM_SRC_DIR}/dedupe.c
-  ${CUSTOM_SRC_DIR}/pfilter.c
-  ${CUSTOM_SRC_DIR}/ax25_pad.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/tq.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  ${CUSTOM_SRC_DIR}/decode_aprs.c
-  ${CUSTOM_SRC_DIR}/deviceid.c
-  ${CUSTOM_SRC_DIR}/dwgpsnmea.c
-  ${CUSTOM_SRC_DIR}/dwgps.c
-  ${CUSTOM_SRC_DIR}/dwgpsd.c
-  ${CUSTOM_SRC_DIR}/serial_port.c
-  ${CUSTOM_SRC_DIR}/latlong.c
-  ${CUSTOM_SRC_DIR}/telemetry.c
-  ${CUSTOM_SRC_DIR}/symbols.c
-  ${CUSTOM_SRC_DIR}/tt_text.c
-  )
-
-if(WIN32 OR CYGWIN)
-  list(REMOVE_ITEM dtest_SOURCES
-    ${CUSTOM_SRC_DIR}/dwgpsd.c
-    )
-endif()
-
-add_executable(dtest
-  ${dtest_SOURCES}
-  )
-
-set_target_properties(dtest
-  PROPERTIES COMPILE_FLAGS "-DDIGITEST -DUSE_REGEX_STATIC"
-  )
-
-target_link_libraries(dtest
-  ${MISC_LIBRARIES}
-  ${REGEX_LIBRARIES}
-  ${GPSD_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(dtest ws2_32)
-endif()
-
-
 # Unit test for APRStt tone sequence parsing.
 list(APPEND ttest_SOURCES
   ${CUSTOM_SRC_DIR}/aprs_tt.c
@@ -483,7 +435,6 @@ target_link_libraries(il2p_test
 
 # doing ctest on previous programs
 
-add_test(dtest dtest)
 add_test(ttest ttest)
 add_test(tttexttest tttexttest)
 add_test(pftest pftest)

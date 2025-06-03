@@ -328,10 +328,6 @@ typedef struct alevel_s {
 } alevel_t;
 
 
-#ifndef AXTEST
-// TODO: remove this?
-#define AX25MEMDEBUG 1
-#endif
 
 
 #if AX25MEMDEBUG	// to investigate a memory leak problem
