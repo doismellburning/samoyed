@@ -5,7 +5,6 @@ Can't use cgo directly in test code, *can* use go code that uses cgo though, so 
 https://github.com/golang/go/issues/4030
 */
 
-
 // #include "direwolf.h"
 // #include <stdlib.h>
 // #include <string.h>
