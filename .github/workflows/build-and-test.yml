@@ -15,3 +15,4 @@ jobs:
       with:
         go-version: "1.22"
     - run: "make all"
+    - run: "make stats"

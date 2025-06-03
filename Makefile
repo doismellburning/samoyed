@@ -28,6 +28,24 @@ vet:
 lint: ./bin/golangci-lint
 	./bin/golangci-lint run $(SRC_DIRS)
 
+.PHONY: stats
+stats:
+	@echo "Code Stats"
+	@echo "=========="
+	@echo ""
+	@echo -n "C (src):      "
+	@find src -name \*.c -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
+	@echo -n "H (src):      "
+	@find src -name \*.h -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
+	@echo -n "C (external): "
+	@find external -name \*.c -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
+	@echo -n "H (external): "
+	@find external -name \*.h -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
+	@echo -n "Go:           "
+	@find * -name \*.go -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
+	@echo -n "CMake:        "
+	@find * -name CMakeLists.txt -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
+
 .PHONY: oldhelp
 oldhelp:
 	@echo "The build procedure has changed in version 1.6."
