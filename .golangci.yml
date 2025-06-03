@@ -2,6 +2,7 @@ version: "2"
 linters:
   default: all
   disable:
+    - "dupword"  # One day
     - "errcheck"  # I appreciate the intent, but I'm not checking errors on fmt.Printf etc.
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines
@@ -43,3 +44,6 @@ formatters:
     - golines
   exclusions:
     warn-unused: true
+  settings:
+    golines:
+      max-len: 200  # Long-ish is ok, let's try to minimise deviation from upstream

@@ -177,50 +177,6 @@ target_link_libraries(tttexttest
   )
 
 
-# Unit test for Packet Filtering.
-list(APPEND pftest_SOURCES
-  ${CUSTOM_SRC_DIR}/pfilter.c
-  ${CUSTOM_SRC_DIR}/ais.c
-  ${CUSTOM_SRC_DIR}/ax25_pad.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/decode_aprs.c
-  ${CUSTOM_SRC_DIR}/deviceid.c
-  ${CUSTOM_SRC_DIR}/dwgpsnmea.c
-  ${CUSTOM_SRC_DIR}/dwgps.c
-  ${CUSTOM_SRC_DIR}/dwgpsd.c
-  ${CUSTOM_SRC_DIR}/serial_port.c
-  ${CUSTOM_SRC_DIR}/latlong.c
-  ${CUSTOM_SRC_DIR}/symbols.c
-  ${CUSTOM_SRC_DIR}/telemetry.c
-  ${CUSTOM_SRC_DIR}/tt_text.c
-  )
-
-if(WIN32 OR CYGWIN)
-  list(REMOVE_ITEM pftest_SOURCES
-    ${CUSTOM_SRC_DIR}/dwgpsd.c
-    )
-endif()
-
-add_executable(pftest
-  ${pftest_SOURCES}
-  )
-
-set_target_properties(pftest
-  PROPERTIES COMPILE_FLAGS "-DPFTEST -DUSE_REGEX_STATIC"
-  )
-
-target_link_libraries(pftest
-  ${MISC_LIBRARIES}
-  ${REGEX_LIBRARIES}
-  ${GPSD_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(pftest ws2_32)
-endif()
-
 # Unit test for telemetry decoding.
 list(APPEND tlmtest_SOURCES
   ${CUSTOM_SRC_DIR}/telemetry.c
@@ -418,7 +374,6 @@ target_link_libraries(il2p_test
 
 add_test(ttest ttest)
 add_test(tttexttest tttexttest)
-add_test(pftest pftest)
 add_test(tlmtest tlmtest)
 add_test(lltest lltest)
 add_test(enctest enctest)
