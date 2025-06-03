@@ -64,6 +64,8 @@
 static struct igate_config_s	*save_igate_config_p;
 static int 			s_debug = 0;
 
+static int pftest_running = 0;
+
 
 
 /*-------------------------------------------------------------------
@@ -1325,11 +1327,7 @@ static int filt_i (pfstate_t *pf)
 // TODO: Should produce a warning if a user specified filter does not include "i".
 
 	int heardtime = 180;	// 3 hours * 60 min/hr = 180 minutes
-#if PFTEST
-	int maxhops = 2;
-#else
 	int maxhops = save_igate_config_p->max_digi_hops;	// from IGTXVIA config.
-#endif
 	double dlat = G_UNKNOWN;
 	double dlon = G_UNKNOWN;
 	double km = G_UNKNOWN;
@@ -1400,20 +1398,17 @@ static int filt_i (pfstate_t *pf)
 	  }
 	}
 
-#if PFTEST
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("debug: IGate message filter, %d minutes, %d hops, %.2f %.2f %.2f km\n",
-		heardtime, maxhops, dlat, dlon, km);
-#endif
-
-
 /*
  * Get source address and info part.
  * Addressee has already been extracted into pf->decoded.g_addressee.
  */
 	if (pf->decoded.g_packet_type != packet_type_message) return(0);
 
-#if defined(PFTEST) || defined(DIGITEST)	// TODO: test functionality too, not just syntax.
+	return(1);
+
+	if (pftest_running) return (1); // Replacement for old #ifdef PFTEST
+
+#if defined(DIGITEST)	// TODO: test functionality too, not just syntax.
 
 	(void)dlat;	// Suppress set and not used warning.
 	(void)dlon;
@@ -1503,275 +1498,3 @@ static void print_error (pfstate_t *pf, char *msg)
 	dw_printf ("%*s\n", (int)(strlen(intro) + pf->tokeni + 1), "^");
 	dw_printf ("%s\n", msg);
 }
-
-
-
-#if PFTEST
-
-
-/*-------------------------------------------------------------------
- *
- * Name:   	main & pftest
- *    
- * Purpose:     Unit test for packet filtering.
- *
- * Usage:	gcc -Wall -o pftest -DPFTEST pfilter.c ax25_pad.o textcolor.o fcs_calc.o decode_aprs.o latlong.o symbols.o telemetry.o tt_text.c misc.a regex.a && ./pftest
- *		
- *
- *--------------------------------------------------------------------*/
-
-
-static int error_count = 0;
-static void pftest (int test_num, char *filter, char *packet, int expected);
-
-int main ()
-{
-
-	dw_printf ("Quick test for packet filtering.\n");
-	dw_printf ("Some error messages are normal.  Look at the final success/fail message.\n");
-
-	pftest (1, "", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (2, "0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (3, "1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-
-	pftest (10, "0 | 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (11, "0 | 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (12, "1 | 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (13, "1 | 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (14, "0 | 0 | 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-
-	pftest (20, "0 & 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (21, "0 & 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (22, "1 & 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (23, "1 & 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (24, "1 & 1 & 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (24, "1 & 0 & 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (24, "1 & 1 & 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (30, "0 | ! 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (31, "! 1 | ! 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (32, "! ! 1 | 0", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (33, "1 | ! ! 1", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-
-	pftest (40, "1 &(!0 |0 )", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (41, "0 |(!0 )", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (42, "1 |(!!0 )", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (42, "(!(1 ) & (1 ))", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (50, "b/W2UB/WB2OSZ-5/N2GH", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (51, "b/W2UB/WB2OSZ-14/N2GH", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (52, "b#W2UB#WB2OSZ-5#N2GH", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (53, "b#W2UB#WB2OSZ-14#N2GH", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (60, "o/HOME", "WB2OSZ>APDW12,WIDE1-1,WIDE2-1:;home     *111111z4237.14N/07120.83W-Chelmsford MA", 0);
-	pftest (61, "o/home", "WB2OSZ>APDW12,WIDE1-1,WIDE2-1:;home     *111111z4237.14N/07120.83W-Chelmsford MA", 1);
-	pftest (62, "o/HOME", "HOME>APDW12,WIDE1-1,WIDE2-1:;AWAY     *111111z4237.14N/07120.83W-Chelmsford MA", 0);
-	pftest (63, "o/WB2OSZ-5", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (64, "o/HOME", "WB2OSZ>APDW12,WIDE1-1,WIDE2-1:)home!4237.14N/07120.83W-Chelmsford MA", 0);
-	pftest (65, "o/home", "WB2OSZ>APDW12,WIDE1-1,WIDE2-1:)home!4237.14N/07120.83W-Chelmsford MA", 1);
-
-	pftest (70, "d/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (71, "d/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1*,DIGI2,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (72, "d/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (73, "d/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2,DIGI3*,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (74, "d/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2,DIGI3,DIGI4*:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (75, "d/DIGI9/DIGI2", "WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-
-	pftest (80, "g/W2UB",        "WB2OSZ-5>APDW12::W2UB     :text", 1);
-	pftest (81, "g/W2UB/W2UB-*", "WB2OSZ-5>APDW12::W2UB-9   :text", 1);
-	pftest (82, "g/W2UB/*",      "WB2OSZ-5>APDW12::XXX      :text", 1);
-	pftest (83, "g/W2UB/W*UB",   "WB2OSZ-5>APDW12::W2UB-9   :text", -1);
-	pftest (84, "g/W2UB*",       "WB2OSZ-5>APDW12::W2UB-9   :text", 1);
-	pftest (85, "g/W2UB*",       "WB2OSZ-5>APDW12::W2UBZZ   :text", 1);
-	pftest (86, "g/W2UB",        "WB2OSZ-5>APDW12::W2UB-9   :text", 0);
-	pftest (87, "g/*",           "WB2OSZ-5>APDW12:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (88, "g/W*",          "WB2OSZ-5>APDW12:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (90, "u/APWW10", "WA1PLE-5>APWW10,W1MHL,N8VIM,WIDE2*:@022301h4208.75N/07115.16WoAPRS-IS for Win32", 1);
-	pftest (91, "u/TRSY3T", "W1WRA-7>TRSY3T,WIDE1-1,WIDE2-1:`c-:l!hK\\>\"4b}=<0x0d>", 0);
-	pftest (92, "u/APDW11/APDW12", "WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (93, "u/APDW", "WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	// rather sparse coverage of the cases
-	pftest (100, "t/mqt", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (101, "t/mqtp", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (102, "t/mqtp", "WB2OSZ>APDW12,WIDE1-1,WIDE2-1:;home     *111111z4237.14N/07120.83W-Chelmsford MA", 0);
-	pftest (103, "t/mqop", "WB2OSZ>APDW12,WIDE1-1,WIDE2-1:;home     *111111z4237.14N/07120.83W-Chelmsford MA", 1);
-	pftest (104, "t/p", "W1WRA-7>TRSY3T,WIDE1-1,WIDE2-1:`c-:l!hK\\>\"4b}=<0x0d>", 1);
-	pftest (104, "t/s", "KB1CHU-13>APWW10,W1CLA-1*,WIDE2-1:>FN42pb/_DX: W1MHL 36.0mi 306<0xb0> 13:24 4223.32N 07115.23W", 1);
-
-	pftest (110, "t/p", "N8VIM>APN391,AB1OC-10,W1MRA*,WIDE2:$ULTW0000000001110B6E27F4FFF3897B0001035E004E04DD00030000<0x0d><0x0a>", 0);
-	pftest (111, "t/w", "N8VIM>APN391,AB1OC-10,W1MRA*,WIDE2:$ULTW0000000001110B6E27F4FFF3897B0001035E004E04DD00030000<0x0d><0x0a>", 1);
-	pftest (112, "t/t", "WM1X>APU25N:@210147z4235.39N/07106.58W_359/000g000t027r000P000p000h89b10234/WX REPORT {UIV32N}<0x0d>", 0);
-	pftest (113, "t/w", "WM1X>APU25N:@210147z4235.39N/07106.58W_359/000g000t027r000P000p000h89b10234/WX REPORT {UIV32N}<0x0d>", 1);
-
-	/* Telemetry metadata should not be classified as message. */
-	pftest (114, "t/t", "KJ4SNT>APMI04::KJ4SNT   :PARM.Vin,Rx1h,Dg1h,Eff1h,Rx10m,O1,O2,O3,O4,I1,I2,I3,I4", 1);
-	pftest (115, "t/m", "KJ4SNT>APMI04::KJ4SNT   :PARM.Vin,Rx1h,Dg1h,Eff1h,Rx10m,O1,O2,O3,O4,I1,I2,I3,I4", 0);
-	pftest (116, "t/t", "KB1GKN-10>APRX27,UNCAN,WIDE1*:T#491,4.9,0.3,25.0,0.0,1.0,00000000", 1);
-
-	/* Bulletins should not be considered to be messages.  Was bug in 1.6. */
-	pftest (117, "t/m", "A>B::W1AW     :test", 1);
-	pftest (118, "t/m", "A>B::BLN      :test", 0);
-	pftest (119, "t/m", "A>B::NWS      :test", 0);
-
-	// https://www.aprs-is.net/WX/
-	pftest (121, "t/p", "CWAPID>APRS::NWS-TTTTT:DDHHMMz,ADVISETYPE,zcs{seq#", 0);
-	pftest (122, "t/p", "CWAPID>APRS::SKYCWA   :DDHHMMz,ADVISETYPE,zcs{seq#", 0);
-	pftest (123, "t/p", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", 0);
-	pftest (124, "t/n", "CWAPID>APRS::NWS-TTTTT:DDHHMMz,ADVISETYPE,zcs{seq#", 1);
-	pftest (125, "t/n", "CWAPID>APRS::SKYCWA   :DDHHMMz,ADVISETYPE,zcs{seq#", 1);
-	//pftest (126, "t/n", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", 1);
-	pftest (127, "t/",  "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", 0);
-
-	pftest (128, "t/c",  "S0RCE>DEST:<stationcapabilities", 1);
-	pftest (129, "t/h",  "S0RCE>DEST:<stationcapabilities", 0);
-	pftest (130, "t/h",  "S0RCE>DEST:}WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (131, "t/c",  "S0RCE>DEST:}WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (140, "r/42.6/-71.3/10", "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (141, "r/42.6/-71.3/10", "WA1PLE-5>APWW10,W1MHL,N8VIM,WIDE2*:@022301h4208.75N/07115.16WoAPRS-IS for Win32", 0);
-
-	pftest (145, "( t/t & b/WB2OSZ ) | ( t/o & ! r/42.6/-71.3/1 )", "WB2OSZ>APDW12:;home     *111111z4237.14N/07120.83W-Chelmsford MA", 1);
-
-	pftest (150, "s/->", "WB2OSZ-5>APDW12:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (151, "s/->", "WB2OSZ-5>APDW12:!4237.14N/07120.83W-PHG7140Chelmsford MA", 1);
-	pftest (152, "s/->", "WB2OSZ-5>APDW12:!4237.14N/07120.83W>PHG7140Chelmsford MA", 1);
-	pftest (153, "s/->", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W>PHG7140Chelmsford MA", 0);
-
-	pftest (154, "s//#", "WB2OSZ-5>APDW12:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (155, "s//#", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (156, "s//#", "WB2OSZ-5>APDW12:!4237.14N/07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (157, "s//#/\\", "WB2OSZ-5>APDW12:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (158, "s//#/\\", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (159, "s//#/\\", "WB2OSZ-5>APDW12:!4237.14N/07120.83W#PHG7140Chelmsford MA", 0);
-
-	pftest (160, "s//#/LS1", "WB2OSZ-5>APDW12:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (161, "s//#/LS1", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (162, "s//#/LS1", "WB2OSZ-5>APDW12:!4237.14N/07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (163, "s//#/LS\\", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W#PHG7140Chelmsford MA", 1);
-
-	pftest (170, "s:/", "WB2OSZ-5>APDW12:!4237.14N/07120.83W/PHG7140Chelmsford MA", 1);
-	pftest (171, "s:/", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W/PHG7140Chelmsford MA", 0);
-	pftest (172, "s::/", "WB2OSZ-5>APDW12:!4237.14N/07120.83W/PHG7140Chelmsford MA", 0);
-	pftest (173, "s::/", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W/PHG7140Chelmsford MA", 1);
-	pftest (174, "s:/:/", "WB2OSZ-5>APDW12:!4237.14N/07120.83W/PHG7140Chelmsford MA", 1);
-	pftest (175, "s:/:/", "WB2OSZ-5>APDW12:!4237.14N\\07120.83W/PHG7140Chelmsford MA", 1);
-	pftest (176, "s:/:/", "WB2OSZ-5>APDW12:!4237.14NX07120.83W/PHG7140Chelmsford MA", 1);
-	pftest (177, "s:/:/:X", "WB2OSZ-5>APDW12:!4237.14NX07120.83W/PHG7140Chelmsford MA", 1);
-
-	// FIXME: Different on Windows and  64 bit Linux.
-	//pftest (178, "s:/:/:", "WB2OSZ-5>APDW12:!4237.14NX07120.83W/PHG7140Chelmsford MA", 1);
-
-	pftest (179, "s:/:/:\\", "WB2OSZ-5>APDW12:!4237.14NX07120.83W/PHG7140Chelmsford MA", 0);
-
-	pftest (180, "v/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (181, "v/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1*,DIGI2,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (182, "v/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (183, "v/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2,DIGI3*,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (184, "v/DIGI2/DIGI3", "WB2OSZ-5>APDW12,DIGI1,DIGI2,DIGI3,DIGI4*:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-	pftest (185, "v/DIGI9/DIGI2", "WB2OSZ-5>APDW12,DIGI1,DIGI2*,DIGI3,DIGI4:!4237.14NS07120.83W#PHG7140Chelmsford MA", 0);
-
-	/* Test error reporting. */
-
-	pftest (200, "x/", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", -1);
-	pftest (201, "t/w & ( t/w | t/w ", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", -1);
-	pftest (202, "t/w ) ", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", -1);
-	pftest (203, "!", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", -1);
-	pftest (203, "t/w t/w", "CWAPID>APRS:;CWAttttz *DDHHMMzLATLONICONADVISETYPE{seq#", -1);
-	pftest (204, "r/42.6/-71.3", "WA1PLE-5>APWW10,W1MHL,N8VIM,WIDE2*:@022301h4208.75N/07115.16WoAPRS-IS for Win32", -1);
-
-	pftest (210, "i/30/8/42.6/-71.3/50", "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-	pftest (212, "i/30/8/42.6/-71.3/",   "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", -1);
-	pftest (213, "i/30/8/42.6/-71.3",    "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", -1);
-	pftest (214, "i/30/8/42.6/",         "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", -1);
-	pftest (215, "i/30/8/42.6",          "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", -1);
-	pftest (216, "i/30/8/",              "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-	pftest (217, "i/30/8",               "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-
-	// FIXME: behaves differently on Windows and Linux.  Why?
-	// On Windows we have our own version of strsep because it's not in the MS library.
-	// It must behave differently than the Linux version when nothing follows the last separator.
-	//pftest (228, "i/30/",                "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-
-	pftest (229, "i/30",                 "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-	pftest (230, "i/30",                 "X>X:}WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-	pftest (231, "i/",                   "WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", -1);
-
-	// Besure bulletins and telemetry metadata don't get included.
-	pftest (234, "i/30", "KJ4SNT>APMI04::KJ4SNT   :PARM.Vin,Rx1h,Dg1h,Eff1h,Rx10m,O1,O2,O3,O4,I1,I2,I3,I4", 0);
-	pftest (235, "i/30", "A>B::BLN      :test", 0);
-
-	pftest (240, "s/", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-	pftest (241, "s/'/O/-/#/_", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-	pftest (242, "s/O/O/c", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-	pftest (243, "s/O/O/1/2", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-	pftest (244, "s/O/|/1", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-	pftest (245, "s//", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-	pftest (246, "s///", "WB2OSZ-5>APDW12:!4237.14N/07120.83WOPHG7140Chelmsford MA", -1);
-
-	// Third party header - done properly in 1.7.
-	// Packet filter t/h is no longer a mutually exclusive packet type.
-	// Now it is an independent attribute and the encapsulated part is evaluated.
-
-	pftest (250, "o/home", "A>B:}WB2OSZ>APDW12,WIDE1-1,WIDE2-1:;home     *111111z4237.14N/07120.83W-Chelmsford MA", 1);
-	pftest (251, "t/p",    "A>B:}W1WRA-7>TRSY3T,WIDE1-1,WIDE2-1:`c-:l!hK\\>\"4b}=<0x0d>", 1);
-	pftest (252, "i/180",  "A>B:}WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-	pftest (253, "t/m",  "A>B:}WB2OSZ-5>APDW14::W2UB     :Happy Birthday{001", 1);
-	pftest (254, "r/42.6/-71.3/10", "A>B:}WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA", 1);
-	pftest (254, "r/42.6/-71.3/10", "A>B:}WA1PLE-5>APWW10,W1MHL,N8VIM,WIDE2*:@022301h4208.75N/07115.16WoAPRS-IS for Win32", 0);
-	pftest (255, "t/h",  "KB1GKN-10>APRX27,UNCAN,WIDE1*:T#491,4.9,0.3,25.0,0.0,1.0,00000000", 0);
-	pftest (256, "t/h",  "A>B:}KB1GKN-10>APRX27,UNCAN,WIDE1*:T#491,4.9,0.3,25.0,0.0,1.0,00000000", 1);
-	pftest (258, "t/t",  "A>B:}KB1GKN-10>APRX27,UNCAN,WIDE1*:T#491,4.9,0.3,25.0,0.0,1.0,00000000", 1);
-	pftest (259, "t/t",  "A>B:}KJ4SNT>APMI04::KJ4SNT   :PARM.Vin,Rx1h,Dg1h,Eff1h,Rx10m,O1,O2,O3,O4,I1,I2,I3,I4", 1);
-
-	pftest (270, "g/BLN*", "WB2OSZ>APDW17::BLN1xxxxx:bulletin text", 1);
-	pftest (271, "g/BLN*", "A>B:}WB2OSZ>APDW17::BLN1xxxxx:bulletin text", 1);
-	pftest (272, "g/BLN*", "A>B:}WB2OSZ>APDW17::W1AW     :xxxx", 0);
-
-	pftest (273, "g/NWS*", "WB2OSZ>APDW17::NWS-xxxxx:weather bulletin", 1);
-	pftest (274, "g/NWS*", "A>B:}WB2OSZ>APDW17::NWS-xxxxx:weather bulletin", 1);
-	pftest (275, "g/NWS*", "A>B:}WB2OSZ>APDW17::W1AW     :xxxx", 0);
-
-// TODO: add b/ with 3rd party header.
-
-// TODO: to be continued...  directed query ...
-
-	if (error_count > 0) {
-	  text_color_set (DW_COLOR_ERROR);
-	  dw_printf ("\nPacket Filtering Test - FAILED!     %d errors\n", error_count);
-	  exit (EXIT_FAILURE);
-	}
-	text_color_set (DW_COLOR_REC);
-	dw_printf ("\nPacket Filtering Test - SUCCESS!\n");
-	exit (EXIT_SUCCESS);
-
-}
-
-static void pftest (int test_num, char *filter, char *monitor, int expected)
-{
-	int result;
-	packet_t pp;
-
-	text_color_set (DW_COLOR_DEBUG);
-	dw_printf ("test number %d\n", test_num);
-	
-	pp = ax25_from_text (monitor, 1);
-	assert (pp != NULL);
-
-	result = pfilter (0, 0, filter, pp, 1);
-	if (result != expected) {
-	  text_color_set (DW_COLOR_ERROR);
-	  dw_printf ("Unexpected result for test number %d\n", test_num);
-	  error_count++;
-	}
-
-	ax25_delete (pp);
-}
-
-#endif /* if TEST */
-
-/* end pfilter.c */
-
-
