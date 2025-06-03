@@ -5,6 +5,7 @@ linters:
     - "errcheck"  # I appreciate the intent, but I'm not checking errors on fmt.Printf etc.
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines
+    - "gochecknoglobals"  # One day there will be no globals but I do not expect it will be today
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
     - "lll"  # We have inherited lots of long lines

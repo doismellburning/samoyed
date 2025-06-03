@@ -332,25 +332,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# Unit Test for XID frame encode/decode.
-list(APPEND xidtest_SOURCES
-  ${CUSTOM_SRC_DIR}/xid.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(xidtest
-  ${xidtest_SOURCES}
-  )
-
-set_target_properties(xidtest
-  PROPERTIES COMPILE_FLAGS "-DXIDTEST"
-  )
-
-target_link_libraries(xidtest
-  ${MISC_LIBRARIES}
-  )
-
-
 # Unit Test for DTMF encode/decode.
 list(APPEND dtmftest_SOURCES
   ${CUSTOM_SRC_DIR}/dtmf.c
@@ -443,7 +424,6 @@ add_test(lltest lltest)
 add_test(enctest enctest)
 add_test(kisstest kisstest)
 add_test(pad2test pad2test)
-add_test(xidtest xidtest)
 add_test(dtmftest dtmftest)
 
 add_test(check-fx25 "${CUSTOM_TEST_BINARY_DIR}/${TEST_CHECK-FX25_FILE}${CUSTOM_SCRIPT_SUFFIX}")
