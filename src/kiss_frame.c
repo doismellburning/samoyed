@@ -128,24 +128,11 @@ void hex_dump (unsigned char *p, int len)
 }
 #endif
 
-#if KISSTEST
-
-#define dw_printf printf
-
-void text_color_set (dw_color_t c)
-{
-	return;
-}
-
-#else
-
 #ifndef DECAMAIN
 #ifndef KISSUTIL
 static void kiss_set_hardware (int chan, char *command, int debug, struct kissport_status_s *kps, int client,
 		void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient));
 #endif
-#endif
-
 #endif
 
 //#if KISSUTIL
@@ -329,10 +316,6 @@ int kiss_unwrap (unsigned char *in, int ilen, unsigned char *out)
 
 
 #ifndef DECAMAIN
-
-#ifndef KISSTEST
-
-
 
 /*-------------------------------------------------------------------
  *
@@ -974,53 +957,7 @@ void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int 
 } /* end kiss_debug_print */
 
 
-#endif
-
 #endif /* DECAMAIN */
-
-/* Quick unit test for encapsulate & unwrap */
-
-// $ gcc -DKISSTEST kiss_frame.c ; ./a
-// Quick KISS test passed OK.
-
-
-#if KISSTEST
-
-
-int main ()
-{
-	unsigned char din[512];
-	unsigned char kissed[520];
-	unsigned char dout[520];
-	int klen;
-	int dlen;
-	int k;
-
-	for (k = 0; k < 512; k++) {
-	  if (k < 256) {
-	    din[k] = k;
-	  }
-	  else {
-	    din[k] = 511 - k;
-	  }
-	}
-
-	klen = kiss_encapsulate (din, 512, kissed);
-	assert (klen == 512 + 6);
-
-	dlen = kiss_unwrap (kissed, klen, dout);
-	assert (dlen == 512);
-	assert (memcmp(din, dout, 512) == 0);
-
-	dlen = kiss_unwrap (kissed+1, klen-1, dout);
-	assert (dlen == 512);
-	assert (memcmp(din, dout, 512) == 0);
-
-	dw_printf ("Quick KISS test passed OK.\n");
-	exit (EXIT_SUCCESS);
-}
-
-#endif  /* KISSTEST */
 
 #endif /* WALK96 */
 

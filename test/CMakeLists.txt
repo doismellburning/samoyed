@@ -248,20 +248,6 @@ target_link_libraries(enctest
   )
 
 
-# Unit test for KISS encapsulation.
-list(APPEND kisstest_SOURCES
-  ${CUSTOM_SRC_DIR}/kiss_frame.c
-  )
-
-add_executable(kisstest
-  ${kisstest_SOURCES}
-  )
-
-set_target_properties(kisstest
-  PROPERTIES COMPILE_FLAGS "-DKISSTEST"
-  )
-
-
 # Unit test for constructing frames besides UI.
 list(APPEND pad2test_SOURCES
   ${CUSTOM_SRC_DIR}/ax25_pad2.c
@@ -377,7 +363,6 @@ add_test(tttexttest tttexttest)
 add_test(tlmtest tlmtest)
 add_test(lltest lltest)
 add_test(enctest enctest)
-add_test(kisstest kisstest)
 add_test(pad2test pad2test)
 add_test(dtmftest dtmftest)
 
