@@ -17,4 +17,5 @@ jobs:
     - run: "make stats"
     - run: "make samoyed"
     - run: "make test"
+    - run: "make coveragereport"
     - run: "make check"
