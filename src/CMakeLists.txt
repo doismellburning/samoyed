@@ -172,7 +172,7 @@ target_link_libraries(direwolf
 
 if(WIN32 OR CYGWIN)
   set_target_properties(direwolf
-    PROPERTIES COMPILE_FLAGS "-DUSE_REGEX_STATIC"
+    PROPERTIES COMPILE_FLAGS "-DUSE_REGEX_STATIC -DDIREWOLF_MAIN"
     )
   target_link_libraries(direwolf winmm ws2_32 setupapi)
 endif()
