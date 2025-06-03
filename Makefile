@@ -1,5 +1,6 @@
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
+SRC_DIRS = ./cmd/... ./src/...
 
 .PHONY: all
 all: samoyed test
@@ -9,7 +10,23 @@ samoyed: $(C_FILES) $(GO_FILES)
 
 .PHONY: test
 test:
-	go test ./cmd/...
+	go test $(SRC_DIRS)
+
+.PHONY: check
+check: vet
+
+.PHONY: vet
+vet:
+	go vet $(SRC_DIRS)
+
+./bin/golangci-lint:
+	# This is not pleasant but it's also the/a recommended way of installation and means that we're explicitly pinning version
+	# https://golangci-lint.run/welcome/install/#binaries
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.1.6
+
+.PHONY: lint
+lint: ./bin/golangci-lint
+	./bin/golangci-lint run $(SRC_DIRS)
 
 .PHONY: oldhelp
 oldhelp:
