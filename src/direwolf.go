@@ -12,6 +12,12 @@ import (
 )
 
 // Main just wraps the C Dire Wolf main.
-func Main() {
-	C.direwolf_main(1, nil)
+func Main(args []string) {
+	var argv []*C.char
+
+	for _, arg := range args {
+		argv = append(argv, C.CString(arg))
+	}
+
+	C.direwolf_main(C.int(len(args)), &argv[0])
 }

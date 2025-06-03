@@ -12,6 +12,7 @@ linters:
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
     - "nlreturn"  # Lots of false positives on C code that isn't a return
     - "paralleltest"  # One day, but let's have *working* tests first
+    - "prealloc"  # One day, but not now
     - "testpackage"  # Noble intent, but right now we're doing all sorts of juggling with packages, so let's save this for later
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
     - "wrapcheck"  # Error wrapping is the least of my concerns
