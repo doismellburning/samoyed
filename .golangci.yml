@@ -10,6 +10,7 @@ linters:
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
     - "lll"  # We have inherited lots of long lines
+    - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
     - "nlreturn"  # Lots of false positives on C code that isn't a return
     - "paralleltest"  # One day, but let's have *working* tests first
@@ -18,6 +19,8 @@ linters:
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
     - "wrapcheck"  # Error wrapping is the least of my concerns
   settings:
+    cyclop:
+      max-complexity: 60  # I sure wish this could be lower
     depguard:
       rules:
         main:
@@ -25,10 +28,14 @@ linters:
           deny:
             - pkg: invalid
               desc: Dummy deny because we need a non-empty list
+    gocognit:
+      min-complexity: 60  # I sure wish this could be lower
     gocritic:
       disabled-checks:
         - dupSubExpr  # Too many false positives on cgo code
         - ifElseChain  # Reasonable but effort
+    gocyclo:
+      min-complexity: 60  # I sure wish this could be lower
     nestif:
       min-complexity: 20  # There's lots of upstream complexity, so let's soft-disable this
     revive:
