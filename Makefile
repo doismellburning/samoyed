@@ -9,6 +9,10 @@ all: samoyed test
 samoyed: $(C_FILES) $(GO_FILES)
 	go build ./cmd/samoyed
 
+# FIXME Generalise across cmd
+utm2ll: $(C_FILES) $(GO_FILES)
+	go build ./cmd/utm2ll
+
 .PHONY: test
 test:
 	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
