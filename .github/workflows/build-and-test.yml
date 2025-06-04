@@ -19,3 +19,5 @@ jobs:
     - run: "make test"
     - run: "make coveragereport"
     - run: "make check"
+    - name: "Ensure nothing got fixed (i.e. everything was already fine)"
+      run: "git diff --quiet && git diff --cached --quiet"

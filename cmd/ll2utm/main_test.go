@@ -6,6 +6,7 @@ import "os"
 
 func Example_main() { //nolint:testableexamples
 	os.Args = []string{"ll2utm"}
+
 	main()
 	// TODO Can we do a partial match in the style of Python doctests?
 }
