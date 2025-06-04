@@ -37,6 +37,11 @@ vet:
 lint: ./bin/golangci-lint
 	./bin/golangci-lint run $(SRC_DIRS)
 
+.PHONY: fix
+fix: ./bin/golangci-lint
+	./bin/golangci-lint run --fix $(SRC_DIRS) || true  # golangci-lint will still run other non-fix linters, and fail if it didn't fix everything - I just want best-effort
+
+
 .PHONY: stats
 stats:
 	@echo "Code Stats"
