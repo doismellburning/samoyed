@@ -271,22 +271,6 @@ target_link_libraries(ll2utm
   ${MISC_LIBRARIES}
   )
 
-# utm2ll
-list(APPEND utm2ll_SOURCES
-  utm2ll.c
-  textcolor.c
-  )
-
-add_executable(utm2ll
-  ${utm2ll_SOURCES}
-  )
-
-target_link_libraries(utm2ll
-  ${GEOTRANZ_LIBRARIES}
-  ${MISC_LIBRARIES}
-  )
-
-
 # Convert from log file to GPX.
 # log2gpx
 list(APPEND log2gpx_SOURCES

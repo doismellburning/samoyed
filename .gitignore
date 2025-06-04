@@ -1,5 +1,6 @@
 /samoyed
 /bin
+/utm2ll
 
 # Custom
 *.docx
@@ -55,7 +56,6 @@ log2gpx
 text2tt
 tt2text
 ttcalc
-utm2ll
 
 direwolf.conf
 fsk_fast_filter.h

@@ -28,6 +28,9 @@ linters:
     gocritic:
       disabled-checks:
         - dupSubExpr  # Too many false positives on cgo code
+        - ifElseChain  # Reasonable but effort
+    nestif:
+      min-complexity: 20  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"
