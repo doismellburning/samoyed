@@ -255,22 +255,6 @@ target_link_libraries(tt2text
   )
 
 
-# Convert between Latitude/Longitude and UTM coordinates.
-# ll2utm
-list(APPEND ll2utm_SOURCES
-  ll2utm.c
-  textcolor.c
-  )
-
-add_executable(ll2utm
-  ${ll2utm_SOURCES}
-  )
-
-target_link_libraries(ll2utm
-  ${GEOTRANZ_LIBRARIES}
-  ${MISC_LIBRARIES}
-  )
-
 # Convert from log file to GPX.
 # log2gpx
 list(APPEND log2gpx_SOURCES
