@@ -1,6 +1,7 @@
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SRC_DIRS = ./cmd/... ./src/...
+COVERAGE_FILE = cover.out
 
 .PHONY: all
 all: samoyed test
@@ -10,7 +11,11 @@ samoyed: $(C_FILES) $(GO_FILES)
 
 .PHONY: test
 test:
-	go test $(SRC_DIRS)
+	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
+
+.PHONY: coveragereport
+coveragereport:
+	go tool cover -func=$(COVERAGE_FILE)
 
 .PHONY: check
 check: vet lint
