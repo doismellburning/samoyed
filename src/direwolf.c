@@ -193,7 +193,11 @@ static int q_d_opt = 0;			/* "-q d" Quiet, suppress the printing of description 
 static int A_opt_ais_to_obj = 0;	/* "-A" Convert received AIS to APRS "Object Report." */
 
 
+#ifdef C_BUILD
+int main (int argc, char *argv[])
+#else
 int direwolf_main (int argc, char *argv[])
+#endif
 {
 	int err;
 	//int eof;
