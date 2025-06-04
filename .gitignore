@@ -1,5 +1,6 @@
 /samoyed
 /bin
+/ll2utm
 /utm2ll
 
 # Custom
@@ -51,7 +52,6 @@ decode_aprs
 direwolf
 gen_fff
 gen_packets
-ll2utm
 log2gpx
 text2tt
 tt2text
