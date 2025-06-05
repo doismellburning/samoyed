@@ -51,12 +51,7 @@
 
 
 
-#if DTMF_TEST
-#define TIMEOUT_SEC 1	/* short for unit test below. */
-#define DEBUG 1		// Don't remove this.  We want more output for test.
-#else
 #define TIMEOUT_SEC 5	/* for normal operation. */
-#endif
 
 
 #define NUM_TONES 8

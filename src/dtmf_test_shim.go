@@ -97,22 +97,20 @@ func dtmf_test_main(t *testing.T) {
 	push_button(c, ' ', 50)
 
 	dw_printf("\nTest timeout after inactivity.\n\n")
-	/* For this test we use 1 second. */
-	/* In practice, it will probably more like 5. */
 
 	push_button(c, '1', 250)
 	push_button(c, ' ', 500)
 	push_button(c, '2', 250)
 	push_button(c, ' ', 500)
 	push_button(c, '3', 250)
-	push_button(c, ' ', 1200)
+	push_button(c, ' ', 5200)
 
 	push_button(c, '7', 250)
 	push_button(c, ' ', 500)
 	push_button(c, '8', 250)
 	push_button(c, ' ', 500)
 	push_button(c, '9', 250)
-	push_button(c, ' ', 1200)
+	push_button(c, ' ', 5200)
 
 	/* Check for expected results. */
 
