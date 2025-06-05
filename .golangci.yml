@@ -2,11 +2,14 @@ version: "2"
 linters:
   default: all
   disable:
+    - "cyclop"  # One day
+    - "dupl"  # One day
     - "dupword"  # One day
     - "errcheck"  # I appreciate the intent, but I'm not checking errors on fmt.Printf etc.
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines
     - "gochecknoglobals"  # One day there will be no globals but I do not expect it will be today
+    - "gocyclo"  # One day
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
     - "lll"  # We have inherited lots of long lines

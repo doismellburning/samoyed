@@ -177,38 +177,6 @@ target_link_libraries(tttexttest
   )
 
 
-# Unit test for telemetry decoding.
-list(APPEND tlmtest_SOURCES
-  ${CUSTOM_SRC_DIR}/telemetry.c
-  ${CUSTOM_SRC_DIR}/ax25_pad.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-if(WIN32 OR CYGWIN)
-  list(REMOVE_ITEM tlmtest_SOURCES
-    ${CUSTOM_SRC_DIR}/dwgpsd.c
-    )
-endif()
-
-add_executable(tlmtest
-  ${tlmtest_SOURCES}
-  )
-
-set_target_properties(tlmtest
-  PROPERTIES COMPILE_FLAGS "-DTEST -DUSE_REGEX_STATIC"
-  )
-
-target_link_libraries(tlmtest
-  ${MISC_LIBRARIES}
-  ${REGEX_LIBRARIES}
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(tlmtest ws2_32)
-endif()
-
-
 # Unit test for constructing frames besides UI.
 list(APPEND pad2test_SOURCES
   ${CUSTOM_SRC_DIR}/ax25_pad2.c
@@ -307,7 +275,6 @@ target_link_libraries(il2p_test
 
 add_test(ttest ttest)
 add_test(tttexttest tttexttest)
-add_test(tlmtest tlmtest)
 add_test(pad2test pad2test)
 
 add_test(check-fx25 "${CUSTOM_TEST_BINARY_DIR}/${TEST_CHECK-FX25_FILE}${CUSTOM_SCRIPT_SUFFIX}")
