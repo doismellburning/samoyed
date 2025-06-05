@@ -255,20 +255,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# Unit Test for DTMF encode/decode.
-list(APPEND dtmftest_SOURCES
-  ${CUSTOM_SRC_DIR}/dtmf.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(dtmftest
-  ${dtmftest_SOURCES}
-  )
-
-set_target_properties(dtmftest
-  PROPERTIES COMPILE_FLAGS "-DDTMF_TEST"
-  )
-
 # Unit Test FX.25 algorithm.
 
 list(APPEND fxsend_SOURCES

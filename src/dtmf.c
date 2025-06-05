@@ -51,12 +51,7 @@
 
 
 
-#if DTMF_TEST
-#define TIMEOUT_SEC 1	/* short for unit test below. */
-#define DEBUG 1		// Don't remove this.  We want more output for test.
-#else
 #define TIMEOUT_SEC 5	/* for normal operation. */
-#endif
 
 
 #define NUM_TONES 8
@@ -86,7 +81,7 @@ static struct dd_s {	 /* Separate for each audio channel. */
 static int s_amplitude = 100;	// range of 0 .. 100
 
 
-static void push_button (int chan, char button, int ms);
+void push_button (int chan, char button, int ms);
 
 
 /*------------------------------------------------------------------
@@ -293,9 +288,7 @@ char dtmf_sample (int c, float input)
 
 	    // Update Data Carrier Detect Indicator.
 
-#ifndef DTMF_TEST
 	    dcd_change (c, MAX_SUBCHANS, 0, decoded != ' ');
-#endif
 
 	    /* Reset timeout timer. */
 	    if (decoded != ' ') {
@@ -373,9 +366,8 @@ int dtmf_send (int chan, char *str, int speed, int txdelay, int txtail)
 
 	push_button (chan, ' ', txtail);
 
-#ifndef DTMF_TEST
 	audio_flush(ACHAN2ADEV(chan));
-#endif
+
 	return (txdelay +
 		(int) (1000.0f * (float)strlen(str) / (float)speed + 0.5f) +
 		txtail);
@@ -402,7 +394,7 @@ int dtmf_send (int chan, char *str, int speed, int txdelay, int txtail)
  *
  *----------------------------------------------------------------*/
 
-static void push_button (int chan, char button, int ms)
+void push_button_raw (int chan, char button, int ms, int test_mode)
 {
 	float phasea = 0;
 	float phaseb = 0;
@@ -410,11 +402,11 @@ static void push_button (int chan, char button, int ms)
 	float fb = 0;
 	int i;
 	float dtmf;	// Audio.  Sum of two sine waves.
-#if DTMF_TEST
+
+	// test_mode
 	char x;
 	static char result[100];
 	static int result_len = 0;
-#endif
 
 	switch (button) {
 	  case '1':  fa = dtmf_tones[0]; fb = dtmf_tones[4]; break;
@@ -441,10 +433,8 @@ static void push_button (int chan, char button, int ms)
 	  case 'd':
 	  case 'D':  fa = dtmf_tones[3]; fb = dtmf_tones[7]; break;
 
-#if DTMF_TEST
-
 	  case '?':	/* check result */
-
+	    assert(test_mode);
 	    if (strcmp(result, "123A456B789C*0#D123$789$") == 0) {
 	      text_color_set(DW_COLOR_REC);
 	      dw_printf ("\nSuccess!\n");
@@ -462,7 +452,6 @@ static void push_button (int chan, char button, int ms)
 	      exit (EXIT_FAILURE);
 	    }
 	    break;
-#endif
 	}
 
 	//dw_printf ("push_button (%d, '%c', %d), fa=%.0f, fb=%.0f. %d samples\n", chan, button, ms, fa, fb, (ms*dd[chan].sample_rate)/1000);
@@ -483,117 +472,33 @@ static void push_button (int chan, char button, int ms)
 	    dtmf = 0;
 	  }
 
-#if DTMF_TEST
+	  if (test_mode) {
+	    /* Make sure it is insensitive to signal amplitude. */
+	    /* (Uncomment each of below when testing.) */
 
-	  /* Make sure it is insensitive to signal amplitude. */
-	  /* (Uncomment each of below when testing.) */
+	    x = dtmf_sample (0, dtmf);
+	    //x = dtmf_sample (0, dtmf * 1000);
+	    //x = dtmf_sample (0, dtmf * 0.001);
 
-	  x = dtmf_sample (0, dtmf);
-	  //x = dtmf_sample (0, dtmf * 1000);
-	  //x = dtmf_sample (0, dtmf * 0.001);
+	    if (x != ' ' && x != '.') {
+	      result[result_len] = x;
+	      result_len++;
+	      result[result_len] = '\0';
+	    }
+	  } else {
+	    // 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
+	    // Amplitude of 100 would use full +-32k range.
 
-	  if (x != ' ' && x != '.') {
-	    result[result_len] = x;
-	    result_len++;
-	    result[result_len] = '\0';
+	    int sam = (int)(dtmf * 16383.0f * (float)s_amplitude / 100.0f);
+	    gen_tone_put_sample (chan, ACHAN2ADEV(chan), sam);
 	  }
-#else
-
-	  // 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
-	  // Amplitude of 100 would use full +-32k range.
-
-	  int sam = (int)(dtmf * 16383.0f * (float)s_amplitude / 100.0f);
-	  gen_tone_put_sample (chan, ACHAN2ADEV(chan), sam);
-
-#endif
 	}
 }
 
+void push_button (int chan, char button, int ms) {
+	push_button_raw(chan, button, ms, 0);
+}
 
-/*------------------------------------------------------------------
- *
- * Name:        main
- *
- * Purpose:     Unit test for functions above.
- *
- * Usage:	rm a.exe ; gcc -DDTMF_TEST dtmf.c textcolor.c ; ./a.exe
- *		or
- *		make dtmftest
- *
- *----------------------------------------------------------------*/
-
-#if DTMF_TEST
-
-static struct audio_s my_audio_config;
-
-
-int main ()
-{
-	int c = 0;	// radio channel.
-
-	memset (&my_audio_config, 0, sizeof(my_audio_config));
-	my_audio_config.adev[ACHAN2ADEV(c)].defined = 1;
-	my_audio_config.adev[ACHAN2ADEV(c)].samples_per_sec = 44100;
-	my_audio_config.chan_medium[c] = MEDIUM_RADIO;
-	my_audio_config.achan[c].dtmf_decode = DTMF_DECODE_ON;
-
-	dtmf_init(&my_audio_config, 50);	
-
-	text_color_set(DW_COLOR_INFO);
-	dw_printf ("\nFirst, check all button tone pairs. \n\n");
-	/* Max auto dialing rate is 10 per second. */
-
-	push_button (c,  '1', 50); push_button (c,  ' ', 50);
-	push_button (c,  '2', 50); push_button (c,  ' ', 50);
-	push_button (c,  '3', 50); push_button (c,  ' ', 50);
-	push_button (c,  'A', 50); push_button (c,  ' ', 50);
-
-	push_button (c,  '4', 50); push_button (c,  ' ', 50);
-	push_button (c,  '5', 50); push_button (c,  ' ', 50);
-	push_button (c,  '6', 50); push_button (c,  ' ', 50);
-	push_button (c,  'B', 50); push_button (c,  ' ', 50);
-
-	push_button (c,  '7', 50); push_button (c,  ' ', 50);
-	push_button (c,  '8', 50); push_button (c,  ' ', 50);
-	push_button (c,  '9', 50); push_button (c,  ' ', 50);
-	push_button (c,  'C', 50); push_button (c,  ' ', 50);
-
-	push_button (c,  '*', 50); push_button (c,  ' ', 50);
-	push_button (c,  '0', 50); push_button (c,  ' ', 50);
-	push_button (c,  '#', 50); push_button (c,  ' ', 50);
-	push_button (c,  'D', 50); push_button (c,  ' ', 50);
-
-	text_color_set(DW_COLOR_INFO);
-	dw_printf ("\nShould reject very short pulses.\n\n");
-	
-	push_button (c,  '1', 20); push_button (c,  ' ', 50);
-	push_button (c,  '1', 20); push_button (c,  ' ', 50);
-	push_button (c,  '1', 20); push_button (c,  ' ', 50);
-	push_button (c,  '1', 20); push_button (c,  ' ', 50);
-	push_button (c,  '1', 20); push_button (c,  ' ', 50);
-
-	text_color_set(DW_COLOR_INFO);
-	dw_printf ("\nTest timeout after inactivity.\n\n");
-	/* For this test we use 1 second. */
-	/* In practice, it will probably more like 5. */
-
-	push_button (c,  '1', 250); push_button (c,  ' ', 500);
-	push_button (c,  '2', 250); push_button (c,  ' ', 500);
-	push_button (c,  '3', 250); push_button (c,  ' ', 1200);
-
-	push_button (c,  '7', 250); push_button (c,  ' ', 500);
-	push_button (c,  '8', 250); push_button (c,  ' ', 500);
-	push_button (c,  '9', 250); push_button (c,  ' ', 1200);
-
-	/* Check for expected results. */
-
-	push_button (c,  '?', 0);
-
-	exit (EXIT_SUCCESS);
-
-}  /* end main */
-
-#endif
-
-/* end dtmf.c */
-
+void push_button_test (int chan, char button, int ms) {
+	push_button_raw(chan, button, ms, 1);
+}
