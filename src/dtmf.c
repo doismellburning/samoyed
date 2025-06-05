@@ -288,9 +288,7 @@ char dtmf_sample (int c, float input)
 
 	    // Update Data Carrier Detect Indicator.
 
-#ifndef DTMF_TEST
 	    dcd_change (c, MAX_SUBCHANS, 0, decoded != ' ');
-#endif
 
 	    /* Reset timeout timer. */
 	    if (decoded != ' ') {
@@ -368,9 +366,8 @@ int dtmf_send (int chan, char *str, int speed, int txdelay, int txtail)
 
 	push_button (chan, ' ', txtail);
 
-#ifndef DTMF_TEST
 	audio_flush(ACHAN2ADEV(chan));
-#endif
+
 	return (txdelay +
 		(int) (1000.0f * (float)strlen(str) / (float)speed + 0.5f) +
 		txtail);
