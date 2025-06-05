@@ -170,12 +170,15 @@ target_link_libraries(direwolf
   ${AVAHI_LIBRARIES}
   )
 
+set(DIREWOLF_COMPILE_FLAGS "-DC_BUILD")
 if(WIN32 OR CYGWIN)
-  set_target_properties(direwolf
-    PROPERTIES COMPILE_FLAGS "-DUSE_REGEX_STATIC"
-    )
+  set(DIREWOLF_COMPILE_FLAGS "${DIREWOLF_COMPILE_FLAGS} -DUSE_REGEX_STATIC")
   target_link_libraries(direwolf winmm ws2_32 setupapi)
 endif()
+
+set_target_properties(direwolf
+  PROPERTIES COMPILE_FLAGS "${DIREWOLF_COMPILE_FLAGS}"
+  )
 
 # decode_aprs
 list(APPEND decode_aprs_SOURCES
