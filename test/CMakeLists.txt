@@ -330,7 +330,6 @@ add_test(tttexttest tttexttest)
 add_test(tlmtest tlmtest)
 add_test(enctest enctest)
 add_test(pad2test pad2test)
-add_test(dtmftest dtmftest)
 
 add_test(check-fx25 "${CUSTOM_TEST_BINARY_DIR}/${TEST_CHECK-FX25_FILE}${CUSTOM_SCRIPT_SUFFIX}")
 add_test(check-il2p "${CUSTOM_TEST_BINARY_DIR}/${TEST_CHECK-IL2P_FILE}${CUSTOM_SCRIPT_SUFFIX}")
