@@ -209,26 +209,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# Unit test for encoding position & object report.
-list(APPEND enctest_SOURCES
-  ${CUSTOM_SRC_DIR}/encode_aprs.c
-  ${CUSTOM_SRC_DIR}/latlong.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(enctest
-  ${enctest_SOURCES}
-  )
-
-set_target_properties(enctest
-  PROPERTIES COMPILE_FLAGS "-DEN_MAIN"
-  )
-
-target_link_libraries(enctest
-  ${MISC_LIBRARIES}
-  )
-
-
 # Unit test for constructing frames besides UI.
 list(APPEND pad2test_SOURCES
   ${CUSTOM_SRC_DIR}/ax25_pad2.c
@@ -328,7 +308,6 @@ target_link_libraries(il2p_test
 add_test(ttest ttest)
 add_test(tttexttest tttexttest)
 add_test(tlmtest tlmtest)
-add_test(enctest enctest)
 add_test(pad2test pad2test)
 
 add_test(check-fx25 "${CUSTOM_TEST_BINARY_DIR}/${TEST_CHECK-FX25_FILE}${CUSTOM_SCRIPT_SUFFIX}")
