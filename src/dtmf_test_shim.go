@@ -11,6 +11,7 @@ package direwolf
 // #include "textcolor.h"
 // #include "gen_tone.h"
 // void push_button_test (int chan, char button, int ms);
+// void ptt_init (struct audio_s *p_modem);
 import "C"
 
 import "testing"
@@ -34,6 +35,12 @@ func dtmf_test_main(t *testing.T) {
 	my_audio_config.adev[ACHAN2ADEV(c)].samples_per_sec = 44100
 	my_audio_config.chan_medium[c] = C.MEDIUM_RADIO
 	my_audio_config.achan[c].dtmf_decode = C.DTMF_DECODE_ON
+
+	// Let's try to set up audio?
+	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1
+	my_audio_config.adev[ACHAN2ADEV(c)].bits_per_sample = 8
+	C.gen_tone_init(&my_audio_config, 100, 0)
+	C.ptt_init(&my_audio_config)
 
 	C.dtmf_init(&my_audio_config, C.int(50))
 
