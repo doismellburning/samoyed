@@ -42,28 +42,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# Unit test for APRStt tone sequence parsing.
-list(APPEND ttest_SOURCES
-  ${CUSTOM_SRC_DIR}/aprs_tt.c
-  ${CUSTOM_SRC_DIR}/tt_text.c
-  ${CUSTOM_SRC_DIR}/latlong.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(ttest
-  ${ttest_SOURCES}
-  )
-
-set_target_properties(ttest
-  PROPERTIES COMPILE_FLAGS "-DTT_MAIN"
-  )
-
-target_link_libraries(ttest
-  ${MISC_LIBRARIES}
-  ${GEOTRANZ_LIBRARIES}
-  )
-
-
 # Unit Test FX.25 algorithm.
 
 list(APPEND fxsend_SOURCES
@@ -133,8 +111,6 @@ target_link_libraries(il2p_test
   )
 
 # doing ctest on previous programs
-
-add_test(ttest ttest)
 
 #  -----------------------------  Manual tests and experiments  ---------------------------
 if(OPTIONAL_TEST)
