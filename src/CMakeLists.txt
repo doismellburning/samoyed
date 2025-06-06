@@ -308,71 +308,6 @@ target_link_libraries(gen_packets
   )
 
 
-# Unit test for AFSK demodulator
-# atest
-list(APPEND atest_SOURCES
-  atest.c
-  ais.c
-  demod.c
-  demod_afsk.c
-  demod_psk.c
-  demod_9600.c
-  dsp.c
-  fx25_extract.c
-  fx25_encode.c
-  fx25_init.c
-  fx25_rec.c
-  hdlc_rec.c
-  hdlc_rec2.c
-  il2p_codec.c
-  il2p_scramble.c
-  il2p_rec.c
-  il2p_payload.c
-  il2p_init.c
-  il2p_header.c
-  multi_modem.c
-  rrbb.c
-  fcs_calc.c
-  ax25_pad.c
-  ax25_pad2.c
-  decode_aprs.c
-  deviceid.c
-  dwgpsnmea.c
-  dwgps.c
-  dwgpsd.c
-  serial_port.c
-  telemetry.c
-  dtime_now.c
-  latlong.c
-  symbols.c
-  tt_text.c
-  textcolor.c
-  )
-
-if(WIN32 OR CYGWIN)
-  list(REMOVE_ITEM atest_SOURCES
-    dwgpsd.c
-    )
-endif()
-
-add_executable(atest
-  ${atest_SOURCES}
-  )
-
-target_link_libraries(atest
-  ${MISC_LIBRARIES}
-  ${GPSD_LIBRARIES}
-  ${REGEX_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  set_target_properties(atest
-    PROPERTIES COMPILE_FLAGS "-DUSE_REGEX_STATIC"
-    )
-endif()
-
-
 # Multiple AGWPE network or serial port clients to test TNCs side by side.
 # aclients
 list(APPEND aclients_SOURCES
@@ -552,7 +487,6 @@ install(TARGETS tt2text DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS atest DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS ttcalc DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS kissutil DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS tnctest DESTINATION ${INSTALL_BIN_DIR})

@@ -1244,7 +1244,7 @@ void ptt_init (struct audio_s *audio_config_p)
 // JWL - save status and new get_ptt function.
 
 
-void ptt_set (int ot, int chan, int ptt_signal)
+void ptt_set_real (int ot, int chan, int ptt_signal)
 {
 
 	int ptt = ptt_signal;
@@ -1491,7 +1491,7 @@ void ptt_set (int ot, int chan, int ptt_signal)
  *
  * ------------------------------------------------------------------*/
 
-int get_input (int it, int chan)
+int get_input_real (int it, int chan)
 {
 	assert (it >= 0 && it < NUM_ICTYPES);
 	assert (chan >= 0 && chan < MAX_RADIO_CHANS);

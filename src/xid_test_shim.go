@@ -112,7 +112,7 @@ func xid_test_main(t *testing.T) {
 	n = C.xid_encode(&param, &info[0], C.cr_cmd)
 	assert.Equal(t, C.int(len(xid_example)), n)
 
-	n = C.memcmp(unsafe.Pointer(&info[0]), unsafe.Pointer(&xid_example[0]), 27) //nolint:gocritic
+	n = C.memcmp(unsafe.Pointer(&info[0]), unsafe.Pointer(&xid_example[0]), 27)
 	assert.Equal(t, C.int(0), n)
 
 	/* try a couple different values, no srej. */

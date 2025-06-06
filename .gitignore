@@ -1,5 +1,6 @@
 /samoyed
 /bin
+/atest
 /ll2utm
 /utm2ll
 
@@ -47,7 +48,6 @@ z*
 # Binaries, other build results
 
 aclients
-atest
 decode_aprs
 direwolf
 gen_fff
