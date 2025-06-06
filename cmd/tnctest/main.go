@@ -1,26 +1,45 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2016  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+/* Test AX.25 connected mode between two TNCs */
+package main
+
+//// #cgo CFLAGS: -I../../src -I../../external/geotranz -I../../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0
+//// #cgo LDFLAGS: -lm
+// #include "direwolf.h"
+// #include <stdlib.h>
+// #include <stddef.h>
+// #include <netdb.h>
+// #include <sys/types.h>
+// #include <sys/ioctl.h>
+// #include <sys/socket.h>
+// #include <arpa/inet.h>
+// #include <netinet/in.h>
+// #include <netinet/tcp.h>
+// #include <fcntl.h>
+// //#include <termios.h>
+// #include <sys/errno.h>
+// #include <unistd.h>
+// #include <stdio.h>
+// #include <assert.h>
+// #include <ctype.h>
+// #include <string.h>
+// #include <time.h>
+// //#include "ax25_pad.h"
+// #include "textcolor.h"
+// #include "dtime_now.h"
+// #include "serial_port.h"
+import "C"
+
+import (
+	"fmt"
+	"math"
+	"os"
+	"strconv"
+	"strings"
+
+	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
+)
 
 
 /*------------------------------------------------------------------
- *
- * Module:      tnctest.c
  *
  * Purpose:   	Test AX.25 connected mode between two TNCs.
  *		
@@ -42,46 +61,6 @@
 
 
 
-/*
- * Native Windows:	Use the Winsock interface.
- * Linux:		Use the BSD socket interface.
- */
-
-#include "direwolf.h"		// Sets _WIN32_WINNT for XP API level needed by ws2tcpip.h
-
-#if __WIN32__
-
-#include <winsock2.h>
-#include <ws2tcpip.h>  		// _WIN32_WINNT must be set to 0x0501 before including this
-
-#else 
-
-#include <stdlib.h>
-#include <stddef.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <fcntl.h>
-//#include <termios.h>
-#include <sys/errno.h>
-#endif
-
-#include <unistd.h>
-#include <stdio.h>
-#include <assert.h>
-#include <ctype.h>
-#include <string.h>
-#include <time.h>
-
-
-//#include "ax25_pad.h"
-#include "textcolor.h"
-#include "dtime_now.h"
-#include "serial_port.h"
 
 
 /* We don't deal with big-endian processors here. */
