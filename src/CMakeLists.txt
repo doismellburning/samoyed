@@ -285,29 +285,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# TNC interoperability testing for AX.25 connected mode.
-# tnctest
-list(APPEND tnctest_SOURCES
-  tnctest.c
-  textcolor.c
-  dtime_now.c
-  serial_port.c
-  )
-
-add_executable(tnctest
-  ${tnctest_SOURCES}
-  )
-
-target_link_libraries(tnctest
-  ${MISC_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(tnctest ws2_32)
-endif()
-
-
 # List USB audio adapters than can use GPIO for PTT.
 # Originally for Linux only (using udev).
 # Version 1.7 adds it for Windows.  Uses local hidapi code.
@@ -408,7 +385,6 @@ install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS ttcalc DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS kissutil DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS tnctest DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
 if(UDEV_FOUND OR WIN32 OR CYGWIN OR HIDAPI_FOUND)
   install(TARGETS cm108 DESTINATION ${INSTALL_BIN_DIR})
