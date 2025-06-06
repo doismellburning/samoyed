@@ -1,17 +1,18 @@
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SRC_DIRS = ./cmd/... ./src/...
+CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
 
 .PHONY: all
-all: samoyed test
+all: $(CMDS) test
 
-samoyed: $(C_FILES) $(GO_FILES)
-	go build ./cmd/samoyed
+.PHONY: cmds
+cmds: $(CMDS)
 
-# FIXME Generalise across cmd
-utm2ll: $(C_FILES) $(GO_FILES)
-	go build ./cmd/utm2ll
+# samoyed, ll2utm, etc. etc.
+$(CMDS): $(C_FILES) $(GO_FILES)
+	go build ./cmd/$@/...
 
 .PHONY: test
 test:
