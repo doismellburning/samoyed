@@ -1003,7 +1003,7 @@ static int set_oss_params (int a, int fd, struct audio_s *pa)
 // Use hot attribute for all functions called for every audio sample.
 
 __attribute__((hot))
-int audio_get (int a)
+int audio_get_real (int a)
 {
 	int n;
 #if USE_ALSA

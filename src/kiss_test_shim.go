@@ -44,11 +44,11 @@ func kiss_test_main(t *testing.T) {
 	var dout [520]C.uchar
 	var dlen = C.kiss_unwrap(&kissed[0], klen, &dout[0])
 	assert.Equal(t, C.int(512), dlen)
-	assert.Zero(t, C.memcmp(unsafe.Pointer(&din[0]), unsafe.Pointer(&dout[0]), 512)) //nolint:gocritic
+	assert.Zero(t, C.memcmp(unsafe.Pointer(&din[0]), unsafe.Pointer(&dout[0]), 512))
 
 	dlen = C.kiss_unwrap(&kissed[1], klen-1, &dout[0])
 	assert.Equal(t, C.int(512), dlen)
-	assert.Zero(t, C.memcmp(unsafe.Pointer(&din[0]), unsafe.Pointer(&dout[0]), 512)) //nolint:gocritic
+	assert.Zero(t, C.memcmp(unsafe.Pointer(&din[0]), unsafe.Pointer(&dout[0]), 512))
 
 	dw_printf("Quick KISS test passed OK.\n")
 }

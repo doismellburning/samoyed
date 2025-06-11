@@ -16,6 +16,8 @@ jobs:
         go-version: "1.22"
     - run: "make stats"
     - run: "make cmds"
+    - name: "Install Dire Wolf to test parsing"
+      run: "sudo apt install --yes direwolf"
     - run: "make test"
     - run: "make coveragereport"
     - run: "make check"

@@ -228,7 +228,7 @@ void dlq_init (void)
  *
  *--------------------------------------------------------------------*/
 
-void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum)
+void dlq_rec_frame_real (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum)
 {
 
 	struct dlq_item_s *pnew;
