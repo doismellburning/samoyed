@@ -15,15 +15,26 @@ $(CMDS): $(C_FILES) $(GO_FILES)
 	go build ./cmd/$@/...
 
 .PHONY: test
-test:
+test: gotest test-scripts
+
+.PHONY: gotest
+gotest:
 	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
+
+.PHONY: test-scripts
+test-scripts: $(CMDS)
+	for script in ./test-scripts/*; do $$script; done
 
 .PHONY: coveragereport
 coveragereport:
 	go tool cover -func=$(COVERAGE_FILE)
 
 .PHONY: check
-check: vet lint
+check: vet lint shellcheck
+
+.PHONY: shellcheck
+shellcheck:
+	shellcheck --external-sources test-scripts/* --exclude SC1091
 
 .PHONY: vet
 vet:

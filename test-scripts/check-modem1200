@@ -1,0 +1,11 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+$GEN_PACKETS -n 100 -o test12.wav
+$ATEST -F0 -PA -D1 -L66 -G72 test12.wav
+$ATEST -F1 -PA -D1 -L72 -G78 test12.wav
+$ATEST -F0 -PB -D1 -L66 -G74 test12.wav
+$ATEST -F1 -PB -D1 -L70 -G82 test12.wav

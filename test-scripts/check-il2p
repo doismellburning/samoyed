@@ -1,0 +1,8 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+# FIXME il2p_test
+
