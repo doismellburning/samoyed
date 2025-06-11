@@ -1,0 +1,13 @@
+#!/bin/bash
+
+ATEST="$(dirname "$(realpath "$0")")/../atest"
+export ATEST
+
+GEN_PACKETS=gen_packets  # Upstream for now, until it's ported
+export GEN_PACKETS
+
+function goto_tmpdir() {
+	TMPDIR=$(mktemp --directory)
+	echo "$TMPDIR"
+	cd "$TMPDIR" || exit
+}

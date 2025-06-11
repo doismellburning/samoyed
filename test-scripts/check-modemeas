@@ -1,0 +1,8 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+$GEN_PACKETS -B EAS -o testeas.wav
+$ATEST -B EAS -L 6 -G 6 testeas.wav

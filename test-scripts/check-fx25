@@ -1,0 +1,20 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+# FIXME fxsend
+# FIXME fxrec
+
+$GEN_PACKETS -B9600 -n 100 -X 0 -o test96f0.wav
+$ATEST -B9600 -F0 -L60 -G64 test96f0.wav
+
+$GEN_PACKETS -B9600 -n 100 -X 16 -o test96f16.wav
+$ATEST -B9600 -F0 -L63 -G67 test96f16.wav
+
+$GEN_PACKETS -B9600 -n 100 -X 32 -o test96f32.wav
+$ATEST -B9600 -F0 -L64 -G68 test96f32.wav
+
+$GEN_PACKETS -B9600 -n 100 -X 64 -o test96f64.wav
+$ATEST -B9600 -F0 -L71 -G75 test96f64.wav
