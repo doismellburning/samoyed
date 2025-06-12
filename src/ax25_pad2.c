@@ -302,27 +302,6 @@ packet_t ax25_u_frame (char addrs[AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN], int num_ad
         assert (this_p->magic1 == MAGIC);
         assert (this_p->magic2 == MAGIC);
 
-#if PAD2TEST
-	ax25_frame_type_t check_ftype;
-	cmdres_t check_cr;
-	char check_desc[80];
-	int check_pf;
-	int check_nr;
-	int check_ns;
-
-	check_ftype = ax25_frame_type (this_p, &check_cr, check_desc, &check_pf, &check_nr, &check_ns);
-
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("check: ftype=%d, desc=\"%s\", pf=%d\n", check_ftype, check_desc, check_pf);
-
-	assert (check_cr == cr);
-	assert (check_ftype == ftype);
-	assert (check_pf == pf);
-	assert (check_nr == -1);
-	assert (check_ns == -1);
-
-#endif
-
 	return (this_p);
 
 } /* end ax25_u_frame */
@@ -472,28 +451,6 @@ packet_t ax25_s_frame (char addrs[AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN], int num_ad
         assert (this_p->magic1 == MAGIC);
         assert (this_p->magic2 == MAGIC);
 
-#if PAD2TEST
-
-	ax25_frame_type_t check_ftype;
-	cmdres_t check_cr;
-	char check_desc[80];
-	int check_pf;
-	int check_nr;
-	int check_ns;
-	
-	// todo modulo must be input.
-	check_ftype = ax25_frame_type (this_p, &check_cr, check_desc, &check_pf, &check_nr, &check_ns);
-
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d\n", check_ftype, check_desc, check_pf, check_nr);
-
-	assert (check_cr == cr);
-	assert (check_ftype == ftype);
-	assert (check_pf == pf);
-	assert (check_nr == nr);
-	assert (check_ns == -1);
-
-#endif
 	return (this_p);
 
 } /* end ax25_s_frame */
@@ -628,34 +585,6 @@ packet_t ax25_i_frame (char addrs[AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN], int num_ad
 	assert (p == this_p->frame_data + this_p->frame_len);
         assert (this_p->magic1 == MAGIC);
         assert (this_p->magic2 == MAGIC);
-
-#if PAD2TEST
-
-	ax25_frame_type_t check_ftype;
-	cmdres_t check_cr;
-	char check_desc[80];
-	int check_pf;
-	int check_nr;
-	int check_ns;
-	unsigned char *check_pinfo;
-	int check_info_len;
-
-	check_ftype = ax25_frame_type (this_p, &check_cr, check_desc, &check_pf, &check_nr, &check_ns);
-
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, check_desc, check_pf, check_nr, check_ns);
-
-	check_info_len = ax25_get_info (this_p, &check_pinfo);
-
-	assert (check_cr == cr);
-	assert (check_ftype == frame_type_I);
-	assert (check_pf == pf);
-	assert (check_nr == nr);
-	assert (check_ns == ns);
-
-	assert (check_info_len == info_len);
-	assert (strcmp((char*)check_pinfo,(char*)pinfo) == 0);
-#endif
 
 	return (this_p);
 
