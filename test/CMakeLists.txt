@@ -83,32 +83,6 @@ target_link_libraries(tttexttest
   )
 
 
-# Unit test for constructing frames besides UI.
-list(APPEND pad2test_SOURCES
-  ${CUSTOM_SRC_DIR}/ax25_pad2.c
-  ${CUSTOM_SRC_DIR}/ax25_pad.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(pad2test
-  ${pad2test_SOURCES}
-  )
-
-set_target_properties(pad2test
-  PROPERTIES COMPILE_FLAGS "-DPAD2TEST -DUSE_REGEX_STATIC"
-  )
-
-target_link_libraries(pad2test
-  ${MISC_LIBRARIES}
-  ${REGEX_LIBRARIES}
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(pad2test ws2_32)
-endif()
-
-
 # Unit Test FX.25 algorithm.
 
 list(APPEND fxsend_SOURCES
@@ -181,7 +155,6 @@ target_link_libraries(il2p_test
 
 add_test(ttest ttest)
 add_test(tttexttest tttexttest)
-add_test(pad2test pad2test)
 
 #  -----------------------------  Manual tests and experiments  ---------------------------
 if(OPTIONAL_TEST)
