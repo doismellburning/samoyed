@@ -178,48 +178,48 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 4, ipp.parity_symbols_per_block)
 
 	e = C.il2p_payload_compute(&ipp, 236, 0)
-	assert(ipp.small_block_size == 236)
-	assert(ipp.large_block_size == 237)
-	assert(ipp.large_block_count == 0)
-	assert(ipp.small_block_count == 1)
-	assert(ipp.parity_symbols_per_block == 8)
+	assert.Equal(t, 236, ipp.small_block_size )
+	assert.Equal(t, 237, ipp.large_block_size )
+	assert.Equal(t, 0, ipp.large_block_count )
+	assert.Equal(t, 1, ipp.small_block_count )
+	assert.Equal(t, 8, ipp.parity_symbols_per_block )
 
 	e = C.il2p_payload_compute(&ipp, 512, 0)
-	assert(ipp.small_block_size == 170)
-	assert(ipp.large_block_size == 171)
-	assert(ipp.large_block_count == 2)
-	assert(ipp.small_block_count == 1)
-	assert(ipp.parity_symbols_per_block == 6)
+	assert.Equal(t, 170, ipp.small_block_size )
+	assert.Equal(t, 171, ipp.large_block_size )
+	assert.Equal(t, 2, ipp.large_block_count )
+	assert.Equal(t, 1, ipp.small_block_count )
+	assert.Equal(t, 6, ipp.parity_symbols_per_block )
 
 	e = C.il2p_payload_compute(&ipp, 1023, 0)
-	assert(ipp.small_block_size == 204)
-	assert(ipp.large_block_size == 205)
-	assert(ipp.large_block_count == 3)
-	assert(ipp.small_block_count == 2)
-	assert(ipp.parity_symbols_per_block == 8)
+	assert.Equal(t, 204, ipp.small_block_size )
+	assert.Equal(t, 205, ipp.large_block_size )
+	assert.Equal(t, 3, ipp.large_block_count )
+	assert.Equal(t, 2, ipp.small_block_count )
+	assert.Equal(t, 8, ipp.parity_symbols_per_block )
 
 	// Now try all possible sizes for Baseline FEC Parity.
 
-	for n := 1; n <= IL2P_MAX_PAYLOAD_SIZE; n++ {
-		e = il2p_payload_compute(&ipp, n, 0)
+	for n := C.int(1); n <= C.IL2P_MAX_PAYLOAD_SIZE; n++ {
+		e = C.il2p_payload_compute(&ipp, n, 0)
 		//dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
 		//		ipp.large_block_count, ipp.small_block_count);
 		//fflush (stdout);
 
-		assert(ipp.payload_block_count >= 1 && ipp.payload_block_count <= IL2P_MAX_PAYLOAD_BLOCKS)
-		assert(ipp.payload_block_count == ipp.small_block_count+ipp.large_block_count)
-		assert(ipp.small_block_count*ipp.small_block_size+
-			ipp.large_block_count*ipp.large_block_size == n)
-		assert(ipp.parity_symbols_per_block == 2 ||
+		assert.GreaterOrEqual(t, 1, ipp.payload_block_count)
+		assert.LessOrEqual(t, C.IL2P_MAX_PAYLOAD_BLOCKS, ipp.payload_block_count)
+		assert.Equal(t, ipp.small_block_count + ipp.large_block_count, ipp.payload_block_count)
+		assert.Equal(t, n, ipp.small_block_count*ipp.small_block_size + ipp.large_block_count*ipp.large_block_size)
+		assert.True(t, ipp.parity_symbols_per_block == 2 ||
 			ipp.parity_symbols_per_block == 4 ||
 			ipp.parity_symbols_per_block == 6 ||
 			ipp.parity_symbols_per_block == 8)
 
 		// Data and parity must fit in RS block size of 255.
 		// Size test does not apply if block count is 0.
-		assert(ipp.small_block_count == 0 || ipp.small_block_size+ipp.parity_symbols_per_block <= 255)
-		assert(ipp.large_block_count == 0 || ipp.large_block_size+ipp.parity_symbols_per_block <= 255)
+		assert.True(t, ipp.small_block_count == 0 || ipp.small_block_size+ipp.parity_symbols_per_block <= 255)
+		assert.True(t, ipp.large_block_count == 0 || ipp.large_block_size+ipp.parity_symbols_per_block <= 255)
 	}
 
 	// All sizes for MAX FEC.
@@ -282,7 +282,9 @@ func test_payload(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func test_example_headers() {
+func test_example_headers(t *testing.T) {
+	t.Helper()
+
 	//----------- Example 1:  AX.25 S-Frame   --------------
 
 	//	This frame sample only includes a 15 byte header, without PID field.
@@ -302,7 +304,6 @@ func test_example_headers() {
 	//	IL2P Data After Scrambling and RS Encoding:
 	//	26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e 8a 97
 
-	text_color_set(DW_COLOR_INFO)
 	dw_printf("Example 1: AX.25 S-Frame...\n")
 
 	var example1 []C.uchar = []C.uchar{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
@@ -316,9 +317,9 @@ func test_example_headers() {
 	memset(&alevel, 0, sizeof(alevel))
 
 	var pp = ax25_from_frame(example1, sizeof(example1), alevel)
-	assert(pp != NULL)
+	assert.Nil(t, pp)
 	var e = il2p_type_1_header(pp, 0, header)
-	assert(e == 0)
+	assert.Equal(t, 0, e)
 	ax25_delete(pp)
 
 	//dw_printf ("Example 1 header:\n");
@@ -329,14 +330,14 @@ func test_example_headers() {
 
 	assert(memcmp(header, header1, sizeof(header)) == 0)
 
-	il2p_scramble_block(header, sresult, 13)
+	C.il2p_scramble_block(header, sresult, 13)
 	//dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
 	//for (int i = 0 ; i < sizeof(sresult); i++) {
 	//   dw_printf (" %02x", sresult[i]);
 	//}
 	//dw_printf ("\n");
 
-	il2p_encode_rs(sresult, 13, 2, check)
+	C.il2p_encode_rs(sresult, 13, 2, check)
 
 	//dw_printf ("expect checksum = 8a 97\n");
 	//dw_printf ("check = ");
@@ -349,21 +350,21 @@ func test_example_headers() {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(header, 0)
-	assert(pp != NULL)
+	pp = C.il2p_decode_header_type_1(header, 0)
+	assert.NotNil(t, pp)
 
 	var dst_addr [AX25_MAX_ADDR_LEN]C.char
 	var src_addr [AX25_MAX_ADDR_LEN]C.char
 
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
+	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
+	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
 
 	var cr cmdres_t // command or response.
 	var description [64]C.char
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
 
-	var frame_type = ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
+	var frame_type = C.ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
 
 	dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
