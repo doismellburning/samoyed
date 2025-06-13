@@ -136,7 +136,6 @@ static int tt_debug = 0;
 
 static struct tt_config_s tt_config;
 
-#if TT_MAIN
 #define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
 static struct ttloc_s test_config[] = {
 
@@ -160,7 +159,6 @@ static struct ttloc_s test_config[] = {
 	{ TTLOC_MACRO, "xxyyy", .macro.definition = "B9xx*AB166*AA2B4C5B3B0Ayyy" },
 	{ TTLOC_MACRO, "xxxxzzzzzzzzzz", .macro.definition = "BAxxxx*ACzzzzzzzzzz" },
 }; 
-#endif
 
 
 void aprs_tt_init (struct tt_config_s *p, int debug)
@@ -168,19 +166,20 @@ void aprs_tt_init (struct tt_config_s *p, int debug)
 	int c;
 	tt_debug = debug;
 
-#if TT_MAIN
-	/* For unit testing. */
+	if (p == NULL) {
+		/* For unit testing. */
 
-	memset (&tt_config, 0, sizeof(struct tt_config_s));	
-	tt_config.ttloc_size = NUM_TEST_CONFIG;
-	tt_config.ttloc_ptr = test_config;
-	tt_config.ttloc_len = NUM_TEST_CONFIG;
+		memset (&tt_config, 0, sizeof(struct tt_config_s));
+		tt_config.ttloc_size = NUM_TEST_CONFIG;
+		tt_config.ttloc_ptr = test_config;
+		tt_config.ttloc_len = NUM_TEST_CONFIG;
 
-	/* Don't care about xmit timing or corral here. */
-#else
-	// TODO: Keep ptr instead of making a copy.
-	memcpy (&tt_config, p, sizeof(struct tt_config_s));
-#endif
+		/* Don't care about xmit timing or corral here. */
+	} else {
+		// TODO: Keep ptr instead of making a copy.
+		memcpy (&tt_config, p, sizeof(struct tt_config_s));
+	}
+
 	for (c=0; c<MAX_RADIO_CHANS; c++) {
 	  msg_len[c] = 0;
 	  msg_str[c][0] = '\0';
