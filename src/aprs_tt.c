@@ -218,8 +218,6 @@ void aprs_tt_init (struct tt_config_s *p, int debug)
  *
  *----------------------------------------------------------------*/
 
-#ifndef TT_MAIN
-
 void aprs_tt_button (int chan, char button)
 {
 	static int poll_period = 0;
@@ -278,8 +276,6 @@ void aprs_tt_button (int chan, char button)
 	}	
   
 } /* end aprs_tt_button */
-
-#endif
 
 /*------------------------------------------------------------------
  *
