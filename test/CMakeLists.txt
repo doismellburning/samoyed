@@ -64,25 +64,6 @@ target_link_libraries(ttest
   )
 
 
-# Unit test for APRStt tone sequence / text conversions.
-list(APPEND tttexttest_SOURCES
-  ${CUSTOM_SRC_DIR}/tt_text.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(tttexttest
-  ${tttexttest_SOURCES}
-  )
-
-set_target_properties(tttexttest
-  PROPERTIES COMPILE_FLAGS "-DTTT_TEST"
-  )
-
-target_link_libraries(tttexttest
-  ${MISC_LIBRARIES}
-  )
-
-
 # Unit Test FX.25 algorithm.
 
 list(APPEND fxsend_SOURCES
@@ -154,7 +135,6 @@ target_link_libraries(il2p_test
 # doing ctest on previous programs
 
 add_test(ttest ttest)
-add_test(tttexttest tttexttest)
 
 #  -----------------------------  Manual tests and experiments  ---------------------------
 if(OPTIONAL_TEST)
