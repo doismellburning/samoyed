@@ -106,16 +106,13 @@ static int parse_aprstt3_call (char *e);
 static int parse_location (char *e);
 static int parse_comment (char *e);
 static int expand_macro (char *e);
-#ifndef TT_MAIN
 static void raw_tt_data_to_app (int chan, char *msg);
-#endif
 static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize);
 
-#if TT_MAIN
-static void check_result (void);
-#endif
-
 static int tt_debug = 0;
+
+// Replacement for the TT_MAIN define, to work better with Go, and try to reduce some complexity
+int running_TT_MAIN_tests = 0;
 
 
 /*------------------------------------------------------------------
@@ -134,13 +131,10 @@ static int tt_debug = 0;
  * Description:	The main program needs to call this at application
  *		start up time after reading the configuration file.
  *
- *		TT_MAIN is defined for unit testing.
- *
  *----------------------------------------------------------------*/
 
 static struct tt_config_s tt_config;
 
-#if TT_MAIN
 #define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
 static struct ttloc_s test_config[] = {
 
@@ -164,7 +158,6 @@ static struct ttloc_s test_config[] = {
 	{ TTLOC_MACRO, "xxyyy", .macro.definition = "B9xx*AB166*AA2B4C5B3B0Ayyy" },
 	{ TTLOC_MACRO, "xxxxzzzzzzzzzz", .macro.definition = "BAxxxx*ACzzzzzzzzzz" },
 }; 
-#endif
 
 
 void aprs_tt_init (struct tt_config_s *p, int debug)
@@ -172,19 +165,20 @@ void aprs_tt_init (struct tt_config_s *p, int debug)
 	int c;
 	tt_debug = debug;
 
-#if TT_MAIN
-	/* For unit testing. */
+	if (p == NULL) {
+		/* For unit testing. */
 
-	memset (&tt_config, 0, sizeof(struct tt_config_s));	
-	tt_config.ttloc_size = NUM_TEST_CONFIG;
-	tt_config.ttloc_ptr = test_config;
-	tt_config.ttloc_len = NUM_TEST_CONFIG;
+		memset (&tt_config, 0, sizeof(struct tt_config_s));
+		tt_config.ttloc_size = NUM_TEST_CONFIG;
+		tt_config.ttloc_ptr = test_config;
+		tt_config.ttloc_len = NUM_TEST_CONFIG;
 
-	/* Don't care about xmit timing or corral here. */
-#else
-	// TODO: Keep ptr instead of making a copy.
-	memcpy (&tt_config, p, sizeof(struct tt_config_s));
-#endif
+		/* Don't care about xmit timing or corral here. */
+	} else {
+		// TODO: Keep ptr instead of making a copy.
+		memcpy (&tt_config, p, sizeof(struct tt_config_s));
+	}
+
 	for (c=0; c<MAX_RADIO_CHANS; c++) {
 	  msg_len[c] = 0;
 	  msg_str[c][0] = '\0';
@@ -219,8 +213,6 @@ void aprs_tt_init (struct tt_config_s *p, int debug)
  *		space, between blocks, shouldn't get here.
  *
  *----------------------------------------------------------------*/
-
-#ifndef TT_MAIN
 
 void aprs_tt_button (int chan, char button)
 {
@@ -281,8 +273,6 @@ void aprs_tt_button (int chan, char button)
   
 } /* end aprs_tt_button */
 
-#endif
-
 /*------------------------------------------------------------------
  *
  * Name:        aprs_tt_sequence
@@ -312,7 +302,7 @@ void aprs_tt_button (int chan, char button)
  *
  *----------------------------------------------------------------*/
 
-static char m_callsign[20];	/* really object name */
+char m_callsign[20];	/* really object name */
 
 /*
  * Standard APRStt has symbol code 'A' (box) with overlay of 0-9, A-Z. 
@@ -323,19 +313,19 @@ static char m_callsign[20];	/* really object name */
  *	Alternate table symbol code, overlay of 0-9, A-Z.
  */
 
-static char m_symtab_or_overlay;
-static char m_symbol_code;		// Default 'A'
+char m_symtab_or_overlay;
+char m_symbol_code;		// Default 'A'
 
 static char m_loc_text[24];
-static double m_longitude;		// Set to G_UNKNOWN if not defined.
-static double m_latitude;		// Set to G_UNKNOWN if not defined.
+double m_longitude;		// Set to G_UNKNOWN if not defined.
+double m_latitude;		// Set to G_UNKNOWN if not defined.
 static int m_ambiguity;
-static char m_comment[200];
-static char m_freq[12];
+char m_comment[200];
+char m_freq[12];
 static char m_ctcss[8];
 static char m_mic_e;
-static char m_dao[6];
-static int m_ssid;			// Default 12 for APRStt user.
+char m_dao[6];
+int m_ssid;			// Default 12 for APRStt user.
 
 
 
@@ -384,10 +374,9 @@ void aprs_tt_sequence (int chan, char *msg)
 		m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, m_freq, m_ctcss, m_comment, m_latitude, m_longitude, m_dao);
 #endif
 
-#if TT_MAIN
-	(void)err;		// suppress variable set but not used warning.
-	check_result ();	// for unit testing.
-#else
+	if (running_TT_MAIN_tests) {
+		return;
+	}
 
 /*
  * If digested successfully.  Add to our list of users and schedule transmissions.
@@ -444,9 +433,6 @@ void aprs_tt_sequence (int chan, char *msg)
 	}
 
 	tq_append (chan, TQ_PRIO_0_HI, pp);
-
-#endif  /* ifndef TT_MAIN */
-
 } /* end aprs_tt_sequence */
 
 
@@ -1106,26 +1092,26 @@ static int parse_aprstt3_call (char *e)
 	  char suffix[8];
           if (tt_call5_suffix_to_text(e+2,1,suffix) == 0) {
 
-#if TT_MAIN
-	    /* For unit test, use suffix rather than trying lookup. */
-	    strlcpy (m_callsign, suffix, sizeof(m_callsign));
-#else
-	    char call[12];
+            if (running_TT_MAIN_tests) {
+	      /* For unit test, use suffix rather than trying lookup. */
+	      strlcpy (m_callsign, suffix, sizeof(m_callsign));
+            } else {
+	      char call[12];
 
-	    /* In normal operation, try to find full callsign for the suffix received. */
+	      /* In normal operation, try to find full callsign for the suffix received. */
 
-	    if (tt_3char_suffix_search (suffix, call) >= 0) {
-	      text_color_set(DW_COLOR_INFO);
-	      dw_printf ("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call);
+	      if (tt_3char_suffix_search (suffix, call) >= 0) {
+	        text_color_set(DW_COLOR_INFO);
+	        dw_printf ("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call);
 
-	      strlcpy(m_callsign, call, sizeof(m_callsign));
+	        strlcpy(m_callsign, call, sizeof(m_callsign));
+	      }
+	      else {
+	        text_color_set(DW_COLOR_ERROR);
+	        dw_printf ("Couldn't find full callsign for suffix \"%s\"\n", suffix);
+	        return (TT_ERROR_SUFFIX_NO_CALL);	/* Don't know this user. */
+	      }
 	    }
-	    else {
-	      text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Couldn't find full callsign for suffix \"%s\"\n", suffix);
-	      return (TT_ERROR_SUFFIX_NO_CALL);	/* Don't know this user. */
-	    }
-#endif
 	  }
 	  else {
 	    return (TT_ERROR_INVALID_CALL);	/* Could not convert to text */
@@ -1754,14 +1740,8 @@ static int parse_comment (char *e)
  *
  *----------------------------------------------------------------*/
 
-#ifndef TT_MAIN
-
 static void raw_tt_data_to_app (int chan, char *msg)
 {
-
-#if TT_MAIN
-	return ;
-#else
 	char src[10], dest[10];
 	char raw_tt_msg[256];
 	packet_t pp;
@@ -1806,11 +1786,7 @@ static void raw_tt_data_to_app (int chan, char *msg)
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg);
 	}
-
-#endif
 }
-
-#endif
 
 
 /*------------------------------------------------------------------
@@ -1909,201 +1885,6 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 
 } /* end dw_run_cmd */
 
-
-/*------------------------------------------------------------------
- *
- * Name:        main
- *
- * Purpose:     Unit test for this file.
- *
- * Description:	Run unit test like this:
- *
- *			rm a.exe ; gcc tt_text.c -DTT_MAIN -Igeotranz aprs_tt.c latlong.o textcolor.o geotranz.a misc.a  ; ./a.exe
- *		or
- *			make ttest
- *
- *----------------------------------------------------------------*/
-
-
-#if TT_MAIN
-
-/*
- * Regression test for the parsing.
- * It does not maintain any history so abbreviation will not invoke previous full call.
- */
-
-/* Some examples are derived from http://www.aprs.org/aprstt/aprstt-coding24.txt */
-
-
-static const struct {
-	char *toneseq;		/* Tone sequence in. */
-	
-	char *callsign;		/* Expected results... */
-	char *ssid;
-	char *symbol;
-	char *freq;
-	char *comment;
-	char *lat;
-	char *lon;
-	char *dao;
-} testcases[] = {
-
-  /* Callsigns & abbreviations, traditional */
-
-	{ "A9A2B42A7A7C71#",	"WB4APR", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !" }, 	/* WB4APR/7 */
-	{ "A27773#",		"277",    "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !" }, 	/* abbreviated form */
-
-	/* Intentionally wrong - Has 6 for checksum when it should be 3. */
-	{ "A27776#",		"",       "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* Expect error message. */
-	
-	/* Example in spec is wrong.  checksum should be 5 in this case. */
-	{ "A2A7A7C71#",		"",       "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* Spelled suffix, overlay, checksum */
-	{ "A2A7A7C75#",		"APR",    "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* Spelled suffix, overlay, checksum */
-	{ "A27773#",		"277",    "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* Suffix digits, overlay, checksum */
-
-	{ "A9A2B26C7D9D71#",	"WB2OSZ", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* WB2OSZ/7 numeric overlay */
-	{ "A67979#",		"679",    "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* abbreviated form */
-
-	{ "A9A2B26C7D9D5A9#",	"WB2OSZ", "12", "JA", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* WB2OSZ/J letter overlay */
-	{ "A6795A7#",		"679",    "12", "JA", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* abbreviated form */
-
-	{ "A277#",		"277",    "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },	/* Tactical call "277" no overlay and no checksum */
-
-  /* QIKcom-2 style 10 digit call & 5 digit suffix */
-
-	{ "AC9242771558#", 	"WB4APR", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },
-	{ "AC27722#",		"APR",    "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },
-
-  /* Locations */
-
-	{ "B01*A67979#",	"679",    "12", "7A", "", "", "12.2500", "56.2500", "!T1 !" },
-	{ "B988*A67979#",	"679",    "12", "7A", "", "", "12.5000", "56.5000", "!T88!" },
-
-	{ "B51000125*A67979#",	"679",    "12", "7A", "", "", "52.7907", "0.8309", "!TB5!" },		/* expect about 52.79  +0.83 */
-
-	{ "B5206070*A67979#",	"679",    "12", "7A", "", "", "37.9137", "-81.1366", "!TB5!" },		/* Try to get from Hilltop Tower to Archery & Target Range. */
-													/* Latitude comes out ok, 37.9137 -> 55.82 min. */
-													/* Longitude -81.1254 -> 8.20 min */
-	{ "B21234*A67979#",	"679",    "12", "7A", "", "", "12.3400", "56.1200", "!TB2!" },
-
-	{ "B533686*A67979#",	"679",    "12", "7A", "", "", "37.9222", "81.1143", "!TB5!" },
-
-// TODO: should test other coordinate systems.
-
-  /* Comments */
-
-	{ "C1",			"",       "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },
-	{ "C2",			"",       "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !" },
-	{ "C146520",		"",       "12", "\\A", "146.520MHz", "", "-999999.0000", "-999999.0000", "!T  !" },
-	{ "C7788444222550227776669660333666990122223333",
-	                        "",       "12", "\\A", "", "QUICK BROWN FOX 123", "-999999.0000", "-999999.0000", "!T  !" },
-  /* Macros */
-
-	{ "88345",		"BIKE 345", "0", "/b", "", "", "12.5000", "56.5000", "!T88!" },
-
-  /* 10 digit representation for callsign & satellite grid. WB4APR near 39.5, -77   */
-
-	{ "AC9242771558*BA1819", "WB4APR", "12", "\\A", "", "", "39.5000", "-77.0000", "!TBA!" },
-	{ "18199242771558",	 "WB4APR", "12", "\\A", "", "", "39.5000", "-77.0000", "!TBA!" },
-};
-
-
-static int test_num;
-static int error_count;
-
-static void check_result (void)
-{
-	char stemp[32];
-
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("callsign=\"%s\", ssid=%d, symbol=\"%c%c\", freq=\"%s\", comment=\"%s\", lat=%.4f, lon=%.4f, dao=\"%s\"\n", 
-		m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, m_freq, m_comment, m_latitude, m_longitude, m_dao);
-
-
-	if (strcmp(m_callsign, testcases[test_num].callsign) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for callsign.\n", testcases[test_num].callsign);
-	  error_count++;
-	}
-
-	snprintf (stemp, sizeof(stemp), "%d", m_ssid);
-	if (strcmp(stemp, testcases[test_num].ssid) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for SSID.\n", testcases[test_num].ssid);
-	  error_count++;
-	}
-
-	stemp[0] = m_symtab_or_overlay;
-	stemp[1] = m_symbol_code;
-	stemp[2] = '\0';
-	if (strcmp(stemp, testcases[test_num].symbol) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for Symbol.\n", testcases[test_num].symbol);
-	  error_count++;
-	}
-
-	if (strcmp(m_freq, testcases[test_num].freq) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for Freq.\n", testcases[test_num].freq);
-	  error_count++;
-	}
-
-	if (strcmp(m_comment, testcases[test_num].comment) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for Comment.\n", testcases[test_num].comment);
-	  error_count++;
-	}
-
-	snprintf (stemp, sizeof(stemp), "%.4f", m_latitude);
-	if (strcmp(stemp, testcases[test_num].lat) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for Latitude.\n", testcases[test_num].lat);
-	  error_count++;
-	}
-
-	snprintf (stemp, sizeof(stemp), "%.4f", m_longitude);
-	if (strcmp(stemp, testcases[test_num].lon) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for Longitude.\n", testcases[test_num].lon);
-	  error_count++;
-	}
-
-	if (strcmp(m_dao, testcases[test_num].dao) != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR: Expected \"%s\" for DAO.\n", testcases[test_num].dao);
-	  error_count++;
-	}
-}
-
-
-int main (int argc, char *argv[])
-{
-	aprs_tt_init (NULL, 0);
-
-	error_count = 0;
-
-	for (test_num = 0; test_num < sizeof(testcases) / sizeof(testcases[0]); test_num++) {
-
-	  text_color_set(DW_COLOR_INFO);
-	  dw_printf ("\nTest case %d: %s\n", test_num, testcases[test_num].toneseq);
-
-	  aprs_tt_sequence (0, testcases[test_num].toneseq);
-	}
-
-	if (error_count != 0) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("\n\nTEST FAILED, Total of %d errors.\n", error_count);
-	  return (EXIT_FAILURE);
-	}
-
-	text_color_set(DW_COLOR_REC);
-	dw_printf ("\n\nAll tests passed.\n");
-	return (EXIT_SUCCESS);
-
-}  /* end main */
-
-
-#endif		
 
 /* end aprs_tt.c */
 
