@@ -21,6 +21,11 @@ test: gotest test-scripts
 gotest:
 	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
+# TODO Better output name, non-PHONY target, docs, etc.
+.PHONY: gotest-bin
+gotest-bin:
+	go test -c -gcflags "-N -l" ./src
+
 .PHONY: test-scripts
 test-scripts: $(CMDS)
 	for script in ./test-scripts/*; do $$script; done
