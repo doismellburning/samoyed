@@ -3,8 +3,6 @@
 
 set(GEN_PACKETS_BIN "${CMAKE_BINARY_DIR}/src/gen_packets${CMAKE_EXECUTABLE_SUFFIX}")
 set(ATEST_BIN "${CMAKE_BINARY_DIR}/src/atest${CMAKE_EXECUTABLE_SUFFIX}")
-set(FXSEND_BIN "${CMAKE_BINARY_DIR}/test/fxsend${CMAKE_EXECUTABLE_SUFFIX}")
-set(FXREC_BIN "${CMAKE_BINARY_DIR}/test/fxrec${CMAKE_EXECUTABLE_SUFFIX}")
 set(IL2P_TEST_BIN "${CMAKE_BINARY_DIR}/test/il2p_test${CMAKE_EXECUTABLE_SUFFIX}")
 
 if(WIN32)
@@ -40,41 +38,6 @@ if(WIN32 OR CYGWIN)
     ${CUSTOM_SRC_DIR}/dwgpsd.c
     )
 endif()
-
-
-# Unit Test FX.25 algorithm.
-
-list(APPEND fxsend_SOURCES
-  ${CUSTOM_SRC_DIR}/fx25_send.c
-  ${CUSTOM_SRC_DIR}/fx25_encode.c
-  ${CUSTOM_SRC_DIR}/fx25_init.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(fxsend
-  ${fxsend_SOURCES}
-  )
-
-set_target_properties(fxsend
-  PROPERTIES COMPILE_FLAGS "-DFXTEST"
-  )
-
-list(APPEND fxrec_SOURCES
-  ${CUSTOM_SRC_DIR}/fx25_rec.c
-  ${CUSTOM_SRC_DIR}/fx25_extract.c
-  ${CUSTOM_SRC_DIR}/fx25_init.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(fxrec
-  ${fxrec_SOURCES}
-  )
-
-set_target_properties(fxrec
-  PROPERTIES COMPILE_FLAGS "-DFXTEST"
-  )
 
 
 # Unit Test IL2P with out modems.

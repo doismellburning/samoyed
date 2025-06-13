@@ -31,42 +31,13 @@
 #include "gen_tone.h"
 
 
-//#define FXTEST 1		// To build unit test application.
 
-
-#ifndef FXTEST
 static void send_bytes (int chan, unsigned char *b, int count);
 static void send_bit (int chan, int b);
-#endif
 static int stuff_it (unsigned char *in, int ilen, unsigned char *out, int osize);
 
 
 static int number_of_bits_sent[MAX_RADIO_CHANS];		// Count number of bits sent by "fx25_send_frame" or "???"
-
-
-#if FXTEST
-static unsigned char preload[] = {
-	'T'<<1, 'E'<<1, 'S'<<1, 'T'<<1, ' '<<1, ' '<<1, 0x60,
-	'W'<<1, 'B'<<1, '2'<<1, 'O'<<1, 'S'<<1, 'Z'<<1, 0x63,
-	0x03, 0xf0,
-	'F', 'o', 'o', '?' , 'B', 'a', 'r', '?' ,   //  '?' causes bit stuffing
-	0, 0, 0		// Room for FCS + extra
-}; 
-
-int main ()
-{
-	text_color_set(DW_COLOR_ERROR);
-	dw_printf("fxsend - FX.25 unit test.\n");
-	dw_printf("This generates 11 files named fx01.dat, fx02.dat, ..., fx0b.dat\n");
-	dw_printf("Run fxrec as second part of test.\n");
-
-	fx25_init (3);
-	for (int i = 100 + CTAG_MIN; i <= 100 + CTAG_MAX; i++) {
-	  fx25_send_frame (0, preload, (int)sizeof(preload)-3, i);
-	}
-	exit(EXIT_SUCCESS);
-} // end main
-#endif
 
 
 /*-------------------------------------------------------------
@@ -110,7 +81,7 @@ int main ()
  *
  *--------------------------------------------------------------*/
 
-int fx25_send_frame (int chan, unsigned char *fbuf, int flen, int fx_mode)
+int fx25_send_frame (int chan, unsigned char *fbuf, int flen, int fx_mode, int test_mode)
 {
 	if (fx25_get_debug() >= 3) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -186,50 +157,49 @@ int fx25_send_frame (int chan, unsigned char *fbuf, int flen, int fx_mode)
 	  dw_printf ("------\n");
 	}
 
-#if FXTEST
-	// Standalone text application.
+	if (test_mode) {
+	  // Standalone text application.
 
-	unsigned char flags[16] = { 0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e };
-	char fname[32];
-	snprintf (fname, sizeof(fname), "fx%02x.dat", ctag_num);
-	FILE *fp = fopen(fname, "wb");
-	fwrite (flags, sizeof(flags), 1, fp);
-	//fwrite ((unsigned char *)(&ctag_value), sizeof(ctag_value), 1, fp);	// No - assumes little endian.
-	for (int k = 0; k < 8; k++) {
-	  unsigned char b = (ctag_value >> (k * 8)) & 0xff;	// Should be portable to big endian too.
-	  fwrite (&b, 1, 1, fp);
-	}
+	  unsigned char flags[16] = { 0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e ,0x7e };
+	  char fname[32];
+	  snprintf (fname, sizeof(fname), "fx%02x.dat", ctag_num);
+	  FILE *fp = fopen(fname, "wb");
+	  fwrite (flags, sizeof(flags), 1, fp);
+	  //fwrite ((unsigned char *)(&ctag_value), sizeof(ctag_value), 1, fp);	// No - assumes little endian.
+	  for (int k = 0; k < 8; k++) {
+	    unsigned char b = (ctag_value >> (k * 8)) & 0xff;	// Should be portable to big endian too.
+	    fwrite (&b, 1, 1, fp);
+	  }
 #if 1
-	for (int j = 8; j < 16; j++) {	// Introduce errors.
-	  data[j] = ~ data[j];
-	}
+	  for (int j = 8; j < 16; j++) {	// Introduce errors.
+	    data[j] = ~ data[j];
+	  }
 #endif
-	fwrite (data, k_data_radio, 1, fp);
-	fwrite (check, NROOTS, 1, fp);
-	fwrite (flags, sizeof(flags), 1, fp);
-	fflush(fp);
-	fclose (fp);
-#else
-	// Normal usage.  Send bits to modulator.
+	  fwrite (data, k_data_radio, 1, fp);
+	  fwrite (check, NROOTS, 1, fp);
+	  fwrite (flags, sizeof(flags), 1, fp);
+	  fflush(fp);
+	  fclose (fp);
+	} else {
+	  // Normal usage.  Send bits to modulator.
 
 // Temp hack for testing.  Corrupt first 8 bytes.
 //	for (int j = 0; j < 16; j++) {
 //	  data[j] = ~ data[j];
 //	}
 
-	for (int k = 0; k < 8; k++) {
-	  unsigned char b = (ctag_value >> (k * 8)) & 0xff;
-	  send_bytes (chan, &b, 1);
+	  for (int k = 0; k < 8; k++) {
+	    unsigned char b = (ctag_value >> (k * 8)) & 0xff;
+	    send_bytes (chan, &b, 1);
+	  }
+	  send_bytes (chan, data, k_data_radio);
+	  send_bytes (chan, check, NROOTS);
 	}
-	send_bytes (chan, data, k_data_radio);
-	send_bytes (chan, check, NROOTS);
-#endif
 	
 	return (number_of_bits_sent[chan]);
 }
 
 
-#ifndef FXTEST
 
 static void send_bytes (int chan, unsigned char *b, int count)
 {
@@ -257,7 +227,6 @@ static void send_bit (int chan, int b)
 	tone_gen_put_bit (chan, output[chan]);
 	number_of_bits_sent[chan]++;
 }
-#endif  // FXTEST
 
 
 /*-------------------------------------------------------------

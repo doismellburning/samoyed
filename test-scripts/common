@@ -3,6 +3,11 @@
 ATEST="$(dirname "$(realpath "$0")")/../atest"
 export ATEST
 
+FXSEND="$(dirname "$(realpath "$0")")/../fxsend"
+export FXSEND
+FXREC="$(dirname "$(realpath "$0")")/../fxrec"
+export FXREC
+
 GEN_PACKETS=gen_packets  # Upstream for now, until it's ported
 export GEN_PACKETS
 

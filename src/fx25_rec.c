@@ -65,63 +65,8 @@ static void process_rs_block (int chan, int subchan, int slice, struct fx_contex
 
 static int my_unstuff (int chan, int subchan, int slice, unsigned char * restrict pin, int ilen, unsigned char * restrict frame_buf);
 
-//#define FXTEST 1	// Define for standalone test application.
-			// It expects to find files fx01.dat, fx02.dat, ..., fx0b.dat/
-
-#if FXTEST
-static int fx25_test_count = 0;
-
-int main ()
-{
-	fx25_init(3);
-
-	for (int i = CTAG_MIN; i <= CTAG_MAX; i++) {
-	
-	  char fname[32];
-	  snprintf (fname, sizeof(fname), "fx%02x.dat", i);
-	  FILE *fp = fopen(fname, "rb");
-	  if (fp == NULL) {
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("\n");
-	    dw_printf ("****** Could not open %s ******\n", fname);
-	    dw_printf ("****** Did you generate the test files first? ******\n");
-	    exit (EXIT_FAILURE);
-	  }
-
-//#if 0  // reminder for future if reading from stdin.
-//#if __WIN32__
-//	// So 0x1a byte does not signal EOF.
-//	_setmode(_fileno(stdin), _O_BINARY);
-//#endif
-//	fp = stdin;
-//#endif
-	  unsigned char ch;
-	  while (fread(&ch, 1, 1, fp) == 1) {
-	    for (unsigned char imask = 0x01; imask != 0; imask <<=1) {
-	      fx25_rec_bit (0, 0, 0, ch & imask);
-	    }
-	  }
-	  fclose (fp);
-	}
-
-	if (fx25_test_count == 11) {
-	  text_color_set(DW_COLOR_REC);
-	  dw_printf ("\n");
-	  dw_printf ("\n");
-	  dw_printf ("\n");
-	  dw_printf ("***** FX25 unit test Success - all tests passed. *****\n");
-	  exit (EXIT_SUCCESS);
-	}
-	text_color_set(DW_COLOR_ERROR);
-	dw_printf ("\n");
-	dw_printf ("\n");
-	dw_printf ("***** FX25 unit test FAILED.  Only %d/11 tests passed. *****\n", fx25_test_count);
-	exit (EXIT_SUCCESS);
-
-} // end main 
-
-#endif  // FXTEST
-
+int FXTEST = 0;
+int fx25_test_count = 0;
 
 
 /***********************************************************************************
@@ -350,14 +295,14 @@ static void process_rs_block (int chan, int subchan, int slice, struct fx_contex
 	        fx_hex_dump (frame_buf, frame_len);
 	      }
 
-#if FXTEST 
-	      fx25_test_count++;
-#else
-	      alevel_t alevel = demod_get_audio_level (chan, subchan);
+	      if (FXTEST) {
+	        fx25_test_count++;
+	      } else {
+	        alevel_t alevel = demod_get_audio_level (chan, subchan);
 
-	      multi_modem_process_rec_frame (chan, subchan, slice, frame_buf, frame_len - 2, alevel, derrors, 1);   /* len-2 to remove FCS. */
+	        multi_modem_process_rec_frame (chan, subchan, slice, frame_buf, frame_len - 2, alevel, derrors, 1);   /* len-2 to remove FCS. */
+	      }
 
-#endif
 	    } else {
 	      // Most likely cause is defective sender software.
 	      text_color_set(DW_COLOR_ERROR);

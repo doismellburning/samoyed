@@ -98,7 +98,7 @@ int layer2_send_frame (int chan, packet_t pp, int bad_fcs, struct audio_s *audio
 	else if (audio_config_p->achan[chan].layer2_xmit == LAYER2_FX25) {
 	  unsigned char fbuf[AX25_MAX_PACKET_LEN+2];
 	  int flen = ax25_pack (pp, fbuf);
-	  int n = fx25_send_frame (chan, fbuf, flen, audio_config_p->achan[chan].fx25_strength);
+	  int n = fx25_send_frame (chan, fbuf, flen, audio_config_p->achan[chan].fx25_strength, 0);
 	  if (n > 0) {
 	    return (n);
 	  }

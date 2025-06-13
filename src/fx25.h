@@ -64,7 +64,7 @@ void FREE_RS(struct rs *rs);
 // Maybe these should be in a different file, separated from the internal stuff.
 
 void fx25_init ( int debug_level );
-int fx25_send_frame (int chan, unsigned char *fbuf, int flen, int fx_mode);
+int fx25_send_frame (int chan, unsigned char *fbuf, int flen, int fx_mode, int test_mode);
 void fx25_rec_bit (int chan, int subchan, int slice, int dbit);
 int fx25_rec_busy (int chan);
 
