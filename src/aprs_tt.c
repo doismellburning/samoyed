@@ -1096,26 +1096,26 @@ static int parse_aprstt3_call (char *e)
 	  char suffix[8];
           if (tt_call5_suffix_to_text(e+2,1,suffix) == 0) {
 
-#if TT_MAIN
-	    /* For unit test, use suffix rather than trying lookup. */
-	    strlcpy (m_callsign, suffix, sizeof(m_callsign));
-#else
-	    char call[12];
+            if (running_TT_MAIN_tests) {
+	      /* For unit test, use suffix rather than trying lookup. */
+	      strlcpy (m_callsign, suffix, sizeof(m_callsign));
+            } else {
+	      char call[12];
 
-	    /* In normal operation, try to find full callsign for the suffix received. */
+	      /* In normal operation, try to find full callsign for the suffix received. */
 
-	    if (tt_3char_suffix_search (suffix, call) >= 0) {
-	      text_color_set(DW_COLOR_INFO);
-	      dw_printf ("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call);
+	      if (tt_3char_suffix_search (suffix, call) >= 0) {
+	        text_color_set(DW_COLOR_INFO);
+	        dw_printf ("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call);
 
-	      strlcpy(m_callsign, call, sizeof(m_callsign));
+	        strlcpy(m_callsign, call, sizeof(m_callsign));
+	      }
+	      else {
+	        text_color_set(DW_COLOR_ERROR);
+	        dw_printf ("Couldn't find full callsign for suffix \"%s\"\n", suffix);
+	        return (TT_ERROR_SUFFIX_NO_CALL);	/* Don't know this user. */
+	      }
 	    }
-	    else {
-	      text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Couldn't find full callsign for suffix \"%s\"\n", suffix);
-	      return (TT_ERROR_SUFFIX_NO_CALL);	/* Don't know this user. */
-	    }
-#endif
 	  }
 	  else {
 	    return (TT_ERROR_INVALID_CALL);	/* Could not convert to text */
