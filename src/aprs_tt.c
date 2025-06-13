@@ -131,8 +131,6 @@ int running_TT_MAIN_tests = 0;
  * Description:	The main program needs to call this at application
  *		start up time after reading the configuration file.
  *
- *		TT_MAIN is defined for unit testing.
- *
  *----------------------------------------------------------------*/
 
 static struct tt_config_s tt_config;
