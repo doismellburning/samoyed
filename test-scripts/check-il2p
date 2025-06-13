@@ -4,5 +4,4 @@ source "$(dirname "$(realpath "$0")")/common"
 
 goto_tmpdir
 
-# FIXME il2p_test
-
+$IL2P_TEST

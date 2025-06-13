@@ -3,6 +3,9 @@
 ATEST="$(dirname "$(realpath "$0")")/../atest"
 export ATEST
 
+IL2P_TEST="$(dirname "$(realpath "$0")")/../il2p_test"
+export IL2P_TEST
+
 FXSEND="$(dirname "$(realpath "$0")")/../fxsend"
 export FXSEND
 FXREC="$(dirname "$(realpath "$0")")/../fxrec"
