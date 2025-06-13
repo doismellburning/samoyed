@@ -3,7 +3,6 @@
 
 set(GEN_PACKETS_BIN "${CMAKE_BINARY_DIR}/src/gen_packets${CMAKE_EXECUTABLE_SUFFIX}")
 set(ATEST_BIN "${CMAKE_BINARY_DIR}/src/atest${CMAKE_EXECUTABLE_SUFFIX}")
-set(FXREC_BIN "${CMAKE_BINARY_DIR}/test/fxrec${CMAKE_EXECUTABLE_SUFFIX}")
 set(IL2P_TEST_BIN "${CMAKE_BINARY_DIR}/test/il2p_test${CMAKE_EXECUTABLE_SUFFIX}")
 
 if(WIN32)
@@ -39,23 +38,6 @@ if(WIN32 OR CYGWIN)
     ${CUSTOM_SRC_DIR}/dwgpsd.c
     )
 endif()
-
-
-list(APPEND fxrec_SOURCES
-  ${CUSTOM_SRC_DIR}/fx25_rec.c
-  ${CUSTOM_SRC_DIR}/fx25_extract.c
-  ${CUSTOM_SRC_DIR}/fx25_init.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(fxrec
-  ${fxrec_SOURCES}
-  )
-
-set_target_properties(fxrec
-  PROPERTIES COMPILE_FLAGS "-DFXTEST"
-  )
 
 
 # Unit Test IL2P with out modems.

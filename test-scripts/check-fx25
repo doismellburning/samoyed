@@ -5,7 +5,7 @@ source "$(dirname "$(realpath "$0")")/common"
 goto_tmpdir
 
 $FXSEND
-# FIXME fxrec
+$FXREC
 
 $GEN_PACKETS -B9600 -n 100 -X 0 -o test96f0.wav
 $ATEST -B9600 -F0 -L60 -G64 test96f0.wav
