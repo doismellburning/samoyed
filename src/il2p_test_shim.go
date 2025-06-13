@@ -224,54 +224,54 @@ func test_payload(t *testing.T) {
 
 	// All sizes for MAX FEC.
 
-	for n := 1; n <= IL2P_MAX_PAYLOAD_SIZE; n++ {
-		e = il2p_payload_compute(&ipp, n, 1) // 1 for max fec.
+	for n := C.int(1); n <= C.IL2P_MAX_PAYLOAD_SIZE; n++ {
+		e = C.il2p_payload_compute(&ipp, n, 1) // 1 for max fec.
 		//dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
 		//		ipp.large_block_count, ipp.small_block_count);
 		//fflush (stdout);
 
-		assert(ipp.payload_block_count >= 1 && ipp.payload_block_count <= IL2P_MAX_PAYLOAD_BLOCKS)
-		assert(ipp.payload_block_count == ipp.small_block_count+ipp.large_block_count)
-		assert(ipp.small_block_count*ipp.small_block_size+
+		assert.True(t, ipp.payload_block_count >= 1 && ipp.payload_block_count <= C.IL2P_MAX_PAYLOAD_BLOCKS)
+		assert.True(t, ipp.payload_block_count == ipp.small_block_count+ipp.large_block_count)
+		assert.True(t, ipp.small_block_count*ipp.small_block_size+
 			ipp.large_block_count*ipp.large_block_size == n)
-		assert(ipp.parity_symbols_per_block == 16)
+		assert.True(t, ipp.parity_symbols_per_block == 16)
 
 		// Data and parity must fit in RS block size of 255.
 		// Size test does not apply if block count is 0.
-		assert(ipp.small_block_count == 0 || ipp.small_block_size+ipp.parity_symbols_per_block <= 255)
-		assert(ipp.large_block_count == 0 || ipp.large_block_size+ipp.parity_symbols_per_block <= 255)
+		assert.True(t, ipp.small_block_count == 0 || ipp.small_block_size+ipp.parity_symbols_per_block <= 255)
+		assert.True(t, ipp.large_block_count == 0 || ipp.large_block_size+ipp.parity_symbols_per_block <= 255)
 	}
 
 	// Now let's try encoding payloads and extracting original again.
 	// This will also provide exercise for scrambling and Reed Solomon under more conditions.
 
-	var original_payload [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-	for n := 0; n < IL2P_MAX_PAYLOAD_SIZE; n++ {
+	var original_payload [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
+	for n := C.int(0); n < C.IL2P_MAX_PAYLOAD_SIZE; n++ {
 		original_payload[n] = n & 0xff
 	}
-	for max_fec := 0; max_fec <= 1; max_fec++ {
-		for payload_length := 1; payload_length <= IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
+	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
+		for payload_length := C.int(1); payload_length <= C.IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			//dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
-			var encoded [IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar
-			var k = il2p_encode_payload(original_payload, payload_length, max_fec, encoded)
+			var encoded [C.IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar
+			var k = C.il2p_encode_payload(&original_payload[0], payload_length, max_fec, &encoded[0])
 
 			//dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
-			assert(k > payload_length && k <= IL2P_MAX_ENCODED_PAYLOAD_SIZE)
+			assert.True(t, k > payload_length && k <= C.IL2P_MAX_ENCODED_PAYLOAD_SIZE)
 
 			// Now extract.
 
-			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
+			var extracted [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
 			var symbols_corrected = 0
-			var e = il2p_decode_payload(encoded, payload_length, max_fec, extracted, &symbols_corrected)
+			var e = il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
 			//dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
-			assert(e == payload_length)
+			assert.True(t, e == payload_length)
 
 			// if (memcmp (original_payload, extracted, payload_length) != 0) {
 			//  dw_printf ("********** Received message not as expected. **********\n");
 			//  fx_hex_dump(extracted, payload_length);
 			// }
-			assert(memcmp(original_payload, extracted, payload_length) == 0)
+			assert.True(t, memcmp(original_payload, extracted, payload_length) == 0)
 		}
 	}
 } // end test_payload
@@ -328,7 +328,7 @@ func test_example_headers(t *testing.T) {
 	//}
 	///dw_printf ("\n");
 
-	assert(memcmp(header, header1, sizeof(header)) == 0)
+	assert.True(t, memcmp(header, header1, sizeof(header)) == 0)
 
 	C.il2p_scramble_block(header, sresult, 13)
 	//dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
@@ -345,8 +345,8 @@ func test_example_headers(t *testing.T) {
 	//    dw_printf (" %02x", check[i]);
 	//}
 	//dw_printf ("\n");
-	assert(check[0] == 0x8a)
-	assert(check[1] == 0x97)
+	assert.True(t, check[0] == 0x8a)
+	assert.True(t, check[1] == 0x97)
 
 	// Can we go from IL2P back to AX.25?
 
@@ -400,9 +400,9 @@ func test_example_headers(t *testing.T) {
 	memset(&alevel, 0, sizeof(alevel))
 
 	pp = ax25_from_frame(example2, sizeof(example2), alevel)
-	assert(pp != nil)
+	assert.True(t, pp != nil)
 	e = il2p_type_1_header(pp, 0, header)
-	assert(e == 0)
+	assert.True(t, e == 0)
 	ax25_delete(pp)
 
 	//dw_printf ("Example 2 header:\n");
@@ -411,7 +411,7 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert(memcmp(header, header2, sizeof(header2)) == 0)
+	assert.True(t, memcmp(header, header2, sizeof(header2)) == 0)
 
 	il2p_scramble_block(header, sresult, 13)
 	//dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
@@ -428,13 +428,13 @@ func test_example_headers(t *testing.T) {
 	//    dw_printf (" %02x", check[i]);
 	//}
 	//dw_printf ("\n");
-	assert(check[0] == 0x91)
-	assert(check[1] == 0xbd)
+	assert.True(t, check[0] == 0x91)
+	assert.True(t, check[1] == 0xbd)
 
 	// Can we go from IL2P back to AX.25?
 
 	pp = il2p_decode_header_type_1(header, 0)
-	assert(pp != NULL)
+	assert.True(t, pp != NULL)
 
 	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
 	ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
@@ -478,9 +478,9 @@ func test_example_headers(t *testing.T) {
 	memset(&alevel, 0, sizeof(alevel))
 
 	pp = ax25_from_frame(example3, sizeof(example3), alevel)
-	assert(pp != NULL)
+	assert.True(t, pp != NULL)
 	e = il2p_type_1_header(pp, 0, header)
-	assert(e == 9)
+	assert.True(t, e == 9)
 	ax25_delete(pp)
 
 	//dw_printf ("Example 3 header:\n");
@@ -489,7 +489,7 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert(memcmp(header, header3, sizeof(header)) == 0)
+	assert.True(t, memcmp(header, header3, sizeof(header)) == 0)
 
 	il2p_scramble_block(header, sresult, 13)
 	//dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
@@ -507,15 +507,15 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert(check[0] == 0x43)
-	assert(check[1] == 0x35)
+	assert.True(t, check[0] == 0x43)
+	assert.True(t, check[1] == 0x35)
 
 	// That was only the header.  We will get to the info part in a later test.
 
 	// Can we go from IL2P back to AX.25?
 
 	pp = il2p_decode_header_type_1(header, 0)
-	assert(pp != nil)
+	assert.True(t, pp != nil)
 
 	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
 	ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
@@ -532,7 +532,7 @@ func test_example_headers(t *testing.T) {
 	// Example 3 again, this time the Information part is included.
 
 	pp = ax25_from_frame(example3, sizeof(example3), alevel)
-	assert(pp != nil)
+	assert.True(t, pp != nil)
 
 	var max_fec C.int = 0
 	var iout [IL2P_MAX_PACKET_SIZE]C.uchar
@@ -543,8 +543,8 @@ func test_example_headers(t *testing.T) {
 	//dw_printf ("actual result for example 3:\n");
 	//fx_hex_dump(iout, e);
 	// Does it match the example in the protocol spec?
-	assert(e == sizeof(complete3))
-	assert(memcmp(iout, complete3, sizeof(complete3)) == 0)
+	assert.True(t, e == sizeof(complete3))
+	assert.True(t, memcmp(iout, complete3, sizeof(complete3)) == 0)
 	ax25_delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
@@ -564,10 +564,10 @@ func enc_dec_compare(pp1 packet_t) {
 
 		var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
 		var enc_len = il2p_encode_frame(pp1, max_fec, encoded)
-		assert(enc_len >= 0)
+		assert.True(t, enc_len >= 0)
 
 		var pp2 = il2p_decode_frame(encoded)
-		assert(pp2 != NULL)
+		assert.True(t, pp2 != NULL)
 
 		// Is it the same after encoding to IL2P and then decoding?
 
@@ -589,7 +589,7 @@ func enc_dec_compare(pp1 packet_t) {
 			ax25_hex_dump(pp2)
 		}
 
-		assert(len1 == len2 && memcmp(data1, data2, len1) == 0)
+		assert.True(t, len1 == len2 && memcmp(data1, data2, len1) == 0)
 
 		ax25_delete(pp2)
 	}
@@ -883,7 +883,7 @@ func test_serdes(t *testing.T) {
 		var packet [1024]C.char
 		//FIXME KG snprintf (packet, sizeof(packet), "%s:%s", hdr_type ? addrs2 : addrs3, text);
 		var pp = ax25_from_text(packet, 1)
-		assert(pp != NULL)
+		assert.True(t, pp != NULL)
 
 		var channel int
 
@@ -900,6 +900,6 @@ func test_serdes(t *testing.T) {
 	}
 
 	dw_printf("Serdes receive count = %d\n", rec_count)
-	assert(rec_count == 12)
+	assert.True(t, rec_count == 12)
 	rec_count = -1 // disable deserialized packet test.
 }
