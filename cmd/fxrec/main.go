@@ -24,30 +24,6 @@ import (
 	_ "github.com/doismellburning/samoyed/src" // cgo
 )
 
-/* FIXME KG
-struct fx_context_s {
-
-	enum { FX_TAG=0, FX_DATA, FX_CHECK } state;
-	uint64_t accum;		// Accumulate bits for matching to correlation tag.
-	int ctag_num;		// Correlation tag number, CTAG_MIN to CTAG_MAX if approx. match found.
-	int k_data_radio;	// Expected size of "data" sent over radio.
-	int coffs;		// Starting offset of the check part.
-	int nroots;		// Expected number of check bytes.
-	int dlen;		// Accumulated length in "data" below.
-	int clen;		// Accumulated length in "check" below.
-	unsigned char imask;	// Mask for storing a bit.
-	unsigned char block[FX25_BLOCK_SIZE+1];
-};
-
-static struct fx_context_s *fx_context[MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS];
-
-static void process_rs_block (int chan, int subchan, int slice, struct fx_context_s *F);
-
-static int my_unstuff (int chan, int subchan, int slice, unsigned char * restrict pin, int ilen, unsigned char * restrict frame_buf);
-
-static int fx25_test_count = 0;
-*/
-
 func main() {
 	C.FXTEST = 1
 
