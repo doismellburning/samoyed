@@ -13,6 +13,7 @@ and with reduced platform scope to cut complexity and make it easier to extend.
 * Lean on the Go stdlib to leverage existing tooling
 * Maintain broad-strokes compatibility with Dire Wolf to minimise switching costs
 * Reduce platform compatibility (drop win32 support, possibly Windows and Mac entirely, older versions of Linux etc) to reduce complexity
+* Remove reliance on preprocessor defines for test infrastructure and tooling to reduce complexity
 
 ## Dire Wolf
 
