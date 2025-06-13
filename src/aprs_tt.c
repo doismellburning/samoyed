@@ -106,9 +106,7 @@ static int parse_aprstt3_call (char *e);
 static int parse_location (char *e);
 static int parse_comment (char *e);
 static int expand_macro (char *e);
-#ifndef TT_MAIN
 static void raw_tt_data_to_app (int chan, char *msg);
-#endif
 static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize);
 
 static int tt_debug = 0;
@@ -1744,14 +1742,8 @@ static int parse_comment (char *e)
  *
  *----------------------------------------------------------------*/
 
-#ifndef TT_MAIN
-
 static void raw_tt_data_to_app (int chan, char *msg)
 {
-
-#if TT_MAIN
-	return ;
-#else
 	char src[10], dest[10];
 	char raw_tt_msg[256];
 	packet_t pp;
@@ -1796,11 +1788,7 @@ static void raw_tt_data_to_app (int chan, char *msg)
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg);
 	}
-
-#endif
 }
-
-#endif
 
 
 /*------------------------------------------------------------------
