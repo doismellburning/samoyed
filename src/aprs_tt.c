@@ -113,6 +113,9 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 
 static int tt_debug = 0;
 
+// Replacement for the TT_MAIN define, to work better with Go, and try to reduce some complexity
+int running_TT_MAIN_tests = 0;
+
 
 /*------------------------------------------------------------------
  *
@@ -379,9 +382,9 @@ void aprs_tt_sequence (int chan, char *msg)
 		m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, m_freq, m_ctcss, m_comment, m_latitude, m_longitude, m_dao);
 #endif
 
-#if TT_MAIN
-	(void)err;		// suppress variable set but not used warning.
-#else
+	if (running_TT_MAIN_tests) {
+		return;
+	}
 
 /*
  * If digested successfully.  Add to our list of users and schedule transmissions.
@@ -438,9 +441,6 @@ void aprs_tt_sequence (int chan, char *msg)
 	}
 
 	tq_append (chan, TQ_PRIO_0_HI, pp);
-
-#endif  /* ifndef TT_MAIN */
-
 } /* end aprs_tt_sequence */
 
 

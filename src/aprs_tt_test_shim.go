@@ -26,6 +26,7 @@ package direwolf
 // #include "mgrs.h"
 // #include "usng.h"
 // #include "error_string.h"
+// extern int running_TT_MAIN_tests; // Replacement for the TT_MAIN define
 // // Expose some of the aprs_tt.c globals
 // extern char m_callsign[20];
 // extern char m_comment[200];
@@ -158,6 +159,8 @@ func check_result(t *testing.T, testCase ttTestCase) {
 
 func aprs_tt_test_main(t *testing.T) {
 	t.Helper()
+
+	C.running_TT_MAIN_tests = 1
 
 	C.aprs_tt_init(nil, 0)
 
