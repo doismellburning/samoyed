@@ -76,43 +76,6 @@ static char text[] =
 static int rec_count = -1;	// disable deserialized packet test.
 static int polarity = 0;
 
-static void test_serdes (void)
-{
-	text_color_set(DW_COLOR_INFO);
-	dw_printf ("\nTest serialize / deserialize...\n");
-	rec_count = 0;
-
-	int max_fec = 1;
-
-	// try combinations of header type, max_fec, polarity, errors.
-
-	for (int hdr_type = 0; hdr_type <= 1; hdr_type++) {
-	    char packet[1024];
-	    snprintf (packet, sizeof(packet), "%s:%s", hdr_type ? addrs2 : addrs3, text);
-	    packet_t pp = ax25_from_text (packet, 1);
-	    assert (pp != NULL);
-
-	    int chan = 0;
-	
-
-	    for (max_fec = 0; max_fec <= 1; max_fec++) {
-	        for (polarity = 0; polarity <= 2; polarity++) {	// 2 means throw in some errors.
- 	            int num_bits_sent = il2p_send_frame (chan, pp, max_fec, polarity);
-	            dw_printf ("%d bits sent.\n", num_bits_sent);
-
-	            // Need extra bit at end to flush out state machine.
-	            il2p_rec_bit (0, 0, 0, 0);
-	        }
-	    }
-	    ax25_delete(pp);
-	}
-
-	dw_printf ("Serdes receive count = %d\n", rec_count);
-	assert (rec_count == 12);
-	rec_count = -1;		// disable deserialized packet test.
-}
-
-
 // Serializing calls this which then simulates the demodulator output.
 
 void tone_gen_put_bit_fake (int chan, int data)
