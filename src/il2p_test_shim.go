@@ -547,7 +547,7 @@ func test_example_headers(t *testing.T) {
 	//dw_printf ("actual result for example 3:\n");
 	//fx_hex_dump(iout, e);
 	// Does it match the example in the protocol spec?
-	assert.True(t, e == len(complete3))
+	assert.True(t, e == C.int(len(complete3)))
 	assert.True(t, C.memcmp(unsafe.Pointer(&iout[0]), unsafe.Pointer(&complete3[0]), C.ulong(len(complete3))) == 0)
 	C.ax25_delete(pp)
 
@@ -563,15 +563,15 @@ func test_example_headers(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func enc_dec_compare(pp1 packet_t) {
-	for max_fec := 0; max_fec <= 1; max_fec++ {
+func enc_dec_compare(t *testing.T, pp1 packet_t) {
+	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
 
 		var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
-		var enc_len = il2p_encode_frame(pp1, max_fec, encoded)
+		var enc_len = C.il2p_encode_frame(pp1, max_fec, &encoded[0])
 		assert.True(t, enc_len >= 0)
 
 		var pp2 = il2p_decode_frame(encoded)
-		assert.True(t, pp2 != NULL)
+		assert.True(t, pp2 != nil)
 
 		// Is it the same after encoding to IL2P and then decoding?
 
@@ -681,7 +681,7 @@ func all_frame_types() {
 
 				pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
 				ax25_hex_dump(pp)
-				enc_dec_compare(pp)
+				enc_dec_compare(t, pp)
 				ax25_delete(pp)
 			}
 		}
@@ -708,10 +708,10 @@ func all_frame_types() {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, NULL, 0)
+				pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				ax25_hex_dump(pp)
-				enc_dec_compare(pp)
+				enc_dec_compare(t, pp)
 				ax25_delete(pp)
 			}
 
@@ -723,10 +723,10 @@ func all_frame_types() {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, NULL, 0)
+				pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				ax25_hex_dump(pp)
-				enc_dec_compare(pp)
+				enc_dec_compare(t, pp)
 				ax25_delete(pp)
 			}
 		}
@@ -749,7 +749,7 @@ func all_frame_types() {
 		pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info, (int)(sizeof(srej_info)))
 
 		ax25_hex_dump(pp)
-		enc_dec_compare(pp)
+		enc_dec_compare(t, pp)
 		ax25_delete(pp)
 	}
 
@@ -774,7 +774,7 @@ func all_frame_types() {
 			pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			ax25_hex_dump(pp)
-			enc_dec_compare(pp)
+			enc_dec_compare(t, pp)
 			ax25_delete(pp)
 		}
 
@@ -790,7 +790,7 @@ func all_frame_types() {
 			pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			ax25_hex_dump(pp)
-			enc_dec_compare(pp)
+			enc_dec_compare(t, pp)
 			ax25_delete(pp)
 		}
 	}
@@ -887,7 +887,7 @@ func test_serdes(t *testing.T) {
 		var packet [1024]C.char
 		//FIXME KG snprintf (packet, sizeof(packet), "%s:%s", hdr_type ? addrs2 : addrs3, text);
 		var pp = ax25_from_text(packet, 1)
-		assert.True(t, pp != NULL)
+		assert.True(t, pp != nil)
 
 		var channel int
 
