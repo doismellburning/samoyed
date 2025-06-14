@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"testing"
 	"unsafe"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -177,27 +178,27 @@ func test_payload(t *testing.T) {
 	assert.GreaterOrEqual(t, 0, e)
 
 	e = C.il2p_payload_compute(&ipp, 236, 0)
-	assert.Equal(t, 236, ipp.small_block_size )
-	assert.Equal(t, 237, ipp.large_block_size )
-	assert.Equal(t, 0, ipp.large_block_count )
-	assert.Equal(t, 1, ipp.small_block_count )
-	assert.Equal(t, 8, ipp.parity_symbols_per_block )
+	assert.Equal(t, 236, ipp.small_block_size)
+	assert.Equal(t, 237, ipp.large_block_size)
+	assert.Equal(t, 0, ipp.large_block_count)
+	assert.Equal(t, 1, ipp.small_block_count)
+	assert.Equal(t, 8, ipp.parity_symbols_per_block)
 	assert.GreaterOrEqual(t, 0, e)
 
 	e = C.il2p_payload_compute(&ipp, 512, 0)
-	assert.Equal(t, 170, ipp.small_block_size )
-	assert.Equal(t, 171, ipp.large_block_size )
-	assert.Equal(t, 2, ipp.large_block_count )
-	assert.Equal(t, 1, ipp.small_block_count )
-	assert.Equal(t, 6, ipp.parity_symbols_per_block )
+	assert.Equal(t, 170, ipp.small_block_size)
+	assert.Equal(t, 171, ipp.large_block_size)
+	assert.Equal(t, 2, ipp.large_block_count)
+	assert.Equal(t, 1, ipp.small_block_count)
+	assert.Equal(t, 6, ipp.parity_symbols_per_block)
 	assert.GreaterOrEqual(t, 0, e)
 
 	e = C.il2p_payload_compute(&ipp, 1023, 0)
-	assert.Equal(t, 204, ipp.small_block_size )
-	assert.Equal(t, 205, ipp.large_block_size )
-	assert.Equal(t, 3, ipp.large_block_count )
-	assert.Equal(t, 2, ipp.small_block_count )
-	assert.Equal(t, 8, ipp.parity_symbols_per_block )
+	assert.Equal(t, 204, ipp.small_block_size)
+	assert.Equal(t, 205, ipp.large_block_size)
+	assert.Equal(t, 3, ipp.large_block_count)
+	assert.Equal(t, 2, ipp.small_block_count)
+	assert.Equal(t, 8, ipp.parity_symbols_per_block)
 	assert.GreaterOrEqual(t, 0, e)
 
 	// Now try all possible sizes for Baseline FEC Parity.
@@ -211,8 +212,8 @@ func test_payload(t *testing.T) {
 
 		assert.GreaterOrEqual(t, 1, ipp.payload_block_count)
 		assert.LessOrEqual(t, C.IL2P_MAX_PAYLOAD_BLOCKS, ipp.payload_block_count)
-		assert.Equal(t, ipp.small_block_count + ipp.large_block_count, ipp.payload_block_count)
-		assert.Equal(t, n, ipp.small_block_count*ipp.small_block_size + ipp.large_block_count*ipp.large_block_size)
+		assert.Equal(t, ipp.small_block_count+ipp.large_block_count, ipp.payload_block_count)
+		assert.Equal(t, n, ipp.small_block_count*ipp.small_block_size+ipp.large_block_count*ipp.large_block_size)
 		assert.True(t, ipp.parity_symbols_per_block == 2 ||
 			ipp.parity_symbols_per_block == 4 ||
 			ipp.parity_symbols_per_block == 6 ||
@@ -606,7 +607,7 @@ func all_frame_types(t *testing.T) {
 	int nr, ns;
 	*/
 	var pinfo *C.uchar
-	var pid C.int = 0xf0;
+	var pid C.int = 0xf0
 	var info_len C.int
 
 	C.strcpy(&addrs[0][0], C.CString("W2UB"))
