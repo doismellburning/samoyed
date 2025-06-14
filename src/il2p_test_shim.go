@@ -14,8 +14,6 @@ import "C"
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"testing"
 	"unsafe"
 	"github.com/stretchr/testify/assert"
@@ -369,6 +367,7 @@ func test_example_headers(t *testing.T) {
 	var nr, ns C.int // Sequence numbers.
 
 	var frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	_ = frame_type // FIXME KG
 
 	// FIXME KG dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
@@ -563,7 +562,7 @@ func test_example_headers(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func enc_dec_compare(t *testing.T, pp1 packet_t) {
+func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
 
 		var encoded [C.IL2P_MAX_PACKET_SIZE]C.uchar
@@ -688,20 +687,20 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nS frames...\n")
 
-	for ftype := C.frame_type_S_RR; ftype <= C.frame_type_S_SREJ; ftype++ {
+	for ftype := C.ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
 
-		for pf := 0; pf <= 1; pf++ {
+		for pf := C.int(0); pf <= 1; pf++ {
 
-			var modulo = 8
+			var modulo C.int = 8
 			var nr = modulo/2 + 1
 
 			// SREJ can only be response.
 
-			for cr := 0; cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
+			for cr := C.cmdres_t(0); cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
@@ -711,11 +710,11 @@ func all_frame_types(t *testing.T) {
 			modulo = 128
 			nr = modulo/2 + 1
 
-			for cr := 0; cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
+			for cr := C.cmdres_t(0); cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
@@ -729,15 +728,15 @@ func all_frame_types(t *testing.T) {
 	var srej_info []C.uchar = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
 	var ftype = C.ax25_frame_type_t(C.frame_type_S_SREJ)
-	for pf := 0; pf <= 1; pf++ {
+	for pf := C.int(0); pf <= 1; pf++ {
 
-		var modulo = 128
-		var nr = 127
-		var cr = C.cr_res
+		var modulo C.int = 128
+		var nr C.int = 127
+		var cr C.cmdres_t = C.cr_res
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, srej_info, C.int(len(srej_info)))
+		var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
 
 		C.ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
@@ -751,17 +750,17 @@ func all_frame_types(t *testing.T) {
 	pinfo = (*C.uchar)(unsafe.Pointer(C.strdup(C.CString("The rain in Spain stays mainly on the plain."))))
 	info_len = C.int(C.strlen((*C.char)(unsafe.Pointer(pinfo))))
 
-	for pf := 0; pf <= 1; pf++ {
+	for pf := C.int(0); pf <= 1; pf++ {
 
-		var modulo = 8
+		var modulo C.int = 8
 		var nr = 0x55 & (modulo - 1)
 		var ns = 0xaa & (modulo - 1)
 
-		for cr := 1; cr <= 1; cr++ { // can only be command
+		for cr := C.cmdres_t(1); cr <= 1; cr++ { // can only be command
 
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = C.ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
@@ -772,11 +771,11 @@ func all_frame_types(t *testing.T) {
 		nr = 0x55 & (modulo - 1)
 		ns = 0xaa & (modulo - 1)
 
-		for cr := 1; cr <= 1; cr++ {
+		for cr := C.cmdres_t(1); cr <= 1; cr++ {
 
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
@@ -804,7 +803,7 @@ func decode_bitstream(t *testing.T) {
 
 	dw_printf("-----\nReading il2p-bitstream.txt if available...\n")
 
-	var fp = C.fopen("il2p-bitstream.txt", "r")
+	var fp = C.fopen(C.CString("il2p-bitstream.txt"), C.CString("r"))
 	if fp == nil {
 		dw_printf("Bitstream test file not available.\n")
 		return
@@ -815,7 +814,7 @@ func decode_bitstream(t *testing.T) {
 	C.il2p_set_debug(1)
 
 	var ch C.int
-	for ch != EOF {
+	for ch != C.EOF {
 		ch = C.fgetc(fp)
 		if ch == '0' || ch == '1' {
 			C.il2p_rec_bit(0, 0, 0, ch-'0')
@@ -867,28 +866,26 @@ func test_serdes(t *testing.T) {
 	dw_printf("\nTest serialize / deserialize...\n")
 	rec_count = 0
 
-	var max_fec = 1
-
 	// try combinations of header type, max_fec, polarity, errors.
 
 	for hdr_type := 0; hdr_type <= 1; hdr_type++ {
 		var packet [1024]C.char
 		//FIXME KG snprintf (packet, sizeof(packet), "%s:%s", hdr_type ? addrs2 : addrs3, text);
-		var pp = ax25_from_text(packet, 1)
+		var pp = C.ax25_from_text(&packet[0], 1)
 		assert.True(t, pp != nil)
 
-		var channel int
+		var channel C.int
 
-		for max_fec := 0; max_fec <= 1; max_fec++ {
-			for polarity := 0; polarity <= 2; polarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, polarity)
+		for max_fec := C.int(0); max_fec <= 1; max_fec++ {
+			for polarity := C.int(0); polarity <= 2; polarity++ { // 2 means throw in some errors.
+				var num_bits_sent = C.il2p_send_frame(channel, pp, max_fec, polarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
-				il2p_rec_bit(0, 0, 0, 0)
+				C.il2p_rec_bit(0, 0, 0, 0)
 			}
 		}
-		ax25_delete(pp)
+		C.ax25_delete(pp)
 	}
 
 	dw_printf("Serdes receive count = %d\n", rec_count)
