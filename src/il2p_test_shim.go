@@ -599,24 +599,20 @@ func enc_dec_compare(t *testing.T, pp1 packet_t) {
 	}
 }
 
-func all_frame_types() {
+func all_frame_types(t *testing.T) {
 	var addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
 	/* FIXME KG
-	int num_addr = 2;
 	cmdres_t cr;
-	ax25_frame_type_t ftype;
-	int pf = 0;
-	int pid = 0xf0;
 	int modulo;
 	int nr, ns;
-	unsigned char *pinfo = NULL;
-	int info_len = 0;
-	packet_t pp;
 	*/
+	var pinfo *C.uchar
+	var pid C.int = 0xf0;
+	var info_len C.int
 
 	C.strcpy(&addrs[0][0], C.CString("W2UB"))
 	C.strcpy(&addrs[1][0], C.CString("WB2OSZ-12"))
-	var num_addr = 2
+	var num_addr C.int = 2
 
 	dw_printf("Testing all frame types.\n")
 
@@ -624,12 +620,12 @@ func all_frame_types() {
 
 	dw_printf("\nU frames...\n")
 
-	for ftype := C.frame_type_U_SABME; ftype <= C.frame_type_U_TEST; ftype++ {
+	for ftype := C.ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
 
-		for pf := 0; pf <= 1; pf++ {
+		for pf := C.int(0); pf <= 1; pf++ {
 
-			var cmin = 0
-			var cmax = 1
+			var cmin C.cmdres_t = 0
+			var cmax C.cmdres_t = 1
 
 			switch ftype {
 			// 0 = response, 1 = command
@@ -675,13 +671,12 @@ func all_frame_types() {
 
 			for cr := cmin; cr <= cmax; cr++ {
 
-				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
-				ax25_hex_dump(pp)
+				var pp = C.ax25_u_frame(&addrs[0], num_addr, cr, ftype, pf, pid, pinfo, info_len)
+				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				ax25_delete(pp)
+				C.ax25_delete(pp)
 			}
 		}
 	}
@@ -704,14 +699,13 @@ func all_frame_types() {
 
 			for cr := 0; cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
 
-				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
-				ax25_hex_dump(pp)
+				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				ax25_delete(pp)
+				C.ax25_delete(pp)
 			}
 
 			modulo = 128
@@ -719,14 +713,13 @@ func all_frame_types() {
 
 			for cr := 0; cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
 
-				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
-				ax25_hex_dump(pp)
+				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				ax25_delete(pp)
+				C.ax25_delete(pp)
 			}
 		}
 	}
@@ -744,7 +737,7 @@ func all_frame_types() {
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info, (int)(sizeof(srej_info)))
+		var pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info, (int)(sizeof(srej_info)))
 
 		C.ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
@@ -768,7 +761,7 @@ func all_frame_types() {
 
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			pp = C.ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = C.ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
@@ -781,14 +774,13 @@ func all_frame_types() {
 
 		for cr := 1; cr <= 1; cr++ {
 
-			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
-			ax25_hex_dump(pp)
+			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			ax25_delete(pp)
+			C.ax25_delete(pp)
 		}
 	}
 
@@ -819,8 +811,8 @@ func decode_bitstream(t *testing.T) {
 	}
 
 	decoding_bitstream = 1
-	var save_previous = il2p_get_debug()
-	il2p_set_debug(1)
+	var save_previous = C.il2p_get_debug()
+	C.il2p_set_debug(1)
 
 	var ch C.int
 	for ch != EOF {
@@ -832,7 +824,6 @@ func decode_bitstream(t *testing.T) {
 	C.fclose(fp)
 	C.il2p_set_debug(save_previous)
 	decoding_bitstream = 0
-
 } // end decode_bitstream
 
 /////////////////////////////////////////////////////////////////////////////////////////////
