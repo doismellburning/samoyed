@@ -840,29 +840,18 @@ func decode_bitstream(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-/* FIXME KG
-var addrs2[]C.char = "AA1AAA-1>ZZ9ZZZ-9";
-var addrs3[]C.char = "AA1AAA-1>ZZ9ZZZ-9,DIGI*";
-var text[]C.char = ""
-	"'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'"
-	"\n"
-	"'Certainly,' said Alice."
-	"\n"
-	"'And only one for birthday presents, you know. There's glory for you!'"
-	"\n"
-	"'I don't know what you mean by \"glory\",' Alice said."
-	"\n"
-	"Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I meant \"there's a nice knock-down argument for you!\"'"
-	"\n"
-	"'But \"glory\" doesn't mean \"a nice knock-down argument\",' Alice objected."
-	"\n"
-	"'When I use a word,' Humpty Dumpty said, in rather a scornful tone, 'it means just what I choose it to mean - neither more nor less.'"
-	"\n"
-	"'The question is,' said Alice, 'whether you can make words mean so many different things.'"
-	"\n"
-	"'The question is,' said Humpty Dumpty, 'which is to be master - that's all.'"
-	"\n" ;
-*/
+var addrs2 = "AA1AAA-1>ZZ9ZZZ-9";
+var addrs3 = "AA1AAA-1>ZZ9ZZZ-9,DIGI*";
+var text = ```'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
+'Certainly,' said Alice.
+'And only one for birthday presents, you know. There's glory for you!'
+'I don't know what you mean by \"glory\",' Alice said.
+Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I meant \"there's a nice knock-down argument for you!\"'
+'But \"glory\" doesn't mean \"a nice knock-down argument\",' Alice objected.
+'When I use a word,' Humpty Dumpty said, in rather a scornful tone, 'it means just what I choose it to mean - neither more nor less.'
+'The question is,' said Alice, 'whether you can make words mean so many different things.'
+'The question is,' said Humpty Dumpty, 'which is to be master - that's all.'
+```
 
 var rec_count = -1 // disable deserialized packet test.
 var polarity = 0
@@ -876,7 +865,12 @@ func test_serdes(t *testing.T) {
 	// try combinations of header type, max_fec, polarity, errors.
 
 	for hdr_type := 0; hdr_type <= 1; hdr_type++ {
-		var packet [1024]C.char
+		var packet *C.char
+		if hdr_type == 1 {
+			packet = C.CString(fmt.Sprintf("%s:%s", addrs2, text))
+		} else {
+			packet = C.CString(fmt.Sprintf("%s:%s", addrs3, text))
+		}
 		//FIXME KG snprintf (packet, sizeof(packet), "%s:%s", hdr_type ? addrs2 : addrs3, text);
 		var pp = C.ax25_from_text(&packet[0], 1)
 		assert.True(t, pp != nil)
