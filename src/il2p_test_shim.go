@@ -842,7 +842,7 @@ func decode_bitstream(t *testing.T) {
 
 var addrs2 = "AA1AAA-1>ZZ9ZZZ-9";
 var addrs3 = "AA1AAA-1>ZZ9ZZZ-9,DIGI*";
-var text = ```'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
+var text = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
 'Certainly,' said Alice.
 'And only one for birthday presents, you know. There's glory for you!'
 'I don't know what you mean by \"glory\",' Alice said.
@@ -851,7 +851,7 @@ Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I m
 'When I use a word,' Humpty Dumpty said, in rather a scornful tone, 'it means just what I choose it to mean - neither more nor less.'
 'The question is,' said Alice, 'whether you can make words mean so many different things.'
 'The question is,' said Humpty Dumpty, 'which is to be master - that's all.'
-```
+`
 
 var rec_count = -1 // disable deserialized packet test.
 var polarity = 0
