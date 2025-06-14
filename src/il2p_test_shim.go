@@ -176,6 +176,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 0, ipp.large_block_count)
 	assert.Equal(t, 1, ipp.small_block_count)
 	assert.Equal(t, 4, ipp.parity_symbols_per_block)
+	assert.GreaterOrEqual(t, 0, e)
 
 	e = C.il2p_payload_compute(&ipp, 236, 0)
 	assert.Equal(t, 236, ipp.small_block_size )
@@ -183,6 +184,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 0, ipp.large_block_count )
 	assert.Equal(t, 1, ipp.small_block_count )
 	assert.Equal(t, 8, ipp.parity_symbols_per_block )
+	assert.GreaterOrEqual(t, 0, e)
 
 	e = C.il2p_payload_compute(&ipp, 512, 0)
 	assert.Equal(t, 170, ipp.small_block_size )
@@ -190,6 +192,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 2, ipp.large_block_count )
 	assert.Equal(t, 1, ipp.small_block_count )
 	assert.Equal(t, 6, ipp.parity_symbols_per_block )
+	assert.GreaterOrEqual(t, 0, e)
 
 	e = C.il2p_payload_compute(&ipp, 1023, 0)
 	assert.Equal(t, 204, ipp.small_block_size )
@@ -197,6 +200,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, 3, ipp.large_block_count )
 	assert.Equal(t, 2, ipp.small_block_count )
 	assert.Equal(t, 8, ipp.parity_symbols_per_block )
+	assert.GreaterOrEqual(t, 0, e)
 
 	// Now try all possible sizes for Baseline FEC Parity.
 
@@ -411,16 +415,16 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert.True(t, C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), len(header2)) == 0)
+	assert.True(t, C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), C.ulong(len(header2))) == 0)
 
-	C.il2p_scramble_block(header, sresult, 13)
+	C.il2p_scramble_block(&header[0], &sresult[0], 13)
 	//dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
 	//for (int i = 0 ; i < sizeof(sresult); i++) {
 	//   dw_printf (" %02x", sresult[i]);
 	//}
 	//dw_printf ("\n");
 
-	C.il2p_encode_rs(sresult, 13, 2, check)
+	C.il2p_encode_rs(&sresult[0], 13, 2, &check[0])
 
 	//dw_printf ("expect checksum = 91 bd\n");
 	//dw_printf ("check = ");
@@ -433,7 +437,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = C.il2p_decode_header_type_1(header, 0)
+	pp = C.il2p_decode_header_type_1(&header[0], 0)
 	assert.True(t, pp != nil)
 
 	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
@@ -441,7 +445,7 @@ func test_example_headers(t *testing.T) {
 
 	frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 
-	dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
+	// FIXME KG dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
 	// TODO: compare binary.
 
@@ -473,13 +477,13 @@ func test_example_headers(t *testing.T) {
 	var example3 []C.uchar = []C.uchar{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
 	var header3 []C.uchar = []C.uchar{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
 	var complete3 []C.uchar = []C.uchar{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	C.memset(header, 0, sizeof(header))
-	C.memset(sresult, 0, sizeof(sresult))
-	C.memset(&alevel, 0, sizeof(alevel))
+	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
+	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
+	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_struct_alevel_s)
 
-	pp = C.ax25_from_frame(example3, sizeof(example3), alevel)
+	pp = C.ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
 	assert.True(t, pp != nil)
-	e = C.il2p_type_1_header(pp, 0, header)
+	e = C.il2p_type_1_header(pp, 0, &header[0])
 	assert.True(t, e == 9)
 	C.ax25_delete(pp)
 
@@ -489,16 +493,16 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert.True(t, C.memcmp(header, header3, sizeof(header)) == 0)
+	assert.True(t, C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header3[0]), C.ulong(len(header))) == 0)
 
-	C.il2p_scramble_block(header, sresult, 13)
+	C.il2p_scramble_block(&header[0], &sresult[0], 13)
 	//dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
 	//for (int i = 0 ; i < sizeof(sresult); i++) {
 	//   dw_printf (" %02x", sresult[i]);
 	//}
 	//dw_printf ("\n");
 
-	C.il2p_encode_rs(sresult, 13, 2, check)
+	C.il2p_encode_rs(&sresult[0], 13, 2, &check[0])
 
 	//dw_printf ("expect checksum = 43 35\n");
 	//dw_printf ("check = ");
@@ -514,15 +518,15 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = C.il2p_decode_header_type_1(header, 0)
+	pp = C.il2p_decode_header_type_1(&header[0], 0)
 	assert.True(t, pp != nil)
 
-	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
-	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
+	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
+	C.ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
 
-	frame_type = C.ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
+	frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 
-	dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
+	// FIXME KG dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
 	// TODO: compare binary.
 
@@ -531,21 +535,21 @@ func test_example_headers(t *testing.T) {
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = C.ax25_from_frame(example3, sizeof(example3), alevel)
+	pp = C.ax25_from_frame(example3, len(example3), alevel)
 	assert.True(t, pp != nil)
 
 	var max_fec C.int = 0
 	var iout [C.IL2P_MAX_PACKET_SIZE]C.uchar
-	e = C.il2p_encode_frame(pp, max_fec, iout)
+	e = C.il2p_encode_frame(pp, max_fec, &iout[0])
 
 	//dw_printf ("expected for example 3:\n");
 	//fx_hex_dump(complete3, sizeof(complete3));
 	//dw_printf ("actual result for example 3:\n");
 	//fx_hex_dump(iout, e);
 	// Does it match the example in the protocol spec?
-	assert.True(t, e == sizeof(complete3))
-	assert.True(t, memcmp(iout, complete3, sizeof(complete3)) == 0)
-	ax25_delete(pp)
+	assert.True(t, e == len(complete3))
+	assert.True(t, C.memcmp(unsafe.Pointer(&iout[0]), unsafe.Pointer(&complete3[0]), C.ulong(len(complete3))) == 0)
+	C.ax25_delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
 
