@@ -165,8 +165,8 @@ func test_payload(t *testing.T) {
 
 	fmt.Println("Test payload functions...")
 
-	var ipp C.il2p_payload_properties_t
 	var e C.int
+	var ipp C.il2p_payload_properties_t
 
 	// Examples in specification.
 
@@ -248,7 +248,7 @@ func test_payload(t *testing.T) {
 
 	var original_payload [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
 	for n := C.int(0); n < C.IL2P_MAX_PAYLOAD_SIZE; n++ {
-		original_payload[n] = n & 0xff
+		original_payload[n] = C.uchar(C.uint(n) & 0xff)
 	}
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
 		for payload_length := C.int(1); payload_length <= C.IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
@@ -262,8 +262,8 @@ func test_payload(t *testing.T) {
 			// Now extract.
 
 			var extracted [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
-			var symbols_corrected = 0
-			var e = il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
+			var symbols_corrected C.int = 0
+			var e = C.il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
 			//dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
 			assert.True(t, e == payload_length)
 
@@ -271,7 +271,7 @@ func test_payload(t *testing.T) {
 			//  dw_printf ("********** Received message not as expected. **********\n");
 			//  fx_hex_dump(extracted, payload_length);
 			// }
-			assert.True(t, memcmp(original_payload, extracted, payload_length) == 0)
+			assert.True(t, C.memcmp(unsafe.Pointer(&original_payload[0]), unsafe.Pointer(&extracted[0]), C.ulong(payload_length)) == 0)
 		}
 	}
 } // end test_payload
@@ -308,19 +308,19 @@ func test_example_headers(t *testing.T) {
 
 	var example1 []C.uchar = []C.uchar{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
 	var header1 []C.uchar = []C.uchar{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var header [IL2P_HEADER_SIZE]C.uchar
+	var header [C.IL2P_HEADER_SIZE]C.uchar
 	var sresult [32]C.uchar
-	memset(header, 0, sizeof(header))
-	memset(sresult, 0, sizeof(sresult))
+	C.memset(unsafe.Pointer(&header[0]), 0, C.IL2P_HEADER_SIZE)
+	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
 	var check [2]C.uchar
-	var alevel alevel_t
-	memset(&alevel, 0, sizeof(alevel))
+	var alevel C.alevel_t
+	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_alevel_t)
 
-	var pp = ax25_from_frame(example1, sizeof(example1), alevel)
+	var pp = C.ax25_from_frame(&example1[0], C.int(len(example1)), alevel)
 	assert.Nil(t, pp)
-	var e = il2p_type_1_header(pp, 0, header)
+	var e = C.il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, 0, e)
-	ax25_delete(pp)
+	C.ax25_delete(pp)
 
 	//dw_printf ("Example 1 header:\n");
 	//for (int i = 0 ; i < sizeof(header); i++) {
@@ -328,16 +328,16 @@ func test_example_headers(t *testing.T) {
 	//}
 	///dw_printf ("\n");
 
-	assert.True(t, memcmp(header, header1, sizeof(header)) == 0)
+	assert.True(t, C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), C.IL2P_HEADER_SIZE) == 0)
 
-	C.il2p_scramble_block(header, sresult, 13)
+	C.il2p_scramble_block(&header[0], &sresult[0], 13)
 	//dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
 	//for (int i = 0 ; i < sizeof(sresult); i++) {
 	//   dw_printf (" %02x", sresult[i]);
 	//}
 	//dw_printf ("\n");
 
-	C.il2p_encode_rs(sresult, 13, 2, check)
+	C.il2p_encode_rs(&sresult[0], 13, 2, &check[0])
 
 	//dw_printf ("expect checksum = 8a 97\n");
 	//dw_printf ("check = ");
@@ -350,23 +350,23 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = C.il2p_decode_header_type_1(header, 0)
+	pp = C.il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	var dst_addr [AX25_MAX_ADDR_LEN]C.char
-	var src_addr [AX25_MAX_ADDR_LEN]C.char
+	var dst_addr [C.AX25_MAX_ADDR_LEN]C.char
+	var src_addr [C.AX25_MAX_ADDR_LEN]C.char
 
-	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
-	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
+	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
+	C.ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
 
-	var cr cmdres_t // command or response.
+	var cr C.cmdres_t // command or response.
 	var description [64]C.char
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
 
-	var frame_type = C.ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
+	var frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 
-	dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
+	// FIXME KG dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
 	// TODO: compare binary.
 	C.ax25_delete(pp)
@@ -395,15 +395,15 @@ func test_example_headers(t *testing.T) {
 	//dw_printf ("---------- example 2 ------------\n");
 	var example2 []C.uchar = []C.uchar{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
 	var header2 []C.uchar = []C.uchar{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	memset(header, 0, sizeof(header))
-	memset(sresult, 0, sizeof(sresult))
-	memset(&alevel, 0, sizeof(alevel))
+	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
+	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
+	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_struct_alevel_s)
 
-	pp = ax25_from_frame(example2, sizeof(example2), alevel)
+	pp = C.ax25_from_frame(&example2[0], C.int(len(example2)), alevel)
 	assert.True(t, pp != nil)
-	e = il2p_type_1_header(pp, 0, header)
+	e = C.il2p_type_1_header(pp, 0, &header[0])
 	assert.True(t, e == 0)
-	ax25_delete(pp)
+	C.ax25_delete(pp)
 
 	//dw_printf ("Example 2 header:\n");
 	//for (int i = 0 ; i < sizeof(header); i++) {
@@ -411,16 +411,16 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert.True(t, memcmp(header, header2, sizeof(header2)) == 0)
+	assert.True(t, C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), len(header2)) == 0)
 
-	il2p_scramble_block(header, sresult, 13)
+	C.il2p_scramble_block(header, sresult, 13)
 	//dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
 	//for (int i = 0 ; i < sizeof(sresult); i++) {
 	//   dw_printf (" %02x", sresult[i]);
 	//}
 	//dw_printf ("\n");
 
-	il2p_encode_rs(sresult, 13, 2, check)
+	C.il2p_encode_rs(sresult, 13, 2, check)
 
 	//dw_printf ("expect checksum = 91 bd\n");
 	//dw_printf ("check = ");
@@ -433,19 +433,19 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(header, 0)
-	assert.True(t, pp != NULL)
+	pp = C.il2p_decode_header_type_1(header, 0)
+	assert.True(t, pp != nil)
 
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
+	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
+	C.ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
 
-	frame_type = ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
+	frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 
 	dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
 	// TODO: compare binary.
 
-	ax25_delete(pp)
+	C.ax25_delete(pp)
 	// TODO: more examples
 
 	dw_printf("Example 2 header OK\n")
@@ -473,15 +473,15 @@ func test_example_headers(t *testing.T) {
 	var example3 []C.uchar = []C.uchar{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
 	var header3 []C.uchar = []C.uchar{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
 	var complete3 []C.uchar = []C.uchar{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	memset(header, 0, sizeof(header))
-	memset(sresult, 0, sizeof(sresult))
-	memset(&alevel, 0, sizeof(alevel))
+	C.memset(header, 0, sizeof(header))
+	C.memset(sresult, 0, sizeof(sresult))
+	C.memset(&alevel, 0, sizeof(alevel))
 
-	pp = ax25_from_frame(example3, sizeof(example3), alevel)
-	assert.True(t, pp != NULL)
-	e = il2p_type_1_header(pp, 0, header)
+	pp = C.ax25_from_frame(example3, sizeof(example3), alevel)
+	assert.True(t, pp != nil)
+	e = C.il2p_type_1_header(pp, 0, header)
 	assert.True(t, e == 9)
-	ax25_delete(pp)
+	C.ax25_delete(pp)
 
 	//dw_printf ("Example 3 header:\n");
 	//for (int i = 0 ; i < sizeof(header); i++) {
@@ -489,16 +489,16 @@ func test_example_headers(t *testing.T) {
 	//}
 	//dw_printf ("\n");
 
-	assert.True(t, memcmp(header, header3, sizeof(header)) == 0)
+	assert.True(t, C.memcmp(header, header3, sizeof(header)) == 0)
 
-	il2p_scramble_block(header, sresult, 13)
+	C.il2p_scramble_block(header, sresult, 13)
 	//dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
 	//for (int i = 0 ; i < sizeof(sresult); i++) {
 	//   dw_printf (" %02x", sresult[i]);
 	//}
 	//dw_printf ("\n");
 
-	il2p_encode_rs(sresult, 13, 2, check)
+	C.il2p_encode_rs(sresult, 13, 2, check)
 
 	//dw_printf ("expect checksum = 43 35\n");
 	//dw_printf ("check = ");
@@ -514,29 +514,29 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(header, 0)
+	pp = C.il2p_decode_header_type_1(header, 0)
 	assert.True(t, pp != nil)
 
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
+	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, dst_addr)
+	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, src_addr)
 
-	frame_type = ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
+	frame_type = C.ax25_frame_type(pp, &cr, description, &pf, &nr, &ns)
 
 	dw_printf("%s(): %s>%s: %s\n", __func__, src_addr, dst_addr, description)
 
 	// TODO: compare binary.
 
-	ax25_delete(pp)
+	C.ax25_delete(pp)
 	dw_printf("Example 3 header OK\n")
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = ax25_from_frame(example3, sizeof(example3), alevel)
+	pp = C.ax25_from_frame(example3, sizeof(example3), alevel)
 	assert.True(t, pp != nil)
 
 	var max_fec C.int = 0
-	var iout [IL2P_MAX_PACKET_SIZE]C.uchar
-	e = il2p_encode_frame(pp, max_fec, iout)
+	var iout [C.IL2P_MAX_PACKET_SIZE]C.uchar
+	e = C.il2p_encode_frame(pp, max_fec, iout)
 
 	//dw_printf ("expected for example 3:\n");
 	//fx_hex_dump(complete3, sizeof(complete3));
