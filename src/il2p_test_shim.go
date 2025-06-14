@@ -694,9 +694,11 @@ func all_frame_types(t *testing.T) {
 			var modulo C.int = 8
 			var nr = modulo/2 + 1
 
-			// SREJ can only be response.
-
-			for cr := C.cmdres_t(0); cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
+			for cr := C.cmdres_t(0); cr <= C.cr_cmd; cr++ {
+				// SREJ can only be response.
+				if ftype == C.frame_type_S_SREJ && cr != C.cr_res {
+					continue
+				}
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -710,7 +712,11 @@ func all_frame_types(t *testing.T) {
 			modulo = 128
 			nr = modulo/2 + 1
 
-			for cr := C.cmdres_t(0); cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
+			for cr := C.cmdres_t(0); cr <= C.cr_cmd; cr++ {
+				// SREJ can only be response.
+				if ftype == C.frame_type_S_SREJ && cr != C.cr_res {
+					continue
+				}
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
