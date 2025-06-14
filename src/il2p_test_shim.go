@@ -581,7 +581,7 @@ func enc_dec_compare(t *testing.T, pp1 packet_t) {
 		var len2 = C.ax25_get_frame_len(pp2)
 		var data2 = C.ax25_get_frame_data_ptr(pp2)
 
-		if len1 != len2 || C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), len1) != 0 {
+		if len1 != len2 || C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), C.ulong(len1)) != 0 {
 
 			dw_printf("\nEncode/Decode Error.  Original:\n")
 			C.ax25_hex_dump(pp1)
@@ -614,8 +614,8 @@ func all_frame_types() {
 	packet_t pp;
 	*/
 
-	C.strcpy(addrs[0], C.CString("W2UB"))
-	C.strcpy(addrs[1], C.CString("WB2OSZ-12"))
+	C.strcpy(&addrs[0][0], C.CString("W2UB"))
+	C.strcpy(&addrs[1][0], C.CString("WB2OSZ-12"))
 	var num_addr = 2
 
 	dw_printf("Testing all frame types.\n")
@@ -624,7 +624,7 @@ func all_frame_types() {
 
 	dw_printf("\nU frames...\n")
 
-	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
+	for ftype := C.frame_type_U_SABME; ftype <= C.frame_type_U_TEST; ftype++ {
 
 		for pf := 0; pf <= 1; pf++ {
 
@@ -633,39 +633,39 @@ func all_frame_types() {
 
 			switch ftype {
 			// 0 = response, 1 = command
-			case frame_type_U_SABME:
+			case C.frame_type_U_SABME:
 				cmin = 1
 				cmax = 1
 				break
-			case frame_type_U_SABM:
+			case C.frame_type_U_SABM:
 				cmin = 1
 				cmax = 1
 				break
-			case frame_type_U_DISC:
+			case C.frame_type_U_DISC:
 				cmin = 1
 				cmax = 1
 				break
-			case frame_type_U_DM:
+			case C.frame_type_U_DM:
 				cmin = 0
 				cmax = 0
 				break
-			case frame_type_U_UA:
+			case C.frame_type_U_UA:
 				cmin = 0
 				cmax = 0
 				break
-			case frame_type_U_FRMR:
+			case C.frame_type_U_FRMR:
 				cmin = 0
 				cmax = 0
 				break
-			case frame_type_U_UI:
+			case C.frame_type_U_UI:
 				cmin = 0
 				cmax = 1
 				break
-			case frame_type_U_XID:
+			case C.frame_type_U_XID:
 				cmin = 0
 				cmax = 1
 				break
-			case frame_type_U_TEST:
+			case C.frame_type_U_TEST:
 				cmin = 0
 				cmax = 1
 				break
@@ -693,7 +693,7 @@ func all_frame_types() {
 
 	dw_printf("\nS frames...\n")
 
-	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
+	for ftype := C.frame_type_S_RR; ftype <= C.frame_type_S_SREJ; ftype++ {
 
 		for pf := 0; pf <= 1; pf++ {
 
@@ -702,7 +702,7 @@ func all_frame_types() {
 
 			// SREJ can only be response.
 
-			for cr := 0; cr <= int(ftype != frame_type_S_SREJ); cr++ {
+			for cr := 0; cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
 
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
@@ -717,7 +717,7 @@ func all_frame_types() {
 			modulo = 128
 			nr = modulo/2 + 1
 
-			for cr := 0; cr <= int(ftype != frame_type_S_SREJ); cr++ {
+			for cr := 0; cr <= int(ftype != C.frame_type_S_SREJ); cr++ {
 
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
@@ -735,21 +735,20 @@ func all_frame_types() {
 
 	var srej_info []C.uchar = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = frame_type_S_SREJ
+	var ftype = C.frame_type_S_SREJ
 	for pf := 0; pf <= 1; pf++ {
 
 		var modulo = 128
 		var nr = 127
 		var cr = cr_res
 
-		text_color_set(DW_COLOR_INFO)
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info, (int)(sizeof(srej_info)))
+		pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info, (int)(sizeof(srej_info)))
 
-		ax25_hex_dump(pp)
+		C.ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
-		ax25_delete(pp)
+		C.ax25_delete(pp)
 	}
 
 	/* I frame */
@@ -767,14 +766,13 @@ func all_frame_types() {
 
 		for cr := 1; cr <= 1; cr++ { // can only be command
 
-			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			pp = C.ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
-			ax25_hex_dump(pp)
+			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			ax25_delete(pp)
+			C.ax25_delete(pp)
 		}
 
 		modulo = 128
