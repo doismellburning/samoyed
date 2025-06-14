@@ -535,7 +535,7 @@ func test_example_headers(t *testing.T) {
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = C.ax25_from_frame(example3, len(example3), alevel)
+	pp = C.ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
 	assert.True(t, pp != nil)
 
 	var max_fec C.int = 0
@@ -566,41 +566,41 @@ func test_example_headers(t *testing.T) {
 func enc_dec_compare(t *testing.T, pp1 packet_t) {
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
 
-		var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
+		var encoded [C.IL2P_MAX_PACKET_SIZE]C.uchar
 		var enc_len = C.il2p_encode_frame(pp1, max_fec, &encoded[0])
 		assert.True(t, enc_len >= 0)
 
-		var pp2 = il2p_decode_frame(encoded)
+		var pp2 = C.il2p_decode_frame(&encoded[0])
 		assert.True(t, pp2 != nil)
 
 		// Is it the same after encoding to IL2P and then decoding?
 
-		var len1 = ax25_get_frame_len(pp1)
-		var data1 = ax25_get_frame_data_ptr(pp1)
+		var len1 = C.ax25_get_frame_len(pp1)
+		var data1 = C.ax25_get_frame_data_ptr(pp1)
 
-		var len2 = ax25_get_frame_len(pp2)
-		var data2 = ax25_get_frame_data_ptr(pp2)
+		var len2 = C.ax25_get_frame_len(pp2)
+		var data2 = C.ax25_get_frame_data_ptr(pp2)
 
-		if len1 != len2 || memcmp(data1, data2, len1) != 0 {
+		if len1 != len2 || C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), len1) != 0 {
 
 			dw_printf("\nEncode/Decode Error.  Original:\n")
-			ax25_hex_dump(pp1)
+			C.ax25_hex_dump(pp1)
 
 			dw_printf("IL2P encoded as:\n")
-			fx_hex_dump(encoded, enc_len)
+			C.fx_hex_dump(&encoded[0], enc_len)
 
 			dw_printf("Got turned into this:\n")
-			ax25_hex_dump(pp2)
+			C.ax25_hex_dump(pp2)
 		}
 
-		assert.True(t, len1 == len2 && memcmp(data1, data2, len1) == 0)
+		assert.True(t, len1 == len2 && C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), C.ulong(len1)) == 0)
 
-		ax25_delete(pp2)
+		C.ax25_delete(pp2)
 	}
 }
 
 func all_frame_types() {
-	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+	var addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
 	/* FIXME KG
 	int num_addr = 2;
 	cmdres_t cr;
@@ -614,11 +614,10 @@ func all_frame_types() {
 	packet_t pp;
 	*/
 
-	strcpy(addrs[0], "W2UB")
-	strcpy(addrs[1], "WB2OSZ-12")
-	num_addr = 2
+	C.strcpy(addrs[0], C.CString("W2UB"))
+	C.strcpy(addrs[1], C.CString("WB2OSZ-12"))
+	var num_addr = 2
 
-	text_color_set(DW_COLOR_INFO)
 	dw_printf("Testing all frame types.\n")
 
 	/* U frame */
