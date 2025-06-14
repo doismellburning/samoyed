@@ -701,7 +701,7 @@ func all_frame_types(t *testing.T) {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
@@ -715,7 +715,7 @@ func all_frame_types(t *testing.T) {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
@@ -728,16 +728,16 @@ func all_frame_types(t *testing.T) {
 
 	var srej_info []C.uchar = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = C.frame_type_S_SREJ
+	var ftype = C.ax25_frame_type_t(C.frame_type_S_SREJ)
 	for pf := 0; pf <= 1; pf++ {
 
 		var modulo = 128
 		var nr = 127
-		var cr = cr_res
+		var cr = C.cr_res
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = C.ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info, (int)(sizeof(srej_info)))
+		var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, srej_info, C.int(len(srej_info)))
 
 		C.ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
