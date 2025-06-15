@@ -6,6 +6,7 @@
 /ll2utm
 /fxrec
 /fxsend
+/ttcalc
 /utm2ll
 
 # Custom
@@ -58,7 +59,6 @@ gen_packets
 log2gpx
 text2tt
 tt2text
-ttcalc
 
 direwolf.conf
 fsk_fast_filter.h
