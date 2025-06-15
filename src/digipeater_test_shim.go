@@ -28,18 +28,15 @@ https://github.com/golang/go/issues/4030
 // char *config_atgp = "HOP";
 import "C"
 
-import "unsafe"
+import (
+	"testing"
+	"unsafe"
 
-func digipeater_test(_in, _out string) {
-	/*
-		packet_t pp, result;
-		char rec[256];
-		char xmit[256];
-		unsigned char *pinfo;
-		unsigned char frame[AX25_MAX_PACKET_LEN];
-		int frame_len;
-		alevel_t alevel;
-	*/
+	"github.com/stretchr/testify/assert"
+)
+
+func digipeater_test(t *testing.T, _in, _out string) {
+	t.Helper()
 
 	var in = C.CString(_in)
 	var out = C.CString(_out)
@@ -51,7 +48,7 @@ func digipeater_test(_in, _out string) {
 	 * text again to make sure it comes out the same.
 	 */
 	var pp = C.ax25_from_text(in, 1)
-	// FIXME KG assert(pp != nil)
+	assert.NotNil(t, pp)
 
 	var rec [256]C.char
 	var pinfo *C.uchar
@@ -79,7 +76,7 @@ func digipeater_test(_in, _out string) {
 	alevel.space = 50
 
 	pp = C.ax25_from_frame(&frame[0], frame_len, alevel)
-	// FIXME KG assert(pp != NULL)
+	assert.NotNil(t, pp)
 	C.ax25_format_addrs(pp, &rec[0])
 	C.ax25_get_info(pp, &pinfo)
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
@@ -130,12 +127,8 @@ func digipeater_test(_in, _out string) {
 	dw_printf("\n")
 }
 
-func digipeater_test_main() bool {
-	/*
-		int e;
-		failed = 0;
-		char message[256];
-	*/
+func digipeater_test_main(t *testing.T) bool {
+	t.Helper()
 
 	C.mycall = C.CString("WB2OSZ-9")
 
@@ -170,85 +163,85 @@ func digipeater_test_main() bool {
 	 * Let's start with the most basic cases.
 	 */
 
-	digipeater_test("W1ABC>TEST01,TRACE3-3:",
+	digipeater_test(t, "W1ABC>TEST01,TRACE3-3:",
 		"W1ABC>TEST01,WB2OSZ-9*,TRACE3-2:")
 
-	digipeater_test("W1ABC>TEST02,WIDE3-3:",
+	digipeater_test(t, "W1ABC>TEST02,WIDE3-3:",
 		"W1ABC>TEST02,WB2OSZ-9*,WIDE3-2:")
 
-	digipeater_test("W1ABC>TEST03,WIDE3-2:",
+	digipeater_test(t, "W1ABC>TEST03,WIDE3-2:",
 		"W1ABC>TEST03,WB2OSZ-9*,WIDE3-1:")
 
-	digipeater_test("W1ABC>TEST04,WIDE3-1:",
+	digipeater_test(t, "W1ABC>TEST04,WIDE3-1:",
 		"W1ABC>TEST04,WB2OSZ-9*:")
 
 	/*
 	 * Look at edge case of maximum number of digipeaters.
 	 */
-	digipeater_test("W1ABC>TEST11,R1,R2,R3,R4,R5,R6*,WIDE3-3:",
+	digipeater_test(t, "W1ABC>TEST11,R1,R2,R3,R4,R5,R6*,WIDE3-3:",
 		"W1ABC>TEST11,R1,R2,R3,R4,R5,R6,WB2OSZ-9*,WIDE3-2:")
 
-	digipeater_test("W1ABC>TEST12,R1,R2,R3,R4,R5,R6,R7*,WIDE3-3:",
+	digipeater_test(t, "W1ABC>TEST12,R1,R2,R3,R4,R5,R6,R7*,WIDE3-3:",
 		"W1ABC>TEST12,R1,R2,R3,R4,R5,R6,R7*,WIDE3-2:")
 
-	digipeater_test("W1ABC>TEST13,R1,R2,R3,R4,R5,R6,R7*,WIDE3-1:",
+	digipeater_test(t, "W1ABC>TEST13,R1,R2,R3,R4,R5,R6,R7*,WIDE3-1:",
 		"W1ABC>TEST13,R1,R2,R3,R4,R5,R6,R7,WB2OSZ-9*:")
 
 	/*
 	 * "Trap" large values of "N" by repeating only once.
 	 */
-	digipeater_test("W1ABC>TEST21,WIDE4-4:",
+	digipeater_test(t, "W1ABC>TEST21,WIDE4-4:",
 		"W1ABC>TEST21,WB2OSZ-9*:")
 
-	digipeater_test("W1ABC>TEST22,WIDE7-7:",
+	digipeater_test(t, "W1ABC>TEST22,WIDE7-7:",
 		"W1ABC>TEST22,WB2OSZ-9*:")
 
 	/*
 	 * Only values in range of 1 thru 7 are valid.
 	 */
-	digipeater_test("W1ABC>TEST31,WIDE0-4:",
+	digipeater_test(t, "W1ABC>TEST31,WIDE0-4:",
 		"")
 
-	digipeater_test("W1ABC>TEST32,WIDE8-4:",
+	digipeater_test(t, "W1ABC>TEST32,WIDE8-4:",
 		"")
 
-	digipeater_test("W1ABC>TEST33,WIDE2:",
+	digipeater_test(t, "W1ABC>TEST33,WIDE2:",
 		"")
 
 	/*
 	 * and a few cases actually heard.
 	 */
 
-	digipeater_test("WA1ENO>FN42ND,W1MV-1*,WIDE3-2:",
+	digipeater_test(t, "WA1ENO>FN42ND,W1MV-1*,WIDE3-2:",
 		"WA1ENO>FN42ND,W1MV-1,WB2OSZ-9*,WIDE3-1:")
 
-	digipeater_test("W1ON-3>BEACON:",
+	digipeater_test(t, "W1ON-3>BEACON:",
 		"")
 
-	digipeater_test("W1CMD-9>TQ3Y8P,N1RCW-2,W1CLA-1,N8VIM,WIDE2*:",
+	digipeater_test(t, "W1CMD-9>TQ3Y8P,N1RCW-2,W1CLA-1,N8VIM,WIDE2*:",
 		"")
 
-	digipeater_test("W1CLA-1>APX192,W1GLO-1,WIDE2*:",
+	digipeater_test(t, "W1CLA-1>APX192,W1GLO-1,WIDE2*:",
 		"")
 
-	digipeater_test("AC1U-9>T2TX4S,AC1U,WIDE1,N8VIM*,WIDE2-1:",
+	digipeater_test(t, "AC1U-9>T2TX4S,AC1U,WIDE1,N8VIM*,WIDE2-1:",
 		"AC1U-9>T2TX4S,AC1U,WIDE1,N8VIM,WB2OSZ-9*:")
 
 	/*
 	 * Someone is still using the old style and will probably be disappointed.
 	 */
 
-	digipeater_test("K1CPD-1>T2SR5R,RELAY*,WIDE,WIDE,SGATE,WIDE:",
+	digipeater_test(t, "K1CPD-1>T2SR5R,RELAY*,WIDE,WIDE,SGATE,WIDE:",
 		"")
 
 	/*
 	 * Change destination SSID to normal digipeater if none specified.  (Obsolete, removed.)
 	 */
 
-	digipeater_test("W1ABC>TEST-3:",
+	digipeater_test(t, "W1ABC>TEST-3:",
 		"")
 
-	digipeater_test("W1DEF>TEST-3,WIDE2-2:",
+	digipeater_test(t, "W1DEF>TEST-3,WIDE2-2:",
 		"W1DEF>TEST-3,WB2OSZ-9*,WIDE2-1:")
 
 	/*
@@ -257,16 +250,16 @@ func digipeater_test_main() bool {
 	 * The 4th case might be controversial.
 	 */
 
-	digipeater_test("W1XYZ>TESTD,R1*,WIDE3-2:info1",
+	digipeater_test(t, "W1XYZ>TESTD,R1*,WIDE3-2:info1",
 		"W1XYZ>TESTD,R1,WB2OSZ-9*,WIDE3-1:info1")
 
-	digipeater_test("W1XYZ>TESTD,R2*,WIDE3-2:info1",
+	digipeater_test(t, "W1XYZ>TESTD,R2*,WIDE3-2:info1",
 		"")
 
-	digipeater_test("W1XYZ>TESTD,R3*,WIDE3-2:info1",
+	digipeater_test(t, "W1XYZ>TESTD,R3*,WIDE3-2:info1",
 		"")
 
-	digipeater_test("W1XYZ>TESTD,R1*,WB2OSZ-9:has explicit routing",
+	digipeater_test(t, "W1XYZ>TESTD,R1*,WB2OSZ-9:has explicit routing",
 		"W1XYZ>TESTD,R1,WB2OSZ-9*:has explicit routing")
 
 	/*
@@ -274,20 +267,20 @@ func digipeater_test_main() bool {
 	 */
 	C.sleep(5)
 
-	digipeater_test("W1XYZ>TEST,R3*,WIDE3-2:info1",
+	digipeater_test(t, "W1XYZ>TEST,R3*,WIDE3-2:info1",
 		"W1XYZ>TEST,R3,WB2OSZ-9*,WIDE3-1:info1")
 
 	/*
 	 * Although source and destination match, the info field is different.
 	 */
 
-	digipeater_test("W1XYZ>TEST,R1*,WIDE3-2:info4",
+	digipeater_test(t, "W1XYZ>TEST,R1*,WIDE3-2:info4",
 		"W1XYZ>TEST,R1,WB2OSZ-9*,WIDE3-1:info4")
 
-	digipeater_test("W1XYZ>TEST,R1*,WIDE3-2:info5",
+	digipeater_test(t, "W1XYZ>TEST,R1*,WIDE3-2:info5",
 		"W1XYZ>TEST,R1,WB2OSZ-9*,WIDE3-1:info5")
 
-	digipeater_test("W1XYZ>TEST,R1*,WIDE3-2:info6",
+	digipeater_test(t, "W1XYZ>TEST,R1*,WIDE3-2:info6",
 		"W1XYZ>TEST,R1,WB2OSZ-9*,WIDE3-1:info6")
 
 	/*
@@ -295,34 +288,34 @@ func digipeater_test_main() bool {
 	 * "Preemptive" digipeating looks ahead beyond the first unused digipeater.
 	 */
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:off",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:off",
 		"")
 
 	C.preempt = C.PREEMPT_DROP
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:drop",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:drop",
 		"W1ABC>TEST11,WB2OSZ-9*,CITYE:drop")
 
 	C.preempt = C.PREEMPT_MARK
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:mark1",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:mark1",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark1")
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYB,CITYC,WB2OSZ-9,CITYE:mark2",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,WB2OSZ-9,CITYE:mark2",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark2")
 
 	C.preempt = C.PREEMPT_TRACE
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:trace1",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:trace1",
 		"W1ABC>TEST11,CITYA,WB2OSZ-9*,CITYE:trace1")
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD:trace2",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD:trace2",
 		"W1ABC>TEST11,CITYA,WB2OSZ-9*:trace2")
 
-	digipeater_test("W1ABC>TEST11,CITYB,CITYC,CITYD:trace3",
+	digipeater_test(t, "W1ABC>TEST11,CITYB,CITYC,CITYD:trace3",
 		"W1ABC>TEST11,WB2OSZ-9*:trace3")
 
-	digipeater_test("W1ABC>TEST11,CITYA*,CITYW,CITYX,CITYY,CITYZ:nomatch",
+	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYW,CITYX,CITYY,CITYZ:nomatch",
 		"")
 
 	/*
@@ -330,65 +323,65 @@ func digipeater_test_main() bool {
 	 * Yes.  Don't retransmit my own.  1.4H
 	 */
 
-	digipeater_test("WB2OSZ-7>TEST14,WIDE1-1,WIDE1-1:stuff",
+	digipeater_test(t, "WB2OSZ-7>TEST14,WIDE1-1,WIDE1-1:stuff",
 		"WB2OSZ-7>TEST14,WB2OSZ-9*,WIDE1-1:stuff")
 
-	digipeater_test("WB2OSZ-9>TEST14,WIDE1-1,WIDE1-1:from myself",
+	digipeater_test(t, "WB2OSZ-9>TEST14,WIDE1-1,WIDE1-1:from myself",
 		"")
 
-	digipeater_test("WB2OSZ-9>TEST14,WIDE1-1*,WB2OSZ-9:from myself but explicit routing",
+	digipeater_test(t, "WB2OSZ-9>TEST14,WIDE1-1*,WB2OSZ-9:from myself but explicit routing",
 		"WB2OSZ-9>TEST14,WIDE1-1,WB2OSZ-9*:from myself but explicit routing")
 
-	digipeater_test("WB2OSZ-15>TEST14,WIDE1-1,WIDE1-1:stuff",
+	digipeater_test(t, "WB2OSZ-15>TEST14,WIDE1-1,WIDE1-1:stuff",
 		"WB2OSZ-15>TEST14,WB2OSZ-9*,WIDE1-1:stuff")
 
 	// New in 1.7 - ATGP Hack
 
 	C.preempt = C.PREEMPT_OFF // Shouldn't make a difference here.
 
-	digipeater_test("W1ABC>TEST51,HOP7-7,HOP7-7:stuff1",
+	digipeater_test(t, "W1ABC>TEST51,HOP7-7,HOP7-7:stuff1",
 		"W1ABC>TEST51,WB2OSZ-9*,HOP7-6,HOP7-7:stuff1")
 
-	digipeater_test("W1ABC>TEST52,ABCD*,HOP7-1,HOP7-7:stuff2",
+	digipeater_test(t, "W1ABC>TEST52,ABCD*,HOP7-1,HOP7-7:stuff2",
 		"W1ABC>TEST52,WB2OSZ-9,HOP7*,HOP7-7:stuff2") // Used up address remains.
 
-	digipeater_test("W1ABC>TEST53,HOP7*,HOP7-7:stuff3",
+	digipeater_test(t, "W1ABC>TEST53,HOP7*,HOP7-7:stuff3",
 		"W1ABC>TEST53,WB2OSZ-9*,HOP7-6:stuff3") // But it gets removed here.
 
-	digipeater_test("W1ABC>TEST54,HOP7*,HOP7-1:stuff4",
+	digipeater_test(t, "W1ABC>TEST54,HOP7*,HOP7-1:stuff4",
 		"W1ABC>TEST54,WB2OSZ-9,HOP7*:stuff4") // Remains again here.
 
-	digipeater_test("W1ABC>TEST55,HOP7,HOP7*:stuff5",
+	digipeater_test(t, "W1ABC>TEST55,HOP7,HOP7*:stuff5",
 		"")
 
 	// Examples given for desired result.
 
 	C.mycall = C.CString("CLNGMN-1")
-	digipeater_test("W1ABC>TEST60,HOP7-7,HOP7-7:",
+	digipeater_test(t, "W1ABC>TEST60,HOP7-7,HOP7-7:",
 		"W1ABC>TEST60,CLNGMN-1*,HOP7-6,HOP7-7:")
-	digipeater_test("W1ABC>TEST61,ROAN-3*,HOP7-6,HOP7-7:",
+	digipeater_test(t, "W1ABC>TEST61,ROAN-3*,HOP7-6,HOP7-7:",
 		"W1ABC>TEST61,CLNGMN-1*,HOP7-5,HOP7-7:")
 
 	C.mycall = C.CString("GDHILL-8")
-	digipeater_test("W1ABC>TEST62,MDMTNS-7*,HOP7-1,HOP7-7:",
+	digipeater_test(t, "W1ABC>TEST62,MDMTNS-7*,HOP7-1,HOP7-7:",
 		"W1ABC>TEST62,GDHILL-8,HOP7*,HOP7-7:")
-	digipeater_test("W1ABC>TEST63,CAMLBK-9*,HOP7-1,HOP7-7:",
+	digipeater_test(t, "W1ABC>TEST63,CAMLBK-9*,HOP7-1,HOP7-7:",
 		"W1ABC>TEST63,GDHILL-8,HOP7*,HOP7-7:")
 
 	C.mycall = C.CString("MDMTNS-7")
-	digipeater_test("W1ABC>TEST64,GDHILL-8*,HOP7*,HOP7-7:",
+	digipeater_test(t, "W1ABC>TEST64,GDHILL-8*,HOP7*,HOP7-7:",
 		"W1ABC>TEST64,MDMTNS-7*,HOP7-6:")
 
 	C.mycall = C.CString("CAMLBK-9")
-	digipeater_test("W1ABC>TEST65,GDHILL-8,HOP7*,HOP7-7:",
+	digipeater_test(t, "W1ABC>TEST65,GDHILL-8,HOP7*,HOP7-7:",
 		"W1ABC>TEST65,CAMLBK-9*,HOP7-6:")
 
 	C.mycall = C.CString("KATHDN-15")
-	digipeater_test("W1ABC>TEST66,MTWASH-14*,HOP7-1:",
+	digipeater_test(t, "W1ABC>TEST66,MTWASH-14*,HOP7-1:",
 		"W1ABC>TEST66,KATHDN-15,HOP7*:")
 
 	C.mycall = C.CString("SPRNGR-1")
-	digipeater_test("W1ABC>TEST67,CLNGMN-1*,HOP7-1:",
+	digipeater_test(t, "W1ABC>TEST67,CLNGMN-1*,HOP7-1:",
 		"W1ABC>TEST67,SPRNGR-1,HOP7*:")
 
 	if C.failed == 0 {
