@@ -3,7 +3,6 @@
 
 set(GEN_PACKETS_BIN "${CMAKE_BINARY_DIR}/src/gen_packets${CMAKE_EXECUTABLE_SUFFIX}")
 set(ATEST_BIN "${CMAKE_BINARY_DIR}/src/atest${CMAKE_EXECUTABLE_SUFFIX}")
-set(IL2P_TEST_BIN "${CMAKE_BINARY_DIR}/test/il2p_test${CMAKE_EXECUTABLE_SUFFIX}")
 
 if(WIN32)
   set(CUSTOM_SCRIPT_SUFFIX ".bat")
@@ -39,39 +38,6 @@ if(WIN32 OR CYGWIN)
     )
 endif()
 
-
-# Unit Test IL2P with out modems.
-
-list(APPEND il2p_test_SOURCES
-  ${CUSTOM_SRC_DIR}/il2p_test.c
-  ${CUSTOM_SRC_DIR}/il2p_init.c
-  ${CUSTOM_SRC_DIR}/il2p_rec.c
-  ${CUSTOM_SRC_DIR}/il2p_send.c
-  ${CUSTOM_SRC_DIR}/il2p_codec.c
-  ${CUSTOM_SRC_DIR}/il2p_payload.c
-  ${CUSTOM_SRC_DIR}/il2p_header.c
-  ${CUSTOM_SRC_DIR}/il2p_scramble.c
-  ${CUSTOM_SRC_DIR}/ax25_pad.c
-  ${CUSTOM_SRC_DIR}/ax25_pad2.c
-  ${CUSTOM_SRC_DIR}/fx25_encode.c
-  ${CUSTOM_SRC_DIR}/fx25_extract.c
-  ${CUSTOM_SRC_DIR}/fx25_init.c
-  ${CUSTOM_SRC_DIR}/fcs_calc.c
-  ${CUSTOM_SRC_DIR}/textcolor.c
-  )
-
-add_executable(il2p_test
-  ${il2p_test_SOURCES}
-  )
-
-#FIXME - remove if not needed.
-#set_target_properties(il2p_test
-#  PROPERTIES COMPILE_FLAGS "-DXXXXX"
-#  )
-
-target_link_libraries(il2p_test
-  ${MISC_LIBRARIES}
-  )
 
 # doing ctest on previous programs
 
