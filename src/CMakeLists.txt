@@ -216,22 +216,6 @@ target_link_libraries(tt2text
   )
 
 
-# Convert from log file to GPX.
-# log2gpx
-list(APPEND log2gpx_SOURCES
-  log2gpx.c
-  textcolor.c
-  )
-
-add_executable(log2gpx
-  ${log2gpx_SOURCES}
-  )
-
-target_link_libraries(log2gpx
-  ${MISC_LIBRARIES}
-  )
-
-
 # Test application to generate sound.
 # gen_packets
 list(APPEND gen_packets_SOURCES
@@ -442,7 +426,6 @@ install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS text2tt DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS tt2text DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS ttcalc DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS kissutil DESTINATION ${INSTALL_BIN_DIR})

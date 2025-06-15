@@ -1,79 +1,64 @@
+package main
 
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2014  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+// #include "direwolf.h"
+// #include <stdlib.h>
+// #include <string.h>
+// #include <stdio.h>
+// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
+import "C"
 
-#include "direwolf.h"
-
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+import (
+	_ "github.com/doismellburning/samoyed/src" // cgo
+)
 
 
 /*
  * Information we gather for each thing.
  */
 
-typedef struct thing_s {
-	double lat;
-	double lon;
-	float alt;		/* Meters above average sea level. */
-	float course;
-	float speed;		/* Meters per second. */
-	char time[20+1+3];
-	char name[9+1+2];
-	char desc[32];		/* freq/offset/tone something like 146.955 MHz -600k PL 74.4 */
-	char comment[80];	/* Combined mic-e status and comment text */
-} thing_t;
+type thing_s struct {
+	lat double
+	lon double
+	alt float 		/* Meters above average sea level. */
+	course float 
+	speed float 		/* Meters per second. */
+	time string
+	name string
+	desc string		/* freq/offset/tone something like 146.955 MHz -600k PL 74.4 */
+	comment string	/* Combined mic-e status and comment text */
+} 
 
-static thing_t *things;		/* Dynamically sized array. */
-static int max_things;		/* Current size. */
-static int num_things;		/* Number of elements currently in use. */
+// FIXME KGstatic thing_t *things;		/* Dynamically sized array. */
+// FIXME KGstatic int max_things;		/* Current size. */
+// FIXME KGstatic int num_things;		/* Number of elements currently in use. */
 
-#define UNKNOWN_VALUE (-999)	/* Special value to indicate unknown altitude, speed, course. */
+// FIXME KG#define UNKNOWN_VALUE (-999)	/* Special value to indicate unknown altitude, speed, course. */
 
-#define KNOTS_TO_METERS_PER_SEC(x) ((x)*0.51444444444)
-
-
-static void read_csv(FILE *fp);
-static void unquote (char *in, char *out);
-static int compar(const void *a, const void *b);
-static void process_things (int first, int last);
+// FIXME KG#define KNOTS_TO_METERS_PER_SEC(x) ((x)*0.51444444444)
 
 
-int log2gpx_main (int argc, char *argv[])
-{
-	int first, last;
+// FIXME KGstatic void read_csv(FILE *fp);
+// FIXME KGstatic void unquote (char *in, char *out);
+// FIXME KGstatic int compar(const void *a, const void *b);
+// FIXME KGstatic void process_things (int first, int last);
+
+
+func main() {
+	// FIXME KG int first, last
 	
-
 /*
  * Allocate array for data.
  * Expand it as needed if initial size is inadequate.
  */
 
-	num_things = 0;
-	max_things = 1000;
-	things = malloc (max_things * sizeof(thing_t));
+	var num_things = 0;
+	var max_things = 1000;
 
 /*
  * Read files listed or stdin if none.
  */
 
+ /* FIXME KG
 	if (argc == 1) {
 	  read_csv (stdin);
 	}
@@ -104,6 +89,7 @@ int log2gpx_main (int argc, char *argv[])
 	  fprintf (stderr, "Nothing to process.\n");
 	  exit (1);
 	}
+	*/
 
 /*
  * Sort the data so everything for the same name is adjacent and
@@ -131,10 +117,11 @@ int log2gpx_main (int argc, char *argv[])
 /*
  * Group together all records for the same entity.
  */
-	last = first = 0;
-	while (first < num_things) {
+ 	first = 0
+	last = 0
+	for first < num_things {
 
-	  while (last < num_things-1 && strcmp(things[first].name, things[last+1].name) == 0) {
+	  for last < num_things-1 && strcmp(things[first].name, things[last+1].name) == 0 {
 	    last++;
 	  }
 	  process_things (first, last);
@@ -145,8 +132,6 @@ int log2gpx_main (int argc, char *argv[])
  *  GPX file tail.
  */
 	printf ("</gpx>\n");
-
-	exit (0);
 }
 
 
@@ -154,8 +139,7 @@ int log2gpx_main (int argc, char *argv[])
  * Read from given file, already open, into things array. 
  */
 
-static void read_csv(FILE *fp)
-{
+func read_csv(FILE *fp) {
 	char raw[500];
 	char csv[500];
 	int n;
