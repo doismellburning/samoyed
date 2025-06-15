@@ -3,6 +3,7 @@
 /atest
 /il2p_test
 /ll2utm
+/log2gpx
 /fxrec
 /fxsend
 /utm2ll
@@ -55,7 +56,6 @@ decode_aprs
 direwolf
 gen_fff
 gen_packets
-log2gpx
 text2tt
 tt2text
 ttcalc
