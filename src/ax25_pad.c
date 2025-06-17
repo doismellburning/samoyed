@@ -217,6 +217,8 @@ int ax25memdebug_seq (packet_t this_p)
 
 #endif
 
+// Runtime replacement for DECAMAIN define
+int DECODE_APRS_UTIL = 0;
 
 
 #define CLEAR_LAST_ADDR_FLAG  this_p->frame_data[this_p->num_addr*7-1] &= ~ SSID_LAST_MASK
@@ -829,20 +831,21 @@ int ax25_parse_addr (int position, char *in_addr, int strict, char *out_addr, in
 	  out_addr[i++] = *p;
 	  out_addr[i] = '\0';
 
-#if DECAMAIN	// Hack when running in decode_aprs utility.
-		// Exempt the "qA..." case because it was already mentioned.
+	  if (DECODE_APRS_UTIL) {
+	    // Hack when running in decode_aprs utility
+	    // Exempt the "qA..." case because it was already mentioned.
 
-	  if (strict && islower(*p) && strncmp(in_addr, "qA", 2) != 0) {
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr);
+	    if (strict && islower(*p) && strncmp(in_addr, "qA", 2) != 0) {
+	      text_color_set(DW_COLOR_ERROR);
+	      dw_printf ("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr);
+	    }
+	  } else {
+	    if (strict && islower(*p)) {
+	      text_color_set(DW_COLOR_ERROR);
+	      dw_printf ("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr);
+	      return 0;
+	    }
 	  }
-#else
-	  if (strict && islower(*p)) {
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr);
-	    return 0;
-	  }
-#endif
 	}
 	
 	j = 0;

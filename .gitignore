@@ -1,6 +1,7 @@
 /samoyed
 /bin
 /atest
+/decode_aprs
 /il2p_test
 /ll2utm
 /fxrec
@@ -51,7 +52,6 @@ z*
 # Binaries, other build results
 
 aclients
-decode_aprs
 direwolf
 gen_fff
 gen_packets
