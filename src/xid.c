@@ -204,7 +204,7 @@ int xid_parse (unsigned char *info, int info_len, struct xid_param_s *result, ch
 	  }
 	  pval = 0;
 	  for (j=0; j<plen; j++) {
-xpected bal	    pval = (pval << 8) + *p++;
+	    pval = (pval << 8) + *p++;
 	  }
 
 	  switch (pind) {
