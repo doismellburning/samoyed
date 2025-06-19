@@ -128,11 +128,9 @@ void hex_dump (unsigned char *p, int len)
 }
 #endif
 
-#ifndef DECAMAIN
 #ifndef KISSUTIL
 static void kiss_set_hardware (int chan, char *command, int debug, struct kissport_status_s *kps, int client,
 		void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient));
-#endif
 #endif
 
 //#if KISSUTIL
@@ -314,8 +312,6 @@ int kiss_unwrap (unsigned char *in, int ilen, unsigned char *out)
 
 }  /* end kiss_unwrap */
 
-
-#ifndef DECAMAIN
 
 /*-------------------------------------------------------------------
  *
@@ -956,8 +952,6 @@ void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int 
 
 } /* end kiss_debug_print */
 
-
-#endif /* DECAMAIN */
 
 #endif /* WALK96 */
 

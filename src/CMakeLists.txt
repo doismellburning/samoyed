@@ -180,48 +180,6 @@ set_target_properties(direwolf
   PROPERTIES COMPILE_FLAGS "${DIREWOLF_COMPILE_FLAGS}"
   )
 
-# decode_aprs
-list(APPEND decode_aprs_SOURCES
-  decode_aprs.c
-  deviceid.c
-  ais.c
-  kiss_frame.c
-  ax25_pad.c
-  dwgpsnmea.c
-  dwgps.c
-  dwgpsd.c
-  serial_port.c
-  symbols.c
-  textcolor.c
-  fcs_calc.c
-  latlong.c
-  log.c
-  telemetry.c
-  tt_text.c
-  )
-
-if(WIN32 OR CYGWIN)
-  list(REMOVE_ITEM decode_aprs_SOURCES
-    dwgpsd.c
-    )
-endif()
-
-add_executable(decode_aprs
-  ${decode_aprs_SOURCES}
-  )
-
-set_target_properties(decode_aprs
-  PROPERTIES COMPILE_FLAGS "-DDECAMAIN -DUSE_REGEX_STATIC"
-  )
-
-target_link_libraries(decode_aprs
-  ${MISC_LIBRARIES}
-  ${REGEX_LIBRARIES}
-  Threads::Threads
-  ${GPSD_LIBRARIES}
-  )
-
-
 # Convert between text and touch tone representation.
 # text2tt
 list(APPEND text2tt_SOURCES
@@ -481,7 +439,6 @@ endif()
 
 
 install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS decode_aprs DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS text2tt DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS tt2text DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
