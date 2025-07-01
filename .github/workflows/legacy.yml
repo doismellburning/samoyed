@@ -1,0 +1,19 @@
+on:
+  push:
+    branches:
+    - "main"
+    tags:
+    - "**"
+  pull_request:
+
+jobs:
+  legacy:
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/checkout@v4"
+    - run: "sudo apt install --yes libasound2-dev libudev-dev libavahi-client-dev"
+    - run: "mkdir build"
+    - run: "cmake .."
+      working-directory: "build"
+    - run: "make -j direwolf"
+      working-directory: "build"

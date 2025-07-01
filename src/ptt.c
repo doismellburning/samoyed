@@ -1478,6 +1478,12 @@ void ptt_set_real (int ot, int chan, int ptt_signal)
 
 } /* end ptt_set */
 
+#ifndef ATEST_C
+void ptt_set (int ot, int chan, int ptt_signal) {
+	ptt_set_real(ot, chan, ptt_signal);
+}
+#endif
+
 /*-------------------------------------------------------------------
  *
  * Name:	get_input
@@ -1542,6 +1548,12 @@ int get_input_real (int it, int chan)
 
 	return -1;	/* Method was none, or something went wrong */
 }
+
+#ifndef ATEST_C
+int get_input (int it, int chan) {
+	return get_input_real(it, chan);
+}
+#endif
 
 /*-------------------------------------------------------------------
  *

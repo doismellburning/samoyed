@@ -291,6 +291,12 @@ void dlq_rec_frame_real (int chan, int subchan, int slice, packet_t pp, alevel_t
 
 } /* end dlq_rec_frame */
 
+#ifndef ATEST_C
+void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum) {
+	dlq_rec_frame_real(chan, subchan, slice, pp, alevel, fec_type, retries, spectrum);
+}
+#endif
+
 
 
 /*-------------------------------------------------------------------
