@@ -1284,6 +1284,12 @@ int audio_get_real (int a)
 
 } /* end audio_get */
 
+#ifndef ATEST_C
+int audio_get (int a) {
+	return audio_get_real(a);
+}
+#endif
+
 
 /*------------------------------------------------------------------
  *
