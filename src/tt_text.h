@@ -1,6 +1,9 @@
 
 /* tt_text.h */
 
+typedef enum { TT_EITHER, TT_MULTIPRESS, TT_TWO_KEY } tt_enc_t;
+tt_enc_t tt_guess_type (char *buttons);
+
 
 /* Encode normal human readable to DTMF representation. */
 

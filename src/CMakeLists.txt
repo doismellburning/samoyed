@@ -180,42 +180,6 @@ set_target_properties(direwolf
   PROPERTIES COMPILE_FLAGS "${DIREWOLF_COMPILE_FLAGS}"
   )
 
-# Convert between text and touch tone representation.
-# text2tt
-list(APPEND text2tt_SOURCES
-  tt_text.c
-  )
-
-add_executable(text2tt
-  ${text2tt_SOURCES}
-  )
-
-set_target_properties(text2tt
-  PROPERTIES COMPILE_FLAGS "-DENC_MAIN"
-  )
-
-target_link_libraries(text2tt
-  ${MISC_LIBRARIES}
-  )
-
-# tt2text
-list(APPEND tt2text_SOURCES
-  tt_text.c
-  )
-
-add_executable(tt2text
-  ${tt2text_SOURCES}
-  )
-
-set_target_properties(tt2text
-  PROPERTIES COMPILE_FLAGS "-DDEC_MAIN"
-  )
-
-target_link_libraries(tt2text
-  ${MISC_LIBRARIES}
-  )
-
-
 # Convert from log file to GPX.
 # log2gpx
 list(APPEND log2gpx_SOURCES
@@ -439,8 +403,6 @@ endif()
 
 
 install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS text2tt DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS tt2text DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
