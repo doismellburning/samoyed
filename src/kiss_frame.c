@@ -875,7 +875,6 @@ static void kiss_set_hardware (int chan, char *command, int debug, struct kisspo
 
 void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int msg_len)
 {
-#ifndef KISSUTIL
 	const char *direction [2] = { "from", "to" };
 	const char *prefix [2] = { "<<<", ">>>" };
 	const char *function[16] = { 
@@ -883,30 +882,30 @@ void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int 
 		"TXtail",	"FullDuplex",	"SetHardware",	"Invalid 7",
 		"Invalid 8", 	"Invalid 9",	"Invalid 10",	"Invalid 11",
 		"Invalid 12", 	"Invalid 13",	"Invalid 14",	"Return" };
-#endif
 
 	text_color_set(DW_COLOR_DEBUG);
 
-#ifdef KISSUTIL
-	dw_printf ("From KISS TNC:\n");
-#else
-	dw_printf ("\n");
-	if (special == NULL) {
-	  unsigned char *p;	/* to skip over FEND if present. */
+	if (KISSUTIL) {
+	  dw_printf ("From KISS TNC:\n");
+	} else {
+	  dw_printf ("\n");
+	  if (special == NULL) {
+	    unsigned char *p;	/* to skip over FEND if present. */
 
-	  p = pmsg;
-	  if (*p == FEND) p++;
+	    p = pmsg;
+	    if (*p == FEND) p++;
 
-	  dw_printf ("%s %s %s KISS client application, channel %d, total length = %d\n",
+	    dw_printf ("%s %s %s KISS client application, channel %d, total length = %d\n",
 			prefix[(int)fromto], function[p[0] & 0xf], direction[(int)fromto], 
 			(p[0] >> 4) & 0xf, msg_len);
-	}
-	else {
-	  dw_printf ("%s %s %s KISS client application, total length = %d\n",
+	  }
+	  else {
+	    dw_printf ("%s %s %s KISS client application, total length = %d\n",
 			prefix[(int)fromto], special, direction[(int)fromto], 
 			msg_len);
+	  }
 	}
-#endif
+
 	hex_dump (pmsg, msg_len);
 
 } /* end kiss_debug_print */
