@@ -39,6 +39,7 @@ package main
 // #include "dtime_now.h"
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
+// extern int KISSUTIL;
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"
 
@@ -116,6 +117,9 @@ func main() {
 	// It could interfere with trying to pipe stdout to some other application.
 
 	C.setlinebuf(C.stdout)
+
+	C.KISSUTIL = 1 // Change behaviour of kiss_process_msg
+	direwolf.KISS_PROCESS_MSG_OVERRIDE = Kissutil_kiss_process_msg
 
 	/*
 	 * Extract command line args.
@@ -529,21 +533,14 @@ func tnc_listen_serial() {
  *
  *		kiss_len	- Number of bytes including the command.
  *
- *		debug		- Debug option is selected.
- *
- *		client		- Not used in this case.
- *
- *		sendfun		- Not used in this case.
- *
  *-----------------------------------------------------------------*/
 
-// TODO Wire this in
-//
-//export Kissutil_kiss_process_msg
-func Kissutil_kiss_process_msg(_kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *C.struct_kissport_status_s, client C.int) {
+func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 	var alevel C.alevel_t
 
-	var kiss_msg = unsafe.Slice(_kiss_msg, kiss_len)
+	// Hacks to work around the dodgy C/Go/callback bodges I had to do
+	var kiss_len = C.int(_kiss_len)
+	var kiss_msg = unsafe.Slice((*C.uchar)(_kiss_msg), kiss_len)
 
 	var channel = (kiss_msg[0] >> 4) & 0xf
 	var cmd = kiss_msg[0] & 0xf

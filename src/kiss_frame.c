@@ -96,6 +96,7 @@
 #include "version.h"
 #include "kissnet.h"
 
+int KISSUTIL = 0; // Dynamic replacement for the old #define
 
 /* In server.c.  Should probably move to some misc. function file. */
 void hex_dump (unsigned char *p, int len);
@@ -503,11 +504,6 @@ void kiss_rec_byte (kiss_frame_t *kf, unsigned char ch, int debug,
  *
  *-----------------------------------------------------------------*/
 
-#ifndef KISSUTIL	// All these ifdefs in here are a sign that this should be refactored.
-			// Should split this into multiple files.
-			// Some functions are only for the TNC end.
-			// Other functions are suitble for both TNC and client app.
-
 // This is used only by the TNC side.
 
 void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct kissport_status_s *kps, int client,
@@ -516,6 +512,12 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 	int chan;
 	int cmd;
 	alevel_t alevel;
+
+	// Temporary for now
+	if (KISSUTIL) {
+		kiss_process_msg_override(kiss_msg, kiss_len);
+		return;
+	}
 
 // New in 1.7:
 // We can have KISS TCP ports which convey only a single radio channel.
@@ -759,8 +761,6 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 	}
 
 } /* end kiss_process_msg */
-
-#endif  // ifndef KISSUTIL
 
 
 /*-------------------------------------------------------------------
