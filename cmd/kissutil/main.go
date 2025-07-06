@@ -39,7 +39,7 @@ package main
 // #include "dtime_now.h"
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
-// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
+// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DKISSUTIL=1
 import "C"
 
 import (
@@ -537,8 +537,6 @@ func tnc_listen_serial() {
  *
  *-----------------------------------------------------------------*/
 
-// TODO Wire this in
-//
 //export Kissutil_kiss_process_msg
 func Kissutil_kiss_process_msg(_kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *C.struct_kissport_status_s, client C.int) {
 	var alevel C.alevel_t
