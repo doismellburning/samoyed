@@ -101,9 +101,7 @@ struct kissport_status_s {
 
 
 
-#ifndef KISSUTIL
 void kiss_frame_init (struct audio_s *pa);
-#endif
 
 int kiss_encapsulate (unsigned char *in, int ilen, unsigned char *out);
 

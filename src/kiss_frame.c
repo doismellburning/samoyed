@@ -101,44 +101,9 @@ int KISSUTIL = 0; // Dynamic replacement for the old #define
 /* In server.c.  Should probably move to some misc. function file. */
 void hex_dump (unsigned char *p, int len);
 
-#ifdef KISSUTIL
-void hex_dump (unsigned char *p, int len)
-{
-	int n, i, offset;
 
-	offset = 0;
-	while (len > 0) {
-	  n = len < 16 ? len : 16;
-	  // FIXME:  Is there some reason not to use dw_printf here?
-	  printf ("  %03x: ", offset);
-	  for (i=0; i<n; i++) {
-	    printf (" %02x", p[i]);
-	  }
-	  for (i=n; i<16; i++) {
-	    printf ("   ");
-	  }
-	  printf ("  ");
-	  for (i=0; i<n; i++) {
-	    printf ("%c", isprint(p[i]) ? p[i] : '.');
-	  }
-	  printf ("\n");
-	  p += 16;
-	  offset += 16;
-	  len -= 16;
-	}
-}
-#endif
-
-#ifndef KISSUTIL
 static void kiss_set_hardware (int chan, char *command, int debug, struct kissport_status_s *kps, int client,
 		void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient));
-#endif
-
-//#if KISSUTIL
-//#define text_color_set(x)   ;
-//#define dw_printf printf
-//#endif
-
 
 /*-------------------------------------------------------------------
  *
@@ -402,7 +367,6 @@ void kiss_rec_byte (kiss_frame_t *kf, unsigned char ch, int debug,
 	   	kf->noise[kf->noise_len] = '\0';
 	      }
 
-#ifndef KISSUTIL
 	      /* Try to appease client app by sending something back. */
 	      if (strcasecmp("restart\r", (char*)(kf->noise)) == 0 ||
 		    strcasecmp("reset\r", (char*)(kf->noise)) == 0) {
@@ -412,7 +376,6 @@ void kiss_rec_byte (kiss_frame_t *kf, unsigned char ch, int debug,
 	      else {
 	        (*sendfun) (0, 0, (unsigned char *)"\r\ncmd:", -1, kps, client);
 	      }
-#endif
 	      kf->noise_len = 0;
 	    }
 	    return;
@@ -848,8 +811,6 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
  *
  *--------------------------------------------------------------------*/
 
-#ifndef KISSUTIL
-
 static void kiss_set_hardware (int chan, char *command, int debug, struct kissport_status_s *kps, int client,
 		void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient))
 {
@@ -896,8 +857,6 @@ static void kiss_set_hardware (int chan, char *command, int debug, struct kisspo
 	return;
 
 } /* end kiss_set_hardware */
-
-#endif 	// ifndef KISSUTIL
 
 
 /*-------------------------------------------------------------------
