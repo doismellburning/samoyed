@@ -35,10 +35,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
-	_ "github.com/doismellburning/samoyed/src" // Pulls this in for cgo
+	direwolf "github.com/doismellburning/samoyed/src" // Pulls this in for cgo
 )
 
 /*------------------------------------------------------------------
@@ -252,7 +251,7 @@ func main() {
 	 */
 
 	for ready := false; !ready; {
-		SLEEP_MS(100)
+		direwolf.SLEEP_MS(100)
 		ready = true
 		for j := range num_tnc {
 			if is_connected[j] < 0 {
@@ -274,7 +273,7 @@ func main() {
 
 	var timeout = 600
 	for ready := false; !ready && timeout > 0; {
-		SLEEP_MS(100)
+		direwolf.SLEEP_MS(100)
 		timeout--
 		ready = true
 		for j := range num_tnc {
@@ -287,7 +286,7 @@ func main() {
 	if timeout == 0 {
 		fmt.Printf("ERROR: Gave up waiting for connect!\n")
 		tnc_disconnect(1, 0) // Tell other TNC.
-		SLEEP_MS(5000)
+		direwolf.SLEEP_MS(5000)
 		fmt.Printf("TEST FAILED!\n")
 		os.Exit(1)
 	}
@@ -296,8 +295,8 @@ func main() {
 	 * Send data.
 	 */
 
-	SLEEP_MS(2000)
-	SLEEP_MS(2000)
+	direwolf.SLEEP_MS(2000)
+	direwolf.SLEEP_MS(2000)
 
 	fmt.Printf("Send data...\n")
 
@@ -310,10 +309,10 @@ func main() {
 			tnc_send_data(0, 1, data)
 		}
 
-		SLEEP_MS(3000 + 1000*burst_size)
-		// SLEEP_MS(3000 + 500 * burst_size);		// OK for low error rate
-		// SLEEP_MS(3000 + 3000 * burst_size);
-		// SLEEP_MS(3000);
+		direwolf.SLEEP_MS(3000 + 1000*burst_size)
+		// direwolf.SLEEP_MS(3000 + 500 * burst_size);		// OK for low error rate
+		// direwolf.SLEEP_MS(3000 + 3000 * burst_size);
+		// direwolf.SLEEP_MS(3000);
 
 		burst_size++
 	}
@@ -328,7 +327,7 @@ func main() {
 	var INACTIVE_TIMEOUT = 120
 
 	for last_rec_seq[0] != max_count && no_activity < INACTIVE_TIMEOUT {
-		SLEEP_MS(1000)
+		direwolf.SLEEP_MS(1000)
 		no_activity++
 
 		if last_rec_seq[0] > last0 {
@@ -366,7 +365,7 @@ func main() {
 
 	timeout = 200 // 20 sec should be generous.
 	for ready := false; !ready && timeout > 0; {
-		SLEEP_MS(100)
+		direwolf.SLEEP_MS(100)
 		timeout--
 		ready = true
 		for j := range num_tnc {
@@ -379,7 +378,7 @@ func main() {
 	if timeout == 0 {
 		fmt.Printf("ERROR: Gave up waiting for disconnect!\n")
 		tnc_reset(1, 0) // Don't leave TNC in bad state for next time.
-		SLEEP_MS(10000)
+		direwolf.SLEEP_MS(10000)
 		errors++
 	}
 
@@ -425,7 +424,7 @@ func process_rec_data(my_index int, data string) {
 			var n, _ = strconv.Atoi(before)
 			if n != last_rec_seq[my_index] {
 				fmt.Printf("%*s%s: Received %d when %d was expected (%s).\n", my_index*column_width, "", tnc_address[my_index], n, last_rec_seq[my_index], data)
-				SLEEP_MS(10000)
+				direwolf.SLEEP_MS(10000)
 				fmt.Printf("TEST FAILED!\n")
 				os.Exit(1)
 			}
@@ -436,7 +435,7 @@ func process_rec_data(my_index int, data string) {
 			var n, _ = strconv.Atoi(before)
 			if n != last_rec_seq[my_index] {
 				fmt.Printf("%*s%s: Received %d when %d was expected.\n", my_index*column_width, "", tnc_address[my_index], n, last_rec_seq[my_index])
-				SLEEP_MS(10000)
+				direwolf.SLEEP_MS(10000)
 				fmt.Printf("TEST FAILED!\n")
 				os.Exit(1)
 			}
@@ -444,7 +443,7 @@ func process_rec_data(my_index int, data string) {
 	} else if strings.HasPrefix(data, "A") {
 		if !strings.HasPrefix("ABCDEFGHIJKLMNOPQRSTUVWXYZ", data) { //nolint:gocritic
 			fmt.Printf("%*s%s: Segmentation is broken.\n", my_index*column_width, "", tnc_address[my_index])
-			SLEEP_MS(10000)
+			direwolf.SLEEP_MS(10000)
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		}
@@ -636,17 +635,17 @@ func tnc_thread_serial(arg int) {
 
 	cmd = "\003\rreset\r"
 	C.serial_port_write(serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
-	SLEEP_MS(3000)
+	direwolf.SLEEP_MS(3000)
 
 	cmd = "echo on\r"
 	C.serial_port_write(serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
-	SLEEP_MS(200)
+	direwolf.SLEEP_MS(200)
 
 	// do any necessary set up here. such as setting mycall
 
 	cmd = fmt.Sprintf("mycall %s\r", tnc_address[my_index])
 	C.serial_port_write(serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
-	SLEEP_MS(200)
+	direwolf.SLEEP_MS(200)
 
 	// Don't want to stop tty output when typing begins.
 
@@ -759,15 +758,15 @@ func tnc_connect(from int, to int) {
 		if !have_cmd_prompt[from] {
 			var cmd string
 
-			SLEEP_MS(1500)
+			direwolf.SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
 			C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
-			SLEEP_MS(1500)
+			direwolf.SLEEP_MS(1500)
 
 			cmd = "\r"
 			C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
-			SLEEP_MS(200)
+			direwolf.SLEEP_MS(200)
 		}
 
 		var cmd = fmt.Sprintf("connect %s\r", tnc_address[to])
@@ -792,15 +791,15 @@ func tnc_disconnect(from int, to int) {
 		if !have_cmd_prompt[from] {
 			var cmd string
 
-			SLEEP_MS(1500)
+			direwolf.SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
 			C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
-			SLEEP_MS(1500)
+			direwolf.SLEEP_MS(1500)
 
 			cmd = "\r"
 			C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
-			SLEEP_MS(200)
+			direwolf.SLEEP_MS(200)
 		}
 
 		var cmd = "disconnect\r"
@@ -817,15 +816,15 @@ func tnc_reset(from int, to int) {
 	} else {
 		var cmd string
 
-		SLEEP_MS(1500)
+		direwolf.SLEEP_MS(1500)
 
 		cmd = ETX_BREAK
 		C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
-		SLEEP_MS(1500)
+		direwolf.SLEEP_MS(1500)
 
 		cmd = "\r"
 		C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
-		SLEEP_MS(200)
+		direwolf.SLEEP_MS(200)
 
 		cmd = "reset\r"
 		C.serial_port_write(serial_fd[from], C.CString(cmd), C.int(len(cmd)))
@@ -857,21 +856,17 @@ func tnc_send_data(from int, to int, data string) {
 
 		var timeout = 600 // 60 sec.  I've seen it take more than 20.
 		for timeout > 0 && busy[from] {
-			SLEEP_MS(100)
+			direwolf.SLEEP_MS(100)
 			timeout--
 		}
 		if timeout == 0 {
 			fmt.Printf("ERROR: Gave up waiting while TNC busy.\n")
 			tnc_disconnect(0, 1)
-			SLEEP_MS(5000)
+			direwolf.SLEEP_MS(5000)
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		} else {
 			C.serial_port_write(serial_fd[from], C.CString(data), C.int(len(data)))
 		}
 	}
-}
-
-func SLEEP_MS(ms int) {
-	time.Sleep(time.Duration(ms) * time.Millisecond)
 }

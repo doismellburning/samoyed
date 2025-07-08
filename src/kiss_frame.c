@@ -96,48 +96,14 @@
 #include "version.h"
 #include "kissnet.h"
 
+int KISSUTIL = 0; // Dynamic replacement for the old #define
 
 /* In server.c.  Should probably move to some misc. function file. */
 void hex_dump (unsigned char *p, int len);
 
-#ifdef KISSUTIL
-void hex_dump (unsigned char *p, int len)
-{
-	int n, i, offset;
 
-	offset = 0;
-	while (len > 0) {
-	  n = len < 16 ? len : 16;
-	  // FIXME:  Is there some reason not to use dw_printf here?
-	  printf ("  %03x: ", offset);
-	  for (i=0; i<n; i++) {
-	    printf (" %02x", p[i]);
-	  }
-	  for (i=n; i<16; i++) {
-	    printf ("   ");
-	  }
-	  printf ("  ");
-	  for (i=0; i<n; i++) {
-	    printf ("%c", isprint(p[i]) ? p[i] : '.');
-	  }
-	  printf ("\n");
-	  p += 16;
-	  offset += 16;
-	  len -= 16;
-	}
-}
-#endif
-
-#ifndef KISSUTIL
 static void kiss_set_hardware (int chan, char *command, int debug, struct kissport_status_s *kps, int client,
 		void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient));
-#endif
-
-//#if KISSUTIL
-//#define text_color_set(x)   ;
-//#define dw_printf printf
-//#endif
-
 
 /*-------------------------------------------------------------------
  *
@@ -401,7 +367,6 @@ void kiss_rec_byte (kiss_frame_t *kf, unsigned char ch, int debug,
 	   	kf->noise[kf->noise_len] = '\0';
 	      }
 
-#ifndef KISSUTIL
 	      /* Try to appease client app by sending something back. */
 	      if (strcasecmp("restart\r", (char*)(kf->noise)) == 0 ||
 		    strcasecmp("reset\r", (char*)(kf->noise)) == 0) {
@@ -411,7 +376,6 @@ void kiss_rec_byte (kiss_frame_t *kf, unsigned char ch, int debug,
 	      else {
 	        (*sendfun) (0, 0, (unsigned char *)"\r\ncmd:", -1, kps, client);
 	      }
-#endif
 	      kf->noise_len = 0;
 	    }
 	    return;
@@ -503,11 +467,6 @@ void kiss_rec_byte (kiss_frame_t *kf, unsigned char ch, int debug,
  *
  *-----------------------------------------------------------------*/
 
-#ifndef KISSUTIL	// All these ifdefs in here are a sign that this should be refactored.
-			// Should split this into multiple files.
-			// Some functions are only for the TNC end.
-			// Other functions are suitble for both TNC and client app.
-
 // This is used only by the TNC side.
 
 void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct kissport_status_s *kps, int client,
@@ -516,6 +475,12 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 	int chan;
 	int cmd;
 	alevel_t alevel;
+
+	// Temporary for now
+	if (KISSUTIL) {
+		kiss_process_msg_override(kiss_msg, kiss_len);
+		return;
+	}
 
 // New in 1.7:
 // We can have KISS TCP ports which convey only a single radio channel.
@@ -760,8 +725,6 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
 
 } /* end kiss_process_msg */
 
-#endif  // ifndef KISSUTIL
-
 
 /*-------------------------------------------------------------------
  *
@@ -848,8 +811,6 @@ void kiss_process_msg (unsigned char *kiss_msg, int kiss_len, int debug, struct 
  *
  *--------------------------------------------------------------------*/
 
-#ifndef KISSUTIL
-
 static void kiss_set_hardware (int chan, char *command, int debug, struct kissport_status_s *kps, int client,
 		void (*sendfun)(int chan, int kiss_cmd, unsigned char *fbuf, int flen, struct kissport_status_s *onlykps, int onlyclient))
 {
@@ -897,8 +858,6 @@ static void kiss_set_hardware (int chan, char *command, int debug, struct kisspo
 
 } /* end kiss_set_hardware */
 
-#endif 	// ifndef KISSUTIL
-
 
 /*-------------------------------------------------------------------
  *
@@ -916,7 +875,6 @@ static void kiss_set_hardware (int chan, char *command, int debug, struct kisspo
 
 void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int msg_len)
 {
-#ifndef KISSUTIL
 	const char *direction [2] = { "from", "to" };
 	const char *prefix [2] = { "<<<", ">>>" };
 	const char *function[16] = { 
@@ -924,30 +882,30 @@ void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int 
 		"TXtail",	"FullDuplex",	"SetHardware",	"Invalid 7",
 		"Invalid 8", 	"Invalid 9",	"Invalid 10",	"Invalid 11",
 		"Invalid 12", 	"Invalid 13",	"Invalid 14",	"Return" };
-#endif
 
 	text_color_set(DW_COLOR_DEBUG);
 
-#ifdef KISSUTIL
-	dw_printf ("From KISS TNC:\n");
-#else
-	dw_printf ("\n");
-	if (special == NULL) {
-	  unsigned char *p;	/* to skip over FEND if present. */
+	if (KISSUTIL) {
+	  dw_printf ("From KISS TNC:\n");
+	} else {
+	  dw_printf ("\n");
+	  if (special == NULL) {
+	    unsigned char *p;	/* to skip over FEND if present. */
 
-	  p = pmsg;
-	  if (*p == FEND) p++;
+	    p = pmsg;
+	    if (*p == FEND) p++;
 
-	  dw_printf ("%s %s %s KISS client application, channel %d, total length = %d\n",
+	    dw_printf ("%s %s %s KISS client application, channel %d, total length = %d\n",
 			prefix[(int)fromto], function[p[0] & 0xf], direction[(int)fromto], 
 			(p[0] >> 4) & 0xf, msg_len);
-	}
-	else {
-	  dw_printf ("%s %s %s KISS client application, total length = %d\n",
+	  }
+	  else {
+	    dw_printf ("%s %s %s KISS client application, total length = %d\n",
 			prefix[(int)fromto], special, direction[(int)fromto], 
 			msg_len);
+	  }
 	}
-#endif
+
 	hex_dump (pmsg, msg_len);
 
 } /* end kiss_debug_print */

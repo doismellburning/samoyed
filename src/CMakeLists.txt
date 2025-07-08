@@ -253,38 +253,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# Talk to a KISS TNC.
-# Note:  kiss_frame.c has conditional compilation on KISSUTIL.
-# kissutil
-list(APPEND kissutil_SOURCES
-  kissutil.c
-  kiss_frame.c
-  ax25_pad.c
-  fcs_calc.c
-  textcolor.c
-  serial_port.c
-  dtime_now.c
-  dwsock.c
-  )
-
-add_executable(kissutil
-  ${kissutil_SOURCES}
-  )
-
-set_target_properties(kissutil
-  PROPERTIES COMPILE_FLAGS "-DKISSUTIL"
-  )
-
-target_link_libraries(kissutil
-  ${MISC_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(kissutil ws2_32)
-endif()
-
-
 # List USB audio adapters than can use GPIO for PTT.
 # Originally for Linux only (using udev).
 # Version 1.7 adds it for Windows.  Uses local hidapi code.
@@ -384,7 +352,6 @@ install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS ttcalc DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS kissutil DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
 if(UDEV_FOUND OR WIN32 OR CYGWIN OR HIDAPI_FOUND)
   install(TARGETS cm108 DESTINATION ${INSTALL_BIN_DIR})
