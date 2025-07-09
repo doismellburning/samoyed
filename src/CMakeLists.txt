@@ -299,28 +299,6 @@ if(UDEV_FOUND OR WIN32 OR CYGWIN OR HIDAPI_FOUND)
 endif()
 
 
-# Touch Tone to Speech sample application.
-# ttcalc
-list(APPEND ttcalc_SOURCES
-  ttcalc.c
-  ax25_pad.c
-  fcs_calc.c
-  textcolor.c
-  )
-
-add_executable(ttcalc
-  ${ttcalc_SOURCES}
-  )
-
-target_link_libraries(ttcalc
-  ${MISC_LIBRARIES}
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(ttcalc ws2_32)
-endif()
-
-
 # Sample for packet radio server application.
 # appserver
 list(APPEND appserver_SOURCES
@@ -351,7 +329,6 @@ install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS ttcalc DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
 if(UDEV_FOUND OR WIN32 OR CYGWIN OR HIDAPI_FOUND)
   install(TARGETS cm108 DESTINATION ${INSTALL_BIN_DIR})

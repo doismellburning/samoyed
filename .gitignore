@@ -10,6 +10,7 @@
 /text2tt
 /tnctest
 /tt2text
+/ttcalc
 /utm2ll
 
 # Custom
@@ -60,7 +61,6 @@ direwolf
 gen_fff
 gen_packets
 log2gpx
-ttcalc
 
 direwolf.conf
 fsk_fast_filter.h
