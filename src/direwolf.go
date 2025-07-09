@@ -2,8 +2,8 @@
 package direwolf
 
 // int direwolf_main(int argc, char *argv[]);
-// #cgo CFLAGS: -I../external/geotranz -I../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0
-// #cgo LDFLAGS: -lm
+// #cgo CFLAGS: -I../external/geotranz -I../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108
+// #cgo LDFLAGS: -lm -ludev
 import "C"
 
 import (
