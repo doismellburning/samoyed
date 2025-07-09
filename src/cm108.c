@@ -104,30 +104,6 @@
 
 #include "direwolf.h"
 
-#ifndef USE_CM108
-
-#ifdef CM108_MAIN
-
-
-#include "textcolor.h"
-
-int main (void)
-{
-	text_color_init (0);    // Turn off text color.
-#if defined(__OpenBSD__) || defined(__FreeBSD__)
-	dw_printf ("CM108 PTT support is not available for this operating system.\n");
-#else
-	dw_printf ("CM108 PTT support was excluded because /usr/include/libudev.h was missing.\n");
-	dw_printf ("Install it with \"sudo apt-get install libudev-dev\" or\n");
-	dw_printf ("\"sudo yum install libudev-devel\" then rebuild.\n");
-#endif
-	return (0);
-}
-
-#endif
-
-#else	// USE_CM108 is defined
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
@@ -1079,9 +1055,3 @@ static int cm108_write (char *name, int iomask, int iodata)
 	return (0);
 
 }  /* end cm108_write */
-
-#endif   // ifdef USE_CM108
-
-/* end cm108.c */
-
-	
