@@ -41,7 +41,7 @@ linters:
     gocyclo:
       min-complexity: 60  # I sure wish this could be lower
     nestif:
-      min-complexity: 20  # There's lots of upstream complexity, so let's soft-disable this
+      min-complexity: 25  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"

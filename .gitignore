@@ -6,6 +6,7 @@
 /il2p_test
 /kissutil
 /ll2utm
+/log2gpx
 /fxrec
 /fxsend
 /text2tt
@@ -61,7 +62,6 @@ aclients
 direwolf
 gen_fff
 gen_packets
-log2gpx
 
 direwolf.conf
 fsk_fast_filter.h

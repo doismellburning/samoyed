@@ -180,22 +180,6 @@ set_target_properties(direwolf
   PROPERTIES COMPILE_FLAGS "${DIREWOLF_COMPILE_FLAGS}"
   )
 
-# Convert from log file to GPX.
-# log2gpx
-list(APPEND log2gpx_SOURCES
-  log2gpx.c
-  textcolor.c
-  )
-
-add_executable(log2gpx
-  ${log2gpx_SOURCES}
-  )
-
-target_link_libraries(log2gpx
-  ${MISC_LIBRARIES}
-  )
-
-
 # Test application to generate sound.
 # gen_packets
 list(APPEND gen_packets_SOURCES
@@ -281,6 +265,5 @@ endif()
 
 install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
