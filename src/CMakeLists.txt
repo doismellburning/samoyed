@@ -253,52 +253,6 @@ if(WIN32 OR CYGWIN)
 endif()
 
 
-# List USB audio adapters than can use GPIO for PTT.
-# Originally for Linux only (using udev).
-# Version 1.7 adds it for Windows.  Uses local hidapi code.
-# Post-1.7 adds it for Mac. Uses hidapi library.
-
-# cm108
-if(UDEV_FOUND OR WIN32 OR CYGWIN OR HIDAPI_FOUND)
-  list(APPEND cm108_SOURCES
-    cm108.c
-    textcolor.c
-    )
-
-  add_executable(cm108
-    ${cm108_SOURCES}
-    )
-
-  set_target_properties(cm108
-    PROPERTIES COMPILE_FLAGS "-DCM108_MAIN"
-    )
-
-  target_link_libraries(cm108
-    ${MISC_LIBRARIES}
-    )
-
-  if (LINUX)
-    target_link_libraries(cm108
-      ${UDEV_LIBRARIES}
-      )
-  endif()
-
-  if (APPLE)
-    target_link_libraries(cm108
-      ${HIDAPI_LIBRARIES}
-      )
-  endif()
-
-  if (WIN32 OR CYGWIN)
-    target_link_libraries(cm108
-      ${HIDAPI_LIBRARIES}
-      ws2_32
-      setupapi
-      )
-  endif()
-endif()
-
-
 # Sample for packet radio server application.
 # appserver
 list(APPEND appserver_SOURCES
@@ -330,6 +284,3 @@ install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS log2gpx DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
-if(UDEV_FOUND OR WIN32 OR CYGWIN OR HIDAPI_FOUND)
-  install(TARGETS cm108 DESTINATION ${INSTALL_BIN_DIR})
-endif()
