@@ -44,53 +44,6 @@ endif()
 #  -----------------------------  Manual tests and experiments  ---------------------------
 if(OPTIONAL_TEST)
 
-  # Unit test for IGate
-  list(APPEND itest_SOURCES
-    ${CUSTOM_SRC_DIR}/igate.c
-    ${CUSTOM_SRC_DIR}/ais.c
-    ${CUSTOM_SRC_DIR}/ax25_pad.c
-    ${CUSTOM_SRC_DIR}/fcs_calc.c
-    ${CUSTOM_SRC_DIR}/mheard.c
-    ${CUSTOM_SRC_DIR}/pfilter.c
-    ${CUSTOM_SRC_DIR}/telemetry.c
-    ${CUSTOM_SRC_DIR}/decode_aprs.c
-    ${CUSTOM_SRC_DIR}/deviceid.c
-    ${CUSTOM_SRC_DIR}/dwgpsnmea.c
-    ${CUSTOM_SRC_DIR}/dwgps.c
-    ${CUSTOM_SRC_DIR}/dwgpsd.c
-    ${CUSTOM_SRC_DIR}/serial_port.c
-    ${CUSTOM_SRC_DIR}/textcolor.c
-    ${CUSTOM_SRC_DIR}/dtime_now.c
-    ${CUSTOM_SRC_DIR}/latlong.c
-    ${CUSTOM_SRC_DIR}/tt_text.c
-    ${CUSTOM_SRC_DIR}/symbols.c
-    )
-
-  if(WIN32 OR CYGWIN)
-    list(REMOVE_ITEM itest_SOURCES
-      ${CUSTOM_SRC_DIR}/dwgpsd.c
-      )
-  endif()
-
-  add_executable(itest
-    ${itest_SOURCES}
-    )
-
-  set_target_properties(itest
-    PROPERTIES COMPILE_FLAGS "-DITEST"
-    )
-
-  target_link_libraries(itest
-    ${MISC_LIBRARIES}
-    ${GPSD_LIBRARIES}
-    Threads::Threads
-    )
-
-  if(WIN32 OR CYGWIN)
-    target_link_libraries(itest ws2_32)
-  endif()
-
-
   # For demodulator tweaking experiments.
   list(APPEND testagc_SOURCES
     ${CUSTOM_SRC_DIR}/atest.c
