@@ -142,7 +142,7 @@ static int ig_to_tx_allow (packet_t pp, int chan);
  * (Don't use SOCKET type because it is unsigned.) 
 */
 
-static volatile int igate_sock = -1;	
+volatile int igate_sock = -1;
 
 /*
  * After connecting to server, we want to make sure
@@ -199,89 +199,6 @@ static char * ia_to_text (int  Family, void * pAddr, char * pStringBuf, size_t S
 	//assert (strlen(pStringBuf) < StringBufSize);
 	return pStringBuf;
 }
-
-
-#if ITEST
-
-// TODO:  Add to automated tests.
-
-/* For unit testing. */
-
-int main (int argc, char *argv[])
-{
-	struct audio_s audio_config;
-	struct igate_config_s igate_config;
-	struct digi_config_s digi_config;
-	packet_t pp;
-
-	memset (&audio_config, 0, sizeof(audio_config));
-	audio_config.adev[0].num_channels = 2;
-	strlcpy (audio_config.mycall[0], "WB2OSZ-1", sizeof(audio_config.achan[0].mycall));
-	strlcpy (audio_config.mycall[1], "WB2OSZ-2", sizeof(audio_config.achan[0].mycall));
-
-	memset (&igate_config, 0, sizeof(igate_config));
-
-	strlcpy (igate_config.t2_server_name, "localhost", sizeof(igate_config.t2_server_name));
-	igate_config.t2_server_port = 14580;
-	strlcpy (igate_config.t2_login, "WB2OSZ-JL", sizeof(igate_config.t2_login));
-	strlcpy (igate_config.t2_passcode, "-1", sizeof(igate_config.t2_passcode));
-	igate_config.t2_filter = strdup ("r/1/2/3");
-	
-	igate_config.tx_chan = 0;
-	strlcpy (igate_config.tx_via, ",WIDE2-1", sizeof(igate_config.tx_via));
-	igate_config.tx_limit_1 = 3;
-	igate_config.tx_limit_5 = 5;
-
-	memset (&digi_config, 0, sizeof(digi_config));
-
-	igate_init(&audio_config, &igate_config, &digi_config, 0);
-
-	while (igate_sock == -1) {
-	  SLEEP_SEC(1);
-	}
-
-	SLEEP_SEC (2);
-	pp = ax25_from_text ("A>B,C,D:Ztest message 1", 0);
-	igate_send_rec_packet (0, pp);
-	ax25_delete (pp);
-
-	SLEEP_SEC (2);
-	pp = ax25_from_text ("A>B,C,D:Ztest message 2", 0);
-	igate_send_rec_packet (0, pp);
-	ax25_delete (pp);
-
-	SLEEP_SEC (2);
-	pp = ax25_from_text ("A>B,C,D:Ztest message 2", 0);   /* Should suppress duplicate. */
-	igate_send_rec_packet (0, pp);
-	ax25_delete (pp);
-
-	SLEEP_SEC (2);
-	pp = ax25_from_text ("A>B,TCPIP,D:ZShould drop this due to path", 0);
-	igate_send_rec_packet (0, pp);
-	ax25_delete (pp);
-
-	SLEEP_SEC (2);
-	pp = ax25_from_text ("A>B,C,D:?Should drop query", 0);
-	igate_send_rec_packet (0, pp);
-	ax25_delete (pp);
-
-	SLEEP_SEC (5);
-	pp = ax25_from_text ("A>B,C,D:}E>F,G*,H:Zthird party stuff", 0);
-	igate_send_rec_packet (0, pp);
-	ax25_delete (pp);
-
-#if 1
-	while (1) {
-	  SLEEP_SEC (20);
-	  text_color_set(DW_COLOR_INFO);
-	  dw_printf ("Send received packet\n");
-	  send_msg_to_server ("W1ABC>APRS:?", strlen("W1ABC>APRS:?"));
-	}
-#endif
-	return 0;
-}
-
-#endif
 
 
 /*
