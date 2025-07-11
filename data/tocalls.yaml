@@ -26,6 +26,10 @@ classes:
    shown: Tracker
    description: Tracker device
  
+ - class: gadget
+   shown: Gadget
+   description: Small non-tracker APRS device
+
  - class: rig
    shown: Rig
    description: Mobile or desktop radio
@@ -39,8 +43,20 @@ classes:
    description: Mobile phone or tablet app
  
  - class: software
-   shown: Software
+   shown: Desktop software
    description: Desktop software
+
+ - class: daemon
+   shown: Background software
+   description: Computer software without user interface
+
+ - class: service
+   shown: Service
+   description: Software running as a web service or a message bot
+
+ - class: network
+   shown: APRS network hardware appliance
+   description: A hardware appliance with self-contained APRS networking features
 
  - class: digi
    shown: Digipeater
@@ -57,10 +73,6 @@ classes:
  - class: satellite
    shown: Satellite
    description: Satellite-based station
-
- - class: service
-   shown: Service
-   description: Software running as a web service
 
 #
 # mic-e device identifier index for new-style 2-character device
@@ -117,6 +129,11 @@ mice:
    model: FTM-500D
    class: rig
 
+ - suffix: "_5"
+   vendor: Yaesu
+   model: FTM-510D
+   class: rig
+
  - suffix: "_)"
    vendor: Yaesu
    model: FTM-100D
@@ -160,6 +177,17 @@ mice:
    vendor: SQ8L
    model: VP-Tracker
    class: tracker
+
+ - suffix: " X"
+   vendor: SainSonic
+   model: AP510
+   class: tracker
+
+ - suffix: "[1"
+   vendor: Open Source
+   model: APRSdroid
+   class: software
+   os: Android
 
 #
 # mic-e legacy devices, with an unique comment suffix and prefix
@@ -292,7 +320,7 @@ tocalls:
    vendor: Anytone
 
  - tocall: APATAR
-   vendor: TA7W/OH2UDS Baris Dinc and TA6AEU
+   vendor: TA7W/OH2UDS Baris Dinc, TA6AD Emre Keles
    model: ATA-R APRS Digipeater
    class: digi
 
@@ -340,9 +368,21 @@ tocalls:
    vendor: hambsd.org
    model: HamBSD
 
+ - tocall: APBT*
+   vendor: BTECH
+   contact: support@baofengtech.com
+
  - tocall: APBT62
-   vendor: BTech
+   vendor: BTECH
    model: DMR 6x2
+   class: ht
+   contact: support@baofengtech.com
+
+ - tocall: APBTUV
+   vendor: BTECH
+   model: UV-PRO
+   class: ht
+   contact: support@baofengtech.com
 
  - tocall: APC???
    vendor: Rob Wittner, KZ5RW
@@ -497,6 +537,14 @@ tocalls:
    os: embedded
    contact: pegloff@gmail.com
 
+ - tocall: APERRB
+   vendor: KG5JNC
+   model: APRS Backend for Errbot
+   class: service
+   contact: me@kg5jnc.com
+   features:
+     - messaging
+
  - tocall: APERS?
    vendor: Jason, KG7YKZ
    model: Runner tracking
@@ -507,11 +555,28 @@ tocalls:
    model: PE1RXQ APRS Tracker
    class: tracker
 
- - tocall: APESP?
+ - tocall: APESP1
    vendor: LY3PH
    model: APRS-ESP
    os: embedded
  
+ - tocall: APESPG
+   vendor: OH2TH
+   model: ESP SmartBeacon APRS-IS Client
+   os: embedded
+
+ - tocall: APESPW
+   vendor: OH2TH
+   model: ESP Weather Station APRS-IS Client
+   os: embedded
+
+ - tocall: APETBT
+   vendor: PD7R
+   model: TBTracker Balloon Telemetry Tracker
+   class: tracker
+   os: embedded
+   contact: roel@kroes.com
+
  - tocall: APFG??
    vendor: KP4DJT
    model: Flood Gage
@@ -531,6 +596,10 @@ tocalls:
    vendor: NW5W
    model: GoBalloon
    class: tracker
+
+ - tocall: APGDT?
+   vendor: VK4FAST
+   model: Graphic Data Terminal
 
  - tocall: APGO??
    vendor: AA3NJ
@@ -666,7 +735,7 @@ tocalls:
    model: PinPoint
 
  - tocall: APIZCI
-   vendor: TA7W/OH2UDS and TA6AEU
+   vendor: TA7W/OH2UDS Baris Dinc, TA6AD Emre Keles
    model: hymTR IZCI Tracker
    class: tracker
    os: embedded
@@ -728,6 +797,20 @@ tocalls:
    model: TM-D700
    class: rig
 
+ - tocall: APKDXn
+   vendor: KelateDX, 9M2D
+   model: LAHKHUANO APRS
+   class: tracker
+   os: embedded
+   contact: mzakiab@gmail.com
+
+ - tocall: APKEYn
+   vendor: 9W2KEY
+   model: ATMega328P APRS
+   class: tracker
+   os: embedded
+   contact: mzakiab@gmail.com
+
  - tocall: APKHTW
    vendor: Kip, W3SN
    model: Tempest Weather Bridge
@@ -744,6 +827,14 @@ tocalls:
  - tocall: APLC??
    vendor: DL3DCW
    model: APRScube
+
+ - tocall: APLDAG
+   vendor: Inigo, EA2CQ
+   model: DAGA LoRa/APRS SOTA spotting
+   class: service
+   contact: ea2cq@irratia.org
+   features:
+     - messaging
 
  - tocall: APLDG?
    vendor: Eddie, 9W2LWK
@@ -769,6 +860,12 @@ tocalls:
    model: LoRa Meteostation
    class: wx
 
+ - tocall: APLER?
+   vendor: Ercan, TA3OER
+   model: TROY LoRa Tracker/iGate
+   os: embedded
+   contact: ta3oer@gmail.com
+
  - tocall: APLETK
    vendor: DL5TKL
    model: T-Echo
@@ -783,6 +880,13 @@ tocalls:
    os: embedded
    contact: hg3fug@fazi.hu
 
+ - tocall: APLFL?
+   vendor: Damian, SQ2CPA
+   model: LoRa/APRS Balloon
+   class: tracker
+   os: embedded
+   contact: sq2cpa@gmail.com
+
  - tocall: APLFM?
    vendor: DO1MA
    model: FemtoAPRS
@@ -793,6 +897,13 @@ tocalls:
    vendor: OE5BPA
    model: LoRa Gateway/Digipeater
    class: digi
+
+ - tocall: APLHB9
+   vendor: SWISS-ARTG
+   model: LoRa iGate RPI
+   class: igate
+   os: Linux/Unix
+   contact: hb9pae@gmail.com
 
  - tocall: APLHI?
    vendor: Giovanni, IW1CGW
@@ -806,10 +917,21 @@ tocalls:
    class: wx
    contact: iw1cgw@libero.it
 
+ - tocall: APLIF?
+   vendor: TA5Y
+   model: TIF LORA APRS I-GATE
+   class: igate
+
  - tocall: APLIG?
    vendor: TA2MUN/TA9OHC
    model: LightAPRS Tracker
    class: tracker
+
+ - tocall: APLLO?
+   vendor: HB4LO
+   model: HAB BOT
+   class: tracker
+   contact: david.perrin@hb9hiz.ch
 
  - tocall: APLM??
    vendor: WA0TQG
@@ -833,6 +955,18 @@ tocalls:
    class: tracker
    os: embedded
    contact: sq9p.peter@gmail.com
+
+ - tocall: APLPS?
+   vendor: Jose, XE3JAC
+   model: ESP-32 LoRa
+   os: embedded
+   contact: xe3jac@gmail.com
+
+ - tocall: APLRF?
+   vendor: Damian, SQ2CPA
+   model: LoRa APRS
+   os: embedded
+   contact: sq2cpa@gmail.com
 
  - tocall: APLRG?
    vendor: Ricardo, CA2RXU
@@ -872,11 +1006,48 @@ tocalls:
    os: embedded
    contact: wajdzik.m@gmail.com
 
+ - tocall: APLZA?
+   vendor: Huang Xuewu, BD5HTY
+   model: LoRa
+   os: embedded
+   contact: bd5hty@gmail.com
+
+ - tocall: APLZX?
+   vendor: N1AF
+   model: LoRa-APRS
+   os: embedded
+   contact: lora-aprs@n1af.org
+
  - tocall: APMAIL
    vendor: Mike, NA7Q
    model: APRS Mailbox
    class: service
    contact: mike.ph4@gmail.com
+
+ - tocall: APMBL3
+   vendor: Mobilinkd LLC
+   model: TNC3
+   class: digi
+   os: embedded
+   contact: support@mobilinkd.com
+
+ - tocall: APMBL4
+   vendor: Mobilinkd LLC
+   model: TNC4
+   class: digi
+   os: embedded
+   contact: support@mobilinkd.com
+
+ - tocall: APMBL?
+   vendor: Mobilinkd LLC
+   contact: support@mobilinkd.com
+
+ - tocall: APMBLN
+   vendor: Mobilinkd LLC
+   model: NucleoTNC
+   class: digi
+   os: embedded
+   contact: support@mobilinkd.com
 
  - tocall: APMG??
    vendor: Alex, AB0TJ
@@ -1002,6 +1173,12 @@ tocalls:
    vendor: Kantronics
    model: KAM-XL
 
+ - tocall: APNL??
+   vendor: OE5DXL, OE5HPM
+   model: dxlAPRS
+   class: daemon
+   os: Linux/Unix
+
  - tocall: APNM??
    vendor: MFJ
    model: TNC
@@ -1074,6 +1251,12 @@ tocalls:
    model: Oscar
    class: satellite
 
+ - tocall: APOPEN
+   vendor: David Platt, AE6EO
+   model: OpenTNC
+   os: embedded
+   contact: dplatt@radagast.org
+
  - tocall: APOPYT
    vendor: Mike, NA7Q
    model: NA7Q Messenger
@@ -1086,6 +1269,31 @@ tocalls:
    class: service
    contact: mike.ph4@gmail.com
 
+ - tocall: APOSB
+   vendor: SharkRF
+   model: openSPOT3
+   class: gadget
+   os: embedded
+   contact: info@sharkrf.com
+
+ - tocall: APOSB4
+   vendor: SharkRF
+   model: openSPOT4
+   class: gadget
+   os: embedded
+   contact: info@sharkrf.com
+
+ - tocall: APOSB?
+   vendor: SharkRF
+   contact: info@sharkrf.com
+
+ - tocall: APOSBM
+   vendor: SharkRF
+   model: M1KE
+   class: gadget
+   os: embedded
+   contact: info@sharkrf.com
+
  - tocall: APOSMS
    vendor: Mike, NA7Q
    model: Open Source SMS Gateway
@@ -1093,6 +1301,13 @@ tocalls:
    contact: mike.ph4@gmail.com
    features:
      - messaging
+
+ - tocall: APOSW?
+   vendor: SharkRF
+   model: openSPOT2
+   class: gadget
+   os: embedded
+   contact: info@sharkrf.com
 
  - tocall: APOT??
    vendor: Argent Data Systems
@@ -1171,6 +1386,12 @@ tocalls:
    model: radiosonde_auto_rx
    class: software
    os: Linux/Unix
+
+ - tocall: APREST
+   vendor: cwop.rest
+   model: HTTP - TCP CWOP Packet Submission
+   class: service
+   contact: leo@herzog.tech
 
  - tocall: APRFG?
    vendor: RF.Guru
@@ -1262,6 +1483,14 @@ tocalls:
    class: app
    os: ipad
 
+ - tocall: APRPJU
+   vendor: Piju 9M2PJU
+   model: 9M2PJU Bot
+   class: daemon
+   contact: 9m2pju@hamradio.my
+   features:
+     - messaging
+
  - tocall: APRPR?
    vendor: Robert DM4RW, Peter DL6MAA
    model: Teensy RPR TNC
@@ -1274,8 +1503,17 @@ tocalls:
    vendor: DL9RDZ
    class: tracker
 
+ - tocall: APRRES
+   vendor: xssfox
+   model: APRS-RepeaterRescue
+   class: network
+   os: embedded
+   contact: repeater-rescue@michaela.lgbt
+   features:
+     - messaging
+
  - tocall: APRRF?
-   vendor: Jean-Francois Huet F1EVM
+   vendor: RRF - Réseau des Répéteurs Francophones
    model: Tracker for RRF
    class: tracker
    os: embedded
@@ -1313,6 +1551,12 @@ tocalls:
    vendor: OH2MQK, OH7LZB
    model: aprsc
    class: software
+
+ - tocall: APSDR?
+   vendor: Marcus Roskosch, DL8MRE
+   model: sdr-control
+   class: app
+   contact: aprs@ham-radio-apps.com
 
  - tocall: APSF??
    vendor: F5OPV, SFCP_LABS
@@ -1352,11 +1596,28 @@ tocalls:
    model: SMS gateway
    class: software
 
+ - tocall: APSN01
+   vendor: CSN Technologies Inc.
+   model: iGateMini
+   contact: info@igatemini.com
+   os: embedded
+   features:
+     - messaging
+
+ - tocall: APSN??
+   vendor: CSN Technologies Inc.
+
  - tocall: APSRF?
    vendor: SoftRF
    model: Ham Edition
    class: tracker
    os: embedded
+
+ - tocall: APSTAR
+   vendor: AllStar Link LLC
+   model: Asterisk/app_rpt
+   class: daemon
+   os: Linux/Unix
 
  - tocall: APSTM?
    vendor: W7QO
@@ -1367,6 +1628,13 @@ tocalls:
    vendor: N0AGI
    model: Satellite Tracking and Operations
    class: software
+
+ - tocall: APSVX?
+   vendor: Tobias Blomberg, SM0SVX
+   model: SvxLink
+   class: daemon
+   os: Linux/Unix
+   contact: aprs-deviceid@cyberspejs.net
 
  - tocall: APT2??
    vendor: Byonics
@@ -1404,6 +1672,12 @@ tocalls:
    os: Linux/Unix
    contact: kl7af@foghaven.net
 
+ - tocall: APTGIK
+   vendor: Juliet Delta, 9M4GIK
+   model: APRS Melaka
+   os: embedded
+   contact: 9m2ikr@gmail.com
+
  - tocall: APTHUR
    model: APRSThursday weekly event mapbot daemon
    contact: harihend1973@gmail.com
@@ -1436,6 +1710,12 @@ tocalls:
  - tocall: APTR??
    vendor: Motorola
    model: MotoTRBO
+
+ - tocall: APTSLA
+   vendor: HA2NON
+   model: tesla-aprs
+   class: daemon
+   contact: nonoo@nonoo.hu
 
  - tocall: APTT*
    vendor: Byonics
@@ -1476,6 +1756,13 @@ tocalls:
    vendor: unknown
    model: IRLP
 
+ - tocall: APW2W?
+   vendor: Joachim Sonnabend, DG3FBL
+   model: WiresX2Web Software
+   class: software
+   os: Windows
+   contact: mail@dg3fbl.de
+
  - tocall: APW9??
    vendor: Mile Strk, 9A9Y
    model: WX Katarina
@@ -1513,6 +1800,12 @@ tocalls:
    features:
      - messaging
      - item-in-msg
+
+ - tocall: APWXS?
+   vendor: Colin Cogle, W1DNS
+   model: aprs-weather-submit
+   class: daemon
+   contact: https://github.com/rhymeswithmogul/aprs-weather-submit/
 
  - tocall: APWnnn
    vendor: Sproul Brothers
@@ -1563,6 +1856,11 @@ tocalls:
  - tocall: APY500
    vendor: Yaesu
    model: FTM-500D
+   class: rig
+
+ - tocall: APY510
+   vendor: Yaesu
+   model: FTM-510D
    class: rig
 
  - tocall: APYS??

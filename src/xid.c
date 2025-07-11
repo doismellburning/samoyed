@@ -212,8 +212,9 @@ int xid_parse (unsigned char *info, int info_len, struct xid_param_s *result, ch
 	    case PI_Classes_of_Procedures:
 	      
 	      if ( ! (pval & PV_Classes_Procedures_Balanced_ABM)) {
-	        text_color_set (DW_COLOR_ERROR);
-	        dw_printf ("XID error: Expected Balanced ABM to be set.\n");	
+		//  https://groups.io/g/bpq32/topic/113348033#msg44169
+	        //text_color_set (DW_COLOR_ERROR);
+	        //dw_printf ("XID error: Expected Balanced ABM to be set.\n");	
 	      }
 
 	      if (pval & PV_Classes_Procedures_Half_Duplex && ! (pval & PV_Classes_Procedures_Full_Duplex)) {
@@ -225,8 +226,9 @@ int xid_parse (unsigned char *info, int info_len, struct xid_param_s *result, ch
 	        strlcat (desc, "Full-Duplex ", desc_size);
 	      }
 	      else {
-	        text_color_set (DW_COLOR_ERROR);
-	        dw_printf ("XID error: Expected one of Half or Full Duplex be set.\n");	
+		//  https://groups.io/g/bpq32/topic/113348033#msg44169
+	        //text_color_set (DW_COLOR_ERROR);
+	        //dw_printf ("XID error: Expected one of Half or Full Duplex be set.\n");	
 	        result->full_duplex = 0;
 	      }
 
@@ -275,8 +277,9 @@ int xid_parse (unsigned char *info, int info_len, struct xid_param_s *result, ch
 	      }
 
 	      if ( ! (pval & PV_HDLC_Optional_Functions_Extended_Address)) {
-	        text_color_set (DW_COLOR_ERROR);
-	        dw_printf ("XID error: Expected Extended Address to be set.\n");	
+		//  https://groups.io/g/bpq32/topic/113348033#msg44169
+	        //text_color_set (DW_COLOR_ERROR);
+	        //dw_printf ("XID error: Expected Extended Address to be set.\n");	
 	      }
 
 	      if ( ! (pval & PV_HDLC_Optional_Functions_TEST_cmd_resp)) {
