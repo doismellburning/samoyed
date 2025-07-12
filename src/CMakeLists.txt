@@ -214,29 +214,6 @@ target_link_libraries(gen_packets
   )
 
 
-# Multiple AGWPE network or serial port clients to test TNCs side by side.
-# aclients
-list(APPEND aclients_SOURCES
-  aclients.c
-  ax25_pad.c
-  fcs_calc.c
-  textcolor.c
-  )
-
-add_executable(aclients
-  ${aclients_SOURCES}
-  )
-
-target_link_libraries(aclients
-  ${MISC_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(aclients ws2_32)
-endif()
-
-
 # Sample for packet radio server application.
 # appserver
 list(APPEND appserver_SOURCES
@@ -264,6 +241,5 @@ endif()
 
 
 install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS aclients DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
