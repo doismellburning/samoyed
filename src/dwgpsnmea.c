@@ -744,73 +744,6 @@ void dwgpsnmea_term (void) {
 
 
 
-/*-------------------------------------------------------------------
- *
- * Name:        main
- *
- * Purpose:    	Simple unit test for other functions in this file.
- *
- * Description: Compile with -DGPSTEST option.
- *
- *		Windows:
- *			gcc  -DGPSTEST -Iregex dwgpsnmea.c dwgps.c textcolor.o serial_port.o latlong.o misc.a
- *			a.exe
- *
- *		Linux:
- *			 gcc -DGPSTEST dwgpsnmea.c dwgps.c textcolor.o serial_port.o latlong.o misc.a -lm -lpthread
- *			./a.out
- *
- *--------------------------------------------------------------------*/
-
-#if GPSTEST
-
-int main (int argc, char *argv[])
-{
-
-	struct misc_config_s config;
-	dwgps_info_t info;
-
-
-	memset (&config, 0, sizeof(config));
-	strlcpy (config.gpsnmea_port, "COM22", sizeof(config.gpsnmea_port));
-
-	dwgps_init (&config, 3);
-
-	while (1) {
-	  dwfix_t fix;
-
-	  fix = dwgps_read (&info);
-	  text_color_set (DW_COLOR_INFO);
-	  switch (fix) {
-	    case DWFIX_2D:
-	    case DWFIX_3D:
-	      dw_printf ("%.6f  %.6f", info.dlat, info.dlon);
-	      dw_printf ("  %.1f knots  %.0f degrees", info.speed_knots, info.track);
-	      if (fix==3) dw_printf ("  altitude = %.1f meters", info.altitude);
-	      dw_printf ("\n");
-	      break;
-	    case DWFIX_NOT_SEEN:
-	    case DWFIX_NO_FIX:
-	      dw_printf ("Location currently not available.\n");
-	      break;
-	    case DWFIX_NOT_INIT:
-	      dw_printf ("GPS Init failed.\n");
-	      exit (1);
-	    case DWFIX_ERROR:
-	    default:
-	      dw_printf ("ERROR getting GPS information.\n");
-	      break;
-	  }
-	  SLEEP_SEC (3);
-	}
-
-} /* end main */
-
-
-#endif
-
-
-
 /* end dwgpsnmea.c */
 
 
