@@ -1,5 +1,6 @@
 /samoyed
 /bin
+/aclients
 /atest
 /cm108
 /decode_aprs
@@ -58,7 +59,6 @@ z*
 
 # Binaries, other build results
 
-aclients
 direwolf
 gen_fff
 gen_packets
