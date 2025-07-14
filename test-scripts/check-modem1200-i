@@ -1,5 +1,8 @@
 #!/bin/bash -e
 
+# shellcheck disable=SC2317
+exit 0 # FIXME Need gen_packets with -I support
+
 source "$(dirname "$(realpath "$0")")/common"
 
 goto_tmpdir

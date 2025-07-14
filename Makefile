@@ -28,7 +28,7 @@ gotest-bin:
 
 .PHONY: test-scripts
 test-scripts: $(CMDS)
-	for script in ./test-scripts/*; do $$script; done
+	./test-scripts/runall
 
 .PHONY: coveragereport
 coveragereport:

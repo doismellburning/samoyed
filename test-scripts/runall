@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+for script in ./test-scripts/check-*
+do
+	echo "************************"
+	echo "Running $script"
+	echo "************************"
+	echo ""
+	$script
+done
