@@ -6,6 +6,7 @@
 /cm108
 /decode_aprs
 /dwgpsnmea
+/gen_packets
 /il2p_test
 /kissutil
 /ll2utm
@@ -63,7 +64,6 @@ z*
 
 direwolf
 gen_fff
-gen_packets
 
 direwolf.conf
 fsk_fast_filter.h

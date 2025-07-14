@@ -180,39 +180,4 @@ set_target_properties(direwolf
   PROPERTIES COMPILE_FLAGS "${DIREWOLF_COMPILE_FLAGS}"
   )
 
-# Test application to generate sound.
-# gen_packets
-list(APPEND gen_packets_SOURCES
-  gen_packets.c
-  ax25_pad.c
-  ax25_pad2.c
-  fx25_encode.c
-  fx25_extract.c
-  fx25_init.c
-  fx25_send.c
-  hdlc_send.c
-  fcs_calc.c
-  gen_tone.c
-  il2p_codec.c
-  il2p_scramble.c
-  il2p_payload.c
-  il2p_init.c
-  il2p_header.c
-  il2p_send.c
-  morse.c
-  dtmf.c
-  textcolor.c
-  dsp.c
-  )
-
-add_executable(gen_packets
-  ${gen_packets_SOURCES}
-  )
-
-target_link_libraries(gen_packets
-  ${MISC_LIBRARIES}
-  )
-
-
 install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
