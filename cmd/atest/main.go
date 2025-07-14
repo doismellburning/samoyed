@@ -146,7 +146,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
 	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
 	var modemProfile = pflag.StringP("modem-profile", "P", "", "Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
-	var decimate = pflag.IntP("decimate", "D", 1, "Divide audio sample rate by n.")
+	var decimate = pflag.IntP("decimate", "D", 0, "Divide audio sample rate by n. 0 is auto-select.")
 	var upsample = pflag.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
 	var fixBits = pflag.IntP("fix-bits", "F", 0, `Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.
@@ -211,8 +211,8 @@ o = DCD output control
 		}
 	}
 
-	if *decimate < 1 || *decimate > 8 {
-		fmt.Fprintf(os.Stderr, "Decimate should be between 1 and 8 inclusive, not %d.\n", *decimate)
+	if *decimate < 0 || *decimate > 8 {
+		fmt.Fprintf(os.Stderr, "Decimate should be between 0 and 8 inclusive, not %d.\n", *decimate)
 		pflag.Usage()
 		os.Exit(1)
 	}
