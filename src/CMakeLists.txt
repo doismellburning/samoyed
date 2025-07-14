@@ -214,32 +214,5 @@ target_link_libraries(gen_packets
   )
 
 
-# Sample for packet radio server application.
-# appserver
-list(APPEND appserver_SOURCES
-  appserver.c
-  agwlib.c
-  dwsock.c
-  dtime_now.c
-  ax25_pad.c
-  fcs_calc.c
-  textcolor.c
-  )
-
-add_executable(appserver
-  ${appserver_SOURCES}
-  )
-
-target_link_libraries(appserver
-  ${MISC_LIBRARIES}
-  Threads::Threads
-  )
-
-if(WIN32 OR CYGWIN)
-  target_link_libraries(appserver ws2_32)
-endif()
-
-
 install(TARGETS direwolf DESTINATION ${INSTALL_BIN_DIR})
 install(TARGETS gen_packets DESTINATION ${INSTALL_BIN_DIR})
-install(TARGETS appserver DESTINATION ${INSTALL_BIN_DIR})
