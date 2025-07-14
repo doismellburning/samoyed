@@ -220,7 +220,7 @@ o = DCD output control
 
 	if *upsample != 0 {
 		if *upsample < 1 || *upsample > 8 {
-			fmt.Fprintf(os.Stderr, "Upsample should be between 1 and 4 inclusive, not %d.\n", *decimate)
+			fmt.Fprintf(os.Stderr, "Upsample should be between 1 and 4 inclusive, not %d.\n", *upsample)
 			pflag.Usage()
 			os.Exit(1)
 		}
@@ -228,7 +228,7 @@ o = DCD output control
 	}
 
 	if *fixBits < C.RETRY_NONE || *fixBits > C.RETRY_MAX {
-		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", C.RETRY_NONE, C.RETRY_MAX, *decimate)
+		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", C.RETRY_NONE, C.RETRY_MAX, *fixBits)
 		pflag.Usage()
 		os.Exit(1)
 	}
