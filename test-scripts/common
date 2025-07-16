@@ -8,7 +8,7 @@ export FXSEND
 FXREC="$(dirname "$(realpath "$0")")/../fxrec"
 export FXREC
 
-GEN_PACKETS=gen_packets  # Upstream for now, until it's ported
+GEN_PACKETS="$(dirname "$(realpath "$0")")/../gen_packets"
 export GEN_PACKETS
 
 function goto_tmpdir() {
