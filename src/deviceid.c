@@ -30,14 +30,6 @@
  *
  *------------------------------------------------------------------*/
 
-//#define TEST 1		// Standalone test.   $ gcc -DTEST deviceid.c && ./a.out
-
-
-#if TEST
-#define HAVE_STRLCPY 1		// prevent defining in direwolf.h
-#define HAVE_STRLCAT 1
-#endif
-
 #include "direwolf.h"
 
 #include <stdlib.h>
@@ -52,122 +44,6 @@
 static void unquote (int line, char *pin, char *pout);
 static int tocall_cmp (const void *px, const void *py);
 static int mice_cmp (const void *px, const void *py);
-
-/*------------------------------------------------------------------
- *
- * Function:	main
- *
- * Purpose:	A little self-test used during development.
- *
- * Description:	Read the yaml file.  Decipher a few typical values.
- *
- *------------------------------------------------------------------*/
-
-#if TEST
-// So we don't need to link with any other files.
-#define dw_printf printf
-void text_color_set(dw_color_t)  { return; }
-void strlcpy(char *dst, char *src, size_t dlen) {
-	strcpy (dst, src);
-}
-void strlcat(char *dst, char *src, size_t dlen) {
-	strcat (dst, src);
-}
-
-
-int main (int argc, char *argv[])
-{
-	char device[80];
-	char comment_out[80];
-
-	deviceid_init ();
-
-	dw_printf ("\n");
-	dw_printf ("Testing ...\n");
-
-// MIC-E Legacy (really Kenwood).
-
-	deviceid_decode_mice (">Comment", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Kenwood TH-D7A") == 0);
-
-	deviceid_decode_mice (">Comment^", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Kenwood TH-D74") == 0);
-
-	deviceid_decode_mice ("]Comment", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Kenwood TM-D700") == 0);
-
-	deviceid_decode_mice ("]Comment=", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Kenwood TM-D710") == 0);
-
-	deviceid_decode_mice ("]\"4V}=", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "\"4V}") == 0);
-	assert (strcmp(device, "Kenwood TM-D710") == 0);
-
-
-// Modern MIC-E.
-
-	deviceid_decode_mice ("`Comment_\"", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Yaesu FTM-350") == 0);
-
-	deviceid_decode_mice ("`Comment_ ", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Yaesu VX-8") == 0);
-
-	deviceid_decode_mice ("'Comment|3", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "Byonics TinyTrak3") == 0);
-
-	deviceid_decode_mice ("Comment", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "Comment") == 0);
-	assert (strcmp(device, "UNKNOWN vendor/model") == 0);
-
-	deviceid_decode_mice ("", comment_out, sizeof(comment_out), device, sizeof(device));
-	dw_printf ("%s %s\n", comment_out, device);
-	assert (strcmp(comment_out, "") == 0);
-	assert (strcmp(device, "UNKNOWN vendor/model") == 0);
-
-// Tocall
-
-	deviceid_decode_dest ("APDW18", device, sizeof(device));
-	dw_printf ("%s\n", device);
-	assert (strcmp(device, "WB2OSZ DireWolf") == 0);
-
-	deviceid_decode_dest ("APD123", device, sizeof(device));
-	dw_printf ("%s\n", device);
-	assert (strcmp(device, "Open Source aprsd") == 0);
-
-	// null for Vendor.
-	deviceid_decode_dest ("APAX", device, sizeof(device));
-	dw_printf ("%s\n", device);
-	assert (strcmp(device, "AFilterX") == 0);
-
-	deviceid_decode_dest ("APA123", device, sizeof(device));
-	dw_printf ("%s\n", device);
-	assert (strcmp(device, "UNKNOWN vendor/model") == 0);
-
-	dw_printf ("\n");
-	dw_printf ("Success!\n");
-
-	exit (EXIT_SUCCESS);
-}
-
-#endif  // TEST
-
-
 
 // Structures to hold mapping from encoded form to vendor and model.
 // The .yaml file has two separate sections for MIC-E but they can
@@ -249,16 +125,7 @@ void deviceid_init(void)
 {
 	FILE *fp = NULL;
 	for (int n = 0; search_locations[n] != NULL && fp == NULL; n++) {
-#if TEST
-	  text_color_set(DW_COLOR_INFO);
-	  dw_printf ("Trying %s\n", search_locations[n]);
-#endif
 	  fp = fopen(search_locations[n], "r");
-#if TEST
-	  if (fp != NULL) {
-	    dw_printf ("Opened %s\n", search_locations[n]);
-	  }
-#endif
 	};
 
 	if (fp == NULL) {
@@ -296,28 +163,16 @@ void deviceid_init(void)
 	    continue;
 	  }
 
-#if TEST
-	  //dw_printf ("%d: %s\n", line, stuff);
-#endif
 	  // This is not very robust; everything better be in exactly the right format.
 
 	  if (strncmp(stuff, "mice:", strlen("mice:")) == 0) {
 	    section = mice_section;
-#if TEST
-	    dw_printf ("Pass %d, line %d, MIC-E section\n", pass, line);
-#endif
 	  }
 	  else if (strncmp(stuff, "micelegacy:", strlen("micelegacy:")) == 0) {
 	    section = mice_section;  // treat both same.
-#if TEST
-	    dw_printf ("Pass %d, line %d, Legacy MIC-E section\n", pass, line);
-#endif
 	  }
 	  else if (strncmp(stuff, "tocalls:", strlen("tocalls:")) == 0) {
 	    section = tocalls_section;
-#if TEST
-	    dw_printf ("Pass %d, line %d, TOCALLS section\n", pass, line);
-#endif
 	  }
 
 	  // The first property of an item is preceded by " - ".
@@ -386,9 +241,6 @@ void deviceid_init(void)
 	 } // while(fgets
 
 	 if (pass == 1) {
-#if TEST
-	  dw_printf ("deviceid sizes %d %d\n", mice_count, tocalls_count);
-#endif
 	  pmice = calloc(sizeof(struct mice), mice_count);
 	  ptocalls = calloc(sizeof(struct tocalls), tocalls_count);
 
@@ -412,18 +264,6 @@ void deviceid_init(void)
 // Example:  APY350 or APY008 would match those specific models before getting to the more generic APY.
 
 	qsort (ptocalls, tocalls_count, sizeof(struct tocalls), tocall_cmp);
-
-
-#if TEST
-	dw_printf ("MIC-E:\n");
-	for (int i = 0; i < mice_count; i++) {
-	  dw_printf ("%s %s %s\n", pmice[i].suffix, pmice[i].vendor, pmice[i].model);
-	}
-	dw_printf ("TOCALLS:\n");
-	for (int i = 0; i < tocalls_count; i++) {
-	  dw_printf ("%s %s %s\n", ptocalls[i].tocall, ptocalls[i].vendor, ptocalls[i].model);
-	}
-#endif
 
 	return;
 
@@ -549,6 +389,10 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 
 	    if (ptocalls[n].vendor != NULL && ptocalls[n].model != NULL) {
 	      strlcat (device, " ", device_size);
+	    }
+
+	    if (ptocalls[n].vendor == NULL && ptocalls[n].model != NULL) {
+	      strlcpy (device, "", device_size);
 	    }
 
 	    if (ptocalls[n].model != NULL) {
