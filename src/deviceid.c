@@ -391,6 +391,10 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 	      strlcat (device, " ", device_size);
 	    }
 
+	    if (ptocalls[n].vendor == NULL && ptocalls[n].model != NULL) {
+	      strlcpy (device, "", device_size);
+	    }
+
 	    if (ptocalls[n].model != NULL) {
 	      strlcat (device, ptocalls[n].model, device_size);
 	    }
