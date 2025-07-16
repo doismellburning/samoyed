@@ -184,8 +184,6 @@ int kiss_encapsulate (unsigned char *in, int ilen, unsigned char *out)
 }  /* end kiss_encapsulate */
 
 
-#ifndef WALK96
-
 /*-------------------------------------------------------------------
  *
  * Name:        kiss_unwrap 
@@ -909,8 +907,5 @@ void kiss_debug_print (fromto_t fromto, char *special, unsigned char *pmsg, int 
 	hex_dump (pmsg, msg_len);
 
 } /* end kiss_debug_print */
-
-
-#endif /* WALK96 */
 
 /* end kiss_frame.c */
