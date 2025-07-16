@@ -1306,7 +1306,7 @@ int audio_get_real (int a)
  *
  *----------------------------------------------------------------*/
 
-int audio_put (int a, int c)
+int audio_put_real (int a, int c)
 {
 	/* Should never be full at this point. */
 	assert (adev[a].outbuf_len < adev[a].outbuf_size_in_bytes);
@@ -1336,7 +1336,7 @@ int audio_put (int a, int c)
  *
  *----------------------------------------------------------------*/
 
-int audio_flush (int a)
+int audio_flush_real (int a)
 {
 #if USE_ALSA
 	int k;

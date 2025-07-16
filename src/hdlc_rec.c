@@ -761,7 +761,7 @@ void hdlc_rec_bit_new (int chan, int subchan, int slice, int raw, int is_scrambl
  *
  *--------------------------------------------------------------------*/
 
-void dcd_change (int chan, int subchan, int slice, int state)
+void dcd_change_real (int chan, int subchan, int slice, int state)
 {
 	int old, new;
 
