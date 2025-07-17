@@ -68,11 +68,9 @@
  * For now, just use a fixed size array for simplicity.
  */
 
-#if TT_MAIN
-#define MAX_TT_USERS 3	
-#else
+int TT_TESTS_RUNNING = 0;
+
 #define MAX_TT_USERS 100
-#endif
 
 #define MAX_CALLSIGN_LEN 9	/* "Object Report" names can be up to 9 characters. */
 				
@@ -198,7 +196,7 @@ int setenv(const char *name, const char *value, int overwrite)
  * Description:	The main program needs to call this at application
  *		start up time after reading the configuration file.
  *
- *		TT_MAIN is defined for unit testing.
+ *		TT_TESTS_RUNNING is defined for unit testing.
  *
  *----------------------------------------------------------------*/
 
@@ -429,13 +427,13 @@ static int corral_slot (void)
  *
  *----------------------------------------------------------------*/
 
-static void digit_suffix (char *callsign, char *suffix)
+static void digit_suffix (char *callsign, char *suffix, size_t suffix_len)
 {
 	char two_key[50];
 	char *t;
 
 
-	strlcpy (suffix, "000", 5);			// TODO: should have proper size
+	strlcpy (suffix, "000", suffix_len);
 	tt_text_to_two_key (callsign, 0, two_key);
 	for (t = two_key; *t != '\0'; t++) {
 	  if (isdigit(*t)) {
@@ -515,7 +513,7 @@ int tt_user_heard (char *callsign, int ssid, char overlay, char symbol, char *lo
 	  tt_user[i].ssid = ssid;
 	  tt_user[i].overlay = overlay;
 	  tt_user[i].symbol = symbol;
-	  digit_suffix(tt_user[i].callsign, tt_user[i].digit_suffix);
+	  digit_suffix(tt_user[i].callsign, tt_user[i].digit_suffix, sizeof(tt_user[i].digit_suffix));
 	  strlcpy (tt_user[i].loc_text, loc_text, sizeof(tt_user[i].loc_text));
 
 	  if (latitude != G_UNKNOWN && longitude != G_UNKNOWN) {
@@ -852,11 +850,10 @@ static void xmit_object_report (int i, int first_time)
 
 	strlcat (stemp, object_info, sizeof(stemp));
 
-#if TT_MAIN
-
-	printf ("---> %s\n\n", stemp);
-
-#else
+	if (TT_TESTS_RUNNING) {
+	  printf ("---> %s\n\n", stemp);
+	  return;
+	}
 
 	if (first_time) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -922,10 +919,6 @@ static void xmit_object_report (int i, int first_time)
 	else {
 	  ax25_delete (pp);
 	}
-
-#endif 
-	
-
 }
 
 static const char *letters[26] = {
@@ -1103,91 +1096,6 @@ void tt_user_dump (void)
 	}
 			
 }
-
-
-/*------------------------------------------------------------------
- *
- * Name:        main
- *
- * Purpose:     Quick test for some functions in this file.
- *
- * Description:	Just a smattering, not an organized test.
- *
- * 		$ rm a.exe ; gcc -DTT_MAIN -Iregex tt_user.c tt_text.c encode_aprs.c latlong.c textcolor.c misc.a ; ./a.exe
- *
- *----------------------------------------------------------------*/
-
-
-#if TT_MAIN
-
-
-static struct audio_s my_audio_config;
-
-static struct tt_config_s my_tt_config;
-
-
-int main (int argc, char *argv[])
-{
-	int n;
-
-/* Fake audio config - All we care about is mycall for constructing object report packet. */
-
-	memset (&my_audio_config, 0, sizeof(my_audio_config));
-
-	strlcpy (my_audio_config.mycall[0], "WB2OSZ-15", sizeof(my_audio_config.mycall[0]));
-
-/* Fake TT gateway config. */
-
-	memset (&my_tt_config, 0, sizeof(my_tt_config));	
-
-	/* Don't care about the location translation here. */
-
-	my_tt_config.retain_time = 20;		/* Normally 80 minutes. */
-	my_tt_config.num_xmits = 3;
-	assert (my_tt_config.num_xmits <= TT_MAX_XMITS);
-	my_tt_config.xmit_delay[0] = 3;		/* Before initial transmission. */
-	my_tt_config.xmit_delay[1] = 5;
-	my_tt_config.xmit_delay[2] = 5;
-
-	my_tt_config.corral_lat = 42.61900;
-	my_tt_config.corral_lon = -71.34717;
-	my_tt_config.corral_offset = 0.02 / 60;
-	my_tt_config.corral_ambiguity = 0;
-
-
-	tt_user_init(&my_audio_config, &my_tt_config);
-
-// tt_user_heard (char *callsign, int ssid, char overlay, char symbol, char *loc_text, double latitude,
-//              double longitude, int ambiguity, char *freq, char *ctcss, char *comment, char mic_e, char *dao);
-
-	tt_user_heard ("TEST1",  12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!");
-	SLEEP_SEC (1);
-	tt_user_heard ("TEST2",  12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!");
-	SLEEP_SEC (1);
-	tt_user_heard ("TEST3",  12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!");
-	SLEEP_SEC (1);
-	tt_user_heard ("TEST4",  12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!");
-	SLEEP_SEC (1);
-	tt_user_heard ("WB2OSZ", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!");
-	tt_user_heard ("K2H",    12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!");
-	tt_user_dump ();
-
-	tt_user_heard ("679",    12, 'J', 'A', "", 37.25,     -71.75,    0, "", " ", " ", ' ', "!T99!");
-	tt_user_heard ("WB2OSZ", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "146.520MHz", "", "", ' ', "!T99!");
-	tt_user_heard ("WB1GOF", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "146.955MHz", "074", "", ' ', "!T99!");
-	tt_user_heard ("679",    12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "Hello, world", '9', "!T99!");
-	tt_user_dump ();
-	
-	for (n=0; n<30; n++) {
-	  SLEEP_SEC(1);
-	  tt_user_background ();
-	}
-
-	return(0);
-
-}  /* end main */
-
-#endif		/* unit test */
 
 
 /* end tt-user.c */
