@@ -7,6 +7,7 @@
 /decode_aprs
 /dwgpsnmea
 /gen_packets
+/gen_tone
 /il2p_test
 /kissutil
 /ll2utm
