@@ -169,7 +169,7 @@ static const int audio_amplitude = 100;	/* % of audio sample range. */
 					/* Currently no option to change this. */
 
 static int d_u_opt = 0;			/* "-d u" command line option to print UTF-8 also in hexadecimal. */
-static int d_p_opt = 0;			/* "-d p" option for dumping packets over radio. */				
+int d_p_opt = 0;			/* "-d p" option for dumping packets over radio. */				
 
 static int q_h_opt = 0;			/* "-q h" Quiet, suppress the "heard" line with audio level. */
 static int q_d_opt = 0;			/* "-q d" Quiet, suppress the printing of description of APRS packets. */
