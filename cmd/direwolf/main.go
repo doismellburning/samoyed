@@ -827,11 +827,15 @@ func main() {
 	C.gen_tone_init(&C.audio_config, audio_amplitude, 0)
 	C.morse_init(&C.audio_config, audio_amplitude)
 
-	/* FIXME KG
-	assert(C.audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16)
-	assert(C.audio_config.adev[0].num_channels == 1 || C.audio_config.adev[0].num_channels == 2)
-	assert(C.audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && C.audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)
-	*/
+	if !(C.audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16) {
+		panic("audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16")
+	}
+	if !(C.audio_config.adev[0].num_channels == 1 || C.audio_config.adev[0].num_channels == 2) {
+		panic("assert(C.audio_config.adev[0].num_channels == 1 || C.audio_config.adev[0].num_channels == 2)")
+	}
+	if !(C.audio_config.adev[0].samples_per_sec >= C.MIN_SAMPLES_PER_SEC && C.audio_config.adev[0].samples_per_sec <= C.MAX_SAMPLES_PER_SEC) {
+		panic("assert(C.audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && C.audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
+	}
 
 	/*
 	 * Initialize the transmit queue.
