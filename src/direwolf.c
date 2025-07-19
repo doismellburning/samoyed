@@ -700,6 +700,10 @@ void cleanup_linux (int x)
 
 #endif
 
+// Because passing a function to signal() from Go is nontrivial
+void setup_sigint_handler() {
+	signal(SIGINT, cleanup_linux);
+}
 
 
 static void usage (char **argv)

@@ -84,7 +84,7 @@ package main
 // #include "dlq.h"		// for fec_type_t definition.
 // #include "deviceid.h"
 // #include "nettnc.h"
-// void cleanup_linux (int x);
+// void setup_sigint_handler();
 // extern struct audio_s audio_config;
 // extern struct tt_config_s tt_config;
 // extern struct misc_config_s misc_config;
@@ -199,7 +199,7 @@ func main() {
 	//fmt.Printf ("Dire Wolf version %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
 
 	C.setlinebuf(C.stdout)
-	// FIXME KG C.signal(C.SIGINT, C.cleanup_linux)
+	C.setup_sigint_handler()
 
 	// I've seen many references to people running this as root.
 	// There is no reason to do that.
