@@ -1,8 +1,8 @@
 // Package direwolf is a cgo wrapper for the Dire Wolf C source, eventually leading to a full port.
 package direwolf
 
-// #cgo CFLAGS: -I../external/geotranz -I../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108
-// #cgo LDFLAGS: -lm -ludev
+// #cgo CFLAGS: -I../external/geotranz -I../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT
+// #cgo LDFLAGS: -lm -ludev -lavahi-common -lavahi-client
 import "C"
 
 import (
