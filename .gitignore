@@ -5,6 +5,7 @@
 /atest
 /cm108
 /decode_aprs
+/direwolf
 /dwgpsnmea
 /gen_packets
 /gen_tone
@@ -64,7 +65,6 @@ z*
 
 # Binaries, other build results
 
-direwolf
 gen_fff
 
 direwolf.conf
