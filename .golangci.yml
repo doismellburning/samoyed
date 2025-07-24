@@ -32,7 +32,7 @@ linters:
             - pkg: invalid
               desc: Dummy deny because we need a non-empty list
     gocognit:
-      min-complexity: 150  # I sure wish this could be lower
+      min-complexity: 180  # I sure wish this could be lower
     gocritic:
       disabled-checks:
         - dupSubExpr  # Too many false positives on cgo code

@@ -61,6 +61,7 @@ package main
 // #include "il2p.h"
 // #include "hdlc_rec.h"
 // #include "atest.h"
+// extern int ATEST_C;
 // extern struct audio_s my_audio_config;
 // extern struct atest_header_t header;
 // extern struct atest_chunk_t chunk;
@@ -75,7 +76,7 @@ package main
 // extern int e_o_f;
 // extern int sample_number;
 // extern float space_gain[MAX_SUBCHANS];
-// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DATEST_C=1
+// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"
 
 import (
@@ -97,6 +98,8 @@ func ACHAN2ADEV(n C.int) C.int {
 }
 
 func main() {
+	C.ATEST_C = 1
+
 	var count [C.MAX_SUBCHANS]int // Experiments G and H
 
 	C.text_color_init(1)

@@ -71,7 +71,6 @@
 #include <ctype.h>
 
 
-#define ATEST_C 1
 
 #include "audio.h"
 #include "demod.h"
@@ -111,6 +110,8 @@ struct wav_header {             /* .WAV file header. */
  
  					/* 16 bit samples are little endian signed short */
 					/* in range of -32768 .. +32767. */
+
+int ATEST_C = 0;
 
 struct atest_header_t header;
 struct atest_chunk_t chunk;
@@ -191,7 +192,7 @@ int audio_get (int a) {
  * This is called when we have a good frame.
  */
 
-void dlq_req_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum)
+void dlq_rec_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum)
 {	
 	
 	char stemp[500];
@@ -353,9 +354,9 @@ void dlq_req_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t
 
 void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum) {
 	if (ATEST_C) {
-		dlq_req_frame_fake(chan, subchan, slice, pp, alevel, fec_type, retries, spectrum);
+		dlq_rec_frame_fake(chan, subchan, slice, pp, alevel, fec_type, retries, spectrum);
 	} else {
-		dlq_req_frame_real(chan, subchan, slice, pp, alevel, fec_type, retries, spectrum);
+		dlq_rec_frame_real(chan, subchan, slice, pp, alevel, fec_type, retries, spectrum);
 	}
 }
 
