@@ -44,8 +44,6 @@ typedef struct retry_conf_s {
 
 
 
-#if defined(DIREWOLF_C) || defined(ATEST_C) || defined(UDPTEST_C)
-
 static const char * retry_text[] = {
 		"NONE",
 		"SINGLE",
@@ -53,7 +51,6 @@ static const char * retry_text[] = {
 		"TRIPLE",
 		"TWO_SEP",
 		"PASSALL" };
-#endif
 
 void hdlc_rec2_init (struct audio_s *audio_config_p);
 
