@@ -71,7 +71,6 @@
 #include <ctype.h>
 
 
-#define ATEST_C 1
 
 #include "audio.h"
 #include "demod.h"
@@ -111,6 +110,8 @@ struct wav_header {             /* .WAV file header. */
  
  					/* 16 bit samples are little endian signed short */
 					/* in range of -32768 .. +32767. */
+
+int ATEST_C = 0;
 
 struct atest_header_t header;
 struct atest_chunk_t chunk;

@@ -4,7 +4,7 @@ package main
 // #include <string.h>
 // #include "dwgps.h"
 // #include "config.h"
-// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DATEST_C=1
+// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"
 
 import (
