@@ -737,7 +737,7 @@ x = Silence FX.25 information.`)
 
 				C.ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
 				C.text_color_set(C.DW_COLOR_INFO)
-				os.Exit(1)
+				os.Exit(0)
 			} else {
 				C.text_color_set(C.DW_COLOR_ERROR)
 				fmt.Printf("\nMark/Space frequencies not defined for channel %d. Cannot calibrate using this modem type.\n", transmitCalibrationChannel)
