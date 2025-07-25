@@ -77,6 +77,9 @@ stats:
 	@echo -n "CMake:        "
 	@find * -name CMakeLists.txt -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
 
+tags: $(C_FILES)
+	ctags --recurse --languages=C --c-kinds=+p --fields=+iaS --extras=+q src/
+
 .PHONY: oldhelp
 oldhelp:
 	@echo "The build procedure has changed in version 1.6."
