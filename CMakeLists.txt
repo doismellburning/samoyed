@@ -393,9 +393,6 @@ if(NOT APPLE)
 endif()
 add_subdirectory(${CUSTOM_MISC_DIR})
 
-# direwolf source code and utilities
-add_subdirectory(src)
-
 # ctest
 if(UNITTEST)
   message(STATUS "Build unit test binaries")
