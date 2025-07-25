@@ -109,7 +109,6 @@
 #include "tq.h"
 #include "xmit.h"
 #include "ptt.h"
-#include "beacon.h"
 #include "dtmf.h"
 #include "aprs_tt.h"
 #include "tt_user.h"
