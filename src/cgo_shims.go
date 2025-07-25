@@ -28,3 +28,7 @@ func text_color_set(c C.enum_dw_color_e) {
 func exit(x int) {
 	os.Exit(x)
 }
+
+func ADEVFIRSTCHAN(n int) int {
+	return n * 2
+}
