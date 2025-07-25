@@ -6,7 +6,10 @@ package direwolf
 // #include "textcolor.h"
 import "C"
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 const G_UNKNOWN = C.G_UNKNOWN
 
@@ -20,4 +23,8 @@ func dw_printf(format string, a ...any) (int, error) {
 
 func text_color_set(c C.enum_dw_color_e) {
 	C.text_color_set(C.dw_color_t(c))
+}
+
+func exit(x int) {
+	os.Exit(x)
 }
