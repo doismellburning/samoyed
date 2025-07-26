@@ -53,6 +53,11 @@ func exit(x int) {
 	os.Exit(x)
 }
 
+// #define ACHAN2ADEV(n) ((n)>>1)
+func ACHAN2ADEV(n C.int) C.int {
+	return n >> 1
+}
+
 func ADEVFIRSTCHAN(n int) int {
 	return n * 2
 }

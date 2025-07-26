@@ -1,4 +1,4 @@
-package main
+package direwolf
 
 import (
 	"io"
@@ -36,7 +36,7 @@ func Test_atest_basic_1(t *testing.T) {
 	os.Stdout = w
 
 	// Run
-	main()
+	AtestMain()
 
 	w.Close() //nolint:gosec
 
