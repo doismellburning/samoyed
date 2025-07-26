@@ -44,7 +44,6 @@ package direwolf
 // #include "tq.h"
 // #include "xmit.h"
 // #include "ptt.h"
-// #include "beacon.h"
 // #include "dtmf.h"
 // #include "aprs_tt.h"
 // #include "tt_user.h"
@@ -233,7 +232,7 @@ x = Silence FX.25 information.`)
 
 	var d_k_opt C.int = 0 /* "-d k" option for serial port KISS.  Can be repeated for more detail. */
 	var d_n_opt C.int = 0 /* "-d n" option for Network KISS.  Can be repeated for more detail. */
-	var d_t_opt C.int = 0 /* "-d t" option for Tracker.  Can be repeated for more detail. */
+	var d_t_opt = 0       /* "-d t" option for Tracker.  Can be repeated for more detail. */
 	var d_g_opt = 0       /* "-d g" option for GPS. Can be repeated for more detail. */
 	var d_o_opt C.int = 0 /* "-d o" option for output control such as PTT and DCD. */
 	var d_i_opt = 0       /* "-d i" option for IGate.  Repeat for more detail */
@@ -268,7 +267,7 @@ x = Silence FX.25 information.`)
 				C.waypoint_set_debug(1) // not documented yet.
 			case 't':
 				d_t_opt++
-				C.beacon_tracker_set_debug(d_t_opt)
+				beacon_tracker_set_debug(d_t_opt)
 			case 'p':
 				C.d_p_opt = 1 // TODO: packet dump for xmit side.
 			case 'o':
@@ -798,7 +797,7 @@ x = Silence FX.25 information.`)
 
 	C.log_init(C.misc_config.log_daily_names, &C.misc_config.log_path[0])
 	C.mheard_init(C.int(d_m_opt))
-	C.beacon_init(&C.audio_config, &C.misc_config, &igate_config)
+	beacon_init(&C.audio_config, &C.misc_config, &igate_config)
 
 	/*
 	 * Get sound samples and decode them.

@@ -2,8 +2,13 @@ package direwolf
 
 // Assorted utilities when porting from C to Go
 
+// #include "direwolf.h"
+// #include "audio.h"
 // #include "decode_aprs.h"
 // #include "textcolor.h"
+// #include "dwgps.h"
+// #include "config.h"
+// #include "tq.h"
 import "C"
 
 import (
@@ -14,6 +19,25 @@ import (
 const G_UNKNOWN = C.G_UNKNOWN
 
 const DW_COLOR_ERROR = C.DW_COLOR_ERROR
+const DW_COLOR_DEBUG = C.DW_COLOR_DEBUG
+const DW_COLOR_INFO = C.DW_COLOR_INFO
+const DW_COLOR_XMIT = C.DW_COLOR_XMIT
+
+const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
+
+const MEDIUM_NONE = C.MEDIUM_NONE
+const MEDIUM_RADIO = C.MEDIUM_RADIO
+const MEDIUM_IGATE = C.MEDIUM_IGATE
+const MEDIUM_NETTNC = C.MEDIUM_NETTNC
+
+const DWFIX_NOT_INIT = C.DWFIX_NOT_INIT
+const DWFIX_2D = C.DWFIX_2D
+const DWFIX_3D = C.DWFIX_3D
+
+const SENDTO_IGATE = C.SENDTO_IGATE
+const SENDTO_RECV = C.SENDTO_RECV
+
+const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
@@ -31,4 +55,22 @@ func exit(x int) {
 
 func ADEVFIRSTCHAN(n int) int {
 	return n * 2
+}
+
+// #define DW_KNOTS_TO_MPH(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 1.15077945)
+func DW_KNOTS_TO_MPH(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 1.15077945
+}
+
+// #define DW_METERS_TO_FEET(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 3.2808399)
+func DW_METERS_TO_FEET(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 3.2808399
 }
