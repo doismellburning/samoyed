@@ -27,3 +27,14 @@ func Test_Modem1200I(t *testing.T) {
 	setupPflag([]string{"atest", "-P+", "-D1", "-L92", "-G95", file})
 	AtestMain()
 }
+
+func Test_FX25_9600_F0(t*testing.T) {
+	var tmpdir = t.TempDir()
+	var file = filepath.Join(tmpdir, "test96f0.wav")
+
+	setupPflag([]string{"gen_packets", "-B9600", "-n", "100", "-X", "0", "-o", file})
+	GenPacketsMain()
+
+	setupPflag([]string{"atest", "-B9600", "-F0", "-L60", "-G64", file})
+	AtestMain()
+}
