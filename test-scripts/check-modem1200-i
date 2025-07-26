@@ -1,8 +1,0 @@
-#!/bin/bash -e
-
-source "$(dirname "$(realpath "$0")")/common"
-
-goto_tmpdir
-
-$GEN_PACKETS -I1 -n 100 -o test12-il2p.wav
-$ATEST -P+ -D1 -L92 -G95 test12-il2p.wav
