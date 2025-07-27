@@ -33,6 +33,8 @@ linters:
               desc: Dummy deny because we need a non-empty list
     gocognit:
       min-complexity: 180  # I sure wish this could be lower
+    goconst:
+      min-occurrences: 5
     gocritic:
       disabled-checks:
         - dupSubExpr  # Too many false positives on cgo code
