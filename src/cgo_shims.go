@@ -99,3 +99,12 @@ func DW_FEET_TO_METERS(x float64) float64 {
 
 	return x * 0.3048
 }
+
+var retry_text = []string{
+	"NONE",
+	"SINGLE",
+	"DOUBLE",
+	"TRIPLE",
+	"TWO_SEP",
+	"PASSALL",
+}
