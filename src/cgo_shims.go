@@ -73,6 +73,15 @@ func DW_KNOTS_TO_MPH(x float64) float64 {
 	return x * 1.15077945
 }
 
+// #define DW_MPH_TO_KNOTS(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.868976)
+func DW_MPH_TO_KNOTS(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.868976
+}
+
 // #define DW_METERS_TO_FEET(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 3.2808399)
 func DW_METERS_TO_FEET(x float64) float64 {
 	if x == G_UNKNOWN {
@@ -80,4 +89,13 @@ func DW_METERS_TO_FEET(x float64) float64 {
 	}
 
 	return x * 3.2808399
+}
+
+// #define DW_FEET_TO_METERS(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.3048)
+func DW_FEET_TO_METERS(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.3048
 }
