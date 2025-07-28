@@ -25,6 +25,7 @@ const DW_COLOR_XMIT = C.DW_COLOR_XMIT
 const DW_COLOR_REC = C.DW_COLOR_REC
 const DW_COLOR_DECODED = C.DW_COLOR_DECODED
 
+const MAX_RADIO_CHANS = C.MAX_RADIO_CHANS
 const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
 
 const MEDIUM_NONE = C.MEDIUM_NONE
@@ -39,6 +40,7 @@ const DWFIX_3D = C.DWFIX_3D
 const SENDTO_IGATE = C.SENDTO_IGATE
 const SENDTO_RECV = C.SENDTO_RECV
 
+const TQ_PRIO_0_HI = C.TQ_PRIO_0_HI
 const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
 func dw_printf(format string, a ...any) (int, error) {
