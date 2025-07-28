@@ -762,7 +762,7 @@ x = Silence FX.25 information.`)
 	 */
 	C.digipeater_init(&C.audio_config, &digi_config)
 	C.igate_init(&C.audio_config, &igate_config, &digi_config, C.int(d_i_opt))
-	C.cdigipeater_init(&C.audio_config, &cdigi_config)
+	cdigipeater_init(&C.audio_config, &cdigi_config)
 	C.pfilter_init(&igate_config, C.int(d_f_opt))
 	C.ax25_link_init(&C.misc_config, C.int(d_c_opt))
 
@@ -1246,7 +1246,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		if channel < C.MAX_RADIO_CHANS {
 			if retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p {
-				C.cdigipeater(channel, pp)
+				cdigipeater(channel, pp)
 			}
 		}
 	}
