@@ -43,6 +43,8 @@ const SENDTO_RECV = C.SENDTO_RECV
 const TQ_PRIO_0_HI = C.TQ_PRIO_0_HI
 const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
+const AX25_MAX_ADDR_LEN = C.AX25_MAX_ADDR_LEN
+
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
