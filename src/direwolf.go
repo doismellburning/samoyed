@@ -82,6 +82,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
+	"unicode"
+	"unsafe"
 
 	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
 	_ "github.com/doismellburning/samoyed/external/misc"     // Pulls this in for cgo
@@ -807,3 +810,444 @@ x = Silence FX.25 information.`)
 	recv_init(&C.audio_config)
 	recv_process()
 }
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        app_process_rec_frame
+ *
+ * Purpose:     This is called when we receive a frame with a valid
+ *		FCS and acceptable size.
+ *
+ * Inputs:	chan	- Audio channel number, 0 or 1.
+ *		subchan	- Which modem caught it.
+ *			  Special cases:
+ *				-1 for DTMF decoder.
+ *				-2 for channel mapped to APRS-IS.
+ *				-3 for channel mapped to network TNC.
+ *		slice	- Slicer which caught it.
+ *		pp	- Packet handle.
+ *		alevel	- Audio level, range of 0 - 100.
+ *				(Special case, use negative to skip
+ *				 display of audio level line.
+ *				 Use -2 to indicate DTMF message.)
+ *		retries	- Level of bit correction used.
+ *		spectrum - Display of how well multiple decoders did.
+ *
+ *
+ * Description:	Print decoded packet.
+ *		Optionally send to another application.
+ *
+ *--------------------------------------------------------------------*/
+
+// TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
+
+func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum string) {
+	/* FIXME KG
+	assert (chan >= 0 && chan < MAX_TOTAL_CHANS);		// TOTAL for virtual channels
+	assert (subchan >= -3 && subchan < MAX_SUBCHANS);
+	assert (slice >= 0 && slice < MAX_SLICERS);
+	assert (pp != NULL);	// 1.1J+
+	*/
+
+	// Extra stuff before slice indicators.
+	// Can indicate FX.25/IL2P or fix_bits.
+	var display_retries string
+
+	switch fec_type {
+	case C.fec_type_fx25:
+		display_retries = " FX.25 "
+	case C.fec_type_il2p:
+		display_retries = " IL2P "
+	default:
+		// Possible fix_bits indication.
+		if C.audio_config.achan[channel].fix_bits != C.RETRY_NONE || C.audio_config.achan[channel].passall > 0 {
+			// FIXME KG assert(retries >= C.RETRY_NONE && retries <= C.RETRY_MAX)
+			display_retries = fmt.Sprintf(" [%s] ", retry_text[int(retries)])
+		}
+	}
+
+	var stemp [500]C.char
+	C.ax25_format_addrs(pp, &stemp[0])
+
+	var pinfo *C.uchar
+	var info_len = C.ax25_get_info(pp, &pinfo)
+
+	/* Print so we can see what is going on. */
+
+	/* Display audio input level. */
+	/* Who are we hearing?   Original station or digipeater. */
+
+	var h C.int
+	var heard [C.AX25_MAX_ADDR_LEN]C.char
+	if C.ax25_get_num_addr(pp) == 0 {
+		/* Not AX.25. No station to display below. */
+		h = -1
+	} else {
+		h = C.ax25_get_heard(pp)
+		C.ax25_get_addr_with_ssid(pp, h, &heard[0])
+	}
+
+	text_color_set(DW_COLOR_DEBUG)
+	dw_printf("\n")
+
+	// The HEARD line.
+
+	if (C.q_h_opt == 0) && alevel.rec >= 0 { /* suppress if "-q h" option */
+		// FIXME: rather than checking for ichannel, how about checking medium==radio
+		if channel != C.audio_config.igate_vchannel { // suppress if from ICHANNEL
+			if h != -1 && h != C.AX25_SOURCE {
+				dw_printf("Digipeater ")
+			}
+
+			var alevel_text [C.AX25_ALEVEL_TO_TEXT_SIZE]C.char
+
+			C.ax25_alevel_to_text(alevel, &alevel_text[0])
+
+			// Experiment: try displaying the DC bias.
+			// Should be 0 for soundcard but could show mistuning with SDR.
+
+			/*
+			  char bias[16];
+			  snprintf (bias, sizeof(bias), " DC%+d", multi_modem_get_dc_average (channel));
+			  strlcat (alevel_text, bias, sizeof(alevel_text));
+			*/
+
+			/* As suggested by KJ4ERJ, if we are receiving from */
+			/* WIDEn-0, it is quite likely (but not guaranteed), that */
+			/* we are actually hearing the preceding station in the path. */
+
+			var _heard = C.GoString(&heard[0]) // TODO Quick convenience hack
+			if h >= C.AX25_REPEATER_2 &&
+				strings.EqualFold(_heard[:4], "WIDE") &&
+				unicode.IsDigit(rune(_heard[4])) &&
+				len(_heard) == 5 {
+				var probably_really [C.AX25_MAX_ADDR_LEN]C.char
+				C.ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
+
+				// audio level applies only for internal modem channels.
+				if subchan >= 0 {
+					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", _heard, C.GoString(&probably_really[0]), C.GoString(&alevel_text[0]), display_retries, spectrum)
+				} else {
+					dw_printf("%s (probably %s)\n", _heard, C.GoString(&probably_really[0]))
+				}
+			} else if _heard == "DTMF" {
+				dw_printf("%s audio level = %s  tt\n", _heard, C.GoString(&alevel_text[0]))
+			} else {
+				// audio level applies only for internal modem channels.
+				if subchan >= 0 {
+					dw_printf("%s audio level = %s  %s  %s\n", _heard, C.GoString(&alevel_text[0]), display_retries, spectrum)
+				} else {
+					dw_printf("%s\n", _heard)
+				}
+			}
+		}
+	}
+
+	/* Version 1.2:   Cranking the input level way up produces 199. */
+	/* Keeping it under 100 gives us plenty of headroom to avoid saturation. */
+
+	// TODO:  suppress this message if not using soundcard input.
+	// i.e. we have no control over the situation when using SDR.
+
+	if alevel.rec > 110 {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Audio input level is too high. This may cause distortion and reduced decode performance.\n")
+		dw_printf("Solution is to decrease the audio input level.\n")
+		dw_printf("Setting audio input level so most stations are around 50 will provide good dyanmic range.\n")
+	} else if alevel.rec < 5 && channel != C.audio_config.igate_vchannel && subchan != -3 {
+		// FIXME: rather than checking for ichannel, how about checking medium==radio
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Audio input level is too low.  Increase so most stations are around 50.\n")
+	}
+
+	// Display non-APRS packets in a different color.
+
+	// Display subchannel only when multiple modems configured for channel.
+
+	// -1 for APRStt DTMF decoder.
+
+	var ts string // optional time stamp
+
+	if C.strlen(&C.audio_config.timestamp_format[0]) > 0 {
+		var tstmp [100]C.char
+		C.timestamp_user_format(&tstmp[0], C.int(len(tstmp)), &C.audio_config.timestamp_format[0])
+		ts = " " + C.GoString(&tstmp[0]) // space after channel.
+	}
+
+	switch subchan {
+	case -1: // dtmf
+		text_color_set(DW_COLOR_REC)
+		dw_printf("[%d.dtmf%s] ", channel, ts)
+	case -2: // APRS-IS
+		text_color_set(DW_COLOR_REC)
+		dw_printf("[%d.is%s] ", channel, ts)
+	case -3: // nettnc
+		text_color_set(DW_COLOR_REC)
+		dw_printf("[%d%s] ", channel, ts)
+	default:
+		if C.ax25_is_aprs(pp) > 0 {
+			text_color_set(DW_COLOR_REC)
+		} else {
+			text_color_set(DW_COLOR_DECODED)
+		}
+
+		if C.audio_config.achan[channel].num_subchan > 1 && C.audio_config.achan[channel].num_slicers == 1 {
+			dw_printf("[%d.%d%s] ", channel, subchan, ts)
+		} else if C.audio_config.achan[channel].num_subchan == 1 && C.audio_config.achan[channel].num_slicers > 1 {
+			dw_printf("[%d.%d%s] ", channel, slice, ts)
+		} else if C.audio_config.achan[channel].num_subchan > 1 && C.audio_config.achan[channel].num_slicers > 1 {
+			dw_printf("[%d.%d.%d%s] ", channel, subchan, slice, ts)
+		} else {
+			dw_printf("[%d%s] ", channel, ts)
+		}
+	}
+
+	dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+
+	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
+
+	var asciiOnly C.int = 0 // Quick bodge because these C bools are ints...
+	if (C.ax25_is_aprs(pp) == 0) && (C.d_u_opt == 0) {
+		asciiOnly = 1
+	}
+
+	if C.ax25_is_aprs(pp) == 0 {
+		var cr C.cmdres_t
+		var desc [80]C.char
+		var pf, nr, ns C.int
+
+		var ftype = C.ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
+
+		/* Could change by 1, since earlier call, if we guess at modulo 128. */
+		info_len = C.ax25_get_info(pp, &pinfo)
+
+		dw_printf("(%s)", C.GoString(&desc[0]))
+		if ftype == C.frame_type_U_XID {
+			var param C.struct_xid_param_s
+			var info2text [150]C.char
+
+			C.xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))
+			dw_printf(" %s\n", C.GoString(&info2text[0]))
+		} else {
+			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
+			dw_printf("\n")
+		}
+	} else {
+		// for APRS we generally want to display non-ASCII to see UTF-8.
+		// for other, probably want to restrict to ASCII only because we are
+		// more likely to have compressed data than UTF-8 text.
+
+		// TODO: Might want to use d_u_opt for transmitted frames too.
+
+		C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
+		dw_printf("\n")
+	}
+
+	// Also display in pure ASCII if non-ASCII characters and "-d u" option specified.
+
+	if C.d_u_opt > 0 {
+		var hasNonPrintable = false
+		for _, r := range C.GoString((*C.char)(unsafe.Pointer(pinfo))) {
+			if !unicode.IsPrint(r) {
+				hasNonPrintable = true
+				break
+			}
+		}
+
+		if hasNonPrintable {
+			text_color_set(DW_COLOR_DEBUG)
+			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1)
+			dw_printf("\n")
+		}
+	}
+
+	/* Optional hex dump of packet. */
+
+	if C.d_p_opt > 0 {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("------\n")
+		C.ax25_hex_dump(pp)
+		dw_printf("------\n")
+	}
+
+	/*
+	 * Decode the contents of UI frames and display in human-readable form.
+	 * Could be APRS or anything random for old fashioned packet beacons.
+	 *
+	 * Suppress printed decoding if "-q d" option used.
+	 */
+	var ais_obj_packet [300]C.char
+
+	if C.ax25_is_aprs(pp) > 0 {
+		var A C.decode_aprs_t
+
+		// we still want to decode it for logging and other processing.
+		// Just be quiet about errors if "-qd" is set.
+
+		C.decode_aprs(&A, pp, C.q_d_opt, nil)
+
+		if C.q_d_opt == 0 {
+			// Print it all out in human readable format unless "-q d" option used.
+
+			C.decode_aprs_print(&A)
+		}
+
+		/*
+		 * Perform validity check on each address.
+		 * This should print an error message if any issues.
+		 */
+		C.ax25_check_addresses(pp)
+
+		// Send to log file.
+
+		C.log_write(channel, &A, pp, alevel, retries)
+
+		// temp experiment.
+		// log_rr_bits (&A, pp);
+
+		// Add to list of stations heard over the radio.
+
+		C.mheard_save_rf(channel, &A, pp, alevel, retries)
+
+		// For AIS, we have an option to convert the NMEA format, in User Defined data,
+		// into an APRS "Object Report" and send that to the clients as well.
+
+		// FIXME: partial implementation.
+
+		var user_def_da = C.CString("{" + string(C.USER_DEF_USER_ID) + string(C.USER_DEF_TYPE_AIS))
+
+		if C.strncmp((*C.char)(unsafe.Pointer(pinfo)), user_def_da, 3) == 0 {
+			C.waypoint_send_ais(C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
+
+			if C.A_opt_ais_to_obj > 0 && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
+				var ais_obj_info [256]C.char
+				C.encode_object(&A.g_name[0], 0, C.time(nil),
+					A.g_lat, A.g_lon, 0, // no ambiguity
+					A.g_symbol_table, A.g_symbol_code,
+					0, 0, 0, C.CString(""), // power, height, gain, direction.
+					// Unknown not handled properly.
+					// Should encode_object take floating point here?
+					C.int(A.g_course+0.5), C.int(DW_MPH_TO_KNOTS(float64(A.g_speed_mph))+0.5),
+					0, 0, 0, &A.g_comment[0], // freq, tone, offset
+					&ais_obj_info[0], C.ulong(len(ais_obj_info)))
+
+				// TODO Bodge
+				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", C.GoString(&A.g_src[0]), C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, C.GoString(&ais_obj_info[0]))
+				C.strcpy(&ais_obj_packet[0], C.CString(_ais_obj_packet))
+
+				dw_printf("[%d.AIS] %s\n", channel, _ais_obj_packet)
+
+				// This will be sent to client apps after the User Defined Data representation.
+			}
+		}
+
+		// Convert to NMEA waypoint sentence if we have a location.
+
+		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
+			var nameIn = &A.g_src[0]
+			if C.strlen(&A.g_name[0]) > 0 {
+				nameIn = &A.g_name[0]
+			}
+
+			C.waypoint_send_sentence(nameIn,
+				A.g_lat, A.g_lon, A.g_symbol_table, A.g_symbol_code,
+				C.float(DW_FEET_TO_METERS(float64(A.g_altitude_ft))), A.g_course, C.float(DW_MPH_TO_KNOTS(float64(A.g_speed_mph))),
+				&A.g_comment[0])
+		}
+	}
+
+	/* Send to another application if connected. */
+	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
+	// We see the same sequence in tt_user.c.
+
+	var fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
+	var flen = C.ax25_pack(pp, &fbuf[0])
+
+	C.server_send_rec_packet(channel, pp, &fbuf[0], flen)                                 // AGW net protocol
+	C.kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)    // KISS TCP
+	C.kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1) // KISS serial port
+	C.kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)     // KISS pseudo terminal
+
+	if C.A_opt_ais_to_obj > 0 && C.strlen(&ais_obj_packet[0]) != 0 {
+		var ao_pp = C.ax25_from_text(&ais_obj_packet[0], 1)
+		if ao_pp != nil {
+			var ao_fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
+			var ao_flen = C.ax25_pack(ao_pp, &ao_fbuf[0])
+
+			C.server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
+			C.kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
+			C.kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
+			C.kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
+			C.ax25_delete(ao_pp)
+		}
+	}
+
+	/*
+	 * If it is from the ICHANNEL, we are done.
+	 * Don't digipeat.  Don't IGate.
+	 * Don't do anything with it after printing and sending to client apps.
+	 */
+
+	if channel == C.audio_config.igate_vchannel {
+		return
+	}
+
+	/*
+	 * If it came from DTMF decoder (subchan == -1), send it to APRStt gateway.
+	 * Otherwise, it is a candidate for IGate and digipeater.
+	 *
+	 * It is also useful to have some way to simulate touch tone
+	 * sequences with BEACON sendto=R0 for testing.
+	 */
+
+	if subchan == -1 { // from DTMF decoder
+		if C.tt_config.gateway_enabled > 0 && info_len >= 2 {
+			C.aprs_tt_sequence(channel, C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:]))
+		}
+	} else if *pinfo == 't' && info_len >= 2 && C.tt_config.gateway_enabled > 0 {
+		// For testing.
+		// Would be nice to verify it was generated locally,
+		// not received over the air.
+		C.aprs_tt_sequence(channel, C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:]))
+	} else {
+		/*
+		 * Send to the IGate processing.
+		 * Use only those with correct CRC; We don't want to spread corrupted data!
+		 * Our earlier "fix bits" hack could allow corrupted information to get thru.
+		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
+		 * confidence that it is correct.
+		 */
+		if C.ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
+			C.igate_send_rec_packet(channel, pp)
+		}
+
+		/* Send out a regenerated copy. Applies to all types, not just APRS. */
+		/* This was an experimental feature never documented in the User Guide. */
+		/* Initial feedback was positive but it fell by the wayside. */
+		/* Should follow up with testers and either document this or clean out the clutter. */
+
+		C.digi_regen(channel, pp)
+
+		/*
+		 * Send to APRS digipeater.
+		 * Use only those with correct CRC; We don't want to spread corrupted data!
+		 * Our earlier "fix bits" hack could allow corrupted information to get thru.
+		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
+		 * confidence that it is correct.
+		 */
+		if C.ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
+			C.digipeater(channel, pp)
+		}
+
+		/*
+		 * Connected mode digipeater.
+		 * Use only those with correct CRC (or using FEC.)
+		 */
+
+		if channel < C.MAX_RADIO_CHANS {
+			if retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p {
+				C.cdigipeater(channel, pp)
+			}
+		}
+	}
+} /* end app_process_rec_packet */

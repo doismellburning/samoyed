@@ -22,6 +22,8 @@ const DW_COLOR_ERROR = C.DW_COLOR_ERROR
 const DW_COLOR_DEBUG = C.DW_COLOR_DEBUG
 const DW_COLOR_INFO = C.DW_COLOR_INFO
 const DW_COLOR_XMIT = C.DW_COLOR_XMIT
+const DW_COLOR_REC = C.DW_COLOR_REC
+const DW_COLOR_DECODED = C.DW_COLOR_DECODED
 
 const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
 
@@ -71,6 +73,15 @@ func DW_KNOTS_TO_MPH(x float64) float64 {
 	return x * 1.15077945
 }
 
+// #define DW_MPH_TO_KNOTS(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.868976)
+func DW_MPH_TO_KNOTS(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.868976
+}
+
 // #define DW_METERS_TO_FEET(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 3.2808399)
 func DW_METERS_TO_FEET(x float64) float64 {
 	if x == G_UNKNOWN {
@@ -78,4 +89,22 @@ func DW_METERS_TO_FEET(x float64) float64 {
 	}
 
 	return x * 3.2808399
+}
+
+// #define DW_FEET_TO_METERS(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.3048)
+func DW_FEET_TO_METERS(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.3048
+}
+
+var retry_text = []string{
+	"NONE",
+	"SINGLE",
+	"DOUBLE",
+	"TRIPLE",
+	"TWO_SEP",
+	"PASSALL",
 }
