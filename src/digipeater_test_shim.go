@@ -99,7 +99,7 @@ func digipeater_test(t *testing.T, _in, _out string) {
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
-	var result = C.digipeat_match(0, pp, C.mycall, C.mycall, &C.alias_re, &C.wide_re, 0, C.preempt, C.config_atgp, nil)
+	var result = digipeat_match(0, pp, C.mycall, C.mycall, &C.alias_re, &C.wide_re, 0, C.preempt, C.config_atgp, nil)
 
 	var xmit [256]C.char
 	if result != nil {
