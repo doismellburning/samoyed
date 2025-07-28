@@ -40,6 +40,7 @@ const DWFIX_3D = C.DWFIX_3D
 const SENDTO_IGATE = C.SENDTO_IGATE
 const SENDTO_RECV = C.SENDTO_RECV
 
+const TQ_PRIO_0_HI = C.TQ_PRIO_0_HI
 const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
 func dw_printf(format string, a ...any) (int, error) {
