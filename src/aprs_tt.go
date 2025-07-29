@@ -724,7 +724,7 @@ func parse_callsign (e string) int {
 	  if (length == 7) {
 	    tttemp[0] = e[length-3];
 	    tttemp[1] = e[length-2];
-	    tttemp[2] = '\0';
+	    tttemp[2] = 0;
 	    tt_two_key_to_text (tttemp, 0, stemp);
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
 	    m_symtab_or_overlay = stemp[0];
@@ -733,8 +733,7 @@ func parse_callsign (e string) int {
 	      dw_printf ("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
 				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
 	    }
-	  }
-	  else {
+	  } else {
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
 	    m_symtab_or_overlay = e[length-2];
 	    if (tt_debug) {
@@ -752,7 +751,7 @@ func parse_callsign (e string) int {
 
 	if (length >= 7 && length <= 24) {
 
-	  int cs_err = checksum_not_ok (e+1, length-2, e[length-1]);
+	  var cs_err = checksum_not_ok (e+1, length-2, e[length-1]);
 
 	  if (cs_err != 0) {
 	    return (cs_err);
@@ -760,7 +759,7 @@ func parse_callsign (e string) int {
 	
 	  if (isupper(e[length-2])) {
 	    memcpy (tttemp, e+1, length-4);
-	    tttemp[length-4] = '\0';
+	    tttemp[length-4] = 0
 	    tt_two_key_to_text (tttemp, 0, m_callsign);
 
 	    tttemp[0] = e[length-3];
@@ -774,8 +773,7 @@ func parse_callsign (e string) int {
 	      dw_printf ("Callsign in two key format1: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
 				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
 	    }
-	  }
-	  else {
+	  } else {
 	    memcpy (tttemp, e+1, length-3);
 	    tttemp[length-3] = '\0';
 	    tt_two_key_to_text (tttemp, 0, m_callsign);
@@ -820,9 +818,7 @@ func parse_callsign (e string) int {
  *----------------------------------------------------------------*/
 
 
-static int parse_object_name (char *e)
-{
-	int length;
+func parse_object_name (e string) int {
 
 	if (tt_debug) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -832,7 +828,7 @@ static int parse_object_name (char *e)
 	assert (e[0] == 'A');
 	assert (e[1] == 'A');
 
-	length = strlen(e);
+	var length = strlen(e);
 
 /* 
  * Object name in two key format.
@@ -893,12 +889,12 @@ static int parse_object_name (char *e)
  *----------------------------------------------------------------*/
 
 
-static int parse_symbol (char *e)
-{
-	int length;
+func parse_symbol (char *e) int {
+	/* FIXME KG
 	char nstr[3];
 	int nn;
 	char stemp[10];
+	*/
 
 	if (tt_debug) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -908,7 +904,7 @@ static int parse_symbol (char *e)
 	assert (e[0] == 'A');
 	assert (e[1] == 'B');
 
-	length = strlength(e);
+	var length = strlength(e);
 
 	if (length >= 4 && length <= 10) {
 
@@ -919,8 +915,7 @@ static int parse_symbol (char *e)
 	  nn = atoi (nstr);
 	  if (nn < 1) {
 	    nn = 1;
-	  }
-	  else if (nn > 94) {
+	  } else if (nn > 94) {
 	    nn = 94;
 	  }
 
@@ -997,11 +992,9 @@ static int parse_symbol (char *e)
  *
  *----------------------------------------------------------------*/
 
-static int parse_aprstt3_call (char *e)
-{
-
-	assert (e[0] == 'A');
-	assert (e[1] == 'C');
+func parse_aprstt3_call (e string) int {
+	// FIXME KG assert (e[0] == 'A');
+	// FIXME KG assert (e[1] == 'C');
 
 	if (tt_debug) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -1009,24 +1002,22 @@ static int parse_aprstt3_call (char *e)
 	}
 
 	if (strlen(e) == 2+10) {
-	  char call[12];
+	  var call[12] C.char
 
 	  if (tt_call10_to_text(e+2,1,call) == 0) {
 	    strlcpy(m_callsign, call, sizeof(m_callsign));
-	  }
-	  else {
+	  } else {
 	    return (TT_ERROR_INVALID_CALL);		/* Could not convert to text */
 	  }
-	}
-	else if (strlen(e) == 2+5) {
-	  char suffix[8];
+	} else if (strlen(e) == 2+5) {
+	  var suffix[8]C.char
           if (tt_call5_suffix_to_text(e+2,1,suffix) == 0) {
 
             if (running_TT_MAIN_tests) {
 	      /* For unit test, use suffix rather than trying lookup. */
 	      strlcpy (m_callsign, suffix, sizeof(m_callsign));
             } else {
-	      char call[12];
+	      var call[12]C.char
 
 	      /* In normal operation, try to find full callsign for the suffix received. */
 
@@ -1035,24 +1026,20 @@ static int parse_aprstt3_call (char *e)
 	        dw_printf ("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call);
 
 	        strlcpy(m_callsign, call, sizeof(m_callsign));
-	      }
-	      else {
+	      } else {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Couldn't find full callsign for suffix \"%s\"\n", suffix);
 	        return (TT_ERROR_SUFFIX_NO_CALL);	/* Don't know this user. */
 	      }
 	    }
-	  }
-	  else {
+	  } else {
 	    return (TT_ERROR_INVALID_CALL);	/* Could not convert to text */
 	  }
-	}
-	else {
+	} else {
 	  return (TT_ERROR_INVALID_CALL);	/* Invalid length, not 2+ (10 ir 5) */
 	}
 
 	return (0);
-
 }  /* end parse_aprstt3_call */
 
 
@@ -1100,13 +1087,11 @@ static int parse_aprstt3_call (char *e)
  *----------------------------------------------------------------*/
 
 /* Average radius of earth in meters. */
-#define R 6371000.
+// FIXME KG #define R 6371000.
 
 
-static int parse_location (char *e)
-{
-	int ipat;
-	char xstr[VALSTRSIZE], ystr[VALSTRSIZE], zstr[VALSTRSIZE], bstr[VALSTRSIZE], dstr[VALSTRSIZE];
+func parse_location (e string) int {
+	/* FIXME KG
 	double x, y, dist, bearing;
 	double lat0, lon0;
 	double lat9, lon9;
@@ -1114,6 +1099,7 @@ static int parse_location (char *e)
 	double easting, northing;
 	char mh[20];	
 	char stemp[32];
+	*/
 
 	if (tt_debug) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -1121,15 +1107,17 @@ static int parse_location (char *e)
 	  // TODO: more detail later...
 	}
 
-	assert (*e == 'B');
+	// FIXME KG assert (*e == 'B');
 
 
-	ipat = find_ttloc_match (e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE);
+	// FIXME KG char xstr[VALSTRSIZE], ystr[VALSTRSIZE], zstr[VALSTRSIZE], bstr[VALSTRSIZE], dstr[VALSTRSIZE];
+	var ipat = find_ttloc_match (e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE);
+
 	if (ipat >= 0) {
 
 	  //dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
 
-	  switch (tt_config.ttloc_ptr[ipat].type) {
+	  switch (tt_config.ttloc_ptr[ipat]._type) {
 	    case TTLOC_POINT:
 		
 	      m_latitude = tt_config.ttloc_ptr[ipat].point.lat;
@@ -1199,26 +1187,30 @@ static int parse_location (char *e)
 
 	      lat0 = tt_config.ttloc_ptr[ipat].grid.lat0;
 	      lat9 = tt_config.ttloc_ptr[ipat].grid.lat9;
-	      double yrange = lat9 - lat0;
+	      var yrange = lat9 - lat0;
 	      y = atof(ystr);
-	      double user_y_max = round(pow(10., strlen(ystr)) - 1.);	// e.g. 999 for 3 digits
+	      var user_y_max = round(pow(10., strlen(ystr)) - 1.);	// e.g. 999 for 3 digits
 	      m_latitude = lat0 + yrange * y / user_y_max;
+		  /* TODO KG
 #if 0
 	      dw_printf ("TTLOC_GRID LAT min=%f, max=%f, range=%f\n", lat0, lat9, yrange);
 	      dw_printf ("TTLOC_GRID LAT user_y=%f, user_y_max=%f\n", y, user_y_max);
 	      dw_printf ("TTLOC_GRID LAT min + yrange * user_y / user_y_range = %f\n", m_latitude);
 #endif
+*/
 	      lon0 = tt_config.ttloc_ptr[ipat].grid.lon0;
 	      lon9 = tt_config.ttloc_ptr[ipat].grid.lon9;
-	      double xrange = lon9 - lon0;
+	      var xrange = lon9 - lon0;
 	      x = atof(xstr);
-	      double user_x_max = round(pow(10., strlen(xstr)) - 1.);
+	      var user_x_max = round(pow(10., strlen(xstr)) - 1.);
 	      m_longitude = lon0 + xrange * x / user_x_max;
+		  /* TODO KG
 #if 0
 	      dw_printf ("TTLOC_GRID LON min=%f, max=%f, range=%f\n", lon0, lon9, xrange);
 	      dw_printf ("TTLOC_GRID LON user_x=%f, user_x_max=%f\n", x, user_x_max);
 	      dw_printf ("TTLOC_GRID LON min + xrange * user_x / user_x_range = %f\n", m_longitude);
 #endif
+*/
 
 	      m_dao[2] = e[0];
 	      m_dao[3] = e[1];
@@ -1248,11 +1240,9 @@ static int parse_location (char *e)
 	
 	      if (isalpha(tt_config.ttloc_ptr[ipat].utm.latband)) {
 	        snprintf (m_loc_text, sizeof(m_loc_text), "%d%c %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), tt_config.ttloc_ptr[ipat].utm.latband, easting, northing);
-	      }
-	      else if (tt_config.ttloc_ptr[ipat].utm.latband == '-') {
+	      } else if (tt_config.ttloc_ptr[ipat].utm.latband == '-') {
 	        snprintf (m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(- tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing);
-	      }
-	      else {
+	      } else {
 	        snprintf (m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing);
 	      }
 
@@ -1264,9 +1254,8 @@ static int parse_location (char *e)
                 m_longitude = R2D(lon0);
 
                 //dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
-              }
-              else {
-	        char message[300];
+              } else {
+	        var message[300] C.char
 
 		text_color_set(DW_COLOR_ERROR);
 	        utm_error_string (lerr, message);
@@ -1295,7 +1284,7 @@ static int parse_location (char *e)
 		strlcpy (ystr, "5", sizeof(ystr));
 	      }
 
-	      char loc[40];
+	      var loc[40]C.char
 	
 	      strlcpy (loc, tt_config.ttloc_ptr[ipat].mgrs.zone, sizeof(loc));
 	      strlcat (loc, xstr, sizeof(loc));
@@ -1306,10 +1295,11 @@ static int parse_location (char *e)
 
 	      strlcpy (m_loc_text, loc, sizeof(m_loc_text));
 
-	      if (tt_config.ttloc_ptr[ipat].type == TTLOC_MGRS)
+	      if (tt_config.ttloc_ptr[ipat]._type == TTLOC_MGRS) {
                 lerr = Convert_MGRS_To_Geodetic(loc, &lat0, &lon0);
-	      else
+			} else {
                 lerr = Convert_USNG_To_Geodetic(loc, &lat0, &lon0);
+			}
 
 
               if (lerr == 0) {
@@ -1317,9 +1307,8 @@ static int parse_location (char *e)
                 m_longitude = R2D(lon0);
 
                 //dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
-              }
-              else {
-	        char message[300];
+              } else {
+	        var message[300]C.char
 
 		text_color_set(DW_COLOR_ERROR);
 	        mgrs_error_string (lerr, message);
@@ -1398,7 +1387,7 @@ static int parse_location (char *e)
 	      break;
 
 	    default:
-	      assert (0);
+	      panic("")
 	  }
 	  return (0);
 	}
@@ -1441,21 +1430,20 @@ static int parse_location (char *e)
  *
  *----------------------------------------------------------------*/
 
-static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize)
-{
-	int ipat;	/* Index into patterns from configuration file */
-	int len;	/* Length of pattern we are trying to match. */
-	int match;
-	char mc;
-	int k;
+func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize) int {
+	// FIXME KG int ipat;	/* Index into patterns from configuration file */
+	// FIXME KG int len;	/* Length of pattern we are trying to match. */
+	// FIXME KG int match;
+	// FIXME KG char mc;
+	// FIXME KG int k;
 
 	// debug dw_printf ("find_ttloc_match: e=%s\n", e);
 
-	for (ipat=0; ipat<tt_config.ttloc_len; ipat++) {
+	for ipat:=0; ipat<tt_config.ttloc_len; ipat++ {
 	  
-	  len = strlen(tt_config.ttloc_ptr[ipat].pattern);
+	  length = strlen(tt_config.ttloc_ptr[ipat].pattern);
 
-	  if ((int)(strlen(e)) == len) {
+	  if ((int)(strlen(e)) == length) {
 
 	    match = 1;
 	    strlcpy (xstr, "", valstrsize);
@@ -1464,7 +1452,7 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 	    strlcpy (bstr, "", valstrsize);
 	    strlcpy (dstr, "", valstrsize);
 
-	    for (k=0; k<len; k++) {
+	    for (k=0; k<length; k++) {
 	      mc = tt_config.ttloc_ptr[ipat].pattern[k];
 	      switch (mc) {
 
@@ -1494,8 +1482,7 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 		     stemp[0] = e[k];
 		     stemp[1] = '\0';
 		     strlcat (xstr, stemp, valstrsize);
-		   }
-		   else {
+		   } else {
 		     match = 0;
 	           }
 		  break;
@@ -1506,8 +1493,7 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 		     stemp[0] = e[k];
 		     stemp[1] = '\0';
 		     strlcat (ystr, stemp, valstrsize);
-		   }
-		   else {
+		   } else {
 		     match = 0;
 	           }
 		  break;
@@ -1518,8 +1504,7 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 		     stemp[0] = e[k];
 		     stemp[1] = '\0';
 		     strlcat (zstr, stemp, valstrsize);
-		   }
-		   else {
+		   } else {
 		     match = 0;
 	           }
 		  break;
@@ -1530,8 +1515,7 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 		     stemp[0] = e[k];
 		     stemp[1] = '\0';
 		     strlcat (bstr, stemp, valstrsize);
-		   }
-		   else {
+		   } else {
 		     match = 0;
 	           }
 		  break;
@@ -1542,8 +1526,7 @@ static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *
 		     stemp[0] = e[k];
 		     stemp[1] = '\0';
 		     strlcat (dstr, stemp, valstrsize);
-		   }
-		   else {
+		   } else {
 		     match = 0;
 	           }
 		  break;
@@ -1711,8 +1694,7 @@ static void raw_tt_data_to_app (int channel, char *msg)
 	  alevel.space = -2;
 
 	  dlq_rec_frame (channel, -1, 0, pp, alevel, 0, RETRY_NONE, "tt");
-	}
-	else {
+	} else {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg);
 	}
@@ -1797,9 +1779,7 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 	  //dw_printf ("%s returns \"%s\"\n", cmd, result);
 	  
 	  return (strlen(result));
-	}
-
-	else {
+	} else {
 	  // explain_popen() would be nice but doesn't seem to be commonly available.
 	  
 	  // We get here only if fork or pipe fails.
