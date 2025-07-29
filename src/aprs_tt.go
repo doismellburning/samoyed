@@ -66,6 +66,7 @@ import ()
  * on multiple channels at the same time.
  */
 
+const MAX_MSG_LEN = 100
 var msg_str [MAX_RADIO_CHANS]string
 
 var tt_debug = 0
@@ -91,7 +92,7 @@ var running_TT_MAIN_tests = false
  *
  *----------------------------------------------------------------*/
 
-// FIXME KG static struct tt_config_s tt_config;
+var tt_config C.tt_config_s
 
 // FIXME KG #define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
 /* FIXME KG
@@ -119,15 +120,15 @@ static struct ttloc_s test_config[] = {
 };
 */
 
-func aprs_tt_init(p *C.struct_tt_config_s, debug C.int) {
+func aprs_tt_init(p *C.struct_tt_config_s, debug int) {
 	tt_debug = debug
 
 	if p == nil {
 		/* For unit testing. */
 		// FIXME KG memset (&tt_config, 0, sizeof(struct tt_config_s));
-		tt_config.ttloc_size = NUM_TEST_CONFIG
-		tt_config.ttloc_ptr = test_config
-		tt_config.ttloc_len = NUM_TEST_CONFIG
+		// FIXME KG tt_config.ttloc_size = NUM_TEST_CONFIG
+		// FIXME KG tt_config.ttloc_ptr = test_config
+		// FIXME KG tt_config.ttloc_len = NUM_TEST_CONFIG
 		/* Don't care about xmit timing or corral here. */
 	} else {
 		// TODO: Keep ptr instead of making a copy.
@@ -162,8 +163,9 @@ func aprs_tt_init(p *C.struct_tt_config_s, debug C.int) {
  *
  *----------------------------------------------------------------*/
 
+var poll_period = 0;
+
 func aprs_tt_button(channel int, button rune) {
-	// FIXME KG static int poll_period = 0;
 
 	// FIXME KG assert (channel >= 0 && channel < MAX_RADIO_CHANS);
 
@@ -177,8 +179,8 @@ func aprs_tt_button(channel int, button rune) {
 		/* Timeout reset. */
 		msg_str[channel] = ""
 	} else if button != '.' && button != ' ' {
-		if msg_len[channel] < MAX_MSG_LEN {
-			msg_str[channel] += button
+		if len(msg_str[channel]) < MAX_MSG_LEN {
+			msg_str[channel] += string(button)
 		}
 		if button == '#' {
 
@@ -203,7 +205,7 @@ func aprs_tt_button(channel int, button rune) {
 			poll_period++
 			if poll_period >= 39 {
 				poll_period = 0
-				tt_user_background()
+				C.tt_user_background()
 			}
 		}
 	}
@@ -1400,7 +1402,7 @@ func parse_location(e string) int {
  *
  *----------------------------------------------------------------*/
 
-func find_ttloc_match(e string, xstr, ystr, zstr, bstr, dstr string, valstrsize size_t) int {
+func find_ttloc_match(e string, xstr, ystr, zstr, bstr, dstr string, valstrsize C.size_t) int {
 	// FIXME KG int ipat;	/* Index into patterns from configuration file */
 	// FIXME KG int len;	/* Length of pattern we are trying to match. */
 	// FIXME KG int match;
