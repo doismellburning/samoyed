@@ -11,7 +11,7 @@ package direwolf
  *
  *		tt_user.c maintains information about users and
  *		generates the APRS Object Reports.
- *		
+ *
  *
  * References:	This is based upon APRStt (TM) documents with some
  *		artistic freedom.
@@ -20,8 +20,8 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// TODO:  clean up terminolgy.  
-// "Message" has a specific meaning in APRS and this is not it.  
+// TODO:  clean up terminolgy.
+// "Message" has a specific meaning in APRS and this is not it.
 // Touch Tone sequence should be appropriate.
 // What do we call the parts separated by * key?  Field.
 
@@ -53,14 +53,12 @@ package direwolf
 // #include "error_string.h"
 import "C"
 
-import (
-)
+import ()
 
 /* Convert between degrees and radians. */
 
 // FIXME KG #define D2R(d) ((d) * M_PI / 180.)
 // FIXME KG #define R2D(r) ((r) * 180. / M_PI)
-
 
 /*
  * Touch Tone sequences are accumulated here until # terminator found.
@@ -68,13 +66,12 @@ import (
  * on multiple channels at the same time.
  */
 
-var msg_str[MAX_RADIO_CHANS]string
+var msg_str [MAX_RADIO_CHANS]string
 
-var tt_debug = 0;
+var tt_debug = 0
 
 // Replacement for the TT_MAIN define, to work better with Go, and try to reduce some complexity
 var running_TT_MAIN_tests = false
-
 
 /*------------------------------------------------------------------
  *
@@ -106,11 +103,11 @@ static struct ttloc_s test_config[] = {
 	{ TTLOC_VECTOR, "B5bbbdddd", .vector.lat = 53., .vector.lon = -1., .vector.scale = 1000. },  // km units
 
 	// Hilltop Tower http://www.aprs.org/aprs-jamboree-2013.html
-	{ TTLOC_VECTOR, "B5bbbddd", .vector.lat = 37+55.37/60., .vector.lon = -(81+7.86/60.), .vector.scale = 16.09344 },   // .01 mile units 
+	{ TTLOC_VECTOR, "B5bbbddd", .vector.lat = 37+55.37/60., .vector.lon = -(81+7.86/60.), .vector.scale = 16.09344 },   // .01 mile units
 
-	{ TTLOC_GRID, "B2xxyy", .grid.lat0 = 12.00, .grid.lon0 = 56.00, 
+	{ TTLOC_GRID, "B2xxyy", .grid.lat0 = 12.00, .grid.lon0 = 56.00,
 				.grid.lat9 = 12.99, .grid.lon9 = 56.99 },
-	{ TTLOC_GRID, "Byyyxxx", .grid.lat0 = 37 + 50./60.0, .grid.lon0 = 81, 
+	{ TTLOC_GRID, "Byyyxxx", .grid.lat0 = 37 + 50./60.0, .grid.lon0 = 81,
 				.grid.lat9 = 37 + 59.99/60.0, .grid.lon9 = 81 + 9.99/60.0 },
 
 	{ TTLOC_MHEAD, "BAxxxxxx", .mhead.prefix = "326129" },
@@ -119,25 +116,24 @@ static struct ttloc_s test_config[] = {
 
 	{ TTLOC_MACRO, "xxyyy", .macro.definition = "B9xx*AB166*AA2B4C5B3B0Ayyy" },
 	{ TTLOC_MACRO, "xxxxzzzzzzzzzz", .macro.definition = "BAxxxx*ACzzzzzzzzzz" },
-}; 
+};
 */
 
-func aprs_tt_init (p *C.struct_tt_config_s, debug C.int) {
-	tt_debug = debug;
+func aprs_tt_init(p *C.struct_tt_config_s, debug C.int) {
+	tt_debug = debug
 
-	if (p == nil) {
+	if p == nil {
 		/* For unit testing. */
 		// FIXME KG memset (&tt_config, 0, sizeof(struct tt_config_s));
-		tt_config.ttloc_size = NUM_TEST_CONFIG;
-		tt_config.ttloc_ptr = test_config;
-		tt_config.ttloc_len = NUM_TEST_CONFIG;
+		tt_config.ttloc_size = NUM_TEST_CONFIG
+		tt_config.ttloc_ptr = test_config
+		tt_config.ttloc_len = NUM_TEST_CONFIG
 		/* Don't care about xmit timing or corral here. */
 	} else {
 		// TODO: Keep ptr instead of making a copy.
 		// FIXME KG memcpy (&tt_config, p, sizeof(struct tt_config_s));
 	}
 }
-
 
 /*------------------------------------------------------------------
  *
@@ -166,54 +162,52 @@ func aprs_tt_init (p *C.struct_tt_config_s, debug C.int) {
  *
  *----------------------------------------------------------------*/
 
-func aprs_tt_button (channel int, button rune) {
+func aprs_tt_button(channel int, button rune) {
 	// FIXME KG static int poll_period = 0;
 
 	// FIXME KG assert (channel >= 0 && channel < MAX_RADIO_CHANS);
-
 
 	//if (button != '.') {
 	//  dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
 	//}
 
+	// TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
 
-// TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
+	if button == '$' {
+		/* Timeout reset. */
+		msg_str[channel] = ""
+	} else if button != '.' && button != ' ' {
+		if msg_len[channel] < MAX_MSG_LEN {
+			msg_str[channel] += button
+		}
+		if button == '#' {
 
-	if (button == '$') {
-/* Timeout reset. */
-	  msg_str[channel] = ""
-	} else if (button != '.' && button != ' ') {
-	  if (msg_len[channel] < MAX_MSG_LEN) {
-	    msg_str[channel] += button;
-	  }
-	  if (button == '#') {
+			/*
+			 * Put into the receive queue like any other packet.
+			 * This way they are all processed by the common receive thread
+			 * rather than the thread associated with the particular audio device.
+			 */
+			C.raw_tt_data_to_app(channel, msg_str[channel])
 
-/* 
- * Put into the receive queue like any other packet.
- * This way they are all processed by the common receive thread
- * rather than the thread associated with the particular audio device.
- */
-	    C.raw_tt_data_to_app (channel, msg_str[channel]);
-
-	    msg_str[channel] = ""
-	  }
+			msg_str[channel] = ""
+		}
 	} else {
-/* 
- * Idle time. Poll occasionally for processing. 
- * Timing would be off we we are listening to more than
- * one channel so do this only for the one specified
- * in the TTOBJ command. 
- */
+		/*
+		 * Idle time. Poll occasionally for processing.
+		 * Timing would be off we we are listening to more than
+		 * one channel so do this only for the one specified
+		 * in the TTOBJ command.
+		 */
 
-	  if (channel == tt_config.obj_recv_chan) {	  
-	    poll_period++;
-	    if (poll_period >= 39) {
-	      poll_period = 0;
-	      tt_user_background ();
-	    }
-	  }
-	}	
-  
+		if channel == tt_config.obj_recv_chan {
+			poll_period++
+			if poll_period >= 39 {
+				poll_period = 0
+				tt_user_background()
+			}
+		}
+	}
+
 } /* end aprs_tt_button */
 
 /*------------------------------------------------------------------
@@ -240,7 +234,7 @@ func aprs_tt_button (channel int, button rune) {
  *
  * Limitation:	Has one set of static data for communication among
  *		group of functions.  This shouldn't be a problem
- *		when receiving on multiple channels at once 
+ *		when receiving on multiple channels at once
  *		because they get serialized thru the receive packet queue.
  *
  *----------------------------------------------------------------*/
@@ -248,7 +242,7 @@ func aprs_tt_button (channel int, button rune) {
 // FIXME KG char m_callsign[20];	/* really object name */
 
 /*
- * Standard APRStt has symbol code 'A' (box) with overlay of 0-9, A-Z. 
+ * Standard APRStt has symbol code 'A' (box) with overlay of 0-9, A-Z.
  *
  * Dire Wolf extension allows:
  *	Symbol table '/' (primary), any symbol code.
@@ -256,7 +250,7 @@ func aprs_tt_button (channel int, button rune) {
  *	Alternate table symbol code, overlay of 0-9, A-Z.
  */
 
- /* FIXME KG
+/* FIXME KG
 char m_symtab_or_overlay;
 char m_symbol_code;		// Default 'A'
 
@@ -272,98 +266,94 @@ char m_dao[6];
 int m_ssid;			// Default 12 for APRStt user.
 */
 
-
-
-func aprs_tt_sequence (channel int, msg string) {
+func aprs_tt_sequence(channel int, msg string) {
 	// FIXME KG int err;
 
+	/* TODO KG
+	   #if DEBUG
+	   	text_color_set(DW_COLOR_DEBUG);
+	   	dw_printf ("\n\"%s\"\n", msg);
+	   #endif
+	*/
 
-/* TODO KG
-#if DEBUG
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("\n\"%s\"\n", msg);
-#endif
-*/
+	/*
+	 * Discard empty message.
+	 * In case # is there as optional start.
+	 */
 
-/* 
- * Discard empty message. 
- * In case # is there as optional start. 
- */
-
-	if (msg[0] == '#') {
-		return;
+	if msg[0] == '#' {
+		return
 	}
 
-/*
- * The parse functions will fill these in. 
- */
-	strlcpy (m_callsign, "", sizeof(m_callsign));
-	m_symtab_or_overlay = APRSTT_DEFAULT_SYMTAB;
-	m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	strlcpy (m_loc_text, "", sizeof(m_loc_text));
-	m_longitude = G_UNKNOWN;
-	m_latitude = G_UNKNOWN;
-	m_ambiguity = 0;
-	strlcpy (m_comment, "", sizeof(m_comment));
-	strlcpy (m_freq, "", sizeof(m_freq));
-	strlcpy (m_ctcss, "", sizeof(m_ctcss));
-	m_mic_e = ' ';
-	strlcpy (m_dao, "!T  !", sizeof(m_dao));	/* start out unknown */
-	m_ssid = 12;
+	/*
+	 * The parse functions will fill these in.
+	 */
+	strlcpy(m_callsign, "", sizeof(m_callsign))
+	m_symtab_or_overlay = APRSTT_DEFAULT_SYMTAB
+	m_symbol_code = APRSTT_DEFAULT_SYMBOL
+	strlcpy(m_loc_text, "", sizeof(m_loc_text))
+	m_longitude = G_UNKNOWN
+	m_latitude = G_UNKNOWN
+	m_ambiguity = 0
+	strlcpy(m_comment, "", sizeof(m_comment))
+	strlcpy(m_freq, "", sizeof(m_freq))
+	strlcpy(m_ctcss, "", sizeof(m_ctcss))
+	m_mic_e = ' '
+	strlcpy(m_dao, "!T  !", sizeof(m_dao)) /* start out unknown */
+	m_ssid = 12
 
-/*
- * Parse the touch tone sequence.
- */
-	err = parse_fields (msg);
+	/*
+	 * Parse the touch tone sequence.
+	 */
+	err = parse_fields(msg)
 
 	/* TODO KG
-#if defined(DEBUG)
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("callsign=\"%s\", ssid=%d, symbol=\"%c%c\", freq=\"%s\", ctcss=\"%s\", comment=\"%s\", lat=%.4f, lon=%.4f, dao=\"%s\"\n",
-		m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, m_freq, m_ctcss, m_comment, m_latitude, m_longitude, m_dao);
-#endif
-*/
+	#if defined(DEBUG)
+		text_color_set(DW_COLOR_DEBUG);
+		dw_printf ("callsign=\"%s\", ssid=%d, symbol=\"%c%c\", freq=\"%s\", ctcss=\"%s\", comment=\"%s\", lat=%.4f, lon=%.4f, dao=\"%s\"\n",
+			m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, m_freq, m_ctcss, m_comment, m_latitude, m_longitude, m_dao);
+	#endif
+	*/
 
-	if (running_TT_MAIN_tests) {
-		return;
+	if running_TT_MAIN_tests {
+		return
 	}
 
-/*
- * If digested successfully.  Add to our list of users and schedule transmissions.
- */
+	/*
+	 * If digested successfully.  Add to our list of users and schedule transmissions.
+	 */
 
-	if (err == 0) {
+	if err == 0 {
 
-	  err = tt_user_heard (m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, 
-		m_loc_text, m_latitude, m_longitude, m_ambiguity,
-		m_freq, m_ctcss, m_comment, m_mic_e, m_dao);
+		err = tt_user_heard(m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code,
+			m_loc_text, m_latitude, m_longitude, m_ambiguity,
+			m_freq, m_ctcss, m_comment, m_mic_e, m_dao)
 	}
 
-
-/*
- * If a command / script was supplied, run it now.
- * This can do additional processing and provide a custom audible response.
- * This is done only for the success case.
- * It might be useful to run it for error cases as well but we currently
- * don't pass in the success / failure code to know the difference.
- */
+	/*
+	 * If a command / script was supplied, run it now.
+	 * This can do additional processing and provide a custom audible response.
+	 * This is done only for the success case.
+	 * It might be useful to run it for error cases as well but we currently
+	 * don't pass in the success / failure code to know the difference.
+	 */
 	var script_response [1000]C.char
 
-	strlcpy (script_response, "", sizeof(script_response));
+	strlcpy(script_response, "", sizeof(script_response))
 
-	if (err == 0 && strlen(tt_config.ttcmd) > 0) {
+	if err == 0 && strlen(tt_config.ttcmd) > 0 {
 
-	  dw_run_cmd (tt_config.ttcmd, 1, script_response, sizeof(script_response));
+		dw_run_cmd(tt_config.ttcmd, 1, script_response, sizeof(script_response))
 
 	}
 
-/*
- * Send response to user by constructing packet with SPEECH or MORSE as destination.
- * Source shouldn't matter because it doesn't get transmitted as AX.25 frame.
- * Use high priority queue for consistent timing.
- *
- * Anything from script, above, will override other predefined responses.
- */
+	/*
+	 * Send response to user by constructing packet with SPEECH or MORSE as destination.
+	 * Source shouldn't matter because it doesn't get transmitted as AX.25 frame.
+	 * Use high priority queue for consistent timing.
+	 *
+	 * Anything from script, above, will override other predefined responses.
+	 */
 
 	var audible_response [sizeof(script_response) + 16]C.char
 
@@ -371,22 +361,21 @@ func aprs_tt_sequence (channel int, msg string) {
 	if C.strlen(script_response) > 0 {
 		response = script_response
 	}
-	snprintf (audible_response, sizeof(audible_response), 
-					"APRSTT>%s:%s", 
-					tt_config.response[err].method,
-					response);
+	snprintf(audible_response, sizeof(audible_response),
+		"APRSTT>%s:%s",
+		tt_config.response[err].method,
+		response)
 
-	var pp = C.ax25_from_text (audible_response, 0);
+	var pp = C.ax25_from_text(audible_response, 0)
 
-	if (pp == nil) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Internal error. Couldn't make frame from \"%s\"\n", audible_response);
-	  return;
+	if pp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Internal error. Couldn't make frame from \"%s\"\n", audible_response)
+		return
 	}
 
-	tq_append (channel, TQ_PRIO_0_HI, pp);
+	tq_append(channel, TQ_PRIO_0_HI, pp)
 } /* end aprs_tt_sequence */
-
 
 /*------------------------------------------------------------------
  *
@@ -414,23 +403,22 @@ func aprs_tt_sequence (channel int, msg string) {
  *
  *----------------------------------------------------------------*/
 
-func parse_fields (msg string) int {
+func parse_fields(msg string) int {
 	/* FIXME KG
 	char stemp[MAX_MSG_LEN+1];
 	char *save;
 	int err;
 	*/
 
-
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("parse_fields (%s).\n", msg);
 
-// Make a copy of msg because strtok corrupts the original.
-// While we are at it, remove any blanks.
-// This should not happen with DTMF reception but could happen
-// in manually crafted strings for testing.
+	// Make a copy of msg because strtok corrupts the original.
+	// While we are at it, remove any blanks.
+	// This should not happen with DTMF reception but could happen
+	// in manually crafted strings for testing.
 
-	var n = 0;
+	var n = 0
 	/* FIXME KG
 	for (char *m = msg; *m != 0 && n < sizeof(stemp)-1; m++) {
 	  if (*m != ' ') {
@@ -440,70 +428,69 @@ func parse_fields (msg string) int {
 	stemp[n] = 0;
 	*/
 
-	var e = strtok_r (stemp, "*#", &save);
+	var e = strtok_r(stemp, "*#", &save)
 	for e != nil {
 
-	  //text_color_set(DW_COLOR_DEBUG);
-	  //dw_printf ("parse_fields () field = %s\n", e);
+		//text_color_set(DW_COLOR_DEBUG);
+		//dw_printf ("parse_fields () field = %s\n", e);
 
-	  switch (*e) {
-	    case 'A': 
-	      switch (e[1]) {
-	        case 'A':			/* AA object-name */
-	          err = parse_object_name (e);
-	          if (err != 0) {
-				  return (err);
-			  }
-	        case 'B':			/* AB symbol */
-	          err = parse_symbol (e);
-	          if (err != 0) {
-				  return (err);
-			  }
-	        case 'C':			/* AC new-style-callsign */
-	          err = parse_aprstt3_call (e);
-	          if (err != 0) {
-				  return (err);
-			  }
-	        default:			/* Traditional style call or suffix */
-	          err = parse_callsign (e);
-	          if (err != 0) {
-				  return (err);
-			  }
-	      }
-	    case 'B': 
-	      err = parse_location (e);
-	      if (err != 0) {
-			  return (err);
-		  }
-	    case 'C': 
-	      err = parse_comment (e);
-	      if (err != 0) {
-			  return (err);
-		  }
-	    case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9': 
-	      err = expand_macro (e);
-	      if (err != 0) {
-			  return (err);
-		  }
-	    // FIXME KG case 0:
-	      /* Empty field.  Just ignore it. */
-	      /* This would happen if someone uses a leading *. */
-	    default:
-	      text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Field does not start with A, B, C, or digit: \"%s\"\n", e);
-	      return (TT_ERROR_D_MSG);
-	  }
-	
-	  e = strtok_r (nil, "*#", &save);
+		switch *e {
+		case 'A':
+			switch e[1] {
+			case 'A': /* AA object-name */
+				err = parse_object_name(e)
+				if err != 0 {
+					return (err)
+				}
+			case 'B': /* AB symbol */
+				err = parse_symbol(e)
+				if err != 0 {
+					return (err)
+				}
+			case 'C': /* AC new-style-callsign */
+				err = parse_aprstt3_call(e)
+				if err != 0 {
+					return (err)
+				}
+			default: /* Traditional style call or suffix */
+				err = parse_callsign(e)
+				if err != 0 {
+					return (err)
+				}
+			}
+		case 'B':
+			err = parse_location(e)
+			if err != 0 {
+				return (err)
+			}
+		case 'C':
+			err = parse_comment(e)
+			if err != 0 {
+				return (err)
+			}
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			err = expand_macro(e)
+			if err != 0 {
+				return (err)
+			}
+		// FIXME KG case 0:
+		/* Empty field.  Just ignore it. */
+		/* This would happen if someone uses a leading *. */
+		default:
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Field does not start with A, B, C, or digit: \"%s\"\n", e)
+			return (TT_ERROR_D_MSG)
+		}
+
+		e = strtok_r(nil, "*#", &save)
 	}
 
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("parse_fields () normal return\n");
 
-	return (0);
+	return (0)
 
 } /* end parse_fields */
-
 
 /*------------------------------------------------------------------
  *
@@ -517,7 +504,7 @@ func parse_fields (msg string) int {
  *
  * Returns:	0 for success or one of the TT_ERROR_... codes.
  *
- * Description:	Separate out the fields, perform substitution, 
+ * Description:	Separate out the fields, perform substitution,
  *		call parse_fields for processing.
  *
  *
@@ -527,7 +514,7 @@ func parse_fields (msg string) int {
 
 // FIXME KG #define VALSTRSIZE 20
 
-func expand_macro (e string) int {
+func expand_macro(e string) int {
 	/* FIXME KG
 	//int len;
 	char xstr[VALSTRSIZE], ystr[VALSTRSIZE], zstr[VALSTRSIZE], bstr[VALSTRSIZE], dstr[VALSTRSIZE];
@@ -535,86 +522,84 @@ func expand_macro (e string) int {
 	char *d;
 	*/
 
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("Macro tone sequence: '%s'\n", e);
+	text_color_set(DW_COLOR_DEBUG)
+	dw_printf("Macro tone sequence: '%s'\n", e)
 
 	//len = strlen(e);
 
-	var ipat = find_ttloc_match (e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE);
+	var ipat = find_ttloc_match(e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE)
 
-	if (ipat >= 0) {
-	  // Why did we print b & d here?
-	  // Documentation says only x, y, z can be used with macros.
-	  // Only those 3 are processed below.
+	if ipat >= 0 {
+		// Why did we print b & d here?
+		// Documentation says only x, y, z can be used with macros.
+		// Only those 3 are processed below.
 
-	  //dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
-	  dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr);
+		//dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
+		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr)
 
-	  dw_printf ("Replace with:        '%s'\n", tt_config.ttloc_ptr[ipat].macro.definition);
+		dw_printf("Replace with:        '%s'\n", tt_config.ttloc_ptr[ipat].macro.definition)
 
-	  if (tt_config.ttloc_ptr[ipat]._type != TTLOC_MACRO) {
+		if tt_config.ttloc_ptr[ipat]._type != TTLOC_MACRO {
 
-	     /* Found match to a different type.  Really shouldn't be here. */
-	     /* Print internal error message... */
-	     dw_printf ("expand_macro: type != TTLOC_MACRO\n");
-	     return (TT_ERROR_INTERNAL);
-	  }
-
-/*
- * We found a match for the length and any fixed digits.
- * Substitute values in to the definition.
- */		
-	  
-	  strlcpy (stemp, "", sizeof(stemp));
-
-	  for d = tt_config.ttloc_ptr[ipat].macro.definition; *d != 0; d++ {
-
-	    for ( *d == 'x' || *d == 'y' || *d == 'z') && *d == d[1] {
-	      /* Collapse adjacent matching substitution characters. */
-	      d++;
-	    }
-
-	    switch (*d) {
-	      case 'x':
-		strlcat (stemp, xstr, sizeof(stemp));
-	        break;
-	      case 'y':
-		strlcat (stemp, ystr, sizeof(stemp));
-	        break;
-	      case 'z':
-		strlcat (stemp, zstr, sizeof(stemp));
-	        break;
-	      default:
-		{
-			/* FIXME KG
-	        char c1[2];
-	        c1[0] = *d;
-	        c1[1] = 0;
-	        strlcat (stemp, c1, sizeof(stemp)); 
-			*/
+			/* Found match to a different type.  Really shouldn't be here. */
+			/* Print internal error message... */
+			dw_printf("expand_macro: type != TTLOC_MACRO\n")
+			return (TT_ERROR_INTERNAL)
 		}
-		break;
-	    }
-	  }
-/*
- * Process as if we heard this over the air.
- */
 
-	  dw_printf ("After substitution:  '%s'\n", stemp);
-	  return (parse_fields (stemp));
+		/*
+		 * We found a match for the length and any fixed digits.
+		 * Substitute values in to the definition.
+		 */
+
+		strlcpy(stemp, "", sizeof(stemp))
+
+		for d = tt_config.ttloc_ptr[ipat].macro.definition; *d != 0; d++ {
+
+			for (*d == 'x' || *d == 'y' || *d == 'z') && *d == d[1] {
+				/* Collapse adjacent matching substitution characters. */
+				d++
+			}
+
+			switch *d {
+			case 'x':
+				strlcat(stemp, xstr, sizeof(stemp))
+				break
+			case 'y':
+				strlcat(stemp, ystr, sizeof(stemp))
+				break
+			case 'z':
+				strlcat(stemp, zstr, sizeof(stemp))
+				break
+			default:
+				{
+					/* FIXME KG
+					   char c1[2];
+					   c1[0] = *d;
+					   c1[1] = 0;
+					   strlcat (stemp, c1, sizeof(stemp));
+					*/
+				}
+				break
+			}
+		}
+		/*
+		 * Process as if we heard this over the air.
+		 */
+
+		dw_printf("After substitution:  '%s'\n", stemp)
+		return (parse_fields(stemp))
 	} else {
-	  /* Send reject sound. */
-	  /* Does not match any macro definitions. */
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Tone sequence did not match any pattern\n");
-	  return (TT_ERROR_MACRO_NOMATCH);
+		/* Send reject sound. */
+		/* Does not match any macro definitions. */
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Tone sequence did not match any pattern\n")
+		return (TT_ERROR_MACRO_NOMATCH)
 	}
-	
+
 	/* should be unreachable */
-	return (0);
+	return (0)
 }
-
-
 
 /*------------------------------------------------------------------
  *
@@ -645,159 +630,157 @@ func expand_macro (e string) int {
  *
  *		Att...ttvk	- Full callsign in two key method, numeric overlay, checksum.
  *		Att...ttvvk	- Full callsign in two key method, letter overlay, checksum.
- *		
+ *
  *
  *----------------------------------------------------------------*/
 
-func checksum_not_ok (char *str, int length, char found) int {
+func checksum_not_ok(char *str, int length, char found) int {
 	/* FIXME KG
 	int i;
 	char expected;
 	*/
 
-	var sum = 0;
-	for i:=0; i<length; i++ {
-	  if (isdigit(str[i])) {
-	    sum += str[i] - '0';
-	  } else if (str[i] >= 'A' && str[i] <= 'D') {
-	    sum += str[i] - 'A' + 10;
-	  } else {
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", str[i]);
-	  }
+	var sum = 0
+	for i := 0; i < length; i++ {
+		if isdigit(str[i]) {
+			sum += str[i] - '0'
+		} else if str[i] >= 'A' && str[i] <= 'D' {
+			sum += str[i] - 'A' + 10
+		} else {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", str[i])
+		}
 	}
-	expected =  '0' + (sum % 10);
+	expected = '0' + (sum % 10)
 
-	if (expected != found) {
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found);
-	    return (TT_ERROR_BAD_CHECKSUM);
+	if expected != found {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
+		return (TT_ERROR_BAD_CHECKSUM)
 	}
-	return (0);
+	return (0)
 }
 
-
-func parse_callsign (e string) int {
+func parse_callsign(e string) int {
 	/* FIXME KG
 	char tttemp[40], stemp[30];
 	*/
 
-	if (tt_debug) {
-	  text_color_set(DW_COLOR_DEBUG);
-	  dw_printf ("APRStt parse callsign (starts with A then digit): \"%s\"\n", e);
+	if tt_debug {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("APRStt parse callsign (starts with A then digit): \"%s\"\n", e)
 	}
 
-	assert (*e == 'A');
+	assert(*e == 'A')
 
-	length = strlen(e);
+	length = strlen(e)
 
-/*
- * special case: 3 digit tactical call.
- */
+	/*
+	 * special case: 3 digit tactical call.
+	 */
 
-	if (length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3])) {
-	  strlcpy (m_callsign, e+1, sizeof(m_callsign));
-	  if (tt_debug) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("Special case, 3 digit tactical call: \"%s\"\n", m_callsign);
-	  }
-	  return (0);
+	if length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) {
+		strlcpy(m_callsign, e+1, sizeof(m_callsign))
+		if tt_debug {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("Special case, 3 digit tactical call: \"%s\"\n", m_callsign)
+		}
+		return (0)
 	}
 
-/* 
- * 3 digit abbreviation:  We only do the parsing here.
- * Another part of application will try to find corresponding full call.
- */
+	/*
+	 * 3 digit abbreviation:  We only do the parsing here.
+	 * Another part of application will try to find corresponding full call.
+	 */
 
-	if ((length == 6 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5])) ||
-	    (length == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isupper(e[5]) && isdigit(e[6]))) {
+	if (length == 6 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5])) ||
+		(length == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isupper(e[5]) && isdigit(e[6])) {
 
-	  var cs_err = checksum_not_ok (e+1, length-2, e[length-1]);
+		var cs_err = checksum_not_ok(e+1, length-2, e[length-1])
 
-	  if (cs_err != 0) {
-	    return (cs_err);
-	  }
+		if cs_err != 0 {
+			return (cs_err)
+		}
 
-	  memcpy (m_callsign, e+1, 3);
-	  // FIXME KG m_callsign[3] = 0;
-	
-	  if (length == 7) {
-	    tttemp[0] = e[length-3];
-	    tttemp[1] = e[length-2];
-	    tttemp[2] = 0;
-	    tt_two_key_to_text (tttemp, 0, stemp);
-	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	    m_symtab_or_overlay = stemp[0];
-	    if (tt_debug) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
-	    }
-	  } else {
-	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	    m_symtab_or_overlay = e[length-2];
-	    if (tt_debug) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("Three digit abbreviation2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
-	    }
-	  }
-	  return (0);
+		memcpy(m_callsign, e+1, 3)
+		// FIXME KG m_callsign[3] = 0;
+
+		if length == 7 {
+			tttemp[0] = e[length-3]
+			tttemp[1] = e[length-2]
+			tttemp[2] = 0
+			tt_two_key_to_text(tttemp, 0, stemp)
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
+			m_symtab_or_overlay = stemp[0]
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
+					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
+			}
+		} else {
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
+			m_symtab_or_overlay = e[length-2]
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("Three digit abbreviation2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
+					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
+			}
+		}
+		return (0)
 	}
 
-/* 
- * Callsign in two key format.
- */
+	/*
+	 * Callsign in two key format.
+	 */
 
-	if (length >= 7 && length <= 24) {
+	if length >= 7 && length <= 24 {
 
-	  var cs_err = checksum_not_ok (e+1, length-2, e[length-1]);
+		var cs_err = checksum_not_ok(e+1, length-2, e[length-1])
 
-	  if (cs_err != 0) {
-	    return (cs_err);
-	  }
-	
-	  if (isupper(e[length-2])) {
-	    memcpy (tttemp, e+1, length-4);
-	    tttemp[length-4] = 0
-	    tt_two_key_to_text (tttemp, 0, m_callsign);
+		if cs_err != 0 {
+			return (cs_err)
+		}
 
-	    tttemp[0] = e[length-3];
-	    tttemp[1] = e[length-2];
-	    tttemp[2] = 0;
-	    tt_two_key_to_text (tttemp, 0, stemp);
-	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	    m_symtab_or_overlay = stemp[0];
-	    if (tt_debug) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("Callsign in two key format1: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
-	    }
-	  } else {
-	    memcpy (tttemp, e+1, length-3);
-	    tttemp[length-3] = 0;
-	    tt_two_key_to_text (tttemp, 0, m_callsign);
+		if isupper(e[length-2]) {
+			memcpy(tttemp, e+1, length-4)
+			tttemp[length-4] = 0
+			tt_two_key_to_text(tttemp, 0, m_callsign)
 
-	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	    m_symtab_or_overlay = e[length-2];
-	    if (tt_debug) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("Callsign in two key format2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
-	    }
-	  }
-	  return (0);
+			tttemp[0] = e[length-3]
+			tttemp[1] = e[length-2]
+			tttemp[2] = 0
+			tt_two_key_to_text(tttemp, 0, stemp)
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
+			m_symtab_or_overlay = stemp[0]
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("Callsign in two key format1: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
+					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
+			}
+		} else {
+			memcpy(tttemp, e+1, length-3)
+			tttemp[length-3] = 0
+			tt_two_key_to_text(tttemp, 0, m_callsign)
+
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
+			m_symtab_or_overlay = e[length-2]
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("Callsign in two key format2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
+					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
+			}
+		}
+		return (0)
 	}
 
-	text_color_set(DW_COLOR_ERROR);
-	dw_printf ("Touch tone callsign not valid: \"%s\"\n", e);
-	return (TT_ERROR_INVALID_CALL);
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Touch tone callsign not valid: \"%s\"\n", e)
+	return (TT_ERROR_INVALID_CALL)
 }
-
 
 /*------------------------------------------------------------------
  *
- * Name:        parse_object_name 
+ * Name:        parse_object_name
  *
  * Purpose:     Extract object name from touch tone sequence.
  *
@@ -817,47 +800,45 @@ func parse_callsign (e string) int {
  *
  *----------------------------------------------------------------*/
 
+func parse_object_name(e string) int {
 
-func parse_object_name (e string) int {
-
-	if (tt_debug) {
-	  text_color_set(DW_COLOR_DEBUG);
-	  dw_printf ("APRStt parse object name (starts with AA): \"%s\"\n", e);
+	if tt_debug {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("APRStt parse object name (starts with AA): \"%s\"\n", e)
 	}
 
-	assert (e[0] == 'A');
-	assert (e[1] == 'A');
+	assert(e[0] == 'A')
+	assert(e[1] == 'A')
 
-	var length = strlen(e);
+	var length = strlen(e)
 
-/* 
- * Object name in two key format.
- */
+	/*
+	 * Object name in two key format.
+	 */
 
-	if (length >= 2 + 1 && length <= 30) {
+	if length >= 2+1 && length <= 30 {
 
-	  if (tt_two_key_to_text (e+2, 0, m_callsign) == 0) {
-	    m_callsign[9] = 0;  /* truncate to 9 */
-	    m_ssid = 0;		/* No ssid for object name */
-	    if (tt_debug) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("Object name in two key format: \"%s\"\n", m_callsign);
-	    }
-	    return (0);
-	  }
+		if tt_two_key_to_text(e+2, 0, m_callsign) == 0 {
+			m_callsign[9] = 0 /* truncate to 9 */
+			m_ssid = 0        /* No ssid for object name */
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("Object name in two key format: \"%s\"\n", m_callsign)
+			}
+			return (0)
+		}
 	}
 
-	text_color_set(DW_COLOR_ERROR);
-	dw_printf ("Touch tone object name not valid: \"%s\"\n", e);
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Touch tone object name not valid: \"%s\"\n", e)
 
-	return (TT_ERROR_INVALID_OBJNAME);
+	return (TT_ERROR_INVALID_OBJNAME)
 
-}  /* end parse_oject_name */
-
+} /* end parse_oject_name */
 
 /*------------------------------------------------------------------
  *
- * Name:        parse_symbol 
+ * Name:        parse_symbol
  *
  * Purpose:     Extract symbol from touch tone sequence.
  *
@@ -873,100 +854,98 @@ func parse_object_name (e string) int {
  *
  * Description:	Data format
  *
- *		AB1nn		- Symbol from primary symbol table.  
- *				  Two digits nn are the same as in the GPSCnn 
- *				  generic address used as a destination. 
+ *		AB1nn		- Symbol from primary symbol table.
+ *				  Two digits nn are the same as in the GPSCnn
+ *				  generic address used as a destination.
  *
- *		AB2nn		- Symbol from alternate symbol table.  
- *				  Two digits nn are the same as in the GPSEnn 
- *				  generic address used as a destination. 
+ *		AB2nn		- Symbol from alternate symbol table.
+ *				  Two digits nn are the same as in the GPSEnn
+ *				  generic address used as a destination.
  *
- *		AB0nnvv		- Symbol from alternate symbol table.  
- *				  Two digits nn are the same as in the GPSEnn 
+ *		AB0nnvv		- Symbol from alternate symbol table.
+ *				  Two digits nn are the same as in the GPSEnn
  *				  generic address used as a destination.
  *	 			  vv is an overlay digit or letter in two key method.
  *
  *----------------------------------------------------------------*/
 
-
-func parse_symbol (char *e) int {
+func parse_symbol(char *e) int {
 	/* FIXME KG
 	char nstr[3];
 	int nn;
 	char stemp[10];
 	*/
 
-	if (tt_debug) {
-	  text_color_set(DW_COLOR_DEBUG);
-	  dw_printf ("APRStt parse symbol (starts with AB): \"%s\"\n", e);
+	if tt_debug {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("APRStt parse symbol (starts with AB): \"%s\"\n", e)
 	}
 
-	assert (e[0] == 'A');
-	assert (e[1] == 'B');
+	assert(e[0] == 'A')
+	assert(e[1] == 'B')
 
-	var length = strlength(e);
+	var length = strlength(e)
 
-	if (length >= 4 && length <= 10) {
+	if length >= 4 && length <= 10 {
 
-	  nstr[0] = e[3];
-	  nstr[1] = e[4];
-	  nstr[2] = 0;
+		nstr[0] = e[3]
+		nstr[1] = e[4]
+		nstr[2] = 0
 
-	  nn = atoi (nstr);
-	  if (nn < 1) {
-	    nn = 1;
-	  } else if (nn > 94) {
-	    nn = 94;
-	  }
+		nn = atoi(nstr)
+		if nn < 1 {
+			nn = 1
+		} else if nn > 94 {
+			nn = 94
+		}
 
-	  switch (e[2]) {
+		switch e[2] {
 
-	    case '1':
-	      m_symtab_or_overlay = '/';
-	      m_symbol_code = 32 + nn;
-	      if (tt_debug) {
-	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("symbol code '%c', primary symbol table '%c'\n",
-				m_symbol_code, m_symtab_or_overlay);
-	      }
-	      return (0);
-	      break;
+		case '1':
+			m_symtab_or_overlay = '/'
+			m_symbol_code = 32 + nn
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("symbol code '%c', primary symbol table '%c'\n",
+					m_symbol_code, m_symtab_or_overlay)
+			}
+			return (0)
+			break
 
-	    case '2':
-	      m_symtab_or_overlay = '\\';
-	      m_symbol_code = 32 + nn;
-	      if (tt_debug) {
-	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("symbol code '%c', alternate symbol table '%c'\n",
-				m_symbol_code, m_symtab_or_overlay);
-	      }
-	      return (0);
-	      break;
+		case '2':
+			m_symtab_or_overlay = '\\'
+			m_symbol_code = 32 + nn
+			if tt_debug {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("symbol code '%c', alternate symbol table '%c'\n",
+					m_symbol_code, m_symtab_or_overlay)
+			}
+			return (0)
+			break
 
-	    case '0':
-	      if (length >= 6) {
-	        if (tt_two_key_to_text (e+5, 0, stemp) == 0) {
-	          m_symbol_code = 32 + nn;
-	          m_symtab_or_overlay = stemp[0];
-	          if (tt_debug) {
-	            text_color_set(DW_COLOR_DEBUG);
-	            dw_printf ("symbol code '%c', alternate symbol table with overlay '%c'\n",
-				m_symbol_code, m_symtab_or_overlay);
-	          }
-	          return (0);
-	        }
-	      }
-	      break;
-	  }
+		case '0':
+			if length >= 6 {
+				if tt_two_key_to_text(e+5, 0, stemp) == 0 {
+					m_symbol_code = 32 + nn
+					m_symtab_or_overlay = stemp[0]
+					if tt_debug {
+						text_color_set(DW_COLOR_DEBUG)
+						dw_printf("symbol code '%c', alternate symbol table with overlay '%c'\n",
+							m_symbol_code, m_symtab_or_overlay)
+					}
+					return (0)
+				}
+			}
+			break
+		}
 	}
 
-	text_color_set(DW_COLOR_ERROR);
-	dw_printf ("Touch tone symbol not valid: \"%s\"\n", e);
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Touch tone symbol not valid: \"%s\"\n", e)
 
-	return (TT_ERROR_INVALID_SYMBOL);
+	return (TT_ERROR_INVALID_SYMBOL)
 
-}  /* end parse_oject_name */
-
+} /* end parse_oject_name */
 
 /*------------------------------------------------------------------
  *
@@ -992,56 +971,55 @@ func parse_symbol (char *e) int {
  *
  *----------------------------------------------------------------*/
 
-func parse_aprstt3_call (e string) int {
+func parse_aprstt3_call(e string) int {
 	// FIXME KG assert (e[0] == 'A');
 	// FIXME KG assert (e[1] == 'C');
 
-	if (tt_debug) {
-	  text_color_set(DW_COLOR_DEBUG);
-	  dw_printf ("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC): \"%s\"\n", e);
+	if tt_debug {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC): \"%s\"\n", e)
 	}
 
-	if (strlen(e) == 2+10) {
-	  var call[12] C.char
+	if strlen(e) == 2+10 {
+		var call [12]C.char
 
-	  if (tt_call10_to_text(e+2,1,call) == 0) {
-	    strlcpy(m_callsign, call, sizeof(m_callsign));
-	  } else {
-	    return (TT_ERROR_INVALID_CALL);		/* Could not convert to text */
-	  }
-	} else if (strlen(e) == 2+5) {
-	  var suffix[8]C.char
-          if (tt_call5_suffix_to_text(e+2,1,suffix) == 0) {
+		if tt_call10_to_text(e+2, 1, call) == 0 {
+			strlcpy(m_callsign, call, sizeof(m_callsign))
+		} else {
+			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
+		}
+	} else if strlen(e) == 2+5 {
+		var suffix [8]C.char
+		if tt_call5_suffix_to_text(e+2, 1, suffix) == 0 {
 
-            if (running_TT_MAIN_tests) {
-	      /* For unit test, use suffix rather than trying lookup. */
-	      strlcpy (m_callsign, suffix, sizeof(m_callsign));
-            } else {
-	      var call[12]C.char
+			if running_TT_MAIN_tests {
+				/* For unit test, use suffix rather than trying lookup. */
+				strlcpy(m_callsign, suffix, sizeof(m_callsign))
+			} else {
+				var call [12]C.char
 
-	      /* In normal operation, try to find full callsign for the suffix received. */
+				/* In normal operation, try to find full callsign for the suffix received. */
 
-	      if (tt_3char_suffix_search (suffix, call) >= 0) {
-	        text_color_set(DW_COLOR_INFO);
-	        dw_printf ("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call);
+				if tt_3char_suffix_search(suffix, call) >= 0 {
+					text_color_set(DW_COLOR_INFO)
+					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call)
 
-	        strlcpy(m_callsign, call, sizeof(m_callsign));
-	      } else {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Couldn't find full callsign for suffix \"%s\"\n", suffix);
-	        return (TT_ERROR_SUFFIX_NO_CALL);	/* Don't know this user. */
-	      }
-	    }
-	  } else {
-	    return (TT_ERROR_INVALID_CALL);	/* Could not convert to text */
-	  }
+					strlcpy(m_callsign, call, sizeof(m_callsign))
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
+					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
+				}
+			}
+		} else {
+			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
+		}
 	} else {
-	  return (TT_ERROR_INVALID_CALL);	/* Invalid length, not 2+ (10 ir 5) */
+		return (TT_ERROR_INVALID_CALL) /* Invalid length, not 2+ (10 ir 5) */
 	}
 
-	return (0);
-}  /* end parse_aprstt3_call */
-
+	return (0)
+} /* end parse_aprstt3_call */
 
 /*------------------------------------------------------------------
  *
@@ -1089,320 +1067,314 @@ func parse_aprstt3_call (e string) int {
 /* Average radius of earth in meters. */
 // FIXME KG #define R 6371000.
 
-
-func parse_location (e string) int {
+func parse_location(e string) int {
 	/* FIXME KG
 	double x, y, dist, bearing;
 	double lat0, lon0;
 	double lat9, lon9;
-	long lerr;	
+	long lerr;
 	double easting, northing;
-	char mh[20];	
+	char mh[20];
 	char stemp[32];
 	*/
 
-	if (tt_debug) {
-	  text_color_set(DW_COLOR_DEBUG);
-	  dw_printf ("APRStt parse location (starts with B): \"%s\"\n", e);
-	  // TODO: more detail later...
+	if tt_debug {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("APRStt parse location (starts with B): \"%s\"\n", e)
+		// TODO: more detail later...
 	}
 
 	// FIXME KG assert (*e == 'B');
 
-
 	// FIXME KG char xstr[VALSTRSIZE], ystr[VALSTRSIZE], zstr[VALSTRSIZE], bstr[VALSTRSIZE], dstr[VALSTRSIZE];
-	var ipat = find_ttloc_match (e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE);
+	var ipat = find_ttloc_match(e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE)
 
-	if (ipat >= 0) {
+	if ipat >= 0 {
 
-	  //dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
+		//dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
 
-	  switch (tt_config.ttloc_ptr[ipat]._type) {
-	    case TTLOC_POINT:
-		
-	      m_latitude = tt_config.ttloc_ptr[ipat].point.lat;
-	      m_longitude = tt_config.ttloc_ptr[ipat].point.lon;
+		switch tt_config.ttloc_ptr[ipat]._type {
+		case TTLOC_POINT:
 
-	      /* Is it one of ten or a hundred positions? */
-	      /* It's not hardwired to always be B0n or B9nn.  */
-	      /* This is a pretty good approximation. */
+			m_latitude = tt_config.ttloc_ptr[ipat].point.lat
+			m_longitude = tt_config.ttloc_ptr[ipat].point.lon
 
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
+			/* Is it one of ten or a hundred positions? */
+			/* It's not hardwired to always be B0n or B9nn.  */
+			/* This is a pretty good approximation. */
 
-	      if (strlen(e) == 3) {	/* probably B0n -->  !Tn ! */
-		m_dao[2] = e[2];
-	        m_dao[3] = ' ';
-	      }
-	      if (strlen(e) == 4) {	/* probably B9nn -->  !Tnn! */
-		m_dao[2] = e[2];
-	        m_dao[3] = e[3];
-	      }
-	      break;
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
 
-	    case TTLOC_VECTOR:
+			if strlen(e) == 3 { /* probably B0n -->  !Tn ! */
+				m_dao[2] = e[2]
+				m_dao[3] = ' '
+			}
+			if strlen(e) == 4 { /* probably B9nn -->  !Tnn! */
+				m_dao[2] = e[2]
+				m_dao[3] = e[3]
+			}
+			break
 
-	      if (strlen(bstr) != 3) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Bearing \"%s\" should be 3 digits.\n", bstr);
-	        // return error code?
-	      }
-	      if (strlen(dstr) < 1) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Distance \"%s\" should 1 or more digits.\n", dstr);
-	        // return error code?
-	      }
+		case TTLOC_VECTOR:
 
-	      lat0 = D2R(tt_config.ttloc_ptr[ipat].vector.lat);
-	      lon0 = D2R(tt_config.ttloc_ptr[ipat].vector.lon);
-	      dist = atof(dstr) * tt_config.ttloc_ptr[ipat].vector.scale;
-	      bearing = D2R(atof(bstr));
-
-	      /* Equations and caluculators found here: */
-	      /* http://movable-type.co.uk/scripts/latlong.html */
-	      /* This should probably be a function in latlong.c in case we have another use for it someday. */
-
-	      m_latitude = R2D(asin(sin(lat0) * cos(dist/R) + cos(lat0) * sin(dist/R) * cos(bearing)));
-
-	      m_longitude = R2D(lon0 + atan2(sin(bearing) * sin(dist/R) * cos(lat0),
-				  cos(dist/R) - sin(lat0) * sin(D2R(m_latitude))));
-
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
-
-	      break;
-
-	    case TTLOC_GRID:
-
-	      if (strlen(xstr) == 0) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Missing X coordinate.\n");
-		strlcpy (xstr, "0", sizeof(xstr));
-	      }
-	      if (strlen(ystr) == 0) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Missing Y coordinate.\n");
-		strlcpy (ystr, "0", sizeof(ystr));
-	      }
-
-	      lat0 = tt_config.ttloc_ptr[ipat].grid.lat0;
-	      lat9 = tt_config.ttloc_ptr[ipat].grid.lat9;
-	      var yrange = lat9 - lat0;
-	      y = atof(ystr);
-	      var user_y_max = round(pow(10., strlen(ystr)) - 1.);	// e.g. 999 for 3 digits
-	      m_latitude = lat0 + yrange * y / user_y_max;
-		  /* TODO KG
-#if 0
-	      dw_printf ("TTLOC_GRID LAT min=%f, max=%f, range=%f\n", lat0, lat9, yrange);
-	      dw_printf ("TTLOC_GRID LAT user_y=%f, user_y_max=%f\n", y, user_y_max);
-	      dw_printf ("TTLOC_GRID LAT min + yrange * user_y / user_y_range = %f\n", m_latitude);
-#endif
-*/
-	      lon0 = tt_config.ttloc_ptr[ipat].grid.lon0;
-	      lon9 = tt_config.ttloc_ptr[ipat].grid.lon9;
-	      var xrange = lon9 - lon0;
-	      x = atof(xstr);
-	      var user_x_max = round(pow(10., strlen(xstr)) - 1.);
-	      m_longitude = lon0 + xrange * x / user_x_max;
-		  /* TODO KG
-#if 0
-	      dw_printf ("TTLOC_GRID LON min=%f, max=%f, range=%f\n", lon0, lon9, xrange);
-	      dw_printf ("TTLOC_GRID LON user_x=%f, user_x_max=%f\n", x, user_x_max);
-	      dw_printf ("TTLOC_GRID LON min + xrange * user_x / user_x_range = %f\n", m_longitude);
-#endif
-*/
-
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
-
-	      break;
-
-	    case TTLOC_UTM:
-
-	      if (strlen(xstr) == 0) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Missing X coordinate.\n");
-	        /* Avoid divide by zero later.  Put in middle of range. */
-		strlcpy (xstr, "5", sizeof(xstr));
-	      }
-	      if (strlen(ystr) == 0) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Missing Y coordinate.\n");
-	        /* Avoid divide by zero later.  Put in middle of range. */
-		strlcpy (ystr, "5", sizeof(ystr));
-	      }
-
-	      x = atof(xstr);
-	      easting = x * tt_config.ttloc_ptr[ipat].utm.scale + tt_config.ttloc_ptr[ipat].utm.x_offset;
-
-	      y = atof(ystr);
-	      northing = y * tt_config.ttloc_ptr[ipat].utm.scale + tt_config.ttloc_ptr[ipat].utm.y_offset;
-	
-	      if (isalpha(tt_config.ttloc_ptr[ipat].utm.latband)) {
-	        snprintf (m_loc_text, sizeof(m_loc_text), "%d%c %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), tt_config.ttloc_ptr[ipat].utm.latband, easting, northing);
-	      } else if (tt_config.ttloc_ptr[ipat].utm.latband == '-') {
-	        snprintf (m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(- tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing);
-	      } else {
-	        snprintf (m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing);
-	      }
-
-              lerr = Convert_UTM_To_Geodetic(tt_config.ttloc_ptr[ipat].utm.lzone, 
-			tt_config.ttloc_ptr[ipat].utm.hemi, easting, northing, &lat0, &lon0);
-
-              if (lerr == 0) {
-                m_latitude = R2D(lat0);
-                m_longitude = R2D(lon0);
-
-                //dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
-              } else {
-	        var message[300] C.char
-
-		text_color_set(DW_COLOR_ERROR);
-	        utm_error_string (lerr, message);
-                dw_printf ("Conversion from UTM failed:\n%s\n\n", message);
-              }
-
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
-
-	      break;
-
-
-	    case TTLOC_MGRS:
-	    case TTLOC_USNG:
-
-	      if (strlen(xstr) == 0) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("MGRS/USNG: Missing X (easting) coordinate.\n");
-	        /* Should not be possible to get here. Fake it and carry on. */
-		strlcpy (xstr, "5", sizeof(xstr));
-	      }
-	      if (strlen(ystr) == 0) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("MGRS/USNG: Missing Y (northing) coordinate.\n");
-	        /* Should not be possible to get here. Fake it and carry on. */
-		strlcpy (ystr, "5", sizeof(ystr));
-	      }
-
-	      var loc[40]C.char
-	
-	      strlcpy (loc, tt_config.ttloc_ptr[ipat].mgrs.zone, sizeof(loc));
-	      strlcat (loc, xstr, sizeof(loc));
-	      strlcat (loc, ystr, sizeof(loc));
-
-	      //text_color_set(DW_COLOR_DEBUG);
-	      //dw_printf ("MGRS/USNG location debug:  %s\n", loc);
-
-	      strlcpy (m_loc_text, loc, sizeof(m_loc_text));
-
-	      if (tt_config.ttloc_ptr[ipat]._type == TTLOC_MGRS) {
-                lerr = Convert_MGRS_To_Geodetic(loc, &lat0, &lon0);
-			} else {
-                lerr = Convert_USNG_To_Geodetic(loc, &lat0, &lon0);
+			if strlen(bstr) != 3 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Bearing \"%s\" should be 3 digits.\n", bstr)
+				// return error code?
+			}
+			if strlen(dstr) < 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Distance \"%s\" should 1 or more digits.\n", dstr)
+				// return error code?
 			}
 
+			lat0 = D2R(tt_config.ttloc_ptr[ipat].vector.lat)
+			lon0 = D2R(tt_config.ttloc_ptr[ipat].vector.lon)
+			dist = atof(dstr) * tt_config.ttloc_ptr[ipat].vector.scale
+			bearing = D2R(atof(bstr))
 
-              if (lerr == 0) {
-                m_latitude = R2D(lat0);
-                m_longitude = R2D(lon0);
+			/* Equations and caluculators found here: */
+			/* http://movable-type.co.uk/scripts/latlong.html */
+			/* This should probably be a function in latlong.c in case we have another use for it someday. */
 
-                //dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
-              } else {
-	        var message[300]C.char
+			m_latitude = R2D(asin(sin(lat0)*cos(dist/R) + cos(lat0)*sin(dist/R)*cos(bearing)))
 
-		text_color_set(DW_COLOR_ERROR);
-	        mgrs_error_string (lerr, message);
-                dw_printf ("Conversion from MGRS/USNG failed:\n%s\n\n", message);
-              }
+			m_longitude = R2D(lon0 + atan2(sin(bearing)*sin(dist/R)*cos(lat0),
+				cos(dist/R)-sin(lat0)*sin(D2R(m_latitude))))
 
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
 
-	      break;
+			break
 
-	    case TTLOC_MHEAD:
+		case TTLOC_GRID:
 
+			if strlen(xstr) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Missing X coordinate.\n")
+				strlcpy(xstr, "0", sizeof(xstr))
+			}
+			if strlen(ystr) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Missing Y coordinate.\n")
+				strlcpy(ystr, "0", sizeof(ystr))
+			}
 
-	      /* Combine prefix from configuration and digits from user. */
-	
-  	      strlcpy (stemp, tt_config.ttloc_ptr[ipat].mhead.prefix, sizeof(stemp));
-	      strlcat (stemp, xstr, sizeof(stemp));
+			lat0 = tt_config.ttloc_ptr[ipat].grid.lat0
+			lat9 = tt_config.ttloc_ptr[ipat].grid.lat9
+			var yrange = lat9 - lat0
+			y = atof(ystr)
+			var user_y_max = round(pow(10., strlen(ystr)) - 1.) // e.g. 999 for 3 digits
+			m_latitude = lat0 + yrange*y/user_y_max
+			/* TODO KG
+			#if 0
+				      dw_printf ("TTLOC_GRID LAT min=%f, max=%f, range=%f\n", lat0, lat9, yrange);
+				      dw_printf ("TTLOC_GRID LAT user_y=%f, user_y_max=%f\n", y, user_y_max);
+				      dw_printf ("TTLOC_GRID LAT min + yrange * user_y / user_y_range = %f\n", m_latitude);
+			#endif
+			*/
+			lon0 = tt_config.ttloc_ptr[ipat].grid.lon0
+			lon9 = tt_config.ttloc_ptr[ipat].grid.lon9
+			var xrange = lon9 - lon0
+			x = atof(xstr)
+			var user_x_max = round(pow(10., strlen(xstr)) - 1.)
+			m_longitude = lon0 + xrange*x/user_x_max
+			/* TODO KG
+			#if 0
+				      dw_printf ("TTLOC_GRID LON min=%f, max=%f, range=%f\n", lon0, lon9, xrange);
+				      dw_printf ("TTLOC_GRID LON user_x=%f, user_x_max=%f\n", x, user_x_max);
+				      dw_printf ("TTLOC_GRID LON min + xrange * user_x / user_x_range = %f\n", m_longitude);
+			#endif
+			*/
 
-	      if (strlen(stemp) != 4 && strlen(stemp) != 6 && strlen(stemp) != 10 && strlen(stemp) != 12) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n", 
-							tt_config.ttloc_ptr[ipat].mhead.prefix, xstr);
-	        return (TT_ERROR_INVALID_MHEAD);
-	      }
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
 
-	      //text_color_set(DW_COLOR_DEBUG);
-	      //dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
+			break
 
-	      if (tt_mhead_to_text (stemp, 0, mh, sizeof(mh))  == 0) {
-	        //text_color_set(DW_COLOR_DEBUG);
-	        //dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
+		case TTLOC_UTM:
 
-		strlcpy (m_loc_text, mh, sizeof(m_loc_text));
+			if strlen(xstr) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Missing X coordinate.\n")
+				/* Avoid divide by zero later.  Put in middle of range. */
+				strlcpy(xstr, "5", sizeof(xstr))
+			}
+			if strlen(ystr) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Missing Y coordinate.\n")
+				/* Avoid divide by zero later.  Put in middle of range. */
+				strlcpy(ystr, "5", sizeof(ystr))
+			}
 
-		ll_from_grid_square (mh, &m_latitude, &m_longitude);
-	      }
+			x = atof(xstr)
+			easting = x*tt_config.ttloc_ptr[ipat].utm.scale + tt_config.ttloc_ptr[ipat].utm.x_offset
 
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
+			y = atof(ystr)
+			northing = y*tt_config.ttloc_ptr[ipat].utm.scale + tt_config.ttloc_ptr[ipat].utm.y_offset
 
-	      break;
+			if isalpha(tt_config.ttloc_ptr[ipat].utm.latband) {
+				snprintf(m_loc_text, sizeof(m_loc_text), "%d%c %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
+			} else if tt_config.ttloc_ptr[ipat].utm.latband == '-' {
+				snprintf(m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(-tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
+			} else {
+				snprintf(m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
+			}
 
-	    case TTLOC_SATSQ:
+			lerr = Convert_UTM_To_Geodetic(tt_config.ttloc_ptr[ipat].utm.lzone,
+				tt_config.ttloc_ptr[ipat].utm.hemi, easting, northing, &lat0, &lon0)
 
-	      if (strlen(xstr) != 4) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Expected 4 digits for the Satellite Square.\n");
-	        return (TT_ERROR_INVALID_SATSQ);
-	      }
+			if lerr == 0 {
+				m_latitude = R2D(lat0)
+				m_longitude = R2D(lon0)
 
-	      /* Convert 4 digits to usual AA99 form, then to location. */
+				//dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
+			} else {
+				var message [300]C.char
 
-	      if (tt_satsq_to_text (xstr, 0, mh)  == 0) {
+				text_color_set(DW_COLOR_ERROR)
+				utm_error_string(lerr, message)
+				dw_printf("Conversion from UTM failed:\n%s\n\n", message)
+			}
 
-	        strlcpy (m_loc_text, mh, sizeof(m_loc_text));
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
 
-		ll_from_grid_square (mh, &m_latitude, &m_longitude);
-	      }
+			break
 
-	      m_dao[2] = e[0];
-	      m_dao[3] = e[1];
+		case TTLOC_MGRS:
+		case TTLOC_USNG:
 
-	      break;
+			if strlen(xstr) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("MGRS/USNG: Missing X (easting) coordinate.\n")
+				/* Should not be possible to get here. Fake it and carry on. */
+				strlcpy(xstr, "5", sizeof(xstr))
+			}
+			if strlen(ystr) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("MGRS/USNG: Missing Y (northing) coordinate.\n")
+				/* Should not be possible to get here. Fake it and carry on. */
+				strlcpy(ystr, "5", sizeof(ystr))
+			}
 
-	    case TTLOC_AMBIG:
+			var loc [40]C.char
 
-	      if (strlen(xstr) != 1) {
-	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Expected 1 digits for the position ambiguity.\n");
-	        return (TT_ERROR_INVALID_LOC);
-	      }
+			strlcpy(loc, tt_config.ttloc_ptr[ipat].mgrs.zone, sizeof(loc))
+			strlcat(loc, xstr, sizeof(loc))
+			strlcat(loc, ystr, sizeof(loc))
 
-	      m_ambiguity = atoi(xstr);
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("MGRS/USNG location debug:  %s\n", loc);
 
-	      break;
+			strlcpy(m_loc_text, loc, sizeof(m_loc_text))
 
-	    default:
-	      panic("")
-	  }
-	  return (0);
+			if tt_config.ttloc_ptr[ipat]._type == TTLOC_MGRS {
+				lerr = Convert_MGRS_To_Geodetic(loc, &lat0, &lon0)
+			} else {
+				lerr = Convert_USNG_To_Geodetic(loc, &lat0, &lon0)
+			}
+
+			if lerr == 0 {
+				m_latitude = R2D(lat0)
+				m_longitude = R2D(lon0)
+
+				//dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
+			} else {
+				var message [300]C.char
+
+				text_color_set(DW_COLOR_ERROR)
+				mgrs_error_string(lerr, message)
+				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", message)
+			}
+
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
+
+			break
+
+		case TTLOC_MHEAD:
+
+			/* Combine prefix from configuration and digits from user. */
+
+			strlcpy(stemp, tt_config.ttloc_ptr[ipat].mhead.prefix, sizeof(stemp))
+			strlcat(stemp, xstr, sizeof(stemp))
+
+			if strlen(stemp) != 4 && strlen(stemp) != 6 && strlen(stemp) != 10 && strlen(stemp) != 12 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
+					tt_config.ttloc_ptr[ipat].mhead.prefix, xstr)
+				return (TT_ERROR_INVALID_MHEAD)
+			}
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
+
+			if tt_mhead_to_text(stemp, 0, mh, sizeof(mh)) == 0 {
+				//text_color_set(DW_COLOR_DEBUG);
+				//dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
+
+				strlcpy(m_loc_text, mh, sizeof(m_loc_text))
+
+				ll_from_grid_square(mh, &m_latitude, &m_longitude)
+			}
+
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
+
+			break
+
+		case TTLOC_SATSQ:
+
+			if strlen(xstr) != 4 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Expected 4 digits for the Satellite Square.\n")
+				return (TT_ERROR_INVALID_SATSQ)
+			}
+
+			/* Convert 4 digits to usual AA99 form, then to location. */
+
+			if tt_satsq_to_text(xstr, 0, mh) == 0 {
+
+				strlcpy(m_loc_text, mh, sizeof(m_loc_text))
+
+				ll_from_grid_square(mh, &m_latitude, &m_longitude)
+			}
+
+			m_dao[2] = e[0]
+			m_dao[3] = e[1]
+
+			break
+
+		case TTLOC_AMBIG:
+
+			if strlen(xstr) != 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Expected 1 digits for the position ambiguity.\n")
+				return (TT_ERROR_INVALID_LOC)
+			}
+
+			m_ambiguity = atoi(xstr)
+
+			break
+
+		default:
+			panic("")
+		}
+		return (0)
 	}
 
 	/* Does not match any location specification. */
 
-	text_color_set(DW_COLOR_ERROR);
-	dw_printf ("Received location \"%s\" does not match any definitions.\n", e);
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Received location \"%s\" does not match any definitions.\n", e)
 
 	/* Send reject sound. */
 
-	return (TT_ERROR_INVALID_LOC);
+	return (TT_ERROR_INVALID_LOC)
 
 } /* end parse_location */
-
 
 /*------------------------------------------------------------------
  *
@@ -1418,19 +1390,19 @@ func parse_location (e string) int {
  *		valstrsize	- size of the outputs so we can check for buffer overflow.
  *
  * Outputs:	xstr		- All digits matching x positions in configuration.
- *		ystr		-                     y 
- *		zstr		-                     z 
+ *		ystr		-                     y
+ *		zstr		-                     z
  *		bstr		-                     b
  * 		dstr		-                     d
  *
  * Returns:     >= 0 for index into table if found.
  *		-1 if not found.
  *
- * Description:	
+ * Description:
  *
  *----------------------------------------------------------------*/
 
-func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize) int {
+func find_ttloc_match(char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize) int {
 	// FIXME KG int ipat;	/* Index into patterns from configuration file */
 	// FIXME KG int len;	/* Length of pattern we are trying to match. */
 	// FIXME KG int match;
@@ -1439,122 +1411,121 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 
 	// debug dw_printf ("find_ttloc_match: e=%s\n", e);
 
-	for ipat:=0; ipat<tt_config.ttloc_len; ipat++ {
-	  
-	  length = strlen(tt_config.ttloc_ptr[ipat].pattern);
+	for ipat := 0; ipat < tt_config.ttloc_len; ipat++ {
 
-	  if ((int)(strlen(e)) == length) {
+		length = strlen(tt_config.ttloc_ptr[ipat].pattern)
 
-	    match = 1;
-	    strlcpy (xstr, "", valstrsize);
-	    strlcpy (ystr, "", valstrsize);
-	    strlcpy (zstr, "", valstrsize);
-	    strlcpy (bstr, "", valstrsize);
-	    strlcpy (dstr, "", valstrsize);
+		if (int)(strlen(e)) == length {
 
-	    for k=0; k<length; k++ {
-	      mc = tt_config.ttloc_ptr[ipat].pattern[k];
-	      switch (mc) {
+			match = 1
+			strlcpy(xstr, "", valstrsize)
+			strlcpy(ystr, "", valstrsize)
+			strlcpy(zstr, "", valstrsize)
+			strlcpy(bstr, "", valstrsize)
+			strlcpy(dstr, "", valstrsize)
 
-	        case 'B':
-	        case '0':
-	        case '1':
-	        case '2':
-	        case '3':
-	        case '4':
-	        case '5':
-	        case '6':
-	        case '7':
-	        case '8':
-	        case '9':
-	        case 'A':	/* Allow A,C,D after the B? */
-	        case 'C':
-	        case 'D':
+			for k = 0; k < length; k++ {
+				mc = tt_config.ttloc_ptr[ipat].pattern[k]
+				switch mc {
 
-		  if (e[k] != mc) {
-		    match = 0;
-		  }
-		  break;
+				case 'B':
+				case '0':
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':
+				case '6':
+				case '7':
+				case '8':
+				case '9':
+				case 'A': /* Allow A,C,D after the B? */
+				case 'C':
+				case 'D':
 
-		case 'x':
-		   if (isdigit(e[k])) {
-	             var stemp[2] C.char
-		     stemp[0] = e[k];
-		     stemp[1] = 0;
-		     strlcat (xstr, stemp, valstrsize);
-		   } else {
-		     match = 0;
-	           }
-		  break;
+					if e[k] != mc {
+						match = 0
+					}
+					break
 
-		case 'y':
-		   if (isdigit(e[k])) {
-	             var stemp [2]C.char;
-		     stemp[0] = e[k];
-		     stemp[1] = 0;
-		     strlcat (ystr, stemp, valstrsize);
-		   } else {
-		     match = 0;
-	           }
-		  break;
+				case 'x':
+					if isdigit(e[k]) {
+						var stemp [2]C.char
+						stemp[0] = e[k]
+						stemp[1] = 0
+						strlcat(xstr, stemp, valstrsize)
+					} else {
+						match = 0
+					}
+					break
 
-		case 'z':
-		   if (isdigit(e[k])) {
-	             var stemp [2]C.char;
-		     stemp[0] = e[k];
-		     stemp[1] = 0;
-		     strlcat (zstr, stemp, valstrsize);
-		   } else {
-		     match = 0;
-	           }
-		  break;
+				case 'y':
+					if isdigit(e[k]) {
+						var stemp [2]C.char
+						stemp[0] = e[k]
+						stemp[1] = 0
+						strlcat(ystr, stemp, valstrsize)
+					} else {
+						match = 0
+					}
+					break
 
-		case 'b':
-		   if (isdigit(e[k])) {
-	             var stemp [2]C.char;
-		     stemp[0] = e[k];
-		     stemp[1] = 0;
-		     strlcat (bstr, stemp, valstrsize);
-		   } else {
-		     match = 0;
-	           }
-		  break;
+				case 'z':
+					if isdigit(e[k]) {
+						var stemp [2]C.char
+						stemp[0] = e[k]
+						stemp[1] = 0
+						strlcat(zstr, stemp, valstrsize)
+					} else {
+						match = 0
+					}
+					break
 
-		case 'd':
-		   if (isdigit(e[k])) {
-	             var stemp [2]C.char;
-		     stemp[0] = e[k];
-		     stemp[1] = 0;
-		     strlcat (dstr, stemp, valstrsize);
-		   } else {
-		     match = 0;
-	           }
-		  break;
+				case 'b':
+					if isdigit(e[k]) {
+						var stemp [2]C.char
+						stemp[0] = e[k]
+						stemp[1] = 0
+						strlcat(bstr, stemp, valstrsize)
+					} else {
+						match = 0
+					}
+					break
 
-		default:
-		  dw_printf ("find_ttloc_match: shouldn't be here.\n");
-		  /* Shouldn't be here. */
-		  match = 0;
-		  break;
+				case 'd':
+					if isdigit(e[k]) {
+						var stemp [2]C.char
+						stemp[0] = e[k]
+						stemp[1] = 0
+						strlcat(dstr, stemp, valstrsize)
+					} else {
+						match = 0
+					}
+					break
 
-	      } /* switch */
-	    } /* for k */
-	  
-	    if (match) {
-	      return (ipat);
-	    }
-	  } /* if strlen */
+				default:
+					dw_printf("find_ttloc_match: shouldn't be here.\n")
+					/* Shouldn't be here. */
+					match = 0
+					break
+
+				} /* switch */
+			} /* for k */
+
+			if match {
+				return (ipat)
+			}
+		} /* if strlen */
 	}
-	return (-1);
+	return (-1)
 
 } /* end find_ttloc_match */
-
 
 /*------------------------------------------------------------------
  *
  * Name:        parse_comment
  *
- * Purpose:     Extract comment / status or other special information from touch tone message. 
+ * Purpose:     Extract comment / status or other special information from touch tone message.
  *
  * Inputs:      e		- An "entry" extracted from a complete
  *				  APRStt message.
@@ -1571,7 +1542,7 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
  *				  The defaults are derived from the MIC-E position comments
  *				  which were always "/" plus exactly 10 characters.
  *				  Users can override the defaults with configuration options.
- *	
+ *
  *		Cnnnnnn		- Six digit frequency reformatted as nnn.nnnMHz
  *
  *		Cnnn		- Three digit are for CTCSS tone.  Use only integer part
@@ -1583,51 +1554,50 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
  *
  *----------------------------------------------------------------*/
 
-func parse_comment (e string) int {
+func parse_comment(e string) int {
 	// FIXME KG assert (*e == 'C');
 
-	var length = strlen(e);
+	var length = strlen(e)
 
-	if (e[1] == 'A') {
-	  tt_ascii2d_to_text (e+2, 0, m_comment);
-	  return (0);
+	if e[1] == 'A' {
+		tt_ascii2d_to_text(e+2, 0, m_comment)
+		return (0)
 	}
 
-	if (length == 2 && isdigit(e[1])) {
-	  m_mic_e = e[1];
-	  return (0);
+	if length == 2 && isdigit(e[1]) {
+		m_mic_e = e[1]
+		return (0)
 	}
 
-	if (length == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5]) && isdigit(e[6])) {
-	  m_freq[0] = e[1];
-	  m_freq[1] = e[2];
-	  m_freq[2] = e[3];
-	  m_freq[3] = '.';
-	  m_freq[4] = e[4];
-	  m_freq[5] = e[5];
-	  m_freq[6] = e[6];
-	  m_freq[7] = 'M';
-	  m_freq[8] = 'H';
-	  m_freq[9] = 'z';
-	  m_freq[10] = 0;
-	  return (0);
+	if length == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5]) && isdigit(e[6]) {
+		m_freq[0] = e[1]
+		m_freq[1] = e[2]
+		m_freq[2] = e[3]
+		m_freq[3] = '.'
+		m_freq[4] = e[4]
+		m_freq[5] = e[5]
+		m_freq[6] = e[6]
+		m_freq[7] = 'M'
+		m_freq[8] = 'H'
+		m_freq[9] = 'z'
+		m_freq[10] = 0
+		return (0)
 	}
 
-	if (length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3])) {
-	  strlcpy (m_ctcss, e+1, sizeof(m_ctcss));
-	  return (0);
+	if length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) {
+		strlcpy(m_ctcss, e+1, sizeof(m_ctcss))
+		return (0)
 	}
 
-	tt_multipress_to_text (e+1, 0, m_comment);
-	return (0);
+	tt_multipress_to_text(e+1, 0, m_comment)
+	return (0)
 }
-
 
 /*------------------------------------------------------------------
  *
  * Name:        raw_tt_data_to_app
  *
- * Purpose:     Send raw touch tone data to application. 
+ * Purpose:     Send raw touch tone data to application.
  *
  * Inputs:      channel		- Channel where touch tone data heard.
  *		msg		- String of button pushes.
@@ -1639,70 +1609,67 @@ func parse_comment (e string) int {
  *
  * Returns:     None
  *
- * Description:	
+ * Description:
  * 		Put raw touch tone message in a packet and send to application.
  * 		The APRS protocol does not have provision for this.
  * 		For now, use the unused "t" message type.
  * 		TODO:  Get an officially sanctioned method.
  *
  * 		Use callsign for source if available.
- * 		Encode the overlay in the destination. 
+ * 		Encode the overlay in the destination.
  *
  *----------------------------------------------------------------*/
 
-static void raw_tt_data_to_app (int channel, char *msg)
-{
-	char src[10], dest[10];
-	char raw_tt_msg[256];
-	packet_t pp;
-	alevel_t alevel;
+func raw_tt_data_to_app(channel int, msg string) {
+	/*
+		char src[10], dest[10];
+		char raw_tt_msg[256];
+		alevel_t alevel;
+	*/
 
+	// Set source and dest to something valid to keep rest of processing happy.
+	// For lack of a better idea, make source "DTMF" to indicate where it came from.
+	// Application version might be useful in case we end up using different
+	// message formats in later versions.
 
+	strlcpy(src, "DTMF", sizeof(src))
+	snprintf(dest, sizeof(dest), "%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
 
-// Set source and dest to something valid to keep rest of processing happy.
-// For lack of a better idea, make source "DTMF" to indicate where it came from.
-// Application version might be useful in case we end up using different
-// message formats in later versions.
+	snprintf(raw_tt_msg, sizeof(raw_tt_msg), "%s>%s:t%s", src, dest, msg)
 
-	strlcpy (src, "DTMF", sizeof(src));
-	snprintf (dest, sizeof(dest), "%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION);
+	var pp = ax25_from_text(raw_tt_msg, 1)
 
-	snprintf (raw_tt_msg, sizeof(raw_tt_msg), "%s>%s:t%s", src, dest, msg);
+	/*
+	 * Process like a normal received frame.
+	 * NOTE:  This goes directly to application rather than
+	 * thru the multi modem duplicate processing.
+	 *
+	 * Should we use a different type so it can be easily
+	 * distinguished later?
+	 *
+	 * We try to capture an overall audio level here.
+	 * Mark and space do not apply in this case.
+	 * This currently doesn't get displayed but we might want it someday.
+	 */
 
-	pp = ax25_from_text (raw_tt_msg, 1);
+	if pp != nil {
 
-/*
- * Process like a normal received frame.
- * NOTE:  This goes directly to application rather than
- * thru the multi modem duplicate processing.
- *
- * Should we use a different type so it can be easily
- * distinguished later?
- *
- * We try to capture an overall audio level here.
- * Mark and space do not apply in this case.
- * This currently doesn't get displayed but we might want it someday.
- */
+		alevel = demod_get_audio_level(channel, 0)
+		alevel.mark = -2
+		alevel.space = -2
 
-	if (pp != nil) {
-
-	  alevel = demod_get_audio_level (channel, 0);
-	  alevel.mark = -2;
-	  alevel.space = -2;
-
-	  dlq_rec_frame (channel, -1, 0, pp, alevel, 0, RETRY_NONE, "tt");
+		dlq_rec_frame(channel, -1, 0, pp, alevel, 0, RETRY_NONE, "tt")
 	} else {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg);
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)
 	}
 }
-
 
 /*------------------------------------------------------------------
  *
  * Name:        dw_run_cmd
  *
- * Purpose:     Run a command and capture the output. 
+ * Purpose:     Run a command and capture the output.
  *
  * Inputs:      cmd		- The command.
  *
@@ -1727,8 +1694,8 @@ static void raw_tt_data_to_app (int channel, char *msg)
  *
  *----------------------------------------------------------------*/
 
-int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz) 
-{
+/* FIXME KG
+func dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz) int {
 	FILE *fp;
 
 	strlcpy (result, "", resultsiz);
@@ -1744,7 +1711,7 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 	    remaining = (int)resultsiz - strlen(result);
 	  }
 
-	  if ((err = pclose(fp)) != 0) {	 
+	  if ((err = pclose(fp)) != 0) {
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("ERROR: Unable to run \"%s\"\n", cmd);
 	    // On Windows, non-existent file produces "Operation not permitted"
@@ -1755,7 +1722,7 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 	  }
 
 	  // take out any newline characters.
-	
+
 	  if (oneline) {
 	    for (pr = result; *pr != 0; pr++) {
 	      if (*pr == '\r' || *pr == '\n' || *pr == '\t') {
@@ -1774,24 +1741,21 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 
 	  //text_color_set(DW_COLOR_DEBUG);
 	  //dw_printf ("%s returns \"%s\"\n", cmd, result);
-	  
+
 	  return (strlen(result));
 	} else {
 	  // explain_popen() would be nice but doesn't seem to be commonly available.
-	  
+
 	  // We get here only if fork or pipe fails.
 	  // The command not existing must be caught above.
 
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("ERROR: Unable to run \"%s\"\n", cmd);
 	  dw_printf ("%s\n", strerror(errno));
-	  
+
 	  return (-1);
 	}
-
-
-} /* end dw_run_cmd */
-
+}
+*/
 
 /* end aprs_tt.c */
-
