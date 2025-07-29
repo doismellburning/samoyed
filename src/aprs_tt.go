@@ -92,7 +92,7 @@ var running_TT_MAIN_tests = false
  *
  *----------------------------------------------------------------*/
 
-var tt_config C.tt_config_s
+var tt_config C.struct_tt_config_s
 
 // FIXME KG #define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
 /* FIXME KG
@@ -201,7 +201,7 @@ func aprs_tt_button(channel int, button rune) {
 		 * in the TTOBJ command.
 		 */
 
-		if channel == tt_config.obj_recv_chan {
+		if C.int(channel) == tt_config.obj_recv_chan {
 			poll_period++
 			if poll_period >= 39 {
 				poll_period = 0
@@ -252,25 +252,20 @@ func aprs_tt_button(channel int, button rune) {
  *	Alternate table symbol code, overlay of 0-9, A-Z.
  */
 
-/* FIXME KG
-char m_symtab_or_overlay;
-char m_symbol_code;		// Default 'A'
-
-static char m_loc_text[24];
-double m_longitude;		// Set to G_UNKNOWN if not defined.
-double m_latitude;		// Set to G_UNKNOWN if not defined.
-static int m_ambiguity;
-char m_comment[200];
-char m_freq[12];
-static char m_ctcss[8];
-static char m_mic_e;
-char m_dao[6];
-int m_ssid;			// Default 12 for APRStt user.
-*/
+var m_symtab_or_overlay rune
+var m_symbol_code rune		// Default 'A'
+var m_loc_text[24]C.char;
+var m_longitude C.double;		// Set to G_UNKNOWN if not defined.
+var m_latitude C.double;		// Set to G_UNKNOWN if not defined.
+var m_ambiguity int
+var m_comment[200]C.char
+var m_freq[12]C.char
+var m_ctcss[8]C.char
+var m_mic_e rune
+var m_dao[6] C.char
+var m_ssid int			// Default 12 for APRStt user.
 
 func aprs_tt_sequence(channel int, msg string) {
-	// FIXME KG int err;
-
 	/* TODO KG
 	   #if DEBUG
 	   	text_color_set(DW_COLOR_DEBUG);
@@ -290,6 +285,7 @@ func aprs_tt_sequence(channel int, msg string) {
 	/*
 	 * The parse functions will fill these in.
 	 */
+	 /* FIXME KG
 	strlcpy(m_callsign, "", sizeof(m_callsign))
 	m_symtab_or_overlay = APRSTT_DEFAULT_SYMTAB
 	m_symbol_code = APRSTT_DEFAULT_SYMBOL
@@ -301,13 +297,14 @@ func aprs_tt_sequence(channel int, msg string) {
 	strlcpy(m_freq, "", sizeof(m_freq))
 	strlcpy(m_ctcss, "", sizeof(m_ctcss))
 	m_mic_e = ' '
-	strlcpy(m_dao, "!T  !", sizeof(m_dao)) /* start out unknown */
+	*/
+	// FIXME KG strlcpy(m_dao, "!T  !", sizeof(m_dao)) /* start out unknown */
 	m_ssid = 12
 
 	/*
 	 * Parse the touch tone sequence.
 	 */
-	err = parse_fields(msg)
+	var err = parse_fields(msg)
 
 	/* TODO KG
 	#if defined(DEBUG)
@@ -326,7 +323,6 @@ func aprs_tt_sequence(channel int, msg string) {
 	 */
 
 	if err == 0 {
-
 		err = tt_user_heard(m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code,
 			m_loc_text, m_latitude, m_longitude, m_ambiguity,
 			m_freq, m_ctcss, m_comment, m_mic_e, m_dao)
@@ -344,9 +340,7 @@ func aprs_tt_sequence(channel int, msg string) {
 	strlcpy(script_response, "", sizeof(script_response))
 
 	if err == 0 && strlen(tt_config.ttcmd) > 0 {
-
 		dw_run_cmd(tt_config.ttcmd, 1, script_response, sizeof(script_response))
-
 	}
 
 	/*
