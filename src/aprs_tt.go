@@ -53,7 +53,9 @@ package direwolf
 // #include "error_string.h"
 import "C"
 
-import ()
+import (
+	"fmt"
+)
 
 /* Convert between degrees and radians. */
 
@@ -94,7 +96,7 @@ var running_TT_MAIN_tests = false
 
 var tt_config C.struct_tt_config_s
 
-// FIXME KG #define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
+// FIXME KG #define NUM_TEST_CONFIG (len(test_config) / len (struct ttloc_s))
 /* FIXME KG
 static struct ttloc_s test_config[] = {
 
@@ -241,7 +243,7 @@ func aprs_tt_button(channel int, button rune) {
  *
  *----------------------------------------------------------------*/
 
-// FIXME KG char m_callsign[20];	/* really object name */
+var m_callsign string	/* really object name */
 
 /*
  * Standard APRStt has symbol code 'A' (box) with overlay of 0-9, A-Z.
@@ -254,15 +256,15 @@ func aprs_tt_button(channel int, button rune) {
 
 var m_symtab_or_overlay rune
 var m_symbol_code rune		// Default 'A'
-var m_loc_text[24]C.char;
-var m_longitude C.double;		// Set to G_UNKNOWN if not defined.
-var m_latitude C.double;		// Set to G_UNKNOWN if not defined.
+var m_loc_text string
+var m_longitude float64		// Set to G_UNKNOWN if not defined.
+var m_latitude float64		// Set to G_UNKNOWN if not defined.
 var m_ambiguity int
-var m_comment[200]C.char
-var m_freq[12]C.char
-var m_ctcss[8]C.char
+var m_comment string
+var m_freq string
+var m_ctcss string
 var m_mic_e rune
-var m_dao[6] C.char
+var m_dao string
 var m_ssid int			// Default 12 for APRStt user.
 
 func aprs_tt_sequence(channel int, msg string) {
@@ -335,12 +337,10 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * It might be useful to run it for error cases as well but we currently
 	 * don't pass in the success / failure code to know the difference.
 	 */
-	var script_response [1000]C.char
-
-	strlcpy(script_response, "", sizeof(script_response))
-
-	if err == 0 && strlen(tt_config.ttcmd) > 0 {
-		dw_run_cmd(tt_config.ttcmd, 1, script_response, sizeof(script_response))
+	var script_response string
+	if err == 0 && C.strlen(&tt_config.ttcmd[0]) > 0 {
+		var _script_response, _ = dw_run_cmd(C.GoString(&tt_config.ttcmd[0]), 1)
+		script_response = string(_script_response)
 	}
 
 	/*
@@ -351,18 +351,14 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * Anything from script, above, will override other predefined responses.
 	 */
 
-	var audible_response [sizeof(script_response) + 16]C.char
-
-	var response = tt_config.response[err].mtext
-	if C.strlen(script_response) > 0 {
+	var response = C.GoString(&tt_config.response[err].mtext[0])
+	if len(script_response) > 0 {
 		response = script_response
 	}
-	snprintf(audible_response, sizeof(audible_response),
-		"APRSTT>%s:%s",
-		tt_config.response[err].method,
-		response)
 
-	var pp = C.ax25_from_text(audible_response, 0)
+	var audible_response = fmt.Sprintf( "APRSTT>%s:%s", tt_config.response[err].method, response)
+
+	var pp = C.ax25_from_text(C.CString(audible_response), 0)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -370,7 +366,7 @@ func aprs_tt_sequence(channel int, msg string) {
 		return
 	}
 
-	tq_append(channel, TQ_PRIO_0_HI, pp)
+	C.tq_append(C.int(channel), TQ_PRIO_0_HI, pp)
 } /* end aprs_tt_sequence */
 
 /*------------------------------------------------------------------
@@ -416,7 +412,7 @@ func parse_fields(msg string) int {
 
 	var n = 0
 	/* FIXME KG
-	for (char *m = msg; *m != 0 && n < sizeof(stemp)-1; m++) {
+	for (char *m = msg; *m != 0 && n < len(stemp)-1; m++) {
 	  if (*m != ' ') {
 	    stemp[n++] = *m;
 	  }
@@ -548,7 +544,7 @@ func expand_macro(e string) int {
 		 * Substitute values in to the definition.
 		 */
 
-		strlcpy(stemp, "", sizeof(stemp))
+		strlcpy(stemp, "", len(stemp))
 
 		for d = tt_config.ttloc_ptr[ipat].macro.definition; *d != 0; d++ {
 
@@ -559,13 +555,13 @@ func expand_macro(e string) int {
 
 			switch *d {
 			case 'x':
-				strlcat(stemp, xstr, sizeof(stemp))
+				strlcat(stemp, xstr, len(stemp))
 				break
 			case 'y':
-				strlcat(stemp, ystr, sizeof(stemp))
+				strlcat(stemp, ystr, len(stemp))
 				break
 			case 'z':
-				strlcat(stemp, zstr, sizeof(stemp))
+				strlcat(stemp, zstr, len(stemp))
 				break
 			default:
 				{
@@ -573,7 +569,7 @@ func expand_macro(e string) int {
 					   char c1[2];
 					   c1[0] = *d;
 					   c1[1] = 0;
-					   strlcat (stemp, c1, sizeof(stemp));
+					   strlcat (stemp, c1, len(stemp));
 					*/
 				}
 				break
@@ -674,7 +670,7 @@ func parse_callsign(e string) int {
 	 */
 
 	if length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) {
-		strlcpy(m_callsign, e+1, sizeof(m_callsign))
+		strlcpy(m_callsign, e+1, len(m_callsign))
 		if tt_debug {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Special case, 3 digit tactical call: \"%s\"\n", m_callsign)
@@ -978,7 +974,7 @@ func parse_aprstt3_call(e string) int {
 		var call [12]C.char
 
 		if tt_call10_to_text(e+2, 1, call) == 0 {
-			strlcpy(m_callsign, call, sizeof(m_callsign))
+			strlcpy(m_callsign, call, len(m_callsign))
 		} else {
 			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
 		}
@@ -988,7 +984,7 @@ func parse_aprstt3_call(e string) int {
 
 			if running_TT_MAIN_tests {
 				/* For unit test, use suffix rather than trying lookup. */
-				strlcpy(m_callsign, suffix, sizeof(m_callsign))
+				strlcpy(m_callsign, suffix, len(m_callsign))
 			} else {
 				var call [12]C.char
 
@@ -998,7 +994,7 @@ func parse_aprstt3_call(e string) int {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, call)
 
-					strlcpy(m_callsign, call, sizeof(m_callsign))
+					strlcpy(m_callsign, call, len(m_callsign))
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
@@ -1147,12 +1143,12 @@ func parse_location(e string) int {
 			if strlen(xstr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing X coordinate.\n")
-				strlcpy(xstr, "0", sizeof(xstr))
+				strlcpy(xstr, "0", len(xstr))
 			}
 			if strlen(ystr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing Y coordinate.\n")
-				strlcpy(ystr, "0", sizeof(ystr))
+				strlcpy(ystr, "0", len(ystr))
 			}
 
 			lat0 = tt_config.ttloc_ptr[ipat].grid.lat0
@@ -1193,13 +1189,13 @@ func parse_location(e string) int {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing X coordinate.\n")
 				/* Avoid divide by zero later.  Put in middle of range. */
-				strlcpy(xstr, "5", sizeof(xstr))
+				strlcpy(xstr, "5", len(xstr))
 			}
 			if strlen(ystr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing Y coordinate.\n")
 				/* Avoid divide by zero later.  Put in middle of range. */
-				strlcpy(ystr, "5", sizeof(ystr))
+				strlcpy(ystr, "5", len(ystr))
 			}
 
 			x = atof(xstr)
@@ -1209,11 +1205,11 @@ func parse_location(e string) int {
 			northing = y*tt_config.ttloc_ptr[ipat].utm.scale + tt_config.ttloc_ptr[ipat].utm.y_offset
 
 			if isalpha(tt_config.ttloc_ptr[ipat].utm.latband) {
-				snprintf(m_loc_text, sizeof(m_loc_text), "%d%c %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
+				snprintf(m_loc_text, len(m_loc_text), "%d%c %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
 			} else if tt_config.ttloc_ptr[ipat].utm.latband == '-' {
-				snprintf(m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(-tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
+				snprintf(m_loc_text, len(m_loc_text), "%d %.0f %.0f", (int)(-tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
 			} else {
-				snprintf(m_loc_text, sizeof(m_loc_text), "%d %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
+				snprintf(m_loc_text, len(m_loc_text), "%d %.0f %.0f", (int)(tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
 			}
 
 			lerr = Convert_UTM_To_Geodetic(tt_config.ttloc_ptr[ipat].utm.lzone,
@@ -1244,25 +1240,25 @@ func parse_location(e string) int {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("MGRS/USNG: Missing X (easting) coordinate.\n")
 				/* Should not be possible to get here. Fake it and carry on. */
-				strlcpy(xstr, "5", sizeof(xstr))
+				strlcpy(xstr, "5", len(xstr))
 			}
 			if strlen(ystr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("MGRS/USNG: Missing Y (northing) coordinate.\n")
 				/* Should not be possible to get here. Fake it and carry on. */
-				strlcpy(ystr, "5", sizeof(ystr))
+				strlcpy(ystr, "5", len(ystr))
 			}
 
 			var loc [40]C.char
 
-			strlcpy(loc, tt_config.ttloc_ptr[ipat].mgrs.zone, sizeof(loc))
-			strlcat(loc, xstr, sizeof(loc))
-			strlcat(loc, ystr, sizeof(loc))
+			strlcpy(loc, tt_config.ttloc_ptr[ipat].mgrs.zone, len(loc))
+			strlcat(loc, xstr, len(loc))
+			strlcat(loc, ystr, len(loc))
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("MGRS/USNG location debug:  %s\n", loc);
 
-			strlcpy(m_loc_text, loc, sizeof(m_loc_text))
+			strlcpy(m_loc_text, loc, len(m_loc_text))
 
 			if tt_config.ttloc_ptr[ipat]._type == TTLOC_MGRS {
 				lerr = Convert_MGRS_To_Geodetic(loc, &lat0, &lon0)
@@ -1292,8 +1288,8 @@ func parse_location(e string) int {
 
 			/* Combine prefix from configuration and digits from user. */
 
-			strlcpy(stemp, tt_config.ttloc_ptr[ipat].mhead.prefix, sizeof(stemp))
-			strlcat(stemp, xstr, sizeof(stemp))
+			strlcpy(stemp, tt_config.ttloc_ptr[ipat].mhead.prefix, len(stemp))
+			strlcat(stemp, xstr, len(stemp))
 
 			if strlen(stemp) != 4 && strlen(stemp) != 6 && strlen(stemp) != 10 && strlen(stemp) != 12 {
 				text_color_set(DW_COLOR_ERROR)
@@ -1305,11 +1301,11 @@ func parse_location(e string) int {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
 
-			if tt_mhead_to_text(stemp, 0, mh, sizeof(mh)) == 0 {
+			if tt_mhead_to_text(stemp, 0, mh, len(mh)) == 0 {
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
 
-				strlcpy(m_loc_text, mh, sizeof(m_loc_text))
+				strlcpy(m_loc_text, mh, len(m_loc_text))
 
 				ll_from_grid_square(mh, &m_latitude, &m_longitude)
 			}
@@ -1331,7 +1327,7 @@ func parse_location(e string) int {
 
 			if tt_satsq_to_text(xstr, 0, mh) == 0 {
 
-				strlcpy(m_loc_text, mh, sizeof(m_loc_text))
+				strlcpy(m_loc_text, mh, len(m_loc_text))
 
 				ll_from_grid_square(mh, &m_latitude, &m_longitude)
 			}
@@ -1579,7 +1575,7 @@ func parse_comment(e string) int {
 	}
 
 	if length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) {
-		strlcpy(m_ctcss, e+1, sizeof(m_ctcss))
+		strlcpy(m_ctcss, e+1, len(m_ctcss))
 		return (0)
 	}
 
@@ -1625,10 +1621,10 @@ func raw_tt_data_to_app(channel int, msg string) {
 	// Application version might be useful in case we end up using different
 	// message formats in later versions.
 
-	strlcpy(src, "DTMF", sizeof(src))
-	snprintf(dest, sizeof(dest), "%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
+	strlcpy(src, "DTMF", len(src))
+	snprintf(dest, len(dest), "%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
 
-	snprintf(raw_tt_msg, sizeof(raw_tt_msg), "%s>%s:t%s", src, dest, msg)
+	snprintf(raw_tt_msg, len(raw_tt_msg), "%s>%s:t%s", src, dest, msg)
 
 	var pp = ax25_from_text(raw_tt_msg, 1)
 
@@ -1686,8 +1682,8 @@ func raw_tt_data_to_app(channel int, msg string) {
  *
  *----------------------------------------------------------------*/
 
+func dw_run_cmd (cmd string, oneline int) ([]byte, error) {
 /* FIXME KG
-func dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz) int {
 	FILE *fp;
 
 	strlcpy (result, "", resultsiz);
@@ -1747,7 +1743,8 @@ func dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz) int {
 
 	  return (-1);
 	}
-}
 */
+	return exec.Command(cmd).Output() // FIXME KG
+}
 
 /* end aprs_tt.c */
