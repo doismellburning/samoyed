@@ -1,21 +1,4 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2013, 2014, 2015  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+package direwolf
 
 /*------------------------------------------------------------------
  *
@@ -37,54 +20,46 @@
  *
  *---------------------------------------------------------------*/
 
-#define APRS_TT_C 1
-
-#include "direwolf.h"
-
-
 // TODO:  clean up terminolgy.  
 // "Message" has a specific meaning in APRS and this is not it.  
 // Touch Tone sequence should be appropriate.
 // What do we call the parts separated by * key?  Field.
 
+// #include "direwolf.h"
+// #include <stdlib.h>
+// #include <math.h>
+// #include <string.h>
+// #include <stdio.h>
+// #include <unistd.h>
+// #include <errno.h>
+// #include <ctype.h>
+// #include <assert.h>
+// #include "version.h"
+// #include "ax25_pad.h"
+// #include "hdlc_rec2.h"		/* for process_rec_frame */
+// #include "textcolor.h"
+// #include "aprs_tt.h"
+// #include "tt_text.h"
+// #include "tt_user.h"
+// #include "symbols.h"
+// #include "latlong.h"
+// #include "dlq.h"
+// #include "demod.h"          /* for alevel_t & demod_get_audio_level() */
+// #include "tq.h"
+// // geotranz
+// #include "utm.h"
+// #include "mgrs.h"
+// #include "usng.h"
+// #include "error_string.h"
+import "C"
 
-#include <stdlib.h>
-#include <math.h>
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <errno.h>
-
-#include <ctype.h>
-#include <assert.h>
-
-#include "version.h"
-#include "ax25_pad.h"
-#include "hdlc_rec2.h"		/* for process_rec_frame */
-#include "textcolor.h"
-#include "aprs_tt.h"
-#include "tt_text.h"
-#include "tt_user.h"
-#include "symbols.h"
-#include "latlong.h"
-#include "dlq.h"
-#include "demod.h"          /* for alevel_t & demod_get_audio_level() */
-#include "tq.h"
-
-
-
-
-// geotranz
-
-#include "utm.h"
-#include "mgrs.h"
-#include "usng.h"
-#include "error_string.h"
+import (
+)
 
 /* Convert between degrees and radians. */
 
-#define D2R(d) ((d) * M_PI / 180.)
-#define R2D(r) ((r) * 180. / M_PI)
+// FIXME KG #define D2R(d) ((d) * M_PI / 180.)
+// FIXME KG #define R2D(r) ((r) * 180. / M_PI)
 
 
 /*
@@ -93,26 +68,12 @@
  * on multiple channels at the same time.
  */
 
-#define MAX_MSG_LEN 100
+var msg_str[MAX_RADIO_CHANS]string
 
-static char msg_str[MAX_RADIO_CHANS][MAX_MSG_LEN+1];
-static int msg_len[MAX_RADIO_CHANS];
-
-static int parse_fields (char *msg);
-static int parse_callsign (char *e);
-static int parse_object_name (char *e);
-static int parse_symbol (char *e);
-static int parse_aprstt3_call (char *e);
-static int parse_location (char *e);
-static int parse_comment (char *e);
-static int expand_macro (char *e);
-static void raw_tt_data_to_app (int chan, char *msg);
-static int find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize);
-
-static int tt_debug = 0;
+var tt_debug = 0;
 
 // Replacement for the TT_MAIN define, to work better with Go, and try to reduce some complexity
-int running_TT_MAIN_tests = 0;
+var running_TT_MAIN_tests = false
 
 
 /*------------------------------------------------------------------
@@ -133,18 +94,19 @@ int running_TT_MAIN_tests = 0;
  *
  *----------------------------------------------------------------*/
 
-static struct tt_config_s tt_config;
+// FIXME KG static struct tt_config_s tt_config;
 
-#define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
+// FIXME KG #define NUM_TEST_CONFIG (sizeof(test_config) / sizeof (struct ttloc_s))
+/* FIXME KG
 static struct ttloc_s test_config[] = {
 
 	{ TTLOC_POINT, "B01", .point.lat = 12.25, .point.lon = 56.25 },
 	{ TTLOC_POINT, "B988", .point.lat = 12.50, .point.lon = 56.50 },
 
-	{ TTLOC_VECTOR, "B5bbbdddd", .vector.lat = 53., .vector.lon = -1., .vector.scale = 1000. },  /* km units */
+	{ TTLOC_VECTOR, "B5bbbdddd", .vector.lat = 53., .vector.lon = -1., .vector.scale = 1000. },  // km units
 
-	/* Hilltop Tower http://www.aprs.org/aprs-jamboree-2013.html */
-	{ TTLOC_VECTOR, "B5bbbddd", .vector.lat = 37+55.37/60., .vector.lon = -(81+7.86/60.), .vector.scale = 16.09344 },   /* .01 mile units */
+	// Hilltop Tower http://www.aprs.org/aprs-jamboree-2013.html
+	{ TTLOC_VECTOR, "B5bbbddd", .vector.lat = 37+55.37/60., .vector.lon = -(81+7.86/60.), .vector.scale = 16.09344 },   // .01 mile units 
 
 	{ TTLOC_GRID, "B2xxyy", .grid.lat0 = 12.00, .grid.lon0 = 56.00, 
 				.grid.lat9 = 12.99, .grid.lon9 = 56.99 },
@@ -158,32 +120,22 @@ static struct ttloc_s test_config[] = {
 	{ TTLOC_MACRO, "xxyyy", .macro.definition = "B9xx*AB166*AA2B4C5B3B0Ayyy" },
 	{ TTLOC_MACRO, "xxxxzzzzzzzzzz", .macro.definition = "BAxxxx*ACzzzzzzzzzz" },
 }; 
+*/
 
-
-void aprs_tt_init (struct tt_config_s *p, int debug)
-{
-	int c;
+func aprs_tt_init (p *C.struct_tt_config_s, debug C.int) {
 	tt_debug = debug;
 
-	if (p == NULL) {
+	if (p == nil) {
 		/* For unit testing. */
-
-		memset (&tt_config, 0, sizeof(struct tt_config_s));
+		// FIXME KG memset (&tt_config, 0, sizeof(struct tt_config_s));
 		tt_config.ttloc_size = NUM_TEST_CONFIG;
 		tt_config.ttloc_ptr = test_config;
 		tt_config.ttloc_len = NUM_TEST_CONFIG;
-
 		/* Don't care about xmit timing or corral here. */
 	} else {
 		// TODO: Keep ptr instead of making a copy.
-		memcpy (&tt_config, p, sizeof(struct tt_config_s));
+		// FIXME KG memcpy (&tt_config, p, sizeof(struct tt_config_s));
 	}
-
-	for (c=0; c<MAX_RADIO_CHANS; c++) {
-	  msg_len[c] = 0;
-	  msg_str[c][0] = '\0';
-	}
-
 }
 
 
@@ -214,31 +166,25 @@ void aprs_tt_init (struct tt_config_s *p, int debug)
  *
  *----------------------------------------------------------------*/
 
-void aprs_tt_button (int chan, char button)
-{
-	static int poll_period = 0;
+func aprs_tt_button (channel int, button rune) {
+	// FIXME KG static int poll_period = 0;
 
-	assert (chan >= 0 && chan < MAX_RADIO_CHANS);
+	// FIXME KG assert (channel >= 0 && channel < MAX_RADIO_CHANS);
 
 
 	//if (button != '.') {
-	//  dw_printf ("aprs_tt_button (%d, '%c')\n", chan, button);
+	//  dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
 	//}
 
 
 // TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
 
 	if (button == '$') {
-
 /* Timeout reset. */
-
-	  msg_len[chan] = 0;
-	  msg_str[chan][0] = '\0';
-	}
-	else if (button != '.' && button != ' ') {
-	  if (msg_len[chan] < MAX_MSG_LEN) {
-	    msg_str[chan][msg_len[chan]++] = button;
-	    msg_str[chan][msg_len[chan]] = '\0';
+	  msg_str[channel] = ""
+	} else if (button != '.' && button != ' ') {
+	  if (msg_len[channel] < MAX_MSG_LEN) {
+	    msg_str[channel] += button;
 	  }
 	  if (button == '#') {
 
@@ -247,14 +193,11 @@ void aprs_tt_button (int chan, char button)
  * This way they are all processed by the common receive thread
  * rather than the thread associated with the particular audio device.
  */
-	    raw_tt_data_to_app (chan, msg_str[chan]);
+	    C.raw_tt_data_to_app (channel, msg_str[channel]);
 
-	    msg_len[chan] = 0;
-	    msg_str[chan][0] = '\0';
+	    msg_str[channel] = ""
 	  }
-	}
-	else {
-
+	} else {
 /* 
  * Idle time. Poll occasionally for processing. 
  * Timing would be off we we are listening to more than
@@ -262,7 +205,7 @@ void aprs_tt_button (int chan, char button)
  * in the TTOBJ command. 
  */
 
-	  if (chan == tt_config.obj_recv_chan) {	  
+	  if (channel == tt_config.obj_recv_chan) {	  
 	    poll_period++;
 	    if (poll_period >= 39) {
 	      poll_period = 0;
@@ -280,7 +223,7 @@ void aprs_tt_button (int chan, char button)
  * Purpose:     Process complete received touch tone sequence
  *		terminated by #.
  *
- * Inputs:      chan		- Audio channel it came from.
+ * Inputs:      channel		- Audio channel it came from.
  *
  *		msg		- String of DTMF buttons.
  *				  # should be the final character.
@@ -302,7 +245,7 @@ void aprs_tt_button (int chan, char button)
  *
  *----------------------------------------------------------------*/
 
-char m_callsign[20];	/* really object name */
+// FIXME KG char m_callsign[20];	/* really object name */
 
 /*
  * Standard APRStt has symbol code 'A' (box) with overlay of 0-9, A-Z. 
@@ -313,6 +256,7 @@ char m_callsign[20];	/* really object name */
  *	Alternate table symbol code, overlay of 0-9, A-Z.
  */
 
+ /* FIXME KG
 char m_symtab_or_overlay;
 char m_symbol_code;		// Default 'A'
 
@@ -326,25 +270,29 @@ static char m_ctcss[8];
 static char m_mic_e;
 char m_dao[6];
 int m_ssid;			// Default 12 for APRStt user.
+*/
 
 
 
-void aprs_tt_sequence (int chan, char *msg)
-{
-	int err;
+func aprs_tt_sequence (channel int, msg string) {
+	// FIXME KG int err;
 
 
+/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("\n\"%s\"\n", msg);
 #endif
+*/
 
 /* 
  * Discard empty message. 
  * In case # is there as optional start. 
  */
 
-	if (msg[0] == '#') return;
+	if (msg[0] == '#') {
+		return;
+	}
 
 /*
  * The parse functions will fill these in. 
@@ -368,11 +316,13 @@ void aprs_tt_sequence (int chan, char *msg)
  */
 	err = parse_fields (msg);
 
+	/* TODO KG
 #if defined(DEBUG)
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("callsign=\"%s\", ssid=%d, symbol=\"%c%c\", freq=\"%s\", ctcss=\"%s\", comment=\"%s\", lat=%.4f, lon=%.4f, dao=\"%s\"\n",
 		m_callsign, m_ssid, m_symtab_or_overlay, m_symbol_code, m_freq, m_ctcss, m_comment, m_latitude, m_longitude, m_dao);
 #endif
+*/
 
 	if (running_TT_MAIN_tests) {
 		return;
@@ -397,7 +347,7 @@ void aprs_tt_sequence (int chan, char *msg)
  * It might be useful to run it for error cases as well but we currently
  * don't pass in the success / failure code to know the difference.
  */
-	char script_response[1000];
+	var script_response [1000]C.char
 
 	strlcpy (script_response, "", sizeof(script_response));
 
@@ -415,24 +365,26 @@ void aprs_tt_sequence (int chan, char *msg)
  * Anything from script, above, will override other predefined responses.
  */
 
-	char audible_response[sizeof(script_response) + 16];
+	var audible_response [sizeof(script_response) + 16]C.char
 
+	var response = tt_config.response[err].mtext
+	if C.strlen(script_response) > 0 {
+		response = script_response
+	}
 	snprintf (audible_response, sizeof(audible_response), 
 					"APRSTT>%s:%s", 
 					tt_config.response[err].method,
-					(strlen(script_response) > 0) ? script_response : tt_config.response[err].mtext);
+					response);
 
-	packet_t pp;
+	var pp = C.ax25_from_text (audible_response, 0);
 
-	pp = ax25_from_text (audible_response, 0);
-
-	if (pp == NULL) {
+	if (pp == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Internal error. Couldn't make frame from \"%s\"\n", audible_response);
 	  return;
 	}
 
-	tq_append (chan, TQ_PRIO_0_HI, pp);
+	tq_append (channel, TQ_PRIO_0_HI, pp);
 } /* end aprs_tt_sequence */
 
 
@@ -462,103 +414,87 @@ void aprs_tt_sequence (int chan, char *msg)
  *
  *----------------------------------------------------------------*/
 
-static int parse_fields (char *msg)
-{
+func parse_fields (msg string) int {
+	/* FIXME KG
 	char stemp[MAX_MSG_LEN+1];
-	char *e;
 	char *save;
 	int err;
+	*/
 
 
-	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("parse_fields (%s).\n", msg);
+	// text_color_set(DW_COLOR_DEBUG);
+	// dw_printf ("parse_fields (%s).\n", msg);
 
 // Make a copy of msg because strtok corrupts the original.
 // While we are at it, remove any blanks.
 // This should not happen with DTMF reception but could happen
 // in manually crafted strings for testing.
 
-	int n = 0;
+	var n = 0;
+	/* FIXME KG
 	for (char *m = msg; *m != '\0' && n < sizeof(stemp)-1; m++) {
 	  if (*m != ' ') {
 	    stemp[n++] = *m;
 	  }
 	}
 	stemp[n] = '\0';
+	*/
 
-	e = strtok_r (stemp, "*#", &save);
-	while (e != NULL) {
+	var e = strtok_r (stemp, "*#", &save);
+	for e != nil {
 
 	  //text_color_set(DW_COLOR_DEBUG);
 	  //dw_printf ("parse_fields () field = %s\n", e);
 
 	  switch (*e) {
-
 	    case 'A': 
-	      
 	      switch (e[1]) {
-
 	        case 'A':			/* AA object-name */
 	          err = parse_object_name (e);
-	          if (err != 0) return (err);
-	          break;
-
+	          if (err != 0) {
+				  return (err);
+			  }
 	        case 'B':			/* AB symbol */
 	          err = parse_symbol (e);
-	          if (err != 0) return (err);
-	          break;
-
+	          if (err != 0) {
+				  return (err);
+			  }
 	        case 'C':			/* AC new-style-callsign */
-
 	          err = parse_aprstt3_call (e);
-	          if (err != 0) return (err);
-	          break;
-
+	          if (err != 0) {
+				  return (err);
+			  }
 	        default:			/* Traditional style call or suffix */
 	          err = parse_callsign (e);
-	          if (err != 0) return (err);
-	          break;
+	          if (err != 0) {
+				  return (err);
+			  }
 	      }
-	      break;
-
 	    case 'B': 
 	      err = parse_location (e);
-	      if (err != 0) return (err);
-	      break;
-
+	      if (err != 0) {
+			  return (err);
+		  }
 	    case 'C': 
 	      err = parse_comment (e);
-	      if (err != 0) return (err);
-	      break;
-
-	    case '0': 
-	    case '1': 
-	    case '2': 
-	    case '3': 
-	    case '4': 
-	    case '5': 
-	    case '6': 
-	    case '7': 
-	    case '8': 
-	    case '9': 
+	      if (err != 0) {
+			  return (err);
+		  }
+	    case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9': 
 	      err = expand_macro (e);
-	      if (err != 0) return (err);
-	      break;
-
-	    case '\0':
+	      if (err != 0) {
+			  return (err);
+		  }
+	    // FIXME KG case '\0':
 	      /* Empty field.  Just ignore it. */
 	      /* This would happen if someone uses a leading *. */
-	      break;
-
 	    default:
-
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Field does not start with A, B, C, or digit: \"%s\"\n", e);
 	      return (TT_ERROR_D_MSG);
-
 	  }
 	
-	  e = strtok_r (NULL, "*#", &save);
+	  e = strtok_r (nil, "*#", &save);
 	}
 
 	//text_color_set(DW_COLOR_DEBUG);
@@ -589,26 +525,24 @@ static int parse_fields (char *msg)
  *
  *----------------------------------------------------------------*/
 
-#define VALSTRSIZE 20
+// FIXME KG #define VALSTRSIZE 20
 
-static int expand_macro (char *e) 
-{
+func expand_macro (e string) int {
+	/* FIXME KG
 	//int len;
-	int ipat;
 	char xstr[VALSTRSIZE], ystr[VALSTRSIZE], zstr[VALSTRSIZE], bstr[VALSTRSIZE], dstr[VALSTRSIZE];
 	char stemp[MAX_MSG_LEN+1];
 	char *d;
-
+	*/
 
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("Macro tone sequence: '%s'\n", e);
 
 	//len = strlen(e);
 
-	ipat = find_ttloc_match (e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE);
+	var ipat = find_ttloc_match (e, xstr, ystr, zstr, bstr, dstr, VALSTRSIZE);
 
 	if (ipat >= 0) {
-
 	  // Why did we print b & d here?
 	  // Documentation says only x, y, z can be used with macros.
 	  // Only those 3 are processed below.
@@ -618,7 +552,7 @@ static int expand_macro (char *e)
 
 	  dw_printf ("Replace with:        '%s'\n", tt_config.ttloc_ptr[ipat].macro.definition);
 
-	  if (tt_config.ttloc_ptr[ipat].type != TTLOC_MACRO) {
+	  if (tt_config.ttloc_ptr[ipat]._type != TTLOC_MACRO) {
 
 	     /* Found match to a different type.  Really shouldn't be here. */
 	     /* Print internal error message... */
@@ -633,9 +567,9 @@ static int expand_macro (char *e)
 	  
 	  strlcpy (stemp, "", sizeof(stemp));
 
-	  for (d = tt_config.ttloc_ptr[ipat].macro.definition; *d != '\0'; d++) {
+	  for d = tt_config.ttloc_ptr[ipat].macro.definition; *d != 0; d++ {
 
-	    while (( *d == 'x' || *d == 'y' || *d == 'z') && *d == d[1]) {
+	    for ( *d == 'x' || *d == 'y' || *d == 'z') && *d == d[1] {
 	      /* Collapse adjacent matching substitution characters. */
 	      d++;
 	    }
@@ -652,10 +586,12 @@ static int expand_macro (char *e)
 	        break;
 	      default:
 		{
+			/* FIXME KG
 	        char c1[2];
 	        c1[0] = *d;
 	        c1[1] = '\0';
 	        strlcat (stemp, c1, sizeof(stemp)); 
+			*/
 		}
 		break;
 	    }
@@ -666,11 +602,7 @@ static int expand_macro (char *e)
 
 	  dw_printf ("After substitution:  '%s'\n", stemp);
 	  return (parse_fields (stemp));
-	}
-
-	else {
-
-
+	} else {
 	  /* Send reject sound. */
 	  /* Does not match any macro definitions. */
 	  text_color_set(DW_COLOR_ERROR);
@@ -717,21 +649,19 @@ static int expand_macro (char *e)
  *
  *----------------------------------------------------------------*/
 
-static int checksum_not_ok (char *str, int len, char found)
-{
+func checksum_not_ok (char *str, int length, char found) int {
+	/* FIXME KG
 	int i;
-	int sum;
 	char expected;
+	*/
 
-	sum = 0;
-	for (i=0; i<len; i++) {
+	var sum = 0;
+	for i:=0; i<length; i++ {
 	  if (isdigit(str[i])) {
 	    sum += str[i] - '0';
-	  }
-	  else if (str[i] >= 'A' && str[i] <= 'D') {
+	  } else if (str[i] >= 'A' && str[i] <= 'D') {
 	    sum += str[i] - 'A' + 10;
-	  }
-	  else {
+	  } else {
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", str[i]);
 	  }
@@ -740,17 +670,17 @@ static int checksum_not_ok (char *str, int len, char found)
 
 	if (expected != found) {
 	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", len, str, expected, found);
+	    dw_printf ("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found);
 	    return (TT_ERROR_BAD_CHECKSUM);
 	}
 	return (0);
 }
 
 
-static int parse_callsign (char *e)
-{
-	int len;
+func parse_callsign (e string) int {
+	/* FIXME KG
 	char tttemp[40], stemp[30];
+	*/
 
 	if (tt_debug) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -759,13 +689,13 @@ static int parse_callsign (char *e)
 
 	assert (*e == 'A');
 
-	len = strlen(e);
+	length = strlen(e);
 
 /*
  * special case: 3 digit tactical call.
  */
 
-	if (len == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3])) {
+	if (length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3])) {
 	  strlcpy (m_callsign, e+1, sizeof(m_callsign));
 	  if (tt_debug) {
 	    text_color_set(DW_COLOR_DEBUG);
@@ -779,21 +709,21 @@ static int parse_callsign (char *e)
  * Another part of application will try to find corresponding full call.
  */
 
-	if ((len == 6 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5])) ||
-	    (len == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isupper(e[5]) && isdigit(e[6]))) {
+	if ((length == 6 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5])) ||
+	    (length == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isupper(e[5]) && isdigit(e[6]))) {
 
-	  int cs_err = checksum_not_ok (e+1, len-2, e[len-1]);
+	  var cs_err = checksum_not_ok (e+1, length-2, e[length-1]);
 
 	  if (cs_err != 0) {
 	    return (cs_err);
 	  }
 
 	  memcpy (m_callsign, e+1, 3);
-	  m_callsign[3] = '\0';
+	  // FIXME KG m_callsign[3] = '\0';
 	
-	  if (len == 7) {
-	    tttemp[0] = e[len-3];
-	    tttemp[1] = e[len-2];
+	  if (length == 7) {
+	    tttemp[0] = e[length-3];
+	    tttemp[1] = e[length-2];
 	    tttemp[2] = '\0';
 	    tt_two_key_to_text (tttemp, 0, stemp);
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
@@ -801,16 +731,16 @@ static int parse_callsign (char *e)
 	    if (tt_debug) {
 	      text_color_set(DW_COLOR_DEBUG);
 	      dw_printf ("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[len-1]);
+				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
 	    }
 	  }
 	  else {
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	    m_symtab_or_overlay = e[len-2];
+	    m_symtab_or_overlay = e[length-2];
 	    if (tt_debug) {
 	      text_color_set(DW_COLOR_DEBUG);
 	      dw_printf ("Three digit abbreviation2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[len-1]);
+				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
 	    }
 	  }
 	  return (0);
@@ -820,21 +750,21 @@ static int parse_callsign (char *e)
  * Callsign in two key format.
  */
 
-	if (len >= 7 && len <= 24) {
+	if (length >= 7 && length <= 24) {
 
-	  int cs_err = checksum_not_ok (e+1, len-2, e[len-1]);
+	  int cs_err = checksum_not_ok (e+1, length-2, e[length-1]);
 
 	  if (cs_err != 0) {
 	    return (cs_err);
 	  }
 	
-	  if (isupper(e[len-2])) {
-	    memcpy (tttemp, e+1, len-4);
-	    tttemp[len-4] = '\0';
+	  if (isupper(e[length-2])) {
+	    memcpy (tttemp, e+1, length-4);
+	    tttemp[length-4] = '\0';
 	    tt_two_key_to_text (tttemp, 0, m_callsign);
 
-	    tttemp[0] = e[len-3];
-	    tttemp[1] = e[len-2];
+	    tttemp[0] = e[length-3];
+	    tttemp[1] = e[length-2];
 	    tttemp[2] = '\0';
 	    tt_two_key_to_text (tttemp, 0, stemp);
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
@@ -842,20 +772,20 @@ static int parse_callsign (char *e)
 	    if (tt_debug) {
 	      text_color_set(DW_COLOR_DEBUG);
 	      dw_printf ("Callsign in two key format1: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[len-1]);
+				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
 	    }
 	  }
 	  else {
-	    memcpy (tttemp, e+1, len-3);
-	    tttemp[len-3] = '\0';
+	    memcpy (tttemp, e+1, length-3);
+	    tttemp[length-3] = '\0';
 	    tt_two_key_to_text (tttemp, 0, m_callsign);
 
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
-	    m_symtab_or_overlay = e[len-2];
+	    m_symtab_or_overlay = e[length-2];
 	    if (tt_debug) {
 	      text_color_set(DW_COLOR_DEBUG);
 	      dw_printf ("Callsign in two key format2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-				m_callsign, m_symbol_code, m_symtab_or_overlay, e[len-1]);
+				m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1]);
 	    }
 	  }
 	  return (0);
@@ -892,7 +822,7 @@ static int parse_callsign (char *e)
 
 static int parse_object_name (char *e)
 {
-	int len;
+	int length;
 
 	if (tt_debug) {
 	  text_color_set(DW_COLOR_DEBUG);
@@ -902,13 +832,13 @@ static int parse_object_name (char *e)
 	assert (e[0] == 'A');
 	assert (e[1] == 'A');
 
-	len = strlen(e);
+	length = strlen(e);
 
 /* 
  * Object name in two key format.
  */
 
-	if (len >= 2 + 1 && len <= 30) {
+	if (length >= 2 + 1 && length <= 30) {
 
 	  if (tt_two_key_to_text (e+2, 0, m_callsign) == 0) {
 	    m_callsign[9] = '\0';  /* truncate to 9 */
@@ -965,7 +895,7 @@ static int parse_object_name (char *e)
 
 static int parse_symbol (char *e)
 {
-	int len;
+	int length;
 	char nstr[3];
 	int nn;
 	char stemp[10];
@@ -978,9 +908,9 @@ static int parse_symbol (char *e)
 	assert (e[0] == 'A');
 	assert (e[1] == 'B');
 
-	len = strlen(e);
+	length = strlength(e);
 
-	if (len >= 4 && len <= 10) {
+	if (length >= 4 && length <= 10) {
 
 	  nstr[0] = e[3];
 	  nstr[1] = e[4];
@@ -1019,7 +949,7 @@ static int parse_symbol (char *e)
 	      break;
 
 	    case '0':
-	      if (len >= 6) {
+	      if (length >= 6) {
 	        if (tt_two_key_to_text (e+5, 0, stemp) == 0) {
 	          m_symbol_code = 32 + nn;
 	          m_symtab_or_overlay = stemp[0];
@@ -1719,7 +1649,7 @@ static int parse_comment (char *e)
  *
  * Purpose:     Send raw touch tone data to application. 
  *
- * Inputs:      chan		- Channel where touch tone data heard.
+ * Inputs:      channel		- Channel where touch tone data heard.
  *		msg		- String of button pushes.
  *				  Normally ends with #.
  *
@@ -1740,7 +1670,7 @@ static int parse_comment (char *e)
  *
  *----------------------------------------------------------------*/
 
-static void raw_tt_data_to_app (int chan, char *msg)
+static void raw_tt_data_to_app (int channel, char *msg)
 {
 	char src[10], dest[10];
 	char raw_tt_msg[256];
@@ -1774,13 +1704,13 @@ static void raw_tt_data_to_app (int chan, char *msg)
  * This currently doesn't get displayed but we might want it someday.
  */
 
-	if (pp != NULL) {
+	if (pp != nil) {
 
-	  alevel = demod_get_audio_level (chan, 0);
+	  alevel = demod_get_audio_level (channel, 0);
 	  alevel.mark = -2;
 	  alevel.space = -2;
 
-	  dlq_rec_frame (chan, -1, 0, pp, alevel, 0, RETRY_NONE, "tt");
+	  dlq_rec_frame (channel, -1, 0, pp, alevel, 0, RETRY_NONE, "tt");
 	}
 	else {
 	  text_color_set(DW_COLOR_ERROR);
@@ -1825,12 +1755,12 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 	strlcpy (result, "", resultsiz);
 
 	fp = popen (cmd, "r");
-	if (fp != NULL) {
+	if (fp != nil) {
 	  int remaining = (int)resultsiz;
 	  char *pr = result;
 	  int err;
 
-	  while (remaining > 2 && fgets(pr, remaining, fp) != NULL) {
+	  for (remaining > 2 && fgets(pr, remaining, fp) != nil) {
 	    pr = result + strlen(result);
 	    remaining = (int)resultsiz - strlen(result);
 	  }
@@ -1856,7 +1786,7 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 
 	    if (oneline > 1) {
 	      pr = result + strlen(result) - 1;
-	      while (pr >= result && *pr == ' ') {
+	      for (pr >= result && *pr == ' ') {
 	        *pr = '\0';
 	        pr--;
 	      }
