@@ -26,17 +26,7 @@ package direwolf
 // #include "mgrs.h"
 // #include "usng.h"
 // #include "error_string.h"
-// extern int running_TT_MAIN_tests; // Replacement for the TT_MAIN define
 // // Expose some of the aprs_tt.c globals
-// extern char m_callsign[20];
-// extern char m_comment[200];
-// extern char m_dao[6];
-// extern char m_freq[12];
-// extern double m_latitude;
-// extern double m_longitude;
-// extern int m_ssid;
-// extern char m_symbol_code;
-// extern char m_symtab_or_overlay;
 import "C"
 
 import (
@@ -133,41 +123,39 @@ var ttTestCases = []ttTestCase{
 func check_result(t *testing.T, testCase ttTestCase) {
 	t.Helper()
 
-	var stemp [32]C.char
+	assert.Equal(t, testCase.callsign, m_callsign, testCase.toneseq)
 
-	assert.Equal(t, testCase.callsign, C.GoString(&C.m_callsign[0]), testCase.toneseq) //nolint:testifylint
+	assert.Equal(t, testCase.ssid, strconv.Itoa(m_ssid), testCase.toneseq)
 
-	assert.Equal(t, testCase.ssid, strconv.Itoa(int(C.m_ssid)), testCase.toneseq)
+	var stemp = fmt.Sprintf("%c%c", m_symtab_or_overlay, m_symbol_code)
+	assert.Equal(t, testCase.symbol, stemp, testCase.toneseq)
 
-	stemp[0] = C.m_symtab_or_overlay
-	stemp[1] = C.m_symbol_code
-	stemp[2] = C.char(0)
-	assert.Equal(t, testCase.symbol, C.GoString(&stemp[0]), testCase.toneseq) //nolint:testifylint
+	assert.Equal(t, testCase.freq, m_freq, testCase.toneseq)
 
-	assert.Equal(t, testCase.freq, C.GoString(&C.m_freq[0]), testCase.toneseq) //nolint:testifylint
+	assert.Equal(t, testCase.comment, m_comment, testCase.toneseq)
 
-	assert.Equal(t, testCase.comment, C.GoString(&C.m_comment[0]), testCase.toneseq) //nolint:testifylint
-
-	var latTmp = fmt.Sprintf("%.4f", float64(C.m_latitude))
+	var latTmp = fmt.Sprintf("%.4f", m_latitude)
 	assert.Equal(t, testCase.latitude, latTmp, testCase.toneseq)
 
-	var lonTmp = fmt.Sprintf("%.4f", float64(C.m_longitude))
+	var lonTmp = fmt.Sprintf("%.4f", m_longitude)
 	assert.Equal(t, testCase.longitude, lonTmp, testCase.toneseq)
 
-	assert.Equal(t, testCase.dao, C.GoString(&C.m_dao[0]), testCase.toneseq) //nolint:testifylint
+	assert.Equal(t, testCase.dao, string(m_dao[:]), testCase.toneseq)
 }
 
 func aprs_tt_test_main(t *testing.T) {
 	t.Helper()
 
-	C.running_TT_MAIN_tests = 1
+	running_TT_MAIN_tests = true
 
-	C.aprs_tt_init(nil, 0)
+	aprs_tt_init(nil, 0)
 
 	for testNum, testCase := range ttTestCases {
 		dw_printf("\nTest case %d: %s\n", testNum, testCase.toneseq)
 
-		C.aprs_tt_sequence(0, C.CString(testCase.toneseq))
+		aprs_tt_sequence(0, testCase.toneseq)
 		check_result(t, testCase)
 	}
+
+	running_TT_MAIN_tests = false
 }

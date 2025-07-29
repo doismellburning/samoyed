@@ -699,14 +699,13 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 
 	if bp.commentcmd != nil {
 		/* Run given command to get variable part of comment. */
-		var var_comment [C.AX25_MAX_INFO_LEN]C.char
-		var k = C.dw_run_cmd(bp.commentcmd, 2, &var_comment[0], C.ulong(len(var_comment)))
+		var var_comment, k = dw_run_cmd(C.GoString(bp.commentcmd), 2)
 
-		if k > 0 {
-			super_comment += C.GoString(&var_comment[0])
+		if k == nil {
+			super_comment += string(var_comment)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("xBEACON, config file line %d, COMMENTCMD failure.\n", bp.lineno)
+			dw_printf("xBEACON, config file line %d, COMMENTCMD failure: %s.\n", bp.lineno, k)
 		}
 	}
 
@@ -804,14 +803,13 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 		} else if bp.custom_infocmd != nil {
 			/* Run given command to obtain the info part for packet. */
 
-			var info_part [C.AX25_MAX_INFO_LEN]C.char
-			var k = C.dw_run_cmd(bp.custom_infocmd, 2, &info_part[0], C.ulong(len(info_part)))
+			var info_part, k = dw_run_cmd(C.GoString(bp.custom_infocmd), 2)
 
-			if k > 0 {
-				beacon_text += C.GoString(&info_part[0])
+			if k == nil {
+				beacon_text += string(info_part)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("CBEACON, config file line %d, INFOCMD failure.\n", bp.lineno)
+				dw_printf("CBEACON, config file line %d, INFOCMD failure: %s.\n", bp.lineno, k)
 				beacon_text = "" // abort!
 			}
 		} else {
