@@ -634,13 +634,9 @@ func expand_macro(e string) int {
  *
  *----------------------------------------------------------------*/
 
-func checksum_not_ok(char *str, int length, char found) int {
-	/* FIXME KG
-	int i;
-	char expected;
-	*/
-
+func checksum_not_ok(str string, length int, found rune) int {
 	var sum = 0
+
 	for i := 0; i < length; i++ {
 		if isdigit(str[i]) {
 			sum += str[i] - '0'
@@ -651,13 +647,15 @@ func checksum_not_ok(char *str, int length, char found) int {
 			dw_printf("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", str[i])
 		}
 	}
-	expected = '0' + (sum % 10)
+
+	var expected = '0' + (sum % 10)
 
 	if expected != found {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
 		return (TT_ERROR_BAD_CHECKSUM)
 	}
+
 	return (0)
 }
 
@@ -869,7 +867,7 @@ func parse_object_name(e string) int {
  *
  *----------------------------------------------------------------*/
 
-func parse_symbol(char *e) int {
+func parse_symbol(e string) int {
 	/* FIXME KG
 	char nstr[3];
 	int nn;
@@ -881,10 +879,10 @@ func parse_symbol(char *e) int {
 		dw_printf("APRStt parse symbol (starts with AB): \"%s\"\n", e)
 	}
 
-	assert(e[0] == 'A')
-	assert(e[1] == 'B')
+	// FIXME KG assert(e[0] == 'A')
+	// FIXME KG assert(e[1] == 'B')
 
-	var length = strlength(e)
+	var length = len(e)
 
 	if length >= 4 && length <= 10 {
 
@@ -1402,7 +1400,7 @@ func parse_location(e string) int {
  *
  *----------------------------------------------------------------*/
 
-func find_ttloc_match(char *e, char *xstr, char *ystr, char *zstr, char *bstr, char *dstr, size_t valstrsize) int {
+func find_ttloc_match(e string, xstr, ystr, zstr, bstr, dstr string, valstrsize size_t) int {
 	// FIXME KG int ipat;	/* Index into patterns from configuration file */
 	// FIXME KG int len;	/* Length of pattern we are trying to match. */
 	// FIXME KG int match;
