@@ -44,6 +44,9 @@ const TQ_PRIO_0_HI = C.TQ_PRIO_0_HI
 const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
 const AX25_MAX_ADDR_LEN = C.AX25_MAX_ADDR_LEN
+const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
+const AX25_REPEATER_1 = C.AX25_REPEATER_1
+const AX25_SOURCE = C.AX25_SOURCE
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
