@@ -187,7 +187,7 @@ func aprs_tt_button(channel int, button rune) {
 			 * This way they are all processed by the common receive thread
 			 * rather than the thread associated with the particular audio device.
 			 */
-			C.raw_tt_data_to_app(channel, msg_str[channel])
+			raw_tt_data_to_app(channel, msg_str[channel])
 
 			msg_str[channel] = ""
 		}
