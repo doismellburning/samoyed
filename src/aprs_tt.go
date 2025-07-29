@@ -432,12 +432,12 @@ func parse_fields (msg string) int {
 
 	var n = 0;
 	/* FIXME KG
-	for (char *m = msg; *m != '\0' && n < sizeof(stemp)-1; m++) {
+	for (char *m = msg; *m != 0 && n < sizeof(stemp)-1; m++) {
 	  if (*m != ' ') {
 	    stemp[n++] = *m;
 	  }
 	}
-	stemp[n] = '\0';
+	stemp[n] = 0;
 	*/
 
 	var e = strtok_r (stemp, "*#", &save);
@@ -485,7 +485,7 @@ func parse_fields (msg string) int {
 	      if (err != 0) {
 			  return (err);
 		  }
-	    // FIXME KG case '\0':
+	    // FIXME KG case 0:
 	      /* Empty field.  Just ignore it. */
 	      /* This would happen if someone uses a leading *. */
 	    default:
@@ -589,7 +589,7 @@ func expand_macro (e string) int {
 			/* FIXME KG
 	        char c1[2];
 	        c1[0] = *d;
-	        c1[1] = '\0';
+	        c1[1] = 0;
 	        strlcat (stemp, c1, sizeof(stemp)); 
 			*/
 		}
@@ -719,7 +719,7 @@ func parse_callsign (e string) int {
 	  }
 
 	  memcpy (m_callsign, e+1, 3);
-	  // FIXME KG m_callsign[3] = '\0';
+	  // FIXME KG m_callsign[3] = 0;
 	
 	  if (length == 7) {
 	    tttemp[0] = e[length-3];
@@ -764,7 +764,7 @@ func parse_callsign (e string) int {
 
 	    tttemp[0] = e[length-3];
 	    tttemp[1] = e[length-2];
-	    tttemp[2] = '\0';
+	    tttemp[2] = 0;
 	    tt_two_key_to_text (tttemp, 0, stemp);
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
 	    m_symtab_or_overlay = stemp[0];
@@ -775,7 +775,7 @@ func parse_callsign (e string) int {
 	    }
 	  } else {
 	    memcpy (tttemp, e+1, length-3);
-	    tttemp[length-3] = '\0';
+	    tttemp[length-3] = 0;
 	    tt_two_key_to_text (tttemp, 0, m_callsign);
 
 	    m_symbol_code = APRSTT_DEFAULT_SYMBOL;
@@ -837,7 +837,7 @@ func parse_object_name (e string) int {
 	if (length >= 2 + 1 && length <= 30) {
 
 	  if (tt_two_key_to_text (e+2, 0, m_callsign) == 0) {
-	    m_callsign[9] = '\0';  /* truncate to 9 */
+	    m_callsign[9] = 0;  /* truncate to 9 */
 	    m_ssid = 0;		/* No ssid for object name */
 	    if (tt_debug) {
 	      text_color_set(DW_COLOR_DEBUG);
@@ -910,7 +910,7 @@ func parse_symbol (char *e) int {
 
 	  nstr[0] = e[3];
 	  nstr[1] = e[4];
-	  nstr[2] = '\0';
+	  nstr[2] = 0;
 
 	  nn = atoi (nstr);
 	  if (nn < 1) {
@@ -1452,7 +1452,7 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 	    strlcpy (bstr, "", valstrsize);
 	    strlcpy (dstr, "", valstrsize);
 
-	    for (k=0; k<length; k++) {
+	    for k=0; k<length; k++ {
 	      mc = tt_config.ttloc_ptr[ipat].pattern[k];
 	      switch (mc) {
 
@@ -1478,9 +1478,9 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 
 		case 'x':
 		   if (isdigit(e[k])) {
-	             char stemp[2];
+	             var stemp[2] C.char
 		     stemp[0] = e[k];
-		     stemp[1] = '\0';
+		     stemp[1] = 0;
 		     strlcat (xstr, stemp, valstrsize);
 		   } else {
 		     match = 0;
@@ -1489,9 +1489,9 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 
 		case 'y':
 		   if (isdigit(e[k])) {
-	             char stemp[2];
+	             var stemp [2]C.char;
 		     stemp[0] = e[k];
-		     stemp[1] = '\0';
+		     stemp[1] = 0;
 		     strlcat (ystr, stemp, valstrsize);
 		   } else {
 		     match = 0;
@@ -1500,9 +1500,9 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 
 		case 'z':
 		   if (isdigit(e[k])) {
-	             char stemp[2];
+	             var stemp [2]C.char;
 		     stemp[0] = e[k];
-		     stemp[1] = '\0';
+		     stemp[1] = 0;
 		     strlcat (zstr, stemp, valstrsize);
 		   } else {
 		     match = 0;
@@ -1511,9 +1511,9 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 
 		case 'b':
 		   if (isdigit(e[k])) {
-	             char stemp[2];
+	             var stemp [2]C.char;
 		     stemp[0] = e[k];
-		     stemp[1] = '\0';
+		     stemp[1] = 0;
 		     strlcat (bstr, stemp, valstrsize);
 		   } else {
 		     match = 0;
@@ -1522,9 +1522,9 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
 
 		case 'd':
 		   if (isdigit(e[k])) {
-	             char stemp[2];
+	             var stemp [2]C.char;
 		     stemp[0] = e[k];
-		     stemp[1] = '\0';
+		     stemp[1] = 0;
 		     strlcat (dstr, stemp, valstrsize);
 		   } else {
 		     match = 0;
@@ -1583,25 +1583,22 @@ func find_ttloc_match (char *e, char *xstr, char *ystr, char *zstr, char *bstr, 
  *
  *----------------------------------------------------------------*/
 
-static int parse_comment (char *e)
-{
-	int len;
+func parse_comment (e string) int {
+	// FIXME KG assert (*e == 'C');
 
-	assert (*e == 'C');
-
-	len = strlen(e);
+	var length = strlen(e);
 
 	if (e[1] == 'A') {
 	  tt_ascii2d_to_text (e+2, 0, m_comment);
 	  return (0);
 	}
 
-	if (len == 2 && isdigit(e[1])) {
+	if (length == 2 && isdigit(e[1])) {
 	  m_mic_e = e[1];
 	  return (0);
 	}
 
-	if (len == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5]) && isdigit(e[6])) {
+	if (length == 7 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3]) && isdigit(e[4]) && isdigit(e[5]) && isdigit(e[6])) {
 	  m_freq[0] = e[1];
 	  m_freq[1] = e[2];
 	  m_freq[2] = e[3];
@@ -1612,11 +1609,11 @@ static int parse_comment (char *e)
 	  m_freq[7] = 'M';
 	  m_freq[8] = 'H';
 	  m_freq[9] = 'z';
-	  m_freq[10] = '\0';
+	  m_freq[10] = 0;
 	  return (0);
 	}
 
-	if (len == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3])) {
+	if (length == 4 && isdigit(e[1]) && isdigit(e[2]) && isdigit(e[3])) {
 	  strlcpy (m_ctcss, e+1, sizeof(m_ctcss));
 	  return (0);
 	}
@@ -1760,7 +1757,7 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 	  // take out any newline characters.
 	
 	  if (oneline) {
-	    for (pr = result; *pr != '\0'; pr++) {
+	    for (pr = result; *pr != 0; pr++) {
 	      if (*pr == '\r' || *pr == '\n' || *pr == '\t') {
 	        *pr = ' ';
 	      }
@@ -1769,7 +1766,7 @@ int dw_run_cmd (char *cmd, int oneline, char *result, size_t resultsiz)
 	    if (oneline > 1) {
 	      pr = result + strlen(result) - 1;
 	      for (pr >= result && *pr == ' ') {
-	        *pr = '\0';
+	        *pr = 0;
 	        pr--;
 	      }
 	    }
