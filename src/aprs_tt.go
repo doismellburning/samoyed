@@ -1624,7 +1624,6 @@ func raw_tt_data_to_app(channel int, msg string) {
 	/*
 		char src[10], dest[10];
 		char raw_tt_msg[256];
-		alevel_t alevel;
 	*/
 
 	// Set source and dest to something valid to keep rest of processing happy.
@@ -1653,8 +1652,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 	 */
 
 	if pp != nil {
-
-		alevel = demod_get_audio_level(channel, 0)
+		var alevel = demod_get_audio_level(channel, 0)
 		alevel.mark = -2
 		alevel.space = -2
 
