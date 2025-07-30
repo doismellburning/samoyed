@@ -399,7 +399,6 @@ func parse_fields(msg string) int {
 	/* FIXME KG
 	char stemp[MAX_MSG_LEN+1];
 	char *save;
-	int err;
 	*/
 
 	// text_color_set(DW_COLOR_DEBUG);
@@ -421,6 +420,7 @@ func parse_fields(msg string) int {
 	*/
 
 	var e = strtok_r(stemp, "*#", &save)
+	var err int
 	for e != nil {
 
 		//text_color_set(DW_COLOR_DEBUG);
