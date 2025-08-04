@@ -13,6 +13,7 @@ import "C"
 
 import (
 	"fmt"
+	"math"
 	"os"
 )
 
@@ -114,4 +115,12 @@ var retry_text = []string{
 	"TRIPLE",
 	"TWO_SEP",
 	"PASSALL",
+}
+
+func D2R(d float64) float64 {
+	return d * math.Pi / 180
+}
+
+func R2D(r float64) float64 {
+	return r * 180 / math.Pi
 }
