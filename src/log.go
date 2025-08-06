@@ -36,9 +36,11 @@ package direwolf
 import "C"
 
 import (
+	"encoding/csv"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -77,8 +79,6 @@ var g_log_fp *os.File
 var g_open_fname string
 
 func log_init(daily_names bool, path string) {
-	// FIXME KG struct stat st;
-
 	g_daily_names = daily_names
 	g_log_path = ""
 	g_log_fp = nil
@@ -339,14 +339,20 @@ func log_write(channel int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t
 			stone = fmt.Sprintf("D%03o", A.g_dcs)
 		}
 
-		// FIXME KG CSV
-		fmt.Fprintf(g_log_fp, "%d,%d,%s,%s,%s,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
-			channel, now.Unix(), itime,
-			C.GoString(&A.g_src[0]), heard, alevel_text, int(retries), sdti,
+		var w = csv.NewWriter(g_log_fp)
+		w.Write([]string{
+			strconv.Itoa(channel), strconv.Itoa(int(now.Unix())), itime,
+			C.GoString(&A.g_src[0]), heard, alevel_text, strconv.Itoa(int(retries)), sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt,
 			sfreq, soffs, stone,
-			smfr, sstatus, stelemetry, scomment)
+			smfr, sstatus, stelemetry, scomment,
+		})
+		w.Flush()
+
+		if err := w.Error(); err != nil {
+			dw_printf("CSV write error: %s", err)
+		}
 	}
 } /* end log_write */
 
