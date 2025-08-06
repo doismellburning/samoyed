@@ -77,8 +77,6 @@ var g_log_fp *os.File
 var g_open_fname string
 
 func log_init(daily_names bool, path string) {
-	// FIXME KG struct stat st;
-
 	g_daily_names = daily_names
 	g_log_path = ""
 	g_log_fp = nil
