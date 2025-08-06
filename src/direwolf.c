@@ -173,45 +173,4 @@ int q_d_opt = 0;			/* "-q d" Quiet, suppress the printing of description of APRS
 
 int A_opt_ais_to_obj = 0;	/* "-A" Convert received AIS to APRS "Object Report." */
 
-
-/* Process control C and window close events. */
-
-#if __WIN32__
-
-static BOOL cleanup_win (int ctrltype)
-{
-	if (ctrltype == CTRL_C_EVENT || ctrltype == CTRL_CLOSE_EVENT) {
-	  text_color_set(DW_COLOR_INFO);
-	  dw_printf ("\nQRT\n");
-	  log_term ();
-	  ptt_term ();
-	  waypoint_term ();
-	  dwgps_term ();
-	  SLEEP_SEC(1);
-	  ExitProcess (0);
-	}
-	return (TRUE);
-}
-
-
-#else
-
-void cleanup_linux (int x)
-{
-	text_color_set(DW_COLOR_INFO);
-	dw_printf ("\nQRT\n");
-	log_term ();
-	ptt_term ();
-	dwgps_term ();
-	SLEEP_SEC(1);
-	exit(0);
-}
-
-#endif
-
-// Because passing a function to signal() from Go is nontrivial
-void setup_sigint_handler() {
-	signal(SIGINT, cleanup_linux);
-}
-
 /* end direwolf.c */
