@@ -789,7 +789,7 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel C.struct_alevel_s
-				C.log_write(999, &A, nil, alevel, 0)
+				log_write(999, &A, nil, alevel, 0)
 			}
 		} else {
 			return /* No fix.  Skip this time. */

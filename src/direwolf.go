@@ -65,7 +65,6 @@ package direwolf
 // #include "dlq.h"		// for fec_type_t definition.
 // #include "deviceid.h"
 // #include "nettnc.h"
-// void setup_sigint_handler();
 // extern struct audio_s audio_config;
 // extern struct tt_config_s tt_config;
 // extern struct misc_config_s misc_config;
@@ -81,8 +80,10 @@ import "C"
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 	"unsafe"
 
@@ -594,7 +595,7 @@ x = Silence FX.25 information.`)
 	// fmt.Printf ("Dire Wolf version %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
 
 	C.setlinebuf(C.stdout)
-	C.setup_sigint_handler()
+	setup_sigint_handler()
 
 	/*
 	 * Open the audio source
@@ -798,7 +799,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	C.log_init(C.misc_config.log_daily_names, &C.misc_config.log_path[0])
+	log_init((C.misc_config.log_daily_names > 0), C.GoString(&C.misc_config.log_path[0]))
 	C.mheard_init(C.int(d_m_opt))
 	beacon_init(&C.audio_config, &C.misc_config, &igate_config)
 
@@ -1100,7 +1101,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		// Send to log file.
 
-		C.log_write(channel, &A, pp, alevel, retries)
+		log_write(int(channel), &A, pp, alevel, retries)
 
 		// temp experiment.
 		// log_rr_bits (&A, pp);
@@ -1251,3 +1252,24 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		}
 	}
 } /* end app_process_rec_packet */
+
+func setup_sigint_handler() {
+	var sigChan = make(chan os.Signal, 1)
+
+	signal.Notify(sigChan, syscall.SIGINT)
+
+	go func() {
+		<-sigChan
+		cleanup()
+	}()
+}
+
+func cleanup() {
+	text_color_set(DW_COLOR_INFO)
+	dw_printf("\nQRT\n")
+	log_term()
+	C.ptt_term()
+	C.dwgps_term()
+	SLEEP_SEC(1)
+	os.Exit(0)
+}
