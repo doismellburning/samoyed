@@ -798,7 +798,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	C.log_init(C.misc_config.log_daily_names, &C.misc_config.log_path[0])
+	log_init((C.misc_config.log_daily_names > 0), C.GoString(&C.misc_config.log_path[0]))
 	C.mheard_init(C.int(d_m_opt))
 	beacon_init(&C.audio_config, &C.misc_config, &igate_config)
 
@@ -1100,7 +1100,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		// Send to log file.
 
-		C.log_write(channel, &A, pp, alevel, retries)
+		log_write(int(channel), &A, pp, alevel, retries)
 
 		// temp experiment.
 		// log_rr_bits (&A, pp);
