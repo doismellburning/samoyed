@@ -633,7 +633,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the touch tone decoder & APRStt gateway.
 	 */
 	C.dtmf_init(&C.audio_config, audio_amplitude)
-	C.aprs_tt_init(&C.tt_config, C.int(aprstt_debug))
+	aprs_tt_init(&C.tt_config, aprstt_debug)
 	C.tt_user_init(&C.audio_config, &C.tt_config)
 
 	/*
@@ -1202,13 +1202,13 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 	if subchan == -1 { // from DTMF decoder
 		if C.tt_config.gateway_enabled > 0 && info_len >= 2 {
-			C.aprs_tt_sequence(channel, C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:]))
+			aprs_tt_sequence(int(channel), C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
 		}
 	} else if *pinfo == 't' && info_len >= 2 && C.tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		C.aprs_tt_sequence(channel, C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:]))
+		aprs_tt_sequence(int(channel), C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
 	} else {
 		/*
 		 * Send to the IGate processing.
