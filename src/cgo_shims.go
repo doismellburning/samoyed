@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"runtime"
 )
 
 const G_UNKNOWN = C.G_UNKNOWN
@@ -123,4 +124,12 @@ func D2R(d float64) float64 {
 
 func R2D(r float64) float64 {
 	return r * 180 / math.Pi
+}
+
+// Can't be "assert" because of conflicts with stretchr/testify/assert, but otherwise, it's compatible enough
+func Assert(t bool) {
+	if !t {
+		_, file, line, _ := runtime.Caller(1)
+		panic(fmt.Sprintf("Assertion failed at %s:%d", file, line))
+	}
 }
