@@ -268,7 +268,7 @@ x = Silence FX.25 information.`)
 			case 'g':
 				d_g_opt++
 			case 'w':
-				C.waypoint_set_debug(1) // not documented yet.
+				waypoint_set_debug(1) // not documented yet.
 			case 't':
 				d_t_opt++
 				beacon_tracker_set_debug(d_t_opt)
@@ -791,7 +791,7 @@ x = Silence FX.25 information.`)
 	 */
 	C.dwgps_init(&C.misc_config, C.int(d_g_opt))
 
-	C.waypoint_init(&C.misc_config)
+	waypoint_init(&C.misc_config)
 
 	/*
 	 * Enable beaconing.
@@ -1118,7 +1118,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		var user_def_da = C.CString("{" + string(C.USER_DEF_USER_ID) + string(C.USER_DEF_TYPE_AIS))
 
 		if C.strncmp((*C.char)(unsafe.Pointer(pinfo)), user_def_da, 3) == 0 {
-			C.waypoint_send_ais(C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
+			waypoint_send_ais([]byte(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
 
 			if C.A_opt_ais_to_obj > 0 && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
 				var ais_obj_info [256]C.char
@@ -1150,10 +1150,10 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 				nameIn = &A.g_name[0]
 			}
 
-			C.waypoint_send_sentence(nameIn,
-				A.g_lat, A.g_lon, A.g_symbol_table, A.g_symbol_code,
-				C.float(DW_FEET_TO_METERS(float64(A.g_altitude_ft))), A.g_course, C.float(DW_MPH_TO_KNOTS(float64(A.g_speed_mph))),
-				&A.g_comment[0])
+			waypoint_send_sentence(C.GoString(nameIn),
+				float64(A.g_lat), float64(A.g_lon), rune(A.g_symbol_table), byte(A.g_symbol_code),
+				DW_FEET_TO_METERS(float64(A.g_altitude_ft)), float64(A.g_course), DW_MPH_TO_KNOTS(float64(A.g_speed_mph)),
+				C.GoString(&A.g_comment[0]))
 		}
 	}
 
