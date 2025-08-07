@@ -635,7 +635,7 @@ x = Silence FX.25 information.`)
 	 */
 	C.dtmf_init(&C.audio_config, audio_amplitude)
 	aprs_tt_init(&C.tt_config, aprstt_debug)
-	C.tt_user_init(&C.audio_config, &C.tt_config)
+	tt_user_init(&C.audio_config, &C.tt_config)
 
 	/*
 	 * Should there be an option for audio output level?

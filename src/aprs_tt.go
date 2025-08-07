@@ -205,7 +205,7 @@ func aprs_tt_button(channel int, button rune) {
 			poll_period++
 			if poll_period >= 39 {
 				poll_period = 0
-				C.tt_user_background()
+				tt_user_background()
 			}
 		}
 	}
@@ -920,18 +920,19 @@ func parse_aprstt3_call(e string) int {
 				/* For unit test, use suffix rather than trying lookup. */
 				m_callsign = C.GoString(&suffix[0])
 			} else {
-				var call [12]C.char
+				var _suffix = C.GoString(&suffix[0])
+				var _call, _idx = tt_3char_suffix_search(_suffix)
 
 				/* In normal operation, try to find full callsign for the suffix received. */
 
-				if C.tt_3char_suffix_search(&suffix[0], &call[0]) >= 0 {
+				if _idx >= 0 {
 					text_color_set(DW_COLOR_INFO)
-					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", C.GoString(&suffix[0]), C.GoString(&call[0]))
+					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", _suffix, _call)
 
-					m_callsign = C.GoString(&call[0])
+					m_callsign = _call
 				} else {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", C.GoString(&suffix[0]))
+					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", _suffix)
 					return (C.TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
 				}
 			}
