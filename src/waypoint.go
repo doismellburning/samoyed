@@ -22,7 +22,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "latlong.h"
 // #include "waypoint.h"
-// #include "mgn_icon.h"		// Magellan icons
 // #include "dwgpsnmea.h"
 // #include "serial_port.h"
 // #include "dwsock.h"
@@ -362,17 +361,17 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 */
 
 	if s_waypoint_formats&WPL_FORMAT_MAGELLAN > 0 {
-		var i = symbol - ' '
+		var i = int(symbol - ' ')
 		var sicon string /* Magellan icon string.  Currently 1 or 2 characters. */
 
-		if i >= 0 && i < C.SYMTAB_SIZE {
+		if i >= 0 && (i < len(mgn_primary_symtab) || i < len(mgn_alternate_symtab)) {
 			if symtab == '/' {
-				sicon = C.GoString(&C.mgn_primary_symtab[i][0])
+				sicon = mgn_primary_symtab[i]
 			} else {
-				sicon = C.GoString(&C.mgn_alternate_symtab[i][0])
+				sicon = mgn_alternate_symtab[i]
 			}
 		} else {
-			sicon = C.MGN_default
+			sicon = MGN_default
 		}
 
 		var sentence = fmt.Sprintf("$PMGNWPL,%s,%s,%s,%s,%s,M,%s,%s,%s", C.GoString(&slat[0]), C.GoString(&slat_ns[0]), C.GoString(&slong[0]), C.GoString(&slong_ew[0]), salt, wname, wcomment, sicon)
