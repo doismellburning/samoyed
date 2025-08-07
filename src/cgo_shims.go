@@ -9,6 +9,7 @@ package direwolf
 // #include "dwgps.h"
 // #include "config.h"
 // #include "tq.h"
+// #include "serial_port.h"
 import "C"
 
 import (
@@ -49,6 +50,8 @@ const AX25_MAX_ADDR_LEN = C.AX25_MAX_ADDR_LEN
 const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
 const AX25_REPEATER_1 = C.AX25_REPEATER_1
 const AX25_SOURCE = C.AX25_SOURCE
+
+const MYFDERROR = C.MYFDERROR
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
