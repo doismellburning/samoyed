@@ -22,7 +22,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "latlong.h"
 // #include "waypoint.h"
-// #include "grm_sym.h"		// Garmin symbols
 // #include "mgn_icon.h"		// Magellan icons
 // #include "dwgpsnmea.h"
 // #include "serial_port.h"
@@ -318,17 +317,17 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 */
 
 	if s_waypoint_formats&WPL_FORMAT_GARMIN > 0 {
-		var i = symbol - ' '
+		var i = int(symbol - ' ')
 		var grm_sym int /* Garmin symbol code. */
 
-		if i >= 0 && i < C.SYMTAB_SIZE {
+		if i >= 0 && (i < len(grm_primary_symtab) || i < len(grm_alternate_symtab)) {
 			if symtab == '/' {
-				grm_sym = int(C.grm_primary_symtab[i])
+				grm_sym = grm_primary_symtab[i]
 			} else {
-				grm_sym = int(C.grm_alternate_symtab[i])
+				grm_sym = grm_alternate_symtab[i]
 			}
 		} else {
-			grm_sym = C.sym_default
+			grm_sym = sym_default
 		}
 
 		var sentence = fmt.Sprintf("$PGRMW,%s,%s,%04X,%s", wname, salt, grm_sym, wcomment)
