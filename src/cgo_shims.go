@@ -53,6 +53,12 @@ const AX25_SOURCE = C.AX25_SOURCE
 
 const MYFDERROR = C.MYFDERROR
 
+const WPL_FORMAT_NMEA_GENERIC = C.WPL_FORMAT_NMEA_GENERIC
+const WPL_FORMAT_GARMIN = C.WPL_FORMAT_GARMIN
+const WPL_FORMAT_MAGELLAN = C.WPL_FORMAT_MAGELLAN
+const WPL_FORMAT_KENWOOD = C.WPL_FORMAT_KENWOOD
+const WPL_FORMAT_AIS = C.WPL_FORMAT_AIS
+
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
