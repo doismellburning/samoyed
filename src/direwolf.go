@@ -258,7 +258,7 @@ x = Silence FX.25 information.`)
 			case 'k':
 				d_k_opt++
 				kissserial_set_debug(d_k_opt)
-				C.kisspt_set_debug(C.int(d_k_opt))
+				kisspt_set_debug(d_k_opt)
 			case 'n':
 				d_n_opt++
 				kiss_net_set_debug(d_n_opt)
@@ -782,7 +782,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	C.kisspt_init(&C.misc_config)
+	kisspt_init(&C.misc_config)
 	kissserial_init(&C.misc_config)
 	C.kiss_frame_init(&C.audio_config)
 
@@ -1167,7 +1167,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	C.server_send_rec_packet(channel, pp, &fbuf[0], flen)                               // AGW net protocol
 	kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)    // KISS TCP
 	kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1) // KISS serial port
-	C.kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)   // KISS pseudo terminal
+	kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)     // KISS pseudo terminal
 
 	if C.A_opt_ais_to_obj > 0 && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = C.ax25_from_text(&ais_obj_packet[0], 1)
@@ -1178,7 +1178,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			C.server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
 			kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
 			kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
-			C.kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
+			kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
 			C.ax25_delete(ao_pp)
 		}
 	}
