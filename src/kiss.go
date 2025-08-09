@@ -217,7 +217,7 @@ func kisspt_open_pt() {
 	*/
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("Virtual KISS TNC is available on %s\n", pt_slave_name)
+	dw_printf("Virtual KISS TNC is available on %s\n", pt_slave.Name())
 
 	// Sample code shows this. Why would we open it here?
 	// On Ubuntu, the slave side disappears after a few
@@ -248,12 +248,12 @@ func kisspt_open_pt() {
 
 	// TODO: Is this removed when application exits?
 
-	var err = os.Symlink(pt_slave.Name(), TMP_KISSTNC_SYMLINK)
-	if err != nil {
+	var symlinkErr = os.Symlink(pt_slave.Name(), TMP_KISSTNC_SYMLINK)
+	if symlinkErr != nil {
 		dw_printf("Created symlink %s -> %s\n", TMP_KISSTNC_SYMLINK, pt_slave.Name())
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create symlink %s: %s\n", TMP_KISSTNC_SYMLINK, err)
+		dw_printf("Failed to create symlink %s: %s\n", TMP_KISSTNC_SYMLINK, symlinkErr)
 		panic("")
 	}
 
@@ -297,17 +297,18 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
 	int err;
 	*/
 
-	if pt_master_fd == -1 {
+	if pt_master_fd == nil {
 		return
 	}
 
+	var kiss_buff [2*C.AX25_MAX_PACKET_LEN + 2]C.uchar
 	if flen < 0 {
-		flen = strlen(fbuf)
-		if kisspt_debug {
-			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf, flen)
+		flen = C.strlen((*C.char)(unsafe.Pointer(fbuf)))
+		if kisspt_debug > 0 {
+			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
 		}
-		strlcpy(kiss_buff, fbuf, sizeof(kiss_buff))
-		kiss_len = strlen(kiss_buff)
+		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
+		kiss_len = C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0])))
 	} else {
 		// FIXME KG unsigned char stemp[AX25_MAX_PACKET_LEN + 1];
 
