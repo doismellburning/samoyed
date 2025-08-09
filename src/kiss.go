@@ -79,7 +79,10 @@ package direwolf
 import "C"
 
 import (
+	"os"
 	"unsafe"
+
+	"github.com/creack/pty"
 )
 
 /*
@@ -92,10 +95,8 @@ import (
  * These are for a Linux pseudo terminal.
  */
 
-var pt_master_fd = -1 /* File descriptor for my end. */
-
-var pt_slave_name [32]C.char /* Pseudo terminal slave name  */
-/* like /dev/pts/999 */
+var pt_master *os.File /* File descriptor for my end. */
+var pt_slave *os.File  /* Pseudo terminal slave */
 
 /*
  * Symlink to pseudo terminal name which changes.
@@ -138,18 +139,13 @@ func kisspt_init(mc *C.struct_misc_config_s) {
 	/*
 	 * This reads messages from client.
 	 */
-	pt_master_fd = -1
+	pt_master = nil
 
-	if mc.enable_kiss_pt {
+	if mc.enable_kiss_pt > 0 {
+		kisspt_open_pt()
 
-		pt_master_fd = kisspt_open_pt()
-
-		if pt_master_fd != -1 {
-			e = pthread_create(&kiss_pterm_listen_tid, nil, kisspt_listen_thread, nil)
-			if e != 0 {
-				text_color_set(DW_COLOR_ERROR)
-				perror("Could not create kiss listening thread for Linux pseudo terminal")
-			}
+		if pt_master != nil {
+			go kisspt_listen_thread()
 		}
 	} else {
 		//text_color_set(DW_COLOR_INFO);
@@ -166,10 +162,6 @@ func kisspt_init(mc *C.struct_misc_config_s) {
 
 }
 
-/*
- * Returns fd for master side of pseudo terminal or -1 for error.
- */
-
 func kisspt_open_pt() {
 	/* TODO KG
 	#if DEBUG
@@ -178,42 +170,25 @@ func kisspt_open_pt() {
 	#endif
 	*/
 
-	var fd = C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
-
-	if fd == -1 || C.grantpt(fd) == -1 || C.unlockpt(fd) == -1 {
+	var ptmx, pts, err = pty.Open()
+	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not create pseudo terminal for KISS TNC.\n")
-		return (-1)
+		dw_printf("ERROR - Could not create pseudo terminal for KISS TNC: %s.\n", err)
+		return
 	}
 
-	var pts = C.ptsname(fd)
-	if pts == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not create pseudo terminal for KISS TNC.\n")
-		return (-1)
-	}
+	pt_master = ptmx
+	pt_slave = pts
 
-	pt_slave_name = C.GoString(pts)
+	// TODO KG grantpt?
+	// TODO KG unlockpt?
+	// TODO KG ptsname?
+	// TODO KG cfmakeraw?
 
-	var ts C.struct_termios
-	var e = C.tcgetattr(fd, &ts)
-	if e != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Can't get pseudo terminal attributes, err=%d\n", e)
-		panic("pt tcgetattr")
-	}
+	// FIXME KG ts.c_cc[C.VMIN] = 1  /* wait for at least one character */
+	// FIXME KG ts.c_cc[C.VTIME] = 0 /* no fancy timing. */
 
-	C.cfmakeraw(&ts)
-
-	ts.c_cc[C.VMIN] = 1  /* wait for at least one character */
-	ts.c_cc[C.VTIME] = 0 /* no fancy timing. */
-
-	e = tcsetattr(fd, C.TCSANOW, &ts)
-	if e != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Can't set pseudo terminal attributes, err=%d\n", e)
-		panic("pt tcsetattr")
-	}
+	// FIXME KG tcsetattr TCSANOW?
 
 	/*
 	 * We had a problem here since the beginning.
@@ -231,6 +206,7 @@ func kisspt_open_pt() {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf("Debug: Try using non-blocking mode for pseudo terminal.\n");
 
+	/* FIXME KG
 	var flags = C.fcntl(fd, C.F_GETFL, 0)
 	e = C.fcntl(fd, C.F_SETFL, flags|C.O_NONBLOCK)
 	if e != 0 {
@@ -238,6 +214,7 @@ func kisspt_open_pt() {
 		dw_printf("Can't set pseudo terminal to nonblocking, fcntl returns %d, errno = %d\n", e, errno)
 		panic("pt fcntl")
 	}
+	*/
 
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("Virtual KISS TNC is available on %s\n", pt_slave_name)
@@ -248,6 +225,7 @@ func kisspt_open_pt() {
 	// is also based on Debian.
 	// Need to revisit this.
 
+	/* FIXME KG
 	var pt_slave_fd = C.open(pt_slave_name, C.O_RDWR|C.O_NOCTTY)
 
 	if pt_slave_fd < 0 {
@@ -256,6 +234,7 @@ func kisspt_open_pt() {
 		panic("")
 		return -1
 	}
+	*/
 
 	/*
 	 * The device name is not the same every time.
@@ -265,19 +244,20 @@ func kisspt_open_pt() {
 	 * does not need to change when the pseudo terminal name changes.
 	 */
 
-	C.unlink(TMP_KISSTNC_SYMLINK)
+	os.Remove(TMP_KISSTNC_SYMLINK)
 
 	// TODO: Is this removed when application exits?
 
-	if C.symlink(pt_slave_name, TMP_KISSTNC_SYMLINK) == 0 {
-		dw_printf("Created symlink %s -> %s\n", TMP_KISSTNC_SYMLINK, pt_slave_name)
+	var err = os.Symlink(pt_slave.Name(), TMP_KISSTNC_SYMLINK)
+	if err != nil {
+		dw_printf("Created symlink %s -> %s\n", TMP_KISSTNC_SYMLINK, pt_slave.Name())
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create symlink %s\n", TMP_KISSTNC_SYMLINK)
-		perror("")
+		dw_printf("Failed to create symlink %s: %s\n", TMP_KISSTNC_SYMLINK, err)
+		panic("")
 	}
 
-	return (fd)
+	return
 }
 
 /*-------------------------------------------------------------------
