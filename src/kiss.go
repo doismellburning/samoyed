@@ -291,65 +291,59 @@ func kisspt_open_pt() {
  *--------------------------------------------------------------------*/
 
 func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C.int, kps *C.struct_kissport_status_s, client C.int) {
-	/* FIXME KG
-	unsigned char kiss_buff[2 * AX25_MAX_PACKET_LEN + 2];
-	int kiss_len;
-	int err;
-	*/
-
-	if pt_master_fd == nil {
+	if pt_master == nil {
 		return
 	}
 
 	var kiss_buff [2*C.AX25_MAX_PACKET_LEN + 2]C.uchar
+	var kiss_len C.int
 	if flen < 0 {
-		flen = C.strlen((*C.char)(unsafe.Pointer(fbuf)))
+		flen = C.int(C.strlen((*C.char)(unsafe.Pointer(fbuf))))
 		if kisspt_debug > 0 {
 			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
 		}
 		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
-		kiss_len = C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0])))
+		kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 	} else {
-		// FIXME KG unsigned char stemp[AX25_MAX_PACKET_LEN + 1];
+		var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
 
-		if flen > (int)(sizeof(stemp))-1 {
+		if flen > C.int(len(stemp)-1) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
-			flen = (sizeof(stemp)) - 1
+			flen = C.int(len(stemp)) - 1
 		}
 
-		stemp[0] = (channel << 4) | kiss_cmd
-		memcpy(stemp+1, fbuf, flen)
+		stemp[0] = C.uchar((channel << 4) | kiss_cmd)
+		C.memcpy(unsafe.Pointer(&stemp[1]), unsafe.Pointer(fbuf), C.ulong(flen))
 
 		if kisspt_debug >= 2 {
 			/* AX.25 frame with the CRC removed. */
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			hex_dump(fbuf, flen)
+			C.hex_dump(fbuf, flen)
 		}
 
-		kiss_len = kiss_encapsulate(stemp, flen+1, kiss_buff)
+		kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
 
 		/* This has KISS framing and escapes for sending to client app. */
 
-		if kisspt_debug {
-			kiss_debug_print(TO_CLIENT, NULL, kiss_buff, kiss_len)
+		if kisspt_debug > 0 {
+			C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
 		}
 
 	}
 
-	err = write(pt_master_fd, kiss_buff, kiss_len)
+	var n, err = pt_master.Write(kiss_buff)
 
-	if err == -1 && errno == EWOULDBLOCK {
+	if n != kiss_len {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%d, len=%d, write returned %d, err = %s\n\n",
+			pt_master.Name(), kiss_len, n, err)
+	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
 		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
-	} else if err != kiss_len {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%d, len=%d, write returned %d, errno = %d\n\n",
-			pt_master_fd, kiss_len, err, errno)
-		perror("pt write")
 	}
 
 } /* kisspt_send_rec_packet */
