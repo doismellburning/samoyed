@@ -334,9 +334,13 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
 
 	}
 
-	var n, err = pt_master.Write(kiss_buff)
+	var _out_bytes = make([]byte, kiss_len)
+	for i := range kiss_len {
+		_out_bytes[i] = byte(kiss_buff[i])
+	}
+	var n, err = pt_master.Write(_out_bytes)
 
-	if n != kiss_len {
+	if C.int(n) != kiss_len {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%d, len=%d, write returned %d, err = %s\n\n",
 			pt_master.Name(), kiss_len, n, err)
@@ -366,7 +370,7 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_get() int {
+func kisspt_get() byte {
 	/* FIXME KG
 	unsigned char ch;
 
@@ -374,6 +378,8 @@ func kisspt_get() int {
 	fd_set fd_in, fd_ex;
 	int rc;
 	*/
+	var ch []byte
+	var n int
 
 	for n == 0 {
 
@@ -416,6 +422,7 @@ func kisspt_get() int {
 		 * We don't get the error from kissattach anymore.
 		 */
 
+		 /* TODO KG Check how this all works with Go IO and the pty lib used..
 		FD_ZERO(&fd_in)
 		FD_SET(pt_master_fd, &fd_in)
 
@@ -428,23 +435,26 @@ func kisspt_get() int {
 			continue // When could we get a 0?
 		}
 
-		// FIXME KG Check rc == -1
+		// TODO KG Check rc == -1
+		*/
 
-		var n = read(pt_master_fd, &ch, 1)
-		if n != 1 {
+		ch = make([]byte, 1)
+		var err error
+		n, err = pt_master.Read(ch)
+		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError receiving KISS message from client application.  Closing %s.\n\n", pt_slave_name)
-			perror("")
+			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", pt_slave.Name(), err)
 
-			close(pt_master_fd)
+			pt_master.Close()
 
-			pt_master_fd = -1
-			unlink(TMP_KISSTNC_SYMLINK)
-			pthread_exit(NULL)
+			pt_master = nil
+			os.Remove(TMP_KISSTNC_SYMLINK)
+			// FIXME KG pthread_exit(NULL)
+			return 0 // TODO KG
 		}
 	}
 
-	return (ch)
+	return ch[0]
 }
 
 /*-------------------------------------------------------------------
