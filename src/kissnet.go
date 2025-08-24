@@ -442,7 +442,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
 							}
 							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
-							kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
+							kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0])))) //nolint:staticcheck
 						} else {
 							var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
 
@@ -453,7 +453,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 							// We now have tcp ports which carry only a single radio channel.
 							// The application will see KISS channel 0 regardless of the radio channel.
 
-							if kps.channel == -1 {
+							if kps.channel == -1 { //nolint:staticcheck
 								// Normal case, all channels.
 								stemp[0] = C.uchar((channel << 4) | kiss_cmd)
 							} else if kps.channel == channel {
@@ -534,7 +534,7 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 	if s_misc_config_p.kiss_copy > 0 {
 		for kps := all_ports; kps != nil; kps = kps.pnext {
 			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
-				if !(kps == from_kps && client == from_client) { // To all but origin.
+				if !(kps == from_kps && client == from_client) { //nolint:staticcheck To all but origin.
 					if kps.client_sock[client] != nil {
 						if kps.channel == -1 || kps.channel == channel {
 							// Two different cases here:
