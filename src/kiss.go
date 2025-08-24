@@ -147,9 +147,6 @@ func kisspt_init(mc *C.struct_misc_config_s) {
 		if pt_master != nil {
 			go kisspt_listen_thread()
 		}
-	} else {
-		//text_color_set(DW_COLOR_INFO);
-		//dw_printf ("Use -p command line option to enable KISS pseudo terminal.\n");
 	}
 
 	/* TODO KG
