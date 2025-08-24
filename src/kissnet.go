@@ -442,7 +442,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
 							}
 							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
-							kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0])))) //nolint:staticcheck
+							// FIXME KG kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 						} else {
 							var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
 
@@ -548,7 +548,7 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 							}
 
 							var kiss_buff [2 * C.AX25_MAX_PACKET_LEN]C.uchar
-							var kiss_len = C.kiss_encapsulate((*C.uchar)(unsafe.Pointer(C.CBytes(msg))), in_len, &kiss_buff[0])
+							var kiss_len = C.kiss_encapsulate((*C.uchar)(C.CBytes(msg)), in_len, &kiss_buff[0])
 
 							/* This has the escapes and the surrounding FENDs. */
 
