@@ -65,42 +65,6 @@ typedef struct kiss_frame_s {
 } kiss_frame_t;
 
 
-// This is used only for TCPKISS but it put in kissnet.h,
-// there would be a circular dependency between the two header files.
-// Each KISS TCP port has its own status block.
-
-struct kissport_status_s {
-
-	struct kissport_status_s *pnext;	// To next in list.
-
-	volatile int arg2;			// temp for passing second arg into
-						// kissnet_listen_thread
-
-	int tcp_port;				// default 8001
-
-	int chan;				// Radio channel for this tcp port.
-						// -1 for all.
-
-	// The default is a limit of 3 client applications at the same time.
-	// You can increase the limit by changing the line below.
-	// A larger number consumes more resources so don't go crazy by making it larger than needed.
-	// TODO:  Should this be moved to direwolf.h so max number of audio devices
-	// client apps are in the same place?
-
-#define MAX_NET_CLIENTS 3
-
-	int client_sock[MAX_NET_CLIENTS];
-				/* File descriptor for socket for */
-				/* communication with client application. */
-				/* Set to -1 if not connected. */
-				/* (Don't use SOCKET type because it is unsigned.) */
-
-	kiss_frame_t kf[MAX_NET_CLIENTS];
-				/* Accumulated KISS frame and state of decoder. */
-};
-
-
-
 void kiss_frame_init (struct audio_s *pa);
 
 int kiss_encapsulate (unsigned char *in, int ilen, unsigned char *out);
