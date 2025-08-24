@@ -653,13 +653,15 @@ void export_gpio(int ch, int ot, int invert, int direction)
 }
 
 #if defined(USE_GPIOD)
-int gpiod_probe(const char *chip_name, int line_number)
+int gpiod_probe(const char *chip_dev_path, int line_number)
 {
+	// chip_dev_path must be complete device path such as /dev/gpiochip3
+
 	struct gpiod_chip *chip;
-	chip = gpiod_chip_open_by_name(chip_name);
+	chip = gpiod_chip_open(chip_dev_path);
 	if (chip == NULL) {
 		text_color_set(DW_COLOR_ERROR);
-		dw_printf ("Can't open GPIOD chip %s.\n", chip_name);
+		dw_printf ("Can't open GPIOD chip %s.\n", chip_dev_path);
 		return -1;
 	}
 
@@ -672,7 +674,7 @@ int gpiod_probe(const char *chip_name, int line_number)
 	}
 	if (ptt_debug_level >= 2) {
 		text_color_set(DW_COLOR_DEBUG);
-		dw_printf("GPIOD probe OK. Chip: %s line: %d\n", chip_name, line_number);
+		dw_printf("GPIOD probe OK. Chip: %s line: %d\n", chip_dev_path, line_number);
 	}
 	return 0;
 }
@@ -936,8 +938,11 @@ void ptt_init (struct audio_s *audio_config_p)
 	        int rc = gpiod_probe(chip_name, line_number);
 	        if (rc < 0) {
 	          text_color_set(DW_COLOR_ERROR);
-	          dw_printf ("Disable PTT for channel %d\n", ch);
-	          audio_config_p->achan[ch].octrl[ot].ptt_method = PTT_METHOD_NONE;
+		  //No, people won't notice the error message and be confused.  Just terminate.
+	          //dw_printf ("Disable PTT for channel %d\n", ch);
+	          //audio_config_p->achan[ch].octrl[ot].ptt_method = PTT_METHOD_NONE;
+	          dw_printf ("Terminating due to failed PTT on channel %d\n", ch);
+		  exit (EXIT_FAILURE);
 	        } else {
 	          // Set initial state off ptt_set will invert output signal if appropriate.
 	          ptt_set (ot, ch, 0);
