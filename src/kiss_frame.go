@@ -339,7 +339,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 				C.tq_append(channel, TQ_PRIO_1_LO, pp)
 			}
 		}
-		break
 
 	case C.KISS_CMD_TXDELAY: /* 1 = TXDELAY */
 
@@ -357,7 +356,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			dw_printf("section, to understand what this means.\n")
 		}
 		C.xmit_set_txdelay(channel, C.int(kiss_msg_bytes[1]))
-		break
 
 	case C.KISS_CMD_PERSISTENCE: /* 2 = Persistence */
 
@@ -375,7 +373,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			dw_printf("section, to understand what this means.\n")
 		}
 		C.xmit_set_persist(channel, C.int(kiss_msg_bytes[1]))
-		break
 
 	case C.KISS_CMD_SLOTTIME: /* 3 = SlotTime */
 
@@ -393,7 +390,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			dw_printf("section, to understand what this means.\n")
 		}
 		C.xmit_set_slottime(channel, C.int(kiss_msg_bytes[1]))
-		break
 
 	case C.KISS_CMD_TXTAIL: /* 4 = TXtail */
 		if kiss_len < 2 {
@@ -413,7 +409,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		}
 
 		C.xmit_set_txtail(channel, C.int(kiss_msg_bytes[1]))
-		break
 
 	case C.KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
 		if kiss_len < 2 {
@@ -424,7 +419,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set FullDuplex = %d, channel %d\n", kiss_msg_bytes[1], channel)
 		C.xmit_set_fulldup(channel, C.int(kiss_msg_bytes[1]))
-		break
 
 	case C.KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 
@@ -436,13 +430,11 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg_bytes[1:], channel)
 		kiss_set_hardware(channel, kiss_msg_bytes[1:], debug, kps, client, sendfun)
-		break
 
 	case C.KISS_CMD_END_KISS: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol end KISS mode - Ignored.\n")
-		break
 
 	default:
 		text_color_set(DW_COLOR_ERROR)
@@ -463,7 +455,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			dw_printf("    Packet TNC Model:  NORMAL      -- Using ACKMODE will cause this error.\n")
 			dw_printf("\n")
 		}
-		break
 	}
 } /* end kiss_process_msg */
 
