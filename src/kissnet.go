@@ -173,12 +173,14 @@ import (
 	"unsafe"
 )
 
+const MAX_NET_CLIENTS = 3
+
 var s_misc_config_p *C.struct_misc_config_s
 
 // Each TCP port has its own status block.
 // There is a variable number so use a linked list.
 
-var all_ports *C.struct_kissport_status_s
+var all_ports *kissport_status_s
 
 var kiss_debug = 0 /* Print information flowing from and to client. */
 
@@ -211,10 +213,10 @@ func kissnet_init(mc *C.struct_misc_config_s) {
 
 	for i := 0; i < C.MAX_KISS_TCP_PORTS; i++ {
 		if mc.kiss_port[i] != 0 {
-			var kps = (*C.struct_kissport_status_s)(C.malloc(C.sizeof_struct_kissport_status_s))
+			var kps = new(kissport_status_s)
 
 			kps.tcp_port = mc.kiss_port[i]
-			kps._chan = mc.kiss_chan[i]
+			kps.channel = mc.kiss_chan[i]
 
 			kissnet_init_one(kps)
 
@@ -225,7 +227,7 @@ func kissnet_init(mc *C.struct_misc_config_s) {
 	}
 }
 
-func kissnet_init_one(kps *C.struct_kissport_status_s) {
+func kissnet_init_one(kps *kissport_status_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -233,9 +235,9 @@ func kissnet_init_one(kps *C.struct_kissport_status_s) {
 	#endif
 	*/
 
-	for client := 0; client < C.MAX_NET_CLIENTS; client++ {
-		kps.client_sock[client] = -1
-		// FIXME KG C.memset(&(kps.kf[client]), 0, C.sizeof(kps.kf[client]))
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
+		kps.client_sock[client] = nil
+		C.memset(unsafe.Pointer(&kps.kf[client]), 0, C.sizeof_kiss_frame_t)
 	}
 
 	if kps.tcp_port == 0 {
@@ -254,7 +256,7 @@ func kissnet_init_one(kps *C.struct_kissport_status_s) {
 	 * Currently we start up a separate thread for each potential connection.
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
-	for client := C.int(0); client < C.MAX_NET_CLIENTS; client++ {
+	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
 		kps.arg2 = client
 
 		go kissnet_listen_thread(kps)
@@ -291,7 +293,7 @@ func kissnet_init_one(kps *C.struct_kissport_status_s) {
  *
  *--------------------------------------------------------------------*/
 
-func connect_listen_thread(kps *C.struct_kissport_status_s) {
+func connect_listen_thread(kps *kissport_status_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -330,18 +332,18 @@ func connect_listen_thread(kps *C.struct_kissport_status_s) {
 
 	for {
 		var client = -1
-		for c := 0; c < C.MAX_NET_CLIENTS && client < 0; c++ {
-			if kps.client_sock[c] <= 0 {
+		for c := 0; c < MAX_NET_CLIENTS && client < 0; c++ {
+			if kps.client_sock[c] == nil {
 				client = c
 			}
 		}
 
 		if client >= 0 {
 			text_color_set(DW_COLOR_INFO)
-			if kps._chan == -1 {
+			if kps.channel == -1 {
 				dw_printf("Ready to accept KISS TCP client application %d on port %d ...\n", client, kps.tcp_port)
 			} else {
-				dw_printf("Ready to accept KISS TCP client application %d on port %d (radio channel %d) ...\n", client, kps.tcp_port, kps._chan)
+				dw_printf("Ready to accept KISS TCP client application %d on port %d (radio channel %d) ...\n", client, kps.tcp_port, kps.channel)
 			}
 
 			var conn, acceptErr = listener.Accept()
@@ -353,10 +355,10 @@ func connect_listen_thread(kps *C.struct_kissport_status_s) {
 			kps.client_sock[client] = conn
 
 			text_color_set(DW_COLOR_INFO)
-			if kps._chan == -1 {
+			if kps.channel == -1 {
 				dw_printf("\nAttached to KISS TCP client application %d on port %d ...\n\n", client, kps.tcp_port)
 			} else {
-				dw_printf("\nAttached to KISS TCP client application %d on port %d (radio channel %d) ...\n\n", client, kps.tcp_port, kps._chan)
+				dw_printf("\nAttached to KISS TCP client application %d on port %d (radio channel %d) ...\n\n", client, kps.tcp_port, kps.channel)
 			}
 
 			// Reset the state and buffer.
@@ -409,7 +411,7 @@ func connect_listen_thread(kps *C.struct_kissport_status_s) {
  *--------------------------------------------------------------------*/
 
 func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C.int,
-	onlykps *C.struct_kissport_status_s, onlyclient C.int) {
+	onlykps *kissport_status_s, onlyclient C.int) {
 	// Something received over the radio would normally be sent to all attached clients.
 	// However, there are times we want to send a response only to a particular client.
 	// In the case of a serial port or pseudo terminal, there is only one potential client.
@@ -417,9 +419,9 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 
 	for kps := all_ports; kps != nil; kps = kps.pnext {
 		if onlykps == nil || kps == onlykps {
-			for client := C.int(0); client < C.MAX_NET_CLIENTS; client++ {
+			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
 				if onlyclient == -1 || client == onlyclient {
-					if kps.client_sock[client] != -1 {
+					if kps.client_sock[client] != nil {
 						var kiss_buff [2 * C.AX25_MAX_PACKET_LEN]C.uchar
 						var kiss_len C.int
 						if flen < 0 {
@@ -451,10 +453,10 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 							// We now have tcp ports which carry only a single radio channel.
 							// The application will see KISS channel 0 regardless of the radio channel.
 
-							if kps._chan == -1 {
+							if kps.channel == -1 {
 								// Normal case, all channels.
 								stemp[0] = C.uchar((channel << 4) | kiss_cmd)
-							} else if kps._chan == channel {
+							} else if kps.channel == channel {
 								// Single radio channel for this port.  Application sees 0.
 								stemp[0] = C.uchar((0 << 4) | kiss_cmd)
 							} else {
@@ -527,19 +529,19 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_kps *C.struct_kissport_status_s, from_client C.int) {
+func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_kps *kissport_status_s, from_client C.int) {
 	var msg = C.GoBytes(unsafe.Pointer(in_msg), in_len)
 	if s_misc_config_p.kiss_copy > 0 {
 		for kps := all_ports; kps != nil; kps = kps.pnext {
-			for client := C.int(0); client < C.MAX_NET_CLIENTS; client++ {
+			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
 				if !(kps == from_kps && client == from_client) { // To all but origin.
-					if kps.client_sock[client] != -1 {
-						if kps._chan == -1 || kps._chan == channel {
+					if kps.client_sock[client] != nil {
+						if kps.channel == -1 || kps.channel == channel {
 							// Two different cases here:
 							//  - The TCP port allows all channels, or
 							//  - The TCP port allows only one channel.  In this case set KISS channel to 0.
 
-							if kps._chan == -1 {
+							if kps.channel == -1 {
 								msg[0] = byte((channel << 4) | cmd)
 							} else {
 								msg[0] = byte(0 | cmd) // set channel to zero.
@@ -559,8 +561,8 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 							if err <= 0 {
 								text_color_set(DW_COLOR_ERROR)
 								dw_printf("\nError copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", kps.tcp_port, client)
-								// FIXME KG close(kps.client_sock[client])
-								kps.client_sock[client] = -1
+								kps.client_sock[client].Close()
+								kps.client_sock[client] = nil
 							}
 						} // Channel is allowed on this port.
 					} // socket is open
@@ -588,15 +590,15 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 
 /* Return one byte (value 0 - 255) */
 
-func kiss_get(kps *C.struct_kissport_status_s, client int) byte {
+func kiss_get(kps *kissport_status_s, client int) byte {
 	for {
-		for kps.client_sock[client] <= 0 {
+		for kps.client_sock[client] == nil {
 			SLEEP_SEC(1) /* Not connected.  Try again later. */
 		}
 
 		/* Just get one byte at a time. */
 
-		var c = (*net.Conn)(kps.client_sock[client]) // FIXME KG
+		var c = kps.client_sock[client]
 		var ch = make([]byte, 1)
 		var n, _ = c.Read(ch)
 
@@ -622,13 +624,13 @@ func kiss_get(kps *C.struct_kissport_status_s, client int) byte {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
 		c.Close()
-		kps.client_sock[client] = -1 // FIXME KG
+		kps.client_sock[client] = nil
 	}
 }
 
-func kissnet_listen_thread(kps *C.struct_kissport_status_s) {
+func kissnet_listen_thread(kps *kissport_status_s) {
 	var client = kps.arg2
-	Assert(client >= 0 && client < C.MAX_NET_CLIENTS)
+	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	kps.arg2 = -1 // Indicates thread is running so
 	// arg2 can be reused for the next one.

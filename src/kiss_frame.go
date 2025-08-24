@@ -21,9 +21,31 @@ import "C"
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"strings"
 	"unsafe"
 )
+
+// This is used only for TCPKISS but it put in kissnet.h,
+// there would be a circular dependency between the two header files.
+// Each KISS TCP port has its own status block.
+
+type kissport_status_s struct {
+	pnext *kissport_status_s // To next in list.
+
+	arg2 C.int // temp for passing second arg into
+	// kissnet_listen_thread
+
+	tcp_port C.int // default 8001
+
+	channel C.int // Radio channel for this tcp port.
+	// -1 for all.
+
+	client_sock [MAX_NET_CLIENTS]net.Conn
+
+	kf [MAX_NET_CLIENTS]C.kiss_frame_t
+	/* Accumulated KISS frame and state of decoder. */
+}
 
 /*-------------------------------------------------------------------
  *
@@ -70,10 +92,10 @@ import (
  * Let's try to keep it happy by sending back a command prompt.
  */
 
-type kiss_sendfun func(C.int, C.int, []byte, C.int, *C.struct_kissport_status_s, C.int)
+type kiss_sendfun func(C.int, C.int, []byte, C.int, *kissport_status_s, C.int)
 
 func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
-	kps *C.struct_kissport_status_s, client C.int,
+	kps *kissport_status_s, client C.int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
 
@@ -198,7 +220,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *C.struct_kissport_status_s, client C.int, sendfun kiss_sendfun) {
+func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissport_status_s, client C.int, sendfun kiss_sendfun) {
 	// Temporary for now
 	if C.KISSUTIL > 0 {
 		kiss_process_msg_override(kiss_msg, kiss_len)
@@ -212,9 +234,9 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *C.str
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
 
 	var channel C.int
-	if kps != nil && kps._chan != -1 {
+	if kps != nil && kps.channel != -1 {
 		// Ignore channel from KISS and substitute radio channel for that KISS TCP port.
-		channel = kps._chan
+		channel = kps.channel
 	} else {
 		// Normal case of getting radio channel from the KISS frame.
 		channel = C.int(kiss_msg_bytes[0]>>4) & 0xf
@@ -520,7 +542,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *C.str
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *C.struct_kissport_status_s, client C.int, sendfun kiss_sendfun) {
+func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport_status_s, client C.int, sendfun kiss_sendfun) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
