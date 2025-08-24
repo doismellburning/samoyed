@@ -159,7 +159,6 @@ func kisspt_init(mc *C.struct_misc_config_s) {
 		dw_printf ("end of kisspt_init: pt_master_fd = %d\n", pt_master_fd);
 	#endif
 	*/
-
 }
 
 func kisspt_open_pt() {
@@ -331,7 +330,6 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
 		if kisspt_debug > 0 {
 			C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
 		}
-
 	}
 
 	var _out_bytes = make([]byte, kiss_len)
@@ -349,7 +347,6 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
 		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
 	}
-
 } /* kisspt_send_rec_packet */
 
 /*-------------------------------------------------------------------
@@ -382,7 +379,6 @@ func kisspt_get() byte {
 	var n int
 
 	for n == 0 {
-
 		/*
 		 * Since the beginning we've always had a couple annoying problems with
 		 * the pseudo terminal KISS interface.
