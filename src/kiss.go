@@ -252,8 +252,6 @@ func kisspt_open_pt() {
 		dw_printf("Failed to create symlink %s: %s\n", TMP_KISSTNC_SYMLINK, symlinkErr)
 		panic("")
 	}
-
-	return
 }
 
 /*-------------------------------------------------------------------
