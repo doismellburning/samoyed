@@ -101,7 +101,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 
 	switch kf.state {
 	case KS_SEARCHING: /* Searching for starting FEND. */
-	// TODO KG Also default: ?
+		// TODO KG Also default: ?
 		if ch == C.FEND {
 			/* Start of frame.  But first print any collected noise for debugging. */
 
