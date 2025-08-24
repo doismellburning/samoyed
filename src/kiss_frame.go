@@ -31,24 +31,21 @@ import (
 // Each KISS TCP port has its own status block.
 
 type kissport_status_s struct {
-	pnext *kissport_status_s;	// To next in list.
+	pnext *kissport_status_s // To next in list.
 
-	arg2 C.int;			// temp for passing second arg into
-						// kissnet_listen_thread
+	arg2 C.int // temp for passing second arg into
+	// kissnet_listen_thread
 
-	tcp_port C.int;				// default 8001
+	tcp_port C.int // default 8001
 
-	channel C.int;				// Radio channel for this tcp port.
-						// -1 for all.
+	channel C.int // Radio channel for this tcp port.
+	// -1 for all.
 
-	client_sock [MAX_NET_CLIENTS]net.Conn;
+	client_sock [MAX_NET_CLIENTS]net.Conn
 
-	kf[MAX_NET_CLIENTS] C.kiss_frame_t;
-				/* Accumulated KISS frame and state of decoder. */
-};
-
-
-
+	kf [MAX_NET_CLIENTS]C.kiss_frame_t
+	/* Accumulated KISS frame and state of decoder. */
+}
 
 /*-------------------------------------------------------------------
  *
@@ -100,16 +97,12 @@ type kiss_sendfun func(C.int, C.int, []byte, C.int, *kissport_status_s, C.int)
 func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 	kps *kissport_status_s, client C.int,
 	sendfun kiss_sendfun) {
-
 	//dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
 
 	switch kf.state {
-
 	case KS_SEARCHING: /* Searching for starting FEND. */
-	default:
-
+	// TODO KG Also default: ?
 		if ch == C.FEND {
-
 			/* Start of frame.  But first print any collected noise for debugging. */
 
 			if kf.noise_len > 0 {
@@ -199,11 +192,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 			dw_printf("KISS message exceeded maximum length.\n")
 		}
 		return
-		break
 	}
-
-	return /* unreachable but suppress compiler warning. */
-
 } /* end kiss_rec_byte */
 
 /*-------------------------------------------------------------------
@@ -476,7 +465,6 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		}
 		break
 	}
-
 } /* end kiss_process_msg */
 
 /*-------------------------------------------------------------------
