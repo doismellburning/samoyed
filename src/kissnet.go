@@ -211,7 +211,7 @@ func kiss_net_set_debug(n int) {
 func kissnet_init(mc *C.struct_misc_config_s) {
 	s_misc_config_p = mc
 
-	for i := 0; i < C.MAX_KISS_TCP_PORTS; i++ {
+	for i := range C.MAX_KISS_TCP_PORTS {
 		if mc.kiss_port[i] != 0 {
 			var kps = new(kissport_status_s)
 
@@ -235,7 +235,7 @@ func kissnet_init_one(kps *kissport_status_s) {
 	#endif
 	*/
 
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
 		C.memset(unsafe.Pointer(&kps.kf[client]), 0, C.sizeof_kiss_frame_t)
 	}
@@ -442,7 +442,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
 							}
 							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
-							kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
+							// FIXME KG kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 						} else {
 							var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
 
@@ -453,7 +453,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 							// We now have tcp ports which carry only a single radio channel.
 							// The application will see KISS channel 0 regardless of the radio channel.
 
-							if kps.channel == -1 {
+							if kps.channel == -1 { //nolint:staticcheck
 								// Normal case, all channels.
 								stemp[0] = C.uchar((channel << 4) | kiss_cmd)
 							} else if kps.channel == channel {
@@ -534,7 +534,8 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 	if s_misc_config_p.kiss_copy > 0 {
 		for kps := all_ports; kps != nil; kps = kps.pnext {
 			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
-				if !(kps == from_kps && client == from_client) { // To all but origin.
+				// To all but origin.
+				if !(kps == from_kps && client == from_client) { //nolint:staticcheck
 					if kps.client_sock[client] != nil {
 						if kps.channel == -1 || kps.channel == channel {
 							// Two different cases here:
@@ -548,7 +549,7 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 							}
 
 							var kiss_buff [2 * C.AX25_MAX_PACKET_LEN]C.uchar
-							var kiss_len = C.kiss_encapsulate((*C.uchar)(unsafe.Pointer(C.CBytes(msg))), in_len, &kiss_buff[0])
+							var kiss_len = C.kiss_encapsulate((*C.uchar)(C.CBytes(msg)), in_len, &kiss_buff[0])
 
 							/* This has the escapes and the surrounding FENDs. */
 
