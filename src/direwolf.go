@@ -1164,10 +1164,10 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	var fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
 	var flen = C.ax25_pack(pp, &fbuf[0])
 
-	C.server_send_rec_packet(channel, pp, &fbuf[0], flen)                               // AGW net protocol
-	kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)    // KISS TCP
-	kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1) // KISS serial port
-	kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)     // KISS pseudo terminal
+	C.server_send_rec_packet(channel, pp, &fbuf[0], flen)                                                            // AGW net protocol
+	kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)                                 // KISS TCP
+	kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &fbuf[0], flen, nil, -1)                              // KISS serial port
+	kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1) // KISS pseudo terminal
 
 	if C.A_opt_ais_to_obj > 0 && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = C.ax25_from_text(&ais_obj_packet[0], 1)
@@ -1178,7 +1178,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			C.server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
 			kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
 			kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
-			kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, &ao_fbuf[0], ao_flen, nil, -1)
+			kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
 			C.ax25_delete(ao_pp)
 		}
 	}

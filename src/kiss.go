@@ -277,7 +277,7 @@ func kisspt_open_pt() {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C.int, kps *C.struct_kissport_status_s, client C.int) {
+func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.int, kps *kissport_status_s, client C.int) {
 	if pt_master == nil {
 		return
 	}
@@ -285,11 +285,11 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
 	var kiss_buff [2*C.AX25_MAX_PACKET_LEN + 2]C.uchar
 	var kiss_len C.int
 	if flen < 0 {
-		flen = C.int(C.strlen((*C.char)(unsafe.Pointer(fbuf))))
+		flen = C.int(len(fbuf))
 		if kisspt_debug > 0 {
-			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
+			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
 		}
-		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
+		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
 		kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 	} else {
 		var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
@@ -301,14 +301,14 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C
 		}
 
 		stemp[0] = C.uchar((channel << 4) | kiss_cmd)
-		C.memcpy(unsafe.Pointer(&stemp[1]), unsafe.Pointer(fbuf), C.ulong(flen))
+		C.memcpy(unsafe.Pointer(&stemp[1]), C.CBytes(fbuf), C.ulong(flen))
 
 		if kisspt_debug >= 2 {
 			/* AX.25 frame with the CRC removed. */
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			C.hex_dump(fbuf, flen)
+			C.hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 		}
 
 		kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
@@ -456,7 +456,7 @@ func kisspt_listen_thread() {
 	*/
 
 	for {
-		// FIXME KG var ch = kisspt_get();
-		// FIXME KG kiss_rec_byte (&kf, ch, kisspt_debug, NULL, -1, kisspt_send_rec_packet);
+		var ch = kisspt_get()
+		kiss_rec_byte(&kf, C.uchar(ch), C.int(kisspt_debug), nil, -1, kisspt_send_rec_packet)
 	}
 }
