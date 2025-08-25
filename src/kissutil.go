@@ -467,7 +467,7 @@ func tnc_listen_net() {
 			if verbose {
 				_verbose = 1
 			}
-			C.kiss_rec_byte(&kstate, C.uchar(data[j]), _verbose, nil, 0, nil)
+			kiss_rec_byte(&kstate, C.uchar(data[j]), _verbose, nil, 0, nil)
 		}
 	}
 } /* end tnc_listen_net */
@@ -514,7 +514,7 @@ func tnc_listen_serial() {
 		if verbose {
 			_verbose = 1
 		}
-		C.kiss_rec_byte(&kstate, C.uchar(ch), _verbose, nil, 0, nil)
+		kiss_rec_byte(&kstate, C.uchar(ch), _verbose, nil, 0, nil)
 	}
 } /* end tnc_listen_serial */
 
