@@ -257,22 +257,7 @@ func kissnet_init_one(kps *kissport_status_s) {
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
 	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
-		kps.arg2 = client
-
-		go kissnet_listen_thread(kps)
-
-		// Wait for new thread to get content of arg2 before reusing it for the next thread create.
-
-		var timer = 0
-		for kps.arg2 >= 0 {
-			SLEEP_MS(10)
-			timer++
-			if timer > 100 { // 1 second - thread did not start
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS data listening thread did not start for tcp port %d, client slot %d\n", kps.tcp_port, client)
-				kps.arg2 = -1 // Keep moving along.
-			}
-		}
+		go kissnet_listen_thread(kps, client)
 	}
 }
 
@@ -627,12 +612,8 @@ func kiss_get(kps *kissport_status_s, client int) byte {
 	}
 }
 
-func kissnet_listen_thread(kps *kissport_status_s) {
-	var client = kps.arg2
+func kissnet_listen_thread(kps *kissport_status_s, client C.int) {
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
-
-	kps.arg2 = -1 // Indicates thread is running so
-	// arg2 can be reused for the next one.
 
 	/* TODO KG
 	#if DEBUG
