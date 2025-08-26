@@ -238,7 +238,7 @@ func kisspt_open_pt() {
 	// TODO: Is this removed when application exits?
 
 	var symlinkErr = os.Symlink(pt_slave.Name(), TMP_KISSTNC_SYMLINK)
-	if symlinkErr != nil {
+	if symlinkErr == nil {
 		dw_printf("Created symlink %s -> %s\n", TMP_KISSTNC_SYMLINK, pt_slave.Name())
 	} else {
 		text_color_set(DW_COLOR_ERROR)
