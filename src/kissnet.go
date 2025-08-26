@@ -410,7 +410,7 @@ func connect_listen_thread(kps *kissport_status_s) {
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C.int,
+func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.int,
 	onlykps *kissport_status_s, onlyclient C.int) {
 	// Something received over the radio would normally be sent to all attached clients.
 	// However, there are times we want to send a response only to a particular client.
@@ -437,11 +437,11 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 							dw_printf("For best results, configure for a KISS-only TNC to avoid this.\n")
 							dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
 
-							flen = C.int(C.strlen((*C.char)(unsafe.Pointer(fbuf))))
+							flen = C.int(len(fbuf))
 							if kiss_debug > 0 {
-								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
+								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
 							}
-							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
+							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
 							// FIXME KG kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 						} else {
 							var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
@@ -464,14 +464,14 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen 
 								continue
 							}
 
-							C.memcpy(unsafe.Pointer(&stemp[1]), unsafe.Pointer(fbuf), C.ulong(flen))
+							C.memcpy(unsafe.Pointer(&stemp[1]), C.CBytes(fbuf), C.ulong(flen))
 
 							if kiss_debug >= 2 {
 								/* AX.25 frame with the CRC removed. */
 								text_color_set(DW_COLOR_DEBUG)
 								dw_printf("\n")
 								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								C.hex_dump(fbuf, flen)
+								C.hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 							}
 
 							kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
@@ -655,8 +655,8 @@ func kissnet_listen_thread(kps *kissport_status_s) {
 	// "Simply KISS" as some call it.
 
 	for {
-		// FIXME KG unsigned char ch = kiss_get(kps, client);
-		// FIXME KG kiss_rec_byte (&(kps.kf[client]), ch, kiss_debug, kps, client, kissnet_send_rec_packet);
+		var ch = kiss_get(kps, int(client));
+		kiss_rec_byte(&(kps.kf[client]), C.uchar(ch), C.int(kiss_debug), kps, client, kissnet_send_rec_packet);
 	}
 } /* end kissnet_listen_thread */
 
