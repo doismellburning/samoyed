@@ -198,8 +198,8 @@ func kissserial_init(mc *C.struct_misc_config_s) {
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, flen C.int,
-	notused1 *C.struct_kissport_status_s, notused2 int) {
+func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.int,
+	notused1 *kissport_status_s, notused2 C.int) {
 	/*
 	 * Quietly discard if we don't have open connection.
 	 */
@@ -211,11 +211,11 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, fl
 	var kiss_len C.int
 
 	if flen < 0 {
-		flen = C.int(C.strlen((*C.char)(unsafe.Pointer(fbuf))))
+		flen = C.int(len(fbuf))
 		if kissserial_debug > 0 {
-			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), fbuf, flen)
+			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
 		}
-		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(unsafe.Pointer(fbuf)))
+		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
 		kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 	} else {
 		var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
@@ -227,14 +227,14 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf *C.uchar, fl
 		}
 
 		stemp[0] = C.uchar((channel << 4) | kiss_cmd)
-		C.memcpy(unsafe.Pointer(&stemp[1]), unsafe.Pointer(fbuf), C.ulong(flen))
+		C.memcpy(unsafe.Pointer(&stemp[1]), C.CBytes(fbuf), C.ulong(flen))
 
 		if kissserial_debug >= 2 {
 			/* AX.25 frame with the CRC removed. */
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			C.hex_dump(fbuf, flen)
+			C.hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 		}
 
 		kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
@@ -386,9 +386,11 @@ func kissserial_listen_thread() {
 	#endif
 	*/
 
-	for { //nolint:staticcheck
-		// FIXME KG var ch, err = kissserial_get()
-		// FIXME KG if err != nil { return } // Was pthread_exit
-		// FIXME KG C.kiss_rec_byte(&kf, C.uchar(ch), C.int(kissserial_debug), nil, -1, kissserial_send_rec_packet) // FIXME KG Cross-C-Go-argh
+	for {
+		var ch, err = kissserial_get()
+		if err != nil {
+			return
+		} // Was pthread_exit
+		kiss_rec_byte(&kf, C.uchar(ch), C.int(kissserial_debug), nil, -1, kissserial_send_rec_packet)
 	}
 }
