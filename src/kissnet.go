@@ -362,7 +362,7 @@ func connect_listen_thread(kps *kissport_status_s) {
 			}
 
 			// Reset the state and buffer.
-			// FIXME KG memset(&(kps.kf[client]), 0, sizeof(kps.kf[client]))
+			kps.kf = [len(kps.kf)]C.kiss_frame_t{}
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
 		}
@@ -442,7 +442,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
 							}
 							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
-							// FIXME KG kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
+							kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
 						} else {
 							var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
 
@@ -483,13 +483,12 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 							}
 						}
 
-						var err int // FIXME KG
-						// FIXME KG err = SOCK_SEND(kps.client_sock[client], kiss_buff, kiss_len)
-						if err <= 0 {
+						var _, err = kps.client_sock[client].Write(C.GoBytes(unsafe.Pointer(&kiss_buff[0]), kiss_len))
+						if err != nil {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("\nError %d sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
-							// FIXME KG close(kps.client_sock[client])
-							// FIXME KG kps.client_sock[client] = -1
+							dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
+							kps.client_sock[client].Close()
+							kps.client_sock[client] = nil
 						}
 					} // frame length >= 0
 				} // if all clients or the one specifie
@@ -557,11 +556,10 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 								C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
 							}
 
-							var err int // FIXME KG
-							// FIXME KG err = SOCK_SEND(kps.client_sock[client], kiss_buff, kiss_len)
-							if err <= 0 {
+							var _, err = kps.client_sock[client].Write(C.GoBytes(unsafe.Pointer(&kiss_buff[0]), kiss_len))
+							if err != nil {
 								text_color_set(DW_COLOR_ERROR)
-								dw_printf("\nError copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", kps.tcp_port, client)
+								dw_printf("\nError %s copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", err, kps.tcp_port, client)
 								kps.client_sock[client].Close()
 								kps.client_sock[client] = nil
 							}
@@ -655,8 +653,8 @@ func kissnet_listen_thread(kps *kissport_status_s) {
 	// "Simply KISS" as some call it.
 
 	for {
-		var ch = kiss_get(kps, int(client));
-		kiss_rec_byte(&(kps.kf[client]), C.uchar(ch), C.int(kiss_debug), kps, client, kissnet_send_rec_packet);
+		var ch = kiss_get(kps, int(client))
+		kiss_rec_byte(&(kps.kf[client]), C.uchar(ch), C.int(kiss_debug), kps, client, kissnet_send_rec_packet)
 	}
 } /* end kissnet_listen_thread */
 
