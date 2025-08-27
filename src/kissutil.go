@@ -681,8 +681,8 @@ func usage2() {
 func timestamp_filename() string {
 	var t = time.Now()
 
-	var s = t.Format("20060102-150405")          // KG: I do not enjoy Go's time formatting
-	s += fmt.Sprintf("-%3d", t.UnixMilli()%1000) // Ditto
+	var s = t.Format("20060102-150405")           // KG: I do not enjoy Go's time formatting
+	s += fmt.Sprintf("-%03d", t.UnixMilli()%1000) // Ditto
 
 	return s
 } /* end timestamp_filename */
