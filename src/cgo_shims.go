@@ -10,6 +10,7 @@ package direwolf
 // #include "config.h"
 // #include "tq.h"
 // #include "serial_port.h"
+// #include "kiss_frame.h"
 import "C"
 
 import (
@@ -58,6 +59,13 @@ const WPL_FORMAT_GARMIN = C.WPL_FORMAT_GARMIN
 const WPL_FORMAT_MAGELLAN = C.WPL_FORMAT_MAGELLAN
 const WPL_FORMAT_KENWOOD = C.WPL_FORMAT_KENWOOD
 const WPL_FORMAT_AIS = C.WPL_FORMAT_AIS
+
+const KS_SEARCHING = C.KS_SEARCHING
+const KS_COLLECTING = C.KS_COLLECTING
+
+const FROM_CLIENT = C.FROM_CLIENT
+
+const MAX_NOISE_LEN = C.MAX_NOISE_LEN
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
