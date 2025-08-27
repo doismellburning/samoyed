@@ -89,7 +89,7 @@ import (
  * Accumulated KISS frame and state of decoder.
  */
 
-// FIXME KG static kiss_frame_t kf;
+var kisspt_kf C.kiss_frame_t
 
 /*
  * These are for a Linux pseudo terminal.
@@ -457,6 +457,6 @@ func kisspt_listen_thread() {
 
 	for {
 		var ch = kisspt_get()
-		kiss_rec_byte(&kf, C.uchar(ch), C.int(kisspt_debug), nil, -1, kisspt_send_rec_packet)
+		kiss_rec_byte(&kisspt_kf, C.uchar(ch), C.int(kisspt_debug), nil, -1, kisspt_send_rec_packet)
 	}
 }
