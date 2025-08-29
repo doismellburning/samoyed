@@ -69,6 +69,23 @@ const FROM_CLIENT = C.FROM_CLIENT
 
 const MAX_NOISE_LEN = C.MAX_NOISE_LEN
 
+const frame_type_I C.ax25_frame_type_t = C.frame_type_I
+const frame_type_S_RR C.ax25_frame_type_t = C.frame_type_S_RR
+const frame_type_S_RNR C.ax25_frame_type_t = C.frame_type_S_RNR
+const frame_type_S_REJ C.ax25_frame_type_t = C.frame_type_S_REJ
+const frame_type_S_SREJ C.ax25_frame_type_t = C.frame_type_S_SREJ
+const frame_type_U_SABME C.ax25_frame_type_t = C.frame_type_U_SABME
+const frame_type_U_SABM C.ax25_frame_type_t = C.frame_type_U_SABM
+const frame_type_U_DISC C.ax25_frame_type_t = C.frame_type_U_DISC
+const frame_type_U_DM C.ax25_frame_type_t = C.frame_type_U_DM
+const frame_type_U_UA C.ax25_frame_type_t = C.frame_type_U_UA
+const frame_type_U_FRMR C.ax25_frame_type_t = C.frame_type_U_FRMR
+const frame_type_U_UI C.ax25_frame_type_t = C.frame_type_U_UI
+const frame_type_U_XID C.ax25_frame_type_t = C.frame_type_U_XID
+const frame_type_U_TEST C.ax25_frame_type_t = C.frame_type_U_TEST
+const frame_type_U C.ax25_frame_type_t = C.frame_type_U
+const frame_not_AX25 C.ax25_frame_type_t = C.frame_not_AX25
+
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
