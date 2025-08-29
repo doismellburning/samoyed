@@ -86,6 +86,11 @@ const frame_type_U_TEST C.ax25_frame_type_t = C.frame_type_U_TEST
 const frame_type_U C.ax25_frame_type_t = C.frame_type_U
 const frame_not_AX25 C.ax25_frame_type_t = C.frame_not_AX25
 
+const cr_00 C.cmdres_t = C.cr_00
+const cr_cmd C.cmdres_t = C.cr_cmd
+const cr_res C.cmdres_t = C.cr_res
+const cr_11 C.cmdres_t = C.cr_11
+
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
