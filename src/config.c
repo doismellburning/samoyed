@@ -43,6 +43,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <limits.h>		// for PATH_MAX
 
 #if ENABLE_GPSD
 #include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
