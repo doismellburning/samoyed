@@ -93,6 +93,10 @@ const cr_cmd C.cmdres_t = C.cr_cmd
 const cr_res C.cmdres_t = C.cr_res
 const cr_11 C.cmdres_t = C.cr_11
 
+const OCTYPE_PTT = C.OCTYPE_PTT
+const OCTYPE_DCD = C.OCTYPE_DCD
+const OCTYPE_CON = C.OCTYPE_CON
+
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
