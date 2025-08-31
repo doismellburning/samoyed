@@ -22,6 +22,7 @@ linters:
     - "prealloc"  # One day, but not now
     - "testpackage"  # Noble intent, but right now we're doing all sorts of juggling with packages, so let's save this for later
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
+    - "whitespace"  # I do not have the energy to deal with extraneous leading/trailing newlines right now
     - "wrapcheck"  # Error wrapping is the least of my concerns
   settings:
     cyclop:
