@@ -615,8 +615,7 @@ func all_frame_types(t *testing.T) {
 
 	for ftype := C.ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
-			var cmin C.cmdres_t = 0
-			var cmax C.cmdres_t = 1
+			var cmin, cmax C.cmdres_t
 
 			switch ftype {
 			// 0 = response, 1 = command
@@ -647,6 +646,8 @@ func all_frame_types(t *testing.T) {
 			case C.frame_type_U_TEST:
 				cmin = 0
 				cmax = 1
+			default:
+				panic(fmt.Sprintf("Surprising frame type found: %d", ftype))
 			}
 
 			for cr := cmin; cr <= cmax; cr++ {
