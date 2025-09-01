@@ -34,8 +34,8 @@ jobs:
               cmake_extra_flags: '-G "MinGW Makefiles"'
             }
           - {
-              name: 'Windows 2019 MinGW 32bit',
-              os: windows-2019,
+              name: 'Windows 2022 MinGW 32bit',
+              os: windows-2022,
               cc: 'i686-w64-mingw32-gcc',
               cxx: 'i686-w64-mingw32-g++',
               ar: 'i686-w64-mingw32-ar',
