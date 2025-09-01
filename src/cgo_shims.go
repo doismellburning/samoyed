@@ -11,6 +11,7 @@ package direwolf
 // #include "tq.h"
 // #include "serial_port.h"
 // #include "kiss_frame.h"
+// #include "ax25_link.h"
 import "C"
 
 import (
@@ -47,8 +48,11 @@ const SENDTO_RECV = C.SENDTO_RECV
 const TQ_PRIO_0_HI = C.TQ_PRIO_0_HI
 const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
+const AX25_DESTINATION = C.AX25_DESTINATION
 const AX25_MAX_ADDR_LEN = C.AX25_MAX_ADDR_LEN
+const AX25_MAX_ADDRS = C.AX25_MAX_ADDRS
 const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
+const AX25_N1_PACLEN_MAX = C.AX25_N1_PACLEN_MAX
 const AX25_REPEATER_1 = C.AX25_REPEATER_1
 const AX25_SOURCE = C.AX25_SOURCE
 
@@ -66,6 +70,32 @@ const KS_COLLECTING = C.KS_COLLECTING
 const FROM_CLIENT = C.FROM_CLIENT
 
 const MAX_NOISE_LEN = C.MAX_NOISE_LEN
+
+const frame_type_I C.ax25_frame_type_t = C.frame_type_I
+const frame_type_S_RR C.ax25_frame_type_t = C.frame_type_S_RR
+const frame_type_S_RNR C.ax25_frame_type_t = C.frame_type_S_RNR
+const frame_type_S_REJ C.ax25_frame_type_t = C.frame_type_S_REJ
+const frame_type_S_SREJ C.ax25_frame_type_t = C.frame_type_S_SREJ
+const frame_type_U_SABME C.ax25_frame_type_t = C.frame_type_U_SABME
+const frame_type_U_SABM C.ax25_frame_type_t = C.frame_type_U_SABM
+const frame_type_U_DISC C.ax25_frame_type_t = C.frame_type_U_DISC
+const frame_type_U_DM C.ax25_frame_type_t = C.frame_type_U_DM
+const frame_type_U_UA C.ax25_frame_type_t = C.frame_type_U_UA
+const frame_type_U_FRMR C.ax25_frame_type_t = C.frame_type_U_FRMR
+const frame_type_U_UI C.ax25_frame_type_t = C.frame_type_U_UI
+const frame_type_U_XID C.ax25_frame_type_t = C.frame_type_U_XID
+const frame_type_U_TEST C.ax25_frame_type_t = C.frame_type_U_TEST
+const frame_type_U C.ax25_frame_type_t = C.frame_type_U
+const frame_not_AX25 C.ax25_frame_type_t = C.frame_not_AX25
+
+const cr_00 C.cmdres_t = C.cr_00
+const cr_cmd C.cmdres_t = C.cr_cmd
+const cr_res C.cmdres_t = C.cr_res
+const cr_11 C.cmdres_t = C.cr_11
+
+const OCTYPE_PTT = C.OCTYPE_PTT
+const OCTYPE_DCD = C.OCTYPE_DCD
+const OCTYPE_CON = C.OCTYPE_CON
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
