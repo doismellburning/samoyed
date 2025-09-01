@@ -2018,6 +2018,7 @@ func lm_data_indication(E *C.dlq_item_t) {
 		(ftype == frame_type_U_SABM) || (ftype == frame_type_U_SABME))
 
 	if S == nil {
+		// TODO KG Log this, it's a pain when testing!
 		return
 	}
 
