@@ -12,6 +12,7 @@ linters:
     - "gocyclo"  # One day
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
+    - "intrange" # Another thing that I like in theory, but am not prioritising right now
     - "lll"  # We have inherited lots of long lines
     - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
