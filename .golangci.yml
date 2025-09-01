@@ -12,14 +12,17 @@ linters:
     - "gocyclo"  # One day
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
+    - "intrange" # Another thing that I like in theory, but am not prioritising right now
     - "lll"  # We have inherited lots of long lines
     - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
     - "nlreturn"  # Lots of false positives on C code that isn't a return
+    - "nolintlint"  # Doesn't play nicely with Cgo
     - "paralleltest"  # One day, but let's have *working* tests first
     - "prealloc"  # One day, but not now
     - "testpackage"  # Noble intent, but right now we're doing all sorts of juggling with packages, so let's save this for later
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
+    - "whitespace"  # I do not have the energy to deal with extraneous leading/trailing newlines right now
     - "wrapcheck"  # Error wrapping is the least of my concerns
   settings:
     cyclop:
@@ -39,7 +42,10 @@ linters:
       min-occurrences: 5
     gocritic:
       disabled-checks:
+        - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
+        - commentFormatting  # Yes but later
         - dupSubExpr  # Too many false positives on cgo code
+        - elseif  # I agree, but I'll fix it later
         - ifElseChain  # Reasonable but effort
         - underef  # Too many false positives on cgo code
     gocyclo:
