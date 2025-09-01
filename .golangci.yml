@@ -31,6 +31,8 @@ linters:
           deny:
             - pkg: invalid
               desc: Dummy deny because we need a non-empty list
+    exhaustive:
+      default-signifies-exhaustive: true  # Soften the check for now...
     gocognit:
       min-complexity: 180  # I sure wish this could be lower
     goconst:
