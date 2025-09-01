@@ -40,6 +40,7 @@ linters:
       min-occurrences: 5
     gocritic:
       disabled-checks:
+        - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
         - dupSubExpr  # Too many false positives on cgo code
         - ifElseChain  # Reasonable but effort
         - underef  # Too many false positives on cgo code
