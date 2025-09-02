@@ -43,6 +43,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <limits.h>		// for PATH_MAX
 
 #if ENABLE_GPSD
 #include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
@@ -683,7 +684,8 @@ static char *split (char *string, int rest_of_line)
  *
  * Purpose:     Read configuration file when application starts up.
  *
- * Inputs:	fname		- Name of configuration file.
+ * Inputs:	fname		- Name of configuration file.  Either default of direwolf.conf
+ *					or specified by user with -c command line option.
  *
  * Outputs:	p_audio_config		- Radio channel parameters stored here.
  *
@@ -727,7 +729,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 			struct misc_config_s *p_misc_config)
 {
 	FILE *fp;
-	char filepath[128];
 	char stuff[MAXCMDLEN];
 	int line;
 	int channel;
@@ -942,52 +943,63 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 								/* on the other end. */
 	p_misc_config->noxid_count = 0;
 
-/* 
- * Try to extract options from a file.
- * 
- * Windows:  File must be in current working directory.
- *
- * Linux: Search current directory then home directory.
- *
- * Future possibility - Could also search home directory
- * for Windows by combinting two variables:
- *	HOMEDRIVE=C:
- *	HOMEPATH=\Users\John
- *
- * It's not clear if this always points to same location:
- *	USERPROFILE=C:\Users\John
- */
-
-
 	channel = 0;
 	adevice = 0;
 
-// TODO: Would be better to have a search list and loop thru it.
+/* 
+ * Try to extract options from a file.
+ * 
+ * First look in cwd, then try home dir.
+ *
+ * Try using this to get Windows home directory:
+ *	USERPROFILE=C:\Users\John
+ * If that fails, we might combine two variables:
+ *	HOMEDRIVE=C:
+ *	HOMEPATH=\Users\John
+ */
 
-        strlcpy(filepath, fname, sizeof(filepath));
 
-        fp = fopen (filepath, "r");
-	
-#ifndef __WIN32__
-	if (fp == NULL && strcmp(fname, "direwolf.conf") == 0) {
-	/* Failed to open the default location.  Try home dir. */
-	  char *p;
+/*
+ * There have been cases where someone had multiple direwolf.conf files
+ * in different places and wasted a lot of time and effort because the
+ * wrong one was being used.
+ *
+ * In version 1.8, I will attempt to display the full absolute path so there
+ * is no confusion.  First look in cwd, then in home direectory.
+ */
+	fp = NULL;
+	char absfilepath[PATH_MAX];
+#ifdef __WIN32__
+	if (_fullpath (absfilepath, fname, sizeof(absfilepath)) != NULL) {
+#else
+	if (realpath (fname, absfilepath) != NULL) {
+#endif
+          fp = fopen (absfilepath, "r");
+	  if (fp == NULL) {		// Failed.  Next, try home dir
+	    strlcpy (absfilepath, "", sizeof(absfilepath));
+#ifdef __WIN32__
+	    char *h = getenv("USERPROFILE");
+	    if (h != NULL && fname[0] != '\\' && fname[1] != ':') {
+	      strlcat (absfilepath, h, sizeof(absfilepath));
+	      strlcat (absfilepath, "\\", sizeof(absfilepath));
+	    }
+#else
+	    // Don't prepend home dir if absolute path given.
+	    char *h = getenv("HOME");
+	    if (h != NULL && fname[0] != '/') {
+	      strlcat (absfilepath, h, sizeof(absfilepath));
+	      strlcat (absfilepath, "/", sizeof(absfilepath));
+	    }
+#endif
+            strlcat (absfilepath, fname, sizeof(absfilepath));
 
-
-          strlcpy (filepath, "", sizeof(filepath));
-
-	  p = getenv("HOME");
-	  if (p != NULL) {
-	    strlcpy (filepath, p, sizeof(filepath));
-	    strlcat (filepath, "/direwolf.conf", sizeof(filepath));
-	    fp = fopen (filepath, "r");
+	    fp = fopen (absfilepath, "r");
 	  } 
 	}
-#endif
+
 	if (fp == NULL)	{
-	  // TODO: not exactly right for all situations.
 	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("ERROR - Could not open configuration file %s\n", filepath);
+	  dw_printf ("ERROR - Could not open configuration file %s in cwd or homedir.\n", fname);
 	  dw_printf ("Try using -c command line option for alternate location.\n");
 #ifndef __WIN32__
 	  dw_printf ("A sample direwolf.conf file should be found in one of:\n");
@@ -998,7 +1010,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	  exit(EXIT_FAILURE);
 	}
 	
-	dw_printf ("\nReading config file %s\n", filepath);
+	dw_printf ("\nReading config file %s\n", absfilepath);
 
 	line = 0;
 	while (fgets(stuff, sizeof(stuff), fp) != NULL) {
@@ -1950,8 +1962,32 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("Use the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines.\n");
 	        continue;
 	      }
-	      strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
+
+	      // Issue 590.  Originally we used the chip name, like gpiochip3, and fed it into
+	      // gpiod_chip_open_by_name.   This function has disappeared in Debian 13 Trixie.
+	      // We must now specify the full device path, like /dev/gpiochip3, for the only
+	      // remaining open function gpiod_chip_open.
+	      // We will allow the user to specify either the name or full device path.
+	      // While we are here, also allow only the number as used by the gpiod utilities.
+
+	      if (t[0] == '/') {	// Looks like device path.  Use as given.
+	        strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
 	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	      }
+
+	      else if (isdigit(t[0])) {		// or if digit, prepend "/dev/gpiochip"
+	        strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, "/dev/gpiochip", 
+	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	        strlcat(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
+	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	      }
+
+	      else {		// otherwise, prepend "/dev/" to the name
+	        strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, "/dev/", 
+	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	        strlcat(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
+	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	      }
 
 	      t = split(NULL,0);
 	      if (t == NULL) {

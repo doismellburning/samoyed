@@ -866,6 +866,8 @@ void server_send_monitored (int chan, packet_t pp, int own_xmit)
  * MONITOR format - 	'I' for information frames.
  *			'U' for unnumbered information.
  *			'S' for supervisory and other unnumbered.
+ *
+ *			'T' for own transmitted frames.
  */
 	struct {
 	  struct agwpe_s hdr;
@@ -875,9 +877,7 @@ void server_send_monitored (int chan, packet_t pp, int own_xmit)
 	int err;
 
 	for (int client=0; client<MAX_NET_CLIENTS; client++) {
-
 	  if (enable_send_monitor_to_client[client] && client_sock[client] > 0) {
-
 	    memset (&agwpe_msg.hdr, 0, sizeof(agwpe_msg.hdr));
 
 	    agwpe_msg.hdr.portx = chan;	// datakind is added later.
@@ -910,6 +910,11 @@ void server_send_monitored (int chan, packet_t pp, int own_xmit)
 	    char desc[120];
 	    agwpe_msg.hdr.datakind = mon_desc (pp, desc, sizeof(desc));
 	    if (own_xmit) {
+	      // Should we include all own transmitted frames or only UNPROTO?
+	      // Discussion:  https://github.com/wb2osz/direwolf/issues/585
+	      if (agwpe_msg.hdr.datakind != 'U') {
+	        break;
+	      }
 	      agwpe_msg.hdr.datakind = 'T';
 	    }
 	    strlcat ((char*)(agwpe_msg.data), desc, sizeof(agwpe_msg.data));
