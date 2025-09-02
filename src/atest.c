@@ -179,6 +179,8 @@ int audio_get_fake (int a)
 	return (ch);
 }
 
+int audio_get_real (int a);
+
 int audio_get (int a) {
 	if (ATEST_C) {
 		return audio_get_fake(a);
@@ -352,6 +354,8 @@ void dlq_rec_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t
 
 } /* end fake dlq_append */
 
+void dlq_rec_frame_real (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum);
+
 void dlq_rec_frame (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum) {
 	if (ATEST_C) {
 		dlq_rec_frame_fake(chan, subchan, slice, pp, alevel, fec_type, retries, spectrum);
@@ -398,6 +402,8 @@ void ptt_set_fake (int ot, int chan, int ptt_signal)
 	return;
 }
 
+void ptt_set_real (int ot, int chan, int ptt_signal);
+
 void ptt_set (int ot, int chan, int ptt_signal) {
 	if (ATEST_C) {
 		ptt_set_fake(ot, chan, ptt_signal);
@@ -410,6 +416,8 @@ int get_input_fake (int it, int chan)
 {
 	return -1;
 }
+
+int get_input_real (int it, int chan);
 
 int get_input (int it, int chan) {
 	if (ATEST_C) {
