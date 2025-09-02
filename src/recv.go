@@ -199,12 +199,13 @@ func recv_adev_thread(a int) {
 
 func recv_process() {
 	for {
-		var timeout_value = C.ax25_link_get_next_timer_expiry()
+		var _timeout_value = ax25_link_get_next_timer_expiry()
+		var timeout_value = C.double(_timeout_value.Unix())
 
 		var timed_out = C.dlq_wait_while_empty(timeout_value)
 
 		if timed_out > 0 {
-			C.dl_timer_expiry()
+			dl_timer_expiry()
 		} else {
 			var pitem = C.dlq_remove()
 
@@ -228,25 +229,25 @@ func recv_process() {
 					/*
 					 * Link processing.
 					 */
-					C.lm_data_indication(pitem)
+					lm_data_indication(pitem)
 				case C.DLQ_CONNECT_REQUEST:
-					C.dl_connect_request(pitem)
+					dl_connect_request(pitem)
 				case C.DLQ_DISCONNECT_REQUEST:
-					C.dl_disconnect_request(pitem)
+					dl_disconnect_request(pitem)
 				case C.DLQ_XMIT_DATA_REQUEST:
-					C.dl_data_request(pitem)
+					dl_data_request(pitem)
 				case C.DLQ_REGISTER_CALLSIGN:
-					C.dl_register_callsign(pitem)
+					dl_register_callsign(pitem)
 				case C.DLQ_UNREGISTER_CALLSIGN:
-					C.dl_unregister_callsign(pitem)
+					dl_unregister_callsign(pitem)
 				case C.DLQ_OUTSTANDING_FRAMES_REQUEST:
-					C.dl_outstanding_frames_request(pitem)
+					dl_outstanding_frames_request(pitem)
 				case C.DLQ_CHANNEL_BUSY:
-					C.lm_channel_busy(pitem)
+					lm_channel_busy(pitem)
 				case C.DLQ_SEIZE_CONFIRM:
-					C.lm_seize_confirm(pitem)
+					lm_seize_confirm(pitem)
 				case C.DLQ_CLIENT_CLEANUP:
-					C.dl_client_cleanup(pitem)
+					dl_client_cleanup(pitem)
 				}
 
 				C.dlq_delete(pitem)
