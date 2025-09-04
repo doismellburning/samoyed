@@ -712,31 +712,25 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 	/*
 	 * Add the info part depending on beacon type.
 	 */
-	var info [C.AX25_MAX_INFO_LEN]C.char
-
 	switch bp.btype {
 	case BEACON_POSITION:
 
-		C.encode_position(bp.messaging, bp.compress,
+		beacon_text += encode_position(bp.messaging, bp.compress,
 			bp.lat, bp.lon, bp.ambiguity,
 			C.int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
 			bp.symtab, bp.symbol,
 			C.int(bp.power), C.int(bp.height), C.int(bp.gain), &bp.dir[0],
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
 			bp.freq, bp.tone, bp.offset,
-			C.CString(super_comment),
-			&info[0], C.ulong(len(info)))
-		beacon_text += C.GoString(&info[0])
+			C.CString(super_comment))
 
 	case BEACON_OBJECT:
 
-		C.encode_object(&bp.objname[0], bp.compress, 1, bp.lat, bp.lon, bp.ambiguity,
+		beacon_text += encode_object(&bp.objname[0], bp.compress, 1, bp.lat, bp.lon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			C.int(bp.power), C.int(bp.height), C.int(bp.gain), &bp.dir[0],
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			bp.freq, bp.tone, bp.offset, C.CString(super_comment),
-			&info[0], C.ulong(len(info)))
-		beacon_text += C.GoString(&info[0])
+			bp.freq, bp.tone, bp.offset, C.CString(super_comment))
 
 	case BEACON_TRACKER:
 
@@ -756,15 +750,13 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 				coarse = C.int(math.Round(float64(gpsinfo.track)))
 			}
 
-			C.encode_position(bp.messaging, bp.compress,
+			beacon_text += encode_position(bp.messaging, bp.compress,
 				gpsinfo.dlat, gpsinfo.dlon, bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				C.int(bp.power), C.int(bp.height), C.int(bp.gain), &bp.dir[0],
 				coarse, C.int(math.Round(float64(gpsinfo.speed_knots))),
 				bp.freq, bp.tone, bp.offset,
-				C.CString(super_comment),
-				&info[0], C.ulong(len(info)))
-			beacon_text += C.GoString(&info[0])
+				C.CString(super_comment))
 
 			/* Write to log file for testing. */
 			/* The idea is to run log2gpx and map the result rather than */

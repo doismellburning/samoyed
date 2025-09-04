@@ -117,18 +117,16 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 
 	var messaging C.int = 0
 	var compressed C.int = 0
-	var info [C.AX25_MAX_PACKET_LEN]C.char
 
-	C.encode_position(messaging, compressed,
+	var info = encode_position(messaging, compressed,
 		C.double(lat), C.double(lon), 0, C.int(DW_METERS_TO_FEET(alt)),
 		'/', '=',
 		C.G_UNKNOWN, C.G_UNKNOWN, C.G_UNKNOWN, C.CString(""), // PHGd
 		C.int(course), C.int(knots),
 		445.925, 0, 0,
-		C.CString(comment),
-		&info[0], C.ulong(len(info)))
+		C.CString(comment))
 
-	var position_report = fmt.Sprintf("%s>WALK96:%s", MYCALL, C.GoString(&info[0]))
+	var position_report = fmt.Sprintf("%s>WALK96:%s", MYCALL, info)
 
 	fmt.Printf("%s\n", position_report)
 

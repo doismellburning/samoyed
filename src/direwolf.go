@@ -1121,19 +1121,17 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			waypoint_send_ais([]byte(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
 
 			if C.A_opt_ais_to_obj > 0 && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-				var ais_obj_info [256]C.char
-				C.encode_object(&A.g_name[0], 0, C.time(nil),
+				var ais_obj_info = encode_object(&A.g_name[0], 0, C.time(nil),
 					A.g_lat, A.g_lon, 0, // no ambiguity
 					A.g_symbol_table, A.g_symbol_code,
 					0, 0, 0, C.CString(""), // power, height, gain, direction.
 					// Unknown not handled properly.
 					// Should encode_object take floating point here?
 					C.int(A.g_course+0.5), C.int(DW_MPH_TO_KNOTS(float64(A.g_speed_mph))+0.5),
-					0, 0, 0, &A.g_comment[0], // freq, tone, offset
-					&ais_obj_info[0], C.ulong(len(ais_obj_info)))
+					0, 0, 0, &A.g_comment[0]) // freq, tone, offset
 
 				// TODO Bodge
-				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", C.GoString(&A.g_src[0]), C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, C.GoString(&ais_obj_info[0]))
+				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", C.GoString(&A.g_src[0]), C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, ais_obj_info)
 				C.strcpy(&ais_obj_packet[0], C.CString(_ais_obj_packet))
 
 				dw_printf("[%d.AIS] %s\n", channel, _ais_obj_packet)
