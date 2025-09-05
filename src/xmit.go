@@ -523,11 +523,7 @@ func xmit_thread (channel C.int) {
 	        var info_len = C.ax25_get_info (pp, &pinfo);
 
 	        text_color_set(DW_COLOR_INFO);
-			var pChar = 'L'
-			if prio == TQ_PRIO_0_HI {
-				pChar = 'H'
-			}
-	        dw_printf ("[%d%c] ", channel, pChar)
+	        dw_printf ("[%d%c] ", channel, priorityToRune(prio))
 
 	        dw_printf ("%s", stemp);			/* stations followed by : */
 	        C.ax25_safe_print (pinfo, info_len, ! ax25_is_aprs(pp));
@@ -540,6 +536,13 @@ func xmit_thread (channel C.int) {
 	} /* while 1 */
 } /* end xmit_thread */
 
+func priorityToRune(prio C.int) rune {
+			if prio == TQ_PRIO_0_HI {
+				return 'H'
+			} else {
+				return 'L'
+			}
+		}
 
 
 /*-------------------------------------------------------------------
@@ -615,58 +618,61 @@ func xmit_thread (channel C.int) {
 
 func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int) {
 
-	int pre_flags, post_flags;
-	int num_bits;		/* Total number of bits in transmission */
+	// FIXME KG int pre_flags, post_flags;
+	// FIXME KG int num_bits;		/* Total number of bits in transmission */
 				/* including all flags and bit stuffing. */
-	int duration;		/* Transmission time in milliseconds. */
-	int already;
-	int wait_more;
+	// FIXME KG int duration;		/* Transmission time in milliseconds. */
+	// FIXME KG int already;
+	// FIXME KG int wait_more;
 
-	int numframe = 0;	/* Number of frames sent during this transmission. */
+	// FIXME KG int numframe = 0;	/* Number of frames sent during this transmission. */
+
+
+	// FIXME KG int nb;
 
 /*
  * These are for timing of a transmission.
  * All are in usual unix time (seconds since 1/1/1970) but higher resolution
  */
-	double time_ptt;	/* Time when PTT is turned on. */
-	double time_now;	/* Current time. */
-
-
-	int nb;
+	var time_ptt = time.Now()
 
 /* 
  * Turn on transmitter.
  * Start sending leading flag bytes.
  */
-	time_ptt = dtime_now ();
 
 // TODO: This was written assuming bits/sec = baud.
 // Does it is need to be scaled differently for PSK?
 
+/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_thread: t=%.3f, Turn on PTT now for channel %d. speed = %d\n", dtime_now()-time_ptt, chan, xmit_bits_per_sec[chan]);
 #endif
-	ptt_set (OCTYPE_PTT, chan, 1);
+*/
+	ptt_set (OCTYPE_PTT, channel, 1);
 
 // Inform data link state machine that we are now transmitting.
 
-	dlq_seize_confirm (chan);	// C4.2.  "This primitive indicates, to the Data-link State
+	dlq_seize_confirm (channel);	// C4.2.  "This primitive indicates, to the Data-link State
 					// machine, that the transmission opportunity has arrived."
 
-	pre_flags = MS_TO_BITS(xmit_txdelay[chan] * 10, chan) / 8;
-	num_bits =  layer2_preamble_postamble (chan, pre_flags, 0, save_audio_config_p);
+	pre_flags = MS_TO_BITS(xmit_txdelay[channel] * 10, channel) / 8;
+	num_bits =  layer2_preamble_postamble (channel, pre_flags, 0, save_audio_config_p);
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("xmit_thread: t=%.3f, txdelay=%d [*10], pre_flags=%d, num_bits=%d\n", dtime_now()-time_ptt, xmit_txdelay[chan], pre_flags, num_bits);
+	dw_printf ("xmit_thread: t=%.3f, txdelay=%d [*10], pre_flags=%d, num_bits=%d\n", dtime_now()-time_ptt, xmit_txdelay[channel], pre_flags, num_bits);
 	double presleep = dtime_now();
 #endif
+*/
 
 	SLEEP_MS (10);			// Give data link state machine a chance to
 					// to stuff more frames into the transmit queue,
 					// in response to dlq_seize_confirm, so
 					// we don't run off the end too soon.
 
+					/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	// How long did sleep last?
@@ -677,39 +683,43 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
 	  dw_printf ("Sleep for 10 ms actually took %.3f second!\n", naptime);
 	}
 #endif
+*/
 
 /*
  * Transmit the frame.
  */
 
-	nb = send_one_frame (chan, prio, pp);
+	nb = send_one_frame (channel, prio, pp);
 
 	num_bits += nb;
-	if (nb > 0) numframe++;
+	if (nb > 0) {
+		numframe++;
+	}
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 #endif
+*/
 	ax25_delete (pp);
 
 /*
  * See if we can bundle additional frames into this transmission.
  */
 
-	int done = 0;
-	while (numframe < max_bundle && ! done) {
+	var done = false
+	for (numframe < max_bundle && ! done) {
 
 /*
  * Peek at what is available.
  * Don't remove from queue yet because it might not be eligible.
  */
 	  prio = TQ_PRIO_1_LO;
-	  pp = tq_peek (chan, TQ_PRIO_0_HI);
+	  pp = tq_peek (channel, TQ_PRIO_0_HI);
 	  if (pp != nil) {
 	    prio = TQ_PRIO_0_HI;
-	  }
-	  else {
-	    pp = tq_peek (chan, TQ_PRIO_1_LO);
+	  } else {
+	    pp = tq_peek (channel, TQ_PRIO_1_LO);
 	  }
 
 	  if (pp != nil) {
@@ -727,26 +737,31 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
 	      case FLAVOR_APRS_NEW:
 	      case FLAVOR_OTHER:
 
-	        pp = tq_remove (chan, prio);
+	        pp = tq_remove (channel, prio);
+			/* TODO KG
 #if DEBUG
 	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("xmit_thread: t=%.3f, tq_remove(chan=%d, prio=%d) returned %p\n", dtime_now()-time_ptt, chan, prio, pp);
+	        dw_printf ("xmit_thread: t=%.3f, tq_remove(channel=%d, prio=%d) returned %p\n", dtime_now()-time_ptt, channel, prio, pp);
 #endif
+*/
 
-	        nb = send_one_frame (chan, prio, pp);
+	        nb = send_one_frame (channel, prio, pp);
 
 	        num_bits += nb;
-	        if (nb > 0) numframe++;
+	        if (nb > 0) {
+				numframe++;
+			}
+			/* TODO KG
 #if DEBUG
 	        text_color_set(DW_COLOR_DEBUG);
 	        dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 #endif
+*/
 	        ax25_delete (pp);
 
 	        break;
 	    }
-	  }
-	  else {
+	  } else {
 	    done = 1;
 	  }
 	}
@@ -755,13 +770,15 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
  * Need TXTAIL because we don't know exactly when the sound is done.
  */
 
-	post_flags = MS_TO_BITS(xmit_txtail[chan] * 10, chan) / 8;
-	nb = layer2_preamble_postamble (chan, post_flags, 1, save_audio_config_p);
+	post_flags = MS_TO_BITS(xmit_txtail[channel] * 10, channel) / 8;
+	nb = layer2_preamble_postamble (channel, post_flags, 1, save_audio_config_p);
 	num_bits += nb;
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("xmit_thread: t=%.3f, txtail=%d [*10], post_flags=%d, nb=%d, num_bits=%d\n", dtime_now()-time_ptt, xmit_txtail[chan], post_flags, nb, num_bits);
+	dw_printf ("xmit_thread: t=%.3f, txtail=%d [*10], post_flags=%d, nb=%d, num_bits=%d\n", dtime_now()-time_ptt, xmit_txtail[channel], post_flags, nb, num_bits);
 #endif
+*/
 
 
 /* 
@@ -771,7 +788,7 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
  * about 40 mS of elapsed real time.
  */
 
-	audio_wait(ACHAN2ADEV(chan));		
+	audio_wait(ACHAN2ADEV(channel));		
 
 /* 
  * Ideally we should be here just about the time when the audio is ending.
@@ -780,7 +797,7 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
  * Calculate how long the frame(s) should take in milliseconds.
  */
 
-	duration = BITS_TO_MS(num_bits, chan);
+	duration = BITS_TO_MS(num_bits, channel);
 
 /*
  * See how long it has been since PTT was turned on.
@@ -791,15 +808,16 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
 	already = (int) ((time_now - time_ptt) * 1000.);
 	wait_more = duration - already;
 
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_thread: t=%.3f, xmit duration=%d, %d already elapsed since PTT, wait %d more\n", dtime_now()-time_ptt, duration, already, wait_more );
 #endif
+*/
 
 	if (wait_more > 0) {
 	  SLEEP_MS(wait_more);
-	}
-	else if (wait_more < -100) {
+	} else if (wait_more < -100) {
 
 	  /* If we run over by 10 mSec or so, it's nothing to worry about. */
 	  /* However, if PTT is still on about 1/10 sec after audio */
@@ -807,23 +825,22 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
 
 	  /* Looks like a bug with the RPi audio system. Never an issue with Ubuntu.  */
 	  /* This runs over randomly sometimes. TODO:  investigate more fully sometime. */
-#ifndef __arm__
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Transmit timing error: PTT is on %d mSec too long.\n", -wait_more);
-#endif
 	}
 
 /*
  * Turn off transmitter.
  */
+ /* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	time_now = dtime_now();
 	dw_printf ("xmit_thread: t=%.3f, Turn off PTT now. Actual time on was %d mS, vs. %d desired\n", dtime_now()-time_ptt, (int) ((time_now - time_ptt) * 1000.), duration);
 #endif
+*/
 		
-	ptt_set (OCTYPE_PTT, chan, 0);
-
+	ptt_set (OCTYPE_PTT, channel, 0);
 } /* end xmit_ax25_frames */
 
 
@@ -849,12 +866,11 @@ func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int)
  *--------------------------------------------------------------------*/
 
 
-static int send_one_frame (int c, int p, packet_t pp)
-{
-	char stemp[1024];	/* max size needed? */
-	int info_len;
-	unsigned char *pinfo;
-	int nb;
+func send_one_frame (c C.int, p C.int, pp packet_t) C.int {
+	// FIXME KG char stemp[1024];	/* max size needed? */
+	// FIXME KG int info_len;
+	// FIXME KG unsigned char *pinfo;
+	// FIXME KG int nb;
 
 
 	if (ax25_is_null_frame(pp)) {
@@ -879,63 +895,65 @@ static int send_one_frame (int c, int p, packet_t pp)
 	  return(0);
 	}
 
-	char ts[100];		// optional time stamp.
+	// FIXME KG char ts[100];		// optional time stamp.
 
 	if (strlen(save_audio_config_p.timestamp_format) > 0) {
-	  char tstmp[100];
+	  // FIXME KG char tstmp[100];
 	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
-	}
-	else {
+	} else {
 	  strlcpy (ts, "", sizeof(ts));
 	}
 
 	ax25_format_addrs (pp, stemp);
 	info_len = ax25_get_info (pp, &pinfo);
 	text_color_set(DW_COLOR_XMIT);
+	/*
 #if 0						// FIXME - enable this?
 	dw_printf ("[%d%c%s%s] ", c,
 			p==TQ_PRIO_0_HI ? 'H' : 'L',
 			save_audio_config_p.achan[c].fx25_strength ? "F" : "",
 			ts);
 #else
-	dw_printf ("[%d%c%s] ", c, p==TQ_PRIO_0_HI ? 'H' : 'L', ts);
-#endif
+*/
+	dw_printf ("[%d%c%s] ", c, priorityToRune(p), ts);
+/* #endif */
 	dw_printf ("%s", stemp);			/* stations followed by : */
 
 /* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
 	if ( ! ax25_is_aprs(pp)) {
-	  ax25_frame_type_t ftype;
+		/* FIXME KG
 	  cmdres_t cr;
 	  char desc[80];
 	  int pf;
 	  int nr;
 	  int ns;
+	  */
 
-	  ftype = ax25_frame_type (pp, &cr, desc, &pf, &nr, &ns);
+	  var ftype = ax25_frame_type (pp, &cr, desc, &pf, &nr, &ns);
 
 	  dw_printf ("(%s)", desc);
 
 	  if (ftype == frame_type_U_XID) {
+		  /* FIXME KG 
 	    struct xid_param_s param;
 	    char info2text[150];
+		*/
 
 	    xid_parse (pinfo, info_len, &param, info2text, sizeof(info2text));
 	    dw_printf (" %s\n", info2text);
-	  }
-	  else {
-	    ax25_safe_print ((char *)pinfo, info_len, ! ax25_is_aprs(pp));
+	  } else {
+	    ax25_safe_print (pinfo, info_len, ! ax25_is_aprs(pp));
 	    dw_printf ("\n");
 	  }
-	}
-	else {
-	  ax25_safe_print ((char *)pinfo, info_len, ! ax25_is_aprs(pp));
+	} else {
+	  ax25_safe_print (pinfo, info_len, ! ax25_is_aprs(pp));
 	  dw_printf ("\n");
 	}
 
-	(void)ax25_check_addresses (pp);
+	ax25_check_addresses (pp);
 
 /* Optional hex dump of packet. */
 
@@ -951,10 +969,10 @@ static int send_one_frame (int c, int p, packet_t pp)
 /*
  * Transmit the frame.
  */
-	int send_invalid_fcs2 = 0;
+	var send_invalid_fcs2 = 0;
 
 	if (save_audio_config_p.xmit_error_rate != 0) {
-	  float r = (float)(rand()) / (float)RAND_MAX;		// Random, 0.0 to 1.0
+	  var r = (rand()) / RAND_MAX;		// Random, 0.0 to 1.0
 
 	  if (save_audio_config_p.xmit_error_rate / 100.0 > r) {
 	    send_invalid_fcs2 = 1;
@@ -970,7 +988,6 @@ static int send_one_frame (int c, int p, packet_t pp)
 	server_send_monitored (c, pp, 1);
 
 	return (nb);
-
 } /* end send_one_frame */
 
 
@@ -996,29 +1013,28 @@ static int send_one_frame (int c, int p, packet_t pp)
  *--------------------------------------------------------------------*/
 
 
-static void xmit_speech (int c, packet_t pp)
-{
+func xmit_speech (c C.int, pp packet_t) {
+	/* FIXME KG 
 	int info_len;
 	unsigned char *pinfo;
+	*/
 
 /*
  * Print spoken packet.  Prefix by channel.
  */
 
-	char ts[100];		// optional time stamp.
+	// FIXME KG char ts[100];		// optional time stamp.
 
 	if (strlen(save_audio_config_p.timestamp_format) > 0) {
-	  char tstmp[100];
+	  // FIXME KG char tstmp[100];
 	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
-	}
-	else {
+	} else {
 	  strlcpy (ts, "", sizeof(ts));
 	}
 
-	info_len = ax25_get_info (pp, &pinfo);
-	(void)info_len;
+	var info_len = ax25_get_info (pp, &pinfo);
 
 	text_color_set(DW_COLOR_XMIT);
 	dw_printf ("[%d.speech%s] \"%s\"\n", c, ts, pinfo);
@@ -1040,7 +1056,7 @@ static void xmit_speech (int c, packet_t pp)
  * Invoke the speech-to-text script.
  */	
 
-	xmit_speak_it (save_audio_config_p.tts_script, c, (char*)pinfo);
+	xmit_speak_it (save_audio_config_p.tts_script, c, pinfo);
 
 /*
  * Turn off transmitter.
@@ -1055,26 +1071,24 @@ static void xmit_speech (int c, packet_t pp)
 /* Broken out into separate function so configuration can validate it. */
 /* Returns 0 for success. */
 
-int xmit_speak_it (char *script, int c, char *orig_msg)
-{
+func xmit_speak_it (script *C.char, c C.int, orig_msg *C.char) C.int {
+	/* FIXME KG
 	int err;
 	char msg[2000];
 	char cmd[sizeof(msg) + 16];
 	char *p;
+	*/
 
 /* Remove any quotes because it will mess up command line argument parsing. */
 
 	strlcpy (msg, orig_msg, sizeof(msg));
 
-	for (p=msg; *p!='\0'; p++) {
-	  if (*p == '"') *p = ' ';
+	for p:=msg; *p!=0; p++ {
+	  if (*p == '"') {
+		  *p = ' ';
+	  }
 	}
-
-#if __WIN32__
-	snprintf (cmd, sizeof(cmd), "%s %d \"%s\" >nul", script, c, msg);
-#else
 	snprintf (cmd, sizeof(cmd), "%s %d \"%s\"", script, c, msg);
-#endif
 
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("cmd=%s\n", cmd);
@@ -1082,15 +1096,16 @@ int xmit_speak_it (char *script, int c, char *orig_msg)
 	err = system (cmd);
 
 	if (err != 0) {
+		/* FIXME KG 
 	  char cwd[1000];
 	  char path[3000];
 	  char *ignore;
+	  */
 
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Failed to run text-to-speech script, %s\n", script);
 
 	  ignore = getcwd (cwd, sizeof(cwd));
-	  (void)ignore;
 	  strlcpy (path, getenv("PATH"), sizeof(path));
 
 	  dw_printf ("CWD = %s\n", cwd);
@@ -1125,27 +1140,26 @@ int xmit_speak_it (char *script, int c, char *orig_msg)
  *--------------------------------------------------------------------*/
 
 
-static void xmit_morse (int c, packet_t pp, int wpm)
-{
+func xmit_morse (c C.int, pp packet_t, wpm C.int) {
+	/* FIXME KG
 	int info_len;
 	unsigned char *pinfo;
 	int length_ms, wait_ms;
 	double start_ptt, wait_until, now;
 
 	char ts[100];		// optional time stamp.
+	*/
 
 	if (strlen(save_audio_config_p.timestamp_format) > 0) {
-	  char tstmp[100];
+	  // FIXME KG char tstmp[100];
 	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
-	}
-	else {
+	} else {
 	  strlcpy (ts, "", sizeof(ts));
 	}
 
 	info_len = ax25_get_info (pp, &pinfo);
-	(void)info_len;
 	text_color_set(DW_COLOR_XMIT);
 	dw_printf ("[%d.morse%s] \"%s\"\n", c, ts, pinfo);
 
@@ -1154,7 +1168,7 @@ static void xmit_morse (int c, packet_t pp, int wpm)
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	length_ms = morse_send (c, (char*)pinfo, wpm, MAXX(xmit_txdelay[c] * 10, 300), MAXX(xmit_txtail[c] * 10, 250));
+	length_ms = morse_send (c, pinfo, wpm, MAXX(xmit_txdelay[c] * 10, 300), MAXX(xmit_txtail[c] * 10, 250));
 
 	// there is probably still sound queued up in the output buffers.
 
@@ -1162,14 +1176,13 @@ static void xmit_morse (int c, packet_t pp, int wpm)
 
 	now = dtime_now();
 
-	wait_ms = (int) ( ( wait_until - now ) * 1000 );
+	wait_ms =  ( ( wait_until - now ) * 1000 );
 	if (wait_ms > 0) {
 	  SLEEP_MS(wait_ms);
 	}
 
 	ptt_set (OCTYPE_PTT, c, 0);
 	ax25_delete (pp);
-
 } /* end xmit_morse */
 
 
@@ -1197,27 +1210,27 @@ static void xmit_morse (int c, packet_t pp, int wpm)
  *--------------------------------------------------------------------*/
 
 
-static void xmit_dtmf (int c, packet_t pp, int speed)
+func xmit_dtmf (c C.int, pp packet_t, speed C.int)
 {
+	/* FIXME KG 
 	int info_len;
 	unsigned char *pinfo;
 	int length_ms, wait_ms;
 	double start_ptt, wait_until, now;
 
 	char ts[100];		// optional time stamp.
+	*/
 
 	if (strlen(save_audio_config_p.timestamp_format) > 0) {
-	  char tstmp[100];
+	  // FIXME KG char tstmp[100];
 	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
-	}
-	else {
+	} else {
 	  strlcpy (ts, "", sizeof(ts));
 	}
 
 	info_len = ax25_get_info (pp, &pinfo);
-	(void)info_len;
 	text_color_set(DW_COLOR_XMIT);
 	dw_printf ("[%d.dtmf%s] \"%s\"\n", c, ts, pinfo);
 
@@ -1226,7 +1239,7 @@ static void xmit_dtmf (int c, packet_t pp, int speed)
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	length_ms = dtmf_send (c, (char*)pinfo, speed, MAXX(xmit_txdelay[c] * 10, 300), MAXX(xmit_txtail[c] * 10, 250));
+	length_ms = dtmf_send (c, pinfo, speed, MAXX(xmit_txdelay[c] * 10, 300), MAXX(xmit_txtail[c] * 10, 250));
 
 	// there is probably still sound queued up in the output buffers.
 
@@ -1234,18 +1247,16 @@ static void xmit_dtmf (int c, packet_t pp, int speed)
 
 	now = dtime_now();
 
-	wait_ms = (int) ( ( wait_until - now ) * 1000 );
+	wait_ms =  ( ( wait_until - now ) * 1000 );
 	if (wait_ms > 0) {
 	  SLEEP_MS(wait_ms);
-	}
-	else {
+	} else {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Oops.  CPU too slow to keep up with DTMF generation.\n");
 	}
 
 	ptt_set (OCTYPE_PTT, c, 0);
 	ax25_delete (pp);
-
 } /* end xmit_dtmf */
 
 
@@ -1309,7 +1320,7 @@ static void xmit_dtmf (int c, packet_t pp, int speed)
 #define WAIT_TIMEOUT_MS (60 * 1000)	
 #define WAIT_CHECK_EVERY_MS 10
 
-static int wait_for_clear_channel (int chan, int slottime, int persist, int fulldup)
+static int wait_for_clear_channel (int channel, int slottime, int persist, int fulldup)
 {
 	int n = 0;
 
@@ -1322,7 +1333,7 @@ static int wait_for_clear_channel (int chan, int slottime, int persist, int full
 
 start_over_again:
 
-	while (hdlc_rec_data_detect_any(chan)) {
+	while (hdlc_rec_data_detect_any(channel)) {
 	  SLEEP_MS(WAIT_CHECK_EVERY_MS);
 	  n++;
 	  if (n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS)) {
@@ -1337,11 +1348,11 @@ start_over_again:
  * turn around fast enough when using squelch and VOX.
  */
 
-	if (save_audio_config_p.achan[chan].dwait > 0) {
-	  SLEEP_MS (save_audio_config_p.achan[chan].dwait * 10);
+	if (save_audio_config_p.achan[channel].dwait > 0) {
+	  SLEEP_MS (save_audio_config_p.achan[channel].dwait * 10);
 	}
 
-	if (hdlc_rec_data_detect_any(chan)) {
+	if (hdlc_rec_data_detect_any(channel)) {
 	  goto start_over_again;
 	}
 
@@ -1349,12 +1360,12 @@ start_over_again:
  * Wait random time.
  * Proceed to transmit sooner if anything shows up in high priority queue.
  */
-	while (tq_peek(chan, TQ_PRIO_0_HI) == nil) {
+	while (tq_peek(channel, TQ_PRIO_0_HI) == nil) {
 	  int r;
 
 	  SLEEP_MS (slottime * 10);
 
-	  if (hdlc_rec_data_detect_any(chan)) {
+	  if (hdlc_rec_data_detect_any(channel)) {
 	    goto start_over_again;
 	  }
 
@@ -1376,7 +1387,7 @@ start_over_again:
 
 // TODO: review this.
 
-	while ( ! dw_mutex_try_lock(&(audio_out_dev_mutex[ACHAN2ADEV(chan)]))) {
+	while ( ! dw_mutex_try_lock(&(audio_out_dev_mutex[ACHAN2ADEV(channel)]))) {
 	  SLEEP_MS(WAIT_CHECK_EVERY_MS);
 	  n++;
 	  if (n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS)) {
