@@ -1,27 +1,6 @@
-
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2011, 2013, 2014, 2015, 2016, 2017  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
+package direwolf
 
 /*------------------------------------------------------------------
- *
- * Module:      xmit.c
  *
  * Purpose:   	Transmit queued up packets when channel is clear.
  *		
@@ -51,32 +30,31 @@
  *
  *---------------------------------------------------------------*/
 
-#include "direwolf.h"
-
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-#include <math.h>
-#include <errno.h>
-#include <stddef.h>
-
-#include "direwolf.h"
-#include "ax25_pad.h"
-#include "textcolor.h"
-#include "audio.h"
-#include "tq.h"
-#include "xmit.h"
-#include "hdlc_send.h"
-#include "hdlc_rec.h"
-#include "ptt.h"
-#include "dtime_now.h"
-#include "morse.h"
-#include "dtmf.h"
-#include "xid.h"
-#include "dlq.h"
-#include "server.h"
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <unistd.h>
+// #include <stdlib.h>
+// #include <assert.h>
+// #include <string.h>
+// #include <math.h>
+// #include <errno.h>
+// #include <stddef.h>
+// #include "direwolf.h"
+// #include "ax25_pad.h"
+// #include "textcolor.h"
+// #include "audio.h"
+// #include "tq.h"
+// #include "xmit.h"
+// #include "hdlc_send.h"
+// #include "hdlc_rec.h"
+// #include "ptt.h"
+// #include "dtime_now.h"
+// #include "morse.h"
+// #include "dtmf.h"
+// #include "xid.h"
+// #include "dlq.h"
+// #include "server.h"
+import "C"
 
 
 /*
@@ -88,78 +66,35 @@
  */
 
 
-static int xmit_slottime[MAX_RADIO_CHANS];	/* Slot time in 10 mS units for persistence algorithm. */
+var xmit_slottime[MAX_RADIO_CHANS] C.int;	/* Slot time in 10 mS units for persistence algorithm. */
 
-static int xmit_persist[MAX_RADIO_CHANS];	/* Sets probability for transmitting after each */
+var xmit_persist[MAX_RADIO_CHANS]C.int;	/* Sets probability for transmitting after each */
 					/* slot time delay.  Transmit if a random number */
 					/* in range of 0 - 255 <= persist value.  */
 					/* Otherwise wait another slot time and try again. */
 
-static int xmit_txdelay[MAX_RADIO_CHANS];	/* After turning on the transmitter, */
+var xmit_txdelay[MAX_RADIO_CHANS]C.int;	/* After turning on the transmitter, */
 					/* send "flags" for txdelay * 10 mS. */
 
-static int xmit_txtail[MAX_RADIO_CHANS];	/* Amount of time to keep transmitting after we */
+var xmit_txtail[MAX_RADIO_CHANS]C.int;	/* Amount of time to keep transmitting after we */
 					/* are done sending the data.  This is to avoid */
 					/* dropping PTT too soon and chopping off the end */
 					/* of the frame.  Again 10 mS units. */
 
-static int xmit_fulldup[MAX_RADIO_CHANS];	/* Full duplex if non-zero. */
+var xmit_fulldup[MAX_RADIO_CHANS]C.int;	/* Full duplex if non-zero. */
 
-static int xmit_bits_per_sec[MAX_RADIO_CHANS];	/* Data transmission rate. */
+var xmit_bits_per_sec[MAX_RADIO_CHANS]C.int;	/* Data transmission rate. */
 					/* Often called baud rate which is equivalent for */
 					/* 1200 & 9600 cases but could be different with other */
 					/* modulation techniques. */
 
-static int g_debug_xmit_packet;		/* print packet in hexadecimal form for debugging. */
+var g_debug_xmit_packet C.int;		/* print packet in hexadecimal form for debugging. */
 
 
-// TODO: When this was first written, bits/sec was same as baud.
-// Need to revisit this for PSK modes where they are not the same.
 
-#if 0		// Added during 1.5 beta test
+// FIXME KG #define BITS_TO_MS(b,ch) (((b)*1000)/xmit_bits_per_sec[(ch)])
 
-static int BITS_TO_MS (int b, int ch) {
-
-	int bits_per_symbol;
-
-	switch (save_audio_config_p->achan[ch].modem_type) {
-	  case MODEM_QPSK:	bits_per_symbol = 2; break;
-	  case MODEM_8PSK:	bits_per_symbol = 3; break;
-	  case default:		bits_per_symbol = 1; break;
-	}
-
-	return ( (b * 1000) / (xmit_bits_per_sec[(ch)] * bits_per_symbol) );
-}
-
-static int MS_TO_BITS (int ms, int ch) {
-
-	int bits_per_symbol;
-
-	switch (save_audio_config_p->achan[ch].modem_type) {
-	  case MODEM_QPSK:	bits_per_symbol = 2; break;
-	  case MODEM_8PSK:	bits_per_symbol = 3; break;
-	  case default:		bits_per_symbol = 1; break;
-	}
-
-	return ( (ms * xmit_bits_per_sec[(ch)] * bits_per_symbol) / 1000 );  TODO...
-}
-
-#else		// OK for 1200, 9600 but wrong for PSK
-
-#define BITS_TO_MS(b,ch) (((b)*1000)/xmit_bits_per_sec[(ch)])
-
-#define MS_TO_BITS(ms,ch) (((ms)*xmit_bits_per_sec[(ch)])/1000)
-
-#endif
-
-#define MAXX(a,b) (((a)>(b)) ? (a) : (b))
-
-
-#if __WIN32__
-static unsigned __stdcall xmit_thread (void *arg);
-#else
-static void * xmit_thread (void *arg);
-#endif
+// FIXME KG #define MS_TO_BITS(ms,ch) (((ms)*xmit_bits_per_sec[(ch)])/1000)
 
 
 /*
@@ -168,16 +103,9 @@ static void * xmit_thread (void *arg);
  * We are not clever enough to multiplex them so use this
  * so only one is activte at the same time.
  */
-static dw_mutex_t audio_out_dev_mutex[MAX_ADEVS];
+// FIXME KG static dw_mutex_t audio_out_dev_mutex[MAX_ADEVS];
 
 
-
-static int wait_for_clear_channel (int channel, int slotttime, int persist, int fulldup);
-static void xmit_ax25_frames (int c, int p, packet_t pp, int max_bundle);
-static int send_one_frame (int c, int p, packet_t pp);
-static void xmit_speech (int c, packet_t pp);
-static void xmit_morse (int c, packet_t pp, int wpm);
-static void xmit_dtmf (int c, packet_t pp, int speed);
 
 
 /*-------------------------------------------------------------------
@@ -202,27 +130,18 @@ static void xmit_dtmf (int c, packet_t pp, int speed);
  *
  *--------------------------------------------------------------------*/
 
-static struct audio_s *save_audio_config_p;
+// FIXME KG static struct audio_s *save_audio_config_p;
 
 
-void xmit_init (struct audio_s *p_modem, int debug_xmit_packet)
-{
-	int j;
-	int ad;
+func xmit_init (p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
+	// FIXME KG pthread_t xmit_tid[MAX_RADIO_CHANS];
 
-#if __WIN32__
-	HANDLE xmit_th[MAX_RADIO_CHANS];
-#else
-	//pthread_attr_t attr;
-	//struct sched_param sp;
-	pthread_t xmit_tid[MAX_RADIO_CHANS];
-#endif
-	//int e;
-
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_init ( ... )\n");
 #endif
+*/
 
 	save_audio_config_p = p_modem;
 
@@ -231,104 +150,77 @@ void xmit_init (struct audio_s *p_modem, int debug_xmit_packet)
 /*
  * Push to Talk (PTT) control.
  */
+ /* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_init: about to call ptt_init \n");
 #endif
-	ptt_init (p_modem);
+*/
+	C.ptt_init (p_modem);
 
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_init: back from ptt_init \n");
 #endif
+*/
 
 /* 
  * Save parameters for later use.
  * TODO1.2:  Any reason to use global config rather than making a copy?
  */
 
-	for (j=0; j<MAX_RADIO_CHANS; j++) {
-	  xmit_bits_per_sec[j] = p_modem->achan[j].baud;
-	  xmit_slottime[j] = p_modem->achan[j].slottime;
-	  xmit_persist[j] = p_modem->achan[j].persist;
-	  xmit_txdelay[j] = p_modem->achan[j].txdelay;
-	  xmit_txtail[j] = p_modem->achan[j].txtail;
-	  xmit_fulldup[j] = p_modem->achan[j].fulldup;
+ for j:=0; j<MAX_RADIO_CHANS; j++ {
+	  xmit_bits_per_sec[j] = p_modem.achan[j].baud;
+	  xmit_slottime[j] = p_modem.achan[j].slottime;
+	  xmit_persist[j] = p_modem.achan[j].persist;
+	  xmit_txdelay[j] = p_modem.achan[j].txdelay;
+	  xmit_txtail[j] = p_modem.achan[j].txtail;
+	  xmit_fulldup[j] = p_modem.achan[j].fulldup;
 	}
 
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_init: about to call tq_init \n");
 #endif
-	tq_init (p_modem);
+*/
+	C.tq_init (p_modem);
 
 
-	for (ad = 0; ad < MAX_ADEVS; ad++) {
+	for ad := 0; ad < MAX_ADEVS; ad++ {
 	  dw_mutex_init (&(audio_out_dev_mutex[ad]));
 	}
  
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_init: about to create threads \n");
 #endif
+*/
 
 //TODO:  xmit thread should be higher priority to avoid
 // underrun on the audio output device.
 
 
-	for (j=0; j<MAX_RADIO_CHANS; j++) {
+for j:=0; j<MAX_RADIO_CHANS; j++ {
 
-	  if (p_modem->chan_medium[j] == MEDIUM_RADIO) {
-#if __WIN32__
-	    xmit_th[j] = (HANDLE)_beginthreadex (NULL, 0, xmit_thread, (void*)(ptrdiff_t)j, 0, NULL);
-	    if (xmit_th[j] == NULL) {
-	       text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Could not create xmit thread %d\n", j);
-	      return;
-	    }
-#else
-	    int e;
-#if 0
-
-//TODO: not this simple.  probably need FIFO policy.
-	    pthread_attr_init (&attr);
-  	    e = pthread_attr_getschedparam (&attr, &sp);
-	    if (e != 0) {
-	      text_color_set(DW_COLOR_ERROR);
-	      perror("pthread_attr_getschedparam");
-	    }
-
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("Default scheduling priority = %d, min=%d, max=%d\n", 
-		sp.sched_priority, 
-		sched_get_priority_min(SCHED_OTHER),
-		sched_get_priority_max(SCHED_OTHER));
-	    sp.sched_priority--;
-
-  	    e = pthread_attr_setschedparam (&attr, &sp);
-	    if (e != 0) {
-	      text_color_set(DW_COLOR_ERROR);
-	      perror("pthread_attr_setschedparam");
-	    }
-	
-	    e = pthread_create (&(xmit_tid[j]), &attr, xmit_thread, (void *)(ptrdiff_t)j);
-	    pthread_attr_destroy (&attr);
-#else
-	    e = pthread_create (&(xmit_tid[j]), NULL, xmit_thread, (void *)(ptrdiff_t)j);
-#endif
+	  if (p_modem.chan_medium[j] == MEDIUM_RADIO) {
+	    var e = pthread_create (&(xmit_tid[j]), nil, xmit_thread, (ptrdiff_t)j);
 	    if (e != 0) {
 	      text_color_set(DW_COLOR_ERROR);
 	      perror("Could not create xmit thread for audio device");
 	      return;
 	    }
-#endif
 	  }
 	}
 
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("xmit_init: finished \n");
 #endif
+*/
 
 
 } /* end tq_init */
@@ -363,8 +255,7 @@ void xmit_init (struct audio_s *p_modem, int debug_xmit_packet)
  *
  *--------------------------------------------------------------------*/
 
-void xmit_set_txdelay (int channel, int value)
-{
+func xmit_set_txdelay (channel C.int, value C.int) {
 	if (channel >= 0 && channel < MAX_RADIO_CHANS) {
 	  xmit_txdelay[channel] = value;
 	}
@@ -526,7 +417,7 @@ static void * xmit_thread (void *arg)
 #endif
 
 	  // Does this extra loop offer any benefit?
-	  while (tq_peek(chan, TQ_PRIO_0_HI) != NULL || tq_peek(chan, TQ_PRIO_1_LO) != NULL) {
+	  while (tq_peek(chan, TQ_PRIO_0_HI) != nil || tq_peek(chan, TQ_PRIO_1_LO) != nil) {
 
 /* 
  * Wait for the channel to be clear.
@@ -537,7 +428,7 @@ static void * xmit_thread (void *arg)
 
 	    prio = TQ_PRIO_1_LO;
 	    pp = tq_remove (chan, TQ_PRIO_0_HI);
-	    if (pp != NULL) {
+	    if (pp != nil) {
 	      prio = TQ_PRIO_0_HI;
 	    }
 	    else {
@@ -548,9 +439,9 @@ static void * xmit_thread (void *arg)
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("xmit_thread: tq_remove(chan=%d, prio=%d) returned %p\n", chan, prio, pp);
 #endif
-	    // Shouldn't have NULL here but be careful.
+	    // Shouldn't have nil here but be careful.
 
-	    if (pp != NULL) {
+	    if (pp != nil) {
 
 
 	      if (ok) {
@@ -816,14 +707,14 @@ static void xmit_ax25_frames (int chan, int prio, packet_t pp, int max_bundle)
  */
 	  prio = TQ_PRIO_1_LO;
 	  pp = tq_peek (chan, TQ_PRIO_0_HI);
-	  if (pp != NULL) {
+	  if (pp != nil) {
 	    prio = TQ_PRIO_0_HI;
 	  }
 	  else {
 	    pp = tq_peek (chan, TQ_PRIO_1_LO);
 	  }
 
-	  if (pp != NULL) {
+	  if (pp != nil) {
 
 	    switch (frame_flavor(pp)) {
 
@@ -992,9 +883,9 @@ static int send_one_frame (int c, int p, packet_t pp)
 
 	char ts[100];		// optional time stamp.
 
-	if (strlen(save_audio_config_p->timestamp_format) > 0) {
+	if (strlen(save_audio_config_p.timestamp_format) > 0) {
 	  char tstmp[100];
-	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p->timestamp_format);
+	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
 	}
@@ -1008,7 +899,7 @@ static int send_one_frame (int c, int p, packet_t pp)
 #if 0						// FIXME - enable this?
 	dw_printf ("[%d%c%s%s] ", c,
 			p==TQ_PRIO_0_HI ? 'H' : 'L',
-			save_audio_config_p->achan[c].fx25_strength ? "F" : "",
+			save_audio_config_p.achan[c].fx25_strength ? "F" : "",
 			ts);
 #else
 	dw_printf ("[%d%c%s] ", c, p==TQ_PRIO_0_HI ? 'H' : 'L', ts);
@@ -1064,13 +955,13 @@ static int send_one_frame (int c, int p, packet_t pp)
  */
 	int send_invalid_fcs2 = 0;
 
-	if (save_audio_config_p->xmit_error_rate != 0) {
+	if (save_audio_config_p.xmit_error_rate != 0) {
 	  float r = (float)(rand()) / (float)RAND_MAX;		// Random, 0.0 to 1.0
 
-	  if (save_audio_config_p->xmit_error_rate / 100.0 > r) {
+	  if (save_audio_config_p.xmit_error_rate / 100.0 > r) {
 	    send_invalid_fcs2 = 1;
 	    text_color_set(DW_COLOR_INFO);
-	    dw_printf ("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", save_audio_config_p->xmit_error_rate);
+	    dw_printf ("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", save_audio_config_p.xmit_error_rate);
 	  }
 	}
 
@@ -1118,9 +1009,9 @@ static void xmit_speech (int c, packet_t pp)
 
 	char ts[100];		// optional time stamp.
 
-	if (strlen(save_audio_config_p->timestamp_format) > 0) {
+	if (strlen(save_audio_config_p.timestamp_format) > 0) {
 	  char tstmp[100];
-	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p->timestamp_format);
+	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
 	}
@@ -1135,7 +1026,7 @@ static void xmit_speech (int c, packet_t pp)
 	dw_printf ("[%d.speech%s] \"%s\"\n", c, ts, pinfo);
 
 
-	if (strlen(save_audio_config_p->tts_script) == 0) {
+	if (strlen(save_audio_config_p.tts_script) == 0) {
           text_color_set(DW_COLOR_ERROR);
           dw_printf ("Text-to-speech script has not been configured.\n");
 	  ax25_delete (pp);
@@ -1151,7 +1042,7 @@ static void xmit_speech (int c, packet_t pp)
  * Invoke the speech-to-text script.
  */	
 
-	xmit_speak_it (save_audio_config_p->tts_script, c, (char*)pinfo);
+	xmit_speak_it (save_audio_config_p.tts_script, c, (char*)pinfo);
 
 /*
  * Turn off transmitter.
@@ -1245,9 +1136,9 @@ static void xmit_morse (int c, packet_t pp, int wpm)
 
 	char ts[100];		// optional time stamp.
 
-	if (strlen(save_audio_config_p->timestamp_format) > 0) {
+	if (strlen(save_audio_config_p.timestamp_format) > 0) {
 	  char tstmp[100];
-	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p->timestamp_format);
+	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
 	}
@@ -1317,9 +1208,9 @@ static void xmit_dtmf (int c, packet_t pp, int speed)
 
 	char ts[100];		// optional time stamp.
 
-	if (strlen(save_audio_config_p->timestamp_format) > 0) {
+	if (strlen(save_audio_config_p.timestamp_format) > 0) {
 	  char tstmp[100];
-	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p->timestamp_format);
+	  timestamp_user_format (tstmp, sizeof(tstmp), save_audio_config_p.timestamp_format);
 	  strlcpy (ts, " ", sizeof(ts));	// space after channel.
 	  strlcat (ts, tstmp, sizeof(ts));
 	}
@@ -1448,8 +1339,8 @@ start_over_again:
  * turn around fast enough when using squelch and VOX.
  */
 
-	if (save_audio_config_p->achan[chan].dwait > 0) {
-	  SLEEP_MS (save_audio_config_p->achan[chan].dwait * 10);
+	if (save_audio_config_p.achan[chan].dwait > 0) {
+	  SLEEP_MS (save_audio_config_p.achan[chan].dwait * 10);
 	}
 
 	if (hdlc_rec_data_detect_any(chan)) {
@@ -1460,7 +1351,7 @@ start_over_again:
  * Wait random time.
  * Proceed to transmit sooner if anything shows up in high priority queue.
  */
-	while (tq_peek(chan, TQ_PRIO_0_HI) == NULL) {
+	while (tq_peek(chan, TQ_PRIO_0_HI) == nil) {
 	  int r;
 
 	  SLEEP_MS (slottime * 10);
