@@ -261,29 +261,25 @@ func xmit_set_txdelay (channel C.int, value C.int) {
 	}
 }
 
-void xmit_set_persist (int channel, int value)
-{
+func xmit_set_persist (channel C.int, value C.int) {
 	if (channel >= 0 && channel < MAX_RADIO_CHANS) {
 	  xmit_persist[channel] = value;
 	}
 }
 
-void xmit_set_slottime (int channel, int value)
-{
+func xmit_set_slottime (channel C.int, value C.int) {
 	if (channel >= 0 && channel < MAX_RADIO_CHANS) {
 	  xmit_slottime[channel] = value;
 	}
 }
 
-void xmit_set_txtail (int channel, int value)
-{
+func xmit_set_txtail (channel C.int, value C.int) {
 	if (channel >= 0 && channel < MAX_RADIO_CHANS) {
 	  xmit_txtail[channel] = value;
 	}
 }
 
-void xmit_set_fulldup (int channel, int value)
-{
+func xmit_set_fulldup (channel C.int, value C.int) {
 	if (channel >= 0 && channel < MAX_RADIO_CHANS) {
 	  xmit_fulldup[channel] = value;
 	}
