@@ -44,10 +44,13 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "digipeater.h"
 // #include "textcolor.h"
-// #include "dedupe.h"
 // #include "tq.h"
 // #include "pfilter.h"
 import "C"
+
+import (
+	"time"
+)
 
 /*
  * Keep pointer to configuration options.
@@ -87,7 +90,7 @@ func digipeater_init(p_audio_config *C.struct_audio_s, p_digi_config *C.struct_d
 	digipeater_audio_config = p_audio_config
 	save_digi_config_p = p_digi_config
 
-	C.dedupe_init(p_digi_config.dedupe_time)
+	dedupe_init(time.Duration(p_digi_config.dedupe_time) * time.Second)
 }
 
 /*------------------------------------------------------------------------------
@@ -158,7 +161,7 @@ func digipeater(from_chan C.int, pp C.packet_t) {
 					&save_digi_config_p.atgp[from_chan][to_chan][0],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
-					C.dedupe_remember(pp, to_chan)
+					dedupe_remember(pp, to_chan)
 					C.tq_append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
 					digi_count[from_chan][to_chan]++
 				}
@@ -182,7 +185,7 @@ func digipeater(from_chan C.int, pp C.packet_t) {
 					&save_digi_config_p.atgp[from_chan][to_chan][0],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
-					C.dedupe_remember(pp, to_chan)
+					dedupe_remember(pp, to_chan)
 					C.tq_append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
 					digi_count[from_chan][to_chan]++
 				}
@@ -347,7 +350,7 @@ func digipeat_match(
 	 *
 	 */
 
-	if C.dedupe_check(pp, to_chan) > 0 {
+	if dedupe_check(pp, to_chan) {
 		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */

@@ -16,7 +16,6 @@ https://github.com/golang/go/issues/4030
 // #include "ax25_pad.h"
 // #include "digipeater.h"
 // #include "textcolor.h"
-// #include "dedupe.h"
 // #include "tq.h"
 // #include "pfilter.h"
 // packet_t digipeat_match (int from_chan, packet_t pp, char *mycall_rec, char *mycall_xmit, regex_t *uidigi, regex_t *uitrace, int to_chan, enum preempt_e preempt, char *atgp, char *type_filter);
@@ -30,6 +29,7 @@ import "C"
 
 import (
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
@@ -103,7 +103,7 @@ func digipeater_test(t *testing.T, _in, _out string) {
 
 	var xmit [256]C.char
 	if result != nil {
-		C.dedupe_remember(result, 0)
+		dedupe_remember(result, 0)
 		C.ax25_format_addrs(result, &xmit[0])
 		C.ax25_get_info(result, &pinfo)
 		C.strcat(&xmit[0], (*C.char)(unsafe.Pointer(pinfo)))
@@ -132,7 +132,7 @@ func digipeater_test_main(t *testing.T) bool {
 
 	C.mycall = C.CString("WB2OSZ-9")
 
-	C.dedupe_init(4)
+	dedupe_init(4 * time.Second)
 
 	/*
 	 * Compile the patterns.
