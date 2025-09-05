@@ -203,7 +203,7 @@ func cdigipeat_match(from_chan C.int, pp C.packet_t, mycall_rec *C.char, mycall_
 	 */
 
 	if cfilter_str != nil {
-		if C.pfilter(from_chan, to_chan, cfilter_str, pp, 0) != 1 {
+		if pfilter(from_chan, to_chan, cfilter_str, pp, 0) != 1 {
 			return (nil)
 		}
 	}

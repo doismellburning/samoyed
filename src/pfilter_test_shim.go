@@ -13,7 +13,6 @@ package direwolf
 // #include "latlong.h"
 // #include "pfilter.h"
 // #include "mheard.h"
-// int pftest_running;
 import "C"
 
 import (
@@ -30,8 +29,8 @@ func pf_test_main(t *testing.T) {
 	// Setup
 	var p_igate_config C.struct_igate_config_s
 	p_igate_config.max_digi_hops = 2
-	C.pfilter_init(&p_igate_config, 0)
-	C.pftest_running = C.int(1) // Change behaviour in pfilter.c to terminate early for test convenience
+	pfilter_init(&p_igate_config, 0)
+	pftest_running = true // Change behaviour in pfilter.c to terminate early for test convenience
 
 	dw_printf("Quick test for packet filtering.\n")
 	dw_printf("Some error messages are normal.  Look at the final success/fail message.\n")
@@ -262,7 +261,7 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	var pp = C.ax25_from_text(C.CString(monitor), 1)
 	assert.NotNil(t, pp)
 
-	var result = C.pfilter(0, 0, C.CString(filter), pp, 1)
+	var result = pfilter(0, 0, C.CString(filter), pp, 1)
 	if !assert.Equal(t, result, C.int(expected), "Unexpected result for test number %d", test_num) {
 		pftest_error_count++
 	}
