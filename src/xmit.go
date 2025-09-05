@@ -177,7 +177,7 @@ func xmit_init(p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
 	C.tq_init(p_modem)
 
 	for ad := 0; ad < C.MAX_ADEVS; ad++ {
-		C.dw_mutex_init(&(C.audio_out_dev_mutex[ad]))
+		C.pthread_mutex_init(&(audio_out_dev_mutex[ad]), nil)
 	}
 
 	/* TODO KG
