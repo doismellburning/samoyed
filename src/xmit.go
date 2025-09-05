@@ -176,8 +176,8 @@ func xmit_init(p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
 	*/
 	C.tq_init(p_modem)
 
-	for ad := 0; ad < MAX_ADEVS; ad++ {
-		dw_mutex_init(&(audio_out_dev_mutex[ad]))
+	for ad := 0; ad < C.MAX_ADEVS; ad++ {
+		C.dw_mutex_init(&(C.audio_out_dev_mutex[ad]))
 	}
 
 	/* TODO KG
@@ -190,8 +190,7 @@ func xmit_init(p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
 	//TODO:  xmit thread should be higher priority to avoid
 	// underrun on the audio output device.
 
-	for j := 0; j < MAX_RADIO_CHANS; j++ {
-
+	for j := C.int(0); j < MAX_RADIO_CHANS; j++ {
 		if p_modem.chan_medium[j] == MEDIUM_RADIO {
 			go xmit_thread(j)
 		}
@@ -296,7 +295,7 @@ const (
 	FLAVOR_OTHER
 )
 
-func frame_flavor(packet_t pp) flavor_t {
+func frame_flavor(pp C.packet_t) flavor_t {
 
 	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
@@ -597,7 +596,7 @@ func priorityToRune(prio C.int) rune {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_ax25_frames(channel C.int, prio C.int, pp packet_t, max_bundle C.int) {
+func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int) {
 
 	// FIXME KG int pre_flags, post_flags;
 	// FIXME KG int num_bits;		/* Total number of bits in transmission */
@@ -842,7 +841,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp packet_t, max_bundle C.int) 
  *
  *--------------------------------------------------------------------*/
 
-func send_one_frame(c C.int, p C.int, pp packet_t) C.int {
+func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 	// FIXME KG char stemp[1024];	/* max size needed? */
 	// FIXME KG int info_len;
 	// FIXME KG unsigned char *pinfo;
@@ -983,7 +982,7 @@ func send_one_frame(c C.int, p C.int, pp packet_t) C.int {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_speech(c C.int, pp packet_t) {
+func xmit_speech(c C.int, pp C.packet_t) {
 	/* FIXME KG
 	int info_len;
 	unsigned char *pinfo;
@@ -1105,7 +1104,7 @@ func xmit_speak_it(script *C.char, c C.int, orig_msg *C.char) C.int {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_morse(c C.int, pp packet_t, wpm C.int) {
+func xmit_morse(c C.int, pp C.packet_t, wpm C.int) {
 	/* FIXME KG
 	int info_len;
 	unsigned char *pinfo;
@@ -1172,7 +1171,7 @@ func xmit_morse(c C.int, pp packet_t, wpm C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_dtmf(c C.int, pp packet_t, speed C.int) {
+func xmit_dtmf(c C.int, pp C.packet_t, speed C.int) {
 	/* FIXME KG
 	int info_len;
 	unsigned char *pinfo;
