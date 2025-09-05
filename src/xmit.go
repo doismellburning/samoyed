@@ -134,8 +134,6 @@ var g_debug_xmit_packet C.int;		/* print packet in hexadecimal form for debuggin
 
 
 func xmit_init (p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
-	// FIXME KG pthread_t xmit_tid[MAX_RADIO_CHANS];
-
 	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
@@ -206,12 +204,7 @@ func xmit_init (p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
 for j:=0; j<MAX_RADIO_CHANS; j++ {
 
 	  if (p_modem.chan_medium[j] == MEDIUM_RADIO) {
-	    var e = pthread_create (&(xmit_tid[j]), nil, xmit_thread, (ptrdiff_t)j);
-	    if (e != 0) {
-	      text_color_set(DW_COLOR_ERROR);
-	      perror("Could not create xmit thread for audio device");
-	      return;
-	    }
+		  go xmit_thread(j)
 	  }
 	}
 
@@ -307,27 +300,36 @@ func xmit_set_fulldup (channel C.int, value C.int) {
  *
  *--------------------------------------------------------------------*/
 
-typedef enum flavor_e { FLAVOR_APRS_NEW, FLAVOR_APRS_DIGI, FLAVOR_SPEECH, FLAVOR_MORSE, FLAVOR_DTMF, FLAVOR_OTHER } flavor_t;
+type flavor_t int
+const (
+	FLAVOR_APRS_NEW flavor_t = iota
+	FLAVOR_APRS_DIGI
+	FLAVOR_SPEECH
+	FLAVOR_MORSE
+	FLAVOR_DTMF
+	FLAVOR_OTHER
+)
 
-static flavor_t frame_flavor (packet_t pp)
-{
+func frame_flavor (packet_t pp) flavor_t {
 
 	if (ax25_is_aprs (pp)) { 	// UI frame, PID 0xF0.
 					// It's unfortunate APRS did not use its own special PID.
 
-	  char dest[AX25_MAX_ADDR_LEN];
+	  var _dest[AX25_MAX_ADDR_LEN]C.char
 
-	  ax25_get_addr_no_ssid(pp, AX25_DESTINATION, dest);
+	  ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_dest[0]);
 
-	  if (strcmp(dest, "SPEECH") == 0) {
+	  var dest = C.GoString(&_dest[0])
+
+	  if dest == "SPEECH" {
 	   return (FLAVOR_SPEECH);
 	  }
 
-	  if (strcmp(dest, "MORSE") == 0) {
+	  if dest == "MORSE" {
 	   return (FLAVOR_MORSE);
 	  }
 
-	  if (strcmp(dest, "DTMF") == 0) {
+	  if dest == "DTMF" {
 	   return (FLAVOR_DTMF);
 	  }
 
@@ -392,49 +394,48 @@ static flavor_t frame_flavor (packet_t pp)
  *
  *--------------------------------------------------------------------*/
 
-#if __WIN32__
-static unsigned __stdcall xmit_thread (void *arg)
-#else
-static void * xmit_thread (void *arg)
-#endif
-{
-	int chan = (int)(ptrdiff_t)arg; // channel number.
+func xmit_thread (channel C.int) {
+	/* FIXME KG
 	packet_t pp;
 	int prio;
 	int ok;
+	*/
 
 
-	while (1) {
+	for {
 
-	  tq_wait_while_empty (chan);
+	  C.tq_wait_while_empty (channel);
+	  /* TODO KG
 #if DEBUG
 	  text_color_set(DW_COLOR_DEBUG);
 	  dw_printf ("xmit_thread, channel %d: woke up\n", chan);
 #endif
+*/
 
 	  // Does this extra loop offer any benefit?
-	  while (tq_peek(chan, TQ_PRIO_0_HI) != nil || tq_peek(chan, TQ_PRIO_1_LO) != nil) {
+	  for (tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil) {
 
 /* 
  * Wait for the channel to be clear.
  * If there is something in the high priority queue, begin transmitting immediately.
  * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
  */
-	    ok = wait_for_clear_channel (chan, xmit_slottime[chan], xmit_persist[chan], xmit_fulldup[chan]);
+	    var ok = wait_for_clear_channel (channel, xmit_slottime[channel], xmit_persist[channel], xmit_fulldup[channel]);
 
 	    prio = TQ_PRIO_1_LO;
-	    pp = tq_remove (chan, TQ_PRIO_0_HI);
+	    pp = tq_remove (channel, TQ_PRIO_0_HI);
 	    if (pp != nil) {
 	      prio = TQ_PRIO_0_HI;
-	    }
-	    else {
-	      pp = tq_remove (chan, TQ_PRIO_1_LO);
+	    } else {
+	      pp = tq_remove (channel, TQ_PRIO_1_LO);
 	    }
 
+		/* TODO KG
 #if DEBUG
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("xmit_thread: tq_remove(chan=%d, prio=%d) returned %p\n", chan, prio, pp);
+	    dw_printf ("xmit_thread: tq_remove(channel=%d, prio=%d) returned %p\n", channel, prio, pp);
 #endif
+*/
 	    // Shouldn't have nil here but be careful.
 
 	    if (pp != nil) {
@@ -449,17 +450,18 @@ static void * xmit_thread (void *arg)
  * If destination is "DTMF" send as Touch Tones.
  */
 
-	        int ssid, wpm, speed;
-
 	        switch (frame_flavor(pp)) {
 
 	          case FLAVOR_SPEECH:
-	            xmit_speech (chan, pp);
+	            xmit_speech (channel, pp);
 	            break;
 
 	          case FLAVOR_MORSE:
-		    ssid = ax25_get_ssid(pp, AX25_DESTINATION);
-		    wpm = (ssid > 0) ? (ssid * 2) : MORSE_DEFAULT_WPM;
+		    var ssid = ax25_get_ssid(pp, AX25_DESTINATION);
+			var wpm = MORSE_DEFAULT_WPM
+			if ssid > 0 {
+				wpm = ssid * 2
+			}
 
 		    // This is a bit of a hack so we don't respond too quickly for APRStt.
 		    // It will be sent in high priority queue while a beacon wouldn't.  
@@ -471,19 +473,23 @@ static void * xmit_thread (void *arg)
 		      //dw_printf ("APRStt morse xmit delay hack...\n");
 		      SLEEP_MS (700);
 		    }
-	            xmit_morse (chan, pp, wpm);
+	            xmit_morse (channel, pp, wpm);
 	            break;
 
 	          case FLAVOR_DTMF:
-		    speed = ax25_get_ssid(pp, AX25_DESTINATION);
-		    if (speed == 0) speed = 5;	// default half of maximum
-	            if (speed > 10) speed = 10;
+		    var speed = ax25_get_ssid(pp, AX25_DESTINATION);
+		    if (speed == 0) {
+				speed = 5;	// default half of maximum
+			}
+	            if (speed > 10) {
+					speed = 10;
+				}
 
-	            xmit_dtmf (chan, pp, speed);
+	            xmit_dtmf (channel, pp, speed);
 	            break;
 
 	          case FLAVOR_APRS_DIGI:
-	            xmit_ax25_frames (chan, prio, pp, 1);	/* 1 means don't bundle */
+	            xmit_ax25_frames (channel, prio, pp, 1);	/* 1 means don't bundle */
 					// I don't know if this in some official specification
 					// somewhere, but it is generally agreed that APRS digipeaters
 					// should send only one frame at a time rather than
@@ -494,37 +500,37 @@ static void * xmit_thread (void *arg)
 	          case FLAVOR_APRS_NEW:
 	          case FLAVOR_OTHER:
 	          default:
-	            xmit_ax25_frames (chan, prio, pp, 256);
+	            xmit_ax25_frames (channel, prio, pp, 256);
 	            break;
 	        }
 
 	        // Corresponding lock is in wait_for_clear_channel.
 
-	        dw_mutex_unlock (&(audio_out_dev_mutex[ACHAN2ADEV(chan)]));
-	      }
-	      else {
+	        dw_mutex_unlock (&(audio_out_dev_mutex[ACHAN2ADEV(channel)]));
+	      } else {
 /*
  * Timeout waiting for clear channel.
  * Discard the packet.
  * Display with ERROR color rather than XMIT color.
  */
-		char stemp[1024];	/* max size needed? */
-		int info_len;
-		unsigned char *pinfo;
-
-
 	        text_color_set(DW_COLOR_ERROR);
 		dw_printf ("Waited too long for clear channel.  Discarding packet below.\n");
 
-	        ax25_format_addrs (pp, stemp);
+		var stemp[1024]C.char	/* max size needed? */
+	        C.ax25_format_addrs (pp, stemp);
 
-	        info_len = ax25_get_info (pp, &pinfo);
+			var pinfo *C.uchar
+	        var info_len = C.ax25_get_info (pp, &pinfo);
 
 	        text_color_set(DW_COLOR_INFO);
-	        dw_printf ("[%d%c] ", chan, (prio==TQ_PRIO_0_HI) ? 'H' : 'L');
+			var pChar = 'L'
+			if prio == TQ_PRIO_0_HI {
+				pChar = 'H'
+			}
+	        dw_printf ("[%d%c] ", channel, pChar)
 
 	        dw_printf ("%s", stemp);			/* stations followed by : */
-	        ax25_safe_print ((char *)pinfo, info_len, ! ax25_is_aprs(pp));
+	        C.ax25_safe_print (pinfo, info_len, ! ax25_is_aprs(pp));
 	        dw_printf ("\n");
 		ax25_delete (pp);
 
@@ -532,9 +538,6 @@ static void * xmit_thread (void *arg)
 	    } /* Have pp */
 	  } /* while queue not empty */
 	} /* while 1 */
-
-	return 0;	/* unreachable but quiet the warning. */
-
 } /* end xmit_thread */
 
 
@@ -610,8 +613,7 @@ static void * xmit_thread (void *arg)
  *--------------------------------------------------------------------*/
 
 
-static void xmit_ax25_frames (int chan, int prio, packet_t pp, int max_bundle)
-{
+func xmit_ax25_frames (channel C.int, prio C.int, pp packet_t, max_bundle C.int) {
 
 	int pre_flags, post_flags;
 	int num_bits;		/* Total number of bits in transmission */
