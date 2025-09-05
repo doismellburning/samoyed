@@ -2578,6 +2578,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    
 	    /* See if we can run it. */
 
+		/* FIXME KG Do we *actually* want to do this...? If so, let's do it when we've ported this to Go...
 	    if (xmit_speak_it(t, -1, " ") == 0) {
 	      if (strlcpy (p_audio_config->tts_script, t, sizeof(p_audio_config->tts_script)) >= sizeof(p_audio_config->tts_script)) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -2589,6 +2590,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Error trying to run Text-to-Speech function.\n", line);
 	      continue;
 	   }
+	   */
 	  }
 
 /*
