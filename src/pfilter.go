@@ -1,27 +1,6 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2015, 2016, 2023  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
-
+package direwolf
 
 /*------------------------------------------------------------------
- *
- * Module:      pfilter.c
  *
  * Purpose:   	Packet filtering based on characteristics.
  *		
@@ -37,21 +16,20 @@
  *
  *---------------------------------------------------------------*/
 
-#include "direwolf.h"
-
-#include <unistd.h>
-#include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <ctype.h>
-
-#include "ax25_pad.h"
-#include "textcolor.h"
-#include "decode_aprs.h"
-#include "latlong.h"
-#include "pfilter.h"
-#include "mheard.h"
+// #include "direwolf.h"
+// #include <unistd.h>
+// #include <assert.h>
+// #include <string.h>
+// #include <stdlib.h>
+// #include <stdio.h>
+// #include <ctype.h>
+// #include "ax25_pad.h"
+// #include "textcolor.h"
+// #include "decode_aprs.h"
+// #include "latlong.h"
+// #include "pfilter.h"
+// #include "mheard.h"
+import "C"
 
 
 
@@ -61,11 +39,9 @@
  * These are set by init function.
  */
 
-static struct igate_config_s	*save_igate_config_p;
-static int 			s_debug = 0;
-
-static int pftest_running = 0;
-
+var save_igate_config_p *C.struct_igate_config_s
+var s_debug = 0
+var pftest_running = 0
 
 
 /*-------------------------------------------------------------------
@@ -84,8 +60,7 @@ static int pftest_running = 0;
  *--------------------------------------------------------------------*/
 
 
-void pfilter_init (struct igate_config_s *p_igate_config, int debug_level)
-{
+func pfilter_init (p_igate_config *C.struct_igate_config_s, debug_level int) {
 	s_debug = debug_level;
 	save_igate_config_p = p_igate_config;
 }
@@ -93,13 +68,13 @@ void pfilter_init (struct igate_config_s *p_igate_config, int debug_level)
 
 
 
-typedef enum token_type_e { TOKEN_AND, TOKEN_OR, TOKEN_NOT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_FILTER_SPEC, TOKEN_EOL } token_type_t;
+// FIXME KG typedef enum token_type_e { TOKEN_AND, TOKEN_OR, TOKEN_NOT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_FILTER_SPEC, TOKEN_EOL } token_type_t;
 
 
-#define MAX_FILTER_LEN 1024
-#define MAX_TOKEN_LEN 1024
+const MAX_FILTER_LEN = 1024
+const MAX_TOKEN_LEN = 1024
 
-typedef struct pfstate_s {
+type pfstate_t struct {
 
 	int from_chan;				/* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
 	int to_chan;				/* Used only for debug and error messages. */
@@ -141,31 +116,20 @@ typedef struct pfstate_s {
 	char token_str[MAX_TOKEN_LEN];		/* Printable string representation for use in error messages. */
 	int tokeni;				/* Index in original string for enhanced error messages. */
 
-} pfstate_t;
+}
 
 
 
-static int parse_expr (pfstate_t *pf);
-static int parse_or_expr (pfstate_t *pf);
-static int parse_and_expr (pfstate_t *pf);
-static int parse_primary (pfstate_t *pf);
-static int parse_filter_spec (pfstate_t *pf);
-
-static void next_token (pfstate_t *pf);
-static void print_error (pfstate_t *pf, char *msg);
-
-static int filt_bodgu (pfstate_t *pf, char *pattern);
-static int filt_t (pfstate_t *pf);
-static int filt_r (pfstate_t *pf, char *sdist);
-static int filt_s (pfstate_t *pf);
-static int filt_i (pfstate_t *pf);
-
-static char *bool2text (int val)
-{
-	if (val == 1) return "TRUE";
-	if (val == 0) return "FALSE";
-	if (val == -1) return "ERROR";
-	return "OOPS!";
+func bool2text (val int) string {
+	if (val == 1) {
+		return "TRUE";
+	} else if (val == 0) {
+		return "FALSE";
+	} else if (val == -1) {
+		return "ERROR";
+	} else {
+		return "OOPS!";
+	}
 }
 
 
@@ -197,27 +161,24 @@ static char *bool2text (int val)
  *
  *--------------------------------------------------------------------*/
 
-int pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
-{
-	pfstate_t pfstate;
-	char *p;
-	int result;
+func pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs) int {
 
-	assert (from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS);
-	assert (to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS);
+	Assert (from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS);
+	Assert (to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS);
 
-	memset (&pfstate, 0, sizeof(pfstate));
-
-	if (pp == NULL) {
+	if (pp == nil) {
 	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("INTERNAL ERROR in pfilter: NULL packet pointer. Please report this!\n");
+	  dw_printf ("INTERNAL ERROR in pfilter: nil packet pointer. Please report this!\n");
 	  return (-1);
 	}
-	if (filter == NULL) {
+
+	if (filter == nil) {
 	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("INTERNAL ERROR in pfilter: NULL filter string pointer. Please report this!\n");
+	  dw_printf ("INTERNAL ERROR in pfilter: nil filter string pointer. Please report this!\n");
 	  return (-1);
 	}
+
+	var pfstate pfstate_t
 
 	pfstate.from_chan = from_chan;
 	pfstate.to_chan = to_chan;
@@ -227,7 +188,7 @@ int pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
 	strlcpy (pfstate.filter_str, filter, sizeof(pfstate.filter_str));
 
 	pfstate.nexti = 0;
-	for (p = pfstate.filter_str; *p != '\0'; p++) {
+	for p := pfstate.filter_str; *p != 0; p++ {
 	  if (iscntrl(*p)) {
 	    *p = ' ';
 	  }
@@ -237,16 +198,16 @@ int pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
 	pfstate.is_aprs = is_aprs;
 
 	if (is_aprs) {
-	  decode_aprs (&pfstate.decoded, pp, 1, NULL);
+	  decode_aprs (&pfstate.decoded, pp, 1, nil);
 	}
 
 	next_token(&pfstate);
 	
+	var result int
 	if (pfstate.token_type == TOKEN_EOL) {
 	  /* Empty filter means reject all. */
 	  result = 0;
-	}
-	else {
+	} else {
 	  result = parse_expr (&pfstate);
 
 	  if (pfstate.token_type != TOKEN_AND && 
@@ -262,14 +223,11 @@ int pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
 	  text_color_set(DW_COLOR_DEBUG);
 	  if (from_chan == MAX_TOTAL_CHANS) {
 	    dw_printf (" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result));
-	  }
-	  else if (to_chan == MAX_TOTAL_CHANS) {
+	  } else if (to_chan == MAX_TOTAL_CHANS) {
 	    dw_printf (" Packet filter from radio channel %d to IGate returns %s\n", from_chan, bool2text(result));
-	  }
-	  else if (is_aprs) {
+	  } else if (is_aprs) {
 	    dw_printf (" Packet filter for APRS digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result));
-	  }
-	  else {
+	  } else {
 	    dw_printf (" Packet filter for traditional digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result));
 	  }
 	}
@@ -321,50 +279,45 @@ int pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
  *
  *--------------------------------------------------------------------*/
 
-static void next_token (pfstate_t *pf) 
-{
-	while (pf->filter_str[pf->nexti] ==  ' ') {
-	  pf->nexti++;
+func next_token (pfstate_t *pf) {
+	for (pf.filter_str[pf.nexti] ==  ' ') {
+	  pf.nexti++;
 	}
 
-	pf->tokeni = pf->nexti;
+	pf.tokeni = pf.nexti;
 
-	if (pf->filter_str[pf->nexti] == '\0') {
-	  pf->token_type = TOKEN_EOL;
-	  strlcpy (pf->token_str, "end-of-line", sizeof(pf->token_str));
-	}
-	else if (pf->filter_str[pf->nexti] == '&') {
-	  pf->nexti++;
-	  pf->token_type = TOKEN_AND;
-	  strlcpy (pf->token_str, "\"&\"", sizeof(pf->token_str));
-	}
-	else if (pf->filter_str[pf->nexti] == '|') {
-	  pf->nexti++;
-	  pf->token_type = TOKEN_OR;
-	  strlcpy (pf->token_str, "\"|\"", sizeof(pf->token_str));
-	}
-	else if (pf->filter_str[pf->nexti] == '!') {
-	  pf->nexti++;
-	  pf->token_type = TOKEN_NOT;
-	  strlcpy (pf->token_str, "\"!\"", sizeof(pf->token_str));
-	}
-	else if (pf->filter_str[pf->nexti] == '(') {
-	  pf->nexti++;
-	  pf->token_type = TOKEN_LPAREN;
-	  strlcpy (pf->token_str, "\"(\"", sizeof(pf->token_str));
-	}
-	else if (pf->filter_str[pf->nexti] == ')') {
-	  pf->nexti++;
-	  pf->token_type = TOKEN_RPAREN;
-	  strlcpy (pf->token_str, "\")\"", sizeof(pf->token_str));
-	}
-	else {
-	  char *p = pf->token_str;
-	  pf->token_type = TOKEN_FILTER_SPEC;
+	if (pf.filter_str[pf.nexti] == 0) {
+	  pf.token_type = TOKEN_EOL;
+	  strlcpy (pf.token_str, "end-of-line", sizeof(pf.token_str));
+	} else if (pf.filter_str[pf.nexti] == '&') {
+	  pf.nexti++;
+	  pf.token_type = TOKEN_AND;
+	  strlcpy (pf.token_str, "\"&\"", sizeof(pf.token_str));
+	} else if (pf.filter_str[pf.nexti] == '|') {
+	  pf.nexti++;
+	  pf.token_type = TOKEN_OR;
+	  strlcpy (pf.token_str, "\"|\"", sizeof(pf.token_str));
+	} else if (pf.filter_str[pf.nexti] == '!') {
+	  pf.nexti++;
+	  pf.token_type = TOKEN_NOT;
+	  strlcpy (pf.token_str, "\"!\"", sizeof(pf.token_str));
+	} else if (pf.filter_str[pf.nexti] == '(') {
+	  pf.nexti++;
+	  pf.token_type = TOKEN_LPAREN;
+	  strlcpy (pf.token_str, "\"(\"", sizeof(pf.token_str));
+	} else if (pf.filter_str[pf.nexti] == ')') {
+	  pf.nexti++;
+	  pf.token_type = TOKEN_RPAREN;
+	  strlcpy (pf.token_str, "\")\"", sizeof(pf.token_str));
+	} else {
+	  char *p = pf.token_str;
+	  pf.token_type = TOKEN_FILTER_SPEC;
+	  /* FIXME KG
 	  do {
-	    *p++ = pf->filter_str[pf->nexti++];
-	  } while (pf->filter_str[pf->nexti] != ' ' && pf->filter_str[pf->nexti] != '\0');
-	  *p = '\0';
+	    *p++ = pf.filter_str[pf.nexti++];
+	  } while (pf.filter_str[pf.nexti] != ' ' && pf.filter_str[pf.nexti] != 0);
+	  */
+	  *p = 0;
 	}
 
 } /* end next_token */
@@ -407,7 +360,7 @@ static int parse_or_expr (pfstate_t *pf)
 	result = parse_and_expr (pf);
 	if (result < 0) return (-1);
 	
-	while (pf->token_type == TOKEN_OR) {
+	for (pf.token_type == TOKEN_OR) {
 	  int e;
 
 	  next_token (pf);
@@ -434,7 +387,7 @@ static int parse_and_expr (pfstate_t *pf)
 	result = parse_primary (pf);
 	if (result < 0) return (-1);
 
-	while (pf->token_type == TOKEN_AND) {
+	for (pf.token_type == TOKEN_AND) {
 	  int e;
 
 	  next_token (pf);
@@ -460,12 +413,12 @@ static int parse_primary (pfstate_t *pf)
 {
 	int result;
 
-	if (pf->token_type == TOKEN_LPAREN) {
+	if (pf.token_type == TOKEN_LPAREN) {
 
 	  next_token (pf);
 	  result = parse_expr (pf);
 	  	  
-	  if (pf->token_type == TOKEN_RPAREN) {
+	  if (pf.token_type == TOKEN_RPAREN) {
 	    next_token (pf);
 	  }
 	  else {
@@ -473,7 +426,7 @@ static int parse_primary (pfstate_t *pf)
 	    result = -1;
 	  }
 	}
-	else if (pf->token_type == TOKEN_NOT) {
+	else if (pf.token_type == TOKEN_NOT) {
 	  int e;
 
 	  next_token (pf);
@@ -487,7 +440,7 @@ static int parse_primary (pfstate_t *pf)
 	  if (e < 0) result = -1;
 	  else result = ! e;
 	}
-	else if (pf->token_type == TOKEN_FILTER_SPEC) {
+	else if (pf.token_type == TOKEN_FILTER_SPEC) {
 	  result = parse_filter_spec (pf);
 	}
 	else {
@@ -525,7 +478,7 @@ static int parse_filter_spec (pfstate_t *pf)
 	int result = -1;
 
 
-	if ( ( ! pf->is_aprs) && strchr ("01bdvu", pf->token_str[0]) == NULL) {
+	if ( ( ! pf.is_aprs) && strchr ("01bdvu", pf.token_str[0]) == nil) {
 
 	  print_error (pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.");
 	  result = -1;
@@ -536,10 +489,10 @@ static int parse_filter_spec (pfstate_t *pf)
 
 /* undocumented: can use 0 or 1 for testing. */
 
-	if (strcmp(pf->token_str, "0") == 0) {
+	if (strcmp(pf.token_str, "0") == 0) {
 	  result = 0;
 	}
-	else if (strcmp(pf->token_str, "1") == 0) {
+	else if (strcmp(pf.token_str, "1") == 0) {
 	  result = 1;
 	}
 
@@ -547,41 +500,41 @@ static int parse_filter_spec (pfstate_t *pf)
 
 /* b - budlist */
 
-	else if (pf->token_str[0] == 'b' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 'b' && ispunct(pf.token_str[1])) {
 	  /* Budlist - AX.25 source address */
 	  /* Could be different than source encapsulated by 3rd party header. */
 	  char addr[AX25_MAX_ADDR_LEN];
-	  ax25_get_addr_with_ssid (pf->pp, AX25_SOURCE, addr);
+	  ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, addr);
 	  result = filt_bodgu (pf, addr);
 
 	  if (s_debug >= 2) {
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), addr);
+	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr);
 	  }
 	}
 
 /* o - object or item name */
 
-	else if (pf->token_str[0] == 'o' && ispunct(pf->token_str[1])) {
-	  result = filt_bodgu (pf, pf->decoded.g_name);
+	else if (pf.token_str[0] == 'o' && ispunct(pf.token_str[1])) {
+	  result = filt_bodgu (pf, pf.decoded.g_name);
 
 	  if (s_debug >= 2) {
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), pf->decoded.g_name);
+	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name);
 	  }
 	}
 
 /* d - was digipeated by */
 
-	else if (pf->token_str[0] == 'd' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 'd' && ispunct(pf.token_str[1])) {
 	  int n;
 	  // Loop on all AX.25 digipeaters.
 	  result = 0;
-	  for (n = AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf->pp); n++) {
+	  for (n = AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++) {
 	    // Consider only those with the H (has-been-used) bit set.
-	    if (ax25_get_h (pf->pp, n)) {
+	    if (ax25_get_h (pf.pp, n)) {
 	      char addr[AX25_MAX_ADDR_LEN];
-	      ax25_get_addr_with_ssid (pf->pp, n, addr);
+	      ax25_get_addr_with_ssid (pf.pp, n, addr);
 	      result = filt_bodgu (pf, addr);
 	    }
 	  }
@@ -589,27 +542,27 @@ static int parse_filter_spec (pfstate_t *pf)
 	  if (s_debug >= 2) {
 	    char path[100];
 
-	    ax25_format_via_path (pf->pp, path, sizeof(path));
+	    ax25_format_via_path (pf.pp, path, sizeof(path));
 	    if (strlen(path) == 0) {
 	      strcpy (path, "no digipeater path");
 	    }
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), path);
+	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), path);
 	  }
 	}
 
 /* v - via not used */
 
-	else if (pf->token_str[0] == 'v' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 'v' && ispunct(pf.token_str[1])) {
 	  int n;
 	  // loop on all AX.25 digipeaters (mnemonic Via)
 	  result = 0;
-	  for (n = AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf->pp); n++) {
+	  for (n = AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++) {
 	    // This is different than the previous "d" filter.
 	    // Consider only those where the the H (has-been-used) bit is NOT set.
-	    if ( ! ax25_get_h (pf->pp, n)) {
+	    if ( ! ax25_get_h (pf.pp, n)) {
 	      char addr[AX25_MAX_ADDR_LEN];
-	      ax25_get_addr_with_ssid (pf->pp, n, addr);
+	      ax25_get_addr_with_ssid (pf.pp, n, addr);
 	      result = filt_bodgu (pf, addr);
 	    }
 	  }
@@ -617,83 +570,83 @@ static int parse_filter_spec (pfstate_t *pf)
 	  if (s_debug >= 2) {
 	    char path[100];
 
-	    ax25_format_via_path (pf->pp, path, sizeof(path));
+	    ax25_format_via_path (pf.pp, path, sizeof(path));
 	    if (strlen(path) == 0) {
 	      strcpy (path, "no digipeater path");
 	    }
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), path);
+	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), path);
 	  }
 	}
 
 /* g - Addressee of message. e.g. "BLN*" for bulletins. */
 
-	else if (pf->token_str[0] == 'g' && ispunct(pf->token_str[1])) {
-	  if (pf->decoded.g_message_subtype == message_subtype_message ||
-	      pf->decoded.g_message_subtype == message_subtype_ack ||
-	      pf->decoded.g_message_subtype == message_subtype_rej ||
-	      pf->decoded.g_message_subtype == message_subtype_bulletin ||
-	      pf->decoded.g_message_subtype == message_subtype_nws ||
-	      pf->decoded.g_message_subtype == message_subtype_directed_query) {
-	    result = filt_bodgu (pf, pf->decoded.g_addressee);
+	else if (pf.token_str[0] == 'g' && ispunct(pf.token_str[1])) {
+	  if (pf.decoded.g_message_subtype == message_subtype_message ||
+	      pf.decoded.g_message_subtype == message_subtype_ack ||
+	      pf.decoded.g_message_subtype == message_subtype_rej ||
+	      pf.decoded.g_message_subtype == message_subtype_bulletin ||
+	      pf.decoded.g_message_subtype == message_subtype_nws ||
+	      pf.decoded.g_message_subtype == message_subtype_directed_query) {
+	    result = filt_bodgu (pf, pf.decoded.g_addressee);
 
 	    if (s_debug >= 2) {
 	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), pf->decoded.g_addressee);
+	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee);
 	    }
 	  }
 	  else {
 	    result = 0;
 	    if (s_debug >= 2) {
 	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), "not a message");
+	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message");
 	    }
 	  }
 	}
 
 /* u - unproto (AX.25 destination) */
 
-	else if (pf->token_str[0] == 'u' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 'u' && ispunct(pf.token_str[1])) {
 	  /* Probably want to exclude mic-e types */
 	  /* because destination is used for part of location. */
 
-	  if (ax25_get_dti(pf->pp) != '\'' && ax25_get_dti(pf->pp) != '`') {
+	  if (ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`') {
 	    char addr[AX25_MAX_ADDR_LEN];
-	    ax25_get_addr_with_ssid (pf->pp, AX25_DESTINATION, addr);
+	    ax25_get_addr_with_ssid (pf.pp, AX25_DESTINATION, addr);
 	    result = filt_bodgu (pf, addr);
 
 	    if (s_debug >= 2) {
 	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), addr);
+	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr);
 	    }
 	  }
 	  else {
 	    result = 0;
 	    if (s_debug >= 2) {
 	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), "MIC-E packet type");
+	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type");
 	    }
 	  }
 	}
 
 /* t - packet type: position, weather, telemetry, etc. */
 
-	else if (pf->token_str[0] == 't' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 't' && ispunct(pf.token_str[1])) {
 	  
 	  result = filt_t (pf);
 
 	  if (s_debug >= 2) {
-	    char *infop = NULL;
-	    (void) ax25_get_info (pf->pp, (unsigned char **)(&infop));
+	    char *infop = nil;
+	    (void) ax25_get_info (pf.pp, (unsigned char **)(&infop));
 
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %c data type indicator\n", pf->token_str, bool2text(result), *infop);
+	    dw_printf ("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), *infop);
 	  }
 	}
 
 /* r - range */
 
-	else if (pf->token_str[0] == 'r' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 'r' && ispunct(pf.token_str[1])) {
 	  /* range */
 	  char sdist[30];
 	  strcpy (sdist, "unknown distance");
@@ -701,46 +654,46 @@ static int parse_filter_spec (pfstate_t *pf)
 
 	  if (s_debug >= 2) {
 	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf->token_str, bool2text(result), sdist);
+	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist);
 	  }
 	}
 
 /* s - symbol */
 
-	else if (pf->token_str[0] == 's' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 's' && ispunct(pf.token_str[1])) {
 	  /* symbol */
 	  result = filt_s (pf);
 
 	  if (s_debug >= 2) {
 	    text_color_set(DW_COLOR_DEBUG);
-	    if (pf->decoded.g_symbol_table == '/') {
-	      dw_printf ("   %s returns %s for symbol %c in primary table\n", pf->token_str, bool2text(result), pf->decoded.g_symbol_code);
+	    if (pf.decoded.g_symbol_table == '/') {
+	      dw_printf ("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code);
 	    }
-	    else if (pf->decoded.g_symbol_table == '\\') {
-	      dw_printf ("   %s returns %s for symbol %c in alternate table\n", pf->token_str, bool2text(result), pf->decoded.g_symbol_code);
+	    else if (pf.decoded.g_symbol_table == '\\') {
+	      dw_printf ("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code);
 	    }
 	    else {
-	      dw_printf ("   %s returns %s for symbol %c with overlay %c\n", pf->token_str, bool2text(result), pf->decoded.g_symbol_code, pf->decoded.g_symbol_table);
+	      dw_printf ("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code, pf.decoded.g_symbol_table);
 	    }
 	  }
 	}
 
 /* i - IGate messaging default */
 
-	else if (pf->token_str[0] == 'i' && ispunct(pf->token_str[1])) {
+	else if (pf.token_str[0] == 'i' && ispunct(pf.token_str[1])) {
 	  /* IGatge messaging */
 	  result = filt_i (pf);
 
 	  if (s_debug >= 2) {
-	    char *infop = NULL;
-	    (void) ax25_get_info (pf->pp, (unsigned char **)(&infop));
+	    char *infop = nil;
+	    (void) ax25_get_info (pf.pp, (unsigned char **)(&infop));
 
 	    text_color_set(DW_COLOR_DEBUG);
-	    if (pf->decoded.g_packet_type == packet_type_message) {
-	      dw_printf ("   %s returns %s for message to %s\n", pf->token_str, bool2text(result), pf->decoded.g_addressee);
+	    if (pf.decoded.g_packet_type == packet_type_message) {
+	      dw_printf ("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee);
 	    }
 	    else {
-	      dw_printf ("   %s returns %s for not an APRS 'message'\n", pf->token_str, bool2text(result));
+	      dw_printf ("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result));
 	    }
 	  }
 	}
@@ -749,7 +702,7 @@ static int parse_filter_spec (pfstate_t *pf)
 
 	else  {
 	  char stemp[80];
-	  snprintf (stemp, sizeof(stemp), "Unrecognized filter type '%c'", pf->token_str[0]);
+	  snprintf (stemp, sizeof(stemp), "Unrecognized filter type '%c'", pf.token_str[0]);
 	  print_error (pf, stemp);
 	  result = -1;
 	}
@@ -797,17 +750,17 @@ static int filt_bodgu (pfstate_t *pf, char *arg)
 	char *v;
 	int result = 0;
 
-	strlcpy (str, pf->token_str, sizeof(str));
+	strlcpy (str, pf.token_str, sizeof(str));
 	sep[0] = str[1];
-	sep[1] = '\0';
+	sep[1] = 0;
 	cp = str + 2;
 
-	while (result == 0 && (v = strsep (&cp, sep)) != NULL) {
+	for (result == 0 && (v = strsep (&cp, sep)) != nil) {
 
 	  int mlen;
 	  char *w;
 
-	  if ((w = strchr(v,'*')) != NULL) {
+	  if ((w = strchr(v,'*')) != nil) {
 	    /* Wildcarding.  Should have single * on end. */
 
 	    mlen = w - v;
@@ -854,73 +807,73 @@ static int filt_bodgu (pfstate_t *pf, char *arg)
 static int filt_t (pfstate_t *pf) 
 {
 	char src[AX25_MAX_ADDR_LEN];
-	char *infop = NULL;
+	char *infop = nil;
 	char *f;
 
 	memset (src, 0, sizeof(src));
-	ax25_get_addr_with_ssid (pf->pp, AX25_SOURCE, src);
-	(void) ax25_get_info (pf->pp, (unsigned char **)(&infop));
+	ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, src);
+	(void) ax25_get_info (pf.pp, (unsigned char **)(&infop));
 
-	assert (infop != NULL);
+	assert (infop != nil);
 
-	for (f = pf->token_str + 2; *f != '\0'; f++) {
+	for (f = pf.token_str + 2; *f != 0; f++) {
 	  switch (*f) {
 	
 	    case 'p':				/* Position */
-	      if (pf->decoded.g_packet_type == packet_type_position) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_position) return(1);
 	      break;
 
 	    case 'o':				/* Object */
-	      if (pf->decoded.g_packet_type == packet_type_object) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_object) return(1);
 	      break;
 
 	    case 'i':				/* Item */
-	      if (pf->decoded.g_packet_type == packet_type_item) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_item) return(1);
 	      break;
 
 	    case 'm':				// Any "message."
-	      if (pf->decoded.g_packet_type == packet_type_message) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_message) return(1);
 	      break;
 
 	    case 'q':				/* Query */
-	      if (pf->decoded.g_packet_type == packet_type_query) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_query) return(1);
 	      break;
 
 	    case 'c':				/* station Capabilities - my extension */
 						/* Most often used for IGate statistics. */
-	      if (pf->decoded.g_packet_type == packet_type_capabilities) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_capabilities) return(1);
 	      break;
 
 	    case 's':				/* Status */
-	      if (pf->decoded.g_packet_type == packet_type_status) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_status) return(1);
 	      break;
 
 	    case 't':				/* Telemetry data or metadata */
-	      if (pf->decoded.g_packet_type == packet_type_telemetry) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_telemetry) return(1);
 	      break;
 
 	    case 'u':				/* User-defined */
-	      if (pf->decoded.g_packet_type == packet_type_userdefined) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_userdefined) return(1);
 	      break;
 
 	    case 'h':				/* has third party Header - my extension */
-	      if (pf->decoded.g_has_thirdparty_header) return (1);
+	      if (pf.decoded.g_has_thirdparty_header) return (1);
 	      break;
 
 	    case 'w':				/* Weather */
 
-	      if (pf->decoded.g_packet_type == packet_type_weather) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_weather) return(1);
 
 	      /* Positions !=/@  with symbol code _ are weather. */
 	      /* Object with _ symbol is also weather.  APRS protocol spec page 66. */
 	      // Can't use *infop because it would not work with 3rd party header.
 
-	      if ((pf->decoded.g_packet_type == packet_type_position ||
-	           pf->decoded.g_packet_type == packet_type_object) && pf->decoded.g_symbol_code == '_') return (1);
+	      if ((pf.decoded.g_packet_type == packet_type_position ||
+	           pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_') return (1);
 	      break;
 
 	    case 'n':				/* NWS format */
-	      if (pf->decoded.g_packet_type == packet_type_nws) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_nws) return(1);
 	      break;
 
 	    default:
@@ -971,37 +924,37 @@ static int filt_r (pfstate_t *pf, char *sdist)
 	double dlat, dlon, ddist, km;
 
 
-	strlcpy (str, pf->token_str, sizeof(str));
+	strlcpy (str, pf.token_str, sizeof(str));
 	sep[0] = str[1];
-	sep[1] = '\0';
+	sep[1] = 0;
 	cp = str + 2;
 
-	if (pf->decoded.g_lat == G_UNKNOWN || pf->decoded.g_lon == G_UNKNOWN) {
+	if (pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN) {
 	  return (0);
 	}
 
 	v = strsep (&cp, sep);
-	if (v == NULL) {
+	if (v == nil) {
 	  print_error (pf, "Missing latitude for Range filter.");
 	  return (-1);
 	}
 	dlat = atof(v);
 
 	v = strsep (&cp, sep);
-	if (v == NULL) {
+	if (v == nil) {
 	  print_error (pf, "Missing longitude for Range filter.");
 	  return (-1);
 	}
 	dlon = atof(v);
 
 	v = strsep (&cp, sep);
-	if (v == NULL) {
+	if (v == nil) {
 	  print_error (pf, "Missing distance for Range filter.");
 	  return (-1);
 	}
 	ddist = atof(v);
 
-	km = ll_distance_km (dlat, dlon, pf->decoded.g_lat, pf->decoded.g_lon);
+	km = ll_distance_km (dlat, dlon, pf.decoded.g_lat, pf.decoded.g_lon);
 
 	sprintf (sdist, "%.2f km", km);
 
@@ -1084,13 +1037,13 @@ static int filt_s (pfstate_t *pf)
 	char str[MAX_TOKEN_LEN];
 	char *cp;
 	char sep[2];		// Delimiter character.  Typically / but it could be different.
-	char *pri = NULL, *alt = NULL, *over = NULL, *extra = NULL;
+	char *pri = nil, *alt = nil, *over = nil, *extra = nil;
 	char *x;
 
 
-	strlcpy (str, pf->token_str, sizeof(str));
+	strlcpy (str, pf.token_str, sizeof(str));
 	sep[0] = str[1];
-	sep[1] = '\0';
+	sep[1] = 0;
 	cp = str + 2;
 
 
@@ -1098,11 +1051,11 @@ static int filt_s (pfstate_t *pf)
 
 	pri = strsep (&cp, sep);
 
-	if (pri != NULL) {
+	if (pri != nil) {
 
 	  // Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
 
-	  for (x = pri; *x != '\0'; x++) {
+	  for (x = pri; *x != 0; x++) {
 	    if ( ! isprint(*x) || *x == '|' || *x == '~') {
 	      print_error (pf, "Symbol filter, primary must be printable ASCII character(s) other than | or ~.");
 	      return (-1);
@@ -1111,7 +1064,7 @@ static int filt_s (pfstate_t *pf)
 
 	  alt = strsep (&cp, sep);
 
-	  if (alt != NULL) {
+	  if (alt != nil) {
 
 	    // Zero length after second / would be pointless.
 
@@ -1120,7 +1073,7 @@ static int filt_s (pfstate_t *pf)
 	      return (-1);
 	    }
 
-	    for (x = alt; *x != '\0'; x++) {
+	    for (x = alt; *x != 0; x++) {
 	      if ( ! isprint(*x) || *x == '|' || *x == '~') {
 	        print_error (pf, "Symbol filter, alternate must be printable ASCII character(s) other than | or ~.");
 	        return (-1);
@@ -1129,11 +1082,11 @@ static int filt_s (pfstate_t *pf)
 
 	    over = strsep (&cp, sep);
 
-	    if (over != NULL) {
+	    if (over != nil) {
 
 	      // Zero length is acceptable and is not the same as missing.
 
-	      for (x = over; *x != '\0'; x++) {
+	      for (x = over; *x != 0; x++) {
 	        if ( (! isupper(*x)) && (! isdigit(*x)) && *x != '\\') {
 	          print_error (pf, "Symbol filter, overlay must be upper case letter, digit, or \\.");
 	          return (-1);
@@ -1142,7 +1095,7 @@ static int filt_s (pfstate_t *pf)
 
 	      extra = strsep (&cp, sep);
 
-	      if (extra != NULL) {
+	      if (extra != nil) {
 	        print_error (pf, "More than 3 delimiter characters in Symbol filter.");
 	        return (-1);
 	      }
@@ -1165,54 +1118,54 @@ static int filt_s (pfstate_t *pf)
 // This applies only for Position, Object, Item.
 // decode_aprs() should set symbol code to space to mean undefined.
 
-	if (pf->decoded.g_symbol_code == ' ') {
+	if (pf.decoded.g_symbol_code == ' ') {
 	  return (0);
 	}
 
 
 // Look for Primary symbols.
 
-	if (pf->decoded.g_symbol_table == '/') {
-	  if (pri != NULL && strlen(pri) > 0) {
-	    return (strchr(pri, pf->decoded.g_symbol_code) != NULL);
+	if (pf.decoded.g_symbol_table == '/') {
+	  if (pri != nil && strlen(pri) > 0) {
+	    return (strchr(pri, pf.decoded.g_symbol_code) != nil);
 	  }
 	}
 
-	if (alt == NULL) {
+	if (alt == nil) {
 	  return (0);
 	}
 
-	//printf ("alt=\"%s\"  sym='%c'\n", alt, pf->decoded.g_symbol_code);
+	//printf ("alt=\"%s\"  sym='%c'\n", alt, pf.decoded.g_symbol_code);
 
 // Look for Alternate symbols.
 
-	if (strchr(alt, pf->decoded.g_symbol_code) != NULL) {
+	if (strchr(alt, pf.decoded.g_symbol_code) != nil) {
 
 	  // We have a match but that might not be enough.
 	  // We must see if there was an overlay part specified.
 
-	  if (over != NULL) {
+	  if (over != nil) {
 
 	    if (strlen(over) > 0) {
 
 	      // Non-zero length overlay part was specified.
 	      // Need to match one of them.
 
-	      return (strchr(over, pf->decoded.g_symbol_table) != NULL);
+	      return (strchr(over, pf.decoded.g_symbol_table) != nil);
 	    }
 	    else {
 
 	      // Zero length overlay part was specified.
 	      // We must have no overlay, i.e.  table is \.
 
-	      return (pf->decoded.g_symbol_table == '\\');
+	      return (pf.decoded.g_symbol_table == '\\');
 	    }
 	  }
 	  else {
 
 	    // No check of overlay part.  Just make sure it is not primary table.
 
-	    return (pf->decoded.g_symbol_table != '/');
+	    return (pf.decoded.g_symbol_table != '/');
 	  }
 	}
 
@@ -1327,29 +1280,29 @@ static int filt_i (pfstate_t *pf)
 // TODO: Should produce a warning if a user specified filter does not include "i".
 
 	int heardtime = 180;	// 3 hours * 60 min/hr = 180 minutes
-	int maxhops = save_igate_config_p->max_digi_hops;	// from IGTXVIA config.
+	int maxhops = save_igate_config_p.max_digi_hops;	// from IGTXVIA config.
 	double dlat = G_UNKNOWN;
 	double dlon = G_UNKNOWN;
 	double km = G_UNKNOWN;
 
 
 	//char src[AX25_MAX_ADDR_LEN];
-	//char *infop = NULL;
+	//char *infop = nil;
 	//int info_len;
 	//char *f;
 	//char addressee[AX25_MAX_ADDR_LEN];
 
 
-	strlcpy (str, pf->token_str, sizeof(str));
+	strlcpy (str, pf.token_str, sizeof(str));
 	sep[0] = str[1];
-	sep[1] = '\0';
+	sep[1] = 0;
 	cp = str + 2;
 
 // Get parameters or defaults.
 
 	v = strsep (&cp, sep);
 
-	if (v != NULL && strlen(v) > 0) {
+	if (v != nil && strlen(v) > 0) {
 	  heardtime = atoi(v);
 	}
 	else {
@@ -1359,7 +1312,7 @@ static int filt_i (pfstate_t *pf)
 
 	v = strsep (&cp, sep);
 
-	if (v != NULL) {
+	if (v != nil) {
 	  if (strlen(v) > 0) {
 	    maxhops = atoi(v);
 	  }
@@ -1369,11 +1322,11 @@ static int filt_i (pfstate_t *pf)
 	  }
 
 	  v = strsep (&cp, sep);
-	  if (v != NULL && strlen(v) > 0) {
+	  if (v != nil && strlen(v) > 0) {
 	    dlat = atof(v);
 
 	    v = strsep (&cp, sep);
-	    if (v != NULL && strlen(v) > 0) {
+	    if (v != nil && strlen(v) > 0) {
 	      dlon = atof(v);
 	    }
 	    else {
@@ -1382,7 +1335,7 @@ static int filt_i (pfstate_t *pf)
 	    }
 
 	    v = strsep (&cp, sep);
-	    if (v != NULL && strlen(v) > 0) {
+	    if (v != nil && strlen(v) > 0) {
 	      km = atof(v);
 	    }
 	    else {
@@ -1392,7 +1345,7 @@ static int filt_i (pfstate_t *pf)
 	  }
 
 	  v = strsep (&cp, sep);
-	  if (v != NULL) {
+	  if (v != nil) {
 	    print_error (pf, "Something unexpected after distance for IGate message filter.");
 	    return (-1);
 	  }
@@ -1400,9 +1353,9 @@ static int filt_i (pfstate_t *pf)
 
 /*
  * Get source address and info part.
- * Addressee has already been extracted into pf->decoded.g_addressee.
+ * Addressee has already been extracted into pf.decoded.g_addressee.
  */
-	if (pf->decoded.g_packet_type != packet_type_message) return(0);
+	if (pf.decoded.g_packet_type != packet_type_message) return(0);
 
 	return(1);
 
@@ -1425,7 +1378,7 @@ static int filt_i (pfstate_t *pf)
  *	 period (range defined as digi hops, distance, or both)."
  */
 
-	int was_heard = mheard_was_recently_nearby ("addressee", pf->decoded.g_addressee, heardtime, maxhops, dlat, dlon, km);
+	int was_heard = mheard_was_recently_nearby ("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km);
 
 	if ( ! was_heard) return (0);
 
@@ -1446,7 +1399,7 @@ static int filt_i (pfstate_t *pf)
  * the past minute, rather than the usual 180 minutes for the addressee.
  */
 
-	was_heard = mheard_was_recently_nearby ("source", pf->decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN);
+	was_heard = mheard_was_recently_nearby ("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN);
 
 	if (was_heard) return (0);
 
@@ -1473,28 +1426,28 @@ static void print_error (pfstate_t *pf, char *msg)
 {
 	char intro[50];
 
-	if (pf->from_chan == MAX_TOTAL_CHANS) {
+	if (pf.from_chan == MAX_TOTAL_CHANS) {
 
-	  if (pf->to_chan == MAX_TOTAL_CHANS) {
+	  if (pf.to_chan == MAX_TOTAL_CHANS) {
 	    snprintf (intro, sizeof(intro), "filter[IG,IG]: ");
 	  }
 	  else {
-	    snprintf (intro, sizeof(intro), "filter[IG,%d]: ", pf->to_chan);
+	    snprintf (intro, sizeof(intro), "filter[IG,%d]: ", pf.to_chan);
 	  }
 	}
 	else {
 
-	  if (pf->to_chan == MAX_TOTAL_CHANS) {
-	    snprintf (intro, sizeof(intro), "filter[%d,IG]: ", pf->from_chan);
+	  if (pf.to_chan == MAX_TOTAL_CHANS) {
+	    snprintf (intro, sizeof(intro), "filter[%d,IG]: ", pf.from_chan);
 	  }
 	  else {
-	    snprintf (intro, sizeof(intro), "filter[%d,%d]: ", pf->from_chan, pf->to_chan);
+	    snprintf (intro, sizeof(intro), "filter[%d,%d]: ", pf.from_chan, pf.to_chan);
 	  }
 	}
 
 	text_color_set (DW_COLOR_ERROR);
 
-	dw_printf ("%s%s\n", intro, pf->filter_str);
-	dw_printf ("%*s\n", (int)(strlen(intro) + pf->tokeni + 1), "^");
+	dw_printf ("%s%s\n", intro, pf.filter_str);
+	dw_printf ("%*s\n", (int)(strlen(intro) + pf.tokeni + 1), "^");
 	dw_printf ("%s\n", msg);
 }
