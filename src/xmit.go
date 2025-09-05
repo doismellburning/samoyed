@@ -98,7 +98,7 @@ var g_debug_xmit_packet C.int /* print packet in hexadecimal form for debugging.
  * We are not clever enough to multiplex them so use this
  * so only one is activte at the same time.
  */
-// FIXME KG static dw_mutex_t audio_out_dev_mutex[MAX_ADEVS];
+var audio_out_dev_mutex[C.MAX_ADEVS]C.dw_mutex_t
 
 /*-------------------------------------------------------------------
  *
@@ -297,12 +297,12 @@ const (
 
 func frame_flavor(pp C.packet_t) flavor_t {
 
-	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
+	if C.ax25_is_aprs(pp) > 0 { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
 
 		var _dest [AX25_MAX_ADDR_LEN]C.char
 
-		ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_dest[0])
+		C.ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_dest[0])
 
 		var dest = C.GoString(&_dest[0])
 
@@ -321,7 +321,7 @@ func frame_flavor(pp C.packet_t) flavor_t {
 		/* Is there at least one digipeater AND has first one been used? */
 		/* I could be the first in the list or later.  Doesn't matter. */
 
-		if ax25_get_num_repeaters(pp) >= 1 && ax25_get_h(pp, AX25_REPEATER_1) {
+		if C.ax25_get_num_repeaters(pp) >= 1 && C.ax25_get_h(pp, AX25_REPEATER_1) > 0 {
 			return (FLAVOR_APRS_DIGI)
 		}
 
@@ -379,14 +379,8 @@ func frame_flavor(pp C.packet_t) flavor_t {
  *--------------------------------------------------------------------*/
 
 func xmit_thread(channel C.int) {
-	/* FIXME KG
-	packet_t pp;
-	int prio;
-	int ok;
-	*/
 
 	for {
-
 		C.tq_wait_while_empty(channel)
 		/* TODO KG
 		#if DEBUG
@@ -396,7 +390,7 @@ func xmit_thread(channel C.int) {
 		*/
 
 		// Does this extra loop offer any benefit?
-		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
+		for C.tq_peek(channel, TQ_PRIO_0_HI) != nil || C.tq_peek(channel, TQ_PRIO_1_LO) != nil {
 
 			/*
 			 * Wait for the channel to be clear.
@@ -405,12 +399,12 @@ func xmit_thread(channel C.int) {
 			 */
 			var ok = wait_for_clear_channel(channel, xmit_slottime[channel], xmit_persist[channel], xmit_fulldup[channel])
 
-			prio = TQ_PRIO_1_LO
-			pp = tq_remove(channel, TQ_PRIO_0_HI)
+			var prio C.int = TQ_PRIO_1_LO
+			var pp = C.tq_remove(channel, TQ_PRIO_0_HI)
 			if pp != nil {
 				prio = TQ_PRIO_0_HI
 			} else {
-				pp = tq_remove(channel, TQ_PRIO_1_LO)
+				pp = C.tq_remove(channel, TQ_PRIO_1_LO)
 			}
 
 			/* TODO KG
@@ -439,8 +433,8 @@ func xmit_thread(channel C.int) {
 						break
 
 					case FLAVOR_MORSE:
-						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
-						var wpm = MORSE_DEFAULT_WPM
+						var ssid = C.ax25_get_ssid(pp, AX25_DESTINATION)
+						var wpm = C.MORSE_DEFAULT_WPM
 						if ssid > 0 {
 							wpm = ssid * 2
 						}
@@ -459,7 +453,7 @@ func xmit_thread(channel C.int) {
 						break
 
 					case FLAVOR_DTMF:
-						var speed = ax25_get_ssid(pp, AX25_DESTINATION)
+						var speed = C.ax25_get_ssid(pp, AX25_DESTINATION)
 						if speed == 0 {
 							speed = 5 // default half of maximum
 						}
@@ -479,8 +473,6 @@ func xmit_thread(channel C.int) {
 						// Discussion here:  http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2021-September/049034.html
 						break
 
-					case FLAVOR_APRS_NEW:
-					case FLAVOR_OTHER:
 					default:
 						xmit_ax25_frames(channel, prio, pp, 256)
 						break
@@ -499,7 +491,7 @@ func xmit_thread(channel C.int) {
 					dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
 
 					var stemp [1024]C.char /* max size needed? */
-					C.ax25_format_addrs(pp, stemp)
+					C.ax25_format_addrs(pp, &stemp[0])
 
 					var pinfo *C.uchar
 					var info_len = C.ax25_get_info(pp, &pinfo)
@@ -508,10 +500,9 @@ func xmit_thread(channel C.int) {
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", stemp) /* stations followed by : */
-					C.ax25_safe_print(pinfo, info_len, !ax25_is_aprs(pp))
+					C.ax25_safe_print(pinfo, info_len, !C.ax25_is_aprs(pp))
 					dw_printf("\n")
-					ax25_delete(pp)
-
+					C.ax25_delete(pp)
 				} /* wait for clear channel error. */
 			} /* Have pp */
 		} /* while queue not empty */
