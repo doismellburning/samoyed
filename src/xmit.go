@@ -1210,8 +1210,7 @@ func xmit_morse (c C.int, pp packet_t, wpm C.int) {
  *--------------------------------------------------------------------*/
 
 
-func xmit_dtmf (c C.int, pp packet_t, speed C.int)
-{
+func xmit_dtmf (c C.int, pp packet_t, speed C.int) {
 	/* FIXME KG 
 	int info_len;
 	unsigned char *pinfo;
@@ -1317,23 +1316,22 @@ func xmit_dtmf (c C.int, pp packet_t, speed C.int)
 /* That's a long time to wait for APRS. */
 /* Might need to revisit some day for connected mode file transfers. */
 
-#define WAIT_TIMEOUT_MS (60 * 1000)	
-#define WAIT_CHECK_EVERY_MS 10
+// FIXME KG const WAIT_TIMEOUT_MS (60 * 1000)	
+// FIXME KG #define WAIT_CHECK_EVERY_MS 10
 
-static int wait_for_clear_channel (int channel, int slottime, int persist, int fulldup)
-{
-	int n = 0;
+func wait_for_clear_channel (channel C.int, slottime C.int, persist C.int, fulldup C.int) C.int {
 
 /*
  * For dull duplex we skip the channel busy check and random wait.
  * We still need to wait if operating in stereo and the other audio
  * half is busy.
  */
+	var n = 0;
 	if ( ! fulldup) {
 
 start_over_again:
 
-	while (hdlc_rec_data_detect_any(channel)) {
+	for (hdlc_rec_data_detect_any(channel)) {
 	  SLEEP_MS(WAIT_CHECK_EVERY_MS);
 	  n++;
 	  if (n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS)) {
@@ -1360,16 +1358,14 @@ start_over_again:
  * Wait random time.
  * Proceed to transmit sooner if anything shows up in high priority queue.
  */
-	while (tq_peek(channel, TQ_PRIO_0_HI) == nil) {
-	  int r;
-
+	for (tq_peek(channel, TQ_PRIO_0_HI) == nil) {
 	  SLEEP_MS (slottime * 10);
 
 	  if (hdlc_rec_data_detect_any(channel)) {
 	    goto start_over_again;
 	  }
 
-	  r = rand() & 0xff;
+	  var r = rand() & 0xff;
 	  if (r <= persist) {
 	    break;
  	  }	
@@ -1387,7 +1383,7 @@ start_over_again:
 
 // TODO: review this.
 
-	while ( ! dw_mutex_try_lock(&(audio_out_dev_mutex[ACHAN2ADEV(channel)]))) {
+	for ( ! dw_mutex_try_lock(&(audio_out_dev_mutex[ACHAN2ADEV(channel)]))) {
 	  SLEEP_MS(WAIT_CHECK_EVERY_MS);
 	  n++;
 	  if (n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS)) {
