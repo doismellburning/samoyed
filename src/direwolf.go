@@ -643,7 +643,7 @@ x = Silence FX.25 information.`)
 	 * It is the range of the digital sound representation.
 	 */
 	C.gen_tone_init(&C.audio_config, audio_amplitude, 0)
-	C.morse_init(&C.audio_config, audio_amplitude)
+	morse_init(&C.audio_config, audio_amplitude)
 
 	if !(C.audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16) { //nolint:staticcheck
 		panic("audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16")
