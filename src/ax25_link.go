@@ -4705,14 +4705,14 @@ func xid_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_
 
 				var param C.struct_xid_param_s
 				var desc [150]C.char
-				var ok = C.xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
+				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
 
 				if ok > 0 {
 					negotiation_response(S, &param)
 
 					var xinfo [40]C.uchar
 					var res = cr_res
-					var xlen = C.xid_encode(&param, &xinfo[0], res)
+					var xlen = xid_encode(&param, &xinfo[0], res)
 
 					var nopid C.int = 0
 					var f C.int = -1
@@ -4738,7 +4738,7 @@ func xid_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_
 
 				var param C.struct_xid_param_s
 				var desc [150]C.char
-				var ok = C.xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
+				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
 
 				if ok > 0 {
 					complete_negotiation(S, &param)
@@ -5137,7 +5137,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			initiate_negotiation(S, &param)
 
 			var xinfo [40]C.uchar
-			var xlen = C.xid_encode(&param, &xinfo[0], cmd)
+			var xlen = xid_encode(&param, &xinfo[0], cmd)
 
 			var pp = C.ax25_u_frame(&S.addrs[0], S.num_addr, cmd, frame_type_U_XID, p, nopid, &xinfo[0], xlen)
 			C.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -6118,7 +6118,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 
 		var xinfo [40]C.uchar
 		var cmd = cr_cmd
-		var xlen = C.xid_encode(&param, &xinfo[0], cmd)
+		var xlen = xid_encode(&param, &xinfo[0], cmd)
 
 		var p C.int = 1
 		var nopid C.int = 0

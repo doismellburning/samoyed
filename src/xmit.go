@@ -880,7 +880,7 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 			var param C.struct_xid_param_s
 			var info2text [150]C.char
 
-			C.xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))
+			xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))
 			dw_printf(" %s\n", C.GoString(&info2text[0]))
 		} else {
 			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
