@@ -113,7 +113,7 @@ func xid_test_main(t *testing.T) {
 	assert.Equal(t, C.int(len(xid_example)), n)
 
 	n = C.memcmp(unsafe.Pointer(&info[0]), unsafe.Pointer(&xid_example[0]), 27)
-	assert.Equal(t, C.int(0), n)
+	assert.Equal(t, C.int(0), n, "n: %d, info: %v, xid_example[0]: %v", n, C.GoBytes(unsafe.Pointer(&info[0]), 27), C.GoBytes(unsafe.Pointer(&xid_example[0]), 27))
 
 	/* try a couple different values, no srej. */
 
