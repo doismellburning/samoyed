@@ -90,7 +90,7 @@ func xid_test_main(t *testing.T) {
 
 	/* parse example. */
 
-	var n = C.xid_parse(&xid_example[0], C.int(len(xid_example)), &param, &desc[0], C.int(len(desc)))
+	var n = xid_parse(&xid_example[0], C.int(len(xid_example)), &param, &desc[0], C.int(len(desc)))
 
 	C.text_color_set(C.DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
@@ -109,7 +109,7 @@ func xid_test_main(t *testing.T) {
 
 	/* encode and verify it comes out the same. */
 
-	n = C.xid_encode(&param, &info[0], C.cr_cmd)
+	n = xid_encode(&param, &info[0], C.cr_cmd)
 	assert.Equal(t, C.int(len(xid_example)), n)
 
 	n = C.memcmp(unsafe.Pointer(&info[0]), unsafe.Pointer(&xid_example[0]), 27)
@@ -125,8 +125,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 1234
 	param.retries = 12
 
-	n = C.xid_encode(&param, &info[0], C.cr_cmd)
-	C.xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
+	n = xid_encode(&param, &info[0], C.cr_cmd)
+	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	C.text_color_set(C.DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
@@ -152,8 +152,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 5555
 	param.retries = 9
 
-	n = C.xid_encode(&param, &info[0], C.cr_cmd)
-	C.xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
+	n = xid_encode(&param, &info[0], C.cr_cmd)
+	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	C.text_color_set(C.DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
@@ -179,8 +179,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 5555
 	param.retries = 9
 
-	n = C.xid_encode(&param, &info[0], C.cr_cmd)
-	C.xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
+	n = xid_encode(&param, &info[0], C.cr_cmd)
+	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	C.text_color_set(C.DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
@@ -206,8 +206,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 999
 	param.retries = G_UNKNOWN
 
-	n = C.xid_encode(&param, &info[0], C.cr_cmd)
-	C.xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
+	n = xid_encode(&param, &info[0], C.cr_cmd)
+	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	C.text_color_set(C.DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
@@ -226,7 +226,7 @@ func xid_test_main(t *testing.T) {
 	/* Default values for empty info field. */
 
 	n = 0
-	C.xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
+	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	C.text_color_set(C.DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
