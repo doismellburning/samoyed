@@ -621,7 +621,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 	var pre_flags = MS_TO_BITS(xmit_txdelay[channel]*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
-	var num_bits = C.layer2_preamble_postamble(channel, pre_flags, 0, save_audio_config_p)
+	var num_bits = layer2_preamble_postamble(channel, pre_flags, 0, save_audio_config_p)
 
 	/* TODO KG
 	#if DEBUG
@@ -730,7 +730,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 	 */
 
 	var post_flags = MS_TO_BITS(xmit_txtail[channel]*10, channel) / 8
-	nb = C.layer2_preamble_postamble(channel, post_flags, 1, save_audio_config_p)
+	nb = layer2_preamble_postamble(channel, post_flags, 1, save_audio_config_p)
 	num_bits += nb
 	/* TODO KG
 	#if DEBUG
@@ -920,7 +920,7 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 		}
 	}
 
-	var nb = C.layer2_send_frame(c, pp, send_invalid_fcs2, save_audio_config_p)
+	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, save_audio_config_p)
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
