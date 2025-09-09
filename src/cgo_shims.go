@@ -12,6 +12,7 @@ package direwolf
 // #include "serial_port.h"
 // #include "kiss_frame.h"
 // #include "ax25_link.h"
+// #include "fx25.h"
 import "C"
 
 import (
@@ -57,6 +58,9 @@ const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
 const AX25_N1_PACLEN_MAX = C.AX25_N1_PACLEN_MAX
 const AX25_REPEATER_1 = C.AX25_REPEATER_1
 const AX25_SOURCE = C.AX25_SOURCE
+
+const FX25_MAX_CHECK = C.FX25_MAX_CHECK
+const FX25_MAX_DATA = C.FX25_MAX_DATA
 
 const MYFDERROR = C.MYFDERROR
 
