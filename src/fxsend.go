@@ -33,6 +33,6 @@ func FxsendMain() {
 
 	var i C.int
 	for i = 100 + C.CTAG_MIN; i <= 100+C.CTAG_MAX; i++ {
-		C.fx25_send_frame(0, &preload[0], C.int(len(preload)-3), i, 1)
+		fx25_send_frame(0, &preload[0], C.int(len(preload)-3), i, true)
 	}
 }

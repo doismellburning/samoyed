@@ -15,4 +15,6 @@ require (
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+	pgregory.net/rapid v1.2.0 // indirect
 )

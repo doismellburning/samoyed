@@ -67,7 +67,7 @@ func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config
 	} else if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_FX25 {
 		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
 		var flen = C.ax25_pack(pp, &fbuf[0])
-		var n = C.fx25_send_frame(channel, &fbuf[0], flen, audio_config_p.achan[channel].fx25_strength, 0)
+		var n = fx25_send_frame(channel, &fbuf[0], flen, audio_config_p.achan[channel].fx25_strength, false)
 		if n > 0 {
 			return (n)
 		}
