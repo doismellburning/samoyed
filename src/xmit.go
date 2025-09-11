@@ -1107,7 +1107,7 @@ func xmit_dtmf(c C.int, pp C.packet_t, speed C.int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = C.dtmf_send(c, (*C.char)(unsafe.Pointer(pinfo)), speed, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
+	var _length_ms = dtmf_send(c, (*C.char)(unsafe.Pointer(pinfo)), speed, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
