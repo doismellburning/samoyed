@@ -14,3 +14,8 @@ type AGWPEHeader struct {
 	DataLen      uint32
 	UserReserved [4]byte
 }
+
+type AGWPEMessage struct {
+	Header AGWPEHeader
+	Data []byte
+}
