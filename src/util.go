@@ -9,3 +9,6 @@ func SLEEP_MS(ms int) {
 func SLEEP_SEC(s int) {
 	SLEEP_MS(s * 1000)
 }
+
+// Used for both KISS and AGWPE
+const MAX_NET_CLIENTS = 3
