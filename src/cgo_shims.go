@@ -69,8 +69,6 @@ const WPL_FORMAT_AIS = C.WPL_FORMAT_AIS
 const KS_SEARCHING = C.KS_SEARCHING
 const KS_COLLECTING = C.KS_COLLECTING
 
-const FROM_CLIENT = C.FROM_CLIENT
-
 const MAX_NOISE_LEN = C.MAX_NOISE_LEN
 
 const frame_type_I C.ax25_frame_type_t = C.frame_type_I
@@ -181,4 +179,14 @@ func Assert(t bool) {
 		_, file, line, _ := runtime.Caller(1)
 		panic(fmt.Sprintf("Assertion failed at %s:%d", file, line))
 	}
+}
+
+type fromto_t = C.fromto_t
+
+const FROM_CLIENT fromto_t = C.FROM_CLIENT
+const TO_CLIENT fromto_t = C.TO_CLIENT
+
+var FROMTO_PREFIX = map[fromto_t]string{
+	FROM_CLIENT: "<<<",
+	TO_CLIENT:   ">>>",
 }
