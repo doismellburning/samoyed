@@ -134,6 +134,7 @@ package direwolf
 import "C"
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"syscall"
@@ -173,7 +174,7 @@ func server_set_debug(n C.int) {
 	debug_client = n
 }
 
-func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEHeader, msg_len C.int) {
+func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEMessage) {
 
 	var direction, datakind string
 
@@ -182,7 +183,7 @@ func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEHeader, msg_len C.int
 	case FROM_CLIENT:
 		direction = "from" /* from the client application */
 
-		switch pmsg.DataKind {
+		switch pmsg.Header.DataKind {
 		case 'P':
 			datakind = "Application Login"
 		case 'X':
@@ -228,7 +229,7 @@ func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEHeader, msg_len C.int
 	case TO_CLIENT:
 		direction = "to"
 
-		switch pmsg.DataKind {
+		switch pmsg.Header.DataKind {
 		case 'R':
 			datakind = "Version Number"
 		case 'X':
@@ -270,23 +271,13 @@ func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEHeader, msg_len C.int
 	dw_printf("\n")
 
 	dw_printf("%s %s %s AGWPE client application %d, total length = %d\n",
-		FROMTO_PREFIX[fromto], datakind, direction, client, msg_len)
+		FROMTO_PREFIX[fromto], datakind, direction, client)
 
-	dw_printf("\tportx = %d, datakind = '%c', pid = 0x%02x\n", pmsg.Portx, pmsg.DataKind, pmsg.PID)
-	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.CallFrom, pmsg.CallTo)
-	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.DataLen, pmsg.UserReserved)
+	dw_printf("\tportx = %d, datakind = '%c', pid = 0x%02x\n", pmsg.Header.Portx, pmsg.Header.DataKind, pmsg.Header.PID)
+	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
+	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
 
 	// FIXME KG hex_dump ((*C.uchar)(pmsg) + sizeof(struct agwpe_s), netle2host(pmsg.data_len_NETLE));
-
-	if msg_len < 36 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("AGWPE message length, %d, is shorter than minimum 36.\n", msg_len)
-	}
-	if msg_len != C.int(pmsg.DataLen+36) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("AGWPE message length, %d, inconsistent with data length %d.\n", msg_len, pmsg.DataLen)
-	}
-
 }
 
 /*-------------------------------------------------------------------
@@ -465,49 +456,49 @@ func server_connect_listen_thread(server_port C.int) {
  *--------------------------------------------------------------------*/
 
 func server_send_rec_packet(channel C.int, pp C.packet_t, fbuf *C.uchar, flen C.int) {
-	/* FIXME KG
-	struct {
-	  struct agwpe_s hdr;
-	  char data[1+AX25_MAX_PACKET_LEN];
-	} agwpe_msg;
-	*/
 
 	/*
 	 * RAW format
 	 */
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
 
 		if enable_send_raw_to_client[client] && client_sock[client] != nil {
 
-			memset(&agwpe_msg.hdr, 0, sizeof(agwpe_msg.hdr))
+			var agwpe_msg = new(AGWPEMessage)
 
-			agwpe_msg.hdr.portx = channel
+			agwpe_msg.Header.Portx = byte(channel)
 
-			agwpe_msg.hdr.datakind = 'K'
+			agwpe_msg.Header.DataKind = 'K'
 
-			ax25_get_addr_with_ssid(pp, AX25_SOURCE, agwpe_msg.hdr.call_from)
+			var callFrom [AX25_MAX_ADDR_LEN]C.char
+			C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
+			// FIXME KG agwpe_msg.Header.CallFrom = callFrom
 
-			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, agwpe_msg.hdr.call_to)
+			var callTo [AX25_MAX_ADDR_LEN]C.char
+			C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
+			// FIXME KG agwpe_msg.Header.CallTo = callTo
 
-			agwpe_msg.hdr.data_len_NETLE = host2netle(flen + 1)
+			agwpe_msg.Header.DataLen = uint32(flen + 1)
+			agwpe_msg.Data = make([]byte, flen + 1)
 
 			/* Stick in extra byte for the "TNC" to use. */
 
-			agwpe_msg.data[0] = channel << 4 // Was 0.  Fixed in 1.8.
-			memcpy(agwpe_msg.data+1, fbuf, flen)
+			agwpe_msg.Data[0] = byte(channel) << 4 // Was 0.  Fixed in 1.8.
 
-			if debug_client {
-				debug_print(TO_CLIENT, client, &agwpe_msg.hdr, sizeof(agwpe_msg.hdr)+netle2host(agwpe_msg.hdr.data_len_NETLE))
+			copy(agwpe_msg.Data[1:], C.GoBytes(unsafe.Pointer(fbuf), flen))
+
+			if debug_client > 0 {
+				debug_print(TO_CLIENT, client, agwpe_msg)
 			}
 
-			err = SOCK_SEND(client_sock[client], &agwpe_msg, sizeof(agwpe_msg.hdr)+netle2host(agwpe_msg.hdr.data_len_NETLE))
+			var err = binary.Write(client_sock[client], binary.LittleEndian, agwpe_msg)
 
-			if err <= 0 {
+			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application.  Closing connection.\n\n")
-				close(client_sock[client])
-				client_sock[client] = -1
-				dlq_client_cleanup(client)
+				client_sock[client].Close()
+				client_sock[client] = nil
+				C.dlq_client_cleanup(client)
 			}
 		}
 	}
@@ -526,18 +517,12 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 	 *
 	 *			'T' for own transmitted frames.
 	 */
-	/* FIXME KG
-	struct {
-	  struct agwpe_s hdr;
-	  char data[128+AX25_MAX_PACKET_LEN];	// Add plenty of room for header prefix.
-	} agwpe_msg;
-	*/
 
 	for client := 0; client < MAX_NET_CLIENTS; client++ {
-		if enable_send_monitor_to_client[client] && client_sock[client] > 0 {
-			memset(&agwpe_msg.hdr, 0, sizeof(agwpe_msg.hdr))
+		if enable_send_monitor_to_client[client] && client_sock[client] != nil {
+			var agwpe_msg = new(AGWPEMessage)
 
-			agwpe_msg.hdr.portx = channel // datakind is added later.
+			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 			ax25_get_addr_with_ssid(pp, AX25_SOURCE, agwpe_msg.hdr.call_from)
 			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, agwpe_msg.hdr.call_to)
 
