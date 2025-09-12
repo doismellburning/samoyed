@@ -173,8 +173,6 @@ import (
 	"unsafe"
 )
 
-const MAX_NET_CLIENTS = 3
-
 var s_misc_config_p *C.struct_misc_config_s
 
 // Each TCP port has its own status block.
