@@ -566,7 +566,7 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 				}
 				agwpe_msg.Header.DataKind = 'T'
 			}
-			agwpe_msg.Data = agwpe_msg.Data + desc
+			agwpe_msg.Data = append(agwpe_msg.Data, desc...)
 
 			// Timestamp with [...]\r
 
@@ -587,18 +587,18 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 			if info_len > 0 && pinfo != nil {
 				// Issue 367: Use of strlcat truncated information part at any nul character.
 				// Use memcpy instead to preserve binary data, e.g. NET/ROM.
-				memcpy(agwpe_msg.data+msg_data_len, pinfo, info_len)
+				agwpe_msg.Data = append(agwpe_msg.Data, pinfo) // FIXME KG pinfo type
 				msg_data_len += info_len
 				agwpe_msg.data[msg_data_len] = '\r'
 				msg_data_len++
 			}
 
-			agwpe_msg.data[msg_data_len] = 0 // add nul at end, included in length.
+			agwpe_msg.Data = append(agwpe_msg.Data, 0) // add nul at end, included in length.
 			msg_data_len++
-			agwpe_msg.Header.data_len_NETLE = host2netle(msg_data_len)
+			agwpe_msg.Header.DataLen = msg_data_len // FIXME KG Just len(Data)
 
-			if debug_client {
-				debug_print(TO_CLIENT, client, &agwpe_msg.Header, sizeof(agwpe_msg.Header)+netle2host(agwpe_msg.Header.data_len_NETLE))
+			if debug_client > 0 {
+				debug_print(TO_CLIENT, client, agwpe_msg)
 			}
 
 			err = SOCK_SEND(client_sock[client], &agwpe_msg, sizeof(agwpe_msg.Header)+netle2host(agwpe_msg.Header.data_len_NETLE))
