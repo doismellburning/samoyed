@@ -523,8 +523,14 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 			var agwpe_msg = new(AGWPEMessage)
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
-			ax25_get_addr_with_ssid(pp, AX25_SOURCE, agwpe_msg.hdr.call_from)
-			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, agwpe_msg.hdr.call_to)
+
+			var callFrom [AX25_MAX_ADDR_LEN]C.char
+			C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
+			// FIXME KG Copy back
+
+			var callTo [AX25_MAX_ADDR_LEN]C.char
+			C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
+			// FIXME KG Copy back
 
 			/* http://uz7ho.org.ua/includes/agwpeapi.htm#_Toc500723812 */
 
@@ -545,19 +551,20 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 
 			// Format the channel and addresses, with leading and trailing space.
 
-			mon_addrs(channel, pp, (agwpe_msg.data), sizeof(agwpe_msg.data))
+			agwpe_msg.Data = mon_addrs(channel, pp)
 
 			// Add the description with <... >
 
-			// FIXME KG char desc[120];
-			agwpe_msg.hdr.datakind = mon_desc(pp, desc, sizeof(desc))
+			var desc []byte
+			agwpe_msg.Header.DataKind, desc = mon_desc(pp)
+
 			if own_xmit {
 				// Should we include all own transmitted frames or only UNPROTO?
 				// Discussion:  https://github.com/wb2osz/direwolf/issues/585
-				if agwpe_msg.hdr.datakind != 'U' {
+				if agwpe_msg.Header.datakind != 'U' {
 					break
 				}
-				agwpe_msg.hdr.datakind = 'T'
+				agwpe_msg.Header.datakind = 'T'
 			}
 			strlcat((agwpe_msg.data), desc, sizeof(agwpe_msg.data))
 
@@ -590,13 +597,13 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 
 			agwpe_msg.data[msg_data_len] = 0 // add nul at end, included in length.
 			msg_data_len++
-			agwpe_msg.hdr.data_len_NETLE = host2netle(msg_data_len)
+			agwpe_msg.Header.data_len_NETLE = host2netle(msg_data_len)
 
 			if debug_client {
-				debug_print(TO_CLIENT, client, &agwpe_msg.hdr, sizeof(agwpe_msg.hdr)+netle2host(agwpe_msg.hdr.data_len_NETLE))
+				debug_print(TO_CLIENT, client, &agwpe_msg.Header, sizeof(agwpe_msg.Header)+netle2host(agwpe_msg.Header.data_len_NETLE))
 			}
 
-			err = SOCK_SEND(client_sock[client], &agwpe_msg, sizeof(agwpe_msg.hdr)+netle2host(agwpe_msg.hdr.data_len_NETLE))
+			err = SOCK_SEND(client_sock[client], &agwpe_msg, sizeof(agwpe_msg.Header)+netle2host(agwpe_msg.Header.data_len_NETLE))
 
 			if err <= 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -622,7 +629,7 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 // I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
 // rather than continuing to propagate historical inconsistencies.
 
-func mon_addrs(channel C.int, pp C.packet_t, result *C.char, result_size C.int) {
+func mon_addrs(channel C.int, pp C.packet_t) []byte {
 
 	var src [AX25_MAX_ADDR_LEN]C.char
 	ax25_get_addr_with_ssid(pp, AX25_SOURCE, src)
@@ -673,7 +680,8 @@ func mon_addrs(channel C.int, pp C.packet_t, result *C.char, result_size C.int) 
 //	'U' for unnumbered information frame.
 //	'S' for supervisory and other unnumbered frames.
 
-func mon_desc(pp C.packet_t, result *C.char, result_size C.int) C.char {
+func mon_desc(pp C.packet_t) (C.char, []byte) {
+	// FIXME KG Return result
 	/* FIXME KG
 	cmdres_t cr;		// command/response.
 	char ignore[80];	// direwolf description.  not used here.
@@ -798,17 +806,17 @@ func server_link_established(channel C.int, client C.int, remote_call *C.char, o
 
 	/* FIXME KG
 	struct {
-	  struct agwpe_s hdr;
+	  struct agwpe_s Header;
 	  char info[100];
 	} reply;
 	*/
 
 	memset(&reply, 0, sizeof(reply))
-	reply.hdr.portx = channel
-	reply.hdr.datakind = 'C'
+	reply.Header.portx = channel
+	reply.Header.datakind = 'C'
 
-	strlcpy(reply.hdr.call_from, remote_call, sizeof(reply.hdr.call_from))
-	strlcpy(reply.hdr.call_to, own_call, sizeof(reply.hdr.call_to))
+	strlcpy(reply.Header.call_from, remote_call, sizeof(reply.Header.call_from))
+	strlcpy(reply.Header.call_to, own_call, sizeof(reply.Header.call_to))
 
 	// Question:  Should the via path be provided too?
 
@@ -819,7 +827,7 @@ func server_link_established(channel C.int, client C.int, remote_call *C.char, o
 		// We started the connection.
 		snprintf(reply.info, sizeof(reply.info), "*** CONNECTED With Station %s\r", remote_call)
 	}
-	reply.hdr.data_len_NETLE = host2netle(strlen(reply.info) + 1)
+	reply.Header.data_len_NETLE = host2netle(strlen(reply.info) + 1)
 
 	send_to_client(client, &reply)
 
@@ -853,23 +861,23 @@ func server_link_terminated(channel C.int, client C.int, remote_call *C.char, ow
 
 	/* FIXME KG
 	struct {
-	  struct agwpe_s hdr;
+	  struct agwpe_s Header;
 	  char info[100];
 	} reply;
 	*/
 
 	memset(&reply, 0, sizeof(reply))
-	reply.hdr.portx = channel
-	reply.hdr.datakind = 'd'
-	strlcpy(reply.hdr.call_from, remote_call, sizeof(reply.hdr.call_from)) /* right order */
-	strlcpy(reply.hdr.call_to, own_call, sizeof(reply.hdr.call_to))
+	reply.Header.portx = channel
+	reply.Header.datakind = 'd'
+	strlcpy(reply.Header.call_from, remote_call, sizeof(reply.Header.call_from)) /* right order */
+	strlcpy(reply.Header.call_to, own_call, sizeof(reply.Header.call_to))
 
 	if timeout {
 		snprintf(reply.info, sizeof(reply.info), "*** DISCONNECTED RETRYOUT With %s\r", remote_call)
 	} else {
 		snprintf(reply.info, sizeof(reply.info), "*** DISCONNECTED From Station %s\r", remote_call)
 	}
-	reply.hdr.data_len_NETLE = host2netle(strlen(reply.info) + 1)
+	reply.Header.data_len_NETLE = host2netle(strlen(reply.info) + 1)
 
 	send_to_client(client, &reply)
 
@@ -903,19 +911,19 @@ func server_rec_conn_data(channel *C.int, client *C.int, remote_call *C.char, ow
 
 	/* FIXME KG
 	struct {
-	  struct agwpe_s hdr;
+	  struct agwpe_s Header;
 	  char info[AX25_MAX_INFO_LEN];		// I suppose there is potential for something larger.
 						// We'll cross that bridge if we ever come to it.
 	} reply;
 	*/
 
-	memset(&reply.hdr, 0, sizeof(reply.hdr))
-	reply.hdr.portx = channel
-	reply.hdr.datakind = 'D'
-	reply.hdr.pid = pid
+	memset(&reply.Header, 0, sizeof(reply.Header))
+	reply.Header.portx = channel
+	reply.Header.datakind = 'D'
+	reply.Header.pid = pid
 
-	strlcpy(reply.hdr.call_from, remote_call, sizeof(reply.hdr.call_from))
-	strlcpy(reply.hdr.call_to, own_call, sizeof(reply.hdr.call_to))
+	strlcpy(reply.Header.call_from, remote_call, sizeof(reply.Header.call_from))
+	strlcpy(reply.Header.call_to, own_call, sizeof(reply.Header.call_to))
 
 	if data_len < 0 {
 		text_color_set(DW_COLOR_ERROR)
@@ -928,7 +936,7 @@ func server_rec_conn_data(channel *C.int, client *C.int, remote_call *C.char, ow
 	}
 
 	memcpy(reply.info, data_ptr, data_len)
-	reply.hdr.data_len_NETLE = host2netle(data_len)
+	reply.Header.data_len_NETLE = host2netle(data_len)
 
 	send_to_client(client, &reply)
 
@@ -957,20 +965,20 @@ func server_outstanding_frames_reply(channel C.int, client C.int, own_call *C.ch
 
 	/* FIXME KG
 	struct {
-	  struct agwpe_s hdr;
+	  struct agwpe_s Header;
 	  int count_NETLE;
 	} reply;
 	*/
 
-	memset(&reply.hdr, 0, sizeof(reply.hdr))
+	memset(&reply.Header, 0, sizeof(reply.Header))
 
-	reply.hdr.portx = channel
-	reply.hdr.datakind = 'Y'
+	reply.Header.portx = channel
+	reply.Header.datakind = 'Y'
 
-	strlcpy(reply.hdr.call_from, own_call, sizeof(reply.hdr.call_from))
-	strlcpy(reply.hdr.call_to, remote_call, sizeof(reply.hdr.call_to))
+	strlcpy(reply.Header.call_from, own_call, sizeof(reply.Header.call_from))
+	strlcpy(reply.Header.call_to, remote_call, sizeof(reply.Header.call_to))
 
-	reply.hdr.data_len_NETLE = host2netle(4)
+	reply.Header.data_len_NETLE = host2netle(4)
 	reply.count_NETLE = host2netle(count)
 
 	send_to_client(client, &reply)
@@ -1050,7 +1058,7 @@ func send_to_client(client C.int, reply_p unsafe.Pointer) {
 	int err;
 	*/
 
-	// FIXME KG var ph = (struct agwpe_s *) reply_p;	// Replies are often hdr + other stuff.
+	// FIXME KG var ph = (struct agwpe_s *) reply_p;	// Replies are often Header + other stuff.
 
 	// FIXME KG len = sizeof(struct agwpe_s) + netle2host(ph.data_len_NETLE);
 
@@ -1081,11 +1089,11 @@ func cmd_listen_thread(client C.int) {
 			SLEEP_SEC(1) /* Not connected.  Try again later. */
 		}
 
-		var n = read_from_socket(client_sock[client], (&cmd.hdr), sizeof(cmd.hdr))
-		if n != sizeof(cmd.hdr) {
+		var n = read_from_socket(client_sock[client], (&cmd.Header), sizeof(cmd.Header))
+		if n != sizeof(cmd.Header) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError getting message header from AGW client application %d.\n", client)
-			dw_printf("Tried to read %d bytes but got only %d.\n", sizeof(cmd.hdr), n)
+			dw_printf("Tried to read %d bytes but got only %d.\n", sizeof(cmd.Header), n)
 			dw_printf("Closing connection.\n\n")
 			close(client_sock[client])
 			client_sock[client] = -1
@@ -1096,11 +1104,11 @@ func cmd_listen_thread(client C.int) {
 		/*
 		 * Take some precautions to guard against bad data which could cause problems later.
 		 */
-		if cmd.hdr.portx < 0 || cmd.hdr.portx >= MAX_TOTAL_CHANS {
+		if cmd.Header.portx < 0 || cmd.Header.portx >= MAX_TOTAL_CHANS {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nInvalid port number, %d, in command '%c', from AGW client application %d.\n",
-				cmd.hdr.portx, cmd.hdr.datakind, client)
-			cmd.hdr.portx = 0 // avoid subscript out of bounds, try to keep going.
+				cmd.Header.portx, cmd.Header.datakind, client)
+			cmd.Header.portx = 0 // avoid subscript out of bounds, try to keep going.
 		}
 
 		/*
@@ -1108,15 +1116,15 @@ func cmd_listen_thread(client C.int) {
 		 * It's not guaranteed that unused bytes will contain 0 so we
 		 * don't issue error message in this case.
 		 */
-		cmd.hdr.call_from[sizeof(cmd.hdr.call_from)-1] = 0
-		cmd.hdr.call_to[sizeof(cmd.hdr.call_to)-1] = 0
+		cmd.Header.call_from[sizeof(cmd.Header.call_from)-1] = 0
+		cmd.Header.call_to[sizeof(cmd.Header.call_to)-1] = 0
 
 		/*
 		 * Following data must fit in available buffer.
 		 * Leave room for an extra nul byte terminator at end later.
 		 */
 
-		var data_len = netle2host(cmd.hdr.data_len_NETLE)
+		var data_len = netle2host(cmd.Header.data_len_NETLE)
 
 		if data_len < 0 || data_len > (sizeof(cmd.data)-1) {
 
@@ -1159,25 +1167,25 @@ func cmd_listen_thread(client C.int) {
 		 */
 
 		if debug_client {
-			debug_print(FROM_CLIENT, client, &cmd.hdr, sizeof(cmd.hdr)+data_len)
+			debug_print(FROM_CLIENT, client, &cmd.Header, sizeof(cmd.Header)+data_len)
 		}
 
-		switch cmd.hdr.datakind {
+		switch cmd.Header.datakind {
 
 		case 'R': /* Request for version number */
 			{
 				/* FIXME KG
 					struct {
-					  struct agwpe_s hdr;
+					  struct agwpe_s Header;
 				          int major_version_NETLE;
 				          int minor_version_NETLE;
 					} reply;
 				*/
 
 				memset(&reply, 0, sizeof(reply))
-				reply.hdr.datakind = 'R'
-				reply.hdr.data_len_NETLE = host2netle(sizeof(reply.major_version_NETLE) + sizeof(reply.minor_version_NETLE))
-				assert(netle2host(reply.hdr.data_len_NETLE) == 8)
+				reply.Header.datakind = 'R'
+				reply.Header.data_len_NETLE = host2netle(sizeof(reply.major_version_NETLE) + sizeof(reply.minor_version_NETLE))
+				assert(netle2host(reply.Header.data_len_NETLE) == 8)
 
 				// Xastir only prints this and doesn't care otherwise.
 				// APRSIS32 doesn't seem to care.
@@ -1198,13 +1206,13 @@ func cmd_listen_thread(client C.int) {
 			{
 				/* FIXME KG
 					struct {
-					  struct agwpe_s hdr;
+					  struct agwpe_s Header;
 				 	  char info[200];
 					} reply;
 				*/
 
 				memset(&reply, 0, sizeof(reply))
-				reply.hdr.datakind = 'G'
+				reply.Header.datakind = 'G'
 
 				// Xastir only prints this and doesn't care otherwise.
 				// YAAC uses this to identify available channels.
@@ -1274,7 +1282,7 @@ func cmd_listen_thread(client C.int) {
 					} // switch
 				} // for each channel
 
-				reply.hdr.data_len_NETLE = host2netle(strlen(reply.info) + 1)
+				reply.Header.data_len_NETLE = host2netle(strlen(reply.info) + 1)
 
 				send_to_client(client, &reply)
 			}
@@ -1285,7 +1293,7 @@ func cmd_listen_thread(client C.int) {
 			{
 				/* FIXME KG
 					struct {
-					  struct agwpe_s hdr;
+					  struct agwpe_s Header;
 				 	  unsigned char on_air_baud_rate; 	// 0=1200, 1=2400, 2=4800, 3=9600, ...
 					  unsigned char traffic_level;		// 0xff if not in autoupdate mode
 					  unsigned char tx_delay;
@@ -1300,9 +1308,9 @@ func cmd_listen_thread(client C.int) {
 
 				memset(&reply, 0, sizeof(reply))
 
-				reply.hdr.portx = cmd.hdr.portx /* Reply with same port number ! */
-				reply.hdr.datakind = 'g'
-				reply.hdr.data_len_NETLE = host2netle(12)
+				reply.Header.portx = cmd.Header.portx /* Reply with same port number ! */
+				reply.Header.datakind = 'g'
+				reply.Header.data_len_NETLE = host2netle(12)
 
 				// YAAC asks for this.
 				// Fake it to keep application happy.
@@ -1335,24 +1343,24 @@ func cmd_listen_thread(client C.int) {
 				/*
 				#if 0						// Currently, this information is not being collected.
 						struct {
-						  struct agwpe_s hdr;
+						  struct agwpe_s Header;
 					 	  char info[100];
 						} reply;
 
 
-					        memset (&reply.hdr, 0, sizeof(reply.hdr));
-					        reply.hdr.datakind = 'H';
+					        memset (&reply.Header, 0, sizeof(reply.Header));
+					        reply.Header.datakind = 'H';
 
 						// TODO:  Implement properly.
 
-					        reply.hdr.portx = cmd.hdr.portx
+					        reply.Header.portx = cmd.Header.portx
 
-					        strlcpy (reply.hdr.call_from, "WB2OSZ-15 Mon,01Jan2000 01:02:03  Tue,31Dec2099 23:45:56", sizeof(reply.hdr.call_from));
+					        strlcpy (reply.Header.call_from, "WB2OSZ-15 Mon,01Jan2000 01:02:03  Tue,31Dec2099 23:45:56", sizeof(reply.Header.call_from));
 						// or                                                  00:00:00                00:00:00
 
 					        strlcpy (agwpe_msg.data, ..., sizeof(agwpe_msg.data));
 
-					        reply.hdr.data_len_NETLE = host2netle(strlen(reply.info));
+					        reply.Header.data_len_NETLE = host2netle(strlen(reply.info));
 
 					        send_to_client (client, &reply);
 				#endif
@@ -1391,10 +1399,10 @@ func cmd_listen_thread(client C.int) {
 					packet_t pp;
 				*/
 
-				var pid = cmd.hdr.pid
-				strlcpy(stemp, cmd.hdr.call_from, sizeof(stemp))
+				var pid = cmd.Header.pid
+				strlcpy(stemp, cmd.Header.call_from, sizeof(stemp))
 				strlcat(stemp, ">", sizeof(stemp))
-				strlcat(stemp, cmd.hdr.call_to, sizeof(stemp))
+				strlcat(stemp, cmd.Header.call_to, sizeof(stemp))
 
 				cmd.data[data_len] = 0
 				ndigi = cmd.data[0]
@@ -1443,7 +1451,7 @@ func cmd_listen_thread(client C.int) {
 				/* xastir when using the AGW interface.  */
 				/* The current version uses only the 'V' message, not 'K' for transmitting. */
 
-				tq_append(cmd.hdr.portx, TQ_PRIO_1_LO, pp)
+				tq_append(cmd.Header.portx, TQ_PRIO_1_LO, pp)
 			}
 
 			break
@@ -1472,7 +1480,7 @@ func cmd_listen_thread(client C.int) {
 				// The seems to be redundant; we already a port number in the header.
 				// Anyhow, the original code here added one to cmd.data to get the
 				// first byte of the frame.  Unfortunately, it did not subtract one from
-				// cmd.hdr.data_len so we ended up sending an extra byte.
+				// cmd.Header.data_len so we ended up sending an extra byte.
 
 				// TODO: Right now I just use the port (channel) number in the header.
 				// What if the second one is inconsistent?
@@ -1496,9 +1504,9 @@ func cmd_listen_thread(client C.int) {
 
 					if ax25_get_num_repeaters(pp) >= 1 &&
 						ax25_get_h(pp, AX25_REPEATER_1) {
-						tq_append(cmd.hdr.portx, TQ_PRIO_0_HI, pp)
+						tq_append(cmd.Header.portx, TQ_PRIO_0_HI, pp)
 					} else {
-						tq_append(cmd.hdr.portx, TQ_PRIO_1_LO, pp)
+						tq_append(cmd.Header.portx, TQ_PRIO_1_LO, pp)
 					}
 				}
 			}
@@ -1515,7 +1523,7 @@ func cmd_listen_thread(client C.int) {
 			{
 				/* FIXME KG
 				struct {
-				  struct agwpe_s hdr;
+				  struct agwpe_s Header;
 				  char data;			// 1 = success, 0 = failure
 				} reply;
 
@@ -1525,13 +1533,13 @@ func cmd_listen_thread(client C.int) {
 				// The protocol spec says it is an error to register the same one more than once.
 				// Too much trouble.  Report success if the channel is valid.
 
-				var channel = cmd.hdr.portx
+				var channel = cmd.Header.portx
 
 				// Connected mode can only be used with internal modems.
 
 				if channel >= 0 && channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 					ok = 1
-					dlq_register_callsign(cmd.hdr.call_from, channel, client)
+					dlq_register_callsign(cmd.Header.call_from, channel, client)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1539,10 +1547,10 @@ func cmd_listen_thread(client C.int) {
 				}
 
 				memset(&reply, 0, sizeof(reply))
-				reply.hdr.datakind = 'X'
-				reply.hdr.portx = cmd.hdr.portx
-				memcpy(reply.hdr.call_from, cmd.hdr.call_from, sizeof(reply.hdr.call_from))
-				reply.hdr.data_len_NETLE = host2netle(1)
+				reply.Header.datakind = 'X'
+				reply.Header.portx = cmd.Header.portx
+				memcpy(reply.Header.call_from, cmd.Header.call_from, sizeof(reply.Header.call_from))
+				reply.Header.data_len_NETLE = host2netle(1)
 				reply.data = ok
 				send_to_client(client, &reply)
 			}
@@ -1552,12 +1560,12 @@ func cmd_listen_thread(client C.int) {
 
 			{
 
-				var channel = cmd.hdr.portx
+				var channel = cmd.Header.portx
 
 				// Connected mode can only be used with internal modems.
 
 				if channel >= 0 && channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-					dlq_unregister_callsign(cmd.hdr.call_from, channel, client)
+					dlq_unregister_callsign(cmd.Header.call_from, channel, client)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1594,14 +1602,14 @@ func cmd_listen_thread(client C.int) {
 				// FIXME KG int pid = 0xf0;		/* normal for AX.25 I frames. */
 				// FIXME KG int j;
 
-				strlcpy(callsigns[AX25_SOURCE], cmd.hdr.call_from, sizeof(callsigns[AX25_SOURCE]))
-				strlcpy(callsigns[AX25_DESTINATION], cmd.hdr.call_to, sizeof(callsigns[AX25_DESTINATION]))
+				strlcpy(callsigns[AX25_SOURCE], cmd.Header.call_from, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_DESTINATION], cmd.Header.call_to, sizeof(callsigns[AX25_DESTINATION]))
 
-				if cmd.hdr.datakind == 'c' {
-					pid = cmd.hdr.pid /* non standard for NETROM, TCP/IP, etc. */
+				if cmd.Header.datakind == 'c' {
+					pid = cmd.Header.pid /* non standard for NETROM, TCP/IP, etc. */
 				}
 
-				if cmd.hdr.datakind == 'v' {
+				if cmd.Header.datakind == 'v' {
 					if v.num_digi >= 1 && v.num_digi <= 7 {
 
 						if data_len != v.num_digi*10+1 && data_len != v.num_digi*10+2 {
@@ -1621,7 +1629,7 @@ func cmd_listen_thread(client C.int) {
 					}
 				}
 
-				dlq_connect_request(callsigns, num_calls, cmd.hdr.portx, client, pid)
+				dlq_connect_request(callsigns, num_calls, cmd.Header.portx, client, pid)
 
 			}
 			break
@@ -1634,10 +1642,10 @@ func cmd_listen_thread(client C.int) {
 				const num_calls = 2 // only first 2 used.  Digipeater path
 				// must be remembered from connect request.
 
-				strlcpy(callsigns[AX25_SOURCE], cmd.hdr.call_from, sizeof(callsigns[AX25_SOURCE]))
-				strlcpy(callsigns[AX25_DESTINATION], cmd.hdr.call_to, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_SOURCE], cmd.Header.call_from, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_DESTINATION], cmd.Header.call_to, sizeof(callsigns[AX25_SOURCE]))
 
-				dlq_xmit_data_request(callsigns, num_calls, cmd.hdr.portx, client, cmd.hdr.pid, cmd.data, netle2host(cmd.hdr.data_len_NETLE))
+				dlq_xmit_data_request(callsigns, num_calls, cmd.Header.portx, client, cmd.Header.pid, cmd.data, netle2host(cmd.Header.data_len_NETLE))
 
 			}
 			break
@@ -1651,10 +1659,10 @@ func cmd_listen_thread(client C.int) {
 				   const int num_calls = 2;	// only first 2 used.
 				*/
 
-				strlcpy(callsigns[AX25_SOURCE], cmd.hdr.call_from, sizeof(callsigns[AX25_SOURCE]))
-				strlcpy(callsigns[AX25_DESTINATION], cmd.hdr.call_to, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_SOURCE], cmd.Header.call_from, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_DESTINATION], cmd.Header.call_to, sizeof(callsigns[AX25_SOURCE]))
 
-				dlq_disconnect_request(callsigns, num_calls, cmd.hdr.portx, client)
+				dlq_disconnect_request(callsigns, num_calls, cmd.Header.portx, client)
 
 			}
 			break
@@ -1692,12 +1700,12 @@ func cmd_listen_thread(client C.int) {
 			*/
 			{
 
-				var pid = cmd.hdr.pid
+				var pid = cmd.Header.pid
 				var stemp [AX25_MAX_PACKET_LEN]C.char
 
-				strlcpy(stemp, cmd.hdr.call_from, sizeof(stemp))
+				strlcpy(stemp, cmd.Header.call_from, sizeof(stemp))
 				strlcat(stemp, ">", sizeof(stemp))
-				strlcat(stemp, cmd.hdr.call_to, sizeof(stemp))
+				strlcat(stemp, cmd.Header.call_to, sizeof(stemp))
 
 				cmd.data[data_len] = 0
 
@@ -1723,7 +1731,7 @@ func cmd_listen_thread(client C.int) {
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 				ax25_set_pid(pp, pid)
 
-				tq_append(cmd.hdr.portx, TQ_PRIO_1_LO, pp)
+				tq_append(cmd.Header.portx, TQ_PRIO_1_LO, pp)
 			}
 			break
 
@@ -1733,20 +1741,20 @@ func cmd_listen_thread(client C.int) {
 			{
 				/* FIXME KG
 				struct {
-				  struct agwpe_s hdr;
+				  struct agwpe_s Header;
 				  int data_NETLE;			// Little endian order.
 				} reply;
 				*/
 
 				memset(&reply, 0, sizeof(reply))
-				reply.hdr.portx = cmd.hdr.portx /* Reply with same port number */
-				reply.hdr.datakind = 'y'
-				reply.hdr.data_len_NETLE = host2netle(4)
+				reply.Header.portx = cmd.Header.portx /* Reply with same port number */
+				reply.Header.datakind = 'y'
+				reply.Header.data_len_NETLE = host2netle(4)
 
 				var n = 0
-				if cmd.hdr.portx >= 0 && cmd.hdr.portx < MAX_RADIO_CHANS {
+				if cmd.Header.portx >= 0 && cmd.Header.portx < MAX_RADIO_CHANS {
 					// Count both normal and expedited in transmit queue for given channel.
-					n = tq_count(cmd.hdr.portx, -1, "", "", 0)
+					n = tq_count(cmd.Header.portx, -1, "", "", 0)
 				}
 				reply.data_NETLE = host2netle(n)
 
@@ -1798,10 +1806,10 @@ func cmd_listen_thread(client C.int) {
 				memset(callsigns, 0, sizeof(callsigns))
 				const int num_calls = 2 // only first 2 used.
 
-				strlcpy(callsigns[AX25_SOURCE], cmd.hdr.call_from, sizeof(callsigns[AX25_SOURCE]))
-				strlcpy(callsigns[AX25_DESTINATION], cmd.hdr.call_to, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_SOURCE], cmd.Header.call_from, sizeof(callsigns[AX25_SOURCE]))
+				strlcpy(callsigns[AX25_DESTINATION], cmd.Header.call_to, sizeof(callsigns[AX25_SOURCE]))
 
-				dlq_outstanding_frames_request(callsigns, num_calls, cmd.hdr.portx, client)
+				dlq_outstanding_frames_request(callsigns, num_calls, cmd.Header.portx, client)
 			}
 			break
 
@@ -1809,7 +1817,7 @@ func cmd_listen_thread(client C.int) {
 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("--- Unexpected Command from application %d using AGW protocol:\n", client)
-			debug_print(FROM_CLIENT, client, &cmd.hdr, sizeof(cmd.hdr)+data_len)
+			debug_print(FROM_CLIENT, client, &cmd.Header, sizeof(cmd.Header)+data_len)
 
 			break
 		}
