@@ -558,20 +558,20 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 			var desc []byte
 			agwpe_msg.Header.DataKind, desc = mon_desc(pp)
 
-			if own_xmit {
+			if own_xmit > 0 {
 				// Should we include all own transmitted frames or only UNPROTO?
 				// Discussion:  https://github.com/wb2osz/direwolf/issues/585
-				if agwpe_msg.Header.datakind != 'U' {
+				if agwpe_msg.Header.DataKind != 'U' {
 					break
 				}
-				agwpe_msg.Header.datakind = 'T'
+				agwpe_msg.Header.DataKind = 'T'
 			}
-			strlcat((agwpe_msg.data), desc, sizeof(agwpe_msg.data))
+			agwpe_msg.Data = agwpe_msg.Data + desc
 
 			// Timestamp with [...]\r
 
 			/* FIXME KG
-			   time_t clock = time(NULL);
+			   time_t clock = time(nil);
 			   struct tm *tm = localtime(&clock);		// TODO: use localtime_r ?
 			   char ts[32];
 			   snprintf (ts, sizeof(ts), "[%02d:%02d:%02d]\r", tm.tm_hour, tm.tm_min, tm.tm_sec);
@@ -580,13 +580,11 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 
 			// Information if any with \r.
 
-			/* FIXME KG
-			   unsigned char *pinfo = NULL;
-			   int info_len = ax25_get_info (pp, &pinfo);
-			   int msg_data_len = strlen((char*)(agwpe_msg.data));	// result length so far
-			*/
+			var pinfo *C.uchar
+			   var info_len = C.ax25_get_info (pp, &pinfo);
+			   var msg_data_len = len(agwpe_msg.Data);	// result length so far
 
-			if info_len > 0 && pinfo != NULL {
+			if info_len > 0 && pinfo != nil {
 				// Issue 367: Use of strlcat truncated information part at any nul character.
 				// Use memcpy instead to preserve binary data, e.g. NET/ROM.
 				memcpy(agwpe_msg.data+msg_data_len, pinfo, info_len)
@@ -680,8 +678,8 @@ func mon_addrs(channel C.int, pp C.packet_t) []byte {
 //	'U' for unnumbered information frame.
 //	'S' for supervisory and other unnumbered frames.
 
-func mon_desc(pp C.packet_t) (C.char, []byte) {
-	// FIXME KG Return result
+func mon_desc(pp C.packet_t) (byte, []byte) {
+	// FIXME KG Return result too as []byte
 	/* FIXME KG
 	cmdres_t cr;		// command/response.
 	char ignore[80];	// direwolf description.  not used here.
@@ -813,7 +811,7 @@ func server_link_established(channel C.int, client C.int, remote_call *C.char, o
 
 	memset(&reply, 0, sizeof(reply))
 	reply.Header.portx = channel
-	reply.Header.datakind = 'C'
+	reply.Header.DataKind = 'C'
 
 	strlcpy(reply.Header.call_from, remote_call, sizeof(reply.Header.call_from))
 	strlcpy(reply.Header.call_to, own_call, sizeof(reply.Header.call_to))
@@ -868,7 +866,7 @@ func server_link_terminated(channel C.int, client C.int, remote_call *C.char, ow
 
 	memset(&reply, 0, sizeof(reply))
 	reply.Header.portx = channel
-	reply.Header.datakind = 'd'
+	reply.Header.DataKind = 'd'
 	strlcpy(reply.Header.call_from, remote_call, sizeof(reply.Header.call_from)) /* right order */
 	strlcpy(reply.Header.call_to, own_call, sizeof(reply.Header.call_to))
 
@@ -919,7 +917,7 @@ func server_rec_conn_data(channel *C.int, client *C.int, remote_call *C.char, ow
 
 	memset(&reply.Header, 0, sizeof(reply.Header))
 	reply.Header.portx = channel
-	reply.Header.datakind = 'D'
+	reply.Header.DataKind = 'D'
 	reply.Header.pid = pid
 
 	strlcpy(reply.Header.call_from, remote_call, sizeof(reply.Header.call_from))
@@ -973,7 +971,7 @@ func server_outstanding_frames_reply(channel C.int, client C.int, own_call *C.ch
 	memset(&reply.Header, 0, sizeof(reply.Header))
 
 	reply.Header.portx = channel
-	reply.Header.datakind = 'Y'
+	reply.Header.DataKind = 'Y'
 
 	strlcpy(reply.Header.call_from, own_call, sizeof(reply.Header.call_from))
 	strlcpy(reply.Header.call_to, remote_call, sizeof(reply.Header.call_to))
@@ -1107,7 +1105,7 @@ func cmd_listen_thread(client C.int) {
 		if cmd.Header.portx < 0 || cmd.Header.portx >= MAX_TOTAL_CHANS {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nInvalid port number, %d, in command '%c', from AGW client application %d.\n",
-				cmd.Header.portx, cmd.Header.datakind, client)
+				cmd.Header.portx, cmd.Header.DataKind, client)
 			cmd.Header.portx = 0 // avoid subscript out of bounds, try to keep going.
 		}
 
@@ -1170,7 +1168,7 @@ func cmd_listen_thread(client C.int) {
 			debug_print(FROM_CLIENT, client, &cmd.Header, sizeof(cmd.Header)+data_len)
 		}
 
-		switch cmd.Header.datakind {
+		switch cmd.Header.DataKind {
 
 		case 'R': /* Request for version number */
 			{
@@ -1183,7 +1181,7 @@ func cmd_listen_thread(client C.int) {
 				*/
 
 				memset(&reply, 0, sizeof(reply))
-				reply.Header.datakind = 'R'
+				reply.Header.DataKind = 'R'
 				reply.Header.data_len_NETLE = host2netle(sizeof(reply.major_version_NETLE) + sizeof(reply.minor_version_NETLE))
 				assert(netle2host(reply.Header.data_len_NETLE) == 8)
 
@@ -1212,7 +1210,7 @@ func cmd_listen_thread(client C.int) {
 				*/
 
 				memset(&reply, 0, sizeof(reply))
-				reply.Header.datakind = 'G'
+				reply.Header.DataKind = 'G'
 
 				// Xastir only prints this and doesn't care otherwise.
 				// YAAC uses this to identify available channels.
@@ -1309,7 +1307,7 @@ func cmd_listen_thread(client C.int) {
 				memset(&reply, 0, sizeof(reply))
 
 				reply.Header.portx = cmd.Header.portx /* Reply with same port number ! */
-				reply.Header.datakind = 'g'
+				reply.Header.DataKind = 'g'
 				reply.Header.data_len_NETLE = host2netle(12)
 
 				// YAAC asks for this.
@@ -1349,7 +1347,7 @@ func cmd_listen_thread(client C.int) {
 
 
 					        memset (&reply.Header, 0, sizeof(reply.Header));
-					        reply.Header.datakind = 'H';
+					        reply.Header.DataKind = 'H';
 
 						// TODO:  Implement properly.
 
@@ -1428,7 +1426,7 @@ func cmd_listen_thread(client C.int) {
 
 				var pp = ax25_from_text(stemp, 1)
 
-				if pp == NULL {
+				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Failed to create frame from AGW 'V' message.\n")
 					break
@@ -1491,7 +1489,7 @@ func cmd_listen_thread(client C.int) {
 				memset(&alevel, 0xff, sizeof(alevel))
 				var pp = ax25_from_frame(cmd.data+1, data_len-1, alevel)
 
-				if pp == NULL {
+				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Failed to create frame from AGW 'K' message.\n")
 				} else {
@@ -1547,7 +1545,7 @@ func cmd_listen_thread(client C.int) {
 				}
 
 				memset(&reply, 0, sizeof(reply))
-				reply.Header.datakind = 'X'
+				reply.Header.DataKind = 'X'
 				reply.Header.portx = cmd.Header.portx
 				memcpy(reply.Header.call_from, cmd.Header.call_from, sizeof(reply.Header.call_from))
 				reply.Header.data_len_NETLE = host2netle(1)
@@ -1605,11 +1603,11 @@ func cmd_listen_thread(client C.int) {
 				strlcpy(callsigns[AX25_SOURCE], cmd.Header.call_from, sizeof(callsigns[AX25_SOURCE]))
 				strlcpy(callsigns[AX25_DESTINATION], cmd.Header.call_to, sizeof(callsigns[AX25_DESTINATION]))
 
-				if cmd.Header.datakind == 'c' {
+				if cmd.Header.DataKind == 'c' {
 					pid = cmd.Header.pid /* non standard for NETROM, TCP/IP, etc. */
 				}
 
-				if cmd.Header.datakind == 'v' {
+				if cmd.Header.DataKind == 'v' {
 					if v.num_digi >= 1 && v.num_digi <= 7 {
 
 						if data_len != v.num_digi*10+1 && data_len != v.num_digi*10+2 {
@@ -1722,7 +1720,7 @@ func cmd_listen_thread(client C.int) {
 
 				var pp = ax25_from_text(stemp, 1)
 
-				if pp == NULL {
+				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Failed to create frame from AGW 'M' message.\n")
 				}
@@ -1748,7 +1746,7 @@ func cmd_listen_thread(client C.int) {
 
 				memset(&reply, 0, sizeof(reply))
 				reply.Header.portx = cmd.Header.portx /* Reply with same port number */
-				reply.Header.datakind = 'y'
+				reply.Header.DataKind = 'y'
 				reply.Header.data_len_NETLE = host2netle(4)
 
 				var n = 0
