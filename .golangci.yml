@@ -16,6 +16,7 @@ linters:
     - "lll"  # We have inherited lots of long lines
     - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
+    - "noctx"  # One day I will learn what a Context is, but that is not today
     - "nlreturn"  # Lots of false positives on C code that isn't a return
     - "nolintlint"  # Doesn't play nicely with Cgo
     - "paralleltest"  # One day, but let's have *working* tests first
@@ -24,6 +25,7 @@ linters:
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
     - "whitespace"  # I do not have the energy to deal with extraneous leading/trailing newlines right now
     - "wrapcheck"  # Error wrapping is the least of my concerns
+    - "wsl"  # Avoid deprecation warning from enabling all
   settings:
     cyclop:
       max-complexity: 60  # I sure wish this could be lower

@@ -48,7 +48,7 @@ vet:
 ./bin/golangci-lint:
 	# This is not pleasant but it's also the/a recommended way of installation and means that we're explicitly pinning version
 	# https://golangci-lint.run/welcome/install/#binaries
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.1.6
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.4.0
 
 .PHONY: lint
 lint: ./bin/golangci-lint

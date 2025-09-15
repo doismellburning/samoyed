@@ -219,6 +219,7 @@ func read_csv(fp *os.File) {
 
 			if len(pspeed) > 0 {
 				var fspeed, _ = strconv.ParseFloat(pspeed, 64)
+
 				speed = KNOTS_TO_METERS_PER_SEC(fspeed)
 			}
 
@@ -234,6 +235,7 @@ func read_csv(fp *os.File) {
 
 			if len(pfreq) > 0 {
 				var freq, _ = strconv.ParseFloat(pfreq, 64)
+
 				desc = fmt.Sprintf("%.3f MHz", freq)
 			}
 

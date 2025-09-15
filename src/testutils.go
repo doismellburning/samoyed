@@ -15,11 +15,13 @@ func AssertOutputContains(t *testing.T, command func(), expectedOutputContains s
 	t.Helper()
 
 	var oldStdout = os.Stdout
+
 	defer func() {
 		os.Stdout = oldStdout
 	}()
 
 	var r, w, _ = os.Pipe()
+
 	os.Stdout = w
 
 	command()

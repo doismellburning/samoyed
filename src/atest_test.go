@@ -28,11 +28,13 @@ func Test_atest_basic_1(t *testing.T) {
 
 	// Capture stdout
 	var oldStdout = os.Stdout
+
 	defer func() {
 		os.Stdout = oldStdout
 	}()
 
 	var r, w, _ = os.Pipe()
+
 	os.Stdout = w
 
 	// Run

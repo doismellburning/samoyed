@@ -128,8 +128,8 @@ func agwlib_init(host string, port string, init_func func() error) error {
 	s_tnc_init_func = init_func
 
 	var connErr error
-	s_tnc_sock, connErr = net.Dial("tcp4", fmt.Sprintf("%s:%s", host, port))
 
+	s_tnc_sock, connErr = net.Dial("tcp4", net.JoinHostPort(host, port))
 	if connErr != nil {
 		return connErr
 	}
@@ -175,8 +175,8 @@ func tnc_listen_thread() {
 			fmt.Printf("Attempting to reattach to network TNC...\n")
 
 			var connErr error
-			s_tnc_sock, connErr = net.Dial("tcp4", fmt.Sprintf("%s:%s", s_tnc_host, s_tnc_port))
 
+			s_tnc_sock, connErr = net.Dial("tcp4", net.JoinHostPort(s_tnc_host, s_tnc_port))
 			if connErr == nil {
 				fmt.Printf("Successfully reattached to network TNC.\n")
 
@@ -193,7 +193,6 @@ func tnc_listen_thread() {
 			var header = new(AGWPEHeader)
 
 			var readErr = binary.Read(s_tnc_sock, binary.LittleEndian, header)
-
 			if readErr != nil {
 				fmt.Printf("Error communicating with network TNC. Will try to reattach: %s\n", readErr)
 				s_tnc_sock.Close() //nolint:gosec
@@ -279,6 +278,7 @@ func process_from_tnc(cmd *AGWPECommand) {
 		var num_chan = 1 // FIXME: FIXME: actually parse it.
 
 		var chans = make([]string, 2)
+
 		chans[0] = "Port1 blah blah"
 		chans[1] = "Port2 blah blah"
 		agw_cb_G_port_information(num_chan, chans)
