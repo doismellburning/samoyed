@@ -350,8 +350,9 @@ func log_write(channel int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t
 		})
 		w.Flush()
 
-		if err := w.Error(); err != nil {
-			dw_printf("CSV write error: %s", err)
+		var writeError = w.Error()
+		if writeError != nil {
+			dw_printf("CSV write error: %s", writeError)
 		}
 	}
 } /* end log_write */
