@@ -30,16 +30,19 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 `)
 
 	var r, w, _ = os.Pipe()
+
 	os.Stdin = r
 
 	// Write input to pipe
 	go func() {
 		defer w.Close()
+
 		w.WriteString(input) //nolint:gosec
 	}()
 
 	// Capture stdout
 	var rOut, wOut, _ = os.Pipe()
+
 	os.Stdout = wOut
 
 	// Capture output in goroutine
@@ -49,6 +52,7 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 
 	go func() {
 		io.Copy(&output, rOut) //nolint:gosec
+
 		done <- true
 	}()
 
