@@ -480,7 +480,7 @@ func tnc_thread_net(arg int) {
 	 * Connect to TNC server.
 	 */
 
-	var conn, connErr = net.Dial("tcp4", fmt.Sprintf("%s:%s", hostname[my_index], port[my_index]))
+	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname[my_index], port[my_index]))
 
 	if connErr != nil {
 		fmt.Printf("TNC %d unable to connect to %s on %s, port %s: %s\n",

@@ -30,6 +30,7 @@ import "C"
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -86,7 +87,7 @@ func waypoint_init(mc *C.struct_misc_config_s) {
 
 	s_waypoint_udp_sock = nil
 	if mc.waypoint_udp_portnum > 0 {
-		var addr = fmt.Sprintf("%s:%d", C.GoString(&mc.waypoint_udp_hostname[0]), int(mc.waypoint_udp_portnum))
+		var addr = net.JoinHostPort(C.GoString(&mc.waypoint_udp_hostname[0]), strconv.Itoa(int(mc.waypoint_udp_portnum)))
 		var conn, err = net.Dial("udp", addr)
 
 		if err != nil {

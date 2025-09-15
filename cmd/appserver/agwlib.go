@@ -128,7 +128,7 @@ func agwlib_init(host string, port string, init_func func() error) error {
 	s_tnc_init_func = init_func
 
 	var connErr error
-	s_tnc_sock, connErr = net.Dial("tcp4", fmt.Sprintf("%s:%s", host, port))
+	s_tnc_sock, connErr = net.Dial("tcp4", net.JoinHostPort(host, port))
 
 	if connErr != nil {
 		return connErr
@@ -175,7 +175,7 @@ func tnc_listen_thread() {
 			fmt.Printf("Attempting to reattach to network TNC...\n")
 
 			var connErr error
-			s_tnc_sock, connErr = net.Dial("tcp4", fmt.Sprintf("%s:%s", s_tnc_host, s_tnc_port))
+			s_tnc_sock, connErr = net.Dial("tcp4", net.JoinHostPort(s_tnc_host, s_tnc_port))
 
 			if connErr == nil {
 				fmt.Printf("Successfully reattached to network TNC.\n")

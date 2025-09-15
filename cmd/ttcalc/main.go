@@ -282,7 +282,7 @@ func calculator(str string) int {
  *---------------------------------------------------------------*/
 
 func connect_to_server(hostname string, port string) (net.Conn, error) {
-	var conn, connErr = net.Dial("tcp4", fmt.Sprintf("%s:%s", hostname, port))
+	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port))
 
 	if connErr != nil {
 		return conn, connErr

@@ -428,7 +428,7 @@ func tnc_listen_net() {
 	// For the IGate we would loop around and try to reconnect if the TNC
 	// goes away.  We should probably do the same here.
 
-	var conn, connErr = net.Dial("tcp", fmt.Sprintf("%s:%s", hostname, port))
+	var conn, connErr = net.Dial("tcp", net.JoinHostPort(hostname, port))
 
 	if connErr != nil {
 		fmt.Printf("Unable to connect to %s on port %s: %s\n", hostname, port, connErr)
