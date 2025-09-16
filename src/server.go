@@ -956,6 +956,10 @@ func server_outstanding_frames_reply(channel C.int, client C.int, own_call *C.ch
 
 func send_to_client(client C.int, reply_p *AGWPEMessage) {
 
+	if client_sock[client] == nil {
+		return
+	}
+
 	var ph = reply_p.Header
 
 	if ph.DataLen > 4096 {
