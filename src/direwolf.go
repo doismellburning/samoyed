@@ -254,7 +254,7 @@ x = Silence FX.25 information.`)
 		for _, p := range *debugStr {
 			switch p {
 			case 'a':
-				C.server_set_debug(1)
+				server_set_debug(1)
 			case 'k':
 				d_k_opt++
 				kissserial_set_debug(d_k_opt)
@@ -770,7 +770,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	C.server_init(&C.audio_config, &C.misc_config)
+	server_init(&C.audio_config, &C.misc_config)
 	kissnet_init(&C.misc_config)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
@@ -1162,7 +1162,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	var fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
 	var flen = C.ax25_pack(pp, &fbuf[0])
 
-	C.server_send_rec_packet(channel, pp, &fbuf[0], flen)                                                                // AGW net protocol
+	server_send_rec_packet(channel, pp, &fbuf[0], flen)                                                                  // AGW net protocol
 	kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)    // KISS TCP
 	kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1) // KISS serial port
 	kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
@@ -1173,7 +1173,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			var ao_fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
 			var ao_flen = C.ax25_pack(ao_pp, &ao_fbuf[0])
 
-			C.server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
+			server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
 			kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
 			kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
 			kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)

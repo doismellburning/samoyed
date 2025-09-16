@@ -924,7 +924,7 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
-	C.server_send_monitored(c, pp, 1)
+	server_send_monitored(c, pp, 1)
 
 	return (nb)
 } /* end send_one_frame */

@@ -961,7 +961,7 @@ func dl_disconnect_request(E *C.dlq_item_t) {
 		// DL-DISCONNECT *confirm*
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-		C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+		server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
 
@@ -987,7 +987,7 @@ func dl_disconnect_request(E *C.dlq_item_t) {
 		STOP_T1(S) // started in establish_data_link.
 		STOP_T3(S) // probably don't need.
 		enter_new_state(S, state_0_disconnected)
-		C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+		server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 
 	case state_2_awaiting_release:
 		{
@@ -1013,7 +1013,7 @@ func dl_disconnect_request(E *C.dlq_item_t) {
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
@@ -1515,7 +1515,7 @@ func dl_outstanding_frames_request(E *C.dlq_item_t) {
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get outstanding frames for %s . %s, chan %d\n", C.GoString(&E.addrs[OWNCALL][0]), C.GoString(&E.addrs[PEERCALL][0]), E._chan)
-			C.server_outstanding_frames_reply(E._chan, E.client, &E.addrs[OWNCALL][0], &E.addrs[PEERCALL][0], 0)
+			server_outstanding_frames_reply(E._chan, E.client, &E.addrs[OWNCALL][0], &E.addrs[PEERCALL][0], 0)
 			return
 		}
 	}
@@ -1546,9 +1546,9 @@ func dl_outstanding_frames_request(E *C.dlq_item_t) {
 
 	if reversed_addrs {
 		// Other end initiated the link.
-		C.server_outstanding_frames_reply(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], count1+count2)
+		server_outstanding_frames_reply(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], count1+count2)
 	} else {
-		C.server_outstanding_frames_reply(S.channel, S.client, &S.addrs[OWNCALL][0], &S.addrs[PEERCALL][0], count1+count2)
+		server_outstanding_frames_reply(S.channel, S.client, &S.addrs[OWNCALL][0], &S.addrs[PEERCALL][0], count1+count2)
 	}
 } // end dl_outstanding_frames_request
 
@@ -1727,7 +1727,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 		// Ready state.
 
 		if pid != C.AX25_PID_SEGMENTATION_FRAGMENT {
-			C.server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
+			server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
 			return
 		} else if dataBytes[0]&0x80 > 0 {
 
@@ -1749,7 +1749,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 		if pid != C.AX25_PID_SEGMENTATION_FRAGMENT {
 
-			C.server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
+			server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Not segment in reassembling state.\n", S.stream_id)
@@ -1786,7 +1786,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 			if S.ra_following == 0 {
 				// Last one.
-				C.server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], S.ra_buff.pid, (*C.char)(unsafe.Pointer(&S.ra_buff.data)), S.ra_buff.len)
+				server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], S.ra_buff.pid, (*C.char)(unsafe.Pointer(&S.ra_buff.data)), S.ra_buff.len)
 				C.cdata_delete(S.ra_buff)
 				S.ra_buff = nil
 			}
@@ -3928,7 +3928,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended C.int, p C.int) {
 
 		// dl connect indication - inform the client app.
 		var incoming C.int = 1
-		C.server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+		server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
 
 		INIT_T1V_SRT(S)
 
@@ -4026,7 +4026,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended C.int, p C.int) {
 				discard_i_queue(S)
 				// dl connect indication
 				var incoming C.int = 1
-				C.server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+				server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
 			}
 			STOP_T1(S)
 			START_T3(S)
@@ -4117,7 +4117,7 @@ func disc_frame(S *ax25_dlsm_t, p C.int) {
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 
 			STOP_T1(S)
 			STOP_T3(S)
@@ -4200,7 +4200,7 @@ func dm_frame(S *ax25_dlsm_t, f C.int) {
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		}
@@ -4219,7 +4219,7 @@ func dm_frame(S *ax25_dlsm_t, f C.int) {
 			// dl disconnect *confirm*
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		}
@@ -4234,7 +4234,7 @@ func dm_frame(S *ax25_dlsm_t, f C.int) {
 		// dl disconnect *indication*
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-		C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+		server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 		discard_i_queue(S)
 		STOP_T1(S)
 		STOP_T3(S)
@@ -4253,7 +4253,7 @@ func dm_frame(S *ax25_dlsm_t, f C.int) {
 				      // dl disconnect *indication*
 				      text_color_set(DW_COLOR_INFO);
 				      dw_printf ("Stream %d: Disconnected from %s.\n", S.stream_id, &S.addrs[PEERCALL][0]);
-				      C.server_link_terminated (S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0);
+				      server_link_terminated (S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0);
 				      STOP_T1;
 				      enter_new_state (S, state_0_disconnected, __func__, __LINE__);
 				    } else {
@@ -4369,7 +4369,7 @@ func ua_frame(S *ax25_dlsm_t, f C.int) {
 				// The AGW API distinguishes between incoming (initiated by other station) and
 				// outgoing (initiated by me) connections.
 				var incoming C.int = 0
-				C.server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+				server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
 			} else if S.vs != S.va {
 				// #if 1
 				// Erratum: 2006 version has this.
@@ -4402,7 +4402,7 @@ func ua_frame(S *ax25_dlsm_t, f C.int) {
 				// *confirm* seems right because we got a reply from the other side.
 
 				var incoming C.int = 0
-				C.server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+				server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
 			}
 
 			STOP_T1(S)
@@ -4458,7 +4458,7 @@ func ua_frame(S *ax25_dlsm_t, f C.int) {
 		if f == 1 {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		} else {
@@ -4928,7 +4928,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			discard_i_queue(S)
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Failed to connect to %s after %d tries.\n", C.GoString(&S.addrs[PEERCALL][0]), S.n2_retry)
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 1)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 1)
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			var cmd = cr_cmd
@@ -4956,7 +4956,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 		if S.rc == S.n2_retry {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			var cmd = cr_cmd
@@ -5014,7 +5014,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Stream %d: Disconnected from %s due to timeouts.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			C.server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 1)
+			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 1)
 
 			discard_i_queue(S)
 
