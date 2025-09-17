@@ -10,6 +10,7 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 // #include "multi_modem.h"
+// extern int IL2P_TEST;
 import "C"
 
 import (
@@ -30,6 +31,8 @@ import (
 
 func il2p_test_main(t *testing.T) {
 	t.Helper()
+
+	C.IL2P_TEST = 1
 
 	var enable_color C.int = 1
 	C.text_color_init(enable_color)
@@ -70,6 +73,8 @@ func il2p_test_main(t *testing.T) {
 	// TODO:  More than 2 addresses.
 
 	decode_bitstream(t)
+
+	C.IL2P_TEST = 0
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
