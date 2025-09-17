@@ -58,7 +58,7 @@ func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config
 
 	if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_IL2P { //nolint:staticcheck
 
-		var n = C.il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
+		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
 		if n > 0 {
 			return (n)
 		}
