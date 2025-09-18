@@ -361,7 +361,7 @@ static const float ci[8] = { 1,	.7071,	0,	-.7071,	-1,	-.7071,	0,	.7071	};
 static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 #endif
 
-void tone_gen_put_bit (int chan, int dat)
+void tone_gen_put_bit_real (int chan, int dat)
 {
 	int a = ACHAN2ADEV(chan);	/* device for channel. */
 

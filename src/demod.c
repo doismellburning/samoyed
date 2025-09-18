@@ -1066,7 +1066,7 @@ void demod_process_sample (int chan, int subchan, int sam)
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
 
-alevel_t demod_get_audio_level (int chan, int subchan) 
+alevel_t demod_get_audio_level_real (int chan, int subchan)
 {
 	struct demodulator_state_s *D;
 	alevel_t alevel;

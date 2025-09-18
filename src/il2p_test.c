@@ -76,6 +76,8 @@ static char text[] =
 static int rec_count = -1;	// disable deserialized packet test.
 static int polarity = 0;
 
+int IL2P_TEST = 0;
+
 // Serializing calls this which then simulates the demodulator output.
 
 void tone_gen_put_bit_fake (int chan, int data)
@@ -83,9 +85,15 @@ void tone_gen_put_bit_fake (int chan, int data)
 	il2p_rec_bit (chan, 0, 0, data);
 }
 
-#ifdef UNITTEST
-#define tone_gen_put_bit tone_gen_put_bit_fake
-#endif
+void tone_gen_put_bit_real (int chan, int data);
+
+void tone_gen_put_bit (int chan, int data) {
+	if (IL2P_TEST) {
+		tone_gen_put_bit_fake(chan, data);
+	} else {
+		tone_gen_put_bit_real(chan, data);
+	}
+}
 
 // This is called when a complete frame has been deserialized.
 
@@ -113,9 +121,15 @@ void multi_modem_process_rec_packet_fake (int chan, int subchan, int slice, pack
 	ax25_delete (pp);
 }
 
-#ifdef UNITTEST
-#define multi_modem_process_rec_packet multi_modem_process_rec_packet_fake
-#endif
+void multi_modem_process_rec_packet_real (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, retry_t retries, fec_type_t fec_type);
+
+void multi_modem_process_rec_packet (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, retry_t retries, fec_type_t fec_type) {
+	if (IL2P_TEST) {
+		multi_modem_process_rec_packet_fake(chan, subchan, slice, pp, alevel, retries, fec_type);
+	} else {
+		multi_modem_process_rec_packet_real(chan, subchan, slice, pp, alevel, retries, fec_type);
+	}
+}
 
 alevel_t demod_get_audio_level_fake (int chan, int subchan)
 {
@@ -124,8 +138,14 @@ alevel_t demod_get_audio_level_fake (int chan, int subchan)
 	return (alevel);
 }
 
-#ifdef UNITTEST
-#define demod_get_audio_level demod_get_audio_level_fake
-#endif
+alevel_t demod_get_audio_level_real (int chan, int subchan);
+
+alevel_t demod_get_audio_level (int chan, int subchan) {
+	if (IL2P_TEST) {
+		return demod_get_audio_level_fake(chan, subchan);
+	} else {
+		return demod_get_audio_level_real(chan, subchan);
+	}
+}
 
 // end il2p_test.c

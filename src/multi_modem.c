@@ -359,7 +359,7 @@ void multi_modem_process_rec_frame (int chan, int subchan, int slice, unsigned c
 
 // TODO: Eliminate function above and move code elsewhere?
 
-void multi_modem_process_rec_packet (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, retry_t retries, fec_type_t fec_type)
+void multi_modem_process_rec_packet_real (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, retry_t retries, fec_type_t fec_type)
 {
 	if (pp == NULL) {
 	  text_color_set(DW_COLOR_ERROR);
