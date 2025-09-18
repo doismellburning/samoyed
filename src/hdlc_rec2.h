@@ -11,39 +11,6 @@
 
 
 
-typedef enum retry_mode_e {
-		RETRY_MODE_CONTIGUOUS=0,
-		RETRY_MODE_SEPARATED=1,
-		}  retry_mode_t;
-
-typedef enum retry_type_e {
-		RETRY_TYPE_NONE=0,
-		RETRY_TYPE_SWAP=1 }  retry_type_t;
-
-typedef struct retry_conf_s {
-	retry_t      retry;
-        retry_mode_t mode;
-        retry_type_t type;
-        union {
-                struct {
-                        int bit_idx_a; /*  */
-                        int bit_idx_b; /*  */
-                        int bit_idx_c; /*  */
-                } sep;       /* RETRY_MODE_SEPARATED */
-
-                struct {
-                        int bit_idx;
-			int nr_bits;
-                } contig;  /* RETRY_MODE_CONTIGUOUS */
-
-        } u_bits;
-	int insert_value;
-
-} retry_conf_t;
-
-
-
-
 static const char * retry_text[] = {
 		"NONE",
 		"SINGLE",
