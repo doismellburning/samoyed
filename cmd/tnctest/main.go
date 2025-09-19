@@ -23,7 +23,7 @@ package main
 // #include "textcolor.h"
 // #include "dtime_now.h"
 // #include "serial_port.h"
-// #cgo CFLAGS: -I../../src -I../../external/geotranz -I../../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0
+// #cgo CFLAGS: -I../../src -I../../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 // #cgo LDFLAGS: -lm
 import "C"
 

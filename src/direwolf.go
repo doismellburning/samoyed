@@ -73,7 +73,7 @@ package direwolf
 // extern int q_h_opt;
 // extern int q_d_opt;
 // extern int A_opt_ais_to_obj;
-// #cgo CFLAGS: -I../external/geotranz -I../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
+// #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm -ludev -lavahi-common -lavahi-client -lhamlib -lasound
 import "C"
 
@@ -88,7 +88,6 @@ import (
 	"unsafe"
 
 	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
-	_ "github.com/doismellburning/samoyed/external/misc"     // Pulls this in for cgo
 	"github.com/spf13/pflag"
 )
 

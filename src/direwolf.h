@@ -286,65 +286,7 @@ char *strtok_r(char *str, const char *delim, char **saveptr);
 char *strcasestr(const char *S, const char *FIND);
 
 
-// cmake tries to determine whether strlcpy and strlcat are provided by the C runtime library.
-//
-//	../CMakeLists.txt:check_symbol_exists(strlcpy string.h HAVE_STRLCPY)
-//
-// It sets HAVE_STRLCPY and HAVE_STRLCAT if the corresponding functions are declared.
-// Unfortunately this does not work right for glibc 2.38 which declares the functions
-// like this:
-//
-//	extern __typeof (strlcpy) __strlcpy;
-//	libc_hidden_proto (__strlcpy)
-//	extern __typeof (strlcat) __strlcat;
-//	libc_hidden_proto (__strlcat)
-//
-// Rather than the normal way found in earlier versions:
-//
-//	extern char *strcpy (char *__restrict __dest, const char *__restrict __src)
-//
-// Perhaps a later version of cmake will recognize this form but the version I'm
-// using does not.
-// So, our work around is to assume these functions are available for glibc >= 2.38.
-//
-// In theory, cmake should be able to find the version of the C runtime library, 
-// but I could not get it to work.  So we have the test here.  We will still build
-// own library with the strl... functions but this does not cause a problem
-// because they have special debug names which will not cause a conflict.
-
-#ifdef __GLIBC__
-#if (__GLIBC__ > 2) || ((__GLIBC__ == 2) && (__GLIBC_MINOR__ >= 38))
-// These functions first added in 2.38.
-//#warning "DEBUG - glibc >= 2.38"
 #define HAVE_STRLCPY 1
 #define HAVE_STRLCAT 1
-#else
-//#warning "DEBUG - glibc < 2.38"
-#endif
-#endif
-
-#define DEBUG_STRL 1	// Extra Debug version when using our own strlcpy, strlcat.
-			// Should be ignored if not supplying our own.
-
-#ifndef HAVE_STRLCPY	// Need to supply our own.
-#if DEBUG_STRL
-#define strlcpy(dst,src,siz) strlcpy_debug(dst,src,siz,__FILE__,__func__,__LINE__)
-size_t strlcpy_debug(char *__restrict__ dst, const char *__restrict__ src, size_t siz, const char *file, const char *func, int line);
-#else
-#define strlcpy(dst,src,siz) strlcpy_debug(dst,src,siz)
-size_t strlcpy_debug(char *__restrict__ dst, const char *__restrict__ src, size_t siz);
-#endif  /* DEBUG_STRL */
-#endif
-
-#ifndef HAVE_STRLCAT	// Need to supply our own.
-#if DEBUG_STRL
-#define strlcat(dst,src,siz) strlcat_debug(dst,src,siz,__FILE__,__func__,__LINE__)
-size_t strlcat_debug(char *__restrict__ dst, const char *__restrict__ src, size_t siz, const char *file, const char *func, int line);
-#else
-#define strlcat(dst,src,siz) strlcat_debug(dst,src,siz)
-size_t strlcat_debug(char *__restrict__ dst, const char *__restrict__ src, size_t siz);
-#endif  /* DEBUG_STRL */
-#endif
-
 
 #endif   /* ifndef DIREWOLF_H */
