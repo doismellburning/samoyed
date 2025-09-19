@@ -17,7 +17,7 @@ package main
 // #include "textcolor.h"
 // #include "cm108.h"
 // int cm108_inventory (struct thing_s *things, int max_things);
-// #cgo CFLAGS: -I../../src -I../../external/geotranz -I../../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108=1
+// #cgo CFLAGS: -I../../src -I../../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108=1
 // #cgo LDFLAGS: -lm -ludev
 import "C"
 

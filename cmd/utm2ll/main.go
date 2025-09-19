@@ -1,7 +1,7 @@
 /* UTM to Latitude / Longitude conversion */
 package main
 
-// #cgo CFLAGS: -I../../src -I../../external/geotranz -I../../external/misc -DMAJOR_VERSION=0 -DMINOR_VERSION=0
+// #cgo CFLAGS: -I../../src -I../../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 // #cgo LDFLAGS: -lm
 // #include "direwolf.h"
 // #include <stdio.h>
