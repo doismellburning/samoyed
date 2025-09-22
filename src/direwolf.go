@@ -15,7 +15,6 @@ package direwolf
 // #include <fcntl.h>
 // #include <sys/types.h>
 // #include <sys/ioctl.h>
-// #include <sys/soundcard.h>
 // #include <sys/socket.h>
 // #include <netinet/in.h>
 // #include <netdb.h>
