@@ -249,7 +249,7 @@ func bitStuff(in []byte) []byte {
 	// Start flag
 
 	for i := range 8 {
-		var v = flag&(1<<(7-i)) > 0
+		var v = flag&(1<<i) > 0
 		outBits = append(outBits, v)
 	}
 
@@ -258,7 +258,7 @@ func bitStuff(in []byte) []byte {
 	var ones = 0
 	for _, b := range in {
 		for i := range 8 {
-			var v = b&(1<<(7-i)) > 0
+			var v = b&(1<<i) > 0
 			outBits = append(outBits, v)
 
 			if v {
@@ -276,7 +276,7 @@ func bitStuff(in []byte) []byte {
 	// End flag
 
 	for i := range 8 {
-		var v = flag&(1<<(7-i)) > 0
+		var v = flag&(1<<i) > 0
 		outBits = append(outBits, v)
 	}
 
