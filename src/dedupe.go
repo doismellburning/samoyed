@@ -188,7 +188,7 @@ func dedupe_remember(pp C.packet_t, channel C.int) {
 	/* want to do it again if it comes from APRS-IS. */
 	/* Not sure about the other way around. */
 
-	C.ig_to_tx_remember(pp, channel, 1)
+	ig_to_tx_remember(pp, channel, 1)
 }
 
 /*------------------------------------------------------------------------------
