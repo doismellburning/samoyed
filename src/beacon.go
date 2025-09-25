@@ -816,13 +816,13 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 			var last_minutes C.int = 30
 
 			var stuff = fmt.Sprintf("<IGATE,MSG_CNT=%d,PKT_CNT=%d,DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d,UPL_CNT=%d,DNL_CNT=%d",
-				C.igate_get_msg_cnt(),
-				C.igate_get_pkt_cnt(),
+				igate_get_msg_cnt(),
+				igate_get_pkt_cnt(),
 				C.mheard_count(0, last_minutes),
 				C.mheard_count(g_igate_config_p.max_digi_hops, last_minutes),
 				C.mheard_count(8, last_minutes),
-				C.igate_get_upl_cnt(),
-				C.igate_get_dnl_cnt())
+				igate_get_upl_cnt(),
+				igate_get_dnl_cnt())
 
 			beacon_text += stuff
 		}
@@ -847,7 +847,7 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 			text_color_set(DW_COLOR_XMIT)
 			dw_printf("[ig] %s\n", beacon_text)
 
-			C.igate_send_rec_packet(-1, pp) // Channel -1 to avoid RF>IS filtering.
+			igate_send_rec_packet(-1, pp) // Channel -1 to avoid RF>IS filtering.
 			C.ax25_delete(pp)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
