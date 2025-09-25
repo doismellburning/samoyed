@@ -401,7 +401,6 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* by a carriage return, line feed sequence. No line may exceed 512 bytes */
 /* including the CR/LF sequence." */
 
-//export igate_send_rec_packet
 func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 
 	if igate_sock == nil {
@@ -1432,7 +1431,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 			#else
 			*/
 			/* This consumes packet so don't reference it again! */
-			C.tq_append(to_chan, TQ_PRIO_1_LO, pradio)
+			tq_append(to_chan, TQ_PRIO_1_LO, pradio)
 			// TODO KG #endif
 			stats_rf_xmit_packets++ // Any type of packet.
 

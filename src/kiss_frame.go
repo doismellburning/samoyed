@@ -333,9 +333,9 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 
 			if C.ax25_get_num_repeaters(pp) >= 1 &&
 				C.ax25_get_h(pp, AX25_REPEATER_1) > 0 {
-				C.tq_append(channel, TQ_PRIO_0_HI, pp)
+				tq_append(channel, TQ_PRIO_0_HI, pp)
 			} else {
-				C.tq_append(channel, TQ_PRIO_1_LO, pp)
+				tq_append(channel, TQ_PRIO_1_LO, pp)
 			}
 		}
 
@@ -560,7 +560,7 @@ func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport
 				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
 			}
 
-			var n = C.tq_count(channel, -1, C.CString(""), C.CString(""), 1)
+			var n = tq_count(channel, -1, C.CString(""), C.CString(""), 1)
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			sendfun(channel, C.KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
 		} else {
