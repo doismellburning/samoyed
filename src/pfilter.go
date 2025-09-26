@@ -408,7 +408,7 @@ func parse_and_expr (pf *pfstate_t) C.int {
 
 func parse_primary (pf *pfstate_t) C.int {
 
-	int result;
+	var result C.int
 
 	if (pf.token_type == TOKEN_LPAREN) {
 
@@ -422,18 +422,20 @@ func parse_primary (pf *pfstate_t) C.int {
 	    result = -1;
 	  }
 	} else if (pf.token_type == TOKEN_NOT) {
-	  int e;
 
 	  next_token (pf);
-	  e = parse_primary (pf);
+	  var e = parse_primary (pf);
 
 	  if (s_debug >= 3) {
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("  ! %s\n", bool2text(e));
 	  }
 
-	  if (e < 0) result = -1;
-	  else result = ! e;
+	  if (e < 0) {
+		  result = -1;
+	  } else {
+		  result = ! e;
+	  }
 	} else if (pf.token_type == TOKEN_FILTER_SPEC) {
 	  result = parse_filter_spec (pf);
 	} else {
@@ -466,13 +468,12 @@ func parse_primary (pf *pfstate_t) C.int {
  *
  *--------------------------------------------------------------------*/
 
-static int parse_filter_spec (pfstate_t *pf)
-{
-	int result = -1;
+func parse_filter_spec (pf *pfstate_t) C.int {
+
+	var result C.int = -1;
 
 
 	if ( ( ! pf.is_aprs) && strchr ("01bdvu", pf.token_str[0]) == nil) {
-
 	  print_error (pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.");
 	  result = -1;
 	  next_token (pf);
@@ -486,94 +487,78 @@ static int parse_filter_spec (pfstate_t *pf)
 	  result = 0;
 	} else if (strcmp(pf.token_str, "1") == 0) {
 	  result = 1;
-	}
+	} else if (pf.token_str[0] == 'b' && ispunct(pf.token_str[1])) {
 
 /* simple string matching */
 
 /* b - budlist */
-
-	else if (pf.token_str[0] == 'b' && ispunct(pf.token_str[1])) {
 	  /* Budlist - AX.25 source address */
 	  /* Could be different than source encapsulated by 3rd party header. */
-	  char addr[AX25_MAX_ADDR_LEN];
-	  ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, addr);
+	  var addr[AX25_MAX_ADDR_LEN]C.char
+	  C.ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, &addr[0]);
 	  result = filt_bodgu (pf, addr);
 
 	  if (s_debug >= 2) {
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr);
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'o' && ispunct(pf.token_str[1])) {
 /* o - object or item name */
-
-	else if (pf.token_str[0] == 'o' && ispunct(pf.token_str[1])) {
 	  result = filt_bodgu (pf, pf.decoded.g_name);
 
 	  if (s_debug >= 2) {
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name);
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'd' && ispunct(pf.token_str[1])) {
 /* d - was digipeated by */
-
-	else if (pf.token_str[0] == 'd' && ispunct(pf.token_str[1])) {
-	  int n;
 	  // Loop on all AX.25 digipeaters.
 	  result = 0;
-	  for (n = AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++) {
+	  for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++ {
 	    // Consider only those with the H (has-been-used) bit set.
 	    if (ax25_get_h (pf.pp, n)) {
-	      char addr[AX25_MAX_ADDR_LEN];
-	      ax25_get_addr_with_ssid (pf.pp, n, addr);
+	      var addr[AX25_MAX_ADDR_LEN]C.char
+	      C.ax25_get_addr_with_ssid (pf.pp, n, &addr[0]);
 	      result = filt_bodgu (pf, addr);
 	    }
 	  }
 
 	  if (s_debug >= 2) {
-	    char path[100];
+	    var path[100]C.char
 
-	    ax25_format_via_path (pf.pp, path, sizeof(path));
+	    C.ax25_format_via_path (pf.pp, &path[0], sizeof(path));
 	    if (strlen(path) == 0) {
 	      strcpy (path, "no digipeater path");
 	    }
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), path);
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'v' && ispunct(pf.token_str[1])) {
 /* v - via not used */
-
-	else if (pf.token_str[0] == 'v' && ispunct(pf.token_str[1])) {
-	  int n;
 	  // loop on all AX.25 digipeaters (mnemonic Via)
 	  result = 0;
-	  for (n = AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++) {
+	  for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++ {
 	    // This is different than the previous "d" filter.
 	    // Consider only those where the the H (has-been-used) bit is NOT set.
 	    if ( ! ax25_get_h (pf.pp, n)) {
-	      char addr[AX25_MAX_ADDR_LEN];
-	      ax25_get_addr_with_ssid (pf.pp, n, addr);
+	      var addr[AX25_MAX_ADDR_LEN]C.char
+	      C.ax25_get_addr_with_ssid (pf.pp, n, &addr[0]);
 	      result = filt_bodgu (pf, addr);
 	    }
 	  }
 
 	  if (s_debug >= 2) {
-	    char path[100];
+	    var path[100]C.char
 
-	    ax25_format_via_path (pf.pp, path, sizeof(path));
+	    C.ax25_format_via_path (pf.pp, &path[0], sizeof(path));
 	    if (strlen(path) == 0) {
 	      strcpy (path, "no digipeater path");
 	    }
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), path);
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'g' && ispunct(pf.token_str[1])) {
 /* g - Addressee of message. e.g. "BLN*" for bulletins. */
-
-	else if (pf.token_str[0] == 'g' && ispunct(pf.token_str[1])) {
 	  if (pf.decoded.g_message_subtype == message_subtype_message ||
 	      pf.decoded.g_message_subtype == message_subtype_ack ||
 	      pf.decoded.g_message_subtype == message_subtype_rej ||
@@ -593,17 +578,14 @@ static int parse_filter_spec (pfstate_t *pf)
 	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message");
 	    }
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'u' && ispunct(pf.token_str[1])) {
 /* u - unproto (AX.25 destination) */
-
-	else if (pf.token_str[0] == 'u' && ispunct(pf.token_str[1])) {
 	  /* Probably want to exclude mic-e types */
 	  /* because destination is used for part of location. */
 
 	  if (ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`') {
-	    char addr[AX25_MAX_ADDR_LEN];
-	    ax25_get_addr_with_ssid (pf.pp, AX25_DESTINATION, addr);
+	    var addr[AX25_MAX_ADDR_LEN]C.char
+	    C.ax25_get_addr_with_ssid (pf.pp, AX25_DESTINATION, &addr[0]);
 	    result = filt_bodgu (pf, addr);
 
 	    if (s_debug >= 2) {
@@ -617,28 +599,22 @@ static int parse_filter_spec (pfstate_t *pf)
 	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type");
 	    }
 	  }
-	}
-
+	} else if (pf.token_str[0] == 't' && ispunct(pf.token_str[1])) {
 /* t - packet type: position, weather, telemetry, etc. */
-
-	else if (pf.token_str[0] == 't' && ispunct(pf.token_str[1])) {
 	  
 	  result = filt_t (pf);
 
 	  if (s_debug >= 2) {
-	    char *infop = nil;
-	    (void) ax25_get_info (pf.pp, (unsigned char **)(&infop));
+	    var infop *C.uchar
+	    C.ax25_get_info (pf.pp, &infop);
 
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), *infop);
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'r' && ispunct(pf.token_str[1])) {
 /* r - range */
-
-	else if (pf.token_str[0] == 'r' && ispunct(pf.token_str[1])) {
 	  /* range */
-	  char sdist[30];
+	  var sdist[30]C.char
 	  strcpy (sdist, "unknown distance");
 	  result = filt_r (pf, sdist);
 
