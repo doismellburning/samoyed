@@ -361,7 +361,7 @@ func aprs_tt_sequence(channel int, msg string) {
 		return
 	}
 
-	C.tq_append(C.int(channel), TQ_PRIO_0_HI, pp)
+	tq_append(C.int(channel), TQ_PRIO_0_HI, pp)
 } /* end aprs_tt_sequence */
 
 /*------------------------------------------------------------------

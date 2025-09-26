@@ -115,7 +115,7 @@ func cdigipeater(from_chan C.int, pp C.packet_t) {
 					&(save_cdigi_config_p.alias[from_chan][to_chan]), to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
 				if result != nil {
-					C.tq_append(to_chan, TQ_PRIO_0_HI, result)
+					tq_append(to_chan, TQ_PRIO_0_HI, result)
 					cdigi_count[from_chan][to_chan]++
 				}
 			}
@@ -135,7 +135,7 @@ func cdigipeater(from_chan C.int, pp C.packet_t) {
 					&(save_cdigi_config_p.alias[from_chan][to_chan]), to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
 				if result != nil {
-					C.tq_append(to_chan, TQ_PRIO_0_HI, result)
+					tq_append(to_chan, TQ_PRIO_0_HI, result)
 					cdigi_count[from_chan][to_chan]++
 				}
 			}

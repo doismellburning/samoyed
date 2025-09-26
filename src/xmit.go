@@ -188,7 +188,7 @@ func xmit_init(p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
 		dw_printf ("xmit_init: about to call tq_init \n");
 	#endif
 	*/
-	C.tq_init(p_modem)
+	tq_init(p_modem)
 
 	/* TODO KG
 	#if DEBUG
@@ -390,7 +390,7 @@ func frame_flavor(pp C.packet_t) flavor_t {
 func xmit_thread(channel C.int) {
 
 	for {
-		C.tq_wait_while_empty(channel)
+		tq_wait_while_empty(channel)
 		/* TODO KG
 		#if DEBUG
 			  text_color_set(DW_COLOR_DEBUG);
@@ -399,7 +399,7 @@ func xmit_thread(channel C.int) {
 		*/
 
 		// Does this extra loop offer any benefit?
-		for C.tq_peek(channel, TQ_PRIO_0_HI) != nil || C.tq_peek(channel, TQ_PRIO_1_LO) != nil {
+		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
 
 			/*
 			 * Wait for the channel to be clear.
@@ -409,11 +409,11 @@ func xmit_thread(channel C.int) {
 			var ok = wait_for_clear_channel(channel, xmit_slottime[channel], xmit_persist[channel], xmit_fulldup[channel])
 
 			var prio C.int = TQ_PRIO_1_LO
-			var pp = C.tq_remove(channel, TQ_PRIO_0_HI)
+			var pp = tq_remove(channel, TQ_PRIO_0_HI)
 			if pp != nil {
 				prio = TQ_PRIO_0_HI
 			} else {
-				pp = C.tq_remove(channel, TQ_PRIO_1_LO)
+				pp = tq_remove(channel, TQ_PRIO_1_LO)
 			}
 
 			/* TODO KG
@@ -682,11 +682,11 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 		 * Don't remove from queue yet because it might not be eligible.
 		 */
 		prio = TQ_PRIO_1_LO
-		pp = C.tq_peek(channel, TQ_PRIO_0_HI)
+		pp = tq_peek(channel, TQ_PRIO_0_HI)
 		if pp != nil {
 			prio = TQ_PRIO_0_HI
 		} else {
-			pp = C.tq_peek(channel, TQ_PRIO_1_LO)
+			pp = tq_peek(channel, TQ_PRIO_1_LO)
 		}
 
 		if pp != nil {
@@ -698,7 +698,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
 
-				pp = C.tq_remove(channel, prio)
+				pp = tq_remove(channel, prio)
 				/* TODO KG
 				#if DEBUG
 					        text_color_set(DW_COLOR_DEBUG);
@@ -1224,7 +1224,7 @@ func wait_for_clear_channel(channel C.int, slottime C.int, persist C.int, fulldu
 		 * Wait random time.
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
-		for C.tq_peek(channel, TQ_PRIO_0_HI) == nil {
+		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(int(slottime) * 10)
 
 			if C.hdlc_rec_data_detect_any(channel) > 0 {

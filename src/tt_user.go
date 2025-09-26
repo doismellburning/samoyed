@@ -796,7 +796,7 @@ func xmit_object_report(i int, first_time bool) {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
 
-		C.igate_send_rec_packet(save_tt_config_p.obj_recv_chan, pp)
+		igate_send_rec_packet(save_tt_config_p.obj_recv_chan, pp)
 	}
 
 	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
@@ -804,7 +804,7 @@ func xmit_object_report(i int, first_time bool) {
 
 		dedupe_remember(pp, save_tt_config_p.obj_xmit_chan)
 
-		C.tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+		tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	} else {
 		C.ax25_delete(pp)
 	}
