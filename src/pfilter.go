@@ -341,36 +341,33 @@ func next_token (pfstate_t *pf) {
  *--------------------------------------------------------------------*/
 
 
-static int parse_expr (pfstate_t *pf)
-{
-	int result;
+func parse_expr (pf *pfstate_t) C.int {
 
-	result = parse_or_expr (pf);
-
-	return (result);
+	return parse_or_expr (pf);
 }
 
 /* or_expr::	and_expr [ | and_expr ] ... */
 
-static int parse_or_expr (pfstate_t *pf)
-{
-	int result;
+func parse_or_expr (pf *pfstate_t) C.int {
 
-	result = parse_and_expr (pf);
-	if (result < 0) return (-1);
+	var result = parse_and_expr (pf);
+	if (result < 0) {
+		return (-1);
+	}
 	
 	for (pf.token_type == TOKEN_OR) {
-	  int e;
 
 	  next_token (pf);
-	  e = parse_and_expr (pf);
+	  var e = parse_and_expr (pf);
 
 	  if (s_debug >= 3) {
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("  %s | %s\n", bool2text(result), bool2text(e));
 	  }
 
-	  if (e < 0) return (-1);
+	  if (e < 0) {
+		  return (-1);
+	  }
 	  result |= e;
 	}
 
@@ -379,25 +376,26 @@ static int parse_or_expr (pfstate_t *pf)
 
 /* and_expr::	primary [ & primary ] ... */
  
-static int parse_and_expr (pfstate_t *pf)
-{
-	int result;
+func parse_and_expr (pf *pfstate_t) C.int {
 
-	result = parse_primary (pf);
-	if (result < 0) return (-1);
+	var result = parse_primary (pf);
+	if (result < 0) {
+		return (-1);
+	}
 
 	for (pf.token_type == TOKEN_AND) {
-	  int e;
 
 	  next_token (pf);
-	  e = parse_primary (pf);
+	  var e = parse_primary (pf);
 
 	  if (s_debug >= 3) {
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("  %s & %s\n", bool2text(result), bool2text(e));
 	  }
 
-	  if (e < 0) return (-1);
+	  if (e < 0) {
+		  return (-1);
+	  }
 	  result &= e;
 	}
 
@@ -408,8 +406,8 @@ static int parse_and_expr (pfstate_t *pf)
 /* 		! primary	*/
 /*		filter_spec	*/
 
-static int parse_primary (pfstate_t *pf)
-{
+func parse_primary (pf *pfstate_t) C.int {
+
 	int result;
 
 	if (pf.token_type == TOKEN_LPAREN) {
@@ -419,13 +417,11 @@ static int parse_primary (pfstate_t *pf)
 	  	  
 	  if (pf.token_type == TOKEN_RPAREN) {
 	    next_token (pf);
-	  }
-	  else {
+	  } else {
 	    print_error (pf, "Expected \")\" here.\n");
 	    result = -1;
 	  }
-	}
-	else if (pf.token_type == TOKEN_NOT) {
+	} else if (pf.token_type == TOKEN_NOT) {
 	  int e;
 
 	  next_token (pf);
@@ -438,11 +434,9 @@ static int parse_primary (pfstate_t *pf)
 
 	  if (e < 0) result = -1;
 	  else result = ! e;
-	}
-	else if (pf.token_type == TOKEN_FILTER_SPEC) {
+	} else if (pf.token_type == TOKEN_FILTER_SPEC) {
 	  result = parse_filter_spec (pf);
-	}
-	else {
+	} else {
 	  print_error (pf, "Expected filter specification, (, or ! here.");
 	  result = -1;
 	}
@@ -490,8 +484,7 @@ static int parse_filter_spec (pfstate_t *pf)
 
 	if (strcmp(pf.token_str, "0") == 0) {
 	  result = 0;
-	}
-	else if (strcmp(pf.token_str, "1") == 0) {
+	} else if (strcmp(pf.token_str, "1") == 0) {
 	  result = 1;
 	}
 
@@ -593,8 +586,7 @@ static int parse_filter_spec (pfstate_t *pf)
 	      text_color_set(DW_COLOR_DEBUG);
 	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee);
 	    }
-	  }
-	  else {
+	  } else {
 	    result = 0;
 	    if (s_debug >= 2) {
 	      text_color_set(DW_COLOR_DEBUG);
@@ -618,8 +610,7 @@ static int parse_filter_spec (pfstate_t *pf)
 	      text_color_set(DW_COLOR_DEBUG);
 	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr);
 	    }
-	  }
-	  else {
+	  } else {
 	    result = 0;
 	    if (s_debug >= 2) {
 	      text_color_set(DW_COLOR_DEBUG);
@@ -667,11 +658,9 @@ static int parse_filter_spec (pfstate_t *pf)
 	    text_color_set(DW_COLOR_DEBUG);
 	    if (pf.decoded.g_symbol_table == '/') {
 	      dw_printf ("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code);
-	    }
-	    else if (pf.decoded.g_symbol_table == '\\') {
+	    } else if (pf.decoded.g_symbol_table == '\\') {
 	      dw_printf ("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code);
-	    }
-	    else {
+	    } else {
 	      dw_printf ("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code, pf.decoded.g_symbol_table);
 	    }
 	  }
@@ -690,8 +679,7 @@ static int parse_filter_spec (pfstate_t *pf)
 	    text_color_set(DW_COLOR_DEBUG);
 	    if (pf.decoded.g_packet_type == packet_type_message) {
 	      dw_printf ("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee);
-	    }
-	    else {
+	    } else {
 	      dw_printf ("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result));
 	    }
 	  }
@@ -1099,16 +1087,14 @@ static int filt_s (pfstate_t *pf)
 	        return (-1);
 	      }
 	    }
-	  }
-	  else {
+	  } else {
 	    // No alt part is OK if at least one primary symbol was specified.
 	    if (strlen(pri) == 0) {
 	      print_error (pf, "No symbols specified for Symbol filter.");
 	      return (-1);
 	    }
 	  }
-	}
-	else {
+	} else {
 	  print_error (pf, "Missing arguments for Symbol filter.");
 	  return (-1);
 	}
@@ -1151,16 +1137,14 @@ static int filt_s (pfstate_t *pf)
 	      // Need to match one of them.
 
 	      return (strchr(over, pf.decoded.g_symbol_table) != nil);
-	    }
-	    else {
+	    } else {
 
 	      // Zero length overlay part was specified.
 	      // We must have no overlay, i.e.  table is \.
 
 	      return (pf.decoded.g_symbol_table == '\\');
 	    }
-	  }
-	  else {
+	  } else {
 
 	    // No check of overlay part.  Just make sure it is not primary table.
 
@@ -1303,8 +1287,7 @@ static int filt_i (pfstate_t *pf)
 
 	if (v != nil && strlen(v) > 0) {
 	  heardtime = atoi(v);
-	}
-	else {
+	} else {
 	  print_error (pf, "Missing time limit for IGate message filter.");
 	  return (-1);
 	}
@@ -1314,8 +1297,7 @@ static int filt_i (pfstate_t *pf)
 	if (v != nil) {
 	  if (strlen(v) > 0) {
 	    maxhops = atoi(v);
-	  }
-	  else {
+	  } else {
 	    print_error (pf, "Missing max digipeater hops for IGate message filter.");
 	    return (-1);
 	  }
@@ -1327,8 +1309,7 @@ static int filt_i (pfstate_t *pf)
 	    v = strsep (&cp, sep);
 	    if (v != nil && strlen(v) > 0) {
 	      dlon = atof(v);
-	    }
-	    else {
+	    } else {
 	      print_error (pf, "Missing longitude for IGate message filter.");
 	      return (-1);
 	    }
@@ -1336,8 +1317,7 @@ static int filt_i (pfstate_t *pf)
 	    v = strsep (&cp, sep);
 	    if (v != nil && strlen(v) > 0) {
 	      km = atof(v);
-	    }
-	    else {
+	    } else {
 	      print_error (pf, "Missing distance, in km, for IGate message filter.");
 	      return (-1);
 	    }
@@ -1429,17 +1409,14 @@ static void print_error (pfstate_t *pf, char *msg)
 
 	  if (pf.to_chan == MAX_TOTAL_CHANS) {
 	    snprintf (intro, sizeof(intro), "filter[IG,IG]: ");
-	  }
-	  else {
+	  } else {
 	    snprintf (intro, sizeof(intro), "filter[IG,%d]: ", pf.to_chan);
 	  }
-	}
-	else {
+	} else {
 
 	  if (pf.to_chan == MAX_TOTAL_CHANS) {
 	    snprintf (intro, sizeof(intro), "filter[%d,IG]: ", pf.from_chan);
-	  }
-	  else {
+	  } else {
 	    snprintf (intro, sizeof(intro), "filter[%d,%d]: ", pf.from_chan, pf.to_chan);
 	  }
 	}
