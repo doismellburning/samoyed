@@ -76,26 +76,26 @@ const MAX_TOKEN_LEN = 1024
 
 type pfstate_t struct {
 
-	int from_chan;				/* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
-	int to_chan;				/* Used only for debug and error messages. */
+	from_chan C.int;				/* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
+	to_chan C.int;				/* Used only for debug and error messages. */
 
 /*
  * Original filter string from config file.
  * All control characters should be replaced by spaces.
  */
-	char filter_str[MAX_FILTER_LEN];
-	int nexti;				/* Next available character index. */
+	filter_str[MAX_FILTER_LEN] C.char
+	nexti C.int;				/* Next available character index. */
 
 /*
  * Packet object.
  */
-	packet_t pp;
+	pp C.packet_t 
 
 /*
  * Are we processing APRS or connected mode?
  * This determines which types of filters are available.
  */
-	int is_aprs;
+	is_aprs bool
 
 /*
  * Packet split into separate parts if APRS.
@@ -107,15 +107,14 @@ type pfstate_t struct {
  *		g_name		- for object or item
  *		g_comment
  */
-	decode_aprs_t decoded;
+	decoded decode_aprs_t
 
 /*
  * These are set by next_token.
  */
-	token_type_t token_type;
-	char token_str[MAX_TOKEN_LEN];		/* Printable string representation for use in error messages. */
-	int tokeni;				/* Index in original string for enhanced error messages. */
-
+	token_type token_type_t
+	token_str[MAX_TOKEN_LEN]C.char		/* Printable string representation for use in error messages. */
+	tokeni int;				/* Index in original string for enhanced error messages. */
 }
 
 
