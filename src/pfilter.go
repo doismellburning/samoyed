@@ -62,7 +62,16 @@ func pfilter_init(p_igate_config *C.struct_igate_config_s, debug_level int) {
 }
 
 type token_type_t int
-{ TOKEN_AND, TOKEN_OR, TOKEN_NOT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_FILTER_SPEC, TOKEN_EOL } token_type_t;
+
+const (
+	TOKEN_AND token_type_t = iota
+	TOKEN_OR
+	TOKEN_NOT
+	TOKEN_LPAREN
+	TOKEN_RPAREN
+	TOKEN_FILTER_SPEC
+	TOKEN_EOL
+)
 
 const MAX_FILTER_LEN = 1024
 const MAX_TOKEN_LEN = 1024
