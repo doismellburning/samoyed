@@ -37,9 +37,9 @@ import "C"
  * These are set by init function.
  */
 
-var save_igate_config_p *C.struct_igate_config_s
-var s_debug = 0
-var pftest_running = 0
+// FIXME KG var save_igate_config_p *C.struct_igate_config_s
+var pfilter_debug = 0
+var pftest_running = false
 
 /*-------------------------------------------------------------------
  *
@@ -57,7 +57,7 @@ var pftest_running = 0
  *--------------------------------------------------------------------*/
 
 func pfilter_init(p_igate_config *C.struct_igate_config_s, debug_level int) {
-	s_debug = debug_level
+	pfilter_debug = debug_level
 	save_igate_config_p = p_igate_config
 }
 
@@ -206,7 +206,7 @@ func pfilter(int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
 		}
 	}
 
-	if s_debug >= 1 {
+	if pfilter_debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		if from_chan == MAX_TOTAL_CHANS {
 			dw_printf(" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result))
@@ -344,7 +344,7 @@ func parse_or_expr(pf *pfstate_t) C.int {
 		next_token(pf)
 		var e = parse_and_expr(pf)
 
-		if s_debug >= 3 {
+		if pfilter_debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  %s | %s\n", bool2text(result), bool2text(e))
 		}
@@ -372,7 +372,7 @@ func parse_and_expr(pf *pfstate_t) C.int {
 		next_token(pf)
 		var e = parse_primary(pf)
 
-		if s_debug >= 3 {
+		if pfilter_debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  %s & %s\n", bool2text(result), bool2text(e))
 		}
@@ -410,7 +410,7 @@ func parse_primary(pf *pfstate_t) C.int {
 		next_token(pf)
 		var e = parse_primary(pf)
 
-		if s_debug >= 3 {
+		if pfilter_debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  ! %s\n", bool2text(e))
 		}
@@ -480,7 +480,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		C.ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &addr[0])
 		result = filt_bodgu(pf, addr)
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
 		}
@@ -488,7 +488,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* o - object or item name */
 		result = filt_bodgu(pf, pf.decoded.g_name)
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name)
 		}
@@ -505,7 +505,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 			}
 		}
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			var path [100]C.char
 
 			C.ax25_format_via_path(pf.pp, &path[0], sizeof(path))
@@ -529,7 +529,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 			}
 		}
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			var path [100]C.char
 
 			C.ax25_format_via_path(pf.pp, &path[0], sizeof(path))
@@ -549,13 +549,13 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 			pf.decoded.g_message_subtype == message_subtype_directed_query {
 			result = filt_bodgu(pf, pf.decoded.g_addressee)
 
-			if s_debug >= 2 {
+			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
 			}
 		} else {
 			result = 0
-			if s_debug >= 2 {
+			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message")
 			}
@@ -570,13 +570,13 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 			C.ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION, &addr[0])
 			result = filt_bodgu(pf, addr)
 
-			if s_debug >= 2 {
+			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
 			}
 		} else {
 			result = 0
-			if s_debug >= 2 {
+			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type")
 			}
@@ -586,7 +586,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 
 		result = filt_t(pf)
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			var infop *C.uchar
 			C.ax25_get_info(pf.pp, &infop)
 
@@ -600,7 +600,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		strcpy(sdist, "unknown distance")
 		result = filt_r(pf, sdist)
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist)
 		}
@@ -608,7 +608,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* s - symbol */
 		result = filt_s(pf)
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			if pf.decoded.g_symbol_table == '/' {
 				dw_printf("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code)
@@ -623,7 +623,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* IGatge messaging */
 		result = filt_i(pf)
 
-		if s_debug >= 2 {
+		if pfilter_debug >= 2 {
 			var infop *C.uchar
 			C.ax25_get_info(pf.pp, &infop)
 
