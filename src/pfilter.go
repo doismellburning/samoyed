@@ -794,48 +794,68 @@ func filt_t (pfstate_t *pf) C.int {
 	      break;
 
 	    case 'm':				// Any "message."
-	      if (pf.decoded.g_packet_type == packet_type_message) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_message) {
+			  return(1);
+		  }
 	      break;
 
 	    case 'q':				/* Query */
-	      if (pf.decoded.g_packet_type == packet_type_query) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_query) {
+			  return(1);
+		  }
 	      break;
 
 	    case 'c':				/* station Capabilities - my extension */
 						/* Most often used for IGate statistics. */
-	      if (pf.decoded.g_packet_type == packet_type_capabilities) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_capabilities) {
+			  return(1);
+		  }
 	      break;
 
 	    case 's':				/* Status */
-	      if (pf.decoded.g_packet_type == packet_type_status) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_status) {
+			  return(1);
+		  }
 	      break;
 
 	    case 't':				/* Telemetry data or metadata */
-	      if (pf.decoded.g_packet_type == packet_type_telemetry) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_telemetry) {
+			  return(1);
+		  }
 	      break;
 
 	    case 'u':				/* User-defined */
-	      if (pf.decoded.g_packet_type == packet_type_userdefined) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_userdefined) {
+			  return(1);
+	  }
 	      break;
 
 	    case 'h':				/* has third party Header - my extension */
-	      if (pf.decoded.g_has_thirdparty_header) return (1);
+	      if (pf.decoded.g_has_thirdparty_header) {
+			  return (1);
+		  }
 	      break;
 
 	    case 'w':				/* Weather */
 
-	      if (pf.decoded.g_packet_type == packet_type_weather) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_weather) {
+			  return(1);
+		  }
 
 	      /* Positions !=/@  with symbol code _ are weather. */
 	      /* Object with _ symbol is also weather.  APRS protocol spec page 66. */
 	      // Can't use *infop because it would not work with 3rd party header.
 
 	      if ((pf.decoded.g_packet_type == packet_type_position ||
-	           pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_') return (1);
+	           pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_') {
+				   return (1);
+			   }
 	      break;
 
 	    case 'n':				/* NWS format */
-	      if (pf.decoded.g_packet_type == packet_type_nws) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_nws) {
+			  return(1);
+		  }
 	      break;
 
 	    default:
