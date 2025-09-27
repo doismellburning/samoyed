@@ -707,8 +707,12 @@ func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
 	sep[1] = 0;
 	cp = str + 2;
 
-	for result == 0 && (v = strsep (&cp, sep)) != nil {
-		var w = strchr(v. '*')
+	for {
+		var v = strsep(&cp, sep)
+		if !(result == 0 && v != nil) {
+			break
+		}
+		var w = strchr(v, '*')
 	  if (w != nil) {
 	    /* Wildcarding.  Should have single * on end. */
 
