@@ -158,7 +158,7 @@ func bool2text(val int) string {
  *
  *--------------------------------------------------------------------*/
 
-func pfilter(int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs) int {
+func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp C.packet_t, is_aprs C.int) C.int {
 
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
@@ -182,7 +182,7 @@ func pfilter(int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs)
 
 	/* Copy filter string, changing any control characters to spaces. */
 
-	strlcpy(pfstate.filter_str, filter, sizeof(pfstate.filter_str))
+	C.strcpy(pfstate.filter_str, filter)
 
 	pfstate.nexti = 0
 	for p := pfstate.filter_str; *p != 0; p++ {
