@@ -622,12 +622,8 @@ func parse_filter_spec (pf *pfstate_t) C.int {
 	    text_color_set(DW_COLOR_DEBUG);
 	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist);
 	  }
-	}
-
+	} else if (pf.token_str[0] == 's' && ispunct(pf.token_str[1])) {
 /* s - symbol */
-
-	else if (pf.token_str[0] == 's' && ispunct(pf.token_str[1])) {
-	  /* symbol */
 	  result = filt_s (pf);
 
 	  if (s_debug >= 2) {
@@ -640,17 +636,14 @@ func parse_filter_spec (pf *pfstate_t) C.int {
 	      dw_printf ("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code, pf.decoded.g_symbol_table);
 	    }
 	  }
-	}
-
+	} else if (pf.token_str[0] == 'i' && ispunct(pf.token_str[1])) {
 /* i - IGate messaging default */
-
-	else if (pf.token_str[0] == 'i' && ispunct(pf.token_str[1])) {
 	  /* IGatge messaging */
 	  result = filt_i (pf);
 
 	  if (s_debug >= 2) {
-	    char *infop = nil;
-	    (void) ax25_get_info (pf.pp, (unsigned char **)(&infop));
+		  var infop *C.uchar
+	     C.ax25_get_info (pf.pp, &infop);
 
 	    text_color_set(DW_COLOR_DEBUG);
 	    if (pf.decoded.g_packet_type == packet_type_message) {
@@ -659,14 +652,9 @@ func parse_filter_spec (pf *pfstate_t) C.int {
 	      dw_printf ("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result));
 	    }
 	  }
-	}
-
+	} else  {
 /* unrecognized filter type */
-
-	else  {
-	  char stemp[80];
-	  snprintf (stemp, sizeof(stemp), "Unrecognized filter type '%c'", pf.token_str[0]);
-	  print_error (pf, stemp);
+	  print_error(pf, fmt.Sprintf("Unrecognized filter type '%c'", pf.token_str[0]))
 	  result = -1;
 	}
 
