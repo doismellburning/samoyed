@@ -1408,9 +1408,8 @@ func filt_i (pf *pfstate_t) C.int {
  *
  *--------------------------------------------------------------------*/
 
-static void print_error (pfstate_t *pf, char *msg)
-{
-	char intro[50];
+func print_error (pf *pfstate_t, msg string) {
+	// FIXME KG char intro[50];
 
 	if (pf.from_chan == MAX_TOTAL_CHANS) {
 
@@ -1431,6 +1430,6 @@ static void print_error (pfstate_t *pf, char *msg)
 	text_color_set (DW_COLOR_ERROR);
 
 	dw_printf ("%s%s\n", intro, pf.filter_str);
-	dw_printf ("%*s\n", (int)(strlen(intro) + pf.tokeni + 1), "^");
+	dw_printf ("%*s\n", (strlen(intro) + pf.tokeni + 1), "^");
 	dw_printf ("%s\n", msg);
 }
