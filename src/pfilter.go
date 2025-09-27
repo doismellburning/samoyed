@@ -3,7 +3,7 @@ package direwolf
 /*------------------------------------------------------------------
  *
  * Purpose:   	Packet filtering based on characteristics.
- *		
+ *
  * Description:	Sometimes it is desirable to digipeat or drop packets based on rules.
  *		For example, you might want to pass only weather information thru
  *		a cross band digipeater or you might want to drop all packets from
@@ -31,8 +31,6 @@ package direwolf
 // #include "mheard.h"
 import "C"
 
-
-
 /*
  * Global stuff (to this file)
  *
@@ -43,7 +41,6 @@ var save_igate_config_p *C.struct_igate_config_s
 var s_debug = 0
 var pftest_running = 0
 
-
 /*-------------------------------------------------------------------
  *
  * Name:        pfilter_init
@@ -51,7 +48,7 @@ var pftest_running = 0
  * Purpose:     One time initialization when main application starts up.
  *
  * Inputs:	p_igate_config	- IGate configuration.
- *  
+ *
  *		debug_level	- 0	no debug output.
  *				  1	single summary line with final result. Indent by 1.
  *				  2	details from each filter specification.  Indent by 3.
@@ -59,78 +56,69 @@ var pftest_running = 0
  *
  *--------------------------------------------------------------------*/
 
-
-func pfilter_init (p_igate_config *C.struct_igate_config_s, debug_level int) {
-	s_debug = debug_level;
-	save_igate_config_p = p_igate_config;
+func pfilter_init(p_igate_config *C.struct_igate_config_s, debug_level int) {
+	s_debug = debug_level
+	save_igate_config_p = p_igate_config
 }
 
-
-
-
 // FIXME KG typedef enum token_type_e { TOKEN_AND, TOKEN_OR, TOKEN_NOT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_FILTER_SPEC, TOKEN_EOL } token_type_t;
-
 
 const MAX_FILTER_LEN = 1024
 const MAX_TOKEN_LEN = 1024
 
 type pfstate_t struct {
+	from_chan C.int /* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
+	to_chan   C.int /* Used only for debug and error messages. */
 
-	from_chan C.int;				/* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
-	to_chan C.int;				/* Used only for debug and error messages. */
+	/*
+	 * Original filter string from config file.
+	 * All control characters should be replaced by spaces.
+	 */
+	filter_str [MAX_FILTER_LEN]C.char
+	nexti      C.int /* Next available character index. */
 
-/*
- * Original filter string from config file.
- * All control characters should be replaced by spaces.
- */
-	filter_str[MAX_FILTER_LEN] C.char
-	nexti C.int;				/* Next available character index. */
+	/*
+	 * Packet object.
+	 */
+	pp C.packet_t
 
-/*
- * Packet object.
- */
-	pp C.packet_t 
-
-/*
- * Are we processing APRS or connected mode?
- * This determines which types of filters are available.
- */
+	/*
+	 * Are we processing APRS or connected mode?
+	 * This determines which types of filters are available.
+	 */
 	is_aprs bool
 
-/*
- * Packet split into separate parts if APRS.
- * Most interesting fields are:
- *
- *		g_symbol_table	- / \ or overlay
- *		g_symbol_code
- *		g_lat, g_lon	- Location
- *		g_name		- for object or item
- *		g_comment
- */
+	/*
+	 * Packet split into separate parts if APRS.
+	 * Most interesting fields are:
+	 *
+	 *		g_symbol_table	- / \ or overlay
+	 *		g_symbol_code
+	 *		g_lat, g_lon	- Location
+	 *		g_name		- for object or item
+	 *		g_comment
+	 */
 	decoded decode_aprs_t
 
-/*
- * These are set by next_token.
- */
+	/*
+	 * These are set by next_token.
+	 */
 	token_type token_type_t
-	token_str[MAX_TOKEN_LEN]C.char		/* Printable string representation for use in error messages. */
-	tokeni int;				/* Index in original string for enhanced error messages. */
+	token_str  [MAX_TOKEN_LEN]C.char /* Printable string representation for use in error messages. */
+	tokeni     int                   /* Index in original string for enhanced error messages. */
 }
 
-
-
-func bool2text (val int) string {
-	if (val == 1) {
-		return "TRUE";
-	} else if (val == 0) {
-		return "FALSE";
-	} else if (val == -1) {
-		return "ERROR";
+func bool2text(val int) string {
+	if val == 1 {
+		return "TRUE"
+	} else if val == 0 {
+		return "FALSE"
+	} else if val == -1 {
+		return "ERROR"
 	} else {
-		return "OOPS!";
+		return "OOPS!"
 	}
 }
-
 
 /*-------------------------------------------------------------------
  *
@@ -138,7 +126,7 @@ func bool2text (val int) string {
  *
  * Purpose:     Decide whether a packet should be allowed thru.
  *
- * Inputs:	from_chan - Channel packet is coming from.  
+ * Inputs:	from_chan - Channel packet is coming from.
  *		to_chan	  - Channel packet is going to.
  *				Both are 0 .. MAX_TOTAL_CHANS-1 or MAX_TOTAL_CHANS for IGate.
  *			 	For debug/error messages only.
@@ -160,96 +148,94 @@ func bool2text (val int) string {
  *
  *--------------------------------------------------------------------*/
 
-func pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs) int {
+func pfilter(int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs) int {
 
-	Assert (from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS);
-	Assert (to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS);
+	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
+	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
-	if (pp == nil) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("INTERNAL ERROR in pfilter: nil packet pointer. Please report this!\n");
-	  return (-1);
+	if pp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("INTERNAL ERROR in pfilter: nil packet pointer. Please report this!\n")
+		return (-1)
 	}
 
-	if (filter == nil) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("INTERNAL ERROR in pfilter: nil filter string pointer. Please report this!\n");
-	  return (-1);
+	if filter == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("INTERNAL ERROR in pfilter: nil filter string pointer. Please report this!\n")
+		return (-1)
 	}
 
 	var pfstate pfstate_t
 
-	pfstate.from_chan = from_chan;
-	pfstate.to_chan = to_chan;
+	pfstate.from_chan = from_chan
+	pfstate.to_chan = to_chan
 
 	/* Copy filter string, changing any control characters to spaces. */
 
-	strlcpy (pfstate.filter_str, filter, sizeof(pfstate.filter_str));
+	strlcpy(pfstate.filter_str, filter, sizeof(pfstate.filter_str))
 
-	pfstate.nexti = 0;
+	pfstate.nexti = 0
 	for p := pfstate.filter_str; *p != 0; p++ {
-	  if (iscntrl(*p)) {
-	    *p = ' ';
-	  }
+		if iscntrl(*p) {
+			*p = ' '
+		}
 	}
 
-	pfstate.pp = pp;
-	pfstate.is_aprs = is_aprs;
+	pfstate.pp = pp
+	pfstate.is_aprs = is_aprs
 
-	if (is_aprs) {
-	  decode_aprs (&pfstate.decoded, pp, 1, nil);
+	if is_aprs {
+		decode_aprs(&pfstate.decoded, pp, 1, nil)
 	}
 
-	next_token(&pfstate);
-	
+	next_token(&pfstate)
+
 	var result int
-	if (pfstate.token_type == TOKEN_EOL) {
-	  /* Empty filter means reject all. */
-	  result = 0;
+	if pfstate.token_type == TOKEN_EOL {
+		/* Empty filter means reject all. */
+		result = 0
 	} else {
-	  result = parse_expr (&pfstate);
+		result = parse_expr(&pfstate)
 
-	  if (pfstate.token_type != TOKEN_AND && 
-		pfstate.token_type != TOKEN_OR && 
-		pfstate.token_type != TOKEN_EOL) {
+		if pfstate.token_type != TOKEN_AND &&
+			pfstate.token_type != TOKEN_OR &&
+			pfstate.token_type != TOKEN_EOL {
 
-	    print_error (&pfstate, "Expected logical operator or end of line here.");
-	    result = -1;
-	  }
+			print_error(&pfstate, "Expected logical operator or end of line here.")
+			result = -1
+		}
 	}
 
-	if (s_debug >= 1) {
-	  text_color_set(DW_COLOR_DEBUG);
-	  if (from_chan == MAX_TOTAL_CHANS) {
-	    dw_printf (" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result));
-	  } else if (to_chan == MAX_TOTAL_CHANS) {
-	    dw_printf (" Packet filter from radio channel %d to IGate returns %s\n", from_chan, bool2text(result));
-	  } else if (is_aprs) {
-	    dw_printf (" Packet filter for APRS digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result));
-	  } else {
-	    dw_printf (" Packet filter for traditional digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result));
-	  }
+	if s_debug >= 1 {
+		text_color_set(DW_COLOR_DEBUG)
+		if from_chan == MAX_TOTAL_CHANS {
+			dw_printf(" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result))
+		} else if to_chan == MAX_TOTAL_CHANS {
+			dw_printf(" Packet filter from radio channel %d to IGate returns %s\n", from_chan, bool2text(result))
+		} else if is_aprs {
+			dw_printf(" Packet filter for APRS digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result))
+		} else {
+			dw_printf(" Packet filter for traditional digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result))
+		}
 	}
 
-	return (result);
+	return (result)
 
 } /* end pfilter */
 
-
-
 /*-------------------------------------------------------------------
  *
- * Name:   	next_token     
+ * Name:   	next_token
  *
  * Purpose:     Extract the next token from input string.
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *
  * Outputs:	See definition of the structure.
  *
  * Description:	Look for these special operators:   & | ! ( ) end-of-line
  *		Anything else is considered a filter specification.
- *		Note that a filter-spec must be followed by space or 
+ *		Note that a filter-spec must be followed by space or
  *		end of line.  This is so the magic characters can appear in one.
  *
  * Future:	Maybe allow words like 'OR' as alternatives to symbols like '|'.
@@ -261,16 +247,16 @@ func pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs
  *		a filter specification?   For example how do we know if the
  *		last character of /#& means HF gateway or AND the next part
  *		of the expression.
- *		
+ *
  *		Approach 1:  Require white space after all filter specifications.
  *			     Currently implemented.
- *			     Simple. Easy to explain. 
+ *			     Simple. Easy to explain.
  *			     More readable than having everything squashed together.
- *		
+ *
  *		Approach 2:  Use escape character to get literal value.  e.g.  s/#\&
- *			     Linux people would be comfortable with this but 
+ *			     Linux people would be comfortable with this but
  *			     others might have a problem with it.
- *		
+ *
  *		Approach 3:  use quotation marks if it contains special characters or space.
  *			     "s/#&"  Simple.  Allows embedded space but I'm not sure
  *		 	     that's useful.  Doesn't hurt to always put the quotes there
@@ -278,49 +264,48 @@ func pfilter (int from_chan, int to_chan, char *filter, packet_t pp, int is_aprs
  *
  *--------------------------------------------------------------------*/
 
-func next_token (pfstate_t *pf) {
-	for (pf.filter_str[pf.nexti] ==  ' ') {
-	  pf.nexti++;
+func next_token(pfstate_t *pf) {
+	for pf.filter_str[pf.nexti] == ' ' {
+		pf.nexti++
 	}
 
-	pf.tokeni = pf.nexti;
+	pf.tokeni = pf.nexti
 
-	if (pf.filter_str[pf.nexti] == 0) {
-	  pf.token_type = TOKEN_EOL;
-	  strlcpy (pf.token_str, "end-of-line", sizeof(pf.token_str));
-	} else if (pf.filter_str[pf.nexti] == '&') {
-	  pf.nexti++;
-	  pf.token_type = TOKEN_AND;
-	  strlcpy (pf.token_str, "\"&\"", sizeof(pf.token_str));
-	} else if (pf.filter_str[pf.nexti] == '|') {
-	  pf.nexti++;
-	  pf.token_type = TOKEN_OR;
-	  strlcpy (pf.token_str, "\"|\"", sizeof(pf.token_str));
-	} else if (pf.filter_str[pf.nexti] == '!') {
-	  pf.nexti++;
-	  pf.token_type = TOKEN_NOT;
-	  strlcpy (pf.token_str, "\"!\"", sizeof(pf.token_str));
-	} else if (pf.filter_str[pf.nexti] == '(') {
-	  pf.nexti++;
-	  pf.token_type = TOKEN_LPAREN;
-	  strlcpy (pf.token_str, "\"(\"", sizeof(pf.token_str));
-	} else if (pf.filter_str[pf.nexti] == ')') {
-	  pf.nexti++;
-	  pf.token_type = TOKEN_RPAREN;
-	  strlcpy (pf.token_str, "\")\"", sizeof(pf.token_str));
+	if pf.filter_str[pf.nexti] == 0 {
+		pf.token_type = TOKEN_EOL
+		strlcpy(pf.token_str, "end-of-line", sizeof(pf.token_str))
+	} else if pf.filter_str[pf.nexti] == '&' {
+		pf.nexti++
+		pf.token_type = TOKEN_AND
+		strlcpy(pf.token_str, "\"&\"", sizeof(pf.token_str))
+	} else if pf.filter_str[pf.nexti] == '|' {
+		pf.nexti++
+		pf.token_type = TOKEN_OR
+		strlcpy(pf.token_str, "\"|\"", sizeof(pf.token_str))
+	} else if pf.filter_str[pf.nexti] == '!' {
+		pf.nexti++
+		pf.token_type = TOKEN_NOT
+		strlcpy(pf.token_str, "\"!\"", sizeof(pf.token_str))
+	} else if pf.filter_str[pf.nexti] == '(' {
+		pf.nexti++
+		pf.token_type = TOKEN_LPAREN
+		strlcpy(pf.token_str, "\"(\"", sizeof(pf.token_str))
+	} else if pf.filter_str[pf.nexti] == ')' {
+		pf.nexti++
+		pf.token_type = TOKEN_RPAREN
+		strlcpy(pf.token_str, "\")\"", sizeof(pf.token_str))
 	} else {
-	  char *p = pf.token_str;
-	  pf.token_type = TOKEN_FILTER_SPEC;
-	  /* FIXME KG
-	  do {
-	    *p++ = pf.filter_str[pf.nexti++];
-	  } while (pf.filter_str[pf.nexti] != ' ' && pf.filter_str[pf.nexti] != 0);
-	  */
-	  *p = 0;
+		char * p = pf.token_str
+		pf.token_type = TOKEN_FILTER_SPEC
+		/* FIXME KG
+		do {
+		  *p++ = pf.filter_str[pf.nexti++];
+		} while (pf.filter_str[pf.nexti] != ' ' && pf.filter_str[pf.nexti] != 0);
+		*/
+		*p = 0
 	}
 
 } /* end next_token */
-
 
 /*-------------------------------------------------------------------
  *
@@ -328,11 +313,11 @@ func next_token (pfstate_t *pf) {
  *		parse_or_expr
  *		parse_and_expr
  *		parse_primary
- *    
+ *
  * Purpose:     Recursive descent parser to evaluate filter specifications
  *		contained within expressions with & | ! ( ).
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *
  * Returns:	 1 = yes
  *		 0 = no
@@ -340,119 +325,118 @@ func next_token (pfstate_t *pf) {
  *
  *--------------------------------------------------------------------*/
 
+func parse_expr(pf *pfstate_t) C.int {
 
-func parse_expr (pf *pfstate_t) C.int {
-
-	return parse_or_expr (pf);
+	return parse_or_expr(pf)
 }
 
 /* or_expr::	and_expr [ | and_expr ] ... */
 
-func parse_or_expr (pf *pfstate_t) C.int {
+func parse_or_expr(pf *pfstate_t) C.int {
 
-	var result = parse_and_expr (pf);
-	if (result < 0) {
-		return (-1);
-	}
-	
-	for (pf.token_type == TOKEN_OR) {
-
-	  next_token (pf);
-	  var e = parse_and_expr (pf);
-
-	  if (s_debug >= 3) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("  %s | %s\n", bool2text(result), bool2text(e));
-	  }
-
-	  if (e < 0) {
-		  return (-1);
-	  }
-	  result |= e;
+	var result = parse_and_expr(pf)
+	if result < 0 {
+		return (-1)
 	}
 
-	return (result);
+	for pf.token_type == TOKEN_OR {
+
+		next_token(pf)
+		var e = parse_and_expr(pf)
+
+		if s_debug >= 3 {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("  %s | %s\n", bool2text(result), bool2text(e))
+		}
+
+		if e < 0 {
+			return (-1)
+		}
+		result |= e
+	}
+
+	return (result)
 }
 
 /* and_expr::	primary [ & primary ] ... */
- 
-func parse_and_expr (pf *pfstate_t) C.int {
 
-	var result = parse_primary (pf);
-	if (result < 0) {
-		return (-1);
+func parse_and_expr(pf *pfstate_t) C.int {
+
+	var result = parse_primary(pf)
+	if result < 0 {
+		return (-1)
 	}
 
-	for (pf.token_type == TOKEN_AND) {
+	for pf.token_type == TOKEN_AND {
 
-	  next_token (pf);
-	  var e = parse_primary (pf);
+		next_token(pf)
+		var e = parse_primary(pf)
 
-	  if (s_debug >= 3) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("  %s & %s\n", bool2text(result), bool2text(e));
-	  }
+		if s_debug >= 3 {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("  %s & %s\n", bool2text(result), bool2text(e))
+		}
 
-	  if (e < 0) {
-		  return (-1);
-	  }
-	  result &= e;
+		if e < 0 {
+			return (-1)
+		}
+		result &= e
 	}
 
-	return (result);
+	return (result)
 }
 
 /* primary::	( expr )	*/
 /* 		! primary	*/
 /*		filter_spec	*/
 
-func parse_primary (pf *pfstate_t) C.int {
+func parse_primary(pf *pfstate_t) C.int {
 
 	var result C.int
 
-	if (pf.token_type == TOKEN_LPAREN) {
+	if pf.token_type == TOKEN_LPAREN {
 
-	  next_token (pf);
-	  result = parse_expr (pf);
-	  	  
-	  if (pf.token_type == TOKEN_RPAREN) {
-	    next_token (pf);
-	  } else {
-	    print_error (pf, "Expected \")\" here.\n");
-	    result = -1;
-	  }
-	} else if (pf.token_type == TOKEN_NOT) {
+		next_token(pf)
+		result = parse_expr(pf)
 
-	  next_token (pf);
-	  var e = parse_primary (pf);
+		if pf.token_type == TOKEN_RPAREN {
+			next_token(pf)
+		} else {
+			print_error(pf, "Expected \")\" here.\n")
+			result = -1
+		}
+	} else if pf.token_type == TOKEN_NOT {
 
-	  if (s_debug >= 3) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("  ! %s\n", bool2text(e));
-	  }
+		next_token(pf)
+		var e = parse_primary(pf)
 
-	  if (e < 0) {
-		  result = -1;
-	  } else {
-		  result = ! e;
-	  }
-	} else if (pf.token_type == TOKEN_FILTER_SPEC) {
-	  result = parse_filter_spec (pf);
+		if s_debug >= 3 {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("  ! %s\n", bool2text(e))
+		}
+
+		if e < 0 {
+			result = -1
+		} else {
+			result = !e
+		}
+	} else if pf.token_type == TOKEN_FILTER_SPEC {
+		result = parse_filter_spec(pf)
 	} else {
-	  print_error (pf, "Expected filter specification, (, or ! here.");
-	  result = -1;
+		print_error(pf, "Expected filter specification, (, or ! here.")
+		result = -1
 	}
 
-	return (result);
+	return (result)
 }
 
 /*-------------------------------------------------------------------
  *
  * Name:   	parse_filter_spec
- *    
+ *
  * Purpose:     Parse and evaluate filter specification.
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *
  * Returns:	 1 = yes
  *		 0 = no
@@ -468,215 +452,212 @@ func parse_primary (pf *pfstate_t) C.int {
  *
  *--------------------------------------------------------------------*/
 
-func parse_filter_spec (pf *pfstate_t) C.int {
+func parse_filter_spec(pf *pfstate_t) C.int {
 
-	var result C.int = -1;
+	var result C.int = -1
 
-
-	if ( ( ! pf.is_aprs) && strchr ("01bdvu", pf.token_str[0]) == nil) {
-	  print_error (pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.");
-	  result = -1;
-	  next_token (pf);
-	  return (result);
+	if (!pf.is_aprs) && strchr("01bdvu", pf.token_str[0]) == nil {
+		print_error(pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.")
+		result = -1
+		next_token(pf)
+		return (result)
 	}
 
+	/* undocumented: can use 0 or 1 for testing. */
 
-/* undocumented: can use 0 or 1 for testing. */
+	if strcmp(pf.token_str, "0") == 0 {
+		result = 0
+	} else if strcmp(pf.token_str, "1") == 0 {
+		result = 1
+	} else if pf.token_str[0] == 'b' && ispunct(pf.token_str[1]) {
 
-	if (strcmp(pf.token_str, "0") == 0) {
-	  result = 0;
-	} else if (strcmp(pf.token_str, "1") == 0) {
-	  result = 1;
-	} else if (pf.token_str[0] == 'b' && ispunct(pf.token_str[1])) {
+		/* simple string matching */
 
-/* simple string matching */
+		/* b - budlist */
+		/* Budlist - AX.25 source address */
+		/* Could be different than source encapsulated by 3rd party header. */
+		var addr [AX25_MAX_ADDR_LEN]C.char
+		C.ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &addr[0])
+		result = filt_bodgu(pf, addr)
 
-/* b - budlist */
-	  /* Budlist - AX.25 source address */
-	  /* Could be different than source encapsulated by 3rd party header. */
-	  var addr[AX25_MAX_ADDR_LEN]C.char
-	  C.ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, &addr[0]);
-	  result = filt_bodgu (pf, addr);
+		if s_debug >= 2 {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
+		}
+	} else if pf.token_str[0] == 'o' && ispunct(pf.token_str[1]) {
+		/* o - object or item name */
+		result = filt_bodgu(pf, pf.decoded.g_name)
 
-	  if (s_debug >= 2) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr);
-	  }
-	} else if (pf.token_str[0] == 'o' && ispunct(pf.token_str[1])) {
-/* o - object or item name */
-	  result = filt_bodgu (pf, pf.decoded.g_name);
+		if s_debug >= 2 {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name)
+		}
+	} else if pf.token_str[0] == 'd' && ispunct(pf.token_str[1]) {
+		/* d - was digipeated by */
+		// Loop on all AX.25 digipeaters.
+		result = 0
+		for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
+			// Consider only those with the H (has-been-used) bit set.
+			if ax25_get_h(pf.pp, n) {
+				var addr [AX25_MAX_ADDR_LEN]C.char
+				C.ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
+				result = filt_bodgu(pf, addr)
+			}
+		}
 
-	  if (s_debug >= 2) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name);
-	  }
-	} else if (pf.token_str[0] == 'd' && ispunct(pf.token_str[1])) {
-/* d - was digipeated by */
-	  // Loop on all AX.25 digipeaters.
-	  result = 0;
-	  for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++ {
-	    // Consider only those with the H (has-been-used) bit set.
-	    if (ax25_get_h (pf.pp, n)) {
-	      var addr[AX25_MAX_ADDR_LEN]C.char
-	      C.ax25_get_addr_with_ssid (pf.pp, n, &addr[0]);
-	      result = filt_bodgu (pf, addr);
-	    }
-	  }
+		if s_debug >= 2 {
+			var path [100]C.char
 
-	  if (s_debug >= 2) {
-	    var path[100]C.char
+			C.ax25_format_via_path(pf.pp, &path[0], sizeof(path))
+			if strlen(path) == 0 {
+				strcpy(path, "no digipeater path")
+			}
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
+		}
+	} else if pf.token_str[0] == 'v' && ispunct(pf.token_str[1]) {
+		/* v - via not used */
+		// loop on all AX.25 digipeaters (mnemonic Via)
+		result = 0
+		for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
+			// This is different than the previous "d" filter.
+			// Consider only those where the the H (has-been-used) bit is NOT set.
+			if !ax25_get_h(pf.pp, n) {
+				var addr [AX25_MAX_ADDR_LEN]C.char
+				C.ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
+				result = filt_bodgu(pf, addr)
+			}
+		}
 
-	    C.ax25_format_via_path (pf.pp, &path[0], sizeof(path));
-	    if (strlen(path) == 0) {
-	      strcpy (path, "no digipeater path");
-	    }
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), path);
-	  }
-	} else if (pf.token_str[0] == 'v' && ispunct(pf.token_str[1])) {
-/* v - via not used */
-	  // loop on all AX.25 digipeaters (mnemonic Via)
-	  result = 0;
-	  for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr (pf.pp); n++ {
-	    // This is different than the previous "d" filter.
-	    // Consider only those where the the H (has-been-used) bit is NOT set.
-	    if ( ! ax25_get_h (pf.pp, n)) {
-	      var addr[AX25_MAX_ADDR_LEN]C.char
-	      C.ax25_get_addr_with_ssid (pf.pp, n, &addr[0]);
-	      result = filt_bodgu (pf, addr);
-	    }
-	  }
+		if s_debug >= 2 {
+			var path [100]C.char
 
-	  if (s_debug >= 2) {
-	    var path[100]C.char
+			C.ax25_format_via_path(pf.pp, &path[0], sizeof(path))
+			if strlen(path) == 0 {
+				strcpy(path, "no digipeater path")
+			}
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
+		}
+	} else if pf.token_str[0] == 'g' && ispunct(pf.token_str[1]) {
+		/* g - Addressee of message. e.g. "BLN*" for bulletins. */
+		if pf.decoded.g_message_subtype == message_subtype_message ||
+			pf.decoded.g_message_subtype == message_subtype_ack ||
+			pf.decoded.g_message_subtype == message_subtype_rej ||
+			pf.decoded.g_message_subtype == message_subtype_bulletin ||
+			pf.decoded.g_message_subtype == message_subtype_nws ||
+			pf.decoded.g_message_subtype == message_subtype_directed_query {
+			result = filt_bodgu(pf, pf.decoded.g_addressee)
 
-	    C.ax25_format_via_path (pf.pp, &path[0], sizeof(path));
-	    if (strlen(path) == 0) {
-	      strcpy (path, "no digipeater path");
-	    }
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), path);
-	  }
-	} else if (pf.token_str[0] == 'g' && ispunct(pf.token_str[1])) {
-/* g - Addressee of message. e.g. "BLN*" for bulletins. */
-	  if (pf.decoded.g_message_subtype == message_subtype_message ||
-	      pf.decoded.g_message_subtype == message_subtype_ack ||
-	      pf.decoded.g_message_subtype == message_subtype_rej ||
-	      pf.decoded.g_message_subtype == message_subtype_bulletin ||
-	      pf.decoded.g_message_subtype == message_subtype_nws ||
-	      pf.decoded.g_message_subtype == message_subtype_directed_query) {
-	    result = filt_bodgu (pf, pf.decoded.g_addressee);
+			if s_debug >= 2 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
+			}
+		} else {
+			result = 0
+			if s_debug >= 2 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message")
+			}
+		}
+	} else if pf.token_str[0] == 'u' && ispunct(pf.token_str[1]) {
+		/* u - unproto (AX.25 destination) */
+		/* Probably want to exclude mic-e types */
+		/* because destination is used for part of location. */
 
-	    if (s_debug >= 2) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee);
-	    }
-	  } else {
-	    result = 0;
-	    if (s_debug >= 2) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message");
-	    }
-	  }
-	} else if (pf.token_str[0] == 'u' && ispunct(pf.token_str[1])) {
-/* u - unproto (AX.25 destination) */
-	  /* Probably want to exclude mic-e types */
-	  /* because destination is used for part of location. */
+		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
+			var addr [AX25_MAX_ADDR_LEN]C.char
+			C.ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION, &addr[0])
+			result = filt_bodgu(pf, addr)
 
-	  if (ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`') {
-	    var addr[AX25_MAX_ADDR_LEN]C.char
-	    C.ax25_get_addr_with_ssid (pf.pp, AX25_DESTINATION, &addr[0]);
-	    result = filt_bodgu (pf, addr);
+			if s_debug >= 2 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
+			}
+		} else {
+			result = 0
+			if s_debug >= 2 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type")
+			}
+		}
+	} else if pf.token_str[0] == 't' && ispunct(pf.token_str[1]) {
+		/* t - packet type: position, weather, telemetry, etc. */
 
-	    if (s_debug >= 2) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr);
-	    }
-	  } else {
-	    result = 0;
-	    if (s_debug >= 2) {
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type");
-	    }
-	  }
-	} else if (pf.token_str[0] == 't' && ispunct(pf.token_str[1])) {
-/* t - packet type: position, weather, telemetry, etc. */
-	  
-	  result = filt_t (pf);
+		result = filt_t(pf)
 
-	  if (s_debug >= 2) {
-	    var infop *C.uchar
-	    C.ax25_get_info (pf.pp, &infop);
+		if s_debug >= 2 {
+			var infop *C.uchar
+			C.ax25_get_info(pf.pp, &infop)
 
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), *infop);
-	  }
-	} else if (pf.token_str[0] == 'r' && ispunct(pf.token_str[1])) {
-/* r - range */
-	  /* range */
-	  var sdist[30]C.char
-	  strcpy (sdist, "unknown distance");
-	  result = filt_r (pf, sdist);
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), *infop)
+		}
+	} else if pf.token_str[0] == 'r' && ispunct(pf.token_str[1]) {
+		/* r - range */
+		/* range */
+		var sdist [30]C.char
+		strcpy(sdist, "unknown distance")
+		result = filt_r(pf, sdist)
 
-	  if (s_debug >= 2) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist);
-	  }
-	} else if (pf.token_str[0] == 's' && ispunct(pf.token_str[1])) {
-/* s - symbol */
-	  result = filt_s (pf);
+		if s_debug >= 2 {
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist)
+		}
+	} else if pf.token_str[0] == 's' && ispunct(pf.token_str[1]) {
+		/* s - symbol */
+		result = filt_s(pf)
 
-	  if (s_debug >= 2) {
-	    text_color_set(DW_COLOR_DEBUG);
-	    if (pf.decoded.g_symbol_table == '/') {
-	      dw_printf ("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code);
-	    } else if (pf.decoded.g_symbol_table == '\\') {
-	      dw_printf ("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code);
-	    } else {
-	      dw_printf ("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code, pf.decoded.g_symbol_table);
-	    }
-	  }
-	} else if (pf.token_str[0] == 'i' && ispunct(pf.token_str[1])) {
-/* i - IGate messaging default */
-	  /* IGatge messaging */
-	  result = filt_i (pf);
+		if s_debug >= 2 {
+			text_color_set(DW_COLOR_DEBUG)
+			if pf.decoded.g_symbol_table == '/' {
+				dw_printf("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code)
+			} else if pf.decoded.g_symbol_table == '\\' {
+				dw_printf("   %s returns %s for symbol %c in alternate table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code)
+			} else {
+				dw_printf("   %s returns %s for symbol %c with overlay %c\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code, pf.decoded.g_symbol_table)
+			}
+		}
+	} else if pf.token_str[0] == 'i' && ispunct(pf.token_str[1]) {
+		/* i - IGate messaging default */
+		/* IGatge messaging */
+		result = filt_i(pf)
 
-	  if (s_debug >= 2) {
-		  var infop *C.uchar
-	     C.ax25_get_info (pf.pp, &infop);
+		if s_debug >= 2 {
+			var infop *C.uchar
+			C.ax25_get_info(pf.pp, &infop)
 
-	    text_color_set(DW_COLOR_DEBUG);
-	    if (pf.decoded.g_packet_type == packet_type_message) {
-	      dw_printf ("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee);
-	    } else {
-	      dw_printf ("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result));
-	    }
-	  }
-	} else  {
-/* unrecognized filter type */
-	  print_error(pf, fmt.Sprintf("Unrecognized filter type '%c'", pf.token_str[0]))
-	  result = -1;
+			text_color_set(DW_COLOR_DEBUG)
+			if pf.decoded.g_packet_type == packet_type_message {
+				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
+			} else {
+				dw_printf("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result))
+			}
+		}
+	} else {
+		/* unrecognized filter type */
+		print_error(pf, fmt.Sprintf("Unrecognized filter type '%c'", pf.token_str[0]))
+		result = -1
 	}
 
-	next_token (pf);
+	next_token(pf)
 
-	return (result);
+	return (result)
 }
-
 
 /*------------------------------------------------------------------------------
  *
  * Name:	filt_bodgu
- * 
+ *
  * Purpose:	Filter with text pattern matching
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *			  token_str should have one of these filter specs:
  *
- * 				Budlist		b/call1/call2...  
- * 				Object		o/obj1/obj2...  
- * 				Digipeater	d/digi1/digi2...  
- * 				Group Msg	g/call1/call2...  
+ * 				Budlist		b/call1/call2...
+ * 				Object		o/obj1/obj2...
+ * 				Digipeater	d/digi1/digi2...
+ * 				Group Msg	g/call1/call2...
  * 				Unproto		u/unproto1/unproto2...
  *				Via-not-yet	v/digi1/digi2...noteapd
  *
@@ -693,7 +674,7 @@ func parse_filter_spec (pf *pfstate_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
+func filt_bodgu(pf *pfstate_t, arg *C.char) C.int {
 	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
@@ -702,10 +683,10 @@ func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
 	int result = 0;
 	*/
 
-	strlcpy (str, pf.token_str, sizeof(str));
-	sep[0] = str[1];
-	sep[1] = 0;
-	cp = str + 2;
+	strlcpy(str, pf.token_str, sizeof(str))
+	sep[0] = str[1]
+	sep[1] = 0
+	cp = str + 2
 
 	for {
 		var v = strsep(&cp, sep)
@@ -713,37 +694,35 @@ func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
 			break
 		}
 		var w = strchr(v, '*')
-	  if (w != nil) {
-	    /* Wildcarding.  Should have single * on end. */
+		if w != nil {
+			/* Wildcarding.  Should have single * on end. */
 
-	    var mlen = w - v;
-	    if (mlen != (strlen(v) - 1)) {
-	      print_error (pf, "Any wildcard * must be at the end of pattern.\n");
-	      return (-1);
-	    }
-	    if (strncmp(v,arg,mlen) == 0) {
-			result = 1;
+			var mlen = w - v
+			if mlen != (strlen(v) - 1) {
+				print_error(pf, "Any wildcard * must be at the end of pattern.\n")
+				return (-1)
+			}
+			if strncmp(v, arg, mlen) == 0 {
+				result = 1
+			}
+		} else {
+			/* Try for exact match. */
+			if strcmp(v, arg) == 0 {
+				result = 1
+			}
 		}
-	  } else {
-	    /* Try for exact match. */
-	    if (strcmp(v,arg) == 0) {
-			result = 1;
-		}
-	  }
 	}
 
-	return (result);
+	return (result)
 }
-
-
 
 /*------------------------------------------------------------------------------
  *
  * Name:	filt_t
- * 
+ *
  * Purpose:	Filter by packet type.
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *
  * Returns:	 1 = yes
  *		 0 = no
@@ -757,128 +736,125 @@ func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
  * References:
  *		http://www.aprs-is.net/WX/
  *		http://wxsvr.aprs.net.au/protocol-new.html	(has disappeared)
- *		
+ *
  *------------------------------------------------------------------------------*/
 
-func filt_t (pfstate_t *pf) C.int {
+func filt_t(pfstate_t *pf) C.int {
 	/* FIXME KG
 	char src[AX25_MAX_ADDR_LEN];
 	char *infop = nil;
 	char *f;
 	*/
 
-	ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, src);
-	 ax25_get_info (pf.pp, (&infop));
+	ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, src)
+	ax25_get_info(pf.pp, (&infop))
 
-	assert (infop != nil);
+	assert(infop != nil)
 
 	for f := pf.token_str + 2; *f != 0; f++ {
-	  switch (*f) {
-	
-	    case 'p':				/* Position */
-	      if (pf.decoded.g_packet_type == packet_type_position) {
-			  return(1);
-		  }
-	      break;
+		switch *f {
 
-	    case 'o':				/* Object */
-	      if (pf.decoded.g_packet_type == packet_type_object) {
-			  return(1);
-		  }
-	      break;
+		case 'p': /* Position */
+			if pf.decoded.g_packet_type == packet_type_position {
+				return (1)
+			}
+			break
 
-	    case 'i':				/* Item */
-	      if (pf.decoded.g_packet_type == packet_type_item) {
-			  return(1);
-		  }
-	      break;
+		case 'o': /* Object */
+			if pf.decoded.g_packet_type == packet_type_object {
+				return (1)
+			}
+			break
 
-	    case 'm':				// Any "message."
-	      if (pf.decoded.g_packet_type == packet_type_message) {
-			  return(1);
-		  }
-	      break;
+		case 'i': /* Item */
+			if pf.decoded.g_packet_type == packet_type_item {
+				return (1)
+			}
+			break
 
-	    case 'q':				/* Query */
-	      if (pf.decoded.g_packet_type == packet_type_query) {
-			  return(1);
-		  }
-	      break;
+		case 'm': // Any "message."
+			if pf.decoded.g_packet_type == packet_type_message {
+				return (1)
+			}
+			break
 
-	    case 'c':				/* station Capabilities - my extension */
-						/* Most often used for IGate statistics. */
-	      if (pf.decoded.g_packet_type == packet_type_capabilities) {
-			  return(1);
-		  }
-	      break;
+		case 'q': /* Query */
+			if pf.decoded.g_packet_type == packet_type_query {
+				return (1)
+			}
+			break
 
-	    case 's':				/* Status */
-	      if (pf.decoded.g_packet_type == packet_type_status) {
-			  return(1);
-		  }
-	      break;
+		case 'c': /* station Capabilities - my extension */
+			/* Most often used for IGate statistics. */
+			if pf.decoded.g_packet_type == packet_type_capabilities {
+				return (1)
+			}
+			break
 
-	    case 't':				/* Telemetry data or metadata */
-	      if (pf.decoded.g_packet_type == packet_type_telemetry) {
-			  return(1);
-		  }
-	      break;
+		case 's': /* Status */
+			if pf.decoded.g_packet_type == packet_type_status {
+				return (1)
+			}
+			break
 
-	    case 'u':				/* User-defined */
-	      if (pf.decoded.g_packet_type == packet_type_userdefined) {
-			  return(1);
-	  }
-	      break;
+		case 't': /* Telemetry data or metadata */
+			if pf.decoded.g_packet_type == packet_type_telemetry {
+				return (1)
+			}
+			break
 
-	    case 'h':				/* has third party Header - my extension */
-	      if (pf.decoded.g_has_thirdparty_header) {
-			  return (1);
-		  }
-	      break;
+		case 'u': /* User-defined */
+			if pf.decoded.g_packet_type == packet_type_userdefined {
+				return (1)
+			}
+			break
 
-	    case 'w':				/* Weather */
+		case 'h': /* has third party Header - my extension */
+			if pf.decoded.g_has_thirdparty_header {
+				return (1)
+			}
+			break
 
-	      if (pf.decoded.g_packet_type == packet_type_weather) {
-			  return(1);
-		  }
+		case 'w': /* Weather */
 
-	      /* Positions !=/@  with symbol code _ are weather. */
-	      /* Object with _ symbol is also weather.  APRS protocol spec page 66. */
-	      // Can't use *infop because it would not work with 3rd party header.
+			if pf.decoded.g_packet_type == packet_type_weather {
+				return (1)
+			}
 
-	      if ((pf.decoded.g_packet_type == packet_type_position ||
-	           pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_') {
-				   return (1);
-			   }
-	      break;
+			/* Positions !=/@  with symbol code _ are weather. */
+			/* Object with _ symbol is also weather.  APRS protocol spec page 66. */
+			// Can't use *infop because it would not work with 3rd party header.
 
-	    case 'n':				/* NWS format */
-	      if (pf.decoded.g_packet_type == packet_type_nws) {
-			  return(1);
-		  }
-	      break;
+			if (pf.decoded.g_packet_type == packet_type_position ||
+				pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_' {
+				return (1)
+			}
+			break
 
-	    default:
+		case 'n': /* NWS format */
+			if pf.decoded.g_packet_type == packet_type_nws {
+				return (1)
+			}
+			break
 
-	      print_error (pf, "Invalid letter in t/ filter.\n");
-	      return (-1);
-	      break;
-	  }
+		default:
+
+			print_error(pf, "Invalid letter in t/ filter.\n")
+			return (-1)
+			break
+		}
 	}
-	return (0);			/* Didn't match anything.  Reject */
+	return (0) /* Didn't match anything.  Reject */
 
 } /* end filt_t */
-
-
-
 
 /*------------------------------------------------------------------------------
  *
  * Name:	filt_r
- * 
+ *
  * Purpose:	Is it in range (kilometers) of given location.
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *			  token_str should contain something of format:
  *
  *				r/lat/lon/dist
@@ -893,11 +869,11 @@ func filt_t (pfstate_t *pf) C.int {
  *		 0 = no
  *		-1 = error detected
  *
- * Description:	
+ * Description:
  *
  *------------------------------------------------------------------------------*/
 
-func filt_r (pf *pfstate_t, sdist *C.char) C.int {
+func filt_r(pf *pfstate_t, sdist *C.char) C.int {
 	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
@@ -905,57 +881,54 @@ func filt_r (pf *pfstate_t, sdist *C.char) C.int {
 	double dlat, dlon, ddist, km;
 	*/
 
+	strlcpy(str, pf.token_str, sizeof(str))
+	sep[0] = str[1]
+	sep[1] = 0
+	cp = str + 2
 
-	strlcpy (str, pf.token_str, sizeof(str));
-	sep[0] = str[1];
-	sep[1] = 0;
-	cp = str + 2;
-
-	if (pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN) {
-	  return (0);
+	if pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN {
+		return (0)
 	}
 
-	var v = strsep (&cp, sep);
-	if (v == nil) {
-	  print_error (pf, "Missing latitude for Range filter.");
-	  return (-1);
+	var v = strsep(&cp, sep)
+	if v == nil {
+		print_error(pf, "Missing latitude for Range filter.")
+		return (-1)
 	}
-	var dlat = atof(v);
+	var dlat = atof(v)
 
-	v = strsep (&cp, sep);
-	if (v == nil) {
-	  print_error (pf, "Missing longitude for Range filter.");
-	  return (-1);
+	v = strsep(&cp, sep)
+	if v == nil {
+		print_error(pf, "Missing longitude for Range filter.")
+		return (-1)
 	}
-	var dlon = atof(v);
+	var dlon = atof(v)
 
-	v = strsep (&cp, sep);
-	if (v == nil) {
-	  print_error (pf, "Missing distance for Range filter.");
-	  return (-1);
+	v = strsep(&cp, sep)
+	if v == nil {
+		print_error(pf, "Missing distance for Range filter.")
+		return (-1)
 	}
-	var ddist = atof(v);
+	var ddist = atof(v)
 
-	var km = ll_distance_km (dlat, dlon, pf.decoded.g_lat, pf.decoded.g_lon);
+	var km = ll_distance_km(dlat, dlon, pf.decoded.g_lat, pf.decoded.g_lon)
 
-	sprintf (sdist, "%.2f km", km);
+	sprintf(sdist, "%.2f km", km)
 
-	if (km <= ddist) {
-	  return (1);
+	if km <= ddist {
+		return (1)
 	}
 
-	return (0);
+	return (0)
 }
-
-
 
 /*------------------------------------------------------------------------------
  *
  * Name:	filt_s
- * 
+ *
  * Purpose:	Filter by symbol.
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *			  token_str should contain something of format:
  *
  *				s/pri/alt/over
@@ -964,8 +937,8 @@ func filt_r (pf *pfstate_t, sdist *C.char) C.int {
  *		 0 = no
  *		-1 = error detected
  *
- * Description:	
- *		  
+ * Description:
+ *
  *		s/pri
  *		s/pri/alt
  *		s/pri/alt/
@@ -980,7 +953,7 @@ func filt_r (pf *pfstate_t, sdist *C.char) C.int {
  *			If the last part is not specified, any overlay or lack of overlay, is ignored.
  *			If the last part is specified, only the listed overlays will match.
  *			An explicit lack of overlay is represented by the \ character.
- *		
+ *
  *		Examples:
  *			s/O		Balloon.
  *			s/->		House or car from primary symbol table.
@@ -1011,10 +984,10 @@ func filt_r (pf *pfstate_t, sdist *C.char) C.int {
  *			probably following the buddy filter pattern of / between each alternative.
  *			There should be an error message because it has more than 3 delimiter characters.
  *
- * 
+ *
  *------------------------------------------------------------------------------*/
 
-func filt_s (pf *pfstate_t) C.int {
+func filt_s(pf *pfstate_t) C.int {
 	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
@@ -1023,135 +996,130 @@ func filt_s (pf *pfstate_t) C.int {
 	char *x;
 	*/
 
+	strlcpy(str, pf.token_str, sizeof(str))
+	sep[0] = str[1]
+	sep[1] = 0
+	cp = str + 2
 
-	strlcpy (str, pf.token_str, sizeof(str));
-	sep[0] = str[1];
-	sep[1] = 0;
-	cp = str + 2;
+	// First, separate the parts and do a strict syntax check.
 
+	pri = strsep(&cp, sep)
 
-// First, separate the parts and do a strict syntax check.
+	if pri != nil {
 
-	pri = strsep (&cp, sep);
+		// Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
 
-	if (pri != nil) {
+		for x := pri; *x != 0; x++ {
+			if !isprint(*x) || *x == '|' || *x == '~' {
+				print_error(pf, "Symbol filter, primary must be printable ASCII character(s) other than | or ~.")
+				return (-1)
+			}
+		}
 
-	  // Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
+		alt = strsep(&cp, sep)
 
-	  for x := pri; *x != 0; x++ {
-	    if ( ! isprint(*x) || *x == '|' || *x == '~') {
-	      print_error (pf, "Symbol filter, primary must be printable ASCII character(s) other than | or ~.");
-	      return (-1);
-	    }
-	  }
+		if alt != nil {
 
-	  alt = strsep (&cp, sep);
+			// Zero length after second / would be pointless.
 
-	  if (alt != nil) {
+			if strlen(alt) == 0 {
+				print_error(pf, "Nothing specified for alternate symbol table.")
+				return (-1)
+			}
 
-	    // Zero length after second / would be pointless.
+			for x := alt; *x != 0; x++ {
+				if !isprint(*x) || *x == '|' || *x == '~' {
+					print_error(pf, "Symbol filter, alternate must be printable ASCII character(s) other than | or ~.")
+					return (-1)
+				}
+			}
 
-	    if (strlen(alt) == 0) {
-	      print_error (pf, "Nothing specified for alternate symbol table.");
-	      return (-1);
-	    }
+			over = strsep(&cp, sep)
 
-		for x := alt; *x != 0; x++ {
-	      if ( ! isprint(*x) || *x == '|' || *x == '~') {
-	        print_error (pf, "Symbol filter, alternate must be printable ASCII character(s) other than | or ~.");
-	        return (-1);
-	      }
-	    }
+			if over != nil {
 
-	    over = strsep (&cp, sep);
+				// Zero length is acceptable and is not the same as missing.
 
-	    if (over != nil) {
+				for x = over; *x != 0; x++ {
+					if (!isupper(*x)) && (!isdigit(*x)) && *x != '\\' {
+						print_error(pf, "Symbol filter, overlay must be upper case letter, digit, or \\.")
+						return (-1)
+					}
+				}
 
-	      // Zero length is acceptable and is not the same as missing.
+				extra = strsep(&cp, sep)
 
-	      for x = over; *x != 0; x++ {
-	        if ( (! isupper(*x)) && (! isdigit(*x)) && *x != '\\') {
-	          print_error (pf, "Symbol filter, overlay must be upper case letter, digit, or \\.");
-	          return (-1);
-	        }
-	      }
-
-	      extra = strsep (&cp, sep);
-
-	      if (extra != nil) {
-	        print_error (pf, "More than 3 delimiter characters in Symbol filter.");
-	        return (-1);
-	      }
-	    }
-	  } else {
-	    // No alt part is OK if at least one primary symbol was specified.
-	    if (strlen(pri) == 0) {
-	      print_error (pf, "No symbols specified for Symbol filter.");
-	      return (-1);
-	    }
-	  }
+				if extra != nil {
+					print_error(pf, "More than 3 delimiter characters in Symbol filter.")
+					return (-1)
+				}
+			}
+		} else {
+			// No alt part is OK if at least one primary symbol was specified.
+			if strlen(pri) == 0 {
+				print_error(pf, "No symbols specified for Symbol filter.")
+				return (-1)
+			}
+		}
 	} else {
-	  print_error (pf, "Missing arguments for Symbol filter.");
-	  return (-1);
+		print_error(pf, "Missing arguments for Symbol filter.")
+		return (-1)
 	}
 
+	// This applies only for Position, Object, Item.
+	// decode_aprs() should set symbol code to space to mean undefined.
 
-// This applies only for Position, Object, Item.
-// decode_aprs() should set symbol code to space to mean undefined.
-
-	if (pf.decoded.g_symbol_code == ' ') {
-	  return (0);
+	if pf.decoded.g_symbol_code == ' ' {
+		return (0)
 	}
 
+	// Look for Primary symbols.
 
-// Look for Primary symbols.
-
-	if (pf.decoded.g_symbol_table == '/') {
-	  if (pri != nil && strlen(pri) > 0) {
-	    return (strchr(pri, pf.decoded.g_symbol_code) != nil);
-	  }
+	if pf.decoded.g_symbol_table == '/' {
+		if pri != nil && strlen(pri) > 0 {
+			return (strchr(pri, pf.decoded.g_symbol_code) != nil)
+		}
 	}
 
-	if (alt == nil) {
-	  return (0);
+	if alt == nil {
+		return (0)
 	}
 
 	//printf ("alt=\"%s\"  sym='%c'\n", alt, pf.decoded.g_symbol_code);
 
-// Look for Alternate symbols.
+	// Look for Alternate symbols.
 
-	if (strchr(alt, pf.decoded.g_symbol_code) != nil) {
+	if strchr(alt, pf.decoded.g_symbol_code) != nil {
 
-	  // We have a match but that might not be enough.
-	  // We must see if there was an overlay part specified.
+		// We have a match but that might not be enough.
+		// We must see if there was an overlay part specified.
 
-	  if (over != nil) {
+		if over != nil {
 
-	    if (strlen(over) > 0) {
+			if strlen(over) > 0 {
 
-	      // Non-zero length overlay part was specified.
-	      // Need to match one of them.
+				// Non-zero length overlay part was specified.
+				// Need to match one of them.
 
-	      return (strchr(over, pf.decoded.g_symbol_table) != nil);
-	    } else {
+				return (strchr(over, pf.decoded.g_symbol_table) != nil)
+			} else {
 
-	      // Zero length overlay part was specified.
-	      // We must have no overlay, i.e.  table is \.
+				// Zero length overlay part was specified.
+				// We must have no overlay, i.e.  table is \.
 
-	      return (pf.decoded.g_symbol_table == '\\');
-	    }
-	  } else {
+				return (pf.decoded.g_symbol_table == '\\')
+			}
+		} else {
 
-	    // No check of overlay part.  Just make sure it is not primary table.
+			// No check of overlay part.  Just make sure it is not primary table.
 
-	    return (pf.decoded.g_symbol_table != '/');
-	  }
+			return (pf.decoded.g_symbol_table != '/')
+		}
 	}
 
-	return (0);
+	return (0)
 
 } /* end filt_s */
-
 
 /*------------------------------------------------------------------------------
  *
@@ -1185,7 +1153,7 @@ func filt_s (pf *pfstate_t) C.int {
  *			from the IGTXVIA configuration will be used.
 
  *		The rest is distanced, in kilometers, from given point.
- *		
+ *
  *		Examples:
  *			i/180/0		Heard in past 3 hours directly.
  *			i/45		Past 45 minutes, default max digi hops.
@@ -1244,7 +1212,7 @@ func filt_s (pf *pfstate_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_i (pf *pfstate_t) C.int {
+func filt_i(pf *pfstate_t) C.int {
 	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
@@ -1252,19 +1220,18 @@ func filt_i (pf *pfstate_t) C.int {
 	char *v;
 	*/
 
-// http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2020-July/048656.html
-// Default of 3 hours should be good.
-// One might question why to have a time limit at all.  Messages are very rare
-// the the APRS-IS wouldn't be sending it to me unless the addressee was in the
-// vicinity recently.
-// TODO: Should produce a warning if a user specified filter does not include "i".
+	// http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2020-July/048656.html
+	// Default of 3 hours should be good.
+	// One might question why to have a time limit at all.  Messages are very rare
+	// the the APRS-IS wouldn't be sending it to me unless the addressee was in the
+	// vicinity recently.
+	// TODO: Should produce a warning if a user specified filter does not include "i".
 
-	var heardtime = 180;	// 3 hours * 60 min/hr = 180 minutes
-	var maxhops = save_igate_config_p.max_digi_hops;	// from IGTXVIA config.
-	var dlat = G_UNKNOWN;
-	var dlon = G_UNKNOWN;
-	var km = G_UNKNOWN;
-
+	var heardtime = 180                             // 3 hours * 60 min/hr = 180 minutes
+	var maxhops = save_igate_config_p.max_digi_hops // from IGTXVIA config.
+	var dlat = G_UNKNOWN
+	var dlon = G_UNKNOWN
+	var km = G_UNKNOWN
 
 	//char src[AX25_MAX_ADDR_LEN];
 	//char *infop = nil;
@@ -1272,164 +1239,162 @@ func filt_i (pf *pfstate_t) C.int {
 	//char *f;
 	//char addressee[AX25_MAX_ADDR_LEN];
 
+	strlcpy(str, pf.token_str, sizeof(str))
+	sep[0] = str[1]
+	sep[1] = 0
+	cp = str + 2
 
-	strlcpy (str, pf.token_str, sizeof(str));
-	sep[0] = str[1];
-	sep[1] = 0;
-	cp = str + 2;
+	// Get parameters or defaults.
 
-// Get parameters or defaults.
+	v = strsep(&cp, sep)
 
-	v = strsep (&cp, sep);
-
-	if (v != nil && strlen(v) > 0) {
-	  heardtime = atoi(v);
+	if v != nil && strlen(v) > 0 {
+		heardtime = atoi(v)
 	} else {
-	  print_error (pf, "Missing time limit for IGate message filter.");
-	  return (-1);
+		print_error(pf, "Missing time limit for IGate message filter.")
+		return (-1)
 	}
 
-	v = strsep (&cp, sep);
+	v = strsep(&cp, sep)
 
-	if (v != nil) {
-	  if (strlen(v) > 0) {
-	    maxhops = atoi(v);
-	  } else {
-	    print_error (pf, "Missing max digipeater hops for IGate message filter.");
-	    return (-1);
-	  }
+	if v != nil {
+		if strlen(v) > 0 {
+			maxhops = atoi(v)
+		} else {
+			print_error(pf, "Missing max digipeater hops for IGate message filter.")
+			return (-1)
+		}
 
-	  v = strsep (&cp, sep);
-	  if (v != nil && strlen(v) > 0) {
-	    dlat = atof(v);
+		v = strsep(&cp, sep)
+		if v != nil && strlen(v) > 0 {
+			dlat = atof(v)
 
-	    v = strsep (&cp, sep);
-	    if (v != nil && strlen(v) > 0) {
-	      dlon = atof(v);
-	    } else {
-	      print_error (pf, "Missing longitude for IGate message filter.");
-	      return (-1);
-	    }
+			v = strsep(&cp, sep)
+			if v != nil && strlen(v) > 0 {
+				dlon = atof(v)
+			} else {
+				print_error(pf, "Missing longitude for IGate message filter.")
+				return (-1)
+			}
 
-	    v = strsep (&cp, sep);
-	    if (v != nil && strlen(v) > 0) {
-	      km = atof(v);
-	    } else {
-	      print_error (pf, "Missing distance, in km, for IGate message filter.");
-	      return (-1);
-	    }
-	  }
+			v = strsep(&cp, sep)
+			if v != nil && strlen(v) > 0 {
+				km = atof(v)
+			} else {
+				print_error(pf, "Missing distance, in km, for IGate message filter.")
+				return (-1)
+			}
+		}
 
-	  v = strsep (&cp, sep);
-	  if (v != nil) {
-	    print_error (pf, "Something unexpected after distance for IGate message filter.");
-	    return (-1);
-	  }
+		v = strsep(&cp, sep)
+		if v != nil {
+			print_error(pf, "Something unexpected after distance for IGate message filter.")
+			return (-1)
+		}
 	}
 
-/*
- * Get source address and info part.
- * Addressee has already been extracted into pf.decoded.g_addressee.
- */
-	if (pf.decoded.g_packet_type != packet_type_message) {
-		return(0);
+	/*
+	 * Get source address and info part.
+	 * Addressee has already been extracted into pf.decoded.g_addressee.
+	 */
+	if pf.decoded.g_packet_type != packet_type_message {
+		return (0)
 	}
 
-	return(1);
+	return (1)
 
-	if (pftest_running) {
-		return (1); // Replacement for old #ifdef PFTEST
+	if pftest_running {
+		return (1) // Replacement for old #ifdef PFTEST
 	}
 
 	/* FIXME KG
-#if defined(DIGITEST)	// TODO: test functionality too, not just syntax.
+	#if defined(DIGITEST)	// TODO: test functionality too, not just syntax.
 
-	(void)dlat;	// Suppress set and not used warning.
-	(void)dlon;
-	(void)km;
-	(void)maxhops;
-	(void)heardtime;
+		(void)dlat;	// Suppress set and not used warning.
+		(void)dlon;
+		(void)km;
+		(void)maxhops;
+		(void)heardtime;
 
-	return (1);
-#else
-*/
+		return (1);
+	#else
+	*/
 
-/*
- * Condition 1:
- *	"the receiving station has been heard within range within a predefined time
- *	 period (range defined as digi hops, distance, or both)."
- */
+	/*
+	 * Condition 1:
+	 *	"the receiving station has been heard within range within a predefined time
+	 *	 period (range defined as digi hops, distance, or both)."
+	 */
 
-	var was_heard = mheard_was_recently_nearby ("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km);
+	var was_heard = mheard_was_recently_nearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
 
-	if ( ! was_heard) {
-		return (0);
+	if !was_heard {
+		return (0)
 	}
 
-/*
- * Condition 2:
- *	"the sending station has not been heard via RF within a predefined time period
- *	 (packets gated from the Internet by other stations are excluded from this test)."
- *
- * This is the part I'm not so sure about.
- * I guess the intention is that if the sender can be heard over RF, then the addressee
- * might hear the sender without the help of Igate stations.
- * Suppose the sender was 1 digipeater hop to the west and the addressee was 1 digipeater hop to the east.
- * I can communicate with each of them with 1 digipeater hop but for them to reach each other, they
- * might need 3 hops and using that many is generally frowned upon and rare.
- *
- * Maybe we could compromise here and say the sender must have been heard directly.
- * It sent the message currently being processed so we must have heard it very recently, i.e. in
- * the past minute, rather than the usual 180 minutes for the addressee.
- */
+	/*
+	 * Condition 2:
+	 *	"the sending station has not been heard via RF within a predefined time period
+	 *	 (packets gated from the Internet by other stations are excluded from this test)."
+	 *
+	 * This is the part I'm not so sure about.
+	 * I guess the intention is that if the sender can be heard over RF, then the addressee
+	 * might hear the sender without the help of Igate stations.
+	 * Suppose the sender was 1 digipeater hop to the west and the addressee was 1 digipeater hop to the east.
+	 * I can communicate with each of them with 1 digipeater hop but for them to reach each other, they
+	 * might need 3 hops and using that many is generally frowned upon and rare.
+	 *
+	 * Maybe we could compromise here and say the sender must have been heard directly.
+	 * It sent the message currently being processed so we must have heard it very recently, i.e. in
+	 * the past minute, rather than the usual 180 minutes for the addressee.
+	 */
 
-	was_heard = mheard_was_recently_nearby ("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN);
+	was_heard = mheard_was_recently_nearby("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
 
-	if (was_heard) {
-		return (0);
+	if was_heard {
+		return (0)
 	}
 
-	return (1);
+	return (1)
 
-// #endif
+	// #endif
 
 } /* end filt_i */
-
 
 /*-------------------------------------------------------------------
  *
  * Name:   	print_error
- *    
+ *
  * Purpose:     Print error message with context so someone can figure out what caused it.
  *
- * Inputs:	pf	- Pointer to current state information.	
+ * Inputs:	pf	- Pointer to current state information.
  *
  *		str	- Specific error message.
  *
  *--------------------------------------------------------------------*/
 
-func print_error (pf *pfstate_t, msg string) {
+func print_error(pf *pfstate_t, msg string) {
 	// FIXME KG char intro[50];
 
-	if (pf.from_chan == MAX_TOTAL_CHANS) {
+	if pf.from_chan == MAX_TOTAL_CHANS {
 
-	  if (pf.to_chan == MAX_TOTAL_CHANS) {
-	    snprintf (intro, sizeof(intro), "filter[IG,IG]: ");
-	  } else {
-	    snprintf (intro, sizeof(intro), "filter[IG,%d]: ", pf.to_chan);
-	  }
+		if pf.to_chan == MAX_TOTAL_CHANS {
+			snprintf(intro, sizeof(intro), "filter[IG,IG]: ")
+		} else {
+			snprintf(intro, sizeof(intro), "filter[IG,%d]: ", pf.to_chan)
+		}
 	} else {
 
-	  if (pf.to_chan == MAX_TOTAL_CHANS) {
-	    snprintf (intro, sizeof(intro), "filter[%d,IG]: ", pf.from_chan);
-	  } else {
-	    snprintf (intro, sizeof(intro), "filter[%d,%d]: ", pf.from_chan, pf.to_chan);
-	  }
+		if pf.to_chan == MAX_TOTAL_CHANS {
+			snprintf(intro, sizeof(intro), "filter[%d,IG]: ", pf.from_chan)
+		} else {
+			snprintf(intro, sizeof(intro), "filter[%d,%d]: ", pf.from_chan, pf.to_chan)
+		}
 	}
 
-	text_color_set (DW_COLOR_ERROR);
+	text_color_set(DW_COLOR_ERROR)
 
-	dw_printf ("%s%s\n", intro, pf.filter_str);
-	dw_printf ("%*s\n", (strlen(intro) + pf.tokeni + 1), "^");
-	dw_printf ("%s\n", msg);
+	dw_printf("%s%s\n", intro, pf.filter_str)
+	dw_printf("%*s\n", (strlen(intro) + pf.tokeni + 1), "^")
+	dw_printf("%s\n", msg)
 }
