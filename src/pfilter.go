@@ -693,37 +693,38 @@ func parse_filter_spec (pf *pfstate_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-static int filt_bodgu (pfstate_t *pf, char *arg)
-{
+func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
+	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
 	char sep[2];
 	char *v;
 	int result = 0;
+	*/
 
 	strlcpy (str, pf.token_str, sizeof(str));
 	sep[0] = str[1];
 	sep[1] = 0;
 	cp = str + 2;
 
-	for (result == 0 && (v = strsep (&cp, sep)) != nil) {
-
-	  int mlen;
-	  char *w;
-
-	  if ((w = strchr(v,'*')) != nil) {
+	for result == 0 && (v = strsep (&cp, sep)) != nil {
+		var w = strchr(v. '*')
+	  if (w != nil) {
 	    /* Wildcarding.  Should have single * on end. */
 
-	    mlen = w - v;
-	    if (mlen != (int)(strlen(v) - 1)) {
+	    var mlen = w - v;
+	    if (mlen != (strlen(v) - 1)) {
 	      print_error (pf, "Any wildcard * must be at the end of pattern.\n");
 	      return (-1);
 	    }
-	    if (strncmp(v,arg,mlen) == 0) result = 1;
-	  } 
-	  else {
+	    if (strncmp(v,arg,mlen) == 0) {
+			result = 1;
+		}
+	  } else {
 	    /* Try for exact match. */
-	    if (strcmp(v,arg) == 0) result = 1;
+	    if (strcmp(v,arg) == 0) {
+			result = 1;
+		}
 	  }
 	}
 
