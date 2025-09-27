@@ -1244,12 +1244,13 @@ func filt_s (pf *pfstate_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-static int filt_i (pfstate_t *pf)
-{
+func filt_i (pf *pfstate_t) C.int {
+	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
 	char sep[2];
 	char *v;
+	*/
 
 // http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2020-July/048656.html
 // Default of 3 hours should be good.
@@ -1258,11 +1259,11 @@ static int filt_i (pfstate_t *pf)
 // vicinity recently.
 // TODO: Should produce a warning if a user specified filter does not include "i".
 
-	int heardtime = 180;	// 3 hours * 60 min/hr = 180 minutes
-	int maxhops = save_igate_config_p.max_digi_hops;	// from IGTXVIA config.
-	double dlat = G_UNKNOWN;
-	double dlon = G_UNKNOWN;
-	double km = G_UNKNOWN;
+	var heardtime = 180;	// 3 hours * 60 min/hr = 180 minutes
+	var maxhops = save_igate_config_p.max_digi_hops;	// from IGTXVIA config.
+	var dlat = G_UNKNOWN;
+	var dlon = G_UNKNOWN;
+	var km = G_UNKNOWN;
 
 
 	//char src[AX25_MAX_ADDR_LEN];
@@ -1330,12 +1331,17 @@ static int filt_i (pfstate_t *pf)
  * Get source address and info part.
  * Addressee has already been extracted into pf.decoded.g_addressee.
  */
-	if (pf.decoded.g_packet_type != packet_type_message) return(0);
+	if (pf.decoded.g_packet_type != packet_type_message) {
+		return(0);
+	}
 
 	return(1);
 
-	if (pftest_running) return (1); // Replacement for old #ifdef PFTEST
+	if (pftest_running) {
+		return (1); // Replacement for old #ifdef PFTEST
+	}
 
+	/* FIXME KG
 #if defined(DIGITEST)	// TODO: test functionality too, not just syntax.
 
 	(void)dlat;	// Suppress set and not used warning.
@@ -1346,6 +1352,7 @@ static int filt_i (pfstate_t *pf)
 
 	return (1);
 #else
+*/
 
 /*
  * Condition 1:
@@ -1353,9 +1360,11 @@ static int filt_i (pfstate_t *pf)
  *	 period (range defined as digi hops, distance, or both)."
  */
 
-	int was_heard = mheard_was_recently_nearby ("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km);
+	var was_heard = mheard_was_recently_nearby ("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km);
 
-	if ( ! was_heard) return (0);
+	if ( ! was_heard) {
+		return (0);
+	}
 
 /*
  * Condition 2:
@@ -1376,11 +1385,13 @@ static int filt_i (pfstate_t *pf)
 
 	was_heard = mheard_was_recently_nearby ("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN);
 
-	if (was_heard) return (0);
+	if (was_heard) {
+		return (0);
+	}
 
 	return (1);
 
-#endif
+// #endif
 
 } /* end filt_i */
 
