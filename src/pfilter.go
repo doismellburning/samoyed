@@ -897,13 +897,13 @@ func filt_t (pfstate_t *pf) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-static int filt_r (pfstate_t *pf, char *sdist)
-{
+func filt_r (pf *pfstate_t, sdist *C.char) C.int {
+	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
 	char sep[2];
-	char *v;
 	double dlat, dlon, ddist, km;
+	*/
 
 
 	strlcpy (str, pf.token_str, sizeof(str));
@@ -915,28 +915,28 @@ static int filt_r (pfstate_t *pf, char *sdist)
 	  return (0);
 	}
 
-	v = strsep (&cp, sep);
+	var v = strsep (&cp, sep);
 	if (v == nil) {
 	  print_error (pf, "Missing latitude for Range filter.");
 	  return (-1);
 	}
-	dlat = atof(v);
+	var dlat = atof(v);
 
 	v = strsep (&cp, sep);
 	if (v == nil) {
 	  print_error (pf, "Missing longitude for Range filter.");
 	  return (-1);
 	}
-	dlon = atof(v);
+	var dlon = atof(v);
 
 	v = strsep (&cp, sep);
 	if (v == nil) {
 	  print_error (pf, "Missing distance for Range filter.");
 	  return (-1);
 	}
-	ddist = atof(v);
+	var ddist = atof(v);
 
-	km = ll_distance_km (dlat, dlon, pf.decoded.g_lat, pf.decoded.g_lon);
+	var km = ll_distance_km (dlat, dlon, pf.decoded.g_lat, pf.decoded.g_lon);
 
 	sprintf (sdist, "%.2f km", km);
 
