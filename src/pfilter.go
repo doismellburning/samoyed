@@ -61,7 +61,8 @@ func pfilter_init(p_igate_config *C.struct_igate_config_s, debug_level int) {
 	save_igate_config_p = p_igate_config
 }
 
-// FIXME KG typedef enum token_type_e { TOKEN_AND, TOKEN_OR, TOKEN_NOT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_FILTER_SPEC, TOKEN_EOL } token_type_t;
+type token_type_t int
+{ TOKEN_AND, TOKEN_OR, TOKEN_NOT, TOKEN_LPAREN, TOKEN_RPAREN, TOKEN_FILTER_SPEC, TOKEN_EOL } token_type_t;
 
 const MAX_FILTER_LEN = 1024
 const MAX_TOKEN_LEN = 1024
@@ -98,7 +99,7 @@ type pfstate_t struct {
 	 *		g_name		- for object or item
 	 *		g_comment
 	 */
-	decoded decode_aprs_t
+	decoded C.decode_aprs_t
 
 	/*
 	 * These are set by next_token.
