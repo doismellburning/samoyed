@@ -1014,13 +1014,14 @@ func filt_r (pf *pfstate_t, sdist *C.char) C.int {
  * 
  *------------------------------------------------------------------------------*/
 
-static int filt_s (pfstate_t *pf)
-{
+func filt_s (pf *pfstate_t) C.int {
+	/* FIXME KG
 	char str[MAX_TOKEN_LEN];
 	char *cp;
 	char sep[2];		// Delimiter character.  Typically / but it could be different.
 	char *pri = nil, *alt = nil, *over = nil, *extra = nil;
 	char *x;
+	*/
 
 
 	strlcpy (str, pf.token_str, sizeof(str));
@@ -1037,7 +1038,7 @@ static int filt_s (pfstate_t *pf)
 
 	  // Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
 
-	  for (x = pri; *x != 0; x++) {
+	  for x := pri; *x != 0; x++ {
 	    if ( ! isprint(*x) || *x == '|' || *x == '~') {
 	      print_error (pf, "Symbol filter, primary must be printable ASCII character(s) other than | or ~.");
 	      return (-1);
@@ -1055,7 +1056,7 @@ static int filt_s (pfstate_t *pf)
 	      return (-1);
 	    }
 
-	    for (x = alt; *x != 0; x++) {
+		for x := alt; *x != 0; x++ {
 	      if ( ! isprint(*x) || *x == '|' || *x == '~') {
 	        print_error (pf, "Symbol filter, alternate must be printable ASCII character(s) other than | or ~.");
 	        return (-1);
@@ -1068,7 +1069,7 @@ static int filt_s (pfstate_t *pf)
 
 	      // Zero length is acceptable and is not the same as missing.
 
-	      for (x = over; *x != 0; x++) {
+	      for x = over; *x != 0; x++ {
 	        if ( (! isupper(*x)) && (! isdigit(*x)) && *x != '\\') {
 	          print_error (pf, "Symbol filter, overlay must be upper case letter, digit, or \\.");
 	          return (-1);
