@@ -760,31 +760,37 @@ func filt_bodgu (pf *pfstate_t, arg *C.char) C.int {
  *		
  *------------------------------------------------------------------------------*/
 
-static int filt_t (pfstate_t *pf) 
-{
+func filt_t (pfstate_t *pf) C.int {
+	/* FIXME KG
 	char src[AX25_MAX_ADDR_LEN];
 	char *infop = nil;
 	char *f;
+	*/
 
-	memset (src, 0, sizeof(src));
 	ax25_get_addr_with_ssid (pf.pp, AX25_SOURCE, src);
-	(void) ax25_get_info (pf.pp, (unsigned char **)(&infop));
+	 ax25_get_info (pf.pp, (&infop));
 
 	assert (infop != nil);
 
-	for (f = pf.token_str + 2; *f != 0; f++) {
+	for f := pf.token_str + 2; *f != 0; f++ {
 	  switch (*f) {
 	
 	    case 'p':				/* Position */
-	      if (pf.decoded.g_packet_type == packet_type_position) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_position) {
+			  return(1);
+		  }
 	      break;
 
 	    case 'o':				/* Object */
-	      if (pf.decoded.g_packet_type == packet_type_object) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_object) {
+			  return(1);
+		  }
 	      break;
 
 	    case 'i':				/* Item */
-	      if (pf.decoded.g_packet_type == packet_type_item) return(1);
+	      if (pf.decoded.g_packet_type == packet_type_item) {
+			  return(1);
+		  }
 	      break;
 
 	    case 'm':				// Any "message."
