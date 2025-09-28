@@ -263,9 +263,7 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	assert.NotNil(t, pp)
 
 	var result = C.pfilter(0, 0, C.CString(filter), pp, 1)
-	if result != C.int(expected) {
-		C.text_color_set(C.DW_COLOR_ERROR)
-		dw_printf("Unexpected result for test number %d\n", test_num)
+	if !assert.Equal(t, result, C.int(expected), "Unexpected result for test number %d", test_num) {
 		pftest_error_count++
 	}
 
