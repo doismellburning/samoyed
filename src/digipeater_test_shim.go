@@ -35,11 +35,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func digipeater_test(t *testing.T, _in, _out string) {
+func digipeater_test(t *testing.T, _in, out string) {
 	t.Helper()
 
 	var in = C.CString(_in)
-	var out = C.CString(_out)
 
 	dw_printf("\n")
 
@@ -115,12 +114,7 @@ func digipeater_test(t *testing.T, _in, _out string) {
 	C.text_color_set(C.DW_COLOR_XMIT)
 	dw_printf("Xmit\t%s\n", C.GoString(&xmit[0]))
 
-	if C.strcmp(&xmit[0], out) == 0 {
-		C.text_color_set(C.DW_COLOR_INFO)
-		dw_printf("OK\n")
-	} else {
-		C.text_color_set(C.DW_COLOR_ERROR)
-		dw_printf("Expect\t%s\n", C.GoString(out))
+	if !assert.Equal(t, out, C.GoString(&xmit[0])) { //nolint:testifylint
 		C.failed++
 	}
 
@@ -389,6 +383,7 @@ func digipeater_test_main(t *testing.T) bool {
 	} else {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		dw_printf("ERROR - %d digipeater tests failed.\n", C.failed)
+		t.Fail()
 	}
 
 	return (C.failed != 0)
