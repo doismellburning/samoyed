@@ -217,7 +217,7 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
 			dw_printf("\n")
 
-			C.nettnc_send_packet(channel, pp)
+			nettnc_send_packet(channel, pp)
 
 		}
 

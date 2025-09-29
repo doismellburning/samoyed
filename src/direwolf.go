@@ -627,7 +627,7 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	C.nettnc_init(&C.audio_config)
+	nettnc_init(&C.audio_config)
 
 	/*
 	 * Initialize the touch tone decoder & APRStt gateway.
