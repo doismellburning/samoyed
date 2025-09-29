@@ -257,7 +257,7 @@ func digipeat_match(
 	 * First check if filtering has been configured.
 	 */
 	if filter_str != nil {
-		if C.pfilter(from_chan, to_chan, filter_str, pp, 1) != 1 {
+		if pfilter(from_chan, to_chan, filter_str, pp, 1) != 1 {
 			return (nil)
 		}
 	}
