@@ -799,7 +799,7 @@ x = Silence FX.25 information.`)
 	 */
 
 	log_init((C.misc_config.log_daily_names > 0), C.GoString(&C.misc_config.log_path[0]))
-	C.mheard_init(C.int(d_m_opt))
+	mheard_init(d_m_opt)
 	beacon_init(&C.audio_config, &C.misc_config, &igate_config)
 
 	/*
@@ -1107,7 +1107,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		// Add to list of stations heard over the radio.
 
-		C.mheard_save_rf(channel, &A, pp, alevel, retries)
+		mheard_save_rf(channel, &A, pp, alevel, retries)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.
