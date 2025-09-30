@@ -448,7 +448,7 @@ func mheard_save_is(_ptext *C.char) {
 		mheard_mutex.Unlock()
 	} else {
 
-		/* Already there.  UPdate last heard from IS time. */
+		/* Already there.  Update last heard from IS time. */
 
 		if mheard_debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
