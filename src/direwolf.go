@@ -59,7 +59,6 @@ package direwolf
 // #include "dtime_now.h"
 // #include "fx25.h"
 // #include "il2p.h"
-// #include "dwsock.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
 // #include "deviceid.h"
@@ -333,8 +332,6 @@ x = Silence FX.25 information.`)
 	C.rig_set_debug(uint32(d_h_opt))
 
 	C.symbols_init()
-
-	C.dwsock_init()
 
 	var digi_config C.struct_digi_config_s
 	var cdigi_config C.struct_cdigi_config_s

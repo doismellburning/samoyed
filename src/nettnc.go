@@ -25,7 +25,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "audio.h"		// configuration.
 // #include "kiss.h"
-// #include "dwsock.h"		// socket helper functions.
 // #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN
 // #include "dlq.h"		// received packet queue
 // #include "nettnc.h"

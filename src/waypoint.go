@@ -24,7 +24,6 @@ package direwolf
 // #include "waypoint.h"
 // #include "dwgpsnmea.h"
 // #include "serial_port.h"
-// #include "dwsock.h"
 import "C"
 
 import (

@@ -34,7 +34,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "serial_port.h"
 // #include "kiss_frame.h"
-// #include "dwsock.h"
 // #include "audio.h"		// for DEFAULT_TXDELAY, etc.
 // #include "dtime_now.h"
 // #define DIR_CHAR "/"

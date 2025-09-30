@@ -125,7 +125,6 @@
 #include "dtime_now.h"
 #include "fx25.h"
 #include "il2p.h"
-#include "dwsock.h"
 #include "dns_sd_dw.h"
 #include "dlq.h"		// for fec_type_t definition.
 #include "deviceid.h"
