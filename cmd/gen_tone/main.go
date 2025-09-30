@@ -44,7 +44,7 @@ func main() {
 	my_audio_config.chan_medium[0] = C.MEDIUM_RADIO // TODO KG ??
 
 	C.audio_open(&my_audio_config)
-	C.gen_tone_init(&my_audio_config, 100, 0)
+	gen_tone_init(&my_audio_config, 100, 0)
 
 	for range 2 {
 		for n := C.int(0); n < my_audio_config.achan[0].baud*2; n++ {
@@ -66,7 +66,7 @@ func main() {
 	my_audio_config.adev[0].num_channels = 2
 
 	C.audio_open(&my_audio_config)
-	C.gen_tone_init(&my_audio_config, 100, 0)
+	gen_tone_init(&my_audio_config, 100, 0)
 
 	for range 4 {
 		for n := C.int(0); n < my_audio_config.achan[0].baud*2; n++ {

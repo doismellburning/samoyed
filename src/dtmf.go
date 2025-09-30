@@ -485,7 +485,7 @@ func push_button_raw(channel C.int, button C.char, ms C.int, test_mode bool) {
 			// Amplitude of 100 would use full +-32k range.
 
 			var sam = C.int(dtmf * 16383.0 * C.float(s_amplitude) / 100.0)
-			C.gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
+			gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
 		}
 	}
 }

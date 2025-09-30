@@ -293,7 +293,7 @@ func eas_send(channel C.int, _str *C.uchar, repeat C.int, txdelay C.int, txtail 
 	const gap C.int = 1000
 	var gaps_sent C.int = 0
 
-	C.gen_tone_put_quiet_ms(channel, txdelay)
+	gen_tone_put_quiet_ms(channel, txdelay)
 
 	for r := C.int(0); r < repeat; r++ {
 		for j := 0; j < 16; j++ {
@@ -308,12 +308,12 @@ func eas_send(channel C.int, _str *C.uchar, repeat C.int, txdelay C.int, txtail 
 		}
 
 		if r < repeat-1 {
-			C.gen_tone_put_quiet_ms(channel, gap)
+			gen_tone_put_quiet_ms(channel, gap)
 			gaps_sent++
 		}
 	}
 
-	C.gen_tone_put_quiet_ms(channel, txtail)
+	gen_tone_put_quiet_ms(channel, txtail)
 
 	C.audio_flush(ACHAN2ADEV(channel))
 

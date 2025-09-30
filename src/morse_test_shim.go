@@ -43,7 +43,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	audio_file_open(filename, &modem)
 	var amplitude C.int = 100
-	C.gen_tone_init(&modem, amplitude, 1)
+	gen_tone_init(&modem, amplitude, 1)
 	morse_init(&modem, amplitude)
 	morse_send(0, message, 10, 100, 100)
 	audio_file_close() // I just realised this all works on globals :s
