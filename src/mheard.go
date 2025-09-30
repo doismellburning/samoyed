@@ -463,7 +463,7 @@ func mheard_save_is(_ptext *C.char) {
 	// The whole purpose of keeping the location is for message sending filter.
 	// We wouldn't want to try sending a message to the station if we didn't hear it over the radio.
 	// On the other hand, I don't think it would hurt.
-	// The filter always includes a time since last heard over the radi.
+	// The filter always includes a time since last heard over the radio.
 
 	if mheard_debug >= 2 {
 		var limit C.int = 10 // normally 30 or 60
