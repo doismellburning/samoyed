@@ -204,9 +204,9 @@ func DecodeAPRSLine(line string) {
 			fmt.Printf("\n")
 
 			var A C.decode_aprs_t
-			C.decode_aprs(&A, pp, 0, nil) // Extract information into structure.
+			decode_aprs(&A, pp, 0, nil) // Extract information into structure.
 
-			C.decode_aprs_print(&A) // Now print it in human readable format.
+			decode_aprs_print(&A) // Now print it in human readable format.
 
 			C.ax25_check_addresses(pp) // Errors for invalid addresses.
 
@@ -221,9 +221,9 @@ func DecodeAPRSLine(line string) {
 		if pp != nil {
 			var A C.decode_aprs_t
 
-			C.decode_aprs(&A, pp, 0, nil) // Extract information into structure.
+			decode_aprs(&A, pp, 0, nil) // Extract information into structure.
 
-			C.decode_aprs_print(&A) // Now print it in human readable format.
+			decode_aprs_print(&A) // Now print it in human readable format.
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.

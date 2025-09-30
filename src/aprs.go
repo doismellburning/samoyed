@@ -12,6 +12,9 @@ type compressed_position_t struct {
 	/* "The presence of the leading Symbol Table Identifier */
 	/* instead of a digit indicates that this is a compressed */
 	/* Position Report and not a normal lat/long report." */
+	/* "a-j" is not a typographical error. */
+	/* The first 10 lower case letters represent the overlay */
+	/* characters of 0-9 in the compressed format. */
 
 	Y          [4]byte /* Compressed Latitude. */
 	X          [4]byte /* Compressed Longitude. */
