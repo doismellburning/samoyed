@@ -262,7 +262,7 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 
 		tone_phase += f1_change_per_sample
 		var sam = C.int(SineTable[(tone_phase>>24)&0xff])
-		C.gen_tone_put_sample(channel, a, sam)
+		gen_tone_put_sample(channel, a, sam)
 	}
 
 	// TODO KG #endif
@@ -304,7 +304,7 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
 
 	for j := 0; j < nsamples; j++ {
 
-		C.gen_tone_put_sample(channel, a, sam)
+		gen_tone_put_sample(channel, a, sam)
 
 	}
 	// TODO KG #endif
@@ -341,7 +341,7 @@ func morse_quiet_ms(channel C.int, ms C.int) {
 	var nsamples = int(float64(ms*save_audio_config_p.adev[a].samples_per_sec/1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-		C.gen_tone_put_sample(channel, a, sam)
+		gen_tone_put_sample(channel, a, sam)
 	}
 
 	// TODO KG #endif
