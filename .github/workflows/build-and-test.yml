@@ -11,7 +11,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
     - uses: "actions/checkout@v4"
-    - uses: "actions/setup-go@v5"
+    - uses: "actions/setup-go@v6"
       with:
         go-version: "1.25"
     - run: "sudo apt install --yes libudev-dev libhamlib-dev libasound2-dev libavahi-client-dev libbsd-dev"
