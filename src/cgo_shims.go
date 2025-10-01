@@ -157,6 +157,15 @@ func DW_FEET_TO_METERS(x float64) float64 {
 	return x * 0.3048
 }
 
+// #define DW_MILES_TO_KM(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 1.609344)
+func DW_MILES_TO_KM(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 1.609344
+}
+
 var retry_text = []string{
 	"NONE",
 	"SINGLE",
