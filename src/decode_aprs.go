@@ -2007,41 +2007,37 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 func aprs_item(A *C.decode_aprs_t, info []byte) {
 
 	type aprs_item_s struct {
-		dti  C.char     /* ')' */
-		name [10]C.char /* Actually variable length 3 - 9 bytes. */
+		dti  byte     /* ')' */
+		name [10]byte /* Actually variable length 3 - 9 bytes. */
 		/* DON'T refer to the rest of this structure; */
 		/* the offsets will be wrong! */
 		/* We make it 10 here so we don't get subscript out of bounds */
 		/* warning when looking for following '!' or '_' character. */
 
-		live_killed__ C.char /* ! for live or _ for killed */
+		live_killed__ byte /* ! for live or _ for killed */
 		pos__         position_t
-		comment__     [43]C.char /* First 7 bytes could be data extension. */
+		comment__     [43]byte /* First 7 bytes could be data extension. */
 	}
+	var p aprs_item_s
 
 	type aprs_compressed_item_s struct {
-		dti  C.char     /* ')' */
-		name [10]C.char /* Actually variable length 3 - 9 bytes. */
+		dti  byte     /* ')' */
+		name [10]byte /* Actually variable length 3 - 9 bytes. */
 		/* DON'T refer to the rest of this structure; */
 		/* the offsets will be wrong! */
 
-		live_killed__ C.char /* ! for live or _ for killed */
+		live_killed__ byte /* ! for live or _ for killed */
 		cpos__        compressed_position_t
-		comment__     [40]C.char /* No data extension in this case. */
+		comment__     [40]byte /* No data extension in this case. */
 	}
+	var q aprs_compressed_item_s
 
-	/* FIXME KG
-	int i;
-	char *ppos;
+	binary.Decode(info, binary.NativeEndian, p)
+	binary.Decode(info, binary.NativeEndian, q)
 
-
-	p = (struct aprs_item_s *)info;
-	q = (struct aprs_compressed_item_s *)info;
-	(void)(q);
-	*/
-
+	/* FIXME KG Something funky with the structs here...
 	memset(A.g_name, 0, sizeof(A.g_name))
-	i = 0
+	var i = 0
 	for i < 9 && p.name[i] != '!' && p.name[i] != '_' {
 		A.g_name[i] = p.name[i]
 		i++
@@ -2060,18 +2056,18 @@ func aprs_item(A *C.decode_aprs_t, info []byte) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString("Object - invalid live/killed"))
 	}
 
-	ppos = p.name + i + 1
+	var ppos = p.name[i + 1:]
 
-	if unicode.IsDigit(*ppos) { /* Human-readable location. */
+	if unicode.IsDigit(ppos[0]) { // Human-readable location.
 		decode_position(A, (*position_t)(ppos))
 
 		data_extension_comment(A, ppos+sizeof(position_t))
-	} else { /* Compressed location. */
+	} else { // Compressed location.
 		decode_compressed_position(A, (*compressed_position_t)(ppos))
 
 		process_comment(A, ppos+sizeof(compressed_position_t), -1)
 	}
-
+	*/
 }
 
 /*------------------------------------------------------------------
