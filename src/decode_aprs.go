@@ -1872,7 +1872,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 
 		C.strcpy(&A.g_comment[0], (*C.char)(C.CBytes(p.message[:])))
 		// Remove message number when displaying message text.
-		pno = strchr(A.g_comment, '{')
+		var pno = C.strchr(&A.g_comment[0], '{')
 		if pno != nil {
 			*pno = 0
 		}
