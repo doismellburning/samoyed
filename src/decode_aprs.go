@@ -1948,6 +1948,7 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 	}
 
 	var ts = get_timestamp(A, p.time_stamp[:])
+	_ = ts // TODO KG Why is ts unused??
 
 	if unicode.IsDigit(rune(p.pos.lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.pos))
