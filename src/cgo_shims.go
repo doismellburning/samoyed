@@ -218,3 +218,11 @@ var FROMTO_PREFIX = map[fromto_t]string{
 	FROM_CLIENT: "<<<",
 	TO_CLIENT:   ">>>",
 }
+
+func bool2Cint(t bool) C.int {
+	if t {
+		return 1
+	} else {
+		return 0
+	}
+}
