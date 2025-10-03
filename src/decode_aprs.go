@@ -2096,7 +2096,7 @@ func aprs_station_capabilities(A *C.decode_aprs_t, info []byte) {
 	// 	process_comment() not applicable here because it
 	//	extracts information found in certain formats.
 
-	strlcpy(A.g_comment, info+1, sizeof(A.g_comment))
+	C.strcpy(&A.g_comment[0], (*C.char)(C.CBytes(info[1:])))
 
 } /* end aprs_station_capabilities */
 
