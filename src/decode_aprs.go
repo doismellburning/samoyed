@@ -1753,7 +1753,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 		A.g_message_subtype = C.message_subtype_directed_query
 
 		aprs_directed_station_query(A, addressee, p.message[1:], quiet)
-	} else if bytes.EqualFold(p.message[:3], []byte("ack")) { 
+	} else if bytes.EqualFold(p.message[:3], []byte("ack")) {
 
 		/* ack or rej?  Message number is required for these. */
 
