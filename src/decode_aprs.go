@@ -2144,58 +2144,60 @@ func aprs_station_capabilities(A *C.decode_aprs_t, info []byte) {
 
 func aprs_status_report(A *C.decode_aprs_t, info []byte) {
 	type aprs_status_time_s struct {
-		dti     C.char    /* > */
-		ztime   [7]C.char /* Time stamp ddhhmmz */
-		comment [55]C.char
+		dti     byte    /* > */
+		ztime   [7]byte /* Time stamp ddhhmmz */
+		comment [55]byte
 	}
+	var pt aprs_status_time_s
 
 	type aprs_status_m4_s struct {
-		dti          C.char    /* > */
-		mhead4       [4]C.char /* 4 character Maidenhead locator. */
-		sym_table_id C.char
-		symbol_code  C.char
-		space        C.char /* Should be space after symbol code. */
-		comment      [54]C.char
+		dti          byte    /* > */
+		mhead4       [4]byte /* 4 character Maidenhead locator. */
+		sym_table_id byte
+		symbol_code  byte
+		space        byte /* Should be space after symbol code. */
+		comment      [54]byte
 	}
+	var pm4 aprs_status_m4_s
 
 	type aprs_status_m6_s struct {
-		dti          C.char    /* > */
-		mhead6       [6]C.char /* 6 character Maidenhead locator. */
-		sym_table_id C.char
-		symbol_code  C.char
-		space        C.char /* Should be space after symbol code. */
-		comment      [54]C.char
+		dti          byte    /* > */
+		mhead6       [6]byte /* 6 character Maidenhead locator. */
+		sym_table_id byte
+		symbol_code  byte
+		space        byte /* Should be space after symbol code. */
+		comment      [54]byte
 	}
+	var pm6 aprs_status_m6_s
 
 	type aprs_status_s struct {
-		dti     C.char /* > */
-		comment [62]C.char
+		dti     byte /* > */
+		comment [62]byte
 	}
+	var ps aprs_status_s
 
 	C.strcpy(&A.g_data_type_desc[0], C.CString("Status Report"))
 
-	/* FIXME KG
-	pt = (struct aprs_status_time_s *)info;
-	pm4 = (struct aprs_status_m4_s *)info;
-	pm6 = (struct aprs_status_m6_s *)info;
-	ps = (struct aprs_status_s *)info;
-	*/
+	binary.Decode(info, binary.NativeEndian, pt)
+	binary.Decode(info, binary.NativeEndian, pm4)
+	binary.Decode(info, binary.NativeEndian, pm6)
+	binary.Decode(info, binary.NativeEndian, ps)
 
 	/*
 	 * Do we have format with time?
 	 */
-	if unicode.IsDigit(pt.ztime[0]) &&
-		unicode.IsDigit(pt.ztime[1]) &&
-		unicode.IsDigit(pt.ztime[2]) &&
-		unicode.IsDigit(pt.ztime[3]) &&
-		unicode.IsDigit(pt.ztime[4]) &&
-		unicode.IsDigit(pt.ztime[5]) &&
+	if unicode.IsDigit(rune(pt.ztime[0])) &&
+		unicode.IsDigit(rune(pt.ztime[1])) &&
+		unicode.IsDigit(rune(pt.ztime[2])) &&
+		unicode.IsDigit(rune(pt.ztime[3])) &&
+		unicode.IsDigit(rune(pt.ztime[4])) &&
+		unicode.IsDigit(rune(pt.ztime[5])) &&
 		pt.ztime[6] == 'z' {
 
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		strlcpy(A.g_comment, pt.comment, sizeof(A.g_comment))
+		C.strcpy(&A.g_comment[0], (*C.char)(C.CBytes(pt.comment[:])))
 	} else if get_maidenhead(A, pm6.mhead6) == 6 {
 
 		/*
