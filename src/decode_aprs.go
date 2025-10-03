@@ -1777,12 +1777,12 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 			*p = 0
 		}
 
-		if C.strlen(A.g_message_number[0]) >= 3 && A.g_message_number[2] == '}' {
+		if C.strlen(&A.g_message_number[0]) >= 3 && A.g_message_number[2] == '}' {
 			A.g_message_number[2] = 0
 		}
 		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)))
 		A.g_message_subtype = C.message_subtype_ack
-	} else if bytes.EqualFold(p.message[:3], []byte("rej") {
+	} else if bytes.EqualFold(p.message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(p.message[:], []byte("rej")) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR: \"%s\" must be lower case \"rej\"\n", p.message)
@@ -1825,12 +1825,12 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 		// X>Y:}A>B::WA1XYX-15:Howdy y'all{toolong
 
 		// Normal messaage case.  Look for message number.
-		var pno = strchr(p.message, '{')
-		if pno != nil {
-			strlcpy(A.g_message_number, pno+1, sizeof(A.g_message_number))
+		var before, after, found = bytes.Cut(p.message[:], []byte{'{'})
+		if found {
+			C.strcpy(&A.g_message_number[0], (*C.char)(C.CBytes(after)))
 
 			// Xastir puts a carriage return on the end.
-			var p = strchr(A.g_message_number, '\r')
+			var p = C.strchr(&A.g_message_number[0], '\r')
 			if p != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
@@ -1838,7 +1838,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 				*p = 0
 			}
 
-			var mlen = strlen(A.g_message_number)
+			var mlen = C.strlen(&A.g_message_number[0])
 			if mlen < 1 || mlen > 5 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Message number \"%s\" has length outside range of 1 to 5.\n", A.g_message_number)
@@ -1846,15 +1846,15 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 
 			// TODO: Complain if not alphanumeric.
 
-			var ack [8]C.char = ""
+			var ack [8]C.char
 
 			if mlen >= 3 && A.g_message_number[2] == '}' {
 				//  New (1999) style.
 				A.g_message_number[2] = 0
-				strlcpy(ack, A.g_message_number+3, sizeof(ack))
+				C.strcpy(&ack[0], &A.g_message_number[3])
 			}
 
-			if strlen(ack) > 0 {
+			if C.strlen(ack) > 0 {
 				// With ACK.  Message number should be 2 characters.
 				C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\", with ACK for \"%s\"", A.g_message_number, A.g_src, addressee, ack)))
 			} else {
@@ -1870,7 +1870,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 
 		/* No location so don't use  process_comment () */
 
-		C.strcpy(&A.g_comment[0], p.message)
+		C.strcpy(&A.g_comment[0], (*C.char)(C.CBytes(p.message[:])))
 		// Remove message number when displaying message text.
 		pno = strchr(A.g_comment, '{')
 		if pno != nil {
