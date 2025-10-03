@@ -1930,7 +1930,7 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 
 	//Assert (sizeof(A.g_name) > sizeof(p.name));
 
-	C.memcpy(unsafe.Pointer(&A.g_name[0]), unsafe.Pointer(&p.name[0]), len(p.name)) // copy exactly 9 bytes.
+	C.memcpy(unsafe.Pointer(&A.g_name[0]), unsafe.Pointer(&p.name[0]), C.size_t(len(p.name))) // copy exactly 9 bytes.
 
 	/* Trim trailing spaces. */
 	var i = C.strlen(&A.g_name[0]) - 1
@@ -1947,9 +1947,9 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString("Object - invalid live/killed"))
 	}
 
-	var ts = get_timestamp(A, p.time_stamp)
+	var ts = get_timestamp(A, p.time_stamp[:])
 
-	if unicode.IsDigit((p.pos.lat[0])) { /* Human-readable location. */
+	if unicode.IsDigit(rune(p.pos.lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.pos))
 
 		if A.g_symbol_code == '_' {
@@ -1958,11 +1958,11 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 			/* for the wind direction and speed. */
 
 			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report with Object"))
-			weather_data(A, p.comment, TRUE)
+			weather_data(A, p.comment[:], true)
 		} else {
 			/* Regular object. */
 
-			data_extension_comment(A, p.comment)
+			data_extension_comment(A, p.comment[:])
 		}
 	} else { /* Compressed location. */
 		decode_compressed_position(A, &(q.cpos))
@@ -1974,11 +1974,11 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 			/* position. */
 
 			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report with Object"))
-			weather_data(A, q.comment, FALSE)
+			weather_data(A, q.comment[:], false)
 		} else {
 			/* Regular position report. */
 
-			process_comment(A, q.comment, -1)
+			process_comment(A, q.comment[:])
 		}
 	}
 } /* end aprs_object */
