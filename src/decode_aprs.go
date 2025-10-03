@@ -3697,7 +3697,7 @@ func get_timestamp(A *C.decode_aprs_t, p []byte) time.Time {
  *
  * Purpose:	See if we have a maidenhead locator.
  *
- * Inputs:	p 	- Pointer to first byte.
+ * Inputs:	p 	- Byte slice
  *
  * Returns:	0 = not found.
  *		4 = possible 4 character locator found.
@@ -3731,7 +3731,7 @@ func get_timestamp(A *C.decode_aprs_t, p []byte) time.Time {
  *
  *------------------------------------------------------------------*/
 
-func get_maidenhead(A *C.decode_aprs_t, p *C.char) C.int {
+func get_maidenhead(A *C.decode_aprs_t, p []byte) C.int {
 
 	if toupper(p[0]) >= 'A' && toupper(p[0]) <= 'R' &&
 		toupper(p[1]) >= 'A' && toupper(p[1]) <= 'R' &&
