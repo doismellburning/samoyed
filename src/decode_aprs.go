@@ -1825,7 +1825,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 		// X>Y:}A>B::WA1XYX-15:Howdy y'all{toolong
 
 		// Normal messaage case.  Look for message number.
-		var before, after, found = bytes.Cut(p.message[:], []byte{'{'})
+		var _, after, found = bytes.Cut(p.message[:], []byte{'{'})
 		if found {
 			C.strcpy(&A.g_message_number[0], (*C.char)(C.CBytes(after)))
 
@@ -1854,7 +1854,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 				C.strcpy(&ack[0], &A.g_message_number[3])
 			}
 
-			if C.strlen(ack) > 0 {
+			if C.strlen(&ack[0]) > 0 {
 				// With ACK.  Message number should be 2 characters.
 				C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\", with ACK for \"%s\"", A.g_message_number, A.g_src, addressee, ack)))
 			} else {
@@ -1906,39 +1906,34 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 func aprs_object(A *C.decode_aprs_t, info []byte) {
 
 	type aprs_object_s struct {
-		dti         C.char /* ; */
-		name        [9]C.char
-		live_killed C.char /* * for live or _ for killed */
-		time_stamp  [7]C.char
+		dti         byte /* ; */
+		name        [9]byte
+		live_killed byte /* * for live or _ for killed */
+		time_stamp  [7]byte
 		pos         position_t
-		comment     [43]C.char /* First 7 bytes could be data extension. */
+		comment     [43]byte /* First 7 bytes could be data extension. */
 	}
+	var p aprs_object_s
 
 	type aprs_compressed_object_s struct {
-		dti         C.char /* ; */
-		name        [9]C.char
-		live_killed C.char /* * for live or _ for killed */
-		time_stamp  [7]C.char
+		dti         byte /* ; */
+		name        [9]byte
+		live_killed byte /* * for live or _ for killed */
+		time_stamp  [7]byte
 		cpos        compressed_position_t
-		comment     [40]C.char /* No data extension in this case. */
+		comment     [40]byte /* No data extension in this case. */
 	}
+	var q aprs_compressed_object_s
 
-	/* FIXME KG
-	time_t ts = 0;
-	int i;
-
-
-	p = (struct aprs_object_s *)info;
-	q = (struct aprs_compressed_object_s *)info;
-	*/
+	binary.Decode(info, binary.NativeEndian, p)
+	binary.Decode(info, binary.NativeEndian, q)
 
 	//Assert (sizeof(A.g_name) > sizeof(p.name));
 
-	memset(A.g_name, 0, sizeof(A.g_name))
-	memcpy(A.g_name, p.name, sizeof(p.name)) // copy exactly 9 bytes.
+	C.memcpy(unsafe.Pointer(&A.g_name[0]), unsafe.Pointer(&p.name[0]), len(p.name)) // copy exactly 9 bytes.
 
 	/* Trim trailing spaces. */
-	i = strlen(A.g_name) - 1
+	var i = C.strlen(&A.g_name[0]) - 1
 	for i >= 0 && A.g_name[i] == ' ' {
 		A.g_name[i] = 0
 		i--
@@ -1952,7 +1947,7 @@ func aprs_object(A *C.decode_aprs_t, info []byte) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString("Object - invalid live/killed"))
 	}
 
-	ts = get_timestamp(A, p.time_stamp)
+	var ts = get_timestamp(A, p.time_stamp)
 
 	if unicode.IsDigit((p.pos.lat[0])) { /* Human-readable location. */
 		decode_position(A, &(p.pos))
