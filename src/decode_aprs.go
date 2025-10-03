@@ -1757,19 +1757,19 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 
 		/* ack or rej?  Message number is required for these. */
 
-		if !bytes.HasPrefix(p.message, "ack") {
+		if !bytes.HasPrefix(p.message[:], []byte("ack")) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR: \"%s\" must be lower case \"ack\"\n", p.message)
 		} else {
 			C.strcpy(&A.g_message_number[0], (*C.char)(C.CBytes(p.message[3:])))
-			if C.strlen(A.g_message_number) == 0 {
+			if C.strlen(&A.g_message_number[0]) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("ERROR: Message number is missing after \"ack\".\n")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
-		var p = C.strchr(A.g_message_number, '\r')
+		var p = C.strchr(&A.g_message_number[0], '\r')
 		if p != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
@@ -1777,25 +1777,25 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 			*p = 0
 		}
 
-		if C.strlen(A.g_message_number) >= 3 && A.g_message_number[2] == '}' {
+		if C.strlen(A.g_message_number[0]) >= 3 && A.g_message_number[2] == '}' {
 			A.g_message_number[2] = 0
 		}
 		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)))
 		A.g_message_subtype = C.message_subtype_ack
-	} else if strncasecmp(p.message, "rej", 3) == 0 {
-		if strncmp(p.message, "rej", 3) != 0 {
+	} else if bytes.EqualFold(p.message[:3], []byte("rej") {
+		if !bytes.HasPrefix(p.message[:], []byte("rej")) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR: \"%s\" must be lower case \"rej\"\n", p.message)
 		} else {
-			strlcpy(A.g_message_number, p.message+3, sizeof(A.g_message_number))
-			if strlen(A.g_message_number) == 0 {
+			C.strcpy(&A.g_message_number[0], (*C.char)(C.CBytes(p.message[3:])))
+			if C.strlen(&A.g_message_number[0]) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("ERROR: Message number is missing after \"rej\".\n")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
-		var p = strchr(A.g_message_number, '\r')
+		var p = C.strchr(&A.g_message_number[0], '\r')
 		if p != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
@@ -1803,7 +1803,7 @@ func aprs_message(A *C.decode_aprs_t, info []byte, quiet bool) {
 			*p = 0
 		}
 
-		if strlen(A.g_message_number) >= 3 && A.g_message_number[2] == '}' {
+		if C.strlen(&A.g_message_number[0]) >= 3 && A.g_message_number[2] == '}' {
 			A.g_message_number[2] = 0
 		}
 		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)))
