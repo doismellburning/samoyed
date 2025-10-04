@@ -2229,19 +2229,19 @@ func aprs_status_report(A *C.decode_aprs_t, info []byte) {
 		//	extracts information found in certain formats.
 
 		C.strcpy(A.g_comment, C.CString(pm6.comment))
-	} else if get_maidenhead(A, pm4.mhead4) == 4 {
+	} else if get_maidenhead(A, pm4.mhead4[:]) == 4 {
 
 		/*
 		 * Do we have format with 4 character Maidenhead locator?
 		 */
 
-		memset(A.g_maidenhead, 0, sizeof(A.g_maidenhead))
-		memcpy(A.g_maidenhead, pm4.mhead4, sizeof(pm4.mhead4))
+		C.memset(unsafe.Pointer(&A.g_maidenhead[0]), 0, C.size_t(len(A.g_maidenhead)))
+		C.memcpy(unsafe.Pointer(&A.g_maidenhead[0]), unsafe.Pointer(&pm4.mhead4[0]), C.size_t(len(pm4.mhead4)))
 
-		A.g_symbol_table = pm4.sym_table_id
-		A.g_symbol_code = pm4.symbol_code
+		A.g_symbol_table = C.char(pm4.sym_table_id)
+		A.g_symbol_code = C.char(pm4.symbol_code)
 
-		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !isupper(A.g_symbol_table) && !unicode.IsDigit(A.g_symbol_table) {
+		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 			if A.g_quiet == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
@@ -2259,7 +2259,7 @@ func aprs_status_report(A *C.decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		C.strcpy(A.g_comment, C.CString(pm4.comment))
+		C.strcpy(&A.g_comment[0], C.CString(pm4.comment))
 	} else {
 
 		/*
