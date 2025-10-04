@@ -2198,19 +2198,19 @@ func aprs_status_report(A *C.decode_aprs_t, info []byte) {
 		//	extracts information found in certain formats.
 
 		C.strcpy(&A.g_comment[0], (*C.char)(C.CBytes(pt.comment[:])))
-	} else if get_maidenhead(A, pm6.mhead6) == 6 {
+	} else if get_maidenhead(A, pm6.mhead6[:]) == 6 {
 
 		/*
 		 * Do we have format with 6 character Maidenhead locator?
 		 */
 
-		memset(A.g_maidenhead, 0, sizeof(A.g_maidenhead))
-		memcpy(A.g_maidenhead, pm6.mhead6, sizeof(pm6.mhead6))
+		C.memset(unsafe.Pointer(&A.g_maidenhead[0]), 0, C.size_t(len(A.g_maidenhead)))
+		C.memcpy(unsafe.Pointer(&A.g_maidenhead[0]), unsafe.Pointer(&pm6.mhead6[0]), len(pm6.mhead6))
 
-		A.g_symbol_table = pm6.sym_table_id
-		A.g_symbol_code = pm6.symbol_code
+		A.g_symbol_table = C.char(pm6.sym_table_id)
+		A.g_symbol_code = C.char(pm6.symbol_code)
 
-		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !isupper(A.g_symbol_table) && !unicode.IsDigit(A.g_symbol_table) {
+		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 			if A.g_quiet == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
@@ -2228,7 +2228,7 @@ func aprs_status_report(A *C.decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		strlcpy(A.g_comment, pm6.comment, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(pm6.comment))
 	} else if get_maidenhead(A, pm4.mhead4) == 4 {
 
 		/*
@@ -2259,13 +2259,13 @@ func aprs_status_report(A *C.decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		strlcpy(A.g_comment, pm4.comment, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(pm4.comment))
 	} else {
 
 		/*
 		 * Whole thing is status text.
 		 */
-		strlcpy(A.g_comment, ps.comment, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(ps.comment))
 	}
 
 	/*
@@ -2626,9 +2626,9 @@ func aprs_raw_touch_tone(A *C.decode_aprs_t, info []byte) {
 	/* Just copy the info field without the message type. */
 
 	if *info == '{' {
-		strlcpy(A.g_comment, info+3, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(info+3))
 	} else {
-		strlcpy(A.g_comment, info+1, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(info+1))
 	}
 
 } /* end aprs_raw_touch_tone */
@@ -2653,9 +2653,9 @@ func aprs_morse_code(A *C.decode_aprs_t, info []byte) {
 	/* Just copy the info field without the message type. */
 
 	if *info == '{' {
-		strlcpy(A.g_comment, info+3, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(info+3))
 	} else {
-		strlcpy(A.g_comment, info+1, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(info+1))
 	}
 
 } /* end aprs_morse_code */
@@ -3790,7 +3790,7 @@ func data_extension_comment(A *C.decode_aprs_t, pdext []byte) C.int {
 	var n int
 
 	if strlen(pdext) < 7 {
-		strlcpy(A.g_comment, pdext, sizeof(A.g_comment))
+		C.strcpy(A.g_comment, C.CString(pdext))
 		return 0
 	}
 
@@ -3833,7 +3833,7 @@ func data_extension_comment(A *C.decode_aprs_t, pdext []byte) C.int {
 		A.g_height = (1 << (pdext[4] - '0')) * 10
 		A.g_gain = pdext[5] - '0'
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			strlcpy(A.g_directivity, dir[pdext[6]-'0'], sizeof(A.g_directivity))
+			C.strcpy(A.g_directivity, C.CString(dir[pdext[6]-'0']))
 		}
 
 		// TODO: look for another 0-9 A-Z followed by a /
@@ -3860,7 +3860,7 @@ func data_extension_comment(A *C.decode_aprs_t, pdext []byte) C.int {
 		A.g_height = (1 << (pdext[4] - '0')) * 10
 		A.g_gain = pdext[5] - '0'
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			strlcpy(A.g_directivity, dir[pdext[6]-'0'], sizeof(A.g_directivity))
+			C.strcpy(A.g_directivity, C.CString(dir[pdext[6]-'0']))
 		}
 
 		process_comment(A, pdext+7, -1)
