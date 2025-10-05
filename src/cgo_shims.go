@@ -175,6 +175,15 @@ func DW_MBAR_TO_INHG(x float64) float64 {
 	return x * 0.0295333727
 }
 
+// #define DW_KM_TO_MILES(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.621371192)
+func DW_KM_TO_MILES(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.621371192
+}
+
 var retry_text = []string{
 	"NONE",
 	"SINGLE",
