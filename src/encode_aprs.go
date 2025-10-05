@@ -55,13 +55,6 @@ import (
 
 /* Position & symbol fields common to several message formats. */
 
-type position_t struct {
-	lat          [8]C.char
-	sym_table_id C.char /* / \ 0-9 A-Z */
-	lon          [9]C.char
-	symbol_code  C.char
-}
-
 func normal_position_string(p *position_t) string {
 	return fmt.Sprintf("%s%c%s%c", C.GoStringN(&p.lat[0], C.int(len(p.lat))), p.sym_table_id, C.GoStringN(&p.lon[0], C.int(len(p.lon))), p.symbol_code)
 }
@@ -127,20 +120,6 @@ func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double
  *----------------------------------------------------------------*/
 
 /* Compressed position & symbol fields common to several message formats. */
-
-type compressed_position_t struct {
-	sym_table_id C.char /* / \ a-j A-Z */
-	/* "The presence of the leading Symbol Table Identifier */
-	/* instead of a digit indicates that this is a compressed */
-	/* Position Report and not a normal lat/long report." */
-
-	y           [4]C.char /* Compressed Latitude. */
-	x           [4]C.char /* Compressed Longitude. */
-	symbol_code C.char
-	c           C.char /* Course/speed or radio range or altitude. */
-	s           C.char
-	t           C.char /* Compression type. */
-}
 
 func compressed_position_string(p *compressed_position_t) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.sym_table_id, C.GoStringN(&p.y[0], C.int(len(p.y))), C.GoStringN(&p.x[0], C.int(len(p.x))), p.symbol_code, p.c, p.s, p.t)
