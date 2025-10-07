@@ -56,7 +56,7 @@ import (
 /* Position & symbol fields common to several message formats. */
 
 func normal_position_string(p *position_t) string {
-	return fmt.Sprintf("%s%c%s%c", string(p.lat[:]), p.sym_table_id, string(p.lon[:]), p.symbol_code)
+	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
 }
 
 func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double, ambiguity C.int) *position_t {
@@ -65,22 +65,22 @@ func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double
 	var stemp [16]C.char
 	C.latitude_to_str(dlat, ambiguity, &stemp[0])
 
-	C.memcpy(unsafe.Pointer(&presult.lat[0]), unsafe.Pointer(&stemp[0]), C.ulong(len(presult.lat)))
+	C.memcpy(unsafe.Pointer(&presult.Lat[0]), unsafe.Pointer(&stemp[0]), C.ulong(len(presult.Lat)))
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
 	}
-	presult.sym_table_id = byte(symtab)
+	presult.SymTableId = byte(symtab)
 
 	C.longitude_to_str(dlong, ambiguity, &stemp[0])
-	C.memcpy(unsafe.Pointer(&presult.lon[0]), unsafe.Pointer(&stemp[0]), C.ulong(len(presult.lon)))
+	C.memcpy(unsafe.Pointer(&presult.Lon[0]), unsafe.Pointer(&stemp[0]), C.ulong(len(presult.Lon)))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not in range of ! to ~\n")
 	}
-	presult.symbol_code = byte(symbol)
+	presult.SymbolCode = byte(symbol)
 
 	return presult
 }
@@ -122,7 +122,7 @@ func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double
 /* Compressed position & symbol fields common to several message formats. */
 
 func compressed_position_string(p *compressed_position_t) string {
-	return fmt.Sprintf("%c%s%s%c%c%c%c", p.sym_table_id, string(p.y[:]), string(p.x[:]), p.symbol_code, p.c, p.s, p.t)
+	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
 }
 
 func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double,
@@ -143,16 +143,16 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 	if unicode.IsDigit(rune(symtab)) {
 		symtab = symtab - '0' + 'a'
 	}
-	presult.sym_table_id = byte(symtab)
+	presult.SymTableId = byte(symtab)
 
-	C.latitude_to_comp_str(dlat, (*C.char)(unsafe.Pointer(&presult.y[0])))
-	C.longitude_to_comp_str(dlong, (*C.char)(unsafe.Pointer(&presult.x[0])))
+	C.latitude_to_comp_str(dlat, (*C.char)(unsafe.Pointer(&presult.Y[0])))
+	C.longitude_to_comp_str(dlong, (*C.char)(unsafe.Pointer(&presult.X[0])))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not in range of ! to ~\n")
 	}
-	presult.symbol_code = byte(symbol)
+	presult.SymbolCode = byte(symbol)
 
 	/*
 	 * The cst field is complicated.
@@ -188,14 +188,14 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 		} else {
 			c = 0
 		}
-		presult.c = byte(c + '!')
+		presult.C = byte(c + '!')
 
 		var s = math.Round(math.Log(float64(speed)+1.0) / math.Log(1.08))
-		presult.s = byte(s + '!')
+		presult.S = byte(s + '!')
 
-		presult.t = 0x26 + '!' /* current, other tracker. */
+		presult.T = 0x26 + '!' /* current, other tracker. */
 	} else if power > 0 || height > 0 || gain > 0 {
-		presult.c = '{' /* radio range. */
+		presult.C = '{' /* radio range. */
 
 		if power == 0 {
 			power = 10
@@ -218,13 +218,13 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 			s = 93
 		}
 
-		presult.s = byte(s + '!')
+		presult.S = byte(s + '!')
 
-		presult.t = 0x26 + '!' /* current, other tracker. */
+		presult.T = 0x26 + '!' /* current, other tracker. */
 	} else {
-		presult.c = ' ' /* cst field not used. */
-		presult.s = ' '
-		presult.t = '!' /* avoid space. */
+		presult.C = ' ' /* cst field not used. */
+		presult.S = ' '
+		presult.T = '!' /* avoid space. */
 	}
 
 	return presult
