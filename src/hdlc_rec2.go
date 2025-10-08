@@ -767,7 +767,7 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 
 			// Sanity check for AIS.
 			if C.ais_check_length(C.int((H2.frame_buf[0]>>2)&0x3f), H2.frame_len-2) == 0 {
-				C.multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
+				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
 				return true
 			} else {
 				return false /* did not pass sanity check */
@@ -781,8 +781,8 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 
 			Assert(C.rrbb_get_chan(block) == channel)
 			Assert(C.rrbb_get_subchan(block) == subchan)
-			C.multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
-			return true                                                                                                             /* success */
+			multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
+			return true                                                                                                           /* success */
 
 		} else if passall {
 			if retry_conf_retry == C.RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
@@ -790,8 +790,8 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
 
-				C.multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, C.RETRY_MAX, 0) /* len-2 to remove FCS. */
-				return true                                                                                                        /* success */
+				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, C.RETRY_MAX, 0) /* len-2 to remove FCS. */
+				return true                                                                                                      /* success */
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("try_decode: internal error passall = %t, retry_conf_retry = %d, retry_conf_type = %d\n",

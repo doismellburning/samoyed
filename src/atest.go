@@ -491,7 +491,7 @@ o = DCD output control
 		 * Initialize the AFSK demodulator and HDLC decoder.
 		 * Needs to be done for each file because they could have different sample rates.
 		 */
-		C.multi_modem_init(&C.my_audio_config)
+		multi_modem_init(&C.my_audio_config)
 		C.packets_decoded_one = 0
 
 		C.e_o_f = 0
@@ -518,7 +518,7 @@ o = DCD output control
 					continue
 				}
 
-				C.multi_modem_process_sample(c, audio_sample)
+				multi_modem_process_sample(c, audio_sample)
 			}
 
 			/* When a complete frame is accumulated, */

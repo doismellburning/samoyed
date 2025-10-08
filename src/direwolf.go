@@ -615,7 +615,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	C.multi_modem_init(&C.audio_config)
+	multi_modem_init(&C.audio_config)
 	C.fx25_init(C.int(d_x_opt))
 	C.il2p_init(C.int(d_2_opt))
 
