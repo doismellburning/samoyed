@@ -823,7 +823,7 @@ func ptt_set(ot C.int, channel C.int, ptt_signal C.int) {
 	if ATEST_C {
 		ptt_set_fake(ot, channel, ptt_signal)
 	} else {
-		C.ptt_set_real(ot, channel, ptt_signal)
+		ptt_set_real(ot, channel, ptt_signal)
 	}
 }
 

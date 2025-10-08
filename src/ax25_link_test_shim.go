@@ -40,7 +40,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	const CHANNEL C.int = 1
 
 	var audioConfig = new(C.struct_audio_s)
-	C.ptt_init(audioConfig)
+	ptt_init(audioConfig)
 	tq_init(audioConfig)
 
 	var miscConfig = new(C.struct_misc_config_s)
