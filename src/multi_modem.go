@@ -282,7 +282,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < C.MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < C.MAX_SUBCHANS)
+	Assert(slice >= 0 && slice < C.MAX_SLICERS)
 
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
