@@ -774,7 +774,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 
 	if wait_more > 0 {
 		SLEEP_MS(int(wait_more.Milliseconds()))
-	} else if wait_more < -100 {
+	} else if wait_more < -100*time.Millisecond {
 
 		/* If we run over by 10 mSec or so, it's nothing to worry about. */
 		/* However, if PTT is still on about 1/10 sec after audio */
