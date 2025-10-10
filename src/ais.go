@@ -86,8 +86,7 @@ static inline void set_bit (unsigned char *base, unsigned int offset, int val)
 {
 	if (val) {
 	  base[offset >> 3] |= mask[offset & 0x7];
-	}
-	else {
+	} else {
 	  base[offset >> 3] &= ~ mask[offset & 0x7];
 	}
 }
@@ -135,8 +134,7 @@ static double get_field_lat (unsigned char *base, unsigned int start, unsigned i
 	int n = get_field_signed(base, start, len);
 	if (len == 17) {
 	  return ((n == 91*600) ? G_UNKNOWN : (double)n / 600.0);
-	}
-	else {
+	} else {
 	  return ((n == 91*600000) ? G_UNKNOWN : (double)n / 600000.0);
 	}
 }
@@ -150,8 +148,7 @@ static double get_field_lon (unsigned char *base, unsigned int start, unsigned i
 	int n = get_field_signed(base, start, len);
 	if (len == 18) {
 	  return ((n == 181*600) ? G_UNKNOWN : (double)n / 600.0);
-	}
-	else {
+	} else {
 	  return ((n == 181*600000) ? G_UNKNOWN : (double)n / 600000.0);
 	}
 }
@@ -168,8 +165,7 @@ static float get_field_speed (unsigned char *base, unsigned int start, unsigned 
 	int n = get_field(base, start, len);
 	if (len == 6) {
 	  return ((n == 63) ? G_UNKNOWN : (float)n);
-	}
-	else {
+	} else {
 	  return ((n == 1023) ? G_UNKNOWN : (float)n * 0.1);
 	}
 }
@@ -184,8 +180,7 @@ static float get_field_course (unsigned char *base, unsigned int start, unsigned
 	int n = get_field(base, start, len);
 	if (len == 9) {
 	  return ((n == 360) ? G_UNKNOWN : (float)n);
-	}
-	else {
+	} else {
 	  return ((n == 3600) ? G_UNKNOWN : (float)n * 0.1);
 	}
 }
@@ -232,11 +227,9 @@ static int char_to_sextet (char ch)
 {
 	if (ch >= '0' && ch <= 'W') {
 	  return (ch - '0');
-	}
-	else if (ch >= '`' && ch <= 'w') {
+	} else if (ch >= '`' && ch <= 'w') {
 	  return (ch - '`' + 40);
-	}
-	else {
+	} else {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Invalid character \"%c\" found in AIS NMEA sentence payload.\n", ch);
 	  return (0);
@@ -252,11 +245,9 @@ static int sextet_to_char (int val)
 {
 	if (val >= 0 && val <= 39) {
 	  return ('0' + val);
-	}
-	else if (val >= 40 && val <= 63) {
+	} else if (val >= 40 && val <= 63) {
 	  return ('`' + val - 40);
-	}
-	else {
+	} else {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Invalid 6 bit value %d from AIS HDLC payload.\n", val);
 	  return ('0');
@@ -582,15 +573,13 @@ int ais_check_length (int type, int length)
 	  int b = length * 8;
 	  if (b >= valid_len[type].min && b <= valid_len[type].max) {
 	    return (0);		// Good.
-	  }
-	  else {
+	  } else {
 	    //text_color_set (DW_COLOR_ERROR);
             //dw_printf("AIS ERROR: type %d, has %d bits when %d to %d expected.\n",
 	    //	type, b, valid_len[type].min, valid_len[type].max);
 	    return (1);		// Length out of range.
 	  }
-	}
-	else {
+	} else {
 	  //text_color_set (DW_COLOR_ERROR);
           //dw_printf("AIS ERROR: message type %d is invalid.\n", type);
 	  return (-1);		// Invalid type.
@@ -677,8 +666,7 @@ static void get_ship_data(char *mssi, char *comment, int comment_size)
 	if (p != nil) {
 	  if (strlen(p.destination) > 0) {
 	    snprintf (comment, comment_size, "%s, %s, dest. %s", p.shipname, p.callsign, p.destination);
-	  }
-	  else {
+	  } else {
 	    snprintf (comment, comment_size, "%s, %s", p.shipname, p.callsign);
 	  }
 	}
