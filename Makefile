@@ -35,7 +35,11 @@ coveragereport:
 	go tool cover -func=$(COVERAGE_FILE)
 
 .PHONY: check
-check: vet lint shellcheck
+check: vet lint shellcheck reuse
+
+.PHONY: reuse
+reuse:
+	reuse lint
 
 .PHONY: shellcheck
 shellcheck:
