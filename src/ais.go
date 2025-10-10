@@ -120,31 +120,45 @@ func get_field_signed (base *byte, start int, length int) int {
 	return (result);
 }
 
-static double get_field_lat (unsigned char *base, unsigned int start, unsigned int len)
-{
+func get_field_lat (base *byte, start int, length int) C.double {
 	// Latitude of 0x3412140 (91 deg) means not available.
 	// Message type 27 uses lower resolution, 17 bits rather than 27.
 	// It encodes minutes/10 rather than normal minutes/10000.
 
-	int n = get_field_signed(base, start, len);
-	if (len == 17) {
-	  return ((n == 91*600) ? G_UNKNOWN : (double)n / 600.0);
+	var n = get_field_signed(base, start, length);
+	if (length == 17) {
+		if (n == 91*600) {
+			return  G_UNKNOWN 
+		} else {
+			return C.double(n) / 600.0;
+		}
 	} else {
-	  return ((n == 91*600000) ? G_UNKNOWN : (double)n / 600000.0);
+	  if (n == 91*600000)  {
+	  	return G_UNKNOWN 
+	} else {
+		return C.double(n) / 600000.0;
+	}
 	}
 }
 
-static double get_field_lon (unsigned char *base, unsigned int start, unsigned int len)
-{
+func get_field_lon (base *byte, start int, length int) C.double {
 	// Longitude of 0x6791AC0 (181 deg) means not available.
 	// Message type 27 uses lower resolution, 18 bits rather than 28.
 	// It encodes minutes/10 rather than normal minutes/10000.
 
-	int n = get_field_signed(base, start, len);
-	if (len == 18) {
-	  return ((n == 181*600) ? G_UNKNOWN : (double)n / 600.0);
+	var n = get_field_signed(base, start, length);
+	if (length == 18) {
+	  if (n == 181*600) {
+		 	return G_UNKNOWN 
+		} else {
+			return C.double(n) / 600.0;
+		}
 	} else {
-	  return ((n == 181*600000) ? G_UNKNOWN : (double)n / 600000.0);
+	  if (n == 181*600000) {
+		  return G_UNKNOWN 
+	  } else {
+		  return C.double(n) / 600000.0;
+	  }
 	}
 }
 
