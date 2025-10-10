@@ -75,15 +75,13 @@ static const struct {
  *
  *--------------------------------------------------------------------*/
 
-static const unsigned char mask[8] = { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01 };
+var mask = []byte{ 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01 };
 
-static inline unsigned int get_bit (unsigned char *base, unsigned int offset)
-{
+func get_bit (base byte,  offset byte) bool {
 	return ( (base[offset >> 3] & mask[offset & 0x7]) != 0);
 }
 
-static inline void set_bit (unsigned char *base, unsigned int offset, int val)
-{
+func set_bit (base *byte, offset byte, val bool) {
 	if (val) {
 	  base[offset >> 3] |= mask[offset & 0x7];
 	} else {
@@ -98,30 +96,27 @@ static inline void set_bit (unsigned char *base, unsigned int offset, int val)
  *
  *--------------------------------------------------------------------*/
 
-static unsigned int get_field (unsigned char *base, unsigned int start, unsigned int len)
-{
-	unsigned int result = 0;
-	for (int k = 0; k < len; k++) {
+func get_field (base *byte, start int, length int) int {
+	var result = 0;
+	for k := 0; k < length; k++ {
 	  result <<= 1;
 	  result |= get_bit (base, start + k);
 	}
 	return (result);
 }
 
-static void set_field (unsigned char *base, unsigned int start, unsigned int len, unsigned int val)
-{
-	for (int k = 0; k < len; k++) {
-	  set_bit (base, start + k, (val >> (len - 1 - k) ) & 1);
+func set_field (base *byte, start int, length int, val int) {
+	for k := 0; k < length; k++ {
+	  set_bit (base, start + k, (val >> (length - 1 - k) ) & 1);
 	}
 }
 
 
-static int get_field_signed (unsigned char *base, unsigned int start, unsigned int len)
-{
-	int result = (int) get_field(base, start, len);
+func get_field_signed (base *byte, start int, length int) int {
+	var result = int( get_field(base, start, length))
 	// Sign extend.
-	result <<= (32 - len);
-	result >>= (32 - len);
+	result <<= (32 - length);
+	result >>= (32 - length);
 	return (result);
 }
 
