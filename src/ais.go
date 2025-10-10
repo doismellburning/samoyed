@@ -210,7 +210,7 @@ static void get_field_string (unsigned char *base, unsigned int start, unsigned 
 	result[nc] = '\0';
 	// Officially it should be terminated/padded with @ but we also see trailing spaces.
 	char *p = strchr(result, '@');
-	if (p != NULL) *p = '\0';
+	if (p != nil) *p = '\0';
 	for (int k = strlen(result) - 1; k >= 0 && result[k] == ' '; k--) {
 	  result[k] = '\0';
 	}
@@ -364,14 +364,14 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
         }
 
         p = strchr (stemp, '*');
-        if (p == NULL) {
+        if (p == nil) {
 	  if ( ! quiet) {
 	    text_color_set (DW_COLOR_INFO);
             dw_printf("Missing AIS sentence checksum.\n");
 	  }
           return (-1);
         }
-        if (cs != strtoul(p+1, NULL, 16)) {
+        if (cs != strtoul(p+1, nil, 16)) {
 	  if ( ! quiet) {
 	    text_color_set (DW_COLOR_ERROR);
             dw_printf("AIS sentence checksum error. Expected %02x but found %s.\n", cs, p+1);
@@ -410,7 +410,7 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
 	(void)(msg_id);
 	(void)(radio_chan);
 
-	if (payload == NULL || strlen(payload) == 0) {
+	if (payload == nil || strlen(payload) == 0) {
 	  if ( ! quiet) {
 	    text_color_set (DW_COLOR_ERROR);
             dw_printf("Payload is missing from AIS sentence.\n");
@@ -627,20 +627,20 @@ struct ship_data_s {
 // I don't think we need a critical region because all channels
 // should be serialized thru the receive queue.
 
-static struct ship_data_s *ships = NULL;
+static struct ship_data_s *ships = nil;
 
 
 static void save_ship_data(char *mssi, char *shipname, char *callsign, char *destination)
 {
 	// Get list node, either existing or new.
 	struct ship_data_s *p = ships;
-	while (p != NULL) {
+	while (p != nil) {
 	  if (strcmp(mssi, p.mssi) == 0) {
 	    break;
 	  }
 	  p = p.pnext;
 	}
-	if (p == NULL) {
+	if (p == nil) {
 	  p = calloc(sizeof(struct ship_data_s),1);
 	  p.pnext = ships;
 	  ships = p;
@@ -668,13 +668,13 @@ static void save_ship_data(char *mssi, char *shipname, char *callsign, char *des
 static void get_ship_data(char *mssi, char *comment, int comment_size)
 {
 	struct ship_data_s *p = ships;
-	while (p != NULL) {
+	while (p != nil) {
 	  if (strcmp(mssi, p.mssi) == 0) {
 	    break;
 	  }
 	  p = p.pnext;
 	}
-	if (p != NULL) {
+	if (p != nil) {
 	  if (strlen(p.destination) > 0) {
 	    snprintf (comment, comment_size, "%s, %s, dest. %s", p.shipname, p.callsign, p.destination);
 	  }
