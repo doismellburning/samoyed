@@ -1081,12 +1081,12 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 
-		C.decode_aprs(&A, pp, C.q_d_opt, nil)
+		decode_aprs(&A, pp, C.q_d_opt, nil)
 
 		if C.q_d_opt == 0 {
 			// Print it all out in human readable format unless "-q d" option used.
 
-			C.decode_aprs_print(&A)
+			decode_aprs_print(&A)
 		}
 
 		/*
