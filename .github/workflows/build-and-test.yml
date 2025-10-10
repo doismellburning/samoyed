@@ -22,6 +22,7 @@ jobs:
       run: "sudo apt install --yes direwolf"
     - run: "make test"
     - run: "make coveragereport"
+    - run: "pipx install reuse"  # For validating the licence config
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
