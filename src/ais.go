@@ -248,8 +248,7 @@ func get_field_string (base *byte, start int, length int, result *C.char) {
 // Characters '0' thru 'W'  become values 0 thru 39.
 // Characters '`' thru 'w'  become values 40 thru 63.
 
-static int char_to_sextet (char ch)
-{
+func char_to_sextet (ch byte) int {
 	if (ch >= '0' && ch <= 'W') {
 	  return (ch - '0');
 	} else if (ch >= '`' && ch <= 'w') {
@@ -266,8 +265,7 @@ static int char_to_sextet (char ch)
 // Values 40 thru 63 become characters '`' thru 'w'.
 // This is known as "Payload Armoring."
 
-static int sextet_to_char (int val)
-{
+func sextet_to_char (val int) byte {
 	if (val >= 0 && val <= 39) {
 	  return ('0' + val);
 	} else if (val >= 40 && val <= 63) {
