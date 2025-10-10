@@ -1,0 +1,42 @@
+version = 1
+
+[[annotations]]
+path = [
+	"*png",
+	"CMakeLists.txt",
+	"audio_win.txt",
+	"cmake/**",
+	"conf/**",
+	"data/**",
+	"doc/**",
+	"man/**",
+	"rpm/**",
+	"scripts/**",
+	"src/*.c",
+	"src/*.h",
+	"systemd/**",
+	"test/**",
+]
+SPDX-FileCopyrightText = "The Dire Wolf Authors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+[[annotations]]
+path = [
+	"*.md",
+	".git*",
+	".github/**",
+	".golangci.yml",
+	"Makefile",
+	"cmd/**",
+	"go.mod",
+	"go.sum",
+	"src/*.go",
+	"test-scripts/**",
+]
+SPDX-FileCopyrightText = "The Samoyed Authors"
+SPDX-License-Identifier = "GPL-2.0-or-later"
+
+[[annotations]]
+path = "debian/**"
+SPDX-FileCopyrightText = "(C) 2014 Iain R. Learmonth <irl@fsfe.org>"
+SPDX-License-Identifier = "GPL-2.0-or-later"
