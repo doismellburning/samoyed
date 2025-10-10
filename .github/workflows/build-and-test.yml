@@ -15,7 +15,6 @@ jobs:
       with:
         go-version: "1.25"
     - run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev libasound2-dev libavahi-client-dev libbsd-dev"
-    - run: "sudo apt install --yes reuse"  # For validating the licence config
     - run: "sudo apt install --yes morse2ascii"  # For decoding the morse
     - run: "make stats"
     - run: "make cmds"
@@ -23,6 +22,7 @@ jobs:
       run: "sudo apt install --yes direwolf"
     - run: "make test"
     - run: "make coveragereport"
+    - run: "pipx install reuse"  # For validating the licence config
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
