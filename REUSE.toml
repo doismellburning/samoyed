@@ -45,3 +45,8 @@ SPDX-License-Identifier = "GPL-2.0-or-later"
 path = "external/geotranz/**"
 SPDX-FileCopyrightText = "National Geospatial-Intelligence Agency"
 SPDX-License-Identifier = "LicenseRef-GEOTRANS"
+
+[[annotations]]
+path = "external/hidapi/**"
+SPDX-FileCopyrightText = "Alan Ott, Signal 11 Software"
+SPDX-License-Identifier = "GPL-3.0-only OR BSD-3-Clause OR LicenseRef-hidapi"
