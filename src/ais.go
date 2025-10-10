@@ -1,26 +1,6 @@
-
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2020  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
+package direwolf
 
 /********************************************************************************
- *
- * File:	ais.c
  *
  * Purpose:	Functions for processing received AIS transmissions and
  *		converting to NMEA sentence representation.
@@ -39,20 +19,19 @@
  *		
  *******************************************************************************/
 
-#include "direwolf.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <ctype.h>
-#include <string.h>
-
-#include "textcolor.h"
-#include "ais.h"
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <assert.h>
+// #include <ctype.h>
+// #include <string.h>
+// #include "textcolor.h"
+// #include "ais.h"
+import "C"
 
 // Lengths, in bits, for the AIS message types.
 
-#define NUM_TYPES 27
+/* FIXME KG 
 static const struct {
 	short min;
 	short max;
@@ -86,9 +65,8 @@ static const struct {
 	{ 60, 1064 },		// 26
 	{ 96, 168 }		// 27	96 or 168, not range
 };
+*/
 
-static void save_ship_data(char *mssi, char *shipname, char *callsign, char *destination);
-static void get_ship_data(char *mssi, char *comment, int comment_size);
 
 
 /*-------------------------------------------------------------------
@@ -657,21 +635,21 @@ static void save_ship_data(char *mssi, char *shipname, char *callsign, char *des
 	// Get list node, either existing or new.
 	struct ship_data_s *p = ships;
 	while (p != NULL) {
-	  if (strcmp(mssi, p->mssi) == 0) {
+	  if (strcmp(mssi, p.mssi) == 0) {
 	    break;
 	  }
-	  p = p->pnext;
+	  p = p.pnext;
 	}
 	if (p == NULL) {
 	  p = calloc(sizeof(struct ship_data_s),1);
-	  p->pnext = ships;
+	  p.pnext = ships;
 	  ships = p;
 	}
 
-	strlcpy (p->mssi, mssi, sizeof(p->mssi));
-	strlcpy (p->shipname, shipname, sizeof(p->shipname));
-	strlcpy (p->callsign, callsign, sizeof(p->callsign));
-	strlcpy (p->destination, destination, sizeof(p->destination));
+	strlcpy (p.mssi, mssi, sizeof(p.mssi));
+	strlcpy (p.shipname, shipname, sizeof(p.shipname));
+	strlcpy (p.callsign, callsign, sizeof(p.callsign));
+	strlcpy (p.destination, destination, sizeof(p.destination));
 }
 
 /*-------------------------------------------------------------------
@@ -691,17 +669,17 @@ static void get_ship_data(char *mssi, char *comment, int comment_size)
 {
 	struct ship_data_s *p = ships;
 	while (p != NULL) {
-	  if (strcmp(mssi, p->mssi) == 0) {
+	  if (strcmp(mssi, p.mssi) == 0) {
 	    break;
 	  }
-	  p = p->pnext;
+	  p = p.pnext;
 	}
 	if (p != NULL) {
-	  if (strlen(p->destination) > 0) {
-	    snprintf (comment, comment_size, "%s, %s, dest. %s", p->shipname, p->callsign, p->destination);
+	  if (strlen(p.destination) > 0) {
+	    snprintf (comment, comment_size, "%s, %s, dest. %s", p.shipname, p.callsign, p.destination);
 	  }
 	  else {
-	    snprintf (comment, comment_size, "%s, %s", p->shipname, p->callsign);
+	    snprintf (comment, comment_size, "%s, %s", p.shipname, p.callsign);
 	  }
 	}
 }
