@@ -162,8 +162,7 @@ func get_field_lon (base *byte, start int, length int) C.double {
 	}
 }
 
-static float get_field_speed (unsigned char *base, unsigned int start, unsigned int len)
-{
+func get_field_speed (base *byte, start int, length int) C.float {
 	// Raw 1023 means not available.
 	// Multiply by 0.1 to get knots.
 	// For aircraft it is knots, not deciknots.
@@ -171,11 +170,19 @@ static float get_field_speed (unsigned char *base, unsigned int start, unsigned 
 	// Message type 27 uses lower resolution, 6 bits rather than 10.
 	// It encodes minutes/10 rather than normal minutes/10000.
 
-	int n = get_field(base, start, len);
-	if (len == 6) {
-	  return ((n == 63) ? G_UNKNOWN : (float)n);
+	var n = get_field(base, start, length);
+	if (length == 6) {
+	  if (n == 63)  {
+return  G_UNKNOWN 
+} else {
+return  C.float(n)
+}
 	} else {
-	  return ((n == 1023) ? G_UNKNOWN : (float)n * 0.1);
+	  if (n == 1023)  {
+return  G_UNKNOWN 
+} else {
+return  C.float(n) * 0.1
+}
 	}
 }
 
@@ -187,16 +194,24 @@ static float get_field_course (unsigned char *base, unsigned int start, unsigned
 	// It encodes degrees rather than normal degrees/10.
 
 	int n = get_field(base, start, len);
-	if (len == 9) {
-	  return ((n == 360) ? G_UNKNOWN : (float)n);
+	if (length == 9) {
+	  if (n == 360)  {
+return  G_UNKNOWN 
+} else {
+return  C.float(n)
+}
 	} else {
-	  return ((n == 3600) ? G_UNKNOWN : (float)n * 0.1);
+	  if (n == 3600)  {
+return  G_UNKNOWN 
+} else {
+return  C.float(n) * 0.1
+}
 	}
 }
 
 static int get_field_ascii (unsigned char *base, unsigned int start, unsigned int len)
 {
-	assert (len == 6);
+	assert (length == 6);
 	int ch = get_field(base, start, len);
 	if (ch < 32) ch += 64;
 	return (ch);
@@ -204,8 +219,8 @@ static int get_field_ascii (unsigned char *base, unsigned int start, unsigned in
 
 static void get_field_string (unsigned char *base, unsigned int start, unsigned int len, char *result)
 {
-	assert (len % 6 == 0);
-	int nc = len / 6;	// Number of characters.
+	assert (length % 6 == 0);
+	int nc = length / 6;	// Number of characters.
 				// Caller better provide space for at least this +1.
 				// No bounds checking here.
 	for (int i = 0; i < nc; i++) {
