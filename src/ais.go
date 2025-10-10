@@ -186,14 +186,13 @@ return  C.float(n) * 0.1
 	}
 }
 
-static float get_field_course (unsigned char *base, unsigned int start, unsigned int len)
-{
+func get_field_course (base *byte, start int, length int) C.float {
 	// Raw 3600 means not available.
 	// Multiply by 0.1 to get degrees
 	// Message type 27 uses lower resolution, 9 bits rather than 12.
 	// It encodes degrees rather than normal degrees/10.
 
-	int n = get_field(base, start, len);
+	var n = get_field(base, start, length);
 	if (length == 9) {
 	  if (n == 360)  {
 return  G_UNKNOWN 
@@ -209,29 +208,31 @@ return  C.float(n) * 0.1
 	}
 }
 
-static int get_field_ascii (unsigned char *base, unsigned int start, unsigned int len)
-{
-	assert (length == 6);
-	int ch = get_field(base, start, len);
-	if (ch < 32) ch += 64;
+func get_field_ascii (base *byte, start int, length int) int {
+	Assert (length == 6);
+	var ch = get_field(base, start, length);
+	if (ch < 32) {
+		ch += 64;
+	}
 	return (ch);
 }
 
-static void get_field_string (unsigned char *base, unsigned int start, unsigned int len, char *result)
-{
-	assert (length % 6 == 0);
-	int nc = length / 6;	// Number of characters.
+func get_field_string (base *byte, start int, length int, result *C.char) {
+	Assert (length % 6 == 0);
+	var nc = length / 6;	// Number of characters.
 				// Caller better provide space for at least this +1.
 				// No bounds checking here.
-	for (int i = 0; i < nc; i++) {
+				for i := 0; i < nc; i++ {
 	  result[i] = get_field_ascii (base, start + i * 6, 6);
 	}
-	result[nc] = '\0';
+	result[nc] = 0;
 	// Officially it should be terminated/padded with @ but we also see trailing spaces.
-	char *p = strchr(result, '@');
-	if (p != nil) *p = '\0';
-	for (int k = strlen(result) - 1; k >= 0 && result[k] == ' '; k--) {
-	  result[k] = '\0';
+	var p = strchr(result, '@');
+	if (p != nil) {
+		p = 0
+	}
+	for k := strlen(result) - 1; k >= 0 && result[k] == ' '; k-- {
+	  result[k] = 0;
 	}
 }
 
@@ -301,7 +302,7 @@ void ais_to_nmea (unsigned char *ais, int ais_len, char *nmea, int nmea_size)
 	for (int k = 0; k < ns; k++) {
 	  payload[k] = sextet_to_char(get_field(ais, k*6, 6));
 	}
-	payload[ns] = '\0';
+	payload[ns] = 0;
 
 	strlcpy (nmea, "!AIVDM,1,1,,A,", nmea_size);
 	strlcat (nmea, payload, nmea_size);
@@ -318,7 +319,7 @@ void ais_to_nmea (unsigned char *ais, int ais_len, char *nmea, int nmea_size)
 
 	// Finally the NMEA style checksum.
 	int cs = 0;
-	for (char *p = nmea + 1; *p != '\0'; p++) {
+	for (char *p = nmea + 1; *p != 0; p++) {
 	  cs ^= *p;
 	}
 	char checksum[8];
@@ -374,7 +375,7 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
         unsigned char cs = 0;
         char *p;
 
-        for (p = stemp+1; *p != '*' && *p != '\0'; p++) {
+        for (p = stemp+1; *p != '*' && *p != 0; p++) {
           cs ^= *p;
         }
 
@@ -393,7 +394,7 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
 	  }
           return (-1);
         }
-        *p = '\0';      // Remove the checksum.
+        *p = 0;      // Remove the checksum.
 
 // Extract the comma separated fields.
 
