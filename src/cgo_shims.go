@@ -157,6 +157,33 @@ func DW_FEET_TO_METERS(x float64) float64 {
 	return x * 0.3048
 }
 
+// #define DW_MILES_TO_KM(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 1.609344)
+func DW_MILES_TO_KM(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 1.609344
+}
+
+// #define DW_MBAR_TO_INHG(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.0295333727)
+func DW_MBAR_TO_INHG(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.0295333727
+}
+
+// #define DW_KM_TO_MILES(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.621371192)
+func DW_KM_TO_MILES(x float64) float64 {
+	if x == G_UNKNOWN {
+		return G_UNKNOWN
+	}
+
+	return x * 0.621371192
+}
+
 var retry_text = []string{
 	"NONE",
 	"SINGLE",
@@ -190,4 +217,12 @@ const TO_CLIENT fromto_t = C.TO_CLIENT
 var FROMTO_PREFIX = map[fromto_t]string{
 	FROM_CLIENT: "<<<",
 	TO_CLIENT:   ">>>",
+}
+
+func bool2Cint(t bool) C.int {
+	if t {
+		return 1
+	} else {
+		return 0
+	}
 }
