@@ -353,26 +353,24 @@ func ais_to_nmea (ais *C.char, ais_len C.int, nmea *C.char, nmea_size C.int) {
 // Make buffer considerably larger to be safe.
 const NMEA_MAX_LEN = 240
 
-int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mssi, int mssi_size, double *odlat, double *odlon,
-			float *ofknots, float *ofcourse, float *ofalt_m, char *symtab, char *symbol, char *comment, int comment_size)
-{
-	char stemp[NMEA_MAX_LEN];	/* Make copy because parsing is destructive. */
+func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, mssi *C.char, mssi_size C.int, odlat *C.double, odlon *C.double,
+			ofknots *C.float, ofcourse *C.float, ofalt_m *C.float, symtab *C.char, symbol *C.char, comment *C.char, comment_size C.int) C.int {
 
-	strlcpy (mssi, "?", mssi_size);
+	C.strlcpy (mssi, "?", mssi_size);
 	*odlat = G_UNKNOWN;
 	*odlon = G_UNKNOWN;
 	*ofknots = G_UNKNOWN;
 	*ofcourse = G_UNKNOWN;
 	*ofalt_m = G_UNKNOWN;
 
-	strlcpy (stemp, sentence, sizeof(stemp));
+	var stemp = C.GoBytes(unsafe.Pointer(sentence), C.strlen(sentence))
 
 // Verify and remove checksum.
 
-        unsigned char cs = 0;
-        char *p;
+        var cs C.uchar = 0;
+        var p *C.char
 
-        for (p = stemp+1; *p != '*' && *p != 0; p++) {
+        for p = stemp+1; *p != '*' && *p != 0; p++ {
           cs ^= *p;
         }
 
@@ -395,15 +393,15 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
 
 // Extract the comma separated fields.
 
-	char *next;
+	var next *C.char
 
-	char *talker;			/* Expecting !AIVDM */
-	char *frag_count;		/* ignored */
-	char *frag_num;			/* ignored */
-	char *msg_id;			/* ignored */
-	char *radio_chan;		/* ignored */
-	char *payload;			/* Encoded as 6 bits per character. */
-	char *fill_bits;		/* Number of bits to discard. */
+	var talker *C.char			/* Expecting !AIVDM */
+	var frag_count *C.char		/* ignored */
+	var frag_num *C.char			/* ignored */
+	var msg_id *C.char			/* ignored */
+	var radio_chan *C.char		/* ignored */
+	var payload *C.char			/* Encoded as 6 bits per character. */
+	var fill_bits *C.char		/* Number of bits to discard. */
 
 	next = stemp;
 	talker = strsep(&next, ",");
@@ -417,11 +415,13 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
 	/* Suppress the 'set but not used' compiler warnings. */
 	/* Alternatively, we might use __attribute__((unused)) */
 
+	/* FIXME KG
 	(void)(talker);
 	(void)(frag_count);
 	(void)(frag_num);
 	(void)(msg_id);
 	(void)(radio_chan);
+	*/
 
 	if (payload == nil || strlen(payload) == 0) {
 	  if ( ! quiet) {
@@ -433,19 +433,19 @@ int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mss
 
 // Convert character representation to bit vector.
 	
-	unsigned char ais[256];
+	var ais[256]C.uchar
 	memset (ais, 0, sizeof(ais));
 
-	int plen = strlen(payload);
+	var plen = strlen(payload);
 
-	for (int k = 0; k < plen; k++) {
+	for k := 0; k < plen; k++ {
 	  set_field (ais, k*6, 6, char_to_sextet(payload[k]));
 	}
 
 // Verify number of filler bits.
 
-	int nfill = atoi(fill_bits);
-	int nbytes = (plen * 6) / 8;
+	var nfill = atoi(fill_bits);
+	var nbytes = (plen * 6) / 8;
 
 	if (nfill != plen * 6 - nbytes * 8) {
 	  if ( ! quiet) {
