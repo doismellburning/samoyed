@@ -1,9 +1,6 @@
 package direwolf
 
 // #include <stdio.h>
-// #include "ais.h"
-// int char_to_sextet (char ch);
-// int sextet_to_char (int val);
 import "C"
 
 import (
@@ -25,7 +22,7 @@ func test_sextet(t *testing.T) {
 	t.Helper()
 
 	for i := range 64 {
-		assert.Equal(t, i, int(C.char_to_sextet((C.char)(C.sextet_to_char(C.int(i))))))
+		assert.Equal(t, i, char_to_sextet(sextet_to_char(i)))
 	}
 }
 
@@ -39,7 +36,7 @@ func test_basic_parse(t *testing.T) {
 	var knots, course, alt_m C.float
 	var symtab, symbol C.char
 
-	var status = C.ais_parse(C.CString(ais), 0, &descr[0], C.int(len(descr)), &mssi[0], C.int(len(mssi)), &lat, &lon, &knots, &course, &alt_m, &symtab, &symbol, &comment[0], C.int(len(comment)))
+	var status = ais_parse(C.CString(ais), 0, &descr[0], C.int(len(descr)), &mssi[0], C.int(len(mssi)), &lat, &lon, &knots, &course, &alt_m, &symtab, &symbol, &comment[0], C.int(len(comment)))
 
 	assert.Equal(t, C.int(0), status)
 	assert.Equal(t, "AIS 1: Position Report Class A", C.GoString(&descr[0]))

@@ -67,7 +67,6 @@ package direwolf
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
-// #include "ais.h"
 // #include "kiss_frame.h"
 // extern int DECODE_APRS_UTIL;
 // void hex_dump (unsigned char *p, int len);

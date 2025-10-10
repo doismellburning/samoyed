@@ -31,7 +31,6 @@ package direwolf
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
-// #include "ais.h"
 import "C"
 
 import (
@@ -2461,7 +2460,7 @@ func aprs_user_defined(A *C.decode_aprs_t, info []byte) {
 		var lat, lon C.double
 		var knots, course, alt_meters C.float
 
-		C.ais_parse(C.CString(string(info[3:])), 0, &A.g_data_type_desc[0], C.int(len(A.g_data_type_desc)), &A.g_name[0], C.int(len(A.g_name)),
+		ais_parse(C.CString(string(info[3:])), 0, &A.g_data_type_desc[0], C.int(len(A.g_data_type_desc)), &A.g_name[0], C.int(len(A.g_name)),
 			&lat, &lon, &knots, &course, &alt_meters, &(A.g_symbol_table), &(A.g_symbol_code),
 			&A.g_comment[0], C.int(len(A.g_comment)))
 
