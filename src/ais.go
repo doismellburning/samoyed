@@ -287,23 +287,23 @@ func sextet_to_char (val int) byte {
  *
  *--------------------------------------------------------------------*/
 
-void ais_to_nmea (unsigned char *ais, int ais_len, char *nmea, int nmea_size)
-{
-	char payload[256];
+func ais_to_nmea (ais *C.char, ais_len C.int, nmea *C.char, nmea_size C.int) {
+
+	var payload[256]C.char
 	// Number of resulting characters for payload.
-	int ns = (ais_len * 8 + 5) / 6;
-	if (ns+1 > sizeof(payload)) {
+	var ns = (ais_len * 8 + 5) / 6;
+	if (ns+1 > len(payload)) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("AIS HDLC payload of %d bytes is too large.\n", ais_len);
 	  ns = sizeof(payload) - 1;
 	}
-	for (int k = 0; k < ns; k++) {
+	for k := 0; k < ns; k++ {
 	  payload[k] = sextet_to_char(get_field(ais, k*6, 6));
 	}
 	payload[ns] = 0;
 
-	strlcpy (nmea, "!AIVDM,1,1,,A,", nmea_size);
-	strlcat (nmea, payload, nmea_size);
+	C.strlcpy (nmea, "!AIVDM,1,1,,A,", nmea_size);
+	C.strlcat (nmea, payload, nmea_size);
 
 	// If the number of bytes in is not a multiple of 3, this does not
 	// produce a whole number of characters out. Extra padding bits were
@@ -311,18 +311,17 @@ void ais_to_nmea (unsigned char *ais, int ais_len, char *nmea, int nmea_size)
 	// decoding application can drop this number of bits from the end.
 	// At least, I think that is the way it should work.
 	// The examples all have 0.
-	char pad_bits[8];
-	snprintf (pad_bits, sizeof(pad_bits), ",%d", ns * 6 - ais_len * 8);
-	strlcat (nmea, pad_bits, nmea_size);
+	var pad_bytes = fmt.Sprintf(",%d", ns * 6 - ais_len * 8);
+	C.strlcat (nmea, C.CString(pad_bits), nmea_size);
 
 	// Finally the NMEA style checksum.
-	int cs = 0;
-	for (char *p = nmea + 1; *p != 0; p++) {
+	var cs = 0;
+	for p := nmea + 1; *p != 0; p++ {
 	  cs ^= *p;
 	}
-	char checksum[8];
-	snprintf (checksum, sizeof(checksum), "*%02X", cs & 0x7f);
-	strlcat (nmea, checksum, nmea_size);
+
+	var checksum = fmt.Sprintf("*%02X", cs & 0x7f);
+	C.strlcat (nmea, C.CString(checksum), nmea_size);
 }
 
 
@@ -352,7 +351,7 @@ void ais_to_nmea (unsigned char *ais, int ais_len, char *nmea, int nmea_size)
 
 // Maximum NMEA sentence length is 82, including CR/LF.
 // Make buffer considerably larger to be safe.
-#define NMEA_MAX_LEN 240
+const NMEA_MAX_LEN = 240
 
 int ais_parse (char *sentence, int quiet, char *descr, int descr_size, char *mssi, int mssi_size, double *odlat, double *odlon,
 			float *ofknots, float *ofcourse, float *ofalt_m, char *symtab, char *symbol, char *comment, int comment_size)
