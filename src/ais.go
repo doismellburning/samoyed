@@ -459,7 +459,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 // Extract the fields of interest from a few message types.
 // Don't get too carried away.
 
-	int aisType = get_field(ais, 0, 6);
+	var aisType = get_field(ais, 0, 6);
 
 	if (aisType >= 1 && aisType <= 27) {
 	  snprintf (mssi, mssi_size, "%09d", get_field(ais, 8, 30));
@@ -503,9 +503,9 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 	    *symtab = '/';
 	    *symbol = 's';		// Power boat (ship) side view
 	    {
-	      char callsign[12];
-	      char shipname[24];
-	      char destination[24];
+	      var callsign[12]C.char
+	      var shipname[24]C.char
+	      var destination[24]C.char
 	      get_field_string(ais, 70, 42, callsign);
 	      get_field_string(ais, 112, 120, shipname);
 	      get_field_string(ais, 302, 120, destination);
@@ -524,7 +524,9 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 	    *odlon = get_field_lon(ais, 61, 28);
 	    *odlat = get_field_lat(ais, 89, 27);
 	    *ofknots = get_field_speed(ais, 50, 10);	// plane is knots, not knots/10
-	    if (*ofknots != G_UNKNOWN) *ofknots = *ofknots * 10.0;
+	    if (*ofknots != G_UNKNOWN) {
+			*ofknots = *ofknots * 10.0;
+		}
 	    *ofcourse = get_field_course(ais, 116, 12);
 	    get_ship_data(mssi, comment, comment_size);
 	    break;
@@ -589,10 +591,9 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
  *
  *--------------------------------------------------------------------*/
 
-int ais_check_length (int aisType, int length)
-{
+func ais_check_length (aisType C.int, length C.int) C.int {
 	if (aisType >= 1 && aisType <= NUM_TYPES) {
-	  int b = length * 8;
+	  var b = length * 8;
 	  if (b >= valid_len[aisType].min && b <= valid_len[aisType].max) {
 	    return (0);		// Good.
 	  } else {
