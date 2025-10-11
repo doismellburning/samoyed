@@ -626,12 +626,12 @@ func ais_check_length (aisType C.int, length C.int) C.int {
  *
  *--------------------------------------------------------------------*/
 
-struct ship_data_s {
-	struct ship_data_s *pnext;
-	char mssi[9+1];
-	char shipname[20+1];
-	char callsign[7+1];
-	char destination[20+1];
+type ship_data_s struct {
+	pnext *ship_data_s
+	mssi[9+1]C.char
+	shipname[20+1]C.char
+	callsign[7+1]C.char
+	destination[20+1]C.char
 };
 
 // Just use a single linked list for now.
@@ -639,7 +639,7 @@ struct ship_data_s {
 // I don't think we need a critical region because all channels
 // should be serialized thru the receive queue.
 
-static struct ship_data_s *ships = nil;
+var ships *ship_data_s
 
 
 static void save_ship_data(char *mssi, char *shipname, char *callsign, char *destination)
