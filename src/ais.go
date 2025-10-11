@@ -75,11 +75,11 @@ static const struct {
 
 var mask = []byte{0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01}
 
-func get_bit(base byte, offset byte) bool {
+func get_bit(base []byte, offset uint) bool {
 	return ((base[offset>>3] & mask[offset&0x7]) != 0)
 }
 
-func set_bit(base *byte, offset byte, val bool) {
+func set_bit(base []byte, offset uint, val bool) {
 	if val {
 		base[offset>>3] |= mask[offset&0x7]
 	} else {
@@ -93,7 +93,7 @@ func set_bit(base *byte, offset byte, val bool) {
  *
  *--------------------------------------------------------------------*/
 
-func get_field(base *byte, start int, length int) int {
+func get_field(base []byte, start uint, length int) int {
 	var result = 0
 	for k := 0; k < length; k++ {
 		result <<= 1
@@ -102,7 +102,7 @@ func get_field(base *byte, start int, length int) int {
 	return (result)
 }
 
-func set_field(base *byte, start int, length int, val int) {
+func set_field(base []byte, start int, length int, val int) {
 	for k := 0; k < length; k++ {
 		set_bit(base, start+k, (val>>(length-1-k))&1)
 	}
