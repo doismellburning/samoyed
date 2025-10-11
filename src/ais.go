@@ -642,18 +642,18 @@ type ship_data_s struct {
 var ships *ship_data_s
 
 
-static void save_ship_data(char *mssi, char *shipname, char *callsign, char *destination)
-{
+func save_ship_data(mssi *C.char, shipname *C.char, callsign *C.char, destination *C.char) {
 	// Get list node, either existing or new.
-	struct ship_data_s *p = ships;
-	while (p != nil) {
+	var p = ships;
+	for (p != nil) {
 	  if (strcmp(mssi, p.mssi) == 0) {
 	    break;
 	  }
 	  p = p.pnext;
 	}
+
 	if (p == nil) {
-	  p = calloc(sizeof(struct ship_data_s),1);
+	  p = new(ship_data_s)
 	  p.pnext = ships;
 	  ships = p;
 	}
@@ -677,10 +677,9 @@ static void save_ship_data(char *mssi, char *shipname, char *callsign, char *des
  *
  *--------------------------------------------------------------------*/
 
-static void get_ship_data(char *mssi, char *comment, int comment_size)
-{
-	struct ship_data_s *p = ships;
-	while (p != nil) {
+func get_ship_data(mssi *C.char, comment *C.char, comment_size C.int) {
+	var p = ships;
+	for (p != nil) {
 	  if (strcmp(mssi, p.mssi) == 0) {
 	    break;
 	  }
