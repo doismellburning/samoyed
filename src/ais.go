@@ -459,18 +459,18 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 // Extract the fields of interest from a few message types.
 // Don't get too carried away.
 
-	int type = get_field(ais, 0, 6);
+	int aisType = get_field(ais, 0, 6);
 
-	if (type >= 1 && type <= 27) {
+	if (aisType >= 1 && aisType <= 27) {
 	  snprintf (mssi, mssi_size, "%09d", get_field(ais, 8, 30));
 	}
-	switch (type) {
+	switch (aisType) {
 
 	  case 1:	// Position Report Class A
 	  case 2:
 	  case 3:
 
-	    snprintf (descr, descr_size, "AIS %d: Position Report Class A", type);
+	    snprintf (descr, descr_size, "AIS %d: Position Report Class A", aisType);
 	    *symtab = '/';
 	    *symbol = 's';		// Power boat (ship) side view
 	    *odlon = get_field_lon(ais, 61, 28);
@@ -482,7 +482,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 
 	  case 4:	// Base Station Report
 
-	    snprintf (descr, descr_size, "AIS %d: Base Station Report", type);
+	    snprintf (descr, descr_size, "AIS %d: Base Station Report", aisType);
 	    *symtab = '\\';
 	    *symbol = 'L';		// Lighthouse
 	    //year = get_field(ais, 38, 14);
@@ -499,7 +499,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 
 	  case 5:	// Static and Voyage Related Data
 
-	    snprintf (descr, descr_size, "AIS %d: Static and Voyage Related Data", type);
+	    snprintf (descr, descr_size, "AIS %d: Static and Voyage Related Data", aisType);
 	    *symtab = '/';
 	    *symbol = 's';		// Power boat (ship) side view
 	    {
@@ -517,7 +517,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 
 	  case 9:	// Standard SAR Aircraft Position Report
 
-	    snprintf (descr, descr_size, "AIS %d: SAR Aircraft Position Report", type);
+	    snprintf (descr, descr_size, "AIS %d: SAR Aircraft Position Report", aisType);
 	    *symtab = '/';
 	    *symbol = '\'';		// Small AIRCRAFT
 	    *ofalt_m = get_field(ais, 38, 12);		// meters, 4095 means not available
@@ -532,7 +532,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 	  case 18:	// Standard Class B CS Position Report
 			// As an oversimplification, Class A is commercial, B is recreational.
 
-	    snprintf (descr, descr_size, "AIS %d: Standard Class B CS Position Report", type);
+	    snprintf (descr, descr_size, "AIS %d: Standard Class B CS Position Report", aisType);
 	    *symtab = '/';
 	    *symbol = 'Y';		// YACHT (sail)
 	    *odlon = get_field_lon(ais, 57, 28);
@@ -542,7 +542,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 
 	  case 19:	// Extended Class B CS Position Report
 
-	    snprintf (descr, descr_size, "AIS %d: Extended Class B CS Position Report", type);
+	    snprintf (descr, descr_size, "AIS %d: Extended Class B CS Position Report", aisType);
 	    *symtab = '/';
 	    *symbol = 'Y';		// YACHT (sail)
 	    *odlon = get_field_lon(ais, 57, 28);
@@ -552,7 +552,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 
 	  case 27:	// Long Range AIS Broadcast message
 
-	    snprintf (descr, descr_size, "AIS %d: Long Range AIS Broadcast message", type);
+	    snprintf (descr, descr_size, "AIS %d: Long Range AIS Broadcast message", aisType);
 	    *symtab = '\\';
 	    *symbol = 's';		// OVERLAY SHIP/boat (top view)
 	    *odlon = get_field_lon(ais, 44, 18);	// Note: minutes/10 rather than usual /10000.
@@ -563,7 +563,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
 	    break;
 
 	  default:
-	    snprintf (descr, descr_size, "AIS message type %d", type);
+	    snprintf (descr, descr_size, "AIS message type %d", aisType);
 	    break;
 	}
 
@@ -579,7 +579,7 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
  *
  * Purpose:    	Verify frame length against expected.
  *
- * Inputs:	type		Message type, 1 - 27.
+ * Inputs:	aisType		Message type, 1 - 27.
  *
  *		length		Number of data octets in in frame.
  *
@@ -589,21 +589,21 @@ func ais_parse (sentence *C.char, quiet C.int, descr *C.char, descr_size C.int, 
  *
  *--------------------------------------------------------------------*/
 
-int ais_check_length (int type, int length)
+int ais_check_length (int aisType, int length)
 {
-	if (type >= 1 && type <= NUM_TYPES) {
+	if (aisType >= 1 && aisType <= NUM_TYPES) {
 	  int b = length * 8;
-	  if (b >= valid_len[type].min && b <= valid_len[type].max) {
+	  if (b >= valid_len[aisType].min && b <= valid_len[aisType].max) {
 	    return (0);		// Good.
 	  } else {
 	    //text_color_set (DW_COLOR_ERROR);
             //dw_printf("AIS ERROR: type %d, has %d bits when %d to %d expected.\n",
-	    //	type, b, valid_len[type].min, valid_len[type].max);
+	    //	type, b, valid_len[aisType].min, valid_len[aisType].max);
 	    return (1);		// Length out of range.
 	  }
 	} else {
 	  //text_color_set (DW_COLOR_ERROR);
-          //dw_printf("AIS ERROR: message type %d is invalid.\n", type);
+          //dw_printf("AIS ERROR: message type %d is invalid.\n", aisType);
 	  return (-1);		// Invalid type.
 	}
 
