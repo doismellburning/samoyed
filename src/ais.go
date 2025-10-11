@@ -83,7 +83,7 @@ func set_bit(base []byte, offset uint, val bool) {
 	if val {
 		base[offset>>3] |= mask[offset&0x7]
 	} else {
-		base[offset>>3] &= ~mask[offset&0x7]
+		base[offset>>3] &= ^mask[offset&0x7]
 	}
 }
 
