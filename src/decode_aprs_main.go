@@ -67,7 +67,6 @@ package direwolf
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
-// #include "telemetry.h"
 // #include "ais.h"
 // #include "deviceid.h"
 // #include "kiss_frame.h"

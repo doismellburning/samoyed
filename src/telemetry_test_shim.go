@@ -11,7 +11,6 @@ package direwolf
 // #include "ax25_pad.h"			// for packet_t, AX25_MAX_ADDR_LEN
 // #include "decode_aprs.h"		// for decode_aprs_t, G_UNKNOWN
 // #include "textcolor.h"
-// #include "telemetry.h"
 // struct t_metadata_s * t_get_metadata (char *station);
 import "C"
 
@@ -20,30 +19,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
-func telemetry_data_original(station string, info string, quiet C.int, output *C.char, outputsize C.size_t, comment *C.char, commentsize C.size_t) {
-	C.telemetry_data_original(C.CString(station), C.CString(info), quiet, output, outputsize, comment, commentsize)
-}
-
-func telemetry_data_base91(station string, cdata string, output *C.char, outputsize C.size_t) {
-	C.telemetry_data_base91(C.CString(station), C.CString(cdata), output, outputsize)
-}
-
-func telemetry_name_message(station string, msg string) {
-	C.telemetry_name_message(C.CString(station), C.CString(msg))
-}
-
-func telemetry_unit_label_message(station string, msg string) {
-	C.telemetry_unit_label_message(C.CString(station), C.CString(msg))
-}
-
-func telemetry_coefficents_message(station string, msg string, quiet C.int) {
-	C.telemetry_coefficents_message(C.CString(station), C.CString(msg), quiet)
-}
-
-func telemetry_bit_sense_message(station string, msg string, quiet C.int) {
-	C.telemetry_bit_sense_message(C.CString(station), C.CString(msg), quiet)
-}
 
 func telemetry_test_main(t *testing.T) {
 	t.Helper()

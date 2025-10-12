@@ -31,4 +31,3 @@ func two_base91_to_i(c *C.char) C.int {
 	}
 	return (result)
 }
-
