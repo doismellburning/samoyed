@@ -191,6 +191,7 @@ x = Silence FX.25 information.`)
 	var il2pInverted = pflag.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 uses weaker FEC.")
 	var aisToAPRS = pflag.BoolP("ais-to-aprs", "A", false, "Convert AIS positions to APRS Object Reports.")
 
+	var showVersion = pflag.BoolP("version", "V", false, "Show version.")
 	var help = pflag.BoolP("help", "h", false, "Display help text.")
 
 	pflag.Usage = func() {
@@ -211,6 +212,12 @@ x = Silence FX.25 information.`)
 	if *help {
 		pflag.Usage()
 		os.Exit(1)
+	}
+
+	if *showVersion {
+		C.text_color_init(C.int(*textColor))
+		printVersion(true)
+		os.Exit(0)
 	}
 
 	if *printUTF8Test {
@@ -585,10 +592,7 @@ x = Silence FX.25 information.`)
 	// https://msdn.microsoft.com/en-us/library/ms724451(v=VS.85).aspx
 
 	C.text_color_init(C.int(*textColor))
-	C.text_color_set(C.DW_COLOR_INFO)
-	// fmt.Printf ("Dire Wolf version %d.%d (%s) BETA TEST 7\n", MAJOR_VERSION, MINOR_VERSION, __DATE__);
-	fmt.Printf("Dire Wolf DEVELOPMENT version %d.%d %s (%s)\n", C.MAJOR_VERSION, C.MINOR_VERSION, "D", C.__DATE__)
-	// fmt.Printf ("Dire Wolf version %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
+	printVersion(false)
 
 	C.setlinebuf(C.stdout)
 	setup_sigint_handler()
