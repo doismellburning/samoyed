@@ -12,7 +12,7 @@ cmds: $(CMDS)
 
 # samoyed, ll2utm, etc. etc.
 $(CMDS): $(C_FILES) $(GO_FILES)
-	go build ./cmd/$@/...
+	go build -ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$@/...
 
 .PHONY: test
 test: gotest test-scripts
