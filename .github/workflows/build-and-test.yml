@@ -5,15 +5,25 @@ on:
     tags:
     - "**"
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build_and_test:
     runs-on: "ubuntu-latest"
+    outputs:
+      SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
     steps:
     - uses: "actions/checkout@v5"
     - uses: "actions/setup-go@v6"
       with:
         go-version: "1.25"
+    - name: "Generate Version"
+      id: "version"
+      run: |
+        export SAMOYED_VERSION=$(date --utc +%Y.%m.%d.%s)-$(git rev-parse --short HEAD)
+        echo "Version: $SAMOYED_VERSION"
+        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT  # Output to be used by the release job
+        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV  # Env to be used by the make build
     - run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev libasound2-dev libavahi-client-dev libbsd-dev"
     - run: "sudo apt install --yes morse2ascii"  # For decoding the morse
     - run: "make stats"
@@ -26,3 +36,28 @@ jobs:
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
+    - uses: "actions/upload-artifact@v4"
+      with:
+        name: "direwolf"
+        path: "direwolf"
+        if-no-files-found: "error"
+
+  release:
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: build_and_test
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/download-artifact@v5"
+      with:
+        name: "direwolf"
+    - name: "Create Release"
+      uses: "softprops/action-gh-release@v2"
+      with:
+        tag_name: "${{ needs.build_and_test.outputs.SAMOYED_VERSION }}"
+        name: "Release ${{ needs.build_and_test.outputs.SAMOYED_VERSION }}"
+        body: |
+          Automated release for commit ${{ github.sha }}.
+
+          CHANGELOG forthcoming.
+        files: "direwolf"
+        draft: true  # TODO Fix
