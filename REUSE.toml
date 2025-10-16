@@ -5,7 +5,6 @@ path = [
 	"*png",
 	"CMakeLists.txt",
 	"audio_win.txt",
-	"cmake/**",
 	"conf/**",
 	"data/**",
 	"doc/**",
@@ -15,7 +14,6 @@ path = [
 	"src/*.c",
 	"src/*.h",
 	"systemd/**",
-	"test/**",
 ]
 SPDX-FileCopyrightText = "The Dire Wolf Authors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
