@@ -16,7 +16,7 @@ $(CMDS): $(C_FILES) $(GO_FILES)
 
 .PHONY: dist
 dist: $(CMDS)
-	tar czvf samoyed-$(SAMOYED_VERSION)-$(shell uname -s)-$(shell uname -m).tgz $(CMDS)
+	tar czvf samoyed-$(SAMOYED_VERSION)-$(shell go env GOOS)-$(shell go env GOARCH).tgz $(CMDS)
 
 .PHONY: test
 test: gotest test-scripts
