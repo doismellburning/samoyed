@@ -14,6 +14,10 @@ cmds: $(CMDS)
 $(CMDS): $(C_FILES) $(GO_FILES)
 	go build -ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$@/...
 
+.PHONY: dist
+dist: $(CMDS)
+	tar czvf samoyed-$(SAMOYED_VERSION)-$(shell go env GOOS)-$(shell go env GOARCH).tgz $(CMDS)
+
 .PHONY: test
 test: gotest test-scripts
 
