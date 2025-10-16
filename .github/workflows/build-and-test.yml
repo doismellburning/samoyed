@@ -63,4 +63,5 @@ jobs:
 
           CHANGELOG forthcoming.
         files: "samoyed/*.tgz"
+        fail_on_unmatched_files: true
         draft: true  # TODO Fix
