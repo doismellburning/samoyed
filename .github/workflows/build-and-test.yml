@@ -36,10 +36,11 @@ jobs:
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
+    - run: "make dist"
     - uses: "actions/upload-artifact@v4"
       with:
-        name: "direwolf"
-        path: "direwolf"
+        name: "samoyed"
+        path: "samoyed*tgz"
         if-no-files-found: "error"
 
   release:
@@ -51,7 +52,7 @@ jobs:
     steps:
     - uses: "actions/download-artifact@v5"
       with:
-        name: "direwolf"
+        name: "samoyed"
     - name: "Create Release"
       uses: "softprops/action-gh-release@v2"
       with:
@@ -61,5 +62,5 @@ jobs:
           Automated release for commit ${{ github.sha }}.
 
           CHANGELOG forthcoming.
-        files: "direwolf"
+        files: "samoyed/*.tgz"
         draft: true  # TODO Fix

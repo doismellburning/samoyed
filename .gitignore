@@ -24,6 +24,8 @@
 
 /tags
 
+*.tgz
+
 # Custom
 *.docx
 z*
