@@ -1,30 +1,7 @@
-/samoyed
+/dist
 /bin
-/aclients
-/appserver
-/atest
-/cm108
-/decode_aprs
-/direwolf
-/dwgpsnmea
-/gen_packets
-/gen_tone
-/il2p_test
-/kissutil
-/ll2utm
-/log2gpx
-/fxrec
-/fxsend
-/text2tt
-/tnctest
-/tt2text
-/ttcalc
-/utm2ll
-/walk96
 
 /tags
-
-*.tgz
 
 # Custom
 *.docx
