@@ -1,14 +1,14 @@
 #!/bin/bash
 
-ATEST="$(dirname "$(realpath "$0")")/../atest"
+ATEST="$(dirname "$(realpath "$0")")/../dist/atest"
 export ATEST
 
-FXSEND="$(dirname "$(realpath "$0")")/../fxsend"
+FXSEND="$(dirname "$(realpath "$0")")/../dist/fxsend"
 export FXSEND
-FXREC="$(dirname "$(realpath "$0")")/../fxrec"
+FXREC="$(dirname "$(realpath "$0")")/../dist/fxrec"
 export FXREC
 
-GEN_PACKETS="$(dirname "$(realpath "$0")")/../gen_packets"
+GEN_PACKETS="$(dirname "$(realpath "$0")")/../dist/gen_packets"
 export GEN_PACKETS
 
 function goto_tmpdir() {
