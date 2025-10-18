@@ -1,3 +1,4 @@
+DIST_DIR = dist
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SRC_DIRS = ./cmd/... ./src/...
@@ -11,12 +12,15 @@ all: $(CMDS) test
 cmds: $(CMDS)
 
 # samoyed, ll2utm, etc. etc.
-$(CMDS): $(C_FILES) $(GO_FILES)
-	go build -ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$@/...
+.PHONY: $(CMDS)
+.SECONDEXPANSION:
+$(CMDS): $(addprefix $(DIST_DIR)/,$$@)
 
-.PHONY: dist
-dist: $(CMDS)
-	tar czvf samoyed-$(SAMOYED_VERSION)-$(shell go env GOOS)-$(shell go env GOARCH).tgz $(CMDS)
+$(DIST_DIR)/%: $(DIST_DIR) $(C_FILES) $(GO_FILES) ./cmd/%
+	go build -o $(DIST_DIR)/ -ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=$(SAMOYED_VERSION)'" ./cmd/$*/...
+
+$(DIST_DIR):
+	mkdir -p $(DIST_DIR)
 
 .PHONY: test
 test: gotest test-scripts
