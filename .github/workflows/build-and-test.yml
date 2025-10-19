@@ -36,11 +36,16 @@ jobs:
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
+    - name: "Set filename"
+      run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> $GITHUB_ENV'
+    - name: "Build tarball"
+      run: "tar czvf \"$TARBALL_NAME\" dist/"
     - uses: "actions/upload-artifact@v4"
       with:
-        name: "samoyed-${{ env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}"
-        path: "dist/"
+        name: "${{ env.TARBALL_NAME }}"
+        path: "${{ env.TARBALL_NAME }}"
         if-no-files-found: "error"
+        compression-level: 0
 
   release:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
@@ -51,7 +56,7 @@ jobs:
     steps:
     - uses: "actions/download-artifact@v5"
       with:
-        name: "samoyed"
+        merge-multiple: true
     - name: "Create Release"
       uses: "softprops/action-gh-release@v2"
       with:
@@ -61,6 +66,6 @@ jobs:
           Automated release for commit ${{ github.sha }}.
 
           CHANGELOG forthcoming.
-        files: "samoyed/*.tgz"
+        files: "*.tgz"
         fail_on_unmatched_files: true
         draft: true  # TODO Fix
