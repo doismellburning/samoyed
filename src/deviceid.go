@@ -81,7 +81,7 @@ static int tocalls_index = -1;		// Current index for filling in.
 // If search order is changed, do the same in symbols.c for consistency.
 // fopen is perfectly happy with / in file path when running on Windows.
 
-var search_locations[]string = {
+var search_locations= []string {
 	 "tocalls.yaml",			// Current working directory
 	 "data/tocalls.yaml",		// Windows with CMake
 	 "../data/tocalls.yaml",		// Source tree
@@ -98,15 +98,15 @@ var search_locations[]string = {
 
 func deviceid_init() {
 
-	FILE *fp = nil;
-	for (int n = 0; search_locations[n] != nil && fp == nil; n++) {
+	var fp FILE
+	for n := 0; search_locations[n] != nil && fp == nil; n++ {
 	  fp = fopen(search_locations[n], "r");
-	};
+	}
 
 	if (fp == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("Could not open any of these file locations:\n");
-	  for (int n = 0; search_locations[n] != nil; n++) {
+	  for n := 0; search_locations[n] != nil; n++ {
 	    dw_printf ("    %s\n", search_locations[n]);
 	  }
 	  dw_printf("It won't be possible to extract device identifiers from packets.\n");
@@ -119,19 +119,21 @@ func deviceid_init() {
 // Read file second time to gather data.
 
 	enum { no_section, mice_section, tocalls_section} section = no_section;
-	char stuff[80];
+	var stuff string
 
-	for (int pass = 1; pass <=2; pass++) {
-	 int line = 0;		// Line number within file.
+	for pass := 1; pass <=2; pass++ {
+	 var line = 0;		// Line number within file.
 
-	 while (fgets(stuff, sizeof(stuff), fp)) {
+	 for (fgets(stuff, sizeof(stuff), fp)) {
 	  line++;
 
 	  // Remove trailing CR/LF or spaces.
-	  char *p = stuff + strlen(stuff) - 1;
+	  var p = stuff + strlen(stuff) - 1;
+	  /* FIXME KG
 	  while (p >= (char*)stuff && (*p == '\r' || *p == '\n' || *p == ' ')) {
 	    *p-- = '\0';
 	  }
+	  */
 
 	  // Ignore comment lines.
 	  if (stuff[0] == '#') {
