@@ -23,28 +23,32 @@ import "C"
 // The .yaml file has two separate sections for MIC-E but they can
 // both be handled as a single more general case.
 
-struct mice {
-	char prefix[4];		// The legacy form has 1 prefix character.
+type mice struct {
+	prefix[4]C.char;		// The legacy form has 1 prefix character.
 				// The newer form has none.  (more accurately ` or ')
-	char suffix[4];		// The legacy form has 0 or 1.
+	suffix[4]C.char		// The legacy form has 0 or 1.
 				// The newer form has 2.
-	char *vendor;
-	char *model;
+	vendor string
+	model string
 };
 
-struct tocalls {
-	char tocall[8];		// Up to 6 characters.  Some may have wildcards at the end.
+type tocalls struct {
+	tocall[8]C.char;		// Up to 6 characters.  Some may have wildcards at the end.
 				// Most often they are trailing "??" or "?" or "???" in one case.
 				// Sometimes there is trailing "nnn".  Does that imply digits only?
 				// Sometimes we see a trailing "*".  Is "*" different than "?"?
 				// There are a couple bizzare cases like APnnnD which can
 				// create an ambigious situation. APMPAD, APRFGD, APY0[125]D.
 				// Screw them if they can't follow the rules.  I'm not putting in a special case.
-	char *vendor;
-	char *model;
+	vendor string
+	model string
 };
 
 
+var pmice []*mice
+var ptocalls []*tocalls
+
+/* FIXME KG
 static struct mice *pmice = NULL;	// Pointer to array.
 static int mice_count = 0;		// Number of allocated elements.
 static int mice_index = -1;		// Current index for filling in.
@@ -52,6 +56,7 @@ static int mice_index = -1;		// Current index for filling in.
 static struct tocalls *ptocalls = NULL;	// Pointer to array.
 static int tocalls_count = 0;		// Number of allocated elements.
 static int tocalls_index = -1;		// Current index for filling in.
+*/
 
 
 
