@@ -96,8 +96,8 @@ var search_locations[]string = {
 };
 
 
-void deviceid_init(void)
-{
+func deviceid_init() {
+
 	FILE *fp = NULL;
 	for (int n = 0; search_locations[n] != NULL && fp == NULL; n++) {
 	  fp = fopen(search_locations[n], "r");
