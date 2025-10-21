@@ -68,3 +68,4 @@ jobs:
         files: "*.tgz"
         fail_on_unmatched_files: true
         draft: true  # TODO Fix
+        prerelease: true
