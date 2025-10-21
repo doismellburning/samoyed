@@ -19,10 +19,6 @@ package direwolf
 // #include "textcolor.h"
 import "C"
 
-static void unquote (int line, char *pin, char *pout);
-static int tocall_cmp (const void *px, const void *py);
-static int mice_cmp (const void *px, const void *py);
-
 // Structures to hold mapping from encoded form to vendor and model.
 // The .yaml file has two separate sections for MIC-E but they can
 // both be handled as a single more general case.
