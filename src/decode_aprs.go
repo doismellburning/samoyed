@@ -245,7 +245,7 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 	case '`': /* Current Mic-E Data */
 
 	default:
-		C.deviceid_decode_dest(&A.g_dest[0], &A.g_mfr[0], C.size_t(len(A.g_mfr)))
+		C.strcpy(&A.g_mfr[0], C.CString(deviceid_decode_dest(C.GoString(&A.g_dest[0]))))
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -1442,25 +1442,26 @@ func aprs_mic_e(A *C.decode_aprs_t, pp C.packet_t, info []byte) {
 	/* Now try to pick out manufacturer and other optional items. */
 	/* The telemetry field, in the original spec, is no longer used. */
 
-	var trimmed [256]C.char // Comment with vendor/model removed.
-	deviceid_decode_mice(string(mcomment), &trimmed[0], len(trimmed), &A.g_mfr[0], len(A.g_mfr))
+	// Comment with vendor/model removed.
+	var trimmed, device = deviceid_decode_mice(string(mcomment))
+	C.strcpy(&A.g_mfr[0], C.CString(device))
 
 	// Possible altitude at beginning of remaining comment.
 	// Three base 91 characters followed by }
 
-	if C.strlen(&trimmed[0]) >= 4 &&
-		isdigit91(byte(trimmed[0])) &&
-		isdigit91(byte(trimmed[1])) &&
-		isdigit91(byte(trimmed[2])) &&
+	if len(trimmed) >= 4 &&
+		isdigit91(trimmed[0]) &&
+		isdigit91(trimmed[1]) &&
+		isdigit91(trimmed[2]) &&
 		trimmed[3] == '}' {
 
 		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
-		process_comment(A, C.GoBytes(unsafe.Pointer(&trimmed[4]), C.int(C.strlen(&trimmed[4]))))
+		process_comment(A, []byte(trimmed)[4:])
 		return
 	}
 
-	process_comment(A, C.GoBytes(unsafe.Pointer(&trimmed[0]), C.int(C.strlen(&trimmed[0]))))
+	process_comment(A, []byte(trimmed))
 
 } // end aprs_mic_e
 
