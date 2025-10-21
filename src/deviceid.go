@@ -81,22 +81,18 @@ static int tocalls_index = -1;		// Current index for filling in.
 // If search order is changed, do the same in symbols.c for consistency.
 // fopen is perfectly happy with / in file path when running on Windows.
 
-static const char *search_locations[] = {
-	(const char *) "tocalls.yaml",			// Current working directory
-	(const char *) "data/tocalls.yaml",		// Windows with CMake
-	(const char *) "../data/tocalls.yaml",		// Source tree
-#ifndef __WIN32__
-	(const char *) "/usr/local/share/direwolf/tocalls.yaml",
-	(const char *) "/usr/share/direwolf/tocalls.yaml",
-#endif
-#if __APPLE__
+var search_locations[]string = {
+	 "tocalls.yaml",			// Current working directory
+	 "data/tocalls.yaml",		// Windows with CMake
+	 "../data/tocalls.yaml",		// Source tree
+	 "/usr/local/share/direwolf/tocalls.yaml",
+	 "/usr/share/direwolf/tocalls.yaml",
 	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
 	// Adding the /opt/local tree since macports typically installs there.  Users might want their
 	// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
 	// path as well.
-	(const char *) "/opt/local/share/direwolf/tocalls.yaml",
-#endif
-	(const char *) NULL		// Important - Indicates end of list.
+	 "/opt/local/share/direwolf/tocalls.yaml",
+
 };
 
 
