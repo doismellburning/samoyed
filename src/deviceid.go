@@ -301,10 +301,10 @@ static int tocall_cmp (const void *px, const void *py)
 	const struct tocalls *x = (struct tocalls *)px;
 	const struct tocalls *y = (struct tocalls *)py;
 
-	if (strlen(x->tocall) != strlen(y->tocall)) {
-	  return (strlen(y->tocall) - strlen(x->tocall));
+	if (strlen(x.tocall) != strlen(y.tocall)) {
+	  return (strlen(y.tocall) - strlen(x.tocall));
 	}
-	return (strcmp(x->tocall, y->tocall));
+	return (strcmp(x.tocall, y.tocall));
 }
 
 // Used to sort the suffixes by length.
@@ -316,7 +316,7 @@ static int mice_cmp (const void *px, const void *py)
 	const struct mice *x = (struct mice *)px;
 	const struct mice *y = (struct mice *)py;
 
-	return (strlen(y->suffix) - strlen(x->suffix));
+	return (strlen(y.suffix) - strlen(x.suffix));
 }
 
 
