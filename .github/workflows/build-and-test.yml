@@ -64,8 +64,7 @@ jobs:
         name: "Release ${{ needs.build_and_test.outputs.SAMOYED_VERSION }}"
         body: |
           Automated release for commit ${{ github.sha }}.
-
-          CHANGELOG forthcoming.
+        generate_release_notes: true
         files: "*.tgz"
         fail_on_unmatched_files: true
         draft: true  # TODO Fix
