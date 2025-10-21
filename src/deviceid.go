@@ -49,11 +49,11 @@ var pmice []*mice
 var ptocalls []*tocalls
 
 /* FIXME KG
-static struct mice *pmice = NULL;	// Pointer to array.
+static struct mice *pmice = nil;	// Pointer to array.
 static int mice_count = 0;		// Number of allocated elements.
 static int mice_index = -1;		// Current index for filling in.
 
-static struct tocalls *ptocalls = NULL;	// Pointer to array.
+static struct tocalls *ptocalls = nil;	// Pointer to array.
 static int tocalls_count = 0;		// Number of allocated elements.
 static int tocalls_index = -1;		// Current index for filling in.
 */
@@ -98,15 +98,15 @@ var search_locations[]string = {
 
 func deviceid_init() {
 
-	FILE *fp = NULL;
-	for (int n = 0; search_locations[n] != NULL && fp == NULL; n++) {
+	FILE *fp = nil;
+	for (int n = 0; search_locations[n] != nil && fp == nil; n++) {
 	  fp = fopen(search_locations[n], "r");
 	};
 
-	if (fp == NULL) {
+	if (fp == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("Could not open any of these file locations:\n");
-	  for (int n = 0; search_locations[n] != NULL; n++) {
+	  for (int n = 0; search_locations[n] != nil; n++) {
 	    dw_printf ("    %s\n", search_locations[n]);
 	  }
 	  dw_printf("It won't be possible to extract device identifiers from packets.\n");
@@ -349,7 +349,7 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 {
 	strlcpy (device, "UNKNOWN vendor/model", device_size);
 
-	if (ptocalls == NULL) {
+	if (ptocalls == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("deviceid_decode_dest called without any deviceid data.\n");
 	  return;
@@ -358,19 +358,19 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 	for (int n = 0; n < tocalls_count; n++) {
 	  if (strncmp(dest, ptocalls[n].tocall, strlen(ptocalls[n].tocall)) == 0) {
 
-	    if (ptocalls[n].vendor != NULL) {
+	    if (ptocalls[n].vendor != nil) {
 	      strlcpy (device, ptocalls[n].vendor, device_size);
 	    }
 
-	    if (ptocalls[n].vendor != NULL && ptocalls[n].model != NULL) {
+	    if (ptocalls[n].vendor != nil && ptocalls[n].model != nil) {
 	      strlcat (device, " ", device_size);
 	    }
 
-	    if (ptocalls[n].vendor == NULL && ptocalls[n].model != NULL) {
+	    if (ptocalls[n].vendor == nil && ptocalls[n].model != nil) {
 	      strlcpy (device, "", device_size);
 	    }
 
-	    if (ptocalls[n].model != NULL) {
+	    if (ptocalls[n].model != nil) {
 	      strlcat (device, ptocalls[n].model, device_size);
 	    }
 	    return;
@@ -444,7 +444,7 @@ void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, ch
 	  return;
 	}
 
-	if (ptocalls == NULL) {
+	if (ptocalls == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("deviceid_decode_mice called without any deviceid data.\n");
 	  return;
@@ -469,15 +469,15 @@ void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, ch
 		pmice[n].suffix,
 	        strlen(pmice[n].suffix)) == 0)  ) {
 
-	    if (pmice[n].vendor != NULL) {
+	    if (pmice[n].vendor != nil) {
 	      strlcpy (device, pmice[n].vendor, device_size);
 	    }
 
-	    if (pmice[n].vendor != NULL && pmice[n].model != NULL) {
+	    if (pmice[n].vendor != nil && pmice[n].model != nil) {
 	      strlcat (device, " ", device_size);
 	    }
 
-	    if (pmice[n].model != NULL) {
+	    if (pmice[n].model != nil) {
 	      strlcat (device, pmice[n].model, device_size);
 	    }
 
