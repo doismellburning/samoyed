@@ -142,11 +142,9 @@ func deviceid_init() {
 
 	  if (strncmp(stuff, "mice:", strlen("mice:")) == 0) {
 	    section = mice_section;
-	  }
-	  else if (strncmp(stuff, "micelegacy:", strlen("micelegacy:")) == 0) {
+	  } else if (strncmp(stuff, "micelegacy:", strlen("micelegacy:")) == 0) {
 	    section = mice_section;  // treat both same.
-	  }
-	  else if (strncmp(stuff, "tocalls:", strlen("tocalls:")) == 0) {
+	  } else if (strncmp(stuff, "tocalls:", strlen("tocalls:")) == 0) {
 	    section = tocalls_section;
 	  }
 
@@ -172,14 +170,11 @@ func deviceid_init() {
 	        }
 	        if (strncmp(stuff+3, "prefix: ", strlen("prefix: ")) == 0) {
 	          unquote (line, stuff+3+8, pmice[mice_index].prefix);  
-	        }
-	        else if (strncmp(stuff+3, "suffix: ", strlen("suffix: ")) == 0) {
+	        } else if (strncmp(stuff+3, "suffix: ", strlen("suffix: ")) == 0) {
 	          unquote (line, stuff+3+8, pmice[mice_index].suffix);  
-	        }
-	        else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
+	        } else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
 	          pmice[mice_index].vendor = strdup(stuff+3+8);  
-	        }
-	        else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
+	        } else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
 	          pmice[mice_index].model = strdup(stuff+3+7);  
 	        }
 	        break;
@@ -203,11 +198,9 @@ func deviceid_init() {
 	          while (p >= (char*)stuff && (*p == '\r' || *p == '\n' || *p == ' ')) {
 	            *p-- = '\0';
 	          }
-	        }
-	        else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
+	        } else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
 	          ptocalls[tocalls_index].vendor = strdup(stuff+3+8);  
-	        }
-	        else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
+	        } else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
 	          ptocalls[tocalls_index].model = strdup(stuff+3+7);  
 	        }
 	        break;
