@@ -1,26 +1,6 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2023  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
+package direwolf
 
 /*------------------------------------------------------------------
- *
- * File:	deviceid.c
  *
  * Purpose:	Determine the device identifier from the destination field,
  *		or from prefix/suffix for MIC-E format.
@@ -30,54 +10,53 @@
  *
  *------------------------------------------------------------------*/
 
-#include "direwolf.h"
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
-
-#include "deviceid.h"
-#include "textcolor.h"
-
-
-static void unquote (int line, char *pin, char *pout);
-static int tocall_cmp (const void *px, const void *py);
-static int mice_cmp (const void *px, const void *py);
+// #include "direwolf.h"
+// #include <stdlib.h>
+// #include <stdio.h>
+// #include <string.h>
+// #include <assert.h>
+// #include "deviceid.h"
+// #include "textcolor.h"
+import "C"
 
 // Structures to hold mapping from encoded form to vendor and model.
 // The .yaml file has two separate sections for MIC-E but they can
 // both be handled as a single more general case.
 
-struct mice {
-	char prefix[4];		// The legacy form has 1 prefix character.
+type mice struct {
+	prefix[4]C.char;		// The legacy form has 1 prefix character.
 				// The newer form has none.  (more accurately ` or ')
-	char suffix[4];		// The legacy form has 0 or 1.
+	suffix[4]C.char		// The legacy form has 0 or 1.
 				// The newer form has 2.
-	char *vendor;
-	char *model;
+	vendor string
+	model string
 };
 
-struct tocalls {
-	char tocall[8];		// Up to 6 characters.  Some may have wildcards at the end.
+type tocalls struct {
+	tocall[8]C.char;		// Up to 6 characters.  Some may have wildcards at the end.
 				// Most often they are trailing "??" or "?" or "???" in one case.
 				// Sometimes there is trailing "nnn".  Does that imply digits only?
 				// Sometimes we see a trailing "*".  Is "*" different than "?"?
 				// There are a couple bizzare cases like APnnnD which can
 				// create an ambigious situation. APMPAD, APRFGD, APY0[125]D.
 				// Screw them if they can't follow the rules.  I'm not putting in a special case.
-	char *vendor;
-	char *model;
+	vendor string
+	model string
 };
 
 
-static struct mice *pmice = NULL;	// Pointer to array.
+var pmice []*mice
+var ptocalls []*tocalls
+
+/* FIXME KG
+static struct mice *pmice = nil;	// Pointer to array.
 static int mice_count = 0;		// Number of allocated elements.
 static int mice_index = -1;		// Current index for filling in.
 
-static struct tocalls *ptocalls = NULL;	// Pointer to array.
+static struct tocalls *ptocalls = nil;	// Pointer to array.
 static int tocalls_count = 0;		// Number of allocated elements.
 static int tocalls_index = -1;		// Current index for filling in.
+*/
 
 
 
@@ -102,36 +81,35 @@ static int tocalls_index = -1;		// Current index for filling in.
 // If search order is changed, do the same in symbols.c for consistency.
 // fopen is perfectly happy with / in file path when running on Windows.
 
-static const char *search_locations[] = {
-	(const char *) "tocalls.yaml",			// Current working directory
-	(const char *) "data/tocalls.yaml",		// Windows with CMake
-	(const char *) "../data/tocalls.yaml",		// Source tree
-#ifndef __WIN32__
-	(const char *) "/usr/local/share/direwolf/tocalls.yaml",
-	(const char *) "/usr/share/direwolf/tocalls.yaml",
-#endif
-#if __APPLE__
+var search_locations= []string {
+	 "tocalls.yaml",			// Current working directory
+	 "data/tocalls.yaml",		// Windows with CMake
+	 "../data/tocalls.yaml",		// Source tree
+	 "/usr/local/share/direwolf/tocalls.yaml",
+	 "/usr/share/direwolf/tocalls.yaml",
 	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
 	// Adding the /opt/local tree since macports typically installs there.  Users might want their
 	// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
 	// path as well.
-	(const char *) "/opt/local/share/direwolf/tocalls.yaml",
-#endif
-	(const char *) NULL		// Important - Indicates end of list.
+	 "/opt/local/share/direwolf/tocalls.yaml",
+
 };
 
+/* FIXME KG
+	enum { no_section, mice_section, tocalls_section} section = no_section;
+	*/
 
-void deviceid_init(void)
-{
-	FILE *fp = NULL;
-	for (int n = 0; search_locations[n] != NULL && fp == NULL; n++) {
+func deviceid_init() {
+
+	var fp FILE
+	for n := 0; search_locations[n] != nil && fp == nil; n++ {
 	  fp = fopen(search_locations[n], "r");
-	};
+	}
 
-	if (fp == NULL) {
+	if (fp == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("Could not open any of these file locations:\n");
-	  for (int n = 0; search_locations[n] != NULL; n++) {
+	  for n := 0; search_locations[n] != nil; n++ {
 	    dw_printf ("    %s\n", search_locations[n]);
 	  }
 	  dw_printf("It won't be possible to extract device identifiers from packets.\n");
@@ -143,20 +121,22 @@ void deviceid_init(void)
 // Rewind.
 // Read file second time to gather data.
 
-	enum { no_section, mice_section, tocalls_section} section = no_section;
-	char stuff[80];
+	// FIXME KG enum { no_section, mice_section, tocalls_section} section = no_section;
+	var stuff string
 
-	for (int pass = 1; pass <=2; pass++) {
-	 int line = 0;		// Line number within file.
+	for pass := 1; pass <=2; pass++ {
+	 var line = 0;		// Line number within file.
 
-	 while (fgets(stuff, sizeof(stuff), fp)) {
+	 for (fgets(stuff, sizeof(stuff), fp)) {
 	  line++;
 
 	  // Remove trailing CR/LF or spaces.
-	  char *p = stuff + strlen(stuff) - 1;
+	  var p = stuff + strlen(stuff) - 1;
+	  /* FIXME KG
 	  while (p >= (char*)stuff && (*p == '\r' || *p == '\n' || *p == ' ')) {
-	    *p-- = '\0';
+	    *p-- = 0;
 	  }
+	  */
 
 	  // Ignore comment lines.
 	  if (stuff[0] == '#') {
@@ -167,11 +147,9 @@ void deviceid_init(void)
 
 	  if (strncmp(stuff, "mice:", strlen("mice:")) == 0) {
 	    section = mice_section;
-	  }
-	  else if (strncmp(stuff, "micelegacy:", strlen("micelegacy:")) == 0) {
+	  } else if (strncmp(stuff, "micelegacy:", strlen("micelegacy:")) == 0) {
 	    section = mice_section;  // treat both same.
-	  }
-	  else if (strncmp(stuff, "tocalls:", strlen("tocalls:")) == 0) {
+	  } else if (strncmp(stuff, "tocalls:", strlen("tocalls:")) == 0) {
 	    section = tocalls_section;
 	  }
 
@@ -197,14 +175,11 @@ void deviceid_init(void)
 	        }
 	        if (strncmp(stuff+3, "prefix: ", strlen("prefix: ")) == 0) {
 	          unquote (line, stuff+3+8, pmice[mice_index].prefix);  
-	        }
-	        else if (strncmp(stuff+3, "suffix: ", strlen("suffix: ")) == 0) {
+	        } else if (strncmp(stuff+3, "suffix: ", strlen("suffix: ")) == 0) {
 	          unquote (line, stuff+3+8, pmice[mice_index].suffix);  
-	        }
-	        else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
+	        } else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
 	          pmice[mice_index].vendor = strdup(stuff+3+8);  
-	        }
-	        else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
+	        } else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
 	          pmice[mice_index].model = strdup(stuff+3+7);  
 	        }
 	        break;
@@ -216,23 +191,21 @@ void deviceid_init(void)
 	        }
 	        if (strncmp(stuff+3, "tocall: ", strlen("tocall: ")) == 0) {
 	          // Remove trailing wildcard characters ? * n
-	          char *r = stuff + strlen(stuff) - 1;
-	          while (r >= (char*)stuff && (*r == '?' || *r == '*' || *r == 'n')) {
-	            *r-- = '\0';
+	          var r = stuff + strlen(stuff) - 1;
+	          for r >= stuff && (*r == '?' || *r == '*' || *r == 'n') {
+	            // FIXME KG *r-- = 0;
 	          }
 
 	          strlcpy (ptocalls[tocalls_index].tocall, stuff+3+8, sizeof(ptocalls[tocalls_index].tocall));
 
 	          // Remove trailing CR/LF or spaces.
-	          char *p = stuff + strlen(stuff) - 1;
-	          while (p >= (char*)stuff && (*p == '\r' || *p == '\n' || *p == ' ')) {
-	            *p-- = '\0';
+	          var p = stuff + strlen(stuff) - 1;
+	          for p >= stuff && (*p == '\r' || *p == '\n' || *p == ' ') {
+	            // FIXME KG *p-- = 0;
 	          }
-	        }
-	        else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
+	        } else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
 	          ptocalls[tocalls_index].vendor = strdup(stuff+3+8);  
-	        }
-	        else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
+	        } else if (strncmp(stuff+3, "model: ", strlen("model: ")) == 0) {
 	          ptocalls[tocalls_index].model = strdup(stuff+3+7);  
 	        }
 	        break;
@@ -241,8 +214,8 @@ void deviceid_init(void)
 	 } // while(fgets
 
 	 if (pass == 1) {
-	  pmice = calloc(sizeof(struct mice), mice_count);
-	  ptocalls = calloc(sizeof(struct tocalls), tocalls_count);
+	  // FIXME KG pmice = calloc(sizeof(struct mice), mice_count);
+	  // FIXME KG ptocalls = calloc(sizeof(struct tocalls), tocalls_count);
 
 	  rewind (fp);
 	  section = no_section;
@@ -257,13 +230,13 @@ void deviceid_init(void)
 
 // MIC-E Legacy needs to be sorted so those with suffix come first.
 
-	qsort (pmice, mice_count, sizeof(struct mice), mice_cmp);
+	// FIXME KG qsort (pmice, mice_count, sizeof(struct mice), mice_cmp);
 
 
 // Sort tocalls by decreasing length so the search will go from most specific to least specific.
 // Example:  APY350 or APY008 would match those specific models before getting to the more generic APY.
 
-	qsort (ptocalls, tocalls_count, sizeof(struct tocalls), tocall_cmp);
+	// FIXME KG qsort (ptocalls, tocalls_count, sizeof(struct tocalls), tocall_cmp);
 
 	return;
 
@@ -290,11 +263,10 @@ void deviceid_init(void)
  *
  *------------------------------------------------------------------*/
 
-static void unquote (int line, char *pin, char *pout)
-{
-	int count = 0;
+func unquote (line C.int, pin *C.char, pout *C.char) {
+	var count = 0;
 
-	*pout = '\0';
+	*pout = 0;
 	if (*pin != '"') {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("Missing leading \" for %s on line %d.\n", pin, line);
@@ -302,14 +274,16 @@ static void unquote (int line, char *pin, char *pout)
 	}
 
 	pin++;
-	while (*pin != '\0' && *pin != '\"' && count < 2) {
+	for *pin != 0 && *pin != '"' && count < 2 {
 	  if (*pin == '\\') {
 	    pin++;
 	  }
-	  *pout++ = *pin++;
+	  *pout = *pin;
+	  pout++
+	  pin++
 	  count++;
 	}
-	*pout = '\0';
+	*pout = 0;
 
 	if (*pin != '"') {
 	  text_color_set(DW_COLOR_ERROR);
@@ -326,10 +300,10 @@ static int tocall_cmp (const void *px, const void *py)
 	const struct tocalls *x = (struct tocalls *)px;
 	const struct tocalls *y = (struct tocalls *)py;
 
-	if (strlen(x->tocall) != strlen(y->tocall)) {
-	  return (strlen(y->tocall) - strlen(x->tocall));
+	if (strlen(x.tocall) != strlen(y.tocall)) {
+	  return (strlen(y.tocall) - strlen(x.tocall));
 	}
-	return (strcmp(x->tocall, y->tocall));
+	return (strcmp(x.tocall, y.tocall));
 }
 
 // Used to sort the suffixes by length.
@@ -341,7 +315,7 @@ static int mice_cmp (const void *px, const void *py)
 	const struct mice *x = (struct mice *)px;
 	const struct mice *y = (struct mice *)py;
 
-	return (strlen(y->suffix) - strlen(x->suffix));
+	return (strlen(y.suffix) - strlen(x.suffix));
 }
 
 
@@ -374,7 +348,7 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 {
 	strlcpy (device, "UNKNOWN vendor/model", device_size);
 
-	if (ptocalls == NULL) {
+	if (ptocalls == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("deviceid_decode_dest called without any deviceid data.\n");
 	  return;
@@ -383,19 +357,19 @@ void deviceid_decode_dest (char *dest, char *device, size_t device_size)
 	for (int n = 0; n < tocalls_count; n++) {
 	  if (strncmp(dest, ptocalls[n].tocall, strlen(ptocalls[n].tocall)) == 0) {
 
-	    if (ptocalls[n].vendor != NULL) {
+	    if (ptocalls[n].vendor != nil) {
 	      strlcpy (device, ptocalls[n].vendor, device_size);
 	    }
 
-	    if (ptocalls[n].vendor != NULL && ptocalls[n].model != NULL) {
+	    if (ptocalls[n].vendor != nil && ptocalls[n].model != nil) {
 	      strlcat (device, " ", device_size);
 	    }
 
-	    if (ptocalls[n].vendor == NULL && ptocalls[n].model != NULL) {
+	    if (ptocalls[n].vendor == nil && ptocalls[n].model != nil) {
 	      strlcpy (device, "", device_size);
 	    }
 
-	    if (ptocalls[n].model != NULL) {
+	    if (ptocalls[n].model != nil) {
 	      strlcat (device, ptocalls[n].model, device_size);
 	    }
 	    return;
@@ -469,7 +443,7 @@ void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, ch
 	  return;
 	}
 
-	if (ptocalls == NULL) {
+	if (ptocalls == nil) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("deviceid_decode_mice called without any deviceid data.\n");
 	  return;
@@ -494,22 +468,22 @@ void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, ch
 		pmice[n].suffix,
 	        strlen(pmice[n].suffix)) == 0)  ) {
 
-	    if (pmice[n].vendor != NULL) {
+	    if (pmice[n].vendor != nil) {
 	      strlcpy (device, pmice[n].vendor, device_size);
 	    }
 
-	    if (pmice[n].vendor != NULL && pmice[n].model != NULL) {
+	    if (pmice[n].vendor != nil && pmice[n].model != nil) {
 	      strlcat (device, " ", device_size);
 	    }
 
-	    if (pmice[n].model != NULL) {
+	    if (pmice[n].model != nil) {
 	      strlcat (device, pmice[n].model, device_size);
 	    }
 
 	    // Remove any prefix/suffix and return what remains.
 
 	    strlcpy (trimmed, comment + 1, trimmed_size);
-	    trimmed[strlen(comment) - 1 - strlen(pmice[n].suffix)] = '\0';
+	    trimmed[strlen(comment) - 1 - strlen(pmice[n].suffix)] = 0;
 
 	    return;
 	  }
