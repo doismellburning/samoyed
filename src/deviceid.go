@@ -95,6 +95,9 @@ var search_locations= []string {
 
 };
 
+/* FIXME KG
+	enum { no_section, mice_section, tocalls_section} section = no_section;
+	*/
 
 func deviceid_init() {
 
@@ -118,7 +121,7 @@ func deviceid_init() {
 // Rewind.
 // Read file second time to gather data.
 
-	enum { no_section, mice_section, tocalls_section} section = no_section;
+	// FIXME KG enum { no_section, mice_section, tocalls_section} section = no_section;
 	var stuff string
 
 	for pass := 1; pass <=2; pass++ {
@@ -131,7 +134,7 @@ func deviceid_init() {
 	  var p = stuff + strlen(stuff) - 1;
 	  /* FIXME KG
 	  while (p >= (char*)stuff && (*p == '\r' || *p == '\n' || *p == ' ')) {
-	    *p-- = '\0';
+	    *p-- = 0;
 	  }
 	  */
 
@@ -188,17 +191,17 @@ func deviceid_init() {
 	        }
 	        if (strncmp(stuff+3, "tocall: ", strlen("tocall: ")) == 0) {
 	          // Remove trailing wildcard characters ? * n
-	          char *r = stuff + strlen(stuff) - 1;
-	          while (r >= (char*)stuff && (*r == '?' || *r == '*' || *r == 'n')) {
-	            *r-- = '\0';
+	          var r = stuff + strlen(stuff) - 1;
+	          for r >= stuff && (*r == '?' || *r == '*' || *r == 'n') {
+	            // FIXME KG *r-- = 0;
 	          }
 
 	          strlcpy (ptocalls[tocalls_index].tocall, stuff+3+8, sizeof(ptocalls[tocalls_index].tocall));
 
 	          // Remove trailing CR/LF or spaces.
-	          char *p = stuff + strlen(stuff) - 1;
-	          while (p >= (char*)stuff && (*p == '\r' || *p == '\n' || *p == ' ')) {
-	            *p-- = '\0';
+	          var p = stuff + strlen(stuff) - 1;
+	          for p >= stuff && (*p == '\r' || *p == '\n' || *p == ' ') {
+	            // FIXME KG *p-- = 0;
 	          }
 	        } else if (strncmp(stuff+3, "vendor: ", strlen("vendor: ")) == 0) {
 	          ptocalls[tocalls_index].vendor = strdup(stuff+3+8);  
@@ -211,8 +214,8 @@ func deviceid_init() {
 	 } // while(fgets
 
 	 if (pass == 1) {
-	  pmice = calloc(sizeof(struct mice), mice_count);
-	  ptocalls = calloc(sizeof(struct tocalls), tocalls_count);
+	  // FIXME KG pmice = calloc(sizeof(struct mice), mice_count);
+	  // FIXME KG ptocalls = calloc(sizeof(struct tocalls), tocalls_count);
 
 	  rewind (fp);
 	  section = no_section;
@@ -227,13 +230,13 @@ func deviceid_init() {
 
 // MIC-E Legacy needs to be sorted so those with suffix come first.
 
-	qsort (pmice, mice_count, sizeof(struct mice), mice_cmp);
+	// FIXME KG qsort (pmice, mice_count, sizeof(struct mice), mice_cmp);
 
 
 // Sort tocalls by decreasing length so the search will go from most specific to least specific.
 // Example:  APY350 or APY008 would match those specific models before getting to the more generic APY.
 
-	qsort (ptocalls, tocalls_count, sizeof(struct tocalls), tocall_cmp);
+	// FIXME KG qsort (ptocalls, tocalls_count, sizeof(struct tocalls), tocall_cmp);
 
 	return;
 
@@ -260,11 +263,10 @@ func deviceid_init() {
  *
  *------------------------------------------------------------------*/
 
-static void unquote (int line, char *pin, char *pout)
-{
-	int count = 0;
+func unquote (line C.int, pin *C.char, pout *C.char) {
+	var count = 0;
 
-	*pout = '\0';
+	*pout = 0;
 	if (*pin != '"') {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf("Missing leading \" for %s on line %d.\n", pin, line);
@@ -272,14 +274,16 @@ static void unquote (int line, char *pin, char *pout)
 	}
 
 	pin++;
-	while (*pin != '\0' && *pin != '\"' && count < 2) {
+	for *pin != 0 && *pin != '"' && count < 2 {
 	  if (*pin == '\\') {
 	    pin++;
 	  }
-	  *pout++ = *pin++;
+	  *pout = *pin;
+	  pout++
+	  pin++
 	  count++;
 	}
-	*pout = '\0';
+	*pout = 0;
 
 	if (*pin != '"') {
 	  text_color_set(DW_COLOR_ERROR);
@@ -479,7 +483,7 @@ void deviceid_decode_mice (char *comment, char *trimmed, size_t trimmed_size, ch
 	    // Remove any prefix/suffix and return what remains.
 
 	    strlcpy (trimmed, comment + 1, trimmed_size);
-	    trimmed[strlen(comment) - 1 - strlen(pmice[n].suffix)] = '\0';
+	    trimmed[strlen(comment) - 1 - strlen(pmice[n].suffix)] = 0;
 
 	    return;
 	  }
