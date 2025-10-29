@@ -101,7 +101,7 @@ func DecodeAPRSMain() {
 
 	C.text_color_init(0)
 	C.text_color_set(C.DW_COLOR_INFO)
-	C.deviceid_init()
+	deviceid_init()
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
