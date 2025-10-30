@@ -13,13 +13,3 @@ void demod_9600_process_sample (int chan, int sam, int upsample, struct demodula
 
 
 
-/* Undo data scrambling for 9600 baud. */
-
-static inline int descramble (int in, int *state)
-{
-	int out;
-
-	out = (in ^ (*state >> 16) ^ (*state >> 11)) & 1;
-	*state = (*state << 1) | (in & 1);
-	return (out);
-}

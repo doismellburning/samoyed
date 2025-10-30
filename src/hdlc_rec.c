@@ -43,10 +43,20 @@
 #include "ax25_pad.h"
 #include "rrbb.h"
 #include "multi_modem.h"
-#include "demod_9600.h"		/* for descramble() */
 #include "ptt.h"
 #include "fx25.h"
 #include "il2p.h"
+
+/* Undo data scrambling for 9600 baud. */
+
+int descramble (int in, int *state)
+{
+	int out;
+
+	out = (in ^ (*state >> 16) ^ (*state >> 11)) & 1;
+	*state = (*state << 1) | (in & 1);
+	return (out);
+}
 
 
 //#define TEST 1				/* Define for unit testing. */

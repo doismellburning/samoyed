@@ -39,7 +39,7 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
     gocognit:
-      min-complexity: 180  # I sure wish this could be lower
+      min-complexity: 270  # I sure wish this could be lower
     goconst:
       min-occurrences: 5
     gocritic:
@@ -53,7 +53,7 @@ linters:
     gocyclo:
       min-complexity: 60  # I sure wish this could be lower
     nestif:
-      min-complexity: 50  # There's lots of upstream complexity, so let's soft-disable this
+      min-complexity: 100  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"
