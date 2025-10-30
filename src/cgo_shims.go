@@ -32,6 +32,7 @@ const DW_COLOR_DECODED = C.DW_COLOR_DECODED
 
 const MAX_RADIO_CHANS = C.MAX_RADIO_CHANS
 const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
+const MAX_SUBCHANS = C.MAX_SUBCHANS
 
 const MEDIUM_NONE = C.MEDIUM_NONE
 const MEDIUM_RADIO = C.MEDIUM_RADIO
@@ -97,6 +98,17 @@ const cr_11 C.cmdres_t = C.cr_11
 const OCTYPE_PTT = C.OCTYPE_PTT
 const OCTYPE_DCD = C.OCTYPE_DCD
 const OCTYPE_CON = C.OCTYPE_CON
+
+const MODEM_OFF = C.MODEM_OFF
+const MODEM_AFSK = C.MODEM_AFSK
+const MODEM_BASEBAND = C.MODEM_BASEBAND
+const MODEM_EAS = C.MODEM_EAS
+const MODEM_SCRAMBLE = C.MODEM_SCRAMBLE
+const MODEM_QPSK = C.MODEM_QPSK
+const MODEM_8PSK = C.MODEM_8PSK
+const MODEM_AIS = C.MODEM_AIS
+
+const RETRY_NONE = C.RETRY_NONE
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
