@@ -31,7 +31,6 @@ package direwolf
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
-// #include "telemetry.h"
 // #include "ais.h"
 // #include "deviceid.h"
 import "C"
@@ -4082,7 +4081,7 @@ func process_comment(A *C.decode_aprs_t, commentData []byte) {
 
 		//dw_printf("compressed telemetry data = \"%s\"\n", tdata);
 
-		C.telemetry_data_base91(&A.g_src[0], C.CString(string(tdata)), &A.g_telemetry[0], C.size_t(len(A.g_telemetry)))
+		telemetry_data_base91(C.GoString(&A.g_src[0]), string(tdata), &A.g_telemetry[0], C.size_t(len(A.g_telemetry)))
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}

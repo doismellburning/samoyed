@@ -11,8 +11,6 @@ package direwolf
 // #include "ax25_pad.h"			// for packet_t, AX25_MAX_ADDR_LEN
 // #include "decode_aprs.h"		// for decode_aprs_t, G_UNKNOWN
 // #include "textcolor.h"
-// #include "telemetry.h"
-// struct t_metadata_s * t_get_metadata (char *station);
 import "C"
 
 import (
@@ -20,30 +18,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
-func telemetry_data_original(station string, info string, quiet C.int, output *C.char, outputsize C.size_t, comment *C.char, commentsize C.size_t) {
-	C.telemetry_data_original(C.CString(station), C.CString(info), quiet, output, outputsize, comment, commentsize)
-}
-
-func telemetry_data_base91(station string, cdata string, output *C.char, outputsize C.size_t) {
-	C.telemetry_data_base91(C.CString(station), C.CString(cdata), output, outputsize)
-}
-
-func telemetry_name_message(station string, msg string) {
-	C.telemetry_name_message(C.CString(station), C.CString(msg))
-}
-
-func telemetry_unit_label_message(station string, msg string) {
-	C.telemetry_unit_label_message(C.CString(station), C.CString(msg))
-}
-
-func telemetry_coefficents_message(station string, msg string, quiet C.int) {
-	C.telemetry_coefficents_message(C.CString(station), C.CString(msg), quiet)
-}
-
-func telemetry_bit_sense_message(station string, msg string, quiet C.int) {
-	C.telemetry_bit_sense_message(C.CString(station), C.CString(msg), quiet)
-}
 
 func telemetry_test_main(t *testing.T) {
 	t.Helper()
@@ -142,43 +116,43 @@ func telemetry_test_main(t *testing.T) {
 
 	telemetry_name_message("N0QBF-11", "Battery,Btemp,ATemp,Pres,Alt,Camra,Chut,Sun,10m,ATV")
 
-	var pm = C.t_get_metadata(C.CString("N0QBF-11"))
+	var pm = t_get_metadata("N0QBF-11")
 
-	assert.Equal(t, "Battery", C.GoString(&pm.name[0][0]), "test 301")
-	assert.Equal(t, "Btemp", C.GoString(&pm.name[1][0]), "test 301")
-	assert.Equal(t, "ATemp", C.GoString(&pm.name[2][0]), "test 301")
-	assert.Equal(t, "Pres", C.GoString(&pm.name[3][0]), "test 301")
-	assert.Equal(t, "Alt", C.GoString(&pm.name[4][0]), "test 301")
-	assert.Equal(t, "Camra", C.GoString(&pm.name[5][0]), "test 301")
-	assert.Equal(t, "Chut", C.GoString(&pm.name[6][0]), "test 301")
-	assert.Equal(t, "Sun", C.GoString(&pm.name[7][0]), "test 301")
-	assert.Equal(t, "10m", C.GoString(&pm.name[8][0]), "test 301")
-	assert.Equal(t, "ATV", C.GoString(&pm.name[9][0]), "test 301")
-	assert.Equal(t, "D6", C.GoString(&pm.name[10][0]), "test 301")
-	assert.Equal(t, "D7", C.GoString(&pm.name[11][0]), "test 301")
-	assert.Equal(t, "D8", C.GoString(&pm.name[12][0]), "test 301")
+	assert.Equal(t, "Battery", pm.name[0], "test 301")
+	assert.Equal(t, "Btemp", pm.name[1], "test 301")
+	assert.Equal(t, "ATemp", pm.name[2], "test 301")
+	assert.Equal(t, "Pres", pm.name[3], "test 301")
+	assert.Equal(t, "Alt", pm.name[4], "test 301")
+	assert.Equal(t, "Camra", pm.name[5], "test 301")
+	assert.Equal(t, "Chut", pm.name[6], "test 301")
+	assert.Equal(t, "Sun", pm.name[7], "test 301")
+	assert.Equal(t, "10m", pm.name[8], "test 301")
+	assert.Equal(t, "ATV", pm.name[9], "test 301")
+	assert.Equal(t, "D6", pm.name[10], "test 301")
+	assert.Equal(t, "D7", pm.name[11], "test 301")
+	assert.Equal(t, "D8", pm.name[12], "test 301")
 
 	telemetry_unit_label_message("N0QBF-11", "v/100,deg.F,deg.F,Mbar,Kft,Click,OPEN,on,on,hi")
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
+	pm = t_get_metadata("N0QBF-11")
 
-	assert.Equal(t, "v/100", C.GoString(&pm.unit[0][0]), "test 302")
-	assert.Equal(t, "deg.F", C.GoString(&pm.unit[1][0]), "test 302")
-	assert.Equal(t, "deg.F", C.GoString(&pm.unit[2][0]), "test 302")
-	assert.Equal(t, "Mbar", C.GoString(&pm.unit[3][0]), "test 302")
-	assert.Equal(t, "Kft", C.GoString(&pm.unit[4][0]), "test 302")
-	assert.Equal(t, "Click", C.GoString(&pm.unit[5][0]), "test 302")
-	assert.Equal(t, "OPEN", C.GoString(&pm.unit[6][0]), "test 302")
-	assert.Equal(t, "on", C.GoString(&pm.unit[7][0]), "test 302")
-	assert.Equal(t, "on", C.GoString(&pm.unit[8][0]), "test 302")
-	assert.Equal(t, "hi", C.GoString(&pm.unit[9][0]), "test 302")
-	assert.Empty(t, C.GoString(&pm.unit[10][0]), "test 302")
-	assert.Empty(t, C.GoString(&pm.unit[11][0]), "test 302")
-	assert.Empty(t, C.GoString(&pm.unit[12][0]), "test 302")
+	assert.Equal(t, "v/100", pm.unit[0], "test 302")
+	assert.Equal(t, "deg.F", pm.unit[1], "test 302")
+	assert.Equal(t, "deg.F", pm.unit[2], "test 302")
+	assert.Equal(t, "Mbar", pm.unit[3], "test 302")
+	assert.Equal(t, "Kft", pm.unit[4], "test 302")
+	assert.Equal(t, "Click", pm.unit[5], "test 302")
+	assert.Equal(t, "OPEN", pm.unit[6], "test 302")
+	assert.Equal(t, "on", pm.unit[7], "test 302")
+	assert.Equal(t, "on", pm.unit[8], "test 302")
+	assert.Equal(t, "hi", pm.unit[9], "test 302")
+	assert.Empty(t, pm.unit[10], "test 302")
+	assert.Empty(t, pm.unit[11], "test 302")
+	assert.Empty(t, pm.unit[12], "test 302")
 
 	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", 0)
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
+	pm = t_get_metadata("N0QBF-11")
 
 	if pm.coeff[0][0] != 0 || pm.coeff[0][1] < 5.1999 || pm.coeff[0][1] > 5.2001 || pm.coeff[0][2] != 0 ||
 		pm.coeff[1][0] != 0 || pm.coeff[1][1] < .52999 || pm.coeff[1][1] > .53001 || pm.coeff[1][2] != -32 ||
@@ -201,7 +175,7 @@ func telemetry_test_main(t *testing.T) {
 
 	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", 0)
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
+	pm = t_get_metadata("N0QBF-11")
 
 	if pm.coeff[0][0] != 0 || pm.coeff[0][1] < 5.1999 || pm.coeff[0][1] > 5.2001 || pm.coeff[0][2] != 0 ||
 		pm.coeff[1][0] != 0 || pm.coeff[1][1] < .52999 || pm.coeff[1][1] > .53001 || pm.coeff[1][2] != -32 ||
@@ -221,7 +195,7 @@ func telemetry_test_main(t *testing.T) {
 
 	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", 0)
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
+	pm = t_get_metadata("N0QBF-11")
 
 	if pm.coeff[0][0] != 0 || pm.coeff[0][1] < 5.1999 || pm.coeff[0][1] > 5.2001 || pm.coeff[0][2] != 0 ||
 		pm.coeff[1][0] != 0 || pm.coeff[1][1] < .52999 || pm.coeff[1][1] > .53001 || pm.coeff[1][2] != -32 ||
@@ -241,31 +215,31 @@ func telemetry_test_main(t *testing.T) {
 
 	telemetry_bit_sense_message("N0QBF-11", "10110000,N0QBF's Big Balloon", 0)
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
-	if pm.sense[0] != 1 || pm.sense[1] != 0 || pm.sense[2] != 1 || pm.sense[3] != 1 ||
-		pm.sense[4] != 0 || pm.sense[5] != 0 || pm.sense[6] != 0 || pm.sense[7] != 0 {
+	pm = t_get_metadata("N0QBF-11")
+	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
+		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 306\n")
 	}
-	assert.Equal(t, "N0QBF's Big Balloon", C.GoString(&pm.project[0]), "test 306")
+	assert.Equal(t, "N0QBF's Big Balloon", pm.project, "test 306")
 
 	// Too few and invalid digits.
 	telemetry_bit_sense_message("N0QBF-11", "1011000", 0)
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
-	if pm.sense[0] != 1 || pm.sense[1] != 0 || pm.sense[2] != 1 || pm.sense[3] != 1 ||
-		pm.sense[4] != 0 || pm.sense[5] != 0 || pm.sense[6] != 0 || pm.sense[7] != 0 {
+	pm = t_get_metadata("N0QBF-11")
+	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
+		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 307\n")
 	}
-	assert.Empty(t, C.GoString(&pm.project[0]), "test 307")
+	assert.Empty(t, pm.project, "test 307")
 
 	telemetry_bit_sense_message("N0QBF-11", "10110008", 0)
 
-	pm = C.t_get_metadata(C.CString("N0QBF-11"))
-	if pm.sense[0] != 1 || pm.sense[1] != 0 || pm.sense[2] != 1 || pm.sense[3] != 1 ||
-		pm.sense[4] != 0 || pm.sense[5] != 0 || pm.sense[6] != 0 || pm.sense[7] != 0 {
+	pm = t_get_metadata("N0QBF-11")
+	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
+		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 308\n")
 	}
-	assert.Empty(t, C.GoString(&pm.project[0]), "test 308")
+	assert.Empty(t, pm.project, "test 308")
 
 	dw_printf("part 4\n")
 
