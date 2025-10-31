@@ -500,7 +500,7 @@ o = DCD output control
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
 
-				var audio_sample = C.demod_get_sample(ACHAN2ADEV(c))
+				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
 
 				if audio_sample >= 256*256 {
 					C.e_o_f = 1

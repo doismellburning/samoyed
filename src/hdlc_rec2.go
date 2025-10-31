@@ -79,10 +79,10 @@ package direwolf
 // #include "rrbb.h"
 // #include "multi_modem.h"
 // #include "dtime_now.h"
-// #include "demod_9600.h"		/* for descramble() */
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
 // #include "ais.h"
+// int descramble (int in, int *state);
 import "C"
 
 import (
