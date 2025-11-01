@@ -40,7 +40,7 @@ jobs:
       run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> $GITHUB_ENV'
     - name: "Build tarball"
       run: "tar czvf \"$TARBALL_NAME\" dist/"
-    - uses: "actions/upload-artifact@v4"
+    - uses: "actions/upload-artifact@v5"
       with:
         name: "${{ env.TARBALL_NAME }}"
         path: "${{ env.TARBALL_NAME }}"
