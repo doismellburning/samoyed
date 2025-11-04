@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>samoyed</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>Samoyed</name>
+  <summary>Software TNC and APRS Modem</summary>
+  <description>
+    <p>
+      Samoyed is a software "soundcard" modem/TNC and APRS encoder/decoder.
+      It is based on Dire Wolf, ported to Go for increased tooling support,
+      and with reduced platform scope to cut complexity and make it easier to extend.
+    </p>
+    <p>
+      Features include:
+    </p>
+    <ul>
+      <li>APRS GPS Tracker</li>
+      <li>Digipeater</li>
+      <li>Internet Gateway (IGate)</li>
+      <li>APRStt gateway</li>
+      <li>AX.25 v2.2 Link Layer</li>
+      <li>KISS Interface (TCP/IP, serial port, Bluetooth)</li>
+      <li>Multiple modem support (300 bps AFSK, 1200 bps AFSK, 2400/4800 bps PSK, 9600 bps GMSK)</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">samoyed.desktop</launchable>
+  <url type="homepage">https://github.com/doismellburning/samoyed</url>
+  <url type="bugtracker">https://github.com/doismellburning/samoyed/issues</url>
+  <developer id="io.github.doismellburning">
+    <name>Tom Carrick</name>
+  </developer>
+  <provides>
+    <binary>direwolf</binary>
+    <binary>aclients</binary>
+    <binary>decode_aprs</binary>
+    <binary>kissutil</binary>
+    <binary>atest</binary>
+  </provides>
+  <releases>
+    <release version="development" date="2024-01-01">
+      <description>
+        <p>Development version - mid-port from C to Go</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

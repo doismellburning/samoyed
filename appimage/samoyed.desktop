@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Samoyed
+GenericName=Software TNC and APRS Modem
+Comment=Software "soundcard" modem/TNC and APRS encoder/decoder
+Exec=direwolf
+Icon=samoyed
+Terminal=true
+Categories=HamRadio;Network;
+Keywords=APRS;TNC;Packet Radio;Ham Radio;Amateur Radio;Modem;

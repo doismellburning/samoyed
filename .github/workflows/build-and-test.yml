@@ -40,10 +40,22 @@ jobs:
       run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> $GITHUB_ENV'
     - name: "Build tarball"
       run: "tar czvf \"$TARBALL_NAME\" dist/"
+    - name: "Build AppImage"
+      run: "./appimage/build-appimage.sh"
+    - name: "Set AppImage filename"
+      run: 'echo "APPIMAGE_NAME=Samoyed-${{env.SAMOYED_VERSION }}-${{ runner.arch }}.AppImage" >> $GITHUB_ENV'
+    - name: "Rename AppImage with version"
+      run: "mv Samoyed-${{ runner.arch }}.AppImage \"$APPIMAGE_NAME\""
     - uses: "actions/upload-artifact@v5"
       with:
         name: "${{ env.TARBALL_NAME }}"
         path: "${{ env.TARBALL_NAME }}"
+        if-no-files-found: "error"
+        compression-level: 0
+    - uses: "actions/upload-artifact@v5"
+      with:
+        name: "${{ env.APPIMAGE_NAME }}"
+        path: "${{ env.APPIMAGE_NAME }}"
         if-no-files-found: "error"
         compression-level: 0
 
@@ -67,9 +79,16 @@ jobs:
 
           You will need to fetch your own dependencies for now - see https://github.com/doismellburning/samoyed/blob/main/.github/workflows/build-and-test.yml for an example for Debian. 
 
+          ## Downloads
+
+          - **AppImage**: Cross-distro Linux package (recommended for Linux users)
+          - **Tarball**: Plain binaries archive (requires manual dependency installation)
+
           This is a mid-port pre-release and likely contains bugs. Please file issues at https://github.com/doismellburning/samoyed/issues
         generate_release_notes: true
-        files: "*.tgz"
+        files: |
+          *.tgz
+          *.AppImage
         fail_on_unmatched_files: true
         draft: true  # TODO Fix
         prerelease: true

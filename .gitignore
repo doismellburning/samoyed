@@ -105,3 +105,9 @@ $RECYCLE.BIN/
 # cmake
 build*/
 tmp/
+
+# AppImage build artifacts
+AppDir/
+*.AppImage
+appimagetool-*.AppImage
+runtime-*
