@@ -44,8 +44,6 @@ import (
 const T_NUM_ANALOG = 5  /* Number of analog channels. */
 const T_NUM_DIGITAL = 8 /* Number of digital channels. */
 
-// FIXME KG #define T_STR_LEN 32				/* Max len for labels and units. */
-
 type t_metadata_s struct {
 	pnext *t_metadata_s /* Next in linked list. */
 
@@ -200,17 +198,6 @@ func t_ndp(str string) int {
 func telemetry_data_original(station string, info string, _quiet C.int, output *C.char, outputsize C.size_t, comment *C.char, commentsize C.size_t) {
 
 	var quiet = _quiet != 0
-
-	/* FIXME KG
-	int n;
-	char stemp[256];
-	char *next;
-	char *p;
-
-	float araw[T_NUM_ANALOG];
-	int ndp[T_NUM_ANALOG];
-	int draw[T_NUM_DIGITAL];
-	*/
 
 	/* TODO KG
 	   #if DEBUG1
@@ -508,11 +495,6 @@ func telemetry_name_message(station string, msg string) {
  *--------------------------------------------------------------------*/
 
 func telemetry_unit_label_message(station string, msg string) {
-	/* FIXME KG
-	int n;
-	char *next;
-	char *p;
-	*/
 
 	/* TODO KG
 	#if DEBUG3
@@ -767,10 +749,6 @@ func ival_to_str(x int) string {
 }
 
 func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]int, _output *C.char, outputsize C.size_t) {
-	/* FIXME KG
-	int n;
-	char val_str[VAL_STR_SIZE];
-	*/
 
 	Assert(pm != nil)
 
