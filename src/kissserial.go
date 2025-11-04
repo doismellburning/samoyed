@@ -207,27 +207,23 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 		return
 	}
 
-	var kiss_buff [2*C.AX25_MAX_PACKET_LEN + 2]C.uchar
-	var kiss_len C.int
+	var kiss_buff []byte
 
 	if flen < 0 {
-		flen = C.int(len(fbuf))
 		if kissserial_debug > 0 {
-			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
+			kiss_debug_print(C.TO_CLIENT, "Fake command prompt", fbuf)
 		}
-		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
-		kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
+		kiss_buff = fbuf
 	} else {
-		var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
+		var stemp []byte
+		var leader = byte((channel << 4) | kiss_cmd)
+		stemp = append([]byte{leader}, fbuf...)
 
-		if flen > C.int(len(stemp))-1 {
+		if flen > C.AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
-			flen = C.int(len(stemp)) - 1
+			fbuf = fbuf[:C.AX25_MAX_PACKET_LEN]
 		}
-
-		stemp[0] = C.uchar((channel << 4) | kiss_cmd)
-		C.memcpy(unsafe.Pointer(&stemp[1]), C.CBytes(fbuf), C.ulong(flen))
 
 		if kissserial_debug >= 2 {
 			/* AX.25 frame with the CRC removed. */
@@ -237,14 +233,16 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 			C.hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 		}
 
-		kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
+		kiss_buff = kiss_encapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 
 		if kissserial_debug > 0 {
-			C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
+			kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
 		}
 	}
+
+	var kiss_len = C.int(len(kiss_buff))
 
 	/*
 	 * This write can block on Windows if using the virtual null modem
@@ -268,7 +266,7 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 	 *	      command> change CNCA0 EmuBR=yes
 	 */
 
-	var err = C.serial_port_write(serialport_fd, (*C.char)(unsafe.Pointer(&kiss_buff[0])), kiss_len)
+	var err = C.serial_port_write(serialport_fd, (*C.char)(C.CBytes(kiss_buff)), kiss_len)
 
 	if err != kiss_len {
 		text_color_set(DW_COLOR_ERROR)

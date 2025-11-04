@@ -134,13 +134,11 @@ func DecodeAPRSLine(line string) {
 		// So, let's just strip spaces and use that!
 
 		var spacelessLine = strings.ReplaceAll(line, " ", "")
-		var _bytes, err = hex.DecodeString(spacelessLine)
+		var bytes, err = hex.DecodeString(spacelessLine)
 
 		if err != nil {
 			panic(err)
 		}
-
-		var bytes = byteSliceToCUChars(_bytes)
 
 		// If we have 0xC0 at start, remove it and expect same at end.
 
@@ -162,16 +160,14 @@ func DecodeAPRSLine(line string) {
 		if bytes[0] == 0 {
 			// Treat as KISS.  Undo any KISS encoding.
 			var kiss_frame = bytes
-			var kiss_len = len(kiss_frame)
 
 			fmt.Printf("--- KISS frame ---\n")
-			C.hex_dump(&kiss_frame[0], C.int(kiss_len))
+			C.hex_dump((*C.uchar)(C.CBytes(kiss_frame)), C.int(len(kiss_frame)))
 
 			// Put FEND at end to keep kiss_unwrap happy.
 			// Having one at the beginning is optional.
 
 			kiss_frame = append(kiss_frame, C.FEND)
-			kiss_len++
 
 			// In the more general case, we would need to include
 			// the command byte because it could be escaped.
@@ -179,14 +175,14 @@ func DecodeAPRSLine(line string) {
 			// remove it before, rather than after, the conversion.
 
 			// FIXME KG Check
-			C.kiss_unwrap(&kiss_frame[1], C.int(kiss_len-1), &bytes[0])
+			bytes = kiss_unwrap(kiss_frame)
 		}
 
 		// Treat as AX.25.
 
 		var alevel C.alevel_t
 
-		var pp = C.ax25_from_frame(&bytes[0], C.int(len(bytes)), alevel)
+		var pp = C.ax25_from_frame((*C.uchar)(C.CBytes(bytes)), C.int(len(bytes)), alevel)
 		if pp != nil {
 			var addrs [120]C.char
 			var pinfo *C.uchar

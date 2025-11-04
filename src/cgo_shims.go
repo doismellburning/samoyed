@@ -111,6 +111,11 @@ const MODEM_AIS = C.MODEM_AIS
 
 const RETRY_NONE = C.RETRY_NONE
 
+const FEND = C.FEND
+const FESC = C.FESC
+const TFEND = C.TFEND
+const TFESC = C.TFESC
+
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much

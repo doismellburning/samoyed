@@ -270,11 +270,10 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 				/* As received over the wire from network TNC. */
 				// May include escapted characters.  What about FEND?
 				// FIXME: make it say Network TNC.
-				C.kiss_debug_print(FROM_CLIENT, nil, &kf.kiss_msg[0], kf.kiss_len)
+				kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
 			}
 
-			var unwrapped [AX25_MAX_PACKET_LEN]C.uchar
-			var ulen = C.kiss_unwrap(&kf.kiss_msg[0], kf.kiss_len, &unwrapped[0])
+			var unwrapped = kiss_unwrap(C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
@@ -283,7 +282,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 				dw_printf("Frame content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				C.hex_dump(&unwrapped[1], ulen-1)
+				C.hex_dump((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])))
 			}
 
 			// Convert to packet object and send to received packet queue.
@@ -292,7 +291,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 			var subchan C.int = -3
 			var slice C.int = 0
 			var alevel C.alevel_t
-			var pp = C.ax25_from_frame(&unwrapped[1], ulen-1, alevel)
+			var pp = C.ax25_from_frame((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])), alevel)
 
 			if pp != nil {
 				var fec_type C.fec_type_t = C.fec_type_none
@@ -351,10 +350,9 @@ func nettnc_send_packet(channel C.int, pp C.packet_t) {
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.
 
-	var kiss_buff [2 * AX25_MAX_PACKET_LEN]C.uchar
-	var kiss_len = C.kiss_encapsulate((*C.uchar)(C.CBytes(frame_buff)), flen+1, &kiss_buff[0])
+	var kiss_buff = kiss_encapsulate(frame_buff)
 
-	var _, err = s_tnc_sock[channel].Write(C.GoBytes(unsafe.Pointer(&kiss_buff[0]), kiss_len))
+	var _, err = s_tnc_sock[channel].Write(kiss_buff)
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError %d sending packet to KISS Network TNC for channel %d.  Closing connection.\n\n", err, channel)

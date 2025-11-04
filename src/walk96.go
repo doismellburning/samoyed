@@ -151,10 +151,10 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Encapsulate as KISS and send to TNC.
 	 */
 
-	var kiss_frame [C.AX25_MAX_PACKET_LEN * 2]C.uchar
-	var kiss_len = C.kiss_encapsulate(&ax25_frame[0], frame_len+1, &kiss_frame[0])
+	var kiss_frame = kiss_encapsulate(C.GoBytes(unsafe.Pointer(&ax25_frame[0]), frame_len+1))
+	var kiss_len = len(kiss_frame)
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
-	C.serial_port_write(tnc, (*C.char)(unsafe.Pointer(&kiss_frame[0])), kiss_len)
+	C.serial_port_write(tnc, (*C.char)(C.CBytes(kiss_frame)), C.int(kiss_len))
 }

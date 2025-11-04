@@ -784,7 +784,7 @@ x = Silence FX.25 information.`)
 	 */
 	kisspt_init(&C.misc_config)
 	kissserial_init(&C.misc_config)
-	C.kiss_frame_init(&C.audio_config)
+	kiss_frame_init(&C.audio_config)
 
 	/*
 	 * Open port for communication with GPS.

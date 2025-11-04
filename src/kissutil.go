@@ -38,7 +38,6 @@ package direwolf
 // #include "dtime_now.h"
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
-// extern int KISSUTIL;
 import "C"
 
 import (
@@ -115,7 +114,7 @@ func KissUtilMain() {
 
 	C.setlinebuf(C.stdout)
 
-	C.KISSUTIL = 1 // Change behaviour of kiss_process_msg
+	KISSUTIL = true // Change behaviour of kiss_process_msg
 	KISS_PROCESS_MSG_OVERRIDE = Kissutil_kiss_process_msg
 
 	/*
@@ -370,34 +369,26 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 		cmd = 0
 	}
 
-	var temp [C.AX25_MAX_PACKET_LEN]C.uchar // We don't limit to 256 info bytes.
-
-	if len(data) > len(temp)-1 {
-		fmt.Printf("ERROR - Invalid data length %d - must be in range 0 to %d.\n", len(data), len(temp)-1)
-		data = data[:len(temp)-1]
+	if len(data) > C.AX25_MAX_PACKET_LEN-1 {
+		fmt.Printf("ERROR - Invalid data length %d - must be in range 0 to %d.\n", len(data), C.AX25_MAX_PACKET_LEN-1)
+		data = data[:C.AX25_MAX_PACKET_LEN-1]
 	}
 
-	temp[0] = C.uchar((channel << 4) | cmd)
-	for i, b := range data {
-		temp[i+1] = C.uchar(b)
-	}
+	var temp = []byte{byte((channel << 4) | cmd)}
+	temp = append(temp, data...)
 
-	var kissed [C.AX25_MAX_PACKET_LEN * 2]C.uchar
-	var klen = C.kiss_encapsulate(&temp[0], C.int(len(data))+1, &kissed[0])
+	var kissed = kiss_encapsulate(temp)
+	var klen = C.int(len(kissed))
 
 	if verbose {
 		fmt.Printf("Sending to KISS TNC:\n")
-		C.hex_dump(&kissed[0], klen)
+		C.hex_dump((*C.uchar)(C.CBytes(kissed)), klen)
 	}
 
 	if using_tcp {
-		var kissedBytes = make([]byte, klen)
-		for i := range klen {
-			kissedBytes[i] = byte(kissed[i])
-		}
-		server_sock.Write(kissedBytes[:klen])
+		server_sock.Write(kissed)
 	} else {
-		var rc = C.serial_port_write(serial_fd, (*C.char)(unsafe.Pointer(&kissed[0])), klen)
+		var rc = C.serial_port_write(serial_fd, (*C.char)(C.CBytes(kissed)), klen)
 		if rc != klen {
 			fmt.Printf("ERROR writing KISS frame to serial port.\n")
 			// fmt.Printf ("DEBUG wanted %d, got %d\n", klen, rc);
