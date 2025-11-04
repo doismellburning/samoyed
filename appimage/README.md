@@ -46,7 +46,7 @@ The AppImage runs the `direwolf` binary by default. All command-line arguments a
 ## Files in this directory
 
 - `build-appimage.sh` - Script to build the AppImage
-- `samoyed.desktop` - Desktop entry file for application integration
+- `io.github.doismellburning.samoyed.desktop` - Desktop entry file for application integration
 - `samoyed.svg` - Application icon
 - `io.github.doismellburning.samoyed.appdata.xml` - AppStream metadata
 

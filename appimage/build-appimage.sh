@@ -30,13 +30,11 @@ cp -r data/* "$APPDIR/usr/share/samoyed/"
 
 # Copy desktop file, icon, and metadata
 echo "Copying metadata files..."
-cp appimage/samoyed.desktop "$APPDIR/usr/share/applications/"
-cp appimage/samoyed.desktop "$APPDIR/"
+cp appimage/io.github.doismellburning.samoyed.desktop "$APPDIR/usr/share/applications/"
+cp appimage/io.github.doismellburning.samoyed.desktop "$APPDIR/"
 cp appimage/samoyed.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/"
 cp appimage/samoyed.svg "$APPDIR/"
 cp appimage/io.github.doismellburning.samoyed.appdata.xml "$APPDIR/usr/share/metainfo/"
-# Also create a copy with the simple name for AppImage tool
-cp appimage/io.github.doismellburning.samoyed.appdata.xml "$APPDIR/usr/share/metainfo/samoyed.appdata.xml"
 
 # Create AppRun script
 echo "Creating AppRun script..."
@@ -68,6 +66,6 @@ fi
 
 # Build the AppImage
 echo "Building AppImage..."
-ARCH=$ARCH ./appimagetool-${ARCH}.AppImage --no-appstream --runtime-file runtime-${ARCH} "$APPDIR" "Samoyed-${ARCH}.AppImage"
+ARCH=$ARCH ./appimagetool-${ARCH}.AppImage --runtime-file runtime-${ARCH} "$APPDIR" "Samoyed-${ARCH}.AppImage"
 
 echo "AppImage built successfully: Samoyed-${ARCH}.AppImage"

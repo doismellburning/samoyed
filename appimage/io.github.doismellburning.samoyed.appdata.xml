@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>samoyed</id>
+  <id>io.github.doismellburning.samoyed</id>
   <metadata_license>MIT</metadata_license>
   <project_license>GPL-2.0-or-later</project_license>
   <name>Samoyed</name>
@@ -24,7 +24,7 @@
       <li>Multiple modem support (300 bps AFSK, 1200 bps AFSK, 2400/4800 bps PSK, 9600 bps GMSK)</li>
     </ul>
   </description>
-  <launchable type="desktop-id">samoyed.desktop</launchable>
+  <launchable type="desktop-id">io.github.doismellburning.samoyed.desktop</launchable>
   <url type="homepage">https://github.com/doismellburning/samoyed</url>
   <url type="bugtracker">https://github.com/doismellburning/samoyed/issues</url>
   <developer id="io.github.doismellburning">
