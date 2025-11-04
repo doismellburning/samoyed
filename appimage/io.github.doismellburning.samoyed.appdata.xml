@@ -33,9 +33,24 @@
   <provides>
     <binary>direwolf</binary>
     <binary>aclients</binary>
-    <binary>decode_aprs</binary>
-    <binary>kissutil</binary>
+    <binary>appserver</binary>
     <binary>atest</binary>
+    <binary>cm108</binary>
+    <binary>decode_aprs</binary>
+    <binary>dwgpsnmea</binary>
+    <binary>fxrec</binary>
+    <binary>fxsend</binary>
+    <binary>gen_packets</binary>
+    <binary>gen_tone</binary>
+    <binary>kissutil</binary>
+    <binary>ll2utm</binary>
+    <binary>log2gpx</binary>
+    <binary>text2tt</binary>
+    <binary>tnctest</binary>
+    <binary>tt2text</binary>
+    <binary>ttcalc</binary>
+    <binary>utm2ll</binary>
+    <binary>walk96</binary>
   </provides>
   <releases>
     <release version="development" date="2024-01-01">
