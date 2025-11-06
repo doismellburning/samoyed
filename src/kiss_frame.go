@@ -1,5 +1,63 @@
 package direwolf
 
+/*------------------------------------------------------------------
+ *
+ * Purpose:   	Common code used by Serial port and network versions of KISS protocol.
+ *
+ * Description: The KISS TNC protocol is described in http://www.ka9q.net/papers/kiss.html
+ *
+ *		( An extended form, to handle multiple TNCs on a single serial port.
+ *		  Not applicable for our situation.  http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf )
+ *
+ * 		Briefly, a frame is composed of
+ *
+ *			* FEND (0xC0)
+ *			* Contents - with special escape sequences so a 0xc0
+ *				byte in the data is not taken as end of frame.
+ *				as part of the data.
+ *			* FEND
+ *
+ *		The first byte of the frame contains:
+ *
+ *			* radio channel in upper nybble.
+ *				(KISS doc uses "port" but I don't like that because it has too many meanings.)
+ *			* command in lower nybble.
+ *
+ *
+ *		Commands from application tp TNC:
+ *
+ *			_0	Data Frame	AX.25 frame in raw format.
+ *
+ *			_1	TXDELAY		See explanation in xmit.c.
+ *
+ *			_2	Persistence	"	"
+ *
+ *			_3 	SlotTime	"	"
+ *
+ *			_4	TXtail		"	"
+ *						Spec says it is obsolete but Xastir
+ *						sends it and we respect it.
+ *
+ *			_5	FullDuplex	Full Duplex.  Transmit immediately without
+ *						waiting for channel to be clear.
+ *
+ *			_6	SetHardware	TNC specific.
+ *
+ *			_C	XKISS extension - not supported.
+ *			_E	XKISS extension - not supported.
+ *
+ *			FF	Return		Exit KISS mode.  Ignored.
+ *
+ *
+ *		Messages sent to client application:
+ *
+ *			_0	Data Frame	Received AX.25 frame in raw format.
+ *
+ *			_6	SetHardware	TNC specific.
+ *						Usually a response to a query.
+ *
+ *---------------------------------------------------------------*/
+
 // #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
@@ -15,7 +73,6 @@ package direwolf
 // #include "version.h"
 // #include "kissnet.h"
 // void hex_dump (unsigned char *p, int len);
-// extern int KISSUTIL;
 import "C"
 
 import (
@@ -45,6 +102,203 @@ type kissport_status_s struct {
 
 	kf [MAX_NET_CLIENTS]C.kiss_frame_t
 	/* Accumulated KISS frame and state of decoder. */
+}
+
+var KISSUTIL = false // Dynamic replacement for the old #define
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        kiss_frame_init
+ *
+ * Purpose:     Save information about valid channels for later error checking.
+ *
+ * Inputs:      pa		- Address of structure of type audio_s.
+ *
+ *-----------------------------------------------------------------*/
+
+func kiss_frame_init(pa *C.struct_audio_s) {
+	save_audio_config_p = pa
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        kiss_encapsulate
+ *
+ * Purpose:     Encapsulate a frame into KISS format.
+ *
+ * Inputs:	in	- Address of input block.
+ *			  First byte is the "type indicator" with type and
+ *			  channel but we don't care about that here.
+ *			  If it happens to be FEND or FESC, it is escaped, like any other byte.
+ *
+ *			  This seems cumbersome and confusing to have this
+ *			  one byte offset when encapsulating an AX.25 frame.
+ *			  Maybe the type/channel byte should be passed in
+ *			  as a separate argument.
+ *
+ *			  Note that this is "binary" data and can contain
+ *			  nul (0x00) values.   Don't treat it like a text string!
+ *
+ *		ilen	- Number of bytes in input block.
+ *
+ * Outputs:	out	- Address where to place the KISS encoded representation.
+ *			  The sequence is:
+ *				FEND		- Magic frame separator.
+ *				data		- with certain byte values replaced so
+ *						  FEND will never occur here.
+ *				FEND		- Magic frame separator.
+ *
+ * Returns:	Number of bytes in the output.
+ *		Absolute max length (extremely unlikely) will be twice input plus 2.
+ *
+ *-----------------------------------------------------------------*/
+
+func kiss_encapsulate(in []byte) []byte {
+	var buf bytes.Buffer
+
+	buf.WriteByte(FEND)
+
+	for _, b := range in {
+		switch b {
+		case FEND:
+			buf.WriteByte(FESC)
+			buf.WriteByte(TFEND)
+		case FESC:
+			buf.WriteByte(FESC)
+			buf.WriteByte(TFESC)
+		default:
+			buf.WriteByte(b)
+		}
+	}
+
+	buf.WriteByte(FEND)
+
+	return buf.Bytes()
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        kiss_unwrap
+ *
+ * Purpose:     Extract original data from a KISS frame.
+ *
+ * Inputs:	in	- Address of the received the KISS encoded representation.
+ *			  The sequence is:
+ *				FEND		- Magic frame separator, optional.
+ *				data		- with certain byte values replaced so
+ *						  FEND will never occur here.
+ *				FEND		- Magic frame separator.
+ *		ilen	- Number of bytes in input block.
+ *
+ * Inputs:	out	- Where to put the resulting frame without
+ *			  the escapes or FEND.
+ *			  First byte is the "type indicator" with type and
+ *			  channel but we don't care about that here.
+ *			  We treat it like any other byte with special handling
+ *			  if it happens to be FESC.
+ *			  Note that this is "binary" data and can contain
+ *			  nul (0x00) values.   Don't treat it like a text string!
+ *
+ * Returns:	Number of bytes in the output.
+ *
+ *-----------------------------------------------------------------*/
+
+func kiss_unwrap(in []byte) []byte {
+
+	if len(in) < 2 {
+		/* Need at least the "type indicator" byte and FEND. */
+		/* Probably more. */
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS message less than minimum length.\n")
+		return []byte{}
+	}
+
+	if in[len(in)-1] == FEND {
+		in = in[:len(in)-1] // Ignore last FEND
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("KISS frame should end with FEND.\n")
+	}
+
+	if in[0] == FEND {
+		in = in[1:] // Skip over optional leading FEND
+	}
+
+	var escapedMode = false
+	var buf bytes.Buffer
+	for _, b := range in {
+		if b == FEND {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("KISS frame should not have FEND in the middle.\n")
+		}
+
+		if escapedMode {
+			switch b {
+			case TFESC:
+				buf.WriteByte(FESC)
+			case TFEND:
+				buf.WriteByte(FEND)
+			default:
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("KISS protocol error.  Found 0x%02x after FESC.\n", b)
+			}
+			escapedMode = false
+		} else if b == FESC {
+			escapedMode = true
+		} else {
+			buf.WriteByte(b)
+		}
+	}
+
+	return buf.Bytes()
+} /* end kiss_unwrap */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        kiss_debug_print
+ *
+ * Purpose:     Print message to/from client for debugging.
+ *
+ * Inputs:	fromto		- Direction of message.
+ *		special		- Comment if not a KISS frame.
+ *		pmsg		- Address of the message block.
+ *		msg_len		- Length of the message.
+ *
+ *--------------------------------------------------------------------*/
+
+func kiss_debug_print(fromto C.fromto_t, special string, pmsg []byte) {
+	var direction = []string{"from", "to"}
+	var prefix = []string{"<<<", ">>>"}
+	var function = []string{
+		"Data frame", "TXDELAY", "P", "SlotTime",
+		"TXtail", "FullDuplex", "SetHardware", "Invalid 7",
+		"Invalid 8", "Invalid 9", "Invalid 10", "Invalid 11",
+		"Invalid 12", "Invalid 13", "Invalid 14", "Return"}
+
+	text_color_set(DW_COLOR_DEBUG)
+
+	if KISSUTIL {
+		dw_printf("From KISS TNC:\n")
+	} else {
+		dw_printf("\n")
+		if special == "" {
+
+			if pmsg[0] == FEND {
+				/* Skip over FEND if present. */
+				pmsg = pmsg[1:]
+			}
+
+			dw_printf("%s %s %s KISS client application, channel %d, total length = %d\n",
+				prefix[fromto], function[pmsg[0]&0xf], direction[fromto],
+				(pmsg[0]>>4)&0xf, len(pmsg))
+		} else {
+			dw_printf("%s %s %s KISS client application, total length = %d\n",
+				prefix[fromto], special, direction[fromto],
+				len(pmsg))
+		}
+	}
+
+	C.hex_dump((*C.uchar)(C.CBytes(pmsg)), C.int(len(pmsg)))
 }
 
 /*-------------------------------------------------------------------
@@ -107,7 +361,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 
 			if kf.noise_len > 0 {
 				if debug > 0 {
-					C.kiss_debug_print(FROM_CLIENT, C.CString("Rejected Noise"), &kf.noise[0], kf.noise_len)
+					kiss_debug_print(FROM_CLIENT, "Rejected Noise", C.GoBytes(unsafe.Pointer(&kf.noise[0]), kf.noise_len))
 				}
 				kf.noise_len = 0
 			}
@@ -126,7 +380,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 		}
 		if ch == '\r' {
 			if debug > 0 {
-				C.kiss_debug_print(FROM_CLIENT, C.CString("Rejected Noise"), &kf.noise[0], kf.noise_len)
+				kiss_debug_print(FROM_CLIENT, "Rejected Noise", C.GoBytes(unsafe.Pointer(&kf.noise[0]), kf.noise_len))
 				kf.noise[kf.noise_len] = 0
 			}
 
@@ -161,11 +415,11 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 			kf.kiss_len++
 			if debug > 0 {
 				/* As received over the wire from client app. */
-				C.kiss_debug_print(FROM_CLIENT, nil, &kf.kiss_msg[0], kf.kiss_len)
+				kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
 			}
 
-			var unwrapped [C.AX25_MAX_PACKET_LEN]C.uchar
-			var ulen = C.kiss_unwrap(&kf.kiss_msg[0], kf.kiss_len, &unwrapped[0])
+			var unwrapped = kiss_unwrap(C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
+			var ulen = len(unwrapped)
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
@@ -174,10 +428,10 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 				dw_printf("Packet content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				C.hex_dump(&unwrapped[1], ulen-1)
+				C.hex_dump((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped)-1))
 			}
 
-			kiss_process_msg(&unwrapped[0], ulen, debug, kps, client, sendfun)
+			kiss_process_msg((*C.uchar)(C.CBytes(unwrapped)), C.int(ulen), debug, kps, client, sendfun)
 
 			kf.state = KS_SEARCHING
 			return
@@ -222,7 +476,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 
 func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissport_status_s, client C.int, sendfun kiss_sendfun) {
 	// Temporary for now
-	if C.KISSUTIL > 0 {
+	if KISSUTIL {
 		kiss_process_msg_override(kiss_msg, kiss_len)
 		return
 	}
@@ -315,7 +569,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 
 			dw_printf("\n")
 			text_color_set(DW_COLOR_DEBUG)
-			C.kiss_debug_print(FROM_CLIENT, nil, kiss_msg, kiss_len)
+			kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(kiss_msg), kiss_len))
 			return
 		}
 
@@ -438,7 +692,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("KISS Invalid command %d\n", cmd)
-		C.kiss_debug_print(FROM_CLIENT, nil, kiss_msg, kiss_len)
+		kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(kiss_msg), kiss_len))
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Troubleshooting tip:\n")

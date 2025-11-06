@@ -80,7 +80,6 @@ import "C"
 
 import (
 	"os"
-	"unsafe"
 
 	"github.com/creack/pty"
 )
@@ -282,26 +281,23 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.i
 		return
 	}
 
-	var kiss_buff [2*C.AX25_MAX_PACKET_LEN + 2]C.uchar
-	var kiss_len C.int
+	var kiss_buff []byte
 	if flen < 0 {
-		flen = C.int(len(fbuf))
 		if kisspt_debug > 0 {
-			C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
+			kiss_debug_print(C.TO_CLIENT, "Fake command prompt", fbuf)
 		}
-		C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
-		kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
+		kiss_buff = fbuf
 	} else {
-		var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
+		var stemp []byte
 
-		if flen > C.int(len(stemp)-1) {
+		if flen > C.AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
-			flen = C.int(len(stemp)) - 1
+			fbuf = fbuf[:C.AX25_MAX_PACKET_LEN]
 		}
 
-		stemp[0] = C.uchar((channel << 4) | kiss_cmd)
-		C.memcpy(unsafe.Pointer(&stemp[1]), C.CBytes(fbuf), C.ulong(flen))
+		stemp = []byte{byte((channel << 4) | kiss_cmd)}
+		stemp = append(stemp, fbuf...)
 
 		if kisspt_debug >= 2 {
 			/* AX.25 frame with the CRC removed. */
@@ -311,25 +307,21 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.i
 			C.hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 		}
 
-		kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
+		kiss_buff = kiss_encapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 
 		if kisspt_debug > 0 {
-			C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
+			kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
 		}
 	}
 
-	var _out_bytes = make([]byte, kiss_len)
-	for i := range kiss_len {
-		_out_bytes[i] = byte(kiss_buff[i])
-	}
-	var n, err = pt_master.Write(_out_bytes)
+	var n, err = pt_master.Write(kiss_buff)
 
-	if C.int(n) != kiss_len {
+	if n != len(kiss_buff) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			pt_master.Name(), kiss_len, n, err)
+			pt_master.Name(), len(kiss_buff), n, err)
 	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")

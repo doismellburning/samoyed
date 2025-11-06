@@ -405,8 +405,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
 				if onlyclient == -1 || client == onlyclient {
 					if kps.client_sock[client] != nil {
-						var kiss_buff [2 * C.AX25_MAX_PACKET_LEN]C.uchar
-						var kiss_len C.int
+						var kiss_buff []byte
 						if flen < 0 {
 							// A client app might think it is attached to a traditional TNC.
 							// It might try sending commands over and over again trying to get the TNC into KISS mode.
@@ -422,14 +421,11 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 
 							flen = C.int(len(fbuf))
 							if kiss_debug > 0 {
-								C.kiss_debug_print(C.TO_CLIENT, C.CString("Fake command prompt"), (*C.uchar)(C.CBytes(fbuf)), flen)
+								kiss_debug_print(C.TO_CLIENT, "Fake command prompt", fbuf)
 							}
-							C.strcpy((*C.char)(unsafe.Pointer(&kiss_buff[0])), (*C.char)(C.CBytes(fbuf)))
-							kiss_len = C.int(C.strlen((*C.char)(unsafe.Pointer(&kiss_buff[0]))))
+							kiss_buff = fbuf
 						} else {
-							var stemp [C.AX25_MAX_PACKET_LEN + 1]C.uchar
-
-							Assert(flen < C.int(len(stemp)))
+							var stemp []byte
 
 							// New in 1.7.
 							// Previously all channels were sent to everyone.
@@ -438,16 +434,16 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 
 							if kps.channel == -1 { //nolint:staticcheck
 								// Normal case, all channels.
-								stemp[0] = C.uchar((channel << 4) | kiss_cmd)
+								stemp = []byte{byte((channel << 4) | kiss_cmd)}
 							} else if kps.channel == channel {
 								// Single radio channel for this port.  Application sees 0.
-								stemp[0] = C.uchar((0 << 4) | kiss_cmd)
+								stemp = []byte{byte((0 << 4) | kiss_cmd)}
 							} else {
 								// Skip it.
 								continue
 							}
 
-							C.memcpy(unsafe.Pointer(&stemp[1]), C.CBytes(fbuf), C.ulong(flen))
+							stemp = append(stemp, fbuf...)
 
 							if kiss_debug >= 2 {
 								/* AX.25 frame with the CRC removed. */
@@ -457,16 +453,16 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 								C.hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 							}
 
-							kiss_len = C.kiss_encapsulate(&stemp[0], flen+1, &kiss_buff[0])
+							kiss_buff = kiss_encapsulate(stemp)
 
 							/* This has the escapes and the surrounding FENDs. */
 
 							if kiss_debug > 0 {
-								C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
+								kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
 							}
 						}
 
-						var _, err = kps.client_sock[client].Write(C.GoBytes(unsafe.Pointer(&kiss_buff[0]), kiss_len))
+						var _, err = kps.client_sock[client].Write(kiss_buff)
 						if err != nil {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
@@ -530,16 +526,15 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 								msg[0] = byte(0 | cmd) // set channel to zero.
 							}
 
-							var kiss_buff [2 * C.AX25_MAX_PACKET_LEN]C.uchar
-							var kiss_len = C.kiss_encapsulate((*C.uchar)(C.CBytes(msg)), in_len, &kiss_buff[0])
+							var kiss_buff = kiss_encapsulate(msg)
 
 							/* This has the escapes and the surrounding FENDs. */
 
 							if kiss_debug > 0 {
-								C.kiss_debug_print(C.TO_CLIENT, nil, &kiss_buff[0], kiss_len)
+								kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
 							}
 
-							var _, err = kps.client_sock[client].Write(C.GoBytes(unsafe.Pointer(&kiss_buff[0]), kiss_len))
+							var _, err = kps.client_sock[client].Write(kiss_buff)
 							if err != nil {
 								text_color_set(DW_COLOR_ERROR)
 								dw_printf("\nError %s copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", err, kps.tcp_port, client)

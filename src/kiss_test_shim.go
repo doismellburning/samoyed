@@ -18,7 +18,6 @@ import "C"
 
 import (
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,27 +27,25 @@ import (
 func kiss_test_main(t *testing.T) {
 	t.Helper()
 
-	var din [512]C.uchar
+	var din = make([]byte, 512)
 	for k := range 512 {
 		if k < 256 {
-			din[k] = C.uchar(k)
+			din[k] = byte(k)
 		} else {
-			din[k] = C.uchar(511 - k)
+			din[k] = byte(511 - k)
 		}
 	}
 
-	var kissed [520]C.uchar
-	var klen = C.kiss_encapsulate(&din[0], 512, &kissed[0])
-	assert.Equal(t, C.int(512+6), klen)
+	var kissed = kiss_encapsulate(din)
+	assert.Len(t, kissed, (512 + 6))
 
-	var dout [520]C.uchar
-	var dlen = C.kiss_unwrap(&kissed[0], klen, &dout[0])
-	assert.Equal(t, C.int(512), dlen)
-	assert.Zero(t, C.memcmp(unsafe.Pointer(&din[0]), unsafe.Pointer(&dout[0]), 512))
+	var dout = kiss_unwrap(kissed)
+	assert.Len(t, dout, 512)
+	assert.Equal(t, din, dout)
 
-	dlen = C.kiss_unwrap(&kissed[1], klen-1, &dout[0])
-	assert.Equal(t, C.int(512), dlen)
-	assert.Zero(t, C.memcmp(unsafe.Pointer(&din[0]), unsafe.Pointer(&dout[0]), 512))
+	dout = kiss_unwrap(kissed[1:])
+	assert.Len(t, dout, 512)
+	assert.Equal(t, din, dout)
 
 	dw_printf("Quick KISS test passed OK.\n")
 }
