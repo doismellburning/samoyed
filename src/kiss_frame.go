@@ -124,7 +124,7 @@ func kiss_frame_init(pa *C.struct_audio_s) {
  *
  * Name:        kiss_encapsulate
  *
- * Purpose:     Ecapsulate a frame into KISS format.
+ * Purpose:     Encapsulate a frame into KISS format.
  *
  * Inputs:	in	- Address of input block.
  *			  First byte is the "type indicator" with type and
