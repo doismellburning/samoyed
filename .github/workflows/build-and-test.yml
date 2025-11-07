@@ -43,9 +43,9 @@ jobs:
     - name: "Build AppImage"
       run: "./appimage/build-appimage.sh"
     - name: "Set AppImage filename"
-      run: 'echo "APPIMAGE_NAME=Samoyed-${{env.SAMOYED_VERSION }}-${{ runner.arch }}.AppImage" >> $GITHUB_ENV'
+      run: 'echo "APPIMAGE_NAME=Samoyed-${{env.SAMOYED_VERSION }}-x86_64.AppImage" >> $GITHUB_ENV'
     - name: "Rename AppImage with version"
-      run: "mv Samoyed-${{ runner.arch }}.AppImage \"$APPIMAGE_NAME\""
+      run: "mv Samoyed-x86_64.AppImage \"$APPIMAGE_NAME\""
     - uses: "actions/upload-artifact@v5"
       with:
         name: "${{ env.TARBALL_NAME }}"
