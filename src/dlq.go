@@ -46,9 +46,7 @@ var dlq_queue_head *C.struct_dlq_item_s /* Head of linked list for queue. */
 
 var dlq_mutex sync.Mutex /* Critical section for updating queues. */
 
-var dlq_wake_up_cond *sync.Cond /* Notify received packet processing thread when queue not empty. */
-
-var dlq_wake_up_mutex sync.Mutex /* Required by cond_wait. */
+var dlq_wake_up_chan = make(chan struct{}) /* Notify received packet processing thread when queue not empty. */
 
 var recv_thread_is_waiting bool
 
@@ -91,8 +89,6 @@ func dlq_init() {
 		dw_printf ("dlq_init: pthread_cond_init...\n");
 	#endif
 	*/
-
-	dlq_wake_up_cond = sync.NewCond(&dlq_wake_up_mutex)
 
 	/* TODO KG
 	#if DEBUG
@@ -325,12 +321,7 @@ func append_to_queue(pnew *C.struct_dlq_item_s) {
 	}
 
 	if recv_thread_is_waiting {
-
-		dlq_wake_up_mutex.Lock()
-
-		dlq_wake_up_cond.Signal()
-
-		dlq_wake_up_mutex.Unlock()
+		dlq_wake_up_chan <- struct{}{}
 	}
 
 } /* end append_to_queue */
@@ -819,33 +810,22 @@ func dlq_wait_while_empty(timeout C.double) C.int {
 		#endif
 		*/
 
-		dlq_wake_up_mutex.Lock()
-
 		recv_thread_is_waiting = true
 		if timeout != 0.0 {
 			var timeoutAt = time.Unix(int64(timeout), 0) // TODO KG I suspect we were dropping ns when passing in :s
 			var waitFor = time.Until(timeoutAt)
 
 			// KG: pthread_cond_timedwait in Go...
-			var done = make(chan struct{})
-			go func() {
-				dlq_wake_up_cond.Wait()
-				close(done)
-			}()
-
 			select {
-			case <-done:
+			case <-dlq_wake_up_chan:
 				// Signalled
 			case <-time.After(waitFor):
 				timed_out_result = 1
 			}
-			// TODO KG What happens if we leave the Cond Wait-ing...?
 		} else {
-			dlq_wake_up_cond.Wait()
+			<-dlq_wake_up_chan
 		}
 		recv_thread_is_waiting = false
-
-		dlq_wake_up_mutex.Unlock()
 	}
 
 	/* TODO KG
