@@ -512,7 +512,7 @@ func SET_VA(S *ax25_dlsm_t, n C.int) {
 
 	var x = AX25MODULO(n-1, S.modulo)
 	for S.txdata_by_ns[x] != nil {
-		C.cdata_delete(S.txdata_by_ns[x])
+		cdata_delete(S.txdata_by_ns[x])
 		S.txdata_by_ns[x] = nil
 		x = AX25MODULO(x-1, S.modulo)
 	}
@@ -1120,7 +1120,7 @@ func dl_data_request(E *C.dlq_item_t) {
 		for remaining_len > 0 {
 			var this_len = min(remaining_len, S.n1_paclen)
 
-			var new_txdata = C.cdata_new(E.txdata.pid, &E.txdata.data[offset], this_len)
+			var new_txdata = cdata_new(E.txdata.pid, &E.txdata.data[offset], this_len)
 			data_request_good_size(S, new_txdata)
 
 			offset += this_len
@@ -1133,7 +1133,7 @@ func dl_data_request(E *C.dlq_item_t) {
 			dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, num frames = %d, remaining len = %d\n",
 				E.txdata.len, S.n1_paclen, num_frames, remaining_len)
 		}
-		C.cdata_delete(E.txdata)
+		cdata_delete(E.txdata)
 		E.txdata = nil
 		return
 	}
@@ -1207,7 +1207,7 @@ func dl_data_request(E *C.dlq_item_t) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, number of segments = %d\n",
 			E.txdata.len, S.n1_paclen, nseg_to_follow)
-		C.cdata_delete(E.txdata)
+		cdata_delete(E.txdata)
 		E.txdata = nil
 		return
 	}
@@ -1233,14 +1233,14 @@ func dl_data_request(E *C.dlq_item_t) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d\n",
 			E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
-		C.cdata_delete(E.txdata)
+		cdata_delete(E.txdata)
 		E.txdata = nil
 		return
 	}
 
 	C.memcpy(unsafe.Pointer(&first_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
 
-	var new_txdata = C.cdata_new(C.AX25_PID_SEGMENTATION_FRAGMENT, &first_segment.header, seglen+2)
+	var new_txdata = cdata_new(C.AX25_PID_SEGMENTATION_FRAGMENT, &first_segment.header, seglen+2)
 
 	data_request_good_size(S, new_txdata)
 
@@ -1264,14 +1264,14 @@ func dl_data_request(E *C.dlq_item_t) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d\n",
 				E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
-			C.cdata_delete(E.txdata)
+			cdata_delete(E.txdata)
 			E.txdata = nil
 			return
 		}
 
 		C.memcpy(unsafe.Pointer(&subsequent_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
 
-		new_txdata = C.cdata_new(C.AX25_PID_SEGMENTATION_FRAGMENT, &subsequent_segment.header, seglen+1)
+		new_txdata = cdata_new(C.AX25_PID_SEGMENTATION_FRAGMENT, &subsequent_segment.header, seglen+1)
 
 		data_request_good_size(S, new_txdata)
 
@@ -1289,7 +1289,7 @@ func dl_data_request(E *C.dlq_item_t) {
 			E.txdata.len, S.n1_paclen, remaining_len, orig_offset, E.txdata.len)
 	}
 
-	C.cdata_delete(E.txdata)
+	cdata_delete(E.txdata)
 	E.txdata = nil
 
 } /* end dl_data_request */
@@ -1301,7 +1301,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *C.cdata_t) {
 		/*
 		 * Discard it.
 		 */
-		C.cdata_delete(txdata)
+		cdata_delete(txdata)
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
 		/*
@@ -1313,7 +1313,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *C.cdata_t) {
 		 * TODO: Get better understanding of what'layer_3_initiated' means.
 		 */
 		if S.layer_3_initiated {
-			C.cdata_delete(txdata)
+			cdata_delete(txdata)
 			break
 		}
 
@@ -1619,20 +1619,20 @@ func dl_client_cleanup(E *C.dlq_item_t) {
 
 			for n := 0; n < 128; n++ {
 				if S.txdata_by_ns[n] != nil {
-					C.cdata_delete(S.txdata_by_ns[n])
+					cdata_delete(S.txdata_by_ns[n])
 					S.txdata_by_ns[n] = nil
 				}
 			}
 
 			for n := 0; n < 128; n++ {
 				if S.rxdata_by_ns[n] != nil {
-					C.cdata_delete(S.rxdata_by_ns[n])
+					cdata_delete(S.rxdata_by_ns[n])
 					S.rxdata_by_ns[n] = nil
 				}
 			}
 
 			if S.ra_buff != nil {
-				C.cdata_delete(S.ra_buff)
+				cdata_delete(S.ra_buff)
 				S.ra_buff = nil
 			}
 
@@ -1665,7 +1665,7 @@ func dl_client_cleanup(E *C.dlq_item_t) {
 	 * If there are no link state machines (streams) remaining, there should be no txdata items still allocated.
 	 */
 	if list_head == nil {
-		C.cdata_check_leak()
+		cdata_check_leak()
 	}
 
 	/*
@@ -1735,7 +1735,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 			S.ra_following = C.int(dataBytes[0] & 0x7f)
 			var total = (S.ra_following+1)*(length-1) - 1 // len should be other side's N1
-			S.ra_buff = C.cdata_new(C.int(dataBytes[1]), nil, total)
+			S.ra_buff = cdata_new(C.int(dataBytes[1]), nil, total)
 			S.ra_buff.size = total     // max that we are expecting.
 			S.ra_buff.len = length - 2 // how much accumulated so far.
 			C.memcpy(unsafe.Pointer(&S.ra_buff.data), C.CBytes(dataBytes[2:]), C.ulong(length-2))
@@ -1753,19 +1753,19 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Not segment in reassembling state.\n", S.stream_id)
-			C.cdata_delete(S.ra_buff)
+			cdata_delete(S.ra_buff)
 			S.ra_buff = nil
 			return
 		} else if dataBytes[0]&0x80 > 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: First segment in reassembling state.\n", S.stream_id)
-			C.cdata_delete(S.ra_buff)
+			cdata_delete(S.ra_buff)
 			S.ra_buff = nil
 			return
 		} else if (dataBytes[0] & 0x7f) != byte(S.ra_following-1) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments out of sequence.\n", S.stream_id)
-			C.cdata_delete(S.ra_buff)
+			cdata_delete(S.ra_buff)
 			S.ra_buff = nil
 			return
 		} else {
@@ -1779,7 +1779,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments exceed buffer space.\n", S.stream_id)
-				C.cdata_delete(S.ra_buff)
+				cdata_delete(S.ra_buff)
 				S.ra_buff = nil
 				return
 			}
@@ -1787,7 +1787,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 			if S.ra_following == 0 {
 				// Last one.
 				server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], S.ra_buff.pid, (*C.char)(unsafe.Pointer(&S.ra_buff.data)), S.ra_buff.len)
-				C.cdata_delete(S.ra_buff)
+				cdata_delete(S.ra_buff)
 				S.ra_buff = nil
 			}
 		}
@@ -2522,7 +2522,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 			// away from 8 or 128 (modulo) frames back.  Remove it so it doesn't accidentally
 			// show up at some future inopportune time.
 
-			C.cdata_delete(S.rxdata_by_ns[ns])
+			cdata_delete(S.rxdata_by_ns[ns])
 			S.rxdata_by_ns[ns] = nil
 
 		}
@@ -2542,7 +2542,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 
 			// Don't keep around anymore after sending it to client app.
 
-			C.cdata_delete(S.rxdata_by_ns[S.vr])
+			cdata_delete(S.rxdata_by_ns[S.vr])
 			S.rxdata_by_ns[S.vr] = nil
 
 			SET_VR(S, AX25MODULO(S.vr+1, S.modulo))
@@ -2638,10 +2638,10 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 			// Save it in the receive buffer.
 
 			if S.rxdata_by_ns[ns] != nil {
-				C.cdata_delete(S.rxdata_by_ns[ns])
+				cdata_delete(S.rxdata_by_ns[ns])
 				S.rxdata_by_ns[ns] = nil
 			}
-			S.rxdata_by_ns[ns] = C.cdata_new(pid, info_ptr, info_len)
+			S.rxdata_by_ns[ns] = cdata_new(pid, info_ptr, info_len)
 
 			if s_debug_misc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
@@ -2733,7 +2733,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 
 
 		   	  if (S.rxdata_by_ns[ns] != nil) {
-		   	    C.cdata_delete (S.rxdata_by_ns[ns]);
+		   	    cdata_delete (S.rxdata_by_ns[ns]);
 		   	    S.rxdata_by_ns[ns] = nil;
 		   	  }
 		   	  S.rxdata_by_ns[ns] = cdata_new(pid, info_ptr, info_len);
@@ -5233,7 +5233,7 @@ func clear_exception_conditions(S *ax25_dlsm_t) {
 
 	for n := 0; n < 128; n++ {
 		if S.rxdata_by_ns[n] != nil {
-			C.cdata_delete(S.rxdata_by_ns[n])
+			cdata_delete(S.rxdata_by_ns[n])
 			S.rxdata_by_ns[n] = nil
 		}
 	}
@@ -5954,7 +5954,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 			}
 			var txdata = S.i_frame_queue // Remove from head of list.
 			S.i_frame_queue = txdata.next
-			C.cdata_delete(txdata)
+			cdata_delete(txdata)
 		}
 
 	case state_3_connected, state_4_timer_recovery:
@@ -5994,7 +5994,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 			// Stash in sent array in case it gets lost and needs to be sent again.
 
 			if S.txdata_by_ns[ns] != nil {
-				C.cdata_delete(S.txdata_by_ns[ns])
+				cdata_delete(S.txdata_by_ns[ns])
 			}
 			S.txdata_by_ns[ns] = txdata
 
@@ -6035,7 +6035,7 @@ func discard_i_queue(S *ax25_dlsm_t) {
 	for S.i_frame_queue != nil {
 		var t = S.i_frame_queue
 		S.i_frame_queue = S.i_frame_queue.next
-		C.cdata_delete(t)
+		cdata_delete(t)
 	}
 
 } /* end discard_i_queue */

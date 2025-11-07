@@ -615,7 +615,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 
 	// Inform data link state machine that we are now transmitting.
 
-	C.dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
+	dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
 	// machine, that the transmission opportunity has arrived."
 
 	var pre_flags = MS_TO_BITS(xmit_txdelay[channel]*10, channel) / 8
@@ -833,7 +833,7 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 		// It shouldn't hurt if we send it redundantly.
 		// Added for 1.5 beta test 4.
 
-		C.dlq_seize_confirm(c) // C4.2.  "This primitive indicates, to the Data-link State
+		dlq_seize_confirm(c) // C4.2.  "This primitive indicates, to the Data-link State
 		// machine, that the transmission opportunity has arrived."
 
 		SLEEP_MS(10) // Give data link state machine a chance to

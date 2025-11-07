@@ -503,7 +503,7 @@ func server_send_rec_packet(channel C.int, pp C.packet_t, fbuf *C.uchar, flen C.
 				dw_printf("\nError sending message to AGW client application.  Closing connection.\n\n")
 				client_sock[client].Close()
 				client_sock[client] = nil
-				C.dlq_client_cleanup(client)
+				dlq_client_cleanup(client)
 			}
 		}
 	}
@@ -610,7 +610,7 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 				dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
 				client_sock[client].Close()
 				client_sock[client] = nil
-				C.dlq_client_cleanup(client)
+				dlq_client_cleanup(client)
 			}
 		}
 	}
@@ -995,7 +995,7 @@ func cmd_listen_thread(client C.int) {
 			dw_printf("Closing connection.\n\n")
 			client_sock[client].Close()
 			client_sock[client] = nil
-			C.dlq_client_cleanup(client)
+			dlq_client_cleanup(client)
 			continue
 		}
 
@@ -1029,7 +1029,7 @@ func cmd_listen_thread(client C.int) {
 				dw_printf("Closing connection.\n\n")
 				client_sock[client].Close()
 				client_sock[client] = nil
-				C.dlq_client_cleanup(client)
+				dlq_client_cleanup(client)
 				return
 			}
 
@@ -1350,7 +1350,7 @@ func cmd_listen_thread(client C.int) {
 
 				if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 					ok = 1
-					C.dlq_register_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), C.int(channel), client)
+					dlq_register_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), C.int(channel), client)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1373,7 +1373,7 @@ func cmd_listen_thread(client C.int) {
 			// Connected mode can only be used with internal modems.
 
 			if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-				C.dlq_unregister_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), C.int(channel), client)
+				dlq_unregister_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), C.int(channel), client)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1430,7 +1430,7 @@ func cmd_listen_thread(client C.int) {
 					}
 				}
 
-				C.dlq_connect_request(&callsigns[0], num_calls, C.int(cmd.Header.Portx), client, C.int(pid))
+				dlq_connect_request(callsigns, num_calls, C.int(cmd.Header.Portx), client, C.int(pid))
 			}
 
 		case 'D': /* Send Connected Data */
@@ -1442,7 +1442,7 @@ func cmd_listen_thread(client C.int) {
 				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
 				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
 
-				C.dlq_xmit_data_request(&callsigns[0], num_calls, C.int(cmd.Header.Portx), client, C.int(cmd.Header.PID), (*C.char)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
+				dlq_xmit_data_request(callsigns, num_calls, C.int(cmd.Header.Portx), client, C.int(cmd.Header.PID), (*C.char)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
 			}
 
 		case 'd': /* Disconnect, Terminate an AX.25 Connection */
@@ -1454,7 +1454,7 @@ func cmd_listen_thread(client C.int) {
 				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
 				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
 
-				C.dlq_disconnect_request(&callsigns[0], num_calls, C.int(cmd.Header.Portx), client)
+				dlq_disconnect_request(callsigns, num_calls, C.int(cmd.Header.Portx), client)
 
 			}
 
@@ -1591,7 +1591,7 @@ func cmd_listen_thread(client C.int) {
 				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
 				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
 
-				C.dlq_outstanding_frames_request(&callsigns[0], num_calls, C.int(cmd.Header.Portx), client)
+				dlq_outstanding_frames_request(callsigns, num_calls, C.int(cmd.Header.Portx), client)
 			}
 
 		default:
