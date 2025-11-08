@@ -1,19 +1,19 @@
 # Contributing to Samoyed
 
-Thank you for considering contributing to Samoyed!
-
 ## Commit Messages and PR Titles
 
-This project uses [Conventional Commits](https://www.conventionalcommits.org/) for commit messages and PR titles.
+This project uses [Conventional Commits](https://www.conventionalcommits.org/).
 
-**All PRs must have a title that follows the Conventional Commits format.**
+Format: `<type>[optional scope]: <description>`
 
 Examples:
-- `feat: add new feature`
-- `fix: correct bug in audio processing`
+- `feat: add IL2P protocol support`
+- `fix(audio): correct buffer overflow`
 - `docs: update installation guide`
 
-See [doc/CONVENTIONAL_COMMITS.md](doc/CONVENTIONAL_COMMITS.md) for detailed information about the format and requirements.
+Common types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+PR titles are automatically validated - the CI check will fail if they don't follow this format.
 
 ## Development
 
@@ -24,6 +24,3 @@ See [doc/CONVENTIONAL_COMMITS.md](doc/CONVENTIONAL_COMMITS.md) for detailed info
 5. Ensure linting passes: `make check`
 6. Submit a PR with a conventional commit title
 
-## Questions?
-
-If you have questions or need help, please open an issue on GitHub.

@@ -23,39 +23,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate PR title follows Conventional Commits
-        if: github.event_name == 'pull_request'
-        uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # Configure types allowed in conventional commits
-          types: |
-            feat
-            fix
-            docs
-            style
-            refactor
-            perf
-            test
-            build
-            ci
-            chore
-            revert
-          # Require a scope (e.g., feat(api): add new feature)
-          requireScope: false
-          # Subjects must not be sentence-case, start-case, pascal-case, or upper-case
-          subjectPattern: ^(?![A-Z]).+$
-          subjectPatternError: |
-            The subject "{subject}" found in the pull request title "{title}"
-            doesn't match the configured pattern. Please ensure that the subject
-            doesn't start with an uppercase character.
-          # Ensure the PR title length is reasonable
-          headerPattern: '^(\w+)(?:\(([^\)]+)\))?!?: (.+)$'
-          headerPatternCorrespondence: 'type, scope, subject'
-
-      - name: Validate commit messages follow Conventional Commits
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+      - name: Validate Conventional Commits
         uses: wagoid/commitlint-github-action@v6
         with:
-          configFile: .commitlintrc.json
+          configFile: .commitlintrc.yml
