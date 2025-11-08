@@ -25,6 +25,7 @@ path = [
 	".github/**",
 	".golangci.yml",
 	"Makefile",
+	"appimage/**",
 	"cmd/**",
 	"go.mod",
 	"go.sum",
