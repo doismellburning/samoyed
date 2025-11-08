@@ -789,7 +789,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	C.dwgps_init(&C.misc_config, C.int(d_g_opt))
+	dwgps_init(&C.misc_config, C.int(d_g_opt))
 
 	waypoint_init(&C.misc_config)
 
@@ -1267,7 +1267,7 @@ func cleanup() {
 	dw_printf("\nQRT\n")
 	log_term()
 	C.ptt_term()
-	C.dwgps_term()
+	dwgps_term()
 	SLEEP_SEC(1)
 	os.Exit(0)
 }

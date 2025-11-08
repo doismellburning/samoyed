@@ -1,29 +1,9 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2015  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
+package direwolf
 
 /*------------------------------------------------------------------
  *
- * Module:      dwgps.c
- *
  * Purpose:   	Interface for obtaining location from GPS.
- *		
+ *
  * Description:	This is a wrapper for two different implementations:
  *
  *		(1) Read NMEA sentences from a serial port (or USB
@@ -48,23 +28,26 @@
  *
  *---------------------------------------------------------------*/
 
-#include "direwolf.h"
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <unistd.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <time.h>
+// #include "textcolor.h"
+// #include "dwgps.h"
+// #include "dwgpsnmea.h"
+// #include "dwgpsd.h"
+import "C"
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
+import (
+	"sync"
+	"unsafe"
+)
 
-#include "textcolor.h"
-#include "dwgps.h"
-#include "dwgpsnmea.h"
-#include "dwgpsd.h"
-
-
-static int s_dwgps_debug = 0;		/* Enable debug output. */
-					/* >= 2 show updates from GPS. */
-					/* >= 1 show results from dwgps_read. */
+var s_dwgps_debug C.int = 0 /* Enable debug output. */
+/* >= 2 show updates from GPS. */
+/* >= 1 show results from dwgps_read. */
 
 /*
  * The GPS reader threads deposit current data here when it becomes available.
@@ -73,18 +56,9 @@ static int s_dwgps_debug = 0;		/* Enable debug output. */
  * A critical region to avoid inconsistency between fields.
  */
 
-static dwgps_info_t s_dwgps_info = {
-	.timestamp = 0,
-	.fix = DWFIX_NOT_INIT,			/* to detect read without init. */
-	.dlat = G_UNKNOWN,
-	.dlon = G_UNKNOWN,
-	.speed_knots = G_UNKNOWN,
-	.track = G_UNKNOWN,
-	.altitude = G_UNKNOWN
-};
+var s_dwgps_info = new(C.dwgps_info_t)
 
-static dw_mutex_t s_gps_mutex;
-
+var s_gps_mutex sync.Mutex
 
 /*-------------------------------------------------------------------
  *
@@ -111,27 +85,24 @@ static dw_mutex_t s_gps_mutex;
  *
  *--------------------------------------------------------------------*/
 
+func dwgps_init(pconfig *C.struct_misc_config_s, debug C.int) {
 
-void dwgps_init (struct misc_config_s *pconfig, int debug)
-{
+	dwgps_clear(s_dwgps_info) // Init the global
 
-	s_dwgps_debug = debug;
+	s_dwgps_debug = debug
 
-	dw_mutex_init (&s_gps_mutex);
+	C.dwgpsnmea_init(pconfig, debug)
 
-	dwgpsnmea_init (pconfig, debug);
+	// TODO KG #if ENABLE_GPSD
 
-#if ENABLE_GPSD
+	C.dwgpsd_init(pconfig, debug)
 
-	dwgpsd_init (pconfig, debug);
+	// TODO KG #endif
 
-#endif
-
-	SLEEP_MS(500);		/* So receive thread(s) can clear the */
-				/* not init status before it gets checked. */
+	SLEEP_MS(500) /* So receive thread(s) can clear the */
+	/* not init status before it gets checked. */
 
 } /* end dwgps_init */
-
 
 /*-------------------------------------------------------------------
  *
@@ -141,17 +112,16 @@ void dwgps_init (struct misc_config_s *pconfig, int debug)
  *
  *--------------------------------------------------------------------*/
 
-void dwgps_clear (dwgps_info_t *gpsinfo)
-{
-	gpsinfo->timestamp = 0;
-	gpsinfo->fix = DWFIX_NOT_SEEN;
-	gpsinfo->dlat = G_UNKNOWN;
-	gpsinfo->dlon = G_UNKNOWN;
-	gpsinfo->speed_knots = G_UNKNOWN;
-	gpsinfo->track = G_UNKNOWN;
-	gpsinfo->altitude = G_UNKNOWN;
+//export dwgps_clear
+func dwgps_clear(gpsinfo *C.dwgps_info_t) {
+	gpsinfo.timestamp = 0
+	gpsinfo.fix = C.DWFIX_NOT_SEEN
+	gpsinfo.dlat = G_UNKNOWN
+	gpsinfo.dlon = G_UNKNOWN
+	gpsinfo.speed_knots = G_UNKNOWN
+	gpsinfo.track = G_UNKNOWN
+	gpsinfo.altitude = G_UNKNOWN
 }
-
 
 /*-------------------------------------------------------------------
  *
@@ -166,26 +136,24 @@ void dwgps_clear (dwgps_info_t *gpsinfo)
  *
  *--------------------------------------------------------------------*/
 
-dwfix_t dwgps_read (dwgps_info_t *gpsinfo)
-{
+func dwgps_read(gpsinfo *C.dwgps_info_t) C.dwfix_t {
 
-	dw_mutex_lock (&s_gps_mutex);
+	s_gps_mutex.Lock()
 
-	memcpy (gpsinfo, &s_dwgps_info, sizeof(*gpsinfo));
+	C.memcpy(unsafe.Pointer(gpsinfo), unsafe.Pointer(&s_dwgps_info), C.sizeof_dwgps_info_t)
 
-	dw_mutex_unlock (&s_gps_mutex);
+	s_gps_mutex.Unlock()
 
-	if (s_dwgps_debug >= 1) {
-	  text_color_set (DW_COLOR_DEBUG);
-	  dwgps_print ("gps_read: ", gpsinfo);
+	if s_dwgps_debug >= 1 {
+		text_color_set(DW_COLOR_DEBUG)
+		dwgps_print(C.CString("gps_read: "), gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
 	// or should we leave that up to the caller?
 
-	return (s_dwgps_info.fix);
-} 
-
+	return (s_dwgps_info.fix)
+}
 
 /*-------------------------------------------------------------------
  *
@@ -200,18 +168,17 @@ dwfix_t dwgps_read (dwgps_info_t *gpsinfo)
  *
  *--------------------------------------------------------------------*/
 
-void dwgps_print (char *msg, dwgps_info_t *gpsinfo)
-{
+//export dwgps_print
+func dwgps_print(msg *C.char, gpsinfo *C.dwgps_info_t) {
 
-	dw_printf ("%stime=%d fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
-			msg,
-			(int)gpsinfo->timestamp, (int)gpsinfo->fix,
-			gpsinfo->dlat, gpsinfo->dlon,
-			gpsinfo->track, gpsinfo->speed_knots,
-			gpsinfo->altitude);
+	dw_printf("%stime=%d fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
+		C.GoString(msg),
+		gpsinfo.timestamp, gpsinfo.fix,
+		gpsinfo.dlat, gpsinfo.dlon,
+		gpsinfo.track, gpsinfo.speed_knots,
+		gpsinfo.altitude)
 
-}  /* end dwgps_set_data */
-
+} /* end dwgps_set_data */
 
 /*-------------------------------------------------------------------
  *
@@ -225,18 +192,15 @@ void dwgps_print (char *msg, dwgps_info_t *gpsinfo)
  *
  *--------------------------------------------------------------------*/
 
-void dwgps_term (void) {
+func dwgps_term() {
 
-	dwgpsnmea_term ();
+	C.dwgpsnmea_term()
 
-#if ENABLE_GPSD
-	dwgpsd_term ();
-#endif
+	// TODO KG #if ENABLE_GPSD
+	C.dwgpsd_term()
+	// TODO KG #endif
 
 } /* end dwgps_term */
-
-
-
 
 /*-------------------------------------------------------------------
  *
@@ -248,22 +212,18 @@ void dwgps_term (void) {
  *
  *--------------------------------------------------------------------*/
 
-void dwgps_set_data (dwgps_info_t *gpsinfo)
-{
+//export dwgps_set_data
+func dwgps_set_data(gpsinfo *C.dwgps_info_t) {
 
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 
-	dw_mutex_lock (&s_gps_mutex);
+	s_gps_mutex.Lock()
 
-	memcpy (&s_dwgps_info, gpsinfo, sizeof(s_dwgps_info));
+	C.memcpy(unsafe.Pointer(&s_dwgps_info), unsafe.Pointer(gpsinfo), C.sizeof_dwgps_info_t)
 
-	dw_mutex_unlock (&s_gps_mutex);
+	s_gps_mutex.Unlock()
 
-}  /* end dwgps_set_data */
-
+} /* end dwgps_set_data */
 
 /* end dwgps.c */
-
-
-

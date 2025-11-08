@@ -168,7 +168,7 @@ func beacon_init(pmodem *C.struct_audio_s, pconfig *C.struct_misc_config_s, piga
 				case BEACON_TRACKER:
 					{
 						var gpsinfo C.dwgps_info_t
-						var fix = C.dwgps_read(&gpsinfo)
+						var fix = dwgps_read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", g_misc_config_p.beacon[j].lineno)
@@ -394,7 +394,7 @@ func beacon_thread() {
 		var gpsinfo C.dwgps_info_t
 
 		if number_of_tbeacons > 0 {
-			var fix = C.dwgps_read(&gpsinfo)
+			var fix = dwgps_read(&gpsinfo)
 			var my_speed_mph = DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))
 
 			if g_tracker_debug_level >= 1 {
