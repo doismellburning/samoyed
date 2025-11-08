@@ -202,12 +202,12 @@ func recv_process() {
 		var _timeout_value = ax25_link_get_next_timer_expiry()
 		var timeout_value = C.double(_timeout_value.Unix())
 
-		var timed_out = C.dlq_wait_while_empty(timeout_value)
+		var timed_out = dlq_wait_while_empty(timeout_value)
 
 		if timed_out > 0 {
 			dl_timer_expiry()
 		} else {
-			var pitem = C.dlq_remove()
+			var pitem = dlq_remove()
 
 			if pitem != nil {
 				switch pitem._type {
@@ -250,7 +250,7 @@ func recv_process() {
 					dl_client_cleanup(pitem)
 				}
 
-				C.dlq_delete(pitem)
+				dlq_delete(pitem)
 			} else { //nolint:staticcheck
 				// FIXME KG DEBUG
 				// text_color_set(DW_COLOR_DEBUG);
