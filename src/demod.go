@@ -728,7 +728,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 						dw_printf("This is a suitable ratio for good performance.\n")
 					}
 
-					C.demod_9600_init(save_audio_config_p.achan[channel].modem_type,
+					demod_9600_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].upsample,
 						save_audio_config_p.achan[channel].baud, D)
@@ -973,7 +973,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 		  case MODEM_AIS:
 		*/
 
-		C.demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
+		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
 
 	} /* switch modem_type */
 } /* end demod_process_sample */
