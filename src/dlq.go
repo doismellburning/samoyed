@@ -943,7 +943,7 @@ func dlq_delete(pitem *C.struct_dlq_item_s) {
  *
  * Description:	The flow goes like this:
  *
- *		Client application extablishes a connection with another station.
+ *		Client application establishes a connection with another station.
  *		Client application calls "dlq_xmit_data_request."
  *		A copy of the data is made with this function and attached to the queue item.
  *		The txdata block is attached to the appropriate link state machine.
