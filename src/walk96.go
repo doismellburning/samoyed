@@ -63,13 +63,13 @@ func Walk96Main() {
 	C.strcpy(&config.gpsnmea_port[0], C.CString(gpsSerialPort))
 
 	var debug_gps C.int = 0
-	C.dwgps_init(&config, debug_gps)
+	dwgps_init(&config, debug_gps)
 
 	SLEEP_SEC(1) /* Wait for sample before reading. */
 
 	for range HOWLONG {
 		var info C.dwgps_info_t
-		var fix = C.dwgps_read(&info)
+		var fix = dwgps_read(&info)
 
 		if fix > C.DWFIX_2D {
 			walk96(int(fix), float64(info.dlat), float64(info.dlon), float64(info.speed_knots), float64(info.track), float64(info.altitude))

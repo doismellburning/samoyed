@@ -15,11 +15,11 @@ func DWGPSNMEAMain() {
 	var config C.struct_misc_config_s
 	C.strcpy(&config.gpsnmea_port[0], C.CString("COM22"))
 
-	C.dwgps_init(&config, 3)
+	dwgps_init(&config, 3)
 
 	for {
 		var info C.dwgps_info_t
-		var fix = C.dwgps_read(&info)
+		var fix = dwgps_read(&info)
 
 		switch fix {
 		case C.DWFIX_2D, C.DWFIX_3D:
