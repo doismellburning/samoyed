@@ -25,7 +25,7 @@ func DWGPSNMEAMain() {
 		case C.DWFIX_2D, C.DWFIX_3D:
 			fmt.Printf("%.6f  %.6f", info.dlat, info.dlon)
 			fmt.Printf("  %.1f knots  %.0f degrees", info.speed_knots, info.track)
-			if fix == 3 {
+			if fix == C.DWFIX_3D {
 				fmt.Printf("  altitude = %.1f meters", info.altitude)
 			}
 			fmt.Printf("\n")
