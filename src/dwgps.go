@@ -91,7 +91,7 @@ func dwgps_init(pconfig *C.struct_misc_config_s, debug C.int) {
 
 	s_dwgps_debug = debug
 
-	C.dwgpsnmea_init(pconfig, debug)
+	dwgpsnmea_init(pconfig, debug)
 
 	// TODO KG #if ENABLE_GPSD
 
@@ -194,7 +194,7 @@ func dwgps_print(msg *C.char, gpsinfo *C.dwgps_info_t) {
 
 func dwgps_term() {
 
-	C.dwgpsnmea_term()
+	dwgpsnmea_term()
 
 	// TODO KG #if ENABLE_GPSD
 	C.dwgpsd_term()

@@ -106,7 +106,7 @@ func waypoint_init(mc *C.struct_misc_config_s) {
 	s_waypoint_serial_port_fd = MYFDERROR
 
 	if C.strlen(&mc.waypoint_serial_port[0]) > 0 {
-		s_waypoint_serial_port_fd = C.dwgpsnmea_get_fd(&mc.waypoint_serial_port[0], 4800)
+		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(&mc.waypoint_serial_port[0], 4800)
 
 		if s_waypoint_serial_port_fd == MYFDERROR {
 			s_waypoint_serial_port_fd = C.serial_port_open(&mc.waypoint_serial_port[0], 4800)
