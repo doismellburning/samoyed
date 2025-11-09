@@ -498,7 +498,7 @@ func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	pew, stemp, _ := strings.Cut(stemp, ",")                   /* East/West */
 	pfix, stemp, _ := strings.Cut(stemp, ",")                  /* 0=invalid, 1=GPS fix, 2=DGPS fix */
 	pnum_sat, stemp, _ := strings.Cut(stemp, ",")              /* Number of satellites */
-	phdop, stemp, _ := strings.Cut(stemp, ",")                 /* Horiz. Dilution fo Precision */
+	phdop, stemp, _ := strings.Cut(stemp, ",")                 /* Horiz. Dilution of Precision */
 	paltitude, stemp, altitudeFound := strings.Cut(stemp, ",") /* Altitude, above mean sea level */
 	palt_u, stemp, _ := strings.Cut(stemp, ",")                /* Units for Altitude, typically M for meters. */
 	pheight, stemp, _ := strings.Cut(stemp, ",")               /* Height above ellipsoid */
