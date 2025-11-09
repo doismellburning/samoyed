@@ -5,6 +5,7 @@ linters:
     - "cyclop"  # One day
     - "dupl"  # One day
     - "dupword"  # One day
+    - "err113"  # Eventually
     - "errcheck"  # I appreciate the intent, but I'm not checking errors on fmt.Printf etc.
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines

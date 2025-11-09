@@ -931,7 +931,7 @@ func aprs_raw_nmea(A *C.decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
 		var speed_knots C.float = G_UNKNOWN
 
-		C.dwgpsnmea_gprmc(C.CString(string(info)), A.g_quiet, &(A.g_lat), &(A.g_lon), &speed_knots, &(A.g_course))
+		dwgpsnmea_gprmc(C.CString(string(info)), A.g_quiet, &(A.g_lat), &(A.g_lon), &speed_knots, &(A.g_course))
 		A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(speed_knots)))
 		C.strcpy(&A.g_data_type_desc[0], C.CString("Raw GPS data"))
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
@@ -939,7 +939,7 @@ func aprs_raw_nmea(A *C.decode_aprs_t, info []byte) {
 		var alt_meters C.float = G_UNKNOWN
 		var num_sat C.int = 0
 
-		C.dwgpsnmea_gpgga(C.CString(string(info)), A.g_quiet, &(A.g_lat), &(A.g_lon), &alt_meters, &num_sat)
+		dwgpsnmea_gpgga(C.CString(string(info)), A.g_quiet, &(A.g_lat), &(A.g_lon), &alt_meters, &num_sat)
 		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(alt_meters)))
 		C.strcpy(&A.g_data_type_desc[0], C.CString("Raw GPS data"))
 	}
