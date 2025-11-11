@@ -48,8 +48,3 @@ SPDX-License-Identifier = "LicenseRef-GEOTRANS"
 path = "external/hidapi/**"
 SPDX-FileCopyrightText = "Alan Ott, Signal 11 Software"
 SPDX-License-Identifier = "GPL-3.0-only OR BSD-3-Clause OR LicenseRef-hidapi"
-
-[[annotations]]
-path = "external/regex/**"
-SPDX-FileCopyrightText = "1990, 1993 The Regents of the University of California, RedHat"
-SPDX-License-Identifier = "BSD-4-Clause OR GPL-2.0-or-later"
