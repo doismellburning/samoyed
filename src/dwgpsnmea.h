@@ -8,12 +8,9 @@
 
 #include "dwgps.h"		/* for dwfix_t */
 #include "config.h"
-#include "serial_port.h"	/* for MYFDTYPE */
 
 
 int dwgpsnmea_init (struct misc_config_s *pconfig, int debug);
-
-MYFDTYPE dwgpsnmea_get_fd(char *wp_port_name, int speed);
 
 void dwgpsnmea_term (void);
 

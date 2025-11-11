@@ -23,7 +23,6 @@ package direwolf
 // #include "latlong.h"
 // #include "waypoint.h"
 // #include "dwgpsnmea.h"
-// #include "serial_port.h"
 import "C"
 
 import (
@@ -32,9 +31,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/term"
 )
 
-var s_waypoint_serial_port_fd C.int = MYFDERROR
+var s_waypoint_serial_port_fd *term.Term
 var s_waypoint_udp_sock net.Conn
 var s_waypoint_formats C.int = 0 // which formats should we generate?
 var s_waypoint_debug = 0         // Print information flowing to attached device.
@@ -103,19 +104,17 @@ func waypoint_init(mc *C.struct_misc_config_s) {
 	 * First try to get fd if they have same device name.
 	 * If that fails, do own serial port open.
 	 */
-	s_waypoint_serial_port_fd = MYFDERROR
-
 	if C.strlen(&mc.waypoint_serial_port[0]) > 0 {
 		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(&mc.waypoint_serial_port[0], 4800)
 
-		if s_waypoint_serial_port_fd == MYFDERROR {
-			s_waypoint_serial_port_fd = C.serial_port_open(&mc.waypoint_serial_port[0], 4800)
+		if s_waypoint_serial_port_fd == nil {
+			s_waypoint_serial_port_fd = serial_port_open(C.GoString(&mc.waypoint_serial_port[0]), 4800)
 		} else {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Note: Sharing same port for GPS input and waypoint output.\n")
 		}
 
-		if s_waypoint_serial_port_fd == MYFDERROR {
+		if s_waypoint_serial_port_fd == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Unable to open serial port %s for waypoint output.\n", C.GoString(&mc.waypoint_serial_port[0]))
 		}
@@ -220,7 +219,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 
 	// Don't waste time if no destinations specified.
 
-	if s_waypoint_serial_port_fd == MYFDERROR && s_waypoint_udp_sock == nil {
+	if s_waypoint_serial_port_fd == nil && s_waypoint_udp_sock == nil {
 		return
 	}
 
@@ -540,7 +539,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
  *--------------------------------------------------------------------*/
 
 func waypoint_send_ais(sentence []byte) {
-	if s_waypoint_serial_port_fd == MYFDERROR && s_waypoint_udp_sock == nil {
+	if s_waypoint_serial_port_fd == nil && s_waypoint_udp_sock == nil {
 		return
 	}
 
@@ -565,8 +564,8 @@ func send_sentence(sentence []byte) {
 
 	var final_len = len(final)
 
-	if s_waypoint_serial_port_fd != MYFDERROR {
-		C.serial_port_write(s_waypoint_serial_port_fd, C.CString(string(final)), C.int(final_len))
+	if s_waypoint_serial_port_fd != nil {
+		serial_port_write(s_waypoint_serial_port_fd, final)
 	}
 
 	if s_waypoint_udp_sock != nil {
@@ -579,9 +578,9 @@ func send_sentence(sentence []byte) {
 } /* send_sentence */
 
 func waypoint_term() {
-	if s_waypoint_serial_port_fd != MYFDERROR {
-		C.serial_port_close(s_waypoint_serial_port_fd)
-		s_waypoint_serial_port_fd = MYFDERROR
+	if s_waypoint_serial_port_fd != nil {
+		serial_port_close(s_waypoint_serial_port_fd)
+		s_waypoint_serial_port_fd = nil
 	}
 	if s_waypoint_udp_sock != nil {
 		s_waypoint_udp_sock.Close()

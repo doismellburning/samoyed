@@ -20,7 +20,6 @@ package direwolf
 // #include "latlong.h"
 // #include "dwgps.h"
 // #include "encode_aprs.h"
-// #include "serial_port.h"
 // #include "kiss_frame.h"
 import "C"
 
@@ -28,13 +27,15 @@ import (
 	"fmt"
 	"os"
 	"unsafe"
+
+	"github.com/pkg/term"
 )
 
 const HOWLONG = 20 /* Run for 20 seconds then quit. */
 
 var MYCALL string
 
-var tnc C.MYFDTYPE
+var tnc *term.Term
 
 func Walk96Main() {
 	// Quick and dirty CLI parsing
@@ -50,14 +51,14 @@ func Walk96Main() {
 		gpsSerialPort = os.Args[3]
 	}
 
-	tnc = C.serial_port_open(C.CString(tncSerialPort), 9600)
-	if tnc == C.MYFDERROR {
+	tnc = serial_port_open(tncSerialPort, 9600)
+	if tnc == nil {
 		fmt.Printf("Can't open serial port to KISS TNC.\n")
 		os.Exit(1)
 	}
 
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
-	C.serial_port_write(tnc, C.CString(cmd), C.int(len(cmd)))
+	serial_port_write(tnc, []byte(cmd))
 
 	var config C.struct_misc_config_s
 	C.strcpy(&config.gpsnmea_port[0], C.CString(gpsSerialPort))
@@ -84,7 +85,7 @@ func Walk96Main() {
 
 	// Exit out of KISS mode.
 
-	C.serial_port_write(tnc, C.CString("\xc0\xff\xc0"), 3)
+	serial_port_write(tnc, []byte("\xc0\xff\xc0"))
 
 	SLEEP_MS(100)
 }
@@ -152,9 +153,8 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 */
 
 	var kiss_frame = kiss_encapsulate(C.GoBytes(unsafe.Pointer(&ax25_frame[0]), frame_len+1))
-	var kiss_len = len(kiss_frame)
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
-	C.serial_port_write(tnc, (*C.char)(C.CBytes(kiss_frame)), C.int(kiss_len))
+	serial_port_write(tnc, kiss_frame)
 }
