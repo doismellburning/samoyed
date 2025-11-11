@@ -196,16 +196,10 @@ func TNCTestMain() {
 			tnc_address[j] = fmt.Sprintf("TNC%d", j)
 		}
 
-		var e int
 		if tnctest_using_tcp[j] {
 			go tnc_thread_net(j, hostname[j], port[j], description[j], tnc_address[j])
 		} else {
 			go tnc_thread_serial(j, port[j], description[j], tnc_address[j])
-		}
-
-		if e != 0 {
-			fmt.Print("Internal error: Could not create TNC thread.")
-			os.Exit(1)
 		}
 	}
 
