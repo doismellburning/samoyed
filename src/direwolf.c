@@ -99,7 +99,6 @@
 #include "textcolor.h"
 #include "kiss.h"
 #include "kissnet.h"
-#include "kissserial.h"
 #include "kiss_frame.h"
 #include "gen_tone.h"
 #include "digipeater.h"
