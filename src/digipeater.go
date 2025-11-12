@@ -45,7 +45,6 @@ package direwolf
 // #include "digipeater.h"
 // #include "textcolor.h"
 // #include "tq.h"
-// #include "pfilter.h"
 import "C"
 
 import (

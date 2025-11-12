@@ -109,7 +109,6 @@
 #include "dtmf.h"
 #include "aprs_tt.h"
 #include "igate.h"
-#include "pfilter.h"
 #include "symbols.h"
 #include "dwgps.h"
 #include "log.h"

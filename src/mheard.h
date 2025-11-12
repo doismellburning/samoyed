@@ -4,6 +4,7 @@
 
 #include "decode_aprs.h"	// for decode_aprs_t
 
+#include "igate.h" // for retry_t
 
 void mheard_init (int debug);
 

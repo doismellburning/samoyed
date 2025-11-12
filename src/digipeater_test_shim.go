@@ -17,7 +17,6 @@ https://github.com/golang/go/issues/4030
 // #include "digipeater.h"
 // #include "textcolor.h"
 // #include "tq.h"
-// #include "pfilter.h"
 // packet_t digipeat_match (int from_chan, packet_t pp, char *mycall_rec, char *mycall_xmit, regex_t *uidigi, regex_t *uitrace, int to_chan, enum preempt_e preempt, char *atgp, char *type_filter);
 // char *mycall;
 // regex_t alias_re;
