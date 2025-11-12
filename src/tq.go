@@ -28,7 +28,6 @@ package direwolf
 // #include "dedupe.h"
 // #include "igate.h"
 // #include "dtime_now.h"
-// #include "nettnc.h"
 import "C"
 
 import (
