@@ -97,7 +97,6 @@
 #include "fsk_demod_state.h"		// Values above override defaults.
 
 #include "audio.h"
-//#include "tune.h"	// obsolete. eventually remove all references.
 #include "fsk_gen_filter.h"
 #include "hdlc_rec.h"
 #include "textcolor.h"

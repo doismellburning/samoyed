@@ -34,7 +34,6 @@
 #include <string.h>
 #include <stdint.h>          // uint64_t
 
-//#include "tune.h"
 #include "demod.h"
 #include "hdlc_rec.h"
 #include "hdlc_rec2.h"

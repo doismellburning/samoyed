@@ -56,7 +56,6 @@
 
 #include "fsk_demod_state.h"		// Values above override defaults.
 
-#include "tune.h"
 #include "hdlc_rec.h"
 #include "demod_9600.h"
 #include "textcolor.h"
