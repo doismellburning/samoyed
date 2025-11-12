@@ -31,7 +31,6 @@ package direwolf
 // #include "dedupe.h"
 // #include "tq.h"
 // #include "igate.h"
-// #include "tt_user.h"
 // #include "encode_aprs.h"
 // #include "latlong.h"
 // #include "server.h"
