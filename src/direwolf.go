@@ -29,7 +29,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "xid.h"
 // #include "decode_aprs.h"
-// #include "encode_aprs.h"
 // #include "textcolor.h"
 // #include "kiss_frame.h"
 // #include "gen_tone.h"

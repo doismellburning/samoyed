@@ -22,7 +22,6 @@ package direwolf
 // #include "tq.h"
 // #include "config.h"
 // #include "version.h"
-// #include "encode_aprs.h"
 // #include "decode_aprs.h"
 // #include "latlong.h"
 // #include "dwgps.h"
