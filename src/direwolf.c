@@ -97,7 +97,6 @@
 #include "decode_aprs.h"
 #include "encode_aprs.h"
 #include "textcolor.h"
-#include "kiss.h"
 #include "kiss_frame.h"
 #include "gen_tone.h"
 #include "digipeater.h"
