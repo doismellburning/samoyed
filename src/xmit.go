@@ -52,7 +52,6 @@ package direwolf
 // #include "dtmf.h"
 // #include "xid.h"
 // #include "dlq.h"
-// #include "server.h"
 import "C"
 
 import (

@@ -31,7 +31,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "encode_aprs.h"
 // #include "textcolor.h"
-// #include "server.h"
 // #include "kiss.h"
 // #include "kissnet.h"
 // #include "kissserial.h"

@@ -26,7 +26,6 @@ package direwolf
 // #include "igate.h"
 // #include "encode_aprs.h"
 // #include "latlong.h"
-// #include "server.h"
 // #include "kiss.h"
 // #include "kissserial.h"
 // #include "kissnet.h"
