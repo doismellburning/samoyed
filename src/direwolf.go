@@ -47,7 +47,6 @@ package direwolf
 // #include "symbols.h"
 // #include "dwgps.h"
 // #include "log.h"
-// #include "recv.h"
 // #include "morse.h"
 // #include "mheard.h"
 // #include "ax25_link.h"
