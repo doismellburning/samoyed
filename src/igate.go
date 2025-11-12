@@ -47,7 +47,6 @@ package direwolf
 // #include "igate.h"
 // #include "latlong.h"
 // #include "dtime_now.h"
-// #include "mheard.h"
 import "C"
 
 import (

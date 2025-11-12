@@ -47,7 +47,6 @@ package direwolf
 // #include "dwgps.h"
 // #include "log.h"
 // #include "morse.h"
-// #include "mheard.h"
 // #include "ax25_link.h"
 // #include "dtime_now.h"
 // #include "fx25.h"

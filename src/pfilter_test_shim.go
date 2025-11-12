@@ -11,7 +11,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "decode_aprs.h"
 // #include "latlong.h"
-// #include "mheard.h"
 import "C"
 
 import (

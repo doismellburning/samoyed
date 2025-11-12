@@ -28,7 +28,6 @@ package direwolf
 // #include "log.h"
 // #include "dlq.h"
 // #include "aprs_tt.h"		// for dw_run_cmd - should relocate someday.
-// #include "mheard.h"
 import "C"
 
 import (
