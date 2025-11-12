@@ -24,10 +24,9 @@ package direwolf
 // #include <stddef.h>
 // #include "textcolor.h"
 // #include "audio.h"		// configuration.
-// #include "kiss.h"
+// #include "kiss_frame.h"
 // #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN
 // #include "dlq.h"		// received packet queue
-// #include "nettnc.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 

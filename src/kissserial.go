@@ -76,9 +76,7 @@ package direwolf
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
 // #include "textcolor.h"
-// #include "kissserial.h"
 // #include "kiss_frame.h"
-// #include "xmit.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 

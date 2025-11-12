@@ -335,7 +335,6 @@ void dlq_rec_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t
 #if 0		// temp experiment
 
 #include "decode_aprs.h"
-#include "log.h"
 
 	if (ax25_is_aprs(pp)) {
 

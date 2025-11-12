@@ -40,7 +40,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "aprs_tt.h"
 // #include "tt_text.h"
-// #include "tt_user.h"
 // #include "symbols.h"
 // #include "latlong.h"
 // #include "dlq.h"

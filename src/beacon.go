@@ -20,16 +20,13 @@ package direwolf
 // #include "textcolor.h"
 // #include "audio.h"
 // #include "tq.h"
-// #include "xmit.h"
 // #include "config.h"
 // #include "version.h"
-// #include "encode_aprs.h"
+// #include "decode_aprs.h"
 // #include "latlong.h"
 // #include "dwgps.h"
-// #include "log.h"
 // #include "dlq.h"
 // #include "aprs_tt.h"		// for dw_run_cmd - should relocate someday.
-// #include "mheard.h"
 import "C"
 
 import (

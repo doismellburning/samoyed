@@ -32,7 +32,7 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "textcolor.h"
 // #include "decode_aprs.h"
-// #include "log.h"
+// #include "audio.h"
 import "C"
 
 import (

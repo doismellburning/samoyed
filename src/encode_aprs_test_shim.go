@@ -9,7 +9,6 @@ package direwolf
 // #include <time.h>
 // #include <math.h>
 // #include <assert.h>
-// #include "encode_aprs.h"
 // #include "latlong.h"
 // #include "textcolor.h"
 import "C"

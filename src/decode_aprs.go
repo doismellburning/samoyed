@@ -32,7 +32,6 @@ package direwolf
 // #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
 // #include "ais.h"
-// #include "deviceid.h"
 import "C"
 
 import (

@@ -21,7 +21,6 @@ package direwolf
 // #include "config.h"
 // #include "textcolor.h"
 // #include "latlong.h"
-// #include "waypoint.h"
 // #include "dwgpsnmea.h"
 import "C"
 

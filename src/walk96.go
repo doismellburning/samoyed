@@ -19,7 +19,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "latlong.h"
 // #include "dwgps.h"
-// #include "encode_aprs.h"
 // #include "kiss_frame.h"
 import "C"
 

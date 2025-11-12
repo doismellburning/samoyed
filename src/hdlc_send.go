@@ -2,7 +2,6 @@ package direwolf
 
 // #include "direwolf.h"
 // #include <stdio.h>
-// #include "hdlc_send.h"
 // #include "audio.h"
 // #include "gen_tone.h"
 // #include "textcolor.h"

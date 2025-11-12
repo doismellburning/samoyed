@@ -33,7 +33,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"		// for retry_t
-// #include "mheard.h"
 // #include "latlong.h"
 import "C"
 
