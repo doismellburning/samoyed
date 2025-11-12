@@ -32,7 +32,6 @@ package direwolf
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
 // #include "textcolor.h"
-// #include "serial_port.h"
 // #include "kiss_frame.h"
 // #include "audio.h"		// for DEFAULT_TXDELAY, etc.
 // #include "dtime_now.h"
@@ -52,6 +51,7 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/pkg/term"
 	"github.com/spf13/pflag"
 )
 
@@ -76,7 +76,7 @@ var server_sock net.Conn /* File descriptor for socket interface. */
 /* Set to -1 if not used. */
 /* (Don't use SOCKET type because it is unsigned.) */
 
-var serial_fd = C.MYFDTYPE(-1) /* Serial port handle. */
+var serial_fd *term.Term /* Serial port handle. */
 
 var serial_speed = 9600 /* -s option. */
 /* Serial port speed, bps. */
@@ -378,17 +378,17 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 	temp = append(temp, data...)
 
 	var kissed = kiss_encapsulate(temp)
-	var klen = C.int(len(kissed))
+	var klen = len(kissed)
 
 	if verbose {
 		fmt.Printf("Sending to KISS TNC:\n")
-		C.hex_dump((*C.uchar)(C.CBytes(kissed)), klen)
+		C.hex_dump((*C.uchar)(C.CBytes(kissed)), C.int(klen))
 	}
 
 	if using_tcp {
 		server_sock.Write(kissed)
 	} else {
-		var rc = C.serial_port_write(serial_fd, (*C.char)(C.CBytes(kissed)), klen)
+		var rc = serial_port_write(serial_fd, kissed)
 		if rc != klen {
 			fmt.Printf("ERROR writing KISS frame to serial port.\n")
 			// fmt.Printf ("DEBUG wanted %d, got %d\n", klen, rc);
@@ -477,9 +477,9 @@ func tnc_listen_net() {
  *--------------------------------------------------------------------*/
 
 func tnc_listen_serial() {
-	var serial_fd = C.serial_port_open(C.CString(port), C.int(serial_speed))
+	serial_fd = serial_port_open(port, serial_speed)
 
-	if serial_fd == C.MYFDERROR {
+	if serial_fd == nil {
 		fmt.Printf("Unable to connect to KISS TNC serial port %s.\n", port)
 		// More detail such as "permission denied" or "no such device"
 		os.Exit(1)
@@ -490,10 +490,10 @@ func tnc_listen_serial() {
 	 */
 	var kstate C.kiss_frame_t
 	for {
-		var ch = C.serial_port_get1(serial_fd)
+		var ch, err = serial_port_get1(serial_fd)
 
-		if ch < 0 {
-			fmt.Printf("Read error from serial port KISS TNC.\n")
+		if err != nil {
+			fmt.Printf("Read error from serial port KISS TNC: %s.\n", err)
 			os.Exit(1)
 		}
 

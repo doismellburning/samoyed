@@ -76,7 +76,6 @@ package direwolf
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
 // #include "textcolor.h"
-// #include "serial_port.h"
 // #include "kissserial.h"
 // #include "kiss_frame.h"
 // #include "xmit.h"
@@ -84,9 +83,10 @@ package direwolf
 import "C"
 
 import (
-	"errors"
 	"os"
 	"unsafe"
+
+	"github.com/pkg/term"
 )
 
 /*
@@ -99,12 +99,7 @@ import (
 
 var kf C.kiss_frame_t
 
-/*
- * The serial port device handle.
- * MYFD... are defined in kissserial.h
- */
-
-var serialport_fd C.MYFDTYPE = C.MYFDERROR
+var serialport_fd *term.Term
 
 var kissserial_debug = 0 /* Print information flowing from and to client. */
 
@@ -139,9 +134,9 @@ func kissserial_init(mc *C.struct_misc_config_s) {
 		if g_misc_config_p.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
 
-			serialport_fd = C.serial_port_open(&g_misc_config_p.kiss_serial_port[0], g_misc_config_p.kiss_serial_speed)
+			serialport_fd = serial_port_open(C.GoString(&g_misc_config_p.kiss_serial_port[0]), int(g_misc_config_p.kiss_serial_speed))
 
-			if serialport_fd != MYFDERROR {
+			if serialport_fd != nil {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Opened %s for serial port KISS.\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
 			} else { //nolint:staticcheck
@@ -153,7 +148,7 @@ func kissserial_init(mc *C.struct_misc_config_s) {
 			dw_printf("Will be checking periodically for %s\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
 		}
 
-		if g_misc_config_p.kiss_serial_poll != 0 || serialport_fd != MYFDERROR {
+		if g_misc_config_p.kiss_serial_poll != 0 || serialport_fd != nil {
 			go kissserial_listen_thread()
 		}
 	}
@@ -203,7 +198,7 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 	/*
 	 * Quietly discard if we don't have open connection.
 	 */
-	if serialport_fd == MYFDERROR {
+	if serialport_fd == nil {
 		return
 	}
 
@@ -242,7 +237,7 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 		}
 	}
 
-	var kiss_len = C.int(len(kiss_buff))
+	var kiss_len = len(kiss_buff)
 
 	/*
 	 * This write can block on Windows if using the virtual null modem
@@ -266,13 +261,13 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 	 *	      command> change CNCA0 EmuBR=yes
 	 */
 
-	var err = C.serial_port_write(serialport_fd, (*C.char)(C.CBytes(kiss_buff)), kiss_len)
+	var n = serial_port_write(serialport_fd, kiss_buff)
 
-	if err != kiss_len {
+	if n != kiss_len {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application thru serial port.\n\n")
-		C.serial_port_close(serialport_fd)
-		serialport_fd = MYFDERROR
+		serial_port_close(serialport_fd)
+		serialport_fd = nil
 	}
 } /* kissserial_send_rec_packet */
 
@@ -294,21 +289,20 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_get() (C.int, error) {
-	var ch C.int // normally 0-255 but -1 for error.
+func kissserial_get() (byte, error) {
 
 	if g_misc_config_p.kiss_serial_poll == 0 {
 		/*
 		 * Normal case, was opened at start up time.
 		 */
-		ch = C.serial_port_get1(serialport_fd)
+		var ch, err = serial_port_get1(serialport_fd)
 
-		if ch < 0 {
+		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
-			C.serial_port_close(serialport_fd)
-			serialport_fd = MYFDERROR
-			return ch, errors.New("error reading from KISS serial port") //nolint:err113
+			serial_port_close(serialport_fd)
+			serialport_fd = nil
+			return ch, err
 		}
 
 		/* TODO KG
@@ -324,19 +318,19 @@ func kissserial_get() (C.int, error) {
 	 * Polling case.  Wait until device is present and open.
 	 */
 	for {
-		if serialport_fd != MYFDERROR {
+		if serialport_fd != nil {
 			// Open, try to read.
 
-			ch = C.serial_port_get1(serialport_fd)
+			var ch, err = serial_port_get1(serialport_fd)
 
-			if ch >= 0 {
+			if err == nil {
 				return ch, nil
 			}
 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
-			C.serial_port_close(serialport_fd)
-			serialport_fd = MYFDERROR
+			serial_port_close(serialport_fd)
+			serialport_fd = nil
 		} else {
 			// Not open.  Wait for it to appear and try opening.
 			SLEEP_SEC(int(g_misc_config_p.kiss_serial_poll))
@@ -346,9 +340,9 @@ func kissserial_get() (C.int, error) {
 			if statErr == nil {
 				// It's there now.  Try to open.
 
-				serialport_fd = C.serial_port_open(&g_misc_config_p.kiss_serial_port[0], g_misc_config_p.kiss_serial_speed)
+				serialport_fd = serial_port_open(C.GoString(&g_misc_config_p.kiss_serial_port[0]), int(g_misc_config_p.kiss_serial_speed))
 
-				if serialport_fd != MYFDERROR {
+				if serialport_fd != nil {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
 

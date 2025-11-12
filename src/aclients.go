@@ -46,7 +46,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "textcolor.h"
 // #include "version.h"
-// #include "serial_port.h"
 import "C"
 
 import (
@@ -306,9 +305,9 @@ func client_thread_net(my_index int, hostname string, port string, description s
  *--------------------------------------------------------------------*/
 
 func client_thread_serial(my_index int, port string, description string, packetChan chan<- string) {
-	var fd = C.serial_port_open(C.CString(port), 9600)
+	var fd = serial_port_open(port, 9600)
 
-	if fd == -1 {
+	if fd == nil {
 		fmt.Printf("Client %d unable to connect to %s on %s.\n", my_index, description, port)
 		os.Exit(1)
 	}
@@ -330,10 +329,10 @@ func client_thread_serial(my_index int, port string, description string, packetC
 		var done = false
 		var result [500]C.char
 		for !done {
-			var ch = C.serial_port_get1(fd)
+			var ch, err = serial_port_get1(fd)
 
-			if ch < 0 {
-				fmt.Printf("Client %d fatal read error.\n", my_index)
+			if err != nil {
+				fmt.Printf("Client %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)
 			}
 

@@ -22,7 +22,6 @@ package direwolf
 // #include <time.h>
 // #include "textcolor.h"
 // #include "dtime_now.h"
-// #include "serial_port.h"
 import "C"
 
 import (
@@ -34,6 +33,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/pkg/term"
 )
 
 /*------------------------------------------------------------------
@@ -99,13 +100,13 @@ var tnctest_server_sock [MAX_TNC]net.Conn /* File descriptor for AGW socket inte
 /* Set to -1 if not used. */
 /* (Don't use SOCKET type because it is unsigned.) */
 
-var tnctest_serial_fd [MAX_TNC]C.int /* Serial port handle. */
+var tnctest_serial_fd [MAX_TNC]*term.Term /* Serial port handle. */
 
 var busy [MAX_TNC]bool /* True when TNC busy and can't accept more data. */
 /* For serial port, this is set by XON / XOFF characters. */
 
-var XOFF = 0x13
-var XON = 0x11
+const XOFF byte = 0x13
+const XON byte = 0x11
 
 var tnc_address [MAX_TNC]string /* Name of the TNC used in the frames.  Originally, this */
 /* was simply TNC0 and TNC1 but that can get hard to read */
@@ -570,9 +571,9 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 
 func tnc_thread_serial(my_index int, port string, description string, tnc_address string) {
 
-	tnctest_serial_fd[my_index] = C.serial_port_open(C.CString(port), 9600)
+	tnctest_serial_fd[my_index] = serial_port_open(port, 9600)
 
-	if tnctest_serial_fd[my_index] == MYFDERROR {
+	if tnctest_serial_fd[my_index] == nil {
 		fmt.Printf("TNC %d unable to connect to %s on %s.\n", my_index, description, port)
 		os.Exit(1)
 	}
@@ -584,26 +585,26 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 	var cmd string
 
 	cmd = "\003\rreset\r"
-	C.serial_port_write(tnctest_serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
+	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
 	SLEEP_MS(3000)
 
 	cmd = "echo on\r"
-	C.serial_port_write(tnctest_serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
+	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
 	SLEEP_MS(200)
 
 	// do any necessary set up here. such as setting mycall
 
 	cmd = fmt.Sprintf("mycall %s\r", tnc_address)
-	C.serial_port_write(tnctest_serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
+	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
 	SLEEP_MS(200)
 
 	// Don't want to stop tty output when typing begins.
 
 	cmd = "flow off\r"
-	C.serial_port_write(tnctest_serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
+	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
 
 	cmd = "echo off\r"
-	C.serial_port_write(tnctest_serial_fd[my_index], C.CString(cmd), C.int(len(cmd)))
+	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
 
 	/* Success. */
 
@@ -615,30 +616,29 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 	 */
 
 	for {
-		var ch C.int
 		var result [500]C.char
 		var length int
 
 		var done = false
 		for !done {
-			ch = C.serial_port_get1(tnctest_serial_fd[my_index])
+			var ch, err = serial_port_get1(tnctest_serial_fd[my_index])
 
-			if ch < 0 {
-				fmt.Printf("TNC %d fatal read error.\n", my_index)
+			if err != nil {
+				fmt.Printf("TNC %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)
 			}
 
 			if ch == '\r' || ch == '\n' {
 				done = true
-			} else if ch == C.int(XOFF) {
+			} else if ch == XOFF {
 				var dnow = C.dtime_monotonic()
 				fmt.Printf("%*s[R %.3f] <XOFF>\n", my_index*column_width, "", dnow-start_dtime)
 				busy[my_index] = true
-			} else if ch == C.int(XON) {
+			} else if ch == XON {
 				var dnow = C.dtime_monotonic()
 				fmt.Printf("%*s[R %.3f] <XON>\n", my_index*column_width, "", dnow-start_dtime)
 				busy[my_index] = false
-			} else if C.isprint(ch) == 0 {
+			} else if unicode.IsPrint(rune(ch)) {
 				result[length] = C.char(ch)
 				length++
 			} else {
@@ -711,16 +711,16 @@ func tnc_connect(from int, to int) {
 			SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
-			C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(1500)
 
 			cmd = "\r"
-			C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(200)
 		}
 
 		var cmd = fmt.Sprintf("connect %s\r", tnc_address[to])
-		C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -744,16 +744,16 @@ func tnc_disconnect(from int, to int) {
 			SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
-			C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(1500)
 
 			cmd = "\r"
-			C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(200)
 		}
 
 		var cmd = "disconnect\r"
-		C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -769,15 +769,15 @@ func tnc_reset(from int, to int) {
 		SLEEP_MS(1500)
 
 		cmd = ETX_BREAK
-		C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 		SLEEP_MS(1500)
 
 		cmd = "\r"
-		C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 		SLEEP_MS(200)
 
 		cmd = "reset\r"
-		C.serial_port_write(tnctest_serial_fd[from], C.CString(cmd), C.int(len(cmd)))
+		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -816,7 +816,7 @@ func tnc_send_data(from int, to int, data string) {
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		} else {
-			C.serial_port_write(tnctest_serial_fd[from], C.CString(data), C.int(len(data)))
+			serial_port_write(tnctest_serial_fd[from], []byte(data))
 		}
 	}
 }

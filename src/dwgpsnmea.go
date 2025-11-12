@@ -35,7 +35,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "dwgps.h"
 // #include "dwgpsnmea.h"
-// #include "serial_port.h"
 import "C"
 
 import (
@@ -43,6 +42,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/term"
 )
 
 // TODO KG var s_debug = 0 /* Enable debug output. */
@@ -88,7 +89,7 @@ var s_save_configp *C.struct_misc_config_s
 
 /* Make this static and available to all functions so term function can access it. */
 
-var s_gpsnmea_port_fd C.int = MYFDERROR /* Handle for serial port. */
+var s_gpsnmea_port_fd *term.Term
 
 func dwgpsnmea_init(pconfig *C.struct_misc_config_s, debug C.int) C.int {
 	//dwgps_info_t info;
@@ -112,9 +113,9 @@ func dwgpsnmea_init(pconfig *C.struct_misc_config_s, debug C.int) C.int {
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = C.serial_port_open(&pconfig.gpsnmea_port[0], pconfig.gpsnmea_speed)
+	s_gpsnmea_port_fd = serial_port_open(C.GoString(&pconfig.gpsnmea_port[0]), int(pconfig.gpsnmea_speed))
 
-	if s_gpsnmea_port_fd != MYFDERROR {
+	if s_gpsnmea_port_fd != nil {
 		go read_gpsnmea_thread(s_gpsnmea_port_fd)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -129,11 +130,11 @@ func dwgpsnmea_init(pconfig *C.struct_misc_config_s, debug C.int) C.int {
 
 /* Return fd to share if waypoint wants same device. */
 
-func dwgpsnmea_get_fd(wp_port_name *C.char, speed C.int) C.int {
+func dwgpsnmea_get_fd(wp_port_name *C.char, speed C.int) *term.Term {
 	if C.strcmp(&s_save_configp.gpsnmea_port[0], wp_port_name) == 0 && speed == s_save_configp.gpsnmea_speed {
 		return (s_gpsnmea_port_fd)
 	}
-	return (MYFDERROR)
+	return nil
 }
 
 /*-------------------------------------------------------------------
@@ -152,7 +153,7 @@ func dwgpsnmea_get_fd(wp_port_name *C.char, speed C.int) C.int {
 
 const TIMEOUT = 5
 
-func read_gpsnmea_thread(fd C.int) {
+func read_gpsnmea_thread(fd *term.Term) {
 	// Maximum length of message from GPS receiver is 82 according to some people.
 	// Make buffer considerably larger to be safe.
 
@@ -160,7 +161,7 @@ func read_gpsnmea_thread(fd C.int) {
 
 	if s_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("read_gpsnmea_thread (%d)\n", fd)
+		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
 	var info = new(C.dwgps_info_t)
@@ -175,9 +176,9 @@ func read_gpsnmea_thread(fd C.int) {
 	var gps_msg string
 
 	for {
-		var ch = C.serial_port_get1(fd)
+		var ch, err = serial_port_get1(fd)
 
-		if ch < 0 {
+		if err != nil {
 
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */
@@ -195,8 +196,8 @@ func read_gpsnmea_thread(fd C.int) {
 			}
 			dwgps_set_data(info)
 
-			C.serial_port_close(s_gpsnmea_port_fd)
-			s_gpsnmea_port_fd = MYFDERROR
+			serial_port_close(s_gpsnmea_port_fd)
+			s_gpsnmea_port_fd = nil
 
 			// TODO: If the open() was in this thread, we could wait a while and
 			// try to open again.  That would allow recovery if the USB GPS device
