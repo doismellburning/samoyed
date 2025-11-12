@@ -477,7 +477,7 @@ func tnc_listen_net() {
  *--------------------------------------------------------------------*/
 
 func tnc_listen_serial() {
-	var serial_fd = serial_port_open(port, serial_speed)
+	serial_fd = serial_port_open(port, serial_speed)
 
 	if serial_fd == nil {
 		fmt.Printf("Unable to connect to KISS TNC serial port %s.\n", port)
