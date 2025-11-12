@@ -45,7 +45,6 @@ package direwolf
 // #include "igate.h"
 // #include "symbols.h"
 // #include "dwgps.h"
-// #include "log.h"
 // #include "morse.h"
 // #include "ax25_link.h"
 // #include "dtime_now.h"
