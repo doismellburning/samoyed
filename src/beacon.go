@@ -20,7 +20,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "audio.h"
 // #include "tq.h"
-// #include "xmit.h"
 // #include "config.h"
 // #include "version.h"
 // #include "encode_aprs.h"

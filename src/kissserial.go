@@ -78,7 +78,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "kissserial.h"
 // #include "kiss_frame.h"
-// #include "xmit.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 

@@ -60,7 +60,6 @@
 #include "igate.h"
 #include "latlong.h"
 #include "symbols.h"
-#include "xmit.h"
 #include "tt_text.h"
 #include "ax25_link.h"
 

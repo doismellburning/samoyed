@@ -162,7 +162,6 @@ same direwolf instance.
 // #include "audio.h"
 // #include "kissnet.h"
 // #include "kiss_frame.h"
-// #include "xmit.h"
 // void hex_dump (unsigned char *p, int len);	// This should be in a .h file.
 import "C"
 

@@ -11,7 +11,6 @@ package direwolf
 //#include "textcolor.h"
 //#include "kiss_frame.h"
 //#include "tq.h"
-//#include "xmit.h"
 //#include "version.h"
 //#include "kissnet.h"
 import "C"

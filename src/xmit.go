@@ -44,7 +44,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "audio.h"
 // #include "tq.h"
-// #include "xmit.h"
 // #include "hdlc_send.h"
 // #include "hdlc_rec.h"
 // #include "ptt.h"
