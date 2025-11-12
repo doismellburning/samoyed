@@ -6,7 +6,6 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "dtmf.h"
 // #include "hdlc_rec.h"	// for dcd_change
 // #include "textcolor.h"
 // #include "gen_tone.h"

@@ -48,7 +48,6 @@ package direwolf
 // #include "ptt.h"
 // #include "dtime_now.h"
 // #include "morse.h"
-// #include "dtmf.h"
 // #include "xid.h"
 // #include "dlq.h"
 import "C"

@@ -36,7 +36,6 @@ package direwolf
 // #include "cdigipeater.h"
 // #include "tq.h"
 // #include "ptt.h"
-// #include "dtmf.h"
 // #include "aprs_tt.h"
 // #include "igate.h"
 // #include "symbols.h"

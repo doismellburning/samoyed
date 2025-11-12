@@ -61,7 +61,6 @@ package direwolf
 // #include "gen_tone.h"
 // #include "textcolor.h"
 // #include "morse.h"
-// #include "dtmf.h"
 // #include "fx25.h"
 // #include "il2p.h"
 // #include "gen_packets.h"

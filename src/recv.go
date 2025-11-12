@@ -93,7 +93,6 @@ package direwolf
 // #include "multi_modem.h"
 // #include "textcolor.h"
 // #include "dlq.h"
-// #include "dtmf.h"
 // #include "aprs_tt.h"
 // #include "ax25_link.h"
 import "C"
