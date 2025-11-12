@@ -70,7 +70,6 @@ package direwolf
 // #include "kiss_frame.h"
 // #include "tq.h"
 // #include "version.h"
-// #include "kissnet.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 

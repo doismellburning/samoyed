@@ -32,7 +32,6 @@ package direwolf
 // #include "encode_aprs.h"
 // #include "textcolor.h"
 // #include "kiss.h"
-// #include "kissnet.h"
 // #include "kiss_frame.h"
 // #include "gen_tone.h"
 // #include "digipeater.h"

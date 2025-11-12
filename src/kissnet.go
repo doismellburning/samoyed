@@ -160,8 +160,8 @@ same direwolf instance.
 // #include "ax25_pad.h"
 // #include "textcolor.h"
 // #include "audio.h"
-// #include "kissnet.h"
 // #include "kiss_frame.h"
+// #include "config.h"
 // void hex_dump (unsigned char *p, int len);	// This should be in a .h file.
 import "C"
 

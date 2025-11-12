@@ -27,7 +27,6 @@ package direwolf
 // #include "encode_aprs.h"
 // #include "latlong.h"
 // #include "kiss.h"
-// #include "kissnet.h"
 // #include "kiss_frame.h"
 // extern int TT_TESTS_RUNNING;
 import "C"
