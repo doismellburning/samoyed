@@ -30,7 +30,6 @@
 
 #include "audio.h"
 #include "ax25_pad.h"
-#include "hdlc_send.h"
 #include "gen_tone.h"
 #include "textcolor.h"
 #include "morse.h"
