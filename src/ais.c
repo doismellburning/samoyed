@@ -250,7 +250,7 @@ static void get_field_string (unsigned char *base, unsigned int start, unsigned 
 // Characters '0' thru 'W'  become values 0 thru 39.
 // Characters '`' thru 'w'  become values 40 thru 63.
 
-static int char_to_sextet (char ch)
+int char_to_sextet (char ch)
 {
 	if (ch >= '0' && ch <= 'W') {
 	  return (ch - '0');
@@ -270,7 +270,7 @@ static int char_to_sextet (char ch)
 // Values 40 thru 63 become characters '`' thru 'w'.
 // This is known as "Payload Armoring."
 
-static int sextet_to_char (int val)
+int sextet_to_char (int val)
 {
 	if (val >= 0 && val <= 39) {
 	  return ('0' + val);
