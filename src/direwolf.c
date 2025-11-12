@@ -113,7 +113,6 @@
 #include "il2p.h"
 #include "dns_sd_dw.h"
 #include "dlq.h"		// for fec_type_t definition.
-#include "deviceid.h"
 
 
 //static int idx_decoded = 0;

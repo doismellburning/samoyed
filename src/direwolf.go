@@ -47,7 +47,6 @@ package direwolf
 // #include "il2p.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
-// #include "deviceid.h"
 // extern struct audio_s audio_config;
 // extern struct tt_config_s tt_config;
 // extern struct misc_config_s misc_config;
