@@ -187,6 +187,9 @@ func serial_port_get1(fd *term.Term) (byte, error) {
  *--------------------------------------------------------------------*/
 
 func serial_port_close(fd *term.Term) {
+	if fd == nil {
+		return
+	}
 	fd.Close()
 }
 
