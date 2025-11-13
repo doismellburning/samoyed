@@ -77,7 +77,6 @@ package direwolf
 // #include "dlq.h"
 // #include "fx25.h"
 // #include "version.h"
-// #include "ais.h"
 import "C"
 
 import (
@@ -290,8 +289,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 	switch save_audio_config_p.achan[channel].modem_type {
 	case C.MODEM_AIS:
-		var nmea [256]C.char
-		C.ais_to_nmea(fbuf, flen, &nmea[0], C.int(len(nmea)))
+		var nmea = ais_to_nmea(C.GoBytes(unsafe.Pointer(fbuf), flen))
 
 		// The intention is for the AIS sentences to go only to attached applications.
 		// e.g. SARTrack knows how to parse the AIS sentences.
@@ -300,7 +298,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 		// TODO: Use station callsign, rather than "AIS," so we know where it is coming from,
 		// if it happens to get onto RF somehow.
 
-		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, C.USER_DEF_USER_ID, C.USER_DEF_TYPE_AIS, C.GoString(&nmea[0]))
+		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, C.USER_DEF_USER_ID, C.USER_DEF_TYPE_AIS, string(nmea))
 		pp = C.ax25_from_text(C.CString(monfmt), 1)
 
 		// alevel gets in there somehow making me question why it is passed thru here.

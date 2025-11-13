@@ -81,7 +81,6 @@ package direwolf
 // #include "dtime_now.h"
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
-// #include "ais.h"
 // int descramble (int in, int *state);
 import "C"
 
@@ -766,7 +765,7 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == C.MODEM_AIS {
 
 			// Sanity check for AIS.
-			if C.ais_check_length(C.int((H2.frame_buf[0]>>2)&0x3f), H2.frame_len-2) == 0 {
+			if ais_check_length(int(H2.frame_buf[0]>>2)&0x3f, int(H2.frame_len)-2) == 0 {
 				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
 				return true
 			} else {
