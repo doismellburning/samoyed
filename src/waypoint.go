@@ -248,13 +248,8 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 * G_UNKNOWN value will result in an empty string.
 	 */
 
-	var slat [12]C.char    /* DDMM.mmmm */
-	var slat_ns [2]C.char  /* N or S */
-	var slong [12]C.char   /* DDDMM.mmmm */
-	var slong_ew [2]C.char /* E or W */
-
-	C.latitude_to_nmea(C.double(dlat), &slat[0], &slat_ns[0])
-	C.longitude_to_nmea(C.double(dlong), &slong[0], &slong_ew[0])
+	var slat, slat_ns = latitude_to_nmea(dlat)
+	var slong, slong_ew = longitude_to_nmea(dlong)
 
 	var salt string
 	if alt != G_UNKNOWN {
@@ -286,7 +281,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 */
 
 	if s_waypoint_formats&WPL_FORMAT_NMEA_GENERIC > 0 {
-		var sentence = fmt.Sprintf("$GPWPL,%s,%s,%s,%s,%s", C.GoString(&slat[0]), C.GoString(&slat_ns[0]), C.GoString(&slong[0]), C.GoString(&slong_ew[0]), wname)
+		var sentence = fmt.Sprintf("$GPWPL,%s,%s,%s,%s,%s", slat, slat_ns, slong, slong_ew, wname)
 		var full_sentence = append_checksum([]byte(sentence))
 		send_sentence(full_sentence)
 	}
@@ -372,7 +367,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 			sicon = MGN_default
 		}
 
-		var sentence = fmt.Sprintf("$PMGNWPL,%s,%s,%s,%s,%s,M,%s,%s,%s", C.GoString(&slat[0]), C.GoString(&slat_ns[0]), C.GoString(&slong[0]), C.GoString(&slong_ew[0]), salt, wname, wcomment, sicon)
+		var sentence = fmt.Sprintf("$PMGNWPL,%s,%s,%s,%s,%s,M,%s,%s,%s", slat, slat_ns, slong, slong_ew, salt, wname, wcomment, sicon)
 		var full_sentence = append_checksum([]byte(sentence))
 		send_sentence(full_sentence)
 	}
@@ -491,7 +486,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 		}
 
 		var sentence = fmt.Sprintf("$PKWDWPL,%s,V,%s,%s,%s,%s,%s,%s,%s,%s,%s,%c%c",
-			stime, C.GoString(&slat[0]), C.GoString(&slat_ns[0]), C.GoString(&slong[0]), C.GoString(&slong_ew[0]),
+			stime, slat, slat_ns, slong, slong_ew,
 			sspeed, scourse, sdate, salt, wname, symtab, ken_sym)
 		var full_sentence = append_checksum([]byte(sentence))
 		send_sentence(full_sentence)
