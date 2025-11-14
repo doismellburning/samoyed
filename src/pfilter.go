@@ -907,9 +907,9 @@ func filt_r(pf *pfstate_t, sdist *C.char) C.int {
 		return -1
 	}
 
-	var km = C.ll_distance_km(C.double(dlat), C.double(dlon), pf.decoded.g_lat, pf.decoded.g_lon)
+	var km = ll_distance_km(dlat, dlon, float64(pf.decoded.g_lat), float64(pf.decoded.g_lon))
 
-	if km <= C.double(ddist) {
+	if km <= ddist {
 		return (1)
 	}
 
