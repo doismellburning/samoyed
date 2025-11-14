@@ -78,7 +78,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "rrbb.h"
 // #include "multi_modem.h"
-// #include "dtime_now.h"
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
 // int descramble (int in, int *state);

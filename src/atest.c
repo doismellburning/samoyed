@@ -80,7 +80,6 @@
 #include "hdlc_rec2.h"
 #include "dlq.h"
 #include "ptt.h"
-#include "dtime_now.h"
 #include "fx25.h"
 #include "il2p.h"
 #include "hdlc_rec.h"

@@ -26,12 +26,14 @@ package direwolf
 // #include "audio.h"
 // #include "tq.h"
 // #include "igate.h"
-// #include "dtime_now.h"
 import "C"
 
 import (
 	"sync"
+	"time"
 	"unsafe"
+
+	"github.com/lestrrat-go/strftime"
 )
 
 var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]C.packet_t /* Head of linked list for each queue. */
@@ -190,9 +192,8 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 		var ts string // optional time stamp.
 
 		if C.strlen(&save_audio_config_p.timestamp_format[0]) > 0 {
-			var tstmp [100]C.char
-			C.timestamp_user_format(&tstmp[0], C.int(len(tstmp)), &save_audio_config_p.timestamp_format[0])
-			ts = " " + C.GoString(&tstmp[0]) // space after channel.
+			var formattedTime, _ = strftime.Format(C.GoString(&save_audio_config_p.timestamp_format[0]), time.Now())
+			ts = " " + formattedTime // space after channel.
 		}
 
 		var stemp [256]C.char // Formated addresses.

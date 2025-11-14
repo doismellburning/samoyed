@@ -46,7 +46,6 @@ package direwolf
 // #include "dlq.h"
 // #include "igate.h"
 // #include "latlong.h"
-// #include "dtime_now.h"
 import "C"
 
 import (
@@ -1073,7 +1072,7 @@ func satgate_delay_packet(pp C.packet_t, channel C.int) {
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
 	//}
 
-	C.ax25_set_release_time(pp, C.dtime_now()+C.double(save_igate_config_p.satgate_delay))
+	C.ax25_set_release_time(pp, C.double(float64(time.Now().UnixNano())/1e9)+C.double(save_igate_config_p.satgate_delay))
 	//TODO: save channel too.
 
 	dp_mutex.Lock()
@@ -1122,7 +1121,7 @@ func satgate_delay_thread() {
 
 		if dp_queue_head != nil {
 
-			var now = C.dtime_now()
+			var now = C.double(float64(time.Now().UnixNano()) / 1e9)
 
 			var release_time = C.ax25_get_release_time(dp_queue_head)
 
