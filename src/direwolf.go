@@ -46,14 +46,6 @@ package direwolf
 // #include "il2p.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
-// extern struct audio_s audio_config;
-// extern struct tt_config_s tt_config;
-// extern struct misc_config_s misc_config;
-// extern int d_p_opt;
-// extern int d_u_opt;
-// extern int q_h_opt;
-// extern int q_d_opt;
-// extern int A_opt_ais_to_obj;
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm
@@ -93,6 +85,18 @@ import (
  *			AIS receiver for tracking ships.
  *
  *---------------------------------------------------------------*/
+
+var d_u_opt bool /* "-d u" command line option to print UTF-8 also in hexadecimal. */
+var d_p_opt bool /* "-d p" option for dumping packets over radio. */
+
+var q_h_opt bool /* "-q h" Quiet, suppress the "heard" line with audio level. */
+var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS packets. */
+
+var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
+
+var audio_config C.struct_audio_s
+var dw_tt_config C.struct_tt_config_s
+var misc_config C.struct_misc_config_s
 
 /*-------------------------------------------------------------------
  *
@@ -221,7 +225,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *aisToAPRS {
-		C.A_opt_ais_to_obj = 1
+		A_opt_ais_to_obj = true
 	}
 
 	var d_k_opt = 0       /* "-d k" option for serial port KISS.  Can be repeated for more detail. */
@@ -253,7 +257,7 @@ x = Silence FX.25 information.`)
 				d_n_opt++
 				kiss_net_set_debug(d_n_opt)
 			case 'u':
-				C.d_u_opt = 1
+				d_u_opt = true
 				// separate out gps & waypoints.
 			case 'g':
 				d_g_opt++
@@ -263,7 +267,7 @@ x = Silence FX.25 information.`)
 				d_t_opt++
 				beacon_tracker_set_debug(d_t_opt)
 			case 'p':
-				C.d_p_opt = 1 // TODO: packet dump for xmit side.
+				d_p_opt = true // TODO: packet dump for xmit side.
 			case 'o':
 				d_o_opt++
 				C.ptt_set_debug(d_o_opt)
@@ -295,9 +299,9 @@ x = Silence FX.25 information.`)
 		for _, p := range *quietStr {
 			switch p {
 			case 'h':
-				C.q_h_opt = 1
+				q_h_opt = true
 			case 'd':
-				C.q_d_opt = 1
+				q_d_opt = true
 			case 'x':
 				d_x_opt = 0 // Defaults to minimal info.  This silences.
 			default:
@@ -329,14 +333,14 @@ x = Silence FX.25 information.`)
 	var cdigi_config C.struct_cdigi_config_s
 	var igate_config C.struct_igate_config_s
 
-	C.config_init(C.CString(*configFileName), &C.audio_config, &digi_config, &cdigi_config, &C.tt_config, &igate_config, &C.misc_config)
+	C.config_init(C.CString(*configFileName), &audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, &misc_config)
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < C.MIN_SAMPLES_PER_SEC || *audioSampleRate > C.MAX_SAMPLES_PER_SEC {
 			fmt.Printf("-r option, audio samples/sec, is out of range.\n")
 			os.Exit(1)
 		}
-		C.audio_config.adev[0].samples_per_sec = C.int(*audioSampleRate)
+		audio_config.adev[0].samples_per_sec = C.int(*audioSampleRate)
 	}
 
 	if *audioChannels != 0 {
@@ -344,9 +348,9 @@ x = Silence FX.25 information.`)
 			fmt.Printf("-n option, number of audio channels, is out of range.\n")
 			os.Exit(1)
 		}
-		C.audio_config.adev[0].num_channels = C.int(*audioChannels)
+		audio_config.adev[0].num_channels = C.int(*audioChannels)
 		if *audioChannels == 2 {
-			C.audio_config.chan_medium[1] = C.MEDIUM_RADIO
+			audio_config.chan_medium[1] = C.MEDIUM_RADIO
 		}
 	}
 
@@ -356,7 +360,7 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
-		C.audio_config.adev[0].bits_per_sample = C.int(*bitsPerSample)
+		audio_config.adev[0].bits_per_sample = C.int(*bitsPerSample)
 	}
 
 	if *bitrateStr != "" {
@@ -371,50 +375,50 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
-		C.audio_config.achan[0].baud = C.int(bitrate)
+		audio_config.achan[0].baud = C.int(bitrate)
 
 		/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
 		/* that need to be kept in sync.  Maybe it could be a common function someday. */
 
-		if C.audio_config.achan[0].baud < 600 {
-			C.audio_config.achan[0].modem_type = C.MODEM_AFSK
-			C.audio_config.achan[0].mark_freq = 1600 // Typical for HF SSB.
-			C.audio_config.achan[0].space_freq = 1800
-			C.audio_config.achan[0].decimate = 3 // Reduce CPU load.
-		} else if C.audio_config.achan[0].baud < 1800 {
-			C.audio_config.achan[0].modem_type = C.MODEM_AFSK
-			C.audio_config.achan[0].mark_freq = C.DEFAULT_MARK_FREQ
-			C.audio_config.achan[0].space_freq = C.DEFAULT_SPACE_FREQ
-		} else if C.audio_config.achan[0].baud < 3600 {
-			C.audio_config.achan[0].modem_type = C.MODEM_QPSK
-			C.audio_config.achan[0].mark_freq = 0
-			C.audio_config.achan[0].space_freq = 0
-			if C.audio_config.achan[0].baud != 2400 {
-				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", C.audio_config.achan[0].baud)
+		if audio_config.achan[0].baud < 600 {
+			audio_config.achan[0].modem_type = C.MODEM_AFSK
+			audio_config.achan[0].mark_freq = 1600 // Typical for HF SSB.
+			audio_config.achan[0].space_freq = 1800
+			audio_config.achan[0].decimate = 3 // Reduce CPU load.
+		} else if audio_config.achan[0].baud < 1800 {
+			audio_config.achan[0].modem_type = C.MODEM_AFSK
+			audio_config.achan[0].mark_freq = C.DEFAULT_MARK_FREQ
+			audio_config.achan[0].space_freq = C.DEFAULT_SPACE_FREQ
+		} else if audio_config.achan[0].baud < 3600 {
+			audio_config.achan[0].modem_type = C.MODEM_QPSK
+			audio_config.achan[0].mark_freq = 0
+			audio_config.achan[0].space_freq = 0
+			if audio_config.achan[0].baud != 2400 {
+				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", audio_config.achan[0].baud)
 			}
-		} else if C.audio_config.achan[0].baud < 7200 {
-			C.audio_config.achan[0].modem_type = C.MODEM_8PSK
-			C.audio_config.achan[0].mark_freq = 0
-			C.audio_config.achan[0].space_freq = 0
-			if C.audio_config.achan[0].baud != 4800 {
-				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", C.audio_config.achan[0].baud)
+		} else if audio_config.achan[0].baud < 7200 {
+			audio_config.achan[0].modem_type = C.MODEM_8PSK
+			audio_config.achan[0].mark_freq = 0
+			audio_config.achan[0].space_freq = 0
+			if audio_config.achan[0].baud != 4800 {
+				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", audio_config.achan[0].baud)
 			}
-		} else if C.audio_config.achan[0].baud == 0xA15A15 {
-			C.audio_config.achan[0].modem_type = C.MODEM_AIS
-			C.audio_config.achan[0].baud = 9600
-			C.audio_config.achan[0].mark_freq = 0
-			C.audio_config.achan[0].space_freq = 0
-		} else if C.audio_config.achan[0].baud == 0xEA5EA5 {
-			C.audio_config.achan[0].modem_type = C.MODEM_EAS
-			C.audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
+		} else if audio_config.achan[0].baud == 0xA15A15 {
+			audio_config.achan[0].modem_type = C.MODEM_AIS
+			audio_config.achan[0].baud = 9600
+			audio_config.achan[0].mark_freq = 0
+			audio_config.achan[0].space_freq = 0
+		} else if audio_config.achan[0].baud == 0xEA5EA5 {
+			audio_config.achan[0].modem_type = C.MODEM_EAS
+			audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
 			// Will make more precise in afsk demod init.
-			C.audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
-			C.audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
-			C.strcpy(&C.audio_config.achan[0].profiles[0], C.CString("A"))
+			audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
+			audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
+			C.strcpy(&audio_config.achan[0].profiles[0], C.CString("A"))
 		} else {
-			C.audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
-			C.audio_config.achan[0].mark_freq = 0
-			C.audio_config.achan[0].space_freq = 0
+			audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
+			audio_config.achan[0].mark_freq = 0
+			audio_config.achan[0].space_freq = 0
 		}
 	}
 
@@ -422,43 +426,43 @@ x = Silence FX.25 information.`)
 		// Force G3RUH mode, overriding default for speed.
 		//   Example:   -B 2400 -g
 
-		C.audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
-		C.audio_config.achan[0].mark_freq = 0
-		C.audio_config.achan[0].space_freq = 0
+		audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
+		audio_config.achan[0].mark_freq = 0
+		audio_config.achan[0].space_freq = 0
 	}
 
 	if *direwolf15compat {
 		// V.26 compatible with earlier versions of direwolf.
 		//   Example:   -B 2400 -j    or simply   -j
 
-		C.audio_config.achan[0].v26_alternative = C.V26_A
-		C.audio_config.achan[0].modem_type = C.MODEM_QPSK
-		C.audio_config.achan[0].mark_freq = 0
-		C.audio_config.achan[0].space_freq = 0
-		C.audio_config.achan[0].baud = 2400
+		audio_config.achan[0].v26_alternative = C.V26_A
+		audio_config.achan[0].modem_type = C.MODEM_QPSK
+		audio_config.achan[0].mark_freq = 0
+		audio_config.achan[0].space_freq = 0
+		audio_config.achan[0].baud = 2400
 	}
 
 	if *mfj2400compat {
 		// V.26 compatible with MFJ and maybe others.
 		//   Example:   -B 2400 -J     or simply   -J
 
-		C.audio_config.achan[0].v26_alternative = C.V26_B
-		C.audio_config.achan[0].modem_type = C.MODEM_QPSK
-		C.audio_config.achan[0].mark_freq = 0
-		C.audio_config.achan[0].space_freq = 0
-		C.audio_config.achan[0].baud = 2400
+		audio_config.achan[0].v26_alternative = C.V26_B
+		audio_config.achan[0].modem_type = C.MODEM_QPSK
+		audio_config.achan[0].mark_freq = 0
+		audio_config.achan[0].space_freq = 0
+		audio_config.achan[0].baud = 2400
 	}
 
 	if *audioStatsInterval > 0 {
 		if *audioStatsInterval < 10 {
 			fmt.Printf("Setting such a small audio statistics interval (<10) will produce inaccurate sample rate display.\n")
 		}
-		C.audio_config.statistics_interval = C.int(*audioStatsInterval)
+		audio_config.statistics_interval = C.int(*audioStatsInterval)
 	}
 
 	if *modemProfile != "" {
 		/* -P for modem profile. */
-		C.strcpy(&C.audio_config.achan[0].profiles[0], C.CString(*modemProfile))
+		C.strcpy(&audio_config.achan[0].profiles[0], C.CString(*modemProfile))
 	}
 
 	if *decimate != 0 {
@@ -468,7 +472,7 @@ x = Silence FX.25 information.`)
 		}
 
 		// Reduce audio sampling rate to reduce CPU requirements.
-		C.audio_config.achan[0].decimate = C.int(*decimate)
+		audio_config.achan[0].decimate = C.int(*decimate)
 	}
 
 	if *upsample != 0 {
@@ -480,10 +484,10 @@ x = Silence FX.25 information.`)
 		// Increase G3RUH audio sampling rate to improve performance.
 		// The value is normally determined automatically based on audio
 		// sample rate and baud.  This allows override for experimentation.
-		C.audio_config.achan[0].upsample = C.int(*upsample)
+		audio_config.achan[0].upsample = C.int(*upsample)
 	}
 
-	C.strcpy(&C.audio_config.timestamp_format[0], C.CString(*timestampFormat))
+	C.strcpy(&audio_config.timestamp_format[0], C.CString(*timestampFormat))
 
 	// temp - only xmit errors.
 
@@ -495,14 +499,14 @@ x = Silence FX.25 information.`)
 				fmt.Printf("-ER must be in range of 1 to 99.\n")
 				E_rx_opt = 10
 			}
-			C.audio_config.recv_error_rate = C.int(E_rx_opt)
+			audio_config.recv_error_rate = C.int(E_rx_opt)
 		} else {
 			var E_tx_opt, _ = strconv.Atoi(e)
 			if E_tx_opt < 1 || E_tx_opt > 99 {
 				fmt.Printf("-E must be in range of 1 to 99.\n")
 				E_tx_opt = 10
 			}
-			C.audio_config.xmit_error_rate = C.int(E_tx_opt)
+			audio_config.xmit_error_rate = C.int(E_tx_opt)
 		}
 	}
 
@@ -512,30 +516,30 @@ x = Silence FX.25 information.`)
 	}
 
 	if *logFile != "" {
-		C.misc_config.log_daily_names = 0
-		C.strcpy(&C.misc_config.log_path[0], C.CString(*logFile))
+		misc_config.log_daily_names = 0
+		C.strcpy(&misc_config.log_path[0], C.CString(*logFile))
 	} else if *logDir != "" {
-		C.misc_config.log_daily_names = 1
-		C.strcpy(&C.misc_config.log_path[0], C.CString(*logDir))
+		misc_config.log_daily_names = 1
+		C.strcpy(&misc_config.log_path[0], C.CString(*logDir))
 	}
 
 	if *enablePseudoTerminal {
-		C.misc_config.enable_kiss_pt = 1
+		misc_config.enable_kiss_pt = 1
 	}
 
 	if input_file != "" {
-		C.strcpy(&C.audio_config.adev[0].adevice_in[0], C.CString(input_file))
+		C.strcpy(&audio_config.adev[0].adevice_in[0], C.CString(input_file))
 	}
 
-	C.audio_config.recv_ber = C.float(*bitErrorRate)
+	audio_config.recv_ber = C.float(*bitErrorRate)
 
 	if *fx25CheckBytes > 0 {
 		if *il2pNormal != -1 || *il2pInverted != -1 {
 			fmt.Printf("Can't mix -X with -I or -i.\n")
 			os.Exit(1)
 		}
-		C.audio_config.achan[0].fx25_strength = C.int(*fx25CheckBytes)
-		C.audio_config.achan[0].layer2_xmit = C.LAYER2_FX25
+		audio_config.achan[0].fx25_strength = C.int(*fx25CheckBytes)
+		audio_config.achan[0].layer2_xmit = C.LAYER2_FX25
 	}
 
 	if *il2pNormal != -1 && *il2pInverted != -1 {
@@ -544,26 +548,26 @@ x = Silence FX.25 information.`)
 	}
 
 	if *il2pNormal >= 0 {
-		C.audio_config.achan[0].layer2_xmit = C.LAYER2_IL2P
+		audio_config.achan[0].layer2_xmit = C.LAYER2_IL2P
 		if *il2pNormal > 0 {
-			C.audio_config.achan[0].il2p_max_fec = 1
+			audio_config.achan[0].il2p_max_fec = 1
 		}
-		if C.audio_config.achan[0].il2p_max_fec == 0 {
+		if audio_config.achan[0].il2p_max_fec == 0 {
 			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -I for best results.\n")
 		}
-		C.audio_config.achan[0].il2p_invert_polarity = 0 // normal
+		audio_config.achan[0].il2p_invert_polarity = 0 // normal
 	}
 
 	if *il2pInverted >= 0 {
-		C.audio_config.achan[0].layer2_xmit = C.LAYER2_IL2P
+		audio_config.achan[0].layer2_xmit = C.LAYER2_IL2P
 		if *il2pInverted > 0 {
-			C.audio_config.achan[0].il2p_max_fec = 1
+			audio_config.achan[0].il2p_max_fec = 1
 		}
-		if C.audio_config.achan[0].il2p_max_fec == 0 {
+		if audio_config.achan[0].il2p_max_fec == 0 {
 			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -i for best results.\n")
 		}
-		C.audio_config.achan[0].il2p_invert_polarity = 1 // invert for transmit
-		if C.audio_config.achan[0].baud == 1200 {
+		audio_config.achan[0].il2p_invert_polarity = 1 // invert for transmit
+		if audio_config.achan[0].baud == 1200 {
 			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
 		}
 	}
@@ -592,7 +596,7 @@ x = Silence FX.25 information.`)
 	 */
 	deviceid_init()
 
-	var err = C.audio_open(&C.audio_config)
+	var err = C.audio_open(&audio_config)
 	if err < 0 {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
@@ -604,7 +608,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	multi_modem_init(&C.audio_config)
+	multi_modem_init(&audio_config)
 	C.fx25_init(C.int(d_x_opt))
 	C.il2p_init(C.int(d_2_opt))
 
@@ -613,38 +617,38 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	nettnc_init(&C.audio_config)
+	nettnc_init(&audio_config)
 
 	/*
 	 * Initialize the touch tone decoder & APRStt gateway.
 	 */
-	dtmf_init(&C.audio_config, audio_amplitude)
-	aprs_tt_init(&C.tt_config, aprstt_debug)
-	tt_user_init(&C.audio_config, &C.tt_config)
+	dtmf_init(&audio_config, audio_amplitude)
+	aprs_tt_init(&dw_tt_config, aprstt_debug)
+	tt_user_init(&audio_config, &dw_tt_config)
 
 	/*
 	 * Should there be an option for audio output level?
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	gen_tone_init(&C.audio_config, audio_amplitude, 0)
-	morse_init(&C.audio_config, audio_amplitude)
+	gen_tone_init(&audio_config, audio_amplitude, 0)
+	morse_init(&audio_config, audio_amplitude)
 
-	if !(C.audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16) { //nolint:staticcheck
-		panic("audio_config.adev[0].bits_per_sample == 8 || C.audio_config.adev[0].bits_per_sample == 16")
+	if !(audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16) { //nolint:staticcheck
+		panic("audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16")
 	}
-	if !(C.audio_config.adev[0].num_channels == 1 || C.audio_config.adev[0].num_channels == 2) { //nolint:staticcheck
-		panic("assert(C.audio_config.adev[0].num_channels == 1 || C.audio_config.adev[0].num_channels == 2)")
+	if !(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2) { //nolint:staticcheck
+		panic("assert(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2)")
 	}
-	if !(C.audio_config.adev[0].samples_per_sec >= C.MIN_SAMPLES_PER_SEC && C.audio_config.adev[0].samples_per_sec <= C.MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
-		panic("assert(C.audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && C.audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
+	if !(audio_config.adev[0].samples_per_sec >= C.MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= C.MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
+		panic("assert(audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
 	}
 
 	/*
 	 * Initialize the transmit queue.
 	 */
 
-	xmit_init(&C.audio_config, C.d_p_opt)
+	xmit_init(&audio_config, IfThenElse(d_p_opt, C.int(1), C.int(0)))
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
@@ -688,10 +692,10 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
-		if C.audio_config.chan_medium[transmitCalibrationChannel] == C.MEDIUM_RADIO {
-			if C.audio_config.achan[transmitCalibrationChannel].mark_freq != 0 && C.audio_config.achan[transmitCalibrationChannel].space_freq != 0 {
+		if audio_config.chan_medium[transmitCalibrationChannel] == C.MEDIUM_RADIO {
+			if audio_config.achan[transmitCalibrationChannel].mark_freq != 0 && audio_config.achan[transmitCalibrationChannel].space_freq != 0 {
 				var max_duration = 60
-				var n = C.audio_config.achan[transmitCalibrationChannel].baud * C.int(max_duration)
+				var n = audio_config.achan[transmitCalibrationChannel].baud * C.int(max_duration)
 
 				C.text_color_set(C.DW_COLOR_INFO)
 				C.ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
@@ -700,8 +704,8 @@ x = Silence FX.25 information.`)
 				default:
 				case 'a': // Alternating tones: -x a
 					fmt.Printf("\nSending alternating mark/space calibration tones (%d/%dHz) on channel %d.\nPress control-C to terminate.\n",
-						C.audio_config.achan[transmitCalibrationChannel].mark_freq,
-						C.audio_config.achan[transmitCalibrationChannel].space_freq,
+						audio_config.achan[transmitCalibrationChannel].mark_freq,
+						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
 					for n > 0 {
 						C.tone_gen_put_bit(C.int(transmitCalibrationChannel), n&1)
@@ -709,14 +713,14 @@ x = Silence FX.25 information.`)
 					}
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
-						C.audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
+						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 					for n > 0 {
 						C.tone_gen_put_bit(C.int(transmitCalibrationChannel), 1)
 						n--
 					}
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
-						C.audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
+						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 					for n > 0 {
 						C.tone_gen_put_bit(C.int(transmitCalibrationChannel), 0)
 						n--
@@ -746,37 +750,37 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
-	digipeater_init(&C.audio_config, &digi_config)
-	igate_init(&C.audio_config, &igate_config, &digi_config, C.int(d_i_opt))
-	cdigipeater_init(&C.audio_config, &cdigi_config)
+	digipeater_init(&audio_config, &digi_config)
+	igate_init(&audio_config, &igate_config, &digi_config, C.int(d_i_opt))
+	cdigipeater_init(&audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
-	ax25_link_init(&C.misc_config, C.int(d_c_opt))
+	ax25_link_init(&misc_config, C.int(d_c_opt))
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	server_init(&C.audio_config, &C.misc_config)
-	kissnet_init(&C.misc_config)
+	server_init(&audio_config, &misc_config)
+	kissnet_init(&misc_config)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
-	if C.misc_config.kiss_port[0] > 0 && C.misc_config.dns_sd_enabled > 0 {
-		C.dns_sd_announce(&C.misc_config)
+	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled > 0 {
+		C.dns_sd_announce(&misc_config)
 	}
 
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kisspt_init(&C.misc_config)
-	kissserial_init(&C.misc_config)
-	kiss_frame_init(&C.audio_config)
+	kisspt_init(&misc_config)
+	kissserial_init(&misc_config)
+	kiss_frame_init(&audio_config)
 
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(&C.misc_config, C.int(d_g_opt))
+	dwgps_init(&misc_config, C.int(d_g_opt))
 
-	waypoint_init(&C.misc_config)
+	waypoint_init(&misc_config)
 
 	/*
 	 * Enable beaconing.
@@ -784,16 +788,16 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	log_init((C.misc_config.log_daily_names > 0), C.GoString(&C.misc_config.log_path[0]))
+	log_init((misc_config.log_daily_names > 0), C.GoString(&misc_config.log_path[0]))
 	mheard_init(d_m_opt)
-	beacon_init(&C.audio_config, &C.misc_config, &igate_config)
+	beacon_init(&audio_config, &misc_config, &igate_config)
 
 	/*
 	 * Get sound samples and decode them.
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	recv_init(&C.audio_config)
+	recv_init(&audio_config)
 	recv_process()
 }
 
@@ -846,7 +850,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		display_retries = " IL2P "
 	default:
 		// Possible fix_bits indication.
-		if C.audio_config.achan[channel].fix_bits != C.RETRY_NONE || C.audio_config.achan[channel].passall > 0 {
+		if audio_config.achan[channel].fix_bits != C.RETRY_NONE || audio_config.achan[channel].passall > 0 {
 			// FIXME KG assert(retries >= C.RETRY_NONE && retries <= C.RETRY_MAX)
 			display_retries = fmt.Sprintf(" [%s] ", retry_text[int(retries)])
 		}
@@ -878,9 +882,9 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 	// The HEARD line.
 
-	if (C.q_h_opt == 0) && alevel.rec >= 0 { /* suppress if "-q h" option */
+	if !q_h_opt && alevel.rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
-		if channel != C.audio_config.igate_vchannel { // suppress if from ICHANNEL
+		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
 			if h != -1 && h != C.AX25_SOURCE {
 				dw_printf("Digipeater ")
 			}
@@ -940,7 +944,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		dw_printf("Audio input level is too high. This may cause distortion and reduced decode performance.\n")
 		dw_printf("Solution is to decrease the audio input level.\n")
 		dw_printf("Setting audio input level so most stations are around 50 will provide good dyanmic range.\n")
-	} else if alevel.rec < 5 && channel != C.audio_config.igate_vchannel && subchan != -3 {
+	} else if alevel.rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Audio input level is too low.  Increase so most stations are around 50.\n")
@@ -954,8 +958,8 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 	var ts string // optional time stamp
 
-	if C.strlen(&C.audio_config.timestamp_format[0]) > 0 {
-		var formattedTime, _ = strftime.Format(C.GoString(&C.audio_config.timestamp_format[0]), time.Now())
+	if C.strlen(&audio_config.timestamp_format[0]) > 0 {
+		var formattedTime, _ = strftime.Format(C.GoString(&audio_config.timestamp_format[0]), time.Now())
 		ts = " " + formattedTime // space after channel.
 	}
 
@@ -976,11 +980,11 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			text_color_set(DW_COLOR_DECODED)
 		}
 
-		if C.audio_config.achan[channel].num_subchan > 1 && C.audio_config.achan[channel].num_slicers == 1 {
+		if audio_config.achan[channel].num_subchan > 1 && audio_config.achan[channel].num_slicers == 1 {
 			dw_printf("[%d.%d%s] ", channel, subchan, ts)
-		} else if C.audio_config.achan[channel].num_subchan == 1 && C.audio_config.achan[channel].num_slicers > 1 {
+		} else if audio_config.achan[channel].num_subchan == 1 && audio_config.achan[channel].num_slicers > 1 {
 			dw_printf("[%d.%d%s] ", channel, slice, ts)
-		} else if C.audio_config.achan[channel].num_subchan > 1 && C.audio_config.achan[channel].num_slicers > 1 {
+		} else if audio_config.achan[channel].num_subchan > 1 && audio_config.achan[channel].num_slicers > 1 {
 			dw_printf("[%d.%d.%d%s] ", channel, subchan, slice, ts)
 		} else {
 			dw_printf("[%d%s] ", channel, ts)
@@ -992,7 +996,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
 	var asciiOnly C.int = 0 // Quick bodge because these C bools are ints...
-	if (C.ax25_is_aprs(pp) == 0) && (C.d_u_opt == 0) {
+	if (C.ax25_is_aprs(pp) == 0) && !d_u_opt {
 		asciiOnly = 1
 	}
 
@@ -1030,7 +1034,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 	// Also display in pure ASCII if non-ASCII characters and "-d u" option specified.
 
-	if C.d_u_opt > 0 {
+	if d_u_opt {
 		var hasNonPrintable = false
 		for _, r := range C.GoString((*C.char)(unsafe.Pointer(pinfo))) {
 			if !unicode.IsPrint(r) {
@@ -1048,7 +1052,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 	/* Optional hex dump of packet. */
 
-	if C.d_p_opt > 0 {
+	if d_p_opt {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		C.ax25_hex_dump(pp)
@@ -1069,9 +1073,9 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 
-		decode_aprs(&A, pp, C.q_d_opt, nil)
+		decode_aprs(&A, pp, IfThenElse(q_d_opt, C.int(1), C.int(0)), nil)
 
-		if C.q_d_opt == 0 {
+		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
 
 			decode_aprs_print(&A)
@@ -1104,7 +1108,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		if C.strncmp((*C.char)(unsafe.Pointer(pinfo)), user_def_da, 3) == 0 {
 			waypoint_send_ais([]byte(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
 
-			if C.A_opt_ais_to_obj > 0 && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
+			if A_opt_ais_to_obj && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
 				var ais_obj_info = encode_object(&A.g_name[0], 0, C.time(nil),
 					A.g_lat, A.g_lon, 0, // no ambiguity
 					A.g_symbol_table, A.g_symbol_code,
@@ -1151,7 +1155,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1) // KISS serial port
 	kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
 
-	if C.A_opt_ais_to_obj > 0 && C.strlen(&ais_obj_packet[0]) != 0 {
+	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = C.ax25_from_text(&ais_obj_packet[0], 1)
 		if ao_pp != nil {
 			var ao_fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
@@ -1171,7 +1175,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	 * Don't do anything with it after printing and sending to client apps.
 	 */
 
-	if channel == C.audio_config.igate_vchannel {
+	if channel == audio_config.igate_vchannel {
 		return
 	}
 
@@ -1184,10 +1188,10 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	 */
 
 	if subchan == -1 { // from DTMF decoder
-		if C.tt_config.gateway_enabled > 0 && info_len >= 2 {
+		if dw_tt_config.gateway_enabled > 0 && info_len >= 2 {
 			aprs_tt_sequence(int(channel), C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
 		}
-	} else if *pinfo == 't' && info_len >= 2 && C.tt_config.gateway_enabled > 0 {
+	} else if *pinfo == 't' && info_len >= 2 && dw_tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
