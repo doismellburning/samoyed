@@ -161,7 +161,6 @@ package direwolf
 // #include "dlq.h"
 // #include "tq.h"
 // #include "ax25_link.h"
-// #include "dtime_now.h"
 // #include "ptt.h"
 import "C"
 

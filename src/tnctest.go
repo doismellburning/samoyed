@@ -21,7 +21,6 @@ package direwolf
 // #include <string.h>
 // #include <time.h>
 // #include "textcolor.h"
-// #include "dtime_now.h"
 import "C"
 
 import (
@@ -32,6 +31,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/pkg/term"
@@ -131,7 +131,7 @@ var last_rec_seq [MAX_TNC]int /* Each data packet will contain a sequence number
  * Start time so we can print relative elapsed time.
  */
 
-var start_dtime C.double
+var start_time time.Time
 
 var max_count int
 
@@ -144,7 +144,7 @@ func TNCTestMain() {
 	max_count = 1000
 	max_count = 9999
 
-	start_dtime = C.dtime_monotonic()
+	start_time = time.Now()
 
 	/*
 	 * Extract command line args.
@@ -504,14 +504,12 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 		 * What did we get?
 		 */
 
-		var dnow = C.dtime_monotonic()
-
 		switch mon_cmd.DataKind {
 		case 'C': // AX.25 Connection Received
-			fmt.Printf("%*s[R %.3f] *** Connected to %s ***\n", my_index*column_width, "", dnow-start_dtime, mon_cmd.CallFrom)
+			fmt.Printf("%*s[R %.3f] *** Connected to %s ***\n", my_index*column_width, "", time.Since(start_time).Seconds(), mon_cmd.CallFrom)
 			is_connected[my_index] = 1
 		case 'D': // Connected AX.25 Data
-			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", dnow-start_dtime, data)
+			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), data)
 
 			process_rec_data(my_index, string(data))
 
@@ -540,12 +538,12 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 				}
 			}
 		case 'd': // Disconnected
-			fmt.Printf("%*s[R %.3f] *** Disconnected from %s ***\n", my_index*column_width, "", dnow-start_dtime, mon_cmd.CallFrom)
+			fmt.Printf("%*s[R %.3f] *** Disconnected from %s ***\n", my_index*column_width, "", time.Since(start_time).Seconds(), mon_cmd.CallFrom)
 			is_connected[my_index] = 0
 		case 'y': // Outstanding frames waiting on a Port
-			fmt.Printf("%*s[R %.3f] *** Outstanding frames waiting %d ***\n", my_index*column_width, "", dnow-start_dtime, 123) // TODO
+			fmt.Printf("%*s[R %.3f] *** Outstanding frames waiting %d ***\n", my_index*column_width, "", time.Since(start_time).Seconds(), 123) // TODO
 		default:
-			// fmt.Printf("%*s[R %.3f] --- Ignoring cmd kind '%c' ---\n", my_index*column_width, "", dnow-start_dtime, mon_cmd.DataKind);
+			// fmt.Printf("%*s[R %.3f] --- Ignoring cmd kind '%c' ---\n", my_index*column_width, "", time.Since(start_time).Seconds(), mon_cmd.DataKind);
 		}
 	}
 }
@@ -631,12 +629,10 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 			if ch == '\r' || ch == '\n' {
 				done = true
 			} else if ch == XOFF {
-				var dnow = C.dtime_monotonic()
-				fmt.Printf("%*s[R %.3f] <XOFF>\n", my_index*column_width, "", dnow-start_dtime)
+				fmt.Printf("%*s[R %.3f] <XOFF>\n", my_index*column_width, "", time.Since(start_time).Seconds())
 				busy[my_index] = true
 			} else if ch == XON {
-				var dnow = C.dtime_monotonic()
-				fmt.Printf("%*s[R %.3f] <XON>\n", my_index*column_width, "", dnow-start_dtime)
+				fmt.Printf("%*s[R %.3f] <XON>\n", my_index*column_width, "", time.Since(start_time).Seconds())
 				busy[my_index] = false
 			} else if unicode.IsPrint(rune(ch)) {
 				result[length] = C.char(ch)
@@ -658,9 +654,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 		var _result = C.GoString(&result[0])
 
 		if length > 0 {
-			var dnow = C.dtime_monotonic()
-
-			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", dnow-start_dtime, _result)
+			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), _result)
 
 			if _result == "*** CONNECTED" {
 				is_connected[my_index] = 1
@@ -692,9 +686,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 }
 
 func tnc_connect(from int, to int) {
-	var dnow = C.dtime_monotonic()
-
-	fmt.Printf("%*s[T %.3f] *** Send connect request ***\n", from*column_width, "", dnow-start_dtime)
+	fmt.Printf("%*s[T %.3f] *** Send connect request ***\n", from*column_width, "", time.Since(start_time).Seconds())
 
 	if tnctest_using_tcp[from] {
 		var cmd agwpe_s
@@ -725,9 +717,7 @@ func tnc_connect(from int, to int) {
 }
 
 func tnc_disconnect(from int, to int) {
-	var dnow = C.dtime_monotonic()
-
-	fmt.Printf("%*s[T %.3f] *** Send disconnect request ***\n", from*column_width, "", dnow-start_dtime)
+	fmt.Printf("%*s[T %.3f] *** Send disconnect request ***\n", from*column_width, "", time.Since(start_time).Seconds())
 
 	if tnctest_using_tcp[from] {
 		var cmd agwpe_s
@@ -758,9 +748,7 @@ func tnc_disconnect(from int, to int) {
 }
 
 func tnc_reset(from int, to int) {
-	var dnow = C.dtime_monotonic()
-
-	fmt.Printf("%*s[T %.3f] *** Send reset ***\n", from*column_width, "", dnow-start_dtime)
+	fmt.Printf("%*s[T %.3f] *** Send reset ***\n", from*column_width, "", time.Since(start_time).Seconds())
 
 	if tnctest_using_tcp[from] {
 	} else {
@@ -782,9 +770,7 @@ func tnc_reset(from int, to int) {
 }
 
 func tnc_send_data(from int, to int, data string) {
-	var dnow = C.dtime_monotonic()
-
-	fmt.Printf("%*s[T %.3f] %s\n", from*column_width, "", dnow-start_dtime, data)
+	fmt.Printf("%*s[T %.3f] %s\n", from*column_width, "", time.Since(start_time).Seconds(), data)
 
 	if tnctest_using_tcp[from] {
 		var header agwpe_s

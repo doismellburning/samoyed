@@ -108,7 +108,6 @@
 #include "dwgps.h"
 #include "morse.h"
 #include "ax25_link.h"
-#include "dtime_now.h"
 #include "fx25.h"
 #include "il2p.h"
 #include "dns_sd_dw.h"

@@ -42,7 +42,6 @@ package direwolf
 // #include "dwgps.h"
 // #include "morse.h"
 // #include "ax25_link.h"
-// #include "dtime_now.h"
 // #include "fx25.h"
 // #include "il2p.h"
 // #include "dns_sd_dw.h"
@@ -67,10 +66,12 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 	"unicode"
 	"unsafe"
 
 	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
+	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
 )
 
@@ -954,9 +955,8 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	var ts string // optional time stamp
 
 	if C.strlen(&C.audio_config.timestamp_format[0]) > 0 {
-		var tstmp [100]C.char
-		C.timestamp_user_format(&tstmp[0], C.int(len(tstmp)), &C.audio_config.timestamp_format[0])
-		ts = " " + C.GoString(&tstmp[0]) // space after channel.
+		var formattedTime, _ = strftime.Format(C.GoString(&C.audio_config.timestamp_format[0]), time.Now())
+		ts = " " + formattedTime // space after channel.
 	}
 
 	switch subchan {

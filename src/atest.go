@@ -56,7 +56,6 @@ package direwolf
 // #include "hdlc_rec2.h"
 // #include "dlq.h"
 // #include "ptt.h"
-// #include "dtime_now.h"
 // #include "fx25.h"
 // #include "il2p.h"
 // #include "hdlc_rec.h"
@@ -82,6 +81,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 	"unsafe"
 
 	"github.com/spf13/pflag"
@@ -391,7 +391,7 @@ o = DCD output control
 	C.fx25_init(d_x_opt)
 	C.il2p_init(d_2_opt)
 
-	var start_time = C.dtime_now()
+	var start_time = time.Now()
 	var total_filetime C.double
 	var packets_decoded_total = 0
 
@@ -545,9 +545,9 @@ o = DCD output control
 		C.fclose(C.fp)
 	}
 
-	var elapsed = C.dtime_now() - start_time
+	var elapsed = time.Since(start_time)
 
-	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed, total_filetime/elapsed)
+	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/C.double(elapsed.Seconds()))
 	if C.d_o_opt > 0 {
 		fmt.Printf("DCD count = %d\n", C.dcd_count)
 		fmt.Printf("DCD missing errors = %d\n", C.dcd_missing_errors)

@@ -34,7 +34,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "kiss_frame.h"
 // #include "audio.h"		// for DEFAULT_TXDELAY, etc.
-// #include "dtime_now.h"
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
 import "C"

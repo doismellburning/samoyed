@@ -46,7 +46,6 @@ package direwolf
 // #include "tq.h"
 // #include "hdlc_rec.h"
 // #include "ptt.h"
-// #include "dtime_now.h"
 // #include "morse.h"
 // #include "xid.h"
 // #include "dlq.h"
@@ -60,6 +59,8 @@ import (
 	"sync"
 	"time"
 	"unsafe"
+
+	"github.com/lestrrat-go/strftime"
 )
 
 /*
@@ -1007,9 +1008,8 @@ func xmit_speak_it(script *C.char, c C.int, msg *C.char) error {
 
 func timestampPrefix() string {
 	if C.strlen(&save_audio_config_p.timestamp_format[0]) > 0 {
-		var tstmp [100]C.char
-		C.timestamp_user_format(&tstmp[0], C.int(len(tstmp)), &save_audio_config_p.timestamp_format[0])
-		return " " + C.GoString(&tstmp[0]) // space after channel.
+		var formattedTime, _ = strftime.Format(C.GoString(&save_audio_config_p.timestamp_format[0]), time.Now())
+		return " " + formattedTime // space after channel.
 	}
 
 	return ""
