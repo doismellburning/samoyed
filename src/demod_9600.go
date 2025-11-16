@@ -124,7 +124,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 	}
 
 
-	memset (D, 0, sizeof(struct demodulator_state_s));
+	// FIXME KG memset (D, 0, sizeof(struct demodulator_state_s));
 	D.modem_type = modem_type;
 	D.num_slicers = 1;
 
@@ -143,7 +143,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 	    //D.lp_filter_size = ((int) (0.5f * ( D.lp_filter_len_bits * (float)original_sample_rate / (float)baud ))) * 2 + 1;
 
 	    // Just round to nearest integer.
-	    D.lp_filter_size = (int) (( D.lp_filter_len_bits * (float)original_sample_rate / baud) + 0.5f);
+	    D.lp_filter_size = int(( D.lp_filter_len_bits * float64(original_sample_rate) / baud) + 0.5);
 
 	    D.lp_window = BP_WINDOW_COSINE;
 
@@ -173,8 +173,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 
 	// PLL needs to use the upsampled rate.
 
-        D.pll_step_per_sample = 
-		(int) round(TICKS_PER_PLL_CYCLE * (double) baud / (double)(original_sample_rate * upsample));
+        D.pll_step_per_sample = int(round(TICKS_PER_PLL_CYCLE * C.double( baud) / C.double(original_sample_rate * upsample)))
 
 
 		/* TODO KG
@@ -209,7 +208,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 
 	// Initial filter (before scattering) is based on upsampled rate.
 
-	fc = (float)baud * D.lpf_baud / (float)(original_sample_rate * upsample);
+	fc = float64(baud) * D.lpf_baud / float64(original_sample_rate * upsample);
 
 	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_size);
 
@@ -271,15 +270,19 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 // Maybe we should turn that off by default, especially for ARM.
 //
 
-	int k = 0;
-	for (int i = 0; i < D.lp_filter_size; i++) {
-	    D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k++];
+	var k = 0;
+	for i := 0; i < D.lp_filter_size; i++ {
+	    D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k];
+		k++
 	    if (upsample >= 2) {
-	        D.u.bb.lp_polyphase_2[i] = D.u.bb.lp_filter[k++];
+	        D.u.bb.lp_polyphase_2[i] = D.u.bb.lp_filter[k];
+			k++
 	        if (upsample >= 3) {
-	            D.u.bb.lp_polyphase_3[i] = D.u.bb.lp_filter[k++];
+	            D.u.bb.lp_polyphase_3[i] = D.u.bb.lp_filter[k];
+				k++
 	            if (upsample >= 4) {
-	                D.u.bb.lp_polyphase_4[i] = D.u.bb.lp_filter[k++];
+	                D.u.bb.lp_polyphase_4[i] = D.u.bb.lp_filter[k];
+					k++
 	            }
 	        }
 	    }
@@ -289,8 +292,8 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 	/* Version 1.2: Experiment with different slicing levels. */
 	// Really didn't help that much because we should have a symmetrical signal.
 
-	for (j = 0; j < MAX_SUBCHANS; j++) {
-	  slice_point[j] = 0.02f * (j - 0.5f * (MAX_SUBCHANS-1));
+	for j := 0; j < MAX_SUBCHANS; j++ {
+	  slice_point[j] = 0.02 * (j - 0.5 * (MAX_SUBCHANS-1));
 	  //dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
 	}
 
@@ -355,14 +358,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
  *
  *--------------------------------------------------------------------*/
 
-inline static void nudge_pll (int chan, int subchan, int slice, float demod_out, struct demodulator_state_s *D);
-
-static void process_filtered_sample (int chan, float fsam, struct demodulator_state_s *D);
-
-
-__attribute__((hot))
-void demod_9600_process_sample (int chan, int sam, int upsample, struct demodulator_state_s *D)
-{
+func demod_9600_process_sample (int chan, int sam, int upsample, struct demodulator_state_s *D) {
 	float fsam;
 
 	/* TODO KG
