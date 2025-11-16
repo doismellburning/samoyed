@@ -424,15 +424,13 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 
 	if (fsam >= D.alevel_mark_peak) {
 	  D.alevel_mark_peak = fsam * D.quick_attack + D.alevel_mark_peak * (1.0f - D.quick_attack);
-	}
-	else {
+	} else {
 	  D.alevel_mark_peak = fsam * D.sluggish_decay + D.alevel_mark_peak * (1.0f - D.sluggish_decay);
 	}
 
 	if (fsam <= D.alevel_space_peak) {
 	  D.alevel_space_peak = fsam * D.quick_attack + D.alevel_space_peak * (1.0f - D.quick_attack);
-	}
-	else {
+	} else {
 	  D.alevel_space_peak = fsam * D.sluggish_decay + D.alevel_space_peak * (1.0f - D.sluggish_decay);
 	}
 
@@ -461,8 +459,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 
 	  demod_data = demod_out > 0;
 	  nudge_pll (chan, subchan, 0, demod_out, D);
-	}
-	else {
+	} else {
 	  int slice;
 
 	  /* Multiple slicers each feeding its own HDLC decoder. */
@@ -509,8 +506,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 			(D.slicer[slice].data_clock_pll & 0x80000000) ? .5 : .0);
 
 	    fflush (demod_log_fp);
-	  }
-	  else {
+	  } else {
 	    if (demod_log_fp != NULL) {
 	      fclose (demod_log_fp);
 	      demod_log_fp = NULL;
@@ -614,8 +610,7 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 	  signed int before = (signed int)(D.slicer[slice].data_clock_pll);	// Treat as signed.
 	  if (D.slicer[slice].data_detect) {
 	    D.slicer[slice].data_clock_pll = (int)(D.slicer[slice].data_clock_pll * D.pll_locked_inertia + target * (1.0f - D.pll_locked_inertia) );
-	  }
-	  else {
+	  } else {
 	    D.slicer[slice].data_clock_pll = (int)(D.slicer[slice].data_clock_pll * D.pll_searching_inertia + target * (1.0f - D.pll_searching_inertia) );
 	  }
 	  D.slicer[slice].pll_nudge_total += (int64_t)((signed int)(D.slicer[slice].data_clock_pll)) - (int64_t)before;
@@ -653,8 +648,7 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 			demod_data ? 1.35 : 1.0,  
 			descram ? .9 : .55,  
 			(D.data_clock_pll & 0x80000000) ? .1 : .45);
-	}
-	else {
+	} else {
 	  if (demod_log_fp != NULL) {
 	    fclose (demod_log_fp);
 	    demod_log_fp = NULL;
