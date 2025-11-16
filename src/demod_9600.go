@@ -44,8 +44,9 @@ var slice_point[MAX_SUBCHANS]float64
 
 /* Add sample to buffer and shift the rest down. */
 
-func push_sample (val float64, buff []float64)  []float64 {
-	return append([]float64{val}, buff...)
+func push_sample (val C.float, buff *C.float, size C.int) {
+	C.memmove(buff+1,buff,(size-1)*sizeof(float));
+	buff[0] = val; 
 }
 
 /* FIR filter kernel. */
@@ -596,7 +597,7 @@ func nudge_pll_9600 (channel C.int, subchannel C.int, slice C.int, demod_out_f C
 
 	  var target = D.pll_step_per_sample * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f);
 
-	  var before = C.sint(D.slicer[slice].data_clock_pll);	// Treat as signed.
+	  var before = C.int(D.slicer[slice].data_clock_pll);	// Treat as signed.
 	  if (D.slicer[slice].data_detect) {
 	    D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll * D.pll_locked_inertia + target * (1.0 - D.pll_locked_inertia) );
 	  } else {
