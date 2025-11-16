@@ -39,31 +39,24 @@ import "C"
 
 
 
-static float slice_point[MAX_SUBCHANS];
+var slice_point[MAX_SUBCHANS]float64
 
 
 /* Add sample to buffer and shift the rest down. */
 
-__attribute__((hot)) __attribute__((always_inline))
-static inline void push_sample (float val, float *buff, int size)
-{
-	memmove(buff+1,buff,(size-1)*sizeof(float));
-	buff[0] = val; 
+func push_sample (val float64, buff []float64)  []float64 {
+	return append([]float64{val}, buff...)
 }
-
 
 /* FIR filter kernel. */
 
-__attribute__((hot)) __attribute__((always_inline))
-static inline float convolve (const float *__restrict__ data, const float *__restrict__ filter, int filter_size)
-{
-	float sum = 0.0f;
-	int j;
+func convolve (data, filter []float64) float64 {
+	var sum = 0.0
 
-//#pragma GCC ivdep				// ignored until gcc 4.9
-	for (j=0; j<filter_size; j++) {
-	    sum += filter[j] * data[j];
+	for j, f := range filter {
+		sum += f * data[j]
 	}
+
 	return (sum);
 }
 
