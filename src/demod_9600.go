@@ -567,9 +567,7 @@ func process_filtered_sample (channel C.int, fsam C.float, D *C.struct_demodulat
  *
  *--------------------------------------------------------------------*/
 
-__attribute__((hot))
-inline static void nudge_pll (int channel, int subchannel, int slice, float demod_out_f, struct demodulator_state_s *D)
-{
+func nudge_pll_9600 (channel C.int, subchannel C.int, slice C.int, demod_out_f C.float, D *C.struct_demodulator_state_s) {
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll;
 
 	// Perform the add as unsigned to avoid signed overflow error.
@@ -596,15 +594,15 @@ inline static void nudge_pll (int channel, int subchannel, int slice, float demo
 
 	  pll_dcd_signal_transition2 (D, slice, D.slicer[slice].data_clock_pll);
 
-	  float target = D.pll_step_per_sample * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f);
+	  var target = D.pll_step_per_sample * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f);
 
-	  signed int before = (signed int)(D.slicer[slice].data_clock_pll);	// Treat as signed.
+	  var before = C.sint(D.slicer[slice].data_clock_pll);	// Treat as signed.
 	  if (D.slicer[slice].data_detect) {
-	    D.slicer[slice].data_clock_pll = (int)(D.slicer[slice].data_clock_pll * D.pll_locked_inertia + target * (1.0 - D.pll_locked_inertia) );
+	    D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll * D.pll_locked_inertia + target * (1.0 - D.pll_locked_inertia) );
 	  } else {
-	    D.slicer[slice].data_clock_pll = (int)(D.slicer[slice].data_clock_pll * D.pll_searching_inertia + target * (1.0 - D.pll_searching_inertia) );
+	    D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll * D.pll_searching_inertia + target * (1.0 - D.pll_searching_inertia) );
 	  }
-	  D.slicer[slice].pll_nudge_total += (int64_t)((signed int)(D.slicer[slice].data_clock_pll)) - (int64_t)before;
+	  D.slicer[slice].pll_nudge_total += C.int64_t(C.int(D.slicer[slice].data_clock_pll)) - C.int64_t(before)
 	}
 
 
