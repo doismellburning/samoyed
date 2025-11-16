@@ -125,8 +125,8 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 
 
 	memset (D, 0, sizeof(struct demodulator_state_s));
-	D->modem_type = modem_type;
-	D->num_slicers = 1;
+	D.modem_type = modem_type;
+	D.num_slicers = 1;
 
 // Multiple profiles in future?
 
@@ -137,23 +137,23 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 //	  case 'L':			// upsample x4 with filtering.
 
 
-	    D->lp_filter_len_bits =  1.0;	// -U4 = 61 	4.59 samples/symbol
+	    D.lp_filter_len_bits =  1.0;	// -U4 = 61 	4.59 samples/symbol
 
 	    // Works best with odd number in some tests.  Even is better in others.
-	    //D->lp_filter_size = ((int) (0.5f * ( D->lp_filter_len_bits * (float)original_sample_rate / (float)baud ))) * 2 + 1;
+	    //D.lp_filter_size = ((int) (0.5f * ( D.lp_filter_len_bits * (float)original_sample_rate / (float)baud ))) * 2 + 1;
 
 	    // Just round to nearest integer.
-	    D->lp_filter_size = (int) (( D->lp_filter_len_bits * (float)original_sample_rate / baud) + 0.5f);
+	    D.lp_filter_size = (int) (( D.lp_filter_len_bits * (float)original_sample_rate / baud) + 0.5f);
 
-	    D->lp_window = BP_WINDOW_COSINE;
+	    D.lp_window = BP_WINDOW_COSINE;
 
-	    D->lpf_baud = 1.00;
+	    D.lpf_baud = 1.00;
 
-	    D->agc_fast_attack = 0.080;
-	    D->agc_slow_decay =  0.00012;
+	    D.agc_fast_attack = 0.080;
+	    D.agc_slow_decay =  0.00012;
 
-	    D->pll_locked_inertia = 0.89;
-	    D->pll_searching_inertia = 0.67;
+	    D.pll_locked_inertia = 0.89;
+	    D.pll_searching_inertia = 0.67;
 
 //	    break;
 //	}
@@ -162,10 +162,10 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 #if 0
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("----------  %s  (%d, %d)  -----------\n", __func__, samples_per_sec, baud);
-	dw_printf ("filter_len_bits = %.2f\n", D->lp_filter_len_bits);
-	dw_printf ("lp_filter_size = %d\n", D->lp_filter_size);
-	dw_printf ("lp_window = %d\n", D->lp_window);
-	dw_printf ("lpf_baud = %.2f\n", D->lpf_baud);
+	dw_printf ("filter_len_bits = %.2f\n", D.lp_filter_len_bits);
+	dw_printf ("lp_filter_size = %d\n", D.lp_filter_size);
+	dw_printf ("lp_window = %d\n", D.lp_window);
+	dw_printf ("lpf_baud = %.2f\n", D.lpf_baud);
 	dw_printf ("samples per bit = %.1f\n", (double)samples_per_sec / baud);
 #endif
 */
@@ -173,47 +173,47 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 
 	// PLL needs to use the upsampled rate.
 
-        D->pll_step_per_sample = 
+        D.pll_step_per_sample = 
 		(int) round(TICKS_PER_PLL_CYCLE * (double) baud / (double)(original_sample_rate * upsample));
 
 
 		/* TODO KG
 #ifdef TUNE_LP_WINDOW
-	D->lp_window = TUNE_LP_WINDOW;
+	D.lp_window = TUNE_LP_WINDOW;
 #endif
 
 #if TUNE_LP_FILTER_SIZE
-	D->lp_filter_size = TUNE_LP_FILTER_SIZE;
+	D.lp_filter_size = TUNE_LP_FILTER_SIZE;
 #endif
 
 #ifdef TUNE_LPF_BAUD
-	D->lpf_baud = TUNE_LPF_BAUD;
+	D.lpf_baud = TUNE_LPF_BAUD;
 #endif	
 
 #ifdef TUNE_AGC_FAST
-	D->agc_fast_attack = TUNE_AGC_FAST;
+	D.agc_fast_attack = TUNE_AGC_FAST;
 #endif
 
 #ifdef TUNE_AGC_SLOW
-	D->agc_slow_decay = TUNE_AGC_SLOW;
+	D.agc_slow_decay = TUNE_AGC_SLOW;
 #endif
 
 #if defined(TUNE_PLL_LOCKED)
-	D->pll_locked_inertia = TUNE_PLL_LOCKED;
+	D.pll_locked_inertia = TUNE_PLL_LOCKED;
 #endif
 
 #if defined(TUNE_PLL_SEARCHING)
-	D->pll_searching_inertia = TUNE_PLL_SEARCHING;
+	D.pll_searching_inertia = TUNE_PLL_SEARCHING;
 #endif
 */
 
 	// Initial filter (before scattering) is based on upsampled rate.
 
-	fc = (float)baud * D->lpf_baud / (float)(original_sample_rate * upsample);
+	fc = (float)baud * D.lpf_baud / (float)(original_sample_rate * upsample);
 
-	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D->lp_filter_size);
+	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_size);
 
-	gen_lowpass (fc, D->u.bb.lp_filter, D->lp_filter_size * upsample, D->lp_window);
+	gen_lowpass (fc, D.u.bb.lp_filter, D.lp_filter_size * upsample, D.lp_window);
 
 // New in 1.7 -
 // Use a polyphase filter to reduce the CPU load.
@@ -272,14 +272,14 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 //
 
 	int k = 0;
-	for (int i = 0; i < D->lp_filter_size; i++) {
-	    D->u.bb.lp_polyphase_1[i] = D->u.bb.lp_filter[k++];
+	for (int i = 0; i < D.lp_filter_size; i++) {
+	    D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k++];
 	    if (upsample >= 2) {
-	        D->u.bb.lp_polyphase_2[i] = D->u.bb.lp_filter[k++];
+	        D.u.bb.lp_polyphase_2[i] = D.u.bb.lp_filter[k++];
 	        if (upsample >= 3) {
-	            D->u.bb.lp_polyphase_3[i] = D->u.bb.lp_filter[k++];
+	            D.u.bb.lp_polyphase_3[i] = D.u.bb.lp_filter[k++];
 	            if (upsample >= 4) {
-	                D->u.bb.lp_polyphase_4[i] = D->u.bb.lp_filter[k++];
+	                D.u.bb.lp_polyphase_4[i] = D.u.bb.lp_filter[k++];
 	            }
 	        }
 	    }
@@ -386,18 +386,18 @@ void demod_9600_process_sample (int chan, int sam, int upsample, struct demodula
 	fsam = (float)sam / 16384.0f;
 
 	// Low pass filter
-	push_sample (fsam, D->u.bb.audio_in, D->lp_filter_size);
+	push_sample (fsam, D.u.bb.audio_in, D.lp_filter_size);
 
-	fsam = convolve (D->u.bb.audio_in, D->u.bb.lp_polyphase_1, D->lp_filter_size);
+	fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_1, D.lp_filter_size);
 	process_filtered_sample (chan, fsam, D);
 	if (upsample >= 2) {
-	    fsam = convolve (D->u.bb.audio_in, D->u.bb.lp_polyphase_2, D->lp_filter_size);
+	    fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_2, D.lp_filter_size);
 	    process_filtered_sample (chan, fsam, D);
 	    if (upsample >= 3) {
-	        fsam = convolve (D->u.bb.audio_in, D->u.bb.lp_polyphase_3, D->lp_filter_size);
+	        fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_3, D.lp_filter_size);
 	        process_filtered_sample (chan, fsam, D);
 	        if (upsample >= 4) {
-	            fsam = convolve (D->u.bb.audio_in, D->u.bb.lp_polyphase_4, D->lp_filter_size);
+	            fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_4, D.lp_filter_size);
 	            process_filtered_sample (chan, fsam, D);
 	        }
 	    }
@@ -420,20 +420,20 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
  * Here we keep + and - peaks because there could be a DC bias.
  */
 
-// TODO:  probably no need for this.  Just use  D->m_peak, D->m_valley
+// TODO:  probably no need for this.  Just use  D.m_peak, D.m_valley
 
-	if (fsam >= D->alevel_mark_peak) {
-	  D->alevel_mark_peak = fsam * D->quick_attack + D->alevel_mark_peak * (1.0f - D->quick_attack);
+	if (fsam >= D.alevel_mark_peak) {
+	  D.alevel_mark_peak = fsam * D.quick_attack + D.alevel_mark_peak * (1.0f - D.quick_attack);
 	}
 	else {
-	  D->alevel_mark_peak = fsam * D->sluggish_decay + D->alevel_mark_peak * (1.0f - D->sluggish_decay);
+	  D.alevel_mark_peak = fsam * D.sluggish_decay + D.alevel_mark_peak * (1.0f - D.sluggish_decay);
 	}
 
-	if (fsam <= D->alevel_space_peak) {
-	  D->alevel_space_peak = fsam * D->quick_attack + D->alevel_space_peak * (1.0f - D->quick_attack);
+	if (fsam <= D.alevel_space_peak) {
+	  D.alevel_space_peak = fsam * D.quick_attack + D.alevel_space_peak * (1.0f - D.quick_attack);
 	}
 	else {
-	  D->alevel_space_peak = fsam * D->sluggish_decay + D->alevel_space_peak * (1.0f - D->sluggish_decay);
+	  D.alevel_space_peak = fsam * D.sluggish_decay + D.alevel_space_peak * (1.0f - D.sluggish_decay);
 	}
 
 /* 
@@ -447,13 +447,13 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 	float demod_out;
 	int demod_data;				/* Still scrambled. */
 
-	demod_out = agc (fsam, D->agc_fast_attack, D->agc_slow_decay, &(D->m_peak), &(D->m_valley));
+	demod_out = agc (fsam, D.agc_fast_attack, D.agc_slow_decay, &(D.m_peak), &(D.m_valley));
 
 // TODO: There is potential for multiple decoders with one filter.
 
-//dw_printf ("peak=%.2f valley=%.2f fsam=%.2f norm=%.2f\n", D->m_peak, D->m_valley, fsam, norm);
+//dw_printf ("peak=%.2f valley=%.2f fsam=%.2f norm=%.2f\n", D.m_peak, D.m_valley, fsam, norm);
 
-	if (D->num_slicers <= 1) {
+	if (D.num_slicers <= 1) {
 
 	  /* Normal case of one demodulator to one HDLC decoder. */
 	  /* Demodulator output is difference between response from two filters. */
@@ -467,7 +467,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 
 	  /* Multiple slicers each feeding its own HDLC decoder. */
 
-	  for (slice=0; slice<D->num_slicers; slice++) {
+	  for (slice=0; slice<D.num_slicers; slice++) {
 	    demod_data = demod_out - slice_point[slice] > 0;
 	    nudge_pll (chan, subchan, slice, demod_out - slice_point[slice], D);
 	  }
@@ -483,7 +483,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 	if (chan == 0) {
 
 	  if (1) {
-	  //if (D->slicer[slice].data_detect) {
+	  //if (D.slicer[slice].data_detect) {
 	    char fname[30];
 	    int slice = 0;
 
@@ -502,11 +502,11 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 	    fprintf (demod_log_fp, "%.3f, %.3f, %.3f, %.3f, %.3f, %d, %.2f\n",
 			fsam + 6,
 			fsam + 4,
-			D->m_peak + 4,
-			D->m_valley + 4,
+			D.m_peak + 4,
+			D.m_valley + 4,
 			demod_out + 2,
 			demod_data + 2,
-			(D->slicer[slice].data_clock_pll & 0x80000000) ? .5 : .0);
+			(D.slicer[slice].data_clock_pll & 0x80000000) ? .5 : .0);
 
 	    fflush (demod_log_fp);
 	  }
@@ -547,7 +547,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
  *
  * Description:	A PLL is used to sample near the centers of the data bits.
  *
- *		D->data_clock_pll is a SIGNED 32 bit variable.
+ *		D.data_clock_pll is a SIGNED 32 bit variable.
  *		When it overflows from a large positive value to a negative value, we
  *		sample a data bit from the demodulated signal.
  *
@@ -583,18 +583,18 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 __attribute__((hot))
 inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_f, struct demodulator_state_s *D)
 {
-	D->slicer[slice].prev_d_c_pll = D->slicer[slice].data_clock_pll;
+	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll;
 
 	// Perform the add as unsigned to avoid signed overflow error.
-	D->slicer[slice].data_clock_pll = (signed)((unsigned)(D->slicer[slice].data_clock_pll) + (unsigned)(D->pll_step_per_sample));
+	D.slicer[slice].data_clock_pll = (signed)((unsigned)(D.slicer[slice].data_clock_pll) + (unsigned)(D.pll_step_per_sample));
 
-	if ( D->slicer[slice].prev_d_c_pll > 1000000000 && D->slicer[slice].data_clock_pll < -1000000000) {
+	if ( D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000) {
 
 	  /* Overflow.  Was large positive, wrapped around, now large negative. */
 
-	  hdlc_rec_bit_new (chan, subchan, slice, demod_out_f > 0, D->modem_type == MODEM_SCRAMBLE, D->slicer[slice].lfsr,
-			&(D->slicer[slice].pll_nudge_total), &(D->slicer[slice].pll_symbol_count));
-	  D->slicer[slice].pll_symbol_count++;
+	  hdlc_rec_bit_new (chan, subchan, slice, demod_out_f > 0, D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
+			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count));
+	  D.slicer[slice].pll_symbol_count++;
 
 	  pll_dcd_each_symbol2 (D, chan, subchan, slice);
 	}
@@ -602,23 +602,23 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 /*
  * Zero crossing?
  */
-        if ((D->slicer[slice].prev_demod_out_f < 0 && demod_out_f > 0) ||
-	    (D->slicer[slice].prev_demod_out_f > 0 && demod_out_f < 0)) {
+        if ((D.slicer[slice].prev_demod_out_f < 0 && demod_out_f > 0) ||
+	    (D.slicer[slice].prev_demod_out_f > 0 && demod_out_f < 0)) {
 
 	  // Note:  Test for this demodulator, not overall for channel.
 
-	  pll_dcd_signal_transition2 (D, slice, D->slicer[slice].data_clock_pll);
+	  pll_dcd_signal_transition2 (D, slice, D.slicer[slice].data_clock_pll);
 
-	  float target = D->pll_step_per_sample * demod_out_f / (demod_out_f - D->slicer[slice].prev_demod_out_f);
+	  float target = D.pll_step_per_sample * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f);
 
-	  signed int before = (signed int)(D->slicer[slice].data_clock_pll);	// Treat as signed.
-	  if (D->slicer[slice].data_detect) {
-	    D->slicer[slice].data_clock_pll = (int)(D->slicer[slice].data_clock_pll * D->pll_locked_inertia + target * (1.0f - D->pll_locked_inertia) );
+	  signed int before = (signed int)(D.slicer[slice].data_clock_pll);	// Treat as signed.
+	  if (D.slicer[slice].data_detect) {
+	    D.slicer[slice].data_clock_pll = (int)(D.slicer[slice].data_clock_pll * D.pll_locked_inertia + target * (1.0f - D.pll_locked_inertia) );
 	  }
 	  else {
-	    D->slicer[slice].data_clock_pll = (int)(D->slicer[slice].data_clock_pll * D->pll_searching_inertia + target * (1.0f - D->pll_searching_inertia) );
+	    D.slicer[slice].data_clock_pll = (int)(D.slicer[slice].data_clock_pll * D.pll_searching_inertia + target * (1.0f - D.pll_searching_inertia) );
 	  }
-	  D->slicer[slice].pll_nudge_total += (int64_t)((signed int)(D->slicer[slice].data_clock_pll)) - (int64_t)before;
+	  D.slicer[slice].pll_nudge_total += (int64_t)((signed int)(D.slicer[slice].data_clock_pll)) - (int64_t)before;
 	}
 
 
@@ -626,7 +626,7 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 #if DEBUG5
 
 	//if (chan == 0) {
-	if (D->slicer[slice].data_detect) {
+	if (D.slicer[slice].data_detect) {
 	
 	  char fname[30];
 
@@ -647,12 +647,12 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 	  }
 	  fprintf (demod_log_fp, "%.3f, %.3f, %.3f, %.3f, %.2f, %.2f, %.2f\n", 
 			0.5f * fsam + 3.5,
-			0.5f * D->m_peak + 3.5,
-			0.5f * D->m_valley + 3.5,
+			0.5f * D.m_peak + 3.5,
+			0.5f * D.m_valley + 3.5,
 			0.5f * demod_out + 2.0,
 			demod_data ? 1.35 : 1.0,  
 			descram ? .9 : .55,  
-			(D->data_clock_pll & 0x80000000) ? .1 : .45);
+			(D.data_clock_pll & 0x80000000) ? .1 : .45);
 	}
 	else {
 	  if (demod_log_fp != NULL) {
@@ -670,7 +670,7 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
  * Remember demodulator output (pre-descrambling) so we can compare next time
  * for the DPLL sync.
  */
-	D->slicer[slice].prev_demod_out_f = demod_out_f;
+	D.slicer[slice].prev_demod_out_f = demod_out_f;
 
 } /* end nudge_pll */
 
