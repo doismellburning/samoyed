@@ -63,27 +63,28 @@ func convolve (data, filter []float64) float64 {
 /* Automatic gain control. */
 /* Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5 */
 
-__attribute__((hot)) __attribute__((always_inline))
-static inline float agc (float in, float fast_attack, float slow_decay, float *ppeak, float *pvalley)
-{
-	if (in >= *ppeak) {
-	  *ppeak = in * fast_attack + *ppeak * (1.0f - fast_attack);
-	}
-	else {
-	  *ppeak = in * slow_decay + *ppeak * (1.0f - slow_decay);
+func agc (in, fast_attack, slow_decay float64, inPeak, inValley float64) float64 {
+
+	var outPeak = inPeak
+	var outValley = inValley
+
+	if (in >= inPeak) {
+	  outPeak = in * fast_attack + inPeak * (1.0 - fast_attack);
+	} else {
+	  outPeak = in * slow_decay + inPeak * (1.0 - slow_decay);
 	}
 
-	if (in <= *pvalley) {
-	  *pvalley = in * fast_attack + *pvalley * (1.0f - fast_attack);
-	}
-	else  {   
-	  *pvalley = in * slow_decay + *pvalley * (1.0f - slow_decay);
+	if (in <= inValley) {
+	  outValley = in * fast_attack + inValley * (1.0 - fast_attack);
+	} else  {   
+	  outValley = in * slow_decay + inValley * (1.0 - slow_decay);
 	}
 
-	if (*ppeak > *pvalley) {
-	  return ((in - 0.5f * (*ppeak + *pvalley)) / (*ppeak - *pvalley));
+	if (outPeak > outValley) {
+	  return outPeak, outValley, (in - 0.5 * (outPeak + outValley)) / (outPeak - outValley)
 	}
-	return (0.0);
+
+	return outPeak, outValley, 0.0
 }
 
 
