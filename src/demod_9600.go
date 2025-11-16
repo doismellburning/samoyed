@@ -153,6 +153,7 @@ void demod_9600_init (enum modem_t modem_type, int original_sample_rate, int ups
 //	    break;
 //	}
 
+/* TODO KG
 #if 0
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("----------  %s  (%d, %d)  -----------\n", __func__, samples_per_sec, baud);
@@ -162,6 +163,7 @@ void demod_9600_init (enum modem_t modem_type, int original_sample_rate, int ups
 	dw_printf ("lpf_baud = %.2f\n", D->lpf_baud);
 	dw_printf ("samples per bit = %.1f\n", (double)samples_per_sec / baud);
 #endif
+*/
 
 
 	// PLL needs to use the upsampled rate.
@@ -170,6 +172,7 @@ void demod_9600_init (enum modem_t modem_type, int original_sample_rate, int ups
 		(int) round(TICKS_PER_PLL_CYCLE * (double) baud / (double)(original_sample_rate * upsample));
 
 
+		/* TODO KG
 #ifdef TUNE_LP_WINDOW
 	D->lp_window = TUNE_LP_WINDOW;
 #endif
@@ -197,6 +200,7 @@ void demod_9600_init (enum modem_t modem_type, int original_sample_rate, int ups
 #if defined(TUNE_PLL_SEARCHING)
 	D->pll_searching_inertia = TUNE_PLL_SEARCHING;
 #endif
+*/
 
 	// Initial filter (before scattering) is based on upsampled rate.
 
@@ -356,10 +360,12 @@ void demod_9600_process_sample (int chan, int sam, int upsample, struct demodula
 {
 	float fsam;
 
+	/* TODO KG
 #if DEBUG4
 	static FILE *demod_log_fp = NULL;
-	static int log_file_seq = 0;		/* Part of log file name */
+	static int log_file_seq = 0;		// Part of log file name
 #endif
+*/
 
 	int subchan = 0;
 
@@ -466,6 +472,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 	// suppress compiler warning about it not being used.
 	(void) demod_data;
 
+	/* TODO KG
 #if DEBUG4
 
 	if (chan == 0) {
@@ -506,6 +513,7 @@ static void process_filtered_sample (int chan, float fsam, struct demodulator_st
 	  }
 	}
 #endif
+*/
 
 } /* end demod_9600_process_sample */
 
@@ -609,6 +617,7 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 	}
 
 
+	/* TODO KG
 #if DEBUG5
 
 	//if (chan == 0) {
@@ -649,6 +658,7 @@ inline static void nudge_pll (int chan, int subchan, int slice, float demod_out_
 	//}
 
 #endif
+*/
 
 
 /*
