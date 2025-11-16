@@ -1,29 +1,6 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-// 
-//    Copyright (C) 2011, 2012, 2013, 2015, 2019, 2021  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
-
-//#define DEBUG4 1	/* capture 9600 output to log files */
-
+package direwolf
 
 /*------------------------------------------------------------------
- *
- * Module:      demod_9600.c
  *
  * Purpose:   	Demodulator for baseband signal.
  *		This is used for AX.25 (with scrambling) and IL2P without.
@@ -34,32 +11,30 @@
  *
  *---------------------------------------------------------------*/
 
-#include "direwolf.h"
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <string.h>
-#include <assert.h>
-#include <ctype.h>
-
-// Fine tuning for different demodulator types.
-// Don't remove this section.  It is here for a reason.
-
-#define DCD_THRESH_ON 32                // Hysteresis: Can miss 0 out of 32 for detecting lock.
-                                        // This is best for actual on-the-air signals.
-                                        // Still too many brief false matches.
-#define DCD_THRESH_OFF 8                // Might want a little more fine tuning.
-#define DCD_GOOD_WIDTH 1024             // No more than 1024!!!
-
-#include "fsk_demod_state.h"		// Values above override defaults.
-
-#include "hdlc_rec.h"
-#include "demod_9600.h"
-#include "textcolor.h"
-#include "dsp.h"
+// #include "direwolf.h"
+// #include <stdlib.h>
+// #include <stdio.h>
+// #include <math.h>
+// #include <unistd.h>
+// #include <sys/stat.h>
+// #include <string.h>
+// #include <assert.h>
+// #include <ctype.h>
+// 
+// // Fine tuning for different demodulator types.
+// // Don't remove this section.  It is here for a reason.
+// #define DCD_THRESH_ON 32                // Hysteresis: Can miss 0 out of 32 for detecting lock.
+//                                         // This is best for actual on-the-air signals.
+//                                         // Still too many brief false matches.
+// #define DCD_THRESH_OFF 8                // Might want a little more fine tuning.
+// #define DCD_GOOD_WIDTH 1024             // No more than 1024!!!
+// #include "fsk_demod_state.h"		// Values above override defaults.
+// 
+// #include "hdlc_rec.h"
+// #include "demod_9600.h"
+// #include "textcolor.h"
+// #include "dsp.h"
+import "C"
 
 
 
