@@ -402,7 +402,7 @@ func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		*odlat = C.latitude_from_nmea(C.CString(plat), C.CString(pns))
+		*odlat = C.double(latitude_from_nmea(plat, pns[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -412,7 +412,7 @@ func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		*odlon = C.longitude_from_nmea(C.CString(plon), C.CString(pew))
+		*odlon = C.double(longitude_from_nmea(plon, pew[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -534,7 +534,7 @@ func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		*odlat = C.latitude_from_nmea(C.CString(plat), C.CString(pns))
+		*odlat = C.double(latitude_from_nmea(plat, pns[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -544,7 +544,7 @@ func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		*odlon = C.longitude_from_nmea(C.CString(plon), C.CString(pew))
+		*odlon = C.double(longitude_from_nmea(plon, pew[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)

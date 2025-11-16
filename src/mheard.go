@@ -645,7 +645,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 
 	if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN && mptr.dlat != G_UNKNOWN && mptr.dlon != G_UNKNOWN {
 
-		var dist = C.ll_distance_km(mptr.dlat, mptr.dlon, dlat, dlon)
+		var dist = C.double(ll_distance_km(float64(mptr.dlat), float64(mptr.dlon), float64(dlat), float64(dlon)))
 
 		if dist > km {
 

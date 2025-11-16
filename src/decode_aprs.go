@@ -490,8 +490,11 @@ func decode_aprs_print(A *C.decode_aprs_t) {
 	if C.strlen(&A.g_maidenhead[0]) > 0 {
 
 		if A.g_lat == G_UNKNOWN && A.g_lon == G_UNKNOWN {
-
-			C.ll_from_grid_square(&A.g_maidenhead[0], &(A.g_lat), &(A.g_lon))
+			var lat, lon, err = ll_from_grid_square(C.GoString(&A.g_maidenhead[0]))
+			if err == nil {
+				A.g_lat = C.double(lat)
+				A.g_lon = C.double(lon)
+			}
 		}
 
 		dw_printf("Grid square = %s, ", C.GoString(&A.g_maidenhead[0]))

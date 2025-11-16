@@ -989,7 +989,7 @@ func parse_aprstt3_call(e string) int {
  *----------------------------------------------------------------*/
 
 /* Average radius of earth in meters. */
-const R = 6371000.0
+const R_M = 6371000.0
 
 func parse_location(e string) int {
 	if tt_debug > 0 {
@@ -1052,10 +1052,10 @@ func parse_location(e string) int {
 			/* http://movable-type.co.uk/scripts/latlong.html */
 			/* This should probably be a function in latlong.c in case we have another use for it someday. */
 
-			m_latitude = R2D(math.Asin(math.Sin(lat0)*math.Cos(dist/R) + math.Cos(lat0)*math.Sin(dist/R)*math.Cos(bearing)))
+			m_latitude = R2D(math.Asin(math.Sin(lat0)*math.Cos(dist/R_M) + math.Cos(lat0)*math.Sin(dist/R_M)*math.Cos(bearing)))
 
-			m_longitude = R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R)*math.Cos(lat0),
-				math.Cos(dist/R)-math.Sin(lat0)*math.Sin(D2R(m_latitude))))
+			m_longitude = R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
+				math.Cos(dist/R_M)-math.Sin(lat0)*math.Sin(D2R(m_latitude))))
 
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
@@ -1225,10 +1225,11 @@ func parse_location(e string) int {
 
 				m_loc_text = C.GoString(&mh[0])
 
-				var _m_latitude, _m_longitude C.double
-				C.ll_from_grid_square(&mh[0], &_m_latitude, &_m_longitude)
-				m_latitude = float64(_m_latitude)
-				m_longitude = float64(_m_longitude)
+				var lat, lon, err = ll_from_grid_square(m_loc_text)
+				if err == nil {
+					m_latitude = lat
+					m_longitude = lon
+				}
 			}
 
 			m_dao[2] = e[0]
@@ -1248,10 +1249,11 @@ func parse_location(e string) int {
 			if C.tt_satsq_to_text(C.CString(xstr), 0, &mh[0]) == 0 {
 				m_loc_text = C.GoString(&mh[0])
 
-				var _m_latitude, _m_longitude C.double
-				C.ll_from_grid_square(&mh[0], &_m_latitude, &_m_longitude)
-				m_latitude = float64(_m_latitude)
-				m_longitude = float64(_m_longitude)
+				var lat, lon, err = ll_from_grid_square(m_loc_text)
+				if err == nil {
+					m_latitude = lat
+					m_longitude = lon
+				}
 			}
 
 			m_dao[2] = e[0]

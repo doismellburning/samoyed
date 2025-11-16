@@ -32,7 +32,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unsafe"
 )
 
 /*------------------------------------------------------------------
@@ -61,10 +60,7 @@ func normal_position_string(p *position_t) string {
 func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double, ambiguity C.int) *position_t {
 	var presult = new(position_t)
 
-	var stemp [16]C.char
-	C.latitude_to_str(dlat, ambiguity, &stemp[0])
-
-	C.memcpy(unsafe.Pointer(&presult.Lat[0]), unsafe.Pointer(&stemp[0]), C.ulong(len(presult.Lat)))
+	copy(presult.Lat[:], latitude_to_str(float64(dlat), int(ambiguity)))
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
 		text_color_set(DW_COLOR_ERROR)
@@ -72,8 +68,7 @@ func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double
 	}
 	presult.SymTableId = byte(symtab)
 
-	C.longitude_to_str(dlong, ambiguity, &stemp[0])
-	C.memcpy(unsafe.Pointer(&presult.Lon[0]), unsafe.Pointer(&stemp[0]), C.ulong(len(presult.Lon)))
+	copy(presult.Lon[:], longitude_to_str(float64(dlong), int(ambiguity)))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
@@ -144,8 +139,8 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 	}
 	presult.SymTableId = byte(symtab)
 
-	C.latitude_to_comp_str(dlat, (*C.char)(unsafe.Pointer(&presult.Y[0])))
-	C.longitude_to_comp_str(dlong, (*C.char)(unsafe.Pointer(&presult.X[0])))
+	copy(presult.Y[:], latitude_to_comp_str(float64(dlat)))
+	copy(presult.X[:], longitude_to_comp_str(float64(dlong)))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
