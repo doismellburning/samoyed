@@ -111,12 +111,17 @@ func agc (in, fast_attack, slow_decay float64, inPeak, inValley float64) float64
  *		
  *----------------------------------------------------------------*/
 
-void demod_9600_init (enum modem_t modem_type, int original_sample_rate, int upsample, int baud, struct demodulator_state_s *D)
-{	
+func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *C.struct_demodulator_state_s) {	
+	/* FIXME KG
 	float fc;
 	int j;
-	if (upsample < 1) upsample = 1;
-	if (upsample > 4) upsample = 4;
+	*/
+	if (upsample < 1) {
+		upsample = 1;
+	}
+	if (upsample > 4) {
+		upsample = 4;
+	}
 
 
 	memset (D, 0, sizeof(struct demodulator_state_s));
