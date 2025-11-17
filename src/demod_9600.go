@@ -36,6 +36,10 @@ package direwolf
 // #include "dsp.h"
 import "C"
 
+import (
+	"math"
+)
+
 
 
 
@@ -115,10 +119,7 @@ func agc (in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.floa
  *----------------------------------------------------------------*/
 
 func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *C.struct_demodulator_state_s) {	
-	/* FIXME KG
-	float fc;
-	int j;
-	*/
+
 	if (upsample < 1) {
 		upsample = 1;
 	}
@@ -140,15 +141,15 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 //	  case 'L':			// upsample x4 with filtering.
 
 
-	    D.lp_filter_len_bits =  1.0;	// -U4 = 61 	4.59 samples/symbol
+	    D.lp_filter_width_sym =  1.0;	// -U4 = 61 	4.59 samples/symbol
 
 	    // Works best with odd number in some tests.  Even is better in others.
-	    //D.lp_filter_size = ((int) (0.5f * ( D.lp_filter_len_bits * (float)original_sample_rate / (float)baud ))) * 2 + 1;
+	    //D.lp_filter_taps = ((int) (0.5f * ( D.lp_filter_width_sym * (float)original_sample_rate / (float)baud ))) * 2 + 1;
 
 	    // Just round to nearest integer.
-	    D.lp_filter_size = int(( D.lp_filter_len_bits * float64(original_sample_rate) / baud) + 0.5);
+	    D.lp_filter_taps = int(( D.lp_filter_width_sym * float64(original_sample_rate) / baud) + 0.5);
 
-	    D.lp_window = BP_WINDOW_COSINE;
+	    D.lp_window = C.BP_WINDOW_COSINE;
 
 	    D.lpf_baud = 1.00;
 
@@ -165,8 +166,8 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 #if 0
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("----------  %s  (%d, %d)  -----------\n", __func__, samples_per_sec, baud);
-	dw_printf ("filter_len_bits = %.2f\n", D.lp_filter_len_bits);
-	dw_printf ("lp_filter_size = %d\n", D.lp_filter_size);
+	dw_printf ("filter_len_bits = %.2f\n", D.lp_filter_width_sym);
+	dw_printf ("lp_filter_taps = %d\n", D.lp_filter_taps);
 	dw_printf ("lp_window = %d\n", D.lp_window);
 	dw_printf ("lpf_baud = %.2f\n", D.lpf_baud);
 	dw_printf ("samples per bit = %.1f\n", (double)samples_per_sec / baud);
@@ -176,7 +177,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 
 	// PLL needs to use the upsampled rate.
 
-        D.pll_step_per_sample = int(round(TICKS_PER_PLL_CYCLE * C.double( baud) / C.double(original_sample_rate * upsample)))
+        D.pll_step_per_sample = int(math.Round(C.TICKS_PER_PLL_CYCLE * C.double( baud) / C.double(original_sample_rate * upsample)))
 
 
 		/* TODO KG
@@ -185,7 +186,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 #endif
 
 #if TUNE_LP_FILTER_SIZE
-	D.lp_filter_size = TUNE_LP_FILTER_SIZE;
+	D.lp_filter_taps = TUNE_LP_FILTER_SIZE;
 #endif
 
 #ifdef TUNE_LPF_BAUD
@@ -211,11 +212,11 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 
 	// Initial filter (before scattering) is based on upsampled rate.
 
-	fc = float64(baud) * D.lpf_baud / float64(original_sample_rate * upsample);
+	var fc = float64(baud) * D.lpf_baud / float64(original_sample_rate * upsample);
 
-	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_size);
+	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_taps);
 
-	gen_lowpass (fc, D.u.bb.lp_filter, D.lp_filter_size * upsample, D.lp_window);
+	C.gen_lowpass (fc, D.u.bb.lp_filter, D.lp_filter_taps * upsample, D.lp_window);
 
 // New in 1.7 -
 // Use a polyphase filter to reduce the CPU load.
@@ -274,7 +275,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
 //
 
 	var k = 0;
-	for i := 0; i < D.lp_filter_size; i++ {
+	for i := 0; i < D.lp_filter_taps; i++ {
 	    D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k];
 		k++
 	    if (upsample >= 2) {
@@ -384,18 +385,18 @@ func demod_9600_process_sample (channel C.int, sam C.int, upsample C.int, D *C.s
 	var fsam = float64(sam) / 16384.0;
 
 	// Low pass filter
-	push_sample (fsam, D.u.bb.audio_in, D.lp_filter_size);
+	push_sample (fsam, D.u.bb.audio_in, D.lp_filter_taps);
 
-	fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_1, D.lp_filter_size);
+	fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_1, D.lp_filter_taps);
 	process_filtered_sample (channel, fsam, D);
 	if (upsample >= 2) {
-	    fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_2, D.lp_filter_size);
+	    fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_2, D.lp_filter_taps);
 	    process_filtered_sample (channel, fsam, D);
 	    if (upsample >= 3) {
-	        fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_3, D.lp_filter_size);
+	        fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_3, D.lp_filter_taps);
 	        process_filtered_sample (channel, fsam, D);
 	        if (upsample >= 4) {
-	            fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_4, D.lp_filter_size);
+	            fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_4, D.lp_filter_taps);
 	            process_filtered_sample (channel, fsam, D);
 	        }
 	    }
