@@ -45,8 +45,10 @@ var slice_point[MAX_SUBCHANS]float64
 /* Add sample to buffer and shift the rest down. */
 
 func push_sample (val C.float, buff *C.float, size C.int) {
+	/* FIXME KG
 	C.memmove(buff+1,buff,(size-1)*sizeof(float));
 	buff[0] = val; 
+	*/
 }
 
 /* FIR filter kernel. */
@@ -64,7 +66,7 @@ func convolve (data, filter []float64) float64 {
 /* Automatic gain control. */
 /* Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5 */
 
-func agc (in, fast_attack, slow_decay float64, inPeak, inValley float64) float64 {
+func agc (in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float, C.float, C.float) {
 
 	var outPeak = inPeak
 	var outValley = inValley
