@@ -4,10 +4,10 @@ package direwolf
  *
  * Purpose:   	Demodulator for baseband signal.
  *		This is used for AX.25 (with scrambling) and IL2P without.
- *		
+ *
  * Input:	Audio samples from either a file or the "sound card."
  *
- * Outputs:	Calls hdlc_rec_bit() for each bit demodulated.  
+ * Outputs:	Calls hdlc_rec_bit() for each bit demodulated.
  *
  *---------------------------------------------------------------*/
 
@@ -20,7 +20,7 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// 
+//
 // // Fine tuning for different demodulator types.
 // // Don't remove this section.  It is here for a reason.
 // #define DCD_THRESH_ON 32                // Hysteresis: Can miss 0 out of 32 for detecting lock.
@@ -29,7 +29,7 @@ package direwolf
 // #define DCD_THRESH_OFF 8                // Might want a little more fine tuning.
 // #define DCD_GOOD_WIDTH 1024             // No more than 1024!!!
 // #include "fsk_demod_state.h"		// Values above override defaults.
-// 
+//
 // #include "hdlc_rec.h"
 // #include "demod_9600.h"
 // #include "textcolor.h"
@@ -40,60 +40,55 @@ import (
 	"math"
 )
 
-
-
-
-var slice_point[MAX_SUBCHANS]float64
-
+var slice_point [MAX_SUBCHANS]float64
 
 /* Add sample to buffer and shift the rest down. */
 
-func push_sample (val C.float, buff *C.float, size C.int) {
+func push_sample(val C.float, buff *C.float, size C.int) {
 	/* FIXME KG
 	C.memmove(buff+1,buff,(size-1)*sizeof(float));
-	buff[0] = val; 
+	buff[0] = val;
 	*/
 }
 
 /* FIR filter kernel. */
 
-func convolve (data, filter []float64) float64 {
+func convolve(data, filter []float64) float64 {
 	var sum = 0.0
 
 	for j, f := range filter {
 		sum += f * data[j]
 	}
 
-	return (sum);
+	return (sum)
 }
 
 /* Automatic gain control. */
 /* Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5 */
 
-func agc (in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float, C.float, C.float) {
+func agc(in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float, C.float, C.float) {
 
 	var outPeak = inPeak
 	var outValley = inValley
 
-	if (in >= inPeak) {
-	  outPeak = in * fast_attack + inPeak * (1.0 - fast_attack);
+	if in >= inPeak {
+		outPeak = in*fast_attack + inPeak*(1.0-fast_attack)
 	} else {
-	  outPeak = in * slow_decay + inPeak * (1.0 - slow_decay);
+		outPeak = in*slow_decay + inPeak*(1.0-slow_decay)
 	}
 
-	if (in <= inValley) {
-	  outValley = in * fast_attack + inValley * (1.0 - fast_attack);
-	} else  {   
-	  outValley = in * slow_decay + inValley * (1.0 - slow_decay);
+	if in <= inValley {
+		outValley = in*fast_attack + inValley*(1.0-fast_attack)
+	} else {
+		outValley = in*slow_decay + inValley*(1.0-slow_decay)
 	}
 
-	if (outPeak > outValley) {
-	  return outPeak, outValley, (in - 0.5 * (outPeak + outValley)) / (outPeak - outValley)
+	if outPeak > outValley {
+		return outPeak, outValley, (in - 0.5*(outPeak+outValley)) / (outPeak - outValley)
 	}
 
 	return outPeak, outValley, 0.0
 }
-
 
 /*------------------------------------------------------------------
  *
@@ -115,195 +110,188 @@ func agc (in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.floa
  *		D		- Address of demodulator state.
  *
  * Returns:     None
- *		
+ *
  *----------------------------------------------------------------*/
 
-func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *C.struct_demodulator_state_s) {	
+func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *C.struct_demodulator_state_s) {
 
-	if (upsample < 1) {
-		upsample = 1;
+	if upsample < 1 {
+		upsample = 1
 	}
-	if (upsample > 4) {
-		upsample = 4;
+	if upsample > 4 {
+		upsample = 4
 	}
-
 
 	// FIXME KG memset (D, 0, sizeof(struct demodulator_state_s));
-	D.modem_type = modem_type;
-	D.num_slicers = 1;
+	D.modem_type = modem_type
+	D.num_slicers = 1
 
-// Multiple profiles in future?
+	// Multiple profiles in future?
 
-//	switch (profile) {
+	//	switch (profile) {
 
-//	  case 'J':			// upsample x2 with filtering.
-//	  case 'K':			// upsample x3 with filtering.
-//	  case 'L':			// upsample x4 with filtering.
+	//	  case 'J':			// upsample x2 with filtering.
+	//	  case 'K':			// upsample x3 with filtering.
+	//	  case 'L':			// upsample x4 with filtering.
 
+	D.lp_filter_width_sym = 1.0 // -U4 = 61 	4.59 samples/symbol
 
-	    D.lp_filter_width_sym =  1.0;	// -U4 = 61 	4.59 samples/symbol
+	// Works best with odd number in some tests.  Even is better in others.
+	//D.lp_filter_taps = ((int) (0.5f * ( D.lp_filter_width_sym * (float)original_sample_rate / (float)baud ))) * 2 + 1;
 
-	    // Works best with odd number in some tests.  Even is better in others.
-	    //D.lp_filter_taps = ((int) (0.5f * ( D.lp_filter_width_sym * (float)original_sample_rate / (float)baud ))) * 2 + 1;
+	// Just round to nearest integer.
+	D.lp_filter_taps = int((D.lp_filter_width_sym * float64(original_sample_rate) / baud) + 0.5)
 
-	    // Just round to nearest integer.
-	    D.lp_filter_taps = int(( D.lp_filter_width_sym * float64(original_sample_rate) / baud) + 0.5);
+	D.lp_window = C.BP_WINDOW_COSINE
 
-	    D.lp_window = C.BP_WINDOW_COSINE;
+	D.lpf_baud = 1.00
 
-	    D.lpf_baud = 1.00;
+	D.agc_fast_attack = 0.080
+	D.agc_slow_decay = 0.00012
 
-	    D.agc_fast_attack = 0.080;
-	    D.agc_slow_decay =  0.00012;
+	D.pll_locked_inertia = 0.89
+	D.pll_searching_inertia = 0.67
 
-	    D.pll_locked_inertia = 0.89;
-	    D.pll_searching_inertia = 0.67;
+	//	    break;
+	//	}
 
-//	    break;
-//	}
-
-/* TODO KG
-#if 0
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("----------  %s  (%d, %d)  -----------\n", __func__, samples_per_sec, baud);
-	dw_printf ("filter_len_bits = %.2f\n", D.lp_filter_width_sym);
-	dw_printf ("lp_filter_taps = %d\n", D.lp_filter_taps);
-	dw_printf ("lp_window = %d\n", D.lp_window);
-	dw_printf ("lpf_baud = %.2f\n", D.lpf_baud);
-	dw_printf ("samples per bit = %.1f\n", (double)samples_per_sec / baud);
-#endif
-*/
-
+	/* TODO KG
+	   #if 0
+	   	text_color_set(DW_COLOR_DEBUG);
+	   	dw_printf ("----------  %s  (%d, %d)  -----------\n", __func__, samples_per_sec, baud);
+	   	dw_printf ("filter_len_bits = %.2f\n", D.lp_filter_width_sym);
+	   	dw_printf ("lp_filter_taps = %d\n", D.lp_filter_taps);
+	   	dw_printf ("lp_window = %d\n", D.lp_window);
+	   	dw_printf ("lpf_baud = %.2f\n", D.lpf_baud);
+	   	dw_printf ("samples per bit = %.1f\n", (double)samples_per_sec / baud);
+	   #endif
+	*/
 
 	// PLL needs to use the upsampled rate.
 
-        D.pll_step_per_sample = int(math.Round(C.TICKS_PER_PLL_CYCLE * C.double( baud) / C.double(original_sample_rate * upsample)))
+	D.pll_step_per_sample = int(math.Round(C.TICKS_PER_PLL_CYCLE * C.double(baud) / C.double(original_sample_rate*upsample)))
 
+	/* TODO KG
+	#ifdef TUNE_LP_WINDOW
+		D.lp_window = TUNE_LP_WINDOW;
+	#endif
 
-		/* TODO KG
-#ifdef TUNE_LP_WINDOW
-	D.lp_window = TUNE_LP_WINDOW;
-#endif
+	#if TUNE_LP_FILTER_SIZE
+		D.lp_filter_taps = TUNE_LP_FILTER_SIZE;
+	#endif
 
-#if TUNE_LP_FILTER_SIZE
-	D.lp_filter_taps = TUNE_LP_FILTER_SIZE;
-#endif
+	#ifdef TUNE_LPF_BAUD
+		D.lpf_baud = TUNE_LPF_BAUD;
+	#endif
 
-#ifdef TUNE_LPF_BAUD
-	D.lpf_baud = TUNE_LPF_BAUD;
-#endif	
+	#ifdef TUNE_AGC_FAST
+		D.agc_fast_attack = TUNE_AGC_FAST;
+	#endif
 
-#ifdef TUNE_AGC_FAST
-	D.agc_fast_attack = TUNE_AGC_FAST;
-#endif
+	#ifdef TUNE_AGC_SLOW
+		D.agc_slow_decay = TUNE_AGC_SLOW;
+	#endif
 
-#ifdef TUNE_AGC_SLOW
-	D.agc_slow_decay = TUNE_AGC_SLOW;
-#endif
+	#if defined(TUNE_PLL_LOCKED)
+		D.pll_locked_inertia = TUNE_PLL_LOCKED;
+	#endif
 
-#if defined(TUNE_PLL_LOCKED)
-	D.pll_locked_inertia = TUNE_PLL_LOCKED;
-#endif
-
-#if defined(TUNE_PLL_SEARCHING)
-	D.pll_searching_inertia = TUNE_PLL_SEARCHING;
-#endif
-*/
+	#if defined(TUNE_PLL_SEARCHING)
+		D.pll_searching_inertia = TUNE_PLL_SEARCHING;
+	#endif
+	*/
 
 	// Initial filter (before scattering) is based on upsampled rate.
 
-	var fc = float64(baud) * D.lpf_baud / float64(original_sample_rate * upsample);
+	var fc = float64(baud) * D.lpf_baud / float64(original_sample_rate*upsample)
 
 	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_taps);
 
-	C.gen_lowpass (fc, D.u.bb.lp_filter, D.lp_filter_taps * upsample, D.lp_window);
+	C.gen_lowpass(fc, D.u.bb.lp_filter, D.lp_filter_taps*upsample, D.lp_window)
 
-// New in 1.7 -
-// Use a polyphase filter to reduce the CPU load.
-// Originally I used zero stuffing to upsample.
-// Here is the general idea.
-//
-// Suppose the input samples are 1 2 3 4 5 6 7 8 9 ...
-// Filter coefficients are a b c d e f g h i ...
-//
-// With original sampling rate, the filtering would involve multiplying and adding:
-//
-// 	1a 2b 3c 4d 5e 6f ...
-//
-// When upsampling by 3, each of these would need to be evaluated
-// for each audio sample:
-//
-//	1a 0b 0c 2d 0e 0f 3g 0h 0i ...
-//	0a 1b 0c 0d 2e 0f 0g 3h 0i ...
-//	0a 0b 1c 0d 0e 2f 0g 0h 3i ...
-//
-// 2/3 of the multiplies are always by a stuffed zero.
-// We can do this more efficiently by removing them.
-//
-//	1a       2d       3g       ...
-//	   1b       2e       3h    ...
-//	      1c       2f       3i ...
-//
-// We scatter the original filter across multiple shorter filters.
-// Each input sample cycles around them to produce the upsampled rate.
-//
-//	a d g ...
-//	b e h ...
-//	c f i ...
-//
-// There are countless sources of information DSP but this one is unique
-// in that it is a college course that mentions APRS.
-// https://www2.eecs.berkeley.edu/Courses/EE123
-//
-// Was the effort worthwhile?  Times on an RPi 3.
-//
-// command:   atest -B9600  ~/walkabout9600[abc]-compressed*.wav
-//
-// These are 3 recordings of a portable system being carried out of
-// range and back in again.  It is a real world test for weak signals.
-//
-//	options		num decoded	seconds		x realtime
-//			1.6	1.7	1.6	1.7	1.6	1.7
-//			---	---	---	---	---	---
-//	-P-		171	172	23.928	17.967	14.9	19.9
-//	-P+		180	180	54.688	48.772	6.5	7.3
-//	-P- -F1		177	178	32.686	26.517	10.9	13.5
-//
-// So, it turns out that -P+ doesn't have a dramatic improvement, only
-// around 4%, for drastically increased CPU requirements.
-// Maybe we should turn that off by default, especially for ARM.
-//
+	// New in 1.7 -
+	// Use a polyphase filter to reduce the CPU load.
+	// Originally I used zero stuffing to upsample.
+	// Here is the general idea.
+	//
+	// Suppose the input samples are 1 2 3 4 5 6 7 8 9 ...
+	// Filter coefficients are a b c d e f g h i ...
+	//
+	// With original sampling rate, the filtering would involve multiplying and adding:
+	//
+	// 	1a 2b 3c 4d 5e 6f ...
+	//
+	// When upsampling by 3, each of these would need to be evaluated
+	// for each audio sample:
+	//
+	//	1a 0b 0c 2d 0e 0f 3g 0h 0i ...
+	//	0a 1b 0c 0d 2e 0f 0g 3h 0i ...
+	//	0a 0b 1c 0d 0e 2f 0g 0h 3i ...
+	//
+	// 2/3 of the multiplies are always by a stuffed zero.
+	// We can do this more efficiently by removing them.
+	//
+	//	1a       2d       3g       ...
+	//	   1b       2e       3h    ...
+	//	      1c       2f       3i ...
+	//
+	// We scatter the original filter across multiple shorter filters.
+	// Each input sample cycles around them to produce the upsampled rate.
+	//
+	//	a d g ...
+	//	b e h ...
+	//	c f i ...
+	//
+	// There are countless sources of information DSP but this one is unique
+	// in that it is a college course that mentions APRS.
+	// https://www2.eecs.berkeley.edu/Courses/EE123
+	//
+	// Was the effort worthwhile?  Times on an RPi 3.
+	//
+	// command:   atest -B9600  ~/walkabout9600[abc]-compressed*.wav
+	//
+	// These are 3 recordings of a portable system being carried out of
+	// range and back in again.  It is a real world test for weak signals.
+	//
+	//	options		num decoded	seconds		x realtime
+	//			1.6	1.7	1.6	1.7	1.6	1.7
+	//			---	---	---	---	---	---
+	//	-P-		171	172	23.928	17.967	14.9	19.9
+	//	-P+		180	180	54.688	48.772	6.5	7.3
+	//	-P- -F1		177	178	32.686	26.517	10.9	13.5
+	//
+	// So, it turns out that -P+ doesn't have a dramatic improvement, only
+	// around 4%, for drastically increased CPU requirements.
+	// Maybe we should turn that off by default, especially for ARM.
+	//
 
-	var k = 0;
+	var k = 0
 	for i := 0; i < D.lp_filter_taps; i++ {
-	    D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k];
+		D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k]
 		k++
-	    if (upsample >= 2) {
-	        D.u.bb.lp_polyphase_2[i] = D.u.bb.lp_filter[k];
+		if upsample >= 2 {
+			D.u.bb.lp_polyphase_2[i] = D.u.bb.lp_filter[k]
 			k++
-	        if (upsample >= 3) {
-	            D.u.bb.lp_polyphase_3[i] = D.u.bb.lp_filter[k];
+			if upsample >= 3 {
+				D.u.bb.lp_polyphase_3[i] = D.u.bb.lp_filter[k]
 				k++
-	            if (upsample >= 4) {
-	                D.u.bb.lp_polyphase_4[i] = D.u.bb.lp_filter[k];
+				if upsample >= 4 {
+					D.u.bb.lp_polyphase_4[i] = D.u.bb.lp_filter[k]
 					k++
-	            }
-	        }
-	    }
+				}
+			}
+		}
 	}
-
 
 	/* Version 1.2: Experiment with different slicing levels. */
 	// Really didn't help that much because we should have a symmetrical signal.
 
 	for j := 0; j < MAX_SUBCHANS; j++ {
-	  slice_point[j] = 0.02 * (j - 0.5 * (MAX_SUBCHANS-1));
-	  //dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
+		slice_point[j] = 0.02 * (j - 0.5*(MAX_SUBCHANS-1))
+		//dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
 	}
 
 } /* end fsk_demod_init */
-
-
 
 /*-------------------------------------------------------------------
  *
@@ -318,7 +306,7 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
  *		sam	- One sample of audio.
  *			  Should be in range of -32768 .. 32767.
  *
- * Returns:	None 
+ * Returns:	None
  *
  * Descripion:	"9600 baud" packet is FSK for an FM voice transceiver.
  *		By the time it gets here, it's really a baseband signal.
@@ -362,19 +350,19 @@ func demod_9600_init (modem_type C.enum_modem_t, original_sample_rate C.int, ups
  *
  *--------------------------------------------------------------------*/
 
-func demod_9600_process_sample (channel C.int, sam C.int, upsample C.int, D *C.struct_demodulator_state_s) {
+func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *C.struct_demodulator_state_s) {
 
 	/* TODO KG
-#if DEBUG4
-	static FILE *demod_log_fp = NULL;
-	static int log_file_seq = 0;		// Part of log file name
-#endif
-*/
+	#if DEBUG4
+		static FILE *demod_log_fp = NULL;
+		static int log_file_seq = 0;		// Part of log file name
+	#endif
+	*/
 
-	var subchan = 0;
+	var subchan = 0
 
-	assert (channel >= 0 && channel < MAX_RADIO_CHANS);
-	assert (subchan >= 0 && subchan < MAX_SUBCHANS);
+	assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
 	/* Scale to nice number for convenience. */
 	/* Consistent with the AFSK demodulator, we'd like to use */
@@ -382,137 +370,135 @@ func demod_9600_process_sample (channel C.int, sam C.int, upsample C.int, D *C.s
 	/* i.e.  input range +-16k becomes +-1 here and is */
 	/* displayed in the heard line as audio level 100. */
 
-	var fsam = float64(sam) / 16384.0;
+	var fsam = float64(sam) / 16384.0
 
 	// Low pass filter
-	push_sample (fsam, D.u.bb.audio_in, D.lp_filter_taps);
+	push_sample(fsam, D.u.bb.audio_in, D.lp_filter_taps)
 
-	fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_1, D.lp_filter_taps);
-	process_filtered_sample (channel, fsam, D);
-	if (upsample >= 2) {
-	    fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_2, D.lp_filter_taps);
-	    process_filtered_sample (channel, fsam, D);
-	    if (upsample >= 3) {
-	        fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_3, D.lp_filter_taps);
-	        process_filtered_sample (channel, fsam, D);
-	        if (upsample >= 4) {
-	            fsam = convolve (D.u.bb.audio_in, D.u.bb.lp_polyphase_4, D.lp_filter_taps);
-	            process_filtered_sample (channel, fsam, D);
-	        }
-	    }
+	fsam = convolve(D.u.bb.audio_in, D.u.bb.lp_polyphase_1, D.lp_filter_taps)
+	process_filtered_sample(channel, fsam, D)
+	if upsample >= 2 {
+		fsam = convolve(D.u.bb.audio_in, D.u.bb.lp_polyphase_2, D.lp_filter_taps)
+		process_filtered_sample(channel, fsam, D)
+		if upsample >= 3 {
+			fsam = convolve(D.u.bb.audio_in, D.u.bb.lp_polyphase_3, D.lp_filter_taps)
+			process_filtered_sample(channel, fsam, D)
+			if upsample >= 4 {
+				fsam = convolve(D.u.bb.audio_in, D.u.bb.lp_polyphase_4, D.lp_filter_taps)
+				process_filtered_sample(channel, fsam, D)
+			}
+		}
 	}
 }
 
+func process_filtered_sample(channel C.int, fsam C.float, D *C.struct_demodulator_state_s) {
 
-func process_filtered_sample (channel C.int, fsam C.float, D *C.struct_demodulator_state_s) {
+	var subchan = 0
 
-	var subchan = 0;
+	/*
+	 * Version 1.2: Capture the post-filtering amplitude for display.
+	 * This is similar to the AGC without the normalization step.
+	 * We want decay to be substantially slower to get a longer
+	 * range idea of the received audio.
+	 * For AFSK, we keep mark and space amplitudes.
+	 * Here we keep + and - peaks because there could be a DC bias.
+	 */
 
-/*
- * Version 1.2: Capture the post-filtering amplitude for display.
- * This is similar to the AGC without the normalization step.
- * We want decay to be substantially slower to get a longer
- * range idea of the received audio.
- * For AFSK, we keep mark and space amplitudes.
- * Here we keep + and - peaks because there could be a DC bias.
- */
+	// TODO:  probably no need for this.  Just use  D.m_peak, D.m_valley
 
-// TODO:  probably no need for this.  Just use  D.m_peak, D.m_valley
-
-	if (fsam >= D.alevel_mark_peak) {
-	  D.alevel_mark_peak = fsam * D.quick_attack + D.alevel_mark_peak * (1.0 - D.quick_attack);
+	if fsam >= D.alevel_mark_peak {
+		D.alevel_mark_peak = fsam*D.quick_attack + D.alevel_mark_peak*(1.0-D.quick_attack)
 	} else {
-	  D.alevel_mark_peak = fsam * D.sluggish_decay + D.alevel_mark_peak * (1.0 - D.sluggish_decay);
+		D.alevel_mark_peak = fsam*D.sluggish_decay + D.alevel_mark_peak*(1.0-D.sluggish_decay)
 	}
 
-	if (fsam <= D.alevel_space_peak) {
-	  D.alevel_space_peak = fsam * D.quick_attack + D.alevel_space_peak * (1.0 - D.quick_attack);
+	if fsam <= D.alevel_space_peak {
+		D.alevel_space_peak = fsam*D.quick_attack + D.alevel_space_peak*(1.0-D.quick_attack)
 	} else {
-	  D.alevel_space_peak = fsam * D.sluggish_decay + D.alevel_space_peak * (1.0 - D.sluggish_decay);
+		D.alevel_space_peak = fsam*D.sluggish_decay + D.alevel_space_peak*(1.0-D.sluggish_decay)
 	}
 
-/* 
- * The input level can vary greatly.
- * More importantly, there could be a DC bias which we need to remove.
- *
- * Normalize the signal with automatic gain control (AGC). 
- * This works by looking at the minimum and maximum signal peaks
- * and scaling the results to be roughly in the -1.0 to +1.0 range.
- */
-	var demod_data C.int;				/* Still scrambled. */
+	/*
+	 * The input level can vary greatly.
+	 * More importantly, there could be a DC bias which we need to remove.
+	 *
+	 * Normalize the signal with automatic gain control (AGC).
+	 * This works by looking at the minimum and maximum signal peaks
+	 * and scaling the results to be roughly in the -1.0 to +1.0 range.
+	 */
+	var demod_data C.int /* Still scrambled. */
 
 	var demod_out float64
-	D.m_peak, D.m_valley, demod_out = agc (fsam, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
+	D.m_peak, D.m_valley, demod_out = agc(fsam, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 
-// TODO: There is potential for multiple decoders with one filter.
+	// TODO: There is potential for multiple decoders with one filter.
 
-//dw_printf ("peak=%.2f valley=%.2f fsam=%.2f norm=%.2f\n", D.m_peak, D.m_valley, fsam, norm);
+	//dw_printf ("peak=%.2f valley=%.2f fsam=%.2f norm=%.2f\n", D.m_peak, D.m_valley, fsam, norm);
 
-	if (D.num_slicers <= 1) {
+	if D.num_slicers <= 1 {
 
-	  /* Normal case of one demodulator to one HDLC decoder. */
-	  /* Demodulator output is difference between response from two filters. */
-	  /* AGC should generally keep this around -1 to +1 range. */
+		/* Normal case of one demodulator to one HDLC decoder. */
+		/* Demodulator output is difference between response from two filters. */
+		/* AGC should generally keep this around -1 to +1 range. */
 
-	  demod_data = demod_out > 0;
-	  nudge_pll (channel, subchannel, 0, demod_out, D);
+		demod_data = demod_out > 0
+		nudge_pll(channel, subchannel, 0, demod_out, D)
 	} else {
-	  /* Multiple slicers each feeding its own HDLC decoder. */
+		/* Multiple slicers each feeding its own HDLC decoder. */
 
-	  for slice:=0; slice<D.num_slicers; slice++ {
-	    demod_data = demod_out - slice_point[slice] > 0;
-	    nudge_pll (channel, subchannel, slice, demod_out - slice_point[slice], D);
-	  }
+		for slice := 0; slice < D.num_slicers; slice++ {
+			demod_data = demod_out-slice_point[slice] > 0
+			nudge_pll(channel, subchannel, slice, demod_out-slice_point[slice], D)
+		}
 	}
 
 	// demod_data is used only for debug out.
 	// suppress compiler warning about it not being used.
-	_ = demod_data;
+	_ = demod_data
 
 	/* TODO KG
-#if DEBUG4
+	#if DEBUG4
 
-	if (chan == 0) {
+		if (chan == 0) {
 
-	  if (1) {
-	  //if (D.slicer[slice].data_detect) {
-	    char fname[30];
-	    int slice = 0;
+		  if (1) {
+		  //if (D.slicer[slice].data_detect) {
+		    char fname[30];
+		    int slice = 0;
 
-	    if (demod_log_fp == NULL) {
-	      log_file_seq++;
-	      snprintf (fname, sizeof(fname), "demod/%04d.csv", log_file_seq);
-	      //if (log_file_seq == 1) mkdir ("demod", 0777);
-	      if (log_file_seq == 1) mkdir ("demod");
+		    if (demod_log_fp == NULL) {
+		      log_file_seq++;
+		      snprintf (fname, sizeof(fname), "demod/%04d.csv", log_file_seq);
+		      //if (log_file_seq == 1) mkdir ("demod", 0777);
+		      if (log_file_seq == 1) mkdir ("demod");
 
-	      demod_log_fp = fopen (fname, "w");
-	      text_color_set(DW_COLOR_DEBUG);
-	      dw_printf ("Starting demodulator log file %s\n", fname);
-	      fprintf (demod_log_fp, "Audio, Filtered,  Max,  Min, Normalized, Sliced, Clock\n");
-	    }
+		      demod_log_fp = fopen (fname, "w");
+		      text_color_set(DW_COLOR_DEBUG);
+		      dw_printf ("Starting demodulator log file %s\n", fname);
+		      fprintf (demod_log_fp, "Audio, Filtered,  Max,  Min, Normalized, Sliced, Clock\n");
+		    }
 
-	    fprintf (demod_log_fp, "%.3f, %.3f, %.3f, %.3f, %.3f, %d, %.2f\n",
-			fsam + 6,
-			fsam + 4,
-			D.m_peak + 4,
-			D.m_valley + 4,
-			demod_out + 2,
-			demod_data + 2,
-			(D.slicer[slice].data_clock_pll & 0x80000000) ? .5 : .0);
+		    fprintf (demod_log_fp, "%.3f, %.3f, %.3f, %.3f, %.3f, %d, %.2f\n",
+				fsam + 6,
+				fsam + 4,
+				D.m_peak + 4,
+				D.m_valley + 4,
+				demod_out + 2,
+				demod_data + 2,
+				(D.slicer[slice].data_clock_pll & 0x80000000) ? .5 : .0);
 
-	    fflush (demod_log_fp);
-	  } else {
-	    if (demod_log_fp != NULL) {
-	      fclose (demod_log_fp);
-	      demod_log_fp = NULL;
-	    }
-	  }
-	}
-#endif
-*/
+		    fflush (demod_log_fp);
+		  } else {
+		    if (demod_log_fp != NULL) {
+		      fclose (demod_log_fp);
+		      demod_log_fp = NULL;
+		    }
+		  }
+		}
+	#endif
+	*/
 
 } /* end demod_9600_process_sample */
-
 
 /*-------------------------------------------------------------------
  *
@@ -571,95 +557,92 @@ func process_filtered_sample (channel C.int, fsam C.float, D *C.struct_demodulat
  *
  *--------------------------------------------------------------------*/
 
-func nudge_pll_9600 (channel C.int, subchannel C.int, slice C.int, demod_out_f C.float, D *C.struct_demodulator_state_s) {
-	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll;
+func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.float, D *C.struct_demodulator_state_s) {
+	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (signed)((unsigned)(D.slicer[slice].data_clock_pll) + (unsigned)(D.pll_step_per_sample));
+	D.slicer[slice].data_clock_pll = (signed)((unsigned)(D.slicer[slice].data_clock_pll) + (unsigned)(D.pll_step_per_sample))
 
-	if ( D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000) {
+	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 
-	  /* Overflow.  Was large positive, wrapped around, now large negative. */
+		/* Overflow.  Was large positive, wrapped around, now large negative. */
 
-	  hdlc_rec_bit_new (channel, subchannel, slice, demod_out_f > 0, D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
-			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count));
-	  D.slicer[slice].pll_symbol_count++;
+		hdlc_rec_bit_new(channel, subchannel, slice, demod_out_f > 0, D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
+			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+		D.slicer[slice].pll_symbol_count++
 
-	  pll_dcd_each_symbol2 (D, channel, subchannel, slice);
+		pll_dcd_each_symbol2(D, channel, subchannel, slice)
 	}
 
-/*
- * Zero crossing?
- */
-        if ((D.slicer[slice].prev_demod_out_f < 0 && demod_out_f > 0) ||
-	    (D.slicer[slice].prev_demod_out_f > 0 && demod_out_f < 0)) {
+	/*
+	 * Zero crossing?
+	 */
+	if (D.slicer[slice].prev_demod_out_f < 0 && demod_out_f > 0) ||
+		(D.slicer[slice].prev_demod_out_f > 0 && demod_out_f < 0) {
 
-	  // Note:  Test for this demodulator, not overall for channel.
+		// Note:  Test for this demodulator, not overall for channel.
 
-	  pll_dcd_signal_transition2 (D, slice, D.slicer[slice].data_clock_pll);
+		pll_dcd_signal_transition2(D, slice, D.slicer[slice].data_clock_pll)
 
-	  var target = D.pll_step_per_sample * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f);
+		var target = D.pll_step_per_sample * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f)
 
-	  var before = C.int(D.slicer[slice].data_clock_pll);	// Treat as signed.
-	  if (D.slicer[slice].data_detect) {
-	    D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll * D.pll_locked_inertia + target * (1.0 - D.pll_locked_inertia) );
-	  } else {
-	    D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll * D.pll_searching_inertia + target * (1.0 - D.pll_searching_inertia) );
-	  }
-	  D.slicer[slice].pll_nudge_total += C.int64_t(C.int(D.slicer[slice].data_clock_pll)) - C.int64_t(before)
+		var before = C.int(D.slicer[slice].data_clock_pll) // Treat as signed.
+		if D.slicer[slice].data_detect {
+			D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll*D.pll_locked_inertia + target*(1.0-D.pll_locked_inertia))
+		} else {
+			D.slicer[slice].data_clock_pll = C.int(D.slicer[slice].data_clock_pll*D.pll_searching_inertia + target*(1.0-D.pll_searching_inertia))
+		}
+		D.slicer[slice].pll_nudge_total += C.int64_t(C.int(D.slicer[slice].data_clock_pll)) - C.int64_t(before)
 	}
-
 
 	/* TODO KG
-#if DEBUG5
+	#if DEBUG5
 
-	//if (chan == 0) {
-	if (D.slicer[slice].data_detect) {
-	
-	  char fname[30];
+		//if (chan == 0) {
+		if (D.slicer[slice].data_detect) {
 
-	  
-	  if (demod_log_fp == NULL) {
-	    seq++;
-	    snprintf (fname, sizeof(fname), "demod96/%04d.csv", seq);
-	    if (seq == 1) mkdir ("demod96"
-#ifndef __WIN32__
-					, 0777
-#endif
-						);
-
-	    demod_log_fp = fopen (fname, "w");
-	    text_color_set(DW_COLOR_DEBUG);
-	    dw_printf ("Starting 9600 decoder log file %s\n", fname);
-	    fprintf (demod_log_fp, "Audio, Peak, Valley, Demod, SData, Descram, Clock\n");
-	  }
-	  fprintf (demod_log_fp, "%.3f, %.3f, %.3f, %.3f, %.2f, %.2f, %.2f\n", 
-			0.5f * fsam + 3.5,
-			0.5f * D.m_peak + 3.5,
-			0.5f * D.m_valley + 3.5,
-			0.5f * demod_out + 2.0,
-			demod_data ? 1.35 : 1.0,  
-			descram ? .9 : .55,  
-			(D.data_clock_pll & 0x80000000) ? .1 : .45);
-	} else {
-	  if (demod_log_fp != NULL) {
-	    fclose (demod_log_fp);
-	    demod_log_fp = NULL;
-	  }
-	}
-	//}
-
-#endif
-*/
+		  char fname[30];
 
 
-/*
- * Remember demodulator output (pre-descrambling) so we can compare next time
- * for the DPLL sync.
- */
-	D.slicer[slice].prev_demod_out_f = demod_out_f;
+		  if (demod_log_fp == NULL) {
+		    seq++;
+		    snprintf (fname, sizeof(fname), "demod96/%04d.csv", seq);
+		    if (seq == 1) mkdir ("demod96"
+	#ifndef __WIN32__
+						, 0777
+	#endif
+							);
+
+		    demod_log_fp = fopen (fname, "w");
+		    text_color_set(DW_COLOR_DEBUG);
+		    dw_printf ("Starting 9600 decoder log file %s\n", fname);
+		    fprintf (demod_log_fp, "Audio, Peak, Valley, Demod, SData, Descram, Clock\n");
+		  }
+		  fprintf (demod_log_fp, "%.3f, %.3f, %.3f, %.3f, %.2f, %.2f, %.2f\n",
+				0.5f * fsam + 3.5,
+				0.5f * D.m_peak + 3.5,
+				0.5f * D.m_valley + 3.5,
+				0.5f * demod_out + 2.0,
+				demod_data ? 1.35 : 1.0,
+				descram ? .9 : .55,
+				(D.data_clock_pll & 0x80000000) ? .1 : .45);
+		} else {
+		  if (demod_log_fp != NULL) {
+		    fclose (demod_log_fp);
+		    demod_log_fp = NULL;
+		  }
+		}
+		//}
+
+	#endif
+	*/
+
+	/*
+	 * Remember demodulator output (pre-descrambling) so we can compare next time
+	 * for the DPLL sync.
+	 */
+	D.slicer[slice].prev_demod_out_f = demod_out_f
 
 } /* end nudge_pll */
-
 
 /* end demod_9600.c */
