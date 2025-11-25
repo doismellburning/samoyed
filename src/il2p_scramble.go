@@ -24,7 +24,7 @@ import (
 // So we need to need to ignore the first 5 out and stick in
 // an extra 5 filler bits to flush at the end.
 
-const INIT_TX_LSFR C.int = 0x00f
+const INIT_TX_LFSR C.int = 0x00f
 
 func scramble_bit(in C.int, state *C.int) C.int {
 	var out = ((*state >> 4) ^ *state) & 1
@@ -34,7 +34,7 @@ func scramble_bit(in C.int, state *C.int) C.int {
 
 // Undo data scrambling for il2p receive.
 
-const INIT_RX_LSFR C.int = 0x1f0
+const INIT_RX_LFSR C.int = 0x1f0
 
 func descramble_bit(in C.int, state *C.int) C.int {
 	var out = (in ^ *state) & 1
@@ -57,7 +57,7 @@ func descramble_bit(in C.int, state *C.int) C.int {
 
 //export il2p_scramble_block
 func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
-	var tx_lfsr_state = INIT_TX_LSFR
+	var tx_lfsr_state = INIT_TX_LFSR
 
 	C.memset(unsafe.Pointer(_out), 0, C.size_t(length))
 
@@ -89,7 +89,7 @@ func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 
 	// This is a relic from when I thought the state would need to
 	// be passed along for the next block.
-	// Preserve the LSFR state from before flushing.
+	// Preserve the LFSR state from before flushing.
 	// This might be needed as the initial state for later payload blocks.
 	var x = tx_lfsr_state
 	for n := C.int(0); n < 5; n++ {
@@ -122,7 +122,7 @@ func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 
 //export il2p_descramble_block
 func il2p_descramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
-	var rx_lfsr_state = INIT_RX_LSFR
+	var rx_lfsr_state = INIT_RX_LFSR
 
 	C.memset(unsafe.Pointer(_out), 0, C.size_t(length))
 
