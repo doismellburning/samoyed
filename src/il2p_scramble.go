@@ -59,8 +59,6 @@ func descramble_bit(in C.int, state *C.int) C.int {
 func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 	var tx_lfsr_state = INIT_TX_LFSR
 
-	C.memset(unsafe.Pointer(_out), 0, C.size_t(length))
-
 	var in = unsafe.Slice(_in, length)
 	var out = make([]C.uchar, length)
 
@@ -123,8 +121,6 @@ func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 //export il2p_descramble_block
 func il2p_descramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 	var rx_lfsr_state = INIT_RX_LFSR
-
-	C.memset(unsafe.Pointer(_out), 0, C.size_t(length))
 
 	var in = unsafe.Slice(_in, length)
 	var out = make([]C.uchar, length)
