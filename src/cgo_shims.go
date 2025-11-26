@@ -11,6 +11,7 @@ package direwolf
 // #include "tq.h"
 // #include "kiss_frame.h"
 // #include "ax25_link.h"
+// #include "il2p.h"
 import "C"
 
 import (
@@ -114,6 +115,10 @@ const FEND = C.FEND
 const FESC = C.FESC
 const TFEND = C.TFEND
 const TFESC = C.TFESC
+
+const IL2P_HEADER_SIZE = C.IL2P_HEADER_SIZE
+const IL2P_HEADER_PARITY = C.IL2P_HEADER_PARITY
+const IL2P_MAX_PAYLOAD_SIZE = C.IL2P_MAX_PAYLOAD_SIZE
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
