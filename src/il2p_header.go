@@ -12,6 +12,7 @@ package direwolf
 import "C"
 
 import (
+	"fmt"
 	"unsafe"
 )
 
@@ -444,6 +445,23 @@ func trim(stuff *C.char) {
 	}
 }
 
+// appendSSID appends "-N" (where N is 0-15) to a C string buffer.
+// This replaces the C snprintf call which cannot be used from Go because it's variadic.
+// The maxLen parameter limits the number of bytes to write (including null terminator).
+func appendSSID(buf *C.char, ssid int, maxLen int) {
+	ssidStr := fmt.Sprintf("-%d", ssid)
+	offset := C.strlen(buf)
+	for i := 0; i < len(ssidStr) && i < maxLen-1; i++ {
+		*(*C.char)(unsafe.Add(unsafe.Pointer(buf), int(offset)+i)) = C.char(ssidStr[i])
+	}
+	// Null terminate
+	terminatorPos := int(offset) + len(ssidStr)
+	if terminatorPos >= maxLen {
+		terminatorPos = maxLen - 1
+	}
+	*(*C.char)(unsafe.Add(unsafe.Pointer(buf), terminatorPos)) = 0
+}
+
 /*--------------------------------------------------------------------------------
  *
  * Function:	il2p_decode_header_type_1
@@ -515,8 +533,9 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 			return (nil)
 		}
 	}
-	// TODO KG snprintf(addrs[AX25_DESTINATION]+strlen(addrs[AX25_DESTINATION]), 4, "-%d", (hdr[12]>>4)&0xf)
-	// FIXME KG snprintf(addrs[AX25_DESTINATION]+strlen(addrs[AX25_DESTINATION]), 4, "-%d", (hdr[12]>>4)&0xf)
+	// Append SSID to destination address: "-N" where N is the upper nibble of hdr[12]
+	dstSSID := int((*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12)) >> 4) & 0xf)
+	appendSSID(&addrs[AX25_DESTINATION][0], dstSSID, 4)
 
 	for i := 0; i <= 5; i++ {
 		addrs[AX25_SOURCE][i] = C.char(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i+6)) & C.uchar(0x3f)))
@@ -534,8 +553,9 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 			return (nil)
 		}
 	}
-	// TODO KG snprintf(addrs[AX25_SOURCE]+strlen(addrs[AX25_SOURCE]), 4, "-%d", hdr[12]&0xf)
-	// FIXME KG snprintf(addrs[AX25_SOURCE]+strlen(addrs[AX25_SOURCE]), 4, "-%d", hdr[12]&0xf)
+	// Append SSID to source address: "-N" where N is the lower nibble of hdr[12]
+	srcSSID := int(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12)) & 0xf)
+	appendSSID(&addrs[AX25_SOURCE][0], srcSSID, 4)
 
 	// The PID field gives us the general type.
 	// 0 = 'S' frame.
