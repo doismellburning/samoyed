@@ -449,6 +449,9 @@ func trim(stuff *C.char) {
 // This replaces the C snprintf call which cannot be used from Go because it's variadic.
 // The maxLen parameter limits the number of bytes to write (including null terminator).
 func appendSSID(buf *C.char, ssid int, maxLen int) {
+	if maxLen <= 0 {
+		return
+	}
 	ssidStr := fmt.Sprintf("-%d", ssid)
 	offset := C.strlen(buf)
 	for i := 0; i < len(ssidStr) && i < maxLen-1; i++ {
