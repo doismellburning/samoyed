@@ -447,22 +447,24 @@ func trim(stuff *C.char) {
 
 // appendSSID appends "-N" (where N is 0-15) to a C string buffer.
 // This replaces the C snprintf call which cannot be used from Go because it's variadic.
-// The maxLen parameter limits the number of bytes to write (including null terminator).
+// The maxLen parameter limits the number of bytes to write (including null terminator),
+// similar to snprintf's size parameter.
 func appendSSID(buf *C.char, ssid int, maxLen int) {
 	if maxLen <= 0 {
 		return
 	}
 	ssidStr := fmt.Sprintf("-%d", ssid)
-	offset := C.strlen(buf)
-	for i := 0; i < len(ssidStr) && i < maxLen-1; i++ {
-		*(*C.char)(unsafe.Add(unsafe.Pointer(buf), int(offset)+i)) = C.char(ssidStr[i])
+	offset := int(C.strlen(buf))
+	// Write at most maxLen-1 characters (leaving room for null terminator)
+	charsToWrite := len(ssidStr)
+	if charsToWrite > maxLen-1 {
+		charsToWrite = maxLen - 1
+	}
+	for i := 0; i < charsToWrite; i++ {
+		*(*C.char)(unsafe.Add(unsafe.Pointer(buf), offset+i)) = C.char(ssidStr[i])
 	}
 	// Null terminate
-	terminatorPos := int(offset) + len(ssidStr)
-	if terminatorPos >= maxLen {
-		terminatorPos = maxLen - 1
-	}
-	*(*C.char)(unsafe.Add(unsafe.Pointer(buf), terminatorPos)) = 0
+	*(*C.char)(unsafe.Add(unsafe.Pointer(buf), offset+charsToWrite)) = 0
 }
 
 /*--------------------------------------------------------------------------------
