@@ -120,6 +120,8 @@ const IL2P_HEADER_SIZE = C.IL2P_HEADER_SIZE
 const IL2P_HEADER_PARITY = C.IL2P_HEADER_PARITY
 const IL2P_MAX_PAYLOAD_SIZE = C.IL2P_MAX_PAYLOAD_SIZE
 const IL2P_MAX_PARITY_SYMBOLS = C.IL2P_MAX_PARITY_SYMBOLS
+const IL2P_MAX_ENCODED_PAYLOAD_SIZE = C.IL2P_MAX_ENCODED_PAYLOAD_SIZE
+const IL2P_SYNC_WORD = C.IL2P_SYNC_WORD
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
