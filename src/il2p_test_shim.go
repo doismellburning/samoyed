@@ -10,7 +10,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 // #include "multi_modem.h"
-// extern int IL2P_TEST;
 import "C"
 
 import (
@@ -32,7 +31,7 @@ import (
 func il2p_test_main(t *testing.T) {
 	t.Helper()
 
-	C.IL2P_TEST = 1
+	IL2P_TEST = true
 
 	var enable_color C.int = 1
 	C.text_color_init(enable_color)
@@ -74,7 +73,7 @@ func il2p_test_main(t *testing.T) {
 
 	decode_bitstream(t)
 
-	C.IL2P_TEST = 0
+	IL2P_TEST = false
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -833,7 +832,7 @@ Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I m
 `
 
 var rec_count = -1 // disable deserialized packet test.
-var polarity = 0
+var polarity C.int = 0
 
 func test_serdes(t *testing.T) {
 	t.Helper()
@@ -856,7 +855,7 @@ func test_serdes(t *testing.T) {
 		var channel C.int
 
 		for max_fec := C.int(0); max_fec <= 1; max_fec++ {
-			for polarity := C.int(0); polarity <= 2; polarity++ { // 2 means throw in some errors.
+			for polarity = C.int(0); polarity <= 2; polarity++ { // 2 means throw in some errors.
 				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, polarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
