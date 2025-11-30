@@ -58,7 +58,7 @@ var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
  *
  * Name:        il2p_rec_bit
  *
- * Purpose:     Extract FX.25 packets from a stream of bits.
+ * Purpose:     Extract IL2P packets from a stream of bits.
  *
  * Inputs:      channel    - Channel number.
  *
