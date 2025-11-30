@@ -12,6 +12,7 @@ package direwolf
 // #include "kiss_frame.h"
 // #include "ax25_link.h"
 // #include "il2p.h"
+// #include "fx25.h"
 import "C"
 
 import (
@@ -62,6 +63,9 @@ const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
 const AX25_N1_PACLEN_MAX = C.AX25_N1_PACLEN_MAX
 const AX25_REPEATER_1 = C.AX25_REPEATER_1
 const AX25_SOURCE = C.AX25_SOURCE
+
+const FX25_BLOCK_SIZE = C.FX25_BLOCK_SIZE
+const FX25_MAX_CHECK = C.FX25_MAX_CHECK
 
 const WPL_FORMAT_NMEA_GENERIC = C.WPL_FORMAT_NMEA_GENERIC
 const WPL_FORMAT_GARMIN = C.WPL_FORMAT_GARMIN
