@@ -64,18 +64,15 @@ package direwolf
 // #include "fx25.h"
 // #include "il2p.h"
 // #include "gen_packets.h"
-// extern int g_add_noise;
-// extern float g_noise_level;
-// extern FILE *out_fp;
-// extern int byte_count;
-// int my_rand (void);
-// struct wav_header gen_header;
-// extern int GEN_PACKETS;
+// int audio_flush_real (int a);
+// int audio_put_real (int a, int c);
+// void dcd_change_real (int chan, int subchan, int slice, int state);
 import "C"
 
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -84,11 +81,23 @@ import (
 	"github.com/spf13/pflag"
 )
 
+var GEN_PACKETS = false // Switch between fakes and reals at runtime
+
 var modem C.struct_audio_s
 var g_morse_wpm = 0 /* Send morse code at this speed. */
+var g_add_noise = false
+var g_noise_level C.float = 0
+
+var out_fp *C.FILE
+
+var byte_count C.int /* Number of data bytes written to file. Will be written to header when file is closed. */
+
+var gen_header C.struct_wav_header
+
+var genPacketsRand = rand.New(rand.NewSource(0))
 
 func GenPacketsMain() {
-	C.GEN_PACKETS = 1 // Use the _fake functions
+	GEN_PACKETS = true // Use the _fake functions
 	/*
 	 * Set up default values for the modem.
 	 */
@@ -197,10 +206,10 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		os.Exit(1)
 	} else if *noisyPacketCount > 0 {
 		packet_count = *noisyPacketCount
-		C.g_add_noise = 1
+		g_add_noise = true
 	} else if *packetCount > 0 {
 		packet_count = *packetCount
-		C.g_add_noise = 0
+		g_add_noise = false
 	}
 
 	if *audioSampleRate != C.DEFAULT_SAMPLES_PER_SEC {
@@ -544,21 +553,21 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		for i := 1; i <= packet_count; i++ {
 			if modem.achan[0].baud < 600 {
 				/* e.g. 300 bps AFSK - About 2/3 should be decoded properly. */
-				C.g_noise_level = C.float(float64(*amplitude) * .0048 * (float64(i) / float64(packet_count)))
+				g_noise_level = C.float(float64(*amplitude) * .0048 * (float64(i) / float64(packet_count)))
 			} else if modem.achan[0].baud < 1800 {
 				/* e.g. 1200 bps AFSK - About 2/3 should be decoded properly. */
-				C.g_noise_level = C.float(float64(*amplitude) * .0023 * (float64(i) / float64(packet_count)))
+				g_noise_level = C.float(float64(*amplitude) * .0023 * (float64(i) / float64(packet_count)))
 			} else if modem.achan[0].baud < 3600 {
 				/* e.g. 2400 bps QPSK - T.B.D. */
-				C.g_noise_level = C.float(float64(*amplitude) * .0015 * (float64(i) / float64(packet_count)))
+				g_noise_level = C.float(float64(*amplitude) * .0015 * (float64(i) / float64(packet_count)))
 			} else if modem.achan[0].baud < 7200 {
 				/* e.g. 4800 bps - T.B.D. */
-				C.g_noise_level = C.float(float64(*amplitude) * .0007 * (float64(i) / float64(packet_count)))
+				g_noise_level = C.float(float64(*amplitude) * .0007 * (float64(i) / float64(packet_count)))
 			} else {
 				/* e.g. 9600 */
-				C.g_noise_level = C.float(0.33 * (float64(*amplitude) / 200.0) * (float64(i) / float64(packet_count)))
+				g_noise_level = C.float(0.33 * (float64(*amplitude) / 200.0) * (float64(i) / float64(packet_count)))
 				// temp test
-				// C.g_noise_level = 0.20 * (amplitude / 200.0) * (float64(i) / float64(packet_count));
+				// g_noise_level = 0.20 * (amplitude / 200.0) * (float64(i) / float64(packet_count));
 			}
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  %04d of %04d", i, packet_count)
@@ -625,69 +634,69 @@ func audio_file_open(fname string, pa *C.struct_audio_s) int {
 	/*
 	 * Write the file header.  Don't know length yet.
 	 */
-	C.out_fp = C.fopen(C.CString(fname), C.CString("wb"))
+	out_fp = C.fopen(C.CString(fname), C.CString("wb"))
 
-	if C.out_fp == nil {
+	if out_fp == nil {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		fmt.Printf("Couldn't open file for write: %s\n", fname)
 		C.perror(C.CString(""))
 		return (-1)
 	}
 
-	C.memset(unsafe.Pointer(&C.gen_header), 0, C.sizeof_struct_wav_header)
+	C.memset(unsafe.Pointer(&gen_header), 0, C.sizeof_struct_wav_header)
 
 	// TODO KG Can't get memcpy to work, so just stuff it in manually
-	// C.memcpy(unsafe.Pointer(&C.gen_header.riff[0]), unsafe.Pointer(C.CString("RIFF")), 4)
-	C.gen_header.riff[0] = 'R'
-	C.gen_header.riff[1] = 'I'
-	C.gen_header.riff[2] = 'F'
-	C.gen_header.riff[3] = 'F'
-	C.gen_header.filesize = 0
-	// C.memcpy(unsafe.Pointer(&C.gen_header.wave[0]), unsafe.Pointer(C.CString("WAVE")), 4)
-	C.gen_header.wave[0] = 'W'
-	C.gen_header.wave[1] = 'A'
-	C.gen_header.wave[2] = 'V'
-	C.gen_header.wave[3] = 'E'
-	// C.memcpy(unsafe.Pointer(&C.gen_header.fmt[0]), unsafe.Pointer(C.CString("fmt ")), 4)
-	C.gen_header.fmt[0] = 'f'
-	C.gen_header.fmt[1] = 'm'
-	C.gen_header.fmt[2] = 't'
-	C.gen_header.fmt[3] = ' '
-	C.gen_header.fmtsize = 16   // Always 16.
-	C.gen_header.wformattag = 1 // 1 for PCM.
+	// C.memcpy(unsafe.Pointer(&gen_header.riff[0]), unsafe.Pointer(C.CString("RIFF")), 4)
+	gen_header.riff[0] = 'R'
+	gen_header.riff[1] = 'I'
+	gen_header.riff[2] = 'F'
+	gen_header.riff[3] = 'F'
+	gen_header.filesize = 0
+	// C.memcpy(unsafe.Pointer(&gen_header.wave[0]), unsafe.Pointer(C.CString("WAVE")), 4)
+	gen_header.wave[0] = 'W'
+	gen_header.wave[1] = 'A'
+	gen_header.wave[2] = 'V'
+	gen_header.wave[3] = 'E'
+	// C.memcpy(unsafe.Pointer(&gen_header.fmt[0]), unsafe.Pointer(C.CString("fmt ")), 4)
+	gen_header.fmt[0] = 'f'
+	gen_header.fmt[1] = 'm'
+	gen_header.fmt[2] = 't'
+	gen_header.fmt[3] = ' '
+	gen_header.fmtsize = 16   // Always 16.
+	gen_header.wformattag = 1 // 1 for PCM.
 
-	C.gen_header.nchannels = C.short(pa.adev[0].num_channels)
-	C.gen_header.nsamplespersec = pa.adev[0].samples_per_sec
-	C.gen_header.wbitspersample = C.short(pa.adev[0].bits_per_sample)
+	gen_header.nchannels = C.short(pa.adev[0].num_channels)
+	gen_header.nsamplespersec = pa.adev[0].samples_per_sec
+	gen_header.wbitspersample = C.short(pa.adev[0].bits_per_sample)
 
-	C.gen_header.nblockalign = C.gen_header.wbitspersample / 8 * C.gen_header.nchannels
-	C.gen_header.navgbytespersec = C.int(C.gen_header.nblockalign) * C.gen_header.nsamplespersec
-	// C.memcpy(unsafe.Pointer(&C.gen_header.data[0]), unsafe.Pointer(C.CString("data")), 4)
-	C.gen_header.data[0] = 'd'
-	C.gen_header.data[1] = 'a'
-	C.gen_header.data[2] = 't'
-	C.gen_header.data[3] = 'a'
-	C.gen_header.datasize = 0
+	gen_header.nblockalign = gen_header.wbitspersample / 8 * gen_header.nchannels
+	gen_header.navgbytespersec = C.int(gen_header.nblockalign) * gen_header.nsamplespersec
+	// C.memcpy(unsafe.Pointer(&gen_header.data[0]), unsafe.Pointer(C.CString("data")), 4)
+	gen_header.data[0] = 'd'
+	gen_header.data[1] = 'a'
+	gen_header.data[2] = 't'
+	gen_header.data[3] = 'a'
+	gen_header.datasize = 0
 
-	if !(C.gen_header.nchannels == 1 || C.gen_header.nchannels == 2) { //nolint:staticcheck
-		panic("assert(C.gen_header.nchannels == 1 || C.gen_header.nchannels == 2)")
+	if !(gen_header.nchannels == 1 || gen_header.nchannels == 2) { //nolint:staticcheck
+		panic("assert(gen_header.nchannels == 1 || gen_header.nchannels == 2)")
 	}
 
-	var n = C.fwrite(unsafe.Pointer(&C.gen_header), C.sizeof_struct_wav_header, 1, C.out_fp)
+	var n = C.fwrite(unsafe.Pointer(&gen_header), C.sizeof_struct_wav_header, 1, out_fp)
 
 	if n != 1 {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		fmt.Printf("Couldn't write header to: %s\n", fname)
 		C.perror(C.CString(""))
-		C.fclose(C.out_fp)
-		C.out_fp = nil
+		C.fclose(out_fp)
+		out_fp = nil
 		return (-1)
 	}
 
 	/*
 	 * Number of bytes written will be filled in later.
 	 */
-	C.byte_count = 0
+	byte_count = 0
 
 	return (0)
 } /* end audio_open */
@@ -711,29 +720,29 @@ func audio_file_close() int {
 	/*
 	 * Go back and fix up lengths in header.
 	 */
-	C.gen_header.filesize = C.byte_count + C.sizeof_struct_wav_header - 8
-	C.gen_header.datasize = C.byte_count
+	gen_header.filesize = byte_count + C.sizeof_struct_wav_header - 8
+	gen_header.datasize = byte_count
 
-	if C.out_fp == nil {
+	if out_fp == nil {
 		return (-1)
 	}
 
-	C.fflush(C.out_fp)
+	C.fflush(out_fp)
 
-	C.fseek(C.out_fp, 0, C.SEEK_SET)
-	var n = C.fwrite(unsafe.Pointer(&C.gen_header), C.sizeof_struct_wav_header, 1, C.out_fp)
+	C.fseek(out_fp, 0, C.SEEK_SET)
+	var n = C.fwrite(unsafe.Pointer(&gen_header), C.sizeof_struct_wav_header, 1, out_fp)
 
 	if n != 1 {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		fmt.Printf("Couldn't write header to audio file.\n")
 		C.perror(C.CString("")) // TODO: remove perror.
-		C.fclose(C.out_fp)
-		C.out_fp = nil
+		C.fclose(out_fp)
+		out_fp = nil
 		return (-1)
 	}
 
-	C.fclose(C.out_fp)
-	C.out_fp = nil
+	C.fclose(out_fp)
+	out_fp = nil
 
 	return (0)
 } /* end audio_close */
@@ -809,7 +818,7 @@ func send_packet(str string) {
 			// Then throw in a random amount of time so that receiving
 			// DPLL will need to adjust to a new phase.
 
-			var n = int(float64(samples_per_symbol) * (32 + float64(C.my_rand())/float64(C.MY_RAND_MAX)))
+			var n = int(float64(samples_per_symbol) * (32 + genPacketsRand.Float64()))
 
 			for range n {
 				gen_tone_put_sample(c, 0, 0)
@@ -820,5 +829,94 @@ func send_packet(str string) {
 			layer2_preamble_postamble(c, 2, 1, &modem)
 		}
 		C.ax25_delete(pp)
+	}
+}
+
+/*------------------------------------------------------------------
+ *
+ * Name:        audio_put
+ *
+ * Purpose:     Send one byte to the audio output file.
+ *
+ * Inputs:	c	- One byte in range of 0 - 255.
+ *
+ * Returns:     Normally non-negative.
+ *              -1 for any type of error.
+ *
+ * Description:	The caller must deal with the details of mono/stereo
+ *		and number of bytes per sample.
+ *
+ *----------------------------------------------------------------*/
+
+var sample16 int16
+
+func audio_put_fake(a C.int, c C.int) C.int {
+
+	if g_add_noise {
+		if (byte_count & 1) == 0 {
+			sample16 = int16(c) & 0xff /* save lower byte. */
+			byte_count++
+			return c
+		} else {
+			sample16 |= int16((c << 8) & 0xff00) /* insert upper byte. */
+			byte_count++
+			var s = C.int(sample16) // sign extend.
+
+			/* Add random noise to the signal. */
+			/* r should be in range of -1 .. +1. */
+
+			var r = genPacketsRand.Float64()*2 - 1 // Technically [-1.0, 1.0) but this should do
+
+			s += C.int(5 * C.float(r) * g_noise_level * C.float(32767))
+
+			if s > 32767 {
+				s = 32767
+			}
+			if s < -32767 {
+				s = -32767
+			}
+
+			C.putc(s&0xff, out_fp)
+			return (C.putc((s>>8)&0xff, out_fp))
+		}
+	} else {
+		byte_count++
+		return (C.putc(c, out_fp))
+	}
+
+} /* end audio_put */
+
+//export audio_put
+func audio_put(a C.int, c C.int) C.int {
+	if GEN_PACKETS {
+		return audio_put_fake(a, c)
+	} else {
+		return C.audio_put_real(a, c)
+	}
+}
+
+func audio_flush_fake(a C.int) C.int {
+	return 0
+}
+
+//export audio_flush
+func audio_flush(a C.int) C.int {
+	if GEN_PACKETS {
+		return audio_flush_fake(a)
+	} else {
+		return C.audio_flush_real(a)
+	}
+}
+
+// To keep dtmf.c happy.
+func dcd_change_fake(channel C.int, subchan C.int, slice C.int, state C.int) {
+}
+
+//export dcd_change
+func dcd_change(channel C.int, subchan C.int, slice C.int, state C.int) {
+	if GEN_PACKETS {
+		dcd_change_fake(channel, subchan, slice, state)
+	} else {
+		C.dcd_change_real(channel, subchan, slice, state)
 	}
 }
