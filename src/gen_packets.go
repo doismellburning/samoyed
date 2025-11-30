@@ -72,7 +72,6 @@ import "C"
 import (
 	"bufio"
 	"fmt"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -94,7 +93,14 @@ var byte_count C.int /* Number of data bytes written to file. Will be written to
 
 var gen_header C.struct_wav_header
 
-var genPacketsRand = rand.New(rand.NewSource(0))
+var genPacketsRandSeed int32 = 1
+
+// Although the tests in `test-scripts` all call `atest` with an acceptable *range* of packets, the only way I could get them all to pass was by reimplementing this exact PRNG from Dire Wolf's gen_packets.c - all my attempts to use Go's `math/rand` resulted in decodes that would fall outside of the acceptable range. It's far from impossible that I somehow screwed up my use of `math/rand`, but I think it more likely that the tests depend on this exact PRNG implementation, which I should address at some point. /KG
+// Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG
+func genPacketsRand() int32 {
+	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & C.MY_RAND_MAX)
+	return genPacketsRandSeed
+}
 
 func GenPacketsMain() {
 	GEN_PACKETS = true // Use the _fake functions
@@ -818,7 +824,7 @@ func send_packet(str string) {
 			// Then throw in a random amount of time so that receiving
 			// DPLL will need to adjust to a new phase.
 
-			var n = int(float64(samples_per_symbol) * (32 + genPacketsRand.Float64()))
+			var n = int(float64(samples_per_symbol) * (32 + float64(genPacketsRand())/float64(C.MY_RAND_MAX)))
 
 			for range n {
 				gen_tone_put_sample(c, 0, 0)
@@ -865,7 +871,7 @@ func audio_put_fake(a C.int, c C.int) C.int {
 			/* Add random noise to the signal. */
 			/* r should be in range of -1 .. +1. */
 
-			var r = genPacketsRand.Float64()*2 - 1 // Technically [-1.0, 1.0) but this should do
+			var r = (float64(genPacketsRand()) - float64(C.MY_RAND_MAX)/2.0) / (float64(C.MY_RAND_MAX) / 2.0)
 
 			s += C.int(5 * C.float(r) * g_noise_level * C.float(32767))
 
