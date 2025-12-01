@@ -14,7 +14,6 @@ package direwolf
 // #include "ptt.h"
 // #include "gen_tone.h"		/* for gen_tone_put_sample */
 // #include "morse.h"
-// extern int GEN_PACKETS;
 import "C"
 
 import (
@@ -39,7 +38,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 	}
 	modem.chan_medium[0] = C.MEDIUM_RADIO
 
-	C.GEN_PACKETS = 1
+	GEN_PACKETS = true
 
 	audio_file_open(filename, &modem)
 	var amplitude C.int = 100
