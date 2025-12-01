@@ -1,43 +1,21 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2011, 2012, 2013, 2014, 2015, 2022  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
+package direwolf
 
 /*------------------------------------------------------------------
- *
- * File:	symbols.c
  *
  * Purpose:	Functions related to the APRS symbols
  *
  *------------------------------------------------------------------*/
 
-#include "direwolf.h"
-
-#include <stdio.h>
-#include <assert.h>
-#include <stdlib.h>	
-#include <string.h>	
-#include <ctype.h>	
-
-#include "textcolor.h"
-#include "symbols.h"
-#include "tt_text.h"
-
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <assert.h>
+// #include <stdlib.h>	
+// #include <string.h>	
+// #include <ctype.h>	
+// #include "textcolor.h"
+// #include "symbols.h"
+// #include "tt_text.h"
+import "C"
 
 /*
  * APRS symbol tables.
@@ -50,13 +28,14 @@
  * Primary symbol table.
  */
 
-#define SYMTAB_SIZE 95
+const SYMTAB_SIZE = 95
 
+type SymbolEntry struct {
+	xy string
+	description string
+}
 
-static const struct {
-		char xy[3];
-		char *description;
-	} primary_symtab[SYMTAB_SIZE] = {
+	var primary_symtab = [SYMTAB_SIZE]SymbolEntry{
 
 	/*     00  */	{ "~~", "--no-symbol--" },
 	/*  !  01  */	{ "BB", "Police, Sheriff" },
@@ -152,16 +131,14 @@ static const struct {
 	/*  {  91  */	{ "J1", "" },
 	/*  |  92  */	{ "J2", "TNC Stream Switch" },
 	/*  }  93  */	{ "J3", "" },
-	/*  ~  94  */	{ "J3", "TNC Stream Switch" } };
+	/*  ~  94  */	{ "J3", "TNC Stream Switch" },
+};
 
 /*
  * Alternate symbol table.
  */
 
-static const struct {
-		char xy[3];
-		char *description;
-	} alternate_symtab[SYMTAB_SIZE] = {
+	var alternate_symtab = [SYMTAB_SIZE]SymbolEntry{
 
 	/*     00  */	{ "~~", "--no-symbol--" },
 	/*  !  01  */	{ "OB", "EMERGENCY (!)" },
@@ -257,7 +234,8 @@ static const struct {
 	/*  {  91  */	{ "Q1", "Fog (& future ovrly codes)" },
 	/*  |  92  */	{ "Q2", "TNC Stream Switch" },
 	/*  }  93  */	{ "Q3", "" },
-	/*  ~  94  */	{ "Q4", "TNC Stream Switch" } };
+	/*  ~  94  */	{ "Q4", "TNC Stream Switch" },
+};
 
 
 // Make sure the array is null terminated.
