@@ -241,22 +241,17 @@ type SymbolEntry struct {
 // Make sure the array is null terminated.
 // If search order is changed, do the same in decode_aprs.c for consistency.
 
-static const char *search_locations[] = {
-	(const char *) "symbols-new.txt",		// CWD
-	(const char *) "data/symbols-new.txt",		// Windows with Cmake
-	(const char *) "../data/symbols-new.txt",	// ?
-#ifndef __WIN32__
-	(const char *) "/usr/local/share/direwolf/symbols-new.txt",
-	(const char *) "/usr/share/direwolf/symbols-new.txt",
-#endif
-#if __APPLE__
+var search_locations = []string{
+	 "symbols-new.txt",		// CWD
+	 "data/symbols-new.txt",		// Windows with Cmake
+	 "../data/symbols-new.txt",	// ?
+	 "/usr/local/share/direwolf/symbols-new.txt",
+	 "/usr/share/direwolf/symbols-new.txt",
 	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
 	// Adding the /opt/local tree since macports typically installs there.  Users might want their
 	// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
 	// path as well.
-	(const char *) "/opt/local/share/direwolf/symbols-new.txt",
-#endif
-	(const char *) NULL		// Important - Indicates end of list.
+	 "/opt/local/share/direwolf/symbols-new.txt",
 };
 
 
@@ -291,22 +286,22 @@ static const char *search_locations[] = {
  *
  *------------------------------------------------------------------*/
 
-#define NEW_SYM_INIT_SIZE 20
-#define NEW_SYM_DESC_LEN 29
+const NEW_SYM_INIT_SIZE = 20
+const NEW_SYM_DESC_LEN = 29
 
-typedef struct new_sym_s {
-	char overlay;
-	char symbol;
-	char *description;
-} new_sym_t;
+type new_sym_t struct {
+	overlay C.char
+	symbol C.char
+	description *C.char
+}
 
-static new_sym_t *new_sym_ptr = NULL;	/* Dynamically allocated array. */
-static int new_sym_size = 0;		/* Number of elements allocated. */
-static int new_sym_len = 0;			/* Number of elements used. */
+var new_sym_ptr *new_sym_t
+// FIXME KG static new_sym_t *new_sym_ptr = NULL;	/* Dynamically allocated array. */
+// FIXME KG static int new_sym_size = 0;		/* Number of elements allocated. */
+// FIXME KG static int new_sym_len = 0;			/* Number of elements used. */
 
 
-void symbols_init (void)
-{
+func symbols_init () {
 	FILE *fp = NULL;
 
 /*
@@ -320,12 +315,14 @@ void symbols_init (void)
  *  Column 6 - Start of description.
  */
 
+ /* FIXME KG
 #define COL1_OVERLAY 0
 #define COL2_SYMBOL 1
 #define COL3_SP 2
 #define COL4_EQUAL 3
 #define COL5_SP 4
 #define COL6_DESC 5
+*/
 
 	char stuff[200];
 	int j;
@@ -838,6 +835,7 @@ void symbols_get_description (char symtab, char symbol, char *description, size_
  *
  *------------------------------------------------------------------*/
 
+//export symbols_code_from_description
 int symbols_code_from_description (char overlay, char *description, char *symtab, char *symbol)
 {
 	int j;
@@ -930,30 +928,23 @@ int symbols_code_from_description (char overlay, char *description, char *symtab
  *
  *------------------------------------------------------------------*/
 
-void symbols_to_tones (char symtab, char symbol, char *tones, size_t tonessiz)
-{
+//export symbols_to_tones
+func symbols_to_tones (symtab C.char, symbol C.char, tones *C.char, tonessiz C.size_t) {
 
 	if (symtab == '/') {
+		C.strncpy(tones, C.CString(fmt.Sprintf("AB1%02d", symbol - ' ')), tonessiz)
+	} else if (C.isupper(symtab) == 0 || C.isdigit(symtab) == 0) {
 
-	  snprintf (tones, tonessiz, "AB1%02d", symbol - ' ');
-	}
-	else if (isupper(symtab) || isdigit(symtab)) {
-
-	  char text[2];
-	  char tt[8];
+	  var text[2]C.char
+	  var tt[8]C.char
 
 	  text[0] = symtab;
-	  text[1] = '\0';
+	  text[1] = 0
 
-	  tt_text_to_two_key (text, 0, tt);
+	  tt_text_to_two_key (&text[0], 0, &tt[0]);
 
-	  snprintf (tones, tonessiz, "AB0%02d%s", symbol - ' ', tt);
+	  C.strncpy(tones, C.CString(fmt.Sprintf("AB0%02d%s", symbol - ' ', tt)), tonessiz)
+	} else {
+		C.strncpy(tones, C.CString(fmt.Sprintf("AB2%02d", symbol - ' ')), tonessiz)
 	}
-	else {
-	 
-	  snprintf (tones, tonessiz, "AB2%02d", symbol - ' ');
-	}
-
 }  /* end symbols_to_tones */
-
-/* end symbols.c */
