@@ -354,10 +354,12 @@ func symbols_init () {
 
 	fp = nil;
 	j = 0;
-	do {
-	  if (search_locations[j] == nil) break;
+	for _, l := range search_locations {
 	  fp = fopen(search_locations[j++], "r");
-	} while (fp == nil);
+	  if fp != nil {
+		  break
+	  }
+	} 
 
 	if (fp == nil) {
 
