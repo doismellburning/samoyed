@@ -296,13 +296,13 @@ type new_sym_t struct {
 }
 
 var new_sym_ptr *new_sym_t
-// FIXME KG static new_sym_t *new_sym_ptr = NULL;	/* Dynamically allocated array. */
+// FIXME KG static new_sym_t *new_sym_ptr = nil;	/* Dynamically allocated array. */
 // FIXME KG static int new_sym_size = 0;		/* Number of elements allocated. */
 // FIXME KG static int new_sym_len = 0;			/* Number of elements used. */
 
 
 func symbols_init () {
-	FILE *fp = NULL;
+	FILE *fp = nil;
 
 /*
  * We only care about lines with this format:
@@ -324,8 +324,8 @@ func symbols_init () {
 #define COL6_DESC 5
 */
 
-	char stuff[200];
-	int j;
+	var stuff[200]C.char
+	var j C.int
 
 // Feb. 2022 - Noticed that some lines have - rather than =.
 
@@ -336,6 +336,7 @@ func symbols_init () {
 // 1# - WIDE1-1 digipeater
 
 
+/* FIXME KG
 #define GOOD_LINE(x) (strlen(x) > 6 && \
 			(x[COL1_OVERLAY] == '/' || x[COL1_OVERLAY] == '\\' || isupper(x[COL1_OVERLAY]) || isdigit(x[COL1_OVERLAY])) \
 			&& x[COL2_SYMBOL] >= '!' && x[COL2_SYMBOL] <= '~' \
@@ -343,21 +344,22 @@ func symbols_init () {
 			&& (x[COL4_EQUAL] == '=' || x[COL4_EQUAL] == '-') \
 			&& x[COL5_SP] == ' ' \
 			&& x[COL6_DESC] != ' ')
+			*/
 
-	if (new_sym_ptr != NULL) {
+	if (new_sym_ptr != nil) {
 	  return;			/* was called already. */
 	}
 
 // If search strategy changes, be sure to keep decode_tocall in sync.
 
-	fp = NULL;
+	fp = nil;
 	j = 0;
 	do {
-	  if (search_locations[j] == NULL) break;
+	  if (search_locations[j] == nil) break;
 	  fp = fopen(search_locations[j++], "r");
-	} while (fp == NULL);
+	} while (fp == nil);
 
-	if (fp == NULL) {
+	if (fp == nil) {
 
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Warning: Could not open 'symbols-new.txt'.\n");
@@ -372,7 +374,7 @@ func symbols_init () {
 /*
  * Count number of interesting lines and allocate storage.
  */
-	while (fgets(stuff, sizeof(stuff), fp) != NULL) {
+	while (fgets(stuff, sizeof(stuff), fp) != nil) {
 	  if (GOOD_LINE(stuff)) {
 	    new_sym_size++;
 	  }
@@ -385,7 +387,7 @@ func symbols_init () {
  */
 	rewind (fp);
 
-	while (fgets(stuff, sizeof(stuff), fp) != NULL) {
+	while (fgets(stuff, sizeof(stuff), fp) != nil) {
 
 	  if (GOOD_LINE(stuff)) {
 	    for (j = strlen(stuff+COL6_DESC) - 1; j>=0 && stuff[COL6_DESC+j] <= ' '; j--) {
@@ -399,7 +401,7 @@ func symbols_init () {
 	}
 	fclose (fp);
 
-	assert (new_sym_len == new_sym_size);
+	Assert (new_sym_len == new_sym_size);
 
 #if 0
 	for (j=0; j<new_sym_len; j++) {
@@ -465,15 +467,13 @@ void symbols_list (void)
 								primary_symtab[symbol - ' '].xy, ' ',
 								symbol - ' ', tones,
 								new_sym_ptr[n].description);
-	  }
-	  else if (isupper(overlay) || isdigit(overlay)) {
+	  } else if (isupper(overlay) || isdigit(overlay)) {
 
 	    dw_printf (" %c%c     %s%c          %-7s  %s\n", overlay, symbol, 
 								alternate_symtab[symbol - ' '].xy, overlay,
 								tones,
 								new_sym_ptr[n].description);
-	  }
-	  else {
+	  } else {
 
 	    dw_printf (" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol, 
 								alternate_symtab[symbol - ' '].xy, ' ', 
@@ -668,7 +668,7 @@ void symbols_from_dest_or_src (char dti, char *src, char *dest, char *symtab, ch
 	if (dti == '$') {
 
 	  p = strchr (src, '-');
-	  if (p != NULL) {
+	  if (p != nil) {
 	    int ssid = atoi(p+1);
 	    if (ssid >= 1 && ssid <= 15) {
 	      *symtab = '/';		/* All in Primary table. */
@@ -708,14 +708,12 @@ int symbols_into_dest (char symtab, char symbol, char *dest)
 	  /* Primary Symbol table. */
 	  snprintf (dest, 7, "GPSC%02d", symbol - ' ');
 	  return (0);
-	}
-	else if (symbol >= '!' && symbol <= '~' && symtab == '\\') {
+	} else if (symbol >= '!' && symbol <= '~' && symtab == '\\') {
 	  
 	  /* Alternate Symbol table. */
 	  snprintf (dest, 7, "GPSE%02d", symbol - ' ');
 	  return (0);
-	}
-	else if (symbol >= '!' && symbol <= '~' && (isupper(symtab) || isdigit(symtab))) {
+	} else if (symbol >= '!' && symbol <= '~' && (isupper(symtab) || isdigit(symtab))) {
 
 	  /* Alternate Symbol table with overlay. */
 	  snprintf (dest, 7, "GPS%s%c", alternate_symtab[symbol - ' '].xy, symtab);
@@ -804,8 +802,7 @@ void symbols_get_description (char symtab, char symbol, char *description, size_
 
 	if (symtab == '/') {
 	  strlcpy (description, primary_symtab[symbol-' '].description, desc_size);
-	}
-	else {
+	} else {
 	  strlcpy (description, alternate_symtab[symbol-' '].description, desc_size);
 	  if (symtab != '\\') {
 	    strlcat (description, " w/overlay ", desc_size);
@@ -851,7 +848,7 @@ int symbols_code_from_description (char overlay, char *description, char *symtab
 	if (isupper(overlay) || isdigit(overlay)) {
 
 	  for (j=0; j<SYMTAB_SIZE; j++) {
-	    if (strcasestr(alternate_symtab[j].description, description) != NULL) {
+	    if (strcasestr(alternate_symtab[j].description, description) != nil) {
 	      *symtab = overlay;
 	      *symbol = j + ' ';
 	      return (1);
@@ -864,7 +861,7 @@ int symbols_code_from_description (char overlay, char *description, char *symtab
  * Search primary table.
  */
 	for (j=0; j<SYMTAB_SIZE; j++) {
-	  if (strcasestr(primary_symtab[j].description, description) != NULL) {
+	  if (strcasestr(primary_symtab[j].description, description) != nil) {
 	    *symtab = '/';
 	    *symbol = j + ' ';
 	    return (1);
@@ -875,7 +872,7 @@ int symbols_code_from_description (char overlay, char *description, char *symtab
  * Search alternate table.
  */
 	for (j=0; j<SYMTAB_SIZE; j++) {
-	  if (strcasestr(alternate_symtab[j].description, description) != NULL) {
+	  if (strcasestr(alternate_symtab[j].description, description) != nil) {
 	    *symtab = '\\';
 	    *symbol = j + ' ';
 	    return (1);
@@ -888,7 +885,7 @@ int symbols_code_from_description (char overlay, char *description, char *symtab
  * generic for queries such as "house" or ...
  */
 	for (j=0; j<new_sym_len; j++) {
-	  if (strcasestr(new_sym_ptr[j].description, description) != NULL) {
+	  if (strcasestr(new_sym_ptr[j].description, description) != nil) {
 	    *symtab = new_sym_ptr[j].overlay;
 	    *symbol = new_sym_ptr[j].symbol;
 	    return (1);
