@@ -5716,7 +5716,7 @@ func beacon_options(cmd string, b *C.struct_beacon_s, line int, p_audio_config *
 		} else {
 
 			/* Try to look up by description. */
-			var ok = symbols_code_from_description(rune(b.symtab), temp_symbol, &(b.symtab), &(b.symbol))
+			var ok = _symbols_code_from_description(rune(b.symtab), temp_symbol, &(b.symtab), &(b.symbol))
 			if ok == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Could not find symbol matching %s.\n", line, temp_symbol)

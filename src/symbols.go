@@ -1,0 +1,901 @@
+package direwolf
+
+/*------------------------------------------------------------------
+ *
+ * Purpose:	Functions related to the APRS symbols
+ *
+ *------------------------------------------------------------------*/
+
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <assert.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <ctype.h>
+// #include "textcolor.h"
+// #include "symbols.h"
+// #include "tt_text.h"
+import "C"
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"unicode"
+)
+
+/*
+ * APRS symbol tables.
+ *
+ * Derived from http://www.aprs.org/symbols/symbolsX.txt
+ * version of 20 Oct 2009.
+ */
+
+/*
+ * Primary symbol table.
+ */
+
+type SymbolEntry struct {
+	xy          string
+	description string
+}
+
+var primary_symtab = []SymbolEntry{
+
+	/*     00  */ {"~~", "--no-symbol--"},
+	/*  !  01  */ {"BB", "Police, Sheriff"},
+	/*  "  02  */ {"BC", "reserved  (was rain)"},
+	/*  #  03  */ {"BD", "DIGI (white center)"},
+	/*  $  04  */ {"BE", "PHONE"},
+	/*  %  05  */ {"BF", "DX CLUSTER"},
+	/*  &  06  */ {"BG", "HF GATEway"},
+	/*  '  07  */ {"BH", "Small AIRCRAFT"},
+	/*  (  08  */ {"BI", "Mobile Satellite Station"},
+	/*  )  09  */ {"BJ", "Wheelchair (handicapped)"},
+	/*  *  10  */ {"BK", "SnowMobile"},
+	/*  +  11  */ {"BL", "Red Cross"},
+	/*  ,  12  */ {"BM", "Boy Scouts"},
+	/*  -  13  */ {"BN", "House QTH (VHF)"},
+	/*  .  14  */ {"BO", "X"},
+	/*  /  15  */ {"BP", "Red Dot"},
+	/*  0  16  */ {"P0", "# circle (obsolete)"},
+	/*  1  17  */ {"P1", "TBD"},
+	/*  2  18  */ {"P2", "TBD"},
+	/*  3  19  */ {"P3", "TBD"},
+	/*  4  20  */ {"P4", "TBD"},
+	/*  5  21  */ {"P5", "TBD"},
+	/*  6  22  */ {"P6", "TBD"},
+	/*  7  23  */ {"P7", "TBD"},
+	/*  8  24  */ {"P8", "TBD"},
+	/*  9  25  */ {"P9", "TBD"},
+	/*  :  26  */ {"MR", "FIRE"},
+	/*  ;  27  */ {"MS", "Campground (Portable ops)"},
+	/*  <  28  */ {"MT", "Motorcycle"},
+	/*  =  29  */ {"MU", "RAILROAD ENGINE"},
+	/*  >  30  */ {"MV", "CAR"},
+	/*  ?  31  */ {"MW", "SERVER for Files"},
+	/*  @  32  */ {"MX", "HC FUTURE predict (dot)"},
+	/*  A  33  */ {"PA", "Aid Station"},
+	/*  B  34  */ {"PB", "BBS or PBBS"},
+	/*  C  35  */ {"PC", "Canoe"},
+	/*  D  36  */ {"PD", ""},
+	/*  E  37  */ {"PE", "EYEBALL (Eye catcher!)"},
+	/*  F  38  */ {"PF", "Farm Vehicle (tractor)"},
+	/*  G  39  */ {"PG", "Grid Square (6 digit)"},
+	/*  H  40  */ {"PH", "HOTEL (blue bed symbol)"},
+	/*  I  41  */ {"PI", "TcpIp on air network stn"},
+	/*  J  42  */ {"PJ", ""},
+	/*  K  43  */ {"PK", "School"},
+	/*  L  44  */ {"PL", "PC user"},
+	/*  M  45  */ {"PM", "MacAPRS"},
+	/*  N  46  */ {"PN", "NTS Station"},
+	/*  O  47  */ {"PO", "BALLOON"},
+	/*  P  48  */ {"PP", "Police"},
+	/*  Q  49  */ {"PQ", "TBD"},
+	/*  R  50  */ {"PR", "REC. VEHICLE"},
+	/*  S  51  */ {"PS", "SHUTTLE"},
+	/*  T  52  */ {"PT", "SSTV"},
+	/*  U  53  */ {"PU", "BUS"},
+	/*  V  54  */ {"PV", "ATV"},
+	/*  W  55  */ {"PW", "National WX Service Site"},
+	/*  X  56  */ {"PX", "HELO"},
+	/*  Y  57  */ {"PY", "YACHT (sail)"},
+	/*  Z  58  */ {"PZ", "WinAPRS"},
+	/*  [  59  */ {"HS", "Human/Person (HT)"},
+	/*  \  60  */ {"HT", "TRIANGLE(DF station)"},
+	/*  ]  61  */ {"HU", "MAIL/PostOffice(was PBBS)"},
+	/*  ^  62  */ {"HV", "LARGE AIRCRAFT"},
+	/*  _  63  */ {"HW", "WEATHER Station (blue)"},
+	/*  `  64  */ {"HX", "Dish Antenna"},
+	/*  a  65  */ {"LA", "AMBULANCE"},
+	/*  b  66  */ {"LB", "BIKE"},
+	/*  c  67  */ {"LC", "Incident Command Post"},
+	/*  d  68  */ {"LD", "Fire dept"},
+	/*  e  69  */ {"LE", "HORSE (equestrian)"},
+	/*  f  70  */ {"LF", "FIRE TRUCK"},
+	/*  g  71  */ {"LG", "Glider"},
+	/*  h  72  */ {"LH", "HOSPITAL"},
+	/*  i  73  */ {"LI", "IOTA (islands on the air)"},
+	/*  j  74  */ {"LJ", "JEEP"},
+	/*  k  75  */ {"LK", "TRUCK"},
+	/*  l  76  */ {"LL", "Laptop"},
+	/*  m  77  */ {"LM", "Mic-E Repeater"},
+	/*  n  78  */ {"LN", "Node (black bulls-eye)"},
+	/*  o  79  */ {"LO", "EOC"},
+	/*  p  80  */ {"LP", "ROVER (puppy, or dog)"},
+	/*  q  81  */ {"LQ", "GRID SQ shown above 128 m"},
+	/*  r  82  */ {"LR", "Repeater"},
+	/*  s  83  */ {"LS", "SHIP (pwr boat)"},
+	/*  t  84  */ {"LT", "TRUCK STOP"},
+	/*  u  85  */ {"LU", "TRUCK (18 wheeler)"},
+	/*  v  86  */ {"LV", "VAN"},
+	/*  w  87  */ {"LW", "WATER station"},
+	/*  x  88  */ {"LX", "xAPRS (Unix)"},
+	/*  y  89  */ {"LY", "YAGI @ QTH"},
+	/*  z  90  */ {"LZ", "TBD"},
+	/*  {  91  */ {"J1", ""},
+	/*  |  92  */ {"J2", "TNC Stream Switch"},
+	/*  }  93  */ {"J3", ""},
+	/*  ~  94  */ {"J3", "TNC Stream Switch"},
+}
+
+/*
+ * Alternate symbol table.
+ */
+
+var alternate_symtab = []SymbolEntry{
+
+	/*     00  */ {"~~", "--no-symbol--"},
+	/*  !  01  */ {"OB", "EMERGENCY (!)"},
+	/*  "  02  */ {"OC", "reserved"},
+	/*  #  03  */ {"OD", "OVERLAY DIGI (green star)"},
+	/*  $  04  */ {"OE", "Bank or ATM  (green box)"},
+	/*  %  05  */ {"OF", "Power Plant with overlay"},
+	/*  &  06  */ {"OG", "I=Igte IGate R=RX T=1hopTX 2=2hopTX"},
+	/*  '  07  */ {"OH", "Crash (& now Incident sites)"},
+	/*  (  08  */ {"OI", "CLOUDY (other clouds w ovrly)"},
+	/*  )  09  */ {"OJ", "Firenet MEO, MODIS Earth Obs."},
+	/*  *  10  */ {"OK", "SNOW (& future ovrly codes)"},
+	/*  +  11  */ {"OL", "Church"},
+	/*  ,  12  */ {"OM", "Girl Scouts"},
+	/*  -  13  */ {"ON", "House (H=HF) (O = Op Present)"},
+	/*  .  14  */ {"OO", "Ambiguous (Big Question mark)"},
+	/*  /  15  */ {"OP", "Waypoint Destination"},
+	/*  0  16  */ {"A0", "CIRCLE (E/I/W=IRLP/Echolink/WIRES)"},
+	/*  1  17  */ {"A1", ""},
+	/*  2  18  */ {"A2", ""},
+	/*  3  19  */ {"A3", ""},
+	/*  4  20  */ {"A4", ""},
+	/*  5  21  */ {"A5", ""},
+	/*  6  22  */ {"A6", ""},
+	/*  7  23  */ {"A7", ""},
+	/*  8  24  */ {"A8", "802.11 or other network node"},
+	/*  9  25  */ {"A9", "Gas Station (blue pump)"},
+	/*  :  26  */ {"NR", "Hail (& future ovrly codes)"},
+	/*  ;  27  */ {"NS", "Park/Picnic area"},
+	/*  <  28  */ {"NT", "ADVISORY (one WX flag)"},
+	/*  =  29  */ {"NU", "APRStt Touchtone (DTMF users)"},
+	/*  >  30  */ {"NV", "OVERLAID CAR"},
+	/*  ?  31  */ {"NW", "INFO Kiosk  (Blue box with ?)"},
+	/*  @  32  */ {"NX", "HURRICANE/Trop-Storm"},
+	/*  A  33  */ {"AA", "overlayBOX DTMF & RFID & XO"},
+	/*  B  34  */ {"AB", "Blwng Snow (& future codes)"},
+	/*  C  35  */ {"AC", "Coast Guard"},
+	/*  D  36  */ {"AD", "Drizzle (proposed APRStt)"},
+	/*  E  37  */ {"AE", "Smoke (& other vis codes)"},
+	/*  F  38  */ {"AF", "Freezng rain (&future codes)"},
+	/*  G  39  */ {"AG", "Snow Shwr (& future ovrlys)"},
+	/*  H  40  */ {"AH", "Haze (& Overlay Hazards)"},
+	/*  I  41  */ {"AI", "Rain Shower"},
+	/*  J  42  */ {"AJ", "Lightning (& future ovrlys)"},
+	/*  K  43  */ {"AK", "Kenwood HT (W)"},
+	/*  L  44  */ {"AL", "Lighthouse"},
+	/*  M  45  */ {"AM", "MARS (A=Army,N=Navy,F=AF)"},
+	/*  N  46  */ {"AN", "Navigation Buoy"},
+	/*  O  47  */ {"AO", "Rocket"},
+	/*  P  48  */ {"AP", "Parking"},
+	/*  Q  49  */ {"AQ", "QUAKE"},
+	/*  R  50  */ {"AR", "Restaurant"},
+	/*  S  51  */ {"AS", "Satellite/Pacsat"},
+	/*  T  52  */ {"AT", "Thunderstorm"},
+	/*  U  53  */ {"AU", "SUNNY"},
+	/*  V  54  */ {"AV", "VORTAC Nav Aid"},
+	/*  W  55  */ {"AW", "# NWS site (NWS options)"},
+	/*  X  56  */ {"AX", "Pharmacy Rx (Apothicary)"},
+	/*  Y  57  */ {"AY", "Radios and devices"},
+	/*  Z  58  */ {"AZ", ""},
+	/*  [  59  */ {"DS", "W.Cloud (& humans w Ovrly)"},
+	/*  \  60  */ {"DT", "New overlayable GPS symbol"},
+	/*  ]  61  */ {"DU", ""},
+	/*  ^  62  */ {"DV", "# Aircraft (shows heading)"},
+	/*  _  63  */ {"DW", "# WX site (green digi)"},
+	/*  `  64  */ {"DX", "Rain (all types w ovrly)"},
+	/*  a  65  */ {"SA", "ARRL, ARES, WinLINK"},
+	/*  b  66  */ {"SB", "Blwng Dst/Snd (& others)"},
+	/*  c  67  */ {"SC", "CD triangle RACES/SATERN/etc"},
+	/*  d  68  */ {"SD", "DX spot by callsign"},
+	/*  e  69  */ {"SE", "Sleet (& future ovrly codes)"},
+	/*  f  70  */ {"SF", "Funnel Cloud"},
+	/*  g  71  */ {"SG", "Gale Flags"},
+	/*  h  72  */ {"SH", "Store. or HAMFST Hh=HAM store"},
+	/*  i  73  */ {"SI", "BOX or points of Interest"},
+	/*  j  74  */ {"SJ", "WorkZone (Steam Shovel)"},
+	/*  k  75  */ {"SK", "Special Vehicle SUV,ATV,4x4"},
+	/*  l  76  */ {"SL", "Areas      (box,circles,etc)"},
+	/*  m  77  */ {"SM", "Value Sign (3 digit display)"},
+	/*  n  78  */ {"SN", "OVERLAY TRIANGLE"},
+	/*  o  79  */ {"SO", "small circle"},
+	/*  p  80  */ {"SP", "Prtly Cldy (& future ovrlys)"},
+	/*  q  81  */ {"SQ", ""},
+	/*  r  82  */ {"SR", "Restrooms"},
+	/*  s  83  */ {"SS", "OVERLAY SHIP/boat (top view)"},
+	/*  t  84  */ {"ST", "Tornado"},
+	/*  u  85  */ {"SU", "OVERLAID TRUCK"},
+	/*  v  86  */ {"SV", "OVERLAID Van"},
+	/*  w  87  */ {"SW", "Flooding"},
+	/*  x  88  */ {"SX", "Wreck or Obstruction ->X<-"},
+	/*  y  89  */ {"SY", "Skywarn"},
+	/*  z  90  */ {"SZ", "OVERLAID Shelter"},
+	/*  {  91  */ {"Q1", "Fog (& future ovrly codes)"},
+	/*  |  92  */ {"Q2", "TNC Stream Switch"},
+	/*  }  93  */ {"Q3", ""},
+	/*  ~  94  */ {"Q4", "TNC Stream Switch"},
+}
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_init
+ *
+ * Purpose:	Initialization for functions related to symbols.
+ *
+ * Inputs:
+ *
+ * Global output:
+ *		new_sym_ptr
+ *		new_sym_size
+ *		new_sym_len
+ *
+ * Description:	The primary and alternate symbol tables are constant
+ *		so they are hardcoded.
+ *		However the "new" symbols, which give new meanings to
+ *		OVERLAID symbols, are always evolving.
+ *		For maximum flexibility, we will read the
+ *		data file at run time rather than compiling it in.
+ *
+ *		For the most recent version, download from:
+ *
+ *		http://www.aprs.org/symbols/symbols-new.txt
+ *
+ *		Windows version:  File must be in current working directory.
+ *
+ *		Linux version: Search order is current working directory
+ *			then /usr/share/direwolf directory.
+ *
+ *------------------------------------------------------------------*/
+
+const NEW_SYM_INIT_SIZE = 20
+const NEW_SYM_DESC_LEN = 29
+
+type new_sym_t struct {
+	overlay     C.char
+	symbol      C.char
+	description string
+}
+
+var new_sym_ptr []*new_sym_t
+
+func symbols_init() {
+
+	/*
+	 * We only care about lines with this format:
+	 *
+	 *  Column 1 - overlay character of / \ upper case or digit
+	 *  Column 2 - symbol in range of ! thru ~
+	 *  Column 3 - space
+	 *  Column 4 - equal sign
+	 *  Column 5 - space
+	 *  Column 6 - Start of description.
+	 */
+
+	const COL1_OVERLAY = 0
+	const COL2_SYMBOL = 1
+	const COL3_SP = 2
+	const COL4_EQUAL = 3
+	const COL5_SP = 4
+	const COL6_DESC = 5
+
+	// Feb. 2022 - Noticed that some lines have - rather than =.
+
+	// LD = LIght Rail or Subway (new Aug 2014)
+	// SD = Seaport Depot (new Aug 2014)
+	// DIGIPEATERS
+	// /# - Generic digipeater
+	// 1# - WIDE1-1 digipeater
+
+	var GOOD_LINE = func(x string) bool {
+		return (len(x) > 6 &&
+			(x[COL1_OVERLAY] == '/' || x[COL1_OVERLAY] == '\\' || unicode.IsUpper(rune(x[COL1_OVERLAY])) || unicode.IsDigit(rune(x[COL1_OVERLAY]))) &&
+			x[COL2_SYMBOL] >= '!' &&
+			x[COL2_SYMBOL] <= '~' &&
+			x[COL3_SP] == ' ' &&
+			(x[COL4_EQUAL] == '=' || x[COL4_EQUAL] == '-') &&
+			x[COL5_SP] == ' ' &&
+			x[COL6_DESC] != ' ')
+	}
+
+	if len(new_sym_ptr) > 0 {
+		return /* was called already. */
+	}
+
+	// If search strategy changes, be sure to keep decode_tocall in sync.
+
+	var fp *os.File
+
+	var SymbolsSearchLocations = []string{
+		"symbols-new.txt",         // CWD
+		"data/symbols-new.txt",    // Windows with Cmake
+		"../data/symbols-new.txt", // ?
+		"/usr/local/share/direwolf/symbols-new.txt",
+		"/usr/share/direwolf/symbols-new.txt",
+		// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
+		// Adding the /opt/local tree since macports typically installs there.  Users might want their
+		// INSTALLDIR (see Makefile.macosx) to mirror that.  If so, then we need to search the /opt/local
+		// path as well.
+		"/opt/local/share/direwolf/symbols-new.txt",
+	}
+
+	for _, l := range SymbolsSearchLocations {
+		var openErr error
+		fp, openErr = os.Open(l)
+		if openErr == nil {
+			break
+		}
+	}
+
+	if fp == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Warning: Could not open 'symbols-new.txt'.\n")
+		dw_printf("The \"new\" OVERLAID character information will not be available.\n")
+
+		return
+	}
+
+	defer fp.Close()
+
+	var scanner = bufio.NewScanner(fp)
+	for scanner.Scan() {
+		var line = scanner.Text()
+
+		if !GOOD_LINE(line) {
+			continue
+		}
+
+		var newSymbol = new(new_sym_t)
+		newSymbol.overlay = C.char(line[COL1_OVERLAY])
+		newSymbol.symbol = C.char(line[COL2_SYMBOL])
+		newSymbol.description = strings.TrimSpace(line[COL6_DESC:])
+
+		new_sym_ptr = append(new_sym_ptr, newSymbol)
+	}
+
+	/*
+		#if 0
+			for (j=0; j<new_sym_len; j++) {
+			  dw_printf ("%02d: %c %c '%s'\n", j, new_sym_ptr[j].overlay,
+				new_sym_ptr[j].symbol, new_sym_ptr[j].description);
+			}
+		#endif
+	*/
+
+} /* end symbols_init */
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_list
+ *
+ * Purpose:	Print a list of all the symbols.
+ *
+ * Inputs:	none
+ *
+ *------------------------------------------------------------------*/
+
+func symbols_list() {
+
+	dw_printf("\n")
+
+	dw_printf("\tPRIMARY SYMBOL TABLE\n")
+	dw_printf("\n")
+	dw_printf("sym  GPSxy  GPSCnn  APRStt  Icon\n")
+	dw_printf("---  -----  ------  ------  ----\n")
+
+	for n, s := range primary_symtab {
+		dw_printf(" /%c     %s      %02d  AB1%02d   %s\n", n+' ', s.xy, n, n, s.description)
+	}
+
+	dw_printf("\n")
+	dw_printf("\tALTERNATE SYMBOL TABLE\n")
+	dw_printf("\n")
+	dw_printf("sym  GPSxy  GPSEnn  APRStt  Icon\n")
+	dw_printf("---  -----  ------  ------  ----\n")
+
+	for n, s := range alternate_symtab {
+		dw_printf(" \\%c     %s      %02d  AB2%02d   %s\n", n+' ', s.xy, n, n, s.description)
+	}
+
+	dw_printf("\n")
+	dw_printf("\tNEW SYMBOLS from symbols-new.txt\n")
+	dw_printf("\n")
+	dw_printf("sym  GPSxyz  GPSxnn  APRStt   Icon\n")
+	dw_printf("---  ------  ------  ------   ----\n")
+
+	for _, s := range new_sym_ptr {
+		var overlay = s.overlay
+		var symbol = s.symbol
+		var tones [12]C.char
+		var index = int(symbol - ' ')
+
+		symbols_to_tones(overlay, symbol, &tones[0], C.size_t(len(tones)))
+
+		if overlay == '/' {
+			if index >= len(primary_symtab) {
+				// TODO KG Warn somehow?
+				continue
+			}
+			dw_printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
+				primary_symtab[index].xy, ' ',
+				index, C.GoString(&tones[0]),
+				s.description)
+		} else if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
+			if index >= len(alternate_symtab) {
+				// TODO KG Warn somehow?
+				continue
+			}
+			dw_printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
+				alternate_symtab[index].xy, overlay,
+				C.GoString(&tones[0]),
+				s.description)
+		} else {
+			if index >= len(alternate_symtab) {
+				// TODO KG Warn somehow?
+				continue
+			}
+			dw_printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
+				alternate_symtab[index].xy, ' ',
+				symbol-' ', C.GoString(&tones[0]),
+				s.description)
+		}
+	}
+	dw_printf("\n")
+	dw_printf("More information here: http://www.aprs.org/symbols.html\n")
+
+} /* end symbols_list */
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_from_dest_or_src
+ *
+ * Purpose:	Extract symbol from destination or source.
+ *
+ * Inputs:	dti	- Data type indicator.
+ *
+ *		src	- Source address with SSID.
+ *
+ *		dest	- Destination address.
+ *			  Don't care if SSID is present or not.
+ *
+ * Outputs:	*symtab
+ *		*symbol
+ *
+ * Description:	There are 3 different ways to specify the symbol,
+ *		in this order of precedence:
+ *
+ *		- Information field.  This was done already in the
+ *		  separate decoders for different message types.
+ *
+ *		If not set already,
+ *
+ *		- The destination address if it has certain formats
+ *		  starting with GPS, SPC, or SYM which are equivalent
+ *		  for our purposes.
+ *		  (Not for MIC-E where destination has a special use.)
+ *
+ *		If all else fails,
+ *
+ *		- SSID of the source address.
+ *
+ *
+ *------------------------------------------------------------------*/
+
+var ssid_to_sym = [16]byte{
+	' ',  /* 0 - No icon. */
+	'a',  /* 1 - Ambulance */
+	'U',  /* 2 - Bus */
+	'f',  /* 3 - Fire Truck */
+	'b',  /* 4 - Bicycle */
+	'Y',  /* 5 - Yacht */
+	'X',  /* 6 - Helicopter */
+	'\'', /* 7 - Small Aircraft */
+	's',  /* 8 - Ship */
+	'>',  /* 9 - Car */
+	'<',  /* 10 - Motorcycle */
+	'O',  /* 11 - Ballon */
+	'j',  /* 12 - Jeep */
+	'R',  /* 13 - Recreational Vehicle */
+	'k',  /* 14 - Truck */
+	'v',  /* 15 - Van */
+}
+
+func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.char, symbol *C.char) {
+
+	var dest = C.GoString(_dest)
+
+	/*
+	 * This part does not apply to MIC-E format because the destination
+	 * is used to encode latitude and other information.
+	 */
+	if dti != '\'' && dti != '`' {
+
+		/*
+		 * For GPSCnn, nn is the index into the primary symbol table.
+		 */
+
+		if strings.HasPrefix(dest, "GPSC") {
+			var nn, _ = strconv.Atoi(dest[4:])
+			if nn >= 1 && nn <= 94 {
+				*symtab = '/' /* Primary */
+				*symbol = C.char(' ' + nn)
+				return
+			}
+		}
+
+		/*
+		 * For GPSEnn, nn is the index into the alternate symbol table.
+		 */
+
+		if strings.HasPrefix(dest, "GPSE") {
+			var nn, _ = strconv.Atoi(dest[4:])
+			if nn >= 1 && nn <= 94 {
+				*symtab = '\\' /* Alternate. */
+				*symbol = C.char(' ' + nn)
+				return
+			}
+		}
+
+		/*
+		 * For GPSxy or SPCxy or SYMxy, look up xy in the translation tables.
+		 * First search the primary table.
+		 */
+
+		if (strings.HasPrefix(dest, "GPS") ||
+			strings.HasPrefix(dest, "SPC") ||
+			strings.HasPrefix(dest, "SYM")) && len(dest) >= 5 {
+			var xy = string(dest[3]) + string(dest[4])
+
+			for nn := 1; nn <= 94; nn++ {
+				if xy == primary_symtab[nn].xy {
+					*symtab = '/' /* Primary. */
+					*symbol = C.char(' ' + nn)
+					return
+				}
+			}
+		}
+
+		/*
+		 * Next, search the alternate table.
+		 * This time, we can have the format ...xyz, where z is an overlay character.
+		 * Only upper case letters and digits are valid overlay characters.
+		 */
+
+		if (strings.HasPrefix(dest, "GPS") ||
+			strings.HasPrefix(dest, "SPC") ||
+			strings.HasPrefix(dest, "SYM")) && len(dest) >= 5 {
+
+			var xy = string(dest[3]) + string(dest[4])
+
+			var z byte
+			if len(dest) > 5 {
+				z = dest[5]
+			}
+
+			for nn := 1; nn <= 94; nn++ {
+				if xy == alternate_symtab[nn].xy {
+					*symtab = '\\' /* Alternate. */
+					*symbol = C.char(' ' + nn)
+					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
+						*symtab = C.char(z)
+					}
+					return
+				}
+			}
+		}
+
+	} /* end not MIC-E */
+
+	/*
+	 * When all else fails, use source SSID.
+	 * This is totally non-obvious and confusing, but it is in the APRS protocol spec.
+	 * Chapter 20, "Symbol in the Source Address SSID"
+	 */
+
+	// January 2022 - Every time this shows up, it confuses people terribly.
+	// e.g. An APRS "message" shows up with Bus or Motorcycle in the description.
+
+	// The position and object formats all contain a proper symbol and table.
+	// There doesn't seem to be much reason to have a symbol for something without
+	// a position because it would not show up on a map.
+	// This just seems to be a remnant of something used long ago and no longer needed.
+	// The protocol spec mentions a "MIM tracker" but I can't find any references to it.
+
+	// If this was completely removed, no one would probably ever notice.
+	// The only possible useful case I can think of would be someone sending a
+	// NMEA string directly from a GPS receiver and wanting to keep the destination field
+	// for the system type.
+
+	if dti == '$' {
+		var _, ssidStr, found = strings.Cut(C.GoString(src), "-")
+		if found {
+			var ssid, _ = strconv.Atoi(ssidStr)
+			if ssid >= 1 && ssid <= 15 {
+				*symtab = '/' /* All in Primary table. */
+				*symbol = C.char(ssid_to_sym[ssid])
+				return
+			}
+		}
+	}
+
+} /* symbols_from_dest_or_src */
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_into_dest
+ *
+ * Purpose:	Encode symbol for destination field.
+ *
+ * Inputs:	symtab		/, \, 0-9, A-Z
+ *		symbol		any printable character ! to ~
+ *
+ * Outputs:	dest		6 character "destination" of the forms
+ *					GPSCnn  - primary table.
+ *					GPSEnn  - alternate table.
+ *					GPSxyz  - alternate with overlay.
+ *
+ * Returns:	0 for success, 1 for error.
+ *
+ *------------------------------------------------------------------*/
+
+func symbols_into_dest(symtab C.char, symbol C.char, dest *C.char) C.int {
+
+	if symbol >= '!' && symbol <= '~' && symtab == '/' {
+
+		/* Primary Symbol table. */
+		C.strcpy(dest, C.CString(fmt.Sprintf("GPSC%02d", symbol-' ')))
+		return (0)
+	} else if symbol >= '!' && symbol <= '~' && symtab == '\\' {
+
+		/* Alternate Symbol table. */
+		C.strcpy(dest, C.CString(fmt.Sprintf("GPSE%02d", symbol-' ')))
+		return (0)
+	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
+
+		/* Alternate Symbol table with overlay. */
+		C.strcpy(dest, C.CString(fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab)))
+		return (0)
+	}
+
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Could not convert symbol \"%c%c\" to GPSxyz destination format.\n",
+		symtab, symbol)
+
+	C.strcpy(dest, C.CString("GPS???")) /* Error. */
+	return (1)
+}
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_get_description
+ *
+ * Purpose:	Get description for given symbol table/code/overlay.
+ *
+ * Inputs:	symtab		/, \, 0-9, A-Z
+ *		symbol		any printable character ! to ~
+ *
+ *		desc_size	Size of description provided by caller
+ *				so we can avoid buffer overflow.
+ *
+ * Outputs:	description	Text description.
+ *				"--no-symbol--"  if error.
+ *
+ *
+ * Description:	This is used for the monitoring and the
+ *		decode_aprs utility.
+ *
+ *------------------------------------------------------------------*/
+
+func symbols_get_description(symtab C.char, symbol C.char, description *C.char, desc_size C.size_t) {
+	/* FIXME KG
+	char tmp2[2];
+	int j;
+	*/
+
+	symbols_init()
+
+	// The symbol table identifier should be
+	//	/	for symbol from primary table
+	//	\	for symbol from alternate table
+	//	0-9,A-Z	for alternate symbol table with overlay character
+
+	if symtab != '/' &&
+		symtab != '\\' &&
+		!unicode.IsDigit(rune(symtab)) &&
+		!unicode.IsUpper(rune(symtab)) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Symbol table identifier is not '/' (primary), '\\' (alternate), or valid overlay character.\n")
+
+		/* Possibilities: */
+		/* Select primary table and keep going, or */
+		/* report no symbol.  It IS an error. */
+		/* We do the latter. */
+
+		symbol = ' '
+		C.strcpy(description, C.CString(primary_symtab[symbol-' '].description))
+		return
+	}
+
+	// Bounds check before using symbol as index into table.
+
+	if symbol < ' ' || symbol > '~' {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Symbol code is not a printable character.\n")
+		symbol = ' ' /* Avoid subscript out of bounds. */
+	}
+
+	// First try to match with the "new" symbols.
+
+	for _, s := range new_sym_ptr {
+		if symtab == s.overlay && symbol == s.symbol {
+			C.strcpy(description, C.CString(s.description))
+			return
+		}
+	}
+
+	// Otherwise use the original symbol tables.
+
+	if symtab == '/' {
+		C.strcpy(description, C.CString(primary_symtab[symbol-' '].description))
+	} else {
+		C.strcpy(description, C.CString(alternate_symtab[symbol-' '].description))
+		if symtab != '\\' {
+			C.strcat(description, C.CString(" w/overlay "))
+			C.strcat(description, C.CString(string(rune(symtab))))
+		}
+	}
+
+} /* end symbols_get_description */
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_code_from_description
+ *
+ * Purpose:	Find a suitable table/symbol based on given description.
+ *
+ * Inputs:	overlay		Explicit overlay or space.
+ *		description	Substring of one of the descriptions.
+ *				Example: dog
+ *
+ * Outputs:	symtab		/, \, 0-9, A-Z
+ *		symbol		any printable character ! to ~
+ *
+ * Returns:	1 for success, 0 for failure.
+ *
+ *------------------------------------------------------------------*/
+
+func symbols_code_from_description(overlay C.char, _description *C.char, symtab *C.char, symbol *C.char) C.int {
+
+	var description = C.GoString(_description)
+
+	symbols_init()
+
+	/*
+	 * If user specified a particular overlay (i.e. for config file BEACON),
+	 * first try the alternate symbol table.
+	 * If that fails should we give up or ignore the overlay and keep trying?
+	 */
+
+	if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
+		for j, s := range alternate_symtab {
+			if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
+				*symtab = overlay
+				*symbol = C.char(j + ' ')
+				return (1)
+			}
+		}
+		/* If that fails should we give up or ignore the overlay and keep trying? */
+	}
+
+	/*
+	 * Search primary table.
+	 */
+	for j, s := range primary_symtab {
+		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
+			*symtab = '/'
+			*symbol = C.char(j + ' ')
+			return (1)
+		}
+	}
+
+	/*
+	 * Search alternate table.
+	 */
+	for j, s := range alternate_symtab {
+		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
+			*symtab = '\\'
+			*symbol = C.char(j + ' ')
+			return (1)
+		}
+	}
+
+	/*
+	 * Finally, the "new" symbols.
+	 * Probably want this last so get get the most standard and
+	 * generic for queries such as "house" or ...
+	 */
+	for _, s := range new_sym_ptr {
+		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
+			*symtab = s.overlay
+			*symbol = s.symbol
+			return (1)
+		}
+	}
+
+	/*
+	 * Default to something generic like house.
+	 * Caller is responsible for issuing error message.
+	 */
+	*symtab = '/'
+	*symbol = '-'
+	return (0)
+
+} /* end symbols_code_from_description */
+
+/*------------------------------------------------------------------
+ *
+ * Function:	symbols_to_tones
+ *
+ * Purpose:	Convert symbol to APRStt tone sequence.
+ *
+ * Inputs:	symtab/overlay
+ *		symbol
+ *		tonessiz	- Amount of space available for result.
+ *
+ * Output:	tones	- string of AB...
+ *
+ * Description:
+ *
+ *		Primary: 	AB1nn		nn = same number as GPSCnn
+ *		Alternate:	AB2nn 		nn = same number as GPSEnn
+ *		with overlay:	AB0nntt   	nn = same as with alternate
+ *						tt = one or two tones from two key method.
+ *
+ *------------------------------------------------------------------*/
+
+func symbols_to_tones(symtab C.char, symbol C.char, tones *C.char, tonessiz C.size_t) {
+
+	if symtab == '/' {
+		C.strncpy(tones, C.CString(fmt.Sprintf("AB1%02d", symbol-' ')), tonessiz)
+	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
+
+		var text [2]C.char
+		var tt [8]C.char
+
+		text[0] = symtab
+		text[1] = 0
+
+		C.tt_text_to_two_key(&text[0], 0, &tt[0])
+
+		C.strncpy(tones, C.CString(fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))), tonessiz)
+	} else {
+		C.strncpy(tones, C.CString(fmt.Sprintf("AB2%02d", symbol-' ')), tonessiz)
+	}
+} /* end symbols_to_tones */
