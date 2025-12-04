@@ -59,7 +59,6 @@ package direwolf
 // #include "fx25.h"
 // #include "il2p.h"
 // #include "hdlc_rec.h"
-// #include "atest.h"
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
 // void ptt_set_real (int ot, int chan, int ptt_signal);
@@ -77,12 +76,38 @@ import (
 	"github.com/spf13/pflag"
 )
 
+type atest_header_t struct {
+	riff     [4]C.char /* "RIFF" */
+	filesize C.int     /* file length - 8 */
+	wave     [4]C.char /* "WAVE" */
+}
+
+type atest_chunk_t struct {
+	id       [4]C.char /* "LIST" or "fmt " */
+	datasize C.int
+}
+
+type atest_format_t struct {
+	wformattag      C.short /* 1 for PCM. */
+	nchannels       C.short /* 1 for mono, 2 for stereo. */
+	nsamplespersec  C.int   /* sampling freq, Hz. */
+	navgbytespersec C.int   /* = nblockalign*nsamplespersec. */
+	nblockalign     C.short /* = wbitspersample/8 * nchannels. */
+	wbitspersample  C.short /* 16 or 8. */
+	extras          [4]C.char
+}
+
+type atest_wav_data_t struct {
+	data     [4]C.char /* "data" */
+	datasize C.int
+}
+
 var ATEST_C = false
 
-var header C.struct_atest_header_t
-var chunk C.struct_atest_chunk_t
-var format C.struct_atest_format_t
-var wav_data C.struct_atest_wav_data_t
+var header atest_header_t
+var chunk atest_chunk_t
+var format atest_format_t
+var wav_data atest_wav_data_t
 
 var atestFP *C.FILE // FIXME KG WAS fp
 var e_o_f bool
