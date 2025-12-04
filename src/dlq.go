@@ -28,8 +28,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "audio.h"
 // #include "dlq.h"
-// extern int ATEST_C;
-// void dlq_rec_frame_fake (int chan, int subchan, int slice, packet_t pp, alevel_t alevel, fec_type_t fec_type, retry_t retries, char *spectrum);
 import "C"
 
 import (
@@ -201,8 +199,8 @@ func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packe
 
 //export dlq_rec_frame
 func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum *C.char) {
-	if C.ATEST_C != 0 {
-		C.dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
+	if ATEST_C {
+		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	} else {
 		dlq_rec_frame_real(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	}
