@@ -96,7 +96,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 
 var audio_config *C.struct_audio_s
 var dw_tt_config C.struct_tt_config_s
-var misc_config C.struct_misc_config_s
+var misc_config *C.struct_misc_config_s
 
 /*-------------------------------------------------------------------
  *
@@ -330,11 +330,12 @@ x = Silence FX.25 information.`)
 	C.symbols_init()
 
 	audio_config = new(C.struct_audio_s)
+	misc_config = new(C.struct_misc_config_s)
 	var digi_config C.struct_digi_config_s
 	var cdigi_config C.struct_cdigi_config_s
 	var igate_config C.struct_igate_config_s
 
-	C.config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, &misc_config)
+	C.config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < C.MIN_SAMPLES_PER_SEC || *audioSampleRate > C.MAX_SAMPLES_PER_SEC {
@@ -755,33 +756,33 @@ x = Silence FX.25 information.`)
 	igate_init(audio_config, &igate_config, &digi_config, C.int(d_i_opt))
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
-	ax25_link_init(&misc_config, C.int(d_c_opt))
+	ax25_link_init(misc_config, C.int(d_c_opt))
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	server_init(audio_config, &misc_config)
-	kissnet_init(&misc_config)
+	server_init(audio_config, misc_config)
+	kissnet_init(misc_config)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
 	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled > 0 {
-		C.dns_sd_announce(&misc_config)
+		C.dns_sd_announce(misc_config)
 	}
 
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kisspt_init(&misc_config)
-	kissserial_init(&misc_config)
+	kisspt_init(misc_config)
+	kissserial_init(misc_config)
 	kiss_frame_init(audio_config)
 
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(&misc_config, C.int(d_g_opt))
+	dwgps_init(misc_config, C.int(d_g_opt))
 
-	waypoint_init(&misc_config)
+	waypoint_init(misc_config)
 
 	/*
 	 * Enable beaconing.
@@ -791,7 +792,7 @@ x = Silence FX.25 information.`)
 
 	log_init((misc_config.log_daily_names > 0), C.GoString(&misc_config.log_path[0]))
 	mheard_init(d_m_opt)
-	beacon_init(audio_config, &misc_config, &igate_config)
+	beacon_init(audio_config, misc_config, &igate_config)
 
 	/*
 	 * Get sound samples and decode them.
