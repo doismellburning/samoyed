@@ -94,7 +94,7 @@ var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS p
 
 var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
 
-var audio_config C.struct_audio_s
+var audio_config *C.struct_audio_s
 var dw_tt_config C.struct_tt_config_s
 var misc_config C.struct_misc_config_s
 
@@ -329,11 +329,12 @@ x = Silence FX.25 information.`)
 
 	C.symbols_init()
 
+	audio_config = new(C.struct_audio_s)
 	var digi_config C.struct_digi_config_s
 	var cdigi_config C.struct_cdigi_config_s
 	var igate_config C.struct_igate_config_s
 
-	C.config_init(C.CString(*configFileName), &audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, &misc_config)
+	C.config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, &misc_config)
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < C.MIN_SAMPLES_PER_SEC || *audioSampleRate > C.MAX_SAMPLES_PER_SEC {
@@ -596,7 +597,7 @@ x = Silence FX.25 information.`)
 	 */
 	deviceid_init()
 
-	var err = C.audio_open(&audio_config)
+	var err = C.audio_open(audio_config)
 	if err < 0 {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
@@ -608,7 +609,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
-	multi_modem_init(&audio_config)
+	multi_modem_init(audio_config)
 	C.fx25_init(C.int(d_x_opt))
 	C.il2p_init(C.int(d_2_opt))
 
@@ -617,22 +618,22 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	nettnc_init(&audio_config)
+	nettnc_init(audio_config)
 
 	/*
 	 * Initialize the touch tone decoder & APRStt gateway.
 	 */
-	dtmf_init(&audio_config, audio_amplitude)
+	dtmf_init(audio_config, audio_amplitude)
 	aprs_tt_init(&dw_tt_config, aprstt_debug)
-	tt_user_init(&audio_config, &dw_tt_config)
+	tt_user_init(audio_config, &dw_tt_config)
 
 	/*
 	 * Should there be an option for audio output level?
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	gen_tone_init(&audio_config, audio_amplitude, 0)
-	morse_init(&audio_config, audio_amplitude)
+	gen_tone_init(audio_config, audio_amplitude, 0)
+	morse_init(audio_config, audio_amplitude)
 
 	if !(audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16) { //nolint:staticcheck
 		panic("audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16")
@@ -648,7 +649,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmit_init(&audio_config, IfThenElse(d_p_opt, C.int(1), C.int(0)))
+	xmit_init(audio_config, IfThenElse(d_p_opt, C.int(1), C.int(0)))
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
@@ -750,16 +751,16 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
-	digipeater_init(&audio_config, &digi_config)
-	igate_init(&audio_config, &igate_config, &digi_config, C.int(d_i_opt))
-	cdigipeater_init(&audio_config, &cdigi_config)
+	digipeater_init(audio_config, &digi_config)
+	igate_init(audio_config, &igate_config, &digi_config, C.int(d_i_opt))
+	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(&misc_config, C.int(d_c_opt))
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	server_init(&audio_config, &misc_config)
+	server_init(audio_config, &misc_config)
 	kissnet_init(&misc_config)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
@@ -773,7 +774,7 @@ x = Silence FX.25 information.`)
 	 */
 	kisspt_init(&misc_config)
 	kissserial_init(&misc_config)
-	kiss_frame_init(&audio_config)
+	kiss_frame_init(audio_config)
 
 	/*
 	 * Open port for communication with GPS.
@@ -790,14 +791,14 @@ x = Silence FX.25 information.`)
 
 	log_init((misc_config.log_daily_names > 0), C.GoString(&misc_config.log_path[0]))
 	mheard_init(d_m_opt)
-	beacon_init(&audio_config, &misc_config, &igate_config)
+	beacon_init(audio_config, &misc_config, &igate_config)
 
 	/*
 	 * Get sound samples and decode them.
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	recv_init(&audio_config)
+	recv_init(audio_config)
 	recv_process()
 }
 
