@@ -657,7 +657,7 @@ func all_frame_types(t *testing.T) {
 			for cr := cmin; cr <= cmax; cr++ {
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_u_frame(&addrs[0], num_addr, cr, ftype, pf, pid, pinfo, info_len)
+				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
 				C.ax25_delete(pp)
@@ -685,7 +685,7 @@ func all_frame_types(t *testing.T) {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
@@ -703,7 +703,7 @@ func all_frame_types(t *testing.T) {
 
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
 				C.ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
@@ -724,7 +724,7 @@ func all_frame_types(t *testing.T) {
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
+		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
 
 		C.ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
@@ -746,7 +746,7 @@ func all_frame_types(t *testing.T) {
 		for cr := C.cmdres_t(1); cr <= 1; cr++ { // can only be command
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
@@ -760,7 +760,7 @@ func all_frame_types(t *testing.T) {
 		for cr := C.cmdres_t(1); cr <= 1; cr++ {
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)

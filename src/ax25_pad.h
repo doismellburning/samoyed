@@ -71,8 +71,6 @@
 #define AX25_PID_ESCAPE_CHARACTER 0xff
 
 
-#ifdef AX25_PAD_C	/* Keep this hidden - implementation could change. */
-
 struct packet_s {
 
 	int magic1;		/* for error checking. */
@@ -148,13 +146,6 @@ struct packet_s {
 
 
 
-#else			/* Public view. */
-
-struct packet_s {
-	int secret;
-};
-
-#endif
 
 
 typedef struct packet_s *packet_t;

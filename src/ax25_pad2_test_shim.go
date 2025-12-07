@@ -83,7 +83,7 @@ func ax25_pad2_test_main(t *testing.T) {
 				C.text_color_set(C.DW_COLOR_INFO)
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_u_frame(&addrs[0], num_addr, cr, ftype, pf, pid, pinfo, info_len)
+				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
 				check_ax25_u_frame(t, pp, cr, ftype, pf)
 				C.ax25_hex_dump(pp)
 				C.ax25_delete(pp)
@@ -107,7 +107,7 @@ func ax25_pad2_test_main(t *testing.T) {
 				C.text_color_set(C.DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 				C.ax25_hex_dump(pp)
@@ -121,7 +121,7 @@ func ax25_pad2_test_main(t *testing.T) {
 				C.text_color_set(C.DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 				C.ax25_hex_dump(pp)
@@ -143,7 +143,7 @@ func ax25_pad2_test_main(t *testing.T) {
 		C.text_color_set(C.DW_COLOR_INFO)
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
+		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
 		check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 		C.ax25_hex_dump(pp)
@@ -166,7 +166,7 @@ func ax25_pad2_test_main(t *testing.T) {
 			C.text_color_set(C.DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)
@@ -181,7 +181,7 @@ func ax25_pad2_test_main(t *testing.T) {
 			C.text_color_set(C.DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, pinfo, info_len)
 
 			C.ax25_hex_dump(pp)

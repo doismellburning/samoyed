@@ -574,7 +574,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		var pf = (control >> 6) & 0x01
 		var pinfo *C.uchar // Any info for SREJ will be added later.
 		var info_len C.int = 0
-		return (C.ax25_s_frame(&addrs[0], num_addr, cr, ftype, modulo, nr, pf, pinfo, info_len))
+		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo, info_len))
 	} else if pid == 1 {
 
 		// 'U' frame other than 'UI'.
@@ -607,7 +607,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		var pf = (control >> 6) & 0x01
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
-		return (C.ax25_u_frame(&addrs[0], num_addr, cr, ftype, pf, axpid, pinfo, info_len))
+		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo, info_len))
 	} else if ui != 0 {
 
 		// 'UI' frame.
@@ -620,7 +620,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
-		return (C.ax25_u_frame(&addrs[0], num_addr, cr, ftype, pf, axpid, pinfo, info_len))
+		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo, info_len))
 	} else {
 
 		// 'I' frame.
@@ -635,7 +635,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
-		return (C.ax25_i_frame(&addrs[0], num_addr, cr, modulo, nr, ns, pf, axpid, pinfo, info_len))
+		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo, info_len))
 	}
 } // end
 
