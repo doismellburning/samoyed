@@ -120,6 +120,7 @@ var units = []*units_s{
 
 /* Do we have a string of all digits? */
 
+/* FIXME KG
 static int alldigits(char *p)
 {
 	if (p == NULL) return (0);
@@ -130,9 +131,11 @@ static int alldigits(char *p)
 	}
 	return (1);
 }
+*/
 
 /* Do we have a string of all letters or + or -  ? */
 
+/* FIXME KG
 static int alllettersorpm(char *p)
 {
 	if (p == NULL) return (0);
@@ -143,6 +146,7 @@ static int alllettersorpm(char *p)
 	}
 	return (1);
 }
+*/
 
 /*------------------------------------------------------------------
  *
@@ -729,28 +733,28 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	memset (p_audio_config, 0, sizeof(struct audio_s));
 
-	p_audio_config->igate_vchannel = -1;		// none.
+	p_audio_config.igate_vchannel = -1;		// none.
 
 	/* First audio device is always available with defaults. */
 	/* Others must be explicitly defined before use. */
 
 	for (adevice=0; adevice<MAX_ADEVS; adevice++) {
 
-	  strlcpy (p_audio_config->adev[adevice].adevice_in, DEFAULT_ADEVICE, sizeof(p_audio_config->adev[adevice].adevice_in));
-	  strlcpy (p_audio_config->adev[adevice].adevice_out, DEFAULT_ADEVICE, sizeof(p_audio_config->adev[adevice].adevice_out));
+	  strlcpy (p_audio_config.adev[adevice].adevice_in, DEFAULT_ADEVICE, sizeof(p_audio_config.adev[adevice].adevice_in));
+	  strlcpy (p_audio_config.adev[adevice].adevice_out, DEFAULT_ADEVICE, sizeof(p_audio_config.adev[adevice].adevice_out));
 
-	  p_audio_config->adev[adevice].defined = 0;
-	  p_audio_config->adev[adevice].copy_from = -1;
-	  p_audio_config->adev[adevice].num_channels = DEFAULT_NUM_CHANNELS;		/* -2 stereo */
-	  p_audio_config->adev[adevice].samples_per_sec = DEFAULT_SAMPLES_PER_SEC;	/* -r option */
-	  p_audio_config->adev[adevice].bits_per_sample = DEFAULT_BITS_PER_SAMPLE;	/* -8 option for 8 instead of 16 bits */
+	  p_audio_config.adev[adevice].defined = 0;
+	  p_audio_config.adev[adevice].copy_from = -1;
+	  p_audio_config.adev[adevice].num_channels = DEFAULT_NUM_CHANNELS;		/* -2 stereo */
+	  p_audio_config.adev[adevice].samples_per_sec = DEFAULT_SAMPLES_PER_SEC;	/* -r option */
+	  p_audio_config.adev[adevice].bits_per_sample = DEFAULT_BITS_PER_SAMPLE;	/* -8 option for 8 instead of 16 bits */
 	}
 
-	p_audio_config->adev[0].defined = 2;		// 2 means it was done by default and not the user's config file.
+	p_audio_config.adev[0].defined = 2;		// 2 means it was done by default and not the user's config file.
 
 // MAX_TOTAL_CHANS
 	for (channel=0; channel<MAX_TOTAL_CHANS; channel++) {
-	  p_audio_config->chan_medium[channel] = MEDIUM_NONE;	/* One or both channels will be */
+	  p_audio_config.chan_medium[channel] = MEDIUM_NONE;	/* One or both channels will be */
 								/* set to radio when corresponding */
 								/* audio device is defined. */
 	}
@@ -760,171 +764,171 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	for (channel=0; channel<MAX_RADIO_CHANS; channel++) {
 	  int ot, it;
 
-	  p_audio_config->achan[channel].modem_type = MODEM_AFSK;			
-	  p_audio_config->achan[channel].v26_alternative = V26_UNSPECIFIED;
-	  p_audio_config->achan[channel].mark_freq = DEFAULT_MARK_FREQ;		/* -m option */
-	  p_audio_config->achan[channel].space_freq = DEFAULT_SPACE_FREQ;		/* -s option */
-	  p_audio_config->achan[channel].baud = DEFAULT_BAUD;			/* -b option */
+	  p_audio_config.achan[channel].modem_type = MODEM_AFSK;			
+	  p_audio_config.achan[channel].v26_alternative = V26_UNSPECIFIED;
+	  p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ;		/* -m option */
+	  p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ;		/* -s option */
+	  p_audio_config.achan[channel].baud = DEFAULT_BAUD;			/* -b option */
 
 	  /* None.  Will set default later based on other factors. */
-	  strlcpy (p_audio_config->achan[channel].profiles, "", sizeof(p_audio_config->achan[channel].profiles));	
+	  strlcpy (p_audio_config.achan[channel].profiles, "", sizeof(p_audio_config.achan[channel].profiles));	
 
-	  p_audio_config->achan[channel].num_freq = 1;				
-	  p_audio_config->achan[channel].offset = 0;
+	  p_audio_config.achan[channel].num_freq = 1;				
+	  p_audio_config.achan[channel].offset = 0;
 
-	  p_audio_config->achan[channel].layer2_xmit = LAYER2_AX25;
-	  p_audio_config->achan[channel].il2p_max_fec = 1;
-	  p_audio_config->achan[channel].il2p_invert_polarity = 0;
+	  p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25;
+	  p_audio_config.achan[channel].il2p_max_fec = 1;
+	  p_audio_config.achan[channel].il2p_invert_polarity = 0;
 
-	  p_audio_config->achan[channel].fix_bits = DEFAULT_FIX_BITS;
-	  p_audio_config->achan[channel].sanity_test = SANITY_APRS;
-	  p_audio_config->achan[channel].passall = 0;
+	  p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS;
+	  p_audio_config.achan[channel].sanity_test = SANITY_APRS;
+	  p_audio_config.achan[channel].passall = 0;
 
 	  for (ot = 0; ot < NUM_OCTYPES; ot++) {
-	    p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE;
-	    strlcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, "", sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
-	    p_audio_config->achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE;
-	    p_audio_config->achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE;
-	    p_audio_config->achan[channel].octrl[ot].out_gpio_num = 0;
-	    p_audio_config->achan[channel].octrl[ot].ptt_lpt_bit = 0;
-	    p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
-	    p_audio_config->achan[channel].octrl[ot].ptt_invert2 = 0;
+	    p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE;
+	    strlcpy (p_audio_config.achan[channel].octrl[ot].ptt_device, "", sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
+	    p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE;
+	    p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE;
+	    p_audio_config.achan[channel].octrl[ot].out_gpio_num = 0;
+	    p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = 0;
+	    p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
+	    p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0;
 	  }
 
 	  for (it = 0; it < NUM_ICTYPES; it++) {
-	    p_audio_config->achan[channel].ictrl[it].method = PTT_METHOD_NONE;
-	    p_audio_config->achan[channel].ictrl[it].in_gpio_num = 0;
-	    p_audio_config->achan[channel].ictrl[it].invert = 0;
+	    p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE;
+	    p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0;
+	    p_audio_config.achan[channel].ictrl[it].invert = 0;
 	  }
 
-	  p_audio_config->achan[channel].dwait = DEFAULT_DWAIT;				
-	  p_audio_config->achan[channel].slottime = DEFAULT_SLOTTIME;				
-	  p_audio_config->achan[channel].persist = DEFAULT_PERSIST;				
-	  p_audio_config->achan[channel].txdelay = DEFAULT_TXDELAY;				
-	  p_audio_config->achan[channel].txtail = DEFAULT_TXTAIL;				
-	  p_audio_config->achan[channel].fulldup = DEFAULT_FULLDUP;
+	  p_audio_config.achan[channel].dwait = DEFAULT_DWAIT;				
+	  p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME;				
+	  p_audio_config.achan[channel].persist = DEFAULT_PERSIST;				
+	  p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY;				
+	  p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL;				
+	  p_audio_config.achan[channel].fulldup = DEFAULT_FULLDUP;
 	}
 
-	p_audio_config->fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2;
+	p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2;
 
 	/* First channel should always be valid. */
 	/* If there is no ADEVICE, it uses default device in mono. */
 
-	p_audio_config->chan_medium[0] = MEDIUM_RADIO;
+	p_audio_config.chan_medium[0] = MEDIUM_RADIO;
 
 	memset (p_digi_config, 0, sizeof(struct digi_config_s));	// APRS digipeater
-	p_digi_config->dedupe_time = DEFAULT_DEDUPE;
+	p_digi_config.dedupe_time = DEFAULT_DEDUPE;
 	memset (p_cdigi_config, 0, sizeof(struct cdigi_config_s));	// Connected mode digipeater
 
 	memset (p_tt_config, 0, sizeof(struct tt_config_s));	
-	p_tt_config->gateway_enabled = 0;
-	p_tt_config->ttloc_size = 2;	/* Start with at least 2.  */
+	p_tt_config.gateway_enabled = 0;
+	p_tt_config.ttloc_size = 2;	/* Start with at least 2.  */
 					/* When full, it will be increased by 50 %. */
-	p_tt_config->ttloc_ptr = malloc (sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
-	p_tt_config->ttloc_len = 0;
+	p_tt_config.ttloc_ptr = malloc (sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	p_tt_config.ttloc_len = 0;
 
 	/* Retention time and decay algorithm from 13 Feb 13 version of */
 	/* http://www.aprs.org/aprstt/aprstt-coding24.txt */
 	/* Reduced by transmit count by one.  An 8 minute delay in between transmissions seems awful long. */
 
-	p_tt_config->retain_time = 80 * 60;
-	p_tt_config->num_xmits = 6;
-	assert (p_tt_config->num_xmits <= TT_MAX_XMITS);
-	p_tt_config->xmit_delay[0] = 3;		/* Before initial transmission. */
-	p_tt_config->xmit_delay[1] = 16;
-	p_tt_config->xmit_delay[2] = 32;
-	p_tt_config->xmit_delay[3] = 64;
-	p_tt_config->xmit_delay[4] = 2 * 60;
-	p_tt_config->xmit_delay[5] = 4 * 60;
-	p_tt_config->xmit_delay[6] = 8 * 60;		// not currently used.
+	p_tt_config.retain_time = 80 * 60;
+	p_tt_config.num_xmits = 6;
+	assert (p_tt_config.num_xmits <= TT_MAX_XMITS);
+	p_tt_config.xmit_delay[0] = 3;		/* Before initial transmission. */
+	p_tt_config.xmit_delay[1] = 16;
+	p_tt_config.xmit_delay[2] = 32;
+	p_tt_config.xmit_delay[3] = 64;
+	p_tt_config.xmit_delay[4] = 2 * 60;
+	p_tt_config.xmit_delay[5] = 4 * 60;
+	p_tt_config.xmit_delay[6] = 8 * 60;		// not currently used.
 
-	strlcpy (p_tt_config->status[0], "", 		sizeof(p_tt_config->status[0]));
-	strlcpy (p_tt_config->status[1], "/off duty", 	sizeof(p_tt_config->status[1]));
-	strlcpy (p_tt_config->status[2], "/enroute", 	sizeof(p_tt_config->status[2]));
-	strlcpy (p_tt_config->status[3], "/in service", sizeof(p_tt_config->status[3]));
-	strlcpy (p_tt_config->status[4], "/returning", 	sizeof(p_tt_config->status[4]));
-	strlcpy (p_tt_config->status[5], "/committed", 	sizeof(p_tt_config->status[5]));
-	strlcpy (p_tt_config->status[6], "/special", 	sizeof(p_tt_config->status[6]));
-	strlcpy (p_tt_config->status[7], "/priority", 	sizeof(p_tt_config->status[7]));
-	strlcpy (p_tt_config->status[8], "/emergency", 	sizeof(p_tt_config->status[8]));
-	strlcpy (p_tt_config->status[9], "/custom 1", 	sizeof(p_tt_config->status[9]));
+	strlcpy (p_tt_config.status[0], "", 		sizeof(p_tt_config.status[0]));
+	strlcpy (p_tt_config.status[1], "/off duty", 	sizeof(p_tt_config.status[1]));
+	strlcpy (p_tt_config.status[2], "/enroute", 	sizeof(p_tt_config.status[2]));
+	strlcpy (p_tt_config.status[3], "/in service", sizeof(p_tt_config.status[3]));
+	strlcpy (p_tt_config.status[4], "/returning", 	sizeof(p_tt_config.status[4]));
+	strlcpy (p_tt_config.status[5], "/committed", 	sizeof(p_tt_config.status[5]));
+	strlcpy (p_tt_config.status[6], "/special", 	sizeof(p_tt_config.status[6]));
+	strlcpy (p_tt_config.status[7], "/priority", 	sizeof(p_tt_config.status[7]));
+	strlcpy (p_tt_config.status[8], "/emergency", 	sizeof(p_tt_config.status[8]));
+	strlcpy (p_tt_config.status[9], "/custom 1", 	sizeof(p_tt_config.status[9]));
 
 	for (m = 0; m < TT_ERROR_MAXP1; m++) {
-	  strlcpy (p_tt_config->response[m].method, "MORSE",	sizeof(p_tt_config->response[m].method));
-	  strlcpy (p_tt_config->response[m].mtext, "?",		sizeof(p_tt_config->response[m].mtext));
+	  strlcpy (p_tt_config.response[m].method, "MORSE",	sizeof(p_tt_config.response[m].method));
+	  strlcpy (p_tt_config.response[m].mtext, "?",		sizeof(p_tt_config.response[m].mtext));
 	}
-	strlcpy (p_tt_config->response[TT_ERROR_OK].mtext, "R", sizeof(p_tt_config->response[TT_ERROR_OK].mtext));
+	strlcpy (p_tt_config.response[TT_ERROR_OK].mtext, "R", sizeof(p_tt_config.response[TT_ERROR_OK].mtext));
 
 
 	memset (p_misc_config, 0, sizeof(struct misc_config_s));
-	p_misc_config->agwpe_port = DEFAULT_AGWPE_PORT;
+	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT;
 
 	for (int i=0; i<MAX_KISS_TCP_PORTS; i++) {
-	  p_misc_config->kiss_port[i] = 0;	// entry not used.
-	  p_misc_config->kiss_chan[i] = -1;
+	  p_misc_config.kiss_port[i] = 0;	// entry not used.
+	  p_misc_config.kiss_chan[i] = -1;
 	}
-	p_misc_config->kiss_port[0] = DEFAULT_KISS_PORT;
-	p_misc_config->kiss_chan[0] = -1;	// all channels.
+	p_misc_config.kiss_port[0] = DEFAULT_KISS_PORT;
+	p_misc_config.kiss_chan[0] = -1;	// all channels.
 
-	p_misc_config->enable_kiss_pt = 0;				/* -p option */
-	p_misc_config->kiss_copy = 0;
+	p_misc_config.enable_kiss_pt = 0;				/* -p option */
+	p_misc_config.kiss_copy = 0;
 
-	p_misc_config->dns_sd_enabled = 1;
+	p_misc_config.dns_sd_enabled = 1;
 
 	/* Defaults from http://info.aprs.net/index.php?title=SmartBeaconing */
 
-	p_misc_config->sb_configured = 0;	/* TRUE if SmartBeaconing is configured. */
-	p_misc_config->sb_fast_speed = 60;	/* MPH */
-	p_misc_config->sb_fast_rate = 180;	/* seconds */
-	p_misc_config->sb_slow_speed = 5;	/* MPH */
-	p_misc_config->sb_slow_rate = 1800;	/* seconds */
-	p_misc_config->sb_turn_time = 15;	/* seconds */
-	p_misc_config->sb_turn_angle = 30;	/* degrees */
-	p_misc_config->sb_turn_slope = 255;	/* degrees * MPH */
+	p_misc_config.sb_configured = 0;	/* TRUE if SmartBeaconing is configured. */
+	p_misc_config.sb_fast_speed = 60;	/* MPH */
+	p_misc_config.sb_fast_rate = 180;	/* seconds */
+	p_misc_config.sb_slow_speed = 5;	/* MPH */
+	p_misc_config.sb_slow_rate = 1800;	/* seconds */
+	p_misc_config.sb_turn_time = 15;	/* seconds */
+	p_misc_config.sb_turn_angle = 30;	/* degrees */
+	p_misc_config.sb_turn_slope = 255;	/* degrees * MPH */
 
 	memset (p_igate_config, 0, sizeof(struct igate_config_s));
-	p_igate_config->t2_server_port = DEFAULT_IGATE_PORT;
-	p_igate_config->tx_chan = -1;			/* IS->RF not enabled */
-	p_igate_config->tx_limit_1 = IGATE_TX_LIMIT_1_DEFAULT;
-	p_igate_config->tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT;
-	p_igate_config->igmsp = 1;
-	p_igate_config->rx2ig_dedupe_time = IGATE_RX2IG_DEDUPE_TIME;
+	p_igate_config.t2_server_port = DEFAULT_IGATE_PORT;
+	p_igate_config.tx_chan = -1;			/* IS to RF not enabled */
+	p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_DEFAULT;
+	p_igate_config.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT;
+	p_igate_config.igmsp = 1;
+	p_igate_config.rx2ig_dedupe_time = IGATE_RX2IG_DEDUPE_TIME;
 
 
 	/* People find this confusing. */
 	/* Ideally we'd like to figure out if com0com is installed */
 	/* and automatically enable this.  */
 	
-	strlcpy (p_misc_config->kiss_serial_port, "", sizeof(p_misc_config->kiss_serial_port));
-	p_misc_config->kiss_serial_speed = 0;
-	p_misc_config->kiss_serial_poll = 0;
+	strlcpy (p_misc_config.kiss_serial_port, "", sizeof(p_misc_config.kiss_serial_port));
+	p_misc_config.kiss_serial_speed = 0;
+	p_misc_config.kiss_serial_poll = 0;
 
-	strlcpy (p_misc_config->gpsnmea_port, "", sizeof(p_misc_config->gpsnmea_port));
-	strlcpy (p_misc_config->waypoint_serial_port, "", sizeof(p_misc_config->waypoint_serial_port));
+	strlcpy (p_misc_config.gpsnmea_port, "", sizeof(p_misc_config.gpsnmea_port));
+	strlcpy (p_misc_config.waypoint_serial_port, "", sizeof(p_misc_config.waypoint_serial_port));
 
-	p_misc_config->log_daily_names = 0;
-	strlcpy (p_misc_config->log_path, "", sizeof(p_misc_config->log_path));
+	p_misc_config.log_daily_names = 0;
+	strlcpy (p_misc_config.log_path, "", sizeof(p_misc_config.log_path));
 
 	/* connected mode. */
 
-	p_misc_config->frack = AX25_T1V_FRACK_DEFAULT;		/* Number of seconds to wait for ack to transmission. */
+	p_misc_config.frack = AX25_T1V_FRACK_DEFAULT;		/* Number of seconds to wait for ack to transmission. */
 
-	p_misc_config->retry = AX25_N2_RETRY_DEFAULT;		/* Number of times to retry before giving up. */
+	p_misc_config.retry = AX25_N2_RETRY_DEFAULT;		/* Number of times to retry before giving up. */
 
-	p_misc_config->paclen = AX25_N1_PACLEN_DEFAULT;		/* Max number of bytes in information part of frame. */
+	p_misc_config.paclen = AX25_N1_PACLEN_DEFAULT;		/* Max number of bytes in information part of frame. */
 
-	p_misc_config->maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT;	/* Max frames to send before ACK.  mod 8 "Window" size. */
+	p_misc_config.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT;	/* Max frames to send before ACK.  mod 8 "Window" size. */
 
-	p_misc_config->maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT;	/* Max frames to send before ACK.  mod 128 "Window" size. */
+	p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT;	/* Max frames to send before ACK.  mod 128 "Window" size. */
 
-	p_misc_config->maxv22 = AX25_N2_RETRY_DEFAULT / 3;	/* Send SABME this many times before falling back to SABM. */
-	p_misc_config->v20_addrs = NULL;			/* Go directly to v2.0 for stations listed */
+	p_misc_config.maxv22 = AX25_N2_RETRY_DEFAULT / 3;	/* Send SABME this many times before falling back to SABM. */
+	p_misc_config.v20_addrs = NULL;			/* Go directly to v2.0 for stations listed */
 								/* without trying v2.2 first. */
-	p_misc_config->v20_count = 0;
-	p_misc_config->noxid_addrs = NULL;			/* Don't send XID to these stations. */
+	p_misc_config.v20_count = 0;
+	p_misc_config.noxid_addrs = NULL;			/* Don't send XID to these stations. */
 								/* Might work with a partial v2.2 implementation */
 								/* on the other end. */
-	p_misc_config->noxid_count = 0;
+	p_misc_config.noxid_count = 0;
 
 	channel = 0;
 	adevice = 0;
@@ -1045,13 +1049,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    // Overriding the default for adevice 0 is ok.
 	    // In that case definded was 2.  That's why we check for 1, not just non-zero.
 
-	    if (p_audio_config->adev[adevice].defined == 1) {		// 1 means defined by user.
+	    if (p_audio_config.adev[adevice].defined == 1) {		// 1 means defined by user.
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: ADEVICE%d can't be defined more than once. Line %d.\n", adevice, line);
 	      continue;
 	    }
 
-	    p_audio_config->adev[adevice].defined = 1;
+	    p_audio_config.adev[adevice].defined = 1;
 
 	    // New case for release 1.8.
 
@@ -1067,15 +1071,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    else {
 	      /* First channel of device is valid. */
 	      // This might be changed to UDP or STDIN when the device name is examined.
-	      p_audio_config->chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
+	      p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
 
-	      strlcpy (p_audio_config->adev[adevice].adevice_in, t, sizeof(p_audio_config->adev[adevice].adevice_in));
-	      strlcpy (p_audio_config->adev[adevice].adevice_out, t, sizeof(p_audio_config->adev[adevice].adevice_out));
+	      strlcpy (p_audio_config.adev[adevice].adevice_in, t, sizeof(p_audio_config.adev[adevice].adevice_in));
+	      strlcpy (p_audio_config.adev[adevice].adevice_out, t, sizeof(p_audio_config.adev[adevice].adevice_out));
 
 	      t = split(NULL,0);
 	      if (t != NULL) {
 		// Different audio devices for receive and transmit.
-	        strlcpy (p_audio_config->adev[adevice].adevice_out, t, sizeof(p_audio_config->adev[adevice].adevice_out));
+	        strlcpy (p_audio_config.adev[adevice].adevice_out, t, sizeof(p_audio_config.adev[adevice].adevice_out));
 	      }
 	    }
 	  }
@@ -1121,12 +1125,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 			  continue;
 		  }
 
-		  p_audio_config->adev[adevice].defined = 1;
+		  p_audio_config.adev[adevice].defined = 1;
 
 		  /* First channel of device is valid. */
-		  p_audio_config->chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
+		  p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
 
-		  strlcpy (p_audio_config->adev[adevice].adevice_in, t, sizeof(p_audio_config->adev[adevice].adevice_in));
+		  strlcpy (p_audio_config.adev[adevice].adevice_in, t, sizeof(p_audio_config.adev[adevice].adevice_in));
 	  }
 	  else if (strcasecmp(t, "PAODEVICE") == 0) {
 		  adevice = 0;
@@ -1148,12 +1152,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 			  continue;
 		  }
 
-		  p_audio_config->adev[adevice].defined = 1;
+		  p_audio_config.adev[adevice].defined = 1;
 
 		  /* First channel of device is valid. */
-		  p_audio_config->chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
+		  p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
 
-		  strlcpy (p_audio_config->adev[adevice].adevice_out, t, sizeof(p_audio_config->adev[adevice].adevice_out));		  
+		  strlcpy (p_audio_config.adev[adevice].adevice_out, t, sizeof(p_audio_config.adev[adevice].adevice_out));		  
 	  }
 
 
@@ -1171,7 +1175,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= MIN_SAMPLES_PER_SEC && n <= MAX_SAMPLES_PER_SEC) {
-	      p_audio_config->adev[adevice].samples_per_sec = n;
+	      p_audio_config.adev[adevice].samples_per_sec = n;
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
@@ -1194,13 +1198,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n ==1 || n == 2) {
-	      p_audio_config->adev[adevice].num_channels = n;
+	      p_audio_config.adev[adevice].num_channels = n;
 
 	      /* Set valid channels depending on mono or stereo. */
 
-	      p_audio_config->chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
+	      p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
 	      if (n == 2) {
-	        p_audio_config->chan_medium[ADEVFIRSTCHAN(adevice) + 1] = MEDIUM_RADIO;
+	        p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice) + 1] = MEDIUM_RADIO;
 	      }
 	    }
 	    else {
@@ -1233,9 +1237,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	      channel = n;
 
-	      if (p_audio_config->chan_medium[n] != MEDIUM_RADIO) {
+	      if (p_audio_config.chan_medium[n] != MEDIUM_RADIO) {
 
-	        if ( ! p_audio_config->adev[ACHAN2ADEV(n)].defined) {
+	        if ( ! p_audio_config.adev[ACHAN2ADEV(n)].defined) {
 	          text_color_set(DW_COLOR_ERROR);
                   dw_printf ("Line %d: Channel number %d is not valid because audio device %d is not defined.\n", 
 								line, n, ACHAN2ADEV(n));
@@ -1272,13 +1276,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    int ichan = atoi(t);
             if (ichan >= MAX_RADIO_CHANS && ichan < MAX_TOTAL_CHANS) {
 
-	      if (p_audio_config->chan_medium[ichan] == MEDIUM_NONE) {
+	      if (p_audio_config.chan_medium[ichan] == MEDIUM_NONE) {
 
-	        p_audio_config->chan_medium[ichan] = MEDIUM_IGATE;
+	        p_audio_config.chan_medium[ichan] = MEDIUM_IGATE;
 
 	        // This is redundant but saves the time of searching through all
 	        // the channels for each packet.
-	        p_audio_config->igate_vchannel = ichan;
+	        p_audio_config.igate_vchannel = ichan;
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -1318,9 +1322,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    int nchan = atoi(t);
             if (nchan >= MAX_RADIO_CHANS && nchan < MAX_TOTAL_CHANS) {
 
-	      if (p_audio_config->chan_medium[nchan] == MEDIUM_NONE) {
+	      if (p_audio_config.chan_medium[nchan] == MEDIUM_NONE) {
 
-	        p_audio_config->chan_medium[nchan] = MEDIUM_NETTNC;
+	        p_audio_config.chan_medium[nchan] = MEDIUM_NETTNC;
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -1338,7 +1342,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing network TNC address for NCHANNEL command.\n", line);
 	      continue;
 	    }
-	    strlcpy (p_audio_config->nettnc_addr[nchan], t, sizeof(p_audio_config->nettnc_addr[nchan]));
+	    strlcpy (p_audio_config.nettnc_addr[nchan], t, sizeof(p_audio_config.nettnc_addr[nchan]));
 
 	    t = split(NULL,0);
 	    if (t == NULL) {
@@ -1346,7 +1350,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing network TNC TCP port for NCHANNEL command.\n", line);
 	      continue;
 	    }
-	    p_audio_config->nettnc_port[nchan] = atoi(t);
+	    p_audio_config.nettnc_port[nchan] = atoi(t);
 	  }
 
 /*
@@ -1387,11 +1391,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      for (c = 0; c < MAX_TOTAL_CHANS; c++) {
 
 	        if (c == channel || 
-			strlen(p_audio_config->mycall[c]) == 0 || 
-			strcasecmp(p_audio_config->mycall[c], "NOCALL") == 0 ||
-			strcasecmp(p_audio_config->mycall[c], "N0CALL") == 0) {
+			strlen(p_audio_config.mycall[c]) == 0 || 
+			strcasecmp(p_audio_config.mycall[c], "NOCALL") == 0 ||
+			strcasecmp(p_audio_config.mycall[c], "N0CALL") == 0) {
 
-	          strlcpy (p_audio_config->mycall[c], t, sizeof(p_audio_config->mycall[c]));
+	          strlcpy (p_audio_config.mycall[c], t, sizeof(p_audio_config.mycall[c]));
 	        }
 	      }
 	    }
@@ -1442,17 +1446,17 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      n = atoi(t);
 	    }
             if (n >= MIN_BAUD && n <= MAX_BAUD) {
-	      p_audio_config->achan[channel].baud = n;
+	      p_audio_config.achan[channel].baud = n;
 	      if (n != 300 && n != 1200 && n != 2400 && n != 4800 && n != 9600 && n != 19200 && n != MAX_BAUD-1 && n != MAX_BAUD-2) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?\n", line, n);
     	      }
 	    }
 	    else {
-	      p_audio_config->achan[channel].baud = DEFAULT_BAUD;
+	      p_audio_config.achan[channel].baud = DEFAULT_BAUD;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Unreasonable data rate. Using %d bits per second.\n",
-				 line, p_audio_config->achan[channel].baud);
+				 line, p_audio_config.achan[channel].baud);
    	    }
 
 
@@ -1462,43 +1466,43 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
 	    /* that need to be kept in sync.  Maybe it could be a common function someday. */
 
-	    if (p_audio_config->achan[channel].baud < 600) {
-              p_audio_config->achan[channel].modem_type = MODEM_AFSK;
-              p_audio_config->achan[channel].mark_freq = 1600;
-              p_audio_config->achan[channel].space_freq = 1800;
+	    if (p_audio_config.achan[channel].baud < 600) {
+              p_audio_config.achan[channel].modem_type = MODEM_AFSK;
+              p_audio_config.achan[channel].mark_freq = 1600;
+              p_audio_config.achan[channel].space_freq = 1800;
 	    }
-	    else if (p_audio_config->achan[channel].baud < 1800) {
-              p_audio_config->achan[channel].modem_type = MODEM_AFSK;
-              p_audio_config->achan[channel].mark_freq = DEFAULT_MARK_FREQ;
-              p_audio_config->achan[channel].space_freq = DEFAULT_SPACE_FREQ;
+	    else if (p_audio_config.achan[channel].baud < 1800) {
+              p_audio_config.achan[channel].modem_type = MODEM_AFSK;
+              p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ;
+              p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ;
 	    }
-	    else if (p_audio_config->achan[channel].baud < 3600) {
-              p_audio_config->achan[channel].modem_type = MODEM_QPSK;
-              p_audio_config->achan[channel].mark_freq = 0;
-              p_audio_config->achan[channel].space_freq = 0;
+	    else if (p_audio_config.achan[channel].baud < 3600) {
+              p_audio_config.achan[channel].modem_type = MODEM_QPSK;
+              p_audio_config.achan[channel].mark_freq = 0;
+              p_audio_config.achan[channel].space_freq = 0;
 	    }
-	    else if (p_audio_config->achan[channel].baud < 7200) {
-              p_audio_config->achan[channel].modem_type = MODEM_8PSK;
-              p_audio_config->achan[channel].mark_freq = 0;
-              p_audio_config->achan[channel].space_freq = 0;
+	    else if (p_audio_config.achan[channel].baud < 7200) {
+              p_audio_config.achan[channel].modem_type = MODEM_8PSK;
+              p_audio_config.achan[channel].mark_freq = 0;
+              p_audio_config.achan[channel].space_freq = 0;
 	    }
-	    else if (p_audio_config->achan[channel].baud == MAX_BAUD-1) {
-              p_audio_config->achan[channel].modem_type = MODEM_AIS;
-              p_audio_config->achan[channel].mark_freq = 0;
-              p_audio_config->achan[channel].space_freq = 0;
+	    else if (p_audio_config.achan[channel].baud == MAX_BAUD-1) {
+              p_audio_config.achan[channel].modem_type = MODEM_AIS;
+              p_audio_config.achan[channel].mark_freq = 0;
+              p_audio_config.achan[channel].space_freq = 0;
 	    }
-	    else if (p_audio_config->achan[channel].baud == MAX_BAUD-2) {
-	      p_audio_config->achan[channel].modem_type = MODEM_EAS;
-	      p_audio_config->achan[channel].baud = 521;	// Actually 520.83 but we have an integer field here.
+	    else if (p_audio_config.achan[channel].baud == MAX_BAUD-2) {
+	      p_audio_config.achan[channel].modem_type = MODEM_EAS;
+	      p_audio_config.achan[channel].baud = 521;	// Actually 520.83 but we have an integer field here.
 								// Will make more precise in afsk demod init.
-	      p_audio_config->achan[channel].mark_freq = 2083;	// Actually 2083.3 - logic 1.
-	      p_audio_config->achan[channel].space_freq = 1563;	// Actually 1562.5 - logic 0.
-	      // ? strlcpy (p_audio_config->achan[channel].profiles, "A", sizeof(p_audio_config->achan[channel].profiles));
+	      p_audio_config.achan[channel].mark_freq = 2083;	// Actually 2083.3 - logic 1.
+	      p_audio_config.achan[channel].space_freq = 1563;	// Actually 1562.5 - logic 0.
+	      // ? strlcpy (p_audio_config.achan[channel].profiles, "A", sizeof(p_audio_config.achan[channel].profiles));
 	    }
 	    else {
-              p_audio_config->achan[channel].modem_type = MODEM_SCRAMBLE;
-              p_audio_config->achan[channel].mark_freq = 0;
-              p_audio_config->achan[channel].space_freq = 0;
+              p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE;
+              p_audio_config.achan[channel].mark_freq = 0;
+              p_audio_config.achan[channel].space_freq = 0;
 	    }
 
 	    /* Get any options. */
@@ -1523,13 +1527,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      /* Of course the MIC and SPKR connections won't */
 	      /* have enough bandwidth so radios must be modified. */
               if (n >= 300 && n <= 5000) {
-	        p_audio_config->achan[channel].mark_freq = n;
+	        p_audio_config.achan[channel].mark_freq = n;
 	      }
 	      else {
-	        p_audio_config->achan[channel].mark_freq = DEFAULT_MARK_FREQ;
+	        p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Unreasonable mark tone frequency. Using %d.\n", 
-				 line, p_audio_config->achan[channel].mark_freq);
+				 line, p_audio_config.achan[channel].mark_freq);
    	      }
 	    
 	      /* Get space frequency */
@@ -1542,27 +1546,27 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 	      n = atoi(t);
               if (n >= 300 && n <= 5000) {
-	        p_audio_config->achan[channel].space_freq = n;
+	        p_audio_config.achan[channel].space_freq = n;
 	      }
 	      else {
-	        p_audio_config->achan[channel].space_freq = DEFAULT_SPACE_FREQ;
+	        p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Unreasonable space tone frequency. Using %d.\n", 
-					 line, p_audio_config->achan[channel].space_freq);
+					 line, p_audio_config.achan[channel].space_freq);
    	      }
 
 	      /* Gently guide users toward new format. */
 
-	      if (p_audio_config->achan[channel].baud == 1200 &&
-                  p_audio_config->achan[channel].mark_freq == 1200 &&
-                  p_audio_config->achan[channel].space_freq == 2200) {
+	      if (p_audio_config.achan[channel].baud == 1200 &&
+                  p_audio_config.achan[channel].mark_freq == 1200 &&
+                  p_audio_config.achan[channel].space_freq == 2200) {
 
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200.\n", line);
 	      }
-	      if (p_audio_config->achan[channel].baud == 300 &&
-                  p_audio_config->achan[channel].mark_freq == 1600 &&
-                  p_audio_config->achan[channel].space_freq == 1800) {
+	      if (p_audio_config.achan[channel].baud == 300 &&
+                  p_audio_config.achan[channel].mark_freq == 1600 &&
+                  p_audio_config.achan[channel].space_freq == 1800) {
 
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800.\n", line);
@@ -1588,9 +1592,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		    }
 		  }    
 		
-		  strlcpy (p_audio_config->achan[channel].profiles, t, sizeof(p_audio_config->achan[channel].profiles));
+		  strlcpy (p_audio_config.achan[channel].profiles, t, sizeof(p_audio_config.achan[channel].profiles));
 	          t = split(NULL,0);
-		  if (strlen(p_audio_config->achan[channel].profiles) > 1 && t != NULL) {
+		  if (strlen(p_audio_config.achan[channel].profiles) > 1 && t != NULL) {
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: Can't combine multiple demodulator types and multiple frequencies.\n", line);
 		    continue;
@@ -1607,26 +1611,26 @@ void config_init (char *fname, struct audio_s *p_audio_config,
                   dw_printf ("Line %d: Number of demodulators is out of range. Using 3.\n", line);
 		  n = 3;
 	        }
-	        p_audio_config->achan[channel].num_freq = n;
+	        p_audio_config.achan[channel].num_freq = n;
 
 	        t = split(NULL,0);
 	        if (t != NULL) {
 	          n = atoi(t);
-                  if (n < 5 || n > abs(p_audio_config->achan[channel].mark_freq - p_audio_config->achan[channel].space_freq)/2) {
+                  if (n < 5 || n > abs(p_audio_config.achan[channel].mark_freq - p_audio_config.achan[channel].space_freq)/2) {
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: Unreasonable value for offset between modems.  Using 50 Hz.\n", line);
 		    n = 50;
 	          }
-		  p_audio_config->achan[channel].offset = n;
+		  p_audio_config.achan[channel].offset = n;
 
 	          text_color_set(DW_COLOR_ERROR);
                   dw_printf ("Line %d: New style for multiple demodulators is %d@%d\n", line,
-			p_audio_config->achan[channel].num_freq, p_audio_config->achan[channel].offset);	  
+			p_audio_config.achan[channel].num_freq, p_audio_config.achan[channel].offset);	  
 	        }
 	        else {
 	          text_color_set(DW_COLOR_ERROR);
                   dw_printf ("Line %d: Missing frequency offset between modems.  Using 50 Hz.\n", line);
-	          p_audio_config->achan[channel].offset = 50;
+	          p_audio_config.achan[channel].offset = 50;
 	        }    
 	      }
 	    }
@@ -1639,60 +1643,60 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 		if ((s = strchr(t, ':')) != NULL) {		/* mark:space */
 
-	          p_audio_config->achan[channel].mark_freq = atoi(t);
-	          p_audio_config->achan[channel].space_freq = atoi(s+1);
+	          p_audio_config.achan[channel].mark_freq = atoi(t);
+	          p_audio_config.achan[channel].space_freq = atoi(s+1);
 
-		  if (p_audio_config->achan[channel].mark_freq == 0 && p_audio_config->achan[channel].space_freq == 0) {
-		    p_audio_config->achan[channel].modem_type = MODEM_SCRAMBLE;
+		  if (p_audio_config.achan[channel].mark_freq == 0 && p_audio_config.achan[channel].space_freq == 0) {
+		    p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE;
 	          }
 	          else {
-		    p_audio_config->achan[channel].modem_type = MODEM_AFSK;
+		    p_audio_config.achan[channel].modem_type = MODEM_AFSK;
 
-                    if (p_audio_config->achan[channel].mark_freq < 300 || p_audio_config->achan[channel].mark_freq > 5000) {
-	              p_audio_config->achan[channel].mark_freq = DEFAULT_MARK_FREQ;
+                    if (p_audio_config.achan[channel].mark_freq < 300 || p_audio_config.achan[channel].mark_freq > 5000) {
+	              p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ;
 	              text_color_set(DW_COLOR_ERROR);
                       dw_printf ("Line %d: Unreasonable mark tone frequency. Using %d instead.\n", 
-				 line, p_audio_config->achan[channel].mark_freq);
+				 line, p_audio_config.achan[channel].mark_freq);
 		    }
-                    if (p_audio_config->achan[channel].space_freq < 300 || p_audio_config->achan[channel].space_freq > 5000) {
-	              p_audio_config->achan[channel].space_freq = DEFAULT_SPACE_FREQ;
+                    if (p_audio_config.achan[channel].space_freq < 300 || p_audio_config.achan[channel].space_freq > 5000) {
+	              p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ;
 	              text_color_set(DW_COLOR_ERROR);
                       dw_printf ("Line %d: Unreasonable space tone frequency. Using %d instead.\n", 
-				 line, p_audio_config->achan[channel].space_freq);
+				 line, p_audio_config.achan[channel].space_freq);
 		    }
 	          }
 	        }
 
 		else if ((s = strchr(t, '@')) != NULL) {		/* num@offset */
 
-	          p_audio_config->achan[channel].num_freq = atoi(t);
-	          p_audio_config->achan[channel].offset = atoi(s+1);
+	          p_audio_config.achan[channel].num_freq = atoi(t);
+	          p_audio_config.achan[channel].offset = atoi(s+1);
 
-                  if (p_audio_config->achan[channel].num_freq < 1 || p_audio_config->achan[channel].num_freq > MAX_SUBCHANS) {
+                  if (p_audio_config.achan[channel].num_freq < 1 || p_audio_config.achan[channel].num_freq > MAX_SUBCHANS) {
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: Number of demodulators is out of range. Using 3.\n", line);
-	            p_audio_config->achan[channel].num_freq = 3;
+	            p_audio_config.achan[channel].num_freq = 3;
 		  }
 
-                  if (p_audio_config->achan[channel].offset < 5 || 
-			p_audio_config->achan[channel].offset > abs(p_audio_config->achan[channel].mark_freq - p_audio_config->achan[channel].space_freq)/2) {
+                  if (p_audio_config.achan[channel].offset < 5 || 
+			p_audio_config.achan[channel].offset > abs(p_audio_config.achan[channel].mark_freq - p_audio_config.achan[channel].space_freq)/2) {
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: Offset between demodulators is unreasonable. Using 50 Hz.\n", line);
-	            p_audio_config->achan[channel].offset = 50;
+	            p_audio_config.achan[channel].offset = 50;
 		  }
 		}
 
 	        else if (alllettersorpm(t)) {		/* profile of letter(s) + - */
 
 		  // Will be validated later.
-		  strlcpy (p_audio_config->achan[channel].profiles, t, sizeof(p_audio_config->achan[channel].profiles));
+		  strlcpy (p_audio_config.achan[channel].profiles, t, sizeof(p_audio_config.achan[channel].profiles));
 	        }
 
 		else if (*t == '/') {		/* /div */
 		  int n = atoi(t+1);
 
                   if (n >= 1 && n <= 8) {
-	            p_audio_config->achan[channel].decimate = n;
+	            p_audio_config.achan[channel].decimate = n;
 		  }
 	    	  else {
 	            text_color_set(DW_COLOR_ERROR);
@@ -1704,7 +1708,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		  int n = atoi(t+1);
 
                   if (n >= 1 && n <= 4) {
-	            p_audio_config->achan[channel].upsample = n;
+	            p_audio_config.achan[channel].upsample = n;
 		  }
 	    	  else {
 	            text_color_set(DW_COLOR_ERROR);
@@ -1714,22 +1718,22 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 		else if (strcasecmp(t, "G3RUH") == 0) {		/* Force G3RUH modem regardless of default for speed. New in 1.6. */
 
-                  p_audio_config->achan[channel].modem_type = MODEM_SCRAMBLE;
-                  p_audio_config->achan[channel].mark_freq = 0;
-                  p_audio_config->achan[channel].space_freq = 0;
+                  p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE;
+                  p_audio_config.achan[channel].mark_freq = 0;
+                  p_audio_config.achan[channel].space_freq = 0;
 		}
 
 		else if (strcasecmp(t, "V26A") == 0 || 		/* Compatible with direwolf versions <= 1.5.  New in 1.6. */
 			 strcasecmp(t, "V26B") == 0) {		/* Compatible with MFJ-2400.  New in 1.6. */
 
-                  if (p_audio_config->achan[channel].modem_type != MODEM_QPSK ||
-		      p_audio_config->achan[channel].baud != 2400) {
+                  if (p_audio_config.achan[channel].modem_type != MODEM_QPSK ||
+		      p_audio_config.achan[channel].baud != 2400) {
 
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: %s option can only be used with 2400 bps PSK.\n", line, t);
 	            continue;
 		  }
-                  p_audio_config->achan[channel].v26_alternative = (strcasecmp(t, "V26A") == 0) ? V26_A : V26_B;
+                  p_audio_config.achan[channel].v26_alternative = (strcasecmp(t, "V26A") == 0) ? V26_A : V26_B;
 		}
 
 		else {
@@ -1743,7 +1747,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      /* A later place catches disallowed combination of + and @. */
 	      /* A later place sets /n for 300 baud if not specified by user. */
 
-	      //dw_printf ("debug: div = %d\n", p_audio_config->achan[channel].decimate);
+	      //dw_printf ("debug: div = %d\n", p_audio_config.achan[channel].decimate);
 
 	    }
 	  }
@@ -1766,7 +1770,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 
-	    p_audio_config->achan[channel].dtmf_decode = DTMF_DECODE_ON;
+	    p_audio_config.achan[channel].dtmf_decode = DTMF_DECODE_ON;
 
 	  }
 
@@ -1794,16 +1798,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= RETRY_NONE && n < RETRY_MAX) {		// MAX is actually last valid +1
-	      p_audio_config->achan[channel].fix_bits = (retry_t)n;
+	      p_audio_config.achan[channel].fix_bits = (retry_t)n;
 	    }
 	    else {
-	      p_audio_config->achan[channel].fix_bits = DEFAULT_FIX_BITS;
+	      p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid value %d for FIX_BITS. Using default of %d.\n",
-			line, n, p_audio_config->achan[channel].fix_bits);
+			line, n, p_audio_config.achan[channel].fix_bits);
 	    }
 
-	    if (p_audio_config->achan[channel].fix_bits > DEFAULT_FIX_BITS) {
+	    if (p_audio_config.achan[channel].fix_bits > DEFAULT_FIX_BITS) {
 	      text_color_set(DW_COLOR_INFO);
               dw_printf ("Line %d: Using a FIX_BITS value greater than %d is not recommended for normal operation.\n",
 			line, DEFAULT_FIX_BITS);
@@ -1818,16 +1822,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      // If more than one sanity test, we silently take the last one.
 
 	      if (strcasecmp(t, "APRS") == 0) {
-	        p_audio_config->achan[channel].sanity_test = SANITY_APRS;
+	        p_audio_config.achan[channel].sanity_test = SANITY_APRS;
 	      }
 	      else if (strcasecmp(t, "AX25") == 0 || strcasecmp(t, "AX.25") == 0) {
-	        p_audio_config->achan[channel].sanity_test = SANITY_AX25;
+	        p_audio_config.achan[channel].sanity_test = SANITY_AX25;
 	      }
 	      else if (strcasecmp(t, "NONE") == 0) {
-	        p_audio_config->achan[channel].sanity_test = SANITY_NONE;
+	        p_audio_config.achan[channel].sanity_test = SANITY_NONE;
 	      }
 	      else if (strcasecmp(t, "PASSALL") == 0) {
-	        p_audio_config->achan[channel].passall = 1;
+	        p_audio_config.achan[channel].passall = 1;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: There is an old saying, \"Be careful what you ask for because you might get it.\"\n", line);
                 dw_printf ("The PASSALL option means allow all frames even when they are invalid.\n");
@@ -1908,14 +1912,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 
 	      if (*t == '-') {
-	        p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 1;
+	        p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
 	      }
 	      else {
-	        p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t);
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
+	        p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t);
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
-	      p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO;
+	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO;
 #endif
 	    }
 	    else if (strcasecmp(t, "GPIOD") == 0) {
@@ -1940,22 +1944,22 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      // While we are here, also allow only the number as used by the gpiod utilities.
 
 	      if (t[0] == '/') {	// Looks like device path.  Use as given.
-	        strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
-	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	        strlcpy(p_audio_config.achan[channel].octrl[ot].out_gpio_name, t, 
+	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
 	      }
 
 	      else if (isdigit(t[0])) {		// or if digit, prepend "/dev/gpiochip"
-	        strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, "/dev/gpiochip", 
-	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
-	        strlcat(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
-	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	        strlcpy(p_audio_config.achan[channel].octrl[ot].out_gpio_name, "/dev/gpiochip", 
+	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
+	        strlcat(p_audio_config.achan[channel].octrl[ot].out_gpio_name, t, 
+	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
 	      }
 
 	      else {		// otherwise, prepend "/dev/" to the name
-	        strlcpy(p_audio_config->achan[channel].octrl[ot].out_gpio_name, "/dev/", 
-	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
-	        strlcat(p_audio_config->achan[channel].octrl[ot].out_gpio_name, t, 
-	              sizeof(p_audio_config->achan[channel].octrl[ot].out_gpio_name));
+	        strlcpy(p_audio_config.achan[channel].octrl[ot].out_gpio_name, "/dev/", 
+	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
+	        strlcat(p_audio_config.achan[channel].octrl[ot].out_gpio_name, t, 
+	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
 	      }
 
 	      t = split(NULL,0);
@@ -1966,14 +1970,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 
 	      if (*t == '-') {
-	        p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 1;
+	        p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
 	      }
 	      else {
-	        p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t);
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
+	        p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t);
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
-	      p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD;
+	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD;
 #else
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Application was not built with optional support for GPIOD.\n");
@@ -1995,14 +1999,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 
 	      if (*t == '-') {
-	        p_audio_config->achan[channel].octrl[ot].ptt_lpt_bit = atoi(t+1);
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 1;
+	        p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = atoi(t+1);
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
 	      }
 	      else {
-	        p_audio_config->achan[channel].octrl[ot].ptt_lpt_bit = atoi(t);
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
+	        p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = atoi(t);
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
-	      p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT;
+	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT;
 #else
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
@@ -2018,7 +2022,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        continue;
 	      }
 	      if (strcasecmp(t, "AUTO") == 0) {
-	        p_audio_config->achan[channel].octrl[ot].ptt_model = -1;
+	        p_audio_config.achan[channel].octrl[ot].ptt_model = -1;
 	      }
 	      else {
 		if ( ! alldigits(t)) {
@@ -2034,7 +2038,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	          dw_printf ("Config file line %d: Unreasonable model number %d for hamlib.\n", line, n);
 	          continue;
 	        }
-	        p_audio_config->achan[channel].octrl[ot].ptt_model = n;
+	        p_audio_config.achan[channel].octrl[ot].ptt_model = n;
 	      }
 
 	      t = split(NULL,0);
@@ -2043,7 +2047,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("Config file line %d: Missing port for hamlib.\n", line);
 	        continue;
 	      }
-	      strlcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
+	      strlcpy (p_audio_config.achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
 
 	      // Optional serial port rate for CAT control PTT.
 
@@ -2055,7 +2059,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	          continue;
 	        }
 	        int n = atoi(t);
-	        p_audio_config->achan[channel].octrl[ot].ptt_rate = n;
+	        p_audio_config.achan[channel].octrl[ot].ptt_rate = n;
 	      }
 
 	      t = split(NULL,0);
@@ -2064,7 +2068,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("Config file line %d: %s was not expected after model & port for hamlib.\n", line, t);
 	      }
 
-	      p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB;
+	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB;
 
 #else
 #if __WIN32__
@@ -2098,31 +2102,31 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        continue;
 	      }
 
-	      p_audio_config->achan[channel].octrl[ot].out_gpio_num = 3;	// All known designs use GPIO 3.
+	      p_audio_config.achan[channel].octrl[ot].out_gpio_num = 3;	// All known designs use GPIO 3.
 										// User can override for special cases.
-	      p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;		// High for transmit.
-	      strcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, "");
+	      p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;		// High for transmit.
+	      strcpy (p_audio_config.achan[channel].octrl[ot].ptt_device, "");
 
 	      // Try to find PTT device for audio output device.
 	      // Simplifiying assumption is that we have one radio per USB Audio Adapter.
 	      // Failure at this point is not an error.
 	      // See if config file sets it explicitly before complaining.
 
-	      cm108_find_ptt (p_audio_config->adev[ACHAN2ADEV(channel)].adevice_out,
-				p_audio_config->achan[channel].octrl[ot].ptt_device,
-				(int)sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
+	      cm108_find_ptt (p_audio_config.adev[ACHAN2ADEV(channel)].adevice_out,
+				p_audio_config.achan[channel].octrl[ot].ptt_device,
+				(int)sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
 
 	      while ((t = split(NULL,0)) != NULL) {
 	        if (*t == '-') {
-	          p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
-		  p_audio_config->achan[channel].octrl[ot].ptt_invert = 1;
+	          p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
+		  p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
 	        }
 	        else if (isdigit(*t)) {
-	          p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t);
-		  p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
+	          p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t);
+		  p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	        }
 	        else if (*t == '/') {
-	          strlcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
+	          strlcpy (p_audio_config.achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
 		}
 		else {
 	          text_color_set(DW_COLOR_ERROR);
@@ -2130,16 +2134,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	          continue;
 	        }
 	      }
-	      if (p_audio_config->achan[channel].octrl[ot].out_gpio_num < 1 || p_audio_config->achan[channel].octrl[ot].out_gpio_num > 8) {
+	      if (p_audio_config.achan[channel].octrl[ot].out_gpio_num < 1 || p_audio_config.achan[channel].octrl[ot].out_gpio_num > 8) {
 	          text_color_set(DW_COLOR_ERROR);
 	          dw_printf ("Config file line %d: CM108 GPIO number %d is not in range of 1 thru 8.\n", line,
-					p_audio_config->achan[channel].octrl[ot].out_gpio_num);
+					p_audio_config.achan[channel].octrl[ot].out_gpio_num);
 	          continue;
 	      }
-	      if (strlen(p_audio_config->achan[channel].octrl[ot].ptt_device) == 0) {
+	      if (strlen(p_audio_config.achan[channel].octrl[ot].ptt_device) == 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", line,
-					p_audio_config->adev[ACHAN2ADEV(channel)].adevice_out);
+					p_audio_config.adev[ACHAN2ADEV(channel)].adevice_out);
 					/* TODO KG
 #if __WIN32__
 	        dw_printf ("You must explicitly mention a HID path.\n");
@@ -2150,7 +2154,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("See Interface Guide for details.\n");
 	        continue;
 	      }
-	      p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_CM108;
+	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_CM108;
 
 #else
 	      text_color_set(DW_COLOR_ERROR);
@@ -2165,7 +2169,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* serial port case. */
 
-	      strlcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
+	      strlcpy (p_audio_config.achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
 
 	      t = split(NULL,0);
 	      if (t == NULL) {
@@ -2176,20 +2180,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 
 	      if (strcasecmp(t, "rts") == 0) {
-	        p_audio_config->achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS;
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
+	        p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS;
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
 	      else if (strcasecmp(t, "dtr") == 0) {
-	        p_audio_config->achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR;
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
+	        p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR;
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
 	      else if (strcasecmp(t, "-rts") == 0) {
-	        p_audio_config->achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS;
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 1;
+	        p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS;
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
 	      }
 	      else if (strcasecmp(t, "-dtr") == 0) {
-	        p_audio_config->achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR;
-		p_audio_config->achan[channel].octrl[ot].ptt_invert = 1;
+	        p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR;
+		p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -2199,7 +2203,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 
 
-	      p_audio_config->achan[channel].octrl[ot].ptt_method = PTT_METHOD_SERIAL;
+	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_SERIAL;
 
 
 	      /* In version 1.2, we allow a second one for same serial port. */
@@ -2210,20 +2214,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      if (t != NULL) {
 
 	        if (strcasecmp(t, "rts") == 0) {
-	          p_audio_config->achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS;
-		  p_audio_config->achan[channel].octrl[ot].ptt_invert2 = 0;
+	          p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS;
+		  p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0;
 	        }
 	        else if (strcasecmp(t, "dtr") == 0) {
-	          p_audio_config->achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR;
-		  p_audio_config->achan[channel].octrl[ot].ptt_invert2 = 0;
+	          p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR;
+		  p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0;
 	        }
 	        else if (strcasecmp(t, "-rts") == 0) {
-	          p_audio_config->achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS;
-		  p_audio_config->achan[channel].octrl[ot].ptt_invert2 = 1;
+	          p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS;
+		  p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 1;
 	        }
 	        else if (strcasecmp(t, "-dtr") == 0) {
-	          p_audio_config->achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR;
-		  p_audio_config->achan[channel].octrl[ot].ptt_invert2 = 1;
+	          p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR;
+		  p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 1;
 	        }
 	        else {
 	          text_color_set(DW_COLOR_ERROR);
@@ -2234,7 +2238,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 		/* Would not make sense to specify the same one twice. */
 
-		if (p_audio_config->achan[channel].octrl[ot].ptt_line == p_audio_config->achan[channel].octrl[ot].ptt_line2) {
+		if (p_audio_config.achan[channel].octrl[ot].ptt_line == p_audio_config.achan[channel].octrl[ot].ptt_line2) {
 	          dw_printf ("Config file line %d: Doesn't make sense to specify the some control line twice.\n", 
 			line);
 	        }
@@ -2283,14 +2287,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 
 	      if (*t == '-') {
-	        p_audio_config->achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = atoi(t+1);
-		p_audio_config->achan[channel].ictrl[ICTYPE_TXINH].invert = 1;
+	        p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = atoi(t+1);
+		p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 1;
 	      }
 	      else {
-	        p_audio_config->achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = atoi(t);
-		p_audio_config->achan[channel].ictrl[ICTYPE_TXINH].invert = 0;
+	        p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = atoi(t);
+		p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 0;
 	      }
-	      p_audio_config->achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO;
+	      p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO;
 #endif
 	    }
 	  }
@@ -2318,13 +2322,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= 0 && n <= 255) {
-	      p_audio_config->achan[channel].dwait = n;
+	      p_audio_config.achan[channel].dwait = n;
 	    }
 	    else {
-	      p_audio_config->achan[channel].dwait = DEFAULT_DWAIT;
+	      p_audio_config.achan[channel].dwait = DEFAULT_DWAIT;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid delay time for DWAIT. Using %d.\n", 
-			line, p_audio_config->achan[channel].dwait);
+			line, p_audio_config.achan[channel].dwait);
    	    }
 	  }
 
@@ -2350,13 +2354,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      // 0 = User has no clue.  This would be no delay.
 	      // 10 = Default.
 	      // 50 = Half second.  User might think it is mSec and use 100.
-	      p_audio_config->achan[channel].slottime = n;
+	      p_audio_config.achan[channel].slottime = n;
 	    }
 	    else {
-	      p_audio_config->achan[channel].slottime = DEFAULT_SLOTTIME;
+	      p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid delay time for persist algorithm. Using default %d.\n",
-			line, p_audio_config->achan[channel].slottime);
+			line, p_audio_config.achan[channel].slottime);
               dw_printf ("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n");
               dw_printf ("section, to understand what this means.\n");
               dw_printf ("Why don't you just use the default?\n");
@@ -2382,13 +2386,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= 5 && n <= 250) {
-	      p_audio_config->achan[channel].persist = n;
+	      p_audio_config.achan[channel].persist = n;
 	    }
 	    else {
-	      p_audio_config->achan[channel].persist = DEFAULT_PERSIST;
+	      p_audio_config.achan[channel].persist = DEFAULT_PERSIST;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid probability for persist algorithm. Using default %d.\n",
-			line, p_audio_config->achan[channel].persist);
+			line, p_audio_config.achan[channel].persist);
               dw_printf ("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n");
               dw_printf ("section, to understand what this means.\n");
               dw_printf ("Why don't you just use the default?\n");
@@ -2431,13 +2435,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
                 dw_printf ("section, to understand what this means.\n");
                 dw_printf ("Why don't you just use the default?\n");
 	      }
-	      p_audio_config->achan[channel].txdelay = n;
+	      p_audio_config.achan[channel].txdelay = n;
 	    }
 	    else {
-	      p_audio_config->achan[channel].txdelay = DEFAULT_TXDELAY;
+	      p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid time for transmit delay. Using %d.\n", 
-			line, p_audio_config->achan[channel].txdelay);
+			line, p_audio_config.achan[channel].txdelay);
    	    }
 	  }
 
@@ -2476,13 +2480,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
                 dw_printf ("section, to understand what this means.\n");
                 dw_printf ("Why don't you just use the default?\n");
 	      }
-	      p_audio_config->achan[channel].txtail = n;
+	      p_audio_config.achan[channel].txtail = n;
 	    }
 	    else {
-	      p_audio_config->achan[channel].txtail = DEFAULT_TXTAIL;
+	      p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid time for transmit timing. Using %d.\n",
-			line, p_audio_config->achan[channel].txtail);
+			line, p_audio_config.achan[channel].txtail);
    	    }
 	  }
 
@@ -2503,13 +2507,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    if (strcasecmp(t, "ON") == 0) {
-	      p_audio_config->achan[channel].fulldup = 1;
+	      p_audio_config.achan[channel].fulldup = 1;
 	    }
 	    else if (strcasecmp(t, "OFF") == 0) {
-	      p_audio_config->achan[channel].fulldup = 0;
+	      p_audio_config.achan[channel].fulldup = 0;
 	    }
 	    else {
-	      p_audio_config->achan[channel].fulldup = 0;
+	      p_audio_config.achan[channel].fulldup = 0;
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Expected ON or OFF for FULLDUP.\n", line);
 	    }
@@ -2539,7 +2543,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 		/* FIXME KG Do we *actually* want to do this...? If so, let's do it when we've ported this to Go...
 	    if (xmit_speak_it(t, -1, " ") == 0) {
-	      if (strlcpy (p_audio_config->tts_script, t, sizeof(p_audio_config->tts_script)) >= sizeof(p_audio_config->tts_script)) {
+	      if (strlcpy (p_audio_config.tts_script, t, sizeof(p_audio_config.tts_script)) >= sizeof(p_audio_config.tts_script)) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: Script for text-to-speech function is too long.\n", line);
 	      }
@@ -2575,15 +2579,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= 0 && n < 200) {
-	      p_audio_config->achan[channel].fx25_strength = n;
-	      p_audio_config->achan[channel].layer2_xmit = LAYER2_FX25;
+	      p_audio_config.achan[channel].fx25_strength = n;
+	      p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25;
 	    }
 	    else {
-	      p_audio_config->achan[channel].fx25_strength = 1;
-	      p_audio_config->achan[channel].layer2_xmit = LAYER2_FX25;
+	      p_audio_config.achan[channel].fx25_strength = 1;
+	      p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Unreasonable value for FX.25 transmission mode. Using %d.\n", 
-			line, p_audio_config->achan[channel].fx25_strength);
+			line, p_audio_config.achan[channel].fx25_strength);
    	    }
 	  }
 
@@ -2611,13 +2615,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= 0 && n < 20) {
-	      p_audio_config->fx25_auto_enable = n;
+	      p_audio_config.fx25_auto_enable = n;
 	    }
 	    else {
-	      p_audio_config->fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2;
+	      p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Unreasonable count for connected mode automatic FX.25. Using %d.\n", 
-			line, p_audio_config->fx25_auto_enable);
+			line, p_audio_config.fx25_auto_enable);
    	    }
 	  }
 
@@ -2638,24 +2642,24 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: IL2PTX can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    p_audio_config->achan[channel].layer2_xmit = LAYER2_IL2P;
-	    p_audio_config->achan[channel].il2p_max_fec = 1;
-	    p_audio_config->achan[channel].il2p_invert_polarity = 0;
+	    p_audio_config.achan[channel].layer2_xmit = LAYER2_IL2P;
+	    p_audio_config.achan[channel].il2p_max_fec = 1;
+	    p_audio_config.achan[channel].il2p_invert_polarity = 0;
 
 	    while ((t = split(NULL,0)) != NULL) {
 	      for (char *c = t; *c != '\0'; c++) {
 	        switch (*c) {
 	          case '+':
-	            p_audio_config->achan[channel].il2p_invert_polarity = 0;
+	            p_audio_config.achan[channel].il2p_invert_polarity = 0;
 	            break;
 	          case '-':
-	            p_audio_config->achan[channel].il2p_invert_polarity = 1;
+	            p_audio_config.achan[channel].il2p_invert_polarity = 1;
 	            break;
 	          case '0':
-	            p_audio_config->achan[channel].il2p_max_fec = 0;
+	            p_audio_config.achan[channel].il2p_max_fec = 0;
 	            break;
 	          case '1':
-	            p_audio_config->achan[channel].il2p_max_fec = 1;
+	            p_audio_config.achan[channel].il2p_max_fec = 1;
 	            break;
 	          default:
 	            text_color_set(DW_COLOR_ERROR);
@@ -2707,8 +2711,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    // Channels specified must be radio channels or network TNCs.
 
-	    if (p_audio_config->chan_medium[from_chan] != MEDIUM_RADIO &&
-	        p_audio_config->chan_medium[from_chan] != MEDIUM_NETTNC) {
+	    if (p_audio_config.chan_medium[from_chan] != MEDIUM_RADIO &&
+	        p_audio_config.chan_medium[from_chan] != MEDIUM_NETTNC) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: FROM-channel %d is not valid.\n", 
 							line, from_chan);
@@ -2735,8 +2739,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 
-	    if (p_audio_config->chan_medium[to_chan] != MEDIUM_RADIO &&
-	        p_audio_config->chan_medium[to_chan] != MEDIUM_NETTNC) {
+	    if (p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO &&
+	        p_audio_config.chan_medium[to_chan] != MEDIUM_NETTNC) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: TO-channel %d is not valid.\n", 
 							line, to_chan);
@@ -2749,9 +2753,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Config file: Missing alias pattern on line %d.\n", line);
 	      continue;
 	    }
-	    e = regcomp (&(p_digi_config->alias[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
+	    e = regcomp (&(p_digi_config.alias[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
 	    if (e != 0) {
-	      regerror (e, &(p_digi_config->alias[from_chan][to_chan]), message, sizeof(message));
+	      regerror (e, &(p_digi_config.alias[from_chan][to_chan]), message, sizeof(message));
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Invalid alias matching pattern on line %d:\n%s\n", 
 							line, message);
@@ -2764,22 +2768,22 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Config file: Missing wide pattern on line %d.\n", line);
 	      continue;
 	    }
-	    e = regcomp (&(p_digi_config->wide[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
+	    e = regcomp (&(p_digi_config.wide[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
 	    if (e != 0) {
-	      regerror (e, &(p_digi_config->wide[from_chan][to_chan]), message, sizeof(message));
+	      regerror (e, &(p_digi_config.wide[from_chan][to_chan]), message, sizeof(message));
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Invalid wide matching pattern on line %d:\n%s\n", 
 							line, message);
 	      continue;
 	    }
 
-	    p_digi_config->enabled[from_chan][to_chan] = 1;
-	    p_digi_config->preempt[from_chan][to_chan] = PREEMPT_OFF;
+	    p_digi_config.enabled[from_chan][to_chan] = 1;
+	    p_digi_config.preempt[from_chan][to_chan] = PREEMPT_OFF;
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
 	      if (strcasecmp(t, "OFF") == 0) {
-	        p_digi_config->preempt[from_chan][to_chan] = PREEMPT_OFF;
+	        p_digi_config.preempt[from_chan][to_chan] = PREEMPT_OFF;
 	        t = split(NULL,0);
 	      }
 	      else if (strcasecmp(t, "DROP") == 0) {
@@ -2787,7 +2791,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("Config file, line %d: Preemptive digipeating DROP option is discouraged.\n", line);
 	        dw_printf ("It can create a via path which is misleading about the actual path taken.\n");
 	        dw_printf ("PREEMPT is the best choice for this feature.\n");
-	        p_digi_config->preempt[from_chan][to_chan] = PREEMPT_DROP;
+	        p_digi_config.preempt[from_chan][to_chan] = PREEMPT_DROP;
 	        t = split(NULL,0);
 	      }
 	      else if (strcasecmp(t, "MARK") == 0) {
@@ -2795,15 +2799,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("Config file, line %d: Preemptive digipeating MARK option is discouraged.\n", line);
 	        dw_printf ("It can create a via path which is misleading about the actual path taken.\n");
 	        dw_printf ("PREEMPT is the best choice for this feature.\n");
-	        p_digi_config->preempt[from_chan][to_chan] = PREEMPT_MARK;
+	        p_digi_config.preempt[from_chan][to_chan] = PREEMPT_MARK;
 	        t = split(NULL,0);
 	      }
 	      else if ((strcasecmp(t, "TRACE") == 0) || (strncasecmp(t, "PREEMPT", 7) == 0)){
-	        p_digi_config->preempt[from_chan][to_chan] = PREEMPT_TRACE;
+	        p_digi_config.preempt[from_chan][to_chan] = PREEMPT_TRACE;
 	        t = split(NULL,0);
 	      }
 	      else if (strncasecmp(t, "ATGP=", 5) == 0) {
-	        strlcpy (p_digi_config->atgp[from_chan][to_chan], t+5, sizeof(p_digi_config->atgp[from_chan][to_chan]));;
+	        strlcpy (p_digi_config.atgp[from_chan][to_chan], t+5, sizeof(p_digi_config.atgp[from_chan][to_chan]));;
 	        t = split(NULL,0);
 	      }
 	    }
@@ -2828,13 +2832,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= 0 && n < 600) {
-	      p_digi_config->dedupe_time = n;
+	      p_digi_config.dedupe_time = n;
 	    }
 	    else {
-	      p_digi_config->dedupe_time = DEFAULT_DEDUPE;
+	      p_digi_config.dedupe_time = DEFAULT_DEDUPE;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Unreasonable value for dedupe time. Using %d.\n", 
-			line, p_digi_config->dedupe_time);
+			line, p_digi_config.dedupe_time);
    	    }
 	  }
 
@@ -2868,7 +2872,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    // Only radio channels are valid for regenerate.
 
-	    if (p_audio_config->chan_medium[from_chan] != MEDIUM_RADIO) {
+	    if (p_audio_config.chan_medium[from_chan] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: FROM-channel %d is not valid.\n", 
 							line, from_chan);
@@ -2894,7 +2898,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 							MAX_RADIO_CHANS-1, line);
 	      continue;
 	    }
-	    if (p_audio_config->chan_medium[to_chan] != MEDIUM_RADIO) {
+	    if (p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: TO-channel %d is not valid.\n", 
 							line, to_chan);
@@ -2902,7 +2906,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	
 
-	    p_digi_config->regen[from_chan][to_chan] = 1;
+	    p_digi_config.regen[from_chan][to_chan] = 1;
 
 	  }
 
@@ -2945,7 +2949,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    // There is discussion about this in the document called
 	    // Why-is-9600-only-twice-as-fast-as-1200.pdf
 
-	    if (p_audio_config->chan_medium[from_chan] != MEDIUM_RADIO) {
+	    if (p_audio_config.chan_medium[from_chan] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: FROM-channel %d is not valid.\n",
 							line, from_chan);
@@ -2972,7 +2976,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 							MAX_RADIO_CHANS-1, line);
 	      continue;
 	    }
-	    if (p_audio_config->chan_medium[to_chan] != MEDIUM_RADIO) {
+	    if (p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: TO-channel %d is not valid.\n",
 							line, to_chan);
@@ -2982,12 +2986,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
-	      e = regcomp (&(p_cdigi_config->alias[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
+	      e = regcomp (&(p_cdigi_config.alias[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
 	      if (e == 0) {
-	        p_cdigi_config->has_alias[from_chan][to_chan] = 1;
+	        p_cdigi_config.has_alias[from_chan][to_chan] = 1;
 	      }
 	      else {
-	        regerror (e, &(p_cdigi_config->alias[from_chan][to_chan]), message, sizeof(message));
+	        regerror (e, &(p_cdigi_config.alias[from_chan][to_chan]), message, sizeof(message));
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Invalid alias matching pattern on line %d:\n%s\n",
 							line, message);
@@ -2996,7 +3000,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      t = split(NULL,0);
 	    }
 
-	    p_cdigi_config->enabled[from_chan][to_chan] = 1;
+	    p_cdigi_config.enabled[from_chan][to_chan] = 1;
 
 	    if (t != NULL) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -3069,14 +3073,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        continue;
 	      }
 
-	      if (p_audio_config->chan_medium[from_chan] != MEDIUM_RADIO &&
-		  p_audio_config->chan_medium[from_chan] != MEDIUM_NETTNC) {
+	      if (p_audio_config.chan_medium[from_chan] != MEDIUM_RADIO &&
+		  p_audio_config.chan_medium[from_chan] != MEDIUM_NETTNC) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file, line %d: FROM-channel %d is not valid.\n", 
 							line, from_chan);
 	        continue;
 	      }
-	      if (p_audio_config->chan_medium[from_chan] == MEDIUM_IGATE) {
+	      if (p_audio_config.chan_medium[from_chan] == MEDIUM_IGATE) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file, line %d: Use 'IG' rather than %d for FROM-channel.\n",
 							line, from_chan);
@@ -3107,14 +3111,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 							MAX_TOTAL_CHANS-1, line);
 	        continue;
 	      }
-	      if (p_audio_config->chan_medium[to_chan] != MEDIUM_RADIO &&
-		  p_audio_config->chan_medium[to_chan] != MEDIUM_NETTNC) {
+	      if (p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO &&
+		  p_audio_config.chan_medium[to_chan] != MEDIUM_NETTNC) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file, line %d: TO-channel %d is not valid.\n", 
 							line, to_chan);
 	        continue;
 	      }
-	      if (p_audio_config->chan_medium[to_chan] == MEDIUM_IGATE) {
+	      if (p_audio_config.chan_medium[to_chan] == MEDIUM_IGATE) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file, line %d: Use 'IG' rather than %d for TO-channel.\n",
 							line, to_chan);
@@ -3128,15 +3132,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      t = " ";				/* Empty means permit nothing. */
 	    }
 
-	    if (p_digi_config->filter_str[from_chan][to_chan] != NULL) {
+	    if (p_digi_config.filter_str[from_chan][to_chan] != NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: Replacing previous filter for same from/to pair:\n        %s\n",
-				line, p_digi_config->filter_str[from_chan][to_chan]);
-	      free (p_digi_config->filter_str[from_chan][to_chan]);
-	      p_digi_config->filter_str[from_chan][to_chan] = NULL;
+				line, p_digi_config.filter_str[from_chan][to_chan]);
+	      free (p_digi_config.filter_str[from_chan][to_chan]);
+	      p_digi_config.filter_str[from_chan][to_chan] = NULL;
 	    }
 
-	    p_digi_config->filter_str[from_chan][to_chan] = strdup(t);
+	    p_digi_config.filter_str[from_chan][to_chan] = strdup(t);
 
 //TODO:  Do a test run to see errors now instead of waiting.
 
@@ -3176,7 +3180,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    // DO NOT allow a network TNC here.
 	    // Must be internal modem to have necessary knowledge about channel status.
 
-            if (p_audio_config->chan_medium[from_chan] != MEDIUM_RADIO) {
+            if (p_audio_config.chan_medium[from_chan] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: FROM-channel %d is not valid.\n",
 							line, from_chan);
@@ -3197,7 +3201,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 							MAX_RADIO_CHANS-1, line);
 	      continue;
 	    }
-            if (p_audio_config->chan_medium[to_chan] != MEDIUM_RADIO) {
+            if (p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: TO-channel %d is not valid.\n",
 							line, to_chan);
@@ -3210,7 +3214,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      t = " ";				/* Empty means permit nothing. */
 	    }
 
-	    p_cdigi_config->cfilter_str[from_chan][to_chan] = strdup(t);
+	    p_cdigi_config.cfilter_str[from_chan][to_chan] = strdup(t);
 
 //TODO1.2:  Do a test run to see errors now instead of waiting.
 
@@ -3235,7 +3239,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing latitude for TTCORRAL command.\n", line);
 	      continue;
 	    }
-	    p_tt_config->corral_lat = parse_ll(t,LAT,line);
+	    p_tt_config.corral_lat = parse_ll(t,LAT,line);
 
 	    t = split(NULL,0);
 	    if (t == NULL) {
@@ -3243,7 +3247,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing longitude for TTCORRAL command.\n", line);
 	      continue;
 	    }
-	    p_tt_config->corral_lon = parse_ll(t,LON,line);
+	    p_tt_config.corral_lon = parse_ll(t,LON,line);
 
 	    t = split(NULL,0);
 	    if (t == NULL) {
@@ -3251,16 +3255,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing longitude for TTCORRAL command.\n", line);
 	      continue;
 	    }
-	    p_tt_config->corral_offset = parse_ll(t,LAT,line);
-	    if (p_tt_config->corral_offset == 1 ||
-		p_tt_config->corral_offset == 2 ||
-	 	p_tt_config->corral_offset == 3) {
-	      p_tt_config->corral_ambiguity = p_tt_config->corral_offset;
-	      p_tt_config->corral_offset = 0;
+	    p_tt_config.corral_offset = parse_ll(t,LAT,line);
+	    if (p_tt_config.corral_offset == 1 ||
+		p_tt_config.corral_offset == 2 ||
+	 	p_tt_config.corral_offset == 3) {
+	      p_tt_config.corral_ambiguity = p_tt_config.corral_offset;
+	      p_tt_config.corral_offset = 0;
 	    }
 
-	    //dw_printf ("DEBUG: corral %f %f %f %d\n", p_tt_config->corral_lat,
-	    //	p_tt_config->corral_lon, p_tt_config->corral_offset, p_tt_config->corral_ambiguity);
+	    //dw_printf ("DEBUG: corral %f %f %f %d\n", p_tt_config.corral_lat,
+	    //	p_tt_config.corral_lon, p_tt_config.corral_offset, p_tt_config.corral_ambiguity);
 	  }
 
 /*
@@ -3273,23 +3277,23 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    struct ttloc_s *tl;
 	    int j;
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    // Should make this a function/macro instead of repeating code.
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_POINT;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    tl->point.lat = 0;
-	    tl->point.lon = 0;
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_POINT;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    tl.point.lat = 0;
+	    tl.point.lon = 0;
 
 	    /* Pattern: B and digits */
 
@@ -3299,7 +3303,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing pattern for TTPOINT command.\n", line);
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
@@ -3320,7 +3324,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing latitude for TTPOINT command.\n", line);
 	      continue;
 	    }
-	    tl->point.lat = parse_ll(t,LAT,line);
+	    tl.point.lat = parse_ll(t,LAT,line);
 
 	    /* Longitude */
 
@@ -3330,13 +3334,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing longitude for TTPOINT command.\n", line);
 	      continue;
 	    }
-	    tl->point.lon = parse_ll(t,LON,line);
+	    tl.point.lon = parse_ll(t,LON,line);
 
 	    /* temp debugging */
 
-	    //for (j=0; j<p_tt_config->ttloc_len; j++) {
-	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config->ttloc_size, 
-	    //		p_tt_config->ttloc_ptr[j].pattern);
+	    //for (j=0; j<p_tt_config.ttloc_len; j++) {
+	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
+	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
 	  }
 
@@ -3352,23 +3356,23 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    double scale;
 	    double meters;
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_VECTOR;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    tl->vector.lat = 0;
-	    tl->vector.lon = 0;
-	    tl->vector.scale = 1;
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_VECTOR;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    tl.vector.lat = 0;
+	    tl.vector.lon = 0;
+	    tl.vector.scale = 1;
 	   
 	    /* Pattern: B5bbbd... */
 
@@ -3378,7 +3382,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing pattern for TTVECTOR command.\n", line);
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
@@ -3403,7 +3407,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing latitude for TTVECTOR command.\n", line);
 	      continue;
 	    }
-	    tl->vector.lat = parse_ll(t,LAT,line);
+	    tl.vector.lat = parse_ll(t,LAT,line);
 
 	    /* Longitude */
 
@@ -3413,7 +3417,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing longitude for TTVECTOR command.\n", line);
 	      continue;
 	    }
-	    tl->vector.lon = parse_ll(t,LON,line);
+	    tl.vector.lon = parse_ll(t,LON,line);
 
 	    /* Longitude */
 
@@ -3444,15 +3448,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Unrecognized unit for TTVECTOR command.  Using miles.\n", line);
 	      meters = 1609.344;
 	    }
-	    tl->vector.scale = scale * meters;
+	    tl.vector.scale = scale * meters;
 
- 	    //dw_printf ("ttvector: %f meters\n", tl->vector.scale);
+ 	    //dw_printf ("ttvector: %f meters\n", tl.vector.scale);
 
 	    /* temp debugging */
 
-	    //for (j=0; j<p_tt_config->ttloc_len; j++) {
-	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config->ttloc_size, 
-	    //		p_tt_config->ttloc_ptr[j].pattern);
+	    //for (j=0; j<p_tt_config.ttloc_len; j++) {
+	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
+	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
 	  }
 
@@ -3466,24 +3470,24 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    struct ttloc_s *tl;
 	    int j;
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_GRID;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    tl->grid.lat0 = 0;
-	    tl->grid.lon0 = 0;
-	    tl->grid.lat9 = 0;
-	    tl->grid.lon9 = 0;
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_GRID;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    tl.grid.lat0 = 0;
+	    tl.grid.lon0 = 0;
+	    tl.grid.lat9 = 0;
+	    tl.grid.lon9 = 0;
 
 	    /* Pattern: B [digit] x... y... */
 
@@ -3493,7 +3497,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing pattern for TTGRID command.\n", line);
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
@@ -3514,7 +3518,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing minimum latitude for TTGRID command.\n", line);
 	      continue;
 	    }
-	    tl->grid.lat0 = parse_ll(t,LAT,line);
+	    tl.grid.lat0 = parse_ll(t,LAT,line);
 
 	    /* Minimum Longitude - all zeros in received data */
 
@@ -3524,7 +3528,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing minimum longitude for TTGRID command.\n", line);
 	      continue;
 	    }
-	    tl->grid.lon0 = parse_ll(t,LON,line);
+	    tl.grid.lon0 = parse_ll(t,LON,line);
 
 	    /* Maximum Latitude - all nines in received data */
 
@@ -3534,7 +3538,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing maximum latitude for TTGRID command.\n", line);
 	      continue;
 	    }
-	    tl->grid.lat9 = parse_ll(t,LAT,line);
+	    tl.grid.lat9 = parse_ll(t,LAT,line);
 
 	    /* Maximum Longitude - all nines in received data */
 
@@ -3544,16 +3548,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing maximum longitude for TTGRID command.\n", line);
 	      continue;
 	    }
-	    tl->grid.lon9 = parse_ll(t,LON,line);
+	    tl.grid.lon9 = parse_ll(t,LON,line);
 
 	    /* temp debugging */
 
-	    // dw_printf ("CONFIG TTGRID min %f %f\n", tl->grid.lat0, tl->grid.lon0);
-	    // dw_printf ("CONFIG TTGRID max %f %f\n", tl->grid.lat9, tl->grid.lon9);
+	    // dw_printf ("CONFIG TTGRID min %f %f\n", tl.grid.lat0, tl.grid.lon0);
+	    // dw_printf ("CONFIG TTGRID max %f %f\n", tl.grid.lat9, tl.grid.lon9);
 
-	    //for (j=0; j<p_tt_config->ttloc_len; j++) {
-	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config->ttloc_size, 
-	    //	p_tt_config->ttloc_ptr[j].pattern);
+	    //for (j=0; j<p_tt_config.ttloc_len; j++) {
+	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
+	    //	p_tt_config.ttloc_ptr[j].pattern);
 	    //}
 	  }
 
@@ -3570,24 +3574,24 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    long lerr;
 
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_UTM;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    tl->utm.lzone = 0;
-	    tl->utm.scale = 1;
-	    tl->utm.x_offset = 0;
-	    tl->utm.y_offset = 0;
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_UTM;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    tl.utm.lzone = 0;
+	    tl.utm.scale = 1;
+	    tl.utm.x_offset = 0;
+	    tl.utm.y_offset = 0;
 
 	    /* Pattern: B [digit] x... y... */
 
@@ -3595,15 +3599,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing pattern for TTUTM command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTUTM pattern must begin with upper case 'B'.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 	    for (j=1; j < (int)(strlen(t)); j++) {
@@ -3620,41 +3624,41 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing zone for TTUTM command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
-	    tl->utm.lzone = parse_utm_zone (t, &(tl->utm.latband), &(tl->utm.hemi));
+	    tl.utm.lzone = parse_utm_zone (t, &(tl.utm.latband), &(tl.utm.hemi));
 
  	    /* Optional scale. */
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
 	      
-	      tl->utm.scale = atof(t);
+	      tl.utm.scale = atof(t);
 
 	      /* Optional x offset. */
 
 	      t = split(NULL,0);
 	      if (t != NULL) {
 
-	        tl->utm.x_offset = atof(t);
+	        tl.utm.x_offset = atof(t);
 
 	        /* Optional y offset. */
 
 	        t = split(NULL,0);
 	        if (t != NULL) {
 	     
-	          tl->utm.y_offset = atof(t);
+	          tl.utm.y_offset = atof(t);
 	        }
 	      }
 	    }
 
 	    /* Practice run to see if conversion might fail later with actual location. */
 
-	    lerr = Convert_UTM_To_Geodetic(tl->utm.lzone, tl->utm.hemi,               
-                        tl->utm.x_offset + 5 * tl->utm.scale,
-                        tl->utm.y_offset + 5 * tl->utm.scale,
+	    lerr = Convert_UTM_To_Geodetic(tl.utm.lzone, tl.utm.hemi,               
+                        tl.utm.x_offset + 5 * tl.utm.scale,
+                        tl.utm.y_offset + 5 * tl.utm.scale,
                         &dlat, &dlon);
 
             if (lerr != 0) {
@@ -3663,7 +3667,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
               utm_error_string (lerr, message);
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid UTM location: \n%s\n", line, message);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
             }
 	  }
@@ -3683,28 +3687,28 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    long lerr;
 	    char message[300];
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
 
 // TODO1.2: in progress...
 	    if (strcasecmp(t, "TTMGRS") == 0) {
-	      tl->type = TTLOC_MGRS;
+	      tl.type = TTLOC_MGRS;
 	    }
 	    else {
-	      tl->type = TTLOC_USNG;
+	      tl.type = TTLOC_USNG;
 	    }
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    strlcpy(tl->mgrs.zone, "", sizeof(tl->mgrs.zone));
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    strlcpy(tl.mgrs.zone, "", sizeof(tl.mgrs.zone));
 
 	    /* Pattern: B [digit] x... y... */
 
@@ -3712,15 +3716,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing pattern for TTUSNG/TTMGRS command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 	    num_x = 0;
@@ -3737,7 +3741,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (num_x < 1 || num_x > 5 || num_x != num_y) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y.\n", line);  
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
@@ -3747,25 +3751,25 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing zone & square for TTUSNG/TTMGRS command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->mgrs.zone, t, sizeof(tl->mgrs.zone));
+	    strlcpy (tl.mgrs.zone, t, sizeof(tl.mgrs.zone));
 
 	    /* Try converting it rather do our own error checking. */
 
-	    if (tl->type == TTLOC_MGRS) {
-	      lerr = Convert_MGRS_To_Geodetic (tl->mgrs.zone, &lat, &lon);
+	    if (tl.type == TTLOC_MGRS) {
+	      lerr = Convert_MGRS_To_Geodetic (tl.mgrs.zone, &lat, &lon);
 	    }
 	    else {
-	      lerr = Convert_USNG_To_Geodetic (tl->mgrs.zone, &lat, &lon);
+	      lerr = Convert_USNG_To_Geodetic (tl.mgrs.zone, &lat, &lon);
 	    }
             if (lerr != 0) {
 
               mgrs_error_string (lerr, message);
 	      text_color_set(DW_COLOR_ERROR);
-              dw_printf ("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", line, tl->mgrs.zone, message);
-	      p_tt_config->ttloc_len--;
+              dw_printf ("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", line, tl.mgrs.zone, message);
+	      p_tt_config.ttloc_len--;
 	      continue;
             }
 
@@ -3799,21 +3803,21 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    int count_other;
 
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len > 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_MHEAD;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    strlcpy(tl->mhead.prefix, "", sizeof(tl->mhead.prefix));
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_MHEAD;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    strlcpy(tl.mhead.prefix, "", sizeof(tl.mhead.prefix));
 
 	    /* Pattern: B, optional additional button, some number of xxxx... for matching */
 
@@ -3821,15 +3825,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing pattern for TTMHEAD command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTMHEAD pattern must begin with upper case 'B'.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
@@ -3852,7 +3856,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (count_other != 0) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTMHEAD must have only lower case x to match received data.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
@@ -3862,28 +3866,28 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t != NULL) {
 	      char mh[30];
 
-	      strlcpy(tl->mhead.prefix, t, sizeof(tl->mhead.prefix));
+	      strlcpy(tl.mhead.prefix, t, sizeof(tl.mhead.prefix));
 
 	      if (!alldigits(t) || (strlen(t) != 4 &&  strlen(t) != 6 && strlen(t) != 10)) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTMHEAD prefix must be 4, 6, or 10 digits.\n", line);
-	        p_tt_config->ttloc_len--;
+	        p_tt_config.ttloc_len--;
 	        continue;
 	      }
 	      if (tt_mhead_to_text(t, 0, mh, sizeof(mh)) != 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTMHEAD prefix not a valid DTMF sequence.\n", line);
-	        p_tt_config->ttloc_len--;
+	        p_tt_config.ttloc_len--;
 	        continue;
 	      }      
 	    }
 
-	    k = strlen(tl->mhead.prefix) + count_x;
+	    k = strlen(tl.mhead.prefix) + count_x;
 
 	    if (k != 4 && k != 6  && k != 10  && k != 12 ) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTMHEAD prefix and user data must have a total of 4, 6, 10, or 12 digits.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 	    
@@ -3907,22 +3911,22 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    struct ttloc_s *tl;
 	    int j;
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len > 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_SATSQ;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
-	    tl->point.lat = 0;
-	    tl->point.lon = 0;
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_SATSQ;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
+	    tl.point.lat = 0;
+	    tl.point.lon = 0;
 
 	    /* Pattern: B, optional additional button, exactly xxxx for matching */
 
@@ -3930,15 +3934,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing pattern for TTSATSQ command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTSATSQ pattern must begin with upper case 'B'.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
@@ -3954,15 +3958,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (strcmp(t+j, "xxxx") != 0) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTSATSQ pattern must end with exactly xxxx in lower case.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
 	    /* temp debugging */
 
-	    //for (j=0; j<p_tt_config->ttloc_len; j++) {
-	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config->ttloc_size, 
-	    //		p_tt_config->ttloc_ptr[j].pattern);
+	    //for (j=0; j<p_tt_config.ttloc_len; j++) {
+	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
+	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
 	  }
 
@@ -3983,20 +3987,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    struct ttloc_s *tl;
 	    int j;
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len > 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_AMBIG;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_AMBIG;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 
 	    /* Pattern: B, optional additional button, exactly x for matching */
 
@@ -4004,15 +4008,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing pattern for TTAMBIG command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    if (t[0] != 'B') {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTAMBIG pattern must begin with upper case 'B'.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
@@ -4028,15 +4032,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (strcmp(t+j, "x") != 0) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTAMBIG pattern must end with exactly one x in lower case.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
 	    /* temp debugging */
 
-	    //for (j=0; j<p_tt_config->ttloc_len; j++) {
-	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config->ttloc_size,
-	    //		p_tt_config->ttloc_ptr[j].pattern);
+	    //for (j=0; j<p_tt_config.ttloc_len; j++) {
+	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size,
+	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
 	  }
 
@@ -4071,20 +4075,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    int p_count[3], d_count[3];
 	    int tt_error = 0;
 
-	    assert (p_tt_config->ttloc_size >= 2);
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    assert (p_tt_config.ttloc_size >= 2);
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    /* Allocate new space, but first, if already full, make larger. */
-	    if (p_tt_config->ttloc_len == p_tt_config->ttloc_size) {
-	      p_tt_config->ttloc_size += p_tt_config->ttloc_size / 2;
-	      p_tt_config->ttloc_ptr = realloc (p_tt_config->ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config->ttloc_size);
+	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
+	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
+	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
-	    p_tt_config->ttloc_len++;
-	    assert (p_tt_config->ttloc_len >= 0 && p_tt_config->ttloc_len <= p_tt_config->ttloc_size);
+	    p_tt_config.ttloc_len++;
+	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config->ttloc_ptr[p_tt_config->ttloc_len-1]);
-	    tl->type = TTLOC_MACRO;
-	    strlcpy(tl->pattern, "", sizeof(tl->pattern));
+	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    tl.type = TTLOC_MACRO;
+	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 
 	    /* Pattern: Any combination of digits, x, y, and z. */
 	    /* Also make note of which letters are used in pattern and definition. */
@@ -4094,10 +4098,10 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing pattern for TTMACRO command.\n", line);
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    strlcpy (tl->pattern, t, sizeof(tl->pattern));
+	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
 	    p_count[0] = p_count[1] = p_count[2] = 0;
 
@@ -4105,7 +4109,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      if ( strchr ("0123456789ABCDxyz", t[j]) == NULL) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z.\n", line);
-	        p_tt_config->ttloc_len--;
+	        p_tt_config.ttloc_len--;
 	        continue;
 	      }
 	      /* Count how many x, y, z in the pattern. */
@@ -4124,8 +4128,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t == NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing definition for TTMACRO command.\n", line);
-	      tl->macro.definition = "";	/* Don't die on null pointer later. */
-	      p_tt_config->ttloc_len--;
+	      tl.macro.definition = "";	/* Don't die on null pointer later. */
+	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
 
@@ -4321,10 +4325,10 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    //dw_printf ("DEBUG Config Line %d: %s -> %s\n", line, t, otemp);
 
 	    if (tt_error == 0) {
-	      tl->macro.definition = strdup(otemp);
+	      tl.macro.definition = strdup(otemp);
 	    }
 	    else {
-	      p_tt_config->ttloc_len--;
+	      p_tt_config.ttloc_len--;
 	    }
 	  }
 
@@ -4361,7 +4365,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    // I suppose we need internal modem channel here.
 	    // otherwise a DTMF decoder would not be available.
 
-	    if (p_audio_config->chan_medium[r] != MEDIUM_RADIO) {
+	    if (p_audio_config.chan_medium[r] != MEDIUM_RADIO) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: TTOBJ DTMF receive channel %d is not valid.\n", 
 							line, r);
@@ -4387,8 +4391,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	          dw_printf ("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, line);
 	          x = -1;
 	        }
-	        else if (p_audio_config->chan_medium[x] != MEDIUM_RADIO &&
-			 p_audio_config->chan_medium[x] != MEDIUM_NETTNC) {
+	        else if (p_audio_config.chan_medium[x] != MEDIUM_RADIO &&
+			 p_audio_config.chan_medium[x] != MEDIUM_NETTNC) {
 	          text_color_set(DW_COLOR_ERROR);
 	          dw_printf ("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", line, x);
 	          x = -1;
@@ -4417,18 +4421,18 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    //text_color_set(DW_COLOR_DEBUG);
 	    //dw_printf ("Debug TTOBJ r=%d, x=%d, app=%d, ig=%d\n", r, x, app, ig);
 
-	    p_audio_config->achan[r].dtmf_decode = DTMF_DECODE_ON;
-	    p_tt_config->gateway_enabled = 1;
-	    p_tt_config->obj_recv_chan = r;
-	    p_tt_config->obj_xmit_chan = x;
-	    p_tt_config->obj_send_to_app = app;
-	    p_tt_config->obj_send_to_ig = ig;
+	    p_audio_config.achan[r].dtmf_decode = DTMF_DECODE_ON;
+	    p_tt_config.gateway_enabled = 1;
+	    p_tt_config.obj_recv_chan = r;
+	    p_tt_config.obj_xmit_chan = x;
+	    p_tt_config.obj_send_to_app = app;
+	    p_tt_config.obj_send_to_ig = ig;
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
 
 	      if (check_via_path(t) >= 0) {
-	        strlcpy (p_tt_config->obj_xmit_via, t, sizeof(p_tt_config->obj_xmit_via));
+	        strlcpy (p_tt_config.obj_xmit_via, t, sizeof(p_tt_config.obj_xmit_via));
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -4505,12 +4509,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  
 	    assert (msg_num >= 0 && msg_num < TT_ERROR_MAXP1);
 
-	    strlcpy (p_tt_config->response[msg_num].method, method, sizeof(p_tt_config->response[msg_num].method));
+	    strlcpy (p_tt_config.response[msg_num].method, method, sizeof(p_tt_config.response[msg_num].method));
 
 // TODO1.3: Need SSID too!
 
-	    strlcpy (p_tt_config->response[msg_num].mtext, t, sizeof(p_tt_config->response[msg_num].mtext));
-	    p_tt_config->response[msg_num].mtext[TT_MTEXT_LEN-1] = '\0';
+	    strlcpy (p_tt_config.response[msg_num].mtext, t, sizeof(p_tt_config.response[msg_num].mtext));
+	    p_tt_config.response[msg_num].mtext[TT_MTEXT_LEN-1] = '\0';
 
 	  }
 
@@ -4550,7 +4554,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  
 	    while (*t == ' ' || *t == '\t') t++;   // remove leading white space.
 
-	    strlcpy (p_tt_config->status[status_num], t, sizeof(p_tt_config->status[status_num]));
+	    strlcpy (p_tt_config.status[status_num], t, sizeof(p_tt_config.status[status_num]));
 	  }
 
 
@@ -4570,7 +4574,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    
-	    strlcpy (p_tt_config->ttcmd, t, sizeof(p_tt_config->ttcmd));
+	    strlcpy (p_tt_config.ttcmd, t, sizeof(p_tt_config.ttcmd));
 	  }
 
 
@@ -4593,23 +4597,23 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing IGate server name for IGSERVER command.\n", line);
 	      continue;
 	    }
-	    strlcpy (p_igate_config->t2_server_name, t, sizeof(p_igate_config->t2_server_name));
+	    strlcpy (p_igate_config.t2_server_name, t, sizeof(p_igate_config.t2_server_name));
 
 	    /* If there is a : in the name, split it out as the port number. */
 
-	    t = strchr (p_igate_config->t2_server_name, ':');
+	    t = strchr (p_igate_config.t2_server_name, ':');
 	    if (t != NULL) {
 	      *t = '\0';
 	      t++;
 	      int n = atoi(t);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
-	        p_igate_config->t2_server_port = n;
+	        p_igate_config.t2_server_port = n;
 	      }
 	      else {
-	        p_igate_config->t2_server_port = DEFAULT_IGATE_PORT;
+	        p_igate_config.t2_server_port = DEFAULT_IGATE_PORT;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Invalid port number for IGate server. Using default %d.\n", 
-			line, p_igate_config->t2_server_port);
+			line, p_igate_config.t2_server_port);
    	      }
 	    }
 
@@ -4619,16 +4623,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    if (t != NULL) {
 	      int n = atoi(t);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
-	        p_igate_config->t2_server_port = n;
+	        p_igate_config.t2_server_port = n;
 	      }
 	      else {
-	        p_igate_config->t2_server_port = DEFAULT_IGATE_PORT;
+	        p_igate_config.t2_server_port = DEFAULT_IGATE_PORT;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Invalid port number for IGate server. Using default %d.\n", 
-			line, p_igate_config->t2_server_port);
+			line, p_igate_config.t2_server_port);
    	      }
 	    }
-	    //dw_printf ("DEBUG  server=%s   port=%d\n", p_igate_config->t2_server_name, p_igate_config->t2_server_port);
+	    //dw_printf ("DEBUG  server=%s   port=%d\n", p_igate_config.t2_server_name, p_igate_config.t2_server_port);
 	    //exit (0);
 	  }
 
@@ -4646,7 +4650,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    // TODO: Wouldn't hurt to do validity checking of format.
-	    strlcpy (p_igate_config->t2_login, t, sizeof(p_igate_config->t2_login));
+	    strlcpy (p_igate_config.t2_login, t, sizeof(p_igate_config.t2_login));
 
 	    t = split(NULL,0);
 	    if (t == NULL) {
@@ -4654,7 +4658,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Line %d: Missing passcode for IGLOGIN command.\n", line);
 	      continue;
 	    }
-	    strlcpy (p_igate_config->t2_passcode, t, sizeof(p_igate_config->t2_passcode));
+	    strlcpy (p_igate_config.t2_passcode, t, sizeof(p_igate_config.t2_passcode));
 	  }
 
 /*
@@ -4680,7 +4684,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 							MAX_TOTAL_CHANS-1, line);
 	      continue;
 	    }
-	    p_igate_config->tx_chan = n;
+	    p_igate_config.tx_chan = n;
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
@@ -4689,9 +4693,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	      n = check_via_path(t);
 	      if (n >= 0) {
-	        p_igate_config->max_digi_hops = n;
-	        p_igate_config->tx_via[0] = ',';
-	        strlcpy (p_igate_config->tx_via + 1, t, sizeof(p_igate_config->tx_via)-1);
+	        p_igate_config.max_digi_hops = n;
+	        p_igate_config.tx_via[0] = ',';
+	        strlcpy (p_igate_config.tx_via + 1, t, sizeof(p_igate_config.tx_via)-1);
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -4701,9 +4705,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 #else	// previously
 
 	      char *p;
-	      p_igate_config->tx_via[0] = ',';
-	      strlcpy (p_igate_config->tx_via + 1, t, sizeof(p_igate_config->tx_via)-1);
-	      for (p = p_igate_config->tx_via; *p != '\0'; p++) {
+	      p_igate_config.tx_via[0] = ',';
+	      strlcpy (p_igate_config.tx_via + 1, t, sizeof(p_igate_config.tx_via)-1);
+	      for (p = p_igate_config.tx_via; *p != '\0'; p++) {
 	        if (islower(*p)) {
 		  *p = toupper(*p);	/* silently force upper case. */
 	        }
@@ -4725,14 +4729,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    t = split(NULL,1);		/* Take rest of line as one string. */
 
-	    if (p_igate_config->t2_filter != NULL) {
+	    if (p_igate_config.t2_filter != NULL) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Warning - Earlier IGFILTER value will be replaced by this one.\n", line);
 	      continue;
 	    }
 
 	    if (t != NULL && strlen(t) > 0) {
-	      p_igate_config->t2_filter = strdup (t);
+	      p_igate_config.t2_filter = strdup (t);
 
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Warning - IGFILTER is a rarely needed expert level feature.\n", line);
@@ -4762,16 +4766,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    
 	    n = atoi(t);
             if (n < 1) {
-	      p_igate_config->tx_limit_1 = 1;
+	      p_igate_config.tx_limit_1 = 1;
 	    }
             else if (n <= IGATE_TX_LIMIT_1_MAX) {
-	      p_igate_config->tx_limit_1 = n;
+	      p_igate_config.tx_limit_1 = n;
 	    }
 	    else {
-	      p_igate_config->tx_limit_1 = IGATE_TX_LIMIT_1_MAX;
+	      p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_MAX;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: One minute transmit limit has been reduced to %d.\n",
-				line, p_igate_config->tx_limit_1);
+				line, p_igate_config.tx_limit_1);
 	      dw_printf ("You won't make friends by setting a limit this high.\n");
    	    }
 
@@ -4785,16 +4789,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    
 	    n = atoi(t);
             if (n < 1) {
-	      p_igate_config->tx_limit_5 = 1;
+	      p_igate_config.tx_limit_5 = 1;
 	    }
             else if (n <= IGATE_TX_LIMIT_5_MAX) {
-	      p_igate_config->tx_limit_5 = n;
+	      p_igate_config.tx_limit_5 = n;
 	    }
 	    else {
-	      p_igate_config->tx_limit_5 = IGATE_TX_LIMIT_5_MAX;
+	      p_igate_config.tx_limit_5 = IGATE_TX_LIMIT_5_MAX;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Five minute transmit limit has been reduced to %d.\n",
-				line, p_igate_config->tx_limit_5);
+				line, p_igate_config.tx_limit_5);
 	      dw_printf ("You won't make friends by setting a limit this high.\n");
    	    }
 	  }
@@ -4813,16 +4817,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	      int n = atoi(t);
               if (n >= 0 && n <= 10) {
-	        p_igate_config->igmsp = n;
+	        p_igate_config.igmsp = n;
 	      }
 	      else {
-	        p_igate_config->igmsp = 1;
+	        p_igate_config.igmsp = 1;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Unreasonable number of times for message sender position.  Using default 1.\n", line);
 	      }
 	    }
 	    else {
-	      p_igate_config->igmsp = 1;
+	      p_igate_config.igmsp = 1;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Missing number of times for message sender position.  Using default 1.\n", line);
 	    }
@@ -4846,16 +4850,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	      int n = atoi(t);
               if (n >= MIN_SATGATE_DELAY && n <= MAX_SATGATE_DELAY) {
-	        p_igate_config->satgate_delay = n;
+	        p_igate_config.satgate_delay = n;
 	      }
 	      else {
-	        p_igate_config->satgate_delay = DEFAULT_SATGATE_DELAY;
+	        p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY;
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Unreasonable SATgate delay.  Using default.\n", line);
 	      }
 	    }
 	    else {
-	      p_igate_config->satgate_delay = DEFAULT_SATGATE_DELAY;
+	      p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY;
 	    }
 	  }
 
@@ -4888,13 +4892,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
             if ((n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0) {
-	      p_misc_config->agwpe_port = n;
+	      p_misc_config.agwpe_port = n;
 	    }
 	    else {
-	      p_misc_config->agwpe_port = DEFAULT_AGWPE_PORT;
+	      p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n", 
-			line, p_misc_config->agwpe_port);
+			line, p_misc_config.agwpe_port);
    	    }
 	  }
 
@@ -4953,7 +4957,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    // "KISSPORT 0" is used to remove the default entry.
 
 	    if (tcp_port == 0) {
-	      p_misc_config->kiss_port[0] = 0;		// Should all be wiped out?
+	      p_misc_config.kiss_port[0] = 0;		// Should all be wiped out?
 	    }
 	    else {
 
@@ -4962,20 +4966,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	      int slot = -1;
 	      for (int i = 0; i < MAX_KISS_TCP_PORTS && slot == -1; i++) {
-	        if (p_misc_config->kiss_port[i] == tcp_port) {
+	        if (p_misc_config.kiss_port[i] == tcp_port) {
 	          slot = i;
 	          if ( ! (slot == 0 && tcp_port == DEFAULT_KISS_PORT)) {
 	            text_color_set(DW_COLOR_ERROR);
 	            dw_printf ("Line %d: Warning: Duplicate TCP port %d will overwrite previous value.\n", line, tcp_port);
 	          }
 	        }
-	        else if (p_misc_config->kiss_port[i] == 0) {
+	        else if (p_misc_config.kiss_port[i] == 0) {
 	          slot = i;
 	        }
 	      }
 	      if (slot >= 0) {
-	        p_misc_config->kiss_port[slot] = tcp_port;
-	        p_misc_config->kiss_chan[slot] = chan;
+	        p_misc_config.kiss_port[slot] = tcp_port;
+	        p_misc_config.kiss_chan[slot] = chan;
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5002,18 +5006,18 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    else {
-	      if (strlen(p_misc_config->kiss_serial_port) > 0) {
+	      if (strlen(p_misc_config.kiss_serial_port) > 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Warning serial port name on line %d replaces earlier value.\n", line);
 	      }
-	      strlcpy (p_misc_config->kiss_serial_port, t, sizeof(p_misc_config->kiss_serial_port));
-	      p_misc_config->kiss_serial_speed = 0;
-	      p_misc_config->kiss_serial_poll = 0;
+	      strlcpy (p_misc_config.kiss_serial_port, t, sizeof(p_misc_config.kiss_serial_port));
+	      p_misc_config.kiss_serial_speed = 0;
+	      p_misc_config.kiss_serial_poll = 0;
 	    }
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
-	      p_misc_config->kiss_serial_speed = atoi(t);
+	      p_misc_config.kiss_serial_speed = atoi(t);
 	    }
 	  }
 
@@ -5030,13 +5034,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    else {
-	      if (strlen(p_misc_config->kiss_serial_port) > 0) {
+	      if (strlen(p_misc_config.kiss_serial_port) > 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Warning serial port name on line %d replaces earlier value.\n", line);
 	      }
-	      strlcpy (p_misc_config->kiss_serial_port, t, sizeof(p_misc_config->kiss_serial_port));
-	      p_misc_config->kiss_serial_speed = 0;
-	      p_misc_config->kiss_serial_poll = 1;	// set polling.
+	      strlcpy (p_misc_config.kiss_serial_port, t, sizeof(p_misc_config.kiss_serial_port));
+	      p_misc_config.kiss_serial_speed = 0;
+	      p_misc_config.kiss_serial_poll = 1;	// set polling.
 	    }
 	  }
 
@@ -5047,7 +5051,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 
 	  else if (strcasecmp(t, "KISSCOPY") == 0) {
-	    p_misc_config->kiss_copy = 1;
+	    p_misc_config.kiss_copy = 1;
 	  }
 
 
@@ -5066,9 +5070,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
 	    if (n == 0 || n == 1) {
-	      p_misc_config->dns_sd_enabled = n;
+	      p_misc_config.dns_sd_enabled = n;
 	    } else {
-	      p_misc_config->dns_sd_enabled = 0;
+	      p_misc_config.dns_sd_enabled = 0;
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", line);
 	    }
@@ -5082,7 +5086,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    else {
-	      strlcpy(p_misc_config->dns_sd_name, t, sizeof(p_misc_config->dns_sd_name));
+	      strlcpy(p_misc_config.dns_sd_name, t, sizeof(p_misc_config.dns_sd_name));
 	    }
 	  }
 
@@ -5098,15 +5102,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Config file, line %d: Missing serial port name for GPS receiver.\n", line);
 	      continue;
 	    }
-	    strlcpy (p_misc_config->gpsnmea_port, t, sizeof(p_misc_config->gpsnmea_port));
+	    strlcpy (p_misc_config.gpsnmea_port, t, sizeof(p_misc_config.gpsnmea_port));
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
 	      int n = atoi(t);
-	      p_misc_config->gpsnmea_speed = n;
+	      p_misc_config.gpsnmea_speed = n;
 	    }
 	    else {
-	      p_misc_config->gpsnmea_speed = 4800;	// The standard at one time.
+	      p_misc_config.gpsnmea_speed = 4800;	// The standard at one time.
 	    }
 	  }
 
@@ -5125,25 +5129,25 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 #elif ENABLE_GPSD
 
-	    strlcpy (p_misc_config->gpsd_host, "localhost", sizeof(p_misc_config->gpsd_host));
-	    p_misc_config->gpsd_port = atoi(DEFAULT_GPSD_PORT);
+	    strlcpy (p_misc_config.gpsd_host, "localhost", sizeof(p_misc_config.gpsd_host));
+	    p_misc_config.gpsd_port = atoi(DEFAULT_GPSD_PORT);
 
 	    t = split(NULL,0);
 	    if (t != NULL) {
-	      strlcpy (p_misc_config->gpsd_host, t, sizeof(p_misc_config->gpsd_host));
+	      strlcpy (p_misc_config.gpsd_host, t, sizeof(p_misc_config.gpsd_host));
 
 	      t = split(NULL,0);
 	      if (t != NULL) {
 
 	        int n = atoi(t);
                 if ((n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0) {
-	          p_misc_config->gpsd_port = n;
+	          p_misc_config.gpsd_port = n;
 	        }
 	        else {
-	          p_misc_config->gpsd_port = atoi(DEFAULT_GPSD_PORT);
+	          p_misc_config.gpsd_port = atoi(DEFAULT_GPSD_PORT);
 	          text_color_set(DW_COLOR_ERROR);
                   dw_printf ("Line %d: Invalid port number for GPSD Socket Interface. Using default of %d.\n", 
-			line, p_misc_config->gpsd_port);
+			line, p_misc_config.gpsd_port);
 	        }
 	      }
 	    }
@@ -5180,11 +5184,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      *p = '\0';
 	      int n = atoi(p+1);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
-	        strlcpy (p_misc_config->waypoint_udp_hostname, t, sizeof(p_misc_config->waypoint_udp_hostname));
-	        if (strlen(p_misc_config->waypoint_udp_hostname) == 0) {
-	          strlcpy (p_misc_config->waypoint_udp_hostname, "localhost", sizeof(p_misc_config->waypoint_udp_hostname));
+	        strlcpy (p_misc_config.waypoint_udp_hostname, t, sizeof(p_misc_config.waypoint_udp_hostname));
+	        if (strlen(p_misc_config.waypoint_udp_hostname) == 0) {
+	          strlcpy (p_misc_config.waypoint_udp_hostname, "localhost", sizeof(p_misc_config.waypoint_udp_hostname));
 	        }
-	        p_misc_config->waypoint_udp_portnum = n;
+	        p_misc_config.waypoint_udp_portnum = n;
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5192,7 +5196,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 	    }
 	    else {
-	      strlcpy (p_misc_config->waypoint_serial_port, t, sizeof(p_misc_config->waypoint_serial_port));
+	      strlcpy (p_misc_config.waypoint_serial_port, t, sizeof(p_misc_config.waypoint_serial_port));
 	    }
 	
 	    /* Anything remaining is the formats to enable. */
@@ -5202,19 +5206,19 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      for ( ; *t != '\0' ; t++ ) {
 	        switch (toupper(*t)) {
 	          case 'N':
-	            p_misc_config->waypoint_formats |= WPL_FORMAT_NMEA_GENERIC;
+	            p_misc_config.waypoint_formats |= WPL_FORMAT_NMEA_GENERIC;
 	            break;
 	          case 'G':
-	            p_misc_config->waypoint_formats |= WPL_FORMAT_GARMIN;
+	            p_misc_config.waypoint_formats |= WPL_FORMAT_GARMIN;
 	            break;
 	          case 'M':
-	            p_misc_config->waypoint_formats |= WPL_FORMAT_MAGELLAN;
+	            p_misc_config.waypoint_formats |= WPL_FORMAT_MAGELLAN;
 	            break;
 	          case 'K':
-	            p_misc_config->waypoint_formats |= WPL_FORMAT_KENWOOD;
+	            p_misc_config.waypoint_formats |= WPL_FORMAT_KENWOOD;
 	            break;
 	          case 'A':
-	            p_misc_config->waypoint_formats |= WPL_FORMAT_AIS;
+	            p_misc_config.waypoint_formats |= WPL_FORMAT_AIS;
 	            break;
 	          case ' ':
 	          case ',':
@@ -5239,12 +5243,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    else {
-	      if (strlen(p_misc_config->log_path) > 0) {
+	      if (strlen(p_misc_config.log_path) > 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: LOGDIR on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line);
 	      }
-	      p_misc_config->log_daily_names = 1;
-	      strlcpy (p_misc_config->log_path, t, sizeof(p_misc_config->log_path));
+	      p_misc_config.log_daily_names = 1;
+	      strlcpy (p_misc_config.log_path, t, sizeof(p_misc_config.log_path));
 	    }
 	    t = split(NULL,0);
 	    if (t != NULL) {
@@ -5264,12 +5268,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    else {
-	      if (strlen(p_misc_config->log_path) > 0) {
+	      if (strlen(p_misc_config.log_path) > 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: LOGFILE on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line);
 	      }
-	      p_misc_config->log_daily_names = 0;
-	      strlcpy (p_misc_config->log_path, t, sizeof(p_misc_config->log_path));
+	      p_misc_config.log_daily_names = 0;
+	      strlcpy (p_misc_config.log_path, t, sizeof(p_misc_config.log_path));
 	    }
 	    t = split(NULL,0);
 	    if (t != NULL) {
@@ -5312,30 +5316,30 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		   strcasecmp(t, "CBEACON") == 0 ||
 		   strcasecmp(t, "IBEACON") == 0) {
 
-	    if (p_misc_config->num_beacons < MAX_BEACONS) {
+	    if (p_misc_config.num_beacons < MAX_BEACONS) {
 
-	      memset (&(p_misc_config->beacon[p_misc_config->num_beacons]), 0, sizeof(struct beacon_s));
+	      memset (&(p_misc_config.beacon[p_misc_config.num_beacons]), 0, sizeof(struct beacon_s));
 	      if (strcasecmp(t, "PBEACON") == 0) {
-	        p_misc_config->beacon[p_misc_config->num_beacons].btype = BEACON_POSITION;
+	        p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_POSITION;
 	      }
 	      else if (strcasecmp(t, "OBEACON") == 0) {
-	        p_misc_config->beacon[p_misc_config->num_beacons].btype = BEACON_OBJECT;
+	        p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_OBJECT;
 	      }
 	      else if (strcasecmp(t, "TBEACON") == 0) {
-	        p_misc_config->beacon[p_misc_config->num_beacons].btype = BEACON_TRACKER;
+	        p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_TRACKER;
 	      }
 	      else if (strcasecmp(t, "IBEACON") == 0) {
-	        p_misc_config->beacon[p_misc_config->num_beacons].btype = BEACON_IGATE;
+	        p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_IGATE;
 	      }
 	      else {
-	        p_misc_config->beacon[p_misc_config->num_beacons].btype = BEACON_CUSTOM;
+	        p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_CUSTOM;
 	      }
 
 	      /* Save line number because some errors will be reported later. */
-	      p_misc_config->beacon[p_misc_config->num_beacons].lineno = line;
+	      p_misc_config.beacon[p_misc_config.num_beacons].lineno = line;
 
-	      if (beacon_options(t + strlen("xBEACON") + 1, &(p_misc_config->beacon[p_misc_config->num_beacons]), line, p_audio_config)) {
-	        p_misc_config->num_beacons++;
+	      if (beacon_options(t + strlen("xBEACON") + 1, &(p_misc_config.beacon[p_misc_config.num_beacons]), line, p_audio_config)) {
+	        p_misc_config.num_beacons++;
 	      }
 	    }
 	    else {
@@ -5361,7 +5365,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    t = split(NULL,0);									\
 	    if (t == NULL) {									\
 	      if (strcmp(name, "fast speed") == 0) {						\
-	        p_misc_config->sb_configured = 1;						\
+	        p_misc_config.sb_configured = 1;						\
 	        continue;									\
 	      }											\
 	      text_color_set(DW_COLOR_ERROR);							\
@@ -5370,12 +5374,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }											\
 	    n = atoi(t);									\
             if (n >= minn && n <= maxx) {							\
-	      p_misc_config->sbvar = n;								\
+	      p_misc_config.sbvar = n;								\
 	    }											\
 	    else {										\
 	      text_color_set(DW_COLOR_ERROR);							\
               dw_printf ("Line %d: Invalid %s for SmartBeaconing. Using default %d %s.\n",	\
-			line, name, p_misc_config->sbvar, unit);				\
+			line, name, p_misc_config.sbvar, unit);				\
    	    }
 
 #define SB_TIME(name,sbvar,minn,maxx,unit)  							\
@@ -5387,12 +5391,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }											\
 	    n = parse_interval(t,line);								\
             if (n >= minn && n <= maxx) {							\
-	      p_misc_config->sbvar = n;								\
+	      p_misc_config.sbvar = n;								\
 	    }											\
 	    else {										\
 	      text_color_set(DW_COLOR_ERROR);							\
               dw_printf ("Line %d: Invalid %s for SmartBeaconing. Using default %d %s.\n",	\
-			line, name, p_misc_config->sbvar, unit);				\
+			line, name, p_misc_config.sbvar, unit);				\
    	    }
 
 
@@ -5409,7 +5413,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* If I was ambitious, I might allow optional */
 	    /* unit at end for miles or km / hour. */
 
-	    p_misc_config->sb_configured = 1;
+	    p_misc_config.sb_configured = 1;
 	  }
 
 
@@ -5432,11 +5436,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= AX25_T1V_FRACK_MIN && n <= AX25_T1V_FRACK_MAX) {
-	      p_misc_config->frack = n;
+	      p_misc_config.frack = n;
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
-              dw_printf ("Line %d: Invalid FRACK time. Using default %d.\n", line, p_misc_config->frack);
+              dw_printf ("Line %d: Invalid FRACK time. Using default %d.\n", line, p_misc_config.frack);
 	    }
 	  }
 
@@ -5455,11 +5459,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= AX25_N2_RETRY_MIN && n <= AX25_N2_RETRY_MAX) {
-	      p_misc_config->retry = n;
+	      p_misc_config.retry = n;
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
-              dw_printf ("Line %d: Invalid RETRY number. Using default %d.\n", line, p_misc_config->retry);
+              dw_printf ("Line %d: Invalid RETRY number. Using default %d.\n", line, p_misc_config.retry);
 	    }
 	  }
 
@@ -5478,11 +5482,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= AX25_N1_PACLEN_MIN && n <= AX25_N1_PACLEN_MAX) {
-	      p_misc_config->paclen = n;
+	      p_misc_config.paclen = n;
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
-              dw_printf ("Line %d: Invalid PACLEN value. Using default %d.\n", line, p_misc_config->paclen);
+              dw_printf ("Line %d: Invalid PACLEN value. Using default %d.\n", line, p_misc_config.paclen);
 	    }
 	  }
 
@@ -5503,13 +5507,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= AX25_K_MAXFRAME_BASIC_MIN && n <= AX25_K_MAXFRAME_BASIC_MAX) {
-	      p_misc_config->maxframe_basic = n;
+	      p_misc_config.maxframe_basic = n;
 	    }
 	    else {
-	      p_misc_config->maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT;
+	      p_misc_config.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d.\n",
-			line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, p_misc_config->maxframe_basic);
+			line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, p_misc_config.maxframe_basic);
 	    }
 	  }
 
@@ -5529,13 +5533,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= AX25_K_MAXFRAME_EXTENDED_MIN && n <= AX25_K_MAXFRAME_EXTENDED_MAX) {
-	      p_misc_config->maxframe_extended = n;
+	      p_misc_config.maxframe_extended = n;
 	    }
 	    else {
-	      p_misc_config->maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT;
+	      p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT;
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d.\n",
-			line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, p_misc_config->maxframe_extended);
+			line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, p_misc_config.maxframe_extended);
    	    }
 	  }
 
@@ -5553,7 +5557,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }
 	    n = atoi(t);
             if (n >= 0 && n <= AX25_N2_RETRY_MAX) {
-	      p_misc_config->maxv22 = n;
+	      p_misc_config.maxv22 = n;
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
@@ -5583,8 +5587,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      int ssid, heard;
 
 	      if (ax25_parse_addr (AX25_DESTINATION, t, strict, call_no_ssid, &ssid, &heard)) {
-	        p_misc_config->v20_addrs = (char**)realloc (p_misc_config->v20_addrs, sizeof(char*) * (p_misc_config->v20_count + 1));
-	        p_misc_config->v20_addrs[p_misc_config->v20_count++] = strdup(t);
+	        p_misc_config.v20_addrs = (char**)realloc (p_misc_config.v20_addrs, sizeof(char*) * (p_misc_config.v20_count + 1));
+	        p_misc_config.v20_addrs[p_misc_config.v20_count++] = strdup(t);
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5619,8 +5623,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      int ssid, heard;
 
 	      if (ax25_parse_addr (AX25_DESTINATION, t, strict, call_no_ssid, &ssid, &heard)) {
-	        p_misc_config->noxid_addrs = (char**)realloc (p_misc_config->noxid_addrs, sizeof(char*) * (p_misc_config->noxid_count + 1));
-	        p_misc_config->noxid_addrs[p_misc_config->noxid_count++] = strdup(t);
+	        p_misc_config.noxid_addrs = (char**)realloc (p_misc_config.noxid_addrs, sizeof(char*) * (p_misc_config.noxid_count + 1));
+	        p_misc_config.noxid_addrs[p_misc_config.noxid_count++] = strdup(t);
 	      }
 	      else {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5661,64 +5665,64 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* APRS digipeating. */
 
-	    if (p_digi_config->enabled[i][j]) {
+	    if (p_digi_config.enabled[i][j]) {
 
-	      if ( strcmp(p_audio_config->mycall[i], "") == 0 ||
-		   strcmp(p_audio_config->mycall[i], "NOCALL") == 0 ||
-		   strcmp(p_audio_config->mycall[i], "N0CALL") == 0) {
+	      if ( strcmp(p_audio_config.mycall[i], "") == 0 ||
+		   strcmp(p_audio_config.mycall[i], "NOCALL") == 0 ||
+		   strcmp(p_audio_config.mycall[i], "N0CALL") == 0) {
 
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i);
-	        p_digi_config->enabled[i][j] = 0;
+	        p_digi_config.enabled[i][j] = 0;
 	      }
 
-	      if ( strcmp(p_audio_config->mycall[j], "") == 0 ||
-	           strcmp(p_audio_config->mycall[j], "NOCALL") == 0 ||
-		   strcmp(p_audio_config->mycall[j], "N0CALL") == 0) {
+	      if ( strcmp(p_audio_config.mycall[j], "") == 0 ||
+	           strcmp(p_audio_config.mycall[j], "NOCALL") == 0 ||
+		   strcmp(p_audio_config.mycall[j], "N0CALL") == 0) {
 
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i); 
-	        p_digi_config->enabled[i][j] = 0;
+	        p_digi_config.enabled[i][j] = 0;
 	      }
 
 	      b = 0;
-	      for (k=0; k<p_misc_config->num_beacons; k++) {
-	        if (p_misc_config->beacon[k].sendto_chan == j) b++;
+	      for (k=0; k<p_misc_config.num_beacons; k++) {
+	        if (p_misc_config.beacon[k].sendto_chan == j) b++;
 	      }
 	      if (b == 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Beaconing should be configured for channel %d when digipeating is enabled.\n", j); 
 		// It's a recommendation, not a requirement.
 		// Was there some good reason to turn it off in earlier version?
-	        //p_digi_config->enabled[i][j] = 0;
+	        //p_digi_config.enabled[i][j] = 0;
 	      }
 	    }
 
 /* Connected mode digipeating. */
 
-	    if (i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && p_cdigi_config->enabled[i][j]) {
+	    if (i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && p_cdigi_config.enabled[i][j]) {
 
-	      if ( strcmp(p_audio_config->mycall[i], "") == 0 ||
-		   strcmp(p_audio_config->mycall[i], "NOCALL") == 0 ||
-		   strcmp(p_audio_config->mycall[i], "N0CALL") == 0) {
+	      if ( strcmp(p_audio_config.mycall[i], "") == 0 ||
+		   strcmp(p_audio_config.mycall[i], "NOCALL") == 0 ||
+		   strcmp(p_audio_config.mycall[i], "N0CALL") == 0) {
 
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i);
-	        p_cdigi_config->enabled[i][j] = 0;
+	        p_cdigi_config.enabled[i][j] = 0;
 	      }
 
-	      if ( strcmp(p_audio_config->mycall[j], "") == 0 ||
-	           strcmp(p_audio_config->mycall[j], "NOCALL") == 0 ||
-		   strcmp(p_audio_config->mycall[j], "N0CALL") == 0) {
+	      if ( strcmp(p_audio_config.mycall[j], "") == 0 ||
+	           strcmp(p_audio_config.mycall[j], "NOCALL") == 0 ||
+		   strcmp(p_audio_config.mycall[j], "N0CALL") == 0) {
 
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i);
-	        p_cdigi_config->enabled[i][j] = 0;
+	        p_cdigi_config.enabled[i][j] = 0;
 	      }
 
 	      b = 0;
-	      for (k=0; k<p_misc_config->num_beacons; k++) {
-	        if (p_misc_config->beacon[k].sendto_chan == j) b++;
+	      for (k=0; k<p_misc_config.num_beacons; k++) {
+	        if (p_misc_config.beacon[k].sendto_chan == j) b++;
 	      }
 	      if (b == 0) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5730,24 +5734,24 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* When IGate is enabled, all radio channels must have a callsign associated. */
 
-	  if (strlen(p_igate_config->t2_login) > 0 &&
-	      (p_audio_config->chan_medium[i] == MEDIUM_RADIO || p_audio_config->chan_medium[i] == MEDIUM_NETTNC)) {
+	  if (strlen(p_igate_config.t2_login) > 0 &&
+	      (p_audio_config.chan_medium[i] == MEDIUM_RADIO || p_audio_config.chan_medium[i] == MEDIUM_NETTNC)) {
 
-	    if (strcmp(p_audio_config->mycall[i], "NOCALL") == 0  || strcmp(p_audio_config->mycall[i], "N0CALL") == 0) {
+	    if (strcmp(p_audio_config.mycall[i], "NOCALL") == 0  || strcmp(p_audio_config.mycall[i], "N0CALL") == 0) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: MYCALL must be set for receive channel %d before Rx IGate is allowed.\n", i);
-	      strlcpy (p_igate_config->t2_login, "", sizeof(p_igate_config->t2_login));
+	      strlcpy (p_igate_config.t2_login, "", sizeof(p_igate_config.t2_login));
 	    }
 	    // Currently we can have only one transmit channel.
 	    // This might be generalized someday to allow more.
-	    if (p_igate_config->tx_chan >= 0 && 
-			( strcmp(p_audio_config->mycall[p_igate_config->tx_chan], "") == 0 ||
-		          strcmp(p_audio_config->mycall[p_igate_config->tx_chan], "NOCALL") == 0 ||
-			  strcmp(p_audio_config->mycall[p_igate_config->tx_chan], "N0CALL") == 0)) {
+	    if (p_igate_config.tx_chan >= 0 && 
+			( strcmp(p_audio_config.mycall[p_igate_config.tx_chan], "") == 0 ||
+		          strcmp(p_audio_config.mycall[p_igate_config.tx_chan], "NOCALL") == 0 ||
+			  strcmp(p_audio_config.mycall[p_igate_config.tx_chan], "N0CALL") == 0)) {
 
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: MYCALL must be set for transmit channel %d before Tx IGate is allowed.\n", i);
-	      p_igate_config->tx_chan = -1;
+	      p_igate_config.tx_chan = -1;
 	    }
 	  }
 	}
@@ -5755,11 +5759,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 // Apply default IS>RF IGate filter if none specified.  New in 1.4.
 // This will handle eventual case of multiple transmit channels.
 
-	if (strlen(p_igate_config->t2_login) > 0) {
+	if (strlen(p_igate_config.t2_login) > 0) {
 	  for (j=0; j<MAX_TOTAL_CHANS; j++) {
-	    if (p_audio_config->chan_medium[j] == MEDIUM_RADIO || p_audio_config->chan_medium[j] == MEDIUM_NETTNC) {
-	      if (p_digi_config->filter_str[MAX_TOTAL_CHANS][j] == NULL) {
-	        p_digi_config->filter_str[MAX_TOTAL_CHANS][j] = strdup("i/180");
+	    if (p_audio_config.chan_medium[j] == MEDIUM_RADIO || p_audio_config.chan_medium[j] == MEDIUM_NETTNC) {
+	      if (p_digi_config.filter_str[MAX_TOTAL_CHANS][j] == NULL) {
+	        p_digi_config.filter_str[MAX_TOTAL_CHANS][j] = strdup("i/180");
 	      }
 	    }
 	  }
@@ -5767,8 +5771,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 // Terrible hack.  But what can we do?
 
-	if (p_misc_config->maxv22 < 0) {
-	  p_misc_config->maxv22 = p_misc_config->retry / 3;
+	if (p_misc_config.maxv22 < 0) {
+	  p_misc_config.maxv22 = p_misc_config.retry / 3;
 	}
 
 } /* end config_init */
@@ -5795,24 +5799,24 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	strlcpy (temp_symbol, "", sizeof(temp_symbol));
 	strlcpy (zone, "", sizeof(zone));
 
-	b->sendto_type = SENDTO_XMIT;
-	b->sendto_chan = 0;
-	b->delay = 60;
-	b->slot = G_UNKNOWN;
-	b->every = 600;
-	//b->delay = 6;		// temp test.
-	//b->every = 3600;
-	b->lat = G_UNKNOWN;
-	b->lon = G_UNKNOWN;
-	b->ambiguity = 0;
-	b->alt_m = G_UNKNOWN;
-	b->symtab = '/';
-	b->symbol = '-';	/* house */
-	b->freq = G_UNKNOWN;
-	b->tone = G_UNKNOWN;
-	b->offset = G_UNKNOWN;
-	b->source = NULL;
-	b->dest = NULL;
+	b.sendto_type = SENDTO_XMIT;
+	b.sendto_chan = 0;
+	b.delay = 60;
+	b.slot = G_UNKNOWN;
+	b.every = 600;
+	//b.delay = 6;		// temp test.
+	//b.every = 3600;
+	b.lat = G_UNKNOWN;
+	b.lon = G_UNKNOWN;
+	b.ambiguity = 0;
+	b.alt_m = G_UNKNOWN;
+	b.symtab = '/';
+	b.symbol = '-';	/* house */
+	b.freq = G_UNKNOWN;
+	b.tone = G_UNKNOWN;
+	b.offset = G_UNKNOWN;
+	b.source = NULL;
+	b.dest = NULL;
 
 	while ((t = split(NULL,0)) != NULL) {
 
@@ -5871,7 +5875,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 // end
 	  if (strcasecmp(keyword, "DELAY") == 0) {
-	    b->delay = parse_interval(value,line);
+	    b.delay = parse_interval(value,line);
 	  }
 	  else if (strcasecmp(keyword, "SLOT") == 0) {
 	    int n = parse_interval(value,line);
@@ -5880,71 +5884,71 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	      dw_printf ("Config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds.\n", line, n);
 	      continue;
 	    }
-	    b->slot = n;
+	    b.slot = n;
 	  }
 	  else if (strcasecmp(keyword, "EVERY") == 0) {
-	    b->every = parse_interval(value,line);
+	    b.every = parse_interval(value,line);
 	  }
 	  else if (strcasecmp(keyword, "SENDTO") == 0) {
 	    if (value[0] == 'i' || value[0] == 'I') {
-	       b->sendto_type = SENDTO_IGATE;
-	       b->sendto_chan = 0;
+	       b.sendto_type = SENDTO_IGATE;
+	       b.sendto_chan = 0;
 	    }
 	    else if (value[0] == 'r' || value[0] == 'R') {
 	       int n = atoi(value+1);
-	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config->chan_medium[n] == MEDIUM_NONE)
-			&& p_audio_config->chan_medium[n] != MEDIUM_IGATE) {
+	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
+			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	         text_color_set(DW_COLOR_ERROR);
 	         dw_printf ("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n);
 	         continue;
 	       }
-	       b->sendto_type = SENDTO_RECV;
-	       b->sendto_chan = n;
+	       b.sendto_type = SENDTO_RECV;
+	       b.sendto_chan = n;
 	    }
 	    else if (value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X') {
 	      int n = atoi(value+1);
-	      if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config->chan_medium[n] == MEDIUM_NONE)
-			&& p_audio_config->chan_medium[n] != MEDIUM_IGATE) {
+	      if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
+			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, n);
 	        continue;
 	      }
 
-	      b->sendto_type = SENDTO_XMIT;
-	      b->sendto_chan = n;
+	      b.sendto_type = SENDTO_XMIT;
+	      b.sendto_chan = n;
 	    }
 	    else {
 	       int n = atoi(value);
-	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config->chan_medium[n] == MEDIUM_NONE)
-			&& p_audio_config->chan_medium[n] != MEDIUM_IGATE) {
+	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
+			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	         text_color_set(DW_COLOR_ERROR);
 	         dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, n);
 	         continue;
 	       }
-	       b->sendto_type = SENDTO_XMIT;
-	       b->sendto_chan = n;
+	       b.sendto_type = SENDTO_XMIT;
+	       b.sendto_chan = n;
 	    }
 	  }
 	  else if (strcasecmp(keyword, "SOURCE") == 0) {
-	    b->source = strdup(value);
-	    for (p = b->source; *p != '\0'; p++) {
+	    b.source = strdup(value);
+	    for (p = b.source; *p != '\0'; p++) {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
 	    }
-	    if (strlen(b->source) > 9) {
-	       b->source[9] = '\0';
+	    if (strlen(b.source) > 9) {
+	       b.source[9] = '\0';
 	    }
 	  }
 	  else if (strcasecmp(keyword, "DEST") == 0) {
-	    b->dest = strdup(value);
-	    for (p = b->dest; *p != '\0'; p++) {
+	    b.dest = strdup(value);
+	    for (p = b.dest; *p != '\0'; p++) {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
 	    }
-	    if (strlen(b->dest) > 9) {
-	       b->dest[9] = '\0';
+	    if (strlen(b.dest) > 9) {
+	       b.dest[9] = '\0';
 	    }
 	  }
 	  else if (strcasecmp(keyword, "VIA") == 0) {
@@ -5952,7 +5956,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 #if 1	// proper checking
 
 	    if (check_via_path(value) >= 0) {
-	      b->via = strdup(value);
+	      b.via = strdup(value);
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
@@ -5962,8 +5966,8 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 #else	// previously
 
-	    b->via = strdup(value);
-	    for (p = b->via; *p != '\0'; p++) {
+	    b.via = strdup(value);
+	    for (p = b.via; *p != '\0'; p++) {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
@@ -5971,24 +5975,24 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 #endif
 	  }
 	  else if (strcasecmp(keyword, "INFO") == 0) {
-	    b->custom_info = strdup(value);
+	    b.custom_info = strdup(value);
 	  }
 	  else if (strcasecmp(keyword, "INFOCMD") == 0) {
-	    b->custom_infocmd = strdup(value);
+	    b.custom_infocmd = strdup(value);
 	  }
 	  else if (strcasecmp(keyword, "OBJNAME") == 0) {
-	    strlcpy(b->objname, value, sizeof(b->objname));
+	    strlcpy(b.objname, value, sizeof(b.objname));
 	  }
 	  else if (strcasecmp(keyword, "LAT") == 0) {
-	    b->lat = parse_ll (value, LAT, line);
+	    b.lat = parse_ll (value, LAT, line);
 	  }
 	  else if (strcasecmp(keyword, "LONG") == 0 || strcasecmp(keyword, "LON") == 0) {
-	    b->lon = parse_ll (value, LON, line);
+	    b.lon = parse_ll (value, LON, line);
 	  }
 	  else if (strcasecmp(keyword, "AMBIGUITY") == 0 || strcasecmp(keyword, "AMBIG") == 0) {
 	    int n = atoi(value);
 	    if (n >= 0 && n <= 4) {
-	      b->ambiguity = n;
+	      b.ambiguity = n;
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
@@ -6009,15 +6013,15 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: Unrecognized unit '%s' for altitude.  Using meter.\n", line, unit);
 	        dw_printf ("Try using singular form.  e.g.  ft or foot rather than feet.\n");
-	        b->alt_m = atof(value);
+	        b.alt_m = atof(value);
 	      }
 	      else {
 	        // valid unit
-	        b->alt_m = atof(value) * meters;
+	        b.alt_m = atof(value) * meters;
 	      }
 	    } else {
 	      // no unit specified
-	      b->alt_m = atof(value);
+	      b.alt_m = atof(value);
 	    }
 	  }
 	  else if (strcasecmp(keyword, "ZONE") == 0) {
@@ -6035,7 +6039,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	  }
 	  else if (strcasecmp(keyword, "OVERLAY") == 0) {
 	    if (strlen(value) == 1 && (isupper(value[0]) || isdigit(value[0]))) {
-	      b->symtab = value[0];
+	      b.symtab = value[0];
 	    }
 	    else {
 	      text_color_set(DW_COLOR_ERROR);
@@ -6043,38 +6047,38 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 	  }
 	  else if (strcasecmp(keyword, "POWER") == 0) {
-	    b->power = atoi(value);
+	    b.power = atoi(value);
 	  }
 	  else if (strcasecmp(keyword, "HEIGHT") == 0) {	// This is in feet.
-	    b->height = atoi(value);
+	    b.height = atoi(value);
 	    // TODO: ability to add units suffix, e.g.  10m
 	  }
 	  else if (strcasecmp(keyword, "GAIN") == 0) {
-	    b->gain = atoi(value);
+	    b.gain = atoi(value);
 	  }
 	  else if (strcasecmp(keyword, "DIR") == 0 || strcasecmp(keyword, "DIRECTION") == 0) {
-	    strlcpy(b->dir, value, sizeof(b->dir));
+	    strlcpy(b.dir, value, sizeof(b.dir));
 	  }
 	  else if (strcasecmp(keyword, "FREQ") == 0) {
-	    b->freq = atof(value);
+	    b.freq = atof(value);
 	  }
 	  else if (strcasecmp(keyword, "TONE") == 0) {
-	    b->tone = atof(value);
+	    b.tone = atof(value);
 	  }
 	  else if (strcasecmp(keyword, "OFFSET") == 0 || strcasecmp(keyword, "OFF") == 0) {
-	    b->offset = atof(value);
+	    b.offset = atof(value);
 	  }
 	  else if (strcasecmp(keyword, "COMMENT") == 0) {
-	    b->comment = strdup(value);
+	    b.comment = strdup(value);
 	  }
 	  else if (strcasecmp(keyword, "COMMENTCMD") == 0) {
-	    b->commentcmd = strdup(value);
+	    b.commentcmd = strdup(value);
 	  }
 	  else if (strcasecmp(keyword, "COMPRESS") == 0 || strcasecmp(keyword, "COMPRESSED") == 0) {
-	    b->compress = atoi(value);
+	    b.compress = atoi(value);
 	  }
 	  else if (strcasecmp(keyword, "MESSAGING") == 0) {
-	    b->messaging = atoi(value);
+	    b.messaging = atoi(value);
 	  }
 	  else {
 	    text_color_set(DW_COLOR_ERROR);
@@ -6083,15 +6087,15 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	  }
 	}
 
-	if (b->custom_info != NULL && b->custom_infocmd != NULL) {
+	if (b.custom_info != NULL && b.custom_infocmd != NULL) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Config file, line %d: Can't use both INFO and INFOCMD at the same time.\n", line);
 	}
 
-	if (b->compress && b->ambiguity != 0) {
+	if (b.compress && b.ambiguity != 0) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Config file, line %d: Position ambiguity can't be used with compressed location format.\n", line);
-	  b->ambiguity = 0;
+	  b.ambiguity = 0;
 	}
 
 /*
@@ -6111,8 +6115,8 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    lerr = Convert_UTM_To_Geodetic(lzone, hemi, easting, northing, &dlat, &dlon);
 
             if (lerr == 0) {
-              b->lat = R2D(dlat);
-	      b->lon = R2D(dlon);
+              b.lat = R2D(dlat);
+	      b.lon = R2D(dlon);
 	    }
 	    else {
 	      char message [300];
@@ -6143,18 +6147,18 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 	    /* Explicit table and symbol. */
 
-	    if (isupper(b->symtab) || isdigit(b->symtab)) {
-	      b->symbol = temp_symbol[1];
+	    if (isupper(b.symtab) || isdigit(b.symtab)) {
+	      b.symbol = temp_symbol[1];
 	    } 
 	    else {
-	      b->symtab = temp_symbol[0];
-	      b->symbol = temp_symbol[1];
+	      b.symtab = temp_symbol[0];
+	      b.symbol = temp_symbol[1];
 	    }
 	  }
 	  else {
 
 	    /* Try to look up by description. */
-	    ok = symbols_code_from_description (b->symtab, temp_symbol, &(b->symtab), &(b->symbol));
+	    ok = symbols_code_from_description (b.symtab, temp_symbol, &(b.symtab), &(b.symbol));
 	    if (!ok) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: Could not find symbol matching %s.\n", line, temp_symbol);
@@ -6164,32 +6168,32 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 /* Check is here because could be using default channel when SENDTO= is not specified. */
 
-	if (b->sendto_type == SENDTO_XMIT) {
+	if (b.sendto_type == SENDTO_XMIT) {
 
-	  if (( b->sendto_chan < 0 || b->sendto_chan >= MAX_TOTAL_CHANS || p_audio_config->chan_medium[b->sendto_chan] == MEDIUM_NONE)
-		&& p_audio_config->chan_medium[b->sendto_chan] != MEDIUM_IGATE) {
+	  if (( b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE)
+		&& p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE) {
 	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, b->sendto_chan);
+	    dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan);
 	    return (0);
 	  }
 
-	  if (p_audio_config->chan_medium[b->sendto_chan] == MEDIUM_IGATE) {  // Prevent subscript out of bounds.
+	  if (p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_IGATE) {  // Prevent subscript out of bounds.
 									     // Will be using call from chan 0 later.
-	    if ( strcmp(p_audio_config->mycall[0], "") == 0 ||
-	         strcmp(p_audio_config->mycall[0], "NOCALL") == 0 ||
-	         strcmp(p_audio_config->mycall[0], "N0CALL") == 0 ) {
+	    if ( strcmp(p_audio_config.mycall[0], "") == 0 ||
+	         strcmp(p_audio_config.mycall[0], "NOCALL") == 0 ||
+	         strcmp(p_audio_config.mycall[0], "N0CALL") == 0 ) {
 
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0); 
 	      return (0);
 	    }
 	  } else {
-	    if ( strcmp(p_audio_config->mycall[b->sendto_chan], "") == 0 ||
-	         strcmp(p_audio_config->mycall[b->sendto_chan], "NOCALL") == 0 ||
-	         strcmp(p_audio_config->mycall[b->sendto_chan], "N0CALL") == 0 ) {
+	    if ( strcmp(p_audio_config.mycall[b.sendto_chan], "") == 0 ||
+	         strcmp(p_audio_config.mycall[b.sendto_chan], "NOCALL") == 0 ||
+	         strcmp(p_audio_config.mycall[b.sendto_chan], "N0CALL") == 0 ) {
 
 	      text_color_set(DW_COLOR_ERROR);
-	      dw_printf ("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b->sendto_chan); 
+	      dw_printf ("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan); 
 	      return (0);
 	    }
 	  }
