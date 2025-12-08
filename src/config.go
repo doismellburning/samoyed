@@ -576,8 +576,8 @@ func check_via_path (via_path *C.char) C.int {
 const MAXCMDLEN = 1200
 
 
-static char *split (char *string, int rest_of_line)
-{
+func split (str *C.char, rest_of_line C.int) *C.char {
+	/* FIXME KG
 	static char cmd[MAXCMDLEN];
 	static char token[MAXCMDLEN];
 	static char shutup[] = " ";	// Shut up static analysis which gets upset
@@ -586,24 +586,27 @@ static char *split (char *string, int rest_of_line)
 	static char *c = shutup;	// Current position in command line.
 	char *s, *t;
 	int in_quotes;
+	*/
 
 /*
  * If string is provided, make a copy.
  * Drop any CRLF at the end.
  * Change any tabs to spaces so we don't have to check for it later.
  */
-	if (string != nil) {
+	if (str != nil) {
 
-	  // dw_printf("split in: '%s'\n", string);
+	  // dw_printf("split in: '%s'\n", str);
 
 	  c = cmd;
-	  for (s = string; *s != 0; s++) {
+	  for s := str; *s != 0; s++ {
 	    if (*s == '\t') {
-	      *c++ = ' ';
+	      *c = ' ';
+		  c++
 	    } else if (*s == '\r' || *s == '\n') {
 	      ;
 	    } else {
-	      *c++ = *s;
+	      *c = *s;
+		  c++
 	    }
 	  }
 	  *c = 0;
@@ -615,18 +618,20 @@ static char *split (char *string, int rest_of_line)
  * Quotation marks inside need to be doubled.
  */
 
-	while (*c == ' ') {
+	for (*c == ' ') {
 	  c++;
 	};
 
 	t = token;
 	in_quotes = 0;
-	for ( ; *c != 0; c++) {
+	for ; *c != 0; c++ {
 
 	  if (*c == '"') {
 	    if (in_quotes) {
 	      if (c[1] == '"') {
-	        *t++ = *c++;
+	        *t = *c;
+			t++
+			c++
 	      } else {
 	        in_quotes = 0;
 	      }
@@ -635,12 +640,14 @@ static char *split (char *string, int rest_of_line)
 	    }
 	  } else if (*c == ' ') {
 	    if (in_quotes || rest_of_line) {
-	      *t++ = *c;
+	      *t = *c;
+		  t++
 	    } else {
 	      break;
 	    }
 	  } else {
-	    *t++ = *c;
+	    *t = *c;
+		t++
 	  }
 	}
 	*t = 0;
@@ -691,8 +698,7 @@ static char *split (char *string, int rest_of_line)
  *
  *--------------------------------------------------------------------*/
 
-static void rtfm()
-{
+func rtfm() {
 	text_color_set(DW_COLOR_ERROR);
 	dw_printf ("See online documentation:\n");
 	dw_printf ("    stable release:    https://github.com/wb2osz/direwolf/tree/master/doc\n");
@@ -701,19 +707,19 @@ static void rtfm()
 	dw_printf ("    general APRS info:    https://how.aprs.works\n");
 }
 
-void config_init (char *fname, struct audio_s *p_audio_config, 
-			struct digi_config_s *p_digi_config,
-			struct cdigi_config_s *p_cdigi_config,
-			struct tt_config_s *p_tt_config,
-			struct igate_config_s *p_igate_config,
-			struct misc_config_s *p_misc_config)
-{
+func config_init (fname *C.char, p_audio_config *C.struct_audio_s,
+			p_digi_config *C.struct_digi_config_s,
+			p_cdigi_config *C.struct_cdigi_config_s,
+			p_tt_config *C.struct_tt_config_s,
+			p_igate_config *C.struct_igate_config_s,
+			p_misc_config C.struct_misc_config_s) {
+				/* FIXME KG
 	FILE *fp;
 	char stuff[MAXCMDLEN];
 	int line;
 	int channel;
-	int adevice;
 	int m;
+	*/
 
 	/* TODO KG
 #if DEBUG
@@ -726,14 +732,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * First apply defaults.
  */
 
-	memset (p_audio_config, 0, sizeof(struct audio_s));
+	// FIXME KG memset (p_audio_config, 0, sizeof(struct audio_s));
 
 	p_audio_config.igate_vchannel = -1;		// none.
 
 	/* First audio device is always available with defaults. */
 	/* Others must be explicitly defined before use. */
 
-	for (adevice=0; adevice<MAX_ADEVS; adevice++) {
+	for adevice:=0; adevice<MAX_ADEVS; adevice++ {
 
 	  strlcpy (p_audio_config.adev[adevice].adevice_in, DEFAULT_ADEVICE, sizeof(p_audio_config.adev[adevice].adevice_in));
 	  strlcpy (p_audio_config.adev[adevice].adevice_out, DEFAULT_ADEVICE, sizeof(p_audio_config.adev[adevice].adevice_out));
@@ -748,7 +754,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	p_audio_config.adev[0].defined = 2;		// 2 means it was done by default and not the user's config file.
 
 // MAX_TOTAL_CHANS
-	for (channel=0; channel<MAX_TOTAL_CHANS; channel++) {
+	for channel:=0; channel<MAX_TOTAL_CHANS; channel++ {
 	  p_audio_config.chan_medium[channel] = MEDIUM_NONE;	/* One or both channels will be */
 								/* set to radio when corresponding */
 								/* audio device is defined. */
@@ -756,8 +762,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 // MAX_RADIO_CHANS for achan[]
 // Maybe achan should be renamed to radiochan to make it clearer.
-	for (channel=0; channel<MAX_RADIO_CHANS; channel++) {
-	  int ot, it;
+for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
+	  // FIXME KG int ot, it;
 
 	  p_audio_config.achan[channel].modem_type = MODEM_AFSK;			
 	  p_audio_config.achan[channel].v26_alternative = V26_UNSPECIFIED;
@@ -779,7 +785,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	  p_audio_config.achan[channel].sanity_test = SANITY_APRS;
 	  p_audio_config.achan[channel].passall = 0;
 
-	  for (ot = 0; ot < NUM_OCTYPES; ot++) {
+	  for ot := 0; ot < NUM_OCTYPES; ot++ {
 	    p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE;
 	    strlcpy (p_audio_config.achan[channel].octrl[ot].ptt_device, "", sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
 	    p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE;
@@ -790,7 +796,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0;
 	  }
 
-	  for (it = 0; it < NUM_ICTYPES; it++) {
+	  for it := 0; it < NUM_ICTYPES; it++ {
 	    p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE;
 	    p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0;
 	    p_audio_config.achan[channel].ictrl[it].invert = 0;
@@ -811,15 +817,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	p_audio_config.chan_medium[0] = MEDIUM_RADIO;
 
-	memset (p_digi_config, 0, sizeof(struct digi_config_s));	// APRS digipeater
+	// FIXME KG memset (p_digi_config, 0, sizeof(struct digi_config_s));	// APRS digipeater
 	p_digi_config.dedupe_time = DEFAULT_DEDUPE;
-	memset (p_cdigi_config, 0, sizeof(struct cdigi_config_s));	// Connected mode digipeater
+	// FIXME KG memset (p_cdigi_config, 0, sizeof(struct cdigi_config_s));	// Connected mode digipeater
 
-	memset (p_tt_config, 0, sizeof(struct tt_config_s));	
+	// FIXME KG memset (p_tt_config, 0, sizeof(struct tt_config_s));	
 	p_tt_config.gateway_enabled = 0;
 	p_tt_config.ttloc_size = 2;	/* Start with at least 2.  */
 					/* When full, it will be increased by 50 %. */
-	p_tt_config.ttloc_ptr = malloc (sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	// FIXME KG p_tt_config.ttloc_ptr = malloc (sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	p_tt_config.ttloc_len = 0;
 
 	/* Retention time and decay algorithm from 13 Feb 13 version of */
@@ -848,17 +854,17 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	strlcpy (p_tt_config.status[8], "/emergency", 	sizeof(p_tt_config.status[8]));
 	strlcpy (p_tt_config.status[9], "/custom 1", 	sizeof(p_tt_config.status[9]));
 
-	for (m = 0; m < TT_ERROR_MAXP1; m++) {
+	for m := 0; m < TT_ERROR_MAXP1; m++ {
 	  strlcpy (p_tt_config.response[m].method, "MORSE",	sizeof(p_tt_config.response[m].method));
 	  strlcpy (p_tt_config.response[m].mtext, "?",		sizeof(p_tt_config.response[m].mtext));
 	}
 	strlcpy (p_tt_config.response[TT_ERROR_OK].mtext, "R", sizeof(p_tt_config.response[TT_ERROR_OK].mtext));
 
 
-	memset (p_misc_config, 0, sizeof(struct misc_config_s));
+	// FIXME KG memset (p_misc_config, 0, sizeof(struct misc_config_s));
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT;
 
-	for (int i=0; i<MAX_KISS_TCP_PORTS; i++) {
+	for i:=0; i<MAX_KISS_TCP_PORTS; i++ {
 	  p_misc_config.kiss_port[i] = 0;	// entry not used.
 	  p_misc_config.kiss_chan[i] = -1;
 	}
@@ -881,7 +887,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	p_misc_config.sb_turn_angle = 30;	/* degrees */
 	p_misc_config.sb_turn_slope = 255;	/* degrees * MPH */
 
-	memset (p_igate_config, 0, sizeof(struct igate_config_s));
+	// FIXME KG memset (p_igate_config, 0, sizeof(struct igate_config_s));
 	p_igate_config.t2_server_port = DEFAULT_IGATE_PORT;
 	p_igate_config.tx_chan = -1;			/* IS to RF not enabled */
 	p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_DEFAULT;
@@ -950,13 +956,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * is no confusion.  First look in cwd, then in home direectory.
  */
 	fp = nil;
-	char absfilepath[PATH_MAX];
+	var absfilepath[PATH_MAX]C.char
 	if (realpath (fname, absfilepath) != nil) {
           fp = fopen (absfilepath, "r");
 	  if (fp == nil) {		// Failed.  Next, try home dir
 	    strlcpy (absfilepath, "", sizeof(absfilepath));
 	    // Don't prepend home dir if absolute path given.
-	    char *h = getenv("HOME");
+	    var h = getenv("HOME");
 	    if (h != nil && fname[0] != '/') {
 	      strlcat (absfilepath, h, sizeof(absfilepath));
 	      strlcat (absfilepath, "/", sizeof(absfilepath));
@@ -981,12 +987,10 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	dw_printf ("\nReading config file %s\n", absfilepath);
 
 	line = 0;
-	while (fgets(stuff, sizeof(stuff), fp) != nil) {
-	  char *t;
-
+	for  /* FIXME KG (fgets(stuff, sizeof(stuff), fp) != nil) */ {
 	  line++;
 
-	  t = split(stuff,0);
+	  var t = split(stuff,0);
 
 	  if (t == nil) {
 	    continue;
@@ -1076,8 +1080,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        strlcpy (p_audio_config.adev[adevice].adevice_out, t, sizeof(p_audio_config.adev[adevice].adevice_out));
 	      }
 	    }
-	  }
-
+	  } else if (strcasecmp(t, "PAIDEVICE") == 0) {
 
 /*
  * PAIDEVICE[n]  input-device
@@ -1099,7 +1102,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  *		These options will probably be removed before general 1.3 release.
  */
 
-	  else if (strcasecmp(t, "PAIDEVICE") == 0) {
 		  adevice = 0;
 		  if (isdigit(t[9])) {
 			  adevice = t[9] - '0';
@@ -1151,22 +1153,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		  p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO;
 
 		  strlcpy (p_audio_config.adev[adevice].adevice_out, t, sizeof(p_audio_config.adev[adevice].adevice_out));		  
-	  }
+	  } else if (strcasecmp(t, "ARATE") == 0) {
 
 
 /*
  * ARATE 		- Audio samples per second, 11025, 22050, 44100, etc.
  */
 
-	  else if (strcasecmp(t, "ARATE") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing audio sample rate for ARATE command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= MIN_SAMPLES_PER_SEC && n <= MAX_SAMPLES_PER_SEC) {
 	      p_audio_config.adev[adevice].samples_per_sec = n;
 	    } else {
@@ -1174,21 +1174,19 @@ void config_init (char *fname, struct audio_s *p_audio_config,
               dw_printf ("Line %d: Use a more reasonable audio sample rate in range of %d - %d.\n", 
 							line, MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC);
    	    }
-	  }
+	  } else if (strcasecmp(t, "ACHANNELS") == 0) {
 
 /*
  * ACHANNELS 		- Number of audio channels for current device: 1 or 2
  */
 
-	  else if (strcasecmp(t, "ACHANNELS") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing number of audio channels for ACHANNELS command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n ==1 || n == 2) {
 	      p_audio_config.adev[adevice].num_channels = n;
 
@@ -1202,7 +1200,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Number of audio channels must be 1 or 2.\n", line);
    	    }
-	  }
+	  } else if (strcasecmp(t, "CHANNEL") == 0) {
 
 /*
  * ==================== Radio channel parameters ==================== 
@@ -1215,15 +1213,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 // TODO: allow full range so mycall can be set for network channels.
 // Watch out for achan[] out of bounds.
 
-	  else if (strcasecmp(t, "CHANNEL") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing channel number for CHANNEL command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n < MAX_RADIO_CHANS) {
 
 	      channel = n;
@@ -1244,7 +1240,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Channel number must in range of 0 to %d.\n", line, MAX_RADIO_CHANS-1);
    	    }
-	  }
+	  } else if (strcasecmp(t, "ICHANNEL") == 0) {
 
 /*
  * ICHANNEL n			- Define IGate virtual channel.
@@ -1255,14 +1251,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  *	This does not change the current channel number used by MODEM, PTT, etc.
  */
 
-	  else if (strcasecmp(t, "ICHANNEL") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing virtual channel number for ICHANNEL command.\n", line);
 	      continue;
 	    }
-	    int ichan = atoi(t);
+	    var ichan = atoi(t);
             if (ichan >= MAX_RADIO_CHANS && ichan < MAX_TOTAL_CHANS) {
 
 	      if (p_audio_config.chan_medium[ichan] == MEDIUM_NONE) {
@@ -1280,7 +1275,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: ICHANNEL number must in range of %d to %d.\n", line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1);
 	    }
-	  }
+	  } else if (strcasecmp(t, "NCHANNEL") == 0) {
 
 /*
  * NCHANNEL chan addr port			- Define Network TNC virtual channel.
@@ -1299,14 +1294,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * FIXME: Can't set mycall for nchannel.
  */
 
-	  else if (strcasecmp(t, "NCHANNEL") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing virtual channel number for NCHANNEL command.\n", line);
 	      continue;
 	    }
-	    int nchan = atoi(t);
+	    var nchan = atoi(t);
             if (nchan >= MAX_RADIO_CHANS && nchan < MAX_TOTAL_CHANS) {
 
 	      if (p_audio_config.chan_medium[nchan] == MEDIUM_NONE) {
@@ -1368,9 +1362,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      // Definitely set for current channel.
 	      // Set for other channels which have not been set yet.
 
-	      int c;
-
-	      for (c = 0; c < MAX_TOTAL_CHANS; c++) {
+		  for c := 0; c < MAX_TOTAL_CHANS; c++ {
 
 	        if (c == channel || 
 			strlen(p_audio_config.mycall[c]) == 0 || 
@@ -1381,8 +1373,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        }
 	      }
 	    }
-	  }
-
+	  } else if (strcasecmp(t, "MODEM") == 0) {
 
 /*
  * MODEM	- Set modem properties for current channel.
@@ -1404,20 +1395,19 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  *	v26a or v26b	- V.26 alternative.  a=original, b=MFJ compatible
  */
 
-	  else if (strcasecmp(t, "MODEM") == 0) {
 
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: MODEM can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing data transmission speed for MODEM command.\n", line);
 	      continue;
 	    }
+		var n C.int
 	    if (strcasecmp(t,"AIS") == 0) {
 	      n = MAX_BAUD-1;	// Hack - See special case later.
 	    } else if (strcasecmp(t,"EAS") == 0) {
@@ -1556,7 +1546,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		  /* Here we only catch something other than letters and + mixed in. */
 		  /* Later, we check for valid letters and no more than one letter if + specified. */
 
-	          for (pc = t; *pc != 0; pc++) {
+		  for pc := t; *pc != 0; pc++ {
 		    if ( ! isalpha(*pc) && ! (*pc == '+')) {
 	              text_color_set(DW_COLOR_ERROR);
                       dw_printf ("Line %d: Demodulator type can only contain letters and + character.\n", line);
@@ -1607,10 +1597,10 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* New style in version 1.2. */
 
-	      while (t != nil) {
-		char *s;
+	      for t != nil {
+			  var s = strchr(t, ':')
 
-		if ((s = strchr(t, ':')) != nil) {		/* mark:space */
+		if (s  != nil) {		/* mark:space */
 
 	          p_audio_config.achan[channel].mark_freq = atoi(t);
 	          p_audio_config.achan[channel].space_freq = atoi(s+1);
@@ -1633,9 +1623,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 				 line, p_audio_config.achan[channel].space_freq);
 		    }
 	          }
-	        }
-
-		else if ((s = strchr(t, '@')) != nil) {		/* num@offset */
+	        } else if ((s = strchr(t, '@')) != nil) {		/* num@offset */
 
 	          p_audio_config.achan[channel].num_freq = atoi(t);
 	          p_audio_config.achan[channel].offset = atoi(s+1);
@@ -1652,16 +1640,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
                     dw_printf ("Line %d: Offset between demodulators is unreasonable. Using 50 Hz.\n", line);
 	            p_audio_config.achan[channel].offset = 50;
 		  }
-		}
-
-	        else if (alllettersorpm(t)) {		/* profile of letter(s) + - */
+		} else if (alllettersorpm(t)) {		/* profile of letter(s) + - */
 
 		  // Will be validated later.
 		  strlcpy (p_audio_config.achan[channel].profiles, t, sizeof(p_audio_config.achan[channel].profiles));
-	        }
-
-		else if (*t == '/') {		/* /div */
-		  int n = atoi(t+1);
+	        } else if (*t == '/') {		/* /div */
+		  var n = atoi(t+1);
 
                   if (n >= 1 && n <= 8) {
 	            p_audio_config.achan[channel].decimate = n;
@@ -1669,10 +1653,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: Ignoring unreasonable sample rate division factor of %d.\n", line, n);
 		  }
-		}
-
-		else if (*t == '*') {		/* *upsample */
-		  int n = atoi(t+1);
+		} else if (*t == '*') {		/* *upsample */
+		  var n = atoi(t+1);
 
                   if (n >= 1 && n <= 4) {
 	            p_audio_config.achan[channel].upsample = n;
@@ -1680,16 +1662,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	            text_color_set(DW_COLOR_ERROR);
                     dw_printf ("Line %d: Ignoring unreasonable upsample ratio of %d.\n", line, n);
 		  }
-		}
-
-		else if (strcasecmp(t, "G3RUH") == 0) {		/* Force G3RUH modem regardless of default for speed. New in 1.6. */
+		} else if (strcasecmp(t, "G3RUH") == 0) {		/* Force G3RUH modem regardless of default for speed. New in 1.6. */
 
                   p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE;
                   p_audio_config.achan[channel].mark_freq = 0;
                   p_audio_config.achan[channel].space_freq = 0;
-		}
-
-		else if (strcasecmp(t, "V26A") == 0 || 		/* Compatible with direwolf versions <= 1.5.  New in 1.6. */
+		} else if (strcasecmp(t, "V26A") == 0 || 		/* Compatible with direwolf versions <= 1.5.  New in 1.6. */
 			 strcasecmp(t, "V26B") == 0) {		/* Compatible with MFJ-2400.  New in 1.6. */
 
                   if (p_audio_config.achan[channel].modem_type != MODEM_QPSK ||
@@ -1735,7 +1713,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    p_audio_config.achan[channel].dtmf_decode = DTMF_DECODE_ON;
 
-	  }
+	  } else if (strcasecmp(t, "FIX_BITS") == 0) {
 
 
 /*
@@ -1746,20 +1724,18 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  *	- Optional sanity check & allow everything even with bad FCS.
  */
 
-	  else if (strcasecmp(t, "FIX_BITS") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: FIX_BITS can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for FIX_BITS command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= RETRY_NONE && n < RETRY_MAX) {		// MAX is actually last valid +1
 	      p_audio_config.achan[channel].fix_bits = (retry_t)n;
 	    } else {
@@ -3204,8 +3180,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	  else if (strcasecmp(t, "TTPOINT") == 0) {
 
-	    struct ttloc_s *tl;
-	    int j;
+	    // FIXME KG struct ttloc_s *tl;
+	    // FIXME KG int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3214,7 +3190,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3281,7 +3257,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	  else if (strcasecmp(t, "TTVECTOR") == 0) {
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 	    double scale;
 	    double meters;
@@ -3292,7 +3268,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3397,7 +3373,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	  else if (strcasecmp(t, "TTGRID") == 0) {
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
@@ -3406,7 +3382,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3498,7 +3474,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	  else if (strcasecmp(t, "TTUTM") == 0) {
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 	    double dlat, dlon;
 	    long lerr;
@@ -3510,7 +3486,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3610,7 +3586,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	  else if (strcasecmp(t, "TTUSNG") == 0 || strcasecmp(t, "TTMGRS") == 0) {
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 	    int num_x, num_y;
 	    double lat, lon;
@@ -3623,7 +3599,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3724,7 +3700,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 // TODO1.3:  TTMHEAD needs testing. 
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 	    int k;
 	    int count_x;
@@ -3737,7 +3713,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3835,7 +3811,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 // TODO1.2:  TTSATSQ To be continued...
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
@@ -3844,7 +3820,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3910,7 +3886,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 // TODO1.3:  TTAMBIG To be continued...
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
@@ -3919,7 +3895,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3995,7 +3971,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	  else if (strcasecmp(t, "TTMACRO") == 0) {
 
-	    struct ttloc_s *tl;
+	    // FIXME KG struct ttloc_s *tl;
 	    int j;
 	    int p_count[3], d_count[3];
 	    int tt_error = 0;
@@ -4006,7 +3982,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* Allocate new space, but first, if already full, make larger. */
 	    if (p_tt_config.ttloc_len == p_tt_config.ttloc_size) {
 	      p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2;
-	      p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
+	      // FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 	    }
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -5205,7 +5181,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    if (p_misc_config.num_beacons < MAX_BEACONS) {
 
-	      memset (&(p_misc_config.beacon[p_misc_config.num_beacons]), 0, sizeof(struct beacon_s));
+	      // FIXME KG memset (&(p_misc_config.beacon[p_misc_config.num_beacons]), 0, sizeof(struct beacon_s));
 	      if (strcasecmp(t, "PBEACON") == 0) {
 	        p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_POSITION;
 	      } else if (strcasecmp(t, "OBEACON") == 0) {
