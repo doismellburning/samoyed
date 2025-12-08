@@ -1,30 +1,9 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2021, 2023  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
-#define CONFIG_C 1		// influences behavior of aprs_tt.h
+package direwolf
 
 
 //#define DEBUG 1
 
 /*------------------------------------------------------------------
- *
- * Module:      config.c
  *
  * Purpose:   	Read configuration information from a file.
  *		
@@ -34,45 +13,39 @@
  *
  *---------------------------------------------------------------*/
 
-#include "direwolf.h"
-
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-#include <ctype.h>
-#include <math.h>
-#include <limits.h>		// for PATH_MAX
-
-#if ENABLE_GPSD
-#include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
-#endif
-
-
-#include "ax25_pad.h"
-#include "textcolor.h"
-#include "audio.h"
-#include "digipeater.h"
-#include "cdigipeater.h"
-#include "config.h"
-#include "aprs_tt.h"
-#include "igate.h"
-#include "latlong.h"
-#include "symbols.h"
-#include "tt_text.h"
-#include "ax25_link.h"
-
-#if USE_CM108		// Current Linux or Windows only
-#include "cm108.h"
-#endif
-
-// geotranz
-
-#include "utm.h"
-#include "mgrs.h"
-#include "usng.h"
-#include "error_string.h"
+// #define CONFIG_C 1		// influences behavior of aprs_tt.h
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <unistd.h>
+// #include <stdlib.h>
+// #include <assert.h>
+// #include <string.h>
+// #include <ctype.h>
+// #include <math.h>
+// #include <limits.h>		// for PATH_MAX
+// #if ENABLE_GPSD
+// #include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
+// #endif
+// #include "ax25_pad.h"
+// #include "textcolor.h"
+// #include "audio.h"
+// #include "digipeater.h"
+// #include "cdigipeater.h"
+// #include "config.h"
+// #include "aprs_tt.h"
+// #include "igate.h"
+// #include "latlong.h"
+// #include "symbols.h"
+// #include "tt_text.h"
+// #include "ax25_link.h"
+// #if USE_CM108		// Current Linux or Windows only
+// #include "cm108.h"
+// #endif
+// #include "utm.h"
+// #include "mgrs.h"
+// #include "usng.h"
+// #include "error_string.h"
+import "C"
 
 #define D2R(d) ((d) * M_PI / 180.)
 #define R2D(r) ((r) * 180. / M_PI)
