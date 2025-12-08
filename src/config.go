@@ -1341,7 +1341,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    } else {
 	      // FIXME KG int const strict = 2;
 	      var call_no_ssid[AX25_MAX_ADDR_LEN]C.char
-	      var ssid, heard C.int
+	      var ssid C.int
+		  var heard C.int
 
 		  for p := t; *p != 0; p++ {
 	        if (islower(*p)) {
