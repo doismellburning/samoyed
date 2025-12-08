@@ -335,7 +335,7 @@ x = Silence FX.25 information.`)
 	var cdigi_config C.struct_cdigi_config_s
 	var igate_config C.struct_igate_config_s
 
-	C.config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+	config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < C.MIN_SAMPLES_PER_SEC || *audioSampleRate > C.MAX_SAMPLES_PER_SEC {

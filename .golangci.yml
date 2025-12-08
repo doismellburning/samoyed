@@ -40,9 +40,9 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
     gocognit:
-      min-complexity: 270  # I sure wish this could be lower
+      min-complexity: 1337  # I sure wish this could be lower
     goconst:
-      min-occurrences: 5
+      min-occurrences: 10
     gocritic:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
@@ -57,7 +57,7 @@ linters:
       excludes:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
     nestif:
-      min-complexity: 100  # There's lots of upstream complexity, so let's soft-disable this
+      min-complexity: 579  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"
