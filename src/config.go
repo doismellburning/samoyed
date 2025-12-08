@@ -176,8 +176,8 @@ static int alllettersorpm(char *p)
 
 // FIXME KG enum parse_ll_which_e { LAT, LON };
 
-static double parse_ll (char *str, enum parse_ll_which_e which, int line)
-{
+func parse_ll (str *C.char, which parse_ll_which_e, line C.int) C.double {
+	/* FIXME KG
 	char stemp[40];
 	int sign;
 	double degrees, minutes;
@@ -185,6 +185,7 @@ static double parse_ll (char *str, enum parse_ll_which_e which, int line)
 	char hemi;
 	int limit;
 	unsigned char sep;
+	*/
 
 /*
  * Remove any negative sign.
@@ -299,10 +300,11 @@ static double parse_ll (char *str, enum parse_ll_which_e which, int line)
  *
  *----------------------------------------------------------------*/
 
-long parse_utm_zone (char *szone, char *latband, char *hemi)
-{
+func parse_utm_zone (szone *C.char, latband *C.char, hemi *C.char) C.long {
+	/* FIXME KG
 	long lzone;
 	char *zlet;
+	*/
 
 
 	*latband = ' ';
@@ -402,16 +404,19 @@ main ()
  *----------------------------------------------------------------*/
 
 
-static int parse_interval (char *str, int line)
-{
-	char *p;
+func parse_interval (str *C.char, line C.int) C.int {
+	/* 
 	int sec;
 	int nc = 0;
 	int bad = 0;
+	*/
 
-	for (p = str; *p != 0; p++) {
-	  if (*p == ':') nc++;
-	  else if ( ! isdigit(*p)) bad++;
+	for p := str; *p != 0; p++ {
+	  if (*p == ':') {
+		  nc++;
+	  } else if ( ! isdigit(*p)) {
+		  bad++;
+	  }
 	}
 	if (bad > 0 || nc > 1) {
 	  text_color_set(DW_COLOR_ERROR);
@@ -472,13 +477,14 @@ static int parse_interval (char *str, int line)
 //#define DEBUG8 1
 
 
-static int check_via_path (char *via_path)
-{
+func check_via_path (via_path *C.char) C.int {
+	/*
 	char stemp[AX25_MAX_REPEATERS * (AX25_MAX_ADDR_LEN + 1)];
 	int num_digi = 0;
 	int max_digi_hops = 0;
 	char *r;
 	char *a;
+	*/
 
 	/* TODO KG
 #if DEBUG8
@@ -493,12 +499,14 @@ static int check_via_path (char *via_path)
 	strlcpy (stemp, via_path, sizeof(stemp));
 
 	r = stemp;
-	while (( a = strsep(&r,",")) != nil) {
+	for /* FIXME KG (( a = strsep(&r,",")) != nil) */ {
+		/* FIXME KG
 	  int strict = 2;
 	  int ok;
 	  char addr[AX25_MAX_ADDR_LEN];
 	  int ssid;
 	  int heard;
+	  */
 
 	  num_digi++;
 	  ok = ax25_parse_addr (AX25_REPEATER_1 - 1 + num_digi, a, strict, addr, &ssid, &heard);
