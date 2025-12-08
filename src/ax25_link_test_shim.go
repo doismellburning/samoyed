@@ -69,7 +69,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 
 	C.strcpy(&addrs[OWNCALL][0], THEIR_CALL)
 	C.strcpy(&addrs[PEERCALL][0], MY_CALL)
-	pp = C.ax25_u_frame(&addrs[0], 2, cr_cmd, frame_type_U_UA, 1, 1, nil, 0)
+	pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UA, 1, 1, nil, 0)
 	assert.NotNil(t, pp)
 
 	E = new(C.dlq_item_t)
