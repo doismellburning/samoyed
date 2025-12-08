@@ -1623,7 +1623,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 				 line, p_audio_config.achan[channel].space_freq);
 		    }
 	          }
-	        } else if ((s = strchr(t, '@')) != nil) {		/* num@offset */
+	        } else if ((s /* FIXME KG = strchr(t, '@') */) != nil) {		/* num@offset */
 
 	          p_audio_config.achan[channel].num_freq = atoi(t);
 	          p_audio_config.achan[channel].offset = atoi(s+1);
@@ -1737,7 +1737,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 	    var n = atoi(t);
             if (n >= RETRY_NONE && n < RETRY_MAX) {		// MAX is actually last valid +1
-	      p_audio_config.achan[channel].fix_bits = (retry_t)n;
+	      p_audio_config.achan[channel].fix_bits = n;
 	    } else {
 	      p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS;
 	      text_color_set(DW_COLOR_ERROR);
@@ -1755,7 +1755,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 
 	    t = split(nil,0);
-	    while (t != nil) {
+	    for t != nil {
 
 	      // If more than one sanity test, we silently take the last one.
 
@@ -1778,7 +1778,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      }
 	      t = split(nil,0);
 	    }
-	  }
+	  } else if (strcasecmp(t, "PTT") == 0 || strcasecmp(t, "DCD") == 0 || strcasecmp(t, "CON") == 0) {
 
 
 /*
@@ -1800,14 +1800,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * Applies to most recent CHANNEL command.
  */
 
-	  else if (strcasecmp(t, "PTT") == 0 || strcasecmp(t, "DCD") == 0 || strcasecmp(t, "CON") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: PTT can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int ot;
-	    char otname[8];
+	    var ot C.int
+	    var otname[8]C.char
 
 	    if (strcasecmp(t, "PTT") == 0) {
 	      ot = OCTYPE_PTT;
@@ -1880,16 +1879,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      if (t[0] == '/') {	// Looks like device path.  Use as given.
 	        strlcpy(p_audio_config.achan[channel].octrl[ot].out_gpio_name, t, 
 	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
-	      }
-
-	      else if (isdigit(t[0])) {		// or if digit, prepend "/dev/gpiochip"
+	      } else if (isdigit(t[0])) {		// or if digit, prepend "/dev/gpiochip"
 	        strlcpy(p_audio_config.achan[channel].octrl[ot].out_gpio_name, "/dev/gpiochip", 
 	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
 	        strlcat(p_audio_config.achan[channel].octrl[ot].out_gpio_name, t, 
 	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
-	      }
-
-	      else {		// otherwise, prepend "/dev/" to the name
+	      } else {		// otherwise, prepend "/dev/" to the name
 	        strlcpy(p_audio_config.achan[channel].octrl[ot].out_gpio_name, "/dev/", 
 	              sizeof(p_audio_config.achan[channel].octrl[ot].out_gpio_name));
 	        strlcat(p_audio_config.achan[channel].octrl[ot].out_gpio_name, t, 
@@ -1966,7 +1961,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	          dw_printf ("See https://github.com/Hamlib/Hamlib/wiki/Supported-Radios for more details.\n");
 	          continue;
 	        }
-	        int n = atoi(t);
+	        var n = atoi(t);
 		if (n < 1 || n > 9999) {
 	          text_color_set(DW_COLOR_ERROR);
 	          dw_printf ("Config file line %d: Unreasonable model number %d for hamlib.\n", line, n);
@@ -1992,7 +1987,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	          dw_printf ("Config file line %d: An optional number is required here for CAT serial port speed: %s\n", line, t);
 	          continue;
 	        }
-	        int n = atoi(t);
+	        var n = atoi(t);
 	        p_audio_config.achan[channel].octrl[ot].ptt_rate = n;
 	      }
 
@@ -2049,9 +2044,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	      cm108_find_ptt (p_audio_config.adev[ACHAN2ADEV(channel)].adevice_out,
 				p_audio_config.achan[channel].octrl[ot].ptt_device,
-				(int)sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
+				sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device));
 
-	      while ((t = split(nil,0)) != nil) {
+	      for {
+			  t = split(nil, 0)
+			  if t == nil {
+				  break
+			  }
 	        if (*t == '-') {
 	          p_audio_config.achan[channel].octrl[ot].out_gpio_num = atoi(t+1);
 		  p_audio_config.achan[channel].octrl[ot].ptt_invert = 1;
@@ -2170,9 +2169,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	      }  /* end of second serial port control line. */
 	    }  /* end of serial port case. */
-
-	  }  /* end of PTT, DCD, CON */
-	  else if (strcasecmp(t, "TXINH") == 0) {
+/* end of PTT, DCD, CON */
+	  }  else if (strcasecmp(t, "TXINH") == 0) {
 
 /*
  * INPUTS
@@ -2187,7 +2185,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      dw_printf ("Line %d: TXINH can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    char itname[8];
+	    var itname[8]C.char
 
 	    strlcpy (itname, "TXINH", sizeof(itname));
 
@@ -2223,7 +2221,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO;
 // #endif
 	    }
-	  }
+	  } else if (strcasecmp(t, "DWAIT") == 0) {
 
 
 /*
@@ -2233,20 +2231,18 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * Now undocumented in User Guide.  Might disappear someday.
  */
 
-	  else if (strcasecmp(t, "DWAIT") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: DWAIT can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing delay time for DWAIT command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n <= 255) {
 	      p_audio_config.achan[channel].dwait = n;
 	    } else {
@@ -2255,26 +2251,24 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Invalid delay time for DWAIT. Using %d.\n", 
 			line, p_audio_config.achan[channel].dwait);
    	    }
-	  }
+	  } else if (strcasecmp(t, "SLOTTIME") == 0) {
 
 /*
  * SLOTTIME n		- For non-digipeat transmit delay timing. n = 10 mS units.
  */
 
-	  else if (strcasecmp(t, "SLOTTIME") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: SLOTTIME can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing delay time for SLOTTIME command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 5 && n < 50) {
 	      // 0 = User has no clue.  This would be no delay.
 	      // 10 = Default.
@@ -2289,26 +2283,24 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("section, to understand what this means.\n");
               dw_printf ("Why don't you just use the default?\n");
    	    }
-	  }
+	  } else if (strcasecmp(t, "PERSIST") == 0) {
 
 /*
  * PERSIST 		- For non-digipeat transmit delay timing.
  */
 
-	  else if (strcasecmp(t, "PERSIST") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: PERSIST can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing probability for PERSIST command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 5 && n <= 250) {
 	      p_audio_config.achan[channel].persist = n;
 	    } else {
@@ -2320,26 +2312,24 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("section, to understand what this means.\n");
               dw_printf ("Why don't you just use the default?\n");
    	    }
-	  }
+	  } else if (strcasecmp(t, "TXDELAY") == 0) {
 
 /*
  * TXDELAY n		- For transmit delay timing. n = 10 mS units.
  */
 
-	  else if (strcasecmp(t, "TXDELAY") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TXDELAY can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing time for TXDELAY command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n <= 255) {
 	      text_color_set(DW_COLOR_ERROR);
 	      if (n < 10) {
@@ -2352,7 +2342,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
                 dw_printf ("Line %d: Keeping with tradition, going back to the 1980s, TXDELAY is in 10 millisecond units.\n", 
 			line);
                 dw_printf ("Line %d: The value %d would be %.3f seconds which seems rather excessive.  Are you sure you want that?\n", 
-			line, n, (double)n * 10. / 1000.);
+			line, n, float64(n) * 10. / 1000.);
                 dw_printf ("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n");
                 dw_printf ("section, to understand what this means.\n");
                 dw_printf ("Why don't you just use the default?\n");
@@ -2364,26 +2354,24 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Invalid time for transmit delay. Using %d.\n", 
 			line, p_audio_config.achan[channel].txdelay);
    	    }
-	  }
+	  } else if (strcasecmp(t, "TXTAIL") == 0) {
 
 /*
  * TXTAIL n		- For transmit timing. n = 10 mS units.
  */
 
-	  else if (strcasecmp(t, "TXTAIL") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TXTAIL can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing time for TXTAIL command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n <= 255) {
 	      if (n < 5) {
                 dw_printf ("Line %d: Setting TXTAIL that small is a REALLY BAD idea if you want other stations to hear you.\n", 
@@ -2395,7 +2383,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
                 dw_printf ("Line %d: Keeping with tradition, going back to the 1980s, TXTAIL is in 10 millisecond units.\n", 
 			line);
                 dw_printf ("Line %d: The value %d would be %.3f seconds which seems rather excessive.  Are you sure you want that?\n", 
-			line, n, (double)n * 10. / 1000.);
+			line, n, float64(n) * 10. / 1000.);
                 dw_printf ("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n");
                 dw_printf ("section, to understand what this means.\n");
                 dw_printf ("Why don't you just use the default?\n");
@@ -2407,12 +2395,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Invalid time for transmit timing. Using %d.\n",
 			line, p_audio_config.achan[channel].txtail);
    	    }
-	  }
+	  } else if (strcasecmp(t, "FULLDUP") == 0) {
 
 /*
  * FULLDUP  {on|off} 		- Full Duplex
  */
-	  else if (strcasecmp(t, "FULLDUP") == 0) {
 
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -2434,15 +2421,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Expected ON or OFF for FULLDUP.\n", line);
 	    }
-	  }
-
+	  } else if (strcasecmp(t, "SPEECH") == 0) {
 /*
  * SPEECH  script 
  *
  * Specify script for text-to-speech function.		
  */
 
-	  else if (strcasecmp(t, "SPEECH") == 0) {
 
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -2470,7 +2455,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	   }
 	   */
-	  }
+	  } else if (strcasecmp(t, "FX25TX") == 0) {
 
 /*
  * FX25TX n		- Enable FX.25 transmission.  Default off.
@@ -2480,20 +2465,18 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *				V1.7 changed from global to per-channel setting.
  */
 
-	  else if (strcasecmp(t, "FX25TX") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: FX25TX can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing FEC mode for FX25TX command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n < 200) {
 	      p_audio_config.achan[channel].fx25_strength = n;
 	      p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25;
@@ -2504,7 +2487,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Unreasonable value for FX.25 transmission mode. Using %d.\n", 
 			line, p_audio_config.achan[channel].fx25_strength);
    	    }
-	  }
+	  } else if (strcasecmp(t, "FX25AUTO") == 0) {
 
 /*
  * FX25AUTO n		- Enable Automatic use of FX.25 for connected mode.  *** Not Implemented ***
@@ -2515,20 +2498,18 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *				Current a global setting.  Could be per channel someday.
  */
 
-	  else if (strcasecmp(t, "FX25AUTO") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: FX25AUTO can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
 	      continue;
 	    }
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing count for FX25AUTO command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n < 20) {
 	      p_audio_config.fx25_auto_enable = n;
 	    } else {
@@ -2537,7 +2518,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Unreasonable count for connected mode automatic FX.25. Using %d.\n", 
 			line, p_audio_config.fx25_auto_enable);
    	    }
-	  }
+	  } else if (strcasecmp(t, "IL2PTX") == 0) {
 
 /*
  * IL2PTX  [ + - ] [ 0 1 ]	- Enable IL2P transmission.  Default off.
@@ -2549,7 +2530,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *				"1" means stronger FEC.  "Max FEC."  Default if not specified.
  */
 
-	  else if (strcasecmp(t, "IL2PTX") == 0) {
 
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -2560,8 +2540,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    p_audio_config.achan[channel].il2p_max_fec = 1;
 	    p_audio_config.achan[channel].il2p_invert_polarity = 0;
 
-	    while ((t = split(nil,0)) != nil) {
-	      for (char *c = t; *c != 0; c++) {
+		for {
+			t = split(nil, 0)
+			if t == nil {
+				break
+			}
+			for c := t; *c != 0; c++ {
 	        switch (*c) {
 	          case '+':
 	            p_audio_config.achan[channel].il2p_invert_polarity = 0;
@@ -2583,7 +2567,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	        }
 	      }
 	    }
-	  }
+	  } else if (strcasecmp(t, "DIGIPEAT") == 0 || strcasecmp(t, "DIGIPEATER") == 0) {
 
 
 /*
@@ -2597,10 +2581,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * DO NOT put this in the User Guide.  On a need to know basis.
  */
 
-	  else if (strcasecmp(t, "DIGIPEAT") == 0 || strcasecmp(t, "DIGIPEATER") == 0) {
-	    int from_chan, to_chan;
-	    int e;
-	    char message[100];
 	    	    
 
 	    t = split(nil,0);
@@ -2615,7 +2595,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 							 line, t);
 	      continue;
 	    }
-	    from_chan = atoi(t);
+	    var from_chan = atoi(t);
 	    if (from_chan < 0 || from_chan >= MAX_TOTAL_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: FROM-channel must be in range of 0 to %d on line %d.\n", 
@@ -2645,7 +2625,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 							 line, t);
 	      continue;
 	    }
-	    to_chan = atoi(t);
+	    var to_chan = atoi(t);
 	    if (to_chan < 0 || to_chan >= MAX_TOTAL_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: TO-channel must be in range of 0 to %d on line %d.\n", 
@@ -2667,7 +2647,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      dw_printf ("Config file: Missing alias pattern on line %d.\n", line);
 	      continue;
 	    }
-	    e = regcomp (&(p_digi_config.alias[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
+	    var e = regcomp (&(p_digi_config.alias[from_chan][to_chan]), t, REG_EXTENDED|REG_NOSUB);
+	    var message[100]C.char
 	    if (e != 0) {
 	      regerror (e, &(p_digi_config.alias[from_chan][to_chan]), message, sizeof(message));
 	      text_color_set(DW_COLOR_ERROR);
@@ -2726,21 +2707,19 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: Found \"%s\" where end of line was expected.\n", line, t);     
 	    }
-	  }
+	  } else if (strcasecmp(t, "DEDUPE") == 0) {
 
 /*
  * DEDUPE 		- Time to suppress digipeating of duplicate APRS packets.
  */
 
-	  else if (strcasecmp(t, "DEDUPE") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing time for DEDUPE command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n < 600) {
 	      p_digi_config.dedupe_time = n;
 	    } else {
@@ -2749,15 +2728,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Unreasonable value for dedupe time. Using %d.\n", 
 			line, p_digi_config.dedupe_time);
    	    }
-	  }
+	  } else if (strcasecmp(t, "regen") == 0) {
 
 /*
  * REGEN 		- Signal regeneration.
  */
 
-	  else if (strcasecmp(t, "regen") == 0) {
-	    int from_chan, to_chan;
-	    	    
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -2771,7 +2747,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 							 line, t);
 	      continue;
 	    }
-	    from_chan = atoi(t);
+	    var from_chan = atoi(t);
 	    if (from_chan < 0 || from_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: FROM-channel must be in range of 0 to %d on line %d.\n", 
@@ -2800,7 +2776,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 							 line, t);
 	      continue;
 	    }
-	    to_chan = atoi(t);
+	    var to_chan = atoi(t);
 	    if (to_chan < 0 || to_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: TO-channel must be in range of 0 to %d on line %d.\n", 
@@ -2817,7 +2793,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    p_digi_config.regen[from_chan][to_chan] = 1;
 
-	  }
+	  } else if (strcasecmp(t, "CDIGIPEAT") == 0 || strcasecmp(t, "CDIGIPEATER") == 0) {
 
 
 /*
@@ -2828,7 +2804,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * CDIGIPEAT  from-chan  to-chan [ alias-pattern ]
  */
 
-	  else if (strcasecmp(t, "CDIGIPEAT") == 0 || strcasecmp(t, "CDIGIPEATER") == 0) {
 	    int from_chan, to_chan;
 	    int e;
 	    char message[100];
