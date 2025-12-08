@@ -1328,25 +1328,22 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 	    p_audio_config.nettnc_port[nchan] = atoi(t);
-	  }
+	  } else if (strcasecmp(t, "mycall") == 0) {
 
 /*
  * MYCALL station
  */
-	  else if (strcasecmp(t, "mycall") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Missing value for MYCALL command on line %d.\n", line);
 	      continue;
 	    } else {
-
-	      char *p;
 	      int const strict = 2;
 	      char call_no_ssid[AX25_MAX_ADDR_LEN];
 	      int ssid, heard;
 
-	      for (p = t; *p != 0; p++) {
+		  for p := t; *p != 0; p++ {
 	        if (islower(*p)) {
 		  *p = toupper(*p);	/* Silently force upper case. */
 					/* Might change to warning someday. */
@@ -1693,10 +1690,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
                     dw_printf ("Line %d: %s option can only be used with 2400 bps PSK.\n", line, t);
 	            continue;
 		  }
-                  p_audio_config.achan[channel].v26_alternative = (strcasecmp(t, "V26A") == 0) ? V26_A : V26_B;
-		}
-
-		else {
+                  p_audio_config.achan[channel].v26_alternative = IfThenElse((strcasecmp(t, "V26A") == 0) , V26_A , V26_B)
+		} else {
 	          text_color_set(DW_COLOR_ERROR);
                   dw_printf ("Line %d: Unrecognized option for MODEM: %s\n", line, t);
 	        } 
@@ -1710,7 +1705,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      //dw_printf ("debug: div = %d\n", p_audio_config.achan[channel].decimate);
 
 	    }
-	  }
+	  } else if (strcasecmp(t, "DTMF") == 0) {
 
 
 
@@ -1723,7 +1718,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 
 
-	  else if (strcasecmp(t, "DTMF") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: DTMF can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
@@ -1874,11 +1868,13 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO;
 #endif
 	    } else if (strcasecmp(t, "GPIOD") == 0) {
+			/*
 #if __WIN32__
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, otname);
 #else		
-#if defined(USE_GPIOD)
+*/
+// #if defined(USE_GPIOD)
 	      t = split(nil,0);
 	      if (t == nil) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -1928,12 +1924,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
 	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD;
+		  /* TODO KG
 #else
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Application was not built with optional support for GPIOD.\n");
 	      dw_printf ("Install packages gpiod and libgpiod-dev, remove 'build' subdirectory, then rebuild.\n");
-#endif /* USE_GPIOD*/
-#endif /* __WIN32__ */
+#endif // USE_GPIOD
+*/
+//#endif /* __WIN32__ */
 	    } else if (strcasecmp(t, "LPT") == 0) {
 
 /* Parallel printer case, x86 Linux only. */
@@ -3023,7 +3021,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Warning! The default is fine for nearly all situations.\n");
 	      dw_printf ("Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .\n");
 	    } else {
-	      to_chan = isdigit(*t) ? atoi(t) : -999;
+	      to_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
 	      if (to_chan < 0 || to_chan >= MAX_TOTAL_CHANS) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Filter TO-channel must be in range of 0 to %d or \"IG\" on line %d.\n", 
@@ -3088,7 +3086,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 
-	    from_chan = isdigit(*t) ? atoi(t) : -999;
+	    from_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
 	    if (from_chan < 0 || from_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Filter FROM-channel must be in range of 0 to %d on line %d.\n",
@@ -3113,7 +3111,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 
-	    to_chan = isdigit(*t) ? atoi(t) : -999;
+	    to_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
 	    if (to_chan < 0 || to_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Filter TO-channel must be in range of 0 to %d on line %d.\n",
@@ -3209,7 +3207,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_POINT;
+	    tl._type = TTLOC_POINT;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    tl.point.lat = 0;
 	    tl.point.lon = 0;
@@ -3287,7 +3285,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_VECTOR;
+	    tl._type = TTLOC_VECTOR;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    tl.vector.lat = 0;
 	    tl.vector.lon = 0;
@@ -3401,7 +3399,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_GRID;
+	    tl._type = TTLOC_GRID;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    tl.grid.lat0 = 0;
 	    tl.grid.lon0 = 0;
@@ -3505,7 +3503,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_UTM;
+	    tl._type = TTLOC_UTM;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    tl.utm.lzone = 0;
 	    tl.utm.scale = 1;
@@ -3621,9 +3619,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 // TODO1.2: in progress...
 	    if (strcasecmp(t, "TTMGRS") == 0) {
-	      tl.type = TTLOC_MGRS;
+	      tl._type = TTLOC_MGRS;
 	    } else {
-	      tl.type = TTLOC_USNG;
+	      tl._type = TTLOC_USNG;
 	    }
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    strlcpy(tl.mgrs.zone, "", sizeof(tl.mgrs.zone));
@@ -3676,7 +3674,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    /* Try converting it rather do our own error checking. */
 
-	    if (tl.type == TTLOC_MGRS) {
+	    if (tl._type == TTLOC_MGRS) {
 	      lerr = Convert_MGRS_To_Geodetic (tl.mgrs.zone, &lat, &lon);
 	    } else {
 	      lerr = Convert_USNG_To_Geodetic (tl.mgrs.zone, &lat, &lon);
@@ -3732,7 +3730,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_MHEAD;
+	    tl._type = TTLOC_MHEAD;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    strlcpy(tl.mhead.prefix, "", sizeof(tl.mhead.prefix));
 
@@ -3839,7 +3837,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_SATSQ;
+	    tl._type = TTLOC_SATSQ;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    tl.point.lat = 0;
 	    tl.point.lon = 0;
@@ -3914,7 +3912,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_AMBIG;
+	    tl._type = TTLOC_AMBIG;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 
 	    /* Pattern: B, optional additional button, exactly x for matching */
@@ -4001,7 +3999,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
 	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
-	    tl.type = TTLOC_MACRO;
+	    tl._type = TTLOC_MACRO;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 
 	    /* Pattern: Any combination of digits, x, y, and z. */
