@@ -125,7 +125,7 @@ static int alldigits(char *p)
 {
 	if (p == nil) return (0);
 	if (strlen(p) == 0) return (0);
-	while (*p != '\0') {
+	while (*p != 0) {
 	  if ( ! isdigit(*p)) return (0);
 	  p++;
 	}
@@ -140,7 +140,7 @@ static int alllettersorpm(char *p)
 {
 	if (p == nil) return (0);
 	if (strlen(p) == 0) return (0);
-	while (*p != '\0') {
+	while (*p != 0) {
 	  if ( ! isalpha(*p) && *p != '+' && *p != '-') return (0);
 	  p++;
 	}
@@ -203,7 +203,7 @@ static double parse_ll (char *str, enum parse_ll_which_e which, int line)
 	  if (isalpha(*endptr)) {
 
 	    hemi = *endptr;
-	    *endptr = '\0';
+	    *endptr = 0;
 	    if (islower(hemi)) {
 	      hemi = toupper(hemi);
 	    }
@@ -235,12 +235,12 @@ static double parse_ll (char *str, enum parse_ll_which_e which, int line)
  * Is there a minutes part?
  */
 	sep = *endptr;
-	if (sep != '\0') {
+	if (sep != 0) {
 
 	  if (sep == DEG1 || sep == DEG2 || sep == DEG3) {
 	 
 	    minutes = strtod (endptr+1, &endptr);
-	    if (*endptr != '\0') {
+	    if (*endptr != 0) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Unexpected character '%c' in location \"%s\"\n", line, sep, str);
 	    }
@@ -310,7 +310,7 @@ long parse_utm_zone (char *szone, char *latband, char *hemi)
 
         lzone = strtol(szone, &zlet, 10);
 
-        if (*zlet == '\0') {
+        if (*zlet == 0) {
 	  /* Number is not followed by letter something else.  */
 	  /* Allow negative number to mean south. */
 
@@ -409,7 +409,7 @@ static int parse_interval (char *str, int line)
 	int nc = 0;
 	int bad = 0;
 
-	for (p = str; *p != '\0'; p++) {
+	for (p = str; *p != 0; p++) {
 	  if (*p == ':') nc++;
 	  else if ( ! isdigit(*p)) bad++;
 	}
@@ -589,7 +589,7 @@ static char *split (char *string, int rest_of_line)
 	  // dw_printf("split in: '%s'\n", string);
 
 	  c = cmd;
-	  for (s = string; *s != '\0'; s++) {
+	  for (s = string; *s != 0; s++) {
 	    if (*s == '\t') {
 	      *c++ = ' ';
 	    } else if (*s == '\r' || *s == '\n') {
@@ -598,7 +598,7 @@ static char *split (char *string, int rest_of_line)
 	      *c++ = *s;
 	    }
 	  }
-	  *c = '\0';
+	  *c = 0;
 	  c = cmd;
 	}
 
@@ -613,7 +613,7 @@ static char *split (char *string, int rest_of_line)
 
 	t = token;
 	in_quotes = 0;
-	for ( ; *c != '\0'; c++) {
+	for ( ; *c != 0; c++) {
 
 	  if (*c == '"') {
 	    if (in_quotes) {
@@ -635,12 +635,12 @@ static char *split (char *string, int rest_of_line)
 	    *t++ = *c;
 	  }
 	}
-	*t = '\0';
+	*t = 0;
 
 	// dw_printf("split out: '%s'\n", token);
 
 	t = token;
-	if (*t == '\0') {
+	if (*t == 0) {
 	  return (nil);
 	}
 
@@ -1346,7 +1346,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      char call_no_ssid[AX25_MAX_ADDR_LEN];
 	      int ssid, heard;
 
-	      for (p = t; *p != '\0'; p++) {
+	      for (p = t; *p != 0; p++) {
 	        if (islower(*p)) {
 		  *p = toupper(*p);	/* Silently force upper case. */
 					/* Might change to warning someday. */
@@ -1550,7 +1550,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		  /* Here we only catch something other than letters and + mixed in. */
 		  /* Later, we check for valid letters and no more than one letter if + specified. */
 
-	          for (pc = t; *pc != '\0'; pc++) {
+	          for (pc = t; *pc != 0; pc++) {
 		    if ( ! isalpha(*pc) && ! (*pc == '+')) {
 	              text_color_set(DW_COLOR_ERROR);
                       dw_printf ("Line %d: Demodulator type can only contain letters and + character.\n", line);
@@ -2567,7 +2567,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    p_audio_config.achan[channel].il2p_invert_polarity = 0;
 
 	    while ((t = split(nil,0)) != nil) {
-	      for (char *c = t; *c != '\0'; c++) {
+	      for (char *c = t; *c != 0; c++) {
 	        switch (*c) {
 	          case '+':
 	            p_audio_config.achan[channel].il2p_invert_polarity = 0;
@@ -4051,12 +4051,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    char t2[2];
 
 	    strlcpy (otemp, "", sizeof(otemp));
-	    t2[1] = '\0';
+	    t2[1] = 0;
 	    pi = t;
 	    while (*pi == ' ' || *pi == '\t') {
 	      pi++;
 	    }
-	    for ( ; *pi != '\0'; pi++) {
+	    for ( ; *pi != 0; pi++) {
 
 	      if (strncmp(pi, "AC{", 3) == 0) {
 
@@ -4064,11 +4064,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != '\0') {
+	        while (*pi != '}' && *pi != '*' && *pi != 0) {
 	          *ps++ = *pi++;
 	        }
 	        if (*pi == '}') {
-	          *ps = '\0';
+	          *ps = 0;
 	          if (tt_text_to_call10 (stemp, 0, ttemp) == 0) {
 	            //text_color_set(DW_COLOR_DEBUG);
 	            //dw_printf ("DEBUG Line %d: AC{%s} -> AC%s\n", line, stemp, ttemp);
@@ -4092,15 +4092,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != '\0') {
+	        while (*pi != '}' && *pi != '*' && *pi != 0) {
 	          *ps++ = *pi++;
 	        }
 	        if (*pi == '}') {
-	          *ps = '\0';
+	          *ps = 0;
 	          if (strlen(stemp) > 9) {
 	            text_color_set(DW_COLOR_ERROR);
 	            dw_printf ("Line %d: Object name %s has been truncated to 9 characters.\n", line, stemp);
-	            stemp[9] = '\0';
+	            stemp[9] = 0;
 	          }
 	          if (tt_text_to_two_key (stemp, 0, ttemp) == 0) {
 	            //text_color_set(DW_COLOR_DEBUG);
@@ -4125,14 +4125,14 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != '\0') {
+	        while (*pi != '}' && *pi != '*' && *pi != 0) {
 	          *ps++ = *pi++;
 	        }
 	        if (*pi == '}') {
 	          char symtab;
 	          char symbol;
 
-	          *ps = '\0';
+	          *ps = 0;
 
 	          // First try to find something matching the description.
 
@@ -4164,11 +4164,11 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != '\0') {
+	        while (*pi != '}' && *pi != '*' && *pi != 0) {
 	          *ps++ = *pi++;
 	        }
 	        if (*pi == '}') {
-	          *ps = '\0';
+	          *ps = 0;
 	          if (tt_text_to_ascii2d (stemp, 0, ttemp) == 0) {
 	            //text_color_set(DW_COLOR_DEBUG);
 	            //dw_printf ("DEBUG Line %d: CA{%s} -> CA%s\n", line, stemp, ttemp);
@@ -4280,7 +4280,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    // Can have any combination of number, APP, IG.  
     	    // Would it be easier with strtok?
 
-	    for (p = t; *p != '\0'; p++) {
+	    for (p = t; *p != 0; p++) {
 
 	      if (isdigit(*p)) {
 	        x = *p - '0';
@@ -4375,7 +4375,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      continue;
 	    }
 
-	    for (p=t; *p!= '\0'; p++) {
+	    for (p=t; *p!= 0; p++) {
 	      if (islower(*p)) *p = toupper(*p);
 	    }
 
@@ -4406,7 +4406,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 // TODO1.3: Need SSID too!
 
 	    strlcpy (p_tt_config.response[msg_num].mtext, t, sizeof(p_tt_config.response[msg_num].mtext));
-	    p_tt_config.response[msg_num].mtext[TT_MTEXT_LEN-1] = '\0';
+	    p_tt_config.response[msg_num].mtext[TT_MTEXT_LEN-1] = 0;
 
 	  }
 
@@ -4495,7 +4495,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    t = strchr (p_igate_config.t2_server_name, ':');
 	    if (t != nil) {
-	      *t = '\0';
+	      *t = 0;
 	      t++;
 	      int n = atoi(t);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
@@ -4596,7 +4596,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      char *p;
 	      p_igate_config.tx_via[0] = ',';
 	      strlcpy (p_igate_config.tx_via + 1, t, sizeof(p_igate_config.tx_via)-1);
-	      for (p = p_igate_config.tx_via; *p != '\0'; p++) {
+	      for (p = p_igate_config.tx_via; *p != 0; p++) {
 	        if (islower(*p)) {
 		  *p = toupper(*p);	/* silently force upper case. */
 	        }
@@ -5052,7 +5052,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    char *p = strchr (t, ':');
 	    if (p != nil) {
-	      *p = '\0';
+	      *p = 0;
 	      int n = atoi(p+1);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
 	        strlcpy (p_misc_config.waypoint_udp_hostname, t, sizeof(p_misc_config.waypoint_udp_hostname));
@@ -5072,7 +5072,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    t = split(nil,1);
 	    if (t != nil) {
-	      for ( ; *t != '\0' ; t++ ) {
+	      for ( ; *t != 0 ; t++ ) {
 	        switch (toupper(*t)) {
 	          case 'N':
 	            p_misc_config.waypoint_formats |= WPL_FORMAT_NMEA_GENERIC;
@@ -5686,7 +5686,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    dw_printf ("Config file: No = found in, %s, on line %d.\n", t, line);
 	    return (0);
 	  }
-	  *e = '\0';
+	  *e = 0;
 	  strlcpy (keyword, t, sizeof(keyword));
 	  strlcpy (value, e+1, sizeof(value));
 
@@ -5702,7 +5702,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	  char temp[256];
 	  int tlen = 0;
 
-	  for (char *p = value; *p != '\0'; ) {
+	  for (char *p = value; *p != 0; ) {
 	    if (p[0] == '\\' && p[1] == 'x' && strlen(p) >= 4 && isxdigit(p[2]) && isxdigit(p[3])) {
 	      int n = 0;
 	      for (int i = 2; i < 4; i++) {
@@ -5721,7 +5721,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	      temp[tlen++] = *p++;
 	    }
 	  }
-	  temp[tlen] = '\0';
+	  temp[tlen] = 0;
 	  strlcpy (value, temp, sizeof(value));
 
 // end
@@ -5775,23 +5775,23 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 	  } else if (strcasecmp(keyword, "SOURCE") == 0) {
 	    b.source = strdup(value);
-	    for (p = b.source; *p != '\0'; p++) {
+	    for (p = b.source; *p != 0; p++) {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
 	    }
 	    if (strlen(b.source) > 9) {
-	       b.source[9] = '\0';
+	       b.source[9] = 0;
 	    }
 	  } else if (strcasecmp(keyword, "DEST") == 0) {
 	    b.dest = strdup(value);
-	    for (p = b.dest; *p != '\0'; p++) {
+	    for (p = b.dest; *p != 0; p++) {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
 	    }
 	    if (strlen(b.dest) > 9) {
-	       b.dest[9] = '\0';
+	       b.dest[9] = 0;
 	    }
 	  } else if (strcasecmp(keyword, "VIA") == 0) {
 
@@ -5808,7 +5808,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 #else	// previously
 
 	    b.via = strdup(value);
-	    for (p = b.via; *p != '\0'; p++) {
+	    for (p = b.via; *p != 0; p++) {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
