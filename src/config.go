@@ -47,8 +47,10 @@ package direwolf
 // #include "error_string.h"
 import "C"
 
+/* FIXME KG
 #define D2R(d) ((d) * M_PI / 180.)
 #define R2D(r) ((r) * 180. / M_PI)
+*/
 
 
 
@@ -59,10 +61,11 @@ import "C"
  * Parsec, light year, and angstrom are probably not useful.
  */
 
-static const struct units_s {
-	char *name;
-	float meters;
-} units[] = {
+type units_s struct {
+	name string
+	meters float64
+} 
+var units = []*units_s{
 	{	"barleycorn",	0.008466667	},	
 	{	"inch",		0.0254		},
 	{	"in",		0.0254		},
@@ -113,9 +116,7 @@ static const struct units_s {
 	{	"league",	4828.032	},	
 	{	"lea",		4828.032	} };
 
-#define NUM_UNITS ((int)((sizeof(units) / sizeof(struct units_s))))
-
-static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_s *p_audio_config);
+// FIXME KG #define NUM_UNITS ((int)((sizeof(units) / sizeof(struct units_s))))
 
 /* Do we have a string of all digits? */
 
@@ -164,12 +165,12 @@ static int alllettersorpm(char *p)
 /* Some wise guy will try to use degree symbol. */
 /* UTF-8 is more difficult because it is a two byte sequence, c2 b0. */
 
-#define DEG1 '^'
-#define DEG2 0xb0	/* ISO Latin1 */
-#define DEG3 0xf8	/* Microsoft code page 437 */
+// FIXME KG #define DEG1 '^'
+// FIXME KG #define DEG2 0xb0	/* ISO Latin1 */
+// FIXME KG #define DEG3 0xf8	/* Microsoft code page 437 */
 
 
-enum parse_ll_which_e { LAT, LON };
+// FIXME KG enum parse_ll_which_e { LAT, LON };
 
 static double parse_ll (char *str, enum parse_ll_which_e which, int line)
 {
@@ -254,11 +255,11 @@ static double parse_ll (char *str, enum parse_ll_which_e which, int line)
 
 	degrees = degrees * sign;
 
-	limit = which == LAT ? 90 : 180;
+	limit = IfThenElse(which == LAT , 90 , 180)
 	if (degrees < -limit || degrees > limit) {
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("Line %d: Number of degrees in \"%s\" is out of range for %s\n", line, str,
-		which == LAT ? "latitude" : "longitude");
+		IfThenElse(which == LAT , "latitude" , "longitude"));
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
 	return (degrees);
@@ -347,6 +348,7 @@ long parse_utm_zone (char *szone, char *latband, char *hemi)
 
 
 
+/*
 #if 0
 main ()
 {
@@ -377,6 +379,7 @@ main ()
 	parse_ll ("12&5", LAT);		// bad character
 }
 #endif
+*/
 
 
 /*------------------------------------------------------------------
@@ -478,10 +481,12 @@ static int check_via_path (char *via_path)
 	char *r;
 	char *a;
 
+	/* TODO KG
 #if DEBUG8
 	text_color_set(DW_COLOR_DEBUG);
         dw_printf ("check_via_path %s\n", via_path);
 #endif
+*/
 	if (strlen(via_path) == 0) {
 	  return (0);
 	}
@@ -499,10 +504,12 @@ static int check_via_path (char *via_path)
 	  num_digi++;
 	  ok = ax25_parse_addr (AX25_REPEATER_1 - 1 + num_digi, a, strict, addr, &ssid, &heard);
 	  if ( ! ok) {
+		  /* TODO KG
 #if DEBUG8
 	    text_color_set(DW_COLOR_DEBUG);
             dw_printf ("check_via_path bad address\n");
 #endif
+*/
 	    return (-1);
 	  }
 
@@ -523,10 +530,12 @@ static int check_via_path (char *via_path)
 	  return (-1);
         }
 
+		/* TODO KG
 #if DEBUG8
 	text_color_set(DW_COLOR_DEBUG);
         dw_printf ("check_via_path %d addresses, %d max digi hops\n", num_digi, max_digi_hops);
 #endif
+*/
 
 	return (max_digi_hops);
 
@@ -558,7 +567,7 @@ static int check_via_path (char *via_path)
  *
  *--------------------------------------------------------------------*/
 
-#define MAXCMDLEN 1200
+const MAXCMDLEN = 1200
 
 
 static char *split (char *string, int rest_of_line)
@@ -707,10 +716,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	int adevice;
 	int m;
 
+	/* TODO KG
 #if DEBUG
 	text_color_set(DW_COLOR_DEBUG);
 	dw_printf ("config_init ( %s )\n", fname);
 #endif
+*/
 
 /* 
  * First apply defaults.
@@ -941,28 +952,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  */
 	fp = NULL;
 	char absfilepath[PATH_MAX];
-#ifdef __WIN32__
-	if (_fullpath (absfilepath, fname, sizeof(absfilepath)) != NULL) {
-#else
 	if (realpath (fname, absfilepath) != NULL) {
-#endif
           fp = fopen (absfilepath, "r");
 	  if (fp == NULL) {		// Failed.  Next, try home dir
 	    strlcpy (absfilepath, "", sizeof(absfilepath));
-#ifdef __WIN32__
-	    char *h = getenv("USERPROFILE");
-	    if (h != NULL && fname[0] != '\\' && fname[1] != ':') {
-	      strlcat (absfilepath, h, sizeof(absfilepath));
-	      strlcat (absfilepath, "\\", sizeof(absfilepath));
-	    }
-#else
 	    // Don't prepend home dir if absolute path given.
 	    char *h = getenv("HOME");
 	    if (h != NULL && fname[0] != '/') {
 	      strlcat (absfilepath, h, sizeof(absfilepath));
 	      strlcat (absfilepath, "/", sizeof(absfilepath));
 	    }
-#endif
             strlcat (absfilepath, fname, sizeof(absfilepath));
 
 	    fp = fopen (absfilepath, "r");
@@ -973,11 +972,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	  text_color_set(DW_COLOR_ERROR);
 	  dw_printf ("ERROR - Could not open configuration file %s in cwd or homedir.\n", fname);
 	  dw_printf ("Try using -c command line option for alternate location.\n");
-#ifndef __WIN32__
 	  dw_printf ("A sample direwolf.conf file should be found in one of:\n");
 	  dw_printf ("    /usr/local/share/doc/direwolf/conf/\n");
 	  dw_printf ("    /usr/share/doc/direwolf/conf/\n");
-#endif
 	  rtfm();
 	  exit(EXIT_FAILURE);
 	}
@@ -2124,16 +2121,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	          p_audio_config->achan[channel].octrl[ot].out_gpio_num = atoi(t);
 		  p_audio_config->achan[channel].octrl[ot].ptt_invert = 0;
 	        }
-#if __WIN32__
-	        else if (*t == '\\') {
-	          strlcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
-		}
-		else {
-	          text_color_set(DW_COLOR_ERROR);
-	          dw_printf ("Config file line %d: Found \"%s\" when expecting GPIO number or device name like \\\\?\\hid#vid_0d8c&... .\n", line, t);
-	          continue;
-	        }
-#else
 	        else if (*t == '/') {
 	          strlcpy (p_audio_config->achan[channel].octrl[ot].ptt_device, t, sizeof(p_audio_config->achan[channel].octrl[ot].ptt_device));
 		}
@@ -2142,7 +2129,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	          dw_printf ("Config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1.\n", line, t);
 	          continue;
 	        }
-#endif
 	      }
 	      if (p_audio_config->achan[channel].octrl[ot].out_gpio_num < 1 || p_audio_config->achan[channel].octrl[ot].out_gpio_num > 8) {
 	          text_color_set(DW_COLOR_ERROR);
@@ -2154,11 +2140,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", line,
 					p_audio_config->adev[ACHAN2ADEV(channel)].adevice_out);
+					/* TODO KG
 #if __WIN32__
 	        dw_printf ("You must explicitly mention a HID path.\n");
 #else
+*/
 	        dw_printf ("You must explicitly mention a device name such as /dev/hidraw1.\n");
-#endif
 	        dw_printf ("Run \"cm108\" utility to get a list.\n");
 	        dw_printf ("See Interface Guide for details.\n");
 	        continue;
