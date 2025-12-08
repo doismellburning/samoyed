@@ -2804,9 +2804,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * CDIGIPEAT  from-chan  to-chan [ alias-pattern ]
  */
 
-	    int from_chan, to_chan;
-	    int e;
-	    char message[100];
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -2820,7 +2817,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 							 line, t);
 	      continue;
 	    }
-	    from_chan = atoi(t);
+	    var from_chan = atoi(t);
 	    if (from_chan < 0 || from_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
@@ -2853,7 +2850,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 							 line, t);
 	      continue;
 	    }
-	    to_chan = atoi(t);
+	    var to_chan = atoi(t);
 	    if (to_chan < 0 || to_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
@@ -2874,6 +2871,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      if (e == 0) {
 	        p_cdigi_config.has_alias[from_chan][to_chan] = 1;
 	      } else {
+	    var message[100]C.char
 	        regerror (e, &(p_cdigi_config.alias[from_chan][to_chan]), message, sizeof(message));
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Invalid alias matching pattern on line %d:\n%s\n",
@@ -2889,7 +2887,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: Found \"%s\" where end of line was expected.\n", line, t);
 	    }
-	  }
+	  } else if (strcasecmp(t, "FILTER") == 0) {
 
 
 /*
@@ -2928,8 +2926,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *			  because the subscriptions are cumulative.
  */
 
-	  else if (strcasecmp(t, "FILTER") == 0) {
-	    int from_chan, to_chan;
+	    var  from_chan C.int
+		var to_chan C.int
 	    	    
 
 	    t = split(nil,0);
@@ -3025,8 +3023,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 //TODO:  Do a test run to see errors now instead of waiting.
 
-	  }
-
+	  } else if (strcasecmp(t, "CFILTER") == 0) {
 
 /*
  * ==================== Packet Filtering for connected digipeater ====================
@@ -3039,9 +3036,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * What would be a useful use case?  Perhaps block by source or destination?
  */
 
-	  else if (strcasecmp(t, "CFILTER") == 0) {
-	    int from_chan, to_chan;
-	    	    
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -3050,7 +3044,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    from_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
+	    var from_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
 	    if (from_chan < 0 || from_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Filter FROM-channel must be in range of 0 to %d on line %d.\n",
@@ -3075,7 +3069,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    to_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
+	    var to_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
 	    if (to_chan < 0 || to_chan >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Filter TO-channel must be in range of 0 to %d on line %d.\n",
@@ -3099,7 +3093,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 //TODO1.2:  Do a test run to see errors now instead of waiting.
 
-	  }
+	  } else if (strcasecmp(t, "TTCORRAL") == 0) {
 
 
 /*
@@ -3112,7 +3106,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * TTCORRAL  latitude  longitude  offset-or-ambiguity 
  */
 
-	  else if (strcasecmp(t, "TTCORRAL") == 0) {
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -3146,14 +3139,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    //dw_printf ("DEBUG: corral %f %f %f %d\n", p_tt_config.corral_lat,
 	    //	p_tt_config.corral_lon, p_tt_config.corral_offset, p_tt_config.corral_ambiguity);
-	  }
+	  } else if (strcasecmp(t, "TTPOINT") == 0) {
 
 /*
  * TTPOINT 		- Define a point represented by touch tone sequence.
  *
  * TTPOINT   pattern  latitude  longitude   
  */
-	  else if (strcasecmp(t, "TTPOINT") == 0) {
 
 	    // FIXME KG struct ttloc_s *tl;
 	    // FIXME KG int j;
@@ -3190,7 +3182,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTPOINT pattern must begin with upper case 'B'.\n", line);
 	    }
-	    for (j=1; j<(int)(strlen(t)); j++) {
+
+		for j:=C.int(1); j<C.int(strlen(t)); j++ {
 	      if ( ! isdigit(t[j])) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTPOINT pattern must be B and digits only.\n", line);
@@ -3223,19 +3216,18 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
 	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
-	  }
+	  } else if (strcasecmp(t, "TTVECTOR") == 0) {
 
 /*
  * TTVECTOR 		- Touch tone location with bearing and distance.
  *
  * TTVECTOR   pattern  latitude  longitude  scale  unit  
  */
-	  else if (strcasecmp(t, "TTVECTOR") == 0) {
 
 	    // FIXME KG struct ttloc_s *tl;
-	    int j;
-	    double scale;
-	    double meters;
+	    // FIXME KG int j;
+	    // FIXME KG double scale;
+	    // FIXME KG double meters;
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3273,7 +3265,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTVECTOR pattern would normally contain \"5bbb\".\n", line);
 	    }
-	    for (j=1; j<(int)(strlen(t)); j++) {
+		for j:=1; j<(C.int)(strlen(t)); j++ {
 	      if ( ! isdigit(t[j]) && t[j] != 'b' && t[j] != 'd') {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTVECTOR pattern must contain only B, digits, b, and d.\n", line);
@@ -3319,7 +3311,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 	    meters = 0;
-	    for (j=0; j<NUM_UNITS && meters == 0; j++) {
+		for j:=0; j<NUM_UNITS && meters == 0; j++ {
 	      if (strcasecmp(units[j].name, t) == 0) {
 	        meters = units[j].meters;
 	      }
@@ -3339,17 +3331,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
 	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
-	  }
+	  } else if (strcasecmp(t, "TTGRID") == 0) {
 
 /*
  * TTGRID 		- Define a grid for touch tone locations.
  *
  * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
  */
-	  else if (strcasecmp(t, "TTGRID") == 0) {
-
-	    // FIXME KG struct ttloc_s *tl;
-	    int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3362,7 +3350,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    p_tt_config.ttloc_len++;
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
 
-	    tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
+	    // FIXME KG struct ttloc_s *tl;
+	    var tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1]);
 	    tl._type = TTLOC_GRID;
 	    strlcpy(tl.pattern, "", sizeof(tl.pattern));
 	    tl.grid.lat0 = 0;
@@ -3384,7 +3373,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TTGRID pattern must begin with upper case 'B'.\n", line);
 	    }
-	    for (j=1; j<(int)(strlen(t)); j++) {
+		for j:=C.int(1); j<C.int(strlen(t)); j++ {
 	      if ( ! isdigit(t[j]) && t[j] != 'x' && t[j] != 'y') {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTGRID pattern must be B, optional digit, xxx, yyy.\n", line);
@@ -3440,19 +3429,17 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
 	    //	p_tt_config.ttloc_ptr[j].pattern);
 	    //}
-	  }
+	  } else if (strcasecmp(t, "TTUTM") == 0) {
 
 /*
  * TTUTM 		- Specify UTM zone for touch tone locations.
  *
  * TTUTM   pattern  zone [ scale [ x-offset y-offset ] ]
  */
-	  else if (strcasecmp(t, "TTUTM") == 0) {
 
 	    // FIXME KG struct ttloc_s *tl;
-	    int j;
-	    double dlat, dlon;
-	    long lerr;
+	    // FIXME KG double dlat, dlon;
+	    // FIXME KG long lerr;
 
 
 	    assert (p_tt_config.ttloc_size >= 2);
@@ -3551,7 +3538,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      p_tt_config.ttloc_len--;
 	      continue;
             }
-	  }
+	  } else if (strcasecmp(t, "TTUSNG") == 0 || strcasecmp(t, "TTMGRS") == 0) {
 
 /*
  * TTUSNG, TTMGRS 		- Specify zone/square for touch tone locations.
@@ -3559,14 +3546,15 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * TTUSNG   pattern  zone_square 
  * TTMGRS   pattern  zone_square 
  */
-	  else if (strcasecmp(t, "TTUSNG") == 0 || strcasecmp(t, "TTMGRS") == 0) {
 
 	    // FIXME KG struct ttloc_s *tl;
+		/* FIXME KG
 	    int j;
 	    int num_x, num_y;
 	    double lat, lon;
 	    long lerr;
 	    char message[300];
+		*/
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3659,7 +3647,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Unexpected stuff at end ignored:  %s\n", line, t);
 	    }
-	  }
+	  } else if (strcasecmp(t, "TTMHEAD") == 0) {
 
 /*
  * TTMHEAD 		- Define pattern to be used for Maidenhead Locator.
@@ -3671,7 +3659,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *
  *			The total number of digts in both must be 4, 6, 10, or 12.
  */
-	  else if (strcasecmp(t, "TTMHEAD") == 0) {
 
 // TODO1.3:  TTMHEAD needs testing. 
 
@@ -3769,7 +3756,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 	    
-	  }
+	  } else if (strcasecmp(t, "TTSATSQ") == 0) {
 
 
 /*
@@ -3782,7 +3769,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *			Must have exactly 4 x.
  */
 
-	  else if (strcasecmp(t, "TTSATSQ") == 0) {
 
 // TODO1.2:  TTSATSQ To be continued...
 
@@ -3845,8 +3831,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size, 
 	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
-	  }
-
+	  } else if (strcasecmp(t, "TTAMBIG") == 0) {
 /*
  * TTAMBIG 		- Define pattern to be used for Object Location Ambiguity.
  *
@@ -3857,7 +3842,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *			Must have exactly one x.
  */
 
-	  else if (strcasecmp(t, "TTAMBIG") == 0) {
 
 // TODO1.3:  TTAMBIG To be continued...
 
@@ -3918,8 +3902,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    //  dw_printf ("debug ttloc %d/%d %s\n", j, p_tt_config.ttloc_size,
 	    //		p_tt_config.ttloc_ptr[j].pattern);
 	    //}
-	  }
-
+	  } else if (strcasecmp(t, "TTMACRO") == 0) {
 
 /*
  * TTMACRO 		- Define compact message format with full expansion
@@ -3944,7 +3927,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *		These provide automatic conversion from plain text to the TT encoding.
  *		
  */
-	  else if (strcasecmp(t, "TTMACRO") == 0) {
 
 	    // FIXME KG struct ttloc_s *tl;
 	    int j;
@@ -4053,9 +4035,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	          dw_printf ("Line %d: AC{... is missing matching } in TTMACRO definition.\n", line);
 		  tt_error++;
 	        }
-	      }
-
-	      else if (strncmp(pi, "AA{", 3) == 0) {
+	      } else if (strncmp(pi, "AA{", 3) == 0) {
 
 		// Convert to object name.
 
@@ -4086,9 +4066,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	          dw_printf ("Line %d: AA{... is missing matching } in TTMACRO definition.\n", line);
 		  tt_error++;
 	        }
-	      }
-
-	      else if (strncmp(pi, "AB{", 3) == 0) {
+	      } else if (strncmp(pi, "AB{", 3) == 0) {
 
 		// Attempt conversion from description to symbol code.
 
@@ -4125,9 +4103,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	          dw_printf ("Line %d: AB{... is missing matching } in TTMACRO definition.\n", line);
 		  tt_error++;
 	        }
-	      }
-
-	      else if (strncmp(pi, "CA{", 3) == 0) {
+	      } else if (strncmp(pi, "CA{", 3) == 0) {
 
 		// Convert to enhanced comment that can contain any ASCII character.
 
@@ -4153,10 +4129,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	          dw_printf ("Line %d: CA{... is missing matching } in TTMACRO definition.\n", line);
 		  tt_error++;
 	        }
-	      }
-
-
-	      else if (strchr("0123456789ABCD*#xyz", *pi) != nil) {
+	      } else if (strchr("0123456789ABCD*#xyz", *pi) != nil) {
 	        t2[0] = *pi;
 	        strlcat (otemp, t2, sizeof(otemp));
 	      } else {
@@ -4197,7 +4170,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    } else {
 	      p_tt_config.ttloc_len--;
 	    }
-	  }
+	  } else if (strcasecmp(t, "TTOBJ") == 0) {
 
 /*
  * TTOBJ 		- TT Object Report options.
@@ -4208,7 +4181,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  */
 
 
-	  else if (strcasecmp(t, "TTOBJ") == 0) {
 	    int r, x = -1;
 	    int app = 0;
 	    int ig = 0;
@@ -4300,7 +4272,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	        dw_printf ("Config file, line %d: invalid via path.\n", line);
 	      }
 	    }
-	  }
+	  } else if (strcasecmp(t, "TTERR") == 0) {
 
 /*
  * TTERR 		- TT responses for success or errors.
@@ -4308,12 +4280,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * TTERR  msg_id  method  text...  
  */
 
-	  else if (strcasecmp(t, "TTERR") == 0) {
+ /* FIXME KG
 	    int n, msg_num;
 	    char *p;
 	    char method[AX25_MAX_ADDR_LEN];
 	    int ssid;
 	    int heard;
+		*/
 
 
 	    t = split(nil,0);
@@ -4377,16 +4350,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    strlcpy (p_tt_config.response[msg_num].mtext, t, sizeof(p_tt_config.response[msg_num].mtext));
 	    p_tt_config.response[msg_num].mtext[TT_MTEXT_LEN-1] = 0;
 
-	  }
+	  } else if (strcasecmp(t, "TTSTATUS") == 0) {
 
 /*
  * TTSTATUS 		- TT custom status messages.
  *
  * TTSTATUS  status_id  text...  
  */
-
-	  else if (strcasecmp(t, "TTSTATUS") == 0) {
-	    int status_num;
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -4395,7 +4365,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 	    
-	    status_num = atoi(t);
+	    var status_num = atoi(t);
 
 	    if (status_num < 1 || status_num > 9) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4413,10 +4383,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
   	    //text_color_set(DW_COLOR_DEBUG);
 	    //dw_printf ("Line %d: TTSTATUS debug %d \"%s\"\n", line, status_num, t);
  
-	    while (*t == ' ' || *t == '\t') t++;   // remove leading white space.
+	    for (*t == ' ' || *t == '\t') {
+			t++   // remove leading white space.
+		}
 
 	    strlcpy (p_tt_config.status[status_num], t, sizeof(p_tt_config.status[status_num]));
-	  }
+	  } else if (strcasecmp(t, "TTCMD") == 0) {
 
 
 /*
@@ -4426,7 +4398,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * TTCMD ...  
  */
 
-	  else if (strcasecmp(t, "TTCMD") == 0) {
 
 	    t = split(nil,1);
 	    if (t == nil) {
@@ -4436,7 +4407,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 	    
 	    strlcpy (p_tt_config.ttcmd, t, sizeof(p_tt_config.ttcmd));
-	  }
+	  } else if (strcasecmp(t, "IGSERVER") == 0) {
 
 
 /*
@@ -4451,7 +4422,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * IGSERVER  hostname:port				-- more in line with usual conventions.
  */
 
-	  else if (strcasecmp(t, "IGSERVER") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4493,15 +4463,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 	    //dw_printf ("DEBUG  server=%s   port=%d\n", p_igate_config.t2_server_name, p_igate_config.t2_server_port);
 	    //exit (0);
-	  }
-
+	  } else if (strcasecmp(t, "IGLOGIN") == 0) {
 /*
  * IGLOGIN 		- Login callsign and passcode for IGate server
  *
  * IGLOGIN  callsign  passcode
  */
 
-	  else if (strcasecmp(t, "IGLOGIN") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4518,7 +4486,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 	    strlcpy (p_igate_config.t2_passcode, t, sizeof(p_igate_config.t2_passcode));
-	  }
+	  } else if (strcasecmp(t, "IGTXVIA") == 0) {
 
 /*
  * IGTXVIA 		- Transmit channel and VIA path for messages from IGate server
@@ -4526,7 +4494,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * IGTXVIA  channel  [ path ]
  */
 
-	  else if (strcasecmp(t, "IGTXVIA") == 0) {
 	    int n;
 
 	    t = split(nil,0);
