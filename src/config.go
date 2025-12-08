@@ -2033,7 +2033,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
 
-#if USE_CM108
+// TODO KG #if USE_CM108
 
 	      if (ot != OCTYPE_PTT) {
 		// Future project:  Allow DCD and CON via the same device.
@@ -2098,6 +2098,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      }
 	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_CM108;
 
+		  /* TODO KG
 #else
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", line, otname);
@@ -2106,6 +2107,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      rtfm();
 	      exit (EXIT_FAILURE);
 #endif
+*/
 	    } else  {
 
 /* serial port case. */
@@ -2180,6 +2182,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    }  /* end of serial port case. */
 
 	  }  /* end of PTT, DCD, CON */
+	  else if (strcasecmp(t, "TXINH") == 0) {
 
 /*
  * INPUTS
@@ -2189,7 +2192,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * TXINH GPIO [-]gpio-num (only type supported so far)
  */
 
-	  else if (strcasecmp(t, "TXINH") == 0) {
 	    if (channel < 0 || channel >= MAX_RADIO_CHANS) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: TXINH can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1);
@@ -2208,10 +2210,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	    if (strcasecmp(t, "GPIO") == 0) {
 
+			/* TODO KG
 #if __WIN32__
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", line, itname);
 #else
+*/
 	      t = split(nil,0);
 	      if (t == nil) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -2227,7 +2231,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 0;
 	      }
 	      p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO;
-#endif
+// #endif
 	    }
 	  }
 
