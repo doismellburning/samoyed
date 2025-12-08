@@ -1339,9 +1339,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Config file: Missing value for MYCALL command on line %d.\n", line);
 	      continue;
 	    } else {
-	      int const strict = 2;
-	      char call_no_ssid[AX25_MAX_ADDR_LEN];
-	      int ssid, heard;
+	      // FIXME KG int const strict = 2;
+	      var call_no_ssid[AX25_MAX_ADDR_LEN]C.char
+	      var ssid, heard C.int
 
 		  for p := t; *p != 0; p++ {
 	        if (islower(*p)) {
@@ -1847,10 +1847,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* GPIO case, Linux only. */
 
+/* TODO KG
 #if __WIN32__
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", line, otname);
 #else		
+*/
 	      t = split(nil,0);
 	      if (t == nil) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -1866,7 +1868,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
 	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO;
-#endif
+// #endif
 	    } else if (strcasecmp(t, "GPIOD") == 0) {
 			/*
 #if __WIN32__
@@ -1936,7 +1938,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 /* Parallel printer case, x86 Linux only. */
 
-#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
+//#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
 
 	      t = split(nil,0);
 	      if (t == nil) {
@@ -1953,10 +1955,12 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 		p_audio_config.achan[channel].octrl[ot].ptt_invert = 0;
 	      }
 	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT;
+		  /* 
 #else
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
 #endif		
+*/
 	    } else if (strcasecmp(t, "RIG") == 0) {
 
 // TODO KG #ifdef USE_HAMLIB
@@ -4584,7 +4588,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    t = split(nil,0);
 	    if (t != nil) {
 
-#if 1	// proper checking
+// TODO KG#if 1	// proper checking
 
 	      n = check_via_path(t);
 	      if (n >= 0) {
@@ -4596,19 +4600,20 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        dw_printf ("Config file, line %d: invalid via path.\n", line);
 	      }
 
-#else	// previously
+/* TODO KG #else	// previously
 
 	      char *p;
 	      p_igate_config.tx_via[0] = ',';
 	      strlcpy (p_igate_config.tx_via + 1, t, sizeof(p_igate_config.tx_via)-1);
 	      for (p = p_igate_config.tx_via; *p != 0; p++) {
 	        if (islower(*p)) {
-		  *p = toupper(*p);	/* silently force upper case. */
+		  *p = toupper(*p);	// silently force upper case. 
 	        }
 	      }
 #endif
+*/
 	    }
-	  }
+	  } else if (strcasecmp(t, "IGFILTER") == 0) {
 
 /*
  * IGFILTER 		- IGate Server side filters.
@@ -4619,7 +4624,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * IGFILTER  filter-spec ... 
  */
 
-	  else if (strcasecmp(t, "IGFILTER") == 0) {
 
 	    t = split(nil,1);		/* Take rest of line as one string. */
 
@@ -4989,15 +4993,15 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    } else {
 	      p_misc_config.gpsnmea_speed = 4800;	// The standard at one time.
 	    }
-	  }
+	  } else if (strcasecmp(t, "gpsd") == 0) {
 
 /*
  * GPSD		- Use GPSD server.
  *
  * GPSD [ host [ port ] ]
  */
-	  else if (strcasecmp(t, "gpsd") == 0) {
 
+/* TODO KG
 #if __WIN32__
 
 	    text_color_set(DW_COLOR_ERROR);
@@ -5005,6 +5009,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    continue;
 
 #elif ENABLE_GPSD
+*/
 
 	    strlcpy (p_misc_config.gpsd_host, "localhost", sizeof(p_misc_config.gpsd_host));
 	    p_misc_config.gpsd_port = atoi(DEFAULT_GPSD_PORT);
@@ -5027,14 +5032,16 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	        }
 	      }
 	    }
+		/* TODO KG
 #else
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("Config file, line %d: The GPSD interface has not been enabled.\n", line);
 	    dw_printf ("Install gpsd and libgps-dev packages then rebuild direwolf.\n");
 	    continue;
 #endif
+*/
 
-	  }
+	  } else if (strcasecmp(t, "waypoint") == 0) {
 
 /*
  * WAYPOINT		- Generate WPL and AIS NMEA sentences for display on map.
@@ -5043,7 +5050,6 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * WAYPOINT  host:udpport [ formats ]
  *		  
  */
-	  else if (strcasecmp(t, "waypoint") == 0) {
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -5055,10 +5061,10 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	    /* If there is a ':' in the name, split it into hostname:udpportnum. */
 	    /* Otherwise assume it is serial port name. */
 
-	    char *p = strchr (t, ':');
+	    var p = strchr (t, ':');
 	    if (p != nil) {
 	      *p = 0;
-	      int n = atoi(p+1);
+	      var n = atoi(p+1);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
 	        strlcpy (p_misc_config.waypoint_udp_hostname, t, sizeof(p_misc_config.waypoint_udp_hostname));
 	        if (strlen(p_misc_config.waypoint_udp_hostname) == 0) {
@@ -5214,7 +5220,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Config file: Maximum number of beacons exceeded on line %d.\n", line);
 	      continue;
 	    }
-	  }
+	  } else if (strcasecmp(t, "SMARTBEACON") == 0 ||	strcasecmp(t, "SMARTBEACONING") == 0) {
 
 
 /*
@@ -5223,11 +5229,10 @@ void config_init (char *fname, struct audio_s *p_audio_config,
  * Parameters must be all or nothing.
  */
 
-	  else if (strcasecmp(t, "SMARTBEACON") == 0 ||	
-	           strcasecmp(t, "SMARTBEACONING") == 0) {
 
 	    int n;
 
+		/* FIXME KG
 #define SB_NUM(name,sbvar,minn,maxx,unit)  							\
 	    t = split(nil,0);									\
 	    if (t == nil) {									\
@@ -5248,7 +5253,9 @@ void config_init (char *fname, struct audio_s *p_audio_config,
               dw_printf ("Line %d: Invalid %s for SmartBeaconing. Using default %d %s.\n",	\
 			line, name, p_misc_config.sbvar, unit);				\
    	    }
+		*/
 
+		/* FIXME KG
 #define SB_TIME(name,sbvar,minn,maxx,unit)  							\
 	    t = split(nil,0);									\
 	    if (t == nil) {									\
@@ -5265,6 +5272,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
               dw_printf ("Line %d: Invalid %s for SmartBeaconing. Using default %d %s.\n",	\
 			line, name, p_misc_config.sbvar, unit);				\
    	    }
+		*/
 
 
 	    SB_NUM  ("fast speed", sb_fast_speed,  2,   90,  "MPH")
@@ -5800,7 +5808,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 	  } else if (strcasecmp(keyword, "VIA") == 0) {
 
-#if 1	// proper checking
+// #if 1	// proper checking
 
 	    if (check_via_path(value) >= 0) {
 	      b.via = strdup(value);
@@ -5810,15 +5818,16 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 
 
-#else	// previously
+/* #else	// previously
 
 	    b.via = strdup(value);
 	    for (p = b.via; *p != 0; p++) {
 	      if (islower(*p)) {
-	        *p = toupper(*p);	/* silently force upper case. */
+	        *p = toupper(*p);	// silently force upper case. 
 	      }
 	    }
 #endif
+*/
 	  } else if (strcasecmp(keyword, "INFO") == 0) {
 	    b.custom_info = strdup(value);
 	  } else if (strcasecmp(keyword, "INFOCMD") == 0) {
