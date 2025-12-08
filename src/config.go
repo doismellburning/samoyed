@@ -1960,7 +1960,8 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
 #endif		
 	    } else if (strcasecmp(t, "RIG") == 0) {
-#ifdef USE_HAMLIB
+
+// TODO KG #ifdef USE_HAMLIB
 
 	      t = split(nil,0);
 	      if (t == nil) {
@@ -2016,19 +2017,21 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 
 	      p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB;
 
-#else
+// #else
+/* TODO KG
 #if __WIN32__
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: Windows version of direwolf does not support HAMLIB.\n", line);
 	      exit (EXIT_FAILURE);
 #else
+*/
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", line, otname);
 	      dw_printf ("You must rebuild direwolf with hamlib support.\n");
 	      dw_printf ("See User Guide for details.\n");
-#endif
+// #endif
 
-#endif
+//#endif
 	    } else if (strcasecmp(t, "CM108") == 0) {
 
 /* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
@@ -2982,7 +2985,7 @@ void config_init (char *fname, struct audio_s *p_audio_config,
 	      dw_printf ("Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .\n");
 	      dw_printf ("Warning! If you insist, be sure to add \" | i/180 \" so you don't break messaging.\n");
 	    } else {
-	      from_chan = isdigit(*t) ? atoi(t) : -999;
+	      from_chan = IfThenElse(isdigit(*t) , atoi(t) , -999)
 	      if (from_chan < 0 || from_chan >= MAX_TOTAL_CHANS) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file: Filter FROM-channel must be in range of 0 to %d or \"IG\" on line %d.\n", 
