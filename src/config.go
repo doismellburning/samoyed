@@ -618,7 +618,7 @@ func split (str *C.char, rest_of_line C.int) *C.char {
  * Quotation marks inside need to be doubled.
  */
 
-	for (*c == ' ') {
+	for *c == ' ' {
 	  c++;
 	};
 
@@ -3478,7 +3478,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      p_tt_config.ttloc_len--;
 	      continue;
 	    }
-	    for (j=1; j < (int)(strlen(t)); j++) {
+		for j:=1; j < C.int(strlen(t)); j++ {
 	      if ( ! isdigit(t[j]) && t[j] != 'x' && t[j] != 'y') {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTUTM pattern must be B, optional digit, xxx, yyy.\n", line);
@@ -3530,7 +3530,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
                         &dlat, &dlon);
 
             if (lerr != 0) {
-	      char message [300];
+	      var message [300]C.char
 
               utm_error_string (lerr, message);
 	      text_color_set(DW_COLOR_ERROR);
@@ -3597,14 +3597,18 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 	    num_x = 0;
 	    num_y = 0;
-	    for (j=1; j<(int)(strlen(t)); j++) {
+	    for j=1; j<C.int(strlen(t)); j++ {
 	      if ( ! isdigit(t[j]) && t[j] != 'x' && t[j] != 'y') {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTUSNG/TTMGRS pattern must be B, optional digit, xxx, yyy.\n", line);
 		// Bail out somehow.  continue would match inner for.
 	      }
-	      if (t[j] == 'x') num_x++;
-	      if (t[j] == 'y') num_y++;
+	      if (t[j] == 'x') {
+			  num_x++;
+		  }
+	      if (t[j] == 'y') {
+			  num_y++;
+		  }
 	    }
 	    if (num_x < 1 || num_x > 5 || num_x != num_y) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -3663,10 +3667,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 // TODO1.3:  TTMHEAD needs testing. 
 
 	    // FIXME KG struct ttloc_s *tl;
+		/* FIXME KG 
 	    int j;
 	    int k;
 	    int count_x;
 	    int count_other;
+		*/
 
 
 	    assert (p_tt_config.ttloc_size >= 2);
@@ -3713,9 +3719,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    count_x = 0;
 	    count_other = 0;
-	    for (k = j ; k < (int)(strlen(t)); k++) {
-	      if (t[k] == 'x') count_x++;
-	      else count_other++;
+		for k := j ; k < C.int(strlen(t)); k++ {
+	      if (t[k] == 'x') {
+			  count_x++;
+		  } else {
+			  count_other++;
+		  }
 	    }
 
 	    if (count_other != 0) {
@@ -3729,7 +3738,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    t = split(nil,0);
 	    if (t != nil) {
-	      char mh[30];
+	      var mh[30]C.char
 
 	      strlcpy(tl.mhead.prefix, t, sizeof(tl.mhead.prefix));
 
@@ -3773,7 +3782,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 // TODO1.2:  TTSATSQ To be continued...
 
 	    // FIXME KG struct ttloc_s *tl;
-	    int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3812,6 +3820,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    /* Optionally one of 0-9ABCD */
 
+		var j C.int
 	    if (strchr("ABCD", t[1]) != nil || isdigit(t[1])) {
 	      j = 2;
 	    } else {
@@ -3846,7 +3855,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 // TODO1.3:  TTAMBIG To be continued...
 
 	    // FIXME KG struct ttloc_s *tl;
-	    int j;
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3883,6 +3891,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    /* Optionally one of 0-9ABCD */
 
+		var j C.int
 	    if (strchr("ABCD", t[1]) != nil || isdigit(t[1])) {
 	      j = 2;
 	    } else {
@@ -3929,9 +3938,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  */
 
 	    // FIXME KG struct ttloc_s *tl;
+		/* FIXME KG
 	    int j;
 	    int p_count[3], d_count[3];
 	    int tt_error = 0;
+		*/
 
 	    assert (p_tt_config.ttloc_size >= 2);
 	    assert (p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size);
@@ -3961,9 +3972,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 	    strlcpy (tl.pattern, t, sizeof(tl.pattern));
 
-	    p_count[0] = p_count[1] = p_count[2] = 0;
+	    p_count[0] = 0
+		p_count[1] = 0
+		p_count[2] = 0;
 
-	    for (j=0; j<(int)(strlen(t)); j++) {
+		for j:=0; j<C.int(strlen(t)); j++ {
 	      if ( strchr ("0123456789ABCDxyz", t[j]) == nil) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z.\n", line);
@@ -3994,20 +4007,20 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    /* Make a pass over the definition, looking for the xx{...} substitutions. */
 	    /* These are done just once when reading the configuration file. */
 
-	    char *pi;
-	    char *ps;
-	    char stemp[100];  // text inside of xx{...}
-	    char ttemp[300];  // Converted to tone sequences.
-	    char otemp[1000]; // Result after any substitutions.
-	    char t2[2];
+	    // FIXME KG char *pi;
+	    // FIXME KG char *ps;
+	    // FIXME KG char stemp[100];  // text inside of xx{...}
+	    // FIXME KG char ttemp[300];  // Converted to tone sequences.
+	    // FIXME KG char otemp[1000]; // Result after any substitutions.
+	    // FIXME KG char t2[2];
 
 	    strlcpy (otemp, "", sizeof(otemp));
 	    t2[1] = 0;
 	    pi = t;
-	    while (*pi == ' ' || *pi == '\t') {
+	    for (*pi == ' ' || *pi == '\t') {
 	      pi++;
 	    }
-	    for ( ; *pi != 0; pi++) {
+	    for  ;*pi != 0; pi++ {
 
 	      if (strncmp(pi, "AC{", 3) == 0) {
 
@@ -4015,8 +4028,10 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != 0) {
-	          *ps++ = *pi++;
+	        for *pi != '}' && *pi != '*' && *pi != 0 {
+	          *ps = *pi;
+			  ps++
+			  pi++
 	        }
 	        if (*pi == '}') {
 	          *ps = 0;
@@ -4041,8 +4056,10 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != 0) {
-	          *ps++ = *pi++;
+	        for *pi != '}' && *pi != '*' && *pi != 0 {
+	          *ps = *pi;
+			  ps++
+			  pi++
 	        }
 	        if (*pi == '}') {
 	          *ps = 0;
@@ -4072,12 +4089,14 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != 0) {
-	          *ps++ = *pi++;
+	        for *pi != '}' && *pi != '*' && *pi != 0 {
+	          *ps = *pi;
+			  ps++
+			  pi++
 	        }
 	        if (*pi == '}') {
-	          char symtab;
-	          char symbol;
+	          var symtab C.char
+	          var symbol C.char
 
 	          *ps = 0;
 
@@ -4109,7 +4128,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	        pi += 3;
 	        ps = stemp;
-	        while (*pi != '}' && *pi != '*' && *pi != 0) {
+	        for *pi != '}' && *pi != '*' && *pi != 0 {
 	          *ps++ = *pi++;
 	        }
 	        if (*pi == '}') {
@@ -4143,7 +4162,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    d_count[0] = d_count[1] = d_count[2] = 0;
 
-	    for (j=0; j<(int)(strlen(otemp)); j++) {
+		for j:=0; j<C.int(strlen(otemp)); j++ {
 	      if (otemp[j] >= 'x' && otemp[j] <= 'z') {
 		d_count[otemp[j]-'x']++;
 	      }
@@ -4151,7 +4170,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    /* A little validity checking. */
 
-	    for (j=0; j<3; j++) {
+		for j:=0; j<3; j++ {
 	      if (p_count[j] > 0 && d_count[j] == 0) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: '%c' is in TTMACRO pattern but is not used in definition.\n", line, 'x'+j);
@@ -4221,7 +4240,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    // Can have any combination of number, APP, IG.  
     	    // Would it be easier with strtok?
 
-	    for (p = t; *p != 0; p++) {
+		for p := t; *p != 0; p++ {
 
 	      if (isdigit(*p)) {
 	        x = *p - '0';
@@ -4297,7 +4316,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    }
 	    
 	    msg_num = -1;
-	    for (n=0; n<TT_ERROR_MAXP1; n++) {
+		for n:=0; n<TT_ERROR_MAXP1; n++ {
 	      if (strcasecmp(t, tt_msg_id[n]) == 0) {
 	        msg_num = n;
 	        break;
@@ -4317,8 +4336,10 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    for (p=t; *p!= 0; p++) {
-	      if (islower(*p)) *p = toupper(*p);
+		for p:=t; *p!= 0; p++ {
+	      if (islower(*p)) {
+			  *p = toupper(*p);
+		  }
 	    }
 
 	    if ( ! ax25_parse_addr(-1, t, 1, method, &ssid, &heard)) {
@@ -4383,7 +4404,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
   	    //text_color_set(DW_COLOR_DEBUG);
 	    //dw_printf ("Line %d: TTSTATUS debug %d \"%s\"\n", line, status_num, t);
  
-	    for (*t == ' ' || *t == '\t') {
+	    for *t == ' ' || *t == '\t' {
 			t++   // remove leading white space.
 		}
 
@@ -4778,8 +4799,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      // Try to find an empty slot.
 	      // A duplicate TCP port number will overwrite the previous value.
 
-	      int slot = -1;
-	      for (int i = 0; i < MAX_KISS_TCP_PORTS && slot == -1; i++) {
+	      var slot = -1;
+		  for i := 0; i < MAX_KISS_TCP_PORTS && slot == -1; i++ {
 	        if (p_misc_config.kiss_port[i] == tcp_port) {
 	          slot = i;
 	          if ( ! (slot == 0 && tcp_port == DEFAULT_KISS_PORT)) {
@@ -5010,7 +5031,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    t = split(nil,1);
 	    if (t != nil) {
-	      for ( ; *t != 0 ; t++ ) {
+	      for  *t != 0 ; t++  {
 	        switch (toupper(*t)) {
 	          case 'N':
 	            p_misc_config.waypoint_formats |= WPL_FORMAT_NMEA_GENERIC;
@@ -5359,7 +5380,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid MAXV22 number. Will use half of RETRY.\n", line);
 	    }
-	  }
+	  } else if (strcasecmp(t, "V20") == 0) {
 
 
 /*
@@ -5368,7 +5389,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *					  Possible to have multiple and they are cumulative.
  */
 
-	  else if (strcasecmp(t, "V20") == 0) {
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -5377,10 +5397,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    while (t != nil) {
+	    for t != nil {
+			/* FIXME KG 
 	      int const strict = 2;
 	      char call_no_ssid[AX25_MAX_ADDR_LEN];
 	      int ssid, heard;
+		  */
 
 	      if (ax25_parse_addr (AX25_DESTINATION, t, strict, call_no_ssid, &ssid, &heard)) {
 	        p_misc_config.v20_addrs = (char**)realloc (p_misc_config.v20_addrs, sizeof(char*) * (p_misc_config.v20_count + 1));
@@ -5393,7 +5415,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      }
 	      t = split(nil,0);
 	    }
-	  }
+	  } else if (strcasecmp(t, "NOXID") == 0) {
 
 
 /*
@@ -5403,7 +5425,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *					  Possible to have multiple and they are cumulative.
  */
 
-	  else if (strcasecmp(t, "NOXID") == 0) {
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -5412,10 +5433,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    while (t != nil) {
+	    for t != nil {
+			/* FIXME KG 
 	      int const strict = 2;
 	      char call_no_ssid[AX25_MAX_ADDR_LEN];
 	      int ssid, heard;
+		  */
 
 	      if (ax25_parse_addr (AX25_DESTINATION, t, strict, call_no_ssid, &ssid, &heard)) {
 	        p_misc_config.noxid_addrs = (char**)realloc (p_misc_config.noxid_addrs, sizeof(char*) * (p_misc_config.noxid_count + 1));
@@ -5428,13 +5451,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      }
 	      t = split(nil,0);
 	    }
-	  }
-
+	  } else {
 
 /*
  * Invalid command.
  */
-	  else {
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("Config file: Unrecognized command '%s' on line %d.\n", t, line);
 	  }  
@@ -5452,10 +5473,10 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  *
  * Suggest that beaconing be enabled when digipeating.
  */
-	int i, j, k, b;
+	// FIXME KG int i, j, k, b;
 
-	for (i=0; i<MAX_TOTAL_CHANS; i++) {
-	  for (j=0; j<MAX_TOTAL_CHANS; j++) {
+	for i:=0; i<MAX_TOTAL_CHANS; i++ {
+		for j:=0; j<MAX_TOTAL_CHANS; j++ {
 
 /* APRS digipeating. */
 
@@ -5479,8 +5500,8 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	        p_digi_config.enabled[i][j] = 0;
 	      }
 
-	      b = 0;
-	      for (k=0; k<p_misc_config.num_beacons; k++) {
+	      var b = 0;
+		  for k:=0; k<p_misc_config.num_beacons; k++ {
 	        if (p_misc_config.beacon[k].sendto_chan == j) b++;
 	      }
 	      if (b == 0) {
@@ -5515,8 +5536,10 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      }
 
 	      b = 0;
-	      for (k=0; k<p_misc_config.num_beacons; k++) {
-	        if (p_misc_config.beacon[k].sendto_chan == j) b++;
+		  for k:=0; k<p_misc_config.num_beacons; k++ {
+	        if (p_misc_config.beacon[k].sendto_chan == j) {
+				b++;
+			}
 	      }
 	      if (b == 0) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5766,7 +5789,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	  } else if (strcasecmp(keyword, "LONG") == 0 || strcasecmp(keyword, "LON") == 0) {
 	    b.lon = parse_ll (value, LON, line);
 	  } else if (strcasecmp(keyword, "AMBIGUITY") == 0 || strcasecmp(keyword, "AMBIG") == 0) {
-	    int n = atoi(value);
+	    var n = atoi(value);
 	    if (n >= 0 && n <= 4) {
 	      b.ambiguity = n;
 	    } else {
@@ -5775,10 +5798,10 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 	  } else if (strcasecmp(keyword, "ALT") == 0 || strcasecmp(keyword, "ALTITUDE") == 0) {
 
-	    char *unit = strpbrk(value, "abcedfghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+	    var unit = strpbrk(value, "abcedfghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
 	    if (unit != nil) {
-	      float meters = 0;
-	      for (int j=0; j<NUM_UNITS && meters == 0; j++) {
+	      var meters = 0;
+		  for j:=0; j<NUM_UNITS && meters == 0; j++ {
 	        if (strcasecmp(units[j].name, unit) == 0) {
 	          meters = units[j].meters;
 	        }
