@@ -4129,7 +4129,9 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	        pi += 3;
 	        ps = stemp;
 	        for *pi != '}' && *pi != '*' && *pi != 0 {
-	          *ps++ = *pi++;
+	          *ps = *pi;
+			  ps++
+			  pi++
 	        }
 	        if (*pi == '}') {
 	          *ps = 0;
@@ -4160,7 +4162,9 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    /* Make sure that number of x, y, z, in pattern and definition match. */
 
-	    d_count[0] = d_count[1] = d_count[2] = 0;
+	    d_count[0] = 0
+		d_count[1] = 0
+		d_count[2] = 0;
 
 		for j:=0; j<C.int(strlen(otemp)); j++ {
 	      if (otemp[j] >= 'x' && otemp[j] <= 'z') {
@@ -4200,10 +4204,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  */
 
 
+ /* FIXME KG 
 	    int r, x = -1;
 	    int app = 0;
 	    int ig = 0;
-	    char *p;
+		*/
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -4212,7 +4217,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    r = atoi(t);
+	    var r = atoi(t);
 	    if (r < 0 || r > MAX_RADIO_CHANS-1) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: DTMF receive channel must be in range of 0 to %d on line %d.\n", 
@@ -4457,7 +4462,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    if (t != nil) {
 	      *t = 0;
 	      t++;
-	      int n = atoi(t);
+	      var n = atoi(t);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
 	        p_igate_config.t2_server_port = n;
 	      } else {
@@ -4472,7 +4477,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    
 	    t = split(nil,0);
 	    if (t != nil) {
-	      int n = atoi(t);
+	      var n = atoi(t);
               if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) {
 	        p_igate_config.t2_server_port = n;
 	      } else {
@@ -4515,8 +4520,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * IGTXVIA  channel  [ path ]
  */
 
-	    int n;
-
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4524,7 +4527,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 
-	    n = atoi(t);
+	    var n = atoi(t);
 	    if (n < 0 || n > MAX_TOTAL_CHANS-1) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", 
@@ -4591,7 +4594,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      dw_printf ("The default behavior is appropriate for most situations.\n");
 	      dw_printf ("Please read \"Successful-APRS-IGate-Operation.pdf\".\n");
 	    }
-	  }
+	  } else if (strcasecmp(t, "IGTXLIMIT") == 0) {
 
 
 /*
@@ -4600,8 +4603,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * IGTXLIMIT  one-minute-limit  five-minute-limit
  */
 
-	  else if (strcasecmp(t, "IGTXLIMIT") == 0) {
-	    int n;
 
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -4610,7 +4611,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      continue;
 	    }
 	    
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n < 1) {
 	      p_igate_config.tx_limit_1 = 1;
 	    } else if (n <= IGATE_TX_LIMIT_1_MAX) {
@@ -4643,7 +4644,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 				line, p_igate_config.tx_limit_5);
 	      dw_printf ("You won't make friends by setting a limit this high.\n");
    	    }
-	  }
+	  } else if (strcasecmp(t, "IGMSP") == 0) {
 
 
 /*
@@ -4652,12 +4653,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * IGMSP  n
  */
 
-	  else if (strcasecmp(t, "IGMSP") == 0) {
 
 	    t = split(nil,0);
 	    if (t != nil) {
 
-	      int n = atoi(t);
+	      var n = atoi(t);
               if (n >= 0 && n <= 10) {
 	        p_igate_config.igmsp = n;
 	      } else {
@@ -4670,7 +4670,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Missing number of times for message sender position.  Using default 1.\n", line);
 	    }
-	  }
+	  } else if (strcasecmp(t, "SATGATE") == 0) {
 
 
 
@@ -4680,7 +4680,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * SATGATE [ n ]
  */
 
-	  else if (strcasecmp(t, "SATGATE") == 0) {
 
 	    text_color_set(DW_COLOR_INFO);
 	    dw_printf ("Line %d: SATGATE is pretty useless and will be removed in a future version.\n", line);
@@ -4688,7 +4687,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    t = split(nil,0);
 	    if (t != nil) {
 
-	      int n = atoi(t);
+	      var n = atoi(t);
               if (n >= MIN_SATGATE_DELAY && n <= MAX_SATGATE_DELAY) {
 	        p_igate_config.satgate_delay = n;
 	      } else {
@@ -4699,7 +4698,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    } else {
 	      p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY;
 	    }
-	  }
+	  } else if (strcasecmp(t, "AGWPORT") == 0) {
 
 
 
@@ -4713,15 +4712,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * In version 1.2 we allow 0 to disable listening.
  */
 
-	  else if (strcasecmp(t, "AGWPORT") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing port number for AGWPORT command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
 	    t = split(nil,0);
 	    if (t != nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4737,7 +4734,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n", 
 			line, p_misc_config.agwpe_port);
    	    }
-	  }
+	  } else if (strcasecmp(t, "KISSPORT") == 0) {
 
 /*
  * KISSPORT port [ chan ]		- Port number for KISS over IP.
@@ -4760,17 +4757,17 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	//				# Transmit to radio channel 1, ignoring KISS channel.
 
 // FIXME
-	  else if (strcasecmp(t, "KISSPORT") == 0) {
-	    int n;
+/* FIXME KG 
 	    int tcp_port = 0;
 	    int chan = -1;	// optional.  default to all if not specified.
+		*/
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing TCP port number for KISSPORT command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if ((n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0) {
 	      tcp_port = n;
 	    } else {
@@ -4781,11 +4778,12 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
    	    }
 
 	    t = split(nil,0);
+		var channel = -1
 	    if (t != nil) {
-	      chan = atoi(t);
-	      if (chan < 0 || chan >= MAX_TOTAL_CHANS) {
+	      channel = atoi(t);
+	      if (channel < 0 || channel >= MAX_TOTAL_CHANS) {
 	        text_color_set(DW_COLOR_ERROR);
-	        dw_printf ("Line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d.\n", line, chan, MAX_TOTAL_CHANS-1);
+	        dw_printf ("Line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d.\n", line, channel, MAX_TOTAL_CHANS-1);
 	        continue;
 	      }
 	    }
@@ -4813,7 +4811,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      }
 	      if (slot >= 0) {
 	        p_misc_config.kiss_port[slot] = tcp_port;
-	        p_misc_config.kiss_chan[slot] = chan;
+	        p_misc_config.kiss_chan[slot] = channel;
 	      } else {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Line %d: Too many KISSPORT commands.\n", line);
@@ -4873,33 +4871,28 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      p_misc_config.kiss_serial_speed = 0;
 	      p_misc_config.kiss_serial_poll = 1;	// set polling.
 	    }
-	  }
-
+	  } else if (strcasecmp(t, "KISSCOPY") == 0) {
 
 /*
  * KISSCOPY 		- Data from network KISS client is copied to all others.
  *			  This does not apply to pseudo terminal KISS.
  */
 
-	  else if (strcasecmp(t, "KISSCOPY") == 0) {
 	    p_misc_config.kiss_copy = 1;
-	  }
-
+	  } else if (strcasecmp(t, "DNSSD") == 0) {
 
 /*
  * DNSSD 		- Enable or disable (1/0) dns-sd, DNS Service Discovery announcements
  * DNSSDNAME            - Set DNS-SD service name, defaults to "Dire Wolf on <hostname>"
  */
 
-	  else if (strcasecmp(t, "DNSSD") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing integer value for DNSSD command.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
 	    if (n == 0 || n == 1) {
 	      p_misc_config.dns_sd_enabled = n;
 	    } else {
@@ -4907,9 +4900,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", line);
 	    }
-	  }
-
-	  else if (strcasecmp(t, "DNSSDNAME") == 0) {
+	  } else if (strcasecmp(t, "DNSSDNAME") == 0) {
 	    t = split(nil, 1);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4918,14 +4909,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    } else {
 	      strlcpy(p_misc_config.dns_sd_name, t, sizeof(p_misc_config.dns_sd_name));
 	    }
-	  }
-
-
+	  } else if (strcasecmp(t, "gpsnmea") == 0) {
 
 /*
  * GPSNMEA  serial-device  [ speed ]		- Direct connection to GPS receiver.
  */
-	  else if (strcasecmp(t, "gpsnmea") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4936,7 +4924,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    t = split(nil,0);
 	    if (t != nil) {
-	      int n = atoi(t);
+	      var n = atoi(t);
 	      p_misc_config.gpsnmea_speed = n;
 	    } else {
 	      p_misc_config.gpsnmea_speed = 4800;	// The standard at one time.
@@ -4969,7 +4957,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      t = split(nil,0);
 	      if (t != nil) {
 
-	        int n = atoi(t);
+	        var n = atoi(t);
                 if ((n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0) {
 	          p_misc_config.gpsd_port = n;
 	        } else {
@@ -5031,7 +5019,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	    t = split(nil,1);
 	    if (t != nil) {
-	      for  *t != 0 ; t++  {
+	      for  ;*t != 0 ; t++  {
 	        switch (toupper(*t)) {
 	          case 'N':
 	            p_misc_config.waypoint_formats |= WPL_FORMAT_NMEA_GENERIC;
@@ -5106,7 +5094,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: LOGFILE on line %d should have file name and nothing more.\n", line);
 	    }
-	  }
+	  } else if (strcasecmp(t, "BEACON") == 0) {
 
 /*
  * BEACON channel delay every message
@@ -5114,14 +5102,16 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * Original handcrafted style.  Removed in version 1.0.
  */
 
-	  else if (strcasecmp(t, "BEACON") == 0) {
 	    	    
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("Config file, line %d: Old style 'BEACON' has been replaced with new commands.\n", line);
 	    dw_printf ("Use PBEACON, OBEACON, TBEACON, or CBEACON instead.\n");
   
-	  }
-
+	  } else if (strcasecmp(t, "PBEACON") == 0 ||
+		   strcasecmp(t, "OBEACON") == 0 ||
+		   strcasecmp(t, "TBEACON") == 0 ||
+		   strcasecmp(t, "CBEACON") == 0 ||
+		   strcasecmp(t, "IBEACON") == 0) {
 
 /*
  * PBEACON keyword=value ...
@@ -5136,11 +5126,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 // TODO: maybe add proportional pathing so multiple beacon timing does not need to be manually constructed?
 // http://www.aprs.org/newN/ProportionalPathing.txt
 
-	  else if (strcasecmp(t, "PBEACON") == 0 ||
-		   strcasecmp(t, "OBEACON") == 0 ||
-		   strcasecmp(t, "TBEACON") == 0 ||
-		   strcasecmp(t, "CBEACON") == 0 ||
-		   strcasecmp(t, "IBEACON") == 0) {
 
 	    if (p_misc_config.num_beacons < MAX_BEACONS) {
 
@@ -5178,8 +5163,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  */
 
 
-	    int n;
-
 		/* FIXME KG
 #define SB_NUM(name,sbvar,minn,maxx,unit)  							\
 	    t = split(nil,0);									\
@@ -5192,7 +5175,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      dw_printf ("Line %d: Missing %s for SmartBeaconing.\n", line, name);		\
 	      continue;										\
 	    }											\
-	    n = atoi(t);									\
+	    var n = atoi(t);									\
             if (n >= minn && n <= maxx) {							\
 	      p_misc_config.sbvar = n;								\
 	    }											\
@@ -5237,7 +5220,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    /* unit at end for miles or km / hour. */
 
 	    p_misc_config.sb_configured = 1;
-	  }
+	  } else if (strcasecmp(t, "FRACK") == 0) {
 
 
 /*
@@ -5249,29 +5232,26 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * FRACK  n 		- Number of seconds to wait for ack to transmission.
  */
 
-	  else if (strcasecmp(t, "FRACK") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for FRACK.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= AX25_T1V_FRACK_MIN && n <= AX25_T1V_FRACK_MAX) {
 	      p_misc_config.frack = n;
 	    } else {
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid FRACK time. Using default %d.\n", line, p_misc_config.frack);
 	    }
-	  }
+	  } else if (strcasecmp(t, "RETRY") == 0) {
 
 
 /*
  * RETRY  n 		- Number of times to retry before giving up.
  */
 
-	  else if (strcasecmp(t, "RETRY") == 0) {
 	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
@@ -5662,13 +5642,13 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 //
 // pbeacon delay=0:05 every=0:30 sendto=R0 lat=12.5N long=69.97W  comment="\xe3\x82\xa2\xe3\x83\x9e\xe3\x83\x81\xe3\x83\xa5\xe3\x82\xa2\xe7\x84\xa1\xe7\xb7\x9a   \xce\xa1\xce\xb1\xce\xb4\xce\xb9\xce\xbf\xce\xb5\xcf\x81\xce\xb1\xcf\x83\xce\xb9\xcf\x84\xce\xb5\xcf\x87\xce\xbd\xce\xb9\xcf\x83\xce\xbc\xcf\x8c\xcf\x82"
 
-	  char temp[256];
-	  int tlen = 0;
+	  var temp[256]C.char
+	  var tlen = 0;
 
-	  for (char *p = value; *p != 0; ) {
+	  for p := value; *p != 0;  {
 	    if (p[0] == '\\' && p[1] == 'x' && strlen(p) >= 4 && isxdigit(p[2]) && isxdigit(p[3])) {
-	      int n = 0;
-	      for (int i = 2; i < 4; i++) {
+	      var n = 0;
+		  for i := 2; i < 4; i++ {
 	        n = n * 16;
 	        if (islower(p[i])) {
 	          n += p[i] - 'a' + 10;
@@ -5691,7 +5671,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	  if (strcasecmp(keyword, "DELAY") == 0) {
 	    b.delay = parse_interval(value,line);
 	  } else if (strcasecmp(keyword, "SLOT") == 0) {
-	    int n = parse_interval(value,line);
+	    var n = parse_interval(value,line);
 	    if ( n < 1 || n > 3600) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds.\n", line, n);
@@ -5705,7 +5685,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	       b.sendto_type = SENDTO_IGATE;
 	       b.sendto_chan = 0;
 	    } else if (value[0] == 'r' || value[0] == 'R') {
-	       int n = atoi(value+1);
+	       var n = atoi(value+1);
 	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
 			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	         text_color_set(DW_COLOR_ERROR);
@@ -5715,7 +5695,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	       b.sendto_type = SENDTO_RECV;
 	       b.sendto_chan = n;
 	    } else if (value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X') {
-	      int n = atoi(value+1);
+	      var n = atoi(value+1);
 	      if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
 			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5726,7 +5706,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	      b.sendto_type = SENDTO_XMIT;
 	      b.sendto_chan = n;
 	    } else {
-	       int n = atoi(value);
+	       var n = atoi(value);
 	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
 			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	         text_color_set(DW_COLOR_ERROR);
