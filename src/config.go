@@ -47,6 +47,8 @@ package direwolf
 import "C"
 
 import (
+	"strconv"
+	"strings"
 	"unicode"
 )
 
@@ -181,15 +183,6 @@ const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
 func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
-	/* FIXME KG
-	char stemp[40];
-	int sign;
-	double degrees, minutes;
-	char *endptr;
-	char hemi;
-	int limit;
-	unsigned char sep;
-	*/
 
 	var stemp = C.GoString(str)
 
@@ -208,7 +201,7 @@ func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
 	if len(stemp) >= 2 {
 		var lastChar = rune(stemp[len(stemp)-1])
 
-		if unicode.IsAlpha(lastChar) {
+		if unicode.IsLetter(lastChar) {
 			var hemi = lastChar
 			stemp = stemp[:len(stemp)-1]
 
@@ -232,45 +225,42 @@ func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
 		}
 	}
 
-	/*
-	 * Parse the degrees part.
-	 */
-	var degrees = strconv.ParseFloat(stemp, 64) // TODO KG Check
-
-	/*
-	 * Is there a minutes part?
-	 */
-	sep = *endptr
-	if sep != 0 {
-
-		if sep == DEG1 || sep == DEG2 || sep == DEG3 {
-
-			minutes = strtod(endptr+1, &endptr)
-			if *endptr != 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Unexpected character '%c' in location \"%s\"\n", line, sep, str)
-			}
-			if minutes >= 60.0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Number of minutes in \"%s\" is >= 60.\n", line, str)
-			}
-			degrees += minutes / 60.0
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Unexpected character '%c' in location \"%s\"\n", line, sep, str)
-		}
+	var degreesStr = stemp
+	var minutesStr string
+	var minutesFound = false
+	if strings.Contains(degreesStr, "^") {
+		degreesStr, minutesStr, minutesFound = strings.Cut(stemp, "^")
+	} else if strings.Contains(degreesStr, "°") {
+		degreesStr, minutesStr, minutesFound = strings.Cut(stemp, "°")
 	}
 
-	degrees = degrees * sign
+	var degrees, degreesErr = strconv.ParseFloat(degreesStr, 64)
+		if degreesErr != nil {
+			dw_printf("Line %d: Could not parse degrees string '%s': %s\n", line, degreesStr, degreesErr)
+		}
 
-	limit = IfThenElse(which == LAT, 90, 180)
+	if minutesFound {
+		var minutes, minutesErr = strconv.ParseFloat(minutesStr, 64)
+		if minutesErr != nil {
+			dw_printf("Line %d: Could not parse minutes string '%s': %s\n", line, minutesStr, minutesErr)
+		}
+		if minutes >= 60.0 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: Number of minutes in \"%s\" is >= 60.\n", line, minutesStr)
+		}
+		degrees += minutes / 60
+	}
+
+	degrees *= float64(sign)
+
+	var limit = float64(IfThenElse(which == LAT, 90, 180))
 	if degrees < -limit || degrees > limit {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Number of degrees in \"%s\" is out of range for %s\n", line, str,
 			IfThenElse(which == LAT, "latitude", "longitude"))
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
-	return (degrees)
+	return C.double(degrees)
 }
 
 /*------------------------------------------------------------------
@@ -312,7 +302,7 @@ func parse_utm_zone(szone *C.char, latband *C.char, hemi *C.char) C.long {
 	*latband = ' '
 	*hemi = 'N' /* default */
 
-	lzone = strtol(szone, &zlet, 10)
+	var lzone = strtol(szone, &zlet, 10)
 
 	if *zlet == 0 {
 		/* Number is not followed by letter something else.  */
