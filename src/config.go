@@ -172,6 +172,9 @@ static int alllettersorpm(char *p)
 // FIXME KG #define DEG3 0xf8	/* Microsoft code page 437 */
 
 // FIXME KG enum parse_ll_which_e { LAT, LON };
+type parse_ll_which_e int
+const LAT parse_ll_which_e = 0
+const LON parse_ll_which_e = 1
 
 func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
 	/* FIXME KG
