@@ -46,6 +46,10 @@ package direwolf
 // #include "error_string.h"
 import "C"
 
+import (
+	"unicode"
+)
+
 /* FIXME KG
 #define D2R(d) ((d) * M_PI / 180.)
 #define R2D(r) ((r) * 180. / M_PI)
@@ -187,27 +191,28 @@ func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
 	unsigned char sep;
 	*/
 
+	var stemp = C.GoString(str)
+
 	/*
 	 * Remove any negative sign.
 	 */
-	strlcpy(stemp, str, sizeof(stemp))
-	sign = +1
+	var sign = 1
 	if stemp[0] == '-' {
+		stemp = stemp[1:]
 		sign = -1
-		stemp[0] = ' '
 	}
+
 	/*
 	 * Process any hemisphere on the end.
 	 */
-	if strlen(stemp) >= 2 {
-		endptr = stemp + strlen(stemp) - 1
-		if isalpha(*endptr) {
+	if len(stemp) >= 2 {
+		var lastChar = rune(stemp[len(stemp)-1])
 
-			hemi = *endptr
-			*endptr = 0
-			if islower(hemi) {
-				hemi = toupper(hemi)
-			}
+		if unicode.IsAlpha(lastChar) {
+			var hemi = lastChar
+			stemp = stemp[:len(stemp)-1]
+
+			hemi = unicode.ToUpper(hemi)
 
 			if hemi == 'W' || hemi == 'S' {
 				sign = -sign
@@ -230,7 +235,7 @@ func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
 	/*
 	 * Parse the degrees part.
 	 */
-	degrees = strtod(stemp, &endptr)
+	var degrees = strconv.ParseFloat(stemp, 64) // TODO KG Check
 
 	/*
 	 * Is there a minutes part?
