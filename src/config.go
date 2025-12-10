@@ -4817,7 +4817,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	        dw_printf ("Line %d: Too many KISSPORT commands.\n", line);
 	      }
 	    }
-	  }
+	  } else if (strcasecmp(t, "NULLMODEM") == 0 || strcasecmp(t, "SERIALKISS") == 0) {
 
 /*
  * NULLMODEM name [ speed ]	- Device name for serial port or our end of the virtual "null modem"
@@ -4829,7 +4829,6 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * TODO1.5: In retrospect, this doesn't seem like such a good name.
  */
 
-	  else if (strcasecmp(t, "NULLMODEM") == 0 || strcasecmp(t, "SERIALKISS") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -4849,14 +4848,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	    if (t != nil) {
 	      p_misc_config.kiss_serial_speed = atoi(t);
 	    }
-	  }
+	  } else if (strcasecmp(t, "SERIALKISSPOLL") == 0) {
 
 /*
  * SERIALKISSPOLL name		- Poll for serial port name that might come and go.
  *			  	  e.g. /dev/rfcomm0 for bluetooth.
  */
 
-	  else if (strcasecmp(t, "SERIALKISSPOLL") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -5046,12 +5044,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	        }
 	      }
 	    }
-	  }
+	  } else if (strcasecmp(t, "logdir") == 0) {
 
 /*
  * LOGDIR	- Directory name for automatically named daily log files.  Use "." for current working directory.
  */
-	  else if (strcasecmp(t, "logdir") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -5070,12 +5067,11 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Config file: LOGDIR on line %d should have directory path and nothing more.\n", line);
 	    }
-	  }
+	  } else if (strcasecmp(t, "logfile") == 0) {
 
 /*
  * LOGFILE	- Log file name, including any directory part.
  */
-	  else if (strcasecmp(t, "logfile") == 0) {
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
@@ -5252,43 +5248,40 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * RETRY  n 		- Number of times to retry before giving up.
  */
 
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for RETRY.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= AX25_N2_RETRY_MIN && n <= AX25_N2_RETRY_MAX) {
 	      p_misc_config.retry = n;
 	    } else {
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid RETRY number. Using default %d.\n", line, p_misc_config.retry);
 	    }
-	  }
+	  } else if (strcasecmp(t, "PACLEN") == 0) {
 
 
 /*
  * PACLEN  n 		- Maximum number of bytes in information part.
  */
 
-	  else if (strcasecmp(t, "PACLEN") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for PACLEN.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= AX25_N1_PACLEN_MIN && n <= AX25_N1_PACLEN_MAX) {
 	      p_misc_config.paclen = n;
 	    } else {
 	      text_color_set(DW_COLOR_ERROR);
               dw_printf ("Line %d: Invalid PACLEN value. Using default %d.\n", line, p_misc_config.paclen);
 	    }
-	  }
+	  } else if (strcasecmp(t, "MAXFRAME") == 0) {
 
 
 /*
@@ -5297,15 +5290,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * Window size would make more sense but everyone else calls it MAXFRAME.
  */
 
-	  else if (strcasecmp(t, "MAXFRAME") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for MAXFRAME.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= AX25_K_MAXFRAME_BASIC_MIN && n <= AX25_K_MAXFRAME_BASIC_MAX) {
 	      p_misc_config.maxframe_basic = n;
 	    } else {
@@ -5314,7 +5305,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d.\n",
 			line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, p_misc_config.maxframe_basic);
 	    }
-	  }
+	  } else if (strcasecmp(t, "EMAXFRAME") == 0) {
 
 
 
@@ -5322,15 +5313,13 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
  * EMAXFRAME  n 		- Max frames to send before ACK.  mod 128 "Window" size.
  */
 
-	  else if (strcasecmp(t, "EMAXFRAME") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for EMAXFRAME.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= AX25_K_MAXFRAME_EXTENDED_MIN && n <= AX25_K_MAXFRAME_EXTENDED_MAX) {
 	      p_misc_config.maxframe_extended = n;
 	    } else {
@@ -5339,21 +5328,18 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
               dw_printf ("Line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d.\n",
 			line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, p_misc_config.maxframe_extended);
    	    }
-	  }
-
+	  } else if (strcasecmp(t, "MAXV22") == 0) {
 /*
  * MAXV22  n 		- Max number of SABME sent before trying SABM.
  */
 
-	  else if (strcasecmp(t, "MAXV22") == 0) {
-	    int n;
 	    t = split(nil,0);
 	    if (t == nil) {
 	      text_color_set(DW_COLOR_ERROR);
 	      dw_printf ("Line %d: Missing value for MAXV22.\n", line);
 	      continue;
 	    }
-	    n = atoi(t);
+	    var n = atoi(t);
             if (n >= 0 && n <= AX25_N2_RETRY_MAX) {
 	      p_misc_config.maxv22 = n;
 	    } else {
@@ -5385,8 +5371,9 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 		  */
 
 	      if (ax25_parse_addr (AX25_DESTINATION, t, strict, call_no_ssid, &ssid, &heard)) {
-	        p_misc_config.v20_addrs = (char**)realloc (p_misc_config.v20_addrs, sizeof(char*) * (p_misc_config.v20_count + 1));
-	        p_misc_config.v20_addrs[p_misc_config.v20_count++] = strdup(t);
+	        // FIXME KG p_misc_config.v20_addrs = (char**)realloc (p_misc_config.v20_addrs, sizeof(char*) * (p_misc_config.v20_count + 1));
+	        p_misc_config.v20_addrs[p_misc_config.v20_count] = strdup(t);
+			p_misc_config.v20_count++
 	      } else {
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Invalid station address for V20 command.\n", line);
@@ -5421,8 +5408,9 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 		  */
 
 	      if (ax25_parse_addr (AX25_DESTINATION, t, strict, call_no_ssid, &ssid, &heard)) {
-	        p_misc_config.noxid_addrs = (char**)realloc (p_misc_config.noxid_addrs, sizeof(char*) * (p_misc_config.noxid_count + 1));
-	        p_misc_config.noxid_addrs[p_misc_config.noxid_count++] = strdup(t);
+	        // FIXME KG p_misc_config.noxid_addrs = (char**)realloc (p_misc_config.noxid_addrs, sizeof(char*) * (p_misc_config.noxid_count + 1));
+	        p_misc_config.noxid_addrs[p_misc_config.noxid_count] = strdup(t);
+			p_misc_config.noxid_count++
 	      } else {
 	        text_color_set(DW_COLOR_ERROR);
                 dw_printf ("Line %d: Invalid station address for NOXID command.\n", line);
@@ -5482,7 +5470,9 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 
 	      var b = 0;
 		  for k:=0; k<p_misc_config.num_beacons; k++ {
-	        if (p_misc_config.beacon[k].sendto_chan == j) b++;
+	        if (p_misc_config.beacon[k].sendto_chan == j) {
+				b++;
+			}
 	      }
 	      if (b == 0) {
 	        text_color_set(DW_COLOR_ERROR);
@@ -5557,7 +5547,7 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 // This will handle eventual case of multiple transmit channels.
 
 	if (strlen(p_igate_config.t2_login) > 0) {
-	  for (j=0; j<MAX_TOTAL_CHANS; j++) {
+		for j:=0; j<MAX_TOTAL_CHANS; j++ {
 	    if (p_audio_config.chan_medium[j] == MEDIUM_RADIO || p_audio_config.chan_medium[j] == MEDIUM_NETTNC) {
 	      if (p_digi_config.filter_str[MAX_TOTAL_CHANS][j] == nil) {
 	        p_digi_config.filter_str[MAX_TOTAL_CHANS][j] = strdup("i/180");
