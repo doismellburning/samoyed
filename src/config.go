@@ -5574,14 +5574,15 @@ for channel:=0; channel<MAX_RADIO_CHANS; channel++ {
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_s *p_audio_config)
-{
+func beacon_options(cmd *C.char, b *C.struct_beacon_s, line C.int, p_audio_config *C.struct_audio_s) C.int {
+	/* FIXME KG 
 	char *t;
 	char temp_symbol[100];
 	int ok;
 	char zone[8];
 	double easting = G_UNKNOWN;
 	double northing = G_UNKNOWN;
+	*/
 
 	strlcpy (temp_symbol, "", sizeof(temp_symbol));
 	strlcpy (zone, "", sizeof(zone));
@@ -5605,15 +5606,19 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	b.source = nil;
 	b.dest = nil;
 
-	while ((t = split(nil,0)) != nil) {
+	for {
+		t = split(nil, 0)
+		if t == nil {
+			break
+		}
 
+		/* FIXME KG
 	  char keyword[20];
 	  char value[1000];
-	  char *e;
-	  char *p;
+	  */
 
 
-	  e = strchr(t, '=');
+	  var e = strchr(t, '=');
 	  if (e == nil) {
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("Config file: No = found in, %s, on line %d.\n", t, line);
@@ -5648,10 +5653,13 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	          n += p[i] - '0';
 	        }
 	      }
-	      temp[tlen++] = n;
+	      temp[tlen] = n;
+		  tlen++
 	      p += 4;
 	    } else {
-	      temp[tlen++] = *p++;
+	      temp[tlen] = *p;
+		  tlen++
+		  p++
 	    }
 	  }
 	  temp[tlen] = 0;
@@ -5676,8 +5684,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	       b.sendto_chan = 0;
 	    } else if (value[0] == 'r' || value[0] == 'R') {
 	       var n = atoi(value+1);
-	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
-			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
+	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	         text_color_set(DW_COLOR_ERROR);
 	         dw_printf ("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n);
 	         continue;
@@ -5686,8 +5693,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	       b.sendto_chan = n;
 	    } else if (value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X') {
 	      var n = atoi(value+1);
-	      if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
-			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
+	      if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	        text_color_set(DW_COLOR_ERROR);
 	        dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, n);
 	        continue;
@@ -5697,8 +5703,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	      b.sendto_chan = n;
 	    } else {
 	       var n = atoi(value);
-	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE)
-			&& p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
+	       if (( n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE) {
 	         text_color_set(DW_COLOR_ERROR);
 	         dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, n);
 	         continue;
@@ -5708,7 +5713,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 	  } else if (strcasecmp(keyword, "SOURCE") == 0) {
 	    b.source = strdup(value);
-	    for (p = b.source; *p != 0; p++) {
+		for p := b.source; *p != 0; p++ {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
@@ -5718,7 +5723,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 	    }
 	  } else if (strcasecmp(keyword, "DEST") == 0) {
 	    b.dest = strdup(value);
-	    for (p = b.dest; *p != 0; p++) {
+		for p := b.dest; *p != 0; p++ {
 	      if (islower(*p)) {
 	        *p = toupper(*p);	/* silently force upper case. */
 	      }
@@ -5853,10 +5858,12 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 	  if (strlen(zone) > 0 && easting != G_UNKNOWN && northing != G_UNKNOWN) {
 
+		  /* FIXME KG
 	    long lzone;
 	    char latband, hemi;
 	    long lerr;
 	    double dlat, dlon;
+		*/
 
 	    lzone = parse_utm_zone (zone, &latband, &hemi);
 
@@ -5866,7 +5873,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
               b.lat = R2D(dlat);
 	      b.lon = R2D(dlon);
 	    } else {
-	      char message [300];
+	      var message [300]C.char
 
               utm_error_string (lerr, message);
 	      text_color_set(DW_COLOR_ERROR);
@@ -5895,8 +5902,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 	    if (isupper(b.symtab) || isdigit(b.symtab)) {
 	      b.symbol = temp_symbol[1];
-	    } 
-	    else {
+	    } else {
 	      b.symtab = temp_symbol[0];
 	      b.symbol = temp_symbol[1];
 	    }
@@ -5915,8 +5921,7 @@ static int beacon_options(char *cmd, struct beacon_s *b, int line, struct audio_
 
 	if (b.sendto_type == SENDTO_XMIT) {
 
-	  if (( b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE)
-		&& p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE) {
+	  if (( b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE) && p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE) {
 	    text_color_set(DW_COLOR_ERROR);
 	    dw_printf ("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan);
 	    return (0);
