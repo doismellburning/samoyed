@@ -293,7 +293,7 @@ func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
  *
  *----------------------------------------------------------------*/
 
-func parse_utm_zone(szone *C.char, latband *C.char, hemi *C.char) C.long {
+func parse_utm_zone(_szone *C.char, latband *C.char, hemi *C.char) C.long {
 	/* FIXME KG
 	long lzone;
 	char *zlet;
@@ -302,9 +302,18 @@ func parse_utm_zone(szone *C.char, latband *C.char, hemi *C.char) C.long {
 	*latband = ' '
 	*hemi = 'N' /* default */
 
-	var lzone = strtol(szone, &zlet, 10)
+	var szone = C.GoString(_szone)
 
-	if *zlet == 0 {
+	var lastRune = rune(szone[len(szone)-1])
+	if unicode.IsLetter(lastRune) {
+		szone=szone[:len(szone)-1]
+	} else {
+		lastRune = 0
+	}
+
+	var lzone, _ = strconv.ParseFloat(szone, 64)
+
+	if lastRune == 0 {
 		/* Number is not followed by letter something else.  */
 		/* Allow negative number to mean south. */
 
@@ -314,12 +323,10 @@ func parse_utm_zone(szone *C.char, latband *C.char, hemi *C.char) C.long {
 			lzone = (-lzone)
 		}
 	} else {
-		if islower(*zlet) {
-			*zlet = toupper(*zlet)
-		}
-		*latband = *zlet
-		if strchr("CDEFGHJKLMNPQRSTUVWX", *zlet) != nil {
-			if *zlet < 'N' {
+		lastRune = unicode.ToUpper(lastRune)
+		*latband = C.char(lastRune)
+		if strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", lastRune) {
+			if lastRune < 'N' {
 				*hemi = 'S'
 			}
 		} else {
@@ -335,8 +342,7 @@ func parse_utm_zone(szone *C.char, latband *C.char, hemi *C.char) C.long {
 
 	}
 
-	return (lzone)
-
+	return C.long(lzone)
 } /* end parse_utm_zone */
 
 /*
@@ -5493,9 +5499,6 @@ func beacon_options(cmd *C.char, b *C.struct_beacon_s, line C.int, p_audio_confi
 	double easting = G_UNKNOWN;
 	double northing = G_UNKNOWN;
 	*/
-
-	strlcpy(temp_symbol, "", sizeof(temp_symbol))
-	strlcpy(zone, "", sizeof(zone))
 
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
