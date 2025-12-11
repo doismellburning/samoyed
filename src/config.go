@@ -179,6 +179,7 @@ static int alllettersorpm(char *p)
 
 // FIXME KG enum parse_ll_which_e { LAT, LON };
 type parse_ll_which_e int
+
 const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
@@ -235,9 +236,9 @@ func parse_ll(str *C.char, which parse_ll_which_e, line C.int) C.double {
 	}
 
 	var degrees, degreesErr = strconv.ParseFloat(degreesStr, 64)
-		if degreesErr != nil {
-			dw_printf("Line %d: Could not parse degrees string '%s': %s\n", line, degreesStr, degreesErr)
-		}
+	if degreesErr != nil {
+		dw_printf("Line %d: Could not parse degrees string '%s': %s\n", line, degreesStr, degreesErr)
+	}
 
 	if minutesFound {
 		var minutes, minutesErr = strconv.ParseFloat(minutesStr, 64)
@@ -306,7 +307,7 @@ func parse_utm_zone(_szone *C.char, latband *C.char, hemi *C.char) C.long {
 
 	var lastRune = rune(szone[len(szone)-1])
 	if unicode.IsLetter(lastRune) {
-		szone=szone[:len(szone)-1]
+		szone = szone[:len(szone)-1]
 	} else {
 		lastRune = 0
 	}
@@ -1827,10 +1828,10 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// #endif
 			} else if strcasecmp(t, "GPIOD") == 0 {
 				/*
-				#if __WIN32__
-					      text_color_set(DW_COLOR_ERROR);
-					      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, otname);
-				#else
+					#if __WIN32__
+						      text_color_set(DW_COLOR_ERROR);
+						      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, otname);
+					#else
 				*/
 				// #if defined(USE_GPIOD)
 				t = split(nil, 0)
@@ -1908,10 +1909,10 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				}
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT
 				/*
-				#else
-					      text_color_set(DW_COLOR_ERROR);
-					      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
-				#endif
+					#else
+						      text_color_set(DW_COLOR_ERROR);
+						      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
+					#endif
 				*/
 			} else if strcasecmp(t, "RIG") == 0 {
 
