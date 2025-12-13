@@ -399,13 +399,8 @@ main ()
  *----------------------------------------------------------------*/
 
 func parse_interval(str *C.char, line C.int) C.int {
-	/*
-		int sec;
-		int nc = 0;
-		int bad = 0;
-	*/
 
-	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
+	var minutesStr, secondsStr, _ = strings.Cut(C.GoString(str), ":") // Don't need to check found because if not, Cut returns `str, "", false`
 
 	var minutes, _ = strconv.Atoi(minutesStr)
 	var interval = 60 * minutes
