@@ -692,8 +692,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	for adevice := 0; adevice < MAX_ADEVS; adevice++ {
 
-		strlcpy(p_audio_config.adev[adevice].adevice_in, DEFAULT_ADEVICE, sizeof(p_audio_config.adev[adevice].adevice_in))
-		strlcpy(p_audio_config.adev[adevice].adevice_out, DEFAULT_ADEVICE, sizeof(p_audio_config.adev[adevice].adevice_out))
+		C.strcpy(&p_audio_config.adev[adevice].adevice_in[0], DEFAULT_ADEVICE)
+		C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], DEFAULT_ADEVICE)
 
 		p_audio_config.adev[adevice].defined = 0
 		p_audio_config.adev[adevice].copy_from = -1
