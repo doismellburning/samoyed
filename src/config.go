@@ -542,8 +542,7 @@ func check_via_path(via_path string) int {
 const MAXCMDLEN = 1200
 
 var splitCmd string
-var splitToken string
-func split(str *C.char, rest_of_line C.int) *C.char {
+func split(str *C.char, rest_of_line bool) *C.char {
 	/* FIXME KG
 	static char cmd[MAXCMDLEN];
 	static char token[MAXCMDLEN];
@@ -583,45 +582,38 @@ func split(str *C.char, rest_of_line C.int) *C.char {
 
 	// FIXME KG FIX FROM HERE
 
-	t = token
-	in_quotes = 0
-	for ; *c != 0; c++ {
-
-		if *c == '"' {
+	var token string
+	var in_quotes = false
+	var parsedLen int
+	for parsedLen = 0; parsedLen < len(splitCmd); parsedLen++ {
+		var c = splitCmd[parsedLen]
+		switch c {
+		case '"':
 			if in_quotes {
-				if c[1] == '"' {
-					*t = *c
-					t++
-					c++
+				if splitCmd[parsedLen+1] == '"' {
+					token += string(c)
+					parsedLen++
 				} else {
-					in_quotes = 0
+					in_quotes = false
 				}
 			} else {
-				in_quotes = 1
+				in_quotes = false
 			}
-		} else if *c == ' ' {
+		case ' ':
 			if in_quotes || rest_of_line {
-				*t = *c
-				t++
+				token += string(c)
 			} else {
 				break
 			}
-		} else {
-			*t = *c
-			t++
+		default:
+			token += string(c)
 		}
 	}
-	*t = 0
+	splitCmd = splitCmd[parsedLen:]
 
 	// dw_printf("split out: '%s'\n", token);
 
-	t = token
-	if *t == 0 {
-		return (nil)
-	}
-
-	return (t)
-
+	return C.CString(token)
 } /* end split */
 
 /*-------------------------------------------------------------------
