@@ -407,10 +407,10 @@ func parse_interval(str *C.char, line C.int) C.int {
 
 	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
 
-	var minutes, _ = strconv.ParseInt(minutesStr)
+	var minutes, _ = strconv.Atoi(minutesStr)
 	var interval = 60 * minutes
 
-	var seconds, _ = strconv.ParseInt(secondsStr)
+	var seconds, _ = strconv.Atoi(secondsStr)
 	interval += seconds
 
 	/* TODO KG Better logging / error handling
