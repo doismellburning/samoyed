@@ -457,14 +457,7 @@ func parse_interval(str *C.char, line C.int) C.int {
 
 //#define DEBUG8 1
 
-func check_via_path(via_path *C.char) C.int {
-	/*
-		char stemp[AX25_MAX_REPEATERS * (AX25_MAX_ADDR_LEN + 1)];
-		int num_digi = 0;
-		int max_digi_hops = 0;
-		char *r;
-		char *a;
-	*/
+func check_via_path(via_path string) int {
 
 	/* TODO KG
 	#if DEBUG8
@@ -472,25 +465,20 @@ func check_via_path(via_path *C.char) C.int {
 	        dw_printf ("check_via_path %s\n", via_path);
 	#endif
 	*/
-	if strlen(via_path) == 0 {
-		return (0)
-	}
 
-	strlcpy(stemp, via_path, sizeof(stemp))
-
-	r = stemp
-	for /* FIXME KG (( a = strsep(&r,",")) != nil) */ {
-		/* FIXME KG
-		int strict = 2;
-		int ok;
-		char addr[AX25_MAX_ADDR_LEN];
-		int ssid;
-		int heard;
-		*/
-
+	var parts = strings.Split(via_path, ",")
+	var num_digi = 0
+	var max_digi_hops = 0
+	for _, part := range parts{
 		num_digi++
-		ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, a, strict, addr, &ssid, &heard)
-		if !ok {
+
+		var strict C.int = 2
+		var addr [AX25_MAX_ADDR_LEN]C.char
+		var ssid C.int
+		var heard C.int
+		var ok = C.ax25_parse_addr(AX25_REPEATER_1-1+num_digi, a, strict, addr, &ssid, &heard)
+
+		if ok == 0 {
 			/* TODO KG
 			#if DEBUG8
 				    text_color_set(DW_COLOR_DEBUG);
@@ -503,8 +491,8 @@ func check_via_path(via_path *C.char) C.int {
 		/* Based on assumption that a callsign can't end with a digit. */
 		/* For something of the form xxx9-9, we take the ssid as max hop count. */
 
-		if ssid > 0 && strlen(addr) >= 2 && isdigit(addr[strlen(addr)-1]) {
-			max_digi_hops += ssid
+		if ssid > 0 && C.strlen(&addr[0]) >= 2 && C.isdigit(addr[C.strlen(&addr[0])-1]) != 0 {
+			max_digi_hops += int(ssid)
 		} else {
 			max_digi_hops++
 		}
