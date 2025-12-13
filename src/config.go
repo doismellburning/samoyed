@@ -405,28 +405,22 @@ func parse_interval(str *C.char, line C.int) C.int {
 		int bad = 0;
 	*/
 
-	for p := str; *p != 0; p++ {
-		if *p == ':' {
-			nc++
-		} else if !isdigit(*p) {
-			bad++
-		}
-	}
+	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
+
+	var minutes, _ = strconv.ParseInt(minutesStr)
+	var interval = 60 * minutes
+
+	var seconds, _ = strconv.ParseInt(secondsStr)
+	interval += seconds
+
+	/* TODO KG Better logging / error handling
 	if bad > 0 || nc > 1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Time interval must be of the form minutes or minutes:seconds.\n", line)
 	}
+	*/
 
-	p = strchr(str, ':')
-
-	if p != nil {
-		sec = atoi(str)*60 + atoi(p+1)
-	} else {
-		sec = atoi(str) * 60
-	}
-
-	return (sec)
-
+	return C.int(seconds)
 } /* end parse_interval */
 
 /*------------------------------------------------------------------
