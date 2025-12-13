@@ -692,8 +692,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	for adevice := 0; adevice < MAX_ADEVS; adevice++ {
 
-		C.strcpy(&p_audio_config.adev[adevice].adevice_in[0], DEFAULT_ADEVICE)
-		C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], DEFAULT_ADEVICE)
+		C.strcpy(&p_audio_config.adev[adevice].adevice_in[0], C.CString(DEFAULT_ADEVICE))
+		C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], C.CString(DEFAULT_ADEVICE))
 
 		p_audio_config.adev[adevice].defined = 0
 		p_audio_config.adev[adevice].copy_from = -1
@@ -723,45 +723,45 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 		p_audio_config.achan[channel].baud = DEFAULT_BAUD             /* -b option */
 
 		/* None.  Will set default later based on other factors. */
-		strlcpy(p_audio_config.achan[channel].profiles, "", sizeof(p_audio_config.achan[channel].profiles))
+		// TODO KG strlcpy(p_audio_config.achan[channel].profiles, "", sizeof(p_audio_config.achan[channel].profiles))
 
 		p_audio_config.achan[channel].num_freq = 1
 		p_audio_config.achan[channel].offset = 0
 
-		p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25
+		p_audio_config.achan[channel].layer2_xmit = C.LAYER2_AX25
 		p_audio_config.achan[channel].il2p_max_fec = 1
 		p_audio_config.achan[channel].il2p_invert_polarity = 0
 
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
-		p_audio_config.achan[channel].sanity_test = SANITY_APRS
+		p_audio_config.achan[channel].sanity_test = C.SANITY_APRS
 		p_audio_config.achan[channel].passall = 0
 
-		for ot := 0; ot < NUM_OCTYPES; ot++ {
-			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
-			strlcpy(p_audio_config.achan[channel].octrl[ot].ptt_device, "", sizeof(p_audio_config.achan[channel].octrl[ot].ptt_device))
-			p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE
-			p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE
+		for ot := 0; ot < C.NUM_OCTYPES; ot++ {
+			p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_NONE
+			C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(""))
+			p_audio_config.achan[channel].octrl[ot].ptt_line = C.PTT_LINE_NONE
+			p_audio_config.achan[channel].octrl[ot].ptt_line2 = C.PTT_LINE_NONE
 			p_audio_config.achan[channel].octrl[ot].out_gpio_num = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
 		}
 
-		for it := 0; it < NUM_ICTYPES; it++ {
-			p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE
+		for it := 0; it < C.NUM_ICTYPES; it++ {
+			p_audio_config.achan[channel].ictrl[it].method = C.PTT_METHOD_NONE
 			p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0
 			p_audio_config.achan[channel].ictrl[it].invert = 0
 		}
 
-		p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
-		p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME
-		p_audio_config.achan[channel].persist = DEFAULT_PERSIST
-		p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY
-		p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL
-		p_audio_config.achan[channel].fulldup = DEFAULT_FULLDUP
+		p_audio_config.achan[channel].dwait = C.DEFAULT_DWAIT
+		p_audio_config.achan[channel].slottime = C.DEFAULT_SLOTTIME
+		p_audio_config.achan[channel].persist = C.DEFAULT_PERSIST
+		p_audio_config.achan[channel].txdelay = C.DEFAULT_TXDELAY
+		p_audio_config.achan[channel].txtail = C.DEFAULT_TXTAIL
+		p_audio_config.achan[channel].fulldup = C.DEFAULT_FULLDUP
 	}
 
-	p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
+	p_audio_config.fx25_auto_enable = C.AX25_N2_RETRY_DEFAULT / 2
 
 	/* First channel should always be valid. */
 	/* If there is no ADEVICE, it uses default device in mono. */
@@ -785,7 +785,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	p_tt_config.retain_time = 80 * 60
 	p_tt_config.num_xmits = 6
-	assert(p_tt_config.num_xmits <= TT_MAX_XMITS)
+	Assert(p_tt_config.num_xmits <= TT_MAX_XMITS)
 	p_tt_config.xmit_delay[0] = 3 /* Before initial transmission. */
 	p_tt_config.xmit_delay[1] = 16
 	p_tt_config.xmit_delay[2] = 32
@@ -3071,8 +3071,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			// FIXME KG struct ttloc_s *tl;
 			// FIXME KG int j;
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			// Should make this a function/macro instead of repeating code.
 			/* Allocate new space, but first, if already full, make larger. */
@@ -3081,7 +3081,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_POINT
@@ -3150,8 +3150,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			// FIXME KG double scale;
 			// FIXME KG double meters;
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3159,7 +3159,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_VECTOR
@@ -3260,8 +3260,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			 * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
 			 */
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3269,7 +3269,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			// FIXME KG struct ttloc_s *tl;
 			var tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
@@ -3362,8 +3362,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			// FIXME KG double dlat, dlon;
 			// FIXME KG long lerr;
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3371,7 +3371,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_UTM
@@ -3476,8 +3476,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			   char message[300];
 			*/
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3485,7 +3485,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 
@@ -3594,8 +3594,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			   int count_other;
 			*/
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3603,7 +3603,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_MHEAD
@@ -3700,8 +3700,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 			// FIXME KG struct ttloc_s *tl;
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3709,7 +3709,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_SATSQ
@@ -3772,8 +3772,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 			// FIXME KG struct ttloc_s *tl;
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3781,7 +3781,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_AMBIG
@@ -3860,8 +3860,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			   int tt_error = 0;
 			*/
 
-			assert(p_tt_config.ttloc_size >= 2)
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_size >= 2)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			/* Allocate new space, but first, if already full, make larger. */
 			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
@@ -3869,7 +3869,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// FIXME KG p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
 			}
 			p_tt_config.ttloc_len++
-			assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
 
 			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
 			tl._type = TTLOC_MACRO
@@ -4280,7 +4280,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Line %d: TTERR debug %d %s-%d \"%s\"\n", line, msg_num, method, ssid, t);
 
-			assert(msg_num >= 0 && msg_num < TT_ERROR_MAXP1)
+			Assert(msg_num >= 0 && msg_num < TT_ERROR_MAXP1)
 
 			strlcpy(p_tt_config.response[msg_num].method, method, sizeof(p_tt_config.response[msg_num].method))
 
