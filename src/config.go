@@ -476,7 +476,7 @@ func check_via_path(via_path string) int {
 		var addr [AX25_MAX_ADDR_LEN]C.char
 		var ssid C.int
 		var heard C.int
-		var ok = C.ax25_parse_addr(AX25_REPEATER_1-1+num_digi, a, strict, addr, &ssid, &heard)
+		var ok = C.ax25_parse_addr(AX25_REPEATER_1-1+C.int(num_digi), C.CString(part), strict, &addr[0], &ssid, &heard)
 
 		if ok == 0 {
 			/* TODO KG
@@ -491,7 +491,7 @@ func check_via_path(via_path string) int {
 		/* Based on assumption that a callsign can't end with a digit. */
 		/* For something of the form xxx9-9, we take the ssid as max hop count. */
 
-		if ssid > 0 && C.strlen(&addr[0]) >= 2 && C.isdigit(addr[C.strlen(&addr[0])-1]) != 0 {
+		if ssid > 0 && C.strlen(&addr[0]) >= 2 && C.isdigit(C.int(addr[C.strlen(&addr[0])-1])) != 0 {
 			max_digi_hops += int(ssid)
 		} else {
 			max_digi_hops++
@@ -541,6 +541,8 @@ func check_via_path(via_path string) int {
 
 const MAXCMDLEN = 1200
 
+var splitCmd string
+var splitToken string
 func split(str *C.char, rest_of_line C.int) *C.char {
 	/* FIXME KG
 	static char cmd[MAXCMDLEN];
@@ -559,23 +561,17 @@ func split(str *C.char, rest_of_line C.int) *C.char {
 	 * Change any tabs to spaces so we don't have to check for it later.
 	 */
 	if str != nil {
-
-		// dw_printf("split in: '%s'\n", str);
-
-		c = cmd
-		for s := str; *s != 0; s++ {
-			if *s == '\t' {
-				*c = ' '
-				c++
-			} else if *s == '\r' || *s == '\n' {
-
-			} else {
-				*c = *s
-				c++
+		splitCmd = ""
+		for _, c := range(C.GoString(str)) {
+			switch c {
+			case '\t':
+				splitCmd += " "
+			case '\n', '\r':
+				// Nothing
+			default:
+				splitCmd += string(c)
 			}
 		}
-		*c = 0
-		c = cmd
 	}
 
 	/*
@@ -583,9 +579,9 @@ func split(str *C.char, rest_of_line C.int) *C.char {
 	 * Quotation marks inside need to be doubled.
 	 */
 
-	for *c == ' ' {
-		c++
-	}
+	splitCmd = strings.TrimSpace(splitCmd)
+
+	// FIXME KG FIX FROM HERE
 
 	t = token
 	in_quotes = 0
