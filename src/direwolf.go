@@ -46,8 +46,8 @@ package direwolf
 // #include "il2p.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
-// #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libudev
-// #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
+// #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgps libudev
+// #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA -DENABLE_GPSD
 // #cgo LDFLAGS: -lm
 import "C"
 
@@ -335,7 +335,7 @@ x = Silence FX.25 information.`)
 	var cdigi_config C.struct_cdigi_config_s
 	var igate_config C.struct_igate_config_s
 
-	C.config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+	config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < C.MIN_SAMPLES_PER_SEC || *audioSampleRate > C.MAX_SAMPLES_PER_SEC {
