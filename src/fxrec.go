@@ -11,8 +11,6 @@ package direwolf
 // #include "textcolor.h"
 // #include "multi_modem.h"
 // #include "demod.h"
-// extern int FXTEST;
-// extern int fx25_test_count;
 import "C"
 
 import (
@@ -22,7 +20,7 @@ import (
 )
 
 func FxrecMain() {
-	C.FXTEST = 1
+	FXTEST = true
 
 	C.fx25_init(3)
 
@@ -46,10 +44,10 @@ func FxrecMain() {
 		C.fclose(fp)
 	}
 
-	if C.fx25_test_count == 11 {
+	if fx25_test_count == 11 {
 		fmt.Printf("***** FX25 unit test Success - all tests passed. *****\n")
 		return
 	}
-	fmt.Printf("***** FX25 unit test FAILED.  Only %d/11 tests passed. *****\n", C.fx25_test_count)
+	fmt.Printf("***** FX25 unit test FAILED.  Only %d/11 tests passed. *****\n", fx25_test_count)
 	os.Exit(1)
 }
