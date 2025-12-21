@@ -847,7 +847,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	 * is no confusion.
 	 */
 	var absFilePath, absFilePathErr = filepath.Abs(C.GoString(fname))
-	if absFilePathErr == nil {
+	if absFilePathErr != nil {
 		dw_printf("Error getting absolute path for config file %s: %s\n", C.GoString(fname), absFilePathErr)
 		os.Exit(1)
 	}
