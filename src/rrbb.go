@@ -1,26 +1,6 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2011, 2012, 2013, 2014, 2015  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-
+package direwolf
 
 /********************************************************************************
- *
- * File:	rrbb.c
  *
  * Purpose:	Raw Received Bit Buffer.
  *		An array of bits used to hold data out of
@@ -33,37 +13,34 @@
  *
  *******************************************************************************/
 
-#define RRBB_C
+// #include "direwolf.h"
+// #include <stdio.h>
+// #include <assert.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include "textcolor.h"
+// #include "ax25_pad.h"
+// #include "rrbb.h"
+import "C"
 
-#include "direwolf.h"
+import (
+	"unsafe"
+)
 
-#include <stdio.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
+var new_count = 0
+var delete_count = 0
 
-#include "textcolor.h"
-#include "ax25_pad.h"
-#include "rrbb.h"
-
-
-#define MAGIC1 0x12344321
-#define MAGIC2 0x56788765
-
-
-volatile static int new_count = 0;
-volatile static int delete_count = 0;
-
+type rrbb_t C.rrbb_t
 
 /***********************************************************************************
  *
- * Name:	rrbb_new	
+ * Name:	rrbb_new
  *
  * Purpose:	Allocate space for an array of samples.
  *
- * Inputs:	chan	- Radio channel from whence it came.
+ * Inputs:	channel	- Radio channel from whence it came.
  *
- *		subchan	- Which demodulator of the channel.
+ *		subchannel	- Which demodulator of the channel.
  *
  *		slice	- multiple thresholds per demodulator.
  *
@@ -74,46 +51,45 @@ volatile static int delete_count = 0;
  *		prev_descram - Previous descrambled bit.
  *
  * Returns:	Handle to be used by other functions.
- *		
- * Description:	
+ *
+ * Description:
  *
  ***********************************************************************************/
 
-rrbb_t rrbb_new (int chan, int subchan, int slice, int is_scrambled, int descram_state, int prev_descram)
-{
-	rrbb_t result;
+//export rrbb_new
+func rrbb_new(channel C.int, subchannel C.int, slice C.int, is_scrambled C.int, descram_state C.int, prev_descram C.int) rrbb_t {
 
-	assert (chan >= 0 && chan < MAX_RADIO_CHANS);
-	assert (subchan >= 0 && subchan < MAX_SUBCHANS);
-	assert (slice >= 0 && slice < MAX_SLICERS);
+	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	Assert(slice >= 0 && slice < MAX_SLICERS)
 
-	result = malloc(sizeof(struct rrbb_s));
-	if (result == NULL) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("FATAL ERROR: Out of memory.\n");
-	  exit (EXIT_FAILURE);
+	var result = rrbb_t(C.malloc(C.sizeof_struct_rrbb_s))
+	if result == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("FATAL ERROR: Out of memory.\n")
+		exit(1)
 	}
-	result->magic1 = MAGIC1;
-	result->chan = chan;
-	result->subchan = subchan;
-	result->slice = slice;
-	result->magic2 = MAGIC2;
+	result.magic1 = MAGIC1
+	result._chan = channel
+	result.subchan = subchannel
+	result.slice = slice
+	result.magic2 = MAGIC2
 
-	new_count++;
+	new_count++
 
-	if (new_count > delete_count + 100) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("MEMORY LEAK, rrbb_new, new_count=%d, delete_count=%d\n", new_count, delete_count);
+	if new_count > delete_count+100 {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("MEMORY LEAK, rrbb_new, new_count=%d, delete_count=%d\n", new_count, delete_count)
 	}
 
-	rrbb_clear (result, is_scrambled, descram_state, prev_descram);
+	rrbb_clear(result, is_scrambled, descram_state, prev_descram)
 
-	return (result);
+	return (result)
 }
 
 /***********************************************************************************
  *
- * Name:	rrbb_clear	
+ * Name:	rrbb_clear
  *
  * Purpose:	Clear by setting length to zero, etc.
  *
@@ -127,32 +103,31 @@ rrbb_t rrbb_new (int chan, int subchan, int slice, int is_scrambled, int descram
  *
  ***********************************************************************************/
 
-void rrbb_clear (rrbb_t b, int is_scrambled, int descram_state, int prev_descram)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_clear
+func rrbb_clear(b rrbb_t, is_scrambled C.int, descram_state C.int, prev_descram C.int) {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	assert (is_scrambled == 0 || is_scrambled == 1);
-	assert (prev_descram == 0 || prev_descram == 1);
+	Assert(is_scrambled == 0 || is_scrambled == 1)
+	Assert(prev_descram == 0 || prev_descram == 1)
 
-	b->nextp = NULL;
+	b.nextp = nil
 
-	b->alevel.rec = 9999;	// TODO: was there some reason for this instead of 0 or -1?
-	b->alevel.mark = 9999;
-	b->alevel.space = 9999;
+	b.alevel.rec = 9999 // TODO: was there some reason for this instead of 0 or -1?
+	b.alevel.mark = 9999
+	b.alevel.space = 9999
 
-	b->len = 0;
+	b.len = 0
 
-	b->is_scrambled = is_scrambled;
-	b->descram_state = descram_state;
-	b->prev_descram = prev_descram;
+	b.is_scrambled = is_scrambled
+	b.descram_state = descram_state
+	b.prev_descram = prev_descram
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_append_bit	
+ * Name:	rrbb_append_bit
  *
  * Purpose:	Append another bit to the end.
  *
@@ -163,267 +138,253 @@ void rrbb_clear (rrbb_t b, int is_scrambled, int descram_state, int prev_descram
 
 /* Definition in header file so it can be inlined. */
 
-
 /***********************************************************************************
  *
- * Name:	rrbb_chop8	
+ * Name:	rrbb_chop8
  *
  * Purpose:	Remove 8 from the length.
  *
  * Inputs:	Handle for bit array.
- *		
+ *
  * Description:	Back up after appending the flag sequence.
  *
  ***********************************************************************************/
 
-void rrbb_chop8 (rrbb_t b)
-{
-	
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_chop8
+func rrbb_chop8(b rrbb_t) {
 
-	if (b->len >= 8) {
-	  b->len -= 8;
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
+
+	if b.len >= 8 {
+		b.len -= 8
 	}
 }
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_len	
+ * Name:	rrbb_get_len
  *
  * Purpose:	Get number of bits in the array.
  *
  * Inputs:	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_len (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_len
+func rrbb_get_len(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->len);
+	return C.int(b.len)
 }
-
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_bit	
+ * Name:	rrbb_get_bit
  *
  * Purpose:	Get value of bit in specified position.
  *
  * Inputs:	Handle for sample array.
  *		Index into array.
- *		
+ *
  ***********************************************************************************/
 
 /* Definition in header file so it can be inlined. */
 
-
-
-
 /***********************************************************************************
  *
- * Name:	rrbb_flip_bit	
+ * Name:	rrbb_flip_bit
  *
  * Purpose:	Complement the value of bit in specified position.
  *
  * Inputs:	Handle for bit array.
  *		Index into array.
- *		
+ *
  ***********************************************************************************/
 
 //void rrbb_flip_bit (rrbb_t b, unsigned int ind)
 //{
 //	unsigned int di, mi;
 //
-//	assert (b != NULL);
-//	assert (b->magic1 == MAGIC1);
-//	assert (b->magic2 == MAGIC2);
+//	Assert (b != nil);
+//	Assert (b.magic1 == MAGIC1);
+//	Assert (b.magic2 == MAGIC2);
 //
-//	assert (ind < b->len);
+//	Assert (ind < b.len);
 //
 //	di = ind / SOI;
 //	mi = ind % SOI;
 //
-//	b->data[di] ^= masks[mi];
+//	b.data[di] ^= masks[mi];
 //}
 
 /***********************************************************************************
  *
- * Name:	rrbb_delete	
+ * Name:	rrbb_delete
  *
  * Purpose:	Free the storage associated with the bit array.
  *
  * Inputs:	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-void rrbb_delete (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_delete
+func rrbb_delete(b rrbb_t) {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	b->magic1 = 0;
-	b->magic2 = 0;
-	
-	free (b);
+	b.magic1 = 0
+	b.magic2 = 0
 
-	delete_count++;
+	C.free(unsafe.Pointer(b))
+
+	delete_count++
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_set_netxp	
+ * Name:	rrbb_set_netxp
  *
  * Purpose:	Set the nextp field, used to maintain a queue.
  *
  * Inputs:	b	Handle for bit array.
  *		np	New value for nextp.
- *		
+ *
  ***********************************************************************************/
 
-void rrbb_set_nextp (rrbb_t b, rrbb_t np)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_set_nextp
+func rrbb_set_nextp(b rrbb_t, np rrbb_t) {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	b->nextp = np;
+	b.nextp = np
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_netxp	
+ * Name:	rrbb_get_netxp
  *
  * Purpose:	Get value of nextp field.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-rrbb_t rrbb_get_nextp (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_nextp
+func rrbb_get_nextp(b rrbb_t) rrbb_t {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->nextp);
+	return (b.nextp)
 }
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_chan	
+ * Name:	rrbb_get_chan
  *
  * Purpose:	Get channel from which bit buffer was received.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_chan (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_chan
+func rrbb_get_chan(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	assert (b->chan >= 0 && b->chan < MAX_RADIO_CHANS);
+	Assert(b._chan >= 0 && b._chan < MAX_RADIO_CHANS)
 
-	return (b->chan);
+	return (b._chan)
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_subchan	
+ * Name:	rrbb_get_subchan
  *
  * Purpose:	Get subchannel from which bit buffer was received.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_subchan (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_subchan
+func rrbb_get_subchan(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	assert (b->subchan >= 0 && b->subchan < MAX_SUBCHANS);
+	Assert(b.subchan >= 0 && b.subchan < MAX_SUBCHANS)
 
-	return (b->subchan);
+	return (b.subchan)
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_slice	
+ * Name:	rrbb_get_slice
  *
  * Purpose:	Get slice number from which bit buffer was received.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_slice (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_slice
+func rrbb_get_slice(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	assert (b->slice >= 0 && b->slice < MAX_SLICERS);
+	Assert(b.slice >= 0 && b.slice < MAX_SLICERS)
 
-	return (b->slice);
+	return (b.slice)
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_set_audio_level	
+ * Name:	rrbb_set_audio_level
  *
  * Purpose:	Set audio level at time the frame was received.
  *
  * Inputs:	b	Handle for bit array.
  *		alevel	Audio level.
- *		
+ *
  ***********************************************************************************/
 
-void rrbb_set_audio_level (rrbb_t b, alevel_t alevel)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_set_audio_level
+func rrbb_set_audio_level(b rrbb_t, alevel C.alevel_t) {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	b->alevel = alevel;
+	b.alevel = alevel
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_audio_level	
+ * Name:	rrbb_get_audio_level
  *
  * Purpose:	Get audio level at time the frame was received.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-alevel_t rrbb_get_audio_level (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_audio_level
+func rrbb_get_audio_level(b rrbb_t) C.alevel_t {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->alevel);
+	return (b.alevel)
 }
-
-
 
 /***********************************************************************************
  *
@@ -436,15 +397,14 @@ alevel_t rrbb_get_audio_level (rrbb_t b)
  *
  ***********************************************************************************/
 
-void rrbb_set_speed_error (rrbb_t b, float speed_error)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_set_speed_error
+func rrbb_set_speed_error(b rrbb_t, speed_error C.float) {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	b->speed_error = speed_error;
+	b.speed_error = speed_error
 }
-
 
 /***********************************************************************************
  *
@@ -458,81 +418,72 @@ void rrbb_set_speed_error (rrbb_t b, float speed_error)
  *
  ***********************************************************************************/
 
-float rrbb_get_speed_error (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_speed_error
+func rrbb_get_speed_error(b rrbb_t) C.float {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->speed_error);
+	return (b.speed_error)
 }
-
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_is_scrambled	
+ * Name:	rrbb_get_is_scrambled
  *
  * Purpose:	Find out if using scrambled data.
  *
  * Inputs:	b	Handle for bit array.
  *
  * Returns:	True (for 9600 baud) or false (for slower AFSK).
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_is_scrambled (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_is_scrambled
+func rrbb_get_is_scrambled(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->is_scrambled);
+	return (b.is_scrambled)
 }
-
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_descram_state	
+ * Name:	rrbb_get_descram_state
  *
  * Purpose:	Get data descrambler state before first data bit of frame.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_descram_state (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_descram_state
+func rrbb_get_descram_state(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->descram_state);
+	return (b.descram_state)
 }
-
 
 /***********************************************************************************
  *
- * Name:	rrbb_get_prev_descram	
+ * Name:	rrbb_get_prev_descram
  *
  * Purpose:	Get previous descrambled bit before first data bit of frame.
  *
  * Inputs:	b	Handle for bit array.
- *		
+ *
  ***********************************************************************************/
 
-int rrbb_get_prev_descram (rrbb_t b)
-{
-	assert (b != NULL);
-	assert (b->magic1 == MAGIC1);
-	assert (b->magic2 == MAGIC2);
+//export rrbb_get_prev_descram
+func rrbb_get_prev_descram(b rrbb_t) C.int {
+	Assert(b != nil)
+	Assert(b.magic1 == MAGIC1)
+	Assert(b.magic2 == MAGIC2)
 
-	return (b->prev_descram);
+	return (b.prev_descram)
 }
 
-
-
 /* end rrbb.c */
-
-
