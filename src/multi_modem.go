@@ -140,7 +140,7 @@ func multi_modem_init(pa *C.struct_audio_s) {
 	save_audio_config_p = pa
 
 	demod_init(save_audio_config_p)
-	C.hdlc_rec_init(save_audio_config_p)
+	hdlc_rec_init(save_audio_config_p)
 
 	for channel := C.int(0); channel < MAX_RADIO_CHANS; channel++ {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
