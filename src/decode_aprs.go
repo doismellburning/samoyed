@@ -378,7 +378,7 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 
 		if pinfo[0] != ':' && pinfo[0] != '}' {
-			C.symbols_from_dest_or_src(C.char(pinfo[0]), &A.g_src[0], &A.g_dest[0], &A.g_symbol_table, &A.g_symbol_code)
+			symbols_from_dest_or_src(C.char(pinfo[0]), &A.g_src[0], &A.g_dest[0], &A.g_symbol_table, &A.g_symbol_code)
 		}
 
 		//dw_printf ("DEBUG decode_aprs@end2 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
@@ -413,7 +413,7 @@ func decode_aprs_print(A *C.decode_aprs_t) {
 
 	if A.g_symbol_code != ' ' {
 		var symbol_description [100]C.char
-		C.symbols_get_description(A.g_symbol_table, A.g_symbol_code, &symbol_description[0], C.size_t(len(symbol_description)))
+		symbols_get_description(A.g_symbol_table, A.g_symbol_code, &symbol_description[0], C.size_t(len(symbol_description)))
 
 		//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 

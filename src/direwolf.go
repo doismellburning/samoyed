@@ -219,8 +219,8 @@ x = Silence FX.25 information.`)
 	}
 
 	if *symbolDump {
-		C.symbols_init()
-		C.symbols_list()
+		symbols_init()
+		symbols_list()
 		os.Exit(0)
 	}
 
@@ -327,7 +327,7 @@ x = Silence FX.25 information.`)
 
 	C.rig_set_debug(uint32(d_h_opt))
 
-	C.symbols_init()
+	symbols_init()
 
 	audio_config = new(C.struct_audio_s)
 	misc_config = new(C.struct_misc_config_s)
