@@ -24,6 +24,7 @@ package direwolf
 import "C"
 
 import (
+	"slices"
 	"unsafe"
 )
 
@@ -93,7 +94,7 @@ var hdlc_state [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlc_state_s
 
 var num_subchannel [MAX_RADIO_CHANS]C.int //TODO1.2 use ptr rather than copy.
 
-var composite_dcd [MAX_RADIO_CHANS][MAX_SUBCHANS + 1]int
+var composite_dcd [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 
 /***********************************************************************************
  *
@@ -733,9 +734,9 @@ func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) 
 	var old = hdlc_rec_data_detect_any(channel)
 
 	if state != 0 {
-		composite_dcd[channel][subchannel] |= (1 << slice)
+		composite_dcd[channel][subchannel][slice] = true
 	} else {
-		composite_dcd[channel][subchannel] &= ^(1 << slice)
+		composite_dcd[channel][subchannel][slice] = false
 	}
 
 	var newVal = hdlc_rec_data_detect_any(channel)
@@ -781,7 +782,7 @@ func hdlc_rec_data_detect_any(channel C.int) C.int {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	for sc := C.int(0); sc < num_subchannel[channel]; sc++ {
-		if composite_dcd[channel][sc] != 0 {
+		if slices.Contains(composite_dcd[channel][sc][:], true) {
 			return (1)
 		}
 	}
