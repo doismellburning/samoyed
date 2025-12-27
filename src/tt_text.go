@@ -1,25 +1,6 @@
-//
-//    This file is part of Dire Wolf, an amateur radio packet TNC.
-//
-//    Copyright (C) 2013, 2015  John Langner, WB2OSZ
-//
-//    This program is free software: you can redistribute it and/or modify
-//    it under the terms of the GNU General Public License as published by
-//    the Free Software Foundation, either version 2 of the License, or
-//    (at your option) any later version.
-//
-//    This program is distributed in the hope that it will be useful,
-//    but WITHOUT ANY WARRANTY; without even the implied warranty of
-//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//    GNU General Public License for more details.
-//
-//    You should have received a copy of the GNU General Public License
-//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
+package direwolf
 
 /*------------------------------------------------------------------
- *
- * Module:      tt_text.c
  *
  * Purpose:   	Translate between text and touch tone representation.
  *		
@@ -33,6 +14,19 @@
  *		http://www.aprs.org/aprstt.html
  *
  *---------------------------------------------------------------*/
+
+// #include "direwolf.h"
+// #include <stdlib.h>
+// #include <stdio.h>
+// #include <string.h>
+// #include <ctype.h>
+// #include <stdarg.h>
+// #include "textcolor.h"
+// #include "tt_text.h"
+import "C"
+import (
+)
+
 
 /*
  * There are two different encodings called:
@@ -95,7 +89,7 @@
  * The world will come crumbling down.
  */
 
-static const char translate[10][4] = {
+var translate = [10][4]C.char{
 		/*	 A	 B	 C	 D  */
 		/*	---	---	---	--- */
 	/* 0 */	{	' ',	 0,	 0,	 0  },
@@ -123,7 +117,7 @@ static const char translate[10][4] = {
  * The column is a two bit code packed into the last 4 digits.
  */
 
-static const char call10encoding[10][4] = {
+var call10encoding = [10][4]C.char{
 		/*	 0	 1	 2	 3  */
 		/*	---	---	---	--- */
 	/* 0 */	{	'0',	' ',	 0,	 0   },
@@ -142,8 +136,8 @@ static const char call10encoding[10][4] = {
  * Special satellite 4 digit gridsquares to cover "99.99% of the world's population."
  */
 
-static const char grid[10][10][3] =      
-     {  { "AP", "BP", "AO", "BO", "CO", "DO", "EO", "FO", "GO", "OJ" },		// 0 - Canada
+var grid = [10][10][3]C.char{
+      { "AP", "BP", "AO", "BO", "CO", "DO", "EO", "FO", "GO", "OJ" },		// 0 - Canada
         { "CN", "DN", "EN", "FN", "GN", "CM", "DM", "EM", "FM", "OI" },		// 1 - USA
         { "DL", "EL", "FL", "DK", "EK", "FK", "EJ", "FJ", "GJ", "PI" },		// 2 - C. America
         { "FI", "GI", "HI", "FH", "GH", "HH", "FG", "GG", "FF", "GF" },		// 3 - S. America
@@ -153,37 +147,6 @@ static const char grid[10][10][3] =
         { "LM", "MM", "NM", "LL", "ML", "NL", "LK", "MK", "NK", "LJ" },		// 7 - India
         { "PH", "QH", "OG", "PG", "QG", "OF", "PF", "QF", "RF", "RE" },		// 8 - Aus / NZ
         { "IL", "IK", "IJ", "JJ", "JI", "JH", "JG", "KG", "JF", "KF" }  };	// 9 - Africa
-
-#include "direwolf.h"
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <assert.h>
-#include <stdarg.h>
-
-#include "textcolor.h"
-#include "tt_text.h"
-
-
-#if defined(ENC_MAIN) || defined(DEC_MAIN)
-
-void text_color_set (dw_color_t c) { return; }
-
-int dw_printf (const char *fmt, ...) 
-{
-	va_list args;
-	int len;
-	
-	va_start (args, fmt);
-	len = vprintf (fmt, args);
-	va_end (args);
-	return (len);
-}
-
-#endif
-
 
 /*------------------------------------------------------------------
  *
@@ -203,8 +166,9 @@ int dw_printf (const char *fmt, ...)
  *
  *----------------------------------------------------------------*/
 
-int tt_text_to_multipress (const char *text, int quiet, char *buttons)
-{
+ //export tt_text_to_multipress
+func tt_text_to_multipress (text *C.const_char, quiet C.int, buttons *C.char) C.int {
+	/* FIXME KG
 	const char *t = text;
 	char *b = buttons;
 	char c;
@@ -214,8 +178,13 @@ int tt_text_to_multipress (const char *text, int quiet, char *buttons)
 	int n;
 
 	*b = '\0';
+	*/
 	
-	while ((c = *t++) != '\0') {
+	for {
+		var c = *t++
+		if c == 0 {
+			break
+		}
 
 	  if (isdigit(c)) {
 	
@@ -236,15 +205,13 @@ int tt_text_to_multipress (const char *text, int quiet, char *buttons)
 	      *b++ = row + '0';
 	      *b = '\0';
 	    }
-	  }
-	  else {
+	  } else {
 	    if (isupper(c)) {
 	      ;
 	    }	  
 	    else if (islower(c)) {
 	      c = toupper(c);
-	    }
-	    else if (c != ' ') {
+	    } else if (c != ' ') {
 	      errors++;
 	      if (! quiet) {
 	        text_color_set (DW_COLOR_ERROR);
@@ -326,15 +293,13 @@ int tt_text_to_two_key (const char *text, int quiet, char *buttons)
 	  
 	    *b++ = c;
 	    *b = '\0';
-	  }
-	  else {
+	  } else {
 	    if (isupper(c)) {
 	      ;
 	    }	  
 	    else if (islower(c)) {
 	      c = toupper(c);
-	    }
-	    else if (c != ' ') {
+	    } else if (c != ' ') {
 	      errors++;
 	      if (! quiet) {
 	        text_color_set (DW_COLOR_ERROR);
@@ -777,12 +742,10 @@ int tt_multipress_to_text (const char *buttons, int quiet, char *text)
 	    if (n < maxspan) {
 	      *t++ = translate[row][n-1];
 	      *t = '\0';
-	    }
-	    else if (n == maxspan) {
+	    } else if (n == maxspan) {
 	      *t++ = c;
 	      *t = '\0';
-	    }
-	    else {
+	    } else {
 	      errors++;
 	      if (! quiet) {
 	        text_color_set (DW_COLOR_ERROR);
@@ -792,8 +755,7 @@ int tt_multipress_to_text (const char *buttons, int quiet, char *text)
 	      *t++ = c;
 	      *t = '\0';
 	    }
-	  }
-	  else if (c == 'A' || c == 'a') {
+	  } else if (c == 'A' || c == 'a') {
 
 /* Separator should occur only if digit before and after are the same. */
 	     
@@ -804,8 +766,7 @@ int tt_multipress_to_text (const char *buttons, int quiet, char *text)
 	        dw_printf ("Multi-press to text: \"A\" can occur only between two same digits.\n");
   	      }
 	    }
-	  }
-	  else {
+	  } else {
 
 /* Completely unexpected character. */
 
@@ -859,8 +820,7 @@ int tt_two_key_to_text (const char *buttons, int quiet, char *text)
 
 	    if (*b >= 'A' && *b <= 'D') {
 	      col = *b++ - 'A';
-	    }
-	    else if (*b >= 'a' && *b <= 'd') {
+	    } else if (*b >= 'a' && *b <= 'd') {
 	      col = *b++ - 'a';
 	    }
 
@@ -868,21 +828,18 @@ int tt_two_key_to_text (const char *buttons, int quiet, char *text)
 	      if (translate[row][col] != 0) {
 	        *t++ = translate[row][col];
 	        *t = '\0';
-	      }
-	      else {
+	      } else {
 		errors++;
 	        if (! quiet) {
 	          text_color_set (DW_COLOR_ERROR);
 	          dw_printf ("Two key to text: Invalid combination \"%c%c\".\n", c, col+'A');
 		}
 	      }
-	    }
-	    else {
+	    } else {
 	      *t++ = c;
 	      *t = '\0';
 	    }
-	  }
-	  else if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) {
+	  } else if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) {
 
 /* ABCD not expected here. */
 	     
@@ -891,8 +848,7 @@ int tt_two_key_to_text (const char *buttons, int quiet, char *text)
 	      text_color_set (DW_COLOR_ERROR);
 	      dw_printf ("Two-key to text: A, B, C, or D in unexpected location.\n");
 	    }
-	  }
-	  else {
+	  } else {
 
 /* Completely unexpected character. */
 
@@ -950,8 +906,7 @@ int tt_two_digits_to_letter (const char *buttons, int quiet, char *text, size_t 
 	      stemp2[0] = translate[row][col];
 	      stemp2[1] = '\0';
 	      strlcpy (text, stemp2, textsiz);
-	    }
-	    else {
+	    } else {
 	      errors++;
 	      strlcpy (text, "", textsiz);
 	      if (! quiet) {
@@ -959,8 +914,7 @@ int tt_two_digits_to_letter (const char *buttons, int quiet, char *text, size_t 
 	        dw_printf ("Two digits to letter: Invalid combination \"%c%c\".\n", c1, c2);
 	      }
 	    }
-	  }
-	  else {
+	  } else {
 	    errors++;
 	    strlcpy (text, "", textsiz);
 	    if (! quiet) {
@@ -968,8 +922,7 @@ int tt_two_digits_to_letter (const char *buttons, int quiet, char *text, size_t 
 	      dw_printf ("Two digits to letter: Second character \"%c\" must be in range of 1 through 4.\n", c2);
 	    }
 	  }
-	}
-	else {
+	} else {
 	  errors++;
 	  strlcpy (text, "", textsiz);
 	  if (! quiet) {
@@ -1056,8 +1009,7 @@ int tt_call10_to_text (const char *buttons, int quiet, char *text)
 	  if (call10encoding[row][col] != 0) {
 	    *t++ = call10encoding[row][col];
 	    *t = '\0';
-	  }
-	  else {
+	  } else {
 	    errors++;
 	    if (! quiet) {
 	      text_color_set (DW_COLOR_ERROR);
@@ -1155,8 +1107,7 @@ int tt_call5_suffix_to_text (const char *buttons, int quiet, char *text)
 	  if (call10encoding[row][col] != 0) {
 	    *t++ = call10encoding[row][col];
 	    *t = '\0';
-	  }
-	  else {
+	  } else {
 	    errors++;
 	    if (! quiet) {
 	      text_color_set (DW_COLOR_ERROR);
@@ -1268,8 +1219,7 @@ int tt_mhead_to_text (const char *buttons, int quiet, char *text, size_t textsiz
 	    errors += tt_two_digits_to_letter (b, quiet, t2, sizeof(t2));
 	    strlcat (text, t2, textsiz);
 	    b += 2;
-	  }
-	  else {
+	  } else {
 
 	    /* Copy the digits. */
 
@@ -1365,8 +1315,7 @@ int tt_text_to_mhead (const char *text, int quiet, char *buttons, size_t buttons
 
 	    errors += tt_letter_to_two_digits (t1, quiet, b3);
 	    strlcat (buttons, b3, buttonsize);
-	  }
-	  else {					/* Should be digits */
+	  } else {					/* Should be digits */
 
 	    char b3[3];
 
@@ -1478,8 +1427,7 @@ int tt_ascii2d_to_text (const char *buttons, int quiet, char *text)
 	  c1 = *b++;
 	  if (*b != '\0') {
 	    c2 = *b++;
-	  }
-	  else {
+	  } else {
 	    c2 = ' ';
 	  }
 
@@ -1490,8 +1438,7 @@ int tt_ascii2d_to_text (const char *buttons, int quiet, char *text)
 
            *t++ = n + 32;
 	   *t = '\0';
-	  }
-	  else {
+	  } else {
 
 /* Unexpected character. */
 
@@ -1531,9 +1478,9 @@ tt_enc_t tt_guess_type (char *buttons)
 	
 /* If it contains B, C, or D, it can't be multipress. */
 
-	if (strchr (buttons, 'B') != NULL || strchr (buttons, 'b') != NULL ||
-	    strchr (buttons, 'C') != NULL || strchr (buttons, 'c') != NULL ||
-	    strchr (buttons, 'D') != NULL || strchr (buttons, 'd') != NULL) {
+	if (strchr (buttons, 'B') != nil || strchr (buttons, 'b') != nil ||
+	    strchr (buttons, 'C') != nil || strchr (buttons, 'c') != nil ||
+	    strchr (buttons, 'D') != nil || strchr (buttons, 'd') != nil) {
 	  return (TT_TWO_KEY);
 	}
 
@@ -1544,8 +1491,7 @@ tt_enc_t tt_guess_type (char *buttons)
 
 	if (err_mp == 0 && err_tk > 0) {
 	  return (TT_MULTIPRESS);
- 	}
-	else if (err_tk == 0 && err_mp > 0) {
+ 	} else if (err_tk == 0 && err_mp > 0) {
 	  return (TT_TWO_KEY);
 	}
 
