@@ -167,24 +167,21 @@ var grid = [10][10][3]C.char{
  *----------------------------------------------------------------*/
 
  //export tt_text_to_multipress
-func tt_text_to_multipress (text *C.const_char, quiet C.int, buttons *C.char) C.int {
+func tt_text_to_multipress (_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
 	/* FIXME KG
-	const char *t = text;
-	char *b = buttons;
 	char c;
-	int row, col;
-	int errors = 0;
-	int found;
 	int n;
 
-	*b = '\0';
+	*b = 0;
 	*/
+
+	var text = C.GoString(_text)
+	var quiet = _quiet != 0
+	var buttons = ""
+
+	var errors = 0
 	
-	for {
-		var c = *t++
-		if c == 0 {
-			break
-		}
+	for _, c := range text {
 
 	  if (isdigit(c)) {
 	
@@ -193,23 +190,22 @@ func tt_text_to_multipress (text *C.const_char, quiet C.int, buttons *C.char) C.
 
 	    n = 1;
 	    row = c - '0';
-	    for (col=0; col<4; col++) {
+		for col:=0; col<4; col++ {
 	      if (translate[row][col] != 0) {
 	        n++;
 	      }
 	    }
-	    if (buttons[0] != '\0' && *(b-1) == row + '0') {
-	      *b++ = 'A';
+		if len(buttons) > 0 && buttons(len(buttons) - 1) == row + '0' {
+			buttons = append(buttons, 'A')
 	    }
-	    while (n--) {
-	      *b++ = row + '0';
-	      *b = '\0';
+		for ;n > 0; n-- {
+			buttons = append(buttons, row + '0')
 	    }
+		// FIXME KG copy to _buttons
 	  } else {
 	    if (isupper(c)) {
 	      ;
-	    }	  
-	    else if (islower(c)) {
+	    }	  else if (islower(c)) {
 	      c = toupper(c);
 	    } else if (c != ' ') {
 	      errors++;
@@ -223,23 +219,22 @@ func tt_text_to_multipress (text *C.const_char, quiet C.int, buttons *C.char) C.
 /* Search for everything else in the translation table. */
 /* Press number of times depending on column where found. */
 
-	    found = 0;
+	    var found = false
 
-	    for (row=0; row<10 && ! found; row++) {
-	      for (col=0; col<4 && ! found; col++) {
+		for row:=0; row<10 && ! found; row++ {
+			for col:=0; col<4 && ! found; col++ {
 	        if (c == translate[row][col]) {
 
 /* Stick in 'A' if previous character used same button. */
-
-	          if (buttons[0] != '\0' && *(b-1) == row + '0') {
-	            *b++ = 'A';
+				if len(buttons) > 0 && buttons[len(buttons) -1] == row + '0' {
+					buttons = append(buttons, 'A')
 	          }
 	          n = col + 1;
-	          while (n--) {
-	            *b++ = row + '0';
-	            *b = '\0';
-	            found = 1;
+	          for ;n>0;n-- {
+				  buttons = append(buttons, row + '0')
+	            found = true
 	          }
+			  // FIXME KG Copy back to _buttons
 	        }
 	      }
 	    }
@@ -273,31 +268,31 @@ func tt_text_to_multipress (text *C.const_char, quiet C.int, buttons *C.char) C.
  *
  *----------------------------------------------------------------*/
 
-int tt_text_to_two_key (const char *text, int quiet, char *buttons)
-{
-	const char *t = text;
-	char *b = buttons;
+//export tt_text_to_two_key
+func tt_text_to_two_key (_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
+	/* FIXME KG
 	char c;
-	int row, col;
-	int errors = 0;
-	int found;
+	*b = 0;
+	*/
+
+	var text = C.GoString(_text)
+	var quiet = _quiet != 0
+	var buttons = ""
+
+	var errors = 0
 
 
-	*b = '\0';
 	
-	while ((c = *t++) != '\0') {
-
+	for _, c := range text {
 	  if (isdigit(c)) {
 	
 /* Digit is single key press. */
 	  
-	    *b++ = c;
-	    *b = '\0';
+	buttons = append(buttons, c)
 	  } else {
 	    if (isupper(c)) {
 	      ;
-	    }	  
-	    else if (islower(c)) {
+	    }	  else if (islower(c)) {
 	      c = toupper(c);
 	    } else if (c != ' ') {
 	      errors++;
@@ -310,15 +305,14 @@ int tt_text_to_two_key (const char *text, int quiet, char *buttons)
 
 /* Search for everything else in the translation table. */
 
-	    found = 0;
+	    var found = false
 
-	    for (row=0; row<10 && ! found; row++) {
-	      for (col=0; col<4 && ! found; col++) {
+		for row:=0; row<10 && ! found; row++ {
+			for col:=0; col<4 && ! found; col++ {
 	        if (c == translate[row][col]) {
-		  *b++ = '0' + row;
-	          *b++ = 'A' + col;
-	          *b = '\0';
-	          found = 1;
+				buttons = append(buttons, row + '0')
+				buttons = append(buttons, col + 'A')
+	          found = true
 	        }
 	      }
 	    }
@@ -357,13 +351,12 @@ int tt_text_to_two_key (const char *text, int quiet, char *buttons)
 
 // TODO:  need to test this.
 
-int tt_letter_to_two_digits (char c, int quiet, char buttons[3])
-{
-	int row, col;
-	int errors = 0;
-	int found;
+//export tt_letter_to_two_digits
+func tt_letter_to_two_digits (c C.char, _quiet C.int, buttons[3]C.char) C.int {
 
-	strlcpy(buttons, "", 3);
+	var errors = 0;
+
+	C.strcpy(&buttons[0], C.CString(""))
   
 	if (islower(c)) {
 	  c = toupper(c);
@@ -381,15 +374,15 @@ int tt_letter_to_two_digits (char c, int quiet, char buttons[3])
 
 /* Search in the translation table. */
 
-	found = 0;
+	var found = false
 
-	for (row=0; row<10 && ! found; row++) {
-	  for (col=0; col<4 && ! found; col++) {
+	for row:=0; row<10 && ! found; row++ {
+		for col:=0; col<4 && ! found; col++ {
 	    if (c == translate[row][col]) {
 	      buttons[0] = '0' + row;
 	      buttons[1] = '1' + col;
-	      buttons[2] = '\0';
-	      found = 1;
+	      buttons[2] = 0;
+	      found = true
 	    }
 	  }
 	 }
@@ -397,7 +390,7 @@ int tt_letter_to_two_digits (char c, int quiet, char buttons[3])
 	  errors++;
 	  text_color_set (DW_COLOR_ERROR);
 	  dw_printf ("Letter to two digits: INTERNAL ERROR.  Should not be here.\n");
-	  strlcpy (buttons, "00", 3);
+	  C.strcpy (&buttons[0], C.CString("00"))
 	}
 
 	return (errors);          
@@ -450,7 +443,7 @@ int tt_text_to_call10 (const char *text, int quiet, char *buttons)
 	  return (errors);
    	}
 
-	for (t = text; *t != '\0'; t++) {
+	for (t = text; *t != 0; t++) {
 
 	  if (! isalnum(*t)) {
 	    if (! quiet) {
@@ -472,7 +465,7 @@ int tt_text_to_call10 (const char *text, int quiet, char *buttons)
 	b = buttons;
 	packed = 0;
 
-	for (t = padded; *t != '\0'; t++) {
+	for (t = padded; *t != 0; t++) {
 	
 	  c = *t;
 	  if (islower(c)) {
@@ -487,7 +480,7 @@ int tt_text_to_call10 (const char *text, int quiet, char *buttons)
 	    for (col=0; col<4 && ! found; col++) {
 	      if (c == call10encoding[row][col]) {
 	        *b++ = '0' + row;
-	        *b = '\0';
+	        *b = 0;
 	        packed = packed * 4 + col;  /* base 4 to binary */
 	        found = 1;
 	      }
@@ -562,7 +555,7 @@ int tt_text_to_satsq (const char *text, int quiet, char *buttons, size_t buttons
 
 	uc[0] = islower(text[0]) ? toupper(text[0]) : text[0];
 	uc[1] = islower(text[1]) ? toupper(text[1]) : text[1];
-	uc[2] = '\0';
+	uc[2] = 0;
 
 	if (uc[0] < 'A' || uc[0] > 'R' || uc[1] < 'A' || uc[1] > 'R') {
 
@@ -599,7 +592,7 @@ int tt_text_to_satsq (const char *text, int quiet, char *buttons, size_t buttons
 	      btemp[1] = col + '0';
 	      btemp[2] = text[2];
 	      btemp[3] = text[3];
-	      btemp[4] = '\0';
+	      btemp[4] = 0;
 
 	      strlcpy (buttons, btemp, buttonsize);
 	      found = 1;
@@ -662,9 +655,9 @@ int tt_text_to_ascii2d (const char *text, int quiet, char *buttons)
 	int errors = 0;
 
 
-	*b = '\0';
+	*b = 0;
 
-	while ((c = *t++) != '\0') {
+	while ((c = *t++) != 0) {
 
 	  int n;
 
@@ -676,7 +669,7 @@ int tt_text_to_ascii2d (const char *text, int quiet, char *buttons)
 
 	  *b++ = (n / 10) + '0';
 	  *b++ = (n % 10) + '0';
-	  *b = '\0';
+	  *b = 0;
 	}
 	return (errors);
 
@@ -714,9 +707,9 @@ int tt_multipress_to_text (const char *buttons, int quiet, char *text)
 	int maxspan;
 	int n;
 
-	*t = '\0';
+	*t = 0;
 	
-	while ((c = *b++) != '\0') {
+	while ((c = *b++) != 0) {
 
 	  if (isdigit(c)) {
 	
@@ -741,10 +734,10 @@ int tt_multipress_to_text (const char *buttons, int quiet, char *text)
 
 	    if (n < maxspan) {
 	      *t++ = translate[row][n-1];
-	      *t = '\0';
+	      *t = 0;
 	    } else if (n == maxspan) {
 	      *t++ = c;
-	      *t = '\0';
+	      *t = 0;
 	    } else {
 	      errors++;
 	      if (! quiet) {
@@ -753,13 +746,13 @@ int tt_multipress_to_text (const char *buttons, int quiet, char *text)
 	      }
 	      /* Treat like the maximum length. */
 	      *t++ = c;
-	      *t = '\0';
+	      *t = 0;
 	    }
 	  } else if (c == 'A' || c == 'a') {
 
 /* Separator should occur only if digit before and after are the same. */
 	     
-	    if (b == buttons + 1 || *b == '\0' || *(b-2) != *b) {
+	    if (b == buttons + 1 || *b == 0 || *(b-2) != *b) {
 	      errors++;
 	      if (! quiet) {
 	        text_color_set (DW_COLOR_ERROR);
@@ -807,9 +800,9 @@ int tt_two_key_to_text (const char *buttons, int quiet, char *text)
 	int row, col;
 	int errors = 0;
 
-	*t = '\0';
+	*t = 0;
 	
-	while ((c = *b++) != '\0') {
+	while ((c = *b++) != 0) {
 
 	  if (isdigit(c)) {
 	
@@ -827,7 +820,7 @@ int tt_two_key_to_text (const char *buttons, int quiet, char *text)
 	    if (col >= 0) {
 	      if (translate[row][col] != 0) {
 	        *t++ = translate[row][col];
-	        *t = '\0';
+	        *t = 0;
 	      } else {
 		errors++;
 	        if (! quiet) {
@@ -837,7 +830,7 @@ int tt_two_key_to_text (const char *buttons, int quiet, char *text)
 	      }
 	    } else {
 	      *t++ = c;
-	      *t = '\0';
+	      *t = 0;
 	    }
 	  } else if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) {
 
@@ -904,7 +897,7 @@ int tt_two_digits_to_letter (const char *buttons, int quiet, char *text, size_t 
 	    if (translate[row][col] != 0) {
 
 	      stemp2[0] = translate[row][col];
-	      stemp2[1] = '\0';
+	      stemp2[1] = 0;
 	      strlcpy (text, stemp2, textsiz);
 	    } else {
 	      errors++;
@@ -964,7 +957,7 @@ int tt_call10_to_text (const char *buttons, int quiet, char *text)
 	int k;
 
 	t = text;
-	*t = '\0';	/* result */
+	*t = 0;	/* result */
 
 /* Validity check. */
 
@@ -978,7 +971,7 @@ int tt_call10_to_text (const char *buttons, int quiet, char *text)
 	  return (errors);
    	}
 
-	for (b = buttons; *b != '\0'; b++) {
+	for (b = buttons; *b != 0; b++) {
 
 	  if (! isdigit(*b)) {
 	    if (! quiet) {
@@ -1008,7 +1001,7 @@ int tt_call10_to_text (const char *buttons, int quiet, char *text)
 
 	  if (call10encoding[row][col] != 0) {
 	    *t++ = call10encoding[row][col];
-	    *t = '\0';
+	    *t = 0;
 	  } else {
 	    errors++;
 	    if (! quiet) {
@@ -1023,7 +1016,7 @@ int tt_call10_to_text (const char *buttons, int quiet, char *text)
 	k = strlen(text) - 1;		/* should be 6 - 1 = 5 */
 
 	while (k >= 0 && text[k] == ' ') {
-	  text[k] = '\0';
+	  text[k] = 0;
 	  k--;
 	}
 
@@ -1062,7 +1055,7 @@ int tt_call5_suffix_to_text (const char *buttons, int quiet, char *text)
 	int k;
 
 	t = text;
-	*t = '\0';	/* result */
+	*t = 0;	/* result */
 
 /* Validity check. */
 
@@ -1076,7 +1069,7 @@ int tt_call5_suffix_to_text (const char *buttons, int quiet, char *text)
 	  return (errors);
 	}
 
-	for (b = buttons; *b != '\0'; b++) {
+	for (b = buttons; *b != 0; b++) {
 
 	  if (! isdigit(*b)) {
 	    if (! quiet) {
@@ -1106,7 +1099,7 @@ int tt_call5_suffix_to_text (const char *buttons, int quiet, char *text)
 
 	  if (call10encoding[row][col] != 0) {
 	    *t++ = call10encoding[row][col];
-	    *t = '\0';
+	    *t = 0;
 	  } else {
 	    errors++;
 	    if (! quiet) {
@@ -1185,7 +1178,7 @@ int tt_mhead_to_text (const char *buttons, int quiet, char *text, size_t textsiz
 	  return (errors);
    	}
 
-	for (b = buttons; *b != '\0'; b++) {
+	for (b = buttons; *b != 0; b++) {
 
 	  if (! isdigit(*b)) {
 	    if (! quiet) {
@@ -1226,7 +1219,7 @@ int tt_mhead_to_text (const char *buttons, int quiet, char *text, size_t textsiz
 	    char d3[3];
 	    d3[0] = *b++;
 	    d3[1] = *b++;
-	    d3[2] = '\0';
+	    d3[2] = 0;
 	    strlcat (text, d3, textsiz);
 	  }
 	}
@@ -1321,7 +1314,7 @@ int tt_text_to_mhead (const char *text, int quiet, char *buttons, size_t buttons
 
 	    b3[0] = t0;
 	    b3[1] = t1;
-	    b3[2] = '\0';
+	    b3[2] = 0;
 	    strlcat (buttons, b3, buttonsize);
 	  }
 	}
@@ -1370,7 +1363,7 @@ int tt_satsq_to_text (const char *buttons, int quiet, char *text)
 	  return (errors);
    	}
 
-	for (b = buttons; *b != '\0'; b++) {
+	for (b = buttons; *b != 0; b++) {
 
 	  if (! isdigit(*b)) {
 	    if (! quiet) {
@@ -1420,12 +1413,12 @@ int tt_ascii2d_to_text (const char *buttons, int quiet, char *text)
 	int errors = 0;
 
 
-	*t = '\0';
+	*t = 0;
 
-	while (*b != '\0') {
+	while (*b != 0) {
 
 	  c1 = *b++;
-	  if (*b != '\0') {
+	  if (*b != 0) {
 	    c2 = *b++;
 	  } else {
 	    c2 = ' ';
@@ -1437,7 +1430,7 @@ int tt_ascii2d_to_text (const char *buttons, int quiet, char *text)
 	    n = (c1 - '0') * 10 + (c2 - '0');
 
            *t++ = n + 32;
-	   *t = '\0';
+	   *t = 0;
 	  } else {
 
 /* Unexpected character. */
