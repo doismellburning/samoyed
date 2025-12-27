@@ -416,20 +416,20 @@ func tt_letter_to_two_digits (c C.char, _quiet C.int, buttons[3]C.char) C.int {
  *
  *----------------------------------------------------------------*/
 
-int tt_text_to_call10 (const char *text, int quiet, char *buttons)
-{
+func tt_text_to_call10 (_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
+	/* 
 	const char *t;
 	char *b;
 	char c;
-	int packed;		/* two bits per character */
+	int packed;		// two bits per character
 	int row, col;
 	int errors = 0;
-	int found;
 	char padded[8];
 	char stemp[11];
+	*/
 
 	// FIXME: Add parameter for sizeof buttons and use strlcpy
-	strcpy (buttons, "");
+	C.strcpy (buttons, C.CString(""));
 
 /* Quick validity check. */
 	
@@ -443,7 +443,7 @@ int tt_text_to_call10 (const char *text, int quiet, char *buttons)
 	  return (errors);
    	}
 
-	for (t = text; *t != 0; t++) {
+	for t := text; *t != 0; t++ {
 
 	  if (! isalnum(*t)) {
 	    if (! quiet) {
@@ -458,14 +458,14 @@ int tt_text_to_call10 (const char *text, int quiet, char *buttons)
 /* Append spaces if less than 6 characters. */
 
 	strcpy (padded, text);
-	while (strlen(padded) < 6) {
+	for (strlen(padded) < 6) {
 	  strcat (padded, " ");
 	}
 
 	b = buttons;
 	packed = 0;
 
-	for (t = padded; *t != 0; t++) {
+	for t := padded; *t != 0; t++ {
 	
 	  c = *t;
 	  if (islower(c)) {
@@ -474,12 +474,13 @@ int tt_text_to_call10 (const char *text, int quiet, char *buttons)
 
 /* Search in the translation table. */
 
-	  found = 0;
+	  var found = false
 
-	  for (row=0; row<10 && ! found; row++) {
-	    for (col=0; col<4 && ! found; col++) {
+	  for row:=0; row<10 && ! found; row++ {
+		  for col:=0; col<4 && ! found; col++ {
 	      if (c == call10encoding[row][col]) {
-	        *b++ = '0' + row;
+	        *b = '0' + row;
+			b++
 	        *b = 0;
 	        packed = packed * 4 + col;  /* base 4 to binary */
 	        found = 1;
