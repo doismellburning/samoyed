@@ -21,11 +21,6 @@ func test_text2tt(t *testing.T, _text string, _expect_mp string, _expect_2k stri
 	t.Helper()
 
 	var text = C.CString(_text)
-	var expect_mp = C.CString(_expect_mp)
-	var expect_2k = C.CString(_expect_2k)
-	var expect_c10 = C.CString(_expect_c10)
-	var expect_loc = C.CString(_expect_loc)
-	var expect_sat = C.CString(_expect_sat)
 
 	dw_printf("\nConvert from text \"%s\" to tone sequence.\n", _text)
 
@@ -33,30 +28,25 @@ func test_text2tt(t *testing.T, _text string, _expect_mp string, _expect_2k stri
 	var buttons = &_buttons[0]
 
 	C.tt_text_to_multipress(text, 0, buttons)
-	assert.Equal(t, C.int(0), C.strcmp(buttons, expect_mp), "Unexpected multi-press value") //nolint:testifylint
+	assert.Equal(t, _expect_mp, C.GoString(buttons), "Unexpected multi-press value") //nolint:testifylint
 
 	C.tt_text_to_two_key(text, 0, buttons)
-	assert.Equal(t, C.int(0), C.strcmp(buttons, expect_2k), "Unexpected two-key value") //nolint:testifylint
+	assert.Equal(t, _expect_2k, C.GoString(buttons), "Unexpected two-key value") //nolint:testifylint
 
 	C.tt_text_to_call10(text, 0, buttons)
-	assert.Equal(t, C.int(0), C.strcmp(buttons, expect_c10), "Unexpected call10 value") //nolint:testifylint
+	assert.Equal(t, _expect_c10, C.GoString(buttons), "Unexpected call10 value") //nolint:testifylint
 
 	C.tt_text_to_mhead(text, 0, buttons, 100)
-	assert.Equal(t, C.int(0), C.strcmp(buttons, expect_loc), "Unexpected Maidenhead value") //nolint:testifylint
+	assert.Equal(t, _expect_loc, C.GoString(buttons), "Unexpected Maidenhead value") //nolint:testifylint
 
 	C.tt_text_to_satsq(text, 0, buttons, 100)
-	assert.Equal(t, C.int(0), C.strcmp(buttons, expect_sat), "Unexpected SatSq value") //nolint:testifylint
+	assert.Equal(t, _expect_sat, C.GoString(buttons), "Unexpected SatSq value") //nolint:testifylint
 }
 
 func test_tt2text(t *testing.T, _buttons string, _expect_mp string, _expect_2k string, _expect_c10 string, _expect_loc string, _expect_sat string) {
 	t.Helper()
 
 	var buttons = C.CString(_buttons)
-	var expect_mp = C.CString(_expect_mp)
-	var expect_2k = C.CString(_expect_2k)
-	var expect_c10 = C.CString(_expect_c10)
-	var expect_loc = C.CString(_expect_loc)
-	var expect_sat = C.CString(_expect_sat)
 
 	dw_printf("\nConvert tone sequence \"%s\" to text.\n", _buttons)
 
@@ -64,19 +54,19 @@ func test_tt2text(t *testing.T, _buttons string, _expect_mp string, _expect_2k s
 	var text = &_text[0]
 
 	C.tt_multipress_to_text(buttons, 0, text)
-	assert.Equal(t, C.int(0), C.strcmp(text, expect_mp), "Unexpected multi-press value") //nolint:testifylint
+	assert.Equal(t, _expect_mp, C.GoString(text), "Unexpected multi-press value") //nolint:testifylint
 
 	C.tt_two_key_to_text(buttons, 0, text)
-	assert.Equal(t, C.int(0), C.strcmp(text, expect_2k), "Unexpected two-key value") //nolint:testifylint
+	assert.Equal(t, _expect_2k, C.GoString(text), "Unexpected two-key value") //nolint:testifylint
 
 	C.tt_call10_to_text(buttons, 0, text)
-	assert.Equal(t, C.int(0), C.strcmp(text, expect_c10), "Unexpected call10 value") //nolint:testifylint
+	assert.Equal(t, _expect_c10, C.GoString(text), "Unexpected call10 value") //nolint:testifylint
 
 	C.tt_mhead_to_text(buttons, 0, text, 100)
-	assert.Equal(t, C.int(0), C.strcmp(text, expect_loc), "Unexpected Maidenhead value") //nolint:testifylint
+	assert.Equal(t, _expect_loc, C.GoString(text), "Unexpected Maidenhead value") //nolint:testifylint
 
 	C.tt_satsq_to_text(buttons, 0, text)
-	assert.Equal(t, C.int(0), C.strcmp(text, expect_sat), "Unexpected SatSq value") //nolint:testifylint
+	assert.Equal(t, _expect_sat, C.GoString(text), "Unexpected SatSq value") //nolint:testifylint
 }
 
 func tt_text_test_main(t *testing.T) {
