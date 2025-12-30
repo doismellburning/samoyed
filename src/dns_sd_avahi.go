@@ -202,7 +202,7 @@ func dns_sd_announce(mc *C.struct_misc_config_s) {
 	if mc.dns_sd_name[0] != 0 {
 		avahiName = C.avahi_strdup(&mc.dns_sd_name[0])
 	} else {
-		avahiName = C.dns_sd_default_service_name()
+		avahiName = C.CString(dns_sd_default_service_name())
 	}
 
 	/* Allocate a new client */
