@@ -805,7 +805,7 @@ func demod_get_sample(a C.int) C.int {
 
 	if save_audio_config_p.adev[a].bits_per_sample == 8 {
 
-		var x1 = C.audio_get(a)
+		var x1 = audio_get(a)
 		if x1 < 0 {
 			return (FSK_READ_ERR)
 		}
@@ -817,12 +817,12 @@ func demod_get_sample(a C.int) C.int {
 		sam = int16(x1-128) * 256
 
 	} else {
-		var x1 = C.audio_get(a) /* lower byte first */
+		var x1 = audio_get(a) /* lower byte first */
 		if x1 < 0 {
 			return (FSK_READ_ERR)
 		}
 
-		var x2 = C.audio_get(a)
+		var x2 = audio_get(a)
 		if x2 < 0 {
 			return (FSK_READ_ERR)
 		}

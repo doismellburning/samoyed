@@ -638,7 +638,7 @@ func audio_get(a C.int) C.int {
 	if ATEST_C {
 		return audio_get_fake(a)
 	} else {
-		return C.audio_get_real(a)
+		return audio_get_real(a)
 	}
 }
 

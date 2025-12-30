@@ -598,7 +598,7 @@ x = Silence FX.25 information.`)
 	 */
 	deviceid_init()
 
-	var err = C.audio_open(audio_config)
+	var err = audio_open(audio_config)
 	if err < 0 {
 		C.text_color_set(C.DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")

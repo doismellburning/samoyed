@@ -348,7 +348,7 @@ func dtmf_send(channel C.int, str *C.char, speed C.int, txdelay C.int, txtail C.
 
 	push_button(channel, ' ', txtail)
 
-	C.audio_flush(ACHAN2ADEV(channel))
+	audio_flush(ACHAN2ADEV(channel))
 
 	return (txdelay +
 		C.int(1000.0*C.float(C.strlen(str))/C.float(speed)+0.5) +

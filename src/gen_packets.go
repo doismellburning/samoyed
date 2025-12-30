@@ -897,7 +897,7 @@ func audio_put(a C.int, c C.int) C.int {
 	if GEN_PACKETS {
 		return audio_put_fake(a, c)
 	} else {
-		return C.audio_put_real(a, c)
+		return audio_put_real(a, c)
 	}
 }
 
@@ -910,7 +910,7 @@ func audio_flush(a C.int) C.int {
 	if GEN_PACKETS {
 		return audio_flush_fake(a)
 	} else {
-		return C.audio_flush_real(a)
+		return audio_flush_real(a)
 	}
 }
 

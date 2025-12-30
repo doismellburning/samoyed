@@ -212,7 +212,7 @@ func morse_send(channel C.int, str string, wpm C.int, txdelay C.int, txtail C.in
 		dw_printf("morse: Internal error.  Inconsistent length, %d vs. %d calculated.\n", time_units, morse_units_str(str))
 	}
 
-	C.audio_flush(ACHAN2ADEV(channel))
+	audio_flush(ACHAN2ADEV(channel))
 
 	return (txdelay + C.int(TIME_UNITS_TO_MS(time_units, wpm)+0.5) + txtail)
 
