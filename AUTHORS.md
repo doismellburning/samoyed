@@ -29,7 +29,7 @@ Taken from https://github.com/wb2osz/direwolf/graphs/contributors
 * https://github.com/mcdermj
 * https://github.com/ew1abz
 * https://github.com/BehemothTheKitten
-* https://github.com/hessu
+* [Heikki Hannikainen, OH7LZB](https://github.com/hessu)
 * https://github.com/df7cb
 * https://github.com/jmkristian
 * https://github.com/arodland
