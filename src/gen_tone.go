@@ -588,10 +588,10 @@ func gen_tone_put_sample(channel C.int, a C.int, sam C.int) {
 		/* Mono */
 
 		if save_audio_config_p.adev[a].bits_per_sample == 8 {
-			C.audio_put(a, ((sam+32768)>>8)&0xff)
+			audio_put(a, ((sam+32768)>>8)&0xff)
 		} else {
-			C.audio_put(a, sam&0xff)
-			C.audio_put(a, (sam>>8)&0xff)
+			audio_put(a, sam&0xff)
+			audio_put(a, (sam>>8)&0xff)
 		}
 	} else {
 
@@ -600,28 +600,28 @@ func gen_tone_put_sample(channel C.int, a C.int, sam C.int) {
 			/* Stereo, left channel. */
 
 			if save_audio_config_p.adev[a].bits_per_sample == 8 {
-				C.audio_put(a, ((sam+32768)>>8)&0xff)
-				C.audio_put(a, 0)
+				audio_put(a, ((sam+32768)>>8)&0xff)
+				audio_put(a, 0)
 			} else {
-				C.audio_put(a, sam&0xff)
-				C.audio_put(a, (sam>>8)&0xff)
+				audio_put(a, sam&0xff)
+				audio_put(a, (sam>>8)&0xff)
 
-				C.audio_put(a, 0)
-				C.audio_put(a, 0)
+				audio_put(a, 0)
+				audio_put(a, 0)
 			}
 		} else {
 
 			/* Stereo, right channel. */
 
 			if save_audio_config_p.adev[a].bits_per_sample == 8 {
-				C.audio_put(a, 0)
-				C.audio_put(a, ((sam+32768)>>8)&0xff)
+				audio_put(a, 0)
+				audio_put(a, ((sam+32768)>>8)&0xff)
 			} else {
-				C.audio_put(a, 0)
-				C.audio_put(a, 0)
+				audio_put(a, 0)
+				audio_put(a, 0)
 
-				C.audio_put(a, sam&0xff)
-				C.audio_put(a, (sam>>8)&0xff)
+				audio_put(a, sam&0xff)
+				audio_put(a, (sam>>8)&0xff)
 			}
 		}
 	}
@@ -664,7 +664,7 @@ func GenToneMain() {
 	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(C.DEFAULT_ADEVICE))
 	my_audio_config.chan_medium[0] = C.MEDIUM_RADIO // TODO KG ??
 
-	C.audio_open(&my_audio_config)
+	audio_open(&my_audio_config)
 	gen_tone_init(&my_audio_config, 100, 0)
 
 	for range 2 {
@@ -677,7 +677,7 @@ func GenToneMain() {
 		}
 	}
 
-	C.audio_close()
+	audio_close()
 
 	/* Now try stereo. */
 
@@ -686,7 +686,7 @@ func GenToneMain() {
 	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(C.DEFAULT_ADEVICE))
 	my_audio_config.adev[0].num_channels = 2
 
-	C.audio_open(&my_audio_config)
+	audio_open(&my_audio_config)
 	gen_tone_init(&my_audio_config, 100, 0)
 
 	for range 4 {
@@ -707,5 +707,5 @@ func GenToneMain() {
 		}
 	}
 
-	C.audio_close()
+	audio_close()
 }
