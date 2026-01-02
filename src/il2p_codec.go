@@ -73,7 +73,7 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 		// Payload is AX.25 info part.
 		var pinfo *C.uchar
-		var info_len = C.ax25_get_info(pp, &pinfo)
+		var info_len = ax25_get_info(pp, &pinfo)
 
 		var k = C.il2p_encode_payload(pinfo, info_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
 		if k > 0 {
@@ -98,8 +98,8 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 			// Payload is entire AX.25 frame.
 
-			var frame_data_ptr = C.ax25_get_frame_data_ptr(pp)
-			var frame_len = C.ax25_get_frame_len(pp)
+			var frame_data_ptr = ax25_get_frame_data_ptr(pp)
+			var frame_len = ax25_get_frame_len(pp)
 			var k = C.il2p_encode_payload(frame_data_ptr, frame_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
 			if k > 0 {
 				out_len += k
@@ -189,7 +189,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 			// It would be possible to have a good header but too many errors in the payload.
 
 			if e <= 0 {
-				C.ax25_delete(pp)
+				ax25_delete(pp)
 				return nil
 			}
 
@@ -198,7 +198,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
 			}
 
-			C.ax25_set_info(pp, &extracted[0], payload_len)
+			ax25_set_info(pp, &extracted[0], payload_len)
 		}
 		return (pp)
 	} else {
@@ -223,7 +223,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = C.ax25_from_frame(&extracted[0], payload_len, alevel)
+		var pp = ax25_from_frame(&extracted[0], payload_len, alevel)
 		return (pp)
 	}
 

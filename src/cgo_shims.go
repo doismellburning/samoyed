@@ -104,22 +104,22 @@ const KS_COLLECTING = C.KS_COLLECTING
 
 const MAX_NOISE_LEN = C.MAX_NOISE_LEN
 
-const frame_type_I C.ax25_frame_type_t = C.frame_type_I
-const frame_type_S_RR C.ax25_frame_type_t = C.frame_type_S_RR
-const frame_type_S_RNR C.ax25_frame_type_t = C.frame_type_S_RNR
-const frame_type_S_REJ C.ax25_frame_type_t = C.frame_type_S_REJ
-const frame_type_S_SREJ C.ax25_frame_type_t = C.frame_type_S_SREJ
-const frame_type_U_SABME C.ax25_frame_type_t = C.frame_type_U_SABME
-const frame_type_U_SABM C.ax25_frame_type_t = C.frame_type_U_SABM
-const frame_type_U_DISC C.ax25_frame_type_t = C.frame_type_U_DISC
-const frame_type_U_DM C.ax25_frame_type_t = C.frame_type_U_DM
-const frame_type_U_UA C.ax25_frame_type_t = C.frame_type_U_UA
-const frame_type_U_FRMR C.ax25_frame_type_t = C.frame_type_U_FRMR
-const frame_type_U_UI C.ax25_frame_type_t = C.frame_type_U_UI
-const frame_type_U_XID C.ax25_frame_type_t = C.frame_type_U_XID
-const frame_type_U_TEST C.ax25_frame_type_t = C.frame_type_U_TEST
-const frame_type_U C.ax25_frame_type_t = C.frame_type_U
-const frame_not_AX25 C.ax25_frame_type_t = C.frame_not_AX25
+const frame_type_I ax25_frame_type_t = C.frame_type_I
+const frame_type_S_RR ax25_frame_type_t = C.frame_type_S_RR
+const frame_type_S_RNR ax25_frame_type_t = C.frame_type_S_RNR
+const frame_type_S_REJ ax25_frame_type_t = C.frame_type_S_REJ
+const frame_type_S_SREJ ax25_frame_type_t = C.frame_type_S_SREJ
+const frame_type_U_SABME ax25_frame_type_t = C.frame_type_U_SABME
+const frame_type_U_SABM ax25_frame_type_t = C.frame_type_U_SABM
+const frame_type_U_DISC ax25_frame_type_t = C.frame_type_U_DISC
+const frame_type_U_DM ax25_frame_type_t = C.frame_type_U_DM
+const frame_type_U_UA ax25_frame_type_t = C.frame_type_U_UA
+const frame_type_U_FRMR ax25_frame_type_t = C.frame_type_U_FRMR
+const frame_type_U_UI ax25_frame_type_t = C.frame_type_U_UI
+const frame_type_U_XID ax25_frame_type_t = C.frame_type_U_XID
+const frame_type_U_TEST ax25_frame_type_t = C.frame_type_U_TEST
+const frame_type_U ax25_frame_type_t = C.frame_type_U
+const frame_not_AX25 ax25_frame_type_t = C.frame_not_AX25
 
 const cr_00 C.cmdres_t = C.cr_00
 const cr_cmd C.cmdres_t = C.cr_cmd
@@ -153,6 +153,14 @@ const IL2P_MAX_PAYLOAD_SIZE = C.IL2P_MAX_PAYLOAD_SIZE
 const IL2P_MAX_PARITY_SYMBOLS = C.IL2P_MAX_PARITY_SYMBOLS
 const IL2P_MAX_ENCODED_PAYLOAD_SIZE = C.IL2P_MAX_ENCODED_PAYLOAD_SIZE
 const IL2P_SYNC_WORD = C.IL2P_SYNC_WORD
+
+const SSID_H_MASK = C.SSID_H_MASK
+const SSID_H_SHIFT = C.SSID_H_SHIFT
+const SSID_RR_MASK = C.SSID_RR_MASK
+const SSID_RR_SHIFT = C.SSID_RR_SHIFT
+const SSID_SSID_MASK = C.SSID_SSID_MASK
+const SSID_SSID_SHIFT = C.SSID_SSID_SHIFT
+const SSID_LAST_MASK = C.SSID_LAST_MASK
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!

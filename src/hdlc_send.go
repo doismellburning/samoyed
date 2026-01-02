@@ -66,7 +66,7 @@ func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_FX25 {
 		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
-		var flen = C.ax25_pack(pp, &fbuf[0])
+		var flen = ax25_pack(pp, &fbuf[0])
 		var n = fx25_send_frame(channel, &fbuf[0], flen, audio_config_p.achan[channel].fx25_strength, false)
 		if n > 0 {
 			return (n)
@@ -78,7 +78,7 @@ func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config
 	}
 
 	var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
-	var flen = C.ax25_pack(pp, &fbuf[0])
+	var flen = ax25_pack(pp, &fbuf[0])
 	return (ax25_only_hdlc_send_frame(channel, &fbuf[0], flen, bad_fcs))
 }
 

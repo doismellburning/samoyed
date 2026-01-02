@@ -45,13 +45,13 @@ func digipeater_test(t *testing.T, _in, out string) {
 	 * As an extra test, change text to internal format back to
 	 * text again to make sure it comes out the same.
 	 */
-	var pp = C.ax25_from_text(in, 1)
+	var pp = ax25_from_text(in, 1)
 	assert.NotNil(t, pp)
 
 	var rec [256]C.char
 	var pinfo *C.uchar
-	C.ax25_format_addrs(pp, &rec[0])
-	C.ax25_get_info(pp, &pinfo)
+	ax25_format_addrs(pp, &rec[0])
+	ax25_get_info(pp, &pinfo)
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
 
 	if C.strcmp(in, &rec[0]) != 0 {
@@ -65,18 +65,18 @@ func digipeater_test(t *testing.T, _in, out string) {
 	 */
 
 	var frame [C.AX25_MAX_PACKET_LEN]C.uchar
-	var frame_len = C.ax25_pack(pp, &frame[0])
-	C.ax25_delete(pp)
+	var frame_len = ax25_pack(pp, &frame[0])
+	ax25_delete(pp)
 
 	var alevel C.alevel_t
 	alevel.rec = 50
 	alevel.mark = 50
 	alevel.space = 50
 
-	pp = C.ax25_from_frame(&frame[0], frame_len, alevel)
+	pp = ax25_from_frame(&frame[0], frame_len, alevel)
 	assert.NotNil(t, pp)
-	C.ax25_format_addrs(pp, &rec[0])
-	C.ax25_get_info(pp, &pinfo)
+	ax25_format_addrs(pp, &rec[0])
+	ax25_get_info(pp, &pinfo)
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
 
 	if C.strcmp(in, &rec[0]) != 0 {
@@ -102,10 +102,10 @@ func digipeater_test(t *testing.T, _in, out string) {
 	var xmit [256]C.char
 	if result != nil {
 		dedupe_remember(result, 0)
-		C.ax25_format_addrs(result, &xmit[0])
-		C.ax25_get_info(result, &pinfo)
+		ax25_format_addrs(result, &xmit[0])
+		ax25_get_info(result, &pinfo)
 		C.strcat(&xmit[0], (*C.char)(unsafe.Pointer(pinfo)))
-		C.ax25_delete(result)
+		ax25_delete(result)
 	} else {
 		C.strcpy(&xmit[0], C.CString(""))
 	}

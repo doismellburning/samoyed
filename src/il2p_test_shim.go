@@ -325,11 +325,11 @@ func test_example_headers(t *testing.T) {
 	var alevel C.alevel_t
 	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_alevel_t)
 
-	var pp = C.ax25_from_frame(&example1[0], C.int(len(example1)), alevel)
+	var pp = ax25_from_frame(&example1[0], C.int(len(example1)), alevel)
 	assert.NotNil(t, pp)
 	var e = C.il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, C.int(0), e)
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 	// dw_printf ("Example 1 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -364,19 +364,19 @@ func test_example_headers(t *testing.T) {
 	var dst_addr [C.AX25_MAX_ADDR_LEN]C.char
 	var src_addr [C.AX25_MAX_ADDR_LEN]C.char
 
-	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
-	C.ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
+	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
+	ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
 
 	var cr C.cmdres_t // command or response.
 	var description [64]C.char
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
 
-	var frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	var frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type // TODO Check this?
 
 	// TODO: compare binary.
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 	dw_printf("Example 1 header OK\n")
 
@@ -406,11 +406,11 @@ func test_example_headers(t *testing.T) {
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_struct_alevel_s)
 
-	pp = C.ax25_from_frame(&example2[0], C.int(len(example2)), alevel)
+	pp = ax25_from_frame(&example2[0], C.int(len(example2)), alevel)
 	assert.NotNil(t, pp)
 	e = C.il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, C.int(0), e)
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 	// dw_printf ("Example 2 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -443,15 +443,15 @@ func test_example_headers(t *testing.T) {
 	pp = C.il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
-	C.ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
+	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
+	ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
 
-	frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type
 
 	// TODO: compare binary.
 
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 	// TODO: more examples
 
 	dw_printf("Example 2 header OK\n")
@@ -483,11 +483,11 @@ func test_example_headers(t *testing.T) {
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_struct_alevel_s)
 
-	pp = C.ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
+	pp = ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
 	assert.NotNil(t, pp)
 	e = C.il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, C.int(9), e)
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 	// dw_printf ("Example 3 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -523,20 +523,20 @@ func test_example_headers(t *testing.T) {
 	pp = C.il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	C.ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
-	C.ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
+	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
+	ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
 
-	frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type
 
 	// TODO: compare binary.
 
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 	dw_printf("Example 3 header OK\n")
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = C.ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
+	pp = ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
 	assert.NotNil(t, pp)
 
 	var max_fec C.int = 0
@@ -550,7 +550,7 @@ func test_example_headers(t *testing.T) {
 	// Does it match the example in the protocol spec?
 	assert.Equal(t, C.int(len(complete3)), e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&iout[0]), unsafe.Pointer(&complete3[0]), C.ulong(len(complete3))))
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
 } // end test_example_headers
@@ -576,26 +576,26 @@ func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
 
 		// Is it the same after encoding to IL2P and then decoding?
 
-		var len1 = C.ax25_get_frame_len(pp1)
-		var data1 = C.ax25_get_frame_data_ptr(pp1)
+		var len1 = ax25_get_frame_len(pp1)
+		var data1 = ax25_get_frame_data_ptr(pp1)
 
-		var len2 = C.ax25_get_frame_len(pp2)
-		var data2 = C.ax25_get_frame_data_ptr(pp2)
+		var len2 = ax25_get_frame_len(pp2)
+		var data2 = ax25_get_frame_data_ptr(pp2)
 
 		if len1 != len2 || C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), C.ulong(len1)) != 0 {
 			dw_printf("\nEncode/Decode Error.  Original:\n")
-			C.ax25_hex_dump(pp1)
+			ax25_hex_dump(pp1)
 
 			dw_printf("IL2P encoded as:\n")
 			C.fx_hex_dump(&encoded[0], enc_len)
 
 			dw_printf("Got turned into this:\n")
-			C.ax25_hex_dump(pp2)
+			ax25_hex_dump(pp2)
 		}
 
 		assert.True(t, len1 == len2 && C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), C.ulong(len1)) == 0)
 
-		C.ax25_delete(pp2)
+		ax25_delete(pp2)
 	}
 }
 
@@ -617,7 +617,7 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nU frames...\n")
 
-	for ftype := C.ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
+	for ftype := ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
 			var cmin, cmax C.cmdres_t
 
@@ -658,9 +658,9 @@ func all_frame_types(t *testing.T) {
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
-				C.ax25_hex_dump(pp)
+				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				C.ax25_delete(pp)
+				ax25_delete(pp)
 			}
 		}
 	}
@@ -672,7 +672,7 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nS frames...\n")
 
-	for ftype := C.ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
+	for ftype := ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
 			var modulo C.int = 8
 			var nr = modulo/2 + 1
@@ -687,9 +687,9 @@ func all_frame_types(t *testing.T) {
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
-				C.ax25_hex_dump(pp)
+				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				C.ax25_delete(pp)
+				ax25_delete(pp)
 			}
 
 			modulo = 128
@@ -705,9 +705,9 @@ func all_frame_types(t *testing.T) {
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 
-				C.ax25_hex_dump(pp)
+				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				C.ax25_delete(pp)
+				ax25_delete(pp)
 			}
 		}
 	}
@@ -716,7 +716,7 @@ func all_frame_types(t *testing.T) {
 
 	var srej_info []C.uchar = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = C.ax25_frame_type_t(C.frame_type_S_SREJ)
+	var ftype = ax25_frame_type_t(C.frame_type_S_SREJ)
 	for pf := C.int(0); pf <= 1; pf++ {
 		var modulo C.int = 128
 		var nr C.int = 127
@@ -726,9 +726,9 @@ func all_frame_types(t *testing.T) {
 
 		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
 
-		C.ax25_hex_dump(pp)
+		ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 	}
 
 	/* I frame */
@@ -748,9 +748,9 @@ func all_frame_types(t *testing.T) {
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
-			C.ax25_hex_dump(pp)
+			ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		}
 
 		modulo = 128
@@ -762,9 +762,9 @@ func all_frame_types(t *testing.T) {
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 
-			C.ax25_hex_dump(pp)
+			ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		}
 	}
 } // end all_frame_types
@@ -849,7 +849,7 @@ func test_serdes(t *testing.T) {
 		} else {
 			packet = C.CString(fmt.Sprintf("%s:%s", addrs3, text))
 		}
-		var pp = C.ax25_from_text(packet, 1)
+		var pp = ax25_from_text(packet, 1)
 		assert.NotNil(t, pp)
 
 		var channel C.int
@@ -863,7 +863,7 @@ func test_serdes(t *testing.T) {
 				C.il2p_rec_bit(0, 0, 0, 0)
 			}
 		}
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 	}
 
 	dw_printf("Serdes receive count = %d\n", rec_count)

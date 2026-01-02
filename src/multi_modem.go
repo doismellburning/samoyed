@@ -299,16 +299,16 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 		// if it happens to get onto RF somehow.
 
 		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, C.USER_DEF_USER_ID, C.USER_DEF_TYPE_AIS, string(nmea))
-		pp = C.ax25_from_text(C.CString(monfmt), 1)
+		pp = ax25_from_text(C.CString(monfmt), 1)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case C.MODEM_EAS:
 		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, C.USER_DEF_USER_ID, C.USER_DEF_TYPE_EAS, C.GoString((*C.char)(unsafe.Pointer(fbuf))))
-		pp = C.ax25_from_text(C.CString(monfmt), 1)
+		pp = ax25_from_text(C.CString(monfmt), 1)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:
-		pp = C.ax25_from_frame(fbuf, flen, alevel)
+		pp = ax25_from_frame(fbuf, flen, alevel)
 	}
 
 	C.multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
@@ -348,7 +348,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 		}
 
 		if drop_it {
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		} else {
 			C.dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, C.CString(""))
 		}
@@ -361,7 +361,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 	if candidate[channel][subchan][slice].packet_p != nil {
 		/* Plain old AX.25: Oops!  Didn't expect it to be there. */
 		/* FX.25: Quietly replace anything already there.  It will have priority. */
-		C.ax25_delete(candidate[channel][subchan][slice].packet_p)
+		ax25_delete(candidate[channel][subchan][slice].packet_p)
 		candidate[channel][subchan][slice].packet_p = nil
 	}
 
@@ -372,7 +372,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 	candidate[channel][subchan][slice].fec_type = fec_type
 	candidate[channel][subchan][slice].retries = retries
 	candidate[channel][subchan][slice].age = 0
-	candidate[channel][subchan][slice].crc = C.uint(C.ax25_m_m_crc(pp))
+	candidate[channel][subchan][slice].crc = C.uint(ax25_m_m_crc(pp))
 }
 
 /*-------------------------------------------------------------------
@@ -534,7 +534,7 @@ func pick_best_candidate(channel C.int) {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 		if n != best_n && candidate[channel][j][k].packet_p != nil {
-			C.ax25_delete(candidate[channel][j][k].packet_p)
+			ax25_delete(candidate[channel][j][k].packet_p)
 			candidate[channel][j][k].packet_p = nil
 		}
 	}
@@ -559,7 +559,7 @@ func pick_best_candidate(channel C.int) {
 	}
 
 	if drop_it {
-		C.ax25_delete(candidate[channel][j][k].packet_p)
+		ax25_delete(candidate[channel][j][k].packet_p)
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)

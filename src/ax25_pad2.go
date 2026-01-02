@@ -168,9 +168,9 @@ import (
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr C.cmdres_t, ftype C.ax25_frame_type_t, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) C.packet_t {
+func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr C.cmdres_t, ftype ax25_frame_type_t, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) C.packet_t {
 
-	var this_p = C.ax25_new()
+	var this_p = ax25_new()
 
 	if this_p == nil {
 		return (nil)
@@ -181,7 +181,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_u_frame: Could not set addresses for U frame.\n")
-		C.ax25_delete(this_p)
+		ax25_delete(this_p)
 		return (nil)
 	}
 
@@ -224,7 +224,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_u_frame: Invalid ftype %d for U frame.\n", ftype)
-		C.ax25_delete(this_p)
+		ax25_delete(this_p)
 		return (nil)
 	}
 
@@ -322,7 +322,7 @@ func ax25_s_frame(
 	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char,
 	num_addr C.int,
 	cr C.cmdres_t,
-	ftype C.ax25_frame_type_t,
+	ftype ax25_frame_type_t,
 	modulo C.int,
 	nr C.int,
 	pf C.int,
@@ -330,7 +330,7 @@ func ax25_s_frame(
 	info_len C.int,
 ) C.packet_t {
 
-	var this_p = C.ax25_new()
+	var this_p = ax25_new()
 
 	if this_p == nil {
 		return (nil)
@@ -339,7 +339,7 @@ func ax25_s_frame(
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Could not set addresses for S frame.\n")
-		C.ax25_delete(this_p)
+		ax25_delete(this_p)
 		return (nil)
 	}
 
@@ -377,7 +377,7 @@ func ax25_s_frame(
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Invalid ftype %d for S frame.\n", ftype)
-		C.ax25_delete(this_p)
+		ax25_delete(this_p)
 		return (nil)
 	}
 
@@ -465,7 +465,7 @@ func ax25_s_frame(
 
 func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr C.cmdres_t, modulo C.int, nr C.int, ns C.int, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) C.packet_t {
 
-	var this_p = C.ax25_new()
+	var this_p = ax25_new()
 
 	if this_p == nil {
 		return (nil)
@@ -474,7 +474,7 @@ func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Could not set addresses for I frame.\n")
-		C.ax25_delete(this_p)
+		ax25_delete(this_p)
 		return (nil)
 	}
 
@@ -599,7 +599,7 @@ func set_addrs(pp C.packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, n
 		var ssid C.int
 		var heard C.int
 
-		var ok = C.ax25_parse_addr(n, &addrs[n][0], strict, &oaddr[0], &ssid, &heard)
+		var ok = ax25_parse_addr(n, &addrs[n][0], strict, &oaddr[0], &ssid, &heard)
 
 		if ok == 0 {
 			return (0)

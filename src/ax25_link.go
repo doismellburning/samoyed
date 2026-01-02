@@ -1095,7 +1095,7 @@ func dl_data_request(E *C.dlq_item_t) {
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_data_request (\"")
-		// FIXME KG C.ax25_safe_print(&E.txdata.data, E.txdata.len, 1) // FIXME KG data is a char[] which I can't figure out how to turn into a char* from cgo
+		// FIXME KG ax25_safe_print(&E.txdata.data, E.txdata.len, 1) // FIXME KG data is a char[] which I can't figure out how to turn into a char* from cgo
 		dw_printf("\") state=%d\n", S.state)
 	}
 
@@ -1965,14 +1965,14 @@ func lm_data_indication(E *C.dlq_item_t) {
 		return
 	}
 
-	E.num_addr = C.ax25_get_num_addr(E.pp)
+	E.num_addr = ax25_get_num_addr(E.pp)
 
 	// Digipeating is not done here so consider only those with no unused digipeater addresses.
 
 	var any_unused_digi = false
 
 	for n := C.int(AX25_REPEATER_1); n < E.num_addr; n++ {
-		if C.ax25_get_h(E.pp, n) == 0 {
+		if ax25_get_h(E.pp, n) == 0 {
 			any_unused_digi = true
 		}
 	}
@@ -1988,7 +1988,7 @@ func lm_data_indication(E *C.dlq_item_t) {
 	// Copy addresses from frame into event structure.
 
 	for n := C.int(0); n < E.num_addr; n++ {
-		C.ax25_get_addr_with_ssid(E.pp, n, &E.addrs[n][0])
+		ax25_get_addr_with_ssid(E.pp, n, &E.addrs[n][0])
 	}
 
 	if s_debug_radio {
@@ -2009,7 +2009,7 @@ func lm_data_indication(E *C.dlq_item_t) {
 	var desc [80]C.char
 	var cr C.cmdres_t
 	var pf, nr, ns C.int
-	var ftype = C.ax25_frame_type(E.pp, &cr, &desc[0], &pf, &nr, &ns)
+	var ftype = ax25_frame_type(E.pp, &cr, &desc[0], &pf, &nr, &ns)
 
 	var client_not_applicable C.int = -1
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, client_not_applicable,
@@ -2027,13 +2027,13 @@ func lm_data_indication(E *C.dlq_item_t) {
 	 * We can't do this until we get the link handle.
 	 */
 
-	C.ax25_set_modulo(E.pp, S.modulo)
+	ax25_set_modulo(E.pp, S.modulo)
 
 	/*
 	 * Now we need to use ax25_frame_type again because the previous results, for nr and ns, might be wrong.
 	 */
 
-	ftype = C.ax25_frame_type(E.pp, &cr, &desc[0], &pf, &nr, &ns)
+	ftype = ax25_frame_type(E.pp, &cr, &desc[0], &pf, &nr, &ns)
 
 	// Gather statistics useful for testing.
 
@@ -2091,9 +2091,9 @@ func lm_data_indication(E *C.dlq_item_t) {
 
 	case frame_type_I: // Information
 		{
-			var pid = C.ax25_get_pid(E.pp)
+			var pid = ax25_get_pid(E.pp)
 			var info_ptr *C.uchar
-			var info_len = C.ax25_get_info(E.pp, &info_ptr)
+			var info_len = ax25_get_info(E.pp, &info_ptr)
 
 			i_frame(S, cr, pf, nr, ns, pid, (*C.char)(unsafe.Pointer(info_ptr)), info_len)
 		}
@@ -2110,7 +2110,7 @@ func lm_data_indication(E *C.dlq_item_t) {
 	case frame_type_S_SREJ: // Selective Reject - Ask for selective frame(s) repeat
 		{
 			var info_ptr *C.uchar
-			var info_len = C.ax25_get_info(E.pp, &info_ptr)
+			var info_len = ax25_get_info(E.pp, &info_ptr)
 			srej_frame(S, cr, pf, nr, info_ptr, info_len)
 		}
 
@@ -2138,7 +2138,7 @@ func lm_data_indication(E *C.dlq_item_t) {
 	case frame_type_U_XID: // Exchange Identification
 		{
 			var info_ptr *C.uchar
-			var info_len = C.ax25_get_info(E.pp, &info_ptr)
+			var info_len = ax25_get_info(E.pp, &info_ptr)
 
 			xid_frame(S, cr, pf, info_ptr, info_len)
 		}
@@ -2146,7 +2146,7 @@ func lm_data_indication(E *C.dlq_item_t) {
 	case frame_type_U_TEST: // Test
 		{
 			var info_ptr *C.uchar
-			var info_len = C.ax25_get_info(E.pp, &info_ptr)
+			var info_len = ax25_get_info(E.pp, &info_ptr)
 
 			test_frame(S, cr, pf, info_ptr, info_len)
 		}
@@ -2509,7 +2509,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 		if s_debug_client_app {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, \"", ns, S.vr)
-			C.ax25_safe_print(info_ptr, info_len, 1)
+			ax25_safe_print(info_ptr, info_len, 1)
 			dw_printf("\"\n")
 		}
 
@@ -2532,7 +2532,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 			if s_debug_client_app {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
-				C.ax25_safe_print((*C.char)(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data)), S.rxdata_by_ns[S.vr].len, 1)
+				ax25_safe_print((*C.char)(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data)), S.rxdata_by_ns[S.vr].len, 1)
 				dw_printf("\"\n")
 			}
 
@@ -2643,7 +2643,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 
 			if s_debug_misc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
-				C.ax25_safe_print(info_ptr, info_len, 1)
+				ax25_safe_print(info_ptr, info_len, 1)
 				dw_printf("\"\n")
 			}
 
@@ -3099,7 +3099,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []C.int, count C.int, allow_f1 bool
  *
  *------------------------------------------------------------------------------*/
 
-func RR_OR_RNR(ready bool) C.ax25_frame_type_t {
+func RR_OR_RNR(ready bool) ax25_frame_type_t {
 	var ft = frame_type_S_RNR
 
 	if ready {
@@ -5353,7 +5353,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func enquiry_response(S *ax25_dlsm_t, frame_type C.ax25_frame_type_t, f C.int) {
+func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f C.int) {
 	var cr = cr_res // Response, not command as seen in flow chart.
 	var nr = S.vr
 
@@ -5627,7 +5627,7 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func check_need_for_response(S *ax25_dlsm_t, frame_type C.ax25_frame_type_t, cr C.cmdres_t, pf C.int) {
+func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr C.cmdres_t, pf C.int) {
 	if cr == cr_cmd && pf == 1 {
 		var f C.int = 1
 		enquiry_response(S, frame_type, f)

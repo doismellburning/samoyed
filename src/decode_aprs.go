@@ -78,7 +78,7 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 
 	var _pinfo *C.uchar
-	var info_len = C.ax25_get_info(pp, &_pinfo)
+	var info_len = ax25_get_info(pp, &_pinfo)
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 
@@ -122,7 +122,7 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 	// NE1CU-10>RFONLY,KB1AEV-15,N3LLO-3,WIDE2*:}W1HS-11>APMI06,TCPIP,NE1CU-10*:T#050,190,039,008,095,20403,00000000
 
 	var _atemp [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_atemp[0])
+	ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_atemp[0])
 	var atemp = C.GoString(&_atemp[0])
 
 	if quiet == 0 {
@@ -135,8 +135,8 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 
 	// Complain if obsolete WIDE or RELAY is found in via path.
 
-	for i := C.int(0); i < C.ax25_get_num_repeaters(pp); i++ {
-		C.ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i, &_atemp[0])
+	for i := C.int(0); i < ax25_get_num_repeaters(pp); i++ {
+		ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i, &_atemp[0])
 		if quiet == 0 {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
 				text_color_set(DW_COLOR_ERROR)
@@ -166,18 +166,18 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 		// e.g.  WR2X-2>APRS,WA1PLE-13*:}
 		//		K1BOS-B>APOSB,TCPIP,WR2X-2*:@122015z4221.42ND07111.93W&/A=000000SharkRF openSPOT3 MMDVM446.025 MA/SW
 
-		var pp_payload = C.ax25_from_text(C.CString(string(pinfo[1:])), 0)
+		var pp_payload = ax25_from_text(C.CString(string(pinfo[1:])), 0)
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
 			A.g_has_thirdparty_header = 1
 			decode_aprs(A, pp_payload, quiet, C.CString(string(payload_src))) // 1 means used recursively
-			C.ax25_delete(pp_payload)
+			ax25_delete(pp_payload)
 			return
 		} else {
 			C.strcpy(&A.g_data_type_desc[0], C.CString("Third Party Header: Unable to parse payload."))
-			C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &A.g_src[0])
-			C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &A.g_dest[0])
+			ax25_get_addr_with_ssid(pp, AX25_SOURCE, &A.g_src[0])
+			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &A.g_dest[0])
 		}
 	}
 
@@ -187,9 +187,9 @@ func decode_aprs(A *C.decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src
 	if third_party_src != nil {
 		C.strcpy(&A.g_src[0], third_party_src)
 	} else {
-		C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &A.g_src[0])
+		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &A.g_src[0])
 	}
-	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &A.g_dest[0])
+	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &A.g_dest[0])
 
 	//dw_printf ("DEBUG decode_aprs source=%s, dest=%s\n", A.g_src, A.g_dest);
 
@@ -622,12 +622,12 @@ func decode_aprs_print(A *C.decode_aprs_t) {
 		n--
 	}
 	if n > 0 {
-		C.ax25_safe_print(&A.g_weather[0], -1, 0)
+		ax25_safe_print(&A.g_weather[0], -1, 0)
 		dw_printf("\n")
 	}
 
 	if C.strlen(&A.g_telemetry[0]) > 0 {
-		C.ax25_safe_print(&A.g_telemetry[0], -1, 0)
+		ax25_safe_print(&A.g_telemetry[0], -1, 0)
 		dw_printf("\n")
 	}
 
@@ -641,7 +641,7 @@ func decode_aprs_print(A *C.decode_aprs_t) {
 		n--
 	}
 	if n > 0 {
-		C.ax25_safe_print(&A.g_comment[0], -1, 0)
+		ax25_safe_print(&A.g_comment[0], -1, 0)
 		dw_printf("\n")
 
 		/*
@@ -1212,7 +1212,7 @@ func aprs_mic_e(A *C.decode_aprs_t, pp C.packet_t, info []byte) {
 	/* Message codes are buried in the first 3 digits. */
 
 	var dest [12]C.char
-	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
 
 	var std_msg = 0
 	var cust_msg = 0
