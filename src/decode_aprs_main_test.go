@@ -5,27 +5,24 @@ import (
 )
 
 func Test_DecodeAPRSLine1(t *testing.T) {
-	// FIXME Until I sort the weird buffering / stdout capture issue, what's printed to terminal != what I can get in stdout,
-	// so let's at least check what we actually get
-	// var expected = "Yaesu"
-	var expected = "\n\n"
+	deviceid_init()
+
+	var expected = "Yaesu"
 
 	AssertOutputContains(t, func() { DecodeAPRSLine("N1EDF-9>T2QT8Y,W1CLA-1,WIDE1*,WIDE2-2,00000:`bSbl!Mv/`\"4%}_ <0x0d>") }, expected)
 }
 
 func Test_DecodeAPRSLine2(t *testing.T) {
-	// FIXME Until I sort the weird buffering / stdout capture issue, what's printed to terminal != what I can get in stdout,
-	// so let's at least check what we actually get
-	// var expected = "Kantronics"
-	var expected = "\n\nERROR"
+	deviceid_init()
+
+	var expected = "Kantronics"
 
 	AssertOutputContains(t, func() { DecodeAPRSLine("WB2OSZ-1>APN383,qAR,N1EDU-2:!4237.14NS07120.83W#PHG7130Chelmsford, MA") }, expected)
 }
 
 func Test_DecodeAPRSLine3(t *testing.T) {
-	// FIXME Until I sort the weird buffering / stdout capture issue, what's printed to terminal != what I can get in stdout,
-	// so let's at least check what we actually get
-	// var expected = "Echolink"
+	deviceid_init()
+
 	var expected = "KISS frame"
 
 	AssertOutputContains(t, func() {
