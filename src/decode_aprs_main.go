@@ -171,8 +171,7 @@ func DecodeAPRSLine(line string) {
 			// Here we know it is 0, so we take a short cut and
 			// remove it before, rather than after, the conversion.
 
-			// FIXME KG Check
-			bytes = kiss_unwrap(kiss_frame)
+			bytes = kiss_unwrap(kiss_frame[1:])
 		}
 
 		// Treat as AX.25.
