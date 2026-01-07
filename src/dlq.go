@@ -915,7 +915,7 @@ func dlq_delete(pitem *C.struct_dlq_item_s) {
 	s_delete_count++
 
 	if pitem.pp != nil {
-		C.ax25_delete(pitem.pp)
+		ax25_delete(pitem.pp)
 		pitem.pp = nil
 	}
 

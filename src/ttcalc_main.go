@@ -111,13 +111,13 @@ func TTCalcMain() {
 		if mon_cmd.DataKind == 'K' {
 			var channel = mon_cmd.Portx
 			var alevel C.alevel_t
-			var pp = C.ax25_from_frame((*C.uchar)(&data[1]), C.int(mon_cmd.DataLen-1), alevel)
+			var pp = ax25_from_frame((*C.uchar)(&data[1]), C.int(mon_cmd.DataLen-1), alevel)
 
 			var result [400]C.char
-			C.ax25_format_addrs(pp, &result[0])
+			ax25_format_addrs(pp, &result[0])
 
 			var pinfo *C.uchar
-			C.ax25_get_info(pp, &pinfo)
+			ax25_get_info(pp, &pinfo)
 
 			fmt.Printf("[%d] %s%s\n", channel, C.GoString(&result[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
@@ -141,7 +141,7 @@ func TTCalcMain() {
 				 * Notice that the special destination will cause it to be spoken.
 				 */
 				var reply_text = fmt.Sprintf("N0CALL>SPEECH:%d", n)
-				var reply_pp = C.ax25_from_text(C.CString(reply_text), 1)
+				var reply_pp = ax25_from_text(C.CString(reply_text), 1)
 
 				/*
 				 * Send it to the TNC.
@@ -154,7 +154,7 @@ func TTCalcMain() {
 				hdr.DataKind = 'K'
 
 				var reply_uchars [C.AX25_MAX_PACKET_LEN]C.uchar
-				var reply_len = C.ax25_pack(reply_pp, &reply_uchars[0])
+				var reply_len = ax25_pack(reply_pp, &reply_uchars[0])
 				hdr.DataLen = 1 + uint32(reply_len)
 
 				binary.Write(server_sock, binary.LittleEndian, hdr)
@@ -166,10 +166,10 @@ func TTCalcMain() {
 				}
 				server_sock.Write(unsafe.Slice(&reply_bytes[0], hdr.DataLen-1))
 
-				C.ax25_delete(reply_pp)
+				ax25_delete(reply_pp)
 			}
 
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		}
 	}
 } /* main */

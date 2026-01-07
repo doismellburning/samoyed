@@ -572,7 +572,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		}
 
 		C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_struct_audio_s)
-		var pp = C.ax25_from_frame((*C.uchar)(C.CBytes(kiss_msg_bytes[1:])), kiss_len-1, alevel)
+		var pp = ax25_from_frame((*C.uchar)(C.CBytes(kiss_msg_bytes[1:])), kiss_len-1, alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
@@ -583,8 +583,8 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			/* the high priority queue. */
 			/* Otherwise, it is an original for the low priority queue. */
 
-			if C.ax25_get_num_repeaters(pp) >= 1 &&
-				C.ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+			if ax25_get_num_repeaters(pp) >= 1 &&
+				ax25_get_h(pp, AX25_REPEATER_1) > 0 {
 				tq_append(channel, TQ_PRIO_0_HI, pp)
 			} else {
 				tq_append(channel, TQ_PRIO_1_LO, pp)

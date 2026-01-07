@@ -134,7 +134,7 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Convert it into AX.25 frame.
 	 */
 
-	var pp = C.ax25_from_text(C.CString(position_report), 1)
+	var pp = ax25_from_text(C.CString(position_report), 1)
 
 	if pp == nil {
 		fmt.Printf("Unexpected error in ax25_from_text.  Quitting.\n")
@@ -144,8 +144,8 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	var ax25_frame [C.AX25_MAX_PACKET_LEN]C.uchar
 	ax25_frame[0] = 0 // Insert channel before KISS encapsulation.
 
-	var frame_len = C.ax25_pack(pp, &ax25_frame[1])
-	C.ax25_delete(pp)
+	var frame_len = ax25_pack(pp, &ax25_frame[1])
+	ax25_delete(pp)
 
 	/*
 	 * Encapsulate as KISS and send to TNC.

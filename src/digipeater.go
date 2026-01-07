@@ -285,15 +285,15 @@ func digipeat_match(
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = C.ax25_get_first_not_repeated(pp)
+	var r = ax25_get_first_not_repeated(pp)
 
 	if r < C.AX25_REPEATER_1 {
 		return (nil)
 	}
 
 	var repeater [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pp, r, &repeater[0])
-	var ssid = C.ax25_get_ssid(pp, r)
+	ax25_get_addr_with_ssid(pp, r, &repeater[0])
+	var ssid = ax25_get_ssid(pp, r)
 
 	/* TODO KG
 	#if DEBUG
@@ -313,13 +313,13 @@ func digipeat_match(
 	 */
 
 	if C.strcmp(&repeater[0], mycall_rec) == 0 {
-		var result = C.ax25_dup(pp)
+		var result = ax25_dup(pp)
 		// FIXME KG assert (result != nil);
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		C.ax25_set_addr(result, r, mycall_xmit)
-		C.ax25_set_h(result, r)
+		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_h(result, r)
 		return (result)
 	}
 
@@ -329,7 +329,7 @@ func digipeat_match(
 	 * dedupe_remember rather than only frames out of digipeater.
 	 */
 	var source [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &source[0])
+	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &source[0])
 	if C.strcmp(&source[0], mycall_rec) == 0 {
 		return (nil)
 	}
@@ -369,11 +369,11 @@ func digipeat_match(
 	 */
 	var err = C.regexec(alias, &repeater[0], 0, nil, 0)
 	if err == 0 {
-		var result = C.ax25_dup(pp)
+		var result = ax25_dup(pp)
 		// FIXME KG assert (result != nil);
 
-		C.ax25_set_addr(result, r, mycall_xmit)
-		C.ax25_set_h(result, r)
+		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_h(result, r)
 		return (result)
 	} else if err != C.REG_NOMATCH {
 		var err_msg [100]C.char
@@ -392,21 +392,21 @@ func digipeat_match(
 	 */
 
 	if preempt != C.PREEMPT_OFF {
-		for r2 := r + 1; r2 < C.ax25_get_num_addr(pp); r2++ {
+		for r2 := r + 1; r2 < ax25_get_num_addr(pp); r2++ {
 			var repeater2 [AX25_MAX_ADDR_LEN]C.char
 
-			C.ax25_get_addr_with_ssid(pp, r2, &repeater2[0])
+			ax25_get_addr_with_ssid(pp, r2, &repeater2[0])
 
 			// text_color_set (DW_COLOR_DEBUG);
 			// dw_printf ("test match %d %s\n", r2, repeater2);
 
 			if C.strcmp(&repeater2[0], mycall_rec) == 0 ||
 				C.regexec(alias, &repeater2[0], 0, nil, 0) == 0 {
-				var result = C.ax25_dup(pp)
+				var result = ax25_dup(pp)
 				// FIXME KG assert (result != nil);
 
-				C.ax25_set_addr(result, r2, mycall_xmit)
-				C.ax25_set_h(result, r2)
+				ax25_set_addr(result, r2, mycall_xmit)
+				ax25_set_h(result, r2)
 
 				switch preempt {
 				case C.PREEMPT_DROP: /* remove all prior */
@@ -416,7 +416,7 @@ func digipeat_match(
 					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					for r2 > AX25_REPEATER_1 {
-						C.ax25_remove_addr(result, r2-1)
+						ax25_remove_addr(result, r2-1)
 						r2--
 					}
 				case C.PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
@@ -425,8 +425,8 @@ func digipeat_match(
 					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					r2--
-					for r2 >= AX25_REPEATER_1 && C.ax25_get_h(result, r2) == 0 {
-						C.ax25_set_h(result, r2)
+					for r2 >= AX25_REPEATER_1 && ax25_get_h(result, r2) == 0 {
+						ax25_set_h(result, r2)
 						r2--
 					}
 				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
@@ -440,8 +440,8 @@ func digipeat_match(
 				// with this option.  Should it be renamed as
 				// PREEMPT which is more descriptive?
 				default:
-					for r2 > AX25_REPEATER_1 && C.ax25_get_h(result, r2-1) == 0 {
-						C.ax25_remove_addr(result, r2-1)
+					for r2 > AX25_REPEATER_1 && ax25_get_h(result, r2-1) == 0 {
+						ax25_remove_addr(result, r2-1)
 						r2--
 					}
 				}
@@ -474,26 +474,26 @@ func digipeat_match(
 
 		if C.strlen(atgp) > 0 && C.strncasecmp(&repeater[0], atgp, C.strlen(atgp)) == 0 {
 			if ssid >= 1 && ssid <= 7 {
-				var result = C.ax25_dup(pp)
+				var result = ax25_dup(pp)
 				// FIXME KG assert (result != nil);
 
 				// First, remove any already used digipeaters.
 
-				for C.ax25_get_num_addr(result) >= 3 && C.ax25_get_h(result, AX25_REPEATER_1) == 1 {
-					C.ax25_remove_addr(result, AX25_REPEATER_1)
+				for ax25_get_num_addr(result) >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
+					ax25_remove_addr(result, AX25_REPEATER_1)
 					r--
 				}
 
 				ssid--
-				C.ax25_set_ssid(result, r, ssid) // could be zero.
+				ax25_set_ssid(result, r, ssid) // could be zero.
 				if ssid == 0 {
-					C.ax25_set_h(result, r)
+					ax25_set_h(result, r)
 				}
 
 				// Insert own call at beginning and mark it used.
 
-				C.ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
-				C.ax25_set_h(result, AX25_REPEATER_1)
+				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
+				ax25_set_h(result, AX25_REPEATER_1)
 				return (result)
 			}
 		}
@@ -509,23 +509,23 @@ func digipeat_match(
 		 */
 
 		if ssid == 1 {
-			var result = C.ax25_dup(pp)
+			var result = ax25_dup(pp)
 			// FIXME KG assert (result != nil);
 
-			C.ax25_set_addr(result, r, mycall_xmit)
-			C.ax25_set_h(result, r)
+			ax25_set_addr(result, r, mycall_xmit)
+			ax25_set_h(result, r)
 			return (result)
 		}
 
 		if ssid >= 2 && ssid <= 7 {
-			var result = C.ax25_dup(pp)
+			var result = ax25_dup(pp)
 			// FIXME KG assert (result != nil);
 
-			C.ax25_set_ssid(result, r, ssid-1) // should be at least 1
+			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
-			if C.ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
-				C.ax25_insert_addr(result, r, mycall_xmit)
-				C.ax25_set_h(result, r)
+			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
+				ax25_insert_addr(result, r, mycall_xmit)
+				ax25_set_h(result, r)
 			}
 			return (result)
 		}
@@ -573,7 +573,7 @@ func digi_regen(from_chan C.int, pp C.packet_t) {
 
 	for to_chan := range C.int(MAX_TOTAL_CHANS) {
 		if save_digi_config_p.regen[from_chan][to_chan] > 0 {
-			var result = C.ax25_dup(pp)
+			var result = ax25_dup(pp)
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
 				tq_append(to_chan, TQ_PRIO_1_LO, result)

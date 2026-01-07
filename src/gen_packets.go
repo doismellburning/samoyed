@@ -773,7 +773,7 @@ func send_packet(str string) {
 		//	X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-
 		//	X>X:NNNN
 
-		var pp = C.ax25_from_text(C.CString(str), 1)
+		var pp = ax25_from_text(C.CString(str), 1)
 		if pp == nil {
 			C.text_color_set(C.DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
@@ -781,20 +781,20 @@ func send_packet(str string) {
 		}
 
 		var pinfo *C.uchar
-		var info_len = C.ax25_get_info(pp, &pinfo)
+		var info_len = ax25_get_info(pp, &pinfo)
 		if info_len >= 3 && C.strncmp((*C.char)(unsafe.Pointer(pinfo)), C.CString("{DE"), 3) == 0 {
 			pinfo = (*C.uchar)(unsafe.Pointer(C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))) // pinfo += 3
 		}
 
-		var repeat = C.ax25_get_ssid(pp, C.AX25_DESTINATION)
+		var repeat = ax25_get_ssid(pp, C.AX25_DESTINATION)
 		if repeat == 0 {
 			repeat = 1
 		}
 
 		eas_send(0, pinfo, repeat, 500, 500)
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 	} else {
-		var pp = C.ax25_from_text(C.CString(str), 1)
+		var pp = ax25_from_text(C.CString(str), 1)
 		if pp == nil {
 			C.text_color_set(C.DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
@@ -802,7 +802,7 @@ func send_packet(str string) {
 		}
 
 		var fbuf [C.AX25_MAX_PACKET_LEN + 2]C.uchar
-		C.ax25_pack(pp, &fbuf[0])
+		ax25_pack(pp, &fbuf[0])
 
 		// If stereo, put same thing in each channel.
 
@@ -834,7 +834,7 @@ func send_packet(str string) {
 			layer2_send_frame(c, pp, 0, &modem)
 			layer2_preamble_postamble(c, 2, 1, &modem)
 		}
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 	}
 }
 

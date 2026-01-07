@@ -303,12 +303,12 @@ const (
 
 func frame_flavor(pp C.packet_t) flavor_t {
 
-	if C.ax25_is_aprs(pp) > 0 { // UI frame, PID 0xF0.
+	if ax25_is_aprs(pp) > 0 { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
 
 		var _dest [AX25_MAX_ADDR_LEN]C.char
 
-		C.ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_dest[0])
+		ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_dest[0])
 
 		var dest = C.GoString(&_dest[0])
 
@@ -327,7 +327,7 @@ func frame_flavor(pp C.packet_t) flavor_t {
 		/* Is there at least one digipeater AND has first one been used? */
 		/* I could be the first in the list or later.  Doesn't matter. */
 
-		if C.ax25_get_num_repeaters(pp) >= 1 && C.ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+		if ax25_get_num_repeaters(pp) >= 1 && ax25_get_h(pp, AX25_REPEATER_1) > 0 {
 			return (FLAVOR_APRS_DIGI)
 		}
 
@@ -437,7 +437,7 @@ func xmit_thread(channel C.int) {
 						xmit_speech(channel, pp)
 
 					case FLAVOR_MORSE:
-						var ssid = C.ax25_get_ssid(pp, AX25_DESTINATION)
+						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
 						var wpm C.int = C.MORSE_DEFAULT_WPM
 						if ssid > 0 {
 							wpm = ssid * 2
@@ -456,7 +456,7 @@ func xmit_thread(channel C.int) {
 						xmit_morse(channel, pp, wpm)
 
 					case FLAVOR_DTMF:
-						var speed = C.ax25_get_ssid(pp, AX25_DESTINATION)
+						var speed = ax25_get_ssid(pp, AX25_DESTINATION)
 						if speed == 0 {
 							speed = 5 // default half of maximum
 						}
@@ -491,18 +491,18 @@ func xmit_thread(channel C.int) {
 					dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
 
 					var stemp [1024]C.char /* max size needed? */
-					C.ax25_format_addrs(pp, &stemp[0])
+					ax25_format_addrs(pp, &stemp[0])
 
 					var pinfo *C.uchar
-					var info_len = C.ax25_get_info(pp, &pinfo)
+					var info_len = ax25_get_info(pp, &pinfo)
 
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
-					C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
+					ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 					dw_printf("\n")
-					C.ax25_delete(pp)
+					ax25_delete(pp)
 				} /* wait for clear channel error. */
 			} /* Have pp */
 		} /* while queue not empty */
@@ -665,7 +665,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 		dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 	#endif
 	*/
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 	/*
 	 * See if we can bundle additional frames into this transmission.
@@ -715,7 +715,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 					        dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 				#endif
 				*/
-				C.ax25_delete(pp)
+				ax25_delete(pp)
 			}
 		} else {
 			done = true
@@ -819,7 +819,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp C.packet_t, max_bundle C.int
 
 func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 
-	if C.ax25_is_null_frame(pp) > 0 {
+	if ax25_is_null_frame(pp) > 0 {
 
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
@@ -844,10 +844,10 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 	var ts = timestampPrefix()
 
 	var stemp [1024]C.char
-	C.ax25_format_addrs(pp, &stemp[0])
+	ax25_format_addrs(pp, &stemp[0])
 
 	var pinfo *C.uchar
-	var info_len = C.ax25_get_info(pp, &pinfo)
+	var info_len = ax25_get_info(pp, &pinfo)
 
 	text_color_set(DW_COLOR_XMIT)
 	/*
@@ -864,12 +864,12 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
-	if C.ax25_is_aprs(pp) == 0 {
+	if ax25_is_aprs(pp) == 0 {
 		var cr C.cmdres_t
 		var desc [80]C.char
 		var pf, nr, ns C.int
 
-		var ftype = C.ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
+		var ftype = ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
 
 		dw_printf("(%s)", C.GoString(&desc[0]))
 
@@ -880,15 +880,15 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 			xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))
 			dw_printf(" %s\n", C.GoString(&info2text[0]))
 		} else {
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 			dw_printf("\n")
 		}
 	} else {
-		C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
+		ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 		dw_printf("\n")
 	}
 
-	C.ax25_check_addresses(pp)
+	ax25_check_addresses(pp)
 
 	/* Optional hex dump of packet. */
 
@@ -896,7 +896,7 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		C.ax25_hex_dump(pp)
+		ax25_hex_dump(pp)
 		dw_printf("------\n")
 	}
 
@@ -953,7 +953,7 @@ func xmit_speech(c C.int, pp C.packet_t) {
 	var ts = timestampPrefix()
 
 	var pinfo *C.uchar
-	C.ax25_get_info(pp, &pinfo)
+	ax25_get_info(pp, &pinfo)
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
@@ -961,7 +961,7 @@ func xmit_speech(c C.int, pp C.packet_t) {
 	if C.strlen(&save_audio_config_p.tts_script[0]) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -981,7 +981,7 @@ func xmit_speech(c C.int, pp C.packet_t) {
 	 */
 
 	C.ptt_set(OCTYPE_PTT, c, 0)
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */
@@ -1042,7 +1042,7 @@ func xmit_morse(c C.int, pp C.packet_t, wpm C.int) {
 	var ts = timestampPrefix()
 
 	var pinfo *C.uchar
-	C.ax25_get_info(pp, &pinfo)
+	ax25_get_info(pp, &pinfo)
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
@@ -1064,7 +1064,7 @@ func xmit_morse(c C.int, pp C.packet_t, wpm C.int) {
 	}
 
 	C.ptt_set(OCTYPE_PTT, c, 0)
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 } /* end xmit_morse */
 
 /*-------------------------------------------------------------------
@@ -1094,7 +1094,7 @@ func xmit_dtmf(c C.int, pp C.packet_t, speed C.int) {
 	var ts = timestampPrefix()
 
 	var pinfo *C.uchar
-	C.ax25_get_info(pp, &pinfo)
+	ax25_get_info(pp, &pinfo)
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
@@ -1119,7 +1119,7 @@ func xmit_dtmf(c C.int, pp C.packet_t, speed C.int) {
 	}
 
 	C.ptt_set(OCTYPE_PTT, c, 0)
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 } /* end xmit_dtmf */
 
 /*-------------------------------------------------------------------

@@ -127,7 +127,7 @@ func GET_PAYLOAD_BYTE_COUNT(hdr *C.uchar) C.int {
 // Return -1 if translation is not possible.  Fall back to type 0 header in this case.
 
 func encode_pid(pp C.packet_t) C.int {
-	var pid = C.ax25_get_pid(pp)
+	var pid = ax25_get_pid(pp)
 
 	if (pid & 0x30) == 0x20 {
 		return (0x2) // AX.25 Layer 3
@@ -221,14 +221,14 @@ func decode_pid(pid C.int) C.int {
 func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	C.memset(unsafe.Pointer(hdr), 0, IL2P_HEADER_SIZE)
 
-	if C.ax25_get_num_addr(pp) != 2 {
+	if ax25_get_num_addr(pp) != 2 {
 		// Only two addresses are allowed for type 1 header.
 		return (-1)
 	}
 
 	// Check does not apply for 'U' frames but put in one place rather than two.
 
-	if C.ax25_get_modulo(pp) == 128 {
+	if ax25_get_modulo(pp) == 128 {
 		return (-1)
 	}
 
@@ -237,11 +237,11 @@ func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	var dst_addr [AX25_MAX_ADDR_LEN]C.char
 	var src_addr [AX25_MAX_ADDR_LEN]C.char
 
-	C.ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &dst_addr[0])
-	var dst_ssid = C.ax25_get_ssid(pp, AX25_DESTINATION)
+	ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &dst_addr[0])
+	var dst_ssid = ax25_get_ssid(pp, AX25_DESTINATION)
 
-	C.ax25_get_addr_no_ssid(pp, AX25_SOURCE, &src_addr[0])
-	var src_ssid = C.ax25_get_ssid(pp, AX25_SOURCE)
+	ax25_get_addr_no_ssid(pp, AX25_SOURCE, &src_addr[0])
+	var src_ssid = ax25_get_ssid(pp, AX25_SOURCE)
 
 	for i := 0; ; i++ {
 		var a = (*C.uchar)(unsafe.Add(unsafe.Pointer(&dst_addr[0]), i))
@@ -278,7 +278,7 @@ func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
 
-	var frame_type = C.ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	var frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 
 	//dw_printf ("%s(): %s-%d>%s-%d: %s\n", __func__, src_addr, src_ssid, dst_addr, dst_ssid, description);
 
@@ -417,7 +417,7 @@ func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 
 	var pinfo *C.uchar
 
-	var info_len = C.ax25_get_info(pp, &pinfo)
+	var info_len = ax25_get_info(pp, &pinfo)
 	if info_len < 0 || info_len > IL2P_MAX_PAYLOAD_SIZE {
 		return (-2)
 	}
@@ -558,7 +558,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
-		var ftype C.ax25_frame_type_t
+		var ftype ax25_frame_type_t
 		switch control & 0x03 {
 		case 0:
 			ftype = frame_type_S_RR
@@ -583,7 +583,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var axpid C.int = 0 // unused for U other than UI.
-		var ftype C.ax25_frame_type_t
+		var ftype ax25_frame_type_t
 		switch (control >> 3) & 0x7 {
 		case 0:
 			ftype = frame_type_U_SABM
@@ -671,7 +671,7 @@ func il2p_type_0_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	SET_FEC_LEVEL(hdr, max_fec)
 	SET_HDR_TYPE(hdr, 0)
 
-	var frame_len = C.ax25_get_frame_len(pp)
+	var frame_len = ax25_get_frame_len(pp)
 
 	if frame_len < 14 || frame_len > IL2P_MAX_PAYLOAD_SIZE {
 		return (-2)

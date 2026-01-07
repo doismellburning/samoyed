@@ -654,10 +654,10 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 	}
 
 	var stemp [500]C.char
-	C.ax25_format_addrs(pp, &stemp[0])
+	ax25_format_addrs(pp, &stemp[0])
 
 	var pinfo *C.uchar
-	var info_len = C.ax25_get_info(pp, &pinfo)
+	var info_len = ax25_get_info(pp, &pinfo)
 
 	/* Print so we can see what is going on. */
 
@@ -668,13 +668,13 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 
 	var h C.int
 	var heard string
-	if C.ax25_get_num_addr(pp) == 0 {
+	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = C.ax25_get_heard(pp)
+		h = ax25_get_heard(pp)
 		var _heard [2*AX25_MAX_ADDR_LEN + 20]C.char
-		C.ax25_get_addr_with_ssid(pp, h, &_heard[0])
+		ax25_get_addr_with_ssid(pp, h, &_heard[0])
 		heard = C.GoString(&_heard[0])
 	}
 
@@ -695,7 +695,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 	}
 
 	var alevel_text [C.AX25_ALEVEL_TO_TEXT_SIZE]C.char
-	C.ax25_alevel_to_text(alevel, &alevel_text[0])
+	ax25_alevel_to_text(alevel, &alevel_text[0])
 
 	/* As suggested by KJ4ERJ, if we are receiving from */
 	/* WIDEn-0, it is quite likely (but not guaranteed), that */
@@ -707,7 +707,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 		len(heard) == 5 {
 
 		var probably_really [AX25_MAX_ADDR_LEN]C.char
-		C.ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
+		ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
 
 		heard += " (probably " + C.GoString(&probably_really[0]) + ")"
 	}
@@ -732,7 +732,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 
 	// Display channel with subchannel/slice if applicable.
 
-	if C.ax25_is_aprs(pp) != 0 {
+	if ax25_is_aprs(pp) != 0 {
 		text_color_set(DW_COLOR_REC)
 	} else {
 		text_color_set(DW_COLOR_DEBUG)
@@ -749,7 +749,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 	}
 
 	dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
-	C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
+	ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
 	dw_printf("\n")
 
 	/*
@@ -759,7 +759,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 	if h_opt {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		C.ax25_hex_dump(pp)
+		ax25_hex_dump(pp)
 		dw_printf("------\n")
 	}
 
@@ -781,7 +781,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 		#endif
 	*/
 
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 
 } /* end fake dlq_append */
 

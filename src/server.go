@@ -475,11 +475,11 @@ func server_send_rec_packet(channel C.int, pp C.packet_t, fbuf *C.uchar, flen C.
 			agwpe_msg.Header.DataKind = 'K'
 
 			var callFrom [AX25_MAX_ADDR_LEN]C.char
-			C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
+			ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
 			copy(agwpe_msg.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(&callFrom[0]), AX25_MAX_ADDR_LEN))
 
 			var callTo [AX25_MAX_ADDR_LEN]C.char
-			C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
+			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
 			copy(agwpe_msg.Header.CallTo[:], C.GoBytes(unsafe.Pointer(&callTo[0]), AX25_MAX_ADDR_LEN))
 
 			agwpe_msg.Header.DataLen = uint32(flen + 1)
@@ -529,11 +529,11 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 
 			var callFrom [AX25_MAX_ADDR_LEN]C.char
-			C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
+			ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
 			copy(agwpe_msg.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(&callFrom[0]), AX25_MAX_ADDR_LEN))
 
 			var callTo [AX25_MAX_ADDR_LEN]C.char
-			C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
+			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
 			copy(agwpe_msg.Header.CallTo[:], C.GoBytes(unsafe.Pointer(&callTo[0]), AX25_MAX_ADDR_LEN))
 
 			/* http://uz7ho.org.ua/includes/agwpeapi.htm#_Toc500723812 */
@@ -581,7 +581,7 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 			// Information if any with \r.
 
 			var pinfo *C.uchar
-			var info_len = C.ax25_get_info(pp, &pinfo)
+			var info_len = ax25_get_info(pp, &pinfo)
 			var msg_data_len = len(agwpe_msg.Data) // result length so far
 
 			if info_len > 0 && pinfo != nil {
@@ -631,12 +631,12 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 func mon_addrs(channel C.int, pp C.packet_t) []byte {
 
 	var src [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
 
 	var dst [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst[0])
+	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst[0])
 
-	var num_digi = C.ax25_get_num_repeaters(pp)
+	var num_digi = ax25_get_num_repeaters(pp)
 
 	if num_digi > 0 {
 		var via string // complete via path
@@ -648,14 +648,14 @@ func mon_addrs(channel C.int, pp C.packet_t) []byte {
 				via += "," // comma if not first address
 			}
 
-			C.ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j, &digiaddr[0])
+			ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j, &digiaddr[0])
 			via += C.GoString(&digiaddr[0])
 			/*
 				#if 0  // Mark each used with * as seen in UZ7HO SoundModem.
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
 				#else */
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
-			if AX25_REPEATER_1+j == C.ax25_get_heard(pp) {
+			if AX25_REPEATER_1+j == ax25_get_heard(pp) {
 				// #endif
 				via += "*"
 			}
@@ -685,7 +685,7 @@ func mon_desc(pp C.packet_t) (byte, string) {
 	var ns C.int          // N(S) Send sequence number.
 	var nr C.int          // N(R) Received sequence number.
 
-	var ftype = C.ax25_frame_type(pp, &cr, &ignore[0], &pf, &nr, &ns)
+	var ftype = ax25_frame_type(pp, &cr, &ignore[0], &pf, &nr, &ns)
 	var pf_text string // P or F depending on whether command or response.
 
 	switch cr {
@@ -704,15 +704,15 @@ func mon_desc(pp C.packet_t) (byte, string) {
 	}
 
 	var pinfo *C.uchar // I, UI, XID, SREJ, TEST can have information part.
-	var info_len = C.ax25_get_info(pp, &pinfo)
+	var info_len = ax25_get_info(pp, &pinfo)
 
 	switch ftype {
 
 	case frame_type_I:
-		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, C.ax25_get_pid(pp), info_len, pf_text, pf)
+		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, ax25_get_pid(pp), info_len, pf_text, pf)
 
 	case frame_type_U_UI:
-		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", C.ax25_get_pid(pp), info_len, pf_text, pf)
+		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", ax25_get_pid(pp), info_len, pf_text, pf)
 
 	case frame_type_S_RR:
 		return 'S', fmt.Sprintf("<RR R%d %s=%d >", nr, pf_text, pf)
@@ -1247,7 +1247,7 @@ func cmd_listen_thread(client C.int) {
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("Transmit '%s'\n", stemp);
 
-				var pp = C.ax25_from_text(C.CString(stemp), 1)
+				var pp = ax25_from_text(C.CString(stemp), 1)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
@@ -1256,10 +1256,10 @@ func cmd_listen_thread(client C.int) {
 				}
 
 				var data = cmd.Data[1+10*ndigi:]
-				C.ax25_set_info(pp, (*C.uchar)(C.CBytes(data)), C.int(cmd.Header.DataLen)-ndigi*10-1)
+				ax25_set_info(pp, (*C.uchar)(C.CBytes(data)), C.int(cmd.Header.DataLen)-ndigi*10-1)
 
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-				C.ax25_set_pid(pp, C.int(pid))
+				ax25_set_pid(pp, C.int(pid))
 
 				/* This goes into the low priority queue because it is an original. */
 
@@ -1302,7 +1302,7 @@ func cmd_listen_thread(client C.int) {
 
 				var alevel C.alevel_t
 				C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_alevel_t)
-				var pp = C.ax25_from_frame((*C.uchar)(C.CBytes(cmd.Data[1:])), C.int(cmd.Header.DataLen)-1, alevel)
+				var pp = ax25_from_frame((*C.uchar)(C.CBytes(cmd.Data[1:])), C.int(cmd.Header.DataLen)-1, alevel)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
@@ -1315,8 +1315,8 @@ func cmd_listen_thread(client C.int) {
 					/* the high priority queue. */
 					/* Otherwise, it is an original for the low priority queue. */
 
-					if C.ax25_get_num_repeaters(pp) >= 1 &&
-						C.ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+					if ax25_get_num_repeaters(pp) >= 1 &&
+						ax25_get_h(pp, AX25_REPEATER_1) > 0 {
 						tq_append(C.int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 					} else {
 						tq_append(C.int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
@@ -1501,16 +1501,16 @@ func cmd_listen_thread(client C.int) {
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("Transmit '%s'\n", stemp);
 
-				var pp = C.ax25_from_text(C.CString(stemp), 1)
+				var pp = ax25_from_text(C.CString(stemp), 1)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Failed to create frame from AGW 'M' message.\n")
 				}
 
-				C.ax25_set_info(pp, (*C.uchar)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
+				ax25_set_info(pp, (*C.uchar)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-				C.ax25_set_pid(pp, C.int(pid))
+				ax25_set_pid(pp, C.int(pid))
 
 				tq_append(C.int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 			}

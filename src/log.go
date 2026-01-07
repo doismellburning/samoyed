@@ -254,13 +254,13 @@ func log_write(channel int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t
 		var heard = ""
 		var h C.int
 		if pp != nil {
-			if C.ax25_get_num_addr(pp) == 0 {
+			if ax25_get_num_addr(pp) == 0 {
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = C.ax25_get_heard(pp)
+				h = ax25_get_heard(pp)
 				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
-				C.ax25_get_addr_with_ssid(pp, h, &_heard[0])
+				ax25_get_addr_with_ssid(pp, h, &_heard[0])
 				heard = C.GoString(&_heard[0])
 			}
 
@@ -269,19 +269,19 @@ func log_write(channel int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t
 				unicode.IsDigit(rune(heard[4])) &&
 				len(heard) == 5 {
 				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
-				C.ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
+				ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
 				heard = C.GoString(&_heard[0])
 				heard += "?"
 			}
 		}
 
 		var _alevel_text [40]C.char
-		C.ax25_alevel_to_text(alevel, &_alevel_text[0])
+		ax25_alevel_to_text(alevel, &_alevel_text[0])
 		var alevel_text = C.GoString(&_alevel_text[0])
 
 		var sdti string
 		if pp != nil {
-			sdti = string(rune(C.ax25_get_dti(pp)))
+			sdti = string(rune(ax25_get_dti(pp)))
 		}
 
 		var sname = C.GoString(&A.g_src[0])
@@ -383,13 +383,13 @@ func log_rr_bits(A *C.decode_aprs_t, pp C.packet_t) { //nolint:gocritic
 
 		if pp != nil {
 			var h C.int
-			if C.ax25_get_num_addr(pp) == 0 {
+			if ax25_get_num_addr(pp) == 0 {
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = C.ax25_get_heard(pp)
+				h = ax25_get_heard(pp)
 				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
-				C.ax25_get_addr_with_ssid(pp, h, &_heard[0])
+				ax25_get_addr_with_ssid(pp, h, &_heard[0])
 				heard = C.GoString(&_heard[0])
 			}
 
@@ -398,15 +398,15 @@ func log_rr_bits(A *C.decode_aprs_t, pp C.packet_t) { //nolint:gocritic
 				unicode.IsDigit(rune(heard[4])) &&
 				len(heard) == 5 {
 				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
-				C.ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
+				ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
 				heard = C.GoString(&_heard[0])
 				heard += "?"
 			}
 
-			var src_c = C.ax25_get_h(pp, C.AX25_SOURCE)
-			var dst_c = C.ax25_get_h(pp, C.AX25_DESTINATION)
-			var src_rr = C.ax25_get_rr(pp, C.AX25_SOURCE)
-			var dst_rr = C.ax25_get_rr(pp, C.AX25_DESTINATION)
+			var src_c = ax25_get_h(pp, C.AX25_SOURCE)
+			var dst_c = ax25_get_h(pp, C.AX25_DESTINATION)
+			var src_rr = ax25_get_rr(pp, C.AX25_SOURCE)
+			var dst_rr = ax25_get_rr(pp, C.AX25_DESTINATION)
 
 			// C RR	for source
 			// C RR	for destination

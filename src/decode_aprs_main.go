@@ -68,7 +68,6 @@ package direwolf
 // #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"
-// extern int DECODE_APRS_UTIL;
 // void hex_dump (unsigned char *p, int len);
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -O0
 import "C"
@@ -94,7 +93,7 @@ func byteSliceToCUChars(data []byte) []C.uchar {
 }
 
 func DecodeAPRSMain() {
-	C.DECODE_APRS_UTIL = 1 // DECAMAIN define replacement
+	DECODE_APRS_UTIL = true // DECAMAIN define replacement
 
 	C.text_color_init(0)
 	C.text_color_set(C.DW_COLOR_INFO)
@@ -117,7 +116,7 @@ func DecodeAPRSLine(line string) {
 	/* Try to process it. */
 
 	fmt.Printf("\n")
-	C.ax25_safe_print(C.CString(line), -1, 0)
+	ax25_safe_print(C.CString(line), -1, 0)
 	fmt.Printf("\n")
 
 	// Do we have monitor format, KISS, or AX.25 frame?
@@ -172,28 +171,27 @@ func DecodeAPRSLine(line string) {
 			// Here we know it is 0, so we take a short cut and
 			// remove it before, rather than after, the conversion.
 
-			// FIXME KG Check
-			bytes = kiss_unwrap(kiss_frame)
+			bytes = kiss_unwrap(kiss_frame[1:])
 		}
 
 		// Treat as AX.25.
 
 		var alevel C.alevel_t
 
-		var pp = C.ax25_from_frame((*C.uchar)(C.CBytes(bytes)), C.int(len(bytes)), alevel)
+		var pp = ax25_from_frame((*C.uchar)(C.CBytes(bytes)), C.int(len(bytes)), alevel)
 		if pp != nil {
 			var addrs [120]C.char
 			var pinfo *C.uchar
 
 			fmt.Printf("--- AX.25 frame ---\n")
-			C.ax25_hex_dump(pp)
+			ax25_hex_dump(pp)
 			fmt.Printf("-------------------\n")
 
-			C.ax25_format_addrs(pp, &addrs[0])
+			ax25_format_addrs(pp, &addrs[0])
 			fmt.Printf("%s", C.GoString(&addrs[0]))
 
-			var info_len = C.ax25_get_info(pp, &pinfo)
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1) // Display non-ASCII to hexadecimal.
+			var info_len = ax25_get_info(pp, &pinfo)
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
 			var A C.decode_aprs_t
@@ -201,16 +199,16 @@ func DecodeAPRSLine(line string) {
 
 			decode_aprs_print(&A) // Now print it in human readable format.
 
-			C.ax25_check_addresses(pp) // Errors for invalid addresses.
+			ax25_check_addresses(pp) // Errors for invalid addresses.
 
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		} else {
 			fmt.Printf("Could not construct AX.25 frame from bytes supplied!\n\n")
 		}
 	} else {
 		// Normal monitoring format.
 
-		var pp = C.ax25_from_text(C.CString(line), 1)
+		var pp = ax25_from_text(C.CString(line), 1)
 		if pp != nil {
 			var A C.decode_aprs_t
 
@@ -224,7 +222,7 @@ func DecodeAPRSLine(line string) {
 
 			// Future?  Add -d option to include hex dump and maybe KISS?
 
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		} else {
 			fmt.Printf("ERROR - Could not parse monitoring format input!\n\n")
 		}

@@ -834,7 +834,7 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 	}
 
 	var strict C.int = 1 // Strict packet checking because they will go over air.
-	var pp = C.ax25_from_text(C.CString(beacon_text), strict)
+	var pp = ax25_from_text(C.CString(beacon_text), strict)
 
 	if pp != nil {
 		/* Send to desired destination. */
@@ -845,7 +845,7 @@ func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
 			dw_printf("[ig] %s\n", beacon_text)
 
 			igate_send_rec_packet(-1, pp) // Channel -1 to avoid RF>IS filtering.
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 

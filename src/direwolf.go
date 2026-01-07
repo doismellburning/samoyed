@@ -859,10 +859,10 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	}
 
 	var stemp [500]C.char
-	C.ax25_format_addrs(pp, &stemp[0])
+	ax25_format_addrs(pp, &stemp[0])
 
 	var pinfo *C.uchar
-	var info_len = C.ax25_get_info(pp, &pinfo)
+	var info_len = ax25_get_info(pp, &pinfo)
 
 	/* Print so we can see what is going on. */
 
@@ -871,12 +871,12 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 	var h C.int
 	var heard [C.AX25_MAX_ADDR_LEN]C.char
-	if C.ax25_get_num_addr(pp) == 0 {
+	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = C.ax25_get_heard(pp)
-		C.ax25_get_addr_with_ssid(pp, h, &heard[0])
+		h = ax25_get_heard(pp)
+		ax25_get_addr_with_ssid(pp, h, &heard[0])
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -893,7 +893,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 			var alevel_text [C.AX25_ALEVEL_TO_TEXT_SIZE]C.char
 
-			C.ax25_alevel_to_text(alevel, &alevel_text[0])
+			ax25_alevel_to_text(alevel, &alevel_text[0])
 
 			// Experiment: try displaying the DC bias.
 			// Should be 0 for soundcard but could show mistuning with SDR.
@@ -914,7 +914,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 				unicode.IsDigit(rune(_heard[4])) &&
 				len(_heard) == 5 {
 				var probably_really [C.AX25_MAX_ADDR_LEN]C.char
-				C.ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
+				ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
 
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
@@ -976,7 +976,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		text_color_set(DW_COLOR_REC)
 		dw_printf("[%d%s] ", channel, ts)
 	default:
-		if C.ax25_is_aprs(pp) > 0 {
+		if ax25_is_aprs(pp) > 0 {
 			text_color_set(DW_COLOR_REC)
 		} else {
 			text_color_set(DW_COLOR_DECODED)
@@ -998,19 +998,19 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
 	var asciiOnly C.int = 0 // Quick bodge because these C bools are ints...
-	if (C.ax25_is_aprs(pp) == 0) && !d_u_opt {
+	if (ax25_is_aprs(pp) == 0) && !d_u_opt {
 		asciiOnly = 1
 	}
 
-	if C.ax25_is_aprs(pp) == 0 {
+	if ax25_is_aprs(pp) == 0 {
 		var cr C.cmdres_t
 		var desc [80]C.char
 		var pf, nr, ns C.int
 
-		var ftype = C.ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
+		var ftype = ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
-		info_len = C.ax25_get_info(pp, &pinfo)
+		info_len = ax25_get_info(pp, &pinfo)
 
 		dw_printf("(%s)", C.GoString(&desc[0]))
 		if ftype == C.frame_type_U_XID {
@@ -1020,7 +1020,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))
 			dw_printf(" %s\n", C.GoString(&info2text[0]))
 		} else {
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
 			dw_printf("\n")
 		}
 	} else {
@@ -1030,7 +1030,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
 
-		C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
+		ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
 		dw_printf("\n")
 	}
 
@@ -1047,7 +1047,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		if hasNonPrintable {
 			text_color_set(DW_COLOR_DEBUG)
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1)
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1)
 			dw_printf("\n")
 		}
 	}
@@ -1057,7 +1057,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	if d_p_opt {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		C.ax25_hex_dump(pp)
+		ax25_hex_dump(pp)
 		dw_printf("------\n")
 	}
 
@@ -1069,7 +1069,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	 */
 	var ais_obj_packet [300]C.char
 
-	if C.ax25_is_aprs(pp) > 0 {
+	if ax25_is_aprs(pp) > 0 {
 		var A C.decode_aprs_t
 
 		// we still want to decode it for logging and other processing.
@@ -1087,7 +1087,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * Perform validity check on each address.
 		 * This should print an error message if any issues.
 		 */
-		C.ax25_check_addresses(pp)
+		ax25_check_addresses(pp)
 
 		// Send to log file.
 
@@ -1150,7 +1150,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	// We see the same sequence in tt_user.c.
 
 	var fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
-	var flen = C.ax25_pack(pp, &fbuf[0])
+	var flen = ax25_pack(pp, &fbuf[0])
 
 	server_send_rec_packet(channel, pp, &fbuf[0], flen)                                                                  // AGW net protocol
 	kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)    // KISS TCP
@@ -1158,16 +1158,16 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
-		var ao_pp = C.ax25_from_text(&ais_obj_packet[0], 1)
+		var ao_pp = ax25_from_text(&ais_obj_packet[0], 1)
 		if ao_pp != nil {
 			var ao_fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
-			var ao_flen = C.ax25_pack(ao_pp, &ao_fbuf[0])
+			var ao_flen = ax25_pack(ao_pp, &ao_fbuf[0])
 
 			server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
 			kissnet_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
 			kissserial_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
 			kisspt_send_rec_packet(channel, C.KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
-			C.ax25_delete(ao_pp)
+			ax25_delete(ao_pp)
 		}
 	}
 
@@ -1206,7 +1206,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if C.ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
+		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
 			igate_send_rec_packet(channel, pp)
 		}
 
@@ -1224,7 +1224,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if C.ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
+		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
 			digipeater(channel, pp)
 		}
 

@@ -223,7 +223,7 @@ func mheard_save_rf(channel C.int, A *C.decode_aprs_t, pp C.packet_t, alevel C.a
 	var now = time.Now()
 
 	var _source [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &_source[0])
+	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &_source[0])
 	var source = C.GoString(&_source[0])
 
 	/*
@@ -236,7 +236,7 @@ func mheard_save_rf(channel C.int, A *C.decode_aprs_t, pp C.packet_t, alevel C.a
 	 * situation.  Look for my rant in the User Guide.
 	 */
 
-	var hops = C.ax25_get_heard(pp) - AX25_SOURCE
+	var hops = ax25_get_heard(pp) - AX25_SOURCE
 	/*
 	 *		Consider the following scenario:
 	 *
@@ -267,12 +267,12 @@ func mheard_save_rf(channel C.int, A *C.decode_aprs_t, pp C.packet_t, alevel C.a
 	// HACK - Reduce hop count by number of used WIDEn-0 addresses.
 
 	if hops > 1 {
-		for k := C.int(0); k < C.ax25_get_num_repeaters(pp); k++ {
+		for k := C.int(0); k < ax25_get_num_repeaters(pp); k++ {
 			var _digi [AX25_MAX_ADDR_LEN]C.char
-			C.ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k, &_digi[0])
+			ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k, &_digi[0])
 			var digi = C.GoString(&_digi[0])
-			var ssid = C.ax25_get_ssid(pp, AX25_REPEATER_1+k)
-			var used = C.ax25_get_h(pp, AX25_REPEATER_1+k)
+			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+k)
+			var used = ax25_get_h(pp, AX25_REPEATER_1+k)
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Examining %s-%d  used=%d.\n", digi, ssid, used);

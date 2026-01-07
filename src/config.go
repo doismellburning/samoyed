@@ -452,7 +452,7 @@ func check_via_path(via_path string) int {
 		var addr [AX25_MAX_ADDR_LEN]C.char
 		var ssid C.int
 		var heard C.int
-		var ok = C.ax25_parse_addr(AX25_REPEATER_1-1+C.int(num_digi), C.CString(part), strict, &addr[0], &ssid, &heard)
+		var ok = ax25_parse_addr(AX25_REPEATER_1-1+C.int(num_digi), C.CString(part), strict, &addr[0], &ssid, &heard)
 
 		if ok == 0 {
 			/* TODO KG
@@ -1239,7 +1239,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				/* Might change to warning someday. */
 				t = strings.ToUpper(t)
 
-				if C.ax25_parse_addr(-1, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) == 0 {
+				if ax25_parse_addr(-1, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) == 0 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Invalid value for MYCALL command on line %d.\n", line)
 					continue
@@ -5186,7 +5186,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				var ssid C.int
 				var heard C.int
 
-				if C.ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
+				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
 					p_misc_config.v20_addrs = (**C.char)(C.realloc(unsafe.Pointer(p_misc_config.v20_addrs), C.size_t(C.int(unsafe.Sizeof(p_misc_config.v20_addrs))*(p_misc_config.v20_count+1))))
 					C.strcpy((*C.char)(unsafe.Add(unsafe.Pointer(p_misc_config.v20_addrs), p_misc_config.v20_count)), C.CString(t))
 					p_misc_config.v20_count++
@@ -5220,7 +5220,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				var ssid C.int
 				var heard C.int
 
-				if C.ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
+				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
 					p_misc_config.noxid_addrs = (**C.char)(C.realloc(unsafe.Pointer(p_misc_config.noxid_addrs), C.size_t(C.int(unsafe.Sizeof(p_misc_config.noxid_addrs))*(p_misc_config.noxid_count+1))))
 					C.strcpy((*C.char)(unsafe.Add(unsafe.Pointer(p_misc_config.noxid_addrs), p_misc_config.noxid_count)), C.CString(t))
 					p_misc_config.noxid_count++

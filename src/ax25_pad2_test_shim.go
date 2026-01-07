@@ -42,7 +42,7 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	/* U frame */
 
-	for ftype := C.ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
+	for ftype := ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
 			var cmin C.cmdres_t = 0
 			var cmax C.cmdres_t = 0
@@ -85,8 +85,8 @@ func ax25_pad2_test_main(t *testing.T) {
 
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
 				check_ax25_u_frame(t, pp, cr, ftype, pf)
-				C.ax25_hex_dump(pp)
-				C.ax25_delete(pp)
+				ax25_hex_dump(pp)
+				ax25_delete(pp)
 			}
 		}
 	}
@@ -98,7 +98,7 @@ func ax25_pad2_test_main(t *testing.T) {
 	C.strcpy(&addrs[2][0], C.CString("DIGI1-1"))
 	num_addr = 3
 
-	for ftype := C.ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
+	for ftype := ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
 			var modulo C.int = 8
 			var nr = modulo/2 + 1
@@ -110,8 +110,8 @@ func ax25_pad2_test_main(t *testing.T) {
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-				C.ax25_hex_dump(pp)
-				C.ax25_delete(pp)
+				ax25_hex_dump(pp)
+				ax25_delete(pp)
 			}
 
 			modulo = 128
@@ -124,8 +124,8 @@ func ax25_pad2_test_main(t *testing.T) {
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-				C.ax25_hex_dump(pp)
-				C.ax25_delete(pp)
+				ax25_hex_dump(pp)
+				ax25_delete(pp)
 			}
 		}
 	}
@@ -134,7 +134,7 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	var srej_info = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype C.ax25_frame_type_t = C.frame_type_S_SREJ
+	var ftype ax25_frame_type_t = C.frame_type_S_SREJ
 	for pf := C.int(0); pf <= 1; pf++ {
 		var modulo C.int = 128
 		var nr C.int = 127
@@ -146,8 +146,8 @@ func ax25_pad2_test_main(t *testing.T) {
 		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
 		check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-		C.ax25_hex_dump(pp)
-		C.ax25_delete(pp)
+		ax25_hex_dump(pp)
+		ax25_delete(pp)
 	}
 
 	dw_printf("\n----------\n\n")
@@ -169,8 +169,8 @@ func ax25_pad2_test_main(t *testing.T) {
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, pinfo, info_len)
 
-			C.ax25_hex_dump(pp)
-			C.ax25_delete(pp)
+			ax25_hex_dump(pp)
+			ax25_delete(pp)
 		}
 
 		modulo = 128
@@ -184,8 +184,8 @@ func ax25_pad2_test_main(t *testing.T) {
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, pinfo, info_len)
 
-			C.ax25_hex_dump(pp)
-			C.ax25_delete(pp)
+			ax25_hex_dump(pp)
+			ax25_delete(pp)
 		}
 	}
 
@@ -194,7 +194,7 @@ func ax25_pad2_test_main(t *testing.T) {
 	dw_printf("\nSUCCESS!\n")
 } /* end main */
 
-func check_ax25_u_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype C.ax25_frame_type_t, pf C.int) {
+func check_ax25_u_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype ax25_frame_type_t, pf C.int) {
 	t.Helper()
 
 	var check_cr C.cmdres_t
@@ -203,7 +203,7 @@ func check_ax25_u_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype C.
 	var check_nr C.int
 	var check_ns C.int
 
-	var check_ftype = C.ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
+	var check_ftype = ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
 
 	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d\n", check_ftype, C.GoString(&check_desc[0]), check_pf)
 
@@ -214,7 +214,7 @@ func check_ax25_u_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype C.
 	assert.Equal(t, C.int(-1), check_ns)
 }
 
-func check_ax25_s_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype C.ax25_frame_type_t, pf C.int, nr C.int) {
+func check_ax25_s_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype ax25_frame_type_t, pf C.int, nr C.int) {
 	t.Helper()
 
 	var check_cr C.cmdres_t
@@ -224,7 +224,7 @@ func check_ax25_s_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype C.
 	var check_ns C.int
 
 	// todo modulo must be input.
-	var check_ftype = C.ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
+	var check_ftype = ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
 
 	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d\n", check_ftype, C.GoString(&check_desc[0]), check_pf, check_nr)
 
@@ -246,14 +246,14 @@ func check_ax25_i_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, pf C.int
 
 	var check_pinfo *C.uchar
 
-	var check_ftype = C.ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
+	var check_ftype = ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
 
 	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, C.GoString(&check_desc[0]), check_pf, check_nr, check_ns)
 
-	var check_info_len = C.ax25_get_info(packet, &check_pinfo)
+	var check_info_len = ax25_get_info(packet, &check_pinfo)
 
 	assert.Equal(t, cr, check_cr)
-	assert.Equal(t, C.ax25_frame_type_t(C.frame_type_I), check_ftype)
+	assert.Equal(t, ax25_frame_type_t(C.frame_type_I), check_ftype)
 	assert.Equal(t, pf, check_pf)
 	assert.Equal(t, nr, check_nr)
 	assert.Equal(t, ns, check_ns)

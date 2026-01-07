@@ -503,7 +503,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* Budlist - AX.25 source address */
 		/* Could be different than source encapsulated by 3rd party header. */
 		var addr [AX25_MAX_ADDR_LEN]C.char
-		C.ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &addr[0])
+		ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &addr[0])
 		result = filt_bodgu(pf, C.GoString(&addr[0]))
 
 		if pfilter_debug >= 2 {
@@ -522,11 +522,11 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
-		for n := C.int(AX25_REPEATER_1); result == 0 && n < C.ax25_get_num_addr(pf.pp); n++ {
+		for n := C.int(AX25_REPEATER_1); result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
 			// Consider only those with the H (has-been-used) bit set.
-			if C.ax25_get_h(pf.pp, n) > 0 {
+			if ax25_get_h(pf.pp, n) > 0 {
 				var addr [AX25_MAX_ADDR_LEN]C.char
-				C.ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
+				ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
 				result = filt_bodgu(pf, C.GoString(&addr[0]))
 			}
 		}
@@ -534,7 +534,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		if pfilter_debug >= 2 {
 			var path [100]C.char
 
-			C.ax25_format_via_path(pf.pp, &path[0], C.size_t(len(path)))
+			ax25_format_via_path(pf.pp, &path[0], C.size_t(len(path)))
 			if C.strlen(&path[0]) == 0 {
 				C.strcpy(&path[0], C.CString("no digipeater path"))
 			}
@@ -545,12 +545,12 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
-		for n := C.int(AX25_REPEATER_1); result == 0 && n < C.ax25_get_num_addr(pf.pp); n++ {
+		for n := C.int(AX25_REPEATER_1); result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
-			if C.ax25_get_h(pf.pp, n) == 0 {
+			if ax25_get_h(pf.pp, n) == 0 {
 				var addr [AX25_MAX_ADDR_LEN]C.char
-				C.ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
+				ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
 				result = filt_bodgu(pf, C.GoString(&addr[0]))
 			}
 		}
@@ -558,7 +558,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		if pfilter_debug >= 2 {
 			var path [100]C.char
 
-			C.ax25_format_via_path(pf.pp, &path[0], C.size_t(len(path)))
+			ax25_format_via_path(pf.pp, &path[0], C.size_t(len(path)))
 			if C.strlen(&path[0]) == 0 {
 				C.strcpy(&path[0], C.CString("no digipeater path"))
 			}
@@ -591,9 +591,9 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
 
-		if C.ax25_get_dti(pf.pp) != '\'' && C.ax25_get_dti(pf.pp) != '`' {
+		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
 			var addr [AX25_MAX_ADDR_LEN]C.char
-			C.ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION, &addr[0])
+			ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION, &addr[0])
 			result = filt_bodgu(pf, C.GoString(&addr[0]))
 
 			if pfilter_debug >= 2 {
@@ -614,7 +614,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 
 		if pfilter_debug >= 2 {
 			var infop *C.uchar
-			C.ax25_get_info(pf.pp, &infop)
+			ax25_get_info(pf.pp, &infop)
 
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), *infop)
@@ -651,7 +651,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 
 		if pfilter_debug >= 2 {
 			var infop *C.uchar
-			C.ax25_get_info(pf.pp, &infop)
+			ax25_get_info(pf.pp, &infop)
 
 			text_color_set(DW_COLOR_DEBUG)
 			if pf.decoded.g_packet_type == C.packet_type_message {
@@ -757,10 +757,10 @@ func filt_bodgu(pf *pfstate_t, arg string) C.int {
 func filt_t(pf *pfstate_t) C.int {
 
 	var src [AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &src[0])
+	ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &src[0])
 
 	var infop *C.uchar
-	C.ax25_get_info(pf.pp, (&infop))
+	ax25_get_info(pf.pp, (&infop))
 
 	Assert(infop != nil)
 

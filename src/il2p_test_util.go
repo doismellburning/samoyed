@@ -61,7 +61,7 @@ func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice 
 	// Does it have the the expected content?
 
 	var pinfo *C.uchar
-	var length = C.ax25_get_info(pp, &pinfo)
+	var length = ax25_get_info(pp, &pinfo)
 	Assert(length == C.int(len(text)))
 	Assert(text == C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
@@ -72,7 +72,7 @@ func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice 
 		Assert(retries == 0)
 	}
 
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 }
 
 //export multi_modem_process_rec_packet

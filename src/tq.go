@@ -197,30 +197,30 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 		}
 
 		var stemp [256]C.char // Formated addresses.
-		C.ax25_format_addrs(pp, &stemp[0])
+		ax25_format_addrs(pp, &stemp[0])
 		var pinfo *C.uchar
-		var info_len = C.ax25_get_info(pp, &pinfo)
+		var info_len = ax25_get_info(pp, &pinfo)
 		text_color_set(DW_COLOR_XMIT)
 
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
 
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			igate_send_rec_packet(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-C.ax25_is_aprs(pp))
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			nettnc_send_packet(channel, pp)
 
 		}
 
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -236,7 +236,7 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 		dw_printf("original KISS protocol specification.  The solution might be to use\n")
 		dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
 		dw_printf("\n")
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -263,11 +263,11 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if C.ax25_is_aprs(pp) > 0 && tq_count(channel, prio, C.CString(""), C.CString(""), 0) > 100 {
+	if ax25_is_aprs(pp) > 0 && tq_count(channel, prio, C.CString(""), C.CString(""), 0) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -286,13 +286,13 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 		var pnext C.packet_t
 		var plast = queue_head[channel][prio]
 		for {
-			pnext = C.ax25_get_nextp(plast)
+			pnext = ax25_get_nextp(plast)
 			if pnext == nil {
 				break
 			}
 			plast = pnext
 		}
-		C.ax25_set_nextp(plast, pp)
+		ax25_set_nextp(plast, pp)
 	}
 
 	tq_mutex.Unlock()
@@ -423,7 +423,7 @@ func lm_data_request(channel C.int, prio C.int, pp C.packet_t) {
 		dw_printf("Connected packet mode is allowed only with internal modems.\n")
 		dw_printf("Why aren't external KISS modems allowed?  See\n")
 		dw_printf("Why-is-9600-only-twice-as-fast-as-1200.pdf for explanation.\n")
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -451,13 +451,13 @@ func lm_data_request(channel C.int, prio C.int, pp C.packet_t) {
 	} else {
 		var plast = queue_head[channel][prio]
 		for {
-			var pnext = C.ax25_get_nextp(plast)
+			var pnext = ax25_get_nextp(plast)
 			if pnext == nil {
 				break
 			}
 			plast = pnext
 		}
-		C.ax25_set_nextp(plast, pp)
+		ax25_set_nextp(plast, pp)
 	}
 
 	tq_mutex.Unlock()
@@ -567,7 +567,7 @@ func lm_seize_request(channel C.int) {
 		return
 	}
 
-	var pp = C.ax25_new()
+	var pp = ax25_new()
 
 	/* TODO KG
 	#if AX25MEMDEBUG
@@ -593,13 +593,13 @@ func lm_seize_request(channel C.int) {
 	} else {
 		var plast = queue_head[channel][prio]
 		for {
-			var pnext = C.ax25_get_nextp(plast)
+			var pnext = ax25_get_nextp(plast)
 			if pnext == nil {
 				break
 			}
 			plast = pnext
 		}
-		C.ax25_set_nextp(plast, pp)
+		ax25_set_nextp(plast, pp)
 	}
 
 	tq_mutex.Unlock()
@@ -738,8 +738,8 @@ func tq_remove(channel C.int, prio C.int) C.packet_t {
 		result_p = nil
 	} else {
 		result_p = queue_head[channel][prio]
-		queue_head[channel][prio] = C.ax25_get_nextp(result_p)
-		C.ax25_set_nextp(result_p, nil)
+		queue_head[channel][prio] = ax25_get_nextp(result_p)
+		ax25_set_nextp(result_p, nil)
 	}
 
 	tq_mutex.Unlock()
@@ -909,14 +909,14 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 	var pp = queue_head[channel][prio]
 
 	for pp != nil {
-		if C.ax25_get_num_addr(pp) >= C.AX25_MIN_ADDRS {
+		if ax25_get_num_addr(pp) >= C.AX25_MIN_ADDRS {
 			// Consider only real packets.
 
 			var count_it C.int = 1
 
 			if source != nil && *source != 0 {
 				var frame_source [AX25_MAX_ADDR_LEN]C.char
-				C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &frame_source[0])
+				ax25_get_addr_with_ssid(pp, AX25_SOURCE, &frame_source[0])
 				/* TODO KG
 				#if DEBUG2
 					// I'm cringing at the thought of printing while in a critical region.  But it's only for temp debug.  :-(
@@ -930,7 +930,7 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 			}
 			if count_it > 0 && dest != nil && *dest != 0 {
 				var frame_dest [AX25_MAX_ADDR_LEN]C.char
-				C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &frame_dest[0])
+				ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &frame_dest[0])
 				/* TODO KG
 				#if DEBUG2
 					// I'm cringing at the thought of printing while in a critical region.  But it's only for debug debug.  :-(
@@ -945,13 +945,13 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 
 			if count_it > 0 {
 				if bytes > 0 {
-					n += C.ax25_get_frame_len(pp)
+					n += ax25_get_frame_len(pp)
 				} else {
 					n++
 				}
 			}
 		}
-		pp = C.ax25_get_nextp(pp)
+		pp = ax25_get_nextp(pp)
 	}
 
 	tq_mutex.Unlock()

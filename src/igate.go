@@ -445,18 +445,18 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 	 * First make a copy of it because it might be modified in place.
 	 */
 
-	var pp = C.ax25_dup(recv_pp)
+	var pp = ax25_dup(recv_pp)
 	Assert(pp != nil)
 
 	/*
 	 * Third party frames require special handling to unwrap payload.
 	 */
-	for C.ax25_get_dti(pp) == '}' {
+	for ax25_get_dti(pp) == '}' {
 
-		for n := C.int(0); n < C.ax25_get_num_repeaters(pp); n++ {
+		for n := C.int(0); n < ax25_get_num_repeaters(pp); n++ {
 			var _via [AX25_MAX_ADDR_LEN]C.char /* includes ssid. Do we want to ignore it? */
 
-			C.ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1, &_via[0])
+			ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1, &_via[0])
 
 			var via = C.GoString(&_via[0])
 
@@ -470,7 +470,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 					dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 				}
 
-				C.ax25_delete(pp)
+				ax25_delete(pp)
 				return
 			}
 		}
@@ -480,22 +480,22 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 			dw_printf("Rx IGate: Unwrap third party message.\n")
 		}
 
-		var inner_pp = C.ax25_unwrap_third_party(pp)
+		var inner_pp = ax25_unwrap_third_party(pp)
 		if inner_pp == nil {
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 			return
 		}
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		pp = inner_pp
 	}
 
 	/*
 	 * Do not relay packets with TCPIP, TCPXX, RFONLY, or NOGATE in the via path.
 	 */
-	for n := C.int(0); n < C.ax25_get_num_repeaters(pp); n++ {
+	for n := C.int(0); n < ax25_get_num_repeaters(pp); n++ {
 		var _via [AX25_MAX_ADDR_LEN]C.char /* includes ssid. Do we want to ignore it? */
 
-		C.ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1, &_via[0])
+		ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1, &_via[0])
 
 		var via = C.GoString(&_via[0])
 
@@ -509,7 +509,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 				dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 			}
 
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 			return
 		}
 	}
@@ -518,12 +518,12 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 	 * Do not relay generic query.
 	 * TODO:  Should probably block in other direction too, in case rf>is gateway did not drop.
 	 */
-	if C.ax25_get_dti(pp) == '?' {
+	if ax25_get_dti(pp) == '?' {
 		if s_debug >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Do not relay generic query.\n")
 		}
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -534,7 +534,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 	 * Starting in 1.4 we preserve any nul characters in the information part.
 	 */
 
-	if C.ax25_cut_at_crlf(pp) > 0 {
+	if ax25_cut_at_crlf(pp) > 0 {
 		if s_debug >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Truncated information part at CR.\n")
@@ -542,7 +542,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 	}
 
 	var pinfo *C.uchar
-	var info_len = C.ax25_get_info(pp, &pinfo)
+	var info_len = ax25_get_info(pp, &pinfo)
 
 	/*
 	 * Someone around here occasionally sends a packet with no information part.
@@ -553,7 +553,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Information part length is zero.\n")
 		}
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -566,8 +566,8 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 	 * (Digis are all unused if we are hearing it directly from source.)
 	 */
 	if save_igate_config_p.satgate_delay > 0 &&
-		C.ax25_get_heard(pp) == AX25_SOURCE &&
-		C.ax25_get_num_repeaters(pp) > 0 {
+		ax25_get_heard(pp) == AX25_SOURCE &&
+		ax25_get_num_repeaters(pp) > 0 {
 
 		satgate_delay_packet(pp, channel)
 	} else {
@@ -596,7 +596,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
 func send_packet_to_server(pp C.packet_t, channel C.int) {
 
 	var pinfo *C.uchar
-	C.ax25_get_info(pp, &pinfo)
+	ax25_get_info(pp, &pinfo)
 
 	/*
 	 * We will often see the same packet multiple times close together due to digipeating.
@@ -613,7 +613,7 @@ func send_packet_to_server(pp C.packet_t, channel C.int) {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Drop duplicate of same packet seen recently.\n")
 		}
-		C.ax25_delete(pp)
+		ax25_delete(pp)
 		return
 	}
 
@@ -644,7 +644,7 @@ func send_packet_to_server(pp C.packet_t, channel C.int) {
 	 */
 
 	var _msg [IGATE_MAX_MSG]C.char
-	C.ax25_format_addrs(pp, &_msg[0])
+	ax25_format_addrs(pp, &_msg[0])
 
 	var msg = C.GoString(&_msg[0])
 
@@ -730,7 +730,7 @@ func send_packet_to_server(pp C.packet_t, channel C.int) {
 	 */
 	rx_to_ig_remember(pp)
 
-	C.ax25_delete(pp)
+	ax25_delete(pp)
 } /* end send_packet_to_server */
 
 /*-------------------------------------------------------------------
@@ -772,7 +772,7 @@ func send_msg_to_server(imsg string) {
 	if s_debug >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		C.ax25_safe_print(C.CString(imsg), C.int(len(imsg)), 0)
+		ax25_safe_print(C.CString(imsg), C.int(len(imsg)), 0)
 		dw_printf("\n")
 	}
 
@@ -929,7 +929,7 @@ func igate_recv_thread() {
 			if !ok_to_send {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				C.ax25_safe_print((*C.char)(C.CBytes(message)), C.int(len(message)), 0)
+				ax25_safe_print((*C.char)(C.CBytes(message)), C.int(len(message)), 0)
 				dw_printf("\n")
 			}
 		} else {
@@ -942,7 +942,7 @@ func igate_recv_thread() {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			C.ax25_safe_print((*C.char)(C.CBytes(message)), C.int(len(message)), 0)
+			ax25_safe_print((*C.char)(C.CBytes(message)), C.int(len(message)), 0)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {
@@ -1005,7 +1005,7 @@ func igate_recv_thread() {
 
 				var stemp = append([]byte("X>X:}"), message...)
 
-				var pp3 = C.ax25_from_text((*C.char)(C.CBytes(stemp)), 0) // 0 means not strict
+				var pp3 = ax25_from_text((*C.char)(C.CBytes(stemp)), 0) // 0 means not strict
 				if pp3 != nil {
 
 					var alevel C.alevel_t
@@ -1072,7 +1072,7 @@ func satgate_delay_packet(pp C.packet_t, channel C.int) {
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
 	//}
 
-	C.ax25_set_release_time(pp, C.double(float64(time.Now().UnixNano())/1e9)+C.double(save_igate_config_p.satgate_delay))
+	ax25_set_release_time(pp, C.double(float64(time.Now().UnixNano())/1e9)+C.double(save_igate_config_p.satgate_delay))
 	//TODO: save channel too.
 
 	dp_mutex.Lock()
@@ -1083,13 +1083,13 @@ func satgate_delay_packet(pp C.packet_t, channel C.int) {
 	} else {
 		plast = dp_queue_head
 		for {
-			pnext = C.ax25_get_nextp(plast)
+			pnext = ax25_get_nextp(plast)
 			if pnext == nil {
 				break
 			}
 			plast = pnext
 		}
-		C.ax25_set_nextp(plast, pp)
+		ax25_set_nextp(plast, pp)
 	}
 
 	dp_mutex.Unlock()
@@ -1123,16 +1123,16 @@ func satgate_delay_thread() {
 
 			var now = C.double(float64(time.Now().UnixNano()) / 1e9)
 
-			var release_time = C.ax25_get_release_time(dp_queue_head)
+			var release_time = ax25_get_release_time(dp_queue_head)
 
 			if now > release_time {
 				dp_mutex.Lock()
 
 				var pp = dp_queue_head
-				dp_queue_head = C.ax25_get_nextp(pp)
+				dp_queue_head = ax25_get_nextp(pp)
 
 				dp_mutex.Unlock()
-				C.ax25_set_nextp(pp, nil)
+				ax25_set_nextp(pp, nil)
 
 				send_packet_to_server(pp, channel)
 			}
@@ -1234,7 +1234,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 	 * Potential Bug:  Up to 8 digipeaters are allowed in radio format.
 	 * Is there a possibility of finding a larger number here?
 	 */
-	var pp3 = C.ax25_from_text((*C.char)(C.CBytes(message)), 0)
+	var pp3 = ax25_from_text((*C.char)(C.CBytes(message)), 0)
 	if pp3 == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
@@ -1254,10 +1254,10 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 	 *	NOGATE or RFONLY - means IGate should not pass them.
 	 *	TCPXX or qAX - means it came from somewhere that did not identify itself correctly.
 	 */
-	for n := C.int(0); n < C.ax25_get_num_repeaters(pp3); n++ {
+	for n := C.int(0); n < ax25_get_num_repeaters(pp3); n++ {
 		var _via [AX25_MAX_ADDR_LEN]C.char /* includes ssid. Do we want to ignore it? */
 
-		C.ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1, &_via[0])
+		ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1, &_via[0])
 
 		var via = C.GoString(&_via[0])
 
@@ -1271,7 +1271,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 				dw_printf("Tx IGate: Do not transmit with %s in path.\n", via)
 			}
 
-			C.ax25_delete(pp3)
+			ax25_delete(pp3)
 			return
 		}
 	}
@@ -1309,7 +1309,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 	// $ raw gps could be a position.  @ could be weather data depending on symbol.
 
 	var _pinfo *C.uchar
-	var info_len = C.ax25_get_info(pp3, (&_pinfo))
+	var info_len = ax25_get_info(pp3, (&_pinfo))
 	var pinfo = C.GoBytes(unsafe.Pointer(_pinfo), info_len)
 
 	var msp_special_case = false
@@ -1340,7 +1340,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
 
-				C.ax25_delete(pp3)
+				ax25_delete(pp3)
 				return
 			}
 		}
@@ -1387,7 +1387,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 	 */
 
 	var dest [AX25_MAX_ADDR_LEN]C.char /* Destination field. */
-	C.ax25_get_addr_with_ssid(pp3, AX25_DESTINATION, &dest[0])
+	ax25_get_addr_with_ssid(pp3, AX25_DESTINATION, &dest[0])
 	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), C.GoString(&dest[0]), C.GoString(&save_audio_config_p.mycall[to_chan][0]), pinfo)
 
 	/* TODO KG
@@ -1417,7 +1417,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 			C.GoString(&save_igate_config_p.tx_via[0]),
 			payload)
 
-		var pradio = C.ax25_from_text(C.CString(radio), 1)
+		var pradio = ax25_from_text(C.CString(radio), 1)
 		if pradio != nil {
 
 			/* TODO KG
@@ -1453,7 +1453,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 
 	}
 
-	C.ax25_delete(pp3)
+	ax25_delete(pp3)
 
 } /* end maybe_xmit_packet_from_igate */
 
@@ -1549,16 +1549,16 @@ func rx_to_ig_remember(pp C.packet_t) {
 	}
 
 	rx2ig_time_stamp[rx2ig_insert_next] = time.Now()
-	rx2ig_checksum[rx2ig_insert_next] = C.ax25_dedupe_crc(pp)
+	rx2ig_checksum[rx2ig_insert_next] = ax25_dedupe_crc(pp)
 
 	if s_debug >= 3 {
 		var src [AX25_MAX_ADDR_LEN]C.char
 		var dest [AX25_MAX_ADDR_LEN]C.char
 		var pinfo *C.uchar
 
-		C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
-		C.ax25_get_info(pp, &pinfo)
+		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		ax25_get_info(pp, &pinfo)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
@@ -1575,7 +1575,7 @@ func rx_to_ig_remember(pp C.packet_t) {
 }
 
 func rx_to_ig_allow(pp C.packet_t) bool {
-	var crc = C.ax25_dedupe_crc(pp)
+	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
 	if s_debug >= 2 {
@@ -1583,9 +1583,9 @@ func rx_to_ig_allow(pp C.packet_t) bool {
 		var dest [AX25_MAX_ADDR_LEN]C.char
 		var pinfo *C.uchar
 
-		C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
-		C.ax25_get_info(pp, &pinfo)
+		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		ax25_get_info(pp, &pinfo)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, C.GoString(&src[0]), C.GoString(&dest[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
@@ -1837,16 +1837,16 @@ func ig_to_tx_init() {
 
 func ig_to_tx_remember(pp C.packet_t, channel C.int, bydigi C.int) {
 	var now = time.Now()
-	var crc = C.ax25_dedupe_crc(pp)
+	var crc = ax25_dedupe_crc(pp)
 
 	if s_debug >= 3 {
 		var src [AX25_MAX_ADDR_LEN]C.char
 		var dest [AX25_MAX_ADDR_LEN]C.char
 		var pinfo *C.uchar
 
-		C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
-		C.ax25_get_info(pp, &pinfo)
+		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		ax25_get_info(pp, &pinfo)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
@@ -1868,18 +1868,18 @@ func ig_to_tx_remember(pp C.packet_t, channel C.int, bydigi C.int) {
 }
 
 func ig_to_tx_allow(pp C.packet_t, channel C.int) bool {
-	var crc = C.ax25_dedupe_crc(pp)
+	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
 	var pinfo *C.uchar
-	C.ax25_get_info(pp, &pinfo)
+	ax25_get_info(pp, &pinfo)
 
 	if s_debug >= 2 {
 		var src [AX25_MAX_ADDR_LEN]C.char
 		var dest [AX25_MAX_ADDR_LEN]C.char
 
-		C.ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		C.ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, C.GoString(&src[0]), C.GoString(&dest[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))

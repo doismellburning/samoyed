@@ -212,14 +212,14 @@ func cdigipeat_match(from_chan C.int, pp C.packet_t, mycall_rec *C.char, mycall_
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = C.ax25_get_first_not_repeated(pp)
+	var r = ax25_get_first_not_repeated(pp)
 
 	if r < C.AX25_REPEATER_1 {
 		return (nil) // Nothing to do.
 	}
 
 	var repeater [C.AX25_MAX_ADDR_LEN]C.char
-	C.ax25_get_addr_with_ssid(pp, r, &repeater[0])
+	ax25_get_addr_with_ssid(pp, r, &repeater[0])
 
 	/*
 	 * First check for explicit use of my call.
@@ -227,15 +227,15 @@ func cdigipeat_match(from_chan C.int, pp C.packet_t, mycall_rec *C.char, mycall_
 	 */
 
 	if C.strcmp(&repeater[0], mycall_rec) == 0 {
-		var result = C.ax25_dup(pp)
+		var result = ax25_dup(pp)
 		if result == nil {
 			panic("assert (result != nil)")
 		}
 
 		/* If using multiple radio channels, they could have different calls. */
 
-		C.ax25_set_addr(result, r, mycall_xmit)
-		C.ax25_set_h(result, r)
+		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_h(result, r)
 		return (result)
 	}
 
@@ -245,13 +245,13 @@ func cdigipeat_match(from_chan C.int, pp C.packet_t, mycall_rec *C.char, mycall_
 	if has_alias > 0 {
 		var err = C.regexec(alias, &repeater[0], 0, nil, 0)
 		if err == 0 {
-			var result = C.ax25_dup(pp)
+			var result = ax25_dup(pp)
 			if result == nil {
 				panic("assert (result != nil)")
 			}
 
-			C.ax25_set_addr(result, r, mycall_xmit)
-			C.ax25_set_h(result, r)
+			ax25_set_addr(result, r, mycall_xmit)
+			ax25_set_h(result, r)
 			return (result)
 		} else if err != C.REG_NOMATCH {
 			var err_msg [100]C.char

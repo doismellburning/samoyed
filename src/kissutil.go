@@ -305,11 +305,11 @@ func process_input(stuff string) {
 	if unicode.IsUpper(rune(stuff[0])) || unicode.IsNumber(rune(stuff[0])) {
 		// Parse the "TNC2 monitor format" and convert to AX.25 frame.
 		var frame_data [C.AX25_MAX_PACKET_LEN]C.uchar
-		var pp = C.ax25_from_text(C.CString(stuff), 1)
+		var pp = ax25_from_text(C.CString(stuff), 1)
 		if pp != nil {
-			C.ax25_pack(pp, &frame_data[0])
+			ax25_pack(pp, &frame_data[0])
 			send_to_kiss_tnc(channel, C.KISS_CMD_DATA_FRAME, []byte(C.GoString((*C.char)(unsafe.Pointer(&frame_data[0])))))
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
 		}
@@ -534,7 +534,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 
 	switch cmd {
 	case C.KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
-		var pp = C.ax25_from_frame(&kiss_msg[1], kiss_len-1, alevel)
+		var pp = ax25_from_frame(&kiss_msg[1], kiss_len-1, alevel)
 		if pp == nil {
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
 		} else {
@@ -549,17 +549,17 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 
 			var addrs [C.AX25_MAX_ADDRS * C.AX25_MAX_ADDR_LEN]C.char // Like source>dest,digi,...,digi:
 
-			C.ax25_format_addrs(pp, &addrs[0])
+			ax25_format_addrs(pp, &addrs[0])
 
 			var pinfo *C.uchar
-			var info_len = C.ax25_get_info(pp, &pinfo)
+			var info_len = ax25_get_info(pp, &pinfo)
 
 			fmt.Printf("%s %s", prefix, C.GoString(&addrs[0])) // [channel] Addresses followed by :
 
 			// Safe print will replace any unprintable characters with
 			// hexadecimal representation.
 
-			C.ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
 			fmt.Printf("\n")
 
 			/*
@@ -583,7 +583,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 				}
 			}
 
-			C.ax25_delete(pp)
+			ax25_delete(pp)
 		}
 
 	case C.KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */

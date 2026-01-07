@@ -290,7 +290,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 			var subchan C.int = -3
 			var slice C.int = 0
 			var alevel C.alevel_t
-			var pp = C.ax25_from_frame((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])), alevel)
+			var pp = ax25_from_frame((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])), alevel)
 
 			if pp != nil {
 				var fec_type C.fec_type_t = C.fec_type_none
@@ -341,8 +341,8 @@ func nettnc_send_packet(channel C.int, pp C.packet_t) {
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
 
-	var fbuf = C.ax25_get_frame_data_ptr(pp)
-	var flen = C.ax25_get_frame_len(pp)
+	var fbuf = ax25_get_frame_data_ptr(pp)
+	var flen = ax25_get_frame_len(pp)
 
 	var frame_buff = []byte{0} // For now, set channel to 0.
 	frame_buff = append(frame_buff, C.GoBytes(unsafe.Pointer(fbuf), flen)...)
