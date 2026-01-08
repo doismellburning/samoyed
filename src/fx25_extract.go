@@ -52,6 +52,10 @@ package direwolf
 // #include "fx25.h"
 import "C"
 
+import (
+	"unsafe"
+)
+
 //#define DEBUG 5
 
 //-----------------------------------------------------------------------
@@ -86,15 +90,18 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 
 	/* form the syndromes; i.e., evaluate data(x) at roots of g(x) */
 	for i = 0; C.uint(i) < rs.nroots; i++ {
-		s[i] = data[0]
+		s[i] = *data
 	}
 
-	for j = 1; j < rs.nn; j++ {
-		for i = 0; i < rs.nroots; i++ {
+	for j = 1; C.uint(j) < rs.nn; j++ {
+		for i = 0; C.uint(i) < rs.nroots; i++ {
+			var data_j = *(*C.uchar)(unsafe.Add(unsafe.Pointer(data), j))
 			if s[i] == 0 {
-				s[i] = data[j]
+				s[i] = data_j
 			} else {
-				s[i] = data[j] ^ rs.alpha_to[modnn(rs, rs.index_of[s[i]]+(rs.fcr+i)*rs.prim)]
+				var rs_index_of_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.index_of), s[i]))
+				var rs_alpha_to_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.alpha_to), modnn(rs, rs_index_of_val+(C.int(rs.fcr)+i)*rs.prim)))
+				s[i] = data_j ^ rs_alpha_to_val
 			}
 		}
 	}
@@ -102,19 +109,19 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 	/* Convert syndromes to index form, checking for nonzero condition */
 	syn_error = 0
 	for i = 0; C.uint(i) < rs.nroots; i++ {
-		syn_error |= s[i]
-		s[i] = rs.index_of[s[i]]
+		syn_error |= C.int(s[i])
+		s[i] = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.index_of), s[i]))
 	}
 
 	// fprintf(stderr,"syn_error = %4x\n",syn_error);
-	if !syn_error {
+	if syn_error != 0 {
 		/* if syndrome is zero, data[] is a codeword and there are no
 		 * errors to correct. So return data[] unmodified
 		 */
 		count = 0
 		goto finish
 	}
-	memset(&lambda[1], 0, rs.nroots*sizeof(lambda[0]))
+	C.memset(&lambda[1], 0, rs.nroots*C.sizeof(lambda[0]))
 	lambda[0] = 1
 
 	if no_eras > 0 {
