@@ -89,19 +89,19 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		s[i] = data[0]
 	}
 
-	for j = 1; j < NN; j++ {
+	for j = 1; j < rs.nn; j++ {
 		for i = 0; i < rs.nroots; i++ {
 			if s[i] == 0 {
 				s[i] = data[j]
 			} else {
-				s[i] = data[j] ^ rs.alpha_to[modnn(rs,rs.index_of[s[i]]+(FCR+i)*PRIM)]
+				s[i] = data[j] ^ rs.alpha_to[modnn(rs, rs.index_of[s[i]]+(rs.fcr+i)*rs.prim)]
 			}
 		}
 	}
 
 	/* Convert syndromes to index form, checking for nonzero condition */
 	syn_error = 0
-	for i = 0; i < rs.nroots; i++ {
+	for i = 0; C.uint(i) < rs.nroots; i++ {
 		syn_error |= s[i]
 		s[i] = rs.index_of[s[i]]
 	}
@@ -119,13 +119,13 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 
 	if no_eras > 0 {
 		/* Init lambda to be the erasure locator polynomial */
-		lambda[1] = rs.alpha_to[modnn(rs,PRIM*(NN-1-eras_pos[0]))]
+		lambda[1] = rs.alpha_to[modnn(rs, rs.prim*(rs.nn-1-eras_pos[0]))]
 		for i = 1; i < no_eras; i++ {
-			u = modnn(rs,PRIM * (NN - 1 - eras_pos[i]))
+			u = modnn(rs, rs.prim*(rs.nn-1-eras_pos[i]))
 			for j = i + 1; j > 0; j-- {
 				tmp = rs.index_of[lambda[j-1]]
-				if tmp != A0 {
-					lambda[j] ^= rs.alpha_to[modnn(rs,u+tmp)]
+				if tmp != rs.nn {
+					lambda[j] ^= rs.alpha_to[modnn(rs, u+tmp)]
 				}
 
 			}
@@ -141,10 +141,10 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		  }
 
 		    count = 0;
-		    for (i = 1,k=IPRIM-1; i <= NN; i++,k = modnn(rs,k+IPRIM)) {
+		    for (i = 1,k=rs.iprim-1; i <= rs.nn; i++,k = modnn(rs,k+rs.iprim)) {
 		      q = 1;
 		      for (j = 1; j <= no_eras; j++) {
-			if (reg[j] != A0) {
+			if (reg[j] != rs.nn) {
 			  reg[j] = modnn(rs,reg[j] + j);
 			  q ^= rs.alpha_to[reg[j]];
 			}
@@ -190,21 +190,21 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		/* Compute discrepancy at the r-th step in poly-form */
 		discr_r = 0
 		for i = 0; i < r; i++ {
-			if (lambda[i] != 0) && (s[r-i-1] != A0) {
-				discr_r ^= rs.alpha_to[modnn(rs,rs.index_of[lambda[i]]+s[r-i-1])]
+			if (lambda[i] != 0) && (s[r-i-1] != rs.nn) {
+				discr_r ^= rs.alpha_to[modnn(rs, rs.index_of[lambda[i]]+s[r-i-1])]
 			}
 		}
 		discr_r = rs.index_of[discr_r] /* Index form */
-		if discr_r == A0 {
+		if discr_r == rs.nn {
 			/* 2 lines below: B(x) <-- x*B(x) */
 			memmove(&b[1], b, rs.nroots*sizeof(b[0]))
-			b[0] = A0
+			b[0] = rs.nn
 		} else {
 			/* 7 lines below: T(x) <-- lambda(x) - discr_r*x*b(x) */
 			t[0] = lambda[0]
 			for i = 0; i < rs.nroots; i++ {
-				if b[i] != A0 {
-					t[i+1] = lambda[i+1] ^ rs.alpha_to[modnn(rs,discr_r+b[i])]
+				if b[i] != rs.nn {
+					t[i+1] = lambda[i+1] ^ rs.alpha_to[modnn(rs, discr_r+b[i])]
 				} else {
 					t[i+1] = lambda[i+1]
 				}
@@ -216,12 +216,12 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 				 * lambda(x)
 				 */
 				for i = 0; i <= rs.nroots; i++ {
-					b[i] = IfThenElse((lambda[i] == 0), A0, modnn(rs,rs.index_of[lambda[i]]-discr_r+NN))
+					b[i] = IfThenElse((lambda[i] == 0), rs.nn, modnn(rs, rs.index_of[lambda[i]]-discr_r+rs.nn))
 				}
 			} else {
 				/* 2 lines below: B(x) <-- x*B(x) */
 				memmove(&b[1], b, rs.nroots*sizeof(b[0]))
-				b[0] = A0
+				b[0] = rs.nn
 			}
 			memcpy(lambda, t, (rs.nroots+1)*sizeof(t[0]))
 		}
@@ -231,20 +231,20 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 	deg_lambda = 0
 	for i = 0; i < rs.nroots+1; i++ {
 		lambda[i] = rs.index_of[lambda[i]]
-		if lambda[i] != A0 {
+		if lambda[i] != rs.nn {
 			deg_lambda = i
 		}
 	}
 	/* Find roots of the error+erasure locator polynomial by Chien search */
 	memcpy(&reg[1], &lambda[1], rs.nroots*sizeof(reg[0]))
 	count = 0 /* Number of roots of lambda(x) */
-	k = IPRIM - 1
-	for i = 1; i <= NN; i++ {
-		k = modnn(rs,k + IPRIM)
+	k = rs.iprim - 1
+	for i = 1; i <= rs.nn; i++ {
+		k = modnn(rs, k+rs.iprim)
 		q = 1 /* lambda[0] is always 0 */
 		for j = deg_lambda; j > 0; j-- {
-			if reg[j] != A0 {
-				reg[j] = modnn(rs,reg[j] + j)
+			if reg[j] != rs.nn {
+				reg[j] = modnn(rs, reg[j]+j)
 				q ^= rs.alpha_to[reg[j]]
 			}
 		}
@@ -253,9 +253,9 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		}
 		/* store root (index-form) and error location number */
 		/*
-		#if DEBUG>=2
-		    fprintf(stderr,"count %d root %d loc %d\n",count,i,k);
-		#endif
+			#if DEBUG>=2
+			    fprintf(stderr,"count %d root %d loc %d\n",count,i,k);
+			#endif
 		*/
 		root[count] = i
 		loc[count] = k
@@ -284,8 +284,8 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		tmp = 0
 		j = IfThenElse((deg_lambda < i), deg_lambda, i)
 		for ; j >= 0; j-- {
-			if (s[i-j] != A0) && (lambda[j] != A0) {
-				tmp ^= rs.alpha_to[modnn(rs,s[i-j]+lambda[j])]
+			if (s[i-j] != rs.nn) && (lambda[j] != rs.nn) {
+				tmp ^= rs.alpha_to[modnn(rs, s[i-j]+lambda[j])]
 			}
 		}
 		if tmp != 0 {
@@ -293,26 +293,26 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		}
 		omega[i] = rs.index_of[tmp]
 	}
-	omega[rs.nroots] = A0
+	omega[rs.nroots] = rs.nn
 
 	/*
 	 * Compute error values in poly-form. num1 = omega(inv(X(l))), num2 =
-	 * inv(X(l))**(FCR-1) and den = lambda_pr(inv(X(l))) all in poly-form
+	 * inv(X(l))**(rs.fcr-1) and den = lambda_pr(inv(X(l))) all in poly-form
 	 */
 	for j = count - 1; j >= 0; j-- {
 		num1 = 0
 		for i = deg_omega; i >= 0; i-- {
-			if omega[i] != A0 {
-				num1 ^= rs.alpha_to[modnn(rs,omega[i]+i*root[j])]
+			if omega[i] != rs.nn {
+				num1 ^= rs.alpha_to[modnn(rs, omega[i]+i*root[j])]
 			}
 		}
-		num2 = rs.alpha_to[modnn(rs,root[j]*(FCR-1)+NN)]
+		num2 = rs.alpha_to[modnn(rs, root[j]*(rs.fcr-1)+rs.nn)]
 		den = 0
 
 		/* lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i] */
 		for i = min(deg_lambda, rs.nroots-1) & ~1; i >= 0; i -= 2 {
-			if lambda[i+1] != A0 {
-				den ^= rs.alpha_to[modnn(rs,lambda[i+1]+i*root[j])]
+			if lambda[i+1] != rs.nn {
+				den ^= rs.alpha_to[modnn(rs, lambda[i+1]+i*root[j])]
 			}
 		}
 		if den == 0 {
@@ -326,7 +326,7 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		}
 		/* Apply error to data */
 		if num1 != 0 {
-			data[loc[j]] ^= rs.alpha_to[modnn(rs,rs.index_of[num1]+rs.index_of[num2]+NN-rs.index_of[den])]
+			data[loc[j]] ^= rs.alpha_to[modnn(rs, rs.index_of[num1]+rs.index_of[num2]+rs.nn-rs.index_of[den])]
 		}
 	}
 finish:
@@ -338,4 +338,11 @@ finish:
 	return count
 }
 
-// end fx25_extract.c
+func modnn(rs *C.struct_rs, x C.int) C.int {
+	for x >= rs.nn {
+		x -= rs.nn
+		x = (x >> rs.mm) + (x & rs.nn)
+	}
+
+	return x
+}
