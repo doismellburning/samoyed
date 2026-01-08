@@ -16,7 +16,6 @@ package direwolf
 // #include <linux/hidraw.h>		// for HIDIOCGRAWINFO
 // #include "textcolor.h"
 // #include "cm108.h"
-// int cm108_inventory (struct thing_s *things, int max_things);
 import "C"
 
 import (
@@ -40,8 +39,6 @@ import (
  *		When specified the pin will be set high and low until interrupted.
  *
  *------------------------------------------------------------------*/
-
-const MAXX_THINGS = 60
 
 func cm108_usage() {
 	fmt.Printf("\n")
@@ -74,7 +71,7 @@ func CM108Main() {
 		var state = 0
 		for {
 			fmt.Printf("%d", state)
-			var err = C.cm108_set_gpio_pin(C.CString(path), C.int(gpio), C.int(state))
+			var err = cm108_set_gpio_pin(C.CString(path), C.int(gpio), C.int(state))
 			if err != 0 {
 				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO!\n")
 				cm108_usage()
@@ -87,8 +84,7 @@ func CM108Main() {
 
 	// Take inventory of USB Audio adapters and other HID devices.
 
-	var things [MAXX_THINGS]C.struct_thing_s
-	var num_things = C.cm108_inventory(&things[0], MAXX_THINGS)
+	var things, _ = cm108_inventory(MAXX_THINGS)
 
 	/////////////////////////////////////////////
 	//                Linux
@@ -105,7 +101,7 @@ func CM108Main() {
 		len(things[0].plughw)/5, "-------",
 		len(things[0].plughw2)/4, "-------",
 		17, "---------", len(things[0].devnode_usb), "---")
-	for i := C.int(0); i < num_things; i++ {
+	for i := 0; i < len(things); i++ {
 		var good = "  "
 		if GOOD_DEVICE(things[i].vid, things[i].pid) {
 			good = "**"
@@ -142,7 +138,7 @@ func CM108Main() {
 	var suggested_names []string = []string{"Fred", "Wilma", "Pebbles", "Dino", "Barney", "Betty", "Bamm_Bamm", "Chip", "Roxy"}
 	// Drop any "/sys" at the beginning.
 	var r = regexp.MustCompile("(/devices/.+/card)[0-9]$") // TODO KG Was REG_EXTENDED - may need some fiddling/checking? Can't easily test...
-	for i := C.int(0); i < num_things; i++ {
+	for i := 0; i < len(things); i++ {
 		if i == 0 || C.GoString(&things[i].devpath[0]) != C.GoString(&things[i-1].devpath[0]) {
 			var matches = r.FindStringSubmatch(C.GoString(&things[i].devpath[0]))
 			if len(matches) > 0 {
