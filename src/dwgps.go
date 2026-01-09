@@ -93,11 +93,10 @@ func dwgps_init(pconfig *C.struct_misc_config_s, debug C.int) {
 
 	dwgpsnmea_init(pconfig, debug)
 
-	// TODO KG #if ENABLE_GPSD
-
+	/* TODO KG
+	#if ENABLE_GPSD
 	C.dwgpsd_init(pconfig, debug)
-
-	// TODO KG #endif
+	*/
 
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
@@ -196,9 +195,10 @@ func dwgps_term() {
 
 	dwgpsnmea_term()
 
-	// TODO KG #if ENABLE_GPSD
+	/* TODO KG
+	#if ENABLE_GPSD
 	C.dwgpsd_term()
-	// TODO KG #endif
+	*/
 
 } /* end dwgps_term */
 

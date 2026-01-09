@@ -24,6 +24,8 @@ package direwolf
 // #include <limits.h>		// for PATH_MAX
 // #if ENABLE_GPSD
 // #include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
+// #else
+// #define DEFAULT_GPSD_PORT "2947"
 // #endif
 // #include "ax25_pad.h"
 // #include "textcolor.h"
@@ -4782,6 +4784,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 			   #elif ENABLE_GPSD
 			*/
+
+			dw_printf("Warning: GPSD support currently disabled pending a rewrite of the integration.\n")
 
 			C.strcpy(&p_misc_config.gpsd_host[0], C.CString("localhost"))
 			p_misc_config.gpsd_port = C.atoi(C.CString(C.DEFAULT_GPSD_PORT))
