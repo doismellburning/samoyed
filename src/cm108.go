@@ -128,6 +128,13 @@ type thing_s struct {
 	// This is what we use to match up audio and HID.
 }
 
+// Test for supported devices.
+func GOOD_DEVICE(v, p C.int) bool {
+	return (v == C.CMEDIA_VID && ((p >= C.CMEDIA_PID1_MIN && p <= C.CMEDIA_PID1_MAX) || p == C.CMEDIA_PID_CM108AH || p == C.CMEDIA_PID_CM108AH_alt || p == C.CMEDIA_PID_CM108B || p == C.CMEDIA_PID_CM119A || p == C.CMEDIA_PID_CM119B)) ||
+		(v == C.SSS_VID && (p == C.SSS_PID1 || p == C.SSS_PID2 || p == C.SSS_PID3)) ||
+		(v == C.AIOC_VID && p == C.AIOC_PID)
+}
+
 const MAXX_THINGS = 60
 
 /*-------------------------------------------------------------------

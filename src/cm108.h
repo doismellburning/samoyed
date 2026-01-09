@@ -70,20 +70,6 @@ extern int cm108_set_gpio_pin (char *name, int num, int state);
 //	20		7	"
 //	22		8	"
 
-// Test for supported devices.
-
-#define GOOD_DEVICE(v,p) 	( (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) \
-							|| p == CMEDIA_PID_CM108AH \
-							|| p == CMEDIA_PID_CM108AH_alt \
-							|| p == CMEDIA_PID_CM108B \
-							|| p == CMEDIA_PID_CM119A \
-							|| p == CMEDIA_PID_CM119B )) \
-				 || \
-				  (v == SSS_VID && (p == SSS_PID1 || p == SSS_PID2 || p == SSS_PID3)) \
-				 || \
-				  (v == AIOC_VID && p == AIOC_PID)  )
-
-
 // Maximum length of name for PTT HID.
 // For Linux, this was originally 17 to handle names like /dev/hidraw3.
 // Windows has more complicated names.  The longest I saw was 95 but longer have been reported.
