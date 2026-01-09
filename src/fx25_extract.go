@@ -100,7 +100,7 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 				s[i] = data_j
 			} else {
 				var rs_index_of_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.index_of), s[i]))
-				var rs_alpha_to_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.alpha_to), modnn(rs, rs_index_of_val+(C.int(rs.fcr)+i)*rs.prim)))
+				var rs_alpha_to_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.alpha_to), modnn(rs, C.int(rs_index_of_val)+(C.int(rs.fcr)+i)*C.int(rs.prim))))
 				s[i] = data_j ^ rs_alpha_to_val
 			}
 		}
@@ -121,15 +121,18 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		count = 0
 		goto finish
 	}
-	C.memset(&lambda[1], 0, rs.nroots*C.sizeof(lambda[0]))
+	C.memset(unsafe.Pointer(&lambda[1]), 0, C.size_t(rs.nroots*C.sizeof_uchar))
 	lambda[0] = 1
 
 	if no_eras > 0 {
 		/* Init lambda to be the erasure locator polynomial */
-		lambda[1] = rs.alpha_to[modnn(rs, rs.prim*(rs.nn-1-eras_pos[0]))]
+		var rs_alpha_to_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.alpha_to), modnn(rs, rs.prim*(C.int(rs.nn)-1-*eras_pos))))
+		lambda[1] = rs_alpha_to_val
 		for i = 1; i < no_eras; i++ {
-			u = modnn(rs, rs.prim*(rs.nn-1-eras_pos[i]))
+			var eras_pos_val = *(*C.int)(unsafe.Add(unsafe.Pointer(eras_pos), i))
+			u = C.uchar(modnn(rs, rs.prim*(C.int(rs.nn)-1-eras_pos_val)))
 			for j = i + 1; j > 0; j-- {
+				var rs_index_of_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.index_of), lambda[j-1]))
 				tmp = rs.index_of[lambda[j-1]]
 				if tmp != rs.nn {
 					lambda[j] ^= rs.alpha_to[modnn(rs, u+tmp)]
@@ -179,7 +182,8 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 		*/
 	}
 	for i = 0; i < rs.nroots+1; i++ {
-		b[i] = rs.index_of[lambda[i]]
+		var rs_index_of_val = *(*C.uchar)(unsafe.Add(unsafe.Pointer(rs.index_of), lambda[i]))
+		b[i] = rs_index_of_val
 	}
 
 	/*
@@ -191,13 +195,13 @@ func DECODE_RS(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) {
 	for {
 		/* r is the step number */
 		r++
-		if r > rs.nroots {
+		if r > C.int(rs.nroots) {
 			break
 		}
 		/* Compute discrepancy at the r-th step in poly-form */
 		discr_r = 0
 		for i = 0; i < r; i++ {
-			if (lambda[i] != 0) && (s[r-i-1] != rs.nn) {
+			if (lambda[i] != 0) && (C.uint(s[r-i-1]) != rs.nn) {
 				discr_r ^= rs.alpha_to[modnn(rs, rs.index_of[lambda[i]]+s[r-i-1])]
 			}
 		}
