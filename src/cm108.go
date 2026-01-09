@@ -105,6 +105,29 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+/*
+ * Result of taking inventory of USB soundcards and USB HIDs.
+ */
+
+type thing_s struct {
+	vid           C.int      // vendor id, displayed as four hexadecimal digits.
+	pid           C.int      // product id, displayed as four hexadecimal digits.
+	card_number   [8]C.char  // "Card" Number.  e.g.  2 for plughw:2,0
+	card_name     [32]C.char // Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
+	product       [32]C.char // product name (e.g. manufacturer, model)
+	devnode_sound [22]C.char // e.g. /dev/snd/pcmC0D0p
+	plughw        [72]C.char // Above in more familiar format e.g. plughw:0,0
+	// Oversized to silence a compiler warning.
+	plughw2        [72]C.char  // With name rather than number.
+	devpath        [128]C.char // Kernel dev path.  Does not include /sys mount point.
+	devnode_hidraw [C.MAXX_HIDRAW_NAME_LEN]C.char
+	// e.g. /dev/hidraw3  -  for Linux - was length 17
+	// The Windows path for a HID looks like this, lengths up to 95 seen.
+	// \\?\hid#vid_0d8c&pid_000c&mi_03#8&164d11c9&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
+	devnode_usb [25]C.char // e.g. /dev/bus/usb/001/012
+	// This is what we use to match up audio and HID.
+}
+
 const MAXX_THINGS = 60
 
 /*-------------------------------------------------------------------
@@ -124,9 +147,9 @@ const MAXX_THINGS = 60
  *
  *------------------------------------------------------------------*/
 
-func cm108_inventory(max_things C.int) ([]*C.struct_thing_s, error) {
+func cm108_inventory(max_things C.int) ([]*thing_s, error) {
 
-	var things []*C.struct_thing_s
+	var things []*thing_s
 
 	/*
 	 * First get a list of the USB audio devices.
@@ -188,7 +211,7 @@ func cm108_inventory(max_things C.int) ([]*C.struct_thing_s, error) {
 				}
 
 				if C.int(len(things)) < max_things {
-					var thing = new(C.struct_thing_s)
+					var thing = new(thing_s)
 
 					thing.vid = vid
 					thing.pid = pid
@@ -255,7 +278,7 @@ func cm108_inventory(max_things C.int) ([]*C.struct_thing_s, error) {
 
 				// If it did not match to existing, add new entry.
 				if !matched && C.int(len(things)) < max_things {
-					var thing = new(C.struct_thing_s)
+					var thing = new(thing_s)
 
 					thing.vid = vid
 					thing.pid = pid
