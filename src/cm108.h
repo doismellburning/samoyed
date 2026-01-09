@@ -70,20 +70,6 @@ extern int cm108_set_gpio_pin (char *name, int num, int state);
 //	20		7	"
 //	22		8	"
 
-// Test for supported devices.
-
-#define GOOD_DEVICE(v,p) 	( (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) \
-							|| p == CMEDIA_PID_CM108AH \
-							|| p == CMEDIA_PID_CM108AH_alt \
-							|| p == CMEDIA_PID_CM108B \
-							|| p == CMEDIA_PID_CM119A \
-							|| p == CMEDIA_PID_CM119B )) \
-				 || \
-				  (v == SSS_VID && (p == SSS_PID1 || p == SSS_PID2 || p == SSS_PID3)) \
-				 || \
-				  (v == AIOC_VID && p == AIOC_PID)  )
-
-
 // Maximum length of name for PTT HID.
 // For Linux, this was originally 17 to handle names like /dev/hidraw3.
 // Windows has more complicated names.  The longest I saw was 95 but longer have been reported.
@@ -91,25 +77,3 @@ extern int cm108_set_gpio_pin (char *name, int num, int state);
 
 #define MAXX_HIDRAW_NAME_LEN 150
 
-/*
- * Result of taking inventory of USB soundcards and USB HIDs.
- */
-
-struct thing_s {
-	int vid;		// vendor id, displayed as four hexadecimal digits.
-	int pid;		// product id, displayed as four hexadecimal digits.
-	char card_number[8];	// "Card" Number.  e.g.  2 for plughw:2,0
-	char card_name[32];	// Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
-	char product[32];	// product name (e.g. manufacturer, model)
-	char devnode_sound[22];	// e.g. /dev/snd/pcmC0D0p
-	char plughw[72];	// Above in more familiar format e.g. plughw:0,0
-				// Oversized to silence a compiler warning.
-	char plughw2[72];	// With name rather than number.
-	char devpath[128];	// Kernel dev path.  Does not include /sys mount point.
-	char devnode_hidraw[MAXX_HIDRAW_NAME_LEN];
-				// e.g. /dev/hidraw3  -  for Linux - was length 17
-				// The Windows path for a HID looks like this, lengths up to 95 seen.
-				// \\?\hid#vid_0d8c&pid_000c&mi_03#8&164d11c9&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
-	char devnode_usb[25];	// e.g. /dev/bus/usb/001/012
-				// This is what we use to match up audio and HID.
-};

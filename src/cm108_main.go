@@ -154,11 +154,3 @@ func CM108Main() {
 	fmt.Printf("LABEL=\"my_usb_audio_end\"\n")
 	fmt.Printf("\n")
 }
-
-// Test for supported devices.
-// Duplicates C macro
-func GOOD_DEVICE(v, p C.int) bool {
-	return (v == C.CMEDIA_VID && ((p >= C.CMEDIA_PID1_MIN && p <= C.CMEDIA_PID1_MAX) || p == C.CMEDIA_PID_CM108AH || p == C.CMEDIA_PID_CM108AH_alt || p == C.CMEDIA_PID_CM108B || p == C.CMEDIA_PID_CM119A || p == C.CMEDIA_PID_CM119B)) ||
-		(v == C.SSS_VID && (p == C.SSS_PID1 || p == C.SSS_PID2 || p == C.SSS_PID3)) ||
-		(v == C.AIOC_VID && p == C.AIOC_PID)
-}
