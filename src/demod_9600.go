@@ -62,8 +62,18 @@ func convolve(data, filter []C.float, filter_size C.int) C.float {
 	return (sum)
 }
 
-/* Automatic gain control. */
-/* Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5 */
+// Automatic Gain control - used when we have a single slicer.
+//
+// The first step is to create an envelope for the peak and valley
+// of the mark or space amplitude.  We need to keep track of the valley
+// because it does not go down to zero when the tone is not present.
+// We want to find the difference between tone present and not.
+//
+// We use an IIR filter with fast attack and slow decay which only considers the past.
+// Perhaps an improvement could be obtained by looking in the future as well.
+//
+
+// Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5
 
 func agc(in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float, C.float, C.float) {
 
