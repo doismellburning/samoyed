@@ -323,7 +323,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						C.demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 							save_audio_config_p.achan[channel].baud,
 							mark,
 							space,
@@ -377,7 +377,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 
 					save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
 
-					C.demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+					demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
 						save_audio_config_p.achan[channel].mark_freq,
 						save_audio_config_p.achan[channel].space_freq,
@@ -426,7 +426,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						C.demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 							save_audio_config_p.achan[channel].baud,
 							mark, space,
 							profile,
@@ -946,12 +946,12 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 			sample_sum[channel][subchan] += sam
 			sample_count[channel][subchan]++
 			if sample_count[channel][subchan] >= save_audio_config_p.achan[channel].decimate {
-				C.demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/save_audio_config_p.achan[channel].decimate, D)
+				demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/save_audio_config_p.achan[channel].decimate, D)
 				sample_sum[channel][subchan] = 0
 				sample_count[channel][subchan] = 0
 			}
 		} else {
-			C.demod_afsk_process_sample(channel, subchan, sam, D)
+			demod_afsk_process_sample(channel, subchan, sam, D)
 		}
 
 	case MODEM_QPSK, MODEM_8PSK:
