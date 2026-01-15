@@ -516,7 +516,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 					//dw_printf ("About to call demod_psk_init for Q-PSK case, modem_type=%d, profile='%c'\n",
 					//	save_audio_config_p.achan[channel].modem_type, profile);
 
-					C.demod_psk_init(save_audio_config_p.achan[channel].modem_type,
+					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
@@ -571,7 +571,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 					//dw_printf ("About to call demod_psk_init for 8-PSK case, modem_type=%d, profile='%c'\n",
 					//	save_audio_config_p.achan[channel].modem_type, profile);
 
-					C.demod_psk_init(save_audio_config_p.achan[channel].modem_type,
+					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
@@ -963,7 +963,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 			// Would probably work but haven't thought about it or tested yet.
 			exit(1)
 		} else {
-			C.demod_psk_process_sample(channel, subchan, sam, D)
+			demod_psk_process_sample(channel, subchan, sam, D)
 		}
 
 	default:
