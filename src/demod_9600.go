@@ -216,7 +216,7 @@ func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsa
 
 	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_taps);
 
-	C.gen_lowpass(fc, &D.u.bb.lp_filter[0], D.lp_filter_taps*upsample, D.lp_window)
+	gen_lowpass(fc, D.u.bb.lp_filter[:], D.lp_filter_taps*upsample, D.lp_window)
 
 	// New in 1.7 -
 	// Use a polyphase filter to reduce the CPU load.
