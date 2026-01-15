@@ -451,7 +451,7 @@ func demod_psk_init(modem_type C.enum_modem_t, v26_alt C.enum_v26_e, _samples_pe
 		f1 /= C.float(samples_per_sec)
 		f2 /= C.float(samples_per_sec)
 
-		C.gen_bandpass(f1, f2, &D.u.psk.pre_filter[0], D.u.psk.pre_filter_taps, D.u.psk.pre_window)
+		gen_bandpass(f1, f2, D.u.psk.pre_filter[:], D.u.psk.pre_filter_taps, D.u.psk.pre_window)
 	}
 
 	/*
@@ -459,7 +459,7 @@ func demod_psk_init(modem_type C.enum_modem_t, v26_alt C.enum_v26_e, _samples_pe
 	 */
 
 	var fc = C.float(correct_baud) * D.u.psk.lpf_baud / C.float(samples_per_sec)
-	C.gen_lowpass(fc, &D.u.psk.lp_filter[0], D.u.psk.lp_filter_taps, D.u.psk.lp_window)
+	gen_lowpass(fc, D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps, D.u.psk.lp_window)
 
 	/*
 	 * No point in having multiple numbers for signal level.
