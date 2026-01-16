@@ -29,7 +29,7 @@ func dtmf_test_main(t *testing.T) {
 	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1
 	my_audio_config.adev[ACHAN2ADEV(c)].bits_per_sample = 8
 	gen_tone_init(&my_audio_config, 100, 0)
-	C.ptt_init(&my_audio_config)
+	ptt_init(&my_audio_config)
 
 	dtmf_init(&my_audio_config, C.int(50))
 

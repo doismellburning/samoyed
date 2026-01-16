@@ -46,7 +46,7 @@ package direwolf
 // #include "il2p.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
-// #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libudev
+// #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm
 import "C"
@@ -228,19 +228,19 @@ x = Silence FX.25 information.`)
 		A_opt_ais_to_obj = true
 	}
 
-	var d_k_opt = 0       /* "-d k" option for serial port KISS.  Can be repeated for more detail. */
-	var d_n_opt = 0       /* "-d n" option for Network KISS.  Can be repeated for more detail. */
-	var d_t_opt = 0       /* "-d t" option for Tracker.  Can be repeated for more detail. */
-	var d_g_opt = 0       /* "-d g" option for GPS. Can be repeated for more detail. */
-	var d_o_opt C.int = 0 /* "-d o" option for output control such as PTT and DCD. */
-	var d_i_opt = 0       /* "-d i" option for IGate.  Repeat for more detail */
-	var d_m_opt = 0       /* "-d m" option for mheard list. */
-	var d_f_opt = 0       /* "-d f" option for filtering.  Repeat for more detail. */
-	var d_h_opt = 0       /* "-d h" option for hamlib debugging.  Repeat for more detail */
-	var d_x_opt = 1       /* "-d x" option for FX.25.  Default minimal. Repeat for more detail.  -qx to silence. */
-	var d_2_opt = 0       /* "-d 2" option for IL2P.  Default minimal. Repeat for more detail. */
-	var d_c_opt = 0       /* "-d c" option for connected mode data link state machine. */
-	var aprstt_debug = 0  /* "-d d" option for APRStt (think Dtmf) debug. */
+	var d_k_opt = 0      /* "-d k" option for serial port KISS.  Can be repeated for more detail. */
+	var d_n_opt = 0      /* "-d n" option for Network KISS.  Can be repeated for more detail. */
+	var d_t_opt = 0      /* "-d t" option for Tracker.  Can be repeated for more detail. */
+	var d_g_opt = 0      /* "-d g" option for GPS. Can be repeated for more detail. */
+	var d_o_opt = 0      /* "-d o" option for output control such as PTT and DCD. */
+	var d_i_opt = 0      /* "-d i" option for IGate.  Repeat for more detail */
+	var d_m_opt = 0      /* "-d m" option for mheard list. */
+	var d_f_opt = 0      /* "-d f" option for filtering.  Repeat for more detail. */
+	var d_h_opt = 0      /* "-d h" option for hamlib debugging.  Repeat for more detail */
+	var d_x_opt = 1      /* "-d x" option for FX.25.  Default minimal. Repeat for more detail.  -qx to silence. */
+	var d_2_opt = 0      /* "-d 2" option for IL2P.  Default minimal. Repeat for more detail. */
+	var d_c_opt = 0      /* "-d c" option for connected mode data link state machine. */
+	var aprstt_debug = 0 /* "-d d" option for APRStt (think Dtmf) debug. */
 
 	if *debugStr != "" {
 		// New in 1.1.  Can combine multiple such as "-d pkk"
@@ -270,7 +270,7 @@ x = Silence FX.25 information.`)
 				d_p_opt = true // TODO: packet dump for xmit side.
 			case 'o':
 				d_o_opt++
-				C.ptt_set_debug(d_o_opt)
+				ptt_set_debug(d_o_opt)
 			case 'i':
 				d_i_opt++
 			case 'm':
@@ -700,7 +700,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * C.int(max_duration)
 
 				C.text_color_set(C.DW_COLOR_INFO)
-				C.ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
+				ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
 
 				switch transmitCalibrationType {
 				default:
@@ -732,7 +732,7 @@ x = Silence FX.25 information.`)
 					SLEEP_SEC(max_duration)
 				}
 
-				C.ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
+				ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
 				C.text_color_set(C.DW_COLOR_INFO)
 				os.Exit(0)
 			} else {
@@ -1256,7 +1256,7 @@ func cleanup() {
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("\nQRT\n")
 	log_term()
-	C.ptt_term()
+	ptt_term()
 	dwgps_term()
 	SLEEP_SEC(1)
 	os.Exit(0)
