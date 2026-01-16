@@ -19,7 +19,6 @@ package direwolf
 // #include <time.h>
 // #include <math.h>
 // #include <assert.h>
-// #include "textcolor.h"
 import "C"
 
 import (

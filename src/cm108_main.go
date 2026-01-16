@@ -14,7 +14,6 @@ package direwolf
 // #include <fcntl.h>
 // #include <errno.h>
 // #include <linux/hidraw.h>		// for HIDIOCGRAWINFO
-// #include "textcolor.h"
 // #include "cm108.h"
 import "C"
 
@@ -55,7 +54,7 @@ func cm108_usage() {
 }
 
 func CM108Main() {
-	C.text_color_init(0) // Turn off text color.
+	text_color_init(0) // Turn off text color.
 
 	if len(os.Args) >= 2 {
 		var path = os.Args[1]

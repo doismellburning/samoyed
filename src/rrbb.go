@@ -18,7 +18,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdlib.h>
 // #include <string.h>
-// #include "textcolor.h"
 // #include "ax25_pad.h"
 // #include "rrbb.h"
 import "C"

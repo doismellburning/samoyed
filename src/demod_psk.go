@@ -74,7 +74,6 @@ package direwolf
 // #include "audio.h"
 // #include "fsk_gen_filter.h"
 // #include "hdlc_rec.h"
-// #include "textcolor.h"
 // #include "demod_psk.h"
 // #include "dsp.h"
 import "C"

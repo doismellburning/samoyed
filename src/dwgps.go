@@ -34,7 +34,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <time.h>
-// #include "textcolor.h"
 // #include "dwgps.h"
 // #include "dwgpsnmea.h"
 // #include "dwgpsd.h"

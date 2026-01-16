@@ -7,7 +7,6 @@ package direwolf
 // #include <ctype.h>
 // #include <assert.h>
 // #include <stdarg.h>
-// #include "textcolor.h"
 // #include "tt_text.h"
 import "C"
 

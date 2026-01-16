@@ -22,7 +22,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// #include "textcolor.h"
 // #include "audio.h"		// configuration.
 // #include "kiss_frame.h"
 // #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN

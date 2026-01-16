@@ -4,7 +4,6 @@ package direwolf
 // #include <stdio.h>
 // #include "audio.h"
 // #include "gen_tone.h"
-// #include "textcolor.h"
 // #include "fcs_calc.h"
 // #include "ax25_pad.h"
 // #include "fx25.h"

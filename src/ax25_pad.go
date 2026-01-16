@@ -150,7 +150,6 @@ package direwolf
 // #include <stdio.h>
 // #include <ctype.h>
 // #include "regex.h"
-// #include "textcolor.h"
 // #include "ax25_pad.h"
 // #include "fcs_calc.h"
 // void hex_dump (unsigned char *p, int len);

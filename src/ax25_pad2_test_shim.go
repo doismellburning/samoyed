@@ -7,7 +7,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <ctype.h>
-// #include "textcolor.h"
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 import "C"
@@ -80,7 +79,7 @@ func ax25_pad2_test_main(t *testing.T) {
 			}
 
 			for cr := cmin; cr <= cmax; cr++ {
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
@@ -104,7 +103,7 @@ func ax25_pad2_test_main(t *testing.T) {
 			var nr = modulo/2 + 1
 
 			for cr := C.cmdres_t(0); cr <= 1; cr++ {
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
@@ -118,7 +117,7 @@ func ax25_pad2_test_main(t *testing.T) {
 			nr = modulo/2 + 1
 
 			for cr := C.cmdres_t(0); cr <= 1; cr++ {
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
@@ -140,7 +139,7 @@ func ax25_pad2_test_main(t *testing.T) {
 		var nr C.int = 127
 		var cr C.cmdres_t = C.cr_res
 
-		C.text_color_set(C.DW_COLOR_INFO)
+		text_color_set(DW_COLOR_INFO)
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
@@ -163,7 +162,7 @@ func ax25_pad2_test_main(t *testing.T) {
 		var ns = 0xaa & (modulo - 1)
 
 		for cr := C.cmdres_t(0); cr <= 1; cr++ {
-			C.text_color_set(C.DW_COLOR_INFO)
+			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
@@ -178,7 +177,7 @@ func ax25_pad2_test_main(t *testing.T) {
 		ns = 0xaa & (modulo - 1)
 
 		for cr := C.cmdres_t(0); cr <= 1; cr++ {
-			C.text_color_set(C.DW_COLOR_INFO)
+			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
@@ -189,7 +188,7 @@ func ax25_pad2_test_main(t *testing.T) {
 		}
 	}
 
-	C.text_color_set(C.DW_COLOR_REC)
+	text_color_set(DW_COLOR_REC)
 	dw_printf("\n----------\n\n")
 	dw_printf("\nSUCCESS!\n")
 } /* end main */

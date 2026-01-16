@@ -91,7 +91,6 @@ package direwolf
 // #include "audio.h"
 // #include "demod.h"
 // #include "multi_modem.h"
-// #include "textcolor.h"
 // #include "dlq.h"
 // #include "aprs_tt.h"
 // #include "ax25_link.h"

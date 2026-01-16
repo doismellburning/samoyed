@@ -31,7 +31,6 @@ package direwolf
 // #include <dirent.h>
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "kiss_frame.h"
 // #include "audio.h"		// for DEFAULT_TXDELAY, etc.
 // #define DIR_CHAR "/"
@@ -108,7 +107,7 @@ var timestamp_format = "" /* -T option */
  *---------------------------------------------------------------*/
 
 func KissUtilMain() {
-	C.text_color_init(0) // Turn off text color.
+	text_color_init(0) // Turn off text color.
 	// It could interfere with trying to pipe stdout to some other application.
 
 	C.setlinebuf(C.stdout)

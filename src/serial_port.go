@@ -17,7 +17,6 @@ package direwolf
 // #include <errno.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "textcolor.h"
 import "C"
 
 import (

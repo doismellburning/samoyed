@@ -92,7 +92,6 @@ package direwolf
 // #include <fcntl.h>
 // #include <errno.h>
 // #include <linux/hidraw.h>		// for HIDIOCGRAWINFO
-// #include "textcolor.h"
 // #include "cm108.h"
 import "C"
 

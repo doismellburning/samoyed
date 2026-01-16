@@ -18,7 +18,6 @@ package direwolf
 // #include <assert.h>
 // #include "version.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "aprs_tt.h"
 // #include "tt_text.h"
 // #include "tq.h"

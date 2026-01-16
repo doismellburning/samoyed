@@ -5,7 +5,6 @@ package direwolf
 // #include "direwolf.h"
 // #include "audio.h"
 // #include "decode_aprs.h"
-// #include "textcolor.h"
 // #include "dwgps.h"
 // #include "config.h"
 // #include "tq.h"
@@ -30,13 +29,6 @@ const BP_WINDOW_COSINE = C.BP_WINDOW_COSINE
 const BP_WINDOW_HAMMING = C.BP_WINDOW_HAMMING
 const BP_WINDOW_BLACKMAN = C.BP_WINDOW_BLACKMAN
 const BP_WINDOW_FLATTOP = C.BP_WINDOW_FLATTOP
-
-const DW_COLOR_ERROR = C.DW_COLOR_ERROR
-const DW_COLOR_DEBUG = C.DW_COLOR_DEBUG
-const DW_COLOR_INFO = C.DW_COLOR_INFO
-const DW_COLOR_XMIT = C.DW_COLOR_XMIT
-const DW_COLOR_REC = C.DW_COLOR_REC
-const DW_COLOR_DECODED = C.DW_COLOR_DECODED
 
 const MAX_RADIO_CHANS = C.MAX_RADIO_CHANS
 const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
@@ -184,10 +176,6 @@ func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
 	return fmt.Printf(format, a...)
-}
-
-func text_color_set(c C.enum_dw_color_e) {
-	C.text_color_set(C.dw_color_t(c))
 }
 
 func exit(x int) {

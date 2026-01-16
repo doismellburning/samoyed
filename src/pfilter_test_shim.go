@@ -8,7 +8,6 @@ package direwolf
 // #include <stdio.h>
 // #include <ctype.h>
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "decode_aprs.h"
 // #include "latlong.h"
 import "C"
@@ -242,18 +241,18 @@ func pf_test_main(t *testing.T) {
 	// TODO: to be continued...  directed query ...
 
 	if pftest_error_count > 0 {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nPacket Filtering Test - FAILED!     %d errors\n", pftest_error_count)
 		t.Fail()
 	}
-	C.text_color_set(C.DW_COLOR_REC)
+	text_color_set(DW_COLOR_REC)
 	dw_printf("\nPacket Filtering Test - SUCCESS!\n")
 }
 
 func pftest(t *testing.T, test_num int, filter string, monitor string, expected int) {
 	t.Helper()
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("test number %d\n", test_num)
 
 	var pp = ax25_from_text(C.CString(monitor), 1)

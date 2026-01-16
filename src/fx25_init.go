@@ -44,7 +44,6 @@ package direwolf
 // #include <inttypes.h>
 // #include <assert.h>
 // #include "fx25.h"
-// #include "textcolor.h"
 import "C"
 
 import (

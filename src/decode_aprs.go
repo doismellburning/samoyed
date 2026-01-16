@@ -26,7 +26,6 @@ package direwolf
 // #include <fcntl.h>
 // #include "regex.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "symbols.h"
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
@@ -520,7 +519,7 @@ func decode_aprs_print(A *C.decode_aprs_t) {
 			}
 			var deg = int(absll)
 			var _min = (absll - C.double(deg)) * 60.0
-			s_lat = fmt.Sprintf("%c %02d%s%07.4f", news, deg, C.CH_DEGREE, _min)
+			s_lat = fmt.Sprintf("%c %02d°%07.4f", news, deg, _min)
 		} else {
 			s_lat = "Invalid Latitude"
 		}
@@ -538,7 +537,7 @@ func decode_aprs_print(A *C.decode_aprs_t) {
 			}
 			var deg = int(absll)
 			var _min = (absll - C.double(deg)) * 60.0
-			s_lon = fmt.Sprintf("%c %03d%s%07.4f", news, deg, C.CH_DEGREE, _min)
+			s_lon = fmt.Sprintf("%c %03d°%07.4f", news, deg, _min)
 		} else {
 			s_lon = "Invalid Longitude"
 		}

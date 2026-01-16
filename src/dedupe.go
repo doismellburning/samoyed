@@ -83,7 +83,6 @@ package direwolf
 // #include <time.h>
 // #include "ax25_pad.h"
 // #include "fcs_calc.h"
-// #include "textcolor.h"
 // #include "igate.h"
 import "C"
 

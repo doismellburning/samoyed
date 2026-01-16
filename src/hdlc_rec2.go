@@ -74,7 +74,6 @@ package direwolf
 // #define RRBB_C 1
 // #include "hdlc_rec2.h"
 // #include "fcs_calc.h"
-// #include "textcolor.h"
 // #include "ax25_pad.h"
 // #include "rrbb.h"
 // #include "multi_modem.h"

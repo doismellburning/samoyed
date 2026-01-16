@@ -41,7 +41,6 @@ package direwolf
 // #include <stddef.h>
 // #include "direwolf.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "audio.h"
 // #include "tq.h"
 // #include "hdlc_rec.h"

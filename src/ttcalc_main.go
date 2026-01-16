@@ -40,7 +40,6 @@ package direwolf
 // #include <string.h>
 // #include "direwolf.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"
 

@@ -51,7 +51,6 @@ package direwolf
 // #include "audio.h"
 // #include "demod.h"
 // #include "multi_modem.h"
-// #include "textcolor.h"
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"
 // #include "dlq.h"
@@ -140,8 +139,8 @@ func AtestMain() {
 
 	var count [C.MAX_SUBCHANS]int // Experiments G and H
 
-	C.text_color_init(1)
-	C.text_color_set(C.DW_COLOR_INFO)
+	text_color_init(1)
+	text_color_set(DW_COLOR_INFO)
 
 	my_audio_config = (*C.struct_audio_s)(C.malloc(C.sizeof_struct_audio_s))
 
@@ -376,7 +375,7 @@ o = DCD output control
 	}
 
 	if my_audio_config.achan[0].baud < C.MIN_BAUD || my_audio_config.achan[0].baud > C.MAX_BAUD {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", C.MIN_BAUD, C.MAX_BAUD)
 		os.Exit(1)
 	}
@@ -427,7 +426,7 @@ o = DCD output control
 	C.memcpy(unsafe.Pointer(&my_audio_config.achan[1]), unsafe.Pointer(&my_audio_config.achan[0]), C.sizeof_struct_achan_param_s)
 
 	if len(pflag.Args()) == 0 {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Specify .WAV file name on command line.\n\n")
 		pflag.Usage()
 		os.Exit(1)
@@ -443,7 +442,7 @@ o = DCD output control
 	for _, wavFileName := range pflag.Args() {
 		atestFP = C.fopen(C.CString(wavFileName), C.CString("rb"))
 		if atestFP == nil {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Couldn't open file for read: %s\n", wavFileName)
 			// perror ("more info?");
 			os.Exit(1)
@@ -457,7 +456,7 @@ o = DCD output control
 		C.fread(unsafe.Pointer(&header), 12, 1, atestFP)
 
 		if C.strncmp(&header.riff[0], C.CString("RIFF"), 4) != 0 || C.strncmp(&header.wave[0], C.CString("WAVE"), 4) != 0 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("This is not a .WAV format file.\n")
 			os.Exit(1)
 		}
@@ -470,12 +469,12 @@ o = DCD output control
 		}
 
 		if C.strncmp(&chunk.id[0], C.CString("fmt "), 4) != 0 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Found \"%4.4s\" where \"fmt \" was expected.\n", C.GoString(&chunk.id[0]))
 			os.Exit(1)
 		}
 		if chunk.datasize != 16 && chunk.datasize != 18 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Need fmt chunk datasize of 16 or 18.  Found %d.\n", chunk.datasize)
 			os.Exit(1)
 		}
@@ -485,25 +484,25 @@ o = DCD output control
 		C.fread(unsafe.Pointer(&wav_data), 8, 1, atestFP)
 
 		if C.strncmp(&wav_data.data[0], C.CString("data"), 4) != 0 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Found \"%4.4s\" where \"data\" was expected.\n", C.GoString(&wav_data.data[0]))
 			os.Exit(1)
 		}
 
 		if format.wformattag != 1 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Sorry, I only understand audio format 1 (PCM).  This file has %d.\n", format.wformattag)
 			os.Exit(1)
 		}
 
 		if format.nchannels != 1 && format.nchannels != 2 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Sorry, I only understand 1 or 2 channels.  This file has %d.\n", format.nchannels)
 			os.Exit(1)
 		}
 
 		if format.wbitspersample != 8 && format.wbitspersample != 16 {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Sorry, I only understand 8 or 16 bits per sample.  This file has %d.\n", format.wbitspersample)
 			os.Exit(1)
 		}
@@ -517,7 +516,7 @@ o = DCD output control
 			my_audio_config.chan_medium[1] = C.MEDIUM_RADIO
 		}
 
-		C.text_color_set(C.DW_COLOR_INFO)
+		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("%d samples per second.  %d bits per sample.  %d audio channels.\n",
 			my_audio_config.adev[0].samples_per_sec,
 			my_audio_config.adev[0].bits_per_sample,
@@ -569,7 +568,7 @@ o = DCD output control
 			/* When a complete frame is accumulated, */
 			/* process_rec_frame, below, is called. */
 		}
-		C.text_color_set(C.DW_COLOR_INFO)
+		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("\n\n")
 
 		if EXPERIMENT_G {
@@ -599,12 +598,12 @@ o = DCD output control
 	}
 
 	if *errorIfLessThan != -1 && packets_decoded_total < *errorIfLessThan {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("\n * * * TEST FAILED: number decoded is less than %d * * * \n", *errorIfLessThan)
 		os.Exit(1)
 	}
 	if *errorIfGreaterThan != -1 && packets_decoded_total > *errorIfGreaterThan {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("\n * * * TEST FAILED: number decoded is greater than %d * * * \n", *errorIfGreaterThan)
 		os.Exit(1)
 	}

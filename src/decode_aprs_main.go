@@ -62,7 +62,6 @@ package direwolf
 // #include <fcntl.h>
 // #include "regex.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "symbols.h"
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
@@ -95,8 +94,8 @@ func byteSliceToCUChars(data []byte) []C.uchar {
 func DecodeAPRSMain() {
 	DECODE_APRS_UTIL = true // DECAMAIN define replacement
 
-	C.text_color_init(0)
-	C.text_color_set(C.DW_COLOR_INFO)
+	text_color_init(0)
+	text_color_set(DW_COLOR_INFO)
 	deviceid_init()
 
 	var scanner = bufio.NewScanner(os.Stdin)

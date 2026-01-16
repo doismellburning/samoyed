@@ -19,7 +19,6 @@ package direwolf
 // #include <string.h>
 // #include <time.h>
 // #include "config.h"
-// #include "textcolor.h"
 // #include "latlong.h"
 // #include "dwgpsnmea.h"
 import "C"
