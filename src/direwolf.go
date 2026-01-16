@@ -27,7 +27,6 @@ package direwolf
 // #include "hdlc_rec.h"
 // #include "hdlc_rec2.h"
 // #include "ax25_pad.h"
-// #include "xid.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"
 // #include "gen_tone.h"
@@ -1013,7 +1012,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		dw_printf("(%s)", C.GoString(&desc[0]))
 		if ftype == C.frame_type_U_XID {
-			var param C.struct_xid_param_s
+			var param xid_param_s
 			var info2text [150]C.char
 
 			xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))

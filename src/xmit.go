@@ -46,7 +46,6 @@ package direwolf
 // #include "hdlc_rec.h"
 // #include "ptt.h"
 // #include "morse.h"
-// #include "xid.h"
 // #include "dlq.h"
 import "C"
 
@@ -873,7 +872,7 @@ func send_one_frame(c C.int, p C.int, pp C.packet_t) C.int {
 		dw_printf("(%s)", C.GoString(&desc[0]))
 
 		if ftype == frame_type_U_XID {
-			var param C.struct_xid_param_s
+			var param xid_param_s
 			var info2text [150]C.char
 
 			xid_parse(pinfo, info_len, &param, &info2text[0], C.int(len(info2text)))
