@@ -49,27 +49,6 @@ package direwolf
 // #include "mgrs.h"
 // #include "usng.h"
 // #include "error_string.h"
-// extern struct tt_config_s *aprs_tt_config;
-// struct ttloc_s *ttloc_ptr_get(int idx);
-// double ttloc_ptr_get_point_lat(int idx);
-// double ttloc_ptr_get_point_lon(int idx);
-// double ttloc_ptr_get_vector_lat(int idx);
-// double ttloc_ptr_get_vector_lon(int idx);
-// double ttloc_ptr_get_vector_scale(int idx);
-// double ttloc_ptr_get_grid_lat0(int idx);
-// double ttloc_ptr_get_grid_lat9(int idx);
-// double ttloc_ptr_get_grid_lon0(int idx);
-// double ttloc_ptr_get_grid_lon9(int idx);
-// double ttloc_ptr_get_utm_scale(int idx);
-// double ttloc_ptr_get_utm_x_offset(int idx);
-// double ttloc_ptr_get_utm_y_offset(int idx);
-// long ttloc_ptr_get_utm_lzone(int idx);
-// char ttloc_ptr_get_utm_latband(int idx);
-// char ttloc_ptr_get_utm_hemi(int idx);
-// char *ttloc_ptr_get_mgrs_zone(int idx);
-// char *ttloc_ptr_get_mhead_prefix(int idx);
-// char *ttloc_ptr_get_macro_definition(int idx);
-// extern struct ttloc_s aprs_tt_test_config;
 import "C"
 
 import (
@@ -80,6 +59,153 @@ import (
 	"strings"
 	"unicode"
 )
+
+/*
+ * For holding location format specifications from config file.
+ * Same thing is also useful for macro definitions.
+ * We have exactly the same situation of looking for a pattern
+ * match and extracting fixed size groups of digits.
+ */
+
+type ttlocTypeT int
+
+const (
+	TTLOC_POINT ttlocTypeT = iota
+	TTLOC_VECTOR
+	TTLOC_GRID
+	TTLOC_UTM
+	TTLOC_MGRS
+	TTLOC_USNG
+	TTLOC_MACRO
+	TTLOC_MHEAD
+	TTLOC_SATSQ
+	TTLOC_AMBIG
+)
+
+type pointTTLoc struct {
+	lat C.double /* Specific locations. */
+	lon C.double
+}
+
+type vectorTTLoc struct {
+	lat   C.double /* For bearing/direction. */
+	lon   C.double
+	scale C.double /* conversion to meters */
+}
+
+type gridTTLoc struct {
+	lat0 C.double /* yyy all zeros. */
+	lon0 C.double /* xxx */
+	lat9 C.double /* yyy all nines. */
+	lon9 C.double /* xxx */
+}
+
+type utmTTLoc struct {
+	scale    C.double
+	x_offset C.double
+	y_offset C.double
+	lzone    C.long /* UTM zone, should be 1-60 */
+	latband  C.char /* Latitude band if specified, otherwise space or - */
+	hemi     C.char /* UTM Hemisphere, should be 'N' or 'S'. */
+}
+
+type mgrsTTLoc struct {
+	zone string /* Zone and square for USNG/MGRS */
+}
+
+type mheadTTLoc struct {
+	prefix string /* should be 10, 6, or 4 digits to be */
+	/* prepended to the received sequence. */
+}
+
+type macroTTLoc struct {
+	definition string
+}
+
+type ttloc_s struct {
+	ttlocType ttlocTypeT
+
+	pattern string /* e.g. B998, B5bbbdddd, B2xxyy, Byyyxxx, BAxxxx */
+	/* For macros, it should be all fixed digits, */
+	/* and the letters x, y, z.  e.g.  911, xxyyyz */
+
+	point  pointTTLoc
+	vector vectorTTLoc
+	grid   gridTTLoc
+	utm    utmTTLoc
+	mgrs   mgrsTTLoc
+	mhead  mheadTTLoc
+	macro  macroTTLoc
+}
+
+var aprs_tt_test_config = []*ttloc_s{
+	{ttlocType: TTLOC_POINT, pattern: "B01", point: pointTTLoc{lat: 12.25, lon: 56.25}},
+	{ttlocType: TTLOC_POINT, pattern: "B988", point: pointTTLoc{lat: 12.50, lon: 56.50}},
+
+	{ttlocType: TTLOC_VECTOR, pattern: "B5bbbdddd", vector: vectorTTLoc{lat: 53., lon: -1., scale: 1000.}}, // km units
+
+	// Hilltop Tower http://www.aprs.org/aprs-jamboree-2013.html
+	{ttlocType: TTLOC_VECTOR, pattern: "B5bbbddd", vector: vectorTTLoc{lat: 37 + 55.37/60., lon: -(81 + 7.86/60.), scale: 16.09344}}, // .01 mile units
+
+	{ttlocType: TTLOC_GRID, pattern: "B2xxyy", grid: gridTTLoc{lat0: 12.00, lon0: 56.00,
+		lat9: 12.99, lon9: 56.99}},
+	{ttlocType: TTLOC_GRID, pattern: "Byyyxxx", grid: gridTTLoc{lat0: 37 + 50./60.0, lon0: 81,
+		lat9: 37 + 59.99/60.0, lon9: 81 + 9.99/60.0}},
+
+	{ttlocType: TTLOC_MHEAD, pattern: "BAxxxxxx", mhead: mheadTTLoc{prefix: "326129"}},
+
+	{ttlocType: TTLOC_SATSQ, pattern: "BAxxxx"},
+
+	{ttlocType: TTLOC_MACRO, pattern: "xxyyy", macro: macroTTLoc{definition: "B9xx*AB166*AA2B4C5B3B0Ayyy"}},
+	{ttlocType: TTLOC_MACRO, pattern: "xxxxzzzzzzzzzz", macro: macroTTLoc{definition: "BAxxxx*ACzzzzzzzzzz"}},
+}
+
+type tt_config_s struct {
+	gateway_enabled C.int /* Send DTMF sequences to APRStt gateway. */
+
+	obj_recv_chan C.int /* Channel to listen for tones. */
+
+	obj_xmit_chan C.int /* Channel to transmit object report. */
+	/* -1 for none.  This could happen if we */
+	/* are only sending to application */
+	/* and/or IGate. */
+
+	obj_send_to_app C.int /* send to attached application(s). */
+
+	obj_send_to_ig C.int /* send to IGate. */
+
+	obj_xmit_via [AX25_MAX_REPEATERS * (AX25_MAX_ADDR_LEN + 1)]C.char
+	/* e.g.  empty or "WIDE2-1,WIDE1-1" */
+
+	retain_time C.int /* Seconds to keep information about a user. */
+
+	num_xmits C.int /* Number of times to transmit object report. */
+
+	xmit_delay [C.TT_MAX_XMITS]C.int /* Delay between them. */
+	/* e.g.  3 seconds before first transmission then */
+	/* delays of 16, 32, seconds etc. in between repeats. */
+
+	ttloc_ptr  []*ttloc_s /* Variable length array of above. */
+	ttloc_size C.int      /* Number of elements allocated. */
+	ttloc_len  C.int      /* Number of elements actually used. */
+
+	corral_lat       C.double /* The "corral" for unknown locations. */
+	corral_lon       C.double
+	corral_offset    C.double
+	corral_ambiguity C.int
+
+	status [10]string /* Up to 9 status messages. e.g.  "/enroute" */
+	/* Position 0 means none and can't be changed. */
+
+	response [C.TT_ERROR_MAXP1]struct {
+		method [AX25_MAX_ADDR_LEN]C.char /* SPEECH or MORSE[-n] */
+		mtext  [C.TT_MTEXT_LEN]C.char    /* Message text. */
+	}
+
+	ttcmd [80]C.char /* Command to generate custom audible response. */
+}
+
+var aprs_tt_config *tt_config_s
 
 /*
  * Touch Tone sequences are accumulated here until # terminator found.
@@ -114,25 +240,25 @@ var running_TT_MAIN_tests = false
  *
  *----------------------------------------------------------------*/
 
-var tt_config *C.struct_tt_config_s
+var tt_config *tt_config_s
 
-func aprs_tt_init(p *C.struct_tt_config_s, debug int) {
+func aprs_tt_init(p *tt_config_s, debug int) {
 	tt_debug = debug
 
 	if p == nil {
 		/* For unit testing. */
 		var NUM_TEST_CONFIG C.int = 10 // TODO KG Hardcoded because cross-language sizing is fiddly
-		var config C.struct_tt_config_s
+		var config tt_config_s
 		config.ttloc_size = NUM_TEST_CONFIG
-		config.ttloc_ptr = &C.aprs_tt_test_config
+		config.ttloc_ptr = aprs_tt_test_config
 		config.ttloc_len = NUM_TEST_CONFIG
 		/* Don't care about xmit timing or corral here. */
 
 		tt_config = &config
-		C.aprs_tt_config = &config
+		aprs_tt_config = &config
 	} else {
 		tt_config = p
-		C.aprs_tt_config = p // For ttloc_ptr_get to work around C variable length array
+		aprs_tt_config = p // For ttloc_ptr_get to work around C variable length array
 	}
 }
 
@@ -483,12 +609,12 @@ func expand_macro(e string) int {
 		// Documentation says only x, y, z can be used with macros.
 		// Only those 3 are processed below.
 
-		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, C.ttloc_ptr_get(ipat).pattern, xstr, ystr, zstr, bstr, dstr);
-		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, C.GoString(&C.ttloc_ptr_get(ipat).pattern[0]), xstr, ystr, zstr)
+		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, aprs_tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
+		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, aprs_tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr)
 
-		dw_printf("Replace with:        '%s'\n", C.GoString(C.ttloc_ptr_get_macro_definition(ipat)))
+		dw_printf("Replace with:        '%s'\n", aprs_tt_config.ttloc_ptr[ipat].macro.definition)
 
-		if C.ttloc_ptr_get(ipat)._type != C.TTLOC_MACRO {
+		if aprs_tt_config.ttloc_ptr[ipat].ttlocType != TTLOC_MACRO {
 			/* Found match to a different type.  Really shouldn't be here. */
 			/* Print internal error message... */
 			dw_printf("expand_macro: type != TTLOC_MACRO\n")
@@ -502,7 +628,7 @@ func expand_macro(e string) int {
 
 		var stemp string
 
-		var definition = C.GoString(C.ttloc_ptr_get_macro_definition(ipat))
+		var definition = aprs_tt_config.ttloc_ptr[ipat].macro.definition
 		for i, d := range definition {
 			if i != len(definition)-1 {
 				if (d == 'x' || d == 'y' || d == 'z') && d == rune(definition[i+1]) {
@@ -1005,12 +1131,12 @@ func parse_location(e string) int {
 	if ipat >= 0 {
 		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
 
-		var ttloc_type = C.ttloc_ptr_get(ipat)._type
+		var ttloc_type = aprs_tt_config.ttloc_ptr[ipat].ttlocType
 		switch ttloc_type {
-		case C.TTLOC_POINT:
+		case TTLOC_POINT:
 
-			m_latitude = float64(C.ttloc_ptr_get_point_lat(ipat))
-			m_longitude = float64(C.ttloc_ptr_get_point_lon(ipat))
+			m_latitude = float64(aprs_tt_config.ttloc_ptr[ipat].point.lat)
+			m_longitude = float64(aprs_tt_config.ttloc_ptr[ipat].point.lon)
 
 			/* Is it one of ten or a hundred positions? */
 			/* It's not hardwired to always be B0n or B9nn.  */
@@ -1028,7 +1154,7 @@ func parse_location(e string) int {
 				m_dao[3] = e[3]
 			}
 
-		case C.TTLOC_VECTOR:
+		case TTLOC_VECTOR:
 			if len(bstr) != 3 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Bearing \"%s\" should be 3 digits.\n", bstr)
@@ -1040,10 +1166,10 @@ func parse_location(e string) int {
 				// return error code?
 			}
 
-			var lat0 = D2R(float64(C.ttloc_ptr_get_vector_lat(ipat)))
-			var lon0 = D2R(float64(C.ttloc_ptr_get_vector_lon(ipat)))
+			var lat0 = D2R(float64(aprs_tt_config.ttloc_ptr[ipat].vector.lat))
+			var lon0 = D2R(float64(aprs_tt_config.ttloc_ptr[ipat].vector.lon))
 			var d, _ = strconv.ParseFloat(dstr, 64)
-			var dist = d * float64(C.ttloc_ptr_get_vector_scale(ipat))
+			var dist = d * float64(aprs_tt_config.ttloc_ptr[ipat].vector.scale)
 			var b, _ = strconv.ParseFloat(bstr, 64)
 			var bearing = D2R(b)
 
@@ -1059,7 +1185,7 @@ func parse_location(e string) int {
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
 
-		case C.TTLOC_GRID:
+		case TTLOC_GRID:
 			if len(xstr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing X coordinate.\n")
@@ -1071,8 +1197,8 @@ func parse_location(e string) int {
 				ystr = "0"
 			}
 
-			var lat0 = float64(C.ttloc_ptr_get_grid_lat0(ipat))
-			var lat9 = float64(C.ttloc_ptr_get_grid_lat9(ipat))
+			var lat0 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lat0)
+			var lat9 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lat9)
 			var yrange = lat9 - lat0
 			var y, _ = strconv.ParseFloat(ystr, 64)
 			var user_y_max = math.Round(math.Pow(10., float64(len(ystr))) - 1.) // e.g. 999 for 3 digits
@@ -1086,8 +1212,8 @@ func parse_location(e string) int {
 			#endif
 			*/
 
-			var lon0 = float64(C.ttloc_ptr_get_grid_lon0(ipat))
-			var lon9 = float64(C.ttloc_ptr_get_grid_lon9(ipat))
+			var lon0 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lon0)
+			var lon9 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lon9)
 			var xrange = lon9 - lon0
 			var x, _ = strconv.ParseFloat(xstr, 64)
 			var user_x_max = math.Round(math.Pow(10., float64(len(xstr))) - 1.)
@@ -1104,7 +1230,7 @@ func parse_location(e string) int {
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
 
-		case C.TTLOC_UTM:
+		case TTLOC_UTM:
 			if len(xstr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing X coordinate.\n")
@@ -1119,22 +1245,22 @@ func parse_location(e string) int {
 			}
 
 			var x, _ = strconv.ParseFloat(xstr, 64)
-			var easting = x*float64(C.ttloc_ptr_get_utm_scale(ipat)) + float64(C.ttloc_ptr_get_utm_x_offset(ipat))
+			var easting = x*float64(aprs_tt_config.ttloc_ptr[ipat].utm.scale) + float64(aprs_tt_config.ttloc_ptr[ipat].utm.x_offset)
 
 			var y, _ = strconv.ParseFloat(ystr, 64)
-			var northing = y*float64(C.ttloc_ptr_get_utm_scale(ipat)) + float64(C.ttloc_ptr_get_utm_y_offset(ipat))
+			var northing = y*float64(aprs_tt_config.ttloc_ptr[ipat].utm.scale) + float64(aprs_tt_config.ttloc_ptr[ipat].utm.y_offset)
 
-			if unicode.IsLetter(rune(C.ttloc_ptr_get_utm_latband(ipat))) {
-				m_loc_text = fmt.Sprintf("%d%c %.0f %.0f", int(C.ttloc_ptr_get_utm_lzone(ipat)), C.ttloc_ptr_get_utm_latband(ipat), easting, northing)
-			} else if C.ttloc_ptr_get_utm_latband(ipat) == '-' {
-				m_loc_text = fmt.Sprintf("%d %.0f %.0f", int(-C.ttloc_ptr_get_utm_lzone(ipat)), easting, northing)
+			if unicode.IsLetter(rune(aprs_tt_config.ttloc_ptr[ipat].utm.latband)) {
+				m_loc_text = fmt.Sprintf("%d%c %.0f %.0f", int(aprs_tt_config.ttloc_ptr[ipat].utm.lzone), aprs_tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
+			} else if aprs_tt_config.ttloc_ptr[ipat].utm.latband == '-' {
+				m_loc_text = fmt.Sprintf("%d %.0f %.0f", int(-aprs_tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
 			} else {
-				m_loc_text = fmt.Sprintf("%d %.0f %.0f", int(C.ttloc_ptr_get_utm_lzone(ipat)), easting, northing)
+				m_loc_text = fmt.Sprintf("%d %.0f %.0f", int(aprs_tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
 			}
 
 			var lat0, lon0 C.double
-			var lerr = C.Convert_UTM_To_Geodetic(C.ttloc_ptr_get_utm_lzone(ipat),
-				C.ttloc_ptr_get_utm_hemi(ipat), C.double(easting), C.double(northing), &lat0, &lon0)
+			var lerr = C.Convert_UTM_To_Geodetic(aprs_tt_config.ttloc_ptr[ipat].utm.lzone,
+				aprs_tt_config.ttloc_ptr[ipat].utm.hemi, C.double(easting), C.double(northing), &lat0, &lon0)
 
 			if lerr == 0 {
 				m_latitude = R2D(float64(lat0))
@@ -1152,7 +1278,7 @@ func parse_location(e string) int {
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
 
-		case C.TTLOC_MGRS, C.TTLOC_USNG:
+		case TTLOC_MGRS, TTLOC_USNG:
 			if len(xstr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("MGRS/USNG: Missing X (easting) coordinate.\n")
@@ -1166,8 +1292,7 @@ func parse_location(e string) int {
 				ystr = "5"
 			}
 
-			var _loc = C.ttloc_ptr_get_mgrs_zone(ipat)
-			var loc = C.GoString(_loc)
+			var loc = aprs_tt_config.ttloc_ptr[ipat].mgrs.zone
 			loc += xstr
 			loc += ystr
 
@@ -1178,7 +1303,7 @@ func parse_location(e string) int {
 
 			var lerr C.long
 			var lat0, lon0 C.double
-			if C.ttloc_ptr_get(ipat)._type == C.TTLOC_MGRS {
+			if aprs_tt_config.ttloc_ptr[ipat].ttlocType == TTLOC_MGRS {
 				lerr = C.Convert_MGRS_To_Geodetic(C.CString(loc), &lat0, &lon0)
 			} else {
 				lerr = C.Convert_USNG_To_Geodetic(C.CString(loc), &lat0, &lon0)
@@ -1200,17 +1325,17 @@ func parse_location(e string) int {
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
 
-		case C.TTLOC_MHEAD:
+		case TTLOC_MHEAD:
 
 			/* Combine prefix from configuration and digits from user. */
 
-			var stemp = C.GoString(C.ttloc_ptr_get_mhead_prefix(ipat))
+			var stemp = aprs_tt_config.ttloc_ptr[ipat].mhead.prefix
 			stemp += xstr
 
 			if len(stemp) != 4 && len(stemp) != 6 && len(stemp) != 10 && len(stemp) != 12 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
-					C.GoString(C.ttloc_ptr_get_mhead_prefix(ipat)), xstr)
+					aprs_tt_config.ttloc_ptr[ipat].mhead.prefix, xstr)
 				return (C.TT_ERROR_INVALID_MHEAD)
 			}
 
@@ -1234,7 +1359,7 @@ func parse_location(e string) int {
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
 
-		case C.TTLOC_SATSQ:
+		case TTLOC_SATSQ:
 
 			if len(xstr) != 4 {
 				text_color_set(DW_COLOR_ERROR)
@@ -1258,7 +1383,7 @@ func parse_location(e string) int {
 			m_dao[2] = e[0]
 			m_dao[3] = e[1]
 
-		case C.TTLOC_AMBIG:
+		case TTLOC_AMBIG:
 
 			if len(xstr) != 1 {
 				text_color_set(DW_COLOR_ERROR)
@@ -1315,8 +1440,7 @@ func find_ttloc_match(e string) (string, string, string, string, string, int) {
 	var xstr, ystr, zstr, bstr, dstr string
 
 	for ipat := C.int(0); ipat < tt_config.ttloc_len; ipat++ {
-		var _pattern = C.ttloc_ptr_get(ipat).pattern
-		var pattern = C.GoString(&_pattern[0])
+		var pattern = aprs_tt_config.ttloc_ptr[ipat].pattern
 		var length = len(pattern) /* Length of pattern we are trying to match. */
 
 		if len(e) == length {

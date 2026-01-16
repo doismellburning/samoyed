@@ -147,9 +147,9 @@ var tt_user [MAX_TT_USERS]tt_user_s
  *
  *----------------------------------------------------------------*/
 
-var save_tt_config_p *C.struct_tt_config_s
+var save_tt_config_p *tt_config_s
 
-func tt_user_init(p_audio_config *C.struct_audio_s, p_tt_config *C.struct_tt_config_s) {
+func tt_user_init(p_audio_config *C.struct_audio_s, p_tt_config *tt_config_s) {
 	save_audio_config_p = p_audio_config
 
 	save_tt_config_p = p_tt_config
@@ -676,10 +676,10 @@ func xmit_object_report(i int, first_time bool) {
 		}
 
 		// Insert "/" if status does not already begin with it.
-		if save_tt_config_p.status[tt_user[i].mic_e-'0'][0] != '/' {
+		if !strings.HasPrefix(save_tt_config_p.status[tt_user[i].mic_e-'0'], "/") {
 			info_comment += "/"
 		}
-		info_comment += C.GoString(&save_tt_config_p.status[tt_user[i].mic_e-'0'][0])
+		info_comment += save_tt_config_p.status[tt_user[i].mic_e-'0']
 	}
 
 	if tt_user[i].dao != "" {
@@ -902,7 +902,7 @@ func tt_setenv(i int) {
 	os.Setenv("TTLOC", tt_user[i].loc_text)
 
 	if tt_user[i].mic_e >= '1' && tt_user[i].mic_e <= '9' {
-		os.Setenv("TTSTATUS", C.GoString(&save_tt_config_p.status[tt_user[i].mic_e-'0'][0]))
+		os.Setenv("TTSTATUS", save_tt_config_p.status[tt_user[i].mic_e-'0'])
 	} else {
 		os.Setenv("TTSTATUS", "")
 	}

@@ -243,18 +243,6 @@ struct misc_config_s {
 
 #define DEFAULT_NULLMODEM "COM3"  	/* should be equiv. to /dev/ttyS2 on Cygwin */
 
-
-
-
-extern void config_init (char *fname, struct audio_s *p_modem, 
-			struct digi_config_s *digi_config,
-			struct cdigi_config_s *cdigi_config,
-			struct tt_config_s *p_tt_config,
-			struct igate_config_s *p_igate_config,
-			struct misc_config_s *misc_config);
-
-
-
 #endif /* CONFIG_H */
 
 /* end config.h */

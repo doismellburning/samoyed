@@ -94,7 +94,7 @@ var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS p
 var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
 
 var audio_config *C.struct_audio_s
-var dw_tt_config C.struct_tt_config_s
+var dw_tt_config tt_config_s
 var misc_config *C.struct_misc_config_s
 
 /*-------------------------------------------------------------------

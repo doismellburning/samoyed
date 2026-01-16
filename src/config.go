@@ -628,7 +628,7 @@ func rtfm() {
 func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	p_digi_config *C.struct_digi_config_s,
 	p_cdigi_config *C.struct_cdigi_config_s,
-	p_tt_config *C.struct_tt_config_s,
+	p_tt_config *tt_config_s,
 	p_igate_config *C.struct_igate_config_s,
 	p_misc_config *C.struct_misc_config_s) {
 
@@ -747,16 +747,16 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	p_tt_config.xmit_delay[5] = 4 * 60
 	p_tt_config.xmit_delay[6] = 8 * 60 // not currently used.
 
-	C.strcpy(&p_tt_config.status[0][0], C.CString(""))
-	C.strcpy(&p_tt_config.status[1][0], C.CString("/off duty"))
-	C.strcpy(&p_tt_config.status[2][0], C.CString("/enroute"))
-	C.strcpy(&p_tt_config.status[3][0], C.CString("/in service"))
-	C.strcpy(&p_tt_config.status[4][0], C.CString("/returning"))
-	C.strcpy(&p_tt_config.status[5][0], C.CString("/committed"))
-	C.strcpy(&p_tt_config.status[6][0], C.CString("/special"))
-	C.strcpy(&p_tt_config.status[7][0], C.CString("/priority"))
-	C.strcpy(&p_tt_config.status[8][0], C.CString("/emergency"))
-	C.strcpy(&p_tt_config.status[9][0], C.CString("/custom 1"))
+	p_tt_config.status[0] = ""
+	p_tt_config.status[1] = "/off duty"
+	p_tt_config.status[2] = "/enroute"
+	p_tt_config.status[3] = "/in service"
+	p_tt_config.status[4] = "/returning"
+	p_tt_config.status[5] = "/committed"
+	p_tt_config.status[6] = "/special"
+	p_tt_config.status[7] = "/priority"
+	p_tt_config.status[8] = "/emergency"
+	p_tt_config.status[9] = "/custom 1"
 
 	for m := 0; m < C.TT_ERROR_MAXP1; m++ {
 		C.strcpy(&p_tt_config.response[m].method[0], C.CString("MORSE"))
