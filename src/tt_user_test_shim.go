@@ -49,7 +49,7 @@ func tt_user_test_main(t *testing.T) {
 
 	/* Fake TT gateway config. */
 
-	var my_tt_config C.struct_tt_config_s
+	var my_tt_config tt_config_s
 
 	/* Don't care about the location translation here. */
 
