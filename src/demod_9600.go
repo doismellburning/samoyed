@@ -32,7 +32,6 @@ package direwolf
 //
 // #include "hdlc_rec.h"
 // #include "demod_9600.h"
-// #include "textcolor.h"
 // #include "dsp.h"
 import "C"
 

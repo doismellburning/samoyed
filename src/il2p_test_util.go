@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "textcolor.h"
 // #include "il2p.h"
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"

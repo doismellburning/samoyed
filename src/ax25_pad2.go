@@ -121,7 +121,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <ctype.h>
-// #include "textcolor.h"
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 import "C"

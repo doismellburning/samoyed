@@ -39,7 +39,6 @@ package direwolf
 // #include <time.h>
 // #include "direwolf.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "version.h"
 // #include "digipeater.h"
 // #include "tq.h"

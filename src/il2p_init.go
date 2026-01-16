@@ -5,7 +5,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <stdio.h>
-// #include "textcolor.h"
 // #include "fx25.h"		// For Reed Solomon stuff.
 // #include "il2p.h"
 import "C"

@@ -23,7 +23,6 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include "latlong.h"
-// #include "textcolor.h"
 import "C"
 
 import (

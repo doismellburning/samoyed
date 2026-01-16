@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "textcolor.h"
 // #include "il2p.h"
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
@@ -33,8 +32,8 @@ func il2p_test_main(t *testing.T) {
 
 	IL2P_TEST = true
 
-	var enable_color C.int = 1
-	C.text_color_init(enable_color)
+	var enable_color = 1
+	text_color_init(enable_color)
 
 	var enable_debug_out C.int = 0
 	C.il2p_init(enable_debug_out)

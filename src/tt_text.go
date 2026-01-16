@@ -21,7 +21,6 @@ package direwolf
 // #include <string.h>
 // #include <ctype.h>
 // #include <stdarg.h>
-// #include "textcolor.h"
 // #include "tt_text.h"
 // typedef const char const_char;
 import "C"

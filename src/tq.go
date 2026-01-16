@@ -22,7 +22,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "audio.h"
 // #include "tq.h"
 // #include "igate.h"

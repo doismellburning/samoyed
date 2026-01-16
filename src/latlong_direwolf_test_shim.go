@@ -10,7 +10,6 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include "latlong.h"
-// #include "textcolor.h"
 // double ll_bearing_deg (double lat1, double lon1, double lat2, double lon2);
 // double ll_dest_lat (double lat1, double lon1, double dist, double bearing);
 // double ll_dest_lon (double lat1, double lon1, double dist, double bearing);
@@ -294,11 +293,11 @@ func latlong_test_main(t *testing.T) {
 	*/
 
 	if errors > 0 {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nLocation Coordinate Conversion Test - FAILED!\n")
 		t.Fail()
 	} else {
-		C.text_color_set(C.DW_COLOR_REC)
+		text_color_set(DW_COLOR_REC)
 		dw_printf("\nLocation Coordinate Conversion Test - SUCCESS!\n")
 	}
 }

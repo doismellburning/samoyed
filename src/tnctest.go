@@ -20,7 +20,6 @@ package direwolf
 // #include <ctype.h>
 // #include <string.h>
 // #include <time.h>
-// #include "textcolor.h"
 import "C"
 
 import (

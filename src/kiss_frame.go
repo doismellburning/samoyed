@@ -66,7 +66,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "kiss_frame.h"
 // #include "tq.h"
 // #include "version.h"

@@ -29,7 +29,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "xid.h"
 // #include "decode_aprs.h"
-// #include "textcolor.h"
 // #include "kiss_frame.h"
 // #include "gen_tone.h"
 // #include "digipeater.h"
@@ -204,7 +203,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *showVersion {
-		C.text_color_init(C.int(*textColor))
+		text_color_init(*textColor)
 		printVersion(true)
 		os.Exit(0)
 	}
@@ -582,7 +581,7 @@ x = Silence FX.25 information.`)
 	// Might want to print OS version here.   For Windows, see:
 	// https://msdn.microsoft.com/en-us/library/ms724451(v=VS.85).aspx
 
-	C.text_color_init(C.int(*textColor))
+	text_color_init(*textColor)
 	printVersion(false)
 
 	C.setlinebuf(C.stdout)
@@ -600,7 +599,7 @@ x = Silence FX.25 information.`)
 
 	var err = audio_open(audio_config)
 	if err < 0 {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
 		SLEEP_SEC(5)
 		pflag.Usage()
@@ -681,16 +680,16 @@ x = Silence FX.25 information.`)
 			case 'p':
 				transmitCalibrationType = p // Set PTT only
 			default:
-				C.text_color_set(C.DW_COLOR_ERROR)
+				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				os.Exit(1)
 			}
 		}
 		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= C.MAX_RADIO_CHANS {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
-			C.text_color_set(C.DW_COLOR_INFO)
+			text_color_set(DW_COLOR_INFO)
 			os.Exit(1)
 		}
 
@@ -699,7 +698,7 @@ x = Silence FX.25 information.`)
 				var max_duration = 60
 				var n = audio_config.achan[transmitCalibrationChannel].baud * C.int(max_duration)
 
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
 
 				switch transmitCalibrationType {
@@ -733,18 +732,18 @@ x = Silence FX.25 information.`)
 				}
 
 				ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				os.Exit(0)
 			} else {
-				C.text_color_set(C.DW_COLOR_ERROR)
+				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("\nMark/Space frequencies not defined for channel %d. Cannot calibrate using this modem type.\n", transmitCalibrationChannel)
-				C.text_color_set(C.DW_COLOR_INFO)
+				text_color_set(DW_COLOR_INFO)
 				os.Exit(1)
 			}
 		} else {
-			C.text_color_set(C.DW_COLOR_ERROR)
+			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\nChannel %d is not configured as a radio channel.\n", transmitCalibrationChannel)
-			C.text_color_set(C.DW_COLOR_INFO)
+			text_color_set(DW_COLOR_INFO)
 			os.Exit(1)
 		}
 	}

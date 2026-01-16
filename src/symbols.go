@@ -12,7 +12,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "textcolor.h"
 // #include "symbols.h"
 // #include "tt_text.h"
 import "C"

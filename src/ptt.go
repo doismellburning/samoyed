@@ -136,7 +136,6 @@ package direwolf
 // #include <hamlib/rig.h>
 // #include <gpiod.h>
 // #include "cm108.h"
-// #include "textcolor.h"
 // #include "audio.h"
 // #include "ptt.h"
 // #include "dlq.h"

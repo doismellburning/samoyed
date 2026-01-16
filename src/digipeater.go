@@ -43,7 +43,6 @@ package direwolf
 // #include <unistd.h>
 // #include "ax25_pad.h"
 // #include "digipeater.h"
-// #include "textcolor.h"
 // #include "tq.h"
 import "C"
 

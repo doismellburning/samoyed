@@ -6,7 +6,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "textcolor.h"
 // #include "xid.h"
 import "C"
 
@@ -92,11 +91,11 @@ func xid_test_main(t *testing.T) {
 
 	var n = xid_parse(&xid_example[0], C.int(len(xid_example)), &param, &desc[0], C.int(len(desc)))
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
 	C.sleep(1)
 
-	C.text_color_set(C.DW_COLOR_ERROR)
+	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, C.int(1), n)
 	assert.Equal(t, C.int(0), param.full_duplex)
@@ -128,11 +127,11 @@ func xid_test_main(t *testing.T) {
 	n = xid_encode(&param, &info[0], C.cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
 	C.sleep(1)
 
-	C.text_color_set(C.DW_COLOR_ERROR)
+	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, C.int(1), param2.full_duplex)
 	assert.Equal(t, srej_none, param2.srej)
@@ -155,11 +154,11 @@ func xid_test_main(t *testing.T) {
 	n = xid_encode(&param, &info[0], C.cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
 	C.sleep(1)
 
-	C.text_color_set(C.DW_COLOR_ERROR)
+	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, C.int(0), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
@@ -182,11 +181,11 @@ func xid_test_main(t *testing.T) {
 	n = xid_encode(&param, &info[0], C.cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
 	C.sleep(1)
 
-	C.text_color_set(C.DW_COLOR_ERROR)
+	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, C.int(0), param2.full_duplex)
 	assert.Equal(t, srej_multi, param2.srej)
@@ -209,11 +208,11 @@ func xid_test_main(t *testing.T) {
 	n = xid_encode(&param, &info[0], C.cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
 	C.sleep(1)
 
-	C.text_color_set(C.DW_COLOR_ERROR)
+	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, C.int(0), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
@@ -228,11 +227,11 @@ func xid_test_main(t *testing.T) {
 	n = 0
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
-	C.text_color_set(C.DW_COLOR_DEBUG)
+	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, C.GoString(&desc[0]))
 	C.sleep(1)
 
-	C.text_color_set(C.DW_COLOR_ERROR)
+	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, G_UNKNOWN, param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)
@@ -242,6 +241,6 @@ func xid_test_main(t *testing.T) {
 	assert.Equal(t, G_UNKNOWN, param2.ack_timer)
 	assert.Equal(t, G_UNKNOWN, param2.retries)
 
-	C.text_color_set(C.DW_COLOR_REC)
+	text_color_set(DW_COLOR_REC)
 	dw_printf("XID test:  Success.\n")
 }

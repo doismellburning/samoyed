@@ -69,7 +69,6 @@ package direwolf
 // #include <stdio.h>
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "multi_modem.h"
 // #include "demod.h"
 // #include "hdlc_rec.h"

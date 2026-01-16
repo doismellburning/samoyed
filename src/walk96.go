@@ -16,7 +16,6 @@ package direwolf
 // #include <math.h>
 // #include "config.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "latlong.h"
 // #include "dwgps.h"
 // #include "kiss_frame.h"

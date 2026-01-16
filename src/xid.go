@@ -29,7 +29,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "textcolor.h"
 // #include "xid.h"
 import "C"
 

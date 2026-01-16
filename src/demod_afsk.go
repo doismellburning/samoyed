@@ -32,7 +32,6 @@ package direwolf
 // #include "fsk_demod_state.h"
 // #include "fsk_gen_filter.h"
 // #include "hdlc_rec.h"
-// #include "textcolor.h"
 // #include "demod_afsk.h"
 // #include "dsp.h"
 import "C"

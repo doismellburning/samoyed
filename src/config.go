@@ -28,7 +28,6 @@ package direwolf
 // #define DEFAULT_GPSD_PORT "2947"
 // #endif
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "audio.h"
 // #include "digipeater.h"
 // #include "cdigipeater.h"

@@ -7,7 +7,6 @@ package main
 // #include <ctype.h>
 // #include <assert.h>
 // #include <stdarg.h>
-// #include "textcolor.h"
 // #include "tt_text.h"
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"

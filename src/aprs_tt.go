@@ -37,7 +37,6 @@ package direwolf
 // #include "version.h"
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"		/* for process_rec_frame */
-// #include "textcolor.h"
 // #include "aprs_tt.h"
 // #include "tt_text.h"
 // #include "symbols.h"

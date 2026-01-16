@@ -71,7 +71,6 @@ package direwolf
 // #include <errno.h>
 // #include "tq.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "kiss_frame.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"

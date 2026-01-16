@@ -158,7 +158,6 @@ same direwolf instance.
 // #include <stddef.h>
 // #include "tq.h"
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "audio.h"
 // #include "kiss_frame.h"
 // #include "config.h"

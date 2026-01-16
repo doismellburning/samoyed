@@ -32,7 +32,6 @@ package direwolf
 // #include <errno.h>
 // #include <time.h>
 // #include <stddef.h>
-// #include "textcolor.h"
 // #include "dwgps.h"
 // #include "dwgpsnmea.h"
 import "C"

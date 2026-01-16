@@ -15,7 +15,6 @@ https://github.com/golang/go/issues/4030
 // #include <unistd.h>
 // #include "ax25_pad.h"
 // #include "digipeater.h"
-// #include "textcolor.h"
 // #include "tq.h"
 // packet_t digipeat_match (int from_chan, packet_t pp, char *mycall_rec, char *mycall_xmit, regex_t *uidigi, regex_t *uitrace, int to_chan, enum preempt_e preempt, char *atgp, char *type_filter);
 // char *mycall;
@@ -55,7 +54,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
 
 	if C.strcmp(in, &rec[0]) != 0 {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text/internal/text error-1 %s -> %s\n", C.GoString(in), C.GoString(&rec[0]))
 	}
 
@@ -80,7 +79,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
 
 	if C.strcmp(in, &rec[0]) != 0 {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf(
 			"internal/frame/internal/text error-2 %s -> %s\n",
 			C.GoString(in),
@@ -92,7 +91,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 	 * On with the digipeater test.
 	 */
 
-	C.text_color_set(C.DW_COLOR_REC)
+	text_color_set(DW_COLOR_REC)
 	dw_printf("Rec\t%s\n", C.GoString(&rec[0]))
 
 	//TODO:										  	             Add filtering to test.
@@ -110,7 +109,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 		C.strcpy(&xmit[0], C.CString(""))
 	}
 
-	C.text_color_set(C.DW_COLOR_XMIT)
+	text_color_set(DW_COLOR_XMIT)
 	dw_printf("Xmit\t%s\n", C.GoString(&xmit[0]))
 
 	if !assert.Equal(t, out, C.GoString(&xmit[0])) { //nolint:testifylint
@@ -135,7 +134,7 @@ func digipeater_test_main(t *testing.T) bool {
 	e = C.regcomp(&C.alias_re, C.CString("^WIDE[4-7]-[1-7]|CITYD$"), C.REG_EXTENDED|C.REG_NOSUB)
 	if e != 0 {
 		C.regerror(e, &C.alias_re, message, 256)
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\n%s\n\n", C.GoString(message))
 		C.exit(1)
 	}
@@ -147,7 +146,7 @@ func digipeater_test_main(t *testing.T) bool {
 	)
 	if e != 0 {
 		C.regerror(e, &C.wide_re, message, 256)
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\n%s\n\n", C.GoString(message))
 		C.exit(1)
 	}
@@ -380,7 +379,7 @@ func digipeater_test_main(t *testing.T) bool {
 	if C.failed == 0 {
 		dw_printf("SUCCESS -- All digipeater tests passed.\n")
 	} else {
-		C.text_color_set(C.DW_COLOR_ERROR)
+		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - %d digipeater tests failed.\n", C.failed)
 		t.Fail()
 	}

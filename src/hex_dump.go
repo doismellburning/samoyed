@@ -1,7 +1,6 @@
 package direwolf
 
 // #include <ctype.h>
-// #include "textcolor.h"
 import "C"
 
 import (

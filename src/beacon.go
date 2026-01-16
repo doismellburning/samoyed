@@ -17,7 +17,6 @@ package direwolf
 // #include <math.h>
 // #include <time.h>
 // #include "ax25_pad.h"
-// #include "textcolor.h"
 // #include "audio.h"
 // #include "tq.h"
 // #include "config.h"

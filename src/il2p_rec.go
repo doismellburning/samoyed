@@ -13,7 +13,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "textcolor.h"
 // #include "il2p.h"
 // #include "multi_modem.h"
 // #include "demod.h"
