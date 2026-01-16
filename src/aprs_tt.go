@@ -38,7 +38,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"		/* for process_rec_frame */
 // #include "aprs_tt.h"
-// #include "tt_text.h"
 // #include "symbols.h"
 // #include "latlong.h"
 // #include "dlq.h"
@@ -763,7 +762,7 @@ func parse_callsign(e string) int {
 			var tttemp = string(e[length-3]) + string(e[length-2])
 			var stemp [30]C.char
 
-			C.tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
+			tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
 
 			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
@@ -798,12 +797,12 @@ func parse_callsign(e string) int {
 		if unicode.IsUpper(rune(e[length-2])) {
 			var tttemp = e[1 : length-3]
 			var _m_callsign [30]C.char
-			C.tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
+			tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
 			m_callsign = C.GoString(&_m_callsign[0])
 
 			tttemp = string(e[length-3]) + string(e[length-2])
 			var stemp [30]C.char
-			C.tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
+			tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
 
 			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
@@ -816,7 +815,7 @@ func parse_callsign(e string) int {
 		} else {
 			var tttemp = e[1 : length-2]
 			var _m_callsign [30]C.char
-			C.tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
+			tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
 			m_callsign = C.GoString(&_m_callsign[0])
 
 			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
@@ -875,7 +874,7 @@ func parse_object_name(e string) int {
 
 	if length >= 2+1 && length <= 30 {
 		var _m_callsign [30]C.char
-		if C.tt_two_key_to_text(C.CString(e[2:]), 0, &_m_callsign[0]) == 0 {
+		if tt_two_key_to_text(C.CString(e[2:]), 0, &_m_callsign[0]) == 0 {
 			m_callsign = C.GoString(&_m_callsign[0])
 			if len(m_callsign) > 9 {
 				m_callsign = m_callsign[:9]
@@ -976,7 +975,7 @@ func parse_symbol(e string) int {
 		case '0':
 			if length >= 6 {
 				var stemp [30]C.char
-				if C.tt_two_key_to_text(C.CString(e[5:]), 0, &stemp[0]) == 0 {
+				if tt_two_key_to_text(C.CString(e[5:]), 0, &stemp[0]) == 0 {
 					m_symbol_code = rune(32 + nn)
 					m_symtab_or_overlay = rune(stemp[0])
 					if tt_debug > 0 {
@@ -1032,14 +1031,14 @@ func parse_aprstt3_call(e string) int {
 	if len(e) == 2+10 {
 		var call [12]C.char
 
-		if C.tt_call10_to_text(C.CString(e[2:]), 1, &call[0]) == 0 {
+		if tt_call10_to_text(C.CString(e[2:]), 1, &call[0]) == 0 {
 			m_callsign = C.GoString(&call[0])
 		} else {
 			return (C.TT_ERROR_INVALID_CALL) /* Could not convert to text */
 		}
 	} else if len(e) == 2+5 {
 		var suffix [8]C.char
-		if C.tt_call5_suffix_to_text(C.CString(e[2:]), 1, &suffix[0]) == 0 {
+		if tt_call5_suffix_to_text(C.CString(e[2:]), 1, &suffix[0]) == 0 {
 			if running_TT_MAIN_tests {
 				/* For unit test, use suffix rather than trying lookup. */
 				m_callsign = C.GoString(&suffix[0])
@@ -1343,7 +1342,7 @@ func parse_location(e string) int {
 			// dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
 
 			var mh [20]C.char
-			if C.tt_mhead_to_text(C.CString(stemp), 0, &mh[0], C.ulong(len(mh))) == 0 {
+			if tt_mhead_to_text(C.CString(stemp), 0, &mh[0], C.ulong(len(mh))) == 0 {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
 
@@ -1370,7 +1369,7 @@ func parse_location(e string) int {
 			/* Convert 4 digits to usual AA99 form, then to location. */
 
 			var mh [20]C.char
-			if C.tt_satsq_to_text(C.CString(xstr), 0, &mh[0]) == 0 {
+			if tt_satsq_to_text(C.CString(xstr), 0, &mh[0]) == 0 {
 				m_loc_text = C.GoString(&mh[0])
 
 				var lat, lon, err = ll_from_grid_square(m_loc_text)
@@ -1544,7 +1543,7 @@ func parse_comment(e string) int {
 
 	if e[1] == 'A' {
 		var _m_comment [200]C.char
-		C.tt_ascii2d_to_text(C.CString(e[2:]), 0, &_m_comment[0])
+		tt_ascii2d_to_text(C.CString(e[2:]), 0, &_m_comment[0])
 		m_comment = C.GoString(&_m_comment[0])
 
 		return (0)
@@ -1567,7 +1566,7 @@ func parse_comment(e string) int {
 	}
 
 	var _m_comment [200]C.char
-	C.tt_multipress_to_text(C.CString(e[1:]), 0, &_m_comment[0])
+	tt_multipress_to_text(C.CString(e[1:]), 0, &_m_comment[0])
 	m_comment = C.GoString(&_m_comment[0])
 
 	return (0)

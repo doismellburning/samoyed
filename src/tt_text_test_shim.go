@@ -7,7 +7,6 @@ package direwolf
 // #include <ctype.h>
 // #include <assert.h>
 // #include <stdarg.h>
-// #include "tt_text.h"
 import "C"
 
 import (
@@ -26,19 +25,19 @@ func test_text2tt(t *testing.T, _text string, _expect_mp string, _expect_2k stri
 	var _buttons [100]C.char
 	var buttons = &_buttons[0]
 
-	C.tt_text_to_multipress(text, 0, buttons)
+	tt_text_to_multipress(text, 0, buttons)
 	assert.Equal(t, _expect_mp, C.GoString(buttons), "Unexpected multi-press value for text %s", _text) //nolint:testifylint
 
-	C.tt_text_to_two_key(text, 0, buttons)
+	tt_text_to_two_key(text, 0, buttons)
 	assert.Equal(t, _expect_2k, C.GoString(buttons), "Unexpected two-key value for text %s", _text) //nolint:testifylint
 
-	C.tt_text_to_call10(text, 0, buttons)
+	tt_text_to_call10(text, 0, buttons)
 	assert.Equal(t, _expect_c10, C.GoString(buttons), "Unexpected call10 value for text %s", _text) //nolint:testifylint
 
-	C.tt_text_to_mhead(text, 0, buttons, 100)
+	tt_text_to_mhead(text, 0, buttons, 100)
 	assert.Equal(t, _expect_loc, C.GoString(buttons), "Unexpected Maidenhead value for text %s", _text) //nolint:testifylint
 
-	C.tt_text_to_satsq(text, 0, buttons, 100)
+	tt_text_to_satsq(text, 0, buttons, 100)
 	assert.Equal(t, _expect_sat, C.GoString(buttons), "Unexpected SatSq value for text %s", _text) //nolint:testifylint
 }
 
@@ -52,19 +51,19 @@ func test_tt2text(t *testing.T, _buttons string, _expect_mp string, _expect_2k s
 	var _text [100]C.char
 	var text = &_text[0]
 
-	C.tt_multipress_to_text(buttons, 0, text)
+	tt_multipress_to_text(buttons, 0, text)
 	assert.Equal(t, _expect_mp, C.GoString(text), "Unexpected multi-press value for buttons %s", _buttons) //nolint:testifylint
 
-	C.tt_two_key_to_text(buttons, 0, text)
+	tt_two_key_to_text(buttons, 0, text)
 	assert.Equal(t, _expect_2k, C.GoString(text), "Unexpected two-key value for buttons %s", _buttons) //nolint:testifylint
 
-	C.tt_call10_to_text(buttons, 0, text)
+	tt_call10_to_text(buttons, 0, text)
 	assert.Equal(t, _expect_c10, C.GoString(text), "Unexpected call10 value for buttons %s", _buttons) //nolint:testifylint
 
-	C.tt_mhead_to_text(buttons, 0, text, 100)
+	tt_mhead_to_text(buttons, 0, text, 100)
 	assert.Equal(t, _expect_loc, C.GoString(text), "Unexpected Maidenhead value for buttons %s", _buttons) //nolint:testifylint
 
-	C.tt_satsq_to_text(buttons, 0, text)
+	tt_satsq_to_text(buttons, 0, text)
 	assert.Equal(t, _expect_sat, C.GoString(text), "Unexpected SatSq value for buttons %s", _buttons) //nolint:testifylint
 }
 

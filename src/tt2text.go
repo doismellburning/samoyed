@@ -7,7 +7,6 @@ package direwolf
 // #include <ctype.h>
 // #include <assert.h>
 // #include <stdarg.h>
-// #include "tt_text.h"
 import "C"
 
 import (
@@ -31,10 +30,10 @@ func TT2TextMain() {
 func TT2Text(goButtons string) {
 	var buttons = C.CString(goButtons)
 
-	switch C.tt_guess_type(buttons) {
-	case C.TT_MULTIPRESS:
+	switch tt_guess_type(buttons) {
+	case TT_MULTIPRESS:
 		fmt.Printf("Looks like multi-press encoding.\n")
-	case C.TT_TWO_KEY:
+	case TT_TWO_KEY:
 		fmt.Printf("Looks like two-key encoding.\n")
 	default:
 		fmt.Printf("Could be either type of encoding.\n")
@@ -45,26 +44,26 @@ func TT2Text(goButtons string) {
 	var n C.int
 
 	fmt.Printf("Decoded text from multi-press method:\n")
-	C.tt_multipress_to_text(buttons, 0, text)
+	tt_multipress_to_text(buttons, 0, text)
 	fmt.Printf("\"%s\"\n", C.GoString(text))
 
 	fmt.Printf("Decoded text from two-key method:\n")
-	C.tt_two_key_to_text(buttons, 0, text)
+	tt_two_key_to_text(buttons, 0, text)
 	fmt.Printf("\"%s\"\n", C.GoString(text))
 
-	n = C.tt_call10_to_text(buttons, 1, text)
+	n = tt_call10_to_text(buttons, 1, text)
 	if n == 0 {
 		fmt.Printf("Decoded callsign from 10 digit method:\n")
 		fmt.Printf("\"%s\"\n", C.GoString(text))
 	}
 
-	n = C.tt_mhead_to_text(buttons, 1, text, C.ulong(len(_text)))
+	n = tt_mhead_to_text(buttons, 1, text, C.ulong(len(_text)))
 	if n == 0 {
 		fmt.Printf("Decoded Maidenhead Locator from DTMF digits:\n")
 		fmt.Printf("\"%s\"\n", C.GoString(text))
 	}
 
-	n = C.tt_satsq_to_text(buttons, 1, text)
+	n = tt_satsq_to_text(buttons, 1, text)
 	if n == 0 {
 		fmt.Printf("Decoded satellite gridsquare from 4 DTMF digits:\n")
 		fmt.Printf("\"%s\"\n", C.GoString(text))

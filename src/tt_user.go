@@ -26,7 +26,6 @@ package direwolf
 // #include "version.h"
 // #include "ax25_pad.h"
 // #include "aprs_tt.h"
-// #include "tt_text.h"
 // #include "tq.h"
 // #include "igate.h"
 // #include "latlong.h"
@@ -343,7 +342,7 @@ func digit_suffix(callsign string) string {
 	var suffix = []byte{'0', '0', '0'}
 
 	var _two_key [50]C.char
-	C.tt_text_to_two_key(C.CString(callsign), 0, &_two_key[0])
+	tt_text_to_two_key(C.CString(callsign), 0, &_two_key[0])
 	var two_key = C.GoString(&_two_key[0])
 
 	for _, t := range two_key {

@@ -7,7 +7,6 @@ package direwolf
 // #include <ctype.h>
 // #include <assert.h>
 // #include <stdarg.h>
-// #include "tt_text.h"
 import "C"
 
 import (
@@ -53,28 +52,28 @@ func Text2TT(args []string) {
 	var cs int
 
 	fmt.Printf("Push buttons for multi-press method:\n")
-	C.tt_text_to_multipress(text, 0, buttons)
+	tt_text_to_multipress(text, 0, buttons)
 	cs = checksum(C.GoString(buttons))
 	fmt.Printf("\"%s\"    checksum for call = %d\n", C.GoString(buttons), cs)
 
 	fmt.Printf("Push buttons for two-key method:\n")
-	C.tt_text_to_two_key(text, 0, buttons)
+	tt_text_to_two_key(text, 0, buttons)
 	cs = checksum(C.GoString(buttons))
 	fmt.Printf("\"%s\"    checksum for call = %d\n", C.GoString(buttons), cs)
 
-	n = C.tt_text_to_call10(text, 1, buttons)
+	n = tt_text_to_call10(text, 1, buttons)
 	if n == 0 {
 		fmt.Printf("Push buttons for fixed length 10 digit callsign:\n")
 		fmt.Printf("\"%s\"\n", C.GoString(buttons))
 	}
 
-	n = C.tt_text_to_mhead(text, 1, buttons, C.ulong(len(_buttons)))
+	n = tt_text_to_mhead(text, 1, buttons, C.ulong(len(_buttons)))
 	if n == 0 {
 		fmt.Printf("Push buttons for Maidenhead Grid Square Locator:\n")
 		fmt.Printf("\"%s\"\n", C.GoString(buttons))
 	}
 
-	n = C.tt_text_to_satsq(text, 1, buttons, C.ulong(len(_buttons)))
+	n = tt_text_to_satsq(text, 1, buttons, C.ulong(len(_buttons)))
 	if n == 0 {
 		fmt.Printf("Push buttons for satellite gridsquare:\n")
 		fmt.Printf("\"%s\"\n", C.GoString(buttons))

@@ -36,7 +36,6 @@ package direwolf
 // #include "igate.h"
 // #include "latlong.h"
 // #include "symbols.h"
-// #include "tt_text.h"
 // #include "ax25_link.h"
 // #if USE_CM108		// Current Linux or Windows only
 // #include "cm108.h"
