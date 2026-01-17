@@ -48,7 +48,6 @@ package direwolf
 // #include <getopt.h>
 // #include <ctype.h>
 // #include <math.h>
-// #include "ax25_pad.h"
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
 // void ptt_set_real (int ot, int chan, int ptt_signal);
@@ -636,7 +635,7 @@ func audio_get(a C.int) C.int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
 
 	packets_decoded_one++
 	if hdlc_rec_data_detect_any(channel) == 0 {
@@ -684,14 +683,14 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 		dw_printf("Digipeater ")
 	}
 
-	var alevel_text [C.AX25_ALEVEL_TO_TEXT_SIZE]C.char
+	var alevel_text [AX25_ALEVEL_TO_TEXT_SIZE]C.char
 	ax25_alevel_to_text(alevel, &alevel_text[0])
 
 	/* As suggested by KJ4ERJ, if we are receiving from */
 	/* WIDEn-0, it is quite likely (but not guaranteed), that */
 	/* we are actually hearing the preceding station in the path. */
 
-	if h >= C.AX25_REPEATER_2 &&
+	if h >= AX25_REPEATER_2 &&
 		strings.HasPrefix(heard, "WIDE") &&
 		unicode.IsDigit(rune(heard[4])) &&
 		len(heard) == 5 {

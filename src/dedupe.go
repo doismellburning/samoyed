@@ -81,7 +81,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <time.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -170,7 +169,7 @@ func dedupe_init(ttl time.Duration) {
  *
  *------------------------------------------------------------------------------*/
 
-func dedupe_remember(pp C.packet_t, channel C.int) {
+func dedupe_remember(pp *packet_t, channel C.int) {
 	history[insert_next].time_stamp = time.Now()
 	history[insert_next].checksum = ax25_dedupe_crc(pp)
 	history[insert_next].xmit_channel = channel
@@ -202,7 +201,7 @@ func dedupe_remember(pp C.packet_t, channel C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func dedupe_check(pp C.packet_t, channel C.int) bool {
+func dedupe_check(pp *packet_t, channel C.int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 

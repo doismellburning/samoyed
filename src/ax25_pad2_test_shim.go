@@ -1,13 +1,11 @@
 package direwolf
 
-// #define AX25_PAD_C		/* this will affect behavior of ax25_pad.h */
 // #include "direwolf.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
 // #include <stdio.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -33,45 +31,45 @@ func ax25_pad2_test_main(t *testing.T) {
 	var pinfo *C.uchar
 	var info_len C.int
 
-	var addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
+	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
 	C.strcpy(&addrs[0][0], C.CString("W2UB"))
 	C.strcpy(&addrs[1][0], C.CString("WB2OSZ-15"))
 	var num_addr C.int = 2
 
 	/* U frame */
 
-	for ftype := ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
+	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
-			var cmin C.cmdres_t = 0
-			var cmax C.cmdres_t = 0
+			var cmin cmdres_t = 0
+			var cmax cmdres_t = 0
 
 			switch ftype {
 			// 0 = response, 1 = command
-			case C.frame_type_U_SABME:
+			case frame_type_U_SABME:
 				cmin = 1
 				cmax = 1
-			case C.frame_type_U_SABM:
+			case frame_type_U_SABM:
 				cmin = 1
 				cmax = 1
-			case C.frame_type_U_DISC:
+			case frame_type_U_DISC:
 				cmin = 1
 				cmax = 1
-			case C.frame_type_U_DM:
+			case frame_type_U_DM:
 				cmin = 0
 				cmax = 0
-			case C.frame_type_U_UA:
+			case frame_type_U_UA:
 				cmin = 0
 				cmax = 0
-			case C.frame_type_U_FRMR:
+			case frame_type_U_FRMR:
 				cmin = 0
 				cmax = 0
-			case C.frame_type_U_UI:
+			case frame_type_U_UI:
 				cmin = 0
 				cmax = 1
-			case C.frame_type_U_XID:
+			case frame_type_U_XID:
 				cmin = 0
 				cmax = 1
-			case C.frame_type_U_TEST:
+			case frame_type_U_TEST:
 				cmin = 0
 				cmax = 1
 			default:
@@ -96,12 +94,12 @@ func ax25_pad2_test_main(t *testing.T) {
 	C.strcpy(&addrs[2][0], C.CString("DIGI1-1"))
 	num_addr = 3
 
-	for ftype := ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
+	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
-			var modulo C.int = 8
-			var nr = modulo/2 + 1
+			var modulo = modulo_8
+			var nr = C.int(modulo/2 + 1)
 
-			for cr := C.cmdres_t(0); cr <= 1; cr++ {
+			for cr := cmdres_t(0); cr <= 1; cr++ {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -112,10 +110,10 @@ func ax25_pad2_test_main(t *testing.T) {
 				ax25_delete(pp)
 			}
 
-			modulo = 128
-			nr = modulo/2 + 1
+			modulo = modulo_128
+			nr = C.int(modulo/2 + 1)
 
-			for cr := C.cmdres_t(0); cr <= 1; cr++ {
+			for cr := cmdres_t(0); cr <= 1; cr++ {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -132,11 +130,11 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	var srej_info = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype ax25_frame_type_t = C.frame_type_S_SREJ
+	var ftype ax25_frame_type_t = frame_type_S_SREJ
 	for pf := C.int(0); pf <= 1; pf++ {
-		var modulo C.int = 128
+		var modulo = modulo_128
 		var nr C.int = 127
-		var cr C.cmdres_t = C.cr_res
+		var cr cmdres_t = cr_res
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
@@ -156,11 +154,11 @@ func ax25_pad2_test_main(t *testing.T) {
 	info_len = C.int(C.strlen((*C.char)(unsafe.Pointer(pinfo))))
 
 	for pf := C.int(0); pf <= 1; pf++ {
-		var modulo C.int = 8
-		var nr = 0x55 & (modulo - 1)
-		var ns = 0xaa & (modulo - 1)
+		var modulo = modulo_8
+		var nr = 0x55 & C.int(modulo-1)
+		var ns = 0xaa & C.int(modulo-1)
 
-		for cr := C.cmdres_t(0); cr <= 1; cr++ {
+		for cr := cmdres_t(0); cr <= 1; cr++ {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -171,11 +169,11 @@ func ax25_pad2_test_main(t *testing.T) {
 			ax25_delete(pp)
 		}
 
-		modulo = 128
-		nr = 0x55 & (modulo - 1)
-		ns = 0xaa & (modulo - 1)
+		modulo = modulo_128
+		nr = 0x55 & C.int(modulo-1)
+		ns = 0xaa & C.int(modulo-1)
 
-		for cr := C.cmdres_t(0); cr <= 1; cr++ {
+		for cr := cmdres_t(0); cr <= 1; cr++ {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -192,10 +190,10 @@ func ax25_pad2_test_main(t *testing.T) {
 	dw_printf("\nSUCCESS!\n")
 } /* end main */
 
-func check_ax25_u_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype ax25_frame_type_t, pf C.int) {
+func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf C.int) {
 	t.Helper()
 
-	var check_cr C.cmdres_t
+	var check_cr cmdres_t
 	var check_desc [80]C.char
 	var check_pf C.int
 	var check_nr C.int
@@ -212,10 +210,10 @@ func check_ax25_u_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype ax
 	assert.Equal(t, C.int(-1), check_ns)
 }
 
-func check_ax25_s_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype ax25_frame_type_t, pf C.int, nr C.int) {
+func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf C.int, nr C.int) {
 	t.Helper()
 
-	var check_cr C.cmdres_t
+	var check_cr cmdres_t
 	var check_desc [80]C.char
 	var check_pf C.int
 	var check_nr C.int
@@ -233,10 +231,10 @@ func check_ax25_s_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, ftype ax
 	assert.Equal(t, C.int(-1), check_ns)
 }
 
-func check_ax25_i_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, pf C.int, nr C.int, ns C.int, pinfo *C.uchar, info_len C.int) {
+func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf C.int, nr C.int, ns C.int, pinfo *C.uchar, info_len C.int) {
 	t.Helper()
 
-	var check_cr C.cmdres_t
+	var check_cr cmdres_t
 	var check_desc [80]C.char
 	var check_pf C.int
 	var check_nr C.int
@@ -251,7 +249,7 @@ func check_ax25_i_frame(t *testing.T, packet C.packet_t, cr C.cmdres_t, pf C.int
 	var check_info_len = ax25_get_info(packet, &check_pinfo)
 
 	assert.Equal(t, cr, check_cr)
-	assert.Equal(t, ax25_frame_type_t(C.frame_type_I), check_ftype)
+	assert.Equal(t, frame_type_I, check_ftype)
 	assert.Equal(t, pf, check_pf)
 	assert.Equal(t, nr, check_nr)
 	assert.Equal(t, ns, check_ns)

@@ -125,7 +125,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// #include "ax25_pad.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -455,7 +454,7 @@ func server_connect_listen_thread(server_port C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func server_send_rec_packet(channel C.int, pp C.packet_t, fbuf *C.uchar, flen C.int) {
+func server_send_rec_packet(channel C.int, pp *packet_t, fbuf *C.uchar, flen C.int) {
 
 	/*
 	 * RAW format
@@ -509,7 +508,7 @@ func server_send_rec_packet(channel C.int, pp C.packet_t, fbuf *C.uchar, flen C.
 
 } /* end server_send_rec_packet */
 
-func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
+func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 	/*
 	 * MONITOR format - 	'I' for information frames.
 	 *			'U' for unnumbered information.
@@ -624,7 +623,7 @@ func server_send_monitored(channel C.int, pp C.packet_t, own_xmit C.int) {
 // I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
 // rather than continuing to propagate historical inconsistencies.
 
-func mon_addrs(channel C.int, pp C.packet_t) []byte {
+func mon_addrs(channel C.int, pp *packet_t) []byte {
 
 	var src [AX25_MAX_ADDR_LEN]C.char
 	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
@@ -673,9 +672,9 @@ func mon_addrs(channel C.int, pp C.packet_t) []byte {
 //	'U' for unnumbered information frame.
 //	'S' for supervisory and other unnumbered frames.
 
-func mon_desc(pp C.packet_t) (byte, string) {
+func mon_desc(pp *packet_t) (byte, string) {
 
-	var cr C.cmdres_t     // command/response.
+	var cr cmdres_t       // command/response.
 	var ignore [80]C.char // direwolf description.  not used here.
 	var pf C.int          // poll/final bit.
 	var ns C.int          // N(S) Send sequence number.
@@ -1296,8 +1295,7 @@ func cmd_listen_thread(client C.int) {
 				// - Use second one instead?
 				// - Error message if a mismatch?
 
-				var alevel C.alevel_t
-				C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_alevel_t)
+				var alevel alevel_t
 				var pp = ax25_from_frame((*C.uchar)(C.CBytes(cmd.Data[1:])), C.int(cmd.Header.DataLen)-1, alevel)
 
 				if pp == nil {

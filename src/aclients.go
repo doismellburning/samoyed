@@ -43,7 +43,6 @@ package direwolf
 // #include <stddef.h>
 // #include <string.h>
 // #include <time.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -273,7 +272,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 
 			use_chan = int(mon_cmd.Portx)
-			var alevel C.alevel_t
+			var alevel alevel_t
 			var dataUChar = byteSliceToCUChars(data[1:])
 			var pp = ax25_from_frame(&dataUChar[0], C.int(mon_cmd.DataLen-1), alevel)
 			var result [400]C.char

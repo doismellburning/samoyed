@@ -6,7 +6,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -64,11 +63,6 @@ var xid_example []C.uchar = []C.uchar{
 func xid_test_main(t *testing.T) {
 	t.Helper()
 
-	// Assorted constants are #define-d in the C, so ends up as Go types when used here, but we want a specific C type
-	var modulo_128 = uint32(C.modulo_128)
-	var modulo_8 = uint32(C.modulo_8)
-	var modulo_unknown = uint32(C.modulo_unknown)
-
 	/*
 		struct xid_param_s param;
 		struct xid_param_s param2;
@@ -103,7 +97,7 @@ func xid_test_main(t *testing.T) {
 
 	/* encode and verify it comes out the same. */
 
-	n = xid_encode(&param, &info[0], C.cr_cmd)
+	n = xid_encode(&param, &info[0], cr_cmd)
 	assert.Equal(t, C.int(len(xid_example)), n)
 
 	n = C.memcmp(unsafe.Pointer(&info[0]), unsafe.Pointer(&xid_example[0]), 27)
@@ -119,7 +113,7 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 1234
 	param.retries = 12
 
-	n = xid_encode(&param, &info[0], C.cr_cmd)
+	n = xid_encode(&param, &info[0], cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -146,7 +140,7 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 5555
 	param.retries = 9
 
-	n = xid_encode(&param, &info[0], C.cr_cmd)
+	n = xid_encode(&param, &info[0], cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -173,7 +167,7 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 5555
 	param.retries = 9
 
-	n = xid_encode(&param, &info[0], C.cr_cmd)
+	n = xid_encode(&param, &info[0], cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -200,7 +194,7 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 999
 	param.retries = G_UNKNOWN
 
-	n = xid_encode(&param, &info[0], C.cr_cmd)
+	n = xid_encode(&param, &info[0], cr_cmd)
 	xid_parse(&info[0], n, &param2, &desc[0], C.int(len(desc)))
 
 	text_color_set(DW_COLOR_DEBUG)

@@ -21,7 +21,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -37,7 +36,7 @@ const TQ_NUM_PRIO = 2 /* Number of priorities. */
 const TQ_PRIO_0_HI = 0
 const TQ_PRIO_1_LO = 1
 
-var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]C.packet_t /* Head of linked list for each queue. */
+var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
 
 var tq_mutex sync.Mutex /* Critical section for updating queues. */
 /* Just one for all queues. */
@@ -153,7 +152,7 @@ func tq_init(audio_config_p *audio_s) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_append(channel C.int, prio C.int, pp C.packet_t) {
+func tq_append(channel C.int, prio C.int, pp *packet_t) {
 
 	/* TODO KG
 	#if DEBUG
@@ -284,7 +283,7 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 	if queue_head[channel][prio] == nil {
 		queue_head[channel][prio] = pp
 	} else {
-		var pnext C.packet_t
+		var pnext *packet_t
 		var plast = queue_head[channel][prio]
 		for {
 			pnext = ax25_get_nextp(plast)
@@ -387,7 +386,7 @@ func tq_append(channel C.int, prio C.int, pp C.packet_t) {
 
 // TODO: FIXME:  this is a copy of tq_append.  Need to fine tune and explain why.
 
-func lm_data_request(channel C.int, prio C.int, pp C.packet_t) {
+func lm_data_request(channel C.int, prio C.int, pp *packet_t) {
 
 	/* TODO KG
 	#if DEBUG
@@ -722,7 +721,7 @@ func tq_wait_while_empty(channel C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_remove(channel C.int, prio C.int) C.packet_t {
+func tq_remove(channel C.int, prio C.int) *packet_t {
 
 	/* TODO KG
 	#if DEBUG
@@ -733,7 +732,7 @@ func tq_remove(channel C.int, prio C.int) C.packet_t {
 
 	tq_mutex.Lock()
 
-	var result_p C.packet_t
+	var result_p *packet_t
 
 	if queue_head[channel][prio] == nil {
 		result_p = nil
@@ -781,7 +780,7 @@ func tq_remove(channel C.int, prio C.int) C.packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func tq_peek(channel C.int, prio C.int) C.packet_t {
+func tq_peek(channel C.int, prio C.int) *packet_t {
 
 	/* TODO KG
 	#if DEBUG
@@ -910,7 +909,7 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 	var pp = queue_head[channel][prio]
 
 	for pp != nil {
-		if ax25_get_num_addr(pp) >= C.AX25_MIN_ADDRS {
+		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
 			// Consider only real packets.
 
 			var count_it C.int = 1

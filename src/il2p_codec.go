@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -49,7 +48,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
+func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 	// Can a type 1 header be used?
 
@@ -135,7 +134,7 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec *C.uchar) C.packet_t {
+func il2p_decode_frame(irec *C.uchar) *packet_t {
 	var uhdr [IL2P_HEADER_SIZE]C.uchar // After FEC and descrambling.
 	var e = il2p_clarify_header(irec, &uhdr[0])
 
@@ -161,7 +160,7 @@ func il2p_decode_frame(irec *C.uchar) C.packet_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_corrected *C.int) C.packet_t {
+func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_corrected *C.int) *packet_t {
 	var hdr_type, max_fec C.int
 	var payload_len = il2p_get_header_attributes(uhdr, &hdr_type, &max_fec)
 
@@ -213,7 +212,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 			return (nil)
 		}
 
-		var alevel C.alevel_t
+		var alevel alevel_t
 		//alevel = demod_get_audio_level (chan, subchan); 	// What TODO? We don't know channel here.
 		// I think alevel gets filled in somewhere later making
 		// this redundant.

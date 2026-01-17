@@ -143,14 +143,12 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #define AX25_PAD_C		/* this will affect behavior of ax25_pad.h */
 // #include "direwolf.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <stdio.h>
 // #include <ctype.h>
 // #include "regex.h"
-// #include "ax25_pad.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -164,7 +162,168 @@ import (
 	"unsafe"
 )
 
-type ax25_frame_type_t C.ax25_frame_type_t
+const AX25_MAX_REPEATERS = 8
+const AX25_MIN_ADDRS = 2  /* Destination & Source. */
+const AX25_MAX_ADDRS = 10 /* Destination, Source, 8 digipeaters. */
+
+const AX25_DESTINATION = 0 /* Address positions in frame. */
+const AX25_SOURCE = 1
+const AX25_REPEATER_1 = 2
+const AX25_REPEATER_2 = 3
+const AX25_REPEATER_3 = 4
+const AX25_REPEATER_4 = 5
+const AX25_REPEATER_5 = 6
+const AX25_REPEATER_6 = 7
+const AX25_REPEATER_7 = 8
+const AX25_REPEATER_8 = 9
+
+const AX25_MAX_ADDR_LEN = 12 /* In theory, you would expect the maximum length */
+/* to be 6 letters, dash, 2 digits, and nul for a */
+/* total of 10.  However, object labels can be 10 */
+/* characters so throw in a couple extra bytes */
+/* to be safe. */
+
+const AX25_MIN_INFO_LEN = 0 /* Previously 1 when considering only APRS. */
+
+const AX25_MAX_INFO_LEN = 2048 /* Maximum size for APRS. */
+/* AX.25 starts out with 256 as the default max */
+/* length but the end stations can negotiate */
+/* something different. */
+/* version 0.8:  Change from 256 to 2028 to */
+/* handle the larger paclen for Linux AX25. */
+
+/* These don't include the 2 bytes for the */
+/* HDLC frame FCS. */
+
+const AX25_MIN_PACKET_LEN = (2*7 + 1)
+
+const AX25_MAX_PACKET_LEN = (AX25_MAX_ADDRS*7 + 2 + 3 + AX25_MAX_INFO_LEN)
+
+const AX25_UI_FRAME = 3 /* Control field value. */
+
+const AX25_PID_NO_LAYER_3 = 0xf0 /* protocol ID used for APRS */
+const AX25_PID_NETROM = 0xcf     /* protocol ID used for NET/ROM */
+const AX25_PID_SEGMENTATION_FRAGMENT = 0x08
+const AX25_PID_ESCAPE_CHARACTER = 0xff
+
+const AX25_ALEVEL_TO_TEXT_SIZE = 40 // overkill but safe.
+
+const MAGIC = 0x41583235
+
+/*
+* The 7th octet of each address contains:
+ *
+* Bits:   H  R  R  SSID  0
+*
+*   H 		for digipeaters set to 0 initially.
+*		Changed to 1 when position has been used.
+*
+*		for source & destination it is called
+*		command/response.  Normally both 1 for APRS.
+*		They should be opposites for connected mode.
+*
+*   R	R	Reserved.  Normally set to 1 1.
+*
+*   SSID	Substation ID.  Range of 0 - 15.
+*
+*   0		Usually 0 but 1 for last address.
+*/
+
+const SSID_H_MASK = 0x80
+const SSID_H_SHIFT = 7
+
+const SSID_RR_MASK = 0x60
+const SSID_RR_SHIFT = 5
+
+const SSID_SSID_MASK = 0x1e
+const SSID_SSID_SHIFT = 1
+
+const SSID_LAST_MASK = 0x01
+
+type packet_t struct {
+	magic1 C.int /* for error checking. */
+
+	seq C.int /* unique sequence number for debugging. */
+
+	release_time C.double /* Time stamp in format returned by dtime_now(). */
+	/* When to release from the SATgate mode delay queue. */
+
+	nextp *packet_t /* Pointer to next in queue. */
+
+	num_addr C.int /* Number of addresses in frame. */
+	/* Range of AX25_MIN_ADDRS .. AX25_MAX_ADDRS for AX.25. */
+	/* It will be 0 if it doesn't look like AX.25. */
+	/* -1 is used temporarily at allocation to mean */
+	/* not determined yet. */
+
+	frame_len C.int /* Frame length without CRC. */
+
+	modulo ax25_modulo_t /* I & S frames have sequence numbers of either 3 bits (modulo 8) */
+	/* or 7 bits (modulo 128).  This is conveyed by either 1 or 2 */
+	/* control bytes.  Unfortunately, we can't determine this by looking */
+	/* at an isolated frame.  We need to know about the context.  If we */
+	/* are part of the conversation, we would know.  But if we are */
+	/* just listening to others, this would be more difficult to determine. */
+
+	/* For U frames:   	set to 0 - not applicable */
+	/* For I & S frames:	8 or 128 if known.  0 if unknown. */
+
+	frame_data [AX25_MAX_PACKET_LEN + 1]C.uchar
+	/* Raw frame contents, without the CRC. */
+
+	magic2 C.int /* Will get stomped on if above overflows. */
+}
+
+type cmdres_t int
+
+const (
+	cr_00  cmdres_t = 2
+	cr_cmd cmdres_t = 1
+	cr_res cmdres_t = 0
+	cr_11  cmdres_t = 3
+)
+
+type ax25_modulo_t int
+
+const (
+	modulo_unknown ax25_modulo_t = 0
+	modulo_8       ax25_modulo_t = 8
+	modulo_128     ax25_modulo_t = 128
+)
+
+type ax25_frame_type_t int
+
+const (
+	frame_type_I       ax25_frame_type_t = iota // Information
+	frame_type_S_RR                             // Receive Ready - System Ready To Receive
+	frame_type_S_RNR                            // Receive Not Ready - TNC Buffer Full
+	frame_type_S_REJ                            // Reject Frame - Out of Sequence or Duplicate
+	frame_type_S_SREJ                           // Selective Reject - Request single frame repeat
+	frame_type_U_SABME                          // Set Async Balanced Mode, Extended
+	frame_type_U_SABM                           // Set Async Balanced Mode
+	frame_type_U_DISC                           // Disconnect
+	frame_type_U_DM                             // Disconnect Mode
+	frame_type_U_UA                             // Unnumbered Acknowledge
+	frame_type_U_FRMR                           // Frame Reject
+	frame_type_U_UI                             // Unnumbered Information
+	frame_type_U_XID                            // Exchange Identification
+	frame_type_U_TEST                           // Test
+	frame_type_U                                // other Unnumbered, not used by AX.25.
+	frame_not_AX25                              // Could not get control byte from frame. This must be last because value plus 1 is for the size of an array.
+)
+
+/*
+ * Originally this was a single number.
+ * Let's try something new in version 1.2.
+ * Also collect AGC values from the mark and space filters.
+ */
+
+type alevel_t struct {
+	rec   C.int
+	mark  C.int
+	space C.int
+	//float ms_ratio;	// TODO: take out after temporary investigation.
+}
 
 /*
  * Accumulate statistics.
@@ -179,14 +338,12 @@ var last_seq_num C.int = 0
 // Runtime replacement for DECAMAIN define
 var DECODE_APRS_UTIL = false
 
-const MAGIC = C.MAGIC
-
-func CLEAR_LAST_ADDR_FLAG(this_p C.packet_t) {
-	this_p.frame_data[this_p.num_addr*7-1] &= ^(C.uchar(C.SSID_LAST_MASK))
+func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {
+	this_p.frame_data[this_p.num_addr*7-1] &= ^(C.uchar(SSID_LAST_MASK))
 }
 
-func SET_LAST_ADDR_FLAG(this_p C.packet_t) {
-	this_p.frame_data[this_p.num_addr*7-1] |= C.SSID_LAST_MASK
+func SET_LAST_ADDR_FLAG(this_p *packet_t) {
+	this_p.frame_data[this_p.num_addr*7-1] |= SSID_LAST_MASK
 }
 
 func isxdigit(b byte) bool {
@@ -204,7 +361,7 @@ func isxdigit(b byte) bool {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_new() C.packet_t {
+func ax25_new() *packet_t {
 
 	/* TODO KG
 	#if DEBUG
@@ -229,7 +386,7 @@ func ax25_new() C.packet_t {
 		dw_printf("Report to WB2OSZ - Memory leak for packet objects.  new=%d, delete=%d\n", ax25_new_count, ax25_delete_count)
 	}
 
-	var this_p = (C.packet_t)(C.calloc(C.sizeof_struct_packet_s, 1))
+	var this_p = new(packet_t)
 
 	Assert(this_p != nil)
 
@@ -249,7 +406,7 @@ func ax25_new() C.packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_delete(this_p C.packet_t) {
+func ax25_delete(this_p *packet_t) {
 	/* TODO KG
 	#if DEBUG
 	        text_color_set(DW_COLOR_DEBUG);
@@ -269,10 +426,7 @@ func ax25_delete(this_p C.packet_t) {
 	Assert(this_p.magic2 == MAGIC)
 
 	this_p.magic1 = 0
-	this_p.magic1 = 0
-
-	//memset (this_p, 0, sizeof (struct packet_s));
-	C.free(unsafe.Pointer(this_p))
+	this_p.magic2 = 0
 }
 
 /*------------------------------------------------------------------------------
@@ -324,7 +478,7 @@ func ax25_delete(this_p C.packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_text(monitor *C.char, strict C.int) C.packet_t {
+func ax25_from_text(monitor *C.char, strict C.int) *packet_t {
 
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
@@ -349,13 +503,13 @@ func ax25_from_text(monitor *C.char, strict C.int) C.packet_t {
 	 * for APRS.
 	 */
 	C.memset(unsafe.Pointer(&this_p.frame_data[AX25_DESTINATION*7]), ' '<<1, 6)
-	this_p.frame_data[AX25_DESTINATION*7+6] = C.SSID_H_MASK | C.SSID_RR_MASK
+	this_p.frame_data[AX25_DESTINATION*7+6] = SSID_H_MASK | SSID_RR_MASK
 
 	C.memset(unsafe.Pointer(&this_p.frame_data[AX25_SOURCE*7]), ' '<<1, 6)
-	this_p.frame_data[AX25_SOURCE*7+6] = C.SSID_RR_MASK | C.SSID_LAST_MASK
+	this_p.frame_data[AX25_SOURCE*7+6] = SSID_RR_MASK | SSID_LAST_MASK
 
-	this_p.frame_data[14] = C.AX25_UI_FRAME
-	this_p.frame_data[15] = C.AX25_PID_NO_LAYER_3
+	this_p.frame_data[14] = AX25_UI_FRAME
+	this_p.frame_data[15] = AX25_PID_NO_LAYER_3
 
 	this_p.frame_len = 7 + 7 + 1 + 1
 	this_p.num_addr = (-1)
@@ -564,7 +718,7 @@ func ax25_from_text(monitor *C.char, strict C.int) C.packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel C.alevel_t) C.packet_t {
+func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel alevel_t) *packet_t {
 
 	/*
 	 * First make sure we have an acceptable length:
@@ -583,9 +737,9 @@ func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel C.alevel_t) C.packet_t {
 	 *
 	 */
 
-	if flen < C.AX25_MIN_PACKET_LEN || flen > C.AX25_MAX_PACKET_LEN {
+	if flen < AX25_MIN_PACKET_LEN || flen > AX25_MAX_PACKET_LEN {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Frame length %d not in allowable range of %d to %d.\n", flen, C.AX25_MIN_PACKET_LEN, C.AX25_MAX_PACKET_LEN)
+		dw_printf("Frame length %d not in allowable range of %d to %d.\n", flen, AX25_MIN_PACKET_LEN, AX25_MAX_PACKET_LEN)
 		return (nil)
 	}
 
@@ -618,14 +772,15 @@ func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel C.alevel_t) C.packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_dup(copy_from C.packet_t) C.packet_t {
+func ax25_dup(copy_from *packet_t) *packet_t {
 
 	var this_p = ax25_new()
 	Assert(this_p != nil)
 
 	var save_seq = this_p.seq
 
-	C.memcpy(unsafe.Pointer(this_p), unsafe.Pointer(copy_from), C.sizeof_struct_packet_s)
+	*this_p = *copy_from
+
 	this_p.seq = save_seq
 
 	return (this_p)
@@ -673,7 +828,6 @@ var position_name = [1 + AX25_MAX_ADDRS]string{
 	"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
 	"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
 
-//export ax25_parse_addr
 func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *C.char, out_ssid *C.int, out_heard *C.int) C.int {
 
 	var in_addr = C.GoString(_in_addr)
@@ -687,8 +841,8 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 	if position < -1 {
 		position = -1
 	}
-	if position > C.AX25_REPEATER_8 {
-		position = C.AX25_REPEATER_8
+	if position > AX25_REPEATER_8 {
+		position = AX25_REPEATER_8
 	}
 	position++ /* Adjust for position_name above. */
 
@@ -849,7 +1003,7 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp C.packet_t) C.int {
+func ax25_check_addresses(pp *packet_t) C.int {
 
 	var all_ok = true
 	for n := C.int(0); n < ax25_get_num_addr(pp); n++ {
@@ -886,7 +1040,7 @@ func ax25_check_addresses(pp C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_unwrap_third_party(from_pp C.packet_t) C.packet_t {
+func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 
 	if ax25_get_dti(from_pp) != '}' {
 		text_color_set(DW_COLOR_ERROR)
@@ -927,7 +1081,7 @@ func ax25_unwrap_third_party(from_pp C.packet_t) C.packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_addr(this_p C.packet_t, n C.int, ad *C.char) {
+func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1007,7 +1161,7 @@ func ax25_set_addr(this_p C.packet_t, n C.int, ad *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_insert_addr(this_p C.packet_t, n C.int, ad *C.char) {
+func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1034,7 +1188,7 @@ func ax25_insert_addr(this_p C.packet_t, n C.int, ad *C.char) {
 	C.memmove(unsafe.Pointer(&this_p.frame_data[(n+1)*7]), unsafe.Pointer(&this_p.frame_data[n*7]), C.size_t(this_p.frame_len-(n*7)))
 	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
 	this_p.frame_len += 7
-	this_p.frame_data[n*7+6] = C.SSID_RR_MASK
+	this_p.frame_data[n*7+6] = SSID_RR_MASK
 
 	SET_LAST_ADDR_FLAG(this_p)
 
@@ -1081,7 +1235,7 @@ func ax25_insert_addr(this_p C.packet_t, n C.int, ad *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_remove_addr(this_p C.packet_t, n C.int) {
+func ax25_remove_addr(this_p *packet_t, n C.int) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1123,7 +1277,7 @@ func ax25_remove_addr(this_p C.packet_t, n C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_num_addr(this_p C.packet_t) C.int {
+func ax25_get_num_addr(this_p *packet_t) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1140,14 +1294,14 @@ func ax25_get_num_addr(this_p C.packet_t) C.int {
 
 	var addr_bytes C.int = 0
 	for a := C.int(0); a < this_p.frame_len && addr_bytes == 0; a++ {
-		if this_p.frame_data[a]&C.SSID_LAST_MASK != 0 {
+		if this_p.frame_data[a]&SSID_LAST_MASK != 0 {
 			addr_bytes = a + 1
 		}
 	}
 
 	if addr_bytes%7 == 0 {
 		var addrs = addr_bytes / 7
-		if addrs >= C.AX25_MIN_ADDRS && addrs <= AX25_MAX_ADDRS {
+		if addrs >= AX25_MIN_ADDRS && addrs <= AX25_MAX_ADDRS {
 			this_p.num_addr = addrs
 		}
 	}
@@ -1168,7 +1322,7 @@ func ax25_get_num_addr(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_num_repeaters(this_p C.packet_t) C.int {
+func ax25_get_num_repeaters(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1202,7 +1356,7 @@ func ax25_get_num_repeaters(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_addr_with_ssid(this_p C.packet_t, n C.int, _station *C.char) {
+func ax25_get_addr_with_ssid(this_p *packet_t, n C.int, _station *C.char) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1277,7 +1431,7 @@ func ax25_get_addr_with_ssid(this_p C.packet_t, n C.int, _station *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_addr_no_ssid(this_p C.packet_t, n C.int, _station *C.char) {
+func ax25_get_addr_no_ssid(this_p *packet_t, n C.int, _station *C.char) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1335,13 +1489,13 @@ func ax25_get_addr_no_ssid(this_p C.packet_t, n C.int, _station *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_ssid(this_p C.packet_t, n C.int) C.int {
+func ax25_get_ssid(this_p *packet_t, n C.int) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	if n >= 0 && n < this_p.num_addr {
-		return C.int((this_p.frame_data[n*7+6] & C.SSID_SSID_MASK) >> C.SSID_SSID_SHIFT)
+		return C.int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_get_ssid(%d), num_addr=%d\n", n, this_p.num_addr)
@@ -1366,14 +1520,14 @@ func ax25_get_ssid(this_p C.packet_t, n C.int) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_ssid(this_p C.packet_t, n C.int, ssid C.int) {
+func ax25_set_ssid(this_p *packet_t, n C.int, ssid C.int) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	if n >= 0 && n < this_p.num_addr {
-		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(C.uchar(C.SSID_SSID_MASK))) |
-			C.uchar((ssid<<C.SSID_SSID_SHIFT)&C.SSID_SSID_MASK)
+		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(C.uchar(SSID_SSID_MASK))) |
+			C.uchar((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_set_ssid(%d,%d), num_addr=%d\n", n, ssid, this_p.num_addr)
@@ -1397,7 +1551,7 @@ func ax25_set_ssid(this_p C.packet_t, n C.int, ssid C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_h(this_p C.packet_t, n C.int) C.int {
+func ax25_get_h(this_p *packet_t, n C.int) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1429,7 +1583,7 @@ func ax25_get_h(this_p C.packet_t, n C.int) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_h(this_p C.packet_t, n C.int) {
+func ax25_set_h(this_p *packet_t, n C.int) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1458,7 +1612,7 @@ func ax25_set_h(this_p C.packet_t, n C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_heard(this_p C.packet_t) C.int {
+func ax25_get_heard(this_p *packet_t) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1490,7 +1644,7 @@ func ax25_get_heard(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_first_not_repeated(this_p C.packet_t) C.int {
+func ax25_get_first_not_repeated(this_p *packet_t) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1519,7 +1673,7 @@ func ax25_get_first_not_repeated(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_rr(this_p C.packet_t, n C.int) C.int {
+func ax25_get_rr(this_p *packet_t, n C.int) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1551,7 +1705,7 @@ func ax25_get_rr(this_p C.packet_t, n C.int) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_info(this_p C.packet_t, paddr **C.uchar) C.int {
+func ax25_get_info(this_p *packet_t, paddr **C.uchar) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1584,7 +1738,7 @@ func ax25_get_info(this_p C.packet_t, paddr **C.uchar) C.int {
 
 } /* end ax25_get_info */
 
-func ax25_set_info(this_p C.packet_t, new_info_ptr *C.uchar, new_info_len C.int) {
+func ax25_set_info(this_p *packet_t, new_info_ptr *C.uchar, new_info_len C.int) {
 	var old_info_ptr *C.uchar
 	var old_info_len = ax25_get_info(this_p, &old_info_ptr)
 	this_p.frame_len -= old_info_len
@@ -1621,7 +1775,7 @@ func ax25_set_info(this_p C.packet_t, new_info_ptr *C.uchar, new_info_len C.int)
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_cut_at_crlf(this_p C.packet_t) C.int {
+func ax25_cut_at_crlf(this_p *packet_t) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1660,7 +1814,7 @@ func ax25_cut_at_crlf(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_dti(this_p C.packet_t) C.int {
+func ax25_get_dti(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1684,7 +1838,7 @@ func ax25_get_dti(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_nextp(this_p C.packet_t, next_p C.packet_t) {
+func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1703,7 +1857,7 @@ func ax25_set_nextp(this_p C.packet_t, next_p C.packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_nextp(this_p C.packet_t) C.packet_t {
+func ax25_get_nextp(this_p *packet_t) *packet_t {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1722,7 +1876,7 @@ func ax25_get_nextp(this_p C.packet_t) C.packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_release_time(this_p C.packet_t, release_time C.double) {
+func ax25_set_release_time(this_p *packet_t, release_time C.double) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1737,7 +1891,7 @@ func ax25_set_release_time(this_p C.packet_t, release_time C.double) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_release_time(this_p C.packet_t) C.double {
+func ax25_get_release_time(this_p *packet_t) C.double {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1752,7 +1906,7 @@ func ax25_get_release_time(this_p C.packet_t) C.double {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_modulo(this_p C.packet_t, modulo C.int) {
+func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1770,7 +1924,7 @@ func ax25_set_modulo(this_p C.packet_t, modulo C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_modulo(this_p C.packet_t) C.int {
+func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1807,7 +1961,7 @@ func ax25_get_modulo(this_p C.packet_t) C.int {
 
 // TODO: max len for result.  buffer overflow?
 
-func ax25_format_addrs(this_p C.packet_t, result *C.char) {
+func ax25_format_addrs(this_p *packet_t, result *C.char) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1871,7 +2025,7 @@ func ax25_format_addrs(this_p C.packet_t, result *C.char) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_format_via_path(this_p C.packet_t, _result *C.char, result_size C.size_t) {
+func ax25_format_via_path(this_p *packet_t, _result *C.char, result_size C.size_t) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1920,7 +2074,7 @@ func ax25_format_via_path(this_p C.packet_t, _result *C.char, result_size C.size
  *
  *------------------------------------------------------------------*/
 
-func ax25_pack(this_p C.packet_t, result *C.uchar) C.int {
+func ax25_pack(this_p *packet_t, result *C.uchar) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1962,7 +2116,7 @@ func ax25_pack(this_p C.packet_t, result *C.uchar) C.int {
 // Should pass in as parameter.
 const DESC_SIZ = 56
 
-func ax25_frame_type(this_p C.packet_t, cr *C.cmdres_t, desc *C.char, pf *C.int, nr *C.int, ns *C.int) ax25_frame_type_t {
+func ax25_frame_type(this_p *packet_t, cr *cmdres_t, desc *C.char, pf *C.int, nr *C.int, ns *C.int) ax25_frame_type_t {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -2004,15 +2158,15 @@ func ax25_frame_type(this_p C.packet_t, cr *C.cmdres_t, desc *C.char, pf *C.int,
 	 */
 
 	if this_p.modulo == 0 && (c&3) == 1 && ax25_get_c2(this_p) != -1 {
-		this_p.modulo = C.modulo_128
+		this_p.modulo = modulo_128
 	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[ax25_get_info_offset(this_p)] == 0xF0 {
-		this_p.modulo = C.modulo_128
+		this_p.modulo = modulo_128
 	} else if this_p.modulo == 0 && (c&1) == 0 && this_p.frame_data[ax25_get_info_offset(this_p)] == 0x08 { // same for segments
-		this_p.modulo = C.modulo_128
+		this_p.modulo = modulo_128
 	}
 
 	var c2 C.int // I & S frames can have second Control byte.
-	if this_p.modulo == C.modulo_128 {
+	if this_p.modulo == modulo_128 {
 		c2 = ax25_get_c2(this_p)
 	}
 
@@ -2048,7 +2202,7 @@ func ax25_frame_type(this_p C.packet_t, cr *C.cmdres_t, desc *C.char, pf *C.int,
 
 		// Information 			rrr p sss 0		or	sssssss 0  rrrrrrr p
 
-		if this_p.modulo == C.modulo_128 {
+		if this_p.modulo == modulo_128 {
 			*ns = (c >> 1) & 0x7f
 			*pf = c2 & 1
 			*nr = (c2 >> 1) & 0x7f
@@ -2065,7 +2219,7 @@ func ax25_frame_type(this_p C.packet_t, cr *C.cmdres_t, desc *C.char, pf *C.int,
 
 		// Supervisory			rrr p/f ss 0 1		or	0000 ss 0 1  rrrrrrr p/f
 
-		if this_p.modulo == C.modulo_128 {
+		if this_p.modulo == modulo_128 {
 			*pf = c2 & 1
 			*nr = (c2 >> 1) & 0x7f
 		} else {
@@ -2230,11 +2384,11 @@ func pid_to_text(p C.int, out *C.char) {
 	}
 }
 
-func ax25_hex_dump(this_p C.packet_t) {
+func ax25_hex_dump(this_p *packet_t) {
 	var fptr = this_p.frame_data
 	var flen = this_p.frame_len
 
-	if this_p.num_addr >= C.AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
+	if this_p.num_addr >= AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
 
 		var c = fptr[this_p.num_addr*7]
 		var p = fptr[this_p.num_addr*7+1]
@@ -2332,7 +2486,7 @@ func ax25_hex_dump(this_p C.packet_t) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_is_aprs(this_p C.packet_t) C.int {
+func ax25_is_aprs(this_p *packet_t) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -2344,7 +2498,7 @@ func ax25_is_aprs(this_p C.packet_t) C.int {
 	var ctrl = ax25_get_control(this_p)
 	var pid = ax25_get_pid(this_p)
 
-	var is_aprs = this_p.num_addr >= 2 && ctrl == C.AX25_UI_FRAME && pid == C.AX25_PID_NO_LAYER_3
+	var is_aprs = this_p.num_addr >= 2 && ctrl == AX25_UI_FRAME && pid == AX25_PID_NO_LAYER_3
 
 	return C.int(IfThenElse(is_aprs, 1, 0))
 }
@@ -2365,7 +2519,7 @@ func ax25_is_aprs(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------*/
 
-func ax25_is_null_frame(this_p C.packet_t) C.int {
+func ax25_is_null_frame(this_p *packet_t) C.int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -2389,7 +2543,7 @@ func ax25_is_null_frame(this_p C.packet_t) C.int {
 *
 *------------------------------------------------------------------*/
 
-func ax25_get_control(this_p C.packet_t) C.int {
+func ax25_get_control(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2403,7 +2557,7 @@ func ax25_get_control(this_p C.packet_t) C.int {
 	return (-1)
 }
 
-func ax25_get_c2(this_p C.packet_t) C.int {
+func ax25_get_c2(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2439,7 +2593,7 @@ func ax25_get_c2(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------*/
 
-func ax25_set_pid(this_p C.packet_t, pid C.int) {
+func ax25_set_pid(this_p *packet_t, pid C.int) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2447,7 +2601,7 @@ func ax25_set_pid(this_p C.packet_t, pid C.int) {
 	// Change 0 to 0xF0 meaning no layer 3 protocol.
 
 	if pid == 0 {
-		pid = C.AX25_PID_NO_LAYER_3
+		pid = AX25_PID_NO_LAYER_3
 	}
 
 	// Sanity check: is it I or UI frame?
@@ -2456,7 +2610,7 @@ func ax25_set_pid(this_p C.packet_t, pid C.int) {
 		return
 	}
 
-	var cr C.cmdres_t // command or response.
+	var cr cmdres_t // command or response.
 	var description [64]C.char
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
@@ -2492,7 +2646,7 @@ func ax25_set_pid(this_p C.packet_t, pid C.int) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_get_pid(this_p C.packet_t) C.int {
+func ax25_get_pid(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2522,7 +2676,7 @@ func ax25_get_pid(this_p C.packet_t) C.int {
  *
  *------------------------------------------------------------------*/
 
-func ax25_get_frame_len(this_p C.packet_t) C.int {
+func ax25_get_frame_len(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2532,7 +2686,7 @@ func ax25_get_frame_len(this_p C.packet_t) C.int {
 
 } /* end ax25_get_frame_len */
 
-func ax25_get_frame_data_ptr(this_p C.packet_t) *C.uchar {
+func ax25_get_frame_data_ptr(this_p *packet_t) *C.uchar {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2589,7 +2743,7 @@ func ax25_get_frame_data_ptr(this_p C.packet_t) *C.uchar {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_dedupe_crc(pp C.packet_t) C.ushort {
+func ax25_dedupe_crc(pp *packet_t) C.ushort {
 
 	var src [AX25_MAX_ADDR_LEN]C.char
 	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
@@ -2645,7 +2799,7 @@ func ax25_dedupe_crc(pp C.packet_t) C.ushort {
 
  *------------------------------------------------------------------------------*/
 
-func ax25_m_m_crc(pp C.packet_t) C.ushort {
+func ax25_m_m_crc(pp *packet_t) C.ushort {
 
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
 	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
@@ -2777,7 +2931,7 @@ func ax25_safe_print(_pstr *C.char, length C.int, ascii_only C.int) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_alevel_to_text(alevel C.alevel_t, text *C.char) C.int {
+func ax25_alevel_to_text(alevel alevel_t, text *C.char) C.int {
 
 	if alevel.rec < 0 {
 		C.strcpy(text, C.CString(""))
@@ -2816,11 +2970,11 @@ func ax25_alevel_to_text(alevel C.alevel_t, text *C.char) C.int {
 
 //#define DEBUGX 1
 
-func ax25_get_control_offset(this_p C.packet_t) C.int {
+func ax25_get_control_offset(this_p *packet_t) C.int {
 	return (this_p.num_addr * 7)
 }
 
-func ax25_get_num_control(this_p C.packet_t) C.int {
+func ax25_get_num_control(this_p *packet_t) C.int {
 
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
@@ -2864,11 +3018,11 @@ func ax25_get_num_control(this_p C.packet_t) C.int {
  * protocol but the more general case is 0, 1 or 2 protocol ID octets.
  */
 
-func ax25_get_pid_offset(this_p C.packet_t) C.int {
+func ax25_get_pid_offset(this_p *packet_t) C.int {
 	return (ax25_get_control_offset(this_p) + ax25_get_num_control(this_p))
 }
 
-func ax25_get_num_pid(this_p C.packet_t) C.int {
+func ax25_get_num_pid(this_p *packet_t) C.int {
 
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
@@ -2883,7 +3037,7 @@ func ax25_get_num_pid(this_p C.packet_t) C.int {
 				  dw_printf ("ax25_get_num_pid, %02x is I or UI frame, pid = %02x, returns %d\n", c, pid, (pid==AX25_PID_ESCAPE_CHARACTER) ? 2 : 1);
 			#endif
 		*/
-		if pid == C.AX25_PID_ESCAPE_CHARACTER {
+		if pid == AX25_PID_ESCAPE_CHARACTER {
 			return (2) /* pid 1111 1111 means another follows. */
 		}
 		return (1)
@@ -2910,7 +3064,7 @@ func ax25_get_num_pid(this_p C.packet_t) C.int {
  * APRS always has an Information field with at least one octet for the Data Type Indicator.
  */
 
-func ax25_get_info_offset(this_p C.packet_t) C.int {
+func ax25_get_info_offset(this_p *packet_t) C.int {
 	var offset = ax25_get_control_offset(this_p) + ax25_get_num_control(this_p) + ax25_get_num_pid(this_p)
 	/*
 		#if DEBUGX
@@ -2920,7 +3074,7 @@ func ax25_get_info_offset(this_p C.packet_t) C.int {
 	return (offset)
 }
 
-func ax25_get_num_info(this_p C.packet_t) C.int {
+func ax25_get_num_info(this_p *packet_t) C.int {
 
 	/* assuming AX.25 frame. */
 

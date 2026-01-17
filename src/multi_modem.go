@@ -68,7 +68,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -86,8 +85,8 @@ import (
 // Candidates for further processing.
 
 type candidate_t struct {
-	packet_p    C.packet_t
-	alevel      C.alevel_t
+	packet_p    *packet_t
+	alevel      alevel_t
 	speed_error C.float
 	fec_type    fec_type_t // Type of FEC: none(0), fx25, il2p
 	retries     retry_t    // For the old "fix bits" strategy, this is the
@@ -268,7 +267,7 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel C.alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < C.MAX_SUBCHANS)
@@ -276,7 +275,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
-	var pp C.packet_t
+	var pp *packet_t
 
 	switch save_audio_config_p.achan[channel].modem_type {
 	case MODEM_AIS:
@@ -307,7 +306,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)

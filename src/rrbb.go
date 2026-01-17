@@ -18,7 +18,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdlib.h>
 // #include <string.h>
-// #include "ax25_pad.h"
 import "C"
 
 var new_count = 0
@@ -40,9 +39,9 @@ type rrbb_t struct {
 	subchannel C.int /* Which modem when more than one per channel. */
 	slice      C.int /* Which slicer. */
 
-	alevel      C.alevel_t /* Received audio level at time of frame capture. */
-	speed_error C.float    /* Received data speed error as percentage. */
-	length      C.uint     /* Current number of samples in array. */
+	alevel      alevel_t /* Received audio level at time of frame capture. */
+	speed_error C.float  /* Received data speed error as percentage. */
+	length      C.uint   /* Current number of samples in array. */
 
 	is_scrambled  C.int /* Is data scrambled G3RUH / K9NG style? */
 	descram_state C.int /* Descrambler state before first data bit of frame. */
@@ -372,7 +371,7 @@ func rrbb_get_slice(b *rrbb_t) C.int {
  *
  ***********************************************************************************/
 
-func rrbb_set_audio_level(b *rrbb_t, alevel C.alevel_t) {
+func rrbb_set_audio_level(b *rrbb_t, alevel alevel_t) {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -390,7 +389,7 @@ func rrbb_set_audio_level(b *rrbb_t, alevel C.alevel_t) {
  *
  ***********************************************************************************/
 
-func rrbb_get_audio_level(b *rrbb_t) C.alevel_t {
+func rrbb_get_audio_level(b *rrbb_t) alevel_t {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)

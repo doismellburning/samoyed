@@ -7,7 +7,6 @@ package direwolf
 //#include <ctype.h>
 //#include <assert.h>
 //#include <string.h>
-//#include "ax25_pad.h"
 import "C"
 
 import (

@@ -61,7 +61,6 @@ package direwolf
 // #include <ctype.h>	/* for isdigit */
 // #include <fcntl.h>
 // #include "regex.h"
-// #include "ax25_pad.h"
 // void hex_dump (unsigned char *p, int len);
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -O0
 import "C"
@@ -170,7 +169,7 @@ func DecodeAPRSLine(line string) {
 
 		// Treat as AX.25.
 
-		var alevel C.alevel_t
+		var alevel alevel_t
 
 		var pp = ax25_from_frame((*C.uchar)(C.CBytes(bytes)), C.int(len(bytes)), alevel)
 		if pp != nil {

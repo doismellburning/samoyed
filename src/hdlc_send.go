@@ -3,7 +3,6 @@ package direwolf
 // #include "direwolf.h"
 // #include <stdio.h>
 // #include <string.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -48,7 +47,7 @@ var number_of_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "
  *
  *--------------------------------------------------------------*/
 
-func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config_p *audio_s) C.int {
+func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_p *audio_s) C.int {
 
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
 

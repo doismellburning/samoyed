@@ -25,7 +25,6 @@ package direwolf
 // #include <ctype.h>	/* for isdigit */
 // #include <fcntl.h>
 // #include "regex.h"
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -214,7 +213,7 @@ type decode_aprs_t struct {
  *
  *------------------------------------------------------------------*/
 
-func decode_aprs(A *decode_aprs_t, pp C.packet_t, quiet C.int, third_party_src *C.char) {
+func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C.char) {
 
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 
@@ -1326,7 +1325,7 @@ func mic_e_digit(A *decode_aprs_t, c C.char, mask int, std_msg *int, cust_msg *i
 	return (0)
 }
 
-func aprs_mic_e(A *decode_aprs_t, pp C.packet_t, info []byte) {
+func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	type aprs_mic_e_s struct {
 		DTI         byte    /* ' or ` */
 		Lon         [3]byte /* "d+28", "m+28", "h+28" */

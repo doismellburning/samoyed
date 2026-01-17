@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -54,7 +53,7 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent
  *
  *--------------------------------------------------------------*/
 
-func il2p_send_frame(channel C.int, pp C.packet_t, max_fec C.int, polarity C.int) C.int {
+func il2p_send_frame(channel C.int, pp *packet_t, max_fec C.int, polarity C.int) C.int {
 	var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
 
 	encoded[0] = (IL2P_SYNC_WORD >> 16) & 0xff

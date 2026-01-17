@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -318,8 +317,7 @@ func test_example_headers(t *testing.T) {
 	C.memset(unsafe.Pointer(&header[0]), 0, IL2P_HEADER_SIZE)
 	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
 	var check [2]C.uchar
-	var alevel C.alevel_t
-	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_alevel_t)
+	var alevel alevel_t
 
 	var pp = ax25_from_frame(&example1[0], C.int(len(example1)), alevel)
 	assert.NotNil(t, pp)
@@ -357,13 +355,13 @@ func test_example_headers(t *testing.T) {
 	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	var dst_addr [C.AX25_MAX_ADDR_LEN]C.char
-	var src_addr [C.AX25_MAX_ADDR_LEN]C.char
+	var dst_addr [AX25_MAX_ADDR_LEN]C.char
+	var src_addr [AX25_MAX_ADDR_LEN]C.char
 
-	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
-	ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
+	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst_addr[0])
+	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src_addr[0])
 
-	var cr C.cmdres_t // command or response.
+	var cr cmdres_t // command or response.
 	var description [64]C.char
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
@@ -400,7 +398,7 @@ func test_example_headers(t *testing.T) {
 	var header2 []C.uchar = []C.uchar{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
 	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
-	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_struct_alevel_s)
+	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(&example2[0], C.int(len(example2)), alevel)
 	assert.NotNil(t, pp)
@@ -439,8 +437,8 @@ func test_example_headers(t *testing.T) {
 	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
-	ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
+	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst_addr[0])
+	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src_addr[0])
 
 	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type
@@ -477,7 +475,7 @@ func test_example_headers(t *testing.T) {
 	var complete3 []C.uchar = []C.uchar{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
 	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
-	C.memset(unsafe.Pointer(&alevel), 0, C.sizeof_struct_alevel_s)
+	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
 	assert.NotNil(t, pp)
@@ -519,8 +517,8 @@ func test_example_headers(t *testing.T) {
 	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
-	ax25_get_addr_with_ssid(pp, C.AX25_SOURCE, &src_addr[0])
+	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst_addr[0])
+	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src_addr[0])
 
 	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type
@@ -559,7 +557,7 @@ func test_example_headers(t *testing.T) {
 //
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
+func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 	t.Helper()
 
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
@@ -598,7 +596,7 @@ func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
 func all_frame_types(t *testing.T) {
 	t.Helper()
 
-	var addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
+	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
 	var pinfo *C.uchar
 	var pid C.int = 0xf0
 	var info_len C.int
@@ -613,37 +611,37 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nU frames...\n")
 
-	for ftype := ax25_frame_type_t(C.frame_type_U_SABME); ftype <= C.frame_type_U_TEST; ftype++ {
+	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
-			var cmin, cmax C.cmdres_t
+			var cmin, cmax cmdres_t
 
 			switch ftype {
 			// 0 = response, 1 = command
-			case C.frame_type_U_SABME:
+			case frame_type_U_SABME:
 				cmin = 1
 				cmax = 1
-			case C.frame_type_U_SABM:
+			case frame_type_U_SABM:
 				cmin = 1
 				cmax = 1
-			case C.frame_type_U_DISC:
+			case frame_type_U_DISC:
 				cmin = 1
 				cmax = 1
-			case C.frame_type_U_DM:
+			case frame_type_U_DM:
 				cmin = 0
 				cmax = 0
-			case C.frame_type_U_UA:
+			case frame_type_U_UA:
 				cmin = 0
 				cmax = 0
-			case C.frame_type_U_FRMR:
+			case frame_type_U_FRMR:
 				cmin = 0
 				cmax = 0
-			case C.frame_type_U_UI:
+			case frame_type_U_UI:
 				cmin = 0
 				cmax = 1
-			case C.frame_type_U_XID:
+			case frame_type_U_XID:
 				cmin = 0
 				cmax = 1
-			case C.frame_type_U_TEST:
+			case frame_type_U_TEST:
 				cmin = 0
 				cmax = 1
 			default:
@@ -668,14 +666,14 @@ func all_frame_types(t *testing.T) {
 
 	dw_printf("\nS frames...\n")
 
-	for ftype := ax25_frame_type_t(C.frame_type_S_RR); ftype <= C.frame_type_S_SREJ; ftype++ {
+	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
 		for pf := C.int(0); pf <= 1; pf++ {
-			var modulo C.int = 8
-			var nr = modulo/2 + 1
+			var modulo = modulo_8
+			var nr = C.int(modulo/2 + 1)
 
-			for cr := C.cmdres_t(0); cr <= C.cr_cmd; cr++ {
+			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
 				// SREJ can only be response.
-				if ftype == C.frame_type_S_SREJ && cr != C.cr_res {
+				if ftype == frame_type_S_SREJ && cr != cr_res {
 					continue
 				}
 
@@ -688,12 +686,12 @@ func all_frame_types(t *testing.T) {
 				ax25_delete(pp)
 			}
 
-			modulo = 128
-			nr = modulo/2 + 1
+			modulo = modulo_128
+			nr = C.int(modulo/2 + 1)
 
-			for cr := C.cmdres_t(0); cr <= C.cr_cmd; cr++ {
+			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
 				// SREJ can only be response.
-				if ftype == C.frame_type_S_SREJ && cr != C.cr_res {
+				if ftype == frame_type_S_SREJ && cr != cr_res {
 					continue
 				}
 
@@ -712,11 +710,11 @@ func all_frame_types(t *testing.T) {
 
 	var srej_info []C.uchar = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype = ax25_frame_type_t(C.frame_type_S_SREJ)
+	var ftype = frame_type_S_SREJ
 	for pf := C.int(0); pf <= 1; pf++ {
-		var modulo C.int = 128
+		var modulo = modulo_128
 		var nr C.int = 127
-		var cr C.cmdres_t = C.cr_res
+		var cr cmdres_t = cr_res
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -735,11 +733,11 @@ func all_frame_types(t *testing.T) {
 	info_len = C.int(C.strlen((*C.char)(unsafe.Pointer(pinfo))))
 
 	for pf := C.int(0); pf <= 1; pf++ {
-		var modulo C.int = 8
-		var nr = 0x55 & (modulo - 1)
-		var ns = 0xaa & (modulo - 1)
+		var modulo = modulo_8
+		var nr = 0x55 & C.int(modulo-1)
+		var ns = 0xaa & C.int(modulo-1)
 
-		for cr := C.cmdres_t(1); cr <= 1; cr++ { // can only be command
+		for cr := cmdres_t(1); cr <= 1; cr++ { // can only be command
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
@@ -749,11 +747,11 @@ func all_frame_types(t *testing.T) {
 			ax25_delete(pp)
 		}
 
-		modulo = 128
-		nr = 0x55 & (modulo - 1)
-		ns = 0xaa & (modulo - 1)
+		modulo = modulo_128
+		nr = 0x55 & C.int(modulo-1)
+		ns = 0xaa & C.int(modulo-1)
 
-		for cr := C.cmdres_t(1); cr <= 1; cr++ {
+		for cr := cmdres_t(1); cr <= 1; cr++ {
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)

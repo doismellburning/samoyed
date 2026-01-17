@@ -13,7 +13,6 @@ https://github.com/golang/go/issues/4030
 // #include <ctype.h>
 // #include "regex.h"
 // #include <unistd.h>
-// #include "ax25_pad.h"
 // char *mycall;
 // regex_t alias_re;
 // regex_t wide_re;
@@ -61,11 +60,11 @@ func digipeater_test(t *testing.T, _in, out string) {
 	 * again, and make sure it is still the same.
 	 */
 
-	var frame [C.AX25_MAX_PACKET_LEN]C.uchar
+	var frame [AX25_MAX_PACKET_LEN]C.uchar
 	var frame_len = ax25_pack(pp, &frame[0])
 	ax25_delete(pp)
 
-	var alevel C.alevel_t
+	var alevel alevel_t
 	alevel.rec = 50
 	alevel.mark = 50
 	alevel.space = 50

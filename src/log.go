@@ -29,7 +29,6 @@ package direwolf
 // #include <sys/stat.h>
 // #include <unistd.h>
 // #include <errno.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -146,7 +145,7 @@ func log_init(daily_names bool, path string) {
  *
  *------------------------------------------------------------------*/
 
-func log_write(channel int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries retry_t) { //nolint:gocritic
+func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) { //nolint:gocritic
 	if len(g_log_path) == 0 {
 		return
 	}
@@ -256,16 +255,16 @@ func log_write(channel int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, 
 				h = -1
 			} else {
 				h = ax25_get_heard(pp)
-				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
+				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
 				ax25_get_addr_with_ssid(pp, h, &_heard[0])
 				heard = C.GoString(&_heard[0])
 			}
 
-			if h >= C.AX25_REPEATER_2 &&
+			if h >= AX25_REPEATER_2 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) &&
 				len(heard) == 5 {
-				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
+				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
 				ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
 				heard = C.GoString(&_heard[0])
 				heard += "?"
@@ -367,7 +366,7 @@ func log_write(channel int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, 
  *
  *------------------------------------------------------------------*/
 
-func log_rr_bits(A *decode_aprs_t, pp C.packet_t) { //nolint:gocritic
+func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
 
@@ -385,25 +384,25 @@ func log_rr_bits(A *decode_aprs_t, pp C.packet_t) { //nolint:gocritic
 				h = -1
 			} else {
 				h = ax25_get_heard(pp)
-				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
+				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
 				ax25_get_addr_with_ssid(pp, h, &_heard[0])
 				heard = C.GoString(&_heard[0])
 			}
 
-			if h >= C.AX25_REPEATER_2 &&
+			if h >= AX25_REPEATER_2 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) &&
 				len(heard) == 5 {
-				var _heard [C.AX25_MAX_ADDR_LEN + 1]C.char
+				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
 				ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
 				heard = C.GoString(&_heard[0])
 				heard += "?"
 			}
 
-			var src_c = ax25_get_h(pp, C.AX25_SOURCE)
-			var dst_c = ax25_get_h(pp, C.AX25_DESTINATION)
-			var src_rr = ax25_get_rr(pp, C.AX25_SOURCE)
-			var dst_rr = ax25_get_rr(pp, C.AX25_DESTINATION)
+			var src_c = ax25_get_h(pp, AX25_SOURCE)
+			var dst_c = ax25_get_h(pp, AX25_DESTINATION)
+			var src_rr = ax25_get_rr(pp, AX25_SOURCE)
+			var dst_rr = ax25_get_rr(pp, AX25_DESTINATION)
 
 			// C RR	for source
 			// C RR	for destination

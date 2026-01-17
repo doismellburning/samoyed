@@ -14,7 +14,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <math.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -136,7 +135,7 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 		os.Exit(1)
 	}
 
-	var ax25_frame [C.AX25_MAX_PACKET_LEN]C.uchar
+	var ax25_frame [AX25_MAX_PACKET_LEN]C.uchar
 	ax25_frame[0] = 0 // Insert channel before KISS encapsulation.
 
 	var frame_len = ax25_pack(pp, &ax25_frame[1])

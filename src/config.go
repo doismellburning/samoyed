@@ -28,7 +28,6 @@ package direwolf
 // #else
 // #define DEFAULT_GPSD_PORT "2947"
 // #endif
-// #include "ax25_pad.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"

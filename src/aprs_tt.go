@@ -34,7 +34,6 @@ package direwolf
 // #include <errno.h>
 // #include <ctype.h>
 // #include <assert.h>
-// #include "ax25_pad.h"
 // // geotranz
 // #include "utm.h"
 // #include "mgrs.h"

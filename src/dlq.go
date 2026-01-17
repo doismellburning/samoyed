@@ -24,7 +24,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <errno.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -104,9 +103,9 @@ type dlq_item_t struct {
 
 	slice C.int /* Winning slicer. */
 
-	pp C.packet_t /* Pointer to frame structure. */
+	pp *packet_t /* Pointer to frame structure. */
 
-	alevel C.alevel_t /* Audio level. */
+	alevel alevel_t /* Audio level. */
 
 	fec_type fec_type_t // Type of FEC for received signal: none, FX.25, or IL2P.
 
@@ -242,7 +241,7 @@ func dlq_init() {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
 
 	/* TODO KG
 	#if DEBUG
@@ -300,7 +299,7 @@ func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packe
 
 } /* end dlq_rec_frame */
 
-func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
 	if ATEST_C {
 		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	} else {

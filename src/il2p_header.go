@@ -5,7 +5,6 @@ package direwolf
 // #include <string.h>
 // #include <stdio.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -123,7 +122,7 @@ func GET_PAYLOAD_BYTE_COUNT(hdr *C.uchar) C.int {
 // Here we squeeze the most common cases down to 4 bits.
 // Return -1 if translation is not possible.  Fall back to type 0 header in this case.
 
-func encode_pid(pp C.packet_t) C.int {
+func encode_pid(pp *packet_t) C.int {
 	var pid = ax25_get_pid(pp)
 
 	if (pid & 0x30) == 0x20 {
@@ -214,7 +213,7 @@ func decode_pid(pid C.int) C.int {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
+func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	C.memset(unsafe.Pointer(hdr), 0, IL2P_HEADER_SIZE)
 
 	if ax25_get_num_addr(pp) != 2 {
@@ -224,7 +223,7 @@ func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 
 	// Check does not apply for 'U' frames but put in one place rather than two.
 
-	if ax25_get_modulo(pp) == 128 {
+	if ax25_get_modulo(pp) == modulo_128 {
 		return (-1)
 	}
 
@@ -269,7 +268,7 @@ func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	var x = (*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12))
 	*x = C.uchar((dst_ssid << 4) | src_ssid)
 
-	var cr C.cmdres_t // command or response.
+	var cr cmdres_t // command or response.
 	var description [64]C.char
 	var pf C.int     // Poll/Final.
 	var nr, ns C.int // Sequence numbers.
@@ -463,7 +462,7 @@ func trim(stuff *C.char) {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
+func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 
 	if GET_HDR_TYPE(hdr) != 1 {
 		text_color_set(DW_COLOR_ERROR)
@@ -564,7 +563,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		default:
 			ftype = frame_type_S_SREJ
 		}
-		var modulo C.int = 8
+		var modulo = modulo_8
 		var nr = (control >> 3) & 0x07
 		var pf = (control >> 6) & 0x01
 		var pinfo *C.uchar // Any info for SREJ will be added later.
@@ -626,7 +625,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 		var pf = (control >> 6) & 0x01
 		var nr = (control >> 3) & 0x7
 		var ns = control & 0x7
-		var modulo C.int = 8
+		var modulo = modulo_8
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
@@ -657,7 +656,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_type_0_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
+func il2p_type_0_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	C.memset(unsafe.Pointer(hdr), 0, IL2P_HEADER_SIZE)
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]

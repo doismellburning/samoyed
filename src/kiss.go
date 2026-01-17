@@ -69,7 +69,6 @@ package direwolf
 // #include <sys/types.h>
 // #include <sys/ioctl.h>
 // #include <errno.h>
-// #include "ax25_pad.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -287,10 +286,10 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.i
 	} else {
 		var stemp []byte
 
-		if flen > C.AX25_MAX_PACKET_LEN {
+		if flen > AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
-			fbuf = fbuf[:C.AX25_MAX_PACKET_LEN]
+			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
 
 		stemp = []byte{byte((channel << 4) | kiss_cmd)}
