@@ -1,6 +1,5 @@
 package direwolf
 
-// #include "symbols.h"
 import "C"
 
 import (

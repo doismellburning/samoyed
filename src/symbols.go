@@ -12,7 +12,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "symbols.h"
 import "C"
 
 import (
