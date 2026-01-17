@@ -72,7 +72,6 @@ package direwolf
 // #include <string.h>
 // //Optimize processing by accessing directly to decoded bits
 // #define RRBB_C 1
-// #include "fcs_calc.h"
 // #include "ax25_pad.h"
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
@@ -752,7 +751,7 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 
 		var actual_fcs = C.ushort(H2.frame_buf[H2.frame_len-2]) | (C.ushort(H2.frame_buf[H2.frame_len-1]) << 8)
 
-		var expected_fcs = C.fcs_calc(&H2.frame_buf[0], H2.frame_len-2)
+		var expected_fcs = fcs_calc(&H2.frame_buf[0], H2.frame_len-2)
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == C.MODEM_AIS {
 

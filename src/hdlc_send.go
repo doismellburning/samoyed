@@ -3,7 +3,6 @@ package direwolf
 // #include "direwolf.h"
 // #include <stdio.h>
 // #include "audio.h"
-// #include "fcs_calc.h"
 // #include "ax25_pad.h"
 // #include "fx25.h"
 import "C"
@@ -98,7 +97,7 @@ func ax25_only_hdlc_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, bad_fc
 		send_data_nrzi(channel, C.int(fbuf[j]))
 	}
 
-	var fcs = C.fcs_calc(_fbuf, flen)
+	var fcs = fcs_calc(_fbuf, flen)
 
 	if bad_fcs > 0 {
 		/* For testing only - Simulate a frame getting corrupted along the way. */

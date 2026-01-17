@@ -13,7 +13,6 @@ package direwolf
 // #include <stdint.h>
 // #include <stdlib.h>
 // #include "fx25.h"
-// #include "fcs_calc.h"
 // #include "demod.h"
 import "C"
 
