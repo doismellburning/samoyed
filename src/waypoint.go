@@ -20,7 +20,6 @@ package direwolf
 // #include <time.h>
 // #include "config.h"
 // #include "latlong.h"
-// #include "dwgpsnmea.h"
 import "C"
 
 import (

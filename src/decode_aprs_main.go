@@ -63,7 +63,6 @@ package direwolf
 // #include "regex.h"
 // #include "ax25_pad.h"
 // #include "latlong.h"
-// #include "dwgpsnmea.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"
 // void hex_dump (unsigned char *p, int len);
