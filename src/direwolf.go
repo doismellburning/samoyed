@@ -24,7 +24,6 @@ package direwolf
 // #include "config.h"
 // #include "demod.h"
 // #include "hdlc_rec.h"
-// #include "hdlc_rec2.h"
 // #include "ax25_pad.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"

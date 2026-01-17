@@ -51,7 +51,6 @@ package direwolf
 // #include "audio.h"
 // #include "demod.h"
 // #include "ax25_pad.h"
-// #include "hdlc_rec2.h"
 // #include "dlq.h"
 // #include "fx25.h"
 // #include "il2p.h"
