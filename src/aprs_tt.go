@@ -38,7 +38,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"		/* for process_rec_frame */
 // #include "aprs_tt.h"
-// #include "symbols.h"
 // #include "latlong.h"
 // #include "dlq.h"
 // #include "demod.h"          /* for alevel_t & demod_get_audio_level() */

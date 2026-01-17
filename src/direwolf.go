@@ -35,7 +35,6 @@ package direwolf
 // #include "ptt.h"
 // #include "aprs_tt.h"
 // #include "igate.h"
-// #include "symbols.h"
 // #include "dwgps.h"
 // #include "morse.h"
 // #include "ax25_link.h"
