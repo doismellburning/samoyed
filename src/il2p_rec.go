@@ -13,7 +13,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "il2p.h"
 // #include "demod.h"
 // #include "dlq.h"
 import "C"

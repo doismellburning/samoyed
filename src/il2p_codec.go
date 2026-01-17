@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "il2p.h"
 // #include "demod.h"
 import "C"
 

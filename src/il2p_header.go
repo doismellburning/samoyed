@@ -7,7 +7,6 @@ package direwolf
 // #include <ctype.h>
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
-// #include "il2p.h"
 import "C"
 
 import (

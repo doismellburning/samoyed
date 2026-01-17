@@ -9,7 +9,6 @@ package direwolf
 // #include "config.h"
 // #include "kiss_frame.h"
 // #include "ax25_link.h"
-// #include "il2p.h"
 // #include "fx25.h"
 // #include "fsk_demod_state.h"
 import "C"

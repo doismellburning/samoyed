@@ -34,7 +34,6 @@ package direwolf
 // #include "dwgps.h"
 // #include "ax25_link.h"
 // #include "fx25.h"
-// #include "il2p.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev

@@ -60,7 +60,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "gen_tone.h"
 // #include "fx25.h"
-// #include "il2p.h"
 // #include "gen_packets.h"
 // int audio_flush_real (int a);
 // int audio_put_real (int a, int c);
