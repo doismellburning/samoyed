@@ -69,7 +69,6 @@ package direwolf
 // #include <sys/types.h>
 // #include <sys/ioctl.h>
 // #include <errno.h>
-// #include "tq.h"
 // #include "ax25_pad.h"
 // #include "kiss_frame.h"
 // void hex_dump (unsigned char *p, int len);

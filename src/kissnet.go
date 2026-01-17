@@ -156,7 +156,6 @@ same direwolf instance.
 // #include <assert.h>
 // #include <string.h>
 // #include <stddef.h>
-// #include "tq.h"
 // #include "ax25_pad.h"
 // #include "audio.h"
 // #include "kiss_frame.h"

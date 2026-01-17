@@ -15,7 +15,6 @@ https://github.com/golang/go/issues/4030
 // #include <unistd.h>
 // #include "ax25_pad.h"
 // #include "digipeater.h"
-// #include "tq.h"
 // packet_t digipeat_match (int from_chan, packet_t pp, char *mycall_rec, char *mycall_xmit, regex_t *uidigi, regex_t *uitrace, int to_chan, enum preempt_e preempt, char *atgp, char *type_filter);
 // char *mycall;
 // regex_t alias_re;

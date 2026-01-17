@@ -18,7 +18,6 @@ package direwolf
 // #include "latlong.h"
 // #include "dlq.h"
 // #include "demod.h"          /* for alevel_t & demod_get_audio_level() */
-// #include "tq.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"

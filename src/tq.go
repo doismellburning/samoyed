@@ -23,7 +23,6 @@ package direwolf
 // #include <string.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "tq.h"
 // #include "igate.h"
 import "C"
 
@@ -34,6 +33,11 @@ import (
 
 	"github.com/lestrrat-go/strftime"
 )
+
+const TQ_NUM_PRIO = 2 /* Number of priorities. */
+
+const TQ_PRIO_0_HI = 0
+const TQ_PRIO_1_LO = 1
 
 var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]C.packet_t /* Head of linked list for each queue. */
 

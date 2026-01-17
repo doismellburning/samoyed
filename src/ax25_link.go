@@ -157,7 +157,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 // #include "dlq.h"
-// #include "tq.h"
 // #include "ax25_link.h"
 // #include "ptt.h"
 import "C"

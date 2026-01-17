@@ -18,7 +18,6 @@ package direwolf
 // #include <time.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "tq.h"
 // #include "config.h"
 // #include "version.h"
 // #include "decode_aprs.h"

@@ -7,7 +7,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "dwgps.h"
 // #include "config.h"
-// #include "tq.h"
 // #include "kiss_frame.h"
 // #include "ax25_link.h"
 // #include "il2p.h"
@@ -74,10 +73,6 @@ const DWFIX_NO_FIX = C.DWFIX_NO_FIX
 
 const SENDTO_IGATE = C.SENDTO_IGATE
 const SENDTO_RECV = C.SENDTO_RECV
-
-const TQ_NUM_PRIO = C.TQ_NUM_PRIO
-const TQ_PRIO_0_HI = C.TQ_PRIO_0_HI
-const TQ_PRIO_1_LO = C.TQ_PRIO_1_LO
 
 const AX25_DESTINATION = C.AX25_DESTINATION
 const AX25_MAX_ADDR_LEN = C.AX25_MAX_ADDR_LEN
