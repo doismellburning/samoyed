@@ -61,8 +61,6 @@ package direwolf
 // #include <sys/soundcard.h>
 // #endif
 // #include "audio.h"
-// #include "audio_stats.h"
-// #include "demod.h"		/* for alevel_t & demod_get_audio_level() */
 import "C"
 
 import (

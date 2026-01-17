@@ -35,7 +35,6 @@ package direwolf
 // #include <string.h>
 // #include <time.h>
 // #include "dwgps.h"
-// #include "dwgpsd.h"
 import "C"
 
 import (

@@ -22,7 +22,6 @@ package direwolf
 // #include "version.h"
 // #include "audio.h"
 // #include "config.h"
-// #include "demod.h"
 // #include "ax25_pad.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"
@@ -33,7 +32,6 @@ package direwolf
 // #include "dwgps.h"
 // #include "ax25_link.h"
 // #include "fx25.h"
-// #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA

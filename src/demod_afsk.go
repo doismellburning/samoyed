@@ -30,9 +30,6 @@ package direwolf
 // #include <ctype.h>
 // #include "audio.h"
 // #include "fsk_demod_state.h"
-// #include "fsk_gen_filter.h"
-// #include "demod_afsk.h"
-// #include "dsp.h"
 import "C"
 
 import (

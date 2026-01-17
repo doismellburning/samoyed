@@ -49,7 +49,6 @@ package direwolf
 // #include <ctype.h>
 // #include <math.h>
 // #include "audio.h"
-// #include "demod.h"
 // #include "ax25_pad.h"
 // #include "dlq.h"
 // #include "fx25.h"

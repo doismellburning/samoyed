@@ -13,7 +13,7 @@ package direwolf
 // #include <stdint.h>
 // #include <stdlib.h>
 // #include "fx25.h"
-// #include "demod.h"
+// #include "dlq.h"
 import "C"
 
 import (

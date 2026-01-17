@@ -89,7 +89,6 @@ package direwolf
 // #include <sys/types.h>
 // #include <assert.h>
 // #include "audio.h"
-// #include "demod.h"
 // #include "dlq.h"
 // #include "aprs_tt.h"
 // #include "ax25_link.h"

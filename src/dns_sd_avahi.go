@@ -26,8 +26,6 @@ package direwolf
 // #include <avahi-common/alternative.h>
 // #include <avahi-common/malloc.h>
 // #include <avahi-common/error.h>
-// #include "dns_sd_dw.h"
-// #include "dns_sd_common.h"
 // void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state, AVAHI_GCC_UNUSED void *userdata);
 // void client_callback(AvahiClient *c, AvahiClientState state, AVAHI_GCC_UNUSED void * userdata);
 import "C"
@@ -43,6 +41,7 @@ var avahiName *C.char
 var avahiKISSPort C.uint16_t
 
 const AVAHI_PRINT_PREFIX = "DNS-SD: Avahi: "
+const DNS_SD_SERVICE = "_kiss-tnc._tcp"
 
 //export entry_group_callback
 func entry_group_callback(g *C.AvahiEntryGroup, state C.AvahiEntryGroupState, userdata unsafe.Pointer) {
@@ -106,7 +105,7 @@ func create_services(c *C.AvahiClient) {
 		 * only listens on IPv4.
 		 */
 
-		if ret := C.avahi_entry_group_add_service_strlst(avahiEntryGroup, C.AVAHI_IF_UNSPEC, C.AVAHI_PROTO_INET, 0, avahiName, C.CString(C.DNS_SD_SERVICE), nil, nil, avahiKISSPort, nil); ret < 0 {
+		if ret := C.avahi_entry_group_add_service_strlst(avahiEntryGroup, C.AVAHI_IF_UNSPEC, C.AVAHI_PROTO_INET, 0, avahiName, C.CString(DNS_SD_SERVICE), nil, nil, avahiKISSPort, nil); ret < 0 {
 			if ret == C.AVAHI_ERR_COLLISION {
 				/* A service name collision with a local service happened. Let's
 				 * pick a new name */

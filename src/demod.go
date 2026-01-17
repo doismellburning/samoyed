@@ -20,12 +20,7 @@ package direwolf
 // #include <assert.h>
 // #include <ctype.h>
 // #include "audio.h"
-// #include "demod.h"
 // #include "fsk_demod_state.h"
-// #include "fsk_gen_filter.h"
-// #include "demod_9600.h"
-// #include "demod_afsk.h"
-// #include "demod_psk.h"
 import "C"
 
 import (
@@ -881,7 +876,6 @@ var mute_input [MAX_RADIO_CHANS]C.int
 // I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 // This is called from ptt_set for half duplex.
 
-//export demod_mute_input
 func demod_mute_input(channel C.int, mute_during_xmit C.int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	mute_input[channel] = mute_during_xmit
@@ -981,7 +975,6 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
 
-//export demod_get_audio_level_real
 func demod_get_audio_level_real(channel C.int, subchan C.int) C.alevel_t {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)

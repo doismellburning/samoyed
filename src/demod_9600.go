@@ -29,9 +29,6 @@ package direwolf
 // #define DCD_THRESH_OFF 8                // Might want a little more fine tuning.
 // #define DCD_GOOD_WIDTH 1024             // No more than 1024!!!
 // #include "fsk_demod_state.h"		// Values above override defaults.
-//
-// #include "demod_9600.h"
-// #include "dsp.h"
 import "C"
 
 import (

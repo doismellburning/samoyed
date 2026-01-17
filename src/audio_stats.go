@@ -37,8 +37,6 @@ package direwolf
 // #include <sys/stat.h>
 // #include <assert.h>
 // #include <time.h>
-// #include "audio_stats.h"
-// #include "demod.h"		/* for alevel_t & demod_get_audio_level() */
 import "C"
 
 import (
@@ -72,7 +70,6 @@ var audioStatsSampleCount [C.MAX_ADEVS]C.int
 var audioStatsErrorCount [C.MAX_ADEVS]C.int
 var audioStatsSuppressFirst [C.MAX_ADEVS]bool
 
-//export audio_stats
 func audio_stats(adev C.int, nchan C.int, nsamp C.int, interval C.int) {
 
 	/* Gather numbers for read from audio device. */
