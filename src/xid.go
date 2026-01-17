@@ -29,7 +29,7 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "xid.h"
+// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -90,6 +90,34 @@ const PV_HDLC_Optional_Functions_Segmenter = 0x000040
 
 const PV_HDLC_Optional_Functions_Synchronous_Tx = 0x000002
 
+type srej_e int
+
+// Order is important because negotiation keeps the lower value of
+// REJ  (srej_none),  SREJ (default without negotiation), Multi-SREJ (if both agree).
+
+const (
+	srej_none          srej_e = 0
+	srej_single        srej_e = 1
+	srej_multi         srej_e = 2
+	srej_not_specified srej_e = 3
+)
+
+type xid_param_s struct {
+	full_duplex C.int
+
+	srej srej_e
+
+	modulo C.enum_ax25_modulo_e
+
+	i_field_length_rx C.int /* In bytes.  XID has it in bits. */
+
+	window_size_rx C.int
+
+	ack_timer C.int /* "T1" in mSec. */
+
+	retries C.int /* "N1" */
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        xid_parse
@@ -116,7 +144,7 @@ const PV_HDLC_Optional_Functions_Synchronous_Tx = 0x000002
  *
  *--------------------------------------------------------------------*/
 
-func xid_parse(_info *C.uchar, info_len C.int, result *C.struct_xid_param_s, _desc *C.char, desc_size C.int) C.int {
+func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.char, desc_size C.int) C.int {
 
 	// What should we do when some fields are missing?
 
@@ -127,7 +155,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *C.struct_xid_param_s, _de
 	// rej and modulo are enum so we can't use G_UNKNOWN there.
 
 	result.full_duplex = G_UNKNOWN
-	result.srej = C.srej_not_specified
+	result.srej = srej_not_specified
 	result.modulo = C.modulo_unknown
 	result.i_field_length_rx = G_UNKNOWN
 	result.window_size_rx = G_UNKNOWN
@@ -224,15 +252,15 @@ func xid_parse(_info *C.uchar, info_len C.int, result *C.struct_xid_param_s, _de
 			}
 
 			if pval&PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp > 0 {
-				result.srej = C.srej_multi
+				result.srej = srej_multi
 			} else if pval&PV_HDLC_Optional_Functions_SREJ_cmd_resp > 0 {
-				result.srej = C.srej_single
+				result.srej = srej_single
 			} else if pval&PV_HDLC_Optional_Functions_REJ_cmd_resp > 0 {
-				result.srej = C.srej_none
+				result.srej = srej_none
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Expected at least one of REJ, SREJ, Multi-SREJ to be set.\n")
-				result.srej = C.srej_none
+				result.srej = srej_none
 			}
 
 			if (pval&PV_HDLC_Optional_Functions_Modulo_8) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_128) == 0 {
@@ -392,7 +420,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *C.struct_xid_param_s, _de
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *C.struct_xid_param_s, _info *C.uchar, cr C.cmdres_t) C.int {
+func xid_encode(param *xid_param_s, _info *C.uchar, cr C.cmdres_t) C.int {
 
 	var info [40]byte
 	var i C.int = 0
@@ -468,10 +496,10 @@ func xid_encode(param *C.struct_xid_param_s, _info *C.uchar, cr C.cmdres_t) C.in
 		switch param.srej {
 		default: // Includes srej_none
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp
-		case C.srej_single:
+		case srej_single:
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp |
 				PV_HDLC_Optional_Functions_SREJ_cmd_resp
-		case C.srej_multi:
+		case srej_multi:
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp |
 				PV_HDLC_Optional_Functions_SREJ_cmd_resp |
 				PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp
@@ -481,9 +509,9 @@ func xid_encode(param *C.struct_xid_param_s, _info *C.uchar, cr C.cmdres_t) C.in
 		switch param.srej {
 		default: // Includes srej_none
 			x |= PV_HDLC_Optional_Functions_REJ_cmd_resp
-		case C.srej_single:
+		case srej_single:
 			x |= PV_HDLC_Optional_Functions_SREJ_cmd_resp
-		case C.srej_multi:
+		case srej_multi:
 			x |= PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp
 		}
 	}

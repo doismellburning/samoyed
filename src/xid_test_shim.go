@@ -6,7 +6,7 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "xid.h"
+// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -69,10 +69,6 @@ func xid_test_main(t *testing.T) {
 	var modulo_128 = uint32(C.modulo_128)
 	var modulo_8 = uint32(C.modulo_8)
 	var modulo_unknown = uint32(C.modulo_unknown)
-	var srej_single = uint32(C.srej_single)
-	var srej_multi = uint32(C.srej_multi)
-	var srej_not_specified = uint32(C.srej_not_specified)
-	var srej_none = uint32(C.srej_none)
 
 	/*
 		struct xid_param_s param;
@@ -83,8 +79,8 @@ func xid_test_main(t *testing.T) {
 	*/
 
 	var desc [150]C.char
-	var param C.struct_xid_param_s
-	var param2 C.struct_xid_param_s
+	var param xid_param_s
+	var param2 xid_param_s
 	var info [40]C.uchar
 
 	/* parse example. */

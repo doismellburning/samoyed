@@ -156,7 +156,6 @@ package direwolf
 // #include <math.h>
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
-// #include "xid.h"
 // #include "dlq.h"
 // #include "tq.h"
 // #include "ax25_link.h"
@@ -276,7 +275,7 @@ type ax25_dlsm_t struct {
 	// Determines whether we have one or two control
 	// octets.  128 allows a much larger window size.
 
-	srej_enable C.enum_srej_e // Is other end capable of processing SREJ?  (Am I allowed to send it?)
+	srej_enable srej_e // Is other end capable of processing SREJ?  (Am I allowed to send it?)
 	// Starts out as 'srej_none' for v2.0 or 'srej_single' for v2.2.
 	// Can be changed to 'srej_multi' with XID exchange.
 	// Should be used only with modulo 128.  (Is this enforced?)
@@ -2587,7 +2586,7 @@ func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
-	} else if S.srej_enable == C.srej_none {
+	} else if S.srej_enable == srej_none {
 
 		// The received sequence number is not the expected one and we can't use SREJ.
 		// The old v2.0 approach is to send and REJ with the number we are expecting.
@@ -2978,7 +2977,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []C.int, count C.int, allow_f1 bool
 
 	// Multi-SREJ - Use info part for additional sequence number(s) instead of sending separate SREJ for each.
 
-	if S.srej_enable == C.srej_multi && count > 1 {
+	if S.srej_enable == srej_multi && count > 1 {
 
 		var info [128]C.uchar
 		var info_len C.int = 0
@@ -4700,7 +4699,7 @@ func xid_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
 
-				var param C.struct_xid_param_s
+				var param xid_param_s
 				var desc [150]C.char
 				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
 
@@ -4733,7 +4732,7 @@ func xid_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_
 
 				// Got expected response.  Copy into my working parameters.
 
-				var param C.struct_xid_param_s
+				var param xid_param_s
 				var desc [150]C.char
 				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
 
@@ -5130,7 +5129,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 		} else {
 			// No response.  Ask again.
 
-			var param C.struct_xid_param_s
+			var param xid_param_s
 			initiate_negotiation(S, &param)
 
 			var xinfo [40]C.uchar
@@ -5377,7 +5376,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f C.int) {
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
-		} else if S.srej_enable == C.srej_single || S.srej_enable == C.srej_multi {
+		} else if S.srej_enable == srej_single || S.srej_enable == srej_multi {
 
 			// SREJ is enabled. This is based on X.25 2.4.6.11.
 
@@ -5811,7 +5810,7 @@ func select_t1_value(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func set_version_2_0(S *ax25_dlsm_t) {
-	S.srej_enable = C.srej_none
+	S.srej_enable = srej_none
 	S.modulo = 8
 	S.n1_paclen = g_misc_config_p.paclen
 	S.k_maxframe = g_misc_config_p.maxframe_basic
@@ -5825,7 +5824,7 @@ func set_version_2_0(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func set_version_2_2(S *ax25_dlsm_t) {
-	S.srej_enable = C.srej_single // Start with single.
+	S.srej_enable = srej_single // Start with single.
 	// Can be increased to multi with XID exchange.
 	S.modulo = 128
 	S.n1_paclen = g_misc_config_p.paclen
@@ -6110,7 +6109,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 	switch S.mdl_state {
 
 	case mdl_state_0_ready:
-		var param C.struct_xid_param_s
+		var param xid_param_s
 		initiate_negotiation(S, &param)
 
 		var xinfo [40]C.uchar
@@ -6142,13 +6141,13 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func initiate_negotiation(S *ax25_dlsm_t, param *C.struct_xid_param_s) {
+func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	param.full_duplex = 0
 	switch S.srej_enable {
-	case C.srej_single, C.srej_multi:
-		param.srej = C.srej_multi // see if other end reconizes it.
+	case srej_single, srej_multi:
+		param.srej = srej_multi // see if other end reconizes it.
 	default:
-		param.srej = C.srej_none
+		param.srej = srej_none
 	}
 
 	param.modulo = uint32(S.modulo)
@@ -6180,7 +6179,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *C.struct_xid_param_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func negotiation_response(S *ax25_dlsm_t, param *C.struct_xid_param_s) {
+func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 
 	// TODO: Integrate with new full duplex capability in v1.5.
 
@@ -6199,12 +6198,12 @@ func negotiation_response(S *ax25_dlsm_t, param *C.struct_xid_param_s) {
 	// Erratum:  2006 version, section, 4.3.3.7 says default selective reject - reject.
 	// We can't do that.
 
-	if param.srej == C.srej_not_specified {
+	if param.srej == srej_not_specified {
 		// not specified, set default
 		if param.modulo == 128 {
-			param.srej = C.srej_single
+			param.srej = srej_single
 		} else {
-			param.srej = C.srej_none
+			param.srej = srej_none
 		}
 	}
 
@@ -6272,8 +6271,8 @@ func negotiation_response(S *ax25_dlsm_t, param *C.struct_xid_param_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func complete_negotiation(S *ax25_dlsm_t, param *C.struct_xid_param_s) {
-	if param.srej != C.srej_not_specified {
+func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
+	if param.srej != srej_not_specified {
 		S.srej_enable = param.srej
 	}
 
