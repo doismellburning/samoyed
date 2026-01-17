@@ -135,7 +135,15 @@ func rrbb_clear(b rrbb_t, is_scrambled C.int, descram_state C.int, prev_descram 
  *
  ***********************************************************************************/
 
-/* Definition in header file so it can be inlined. */
+//export rrbb_append_bit
+func rrbb_append_bit(b rrbb_t, val C.uchar) {
+
+	if b.len >= C.MAX_NUM_BITS {
+		return /* Silently discard if full. */
+	}
+	b.fdata[b.len] = val
+	b.len++
+}
 
 /***********************************************************************************
  *

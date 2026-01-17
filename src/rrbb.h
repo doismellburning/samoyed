@@ -52,15 +52,6 @@ rrbb_t rrbb_new (int chan, int subchan, int slice, int is_scrambled, int descram
 void rrbb_clear (rrbb_t b, int is_scrambled, int descram_state, int prev_descram);
 
 
-static inline /*__attribute__((always_inline))*/ void rrbb_append_bit (rrbb_t b, const unsigned char val)
-{
-	if (b->len >= MAX_NUM_BITS) {
-	  return;	/* Silently discard if full. */
-	}
-	b->fdata[b->len] = val;
-	b->len++;
-}
-
 void rrbb_chop8 (rrbb_t b);
 
 int rrbb_get_len (rrbb_t b);
@@ -87,5 +78,6 @@ int rrbb_get_descram_state (rrbb_t b);
 int rrbb_get_prev_descram (rrbb_t b);
 
 unsigned char rrbb_get_bit (rrbb_t b, int ind);
+void rrbb_append_bit (rrbb_t b, unsigned char val);
 
 #endif
