@@ -69,7 +69,6 @@ package direwolf
 // #include <stdio.h>
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "multi_modem.h"
 // #include "demod.h"
 // #include "hdlc_rec.h"
 // #include "hdlc_rec2.h"
@@ -275,7 +274,6 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
  *
  *--------------------------------------------------------------------*/
 
-//export multi_modem_process_rec_frame
 func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel C.alevel_t, retries C.retry_t, fec_type C.fec_type_t) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
@@ -310,12 +308,11 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 		pp = ax25_from_frame(fbuf, flen, alevel)
 	}
 
-	C.multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
+	multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
 }
 
 // TODO: Eliminate function above and move code elsewhere?
 
-//export multi_modem_process_rec_packet_real
 func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries C.retry_t, fec_type C.fec_type_t) {
 
 	if pp == nil {

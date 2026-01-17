@@ -50,7 +50,6 @@ package direwolf
 // #include <math.h>
 // #include "audio.h"
 // #include "demod.h"
-// #include "multi_modem.h"
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"
 // #include "dlq.h"

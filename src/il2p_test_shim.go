@@ -8,7 +8,6 @@ package direwolf
 // #include "il2p.h"
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
-// #include "multi_modem.h"
 import "C"
 
 import (

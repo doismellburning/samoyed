@@ -22,7 +22,6 @@ package direwolf
 // #include "version.h"
 // #include "audio.h"
 // #include "config.h"
-// #include "multi_modem.h"
 // #include "demod.h"
 // #include "hdlc_rec.h"
 // #include "hdlc_rec2.h"

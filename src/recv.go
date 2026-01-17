@@ -90,7 +90,6 @@ package direwolf
 // #include <assert.h>
 // #include "audio.h"
 // #include "demod.h"
-// #include "multi_modem.h"
 // #include "dlq.h"
 // #include "aprs_tt.h"
 // #include "ax25_link.h"
