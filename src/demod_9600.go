@@ -31,7 +31,6 @@ package direwolf
 // #include "fsk_demod_state.h"		// Values above override defaults.
 //
 // #include "demod_9600.h"
-// #include "dsp.h"
 import "C"
 
 import (
