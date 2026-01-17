@@ -26,7 +26,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"
-// #include "gen_tone.h"
 // #include "digipeater.h"
 // #include "cdigipeater.h"
 // #include "aprs_tt.h"
@@ -700,21 +699,21 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
 					for n > 0 {
-						C.tone_gen_put_bit(C.int(transmitCalibrationChannel), n&1)
+						tone_gen_put_bit(C.int(transmitCalibrationChannel), n&1)
 						n--
 					}
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 					for n > 0 {
-						C.tone_gen_put_bit(C.int(transmitCalibrationChannel), 1)
+						tone_gen_put_bit(C.int(transmitCalibrationChannel), 1)
 						n--
 					}
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 					for n > 0 {
-						C.tone_gen_put_bit(C.int(transmitCalibrationChannel), 0)
+						tone_gen_put_bit(C.int(transmitCalibrationChannel), 0)
 						n--
 					}
 				case 'p': // Silence - set PTT only: -x p

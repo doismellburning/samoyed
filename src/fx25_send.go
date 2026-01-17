@@ -8,7 +8,6 @@ package direwolf
 // #include "fx25.h"
 // #include "fcs_calc.h"
 // #include "audio.h"
-// #include "gen_tone.h"
 import "C"
 
 import (
@@ -192,7 +191,7 @@ func send_bit(channel C.int, b C.int) {
 	if b == 0 {
 		sendBitOutput[channel] = 1 - sendBitOutput[channel]
 	}
-	C.tone_gen_put_bit(channel, sendBitOutput[channel])
+	tone_gen_put_bit(channel, sendBitOutput[channel])
 	fx25BitsSent[channel]++
 }
 

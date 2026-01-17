@@ -20,7 +20,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "audio.h"
-// #include "gen_tone.h"
 import "C"
 
 import (

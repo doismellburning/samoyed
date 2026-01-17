@@ -3,7 +3,6 @@ package direwolf
 // #include "direwolf.h"
 // #include <stdio.h>
 // #include "audio.h"
-// #include "gen_tone.h"
 // #include "fcs_calc.h"
 // #include "ax25_pad.h"
 // #include "fx25.h"
@@ -189,7 +188,7 @@ func send_byte_msb_first(channel C.int, x C.int, polarity C.int) {
 		if (x & 0x80) != 0 {
 			dbit = 1
 		}
-		C.tone_gen_put_bit(channel, (dbit^polarity)&1)
+		tone_gen_put_bit(channel, (dbit^polarity)&1)
 		x <<= 1
 		number_of_bits_sent[channel]++
 	}
@@ -245,7 +244,7 @@ func send_bit_nrzi(channel C.int, b C.int) {
 		nrziBitOutput[channel] = 1 - nrziBitOutput[channel]
 	}
 
-	C.tone_gen_put_bit(channel, nrziBitOutput[channel])
+	tone_gen_put_bit(channel, nrziBitOutput[channel])
 
 	number_of_bits_sent[channel]++
 }
@@ -280,7 +279,7 @@ func send_bit_nrzi(channel C.int, b C.int) {
 
 func eas_put_byte(channel C.int, b C.uchar) {
 	for n := 0; n < 8; n++ {
-		C.tone_gen_put_bit(channel, C.int(b&1))
+		tone_gen_put_bit(channel, C.int(b&1))
 		b >>= 1
 	}
 }
