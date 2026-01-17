@@ -29,7 +29,6 @@ package direwolf
 // #include "cdigipeater.h"
 // #include "igate.h"
 // #include "dwgps.h"
-// #include "ax25_link.h"
 // #include "fx25.h"
 // #include "dlq.h"		// for fec_type_t definition.
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev

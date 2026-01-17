@@ -10,7 +10,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 // #include "dlq.h"
-// #include "ax25_link.h"
 import "C"
 
 import (

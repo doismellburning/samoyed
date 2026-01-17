@@ -8,7 +8,6 @@ package direwolf
 // #include "dwgps.h"
 // #include "config.h"
 // #include "kiss_frame.h"
-// #include "ax25_link.h"
 // #include "fx25.h"
 // #include "fsk_demod_state.h"
 import "C"
@@ -79,7 +78,6 @@ const AX25_MAX_ADDRS = C.AX25_MAX_ADDRS
 const AX25_MAX_INFO_LEN = C.AX25_MAX_INFO_LEN
 const AX25_MAX_PACKET_LEN = C.AX25_MAX_PACKET_LEN
 const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
-const AX25_N1_PACLEN_MAX = C.AX25_N1_PACLEN_MAX
 const AX25_REPEATER_1 = C.AX25_REPEATER_1
 const AX25_SOURCE = C.AX25_SOURCE
 

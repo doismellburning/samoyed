@@ -90,7 +90,6 @@ package direwolf
 // #include <assert.h>
 // #include "audio.h"
 // #include "dlq.h"
-// #include "ax25_link.h"
 import "C"
 
 import (

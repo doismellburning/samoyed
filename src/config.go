@@ -34,7 +34,6 @@ package direwolf
 // #include "config.h"
 // #include "igate.h"
 // #include "latlong.h"
-// #include "ax25_link.h"
 // #if USE_CM108		// Current Linux or Windows only
 // #include "cm108.h"
 // #endif
@@ -714,7 +713,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 		p_audio_config.achan[channel].fulldup = C.DEFAULT_FULLDUP
 	}
 
-	p_audio_config.fx25_auto_enable = C.AX25_N2_RETRY_DEFAULT / 2
+	p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
 
 	/* First channel should always be valid. */
 	/* If there is no ADEVICE, it uses default device in mono. */
@@ -809,18 +808,18 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	/* connected mode. */
 
-	p_misc_config.frack = C.AX25_T1V_FRACK_DEFAULT /* Number of seconds to wait for ack to transmission. */
+	p_misc_config.frack = AX25_T1V_FRACK_DEFAULT /* Number of seconds to wait for ack to transmission. */
 
-	p_misc_config.retry = C.AX25_N2_RETRY_DEFAULT /* Number of times to retry before giving up. */
+	p_misc_config.retry = AX25_N2_RETRY_DEFAULT /* Number of times to retry before giving up. */
 
-	p_misc_config.paclen = C.AX25_N1_PACLEN_DEFAULT /* Max number of bytes in information part of frame. */
+	p_misc_config.paclen = AX25_N1_PACLEN_DEFAULT /* Max number of bytes in information part of frame. */
 
-	p_misc_config.maxframe_basic = C.AX25_K_MAXFRAME_BASIC_DEFAULT /* Max frames to send before ACK.  mod 8 "Window" size. */
+	p_misc_config.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT /* Max frames to send before ACK.  mod 8 "Window" size. */
 
-	p_misc_config.maxframe_extended = C.AX25_K_MAXFRAME_EXTENDED_DEFAULT /* Max frames to send before ACK.  mod 128 "Window" size. */
+	p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT /* Max frames to send before ACK.  mod 128 "Window" size. */
 
-	p_misc_config.maxv22 = C.AX25_N2_RETRY_DEFAULT / 3 /* Send SABME this many times before falling back to SABM. */
-	p_misc_config.v20_addrs = nil                      /* Go directly to v2.0 for stations listed */
+	p_misc_config.maxv22 = AX25_N2_RETRY_DEFAULT / 3 /* Send SABME this many times before falling back to SABM. */
+	p_misc_config.v20_addrs = nil                    /* Go directly to v2.0 for stations listed */
 	/* without trying v2.2 first. */
 	p_misc_config.v20_count = 0
 	p_misc_config.noxid_addrs = nil /* Don't send XID to these stations. */
@@ -2389,7 +2388,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			if n >= 0 && n < 20 {
 				p_audio_config.fx25_auto_enable = C.int(n)
 			} else {
-				p_audio_config.fx25_auto_enable = C.AX25_N2_RETRY_DEFAULT / 2
+				p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unreasonable count for connected mode automatic FX.25. Using %d.\n",
 					line, p_audio_config.fx25_auto_enable)
@@ -5059,7 +5058,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= C.AX25_T1V_FRACK_MIN && n <= C.AX25_T1V_FRACK_MAX {
+			if n >= AX25_T1V_FRACK_MIN && n <= AX25_T1V_FRACK_MAX {
 				p_misc_config.frack = C.int(n)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -5078,7 +5077,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= C.AX25_N2_RETRY_MIN && n <= C.AX25_N2_RETRY_MAX {
+			if n >= AX25_N2_RETRY_MIN && n <= AX25_N2_RETRY_MAX {
 				p_misc_config.retry = C.int(n)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -5097,7 +5096,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= C.AX25_N1_PACLEN_MIN && n <= C.AX25_N1_PACLEN_MAX {
+			if n >= AX25_N1_PACLEN_MIN && n <= AX25_N1_PACLEN_MAX {
 				p_misc_config.paclen = C.int(n)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -5118,13 +5117,13 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= C.AX25_K_MAXFRAME_BASIC_MIN && n <= C.AX25_K_MAXFRAME_BASIC_MAX {
+			if n >= AX25_K_MAXFRAME_BASIC_MIN && n <= AX25_K_MAXFRAME_BASIC_MAX {
 				p_misc_config.maxframe_basic = C.int(n)
 			} else {
-				p_misc_config.maxframe_basic = C.AX25_K_MAXFRAME_BASIC_DEFAULT
+				p_misc_config.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d.\n",
-					line, C.AX25_K_MAXFRAME_BASIC_MIN, C.AX25_K_MAXFRAME_BASIC_MAX, p_misc_config.maxframe_basic)
+					line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, p_misc_config.maxframe_basic)
 			}
 		} else if strings.EqualFold(t, "EMAXFRAME") {
 
@@ -5139,13 +5138,13 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= C.AX25_K_MAXFRAME_EXTENDED_MIN && n <= C.AX25_K_MAXFRAME_EXTENDED_MAX {
+			if n >= AX25_K_MAXFRAME_EXTENDED_MIN && n <= AX25_K_MAXFRAME_EXTENDED_MAX {
 				p_misc_config.maxframe_extended = C.int(n)
 			} else {
-				p_misc_config.maxframe_extended = C.AX25_K_MAXFRAME_EXTENDED_DEFAULT
+				p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d.\n",
-					line, C.AX25_K_MAXFRAME_EXTENDED_MIN, C.AX25_K_MAXFRAME_EXTENDED_MAX, p_misc_config.maxframe_extended)
+					line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, p_misc_config.maxframe_extended)
 			}
 		} else if strings.EqualFold(t, "MAXV22") {
 			/*
@@ -5159,7 +5158,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= 0 && n <= C.AX25_N2_RETRY_MAX {
+			if n >= 0 && n <= AX25_N2_RETRY_MAX {
 				p_misc_config.maxv22 = C.int(n)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
