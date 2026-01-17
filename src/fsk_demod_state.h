@@ -4,8 +4,6 @@
 
 #include <stdint.h>          // int64_t
 
-#include "rpack.h"
-
 #include "audio.h"		// for enum modem_t
 
 /*
