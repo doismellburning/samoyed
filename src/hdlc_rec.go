@@ -13,7 +13,6 @@ package direwolf
 // #include "demod.h"
 // #include "fcs_calc.h"
 // #include "ax25_pad.h"
-// #include "rrbb.h"
 // #include "fx25.h"
 // #include "il2p.h"
 import "C"
@@ -73,7 +72,7 @@ type hdlc_state_s struct {
 	frame_len C.int /* Number of octets in frame_buf. */
 	/* Should be in range of 0 .. MAX_FRAME_LEN. */
 
-	rrbb rrbb_t /* Handle for bit array for raw received bits. */
+	rrbb *rrbb_t /* Handle for bit array for raw received bits. */
 
 	eas_acc C.uint64_t /* Accumulate most recent 64 bits received for EAS. */
 
@@ -474,7 +473,7 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 		H.flag4_det |= 0x80000000
 	}
 
-	C.rrbb_append_bit(H.rrbb, C.uchar(IfThenElse(raw, 1, 0)))
+	rrbb_append_bit(H.rrbb, C.uchar(IfThenElse(raw, 1, 0)))
 
 	if H.pat_det == 0x7e {
 
@@ -577,7 +576,7 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 			var alevel = demod_get_audio_level(channel, subchannel)
 
 			rrbb_set_audio_level(H.rrbb, alevel)
-			hdlc_rec2_block((C.rrbb_t)(unsafe.Pointer(H.rrbb)))
+			hdlc_rec2_block(H.rrbb)
 			/* Now owned by someone else who will free it. */
 			H.rrbb = nil
 
@@ -593,7 +592,7 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 		H.olen = 0 /* Allow accumulation of octets. */
 		H.frame_len = 0
 
-		C.rrbb_append_bit(H.rrbb, C.uchar(IfThenElse(H.prev_raw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		rrbb_append_bit(H.rrbb, C.uchar(IfThenElse(H.prev_raw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */
