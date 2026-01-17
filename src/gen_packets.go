@@ -468,7 +468,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	// Just use the default of minimal information.
 
 	C.fx25_init(1)
-	C.il2p_init(0) // There are no "-d" options so far but it could be handy here.
+	il2p_init(0) // There are no "-d" options so far but it could be handy here.
 
 	if !(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16) { //nolint:staticcheck
 		panic("assert(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16)")

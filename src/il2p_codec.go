@@ -50,7 +50,6 @@ import (
  *
  *--------------------------------------------------------------*/
 
-//export il2p_encode_frame
 func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 	// Can a type 1 header be used?
@@ -58,11 +57,11 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 	var hdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar
 	var out_len C.int
 
-	var e = C.il2p_type_1_header(pp, max_fec, &hdr[0])
+	var e = il2p_type_1_header(pp, max_fec, &hdr[0])
 
 	if e >= 0 {
 		il2p_scramble_block(&hdr[0], iout, IL2P_HEADER_SIZE)
-		C.il2p_encode_rs(iout, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE)))
+		il2p_encode_rs(iout, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE)))
 		out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
 
 		if e == 0 {
@@ -88,11 +87,11 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 		// Could not use type 1 header for some reason.
 		// e.g. More than 2 addresses, extended (mod 128) sequence numbers, etc.
 
-		e = C.il2p_type_0_header(pp, max_fec, &hdr[0])
+		e = il2p_type_0_header(pp, max_fec, &hdr[0])
 		if e > 0 {
 
 			il2p_scramble_block(&hdr[0], iout, IL2P_HEADER_SIZE)
-			C.il2p_encode_rs(iout, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE)))
+			il2p_encode_rs(iout, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE)))
 			out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
 
 			// Payload is entire AX.25 frame.
@@ -137,10 +136,9 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
  *
  *--------------------------------------------------------------*/
 
-//export il2p_decode_frame
 func il2p_decode_frame(irec *C.uchar) C.packet_t {
 	var uhdr [IL2P_HEADER_SIZE]C.uchar // After FEC and descrambling.
-	var e = C.il2p_clarify_header(irec, &uhdr[0])
+	var e = il2p_clarify_header(irec, &uhdr[0])
 
 	// TODO?: for symmetry we might want to clarify the payload before combining.
 
@@ -164,7 +162,6 @@ func il2p_decode_frame(irec *C.uchar) C.packet_t {
  *
  *--------------------------------------------------------------*/
 
-//export il2p_decode_header_payload
 func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_corrected *C.int) C.packet_t {
 	var hdr_type, max_fec C.int
 	var payload_len = il2p_get_header_attributes(uhdr, &hdr_type, &max_fec)
@@ -173,7 +170,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 
 		// Header type 1.  Any payload is the AX.25 Information part.
 
-		var pp = C.il2p_decode_header_type_1(uhdr, *symbols_corrected)
+		var pp = il2p_decode_header_type_1(uhdr, *symbols_corrected)
 		if pp == nil {
 			// Failed for some reason.
 			return (nil)

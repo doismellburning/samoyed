@@ -35,7 +35,7 @@ func il2p_test_main(t *testing.T) {
 	text_color_init(enable_color)
 
 	var enable_debug_out C.int = 0
-	C.il2p_init(enable_debug_out)
+	il2p_init(enable_debug_out)
 
 	fmt.Println("Begin IL2P unit tests.")
 
@@ -91,7 +91,7 @@ func test_scramble(t *testing.T) {
 	var scramout1 []C.uchar = []C.uchar{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53}
 	var scramout []C.uchar = make([]C.uchar, len(scramin1))
 
-	C.il2p_scramble_block(&scramin1[0], &scramout[0], C.int(len(scramin1)))
+	il2p_scramble_block(&scramin1[0], &scramout[0], C.int(len(scramin1)))
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&scramout[0]), unsafe.Pointer(&scramout1[0]), C.ulong(len(scramout1))))
 } // end test_scramble.
 
@@ -111,13 +111,13 @@ func test_rs(t *testing.T) {
 	var example_s []C.uchar = []C.uchar{0x26, 0x57, 0x4d, 0x57, 0xf1, 0x96, 0xcc, 0x85, 0x42, 0xe7, 0x24, 0xf7, 0x2e, 0x8a, 0x97}
 	var parity_out [2]C.uchar
 
-	C.il2p_encode_rs(&example_s[0], 13, 2, &parity_out[0])
+	il2p_encode_rs(&example_s[0], 13, 2, &parity_out[0])
 	// dw_printf ("DEBUG RS encode %02x %02x\n", parity_out[0], parity_out[1]);
 	assert.Equal(t, example_s[13], parity_out[0])
 	assert.Equal(t, example_s[14], parity_out[1])
 
 	var example_u []C.uchar = []C.uchar{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53, 0x91, 0xbd}
-	C.il2p_encode_rs(&example_u[0], 13, 2, &parity_out[0])
+	il2p_encode_rs(&example_u[0], 13, 2, &parity_out[0])
 	// dw_printf ("DEBUG RS encode %02x %02x\n", parity_out[0], parity_out[1]);
 	assert.Equal(t, example_u[13], parity_out[0])
 	assert.Equal(t, example_u[14], parity_out[1])
@@ -128,29 +128,29 @@ func test_rs(t *testing.T) {
 	var corrected [15]C.uchar
 	var e C.int
 
-	e = C.il2p_decode_rs(&example_s[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs(&example_s[0], 13, 2, &corrected[0])
 	assert.Zero(t, e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
 
 	C.memcpy(unsafe.Pointer(&received[0]), unsafe.Pointer(&example_s[0]), 15)
 	received[0] = '?'
-	e = C.il2p_decode_rs(&received[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
 	assert.Equal(t, C.int(1), e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
 
-	e = C.il2p_decode_rs(&example_u[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs(&example_u[0], 13, 2, &corrected[0])
 	assert.Zero(t, e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
 
 	C.memcpy(unsafe.Pointer(&received[0]), unsafe.Pointer(&example_u[0]), 15)
 	received[12] = '?'
-	e = C.il2p_decode_rs(&received[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
 	assert.Equal(t, C.int(1), e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
 
 	received[1] = '?'
 	received[2] = '?'
-	e = C.il2p_decode_rs(&received[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
 	assert.Equal(t, C.int(-1), e)
 }
 
@@ -325,7 +325,7 @@ func test_example_headers(t *testing.T) {
 
 	var pp = ax25_from_frame(&example1[0], C.int(len(example1)), alevel)
 	assert.NotNil(t, pp)
-	var e = C.il2p_type_1_header(pp, 0, &header[0])
+	var e = il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, C.int(0), e)
 	ax25_delete(pp)
 
@@ -337,14 +337,14 @@ func test_example_headers(t *testing.T) {
 
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), C.IL2P_HEADER_SIZE))
 
-	C.il2p_scramble_block(&header[0], &sresult[0], 13)
+	il2p_scramble_block(&header[0], &sresult[0], 13)
 	// dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	C.il2p_encode_rs(&sresult[0], 13, 2, &check[0])
+	il2p_encode_rs(&sresult[0], 13, 2, &check[0])
 
 	// dw_printf ("check = ");
 	// for (int i = 0 ; i < sizeof(check); i++) {
@@ -356,7 +356,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = C.il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
 	var dst_addr [C.AX25_MAX_ADDR_LEN]C.char
@@ -406,7 +406,7 @@ func test_example_headers(t *testing.T) {
 
 	pp = ax25_from_frame(&example2[0], C.int(len(example2)), alevel)
 	assert.NotNil(t, pp)
-	e = C.il2p_type_1_header(pp, 0, &header[0])
+	e = il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, C.int(0), e)
 	ax25_delete(pp)
 
@@ -418,14 +418,14 @@ func test_example_headers(t *testing.T) {
 
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), C.ulong(len(header2))))
 
-	C.il2p_scramble_block(&header[0], &sresult[0], 13)
+	il2p_scramble_block(&header[0], &sresult[0], 13)
 	// dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	C.il2p_encode_rs(&sresult[0], 13, 2, &check[0])
+	il2p_encode_rs(&sresult[0], 13, 2, &check[0])
 
 	// dw_printf ("expect checksum = 91 bd\n");
 	// dw_printf ("check = ");
@@ -438,7 +438,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = C.il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
 	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
@@ -483,7 +483,7 @@ func test_example_headers(t *testing.T) {
 
 	pp = ax25_from_frame(&example3[0], C.int(len(example3)), alevel)
 	assert.NotNil(t, pp)
-	e = C.il2p_type_1_header(pp, 0, &header[0])
+	e = il2p_type_1_header(pp, 0, &header[0])
 	assert.Equal(t, C.int(9), e)
 	ax25_delete(pp)
 
@@ -495,14 +495,14 @@ func test_example_headers(t *testing.T) {
 
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header3[0]), C.ulong(len(header))))
 
-	C.il2p_scramble_block(&header[0], &sresult[0], 13)
+	il2p_scramble_block(&header[0], &sresult[0], 13)
 	// dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	C.il2p_encode_rs(&sresult[0], 13, 2, &check[0])
+	il2p_encode_rs(&sresult[0], 13, 2, &check[0])
 
 	// dw_printf ("expect checksum = 43 35\n");
 	// dw_printf ("check = ");
@@ -518,7 +518,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = C.il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
 	ax25_get_addr_with_ssid(pp, C.AX25_DESTINATION, &dst_addr[0])
@@ -539,7 +539,7 @@ func test_example_headers(t *testing.T) {
 
 	var max_fec C.int = 0
 	var iout [C.IL2P_MAX_PACKET_SIZE]C.uchar
-	e = C.il2p_encode_frame(pp, max_fec, &iout[0])
+	e = il2p_encode_frame(pp, max_fec, &iout[0])
 
 	// dw_printf ("expected for example 3:\n");
 	// fx_hex_dump(complete3, sizeof(complete3));
@@ -566,10 +566,10 @@ func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
 
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
 		var encoded [C.IL2P_MAX_PACKET_SIZE]C.uchar
-		var enc_len = C.il2p_encode_frame(pp1, max_fec, &encoded[0])
+		var enc_len = il2p_encode_frame(pp1, max_fec, &encoded[0])
 		assert.GreaterOrEqual(t, enc_len, C.int(0))
 
-		var pp2 = C.il2p_decode_frame(&encoded[0])
+		var pp2 = il2p_decode_frame(&encoded[0])
 		assert.NotNil(t, pp2)
 
 		// Is it the same after encoding to IL2P and then decoding?
@@ -585,7 +585,7 @@ func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
 			ax25_hex_dump(pp1)
 
 			dw_printf("IL2P encoded as:\n")
-			C.fx_hex_dump(&encoded[0], enc_len)
+			fx_hex_dump(&encoded[0], enc_len)
 
 			dw_printf("Got turned into this:\n")
 			ax25_hex_dump(pp2)
@@ -792,18 +792,18 @@ func decode_bitstream(t *testing.T) {
 	}
 
 	decoding_bitstream = 1
-	var save_previous = C.il2p_get_debug()
-	C.il2p_set_debug(1)
+	var save_previous = il2p_get_debug()
+	il2p_set_debug(1)
 
 	var ch C.int
 	for ch != C.EOF {
 		ch = C.fgetc(fp)
 		if ch == '0' || ch == '1' {
-			C.il2p_rec_bit(0, 0, 0, ch-'0')
+			il2p_rec_bit(0, 0, 0, ch-'0')
 		}
 	}
 	C.fclose(fp)
-	C.il2p_set_debug(save_previous)
+	il2p_set_debug(save_previous)
 	decoding_bitstream = 0
 } // end decode_bitstream
 
@@ -858,7 +858,7 @@ func test_serdes(t *testing.T) {
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
-				C.il2p_rec_bit(0, 0, 0, 0)
+				il2p_rec_bit(0, 0, 0, 0)
 			}
 		}
 		ax25_delete(pp)

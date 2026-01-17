@@ -63,7 +63,7 @@ func il2p_send_frame(channel C.int, pp C.packet_t, max_fec C.int, polarity C.int
 	encoded[1] = (C.IL2P_SYNC_WORD >> 8) & 0xff
 	encoded[2] = (C.IL2P_SYNC_WORD) & 0xff
 
-	var elen = C.il2p_encode_frame(pp, max_fec, &encoded[C.IL2P_SYNC_WORD_SIZE])
+	var elen = il2p_encode_frame(pp, max_fec, &encoded[C.IL2P_SYNC_WORD_SIZE])
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
@@ -74,10 +74,10 @@ func il2p_send_frame(channel C.int, pp C.packet_t, max_fec C.int, polarity C.int
 
 	number_of_il2p_bits_sent[channel] = 0
 
-	if C.il2p_get_debug() >= 1 {
+	if il2p_get_debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("IL2P frame, max_fec = %d, %d encoded bytes total\n", max_fec, elen)
-		C.fx_hex_dump(&encoded[0], elen)
+		fx_hex_dump(&encoded[0], elen)
 	}
 
 	// Clobber some bytes for testing.

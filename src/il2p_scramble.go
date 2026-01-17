@@ -55,7 +55,6 @@ func descramble_bit(in C.int, state *C.int) C.int {
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_scramble_block
 func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 	var tx_lfsr_state = INIT_TX_LFSR
 
@@ -118,7 +117,6 @@ func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_descramble_block
 func il2p_descramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 	var rx_lfsr_state = INIT_RX_LFSR
 

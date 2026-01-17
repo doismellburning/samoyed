@@ -153,7 +153,7 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.large_block_size))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.large_block_size))
 		encoded_length += ipp.large_block_size
-		C.il2p_encode_rs(&scram[0], ipp.large_block_size, ipp.parity_symbols_per_block, &parity[0])
+		il2p_encode_rs(&scram[0], ipp.large_block_size, ipp.parity_symbols_per_block, &parity[0])
 		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&parity[0]), C.size_t(ipp.parity_symbols_per_block))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.parity_symbols_per_block))
 		encoded_length += ipp.parity_symbols_per_block
@@ -168,7 +168,7 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.small_block_size))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.small_block_size))
 		encoded_length += ipp.small_block_size
-		C.il2p_encode_rs(&scram[0], ipp.small_block_size, ipp.parity_symbols_per_block, &parity[0])
+		il2p_encode_rs(&scram[0], ipp.small_block_size, ipp.parity_symbols_per_block, &parity[0])
 		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&parity[0]), C.size_t(ipp.parity_symbols_per_block))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.parity_symbols_per_block))
 		encoded_length += ipp.parity_symbols_per_block
@@ -223,7 +223,7 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 
 	for b := C.int(0); b < ipp.large_block_count; b++ {
 		var corrected_block [255]C.uchar
-		var e = C.il2p_decode_rs(pin, ipp.large_block_size, ipp.parity_symbols_per_block, &corrected_block[0])
+		var e = il2p_decode_rs(pin, ipp.large_block_size, ipp.parity_symbols_per_block, &corrected_block[0])
 
 		// dw_printf ("%s:%d: large block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -234,10 +234,10 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 
 		il2p_descramble_block(&corrected_block[0], pout, ipp.large_block_size)
 
-		if C.il2p_get_debug() >= 2 {
+		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled large payload block, %d bytes:\n", ipp.large_block_size)
-			C.fx_hex_dump(pout, ipp.large_block_size)
+			fx_hex_dump(pout, ipp.large_block_size)
 		}
 
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.large_block_size+ipp.parity_symbols_per_block))
@@ -249,7 +249,7 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 
 	for b := C.int(0); b < ipp.small_block_count; b++ {
 		var corrected_block [255]C.uchar
-		var e = C.il2p_decode_rs(pin, ipp.small_block_size, ipp.parity_symbols_per_block, &corrected_block[0])
+		var e = il2p_decode_rs(pin, ipp.small_block_size, ipp.parity_symbols_per_block, &corrected_block[0])
 
 		// dw_printf ("%s:%d: small block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -260,10 +260,10 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 
 		il2p_descramble_block(&corrected_block[0], pout, ipp.small_block_size)
 
-		if C.il2p_get_debug() >= 2 {
+		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled small payload block, %d bytes:\n", ipp.small_block_size)
-			C.fx_hex_dump(pout, ipp.small_block_size)
+			fx_hex_dump(pout, ipp.small_block_size)
 		}
 
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.small_block_size+ipp.parity_symbols_per_block))

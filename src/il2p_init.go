@@ -51,7 +51,6 @@ var g_il2p_debug = 0
  *
  *--------------------------------------------------------------*/
 
-//export il2p_init
 func il2p_init(il2p_debug C.int) {
 	g_il2p_debug = int(il2p_debug)
 
@@ -67,19 +66,16 @@ func il2p_init(il2p_debug C.int) {
 
 } // end il2p_init
 
-//export il2p_get_debug
 func il2p_get_debug() C.int {
 	return C.int(g_il2p_debug)
 }
 
-//export il2p_set_debug
 func il2p_set_debug(debug C.int) {
 	g_il2p_debug = int(debug)
 }
 
 // Find RS codec control block for specified number of parity symbols.
 
-//export il2p_find_rs
 func il2p_find_rs(nparity C.int) *C.struct_rs {
 	for n := 0; n < NTAB; n++ {
 		if Tab[n].nroots == C.uint(nparity) {
@@ -109,7 +105,6 @@ func il2p_find_rs(nparity C.int) *C.struct_rs {
  *
  *--------------------------------------------------------------*/
 
-//export il2p_encode_rs
 func il2p_encode_rs(tx_data *C.uchar, data_size C.int, num_parity C.int, parity_out *C.uchar) {
 	Assert(data_size >= 1)
 	Assert(num_parity == 2 || num_parity == 4 || num_parity == 6 || num_parity == 8 || num_parity == 16)
@@ -139,7 +134,6 @@ func il2p_encode_rs(tx_data *C.uchar, data_size C.int, num_parity C.int, parity_
  *
  *--------------------------------------------------------------*/
 
-//export il2p_decode_rs
 func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *C.uchar) C.int {
 
 	//  Use zero padding in front if data size is too small.
@@ -154,7 +148,7 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  ==============================\n")
 		dw_printf("%d filler zeros, %d data, %d parity\n", C.int(len(rs_block))-n, data_size, num_parity)
-		C.fx_hex_dump(&rs_block[0], C.int(len(rs_block)))
+		fx_hex_dump(&rs_block[0], C.int(len(rs_block)))
 	}
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
@@ -170,7 +164,7 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 			for j := C.int(0); j < derrors; j++ {
 				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
 			}
-			C.fx_hex_dump(&rs_block[0], C.int(len(rs_block)))
+			fx_hex_dump(&rs_block[0], C.int(len(rs_block)))
 		}
 	}
 

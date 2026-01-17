@@ -74,7 +74,6 @@ var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
  *
  ***********************************************************************************/
 
-//export il2p_rec_bit
 func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 
 	// Allocate context blocks only as needed.
@@ -132,10 +131,10 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 			}
 			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
 
-				if C.il2p_get_debug() >= 1 {
+				if il2p_get_debug() >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
-					C.fx_hex_dump(&F.shdr[0], IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)
+					fx_hex_dump(&F.shdr[0], IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)
 				}
 
 				// Fix any errors and descramble.
@@ -149,10 +148,10 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 
 					plprop, F.eplen = il2p_payload_compute(length, max_fec)
 
-					if C.il2p_get_debug() >= 1 {
+					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("IL2P header after correcting %d symbols and unscrambling [%d.%d.%d]:\n", F.corrected, channel, subchannel, slice)
-						C.fx_hex_dump(&F.uhdr[0], IL2P_HEADER_SIZE)
+						fx_hex_dump(&F.uhdr[0], IL2P_HEADER_SIZE)
 						dw_printf("Header type %d, max fec = %d\n", hdr_type, max_fec)
 						dw_printf("Need to collect %d encoded bytes for %d byte payload.\n", F.eplen, length)
 						dw_printf("%d small blocks of %d and %d large blocks of %d.  %d parity symbols per block\n",
@@ -168,7 +167,7 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 						F.state = IL2P_DECODE
 					} else { // Error.
 
-						if C.il2p_get_debug() >= 1 {
+						if il2p_get_debug() >= 1 {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("IL2P header INVALID.\n")
 						}
@@ -214,7 +213,7 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 		{
 			var pp = il2p_decode_header_payload(&F.uhdr[0], &F.spayload[0], &(F.corrected))
 
-			if C.il2p_get_debug() >= 1 {
+			if il2p_get_debug() >= 1 {
 				if pp != nil {
 					ax25_hex_dump(pp)
 				} else {
@@ -235,7 +234,7 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 			}
 		} // end block for local variables.
 
-		if C.il2p_get_debug() >= 1 {
+		if il2p_get_debug() >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("-----\n")
 		}
