@@ -27,7 +27,6 @@ package direwolf
 // #include <avahi-common/malloc.h>
 // #include <avahi-common/error.h>
 // #include "dns_sd_dw.h"
-// #include "dns_sd_common.h"
 // void entry_group_callback(AvahiEntryGroup *g, AvahiEntryGroupState state, AVAHI_GCC_UNUSED void *userdata);
 // void client_callback(AvahiClient *c, AvahiClientState state, AVAHI_GCC_UNUSED void * userdata);
 import "C"
