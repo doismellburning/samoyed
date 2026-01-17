@@ -74,7 +74,6 @@ package direwolf
 // #define RRBB_C 1
 // #include "fcs_calc.h"
 // #include "ax25_pad.h"
-// #include "rrbb.h"
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
 import "C"
@@ -219,11 +218,11 @@ func hdlc_rec2_init(p_audio_config *C.struct_audio_s) {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_block(block C.rrbb_t) {
-	var channel = C.rrbb_get_chan(block)
-	var subchan = C.rrbb_get_subchan(block)
-	var slice = C.rrbb_get_slice(block)
-	var alevel = C.rrbb_get_audio_level(block)
+func hdlc_rec2_block(block *rrbb_t) {
+	var channel = rrbb_get_chan(block)
+	var subchan = rrbb_get_subchan(block)
+	var slice = rrbb_get_slice(block)
+	var alevel = rrbb_get_audio_level(block)
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	var passall = save_audio_config_p.achan[channel].passall
 
@@ -256,7 +255,7 @@ func hdlc_rec2_block(block C.rrbb_t) {
 			  dw_printf ("Got it the first time.\n");
 		#endif
 		*/
-		C.rrbb_delete(block)
+		rrbb_delete(block)
 		return
 	}
 
@@ -265,7 +264,7 @@ func hdlc_rec2_block(block C.rrbb_t) {
 	 * See if we can "fix" it.
 	 */
 	if try_to_fix_quick_now(block, channel, subchan, slice, alevel) {
-		C.rrbb_delete(block)
+		rrbb_delete(block)
 		return
 	}
 
@@ -276,7 +275,7 @@ func hdlc_rec2_block(block C.rrbb_t) {
 		try_decode(block, channel, subchan, slice, alevel, retry_cfg, true)
 	}
 
-	C.rrbb_delete(block)
+	rrbb_delete(block)
 
 } /* end hdlc_rec2_block */
 
@@ -317,12 +316,12 @@ func hdlc_rec2_block(block C.rrbb_t) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t) bool {
+func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t) bool {
 
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	//int passall = save_audio_config_p.achan[channel].passall;
 
-	var length = C.rrbb_get_len(block)
+	var length = rrbb_get_len(block)
 	/* Prepare the retry configuration */
 
 	var retry_cfg = new(retry_conf_t)
@@ -427,7 +426,7 @@ func try_to_fix_quick_now(block C.rrbb_t, channel C.int, subchan C.int, slice C.
 		dw_printf ("*** Try flipping TWO SEPARATED BITS %d bits\n", len);
 	#endif
 	*/
-	length = C.rrbb_get_len(block)
+	length = rrbb_get_len(block)
 	for i := C.int(0); i < length-2; i++ {
 		retry_cfg.sep.bit_idx_a = i
 
@@ -456,7 +455,7 @@ func try_to_fix_quick_now(block C.rrbb_t, channel C.int, subchan C.int, slice C.
 
 // TODO:  Remove this.  but first figure out what to do in atest.c
 
-func hdlc_rec2_try_to_fix_later(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t) bool {
+func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t) bool {
 	//int len;
 	//retry_t fix_bits = save_audio_config_p.achan[channel].fix_bits;
 	var passall = save_audio_config_p.achan[channel].passall > 0
@@ -562,7 +561,7 @@ func is_sep_bit_modified(bit_idx C.int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t, retry_conf *retry_conf_t, passall bool) bool {
 	// FIXME KG int i;
 
 	/* TODO KG
@@ -576,10 +575,10 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 
 	var H2 hdlc_state2_s
 
-	H2.is_scrambled = C.rrbb_get_is_scrambled(block) > 0
-	H2.prev_descram = C.rrbb_get_prev_descram(block)
-	H2.lfsr = C.rrbb_get_descram_state(block)
-	H2.prev_raw = C.rrbb_get_bit(block, 0) > 0 /* Actually last bit of the */
+	H2.is_scrambled = rrbb_get_is_scrambled(block) > 0
+	H2.prev_descram = rrbb_get_prev_descram(block)
+	H2.lfsr = rrbb_get_descram_state(block)
+	H2.prev_raw = rrbb_get_bit(block, 0) > 0 /* Actually last bit of the */
 	/* opening flag so we can derive the */
 	/* first data bit.  */
 
@@ -598,7 +597,7 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 	H2.olen = 0
 	H2.frame_len = 0
 
-	var blen = C.rrbb_get_len(block)
+	var blen = rrbb_get_len(block)
 
 	/* TODO KG
 	#if DEBUGx
@@ -609,7 +608,7 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 	*/
 	for i := C.int(1); i < blen; i++ {
 		/* Get the value for the current bit */
-		var raw = C.rrbb_get_bit(block, i) > 0
+		var raw = rrbb_get_bit(block, i) > 0
 		/* If swap two sep mode , swap the bit if needed */
 		if retry_conf_retry == C.RETRY_INVERT_TWO_SEP {
 			if is_sep_bit_modified(i, retry_conf) {
@@ -771,8 +770,8 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
 
-			Assert(C.rrbb_get_chan(block) == channel)
-			Assert(C.rrbb_get_subchan(block) == subchan)
+			Assert(rrbb_get_chan(block) == channel)
+			Assert(rrbb_get_subchan(block) == subchan)
 			multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
 			return true                                                                                                           /* success */
 
