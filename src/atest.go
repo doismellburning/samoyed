@@ -53,7 +53,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "dlq.h"
 // #include "fx25.h"
-// #include "il2p.h"
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
 // void ptt_set_real (int ot, int chan, int ptt_signal);
@@ -429,7 +428,7 @@ o = DCD output control
 	}
 
 	C.fx25_init(d_x_opt)
-	C.il2p_init(d_2_opt)
+	il2p_init(d_2_opt)
 
 	var start_time = time.Now()
 	var total_filetime C.double

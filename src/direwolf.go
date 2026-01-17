@@ -34,7 +34,6 @@ package direwolf
 // #include "dwgps.h"
 // #include "ax25_link.h"
 // #include "fx25.h"
-// #include "il2p.h"
 // #include "dns_sd_dw.h"
 // #include "dlq.h"		// for fec_type_t definition.
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
@@ -603,7 +602,7 @@ x = Silence FX.25 information.`)
 	 */
 	multi_modem_init(audio_config)
 	C.fx25_init(C.int(d_x_opt))
-	C.il2p_init(C.int(d_2_opt))
+	il2p_init(C.int(d_2_opt))
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than

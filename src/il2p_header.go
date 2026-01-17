@@ -7,7 +7,6 @@ package direwolf
 // #include <ctype.h>
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
-// #include "il2p.h"
 import "C"
 
 import (
@@ -216,7 +215,6 @@ func decode_pid(pid C.int) C.int {
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_type_1_header
 func il2p_type_1_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	C.memset(unsafe.Pointer(hdr), 0, IL2P_HEADER_SIZE)
 
@@ -466,7 +464,6 @@ func trim(stuff *C.char) {
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_decode_header_type_1
 func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
 
 	if GET_HDR_TYPE(hdr) != 1 {
@@ -661,7 +658,6 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) C.packet_t {
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_type_0_header
 func il2p_type_0_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	C.memset(unsafe.Pointer(hdr), 0, IL2P_HEADER_SIZE)
 
@@ -696,7 +692,6 @@ func il2p_type_0_header(pp C.packet_t, max_fec C.int, hdr *C.uchar) C.int {
  *
  ***********************************************************************************/
 
-//export il2p_get_header_attributes
 func il2p_get_header_attributes(hdr *C.uchar, hdr_type *C.int, max_fec *C.int) C.int {
 	*hdr_type = GET_HDR_TYPE(hdr)
 	*max_fec = GET_FEC_LEVEL(hdr)
@@ -721,11 +716,10 @@ func il2p_get_header_attributes(hdr *C.uchar, hdr_type *C.int, max_fec *C.int) C
  *
  ***********************************************************************************/
 
-//export il2p_clarify_header
 func il2p_clarify_header(rec_hdr *C.uchar, corrected_descrambled_hdr *C.uchar) C.int {
 	var corrected [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar
 
-	var e = C.il2p_decode_rs(rec_hdr, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, &corrected[0])
+	var e = il2p_decode_rs(rec_hdr, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, &corrected[0])
 
 	il2p_descramble_block(&corrected[0], corrected_descrambled_hdr, IL2P_HEADER_SIZE)
 

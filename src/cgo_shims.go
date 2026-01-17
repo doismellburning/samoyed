@@ -9,7 +9,6 @@ package direwolf
 // #include "config.h"
 // #include "kiss_frame.h"
 // #include "ax25_link.h"
-// #include "il2p.h"
 // #include "fx25.h"
 // #include "fsk_demod_state.h"
 import "C"
@@ -151,13 +150,6 @@ const FEND = C.FEND
 const FESC = C.FESC
 const TFEND = C.TFEND
 const TFESC = C.TFESC
-
-const IL2P_HEADER_SIZE = C.IL2P_HEADER_SIZE
-const IL2P_HEADER_PARITY = C.IL2P_HEADER_PARITY
-const IL2P_MAX_PAYLOAD_SIZE = C.IL2P_MAX_PAYLOAD_SIZE
-const IL2P_MAX_PARITY_SYMBOLS = C.IL2P_MAX_PARITY_SYMBOLS
-const IL2P_MAX_ENCODED_PAYLOAD_SIZE = C.IL2P_MAX_ENCODED_PAYLOAD_SIZE
-const IL2P_SYNC_WORD = C.IL2P_SYNC_WORD
 
 const SSID_H_MASK = C.SSID_H_MASK
 const SSID_H_SHIFT = C.SSID_H_SHIFT
