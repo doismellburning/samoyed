@@ -75,13 +75,11 @@ package direwolf
 // #include <sys/types.h>
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
-// #include "kiss_frame.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
 import (
 	"os"
-	"unsafe"
 
 	"github.com/pkg/term"
 )
@@ -94,7 +92,7 @@ import (
  * Accumulated KISS frame and state of decoder.
  */
 
-var kf C.kiss_frame_t
+var kf *kiss_frame_t
 
 var serialport_fd *term.Term
 
@@ -126,6 +124,7 @@ func kissserial_set_debug(n int) {
 
 func kissserial_init(mc *C.struct_misc_config_s) {
 	g_misc_config_p = mc
+	kf = new(kiss_frame_t)
 
 	if C.strlen(&g_misc_config_p.kiss_serial_port[0]) > 0 {
 		if g_misc_config_p.kiss_serial_poll == 0 {
@@ -203,7 +202,7 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 
 	if flen < 0 {
 		if kissserial_debug > 0 {
-			kiss_debug_print(C.TO_CLIENT, "Fake command prompt", fbuf)
+			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 		}
 		kiss_buff = fbuf
 	} else {
@@ -230,7 +229,7 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 		/* This has KISS framing and escapes for sending to client app. */
 
 		if kissserial_debug > 0 {
-			kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
+			kiss_debug_print(TO_CLIENT, "", kiss_buff)
 		}
 	}
 
@@ -343,7 +342,7 @@ func kissserial_get() (byte, error) {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
 
-					C.memset(unsafe.Pointer(&kf), 0, C.sizeof_kiss_frame_t) // Start with clean state.
+					kf = new(kiss_frame_t) // Start with clean state.
 				} else { //nolint:staticcheck
 					// An error message was already displayed.
 				}
@@ -380,6 +379,6 @@ func kissserial_listen_thread() {
 		if err != nil {
 			return
 		} // Was pthread_exit
-		kiss_rec_byte(&kf, C.uchar(ch), C.int(kissserial_debug), nil, -1, kissserial_send_rec_packet)
+		kiss_rec_byte(kf, C.uchar(ch), C.int(kissserial_debug), nil, -1, kissserial_send_rec_packet)
 	}
 }

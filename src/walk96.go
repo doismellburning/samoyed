@@ -18,7 +18,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "latlong.h"
 // #include "dwgps.h"
-// #include "kiss_frame.h"
 import "C"
 
 import (

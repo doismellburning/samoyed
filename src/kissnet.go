@@ -158,7 +158,6 @@ same direwolf instance.
 // #include <stddef.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "kiss_frame.h"
 // #include "config.h"
 // void hex_dump (unsigned char *p, int len);	// This should be in a .h file.
 import "C"
@@ -232,7 +231,7 @@ func kissnet_init_one(kps *kissport_status_s) {
 
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
-		C.memset(unsafe.Pointer(&kps.kf[client]), 0, C.sizeof_kiss_frame_t)
+		kps.kf[client] = new(kiss_frame_t)
 	}
 
 	if kps.tcp_port == 0 {
@@ -342,7 +341,9 @@ func connect_listen_thread(kps *kissport_status_s) {
 			}
 
 			// Reset the state and buffer.
-			kps.kf = [len(kps.kf)]C.kiss_frame_t{}
+			for i := range len(kps.kf) {
+				kps.kf[i] = new(kiss_frame_t)
+			}
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
 		}
@@ -418,7 +419,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 
 							flen = C.int(len(fbuf))
 							if kiss_debug > 0 {
-								kiss_debug_print(C.TO_CLIENT, "Fake command prompt", fbuf)
+								kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 							}
 							kiss_buff = fbuf
 						} else {
@@ -455,7 +456,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 							/* This has the escapes and the surrounding FENDs. */
 
 							if kiss_debug > 0 {
-								kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
+								kiss_debug_print(TO_CLIENT, "", kiss_buff)
 							}
 						}
 
@@ -528,7 +529,7 @@ func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_
 							/* This has the escapes and the surrounding FENDs. */
 
 							if kiss_debug > 0 {
-								kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
+								kiss_debug_print(TO_CLIENT, "", kiss_buff)
 							}
 
 							var _, err = kps.client_sock[client].Write(kiss_buff)
@@ -625,7 +626,7 @@ func kissnet_listen_thread(kps *kissport_status_s, client C.int) {
 
 	for {
 		var ch = kiss_get(kps, int(client))
-		kiss_rec_byte(&(kps.kf[client]), C.uchar(ch), C.int(kiss_debug), kps, client, kissnet_send_rec_packet)
+		kiss_rec_byte(kps.kf[client], C.uchar(ch), C.int(kiss_debug), kps, client, kissnet_send_rec_packet)
 	}
 } /* end kissnet_listen_thread */
 

@@ -7,7 +7,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "dwgps.h"
 // #include "config.h"
-// #include "kiss_frame.h"
 // #include "fx25.h"
 // #include "fsk_demod_state.h"
 import "C"
@@ -91,11 +90,6 @@ const WPL_FORMAT_MAGELLAN = C.WPL_FORMAT_MAGELLAN
 const WPL_FORMAT_KENWOOD = C.WPL_FORMAT_KENWOOD
 const WPL_FORMAT_AIS = C.WPL_FORMAT_AIS
 
-const KS_SEARCHING = C.KS_SEARCHING
-const KS_COLLECTING = C.KS_COLLECTING
-
-const MAX_NOISE_LEN = C.MAX_NOISE_LEN
-
 const frame_type_I ax25_frame_type_t = C.frame_type_I
 const frame_type_S_RR ax25_frame_type_t = C.frame_type_S_RR
 const frame_type_S_RNR ax25_frame_type_t = C.frame_type_S_RNR
@@ -143,11 +137,6 @@ const MODEM_AIS = C.MODEM_AIS
 
 const RETRY_NONE = C.RETRY_NONE
 const RETRY_MAX = C.RETRY_MAX
-
-const FEND = C.FEND
-const FESC = C.FESC
-const TFEND = C.TFEND
-const TFESC = C.TFESC
 
 const SSID_H_MASK = C.SSID_H_MASK
 const SSID_H_SHIFT = C.SSID_H_SHIFT
@@ -262,16 +251,6 @@ func Assert(t bool) {
 		_, file, line, _ := runtime.Caller(1)
 		panic(fmt.Sprintf("Assertion failed at %s:%d", file, line))
 	}
-}
-
-type fromto_t = C.fromto_t
-
-const FROM_CLIENT fromto_t = C.FROM_CLIENT
-const TO_CLIENT fromto_t = C.TO_CLIENT
-
-var FROMTO_PREFIX = map[fromto_t]string{
-	FROM_CLIENT: "<<<",
-	TO_CLIENT:   ">>>",
 }
 
 func bool2Cint(t bool) C.int {

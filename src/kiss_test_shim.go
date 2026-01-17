@@ -8,7 +8,6 @@ package direwolf
 //#include <assert.h>
 //#include <string.h>
 //#include "ax25_pad.h"
-//#include "kiss_frame.h"
 //#include "version.h"
 import "C"
 
