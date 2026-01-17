@@ -16,7 +16,6 @@
 #include "audio.h"		/* for struct audio_s */
 #include "digipeater.h"		/* for struct digi_config_s */
 #include "cdigipeater.h"		/* for struct cdigi_config_s */
-#include "aprs_tt.h"		/* for struct tt_config_s */
 #include "igate.h"		/* for struct igate_config_s */
 
 /*

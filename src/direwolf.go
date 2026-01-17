@@ -27,7 +27,6 @@ package direwolf
 // #include "kiss_frame.h"
 // #include "digipeater.h"
 // #include "cdigipeater.h"
-// #include "aprs_tt.h"
 // #include "igate.h"
 // #include "dwgps.h"
 // #include "ax25_link.h"

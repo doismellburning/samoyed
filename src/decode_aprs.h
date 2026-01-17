@@ -17,7 +17,7 @@
 #endif 
 
 #ifndef APRSTT_LOC_DESC_LEN
-#include "aprs_tt.h"
+#define APRSTT_LOC_DESC_LEN 32
 #endif
 
 typedef struct decode_aprs_s {
