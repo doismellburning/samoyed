@@ -18,6 +18,16 @@ import (
  *
  *--------------------------------------------------------------------------------*/
 
+type il2p_payload_properties_t struct {
+	payload_byte_count       C.int // Total size, 0 thru 1023
+	payload_block_count      C.int
+	small_block_size         C.int
+	large_block_size         C.int
+	large_block_count        C.int
+	small_block_count        C.int
+	parity_symbols_per_block C.int // 2, 4, 6, 8, 16
+}
+
 /*--------------------------------------------------------------------------------
  *
  * Function:	il2p_payload_compute
@@ -36,15 +46,15 @@ import (
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_payload_compute
-func il2p_payload_compute(p *C.il2p_payload_properties_t, payload_size C.int, max_fec C.int) C.int {
-	C.memset(unsafe.Pointer(p), 0, C.sizeof_il2p_payload_properties_t)
+func il2p_payload_compute(payload_size C.int, max_fec C.int) (*il2p_payload_properties_t, C.int) {
+
+	var p = new(il2p_payload_properties_t)
 
 	if payload_size < 0 || payload_size > IL2P_MAX_PAYLOAD_SIZE {
-		return (-1)
+		return p, -1
 	}
 	if payload_size == 0 {
-		return (0)
+		return p, 0
 	}
 
 	if max_fec != 0 {
@@ -78,13 +88,13 @@ func il2p_payload_compute(p *C.il2p_payload_properties_t, payload_size C.int, ma
 			// Should not happen.  But just in case...
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("IL2P parity symbol per payload block error.  small_block_size = %d\n", p.small_block_size)
-			return (-1)
+			return p, -1
 		}
 	}
 
 	// Return the total size for the encoded format.
 
-	return (p.small_block_count*(p.small_block_size+p.parity_symbols_per_block) +
+	return p, (p.small_block_count*(p.small_block_size+p.parity_symbols_per_block) +
 		p.large_block_count*(p.large_block_size+p.parity_symbols_per_block))
 
 } // end il2p_payload_compute
@@ -113,7 +123,6 @@ func il2p_payload_compute(p *C.il2p_payload_properties_t, payload_size C.int, ma
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_encode_payload
 func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, enc *C.uchar) C.int {
 	if payload_size > IL2P_MAX_PAYLOAD_SIZE {
 		return (-1)
@@ -124,8 +133,7 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
 
 	// Determine number of blocks and sizes.
 
-	var ipp C.il2p_payload_properties_t
-	var e = il2p_payload_compute(&ipp, payload_size, max_fec)
+	var ipp, e = il2p_payload_compute(payload_size, max_fec)
 	if e <= 0 {
 		return (e)
 	}
@@ -198,12 +206,10 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
  *
  *--------------------------------------------------------------------------------*/
 
-//export il2p_decode_payload
 func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, payload_out *C.uchar, symbols_corrected *C.int) C.int {
 	// Determine number of blocks and sizes.
 
-	var ipp C.il2p_payload_properties_t
-	var e = il2p_payload_compute(&ipp, payload_size, max_fec)
+	var ipp, e = il2p_payload_compute(payload_size, max_fec)
 	if e <= 0 {
 		return (e)
 	}

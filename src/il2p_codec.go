@@ -74,7 +74,7 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 		var pinfo *C.uchar
 		var info_len = ax25_get_info(pp, &pinfo)
 
-		var k = C.il2p_encode_payload(pinfo, info_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
+		var k = il2p_encode_payload(pinfo, info_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
 		if k > 0 {
 			out_len += k
 			// Success. Info part was <= 1023 bytes.
@@ -99,7 +99,7 @@ func il2p_encode_frame(pp C.packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 			var frame_data_ptr = ax25_get_frame_data_ptr(pp)
 			var frame_len = ax25_get_frame_len(pp)
-			var k = C.il2p_encode_payload(frame_data_ptr, frame_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
+			var k = il2p_encode_payload(frame_data_ptr, frame_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
 			if k > 0 {
 				out_len += k
 				// Success. Entire AX.25 frame <= 1023 bytes.
@@ -167,7 +167,7 @@ func il2p_decode_frame(irec *C.uchar) C.packet_t {
 //export il2p_decode_header_payload
 func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_corrected *C.int) C.packet_t {
 	var hdr_type, max_fec C.int
-	var payload_len = C.il2p_get_header_attributes(uhdr, &hdr_type, &max_fec)
+	var payload_len = il2p_get_header_attributes(uhdr, &hdr_type, &max_fec)
 
 	if hdr_type == 1 {
 
@@ -183,7 +183,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 			// This is the AX.25 Information part.
 
 			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-			var e = C.il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
+			var e = il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
 
 			// It would be possible to have a good header but too many errors in the payload.
 
@@ -205,7 +205,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		// Header type 0.  The payload is the entire AX.25 frame.
 
 		var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-		var e = C.il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
+		var e = il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
 
 		if e <= 0 { // Payload was not received correctly.
 			return (nil)

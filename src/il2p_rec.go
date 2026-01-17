@@ -143,11 +143,11 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
-					var plprop C.il2p_payload_properties_t
+					var plprop *il2p_payload_properties_t
 					var hdr_type, max_fec C.int
 					var length = il2p_get_header_attributes(&F.uhdr[0], &hdr_type, &max_fec)
 
-					F.eplen = il2p_payload_compute(&plprop, length, max_fec)
+					plprop, F.eplen = il2p_payload_compute(length, max_fec)
 
 					if C.il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)

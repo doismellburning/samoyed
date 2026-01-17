@@ -166,11 +166,11 @@ func test_payload(t *testing.T) {
 	fmt.Println("Test payload functions...")
 
 	var e C.int
-	var ipp C.il2p_payload_properties_t
+	var ipp *il2p_payload_properties_t
 
 	// Examples in specification.
 
-	e = C.il2p_payload_compute(&ipp, 100, 0)
+	ipp, e = il2p_payload_compute(100, 0)
 	assert.Equal(t, C.int(100), ipp.small_block_size)
 	assert.Equal(t, C.int(101), ipp.large_block_size)
 	assert.Equal(t, C.int(0), ipp.large_block_count)
@@ -178,7 +178,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, C.int(4), ipp.parity_symbols_per_block)
 	assert.GreaterOrEqual(t, e, C.int(0))
 
-	e = C.il2p_payload_compute(&ipp, 236, 0)
+	ipp, e = il2p_payload_compute(236, 0)
 	assert.Equal(t, C.int(236), ipp.small_block_size)
 	assert.Equal(t, C.int(237), ipp.large_block_size)
 	assert.Equal(t, C.int(0), ipp.large_block_count)
@@ -186,7 +186,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, C.int(8), ipp.parity_symbols_per_block)
 	assert.GreaterOrEqual(t, e, C.int(0))
 
-	e = C.il2p_payload_compute(&ipp, 512, 0)
+	ipp, e = il2p_payload_compute(512, 0)
 	assert.Equal(t, C.int(170), ipp.small_block_size)
 	assert.Equal(t, C.int(171), ipp.large_block_size)
 	assert.Equal(t, C.int(2), ipp.large_block_count)
@@ -194,7 +194,7 @@ func test_payload(t *testing.T) {
 	assert.Equal(t, C.int(6), ipp.parity_symbols_per_block)
 	assert.GreaterOrEqual(t, e, C.int(0))
 
-	e = C.il2p_payload_compute(&ipp, 1023, 0)
+	ipp, e = il2p_payload_compute(1023, 0)
 	assert.Equal(t, C.int(204), ipp.small_block_size)
 	assert.Equal(t, C.int(205), ipp.large_block_size)
 	assert.Equal(t, C.int(3), ipp.large_block_count)
@@ -205,7 +205,7 @@ func test_payload(t *testing.T) {
 	// Now try all possible sizes for Baseline FEC Parity.
 
 	for n := C.int(1); n <= C.IL2P_MAX_PAYLOAD_SIZE; n++ {
-		e = C.il2p_payload_compute(&ipp, n, 0)
+		ipp, e = il2p_payload_compute(n, 0)
 		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
 		//		ipp.large_block_count, ipp.small_block_count);
@@ -230,7 +230,7 @@ func test_payload(t *testing.T) {
 	// All sizes for MAX FEC.
 
 	for n := C.int(1); n <= C.IL2P_MAX_PAYLOAD_SIZE; n++ {
-		e = C.il2p_payload_compute(&ipp, n, 1) // 1 for max fec.
+		ipp, e = il2p_payload_compute(n, 1) // 1 for max fec.
 		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
 		//		ipp.large_block_count, ipp.small_block_count);
@@ -261,7 +261,7 @@ func test_payload(t *testing.T) {
 		for payload_length := C.int(1); payload_length <= C.IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
 			var encoded [C.IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar
-			var k = C.il2p_encode_payload(&original_payload[0], payload_length, max_fec, &encoded[0])
+			var k = il2p_encode_payload(&original_payload[0], payload_length, max_fec, &encoded[0])
 
 			// dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
 			assert.True(t, k > payload_length && k <= C.IL2P_MAX_ENCODED_PAYLOAD_SIZE)
@@ -270,7 +270,7 @@ func test_payload(t *testing.T) {
 
 			var extracted [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
 			var symbols_corrected C.int = 0
-			var e = C.il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
+			var e = il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
 			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
 			assert.Equal(t, payload_length, e)
 

@@ -117,29 +117,4 @@ extern void il2p_scramble_block (unsigned char *in, unsigned char *out, int len)
 extern void il2p_descramble_block (unsigned char *in, unsigned char *out, int len);
 
 
-///////////////////////////////////////////////////////////////////////////////
-//
-// 	il2p_payload.c
-//
-///////////////////////////////////////////////////////////////////////////////
-
-
-typedef struct {
-	int payload_byte_count;		// Total size, 0 thru 1023
-	int payload_block_count;
-	int small_block_size;
-	int large_block_size;
-	int large_block_count;
-	int small_block_count;
-	int parity_symbols_per_block;	// 2, 4, 6, 8, 16
-} il2p_payload_properties_t;
-
-extern int il2p_payload_compute (il2p_payload_properties_t *p, int payload_size, int max_fec);
-
-extern int il2p_encode_payload (unsigned char *payload, int payload_size, int max_fec, unsigned char *enc);
-
-extern int il2p_decode_payload (unsigned char *received, int payload_size, int max_fec, unsigned char *payload_out, int *symbols_corrected);
-
-extern int il2p_get_header_attributes (unsigned char *hdr, int *hdr_type, int *max_fec);
-
 #endif
