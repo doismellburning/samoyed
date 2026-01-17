@@ -25,7 +25,6 @@ package direwolf
 // #include <assert.h>
 // #include "version.h"
 // #include "ax25_pad.h"
-// #include "aprs_tt.h"
 // #include "igate.h"
 // #include "latlong.h"
 // #include "kiss_frame.h"
@@ -396,7 +395,7 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 	if callsign == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("APRStt tone sequence did not include callsign / object name.\n")
-		return (C.TT_ERROR_NO_CALL)
+		return (TT_ERROR_NO_CALL)
 	}
 
 	/*
@@ -448,7 +447,7 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 
 		/* Update the symbol if not the default. */
 
-		if overlay != C.APRSTT_DEFAULT_SYMTAB || symbol != C.APRSTT_DEFAULT_SYMBOL {
+		if overlay != APRSTT_DEFAULT_SYMTAB || symbol != APRSTT_DEFAULT_SYMBOL {
 			tt_user[i].overlay = overlay
 			tt_user[i].symbol = symbol
 		}

@@ -36,7 +36,6 @@ package direwolf
 // #include <assert.h>
 // #include "version.h"
 // #include "ax25_pad.h"
-// #include "aprs_tt.h"
 // #include "latlong.h"
 // #include "dlq.h"
 // // geotranz
@@ -54,6 +53,36 @@ import (
 	"strings"
 	"unicode"
 )
+
+/* Error codes for sending responses to user. */
+
+const TT_ERROR_OK = 0              /* Success. */
+const TT_ERROR_D_MSG = 1           /* D was first char of field.  Not implemented yet. */
+const TT_ERROR_INTERNAL = 2        /* Internal error.  Shouldn't be here. */
+const TT_ERROR_MACRO_NOMATCH = 3   /* No definition for digit sequence. */
+const TT_ERROR_BAD_CHECKSUM = 4    /* Bad checksum on call. */
+const TT_ERROR_INVALID_CALL = 5    /* Invalid callsign. */
+const TT_ERROR_INVALID_OBJNAME = 6 /* Invalid object name. */
+const TT_ERROR_INVALID_SYMBOL = 7  /* Invalid symbol specification. */
+const TT_ERROR_INVALID_LOC = 8     /* Invalid location. */
+const TT_ERROR_NO_CALL = 9         /* No call or object name included. */
+const TT_ERROR_INVALID_MHEAD = 10  /* Invalid Maidenhead Locator. */
+const TT_ERROR_INVALID_SATSQ = 11  /* Satellite square must be 4 digits. */
+const TT_ERROR_SUFFIX_NO_CALL = 12 /* No known callsign for suffix. */
+const TT_ERROR_MAXP1 = 13          /* Number of items above.  i.e. Last number plus 1. */
+
+/*
+ * Configuration options for APRStt.
+ */
+
+const TT_MAX_XMITS = 10
+
+const TT_MTEXT_LEN = 64
+
+const APRSTT_LOC_DESC_LEN = 32 /* Need at least 26 */
+
+const APRSTT_DEFAULT_SYMTAB = '\\'
+const APRSTT_DEFAULT_SYMBOL = 'A'
 
 /*
  * For holding location format specifications from config file.
@@ -176,7 +205,7 @@ type tt_config_s struct {
 
 	num_xmits C.int /* Number of times to transmit object report. */
 
-	xmit_delay [C.TT_MAX_XMITS]C.int /* Delay between them. */
+	xmit_delay [TT_MAX_XMITS]C.int /* Delay between them. */
 	/* e.g.  3 seconds before first transmission then */
 	/* delays of 16, 32, seconds etc. in between repeats. */
 
@@ -192,9 +221,9 @@ type tt_config_s struct {
 	status [10]string /* Up to 9 status messages. e.g.  "/enroute" */
 	/* Position 0 means none and can't be changed. */
 
-	response [C.TT_ERROR_MAXP1]struct {
+	response [TT_ERROR_MAXP1]struct {
 		method [AX25_MAX_ADDR_LEN]C.char /* SPEECH or MORSE[-n] */
-		mtext  [C.TT_MTEXT_LEN]C.char    /* Message text. */
+		mtext  [TT_MTEXT_LEN]C.char      /* Message text. */
 	}
 
 	ttcmd [80]C.char /* Command to generate custom audible response. */
@@ -404,8 +433,8 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * The parse functions will fill these in.
 	 */
 	m_callsign = ""
-	m_symtab_or_overlay = C.APRSTT_DEFAULT_SYMTAB
-	m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
+	m_symtab_or_overlay = APRSTT_DEFAULT_SYMTAB
+	m_symbol_code = APRSTT_DEFAULT_SYMBOL
 	m_loc_text = ""
 	m_longitude = G_UNKNOWN
 	m_latitude = G_UNKNOWN
@@ -562,7 +591,7 @@ func parse_fields(msg string) int {
 		default:
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Field does not start with A, B, C, or digit: \"%s\"\n", e)
-			return (C.TT_ERROR_D_MSG)
+			return (TT_ERROR_D_MSG)
 		}
 	}
 
@@ -613,7 +642,7 @@ func expand_macro(e string) int {
 			/* Found match to a different type.  Really shouldn't be here. */
 			/* Print internal error message... */
 			dw_printf("expand_macro: type != TTLOC_MACRO\n")
-			return (C.TT_ERROR_INTERNAL)
+			return (TT_ERROR_INTERNAL)
 		}
 
 		/*
@@ -654,7 +683,7 @@ func expand_macro(e string) int {
 		/* Does not match any macro definitions. */
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tone sequence did not match any pattern\n")
-		return (C.TT_ERROR_MACRO_NOMATCH)
+		return (TT_ERROR_MACRO_NOMATCH)
 	}
 }
 
@@ -710,7 +739,7 @@ func checksum_not_ok(str string, length int, found rune) int {
 	if expected != found {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
-		return (C.TT_ERROR_BAD_CHECKSUM)
+		return (TT_ERROR_BAD_CHECKSUM)
 	}
 
 	return (0)
@@ -760,7 +789,7 @@ func parse_callsign(e string) int {
 
 			tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
 
-			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
 			if tt_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -768,7 +797,7 @@ func parse_callsign(e string) int {
 					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
 			}
 		} else {
-			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(e[length-2])
 			if tt_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -800,7 +829,7 @@ func parse_callsign(e string) int {
 			var stemp [30]C.char
 			tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
 
-			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
 
 			if tt_debug > 0 {
@@ -814,7 +843,7 @@ func parse_callsign(e string) int {
 			tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
 			m_callsign = C.GoString(&_m_callsign[0])
 
-			m_symbol_code = C.APRSTT_DEFAULT_SYMBOL
+			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(e[length-2])
 
 			if tt_debug > 0 {
@@ -828,7 +857,7 @@ func parse_callsign(e string) int {
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Touch tone callsign not valid: \"%s\"\n", e)
-	return (C.TT_ERROR_INVALID_CALL)
+	return (TT_ERROR_INVALID_CALL)
 }
 
 /*------------------------------------------------------------------
@@ -889,7 +918,7 @@ func parse_object_name(e string) int {
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Touch tone object name not valid: \"%s\"\n", e)
 
-	return (C.TT_ERROR_INVALID_OBJNAME)
+	return (TT_ERROR_INVALID_OBJNAME)
 } /* end parse_oject_name */
 
 /*------------------------------------------------------------------
@@ -988,7 +1017,7 @@ func parse_symbol(e string) int {
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Touch tone symbol not valid: \"%s\"\n", e)
 
-	return (C.TT_ERROR_INVALID_SYMBOL)
+	return (TT_ERROR_INVALID_SYMBOL)
 } /* end parse_oject_name */
 
 /*------------------------------------------------------------------
@@ -1030,7 +1059,7 @@ func parse_aprstt3_call(e string) int {
 		if tt_call10_to_text(C.CString(e[2:]), 1, &call[0]) == 0 {
 			m_callsign = C.GoString(&call[0])
 		} else {
-			return (C.TT_ERROR_INVALID_CALL) /* Could not convert to text */
+			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
 		}
 	} else if len(e) == 2+5 {
 		var suffix [8]C.char
@@ -1052,14 +1081,14 @@ func parse_aprstt3_call(e string) int {
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", _suffix)
-					return (C.TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
+					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
 				}
 			}
 		} else {
-			return (C.TT_ERROR_INVALID_CALL) /* Could not convert to text */
+			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
 		}
 	} else {
-		return (C.TT_ERROR_INVALID_CALL) /* Invalid length, not 2+ (10 ir 5) */
+		return (TT_ERROR_INVALID_CALL) /* Invalid length, not 2+ (10 ir 5) */
 	}
 
 	return (0)
@@ -1331,7 +1360,7 @@ func parse_location(e string) int {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
 					aprs_tt_config.ttloc_ptr[ipat].mhead.prefix, xstr)
-				return (C.TT_ERROR_INVALID_MHEAD)
+				return (TT_ERROR_INVALID_MHEAD)
 			}
 
 			// text_color_set(DW_COLOR_DEBUG);
@@ -1359,7 +1388,7 @@ func parse_location(e string) int {
 			if len(xstr) != 4 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected 4 digits for the Satellite Square.\n")
-				return (C.TT_ERROR_INVALID_SATSQ)
+				return (TT_ERROR_INVALID_SATSQ)
 			}
 
 			/* Convert 4 digits to usual AA99 form, then to location. */
@@ -1383,7 +1412,7 @@ func parse_location(e string) int {
 			if len(xstr) != 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected 1 digits for the position ambiguity.\n")
-				return (C.TT_ERROR_INVALID_LOC)
+				return (TT_ERROR_INVALID_LOC)
 			}
 
 			m_ambiguity, _ = strconv.Atoi(xstr)
@@ -1401,7 +1430,7 @@ func parse_location(e string) int {
 
 	/* Send reject sound. */
 
-	return (C.TT_ERROR_INVALID_LOC)
+	return (TT_ERROR_INVALID_LOC)
 } /* end parse_location */
 
 /*------------------------------------------------------------------

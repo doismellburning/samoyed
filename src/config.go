@@ -32,7 +32,6 @@ package direwolf
 // #include "digipeater.h"
 // #include "cdigipeater.h"
 // #include "config.h"
-// #include "aprs_tt.h"
 // #include "igate.h"
 // #include "latlong.h"
 // #include "ax25_link.h"
@@ -736,7 +735,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	p_tt_config.retain_time = 80 * 60
 	p_tt_config.num_xmits = 6
-	Assert(p_tt_config.num_xmits <= C.TT_MAX_XMITS)
+	Assert(p_tt_config.num_xmits <= TT_MAX_XMITS)
 	p_tt_config.xmit_delay[0] = 3 /* Before initial transmission. */
 	p_tt_config.xmit_delay[1] = 16
 	p_tt_config.xmit_delay[2] = 32
@@ -756,11 +755,11 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	p_tt_config.status[8] = "/emergency"
 	p_tt_config.status[9] = "/custom 1"
 
-	for m := 0; m < C.TT_ERROR_MAXP1; m++ {
+	for m := 0; m < TT_ERROR_MAXP1; m++ {
 		C.strcpy(&p_tt_config.response[m].method[0], C.CString("MORSE"))
 		C.strcpy(&p_tt_config.response[m].mtext[0], C.CString("?"))
 	}
-	C.strcpy(&p_tt_config.response[C.TT_ERROR_OK].mtext[0], C.CString("R"))
+	C.strcpy(&p_tt_config.response[TT_ERROR_OK].mtext[0], C.CString("R"))
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 
