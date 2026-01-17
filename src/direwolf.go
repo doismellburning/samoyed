@@ -32,7 +32,6 @@ package direwolf
 // #include "gen_tone.h"
 // #include "digipeater.h"
 // #include "cdigipeater.h"
-// #include "tq.h"
 // #include "ptt.h"
 // #include "aprs_tt.h"
 // #include "igate.h"

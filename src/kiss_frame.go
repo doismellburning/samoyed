@@ -67,7 +67,6 @@ package direwolf
 // #include <string.h>
 // #include "ax25_pad.h"
 // #include "kiss_frame.h"
-// #include "tq.h"
 // #include "version.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"

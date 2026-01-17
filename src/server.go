@@ -125,7 +125,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// #include "tq.h"
 // #include "ax25_pad.h"
 // #include "audio.h"
 // #include "dlq.h"

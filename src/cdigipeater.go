@@ -29,7 +29,6 @@ package direwolf
 // #include <unistd.h>
 // #include "ax25_pad.h"
 // #include "cdigipeater.h"
-// #include "tq.h"
 import "C"
 
 /*

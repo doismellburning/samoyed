@@ -9,7 +9,6 @@ package direwolf
 //#include <string.h>
 //#include "ax25_pad.h"
 //#include "kiss_frame.h"
-//#include "tq.h"
 //#include "version.h"
 import "C"
 
