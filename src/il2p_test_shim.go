@@ -204,7 +204,7 @@ func test_payload(t *testing.T) {
 
 	// Now try all possible sizes for Baseline FEC Parity.
 
-	for n := C.int(1); n <= C.IL2P_MAX_PAYLOAD_SIZE; n++ {
+	for n := C.int(1); n <= IL2P_MAX_PAYLOAD_SIZE; n++ {
 		ipp, e = il2p_payload_compute(n, 0)
 		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
@@ -213,7 +213,7 @@ func test_payload(t *testing.T) {
 
 		assert.GreaterOrEqual(t, e, C.int(0))
 		assert.GreaterOrEqual(t, ipp.payload_block_count, C.int(1))
-		assert.LessOrEqual(t, ipp.payload_block_count, C.int(C.IL2P_MAX_PAYLOAD_BLOCKS))
+		assert.LessOrEqual(t, ipp.payload_block_count, C.int(IL2P_MAX_PAYLOAD_BLOCKS))
 		assert.Equal(t, ipp.small_block_count+ipp.large_block_count, ipp.payload_block_count)
 		assert.Equal(t, n, ipp.small_block_count*ipp.small_block_size+ipp.large_block_count*ipp.large_block_size)
 		assert.True(t, ipp.parity_symbols_per_block == 2 ||
@@ -229,7 +229,7 @@ func test_payload(t *testing.T) {
 
 	// All sizes for MAX FEC.
 
-	for n := C.int(1); n <= C.IL2P_MAX_PAYLOAD_SIZE; n++ {
+	for n := C.int(1); n <= IL2P_MAX_PAYLOAD_SIZE; n++ {
 		ipp, e = il2p_payload_compute(n, 1) // 1 for max fec.
 		// dw_printf ("bytecount=%d, smallsize=%d, largesize=%d, largecount=%d, smallcount=%d\n", n,
 		//		ipp.small_block_size, ipp.large_block_size,
@@ -238,7 +238,7 @@ func test_payload(t *testing.T) {
 
 		assert.GreaterOrEqual(t, e, C.int(0))
 		assert.GreaterOrEqual(t, ipp.payload_block_count, C.int(1))
-		assert.LessOrEqual(t, ipp.payload_block_count, C.int(C.IL2P_MAX_PAYLOAD_BLOCKS))
+		assert.LessOrEqual(t, ipp.payload_block_count, C.int(IL2P_MAX_PAYLOAD_BLOCKS))
 		assert.Equal(t, ipp.small_block_count+ipp.large_block_count, ipp.payload_block_count)
 		assert.Equal(t, ipp.small_block_count*ipp.small_block_size+
 			ipp.large_block_count*ipp.large_block_size, n)
@@ -253,22 +253,22 @@ func test_payload(t *testing.T) {
 	// Now let's try encoding payloads and extracting original again.
 	// This will also provide exercise for scrambling and Reed Solomon under more conditions.
 
-	var original_payload [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
-	for n := C.int(0); n < C.IL2P_MAX_PAYLOAD_SIZE; n++ {
+	var original_payload [IL2P_MAX_PAYLOAD_SIZE]C.uchar
+	for n := C.int(0); n < IL2P_MAX_PAYLOAD_SIZE; n++ {
 		original_payload[n] = C.uchar(C.uint(n) & 0xff)
 	}
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
-		for payload_length := C.int(1); payload_length <= C.IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
+		for payload_length := C.int(1); payload_length <= IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
-			var encoded [C.IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar
+			var encoded [IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar
 			var k = il2p_encode_payload(&original_payload[0], payload_length, max_fec, &encoded[0])
 
 			// dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
-			assert.True(t, k > payload_length && k <= C.IL2P_MAX_ENCODED_PAYLOAD_SIZE)
+			assert.True(t, k > payload_length && k <= IL2P_MAX_ENCODED_PAYLOAD_SIZE)
 
 			// Now extract.
 
-			var extracted [C.IL2P_MAX_PAYLOAD_SIZE]C.uchar
+			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
 			var symbols_corrected C.int = 0
 			var e = il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
 			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
@@ -315,9 +315,9 @@ func test_example_headers(t *testing.T) {
 
 	var example1 []C.uchar = []C.uchar{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
 	var header1 []C.uchar = []C.uchar{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var header [C.IL2P_HEADER_SIZE]C.uchar
+	var header [IL2P_HEADER_SIZE]C.uchar
 	var sresult [32]C.uchar
-	C.memset(unsafe.Pointer(&header[0]), 0, C.IL2P_HEADER_SIZE)
+	C.memset(unsafe.Pointer(&header[0]), 0, IL2P_HEADER_SIZE)
 	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
 	var check [2]C.uchar
 	var alevel C.alevel_t
@@ -335,7 +335,7 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), C.IL2P_HEADER_SIZE))
+	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), IL2P_HEADER_SIZE))
 
 	il2p_scramble_block(&header[0], &sresult[0], 13)
 	// dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
@@ -538,7 +538,7 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var max_fec C.int = 0
-	var iout [C.IL2P_MAX_PACKET_SIZE]C.uchar
+	var iout [IL2P_MAX_PACKET_SIZE]C.uchar
 	e = il2p_encode_frame(pp, max_fec, &iout[0])
 
 	// dw_printf ("expected for example 3:\n");
@@ -565,7 +565,7 @@ func enc_dec_compare(t *testing.T, pp1 C.packet_t) {
 	t.Helper()
 
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
-		var encoded [C.IL2P_MAX_PACKET_SIZE]C.uchar
+		var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
 		var enc_len = il2p_encode_frame(pp1, max_fec, &encoded[0])
 		assert.GreaterOrEqual(t, enc_len, C.int(0))
 

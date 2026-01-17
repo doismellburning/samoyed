@@ -165,7 +165,7 @@ func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_
 
 	for j := C.int(0); j < nbytes; j++ {
 		if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_IL2P {
-			send_byte_msb_first(channel, C.IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
+			send_byte_msb_first(channel, IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
 		} else {
 			send_control_nrzi(channel, 0x7e)
 		}
