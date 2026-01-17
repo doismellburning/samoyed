@@ -23,7 +23,6 @@ package direwolf
 // #include <ctype.h>
 // #include <stddef.h>
 // #include "audio.h"		// configuration.
-// #include "kiss_frame.h"
 // #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN
 // #include "dlq.h"		// received packet queue
 // void hex_dump (unsigned char *p, int len);
@@ -158,7 +157,7 @@ func nettnc_listen_thread(channel C.int) {
 
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var kstate C.kiss_frame_t // State machine to gather a KISS frame.
+	var kstate kiss_frame_t // State machine to gather a KISS frame.
 
 	for {
 		/*
@@ -224,7 +223,7 @@ func nettnc_listen_thread(channel C.int) {
  *
  *-----------------------------------------------------------------*/
 
-func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override C.int) {
+func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C.int) {
 
 	//dw_printf ("my_kiss_rec_byte ( %c %02x ) \n", b, b);
 
@@ -233,7 +232,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 	/* Searching for starting FEND. */
 	default: // Includes KS_SEARCHING
 
-		if b == C.FEND {
+		if b == FEND {
 
 			/* Start of frame.  */
 
@@ -247,7 +246,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 
 	case KS_COLLECTING: /* Frame collection in progress. */
 
-		if b == C.FEND {
+		if b == FEND {
 
 			/* End of frame. */
 
@@ -257,7 +256,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 				kf.kiss_len++
 				return
 			}
-			if kf.kiss_len == 1 && kf.kiss_msg[0] == C.FEND {
+			if kf.kiss_len == 1 && kf.kiss_msg[0] == FEND {
 				/* Empty frame.  Just go on collecting. */
 				return
 			}
@@ -306,7 +305,7 @@ func my_kiss_rec_byte(kf *C.kiss_frame_t, b C.uchar, debug int, channel_override
 			return
 		}
 
-		if kf.kiss_len < C.MAX_KISS_LEN {
+		if kf.kiss_len < MAX_KISS_LEN {
 			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
 		} else {

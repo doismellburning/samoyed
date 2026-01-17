@@ -70,7 +70,6 @@ package direwolf
 // #include <sys/ioctl.h>
 // #include <errno.h>
 // #include "ax25_pad.h"
-// #include "kiss_frame.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -84,7 +83,7 @@ import (
  * Accumulated KISS frame and state of decoder.
  */
 
-var kisspt_kf C.kiss_frame_t
+var kisspt_kf *kiss_frame_t
 
 /*
  * These are for a Linux pseudo terminal.
@@ -128,6 +127,8 @@ func kisspt_init(mc *C.struct_misc_config_s) {
 	 * This reads messages from client.
 	 */
 	pt_master = nil
+
+	kisspt_kf = new(kiss_frame_t)
 
 	if mc.enable_kiss_pt > 0 {
 		kisspt_open_pt()
@@ -280,7 +281,7 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.i
 	var kiss_buff []byte
 	if flen < 0 {
 		if kisspt_debug > 0 {
-			kiss_debug_print(C.TO_CLIENT, "Fake command prompt", fbuf)
+			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 		}
 		kiss_buff = fbuf
 	} else {
@@ -308,7 +309,7 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.i
 		/* This has KISS framing and escapes for sending to client app. */
 
 		if kisspt_debug > 0 {
-			kiss_debug_print(C.TO_CLIENT, "", kiss_buff)
+			kiss_debug_print(TO_CLIENT, "", kiss_buff)
 		}
 	}
 
@@ -445,6 +446,6 @@ func kisspt_listen_thread() {
 
 	for {
 		var ch = kisspt_get()
-		kiss_rec_byte(&kisspt_kf, C.uchar(ch), C.int(kisspt_debug), nil, -1, kisspt_send_rec_packet)
+		kiss_rec_byte(kisspt_kf, C.uchar(ch), C.int(kisspt_debug), nil, -1, kisspt_send_rec_packet)
 	}
 }

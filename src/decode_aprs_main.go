@@ -64,7 +64,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "latlong.h"
 // #include "decode_aprs.h"
-// #include "kiss_frame.h"
 // void hex_dump (unsigned char *p, int len);
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -O0
 import "C"
@@ -136,13 +135,13 @@ func DecodeAPRSLine(line string) {
 
 		// If we have 0xC0 at start, remove it and expect same at end.
 
-		if bytes[0] == C.FEND {
+		if bytes[0] == FEND {
 			if len(bytes) < 2 || bytes[1] != 0 {
 				fmt.Printf("Was expecting to find 00 after the initial C0.\n")
 				return
 			}
 
-			if bytes[len(bytes)-1] == C.FEND {
+			if bytes[len(bytes)-1] == FEND {
 				fmt.Printf("Removing KISS FEND characters at beginning and end.\n")
 				bytes = bytes[1 : len(bytes)-1]
 			} else {
@@ -161,7 +160,7 @@ func DecodeAPRSLine(line string) {
 			// Put FEND at end to keep kiss_unwrap happy.
 			// Having one at the beginning is optional.
 
-			kiss_frame = append(kiss_frame, C.FEND)
+			kiss_frame = append(kiss_frame, FEND)
 
 			// In the more general case, we would need to include
 			// the command byte because it could be escaped.

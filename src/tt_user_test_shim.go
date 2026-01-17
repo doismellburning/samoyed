@@ -20,7 +20,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "igate.h"
 // #include "latlong.h"
-// #include "kiss_frame.h"
 // extern int TT_TESTS_RUNNING;
 import "C"
 

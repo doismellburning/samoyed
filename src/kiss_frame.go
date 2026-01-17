@@ -66,8 +66,8 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "ax25_pad.h"
-// #include "kiss_frame.h"
 // #include "version.h"
+// #include "audio.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -78,6 +78,63 @@ import (
 	"strings"
 	"unsafe"
 )
+
+const KISS_CMD_DATA_FRAME = 0
+const KISS_CMD_TXDELAY = 1
+const KISS_CMD_PERSISTENCE = 2
+const KISS_CMD_SLOTTIME = 3
+const KISS_CMD_TXTAIL = 4
+const KISS_CMD_FULLDUPLEX = 5
+const KISS_CMD_SET_HARDWARE = 6
+const XKISS_CMD_DATA = 12 // Not supported. http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf
+const XKISS_CMD_POLL = 14 // Not supported.
+const KISS_CMD_END_KISS = 15
+
+/*
+ * Special characters used by SLIP protocol.
+ */
+
+const FEND = 0xC0
+const FESC = 0xDB
+const TFEND = 0xDC
+const TFESC = 0xDD
+
+type kiss_state_e int
+
+const (
+	KS_SEARCHING  kiss_state_e = 0 /* Looking for FEND to start KISS frame. Must be 0 so we can simply zero whole structure to initialize. */
+	KS_COLLECTING kiss_state_e = 1 /* In process of collecting KISS frame. */
+)
+
+const MAX_KISS_LEN = 2048 /* Spec calls for at least 1024. */
+/* Might want to make it longer to accommodate */
+/* maximum packet length. */
+
+const MAX_NOISE_LEN = 100
+
+type kiss_frame_t struct {
+	state kiss_state_e
+
+	kiss_msg [MAX_KISS_LEN]C.uchar
+	/* Leading FEND is optional. */
+	/* Contains escapes and ending FEND. */
+	kiss_len C.int
+
+	noise     [MAX_NOISE_LEN]C.uchar
+	noise_len C.int
+}
+
+type fromto_t int
+
+const (
+	FROM_CLIENT fromto_t = 0
+	TO_CLIENT   fromto_t = 1
+)
+
+var FROMTO_PREFIX = map[fromto_t]string{
+	FROM_CLIENT: "<<<",
+	TO_CLIENT:   ">>>",
+}
 
 // This is used only for TCPKISS but it put in kissnet.h,
 // there would be a circular dependency between the two header files.
@@ -96,7 +153,7 @@ type kissport_status_s struct {
 
 	client_sock [MAX_NET_CLIENTS]net.Conn
 
-	kf [MAX_NET_CLIENTS]C.kiss_frame_t
+	kf [MAX_NET_CLIENTS]*kiss_frame_t
 	/* Accumulated KISS frame and state of decoder. */
 }
 
@@ -262,7 +319,7 @@ func kiss_unwrap(in []byte) []byte {
  *
  *--------------------------------------------------------------------*/
 
-func kiss_debug_print(fromto C.fromto_t, special string, pmsg []byte) {
+func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 	var direction = []string{"from", "to"}
 	var prefix = []string{"<<<", ">>>"}
 	var function = []string{
@@ -344,7 +401,7 @@ func kiss_debug_print(fromto C.fromto_t, special string, pmsg []byte) {
 
 type kiss_sendfun func(C.int, C.int, []byte, C.int, *kissport_status_s, C.int)
 
-func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
+func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 	kps *kissport_status_s, client C.int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
@@ -352,7 +409,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 	switch kf.state {
 	case KS_SEARCHING: /* Searching for starting FEND. */
 		// TODO KG Also default: ?
-		if ch == C.FEND {
+		if ch == FEND {
 			/* Start of frame.  But first print any collected noise for debugging. */
 
 			if kf.noise_len > 0 {
@@ -393,7 +450,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 		return
 
 	case KS_COLLECTING: /* Frame collection in progress. */
-		if ch == C.FEND {
+		if ch == FEND {
 			/* End of frame. */
 
 			if kf.kiss_len == 0 {
@@ -402,7 +459,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 				kf.kiss_len++
 				return
 			}
-			if kf.kiss_len == 1 && kf.kiss_msg[0] == C.FEND {
+			if kf.kiss_len == 1 && kf.kiss_msg[0] == FEND {
 				/* Empty frame.  Just go on collecting. */
 				return
 			}
@@ -433,7 +490,7 @@ func kiss_rec_byte(kf *C.kiss_frame_t, ch C.uchar, debug C.int,
 			return
 		}
 
-		if kf.kiss_len < C.MAX_KISS_LEN {
+		if kf.kiss_len < MAX_KISS_LEN {
 			kf.kiss_msg[kf.kiss_len] = ch
 			kf.kiss_len++
 		} else {
@@ -496,7 +553,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 	var cmd = kiss_msg_bytes[0] & 0xf
 
 	switch cmd {
-	case C.KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
+	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
 
 		// kissnet_copy clobbers first byte but we don't care
 		// because we have already determined channel and command.
@@ -589,7 +646,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			}
 		}
 
-	case C.KISS_CMD_TXDELAY: /* 1 = TXDELAY */
+	case KISS_CMD_TXDELAY: /* 1 = TXDELAY */
 
 		if kiss_len < 2 {
 			text_color_set(DW_COLOR_ERROR)
@@ -606,7 +663,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		}
 		xmit_set_txdelay(channel, C.int(kiss_msg_bytes[1]))
 
-	case C.KISS_CMD_PERSISTENCE: /* 2 = Persistence */
+	case KISS_CMD_PERSISTENCE: /* 2 = Persistence */
 
 		if kiss_len < 2 {
 			text_color_set(DW_COLOR_ERROR)
@@ -623,7 +680,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		}
 		xmit_set_persist(channel, C.int(kiss_msg_bytes[1]))
 
-	case C.KISS_CMD_SLOTTIME: /* 3 = SlotTime */
+	case KISS_CMD_SLOTTIME: /* 3 = SlotTime */
 
 		if kiss_len < 2 {
 			text_color_set(DW_COLOR_ERROR)
@@ -640,7 +697,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		}
 		xmit_set_slottime(channel, C.int(kiss_msg_bytes[1]))
 
-	case C.KISS_CMD_TXTAIL: /* 4 = TXtail */
+	case KISS_CMD_TXTAIL: /* 4 = TXtail */
 		if kiss_len < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for TXTAIL command.\n")
@@ -659,7 +716,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 
 		xmit_set_txtail(channel, C.int(kiss_msg_bytes[1]))
 
-	case C.KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
+	case KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
 		if kiss_len < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for FULLDUPLEX command.\n")
@@ -669,7 +726,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		dw_printf("KISS protocol set FullDuplex = %d, channel %d\n", kiss_msg_bytes[1], channel)
 		xmit_set_fulldup(channel, C.int(kiss_msg_bytes[1]))
 
-	case C.KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
+	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 
 		if kiss_len < 2 {
 			text_color_set(DW_COLOR_ERROR)
@@ -680,7 +737,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg_bytes[1:], channel)
 		kiss_set_hardware(channel, kiss_msg_bytes[1:], debug, kps, client, sendfun)
 
-	case C.KISS_CMD_END_KISS: /* 15 = End KISS mode, channel should be 15. */
+	case KISS_CMD_END_KISS: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol end KISS mode - Ignored.\n")
@@ -695,7 +752,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		dw_printf("Use \"-d kn\" option on direwolf command line to observe\n")
 		dw_printf("all communication with the client application.\n")
 
-		if cmd == C.XKISS_CMD_DATA || cmd == C.XKISS_CMD_POLL {
+		if cmd == XKISS_CMD_DATA || cmd == XKISS_CMD_POLL {
 			dw_printf("\n")
 			dw_printf("It looks like you are trying to use the \"XKISS\" protocol which is not supported.\n")
 			dw_printf("Change your application settings to use standard \"KISS\" rather than some other variant.\n")
@@ -803,7 +860,7 @@ func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", C.MAJOR_VERSION, C.MINOR_VERSION)
-			sendfun(channel, C.KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
+			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -812,7 +869,7 @@ func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport
 
 			var n = tq_count(channel, -1, C.CString(""), C.CString(""), 1)
 			var response = fmt.Sprintf("TXBUF:%d", n)
-			sendfun(channel, C.KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
+			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS Set Hardware unrecognized command: %s.\n", cmd)

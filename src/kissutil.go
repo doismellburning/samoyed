@@ -31,7 +31,6 @@ package direwolf
 // #include <dirent.h>
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
-// #include "kiss_frame.h"
 // #include "audio.h"		// for DEFAULT_TXDELAY, etc.
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
@@ -307,7 +306,7 @@ func process_input(stuff string) {
 		var pp = ax25_from_text(C.CString(stuff), 1)
 		if pp != nil {
 			ax25_pack(pp, &frame_data[0])
-			send_to_kiss_tnc(channel, C.KISS_CMD_DATA_FRAME, []byte(C.GoString((*C.char)(unsafe.Pointer(&frame_data[0])))))
+			send_to_kiss_tnc(channel, KISS_CMD_DATA_FRAME, []byte(C.GoString((*C.char)(unsafe.Pointer(&frame_data[0])))))
 			ax25_delete(pp)
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
@@ -316,22 +315,22 @@ func process_input(stuff string) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
 			var value = parse_number(stuff[1:], C.DEFAULT_TXDELAY)
-			send_to_kiss_tnc(channel, C.KISS_CMD_TXDELAY, []byte{byte(value)})
+			send_to_kiss_tnc(channel, KISS_CMD_TXDELAY, []byte{byte(value)})
 		case 'p': // Persistence
 			var value = parse_number(stuff[1:], C.DEFAULT_PERSIST)
-			send_to_kiss_tnc(channel, C.KISS_CMD_PERSISTENCE, []byte{byte(value)})
+			send_to_kiss_tnc(channel, KISS_CMD_PERSISTENCE, []byte{byte(value)})
 		case 's': // Slot time, 10ms units
 			var value = parse_number(stuff[1:], C.DEFAULT_SLOTTIME)
-			send_to_kiss_tnc(channel, C.KISS_CMD_SLOTTIME, []byte{byte(value)})
+			send_to_kiss_tnc(channel, KISS_CMD_SLOTTIME, []byte{byte(value)})
 		case 't': // txTail, 10ms units
 			var value = parse_number(stuff[1:], C.DEFAULT_TXTAIL)
-			send_to_kiss_tnc(channel, C.KISS_CMD_TXTAIL, []byte{byte(value)})
+			send_to_kiss_tnc(channel, KISS_CMD_TXTAIL, []byte{byte(value)})
 		case 'f': // Full duplex
 			var value = parse_number(stuff[1:], 0)
-			send_to_kiss_tnc(channel, C.KISS_CMD_FULLDUPLEX, []byte{byte(value)})
+			send_to_kiss_tnc(channel, KISS_CMD_FULLDUPLEX, []byte{byte(value)})
 		case 'h': // set Hardware
 			var p = strings.TrimSpace(stuff[1:])
-			send_to_kiss_tnc(channel, C.KISS_CMD_SET_HARDWARE, []byte(p))
+			send_to_kiss_tnc(channel, KISS_CMD_SET_HARDWARE, []byte(p))
 		default:
 			fmt.Printf("Invalid command. Must be one of d p s t f h.\n")
 			usage2()
@@ -428,7 +427,7 @@ func tnc_listen_net() {
 	/*
 	 * Print what we get from TNC.
 	 */
-	var kstate C.kiss_frame_t
+	var kstate kiss_frame_t
 	for {
 		var data = make([]byte, 4096)
 		var length, err = server_sock.Read(data)
@@ -486,7 +485,7 @@ func tnc_listen_serial() {
 	/*
 	 * Read and print.
 	 */
-	var kstate C.kiss_frame_t
+	var kstate kiss_frame_t
 	for {
 		var ch, err = serial_port_get1(serial_fd)
 
@@ -532,7 +531,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
-	case C.KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
+	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
 		var pp = ax25_from_frame(&kiss_msg[1], kiss_len-1, alevel)
 		if pp == nil {
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
@@ -585,7 +584,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 			ax25_delete(pp)
 		}
 
-	case C.KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
+	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 		// Display as "h ..." for in/out symmetry.
 		// Use safe print here?
 		fmt.Printf("[%d] h %s\n", channel, C.GoString((*C.char)(unsafe.Pointer(&kiss_msg[1]))))
