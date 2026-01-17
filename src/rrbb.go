@@ -191,7 +191,10 @@ func rrbb_get_len(b rrbb_t) C.int {
  *
  ***********************************************************************************/
 
-/* Definition in header file so it can be inlined. */
+//export rrbb_get_bit
+func rrbb_get_bit(b rrbb_t, ind C.int) C.uchar {
+	return b.fdata[ind]
+}
 
 /***********************************************************************************
  *

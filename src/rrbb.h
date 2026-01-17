@@ -61,12 +61,6 @@ static inline /*__attribute__((always_inline))*/ void rrbb_append_bit (rrbb_t b,
 	b->len++;
 }
 
-static inline /*__attribute__((always_inline))*/ unsigned char rrbb_get_bit (const rrbb_t b, const int ind)
-{
-	return (b->fdata[ind]);
-}
-
-
 void rrbb_chop8 (rrbb_t b);
 
 int rrbb_get_len (rrbb_t b);
@@ -92,5 +86,6 @@ int rrbb_get_is_scrambled (rrbb_t b);
 int rrbb_get_descram_state (rrbb_t b);
 int rrbb_get_prev_descram (rrbb_t b);
 
+unsigned char rrbb_get_bit (rrbb_t b, int ind);
 
 #endif
