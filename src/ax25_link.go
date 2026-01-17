@@ -157,7 +157,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "ax25_pad2.h"
 // #include "dlq.h"
-// #include "ax25_link.h"
 import "C"
 
 import (
@@ -165,6 +164,28 @@ import (
 	"time"
 	"unsafe"
 )
+
+// Limits and defaults for parameters.
+
+const AX25_N1_PACLEN_MIN = 1                 // Max bytes in Information part of frame.
+const AX25_N1_PACLEN_DEFAULT = 256           // some v2.0 implementations have 128
+const AX25_N1_PACLEN_MAX = AX25_MAX_INFO_LEN // from ax25_pad.h
+
+const AX25_N2_RETRY_MIN = 1 // Number of times to retry before giving up.
+const AX25_N2_RETRY_DEFAULT = 10
+const AX25_N2_RETRY_MAX = 15
+
+const AX25_T1V_FRACK_MIN = 1     // Number of seconds to wait before retrying.
+const AX25_T1V_FRACK_DEFAULT = 3 // KPC-3+ has 4.  TM-D710A has 3.
+const AX25_T1V_FRACK_MAX = 15
+
+const AX25_K_MAXFRAME_BASIC_MIN = 1 // Window size - number of I frames to send before waiting for ack.
+const AX25_K_MAXFRAME_BASIC_DEFAULT = 4
+const AX25_K_MAXFRAME_BASIC_MAX = 7
+
+const AX25_K_MAXFRAME_EXTENDED_MIN = 1
+const AX25_K_MAXFRAME_EXTENDED_DEFAULT = 32
+const AX25_K_MAXFRAME_EXTENDED_MAX = 63 // In theory 127 but I'm restricting as explained in SREJ handling.
 
 // Debug switches for different types of information.
 // Should have command line options instead of changing source and recompiling.
@@ -6226,9 +6247,9 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 		}
 	} else {
 		if param.modulo == 128 {
-			param.window_size_rx = min(param.window_size_rx, C.AX25_K_MAXFRAME_EXTENDED_MAX)
+			param.window_size_rx = min(param.window_size_rx, AX25_K_MAXFRAME_EXTENDED_MAX)
 		} else {
-			param.window_size_rx = min(param.window_size_rx, C.AX25_K_MAXFRAME_BASIC_MAX)
+			param.window_size_rx = min(param.window_size_rx, AX25_K_MAXFRAME_BASIC_MAX)
 		}
 	}
 
