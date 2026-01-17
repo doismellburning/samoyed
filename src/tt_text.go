@@ -21,7 +21,6 @@ package direwolf
 // #include <string.h>
 // #include <ctype.h>
 // #include <stdarg.h>
-// #include "tt_text.h"
 // typedef const char const_char;
 import "C"
 
@@ -30,6 +29,14 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+)
+
+type tt_enc_t int
+
+const (
+	TT_EITHER tt_enc_t = iota
+	TT_MULTIPRESS
+	TT_TWO_KEY
 )
 
 /*
@@ -168,7 +175,6 @@ var grid = [10][10]string{
  *
  *----------------------------------------------------------------*/
 
-//export tt_text_to_multipress
 func tt_text_to_multipress(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
 
 	var text = C.GoString(_text)
@@ -264,7 +270,6 @@ func tt_text_to_multipress(_text *C.const_char, _quiet C.int, _buttons *C.char) 
  *
  *----------------------------------------------------------------*/
 
-//export tt_text_to_two_key
 func tt_text_to_two_key(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
 
 	var text = C.GoString(_text)
@@ -403,7 +408,6 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, C.int) {
  *
  *----------------------------------------------------------------*/
 
-//export tt_text_to_call10
 func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
 
 	var text = C.GoString(_text)
@@ -504,7 +508,6 @@ func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.in
  *
  *----------------------------------------------------------------*/
 
-//export tt_text_to_satsq
 func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, buttonsize C.size_t) C.int {
 
 	var text = C.GoString(_text)
@@ -617,7 +620,6 @@ func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
  *
  *----------------------------------------------------------------*/
 
-//export tt_text_to_ascii2d
 func tt_text_to_ascii2d(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
 
 	var text = C.GoString(_text)
@@ -662,7 +664,6 @@ func tt_text_to_ascii2d(_text *C.const_char, _quiet C.int, _buttons *C.char) C.i
  *
  *----------------------------------------------------------------*/
 
-//export tt_multipress_to_text
 func tt_multipress_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -755,7 +756,6 @@ func tt_multipress_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) 
  *
  *----------------------------------------------------------------*/
 
-//export tt_two_key_to_text
 func tt_two_key_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -844,7 +844,6 @@ func tt_two_key_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.i
  *
  *----------------------------------------------------------------*/
 
-//export tt_two_digits_to_letter
 func tt_two_digits_to_letter(_buttons *C.const_char, _quiet C.int, _text *C.char, textsiz C.size_t) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -915,7 +914,6 @@ func tt_two_digits_to_letter(_buttons *C.const_char, _quiet C.int, _text *C.char
  *
  *----------------------------------------------------------------*/
 
-//export tt_call10_to_text
 func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -1003,7 +1001,6 @@ func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.in
  *
  *----------------------------------------------------------------*/
 
-//export tt_call5_suffix_to_text
 func tt_call5_suffix_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -1111,7 +1108,6 @@ var mhpair = [MAXMHPAIRS]mhpairType{
 	{"sixth", '0', '9'},
 }
 
-//export tt_mhead_to_text
 func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, textsiz C.size_t) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -1201,7 +1197,6 @@ func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, texts
  *
  *----------------------------------------------------------------*/
 
-//export tt_text_to_mhead
 func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, buttonsize C.size_t) C.int {
 
 	var text = C.GoString(_text)
@@ -1292,7 +1287,6 @@ func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
  *
  *----------------------------------------------------------------*/
 
-//export tt_satsq_to_text
 func tt_satsq_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -1353,7 +1347,6 @@ func tt_satsq_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int
  *
  *----------------------------------------------------------------*/
 
-//export tt_ascii2d_to_text
 func tt_ascii2d_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
 
 	var buttons = C.GoString(_buttons)
@@ -1405,8 +1398,7 @@ func tt_ascii2d_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.i
  *
  *----------------------------------------------------------------*/
 
-//export tt_guess_type
-func tt_guess_type(_buttons *C.char) C.tt_enc_t {
+func tt_guess_type(_buttons *C.char) tt_enc_t {
 
 	var buttons = C.GoString(_buttons)
 
@@ -1415,7 +1407,7 @@ func tt_guess_type(_buttons *C.char) C.tt_enc_t {
 	/* If it contains B, C, or D, it can't be multipress. */
 
 	if strings.ContainsAny(buttons, "BCDbcd") {
-		return (C.TT_TWO_KEY)
+		return (TT_TWO_KEY)
 	}
 
 	/* Try parsing quietly and see if one gets errors and the other doesn't. */
@@ -1424,15 +1416,13 @@ func tt_guess_type(_buttons *C.char) C.tt_enc_t {
 	var err_tk = tt_two_key_to_text(_buttons, 1, &text[0])
 
 	if err_mp == 0 && err_tk > 0 {
-		return (C.TT_MULTIPRESS)
+		return (TT_MULTIPRESS)
 	} else if err_tk == 0 && err_mp > 0 {
-		return (C.TT_TWO_KEY)
+		return (TT_TWO_KEY)
 	}
 
 	/* Could be either one. */
 
-	return (C.TT_EITHER)
+	return (TT_EITHER)
 
 } /* end tt_guess_type */
-
-/* end tt_text.c */

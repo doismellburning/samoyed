@@ -14,7 +14,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "hdlc_rec2.h"		/* for process_rec_frame */
 // #include "aprs_tt.h"
-// #include "tt_text.h"
 // #include "symbols.h"
 // #include "latlong.h"
 // #include "dlq.h"

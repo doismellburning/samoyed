@@ -19,7 +19,6 @@ package direwolf
 // #include "version.h"
 // #include "ax25_pad.h"
 // #include "aprs_tt.h"
-// #include "tt_text.h"
 // #include "tq.h"
 // #include "igate.h"
 // #include "latlong.h"

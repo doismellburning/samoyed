@@ -13,7 +13,6 @@ package direwolf
 // #include <string.h>
 // #include <ctype.h>
 // #include "symbols.h"
-// #include "tt_text.h"
 import "C"
 
 import (
@@ -891,7 +890,7 @@ func symbols_to_tones(symtab C.char, symbol C.char, tones *C.char, tonessiz C.si
 		text[0] = symtab
 		text[1] = 0
 
-		C.tt_text_to_two_key(&text[0], 0, &tt[0])
+		tt_text_to_two_key(&text[0], 0, &tt[0])
 
 		C.strncpy(tones, C.CString(fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))), tonessiz)
 	} else {
