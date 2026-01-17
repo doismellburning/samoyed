@@ -69,7 +69,6 @@ package direwolf
 // #include <stdio.h>
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "demod.h"
 // #include "dlq.h"
 // #include "fx25.h"
 // #include "version.h"

@@ -22,7 +22,6 @@ package direwolf
 // #include "version.h"
 // #include "audio.h"
 // #include "config.h"
-// #include "demod.h"
 // #include "ax25_pad.h"
 // #include "decode_aprs.h"
 // #include "kiss_frame.h"

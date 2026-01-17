@@ -5,7 +5,7 @@ package direwolf
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "demod.h"
+// #include "ax25_pad.h"
 import "C"
 
 import (

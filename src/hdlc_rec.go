@@ -10,9 +10,9 @@ package direwolf
 // #include <stdio.h>
 // #include <string.h>
 // #include <stdint.h>          // uint64_t
-// #include "demod.h"
 // #include "ax25_pad.h"
 // #include "fx25.h"
+// #include "audio.h"
 import "C"
 
 import (

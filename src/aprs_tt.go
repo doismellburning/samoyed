@@ -39,7 +39,6 @@ package direwolf
 // #include "aprs_tt.h"
 // #include "latlong.h"
 // #include "dlq.h"
-// #include "demod.h"          /* for alevel_t & demod_get_audio_level() */
 // // geotranz
 // #include "utm.h"
 // #include "mgrs.h"
@@ -1622,7 +1621,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 	 */
 
 	if pp != nil {
-		var alevel = C.demod_get_audio_level(C.int(channel), 0)
+		var alevel = demod_get_audio_level(C.int(channel), 0)
 		alevel.mark = -2
 		alevel.space = -2
 

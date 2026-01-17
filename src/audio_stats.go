@@ -37,7 +37,6 @@ package direwolf
 // #include <sys/stat.h>
 // #include <assert.h>
 // #include <time.h>
-// #include "demod.h"		/* for alevel_t & demod_get_audio_level() */
 import "C"
 
 import (

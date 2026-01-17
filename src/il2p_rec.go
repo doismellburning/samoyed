@@ -13,7 +13,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "demod.h"
 // #include "dlq.h"
 import "C"
 
@@ -223,7 +222,7 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 			}
 
 			if pp != nil {
-				var alevel = C.demod_get_audio_level(channel, subchannel)
+				var alevel = demod_get_audio_level(channel, subchannel)
 				var retries = C.retry_t(F.corrected)
 				var fec_type C.fec_type_t = C.fec_type_il2p
 
