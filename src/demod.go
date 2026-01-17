@@ -21,7 +21,6 @@ package direwolf
 // #include <ctype.h>
 // #include "audio.h"
 // #include "fsk_demod_state.h"
-// #include "fsk_gen_filter.h"
 import "C"
 
 import (
