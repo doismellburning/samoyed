@@ -16,7 +16,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <assert.h>
 // #include "audio.h"
-// #include "gen_tone.h"
 // #include "fsk_demod_state.h"	/* for MAX_FILTER_SIZE which might be overly generous for here. */
 // 				/* but safe if we use same size as for receive. */
 // #include "dsp.h"
@@ -328,7 +327,6 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 #endif
 */
 
-//export tone_gen_put_bit_real
 func tone_gen_put_bit_real(channel C.int, dat C.int) {
 
 	var a = ACHAN2ADEV(channel) /* device for channel. */
@@ -668,11 +666,11 @@ func GenToneMain() {
 
 	for range 2 {
 		for n := C.int(0); n < my_audio_config.achan[0].baud*2; n++ {
-			C.tone_gen_put_bit(chan1, 1)
+			tone_gen_put_bit(chan1, 1)
 		}
 
 		for n := C.int(0); n < my_audio_config.achan[0].baud*2; n++ {
-			C.tone_gen_put_bit(chan1, 0)
+			tone_gen_put_bit(chan1, 0)
 		}
 	}
 
@@ -690,19 +688,19 @@ func GenToneMain() {
 
 	for range 4 {
 		for n := C.int(0); n < my_audio_config.achan[0].baud*2; n++ {
-			C.tone_gen_put_bit(chan1, 1)
+			tone_gen_put_bit(chan1, 1)
 		}
 
 		for n := C.int(0); n < my_audio_config.achan[0].baud*2; n++ {
-			C.tone_gen_put_bit(chan1, 0)
+			tone_gen_put_bit(chan1, 0)
 		}
 
 		for n := C.int(0); n < my_audio_config.achan[1].baud*2; n++ {
-			C.tone_gen_put_bit(chan2, 1)
+			tone_gen_put_bit(chan2, 1)
 		}
 
 		for n := C.int(0); n < my_audio_config.achan[1].baud*2; n++ {
-			C.tone_gen_put_bit(chan2, 0)
+			tone_gen_put_bit(chan2, 0)
 		}
 	}
 

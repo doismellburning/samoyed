@@ -8,7 +8,6 @@ package direwolf
 // #include "fx25.h"
 // #include "fcs_calc.h"
 // #include "audio.h"
-// #include "gen_tone.h"
 import "C"
 
 import (
