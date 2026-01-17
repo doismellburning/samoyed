@@ -43,7 +43,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "audio.h"
 // #include "hdlc_rec.h"
-// #include "ptt.h"
 // #include "dlq.h"
 import "C"
 

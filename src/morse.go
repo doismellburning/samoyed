@@ -16,7 +16,6 @@ package direwolf
 // #include <time.h>
 // #include <math.h>
 // #include "audio.h"
-// #include "ptt.h"
 // #include "gen_tone.h"		/* for gen_tone_put_sample */
 import "C"
 

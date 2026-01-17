@@ -17,7 +17,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "rrbb.h"
 // #include "multi_modem.h"
-// #include "ptt.h"
 // #include "fx25.h"
 // #include "il2p.h"
 import "C"
