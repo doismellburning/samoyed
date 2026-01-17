@@ -44,7 +44,6 @@ package direwolf
 // #include "audio.h"
 // #include "hdlc_rec.h"
 // #include "ptt.h"
-// #include "morse.h"
 // #include "dlq.h"
 import "C"
 
@@ -59,6 +58,8 @@ import (
 
 	"github.com/lestrrat-go/strftime"
 )
+
+const MORSE_DEFAULT_WPM = 10
 
 /*
  * Parameters for transmission.
@@ -435,7 +436,7 @@ func xmit_thread(channel C.int) {
 
 					case FLAVOR_MORSE:
 						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
-						var wpm C.int = C.MORSE_DEFAULT_WPM
+						var wpm C.int = MORSE_DEFAULT_WPM
 						if ssid > 0 {
 							wpm = ssid * 2
 						}

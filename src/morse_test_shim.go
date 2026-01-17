@@ -12,7 +12,6 @@ package direwolf
 // #include "audio.h"
 // #include "ptt.h"
 // #include "gen_tone.h"		/* for gen_tone_put_sample */
-// #include "morse.h"
 import "C"
 
 import (
