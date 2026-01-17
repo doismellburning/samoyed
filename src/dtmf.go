@@ -19,7 +19,7 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "hdlc_rec.h"	// for dcd_change
+// #include "audio.h"
 // #include "gen_tone.h"
 import "C"
 
@@ -271,7 +271,7 @@ func dtmf_sample(c C.int, input C.float) C.char {
 			if decoded != ' ' {
 				_tmpIntBool = 1
 			}
-			C.dcd_change(c, C.MAX_SUBCHANS, 0, _tmpIntBool)
+			dcd_change(c, C.MAX_SUBCHANS, 0, _tmpIntBool)
 
 			/* Reset timeout timer. */
 			if decoded != ' ' {

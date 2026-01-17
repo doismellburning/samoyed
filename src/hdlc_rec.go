@@ -11,7 +11,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>          // uint64_t
 // #include "demod.h"
-// #include "hdlc_rec.h"
 // #include "fcs_calc.h"
 // #include "ax25_pad.h"
 // #include "rrbb.h"
@@ -26,7 +25,6 @@ import (
 
 /* Undo data scrambling for 9600 baud. */
 
-//export descramble
 func descramble(in C.int, state *C.int) C.int {
 
 	var out = (in ^ (*state >> 16) ^ (*state >> 11)) & 1
@@ -393,12 +391,10 @@ a good modem here and providing a result when it is received.
 var dummyll C.int64_t
 var dummy C.int
 
-//export hdlc_rec_bit
 func hdlc_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, is_scrambled C.int, not_used_remove C.int) {
 	hdlc_rec_bit_new(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
 }
 
-//export hdlc_rec_bit_new
 func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, is_scrambled C.int, not_used_remove C.int,
 	pll_nudge_total *C.int64_t, pll_symbol_count *C.int) {
 
@@ -712,7 +708,6 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
  *
  *--------------------------------------------------------------------*/
 
-//export dcd_change_real
 func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
@@ -772,7 +767,6 @@ func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) 
  *
  *--------------------------------------------------------------------*/
 
-//export hdlc_rec_data_detect_any
 func hdlc_rec_data_detect_any(channel C.int) C.int {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)

@@ -77,7 +77,6 @@ package direwolf
 // #include "rrbb.h"
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
-// int descramble (int in, int *state);
 import "C"
 
 import (
@@ -647,7 +646,7 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 			if raw {
 				_raw = 1
 			}
-			var descram = C.descramble(_raw, &(H2.lfsr))
+			var descram = descramble(_raw, &(H2.lfsr))
 
 			dbit = (descram == H2.prev_descram)
 			H2.prev_descram = descram

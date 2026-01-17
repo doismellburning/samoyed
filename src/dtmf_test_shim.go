@@ -6,7 +6,7 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "hdlc_rec.h"	// for dcd_change
+// #include "audio.h"
 // #include "gen_tone.h"
 // void ptt_init (struct audio_s *p_modem);
 import "C"

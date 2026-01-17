@@ -54,7 +54,6 @@ package direwolf
 // #include "dlq.h"
 // #include "fx25.h"
 // #include "il2p.h"
-// #include "hdlc_rec.h"
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
 // void ptt_set_real (int ot, int chan, int ptt_signal);
@@ -645,7 +644,7 @@ func audio_get(a C.int) C.int {
 func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum *C.char) {
 
 	packets_decoded_one++
-	if C.hdlc_rec_data_detect_any(channel) == 0 {
+	if hdlc_rec_data_detect_any(channel) == 0 {
 		dcd_missing_errors++
 	}
 
