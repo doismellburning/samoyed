@@ -30,7 +30,6 @@ package direwolf
 // #define DCD_GOOD_WIDTH 1024             // No more than 1024!!!
 // #include "fsk_demod_state.h"		// Values above override defaults.
 //
-// #include "hdlc_rec.h"
 // #include "demod_9600.h"
 // #include "dsp.h"
 import "C"

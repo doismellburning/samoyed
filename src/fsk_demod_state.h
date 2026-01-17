@@ -6,6 +6,8 @@
 
 #include "audio.h"		// for enum modem_t
 
+void dcd_change (int chan, int subchan, int slice, int state);
+
 /*
  * Demodulator state.
  * The name of the file is from we only had FSK.  Now we have other techniques.
@@ -490,7 +492,6 @@ struct demodulator_state_s
  *
  *--------------------------------------------------------------------*/
 
-#include "hdlc_rec.h"        // for dcd_change
 
 // These are good for 1200 bps AFSK.
 // Might want to override for other modems.

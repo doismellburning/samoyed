@@ -73,7 +73,6 @@ package direwolf
 // #include "fsk_demod_state.h"		// Values above override defaults.
 // #include "audio.h"
 // #include "fsk_gen_filter.h"
-// #include "hdlc_rec.h"
 // #include "demod_psk.h"
 // #include "dsp.h"
 import "C"

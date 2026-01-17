@@ -42,8 +42,6 @@ package direwolf
 // #include "direwolf.h"
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "hdlc_rec.h"
-// #include "ptt.h"
 // #include "dlq.h"
 import "C"
 
@@ -1191,7 +1189,7 @@ func wait_for_clear_channel(channel C.int, slottime C.int, persist C.int, fulldu
 
 	start_over_again:
 
-		for C.hdlc_rec_data_detect_any(channel) > 0 {
+		for hdlc_rec_data_detect_any(channel) > 0 {
 			SLEEP_MS(WAIT_CHECK_EVERY_MS)
 			n++
 			if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
@@ -1210,7 +1208,7 @@ func wait_for_clear_channel(channel C.int, slottime C.int, persist C.int, fulldu
 			SLEEP_MS(int(save_audio_config_p.achan[channel].dwait) * 10)
 		}
 
-		if C.hdlc_rec_data_detect_any(channel) > 0 {
+		if hdlc_rec_data_detect_any(channel) > 0 {
 			goto start_over_again
 		}
 
@@ -1221,7 +1219,7 @@ func wait_for_clear_channel(channel C.int, slottime C.int, persist C.int, fulldu
 		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(int(slottime) * 10)
 
-			if C.hdlc_rec_data_detect_any(channel) > 0 {
+			if hdlc_rec_data_detect_any(channel) > 0 {
 				goto start_over_again
 			}
 

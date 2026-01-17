@@ -137,7 +137,6 @@ package direwolf
 // #include <gpiod.h>
 // #include "cm108.h"
 // #include "audio.h"
-// #include "ptt.h"
 // #include "dlq.h"
 // #include "demod.h"	// to mute recv audio during xmit if half duplex.
 import "C"

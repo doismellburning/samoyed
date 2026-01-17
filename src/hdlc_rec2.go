@@ -72,14 +72,11 @@ package direwolf
 // #include <string.h>
 // //Optimize processing by accessing directly to decoded bits
 // #define RRBB_C 1
-// #include "hdlc_rec2.h"
 // #include "fcs_calc.h"
 // #include "ax25_pad.h"
 // #include "rrbb.h"
-// #include "multi_modem.h"
 // #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
-// int descramble (int in, int *state);
 import "C"
 
 import (
@@ -195,7 +192,6 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-//export hdlc_rec2_init
 func hdlc_rec2_init(p_audio_config *C.struct_audio_s) {
 	save_audio_config_p = p_audio_config
 }
@@ -223,7 +219,6 @@ func hdlc_rec2_init(p_audio_config *C.struct_audio_s) {
  *
  ***********************************************************************************/
 
-//export hdlc_rec2_block
 func hdlc_rec2_block(block C.rrbb_t) {
 	var channel = C.rrbb_get_chan(block)
 	var subchan = C.rrbb_get_subchan(block)
@@ -651,7 +646,7 @@ func try_decode(block C.rrbb_t, channel C.int, subchan C.int, slice C.int, aleve
 			if raw {
 				_raw = 1
 			}
-			var descram = C.descramble(_raw, &(H2.lfsr))
+			var descram = descramble(_raw, &(H2.lfsr))
 
 			dbit = (descram == H2.prev_descram)
 			H2.prev_descram = descram

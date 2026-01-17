@@ -14,7 +14,6 @@ package direwolf
 // #include <stdlib.h>
 // #include "fx25.h"
 // #include "fcs_calc.h"
-// #include "multi_modem.h"
 // #include "demod.h"
 import "C"
 
