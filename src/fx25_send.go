@@ -6,7 +6,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "fx25.h"
-// #include "fcs_calc.h"
 // #include "audio.h"
 import "C"
 
@@ -73,7 +72,7 @@ func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, t
 
 	// Append the FCS.
 
-	var fcs = C.fcs_calc(_fbuf, flen)
+	var fcs = fcs_calc(_fbuf, flen)
 	fbuf = append(fbuf, byte(fcs)&0xff)
 	fbuf = append(fbuf, byte(fcs>>8)&0xff)
 

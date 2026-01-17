@@ -6,7 +6,6 @@ package direwolf
 
 // #include "direwolf.h"
 // #include <stdio.h>
-// #include "fcs_calc.h"
 import "C"
 
 import (
@@ -55,7 +54,6 @@ var ccitt_table = [256]C.ushort{
  * Use this for an AX.25 frame.
  */
 
-//export fcs_calc
 func fcs_calc(_data *C.uchar, length C.int) C.ushort {
 	var crc C.ushort = 0xffff
 	var data = unsafe.Slice(_data, length)
@@ -92,7 +90,6 @@ func fcs_calc(_data *C.uchar, length C.int) C.ushort {
  *	crc = crc16 (region3, sizeof(region3), crc);
  */
 
-//export crc16
 func crc16(_data *C.uchar, length C.int, seed C.ushort) C.ushort {
 	var crc = seed
 	var data = unsafe.Slice(_data, length)
