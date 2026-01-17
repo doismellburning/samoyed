@@ -24,7 +24,6 @@ package direwolf
 // #include "fsk_gen_filter.h"
 // #include "demod_9600.h"
 // #include "demod_afsk.h"
-// #include "demod_psk.h"
 import "C"
 
 import (
