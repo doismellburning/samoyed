@@ -36,7 +36,6 @@ package direwolf
 // #include "aprs_tt.h"
 // #include "igate.h"
 // #include "dwgps.h"
-// #include "morse.h"
 // #include "ax25_link.h"
 // #include "fx25.h"
 // #include "il2p.h"

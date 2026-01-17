@@ -59,7 +59,6 @@ package direwolf
 // #include "audio.h"
 // #include "ax25_pad.h"
 // #include "gen_tone.h"
-// #include "morse.h"
 // #include "fx25.h"
 // #include "il2p.h"
 // #include "gen_packets.h"
