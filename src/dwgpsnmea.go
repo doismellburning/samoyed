@@ -33,7 +33,6 @@ package direwolf
 // #include <time.h>
 // #include <stddef.h>
 // #include "dwgps.h"
-// #include "dwgpsnmea.h"
 import "C"
 
 import (
