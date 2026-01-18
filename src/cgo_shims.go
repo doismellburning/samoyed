@@ -4,7 +4,6 @@ package direwolf
 
 // #include "direwolf.h"
 // #include "audio.h"
-// #include "decode_aprs.h"
 // #include "config.h"
 // #include "fsk_demod_state.h"
 import "C"

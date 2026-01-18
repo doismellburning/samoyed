@@ -29,7 +29,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "decode_aprs.h"
 // #include "ax25_pad.h"
 // #include "latlong.h"
 // #include "audio.h"
@@ -217,7 +216,7 @@ func mheard_dump() {
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_rf(channel C.int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries C.retry_t) {
+func mheard_save_rf(channel C.int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries C.retry_t) {
 
 	var now = time.Now()
 
@@ -343,7 +342,7 @@ func mheard_save_rf(channel C.int, A *C.decode_aprs_t, pp C.packet_t, alevel C.a
 	// Later, the same station sent an object report and the stations's location was overwritten
 	// by the object location.  Solution: Save location only if position report.
 
-	if A.g_packet_type == C.packet_type_position {
+	if A.g_packet_type == packet_type_position {
 		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
 			mptr.dlat = A.g_lat
 			mptr.dlon = A.g_lon

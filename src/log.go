@@ -30,7 +30,6 @@ package direwolf
 // #include <unistd.h>
 // #include <errno.h>
 // #include "ax25_pad.h"
-// #include "decode_aprs.h"
 // #include "audio.h"
 import "C"
 
@@ -148,7 +147,7 @@ func log_init(daily_names bool, path string) {
  *
  *------------------------------------------------------------------*/
 
-func log_write(channel int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries C.retry_t) { //nolint:gocritic
+func log_write(channel int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries C.retry_t) { //nolint:gocritic
 	if len(g_log_path) == 0 {
 		return
 	}
@@ -369,7 +368,7 @@ func log_write(channel int, A *C.decode_aprs_t, pp C.packet_t, alevel C.alevel_t
  *
  *------------------------------------------------------------------*/
 
-func log_rr_bits(A *C.decode_aprs_t, pp C.packet_t) { //nolint:gocritic
+func log_rr_bits(A *decode_aprs_t, pp C.packet_t) { //nolint:gocritic
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
 

@@ -20,7 +20,6 @@ package direwolf
 // #include "audio.h"
 // #include "config.h"
 // #include "version.h"
-// #include "decode_aprs.h"
 // #include "latlong.h"
 import "C"
 
@@ -756,7 +755,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			/* the signals. */
 
 			if g_tracker_debug_level >= 3 {
-				var A C.decode_aprs_t
+				var A decode_aprs_t
 				A.g_freq = G_UNKNOWN
 				A.g_offset = G_UNKNOWN
 				A.g_tone = G_UNKNOWN
