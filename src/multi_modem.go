@@ -69,8 +69,8 @@ package direwolf
 // #include <stdio.h>
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "dlq.h"
 // #include "version.h"
+// #include "audio.h"
 import "C"
 
 import (

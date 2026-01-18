@@ -13,7 +13,7 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "dlq.h"
+// #include "audio.h"
 import "C"
 
 import (

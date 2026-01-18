@@ -41,7 +41,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "version.h"
 // #include "digipeater.h"
-// #include "dlq.h"
 // #include "latlong.h"
 import "C"
 

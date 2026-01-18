@@ -24,7 +24,6 @@ package direwolf
 // #include <stddef.h>
 // #include "audio.h"		// configuration.
 // #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN
-// #include "dlq.h"		// received packet queue
 // void hex_dump (unsigned char *p, int len);
 import "C"
 

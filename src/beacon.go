@@ -22,7 +22,6 @@ package direwolf
 // #include "version.h"
 // #include "decode_aprs.h"
 // #include "latlong.h"
-// #include "dlq.h"
 import "C"
 
 import (

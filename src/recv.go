@@ -89,7 +89,6 @@ package direwolf
 // #include <sys/types.h>
 // #include <assert.h>
 // #include "audio.h"
-// #include "dlq.h"
 import "C"
 
 import (

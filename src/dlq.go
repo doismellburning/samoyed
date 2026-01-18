@@ -26,7 +26,6 @@ package direwolf
 // #include <errno.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "dlq.h"
 import "C"
 
 import (
