@@ -814,7 +814,7 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
-func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum string) {
+func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries C.retry_t, spectrum string) {
 	/* FIXME KG
 	assert (chan >= 0 && chan < MAX_TOTAL_CHANS);		// TOTAL for virtual channels
 	assert (subchan >= -3 && subchan < MAX_SUBCHANS);
@@ -827,9 +827,9 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	var display_retries string
 
 	switch fec_type {
-	case C.fec_type_fx25:
+	case fec_type_fx25:
 		display_retries = " FX.25 "
-	case C.fec_type_il2p:
+	case fec_type_il2p:
 		display_retries = " IL2P "
 	default:
 		// Possible fix_bits indication.
@@ -1187,7 +1187,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
+		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			igate_send_rec_packet(channel, pp)
 		}
 
@@ -1205,7 +1205,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p) {
+		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			digipeater(channel, pp)
 		}
 
@@ -1215,7 +1215,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 */
 
 		if channel < C.MAX_RADIO_CHANS {
-			if retries == C.RETRY_NONE || fec_type == C.fec_type_fx25 || fec_type == C.fec_type_il2p {
+			if retries == C.RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
 				cdigipeater(channel, pp)
 			}
 		}

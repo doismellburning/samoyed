@@ -427,19 +427,19 @@ type ax25_dlsm_t struct {
 
 	// For sending data.
 
-	i_frame_queue *C.cdata_t // Connected data from client which has not been transmitted yet.
+	i_frame_queue *cdata_t // Connected data from client which has not been transmitted yet.
 	// Linked list.
 	// The name is misleading because these are just blocks of
 	// data, not "I frames" at this point.  The name comes from
 	// the protocol specification.
 
-	txdata_by_ns [128]*C.cdata_t // Data which has already been transmitted.
+	txdata_by_ns [128]*cdata_t // Data which has already been transmitted.
 	// Indexed by N(S) in case it gets lost and needs to be sent again.
 	// Cleared out when we get ACK for it.
 
 	magic3 int // Look out for out of bounds for above.
 
-	rxdata_by_ns [128]*C.cdata_t // "Receive buffer"
+	rxdata_by_ns [128]*cdata_t // "Receive buffer"
 	// Data which has been received out of sequence.
 	// Indexed by N(S).
 
@@ -461,7 +461,7 @@ type ax25_dlsm_t struct {
 
 	// Segment reassembler.
 
-	ra_buff *C.cdata_t // Reassembler buffer.  nil when in ready state.
+	ra_buff *cdata_t // Reassembler buffer.  nil when in ready state.
 
 	ra_following C.int // Most recent number following to predict next expected.
 
@@ -869,7 +869,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C
  *
  *------------------------------------------------------------------------------*/
 
-func dl_connect_request(E *C.dlq_item_t) {
+func dl_connect_request(E *dlq_item_t) {
 
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
@@ -956,7 +956,7 @@ func dl_connect_request(E *C.dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func dl_disconnect_request(E *C.dlq_item_t) {
+func dl_disconnect_request(E *dlq_item_t) {
 
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
@@ -1104,7 +1104,7 @@ func DIVROUNDUP(a, b C.int) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func dl_data_request(E *C.dlq_item_t) {
+func dl_data_request(E *dlq_item_t) {
 	var ok_to_create = true
 
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, E.client, ok_to_create)
@@ -1309,7 +1309,7 @@ func dl_data_request(E *C.dlq_item_t) {
 
 } /* end dl_data_request */
 
-func data_request_good_size(S *ax25_dlsm_t, txdata *C.cdata_t) {
+func data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
 	switch S.state {
 
 	case state_0_disconnected, state_2_awaiting_release:
@@ -1399,7 +1399,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *C.cdata_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func dl_register_callsign(E *C.dlq_item_t) {
+func dl_register_callsign(E *dlq_item_t) {
 
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
@@ -1417,7 +1417,7 @@ func dl_register_callsign(E *C.dlq_item_t) {
 
 } /* end dl_register_callsign */
 
-func dl_unregister_callsign(E *C.dlq_item_t) {
+func dl_unregister_callsign(E *dlq_item_t) {
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_unregister_callsign (%s, chan=%d, client=%d)\n", C.GoString(&E.addrs[0][0]), E._chan, E.client)
@@ -1504,7 +1504,7 @@ func dl_unregister_callsign(E *C.dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func dl_outstanding_frames_request(E *C.dlq_item_t) {
+func dl_outstanding_frames_request(E *dlq_item_t) {
 	const ok_to_create = false // must exist already.
 	var reversed_addrs bool
 
@@ -1585,7 +1585,7 @@ func dl_outstanding_frames_request(E *C.dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func dl_client_cleanup(E *C.dlq_item_t) {
+func dl_client_cleanup(E *dlq_item_t) {
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("dl_client_cleanup (%d)\n", E.client)
@@ -1836,7 +1836,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 var dcd_status [MAX_RADIO_CHANS]C.int
 var ptt_status [MAX_RADIO_CHANS]C.int
 
-func lm_channel_busy(E *C.dlq_item_t) {
+func lm_channel_busy(E *dlq_item_t) {
 	Assert(E._chan >= 0 && E._chan < MAX_RADIO_CHANS)
 	Assert(E.activity == OCTYPE_PTT || E.activity == OCTYPE_DCD)
 	Assert(E.status == 1 || E.status == 0)
@@ -1910,7 +1910,7 @@ func lm_channel_busy(E *C.dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func lm_seize_confirm(E *C.dlq_item_t) {
+func lm_seize_confirm(E *dlq_item_t) {
 
 	Assert(E._chan >= 0 && E._chan < MAX_RADIO_CHANS)
 
@@ -1974,7 +1974,7 @@ func lm_seize_confirm(E *C.dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func lm_data_indication(E *C.dlq_item_t) {
+func lm_data_indication(E *dlq_item_t) {
 
 	if E.pp == nil {
 		text_color_set(DW_COLOR_ERROR)

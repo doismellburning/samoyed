@@ -638,7 +638,7 @@ func audio_get(a C.int) C.int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum *C.char) {
+func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries C.retry_t, spectrum *C.char) {
 
 	packets_decoded_one++
 	if hdlc_rec_data_detect_any(channel) == 0 {
@@ -705,9 +705,9 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 	}
 
 	switch fec_type {
-	case C.fec_type_fx25:
+	case fec_type_fx25:
 		dw_printf("%s audio level = %s   FX.25  %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
-	case C.fec_type_il2p:
+	case fec_type_il2p:
 		dw_printf("%s audio level = %s   IL2P  %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
 	default:
 		//case fec_type_none:

@@ -1091,7 +1091,7 @@ func igate_recv_thread() {
 					// See what happens with -2 and follow up on this.
 					// Do we need something else here?
 					var slice C.int = 0
-					var fec_type C.fec_type_t = C.fec_type_none
+					var fec_type fec_type_t = fec_type_none
 					var spectrum = C.CString("APRS-IS")
 					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, C.RETRY_NONE, spectrum)
 				} else {

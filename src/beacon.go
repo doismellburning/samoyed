@@ -847,7 +847,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 
 			var alevel C.alevel_t
 			C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_alevel_t)
-			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, 0, 0, C.CString(""))
+			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, C.CString(""))
 		default:
 			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}

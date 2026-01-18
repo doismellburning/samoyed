@@ -43,7 +43,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 
 	list_head = nil
 
-	var E *C.dlq_item_t
+	var E *dlq_item_t
 	var pp C.packet_t
 	var addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
 
@@ -51,8 +51,8 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 
 	// Connect request
 
-	E = new(C.dlq_item_t)
-	E._type = C.DLQ_CONNECT_REQUEST
+	E = new(dlq_item_t)
+	E._type = DLQ_CONNECT_REQUEST
 	E._chan = CHANNEL
 	C.strcpy(&E.addrs[OWNCALL][0], MY_CALL)
 	C.strcpy(&E.addrs[PEERCALL][0], THEIR_CALL)
@@ -67,7 +67,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UA, 1, 1, nil, 0)
 	assert.NotNil(t, pp)
 
-	E = new(C.dlq_item_t)
+	E = new(dlq_item_t)
 	E._chan = CHANNEL
 	E.pp = pp
 

@@ -291,7 +291,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 			var pp = ax25_from_frame((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])), alevel)
 
 			if pp != nil {
-				var fec_type C.fec_type_t = C.fec_type_none
+				var fec_type fec_type_t = fec_type_none
 				var retries C.retry_t
 
 				var spectrum = C.CString("Network TNC")
