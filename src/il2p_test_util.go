@@ -6,7 +6,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include "ax25_pad.h"
-// #include "ax25_pad2.h"
 // #include "audio.h"
 import "C"
 

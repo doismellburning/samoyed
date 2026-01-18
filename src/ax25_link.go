@@ -155,7 +155,6 @@ package direwolf
 // #include <ctype.h>
 // #include <math.h>
 // #include "ax25_pad.h"
-// #include "ax25_pad2.h"
 import "C"
 
 import (
