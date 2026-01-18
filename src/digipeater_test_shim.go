@@ -14,13 +14,10 @@ https://github.com/golang/go/issues/4030
 // #include "regex.h"
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "digipeater.h"
-// packet_t digipeat_match (int from_chan, packet_t pp, char *mycall_rec, char *mycall_xmit, regex_t *uidigi, regex_t *uitrace, int to_chan, enum preempt_e preempt, char *atgp, char *type_filter);
 // char *mycall;
 // regex_t alias_re;
 // regex_t wide_re;
 // int failed;
-// enum preempt_e preempt = PREEMPT_OFF;
 // char *config_atgp = "HOP";
 import "C"
 
@@ -31,6 +28,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+var preempt = PREEMPT_OFF
 
 func digipeater_test(t *testing.T, _in, out string) {
 	t.Helper()
@@ -95,7 +94,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
-	var result = digipeat_match(0, pp, C.mycall, C.mycall, &C.alias_re, &C.wide_re, 0, C.preempt, C.config_atgp, nil)
+	var result = digipeat_match(0, pp, C.mycall, C.mycall, &C.alias_re, &C.wide_re, 0, preempt, C.config_atgp, nil)
 
 	var xmit [256]C.char
 	if result != nil {
@@ -282,12 +281,12 @@ func digipeater_test_main(t *testing.T) bool {
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:off",
 		"")
 
-	C.preempt = C.PREEMPT_DROP
+	preempt = PREEMPT_DROP
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:drop",
 		"W1ABC>TEST11,WB2OSZ-9*,CITYE:drop")
 
-	C.preempt = C.PREEMPT_MARK
+	preempt = PREEMPT_MARK
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:mark1",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark1")
@@ -295,7 +294,7 @@ func digipeater_test_main(t *testing.T) bool {
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,WB2OSZ-9,CITYE:mark2",
 		"W1ABC>TEST11,CITYA,CITYB,CITYC,WB2OSZ-9*,CITYE:mark2")
 
-	C.preempt = C.PREEMPT_TRACE
+	preempt = PREEMPT_TRACE
 
 	digipeater_test(t, "W1ABC>TEST11,CITYA*,CITYB,CITYC,CITYD,CITYE:trace1",
 		"W1ABC>TEST11,CITYA,WB2OSZ-9*,CITYE:trace1")
@@ -328,7 +327,7 @@ func digipeater_test_main(t *testing.T) bool {
 
 	// New in 1.7 - ATGP Hack
 
-	C.preempt = C.PREEMPT_OFF // Shouldn't make a difference here.
+	preempt = PREEMPT_OFF // Shouldn't make a difference here.
 
 	digipeater_test(t, "W1ABC>TEST51,HOP7-7,HOP7-7:stuff1",
 		"W1ABC>TEST51,WB2OSZ-9*,HOP7-6,HOP7-7:stuff1")

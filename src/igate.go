@@ -40,8 +40,8 @@ package direwolf
 // #include "direwolf.h"
 // #include "ax25_pad.h"
 // #include "version.h"
-// #include "digipeater.h"
 // #include "latlong.h"
+// #include "audio.h"
 import "C"
 
 import (
@@ -260,7 +260,7 @@ func igate_get_dnl_cnt() C.int {
  *
  *--------------------------------------------------------------------*/
 
-func igate_init(p_audio_config *C.struct_audio_s, p_igate_config *igate_config_s, p_digi_config *C.struct_digi_config_s, debug_level C.int) {
+func igate_init(p_audio_config *C.struct_audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level C.int) {
 
 	s_debug = debug_level
 	dp_queue_head = nil

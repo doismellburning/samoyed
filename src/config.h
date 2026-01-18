@@ -14,7 +14,6 @@
 #define CONFIG_H 1
 
 #include "audio.h"		/* for struct audio_s */
-#include "digipeater.h"		/* for struct digi_config_s */
 #include "cdigipeater.h"		/* for struct cdigi_config_s */
 
 /*
