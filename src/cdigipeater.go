@@ -28,8 +28,37 @@ package direwolf
 // #include "regex.h"
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "cdigipeater.h"
 import "C"
+
+/*
+ * Information required for Connected mode digipeating.
+ *
+ * The configuration file reader fills in this information
+ * and it is passed to cdigipeater_init at application start up time.
+ */
+
+type cdigi_config_s struct {
+
+	/*
+	 * Rules for each of the [from_chan][to_chan] combinations.
+	 */
+
+	// For APRS digipeater, we use MAX_TOTAL_CHANS because we use external TNCs.
+	// Connected mode packet must use internal modems we we use MAX_RADIO_CHANS.
+
+	enabled [MAX_RADIO_CHANS][MAX_RADIO_CHANS]C.int // Is it enabled for from/to pair?
+
+	has_alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]C.int // If there was no alias in the config file,
+	// the structure below will not be set up
+	// properly and an attempt to use it could
+	// result in a crash.  (fixed v1.5)
+	// Not needed for [APRS] DIGIPEAT because
+	// the alias is mandatory there.
+	alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]C.regex_t
+
+	cfilter_str [MAX_RADIO_CHANS][MAX_RADIO_CHANS]*C.char
+	// NULL or optional Packet Filter strings such as "t/m".
+}
 
 /*
  * Keep pointer to configuration options.
@@ -37,7 +66,7 @@ import "C"
  */
 
 var save_audio_config_p *C.struct_audio_s
-var save_cdigi_config_p *C.struct_cdigi_config_s
+var save_cdigi_config_p *cdigi_config_s
 
 /*
  * Maintain count of packets digipeated for each combination of from/to channel.
@@ -65,7 +94,7 @@ func cdigipeater_get_count(from_chan int, to_chan int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeater_init(p_audio_config *C.struct_audio_s, p_cdigi_config *C.struct_cdigi_config_s) {
+func cdigipeater_init(p_audio_config *C.struct_audio_s, p_cdigi_config *cdigi_config_s) {
 	save_audio_config_p = p_audio_config
 	save_cdigi_config_p = p_cdigi_config
 }

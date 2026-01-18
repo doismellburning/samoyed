@@ -21,6 +21,7 @@ package direwolf
 // #include <string.h>
 // #include <ctype.h>
 // #include <math.h>
+// #include <regex.h>
 // #include <limits.h>		// for PATH_MAX
 // #if ENABLE_GPSD
 // #include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
@@ -29,7 +30,6 @@ package direwolf
 // #endif
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "cdigipeater.h"
 // #include "config.h"
 // #include "latlong.h"
 // #if USE_CM108		// Current Linux or Windows only
@@ -621,7 +621,7 @@ func rtfm() {
 
 func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	p_digi_config *digi_config_s,
-	p_cdigi_config *C.struct_cdigi_config_s,
+	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
 	p_misc_config *C.struct_misc_config_s) {
