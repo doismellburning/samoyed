@@ -18,7 +18,7 @@ import (
 func FxrecMain() {
 	FXTEST = true
 
-	C.fx25_init(3)
+	fx25_init(3)
 
 	var i C.int
 	for i = CTAG_MIN; i <= CTAG_MAX; i++ {
@@ -34,7 +34,7 @@ func FxrecMain() {
 		for C.fread(unsafe.Pointer(&ch), 1, 1, fp) == 1 {
 			var imask C.uchar
 			for imask = 0x01; imask != 0; imask <<= 1 {
-				C.fx25_rec_bit(0, 0, 0, C.int(ch&imask))
+				fx25_rec_bit(0, 0, 0, C.int(ch&imask))
 			}
 		}
 		C.fclose(fp)

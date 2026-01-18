@@ -61,7 +61,6 @@ import (
 
 // #define DEBUG 5
 
-//export decode_rs_char
 func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) C.int {
 	// Access rs struct members
 	var nn = int(rs.nn)

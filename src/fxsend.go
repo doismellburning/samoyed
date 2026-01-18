@@ -26,7 +26,7 @@ func FxsendMain() {
 	fmt.Println("This generates 11 files named fx01.dat, fx02.dat, ..., fx0b.dat")
 	fmt.Println("Run fxrec as second part of test.")
 
-	C.fx25_init(3)
+	fx25_init(3)
 
 	var i C.int
 	for i = 100 + CTAG_MIN; i <= 100+CTAG_MAX; i++ {

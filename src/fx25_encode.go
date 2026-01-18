@@ -44,7 +44,6 @@ import (
 	"unsafe"
 )
 
-//export encode_rs_char
 func encode_rs_char(rs *C.struct_rs, data *C.uchar, bb *C.uchar) {
 
 	var nroots = int(rs.nroots)

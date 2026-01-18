@@ -426,7 +426,7 @@ o = DCD output control
 		os.Exit(1)
 	}
 
-	C.fx25_init(d_x_opt)
+	fx25_init(d_x_opt)
 	il2p_init(d_2_opt)
 
 	var start_time = time.Now()
