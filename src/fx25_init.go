@@ -447,13 +447,13 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 		// Multiply rs->genpoly[] by  @**(root + x)
 		for j := i; j > 0; j-- {
 			if genpoly[j] != 0 {
-				genpoly[j] = genpoly[j-1] ^ alpha_to[C.modnn(rs, C.int(index_of[genpoly[j]])+C.int(root))]
+				genpoly[j] = genpoly[j-1] ^ alpha_to[modnn(rs, int(index_of[genpoly[j]])+root)]
 			} else {
 				genpoly[j] = genpoly[j-1]
 			}
 		}
 		// rs->genpoly[0] can never be zero
-		genpoly[0] = alpha_to[C.modnn(rs, C.int(index_of[genpoly[0]])+C.int(root))]
+		genpoly[0] = alpha_to[modnn(rs, int(index_of[genpoly[0]])+root)]
 	}
 	// convert rs->genpoly[] to index form for quicker encoding
 	for i := 0; i <= int(nroots); i++ {

@@ -30,14 +30,4 @@ struct rs {
 
 
 
-__attribute__((always_inline))
-static inline int modnn(struct rs *rs, int x){
-  while (x >= rs->nn) {
-    x -= rs->nn;
-    x = (x >> rs->mm) + (x & rs->nn);
-  }
-  return x;
-}
-
-
 #endif // FX25_H
