@@ -135,7 +135,6 @@ package direwolf
 // #include <dirent.h>
 // #include <hamlib/rig.h>
 // #include <gpiod.h>
-// #include "cm108.h"
 // #include "audio.h"
 import "C"
 

@@ -14,7 +14,6 @@ package direwolf
 // #include <fcntl.h>
 // #include <errno.h>
 // #include <linux/hidraw.h>		// for HIDIOCGRAWINFO
-// #include "cm108.h"
 import "C"
 
 import (
