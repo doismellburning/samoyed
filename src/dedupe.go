@@ -82,7 +82,6 @@ package direwolf
 // #include <stdio.h>
 // #include <time.h>
 // #include "ax25_pad.h"
-// #include "igate.h"
 import "C"
 
 import (

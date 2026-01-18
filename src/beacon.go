@@ -46,7 +46,7 @@ const BEACON_POSITION = C.BEACON_POSITION
 
 var g_modem_config_p *C.struct_audio_s
 var g_misc_config_p *C.struct_misc_config_s
-var g_igate_config_p *C.struct_igate_config_s
+var g_igate_config_p *igate_config_s
 
 var g_tracker_debug_level = 0 // 1 for data from gps.
 // 2 + Smart Beaconing logic.
@@ -81,7 +81,7 @@ func beacon_tracker_set_debug(level int) {
  *
  *--------------------------------------------------------------------*/
 
-func beacon_init(pmodem *C.struct_audio_s, pconfig *C.struct_misc_config_s, pigate *C.struct_igate_config_s) {
+func beacon_init(pmodem *C.struct_audio_s, pconfig *C.struct_misc_config_s, pigate *igate_config_s) {
 	/*  FIXME KG
 	struct tm tm;
 	int j;

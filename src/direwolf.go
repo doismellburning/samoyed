@@ -26,7 +26,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "digipeater.h"
 // #include "cdigipeater.h"
-// #include "igate.h"
 // #include "dwgps.h"
 // #include "fx25.h"
 // #include "dlq.h"		// for fec_type_t definition.
@@ -317,7 +316,7 @@ x = Silence FX.25 information.`)
 	misc_config = new(C.struct_misc_config_s)
 	var digi_config C.struct_digi_config_s
 	var cdigi_config C.struct_cdigi_config_s
-	var igate_config C.struct_igate_config_s
+	var igate_config igate_config_s
 
 	config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
 
