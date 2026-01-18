@@ -29,7 +29,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "decode_aprs.h"
 // #include "ax25_pad.h"
 // #include "latlong.h"
 // #include "audio.h"

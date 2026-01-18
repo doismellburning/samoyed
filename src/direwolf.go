@@ -23,7 +23,6 @@ package direwolf
 // #include "audio.h"
 // #include "config.h"
 // #include "ax25_pad.h"
-// #include "decode_aprs.h"
 // #include "cdigipeater.h"
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA

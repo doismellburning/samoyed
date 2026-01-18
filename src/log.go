@@ -30,7 +30,6 @@ package direwolf
 // #include <unistd.h>
 // #include <errno.h>
 // #include "ax25_pad.h"
-// #include "decode_aprs.h"
 // #include "audio.h"
 import "C"
 

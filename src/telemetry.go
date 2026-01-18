@@ -31,7 +31,6 @@ package direwolf
 // #include <math.h>
 // #include <ctype.h>
 // #include "ax25_pad.h"			// for packet_t, AX25_MAX_ADDR_LEN
-// #include "decode_aprs.h"		// for decode_aprs_t, G_UNKNOWN
 import "C"
 
 import (
