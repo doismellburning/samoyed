@@ -8,7 +8,6 @@ package direwolf
 // #include <stdio.h>
 // #include <ctype.h>
 // #include "ax25_pad.h"
-// #include "latlong.h"
 import "C"
 
 import (

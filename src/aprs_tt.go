@@ -36,7 +36,6 @@ package direwolf
 // #include <assert.h>
 // #include "version.h"
 // #include "ax25_pad.h"
-// #include "latlong.h"
 // #include "audio.h"
 // // geotranz
 // #include "utm.h"

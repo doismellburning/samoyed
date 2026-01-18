@@ -30,7 +30,6 @@ package direwolf
 // #include <string.h>
 // #include <ctype.h>
 // #include "ax25_pad.h"
-// #include "latlong.h"
 // #include "audio.h"
 import "C"
 

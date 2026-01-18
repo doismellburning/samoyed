@@ -25,7 +25,6 @@ package direwolf
 // #include <assert.h>
 // #include "version.h"
 // #include "ax25_pad.h"
-// #include "latlong.h"
 import "C"
 
 import (

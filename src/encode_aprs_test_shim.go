@@ -9,7 +9,6 @@ package direwolf
 // #include <time.h>
 // #include <math.h>
 // #include <assert.h>
-// #include "latlong.h"
 import "C"
 
 import (
@@ -82,47 +81,47 @@ func encode_aprs_test_main(t *testing.T) {
 
 	/***********  Position  ***********/
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", C.G_UNKNOWN, 0, 0, 0, 0, "")
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		0, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.Equal(t, "!4234.61ND07126.47W&", result)
 
 	/* with PHG. */
 	// TODO:  Need to test specifying some but not all.
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		50, 100, 6, "N", C.G_UNKNOWN, 0, 0, 0, 0, "")
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		50, 100, 6, "N", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.Equal(t, "!4234.61ND07126.47W&PHG7368", result)
 
 	/* with freq & tone.  minus offset, no offset, explicit simplex. */
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", C.G_UNKNOWN, 0, 146.955, 74.4, -0.6, "")
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		0, 0, 0, "", G_UNKNOWN, 0, 146.955, 74.4, -0.6, "")
 	assert.Equal(t, "!4234.61ND07126.47W&146.955MHz T074 -060 ", result)
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", C.G_UNKNOWN, 0, 146.955, 74.4, C.G_UNKNOWN, "")
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		0, 0, 0, "", G_UNKNOWN, 0, 146.955, 74.4, G_UNKNOWN, "")
 	assert.Equal(t, "!4234.61ND07126.47W&146.955MHz T074 ", result)
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", C.G_UNKNOWN, 0, 146.955, 74.4, 0, "")
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		0, 0, 0, "", G_UNKNOWN, 0, 146.955, 74.4, 0, "")
 	assert.Equal(t, "!4234.61ND07126.47W&146.955MHz T074 +000 ", result)
 
 	/* with course/speed, freq, and comment! */
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
 		0, 0, 0, "", 180, 55, 146.955, 74.4, -0.6, "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz T074 -060 River flooding", result)
 
 	/* Course speed, no tone, + offset */
 
-	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, C.G_UNKNOWN, 0.6, "River flooding")
+	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		0, 0, 0, "", 180, 55, 146.955, G_UNKNOWN, 0.6, "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz +060 River flooding", result)
 
 	/* Course speed, no tone, + offset + altitude */
 
 	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, 12345, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, C.G_UNKNOWN, 0.6, "River flooding")
+		0, 0, 0, "", 180, 55, 146.955, G_UNKNOWN, 0.6, "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz +060 /A=012345River flooding", result)
 
 	result = _encode_position(0, 0, 42+34.61/60, -(71 + 26.47/60), 0, 12345, 'D', '&',
@@ -133,19 +132,19 @@ func encode_aprs_test_main(t *testing.T) {
 
 	/*********** Compressed position. ***********/
 
-	result = _encode_position(0, 1, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", C.G_UNKNOWN, 0, 0, 0, 0, "")
+	result = _encode_position(0, 1, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		0, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.Equal(t, "!D8yKC<Hn[&  !", result)
 
 	/* with PHG. In this case it is converted to precomputed radio range.  TODO: check on this.  Is 27.4 correct? */
 
-	result = _encode_position(0, 1, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
-		50, 100, 6, "N", C.G_UNKNOWN, 0, 0, 0, 0, "")
+	result = _encode_position(0, 1, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+		50, 100, 6, "N", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.Equal(t, "!D8yKC<Hn[&{CG", result)
 
 	/* with course/speed, freq, and comment!  Roundoff. 55 knots should be 63 MPH.  we get 62. */
 
-	result = _encode_position(0, 1, 42+34.61/60, -(71 + 26.47/60), 0, C.G_UNKNOWN, 'D', '&',
+	result = _encode_position(0, 1, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
 		0, 0, 0, "", 180, 55, 146.955, 74.4, -0.6, "River flooding")
 	assert.Equal(t, "!D8yKC<Hn[&NUG146.955MHz T074 -060 River flooding", result)
 
@@ -154,7 +153,7 @@ func encode_aprs_test_main(t *testing.T) {
 	/*********** Object. ***********/
 
 	result = _encode_object("WB1GOF-C", 0, 0, 42+34.61/60, -(71 + 26.47/60), 0, 'D', '&',
-		0, 0, 0, "", C.G_UNKNOWN, 0, 0, 0, 0, "")
+		0, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.Equal(t, ";WB1GOF-C *111111z4234.61ND07126.47W&", result)
 
 	// TODO: need more tests.

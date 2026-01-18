@@ -26,7 +26,6 @@ package direwolf
 // #include <fcntl.h>
 // #include "regex.h"
 // #include "ax25_pad.h"
-// #include "latlong.h"
 // #include "version.h"
 import "C"
 

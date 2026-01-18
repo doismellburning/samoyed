@@ -169,7 +169,7 @@
 /* Prefix with DW_ because /usr/include/gps.h uses a couple of these names. */
 
 #ifndef G_UNKNOWN
-#include "latlong.h"
+#define G_UNKNOWN (-999999)
 #endif
 
 

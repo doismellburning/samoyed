@@ -31,7 +31,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "audio.h"
 // #include "config.h"
-// #include "latlong.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"

@@ -20,7 +20,6 @@ package direwolf
 // #include "audio.h"
 // #include "config.h"
 // #include "version.h"
-// #include "latlong.h"
 import "C"
 
 import (
