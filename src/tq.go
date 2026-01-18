@@ -23,7 +23,6 @@ package direwolf
 // #include <string.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "igate.h"
 import "C"
 
 import (

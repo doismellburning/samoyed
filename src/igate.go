@@ -42,7 +42,6 @@ package direwolf
 // #include "version.h"
 // #include "digipeater.h"
 // #include "dlq.h"
-// #include "igate.h"
 // #include "latlong.h"
 import "C"
 
@@ -56,6 +55,84 @@ import (
 	"time"
 	"unsafe"
 )
+
+const DEFAULT_IGATE_PORT = 14580
+
+type igate_config_s struct {
+
+	/*
+	 * For logging into the IGate server.
+	 */
+	t2_server_name [40]C.char /* Tier 2 IGate server name. */
+
+	t2_server_port C.int /* Typically 14580. */
+
+	t2_login [AX25_MAX_ADDR_LEN]C.char /* e.g. WA9XYZ-15 */
+	/* Note that the ssid could be any two alphanumeric */
+	/* characters not just 1 thru 15. */
+	/* Could be same or different than the radio call(s). */
+	/* Not sure what the consequences would be. */
+
+	t2_passcode [8]C.char /* Max. 5 digits. Could be "-1". */
+
+	t2_filter *C.char /* Optional filter for IS -> RF direction. */
+	/* This is the "server side" filter. */
+	/* A better name would be subscription or something */
+	/* like that because we can only ask for more. */
+
+	/*
+	 * For transmitting.
+	 */
+	tx_chan C.int /* Radio channel for transmitting. */
+	/* 0=first, etc.  -1 for none. */
+	/* Presently IGate can transmit on only a single channel. */
+	/* A future version might generalize this.  */
+	/* Each transmit channel would have its own client side filtering. */
+
+	tx_via [80]C.char /* VIA path for transmitting third party packets. */
+	/* Usual text representation.  */
+	/* Must start with "," if not empty so it can */
+	/* simply be inserted after the destination address. */
+
+	max_digi_hops C.int /* Maximum number of digipeater hops possible for via path. */
+	/* Derived from the SSID when last character of address is a digit. */
+	/* e.g.  "WIDE1-1,WIDE5-2" would be 3. */
+	/* This is useful to know so we can determine how many */
+	/* stations we might be able to reach. */
+
+	tx_limit_1 C.int /* Max. packets to transmit in 1 minute. */
+
+	tx_limit_5 C.int /* Max. packets to transmit in 5 minutes. */
+
+	igmsp C.int /* Number of message sender position reports to allow. */
+	/* Common practice is to default to 1.  */
+	/* We allow additional flexibility of 0 to disable feature */
+	/* or a small number to allow more. */
+
+	/*
+	 * Receiver to IS data options.
+	 */
+	rx2ig_dedupe_time C.int /* seconds.  0 to disable. */
+
+	/*
+	 * Special SATgate mode to delay packets heard directly.
+	 */
+	satgate_delay C.int /* seconds.  0 to disable. */
+}
+
+const IGATE_TX_LIMIT_1_DEFAULT = 6
+const IGATE_TX_LIMIT_1_MAX = 20
+
+const IGATE_TX_LIMIT_5_DEFAULT = 20
+const IGATE_TX_LIMIT_5_MAX = 80
+
+const IGATE_RX2IG_DEDUPE_TIME = 0 /* Issue 85.  0 means disable dupe checking in RF>IS direction. */
+/* See comments in rx_to_ig_remember & rx_to_ig_allow. */
+/* Currently there is no configuration setting to change this. */
+
+const DEFAULT_SATGATE_DELAY = 10
+const MIN_SATGATE_DELAY = 5
+const MAX_SATGATE_DELAY = 30
 
 var dp_mutex sync.Mutex /* Critical section for delayed packet queue. */
 var dp_queue_head C.packet_t
@@ -79,7 +156,7 @@ var ok_to_send = false
  */
 
 // TODO KG static struct audio_s		*save_audio_config_p;
-var save_igate_config_p *C.struct_igate_config_s
+var save_igate_config_p *igate_config_s
 
 // TODO KG static struct digi_config_s 	*save_digi_config_p;
 var s_debug C.int
@@ -184,7 +261,7 @@ func igate_get_dnl_cnt() C.int {
  *
  *--------------------------------------------------------------------*/
 
-func igate_init(p_audio_config *C.struct_audio_s, p_igate_config *C.struct_igate_config_s, p_digi_config *C.struct_digi_config_s, debug_level C.int) {
+func igate_init(p_audio_config *C.struct_audio_s, p_igate_config *igate_config_s, p_digi_config *C.struct_digi_config_s, debug_level C.int) {
 
 	s_debug = debug_level
 	dp_queue_head = nil

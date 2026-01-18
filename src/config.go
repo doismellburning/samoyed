@@ -32,7 +32,6 @@ package direwolf
 // #include "digipeater.h"
 // #include "cdigipeater.h"
 // #include "config.h"
-// #include "igate.h"
 // #include "latlong.h"
 // #if USE_CM108		// Current Linux or Windows only
 // #include "cm108.h"
@@ -625,7 +624,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	p_digi_config *C.struct_digi_config_s,
 	p_cdigi_config *C.struct_cdigi_config_s,
 	p_tt_config *tt_config_s,
-	p_igate_config *C.struct_igate_config_s,
+	p_igate_config *igate_config_s,
 	p_misc_config *C.struct_misc_config_s) {
 
 	/* TODO KG
@@ -787,10 +786,10 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
 	p_igate_config.tx_chan = -1 /* IS to RF not enabled */
-	p_igate_config.tx_limit_1 = C.IGATE_TX_LIMIT_1_DEFAULT
-	p_igate_config.tx_limit_5 = C.IGATE_TX_LIMIT_5_DEFAULT
+	p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_DEFAULT
+	p_igate_config.tx_limit_5 = IGATE_TX_LIMIT_5_DEFAULT
 	p_igate_config.igmsp = 1
-	p_igate_config.rx2ig_dedupe_time = C.IGATE_RX2IG_DEDUPE_TIME
+	p_igate_config.rx2ig_dedupe_time = IGATE_RX2IG_DEDUPE_TIME
 
 	/* People find this confusing. */
 	/* Ideally we'd like to figure out if com0com is installed */
@@ -4460,10 +4459,10 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			var n, _ = strconv.Atoi(t)
 			if n < 1 {
 				p_igate_config.tx_limit_1 = 1
-			} else if n <= C.IGATE_TX_LIMIT_1_MAX {
+			} else if n <= IGATE_TX_LIMIT_1_MAX {
 				p_igate_config.tx_limit_1 = C.int(n)
 			} else {
-				p_igate_config.tx_limit_1 = C.IGATE_TX_LIMIT_1_MAX
+				p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_MAX
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: One minute transmit limit has been reduced to %d.\n",
 					line, p_igate_config.tx_limit_1)
@@ -4480,10 +4479,10 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			n, _ = strconv.Atoi(t)
 			if n < 1 {
 				p_igate_config.tx_limit_5 = 1
-			} else if n <= C.IGATE_TX_LIMIT_5_MAX {
+			} else if n <= IGATE_TX_LIMIT_5_MAX {
 				p_igate_config.tx_limit_5 = C.int(n)
 			} else {
-				p_igate_config.tx_limit_5 = C.IGATE_TX_LIMIT_5_MAX
+				p_igate_config.tx_limit_5 = IGATE_TX_LIMIT_5_MAX
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Five minute transmit limit has been reduced to %d.\n",
 					line, p_igate_config.tx_limit_5)
@@ -4528,15 +4527,15 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			if t != "" {
 
 				var n, _ = strconv.Atoi(t)
-				if n >= C.MIN_SATGATE_DELAY && n <= C.MAX_SATGATE_DELAY {
+				if n >= MIN_SATGATE_DELAY && n <= MAX_SATGATE_DELAY {
 					p_igate_config.satgate_delay = C.int(n)
 				} else {
-					p_igate_config.satgate_delay = C.DEFAULT_SATGATE_DELAY
+					p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unreasonable SATgate delay.  Using default.\n", line)
 				}
 			} else {
-				p_igate_config.satgate_delay = C.DEFAULT_SATGATE_DELAY
+				p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY
 			}
 		} else if strings.EqualFold(t, "AGWPORT") {
 

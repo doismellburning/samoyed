@@ -41,7 +41,7 @@ import (
  * These are set by init function.
  */
 
-// TODO KG var save_igate_config_p *C.struct_igate_config_s
+// TODO KG var save_igate_config_p *igate_config_s
 var pfilter_debug = 0
 var pftest_running = false
 
@@ -60,7 +60,7 @@ var pftest_running = false
  *
  *--------------------------------------------------------------------*/
 
-func pfilter_init(p_igate_config *C.struct_igate_config_s, debug_level int) {
+func pfilter_init(p_igate_config *igate_config_s, debug_level int) {
 	pfilter_debug = debug_level
 	save_igate_config_p = p_igate_config
 }

@@ -24,7 +24,7 @@ func pf_test_main(t *testing.T) {
 	t.Helper()
 
 	// Setup
-	var p_igate_config C.struct_igate_config_s
+	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
 	pfilter_init(&p_igate_config, 0)
 	pftest_running = true // Change behaviour in pfilter.c to terminate early for test convenience
