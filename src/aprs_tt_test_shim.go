@@ -12,7 +12,6 @@ package direwolf
 // #include <assert.h>
 // #include "version.h"
 // #include "ax25_pad.h"
-// #include "latlong.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"

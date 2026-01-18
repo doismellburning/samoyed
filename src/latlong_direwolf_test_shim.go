@@ -9,10 +9,6 @@ package direwolf
 // #include <time.h>
 // #include <math.h>
 // #include <assert.h>
-// #include "latlong.h"
-// double ll_bearing_deg (double lat1, double lon1, double lat2, double lon2);
-// double ll_dest_lat (double lat1, double lon1, double dist, double bearing);
-// double ll_dest_lon (double lat1, double lon1, double dist, double bearing);
 import "C"
 
 import (

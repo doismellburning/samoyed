@@ -16,7 +16,6 @@ package direwolf
 // #include <math.h>
 // #include "config.h"
 // #include "ax25_pad.h"
-// #include "latlong.h"
 import "C"
 
 import (
@@ -118,7 +117,7 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	var info = encode_position(messaging, compressed,
 		C.double(lat), C.double(lon), 0, C.int(DW_METERS_TO_FEET(alt)),
 		'/', '=',
-		C.G_UNKNOWN, C.G_UNKNOWN, C.G_UNKNOWN, C.CString(""), // PHGd
+		G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, C.CString(""), // PHGd
 		C.int(course), C.int(knots),
 		445.925, 0, 0,
 		C.CString(comment))

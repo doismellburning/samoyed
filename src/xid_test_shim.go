@@ -65,7 +65,6 @@ func xid_test_main(t *testing.T) {
 	t.Helper()
 
 	// Assorted constants are #define-d in the C, so ends up as Go types when used here, but we want a specific C type
-	var G_UNKNOWN = C.int(C.G_UNKNOWN)
 	var modulo_128 = uint32(C.modulo_128)
 	var modulo_8 = uint32(C.modulo_8)
 	var modulo_unknown = uint32(C.modulo_unknown)
@@ -213,10 +212,10 @@ func xid_test_main(t *testing.T) {
 	assert.Equal(t, C.int(0), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, G_UNKNOWN, param2.i_field_length_rx)
-	assert.Equal(t, G_UNKNOWN, param2.window_size_rx)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.i_field_length_rx)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.window_size_rx)
 	assert.Equal(t, C.int(999), param2.ack_timer)
-	assert.Equal(t, G_UNKNOWN, param2.retries)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.retries)
 
 	/* Default values for empty info field. */
 
@@ -229,13 +228,13 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, G_UNKNOWN, param2.full_duplex)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)
 	assert.Equal(t, modulo_unknown, param2.modulo)
-	assert.Equal(t, G_UNKNOWN, param2.i_field_length_rx)
-	assert.Equal(t, G_UNKNOWN, param2.window_size_rx)
-	assert.Equal(t, G_UNKNOWN, param2.ack_timer)
-	assert.Equal(t, G_UNKNOWN, param2.retries)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.i_field_length_rx)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.window_size_rx)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.ack_timer)
+	assert.Equal(t, C.int(G_UNKNOWN), param2.retries)
 
 	text_color_set(DW_COLOR_REC)
 	dw_printf("XID test:  Success.\n")

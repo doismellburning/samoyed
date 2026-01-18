@@ -40,7 +40,6 @@ package direwolf
 // #include "direwolf.h"
 // #include "ax25_pad.h"
 // #include "version.h"
-// #include "latlong.h"
 // #include "audio.h"
 import "C"
 

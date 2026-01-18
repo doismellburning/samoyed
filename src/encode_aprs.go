@@ -22,7 +22,6 @@ package direwolf
 // #include <time.h>
 // #include <math.h>
 // #include <assert.h>
-// #include "latlong.h"
 import "C"
 
 import (

@@ -30,6 +30,10 @@ import (
 	"unicode"
 )
 
+/* Use this value for unknown latitude/longitude or other values. */
+
+const G_UNKNOWN = (-999999)
+
 /*------------------------------------------------------------------
  *
  * Name:        latitude_to_str

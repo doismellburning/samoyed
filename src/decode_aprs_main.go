@@ -62,7 +62,6 @@ package direwolf
 // #include <fcntl.h>
 // #include "regex.h"
 // #include "ax25_pad.h"
-// #include "latlong.h"
 // void hex_dump (unsigned char *p, int len);
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -O0
 import "C"
