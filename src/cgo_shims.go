@@ -5,7 +5,6 @@ package direwolf
 // #include "direwolf.h"
 // #include "audio.h"
 // #include "decode_aprs.h"
-// #include "dwgps.h"
 // #include "config.h"
 // #include "fsk_demod_state.h"
 import "C"
@@ -59,12 +58,6 @@ const MEDIUM_NONE = C.MEDIUM_NONE
 const MEDIUM_RADIO = C.MEDIUM_RADIO
 const MEDIUM_IGATE = C.MEDIUM_IGATE
 const MEDIUM_NETTNC = C.MEDIUM_NETTNC
-
-const DWFIX_NOT_INIT = C.DWFIX_NOT_INIT
-const DWFIX_2D = C.DWFIX_2D
-const DWFIX_3D = C.DWFIX_3D
-const DWFIX_ERROR = C.DWFIX_ERROR
-const DWFIX_NO_FIX = C.DWFIX_NO_FIX
 
 const SENDTO_IGATE = C.SENDTO_IGATE
 const SENDTO_RECV = C.SENDTO_RECV

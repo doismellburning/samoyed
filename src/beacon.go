@@ -22,7 +22,6 @@ package direwolf
 // #include "version.h"
 // #include "decode_aprs.h"
 // #include "latlong.h"
-// #include "dwgps.h"
 // #include "dlq.h"
 import "C"
 
@@ -161,7 +160,7 @@ func beacon_init(pmodem *C.struct_audio_s, pconfig *C.struct_misc_config_s, piga
 
 				case BEACON_TRACKER:
 					{
-						var gpsinfo C.dwgps_info_t
+						var gpsinfo dwgps_info_t
 						var fix = dwgps_read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
@@ -385,7 +384,7 @@ func beacon_thread() {
 		 * This needs to be done before the next scheduled tracker
 		 * beacon because corner pegging make it sooner.
 		 */
-		var gpsinfo C.dwgps_info_t
+		var gpsinfo dwgps_info_t
 
 		if number_of_tbeacons > 0 {
 			var fix = dwgps_read(&gpsinfo)
@@ -621,7 +620,7 @@ func sb_calculate_next_time(now C.time_t, current_speed_mph C.float, current_cou
  *
  *--------------------------------------------------------------------*/
 
-func beacon_send(j int, gpsinfo *C.dwgps_info_t) {
+func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	var bp = &(g_misc_config_p.beacon[j])
 
 	if !(bp.sendto_chan >= 0) { //nolint:staticcheck

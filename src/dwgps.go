@@ -34,13 +34,45 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <time.h>
-// #include "dwgps.h"
 import "C"
 
 import (
 	"sync"
-	"unsafe"
 )
+
+/*
+ * Values for fix, equivalent to values from libgps.
+ *	-2 = not initialized.
+ *	-1 = error communicating with GPS receiver.
+ *	0 = nothing heard yet.
+ *	1 = had signal but lost it.
+ *	2 = 2D.
+ *	3 = 3D.
+ *
+ * Undefined float & double values are set to G_UNKNOWN.
+ *
+ */
+
+type dwfix_t int
+
+const (
+	DWFIX_NOT_INIT dwfix_t = -2
+	DWFIX_ERROR    dwfix_t = -1
+	DWFIX_NOT_SEEN dwfix_t = 0
+	DWFIX_NO_FIX   dwfix_t = 1
+	DWFIX_2D       dwfix_t = 2
+	DWFIX_3D       dwfix_t = 3
+)
+
+type dwgps_info_t struct {
+	timestamp   C.time_t /* When last updated.  System time. */
+	fix         dwfix_t  /* Quality of position fix. */
+	dlat        C.double /* Latitude.  Valid if fix >= 2. */
+	dlon        C.double /* Longitude. Valid if fix >= 2. */
+	speed_knots C.float  /* libgps uses meters/sec but we use GPS usual knots. */
+	track       C.float  /* What is difference between track and course? */
+	altitude    C.float  /* meters above mean sea level. Valid if fix == 3. */
+}
 
 var s_dwgps_debug C.int = 0 /* Enable debug output. */
 /* >= 2 show updates from GPS. */
@@ -53,7 +85,7 @@ var s_dwgps_debug C.int = 0 /* Enable debug output. */
  * A critical region to avoid inconsistency between fields.
  */
 
-var s_dwgps_info = new(C.dwgps_info_t)
+var s_dwgps_info = new(dwgps_info_t)
 
 var s_gps_mutex sync.Mutex
 
@@ -92,7 +124,7 @@ func dwgps_init(pconfig *C.struct_misc_config_s, debug C.int) {
 
 	/* TODO KG
 	#if ENABLE_GPSD
-	C.dwgpsd_init(pconfig, debug)
+	dwgpsd_init(pconfig, debug)
 	*/
 
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
@@ -108,10 +140,9 @@ func dwgps_init(pconfig *C.struct_misc_config_s, debug C.int) {
  *
  *--------------------------------------------------------------------*/
 
-//export dwgps_clear
-func dwgps_clear(gpsinfo *C.dwgps_info_t) {
+func dwgps_clear(gpsinfo *dwgps_info_t) {
 	gpsinfo.timestamp = 0
-	gpsinfo.fix = C.DWFIX_NOT_SEEN
+	gpsinfo.fix = DWFIX_NOT_SEEN
 	gpsinfo.dlat = G_UNKNOWN
 	gpsinfo.dlon = G_UNKNOWN
 	gpsinfo.speed_knots = G_UNKNOWN
@@ -132,11 +163,11 @@ func dwgps_clear(gpsinfo *C.dwgps_info_t) {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_read(gpsinfo *C.dwgps_info_t) C.dwfix_t {
+func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
 
 	s_gps_mutex.Lock()
 
-	C.memcpy(unsafe.Pointer(gpsinfo), unsafe.Pointer(&s_dwgps_info), C.sizeof_dwgps_info_t)
+	*gpsinfo = *s_dwgps_info
 
 	s_gps_mutex.Unlock()
 
@@ -164,8 +195,7 @@ func dwgps_read(gpsinfo *C.dwgps_info_t) C.dwfix_t {
  *
  *--------------------------------------------------------------------*/
 
-//export dwgps_print
-func dwgps_print(msg *C.char, gpsinfo *C.dwgps_info_t) {
+func dwgps_print(msg *C.char, gpsinfo *dwgps_info_t) {
 
 	dw_printf("%stime=%d fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
 		C.GoString(msg),
@@ -194,7 +224,7 @@ func dwgps_term() {
 
 	/* TODO KG
 	#if ENABLE_GPSD
-	C.dwgpsd_term()
+	dwgpsd_term()
 	*/
 
 } /* end dwgps_term */
@@ -209,15 +239,14 @@ func dwgps_term() {
  *
  *--------------------------------------------------------------------*/
 
-//export dwgps_set_data
-func dwgps_set_data(gpsinfo *C.dwgps_info_t) {
+func dwgps_set_data(gpsinfo *dwgps_info_t) {
 
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 
 	s_gps_mutex.Lock()
 
-	C.memcpy(unsafe.Pointer(&s_dwgps_info), unsafe.Pointer(gpsinfo), C.sizeof_dwgps_info_t)
+	*s_dwgps_info = *gpsinfo
 
 	s_gps_mutex.Unlock()
 

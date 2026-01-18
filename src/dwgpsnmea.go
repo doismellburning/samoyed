@@ -32,7 +32,6 @@ package direwolf
 // #include <errno.h>
 // #include <time.h>
 // #include <stddef.h>
-// #include "dwgps.h"
 import "C"
 
 import (
@@ -162,9 +161,9 @@ func read_gpsnmea_thread(fd *term.Term) {
 		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
-	var info = new(C.dwgps_info_t)
+	var info = new(dwgps_info_t)
 	dwgps_clear(info)
-	info.fix = C.DWFIX_NOT_SEEN /* clear not init state. */
+	info.fix = DWFIX_NOT_SEEN /* clear not init state. */
 	if s_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print(C.CString("GPSNMEA: "), info)
@@ -187,7 +186,7 @@ func read_gpsnmea_thread(fd *term.Term) {
 			dw_printf("GPSNMEA: Lost communication with GPS receiver.\n")
 			dw_printf("----------------------------------------------\n")
 
-			info.fix = C.DWFIX_ERROR
+			info.fix = DWFIX_ERROR
 			if s_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dwgps_print(C.CString("GPSNMEA: "), info)
@@ -353,7 +352,7 @@ func remove_checksum(sent string, quiet bool) (string, error) {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.double, oknots *C.float, ocourse *C.float) C.dwfix_t {
+func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.double, oknots *C.float, ocourse *C.float) dwfix_t {
 
 	var quiet = _quiet != 0
 
@@ -477,7 +476,7 @@ func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.double, oalt *C.float, onsat *C.int) C.dwfix_t {
+func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.double, oalt *C.float, onsat *C.int) dwfix_t {
 
 	var quiet = _quiet != 0
 
