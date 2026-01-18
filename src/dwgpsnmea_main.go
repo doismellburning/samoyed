@@ -2,7 +2,6 @@
 package direwolf
 
 // #include <string.h>
-// #include "dwgps.h"
 // #include "config.h"
 import "C"
 
@@ -18,20 +17,20 @@ func DWGPSNMEAMain() {
 	dwgps_init(&config, 3)
 
 	for {
-		var info C.dwgps_info_t
+		var info dwgps_info_t
 		var fix = dwgps_read(&info)
 
 		switch fix {
-		case C.DWFIX_2D, C.DWFIX_3D:
+		case DWFIX_2D, DWFIX_3D:
 			fmt.Printf("%.6f  %.6f", info.dlat, info.dlon)
 			fmt.Printf("  %.1f knots  %.0f degrees", info.speed_knots, info.track)
-			if fix == C.DWFIX_3D {
+			if fix == DWFIX_3D {
 				fmt.Printf("  altitude = %.1f meters", info.altitude)
 			}
 			fmt.Printf("\n")
-		case C.DWFIX_NOT_SEEN, C.DWFIX_NO_FIX:
+		case DWFIX_NOT_SEEN, DWFIX_NO_FIX:
 			fmt.Printf("Location currently not available.\n")
-		case C.DWFIX_NOT_INIT:
+		case DWFIX_NOT_INIT:
 			fmt.Printf("GPS Init failed.\n")
 			os.Exit(1)
 		default:

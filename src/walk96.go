@@ -17,7 +17,6 @@ package direwolf
 // #include "config.h"
 // #include "ax25_pad.h"
 // #include "latlong.h"
-// #include "dwgps.h"
 import "C"
 
 import (
@@ -66,10 +65,10 @@ func Walk96Main() {
 	SLEEP_SEC(1) /* Wait for sample before reading. */
 
 	for range HOWLONG {
-		var info C.dwgps_info_t
+		var info dwgps_info_t
 		var fix = dwgps_read(&info)
 
-		if fix > C.DWFIX_2D {
+		if fix > DWFIX_2D {
 			walk96(int(fix), float64(info.dlat), float64(info.dlon), float64(info.speed_knots), float64(info.track), float64(info.altitude))
 		} else if fix < 0 {
 			fmt.Printf("Can't communicate with GPS receiver.\n")
