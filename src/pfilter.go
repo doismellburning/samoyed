@@ -112,7 +112,7 @@ type pfstate_t struct {
 	 *		g_name		- for object or item
 	 *		g_comment
 	 */
-	decoded C.decode_aprs_t
+	decoded decode_aprs_t
 
 	/*
 	 * These are set by next_token.
@@ -566,12 +566,12 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		}
 	} else if pf.token_str[0] == 'g' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* g - Addressee of message. e.g. "BLN*" for bulletins. */
-		if pf.decoded.g_message_subtype == C.message_subtype_message ||
-			pf.decoded.g_message_subtype == C.message_subtype_ack ||
-			pf.decoded.g_message_subtype == C.message_subtype_rej ||
-			pf.decoded.g_message_subtype == C.message_subtype_bulletin ||
-			pf.decoded.g_message_subtype == C.message_subtype_nws ||
-			pf.decoded.g_message_subtype == C.message_subtype_directed_query {
+		if pf.decoded.g_message_subtype == message_subtype_message ||
+			pf.decoded.g_message_subtype == message_subtype_ack ||
+			pf.decoded.g_message_subtype == message_subtype_rej ||
+			pf.decoded.g_message_subtype == message_subtype_bulletin ||
+			pf.decoded.g_message_subtype == message_subtype_nws ||
+			pf.decoded.g_message_subtype == message_subtype_directed_query {
 			result = filt_bodgu(pf, C.GoString(&pf.decoded.g_addressee[0]))
 
 			if pfilter_debug >= 2 {
@@ -653,7 +653,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 			ax25_get_info(pf.pp, &infop)
 
 			text_color_set(DW_COLOR_DEBUG)
-			if pf.decoded.g_packet_type == C.packet_type_message {
+			if pf.decoded.g_packet_type == packet_type_message {
 				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), C.GoString(&pf.decoded.g_addressee[0]))
 			} else {
 				dw_printf("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result))
@@ -767,48 +767,48 @@ func filt_t(pf *pfstate_t) C.int {
 		switch f {
 
 		case 'p': /* Position */
-			if pf.decoded.g_packet_type == C.packet_type_position {
+			if pf.decoded.g_packet_type == packet_type_position {
 				return (1)
 			}
 
 		case 'o': /* Object */
-			if pf.decoded.g_packet_type == C.packet_type_object {
+			if pf.decoded.g_packet_type == packet_type_object {
 				return (1)
 			}
 
 		case 'i': /* Item */
-			if pf.decoded.g_packet_type == C.packet_type_item {
+			if pf.decoded.g_packet_type == packet_type_item {
 				return (1)
 			}
 
 		case 'm': // Any "message."
-			if pf.decoded.g_packet_type == C.packet_type_message {
+			if pf.decoded.g_packet_type == packet_type_message {
 				return (1)
 			}
 
 		case 'q': /* Query */
-			if pf.decoded.g_packet_type == C.packet_type_query {
+			if pf.decoded.g_packet_type == packet_type_query {
 				return (1)
 			}
 
 		case 'c': /* station Capabilities - my extension */
 			/* Most often used for IGate statistics. */
-			if pf.decoded.g_packet_type == C.packet_type_capabilities {
+			if pf.decoded.g_packet_type == packet_type_capabilities {
 				return (1)
 			}
 
 		case 's': /* Status */
-			if pf.decoded.g_packet_type == C.packet_type_status {
+			if pf.decoded.g_packet_type == packet_type_status {
 				return (1)
 			}
 
 		case 't': /* Telemetry data or metadata */
-			if pf.decoded.g_packet_type == C.packet_type_telemetry {
+			if pf.decoded.g_packet_type == packet_type_telemetry {
 				return (1)
 			}
 
 		case 'u': /* User-defined */
-			if pf.decoded.g_packet_type == C.packet_type_userdefined {
+			if pf.decoded.g_packet_type == packet_type_userdefined {
 				return (1)
 			}
 
@@ -819,7 +819,7 @@ func filt_t(pf *pfstate_t) C.int {
 
 		case 'w': /* Weather */
 
-			if pf.decoded.g_packet_type == C.packet_type_weather {
+			if pf.decoded.g_packet_type == packet_type_weather {
 				return (1)
 			}
 
@@ -827,13 +827,13 @@ func filt_t(pf *pfstate_t) C.int {
 			/* Object with _ symbol is also weather.  APRS protocol spec page 66. */
 			// Can't use *infop because it would not work with 3rd party header.
 
-			if (pf.decoded.g_packet_type == C.packet_type_position ||
-				pf.decoded.g_packet_type == C.packet_type_object) && pf.decoded.g_symbol_code == '_' {
+			if (pf.decoded.g_packet_type == packet_type_position ||
+				pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_' {
 				return (1)
 			}
 
 		case 'n': /* NWS format */
-			if pf.decoded.g_packet_type == C.packet_type_nws {
+			if pf.decoded.g_packet_type == packet_type_nws {
 				return (1)
 			}
 
@@ -1291,7 +1291,7 @@ func filt_i(pf *pfstate_t) C.int {
 	 * Get source address and info part.
 	 * Addressee has already been extracted into pf.decoded.g_addressee.
 	 */
-	if pf.decoded.g_packet_type != C.packet_type_message {
+	if pf.decoded.g_packet_type != packet_type_message {
 		return (0)
 	}
 

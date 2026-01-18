@@ -190,7 +190,7 @@ func DecodeAPRSLine(line string) {
 			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
-			var A C.decode_aprs_t
+			var A decode_aprs_t
 			decode_aprs(&A, pp, 0, nil) // Extract information into structure.
 
 			decode_aprs_print(&A) // Now print it in human readable format.
@@ -206,7 +206,7 @@ func DecodeAPRSLine(line string) {
 
 		var pp = ax25_from_text(C.CString(line), 1)
 		if pp != nil {
-			var A C.decode_aprs_t
+			var A decode_aprs_t
 
 			decode_aprs(&A, pp, 0, nil) // Extract information into structure.
 

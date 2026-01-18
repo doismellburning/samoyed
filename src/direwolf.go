@@ -1049,7 +1049,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	var ais_obj_packet [300]C.char
 
 	if ax25_is_aprs(pp) > 0 {
-		var A C.decode_aprs_t
+		var A decode_aprs_t
 
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
