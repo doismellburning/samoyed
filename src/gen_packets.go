@@ -58,7 +58,6 @@ package direwolf
 // #include <math.h>
 // #include "audio.h"
 // #include "ax25_pad.h"
-// #include "gen_packets.h"
 // int audio_flush_real (int a);
 // int audio_put_real (int a, int c);
 // void dcd_change_real (int chan, int subchan, int slice, int state);
@@ -66,7 +65,9 @@ import "C"
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -75,6 +76,24 @@ import (
 	"github.com/spf13/pflag"
 )
 
+type wav_header struct { /* .WAV file header. */
+	riff            [4]C.char /* "RIFF" */
+	filesize        C.int     /* file length - 8 */
+	wave            [4]C.char /* "WAVE" */
+	fmt             [4]C.char /* "fmt " */
+	fmtsize         C.int     /* 16. */
+	wformattag      C.short   /* 1 for PCM. */
+	nchannels       C.short   /* 1 for mono, 2 for stereo. */
+	nsamplespersec  C.int     /* sampling freq, Hz. */
+	navgbytespersec C.int     /* = nblockalign * nsamplespersec. */
+	nblockalign     C.short   /* = wbitspersample / 8 * nchannels. */
+	wbitspersample  C.short   /* 16 or 8. */
+	data            [4]C.char /* "data" */
+	datasize        C.int     /* number of bytes following. */
+}
+
+const MY_RAND_MAX = 0x7fffffff
+
 var GEN_PACKETS = false // Switch between fakes and reals at runtime
 
 var modem C.struct_audio_s
@@ -82,18 +101,18 @@ var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
 var g_noise_level C.float = 0
 
-var out_fp *C.FILE
+var out_fp *os.File
 
 var byte_count C.int /* Number of data bytes written to file. Will be written to header when file is closed. */
 
-var gen_header C.struct_wav_header
+var gen_header wav_header
 
 var genPacketsRandSeed int32 = 1
 
 // Although the tests in `test-scripts` all call `atest` with an acceptable *range* of packets, the only way I could get them all to pass was by reimplementing this exact PRNG from Dire Wolf's gen_packets.c - all my attempts to use Go's `math/rand` resulted in decodes that would fall outside of the acceptable range. It's far from impossible that I somehow screwed up my use of `math/rand`, but I think it more likely that the tests depend on this exact PRNG implementation, which I should address at some point. /KG
 // Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG
 func genPacketsRand() int32 {
-	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & C.MY_RAND_MAX)
+	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & MY_RAND_MAX)
 	return genPacketsRandSeed
 }
 
@@ -635,16 +654,14 @@ func audio_file_open(fname string, pa *C.struct_audio_s) int {
 	/*
 	 * Write the file header.  Don't know length yet.
 	 */
-	out_fp = C.fopen(C.CString(fname), C.CString("wb"))
+	var openErr error
+	out_fp, openErr = os.Create(fname)
 
-	if out_fp == nil {
+	if openErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't open file for write: %s\n", fname)
-		C.perror(C.CString(""))
+		fmt.Printf("Couldn't open %s for write: %s\n", fname, openErr)
 		return (-1)
 	}
-
-	C.memset(unsafe.Pointer(&gen_header), 0, C.sizeof_struct_wav_header)
 
 	// TODO KG Can't get memcpy to work, so just stuff it in manually
 	// C.memcpy(unsafe.Pointer(&gen_header.riff[0]), unsafe.Pointer(C.CString("RIFF")), 4)
@@ -683,13 +700,12 @@ func audio_file_open(fname string, pa *C.struct_audio_s) int {
 		panic("assert(gen_header.nchannels == 1 || gen_header.nchannels == 2)")
 	}
 
-	var n = C.fwrite(unsafe.Pointer(&gen_header), C.sizeof_struct_wav_header, 1, out_fp)
+	var writeErr = binary.Write(out_fp, binary.LittleEndian, gen_header)
 
-	if n != 1 {
+	if writeErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't write header to: %s\n", fname)
-		C.perror(C.CString(""))
-		C.fclose(out_fp)
+		fmt.Printf("Couldn't write header to %s: %s\n", fname, writeErr)
+		out_fp.Close()
 		out_fp = nil
 		return (-1)
 	}
@@ -721,28 +737,33 @@ func audio_file_close() int {
 	/*
 	 * Go back and fix up lengths in header.
 	 */
-	gen_header.filesize = byte_count + C.sizeof_struct_wav_header - 8
+	gen_header.filesize = byte_count + C.int(binary.Size(new(wav_header))) - 8
 	gen_header.datasize = byte_count
 
 	if out_fp == nil {
 		return (-1)
 	}
 
-	C.fflush(out_fp)
-
-	C.fseek(out_fp, 0, C.SEEK_SET)
-	var n = C.fwrite(unsafe.Pointer(&gen_header), C.sizeof_struct_wav_header, 1, out_fp)
-
-	if n != 1 {
+	var _, seekErr = out_fp.Seek(0, io.SeekStart)
+	if seekErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't write header to audio file.\n")
-		C.perror(C.CString("")) // TODO: remove perror.
-		C.fclose(out_fp)
+		fmt.Printf("Couldn't seek in audio file: %s\n", seekErr)
+		out_fp.Close()
 		out_fp = nil
 		return (-1)
 	}
 
-	C.fclose(out_fp)
+	var writeErr = binary.Write(out_fp, binary.LittleEndian, gen_header)
+
+	if writeErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		fmt.Printf("Couldn't write header to audio file: %s\n", writeErr)
+		out_fp.Close()
+		out_fp = nil
+		return (-1)
+	}
+
+	out_fp.Close()
 	out_fp = nil
 
 	return (0)
@@ -819,7 +840,7 @@ func send_packet(str string) {
 			// Then throw in a random amount of time so that receiving
 			// DPLL will need to adjust to a new phase.
 
-			var n = int(float64(samples_per_symbol) * (32 + float64(genPacketsRand())/float64(C.MY_RAND_MAX)))
+			var n = int(float64(samples_per_symbol) * (32 + float64(genPacketsRand())/float64(MY_RAND_MAX)))
 
 			for range n {
 				gen_tone_put_sample(c, 0, 0)
@@ -866,7 +887,7 @@ func audio_put_fake(a C.int, c C.int) C.int {
 			/* Add random noise to the signal. */
 			/* r should be in range of -1 .. +1. */
 
-			var r = (float64(genPacketsRand()) - float64(C.MY_RAND_MAX)/2.0) / (float64(C.MY_RAND_MAX) / 2.0)
+			var r = (float64(genPacketsRand()) - float64(MY_RAND_MAX)/2.0) / (float64(MY_RAND_MAX) / 2.0)
 
 			s += C.int(5 * C.float(r) * g_noise_level * C.float(32767))
 
@@ -877,12 +898,19 @@ func audio_put_fake(a C.int, c C.int) C.int {
 				s = -32767
 			}
 
-			C.putc(s&0xff, out_fp)
-			return (C.putc((s>>8)&0xff, out_fp))
+			var n, writeErr = out_fp.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
+			if writeErr != nil {
+				return -1
+			}
+			return C.int(n)
 		}
 	} else {
 		byte_count++
-		return (C.putc(c, out_fp))
+		var n, writeErr = out_fp.Write([]byte{byte(c)})
+		if writeErr != nil {
+			return -1
+		}
+		return C.int(n)
 	}
 
 } /* end audio_put */
