@@ -32,9 +32,6 @@ package direwolf
 // #include "audio.h"
 // #include "config.h"
 // #include "latlong.h"
-// #if USE_CM108		// Current Linux or Windows only
-// #include "cm108.h"
-// #endif
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"
@@ -1916,7 +1913,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// Failure at this point is not an error.
 				// See if config file sets it explicitly before complaining.
 
-				C.cm108_find_ptt(&p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out[0],
+				cm108_find_ptt(&p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out[0],
 					&p_audio_config.achan[channel].octrl[ot].ptt_device[0],
 					C.int(len(p_audio_config.achan[channel].octrl[ot].ptt_device)))
 
