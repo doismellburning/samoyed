@@ -42,7 +42,6 @@ package direwolf
 // #include "regex.h"
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "digipeater.h"
 import "C"
 
 import (
@@ -50,12 +49,59 @@ import (
 )
 
 /*
+ * Information required for digipeating.
+ *
+ * The configuration file reader fills in this information
+ * and it is passed to digipeater_init at application start up time.
+ */
+const DEFAULT_DEDUPE = 30
+
+type preempt_e int
+
+const (
+	PREEMPT_OFF preempt_e = iota
+	PREEMPT_DROP
+	PREEMPT_MARK
+	PREEMPT_TRACE
+)
+
+type digi_config_s struct {
+	dedupe_time C.int /* Don't digipeat duplicate packets */
+	/* within this number of seconds. */
+
+	/*
+	 * Rules for each of the [from_chan][to_chan] combinations.
+	 */
+
+	alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.regex_t
+
+	wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.regex_t
+
+	enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.int
+
+	preempt [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]preempt_e
+
+	// ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
+	// DO NOT put this in the User Guide.  On a need to know basis.
+
+	atgp [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS][AX25_MAX_ADDR_LEN]C.char
+
+	filter_str [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]*C.char
+	// NULL or optional Packet Filter strings such as "t/m".
+	// Notice the size of arrays is one larger than normal.
+	// That extra position is for the IGate.
+
+	regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.int // Regenerate packet.
+	// Sort of like digipeating but passed along unchanged.
+}
+
+/*
  * Keep pointer to configuration options.
  * Set by digipeater_init and used later.
  */
 
 var digipeater_audio_config *C.struct_audio_s
-var save_digi_config_p *C.struct_digi_config_s
+var save_digi_config_p *digi_config_s
 
 /*
  * Maintain count of packets digipeated for each combination of from/to channel.
@@ -83,7 +129,7 @@ func digipeater_get_count(from_chan, to_chan int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func digipeater_init(p_audio_config *C.struct_audio_s, p_digi_config *C.struct_digi_config_s) {
+func digipeater_init(p_audio_config *C.struct_audio_s, p_digi_config *digi_config_s) {
 	digipeater_audio_config = p_audio_config
 	save_digi_config_p = p_digi_config
 
@@ -246,7 +292,7 @@ func digipeat_match(
 	alias *C.regex_t,
 	wide *C.regex_t,
 	to_chan C.int,
-	preempt C.enum_preempt_e,
+	preempt preempt_e,
 	atgp *C.char,
 	filter_str *C.char,
 ) C.packet_t {
@@ -389,7 +435,7 @@ func digipeat_match(
 	 * But consider this case:  https://github.com/wb2osz/direwolf/issues/488
 	 */
 
-	if preempt != C.PREEMPT_OFF {
+	if preempt != PREEMPT_OFF {
 		for r2 := r + 1; r2 < ax25_get_num_addr(pp); r2++ {
 			var repeater2 [AX25_MAX_ADDR_LEN]C.char
 
@@ -407,7 +453,7 @@ func digipeat_match(
 				ax25_set_h(result, r2)
 
 				switch preempt {
-				case C.PREEMPT_DROP: /* remove all prior */
+				case PREEMPT_DROP: /* remove all prior */
 					// TODO: deprecate this option.  Result is misleading.
 
 					text_color_set(DW_COLOR_ERROR)
@@ -417,7 +463,7 @@ func digipeat_match(
 						ax25_remove_addr(result, r2-1)
 						r2--
 					}
-				case C.PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
+				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
 
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
@@ -429,7 +475,7 @@ func digipeat_match(
 					}
 				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
 					which was the original behaviour of the C too
-				case C.PREEMPT_TRACE:
+				case PREEMPT_TRACE:
 				*/
 				/* My enhancement - remove prior unused digis. */
 				/* this provides an accurate path of where packet traveled. */

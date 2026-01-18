@@ -29,7 +29,6 @@ package direwolf
 // #endif
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "digipeater.h"
 // #include "cdigipeater.h"
 // #include "config.h"
 // #include "latlong.h"
@@ -621,7 +620,7 @@ func rtfm() {
 }
 
 func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
-	p_digi_config *C.struct_digi_config_s,
+	p_digi_config *digi_config_s,
 	p_cdigi_config *C.struct_cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
@@ -2538,29 +2537,29 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			}
 
 			p_digi_config.enabled[from_chan][to_chan] = 1
-			p_digi_config.preempt[from_chan][to_chan] = C.PREEMPT_OFF
+			p_digi_config.preempt[from_chan][to_chan] = PREEMPT_OFF
 
 			t = split("", false)
 			if t != "" {
 				if strings.EqualFold(t, "OFF") {
-					p_digi_config.preempt[from_chan][to_chan] = C.PREEMPT_OFF
+					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_OFF
 					t = split("", false)
 				} else if strings.EqualFold(t, "DROP") {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Preemptive digipeating DROP option is discouraged.\n", line)
 					dw_printf("It can create a via path which is misleading about the actual path taken.\n")
 					dw_printf("PREEMPT is the best choice for this feature.\n")
-					p_digi_config.preempt[from_chan][to_chan] = C.PREEMPT_DROP
+					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_DROP
 					t = split("", false)
 				} else if strings.EqualFold(t, "MARK") {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Preemptive digipeating MARK option is discouraged.\n", line)
 					dw_printf("It can create a via path which is misleading about the actual path taken.\n")
 					dw_printf("PREEMPT is the best choice for this feature.\n")
-					p_digi_config.preempt[from_chan][to_chan] = C.PREEMPT_MARK
+					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_MARK
 					t = split("", false)
 				} else if (strings.EqualFold(t, "TRACE")) || (strings.HasPrefix(strings.ToUpper(t), "PREEMPT")) {
-					p_digi_config.preempt[from_chan][to_chan] = C.PREEMPT_TRACE
+					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_TRACE
 					t = split("", false)
 				} else if strings.HasPrefix(strings.ToUpper(t), "ATGP=") {
 					C.strcpy(&p_digi_config.atgp[from_chan][to_chan][0], C.CString(t[5:]))
