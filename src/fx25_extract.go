@@ -52,7 +52,6 @@ package direwolf
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <string.h>
-// #include "fx25.h"
 import "C"
 
 import (
@@ -61,7 +60,7 @@ import (
 
 // #define DEBUG 5
 
-func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) C.int {
+func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.int {
 	// Access rs struct members
 	var nn = int(rs.nn)
 	var nroots = int(rs.nroots)

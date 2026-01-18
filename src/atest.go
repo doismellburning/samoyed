@@ -51,7 +51,6 @@ package direwolf
 // #include "audio.h"
 // #include "ax25_pad.h"
 // #include "dlq.h"
-// #include "fx25.h"
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
 // void ptt_set_real (int ot, int chan, int ptt_signal);

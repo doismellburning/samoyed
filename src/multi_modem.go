@@ -70,7 +70,6 @@ package direwolf
 // #include <unistd.h>
 // #include "ax25_pad.h"
 // #include "dlq.h"
-// #include "fx25.h"
 // #include "version.h"
 import "C"
 

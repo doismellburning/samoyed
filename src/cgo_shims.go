@@ -7,7 +7,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "dwgps.h"
 // #include "config.h"
-// #include "fx25.h"
 // #include "fsk_demod_state.h"
 import "C"
 

@@ -12,7 +12,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>
 // #include <stdlib.h>
-// #include "fx25.h"
 // #include "dlq.h"
 import "C"
 

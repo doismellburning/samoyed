@@ -5,7 +5,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <stdio.h>
-// #include "fx25.h"		// For Reed Solomon stuff.
 import "C"
 
 import (
@@ -21,12 +20,12 @@ const MAX_NROOTS = 16
 const NTAB = 5
 
 type TabType struct {
-	symsize C.uint       // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly C.uint       // Field generator polynomial coefficients.
-	fcs     C.uint       // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
-	prim    C.uint       // Primitive element to generate polynomial roots.
-	nroots  C.uint       // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
-	rs      *C.struct_rs // Pointer to RS codec control block.  Filled in at init time.
+	symsize C.uint // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly C.uint // Field generator polynomial coefficients.
+	fcs     C.uint // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
+	prim    C.uint // Primitive element to generate polynomial roots.
+	nroots  C.uint // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
+	rs      *rs_t  // Pointer to RS codec control block.  Filled in at init time.
 }
 
 var Tab = [NTAB]TabType{
@@ -75,7 +74,7 @@ func il2p_set_debug(debug C.int) {
 
 // Find RS codec control block for specified number of parity symbols.
 
-func il2p_find_rs(nparity C.int) *C.struct_rs {
+func il2p_find_rs(nparity C.int) *rs_t {
 	for n := 0; n < NTAB; n++ {
 		if Tab[n].nroots == C.uint(nparity) {
 			return Tab[n].rs

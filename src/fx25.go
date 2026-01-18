@@ -1,6 +1,5 @@
 package direwolf
 
-// #include "fx25.h"
 import "C"
 
 const CTAG_MIN = 0x01
@@ -12,7 +11,20 @@ const FX25_MAX_DATA = 239   // i.e. RS(255,239)
 const FX25_MAX_CHECK = 64   // e.g. RS(255, 191)
 const FX25_BLOCK_SIZE = 255 // Block size always 255 for 8 bit symbols.
 
-func modnn(rs *C.struct_rs, _x int) C.int {
+/* Reed-Solomon codec control block */
+type rs_t struct {
+	mm       C.uint   /* Bits per symbol */
+	nn       C.uint   /* Symbols per block (= (1<<mm)-1) */
+	alpha_to *C.uchar /* log lookup table */
+	index_of *C.uchar /* Antilog lookup table */
+	genpoly  *C.uchar /* Generator polynomial */
+	nroots   C.uint   /* Number of generator roots = number of parity symbols */
+	fcr      C.uchar  /* First consecutive root, index form */
+	prim     C.uchar  /* Primitive element, index form */
+	iprim    C.uchar  /* prim-th root of 1, index form */
+}
+
+func modnn(rs *rs_t, _x int) C.int {
 
 	var x = C.uint(_x)
 

@@ -6,7 +6,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>
 // #include <stdlib.h>
-// #include "fx25.h"
 import "C"
 
 import (

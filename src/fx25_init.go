@@ -43,7 +43,6 @@ package direwolf
 // #include <stdint.h>
 // #include <inttypes.h>
 // #include <assert.h>
-// #include "fx25.h"
 import "C"
 
 import (
@@ -56,12 +55,12 @@ const EXIT_FAILURE = 1
 const FX25_NTAB = 3
 
 var fx25Tab = [FX25_NTAB]struct {
-	symsize C.uint       // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly C.uint       // Field generator polynomial coefficients.
-	fcs     C.uint       // First root of RS code generator polynomial, index form.
-	prim    C.uint       // Primitive element to generate polynomial roots.
-	nroots  C.uint       // RS code generator polynomial degree (number of roots).
-	rs      *C.struct_rs // Pointer to RS codec control block.  Filled in at init time.
+	symsize C.uint // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly C.uint // Field generator polynomial coefficients.
+	fcs     C.uint // First root of RS code generator polynomial, index form.
+	prim    C.uint // Primitive element to generate polynomial roots.
+	nroots  C.uint // RS code generator polynomial degree (number of roots).
+	rs      *rs_t  // Pointer to RS codec control block.  Filled in at init time.
 }{
 	{8, 0x11d, 1, 1, 16, nil}, // RS(255,239)
 	{8, 0x11d, 1, 1, 32, nil}, // RS(255,223)
@@ -134,11 +133,10 @@ func fx25_tag_find_match(t C.uint64_t) C.int {
 	return -1
 }
 
-func free_rs_char(rs *C.struct_rs) {
+func free_rs_char(rs *rs_t) {
 	C.free(unsafe.Pointer(rs.alpha_to))
 	C.free(unsafe.Pointer(rs.index_of))
 	C.free(unsafe.Pointer(rs.genpoly))
-	C.free(unsafe.Pointer(rs))
 }
 
 /*-------------------------------------------------------------
@@ -232,7 +230,7 @@ func fx25_init(debug_level C.int) {
 
 // Get properties of specified CTAG number.
 
-func fx25_get_rs(ctag_num C.int) *C.struct_rs {
+func fx25_get_rs(ctag_num C.int) *rs_t {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
@@ -360,7 +358,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
  *   nroots = RS code generator polynomial degree (number of roots)
  */
 
-func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots C.uint) *C.struct_rs {
+func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots C.uint) *rs_t {
 	if symsize > 8*C.sizeof_uchar {
 		return nil // Need version with ints rather than chars
 	}
@@ -375,12 +373,8 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 		return nil // Can't have more roots than symbol values!
 	}
 
-	var rs = (*C.struct_rs)(C.calloc(1, C.sizeof_struct_rs))
-	if rs == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FATAL ERROR: Out of memory.\n")
-		exit(EXIT_FAILURE)
-	}
+	var rs = new(rs_t)
+
 	rs.mm = symsize
 	rs.nn = C.uint((1 << symsize) - 1)
 

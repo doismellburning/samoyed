@@ -37,14 +37,13 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "fx25.h"
 import "C"
 
 import (
 	"unsafe"
 )
 
-func encode_rs_char(rs *C.struct_rs, data *C.uchar, bb *C.uchar) {
+func encode_rs_char(rs *rs_t, data *C.uchar, bb *C.uchar) {
 
 	var nroots = int(rs.nroots)
 	var nn = int(rs.nn)
