@@ -43,7 +43,6 @@ package direwolf
 // #include <stdint.h>
 // #include <inttypes.h>
 // #include <assert.h>
-// #include "fx25.h"
 import "C"
 
 import (
@@ -56,12 +55,12 @@ const EXIT_FAILURE = 1
 const FX25_NTAB = 3
 
 var fx25Tab = [FX25_NTAB]struct {
-	symsize C.uint       // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly C.uint       // Field generator polynomial coefficients.
-	fcs     C.uint       // First root of RS code generator polynomial, index form.
-	prim    C.uint       // Primitive element to generate polynomial roots.
-	nroots  C.uint       // RS code generator polynomial degree (number of roots).
-	rs      *C.struct_rs // Pointer to RS codec control block.  Filled in at init time.
+	symsize C.uint // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly C.uint // Field generator polynomial coefficients.
+	fcs     C.uint // First root of RS code generator polynomial, index form.
+	prim    C.uint // Primitive element to generate polynomial roots.
+	nroots  C.uint // RS code generator polynomial degree (number of roots).
+	rs      *rs_t  // Pointer to RS codec control block.  Filled in at init time.
 }{
 	{8, 0x11d, 1, 1, 16, nil}, // RS(255,239)
 	{8, 0x11d, 1, 1, 32, nil}, // RS(255,223)
@@ -125,9 +124,8 @@ const CLOSE_ENOUGH = 8 // How many bits can be wrong in tag yet consider it a ma
 // Given a 64 bit correlation tag value, find acceptable match in table.
 // Return index into table or -1 for no match.
 
-//export fx25_tag_find_match
 func fx25_tag_find_match(t C.uint64_t) C.int {
-	for c := int(C.CTAG_MIN); c <= int(C.CTAG_MAX); c++ {
+	for c := CTAG_MIN; c <= CTAG_MAX; c++ {
 		if bits.OnesCount64(uint64(t)^tags[c].value) <= CLOSE_ENOUGH {
 			return C.int(c)
 		}
@@ -135,12 +133,10 @@ func fx25_tag_find_match(t C.uint64_t) C.int {
 	return -1
 }
 
-//export free_rs_char
-func free_rs_char(rs *C.struct_rs) {
+func free_rs_char(rs *rs_t) {
 	C.free(unsafe.Pointer(rs.alpha_to))
 	C.free(unsafe.Pointer(rs.index_of))
 	C.free(unsafe.Pointer(rs.genpoly))
-	C.free(unsafe.Pointer(rs))
 }
 
 /*-------------------------------------------------------------
@@ -164,12 +160,11 @@ func free_rs_char(rs *C.struct_rs) {
 
 var g_debug_level C.int
 
-//export fx25_init
 func fx25_init(debug_level C.int) {
 	g_debug_level = debug_level
 
 	for i := 0; i < FX25_NTAB; i++ {
-		fx25Tab[i].rs = C.INIT_RS(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
+		fx25Tab[i].rs = init_rs_char(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
 		if fx25Tab[i].rs == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("FX.25 internal error: init_rs_char failed!\n")
@@ -190,84 +185,78 @@ func fx25_init(debug_level C.int) {
 		}
 	}
 
-	for j := int(C.CTAG_MIN); j <= int(C.CTAG_MAX); j++ {
+	for j := CTAG_MIN; j <= CTAG_MAX; j++ {
 		Assert(tags[j].n_block_radio-tags[j].k_data_radio == int(fx25Tab[tags[j].itab].nroots))
 		Assert(tags[j].n_block_rs-tags[j].k_data_rs == int(fx25Tab[tags[j].itab].nroots))
-		Assert(tags[j].n_block_rs == C.FX25_BLOCK_SIZE)
+		Assert(tags[j].n_block_rs == FX25_BLOCK_SIZE)
 	}
 
-	Assert(C.fx25_pick_mode(100+1, 239) == 1)
-	Assert(C.fx25_pick_mode(100+1, 240) == -1)
+	Assert(fx25_pick_mode(100+1, 239) == 1)
+	Assert(fx25_pick_mode(100+1, 240) == -1)
 
-	Assert(C.fx25_pick_mode(100+5, 223) == 5)
-	Assert(C.fx25_pick_mode(100+5, 224) == -1)
+	Assert(fx25_pick_mode(100+5, 223) == 5)
+	Assert(fx25_pick_mode(100+5, 224) == -1)
 
-	Assert(C.fx25_pick_mode(100+9, 191) == 9)
-	Assert(C.fx25_pick_mode(100+9, 192) == -1)
+	Assert(fx25_pick_mode(100+9, 191) == 9)
+	Assert(fx25_pick_mode(100+9, 192) == -1)
 
-	Assert(C.fx25_pick_mode(16, 32) == 4)
-	Assert(C.fx25_pick_mode(16, 64) == 3)
-	Assert(C.fx25_pick_mode(16, 128) == 2)
-	Assert(C.fx25_pick_mode(16, 239) == 1)
-	Assert(C.fx25_pick_mode(16, 240) == -1)
+	Assert(fx25_pick_mode(16, 32) == 4)
+	Assert(fx25_pick_mode(16, 64) == 3)
+	Assert(fx25_pick_mode(16, 128) == 2)
+	Assert(fx25_pick_mode(16, 239) == 1)
+	Assert(fx25_pick_mode(16, 240) == -1)
 
-	Assert(C.fx25_pick_mode(32, 32) == 8)
-	Assert(C.fx25_pick_mode(32, 64) == 7)
-	Assert(C.fx25_pick_mode(32, 128) == 6)
-	Assert(C.fx25_pick_mode(32, 223) == 5)
-	Assert(C.fx25_pick_mode(32, 234) == -1)
+	Assert(fx25_pick_mode(32, 32) == 8)
+	Assert(fx25_pick_mode(32, 64) == 7)
+	Assert(fx25_pick_mode(32, 128) == 6)
+	Assert(fx25_pick_mode(32, 223) == 5)
+	Assert(fx25_pick_mode(32, 234) == -1)
 
-	Assert(C.fx25_pick_mode(64, 64) == 11)
-	Assert(C.fx25_pick_mode(64, 128) == 10)
-	Assert(C.fx25_pick_mode(64, 191) == 9)
-	Assert(C.fx25_pick_mode(64, 192) == -1)
+	Assert(fx25_pick_mode(64, 64) == 11)
+	Assert(fx25_pick_mode(64, 128) == 10)
+	Assert(fx25_pick_mode(64, 191) == 9)
+	Assert(fx25_pick_mode(64, 192) == -1)
 
-	Assert(C.fx25_pick_mode(1, 32) == 4)
-	Assert(C.fx25_pick_mode(1, 33) == 3)
-	Assert(C.fx25_pick_mode(1, 64) == 3)
-	Assert(C.fx25_pick_mode(1, 65) == 6)
-	Assert(C.fx25_pick_mode(1, 128) == 6)
-	Assert(C.fx25_pick_mode(1, 191) == 9)
-	Assert(C.fx25_pick_mode(1, 223) == 5)
-	Assert(C.fx25_pick_mode(1, 239) == 1)
-	Assert(C.fx25_pick_mode(1, 240) == -1)
+	Assert(fx25_pick_mode(1, 32) == 4)
+	Assert(fx25_pick_mode(1, 33) == 3)
+	Assert(fx25_pick_mode(1, 64) == 3)
+	Assert(fx25_pick_mode(1, 65) == 6)
+	Assert(fx25_pick_mode(1, 128) == 6)
+	Assert(fx25_pick_mode(1, 191) == 9)
+	Assert(fx25_pick_mode(1, 223) == 5)
+	Assert(fx25_pick_mode(1, 239) == 1)
+	Assert(fx25_pick_mode(1, 240) == -1)
 }
 
 // Get properties of specified CTAG number.
 
-//export fx25_get_rs
-func fx25_get_rs(ctag_num C.int) *C.struct_rs {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+func fx25_get_rs(ctag_num C.int) *rs_t {
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
 	return fx25Tab[tags[ctag_num].itab].rs
 }
 
-//export fx25_get_ctag_value
 func fx25_get_ctag_value(ctag_num C.int) C.uint64_t {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.uint64_t(tags[ctag_num].value)
 }
 
-//export fx25_get_k_data_radio
 func fx25_get_k_data_radio(ctag_num C.int) C.int {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(tags[ctag_num].k_data_radio)
 }
 
-//export fx25_get_k_data_rs
 func fx25_get_k_data_rs(ctag_num C.int) C.int {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(tags[ctag_num].k_data_rs)
 }
 
-//export fx25_get_nroots
 func fx25_get_nroots(ctag_num C.int) C.int {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(fx25Tab[tags[ctag_num].itab].nroots)
 }
 
-//export fx25_get_debug
 func fx25_get_debug() C.int {
 	return g_debug_level
 }
@@ -297,7 +286,6 @@ func fx25_get_debug() C.int {
  *
  *--------------------------------------------------------------*/
 
-//export fx25_pick_mode
 func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	if fx_mode <= 0 {
 		return -1
@@ -306,8 +294,8 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	// Specify a specific tag by adding 100 to the number.
 	// Fails if data won't fit.
 
-	if fx_mode-100 >= C.CTAG_MIN && fx_mode-100 <= C.CTAG_MAX {
-		if dlen <= C.fx25_get_k_data_radio(fx_mode-100) {
+	if fx_mode-100 >= CTAG_MIN && fx_mode-100 <= CTAG_MAX {
+		if dlen <= fx25_get_k_data_radio(fx_mode-100) {
 			return fx_mode - 100
 		} else {
 			return -1 // Assuming caller prints failure message.
@@ -318,8 +306,8 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	// Pick the shortest one that can handle the required data length.
 
 	if fx_mode == 16 || fx_mode == 32 || fx_mode == 64 {
-		for k := int(C.CTAG_MAX); k >= int(C.CTAG_MIN); k-- {
-			if fx_mode == C.fx25_get_nroots(C.int(k)) && dlen <= C.fx25_get_k_data_radio(C.int(k)) {
+		for k := CTAG_MAX; k >= CTAG_MIN; k-- {
+			if fx_mode == fx25_get_nroots(C.int(k)) && dlen <= fx25_get_k_data_radio(C.int(k)) {
 				return C.int(k)
 			}
 		}
@@ -353,7 +341,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	var prefer = [6]C.int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
 	for k := 0; k < 6; k++ {
 		var m = prefer[k]
-		if dlen <= C.fx25_get_k_data_radio(m) {
+		if dlen <= fx25_get_k_data_radio(m) {
 			return m
 		}
 	}
@@ -370,8 +358,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
  *   nroots = RS code generator polynomial degree (number of roots)
  */
 
-//export init_rs_char
-func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots C.uint) *C.struct_rs {
+func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots C.uint) *rs_t {
 	if symsize > 8*C.sizeof_uchar {
 		return nil // Need version with ints rather than chars
 	}
@@ -386,12 +373,8 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 		return nil // Can't have more roots than symbol values!
 	}
 
-	var rs = (*C.struct_rs)(C.calloc(1, C.sizeof_struct_rs))
-	if rs == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FATAL ERROR: Out of memory.\n")
-		exit(EXIT_FAILURE)
-	}
+	var rs = new(rs_t)
+
 	rs.mm = symsize
 	rs.nn = C.uint((1 << symsize) - 1)
 
@@ -458,13 +441,13 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 		// Multiply rs->genpoly[] by  @**(root + x)
 		for j := i; j > 0; j-- {
 			if genpoly[j] != 0 {
-				genpoly[j] = genpoly[j-1] ^ alpha_to[C.modnn(rs, C.int(index_of[genpoly[j]])+C.int(root))]
+				genpoly[j] = genpoly[j-1] ^ alpha_to[modnn(rs, int(index_of[genpoly[j]])+root)]
 			} else {
 				genpoly[j] = genpoly[j-1]
 			}
 		}
 		// rs->genpoly[0] can never be zero
-		genpoly[0] = alpha_to[C.modnn(rs, C.int(index_of[genpoly[0]])+C.int(root))]
+		genpoly[0] = alpha_to[modnn(rs, int(index_of[genpoly[0]])+root)]
 	}
 	// convert rs->genpoly[] to index form for quicker encoding
 	for i := 0; i <= int(nroots); i++ {
@@ -478,7 +461,6 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 // FIXME: We already have multiple copies of this.
 // Consolidate them into one somewhere.
 
-//export fx_hex_dump
 func fx_hex_dump(_p *C.uchar, length C.int) {
 	var p = C.GoBytes(unsafe.Pointer(_p), length)
 	var offset = 0

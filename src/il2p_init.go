@@ -5,7 +5,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <stdio.h>
-// #include "fx25.h"		// For Reed Solomon stuff.
 import "C"
 
 import (
@@ -21,12 +20,12 @@ const MAX_NROOTS = 16
 const NTAB = 5
 
 type TabType struct {
-	symsize C.uint       // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly C.uint       // Field generator polynomial coefficients.
-	fcs     C.uint       // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
-	prim    C.uint       // Primitive element to generate polynomial roots.
-	nroots  C.uint       // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
-	rs      *C.struct_rs // Pointer to RS codec control block.  Filled in at init time.
+	symsize C.uint // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly C.uint // Field generator polynomial coefficients.
+	fcs     C.uint // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
+	prim    C.uint // Primitive element to generate polynomial roots.
+	nroots  C.uint // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
+	rs      *rs_t  // Pointer to RS codec control block.  Filled in at init time.
 }
 
 var Tab = [NTAB]TabType{
@@ -55,7 +54,7 @@ func il2p_init(il2p_debug C.int) {
 
 	for i := 0; i < NTAB; i++ {
 		Assert(Tab[i].nroots <= MAX_NROOTS)
-		Tab[i].rs = C.init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
+		Tab[i].rs = init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
 		if Tab[i].rs == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("IL2P internal error: init_rs_char failed!\n")
@@ -75,7 +74,7 @@ func il2p_set_debug(debug C.int) {
 
 // Find RS codec control block for specified number of parity symbols.
 
-func il2p_find_rs(nparity C.int) *C.struct_rs {
+func il2p_find_rs(nparity C.int) *rs_t {
 	for n := 0; n < NTAB; n++ {
 		if Tab[n].nroots == C.uint(nparity) {
 			return Tab[n].rs
@@ -111,7 +110,7 @@ func il2p_encode_rs(tx_data *C.uchar, data_size C.int, num_parity C.int, parity_
 
 	var rs_block [FX25_BLOCK_SIZE]C.uchar
 	C.memcpy(unsafe.Pointer(&rs_block[C.int(len(rs_block))-data_size-num_parity]), unsafe.Pointer(tx_data), C.size_t(data_size))
-	C.encode_rs_char(il2p_find_rs(num_parity), &rs_block[0], parity_out)
+	encode_rs_char(il2p_find_rs(num_parity), &rs_block[0], parity_out)
 }
 
 /*-------------------------------------------------------------
@@ -152,7 +151,7 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
 
-	var derrors = C.decode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &derrlocs[0], 0)
+	var derrors = decode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &derrlocs[0], 0)
 	C.memcpy(unsafe.Pointer(out), unsafe.Pointer(&rs_block[C.int(len(rs_block))-n]), C.size_t(data_size))
 
 	if il2p_get_debug() >= 3 {

@@ -6,7 +6,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>
 // #include <stdlib.h>
-// #include "fx25.h"
 import "C"
 
 import (
@@ -18,10 +17,10 @@ import (
 func FxrecMain() {
 	FXTEST = true
 
-	C.fx25_init(3)
+	fx25_init(3)
 
 	var i C.int
-	for i = C.CTAG_MIN; i <= C.CTAG_MAX; i++ {
+	for i = CTAG_MIN; i <= CTAG_MAX; i++ {
 		var fname = fmt.Sprintf("fx%02x.dat", i)
 		var fp = C.fopen(C.CString(fname), C.CString("rb"))
 		if fp == nil {
@@ -34,7 +33,7 @@ func FxrecMain() {
 		for C.fread(unsafe.Pointer(&ch), 1, 1, fp) == 1 {
 			var imask C.uchar
 			for imask = 0x01; imask != 0; imask <<= 1 {
-				C.fx25_rec_bit(0, 0, 0, C.int(ch&imask))
+				fx25_rec_bit(0, 0, 0, C.int(ch&imask))
 			}
 		}
 		C.fclose(fp)

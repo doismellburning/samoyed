@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "fx25.h"
 // #include "audio.h"
 import "C"
 
@@ -59,7 +58,7 @@ var fx25BitsSent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "fx25_se
  *--------------------------------------------------------------*/
 
 func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, test_mode bool) C.int {
-	if C.fx25_get_debug() >= 3 {
+	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
@@ -83,17 +82,17 @@ func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, t
 	// Pick suitable correlation tag depending on
 	// user's preference, for number of check bytes,
 	// and the data size.
-	var ctag_num = C.fx25_pick_mode(fx_mode, dlen)
+	var ctag_num = fx25_pick_mode(fx_mode, dlen)
 
-	if ctag_num < C.CTAG_MIN || ctag_num > C.CTAG_MAX {
+	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.\n", channel, fx_mode, dlen)
 		return (-1)
 	}
 
-	var ctag_value = C.fx25_get_ctag_value(ctag_num)
-	var k_data_radio = C.fx25_get_k_data_radio(ctag_num)
-	var k_data_rs = C.fx25_get_k_data_rs(ctag_num)
+	var ctag_value = fx25_get_ctag_value(ctag_num)
+	var k_data_radio = fx25_get_k_data_radio(ctag_num)
+	var k_data_rs = fx25_get_k_data_rs(ctag_num)
 
 	// Zero out part of data which won't be transmitted
 	var shorten_by = FX25_MAX_DATA - k_data_radio
@@ -110,14 +109,14 @@ func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, t
 	const fence C.uchar = 0xaa
 	var check [FX25_MAX_CHECK + 1]C.uchar
 	check[FX25_MAX_CHECK] = fence
-	var rs = C.fx25_get_rs(ctag_num)
+	var rs = fx25_get_rs(ctag_num)
 
 	Assert(k_data_rs+C.int(rs.nroots) == C.int(rs.nn))
 
-	C.ENCODE_RS(rs, data, &check[0])
+	encode_rs_char(rs, data, &check[0])
 	Assert(check[FX25_MAX_CHECK] == fence)
 
-	if C.fx25_get_debug() >= 3 {
+	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
 		fx_hex_dump(data, k_data_radio)

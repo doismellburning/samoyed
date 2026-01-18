@@ -27,7 +27,6 @@ package direwolf
 // #include "digipeater.h"
 // #include "cdigipeater.h"
 // #include "dwgps.h"
-// #include "fx25.h"
 // #include "dlq.h"		// for fec_type_t definition.
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
@@ -594,7 +593,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the demodulator(s) and layer 2 decoder (HDLC, IL2P).
 	 */
 	multi_modem_init(audio_config)
-	C.fx25_init(C.int(d_x_opt))
+	fx25_init(C.int(d_x_opt))
 	il2p_init(C.int(d_2_opt))
 
 	/*

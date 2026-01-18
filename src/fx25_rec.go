@@ -12,7 +12,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>
 // #include <stdlib.h>
-// #include "fx25.h"
 // #include "dlq.h"
 import "C"
 
@@ -72,7 +71,6 @@ var fx25_test_count = 0
 
 const FENCE = 0x55 // to detect buffer overflow.
 
-//export fx25_rec_bit
 func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 
 	// Allocate context blocks only as needed.
@@ -96,21 +94,21 @@ func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 			F.accum |= 1 << 63
 		}
 
-		var c = C.fx25_tag_find_match(F.accum)
-		if c >= C.CTAG_MIN && c <= C.CTAG_MAX {
+		var c = fx25_tag_find_match(F.accum)
+		if c >= CTAG_MIN && c <= CTAG_MAX {
 
 			F.ctag_num = c
-			F.k_data_radio = C.fx25_get_k_data_radio(F.ctag_num)
-			F.nroots = C.fx25_get_nroots(F.ctag_num)
-			F.coffs = C.fx25_get_k_data_rs(F.ctag_num)
+			F.k_data_radio = fx25_get_k_data_radio(F.ctag_num)
+			F.nroots = fx25_get_nroots(F.ctag_num)
+			F.coffs = fx25_get_k_data_rs(F.ctag_num)
 			Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
 
-			if C.fx25_get_debug() >= 2 {
+			if fx25_get_debug() >= 2 {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("FX.25[%d.%d]: Matched correlation tag 0x%02x with %d bit errors.  Expecting %d data & %d check bytes.\n",
 					channel, slice, // ideally subchannel too only if applicable
 					c,
-					bits.OnesCount(uint(F.accum^C.fx25_get_ctag_value(c))),
+					bits.OnesCount(uint(F.accum^fx25_get_ctag_value(c))),
 					F.k_data_radio, F.nroots)
 			}
 
@@ -177,7 +175,6 @@ func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
  *
  ***********************************************************************************/
 
-//export fx25_rec_busy
 func fx25_rec_busy(channel C.int) C.int {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
@@ -227,7 +224,7 @@ func fx25_rec_busy(channel C.int) C.int {
  ***********************************************************************************/
 
 func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_context_s) {
-	if C.fx25_get_debug() >= 3 {
+	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
 		fx_hex_dump(&F.block[0], FX25_BLOCK_SIZE)
@@ -235,13 +232,13 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 	Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
-	var rs = C.fx25_get_rs(F.ctag_num)
+	var rs = fx25_get_rs(F.ctag_num)
 
-	var derrors = C.DECODE_RS(rs, &F.block[0], &derrlocs[0], 0)
+	var derrors = decode_rs_char(rs, &F.block[0], &derrlocs[0], 0)
 
 	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
 
-		if C.fx25_get_debug() >= 2 {
+		if fx25_get_debug() >= 2 {
 			text_color_set(DW_COLOR_INFO)
 			if derrors == 0 {
 				dw_printf("FX.25[%d.%d]: FEC complete with no errors.\n", channel, slice)
@@ -263,7 +260,7 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 			var expected_fcs = fcs_calc(&frame_buf[0], frame_len-2)
 			if actual_fcs == expected_fcs {
 
-				if C.fx25_get_debug() >= 3 {
+				if fx25_get_debug() >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
 					fx_hex_dump(&frame_buf[0], frame_len)
@@ -291,7 +288,7 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 			fx_hex_dump(&F.block[0], F.dlen)
 			fx_hex_dump(&frame_buf[0], frame_len)
 		}
-	} else if C.fx25_get_debug() >= 2 {
+	} else if fx25_get_debug() >= 2 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d]: FEC failed.  Too many errors.\n", channel, slice)
 	}

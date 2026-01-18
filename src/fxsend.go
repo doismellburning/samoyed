@@ -5,7 +5,6 @@ package direwolf
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "fx25.h"
 // #include "audio.h"
 import "C"
 
@@ -26,10 +25,10 @@ func FxsendMain() {
 	fmt.Println("This generates 11 files named fx01.dat, fx02.dat, ..., fx0b.dat")
 	fmt.Println("Run fxrec as second part of test.")
 
-	C.fx25_init(3)
+	fx25_init(3)
 
 	var i C.int
-	for i = 100 + C.CTAG_MIN; i <= 100+C.CTAG_MAX; i++ {
+	for i = 100 + CTAG_MIN; i <= 100+CTAG_MAX; i++ {
 		fx25_send_frame(0, &preload[0], C.int(len(preload)-3), i, true)
 	}
 }

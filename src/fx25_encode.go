@@ -37,15 +37,13 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "fx25.h"
 import "C"
 
 import (
 	"unsafe"
 )
 
-//export encode_rs_char
-func encode_rs_char(rs *C.struct_rs, data *C.uchar, bb *C.uchar) {
+func encode_rs_char(rs *rs_t, data *C.uchar, bb *C.uchar) {
 
 	var nroots = int(rs.nroots)
 	var nn = int(rs.nn)
@@ -69,9 +67,9 @@ func encode_rs_char(rs *C.struct_rs, data *C.uchar, bb *C.uchar) {
 
 		if C.uint(feedback) != rs.nn { // feedback term is non-zero
 			for j := 1; j < nroots; j++ {
-				// bb[j] ^= ALPHA_TO[MODNN(feedback + GENPOLY[NROOTS-j])]
+				// bb[j] ^= ALPHA_TO[modnn(feedback + GENPOLY[NROOTS-j])]
 				var genpolyVal = C.uchar(genpolySlice[nroots-j])
-				var modnnResult = C.modnn(rs, C.int(feedback)+C.int(genpolyVal))
+				var modnnResult = modnn(rs, int(feedback)+int(genpolyVal))
 				bbSlice[j] ^= alphaToSlice[modnnResult]
 			}
 		}
@@ -81,9 +79,9 @@ func encode_rs_char(rs *C.struct_rs, data *C.uchar, bb *C.uchar) {
 
 		// bb[NROOTS-1] = ...
 		if C.uint(feedback) != rs.nn {
-			// ALPHA_TO[MODNN(feedback + GENPOLY[0])]
+			// ALPHA_TO[modnn(feedback + GENPOLY[0])]
 			var genpolyVal = C.uchar(genpolySlice[0])
-			var modnnResult = C.modnn(rs, C.int(feedback)+C.int(genpolyVal))
+			var modnnResult = modnn(rs, int(feedback)+int(genpolyVal))
 			bbSlice[nroots-1] = alphaToSlice[modnnResult]
 		} else {
 			bbSlice[nroots-1] = 0

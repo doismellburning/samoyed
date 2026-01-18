@@ -7,7 +7,6 @@ package direwolf
 // #include "decode_aprs.h"
 // #include "dwgps.h"
 // #include "config.h"
-// #include "fx25.h"
 // #include "fsk_demod_state.h"
 import "C"
 
@@ -78,10 +77,6 @@ const AX25_MAX_PACKET_LEN = C.AX25_MAX_PACKET_LEN
 const AX25_MAX_REPEATERS = C.AX25_MAX_REPEATERS
 const AX25_REPEATER_1 = C.AX25_REPEATER_1
 const AX25_SOURCE = C.AX25_SOURCE
-
-const FX25_BLOCK_SIZE = C.FX25_BLOCK_SIZE
-const FX25_MAX_CHECK = C.FX25_MAX_CHECK
-const FX25_MAX_DATA = C.FX25_MAX_DATA
 
 const WPL_FORMAT_NMEA_GENERIC = C.WPL_FORMAT_NMEA_GENERIC
 const WPL_FORMAT_GARMIN = C.WPL_FORMAT_GARMIN

@@ -52,7 +52,6 @@ package direwolf
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <string.h>
-// #include "fx25.h"
 import "C"
 
 import (
@@ -61,8 +60,7 @@ import (
 
 // #define DEBUG 5
 
-//export decode_rs_char
-func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.int) C.int {
+func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.int {
 	// Access rs struct members
 	var nn = int(rs.nn)
 	var nroots = int(rs.nroots)
@@ -75,11 +73,6 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 	var dataSlice = unsafe.Slice((*byte)(data), nn)
 	var alphaTo = unsafe.Slice((*byte)(rs.alpha_to), nn+1)
 	var indexOf = unsafe.Slice((*byte)(rs.index_of), nn+1)
-
-	// Local helper function for MODNN
-	modnn := func(x int) int {
-		return int(C.modnn(rs, C.int(x)))
-	}
 
 	var degLambda, el, degOmega int
 	var i, j, r, k int
@@ -108,7 +101,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 			if s[i] == 0 {
 				s[i] = dataSlice[j]
 			} else {
-				s[i] = dataSlice[j] ^ alphaTo[modnn(int(indexOf[s[i]])+(fcr+i)*prim)]
+				s[i] = dataSlice[j] ^ alphaTo[modnn(rs, int(indexOf[s[i]])+(fcr+i)*prim)]
 			}
 		}
 	}
@@ -137,13 +130,13 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 	if no_eras > 0 {
 		// Init lambda to be the erasure locator polynomial
 		var erasPosSlice = unsafe.Slice(eras_pos, no_eras)
-		lambda[1] = alphaTo[modnn(prim*(nn-1-int(erasPosSlice[0])))]
+		lambda[1] = alphaTo[modnn(rs, prim*(nn-1-int(erasPosSlice[0])))]
 		for i = 1; i < int(no_eras); i++ {
-			u = byte(modnn(prim * (nn - 1 - int(erasPosSlice[i]))))
+			u = byte(modnn(rs, prim*(nn-1-int(erasPosSlice[i]))))
 			for j = i + 1; j > 0; j-- {
 				tmp = indexOf[lambda[j-1]]
 				if int(tmp) != A0 {
-					lambda[j] ^= alphaTo[modnn(int(u)+int(tmp))]
+					lambda[j] ^= alphaTo[modnn(rs, int(u)+int(tmp))]
 				}
 			}
 		}
@@ -157,11 +150,11 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 		//   reg[i] = INDEX_OF[lambda[i]];
 		//
 		// count = 0;
-		// for (i = 1,k=IPRIM-1; i <= NN; i++,k = MODNN(k+IPRIM)) {
+		// for (i = 1,k=IPRIM-1; i <= NN; i++,k = modnn(k+IPRIM)) {
 		//   q = 1;
 		//   for (j = 1; j <= no_eras; j++)
 		// 	if (reg[j] != A0) {
-		// 	  reg[j] = MODNN(reg[j] + j);
+		// 	  reg[j] = modnn(reg[j] + j);
 		// 	  q ^= ALPHA_TO[reg[j]];
 		// 	}
 		//   if (q != 0)
@@ -200,7 +193,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 		discrR = 0
 		for i = 0; i < r; i++ {
 			if lambda[i] != 0 && int(s[r-i-1]) != A0 {
-				discrR ^= alphaTo[modnn(int(indexOf[lambda[i]])+int(s[r-i-1]))]
+				discrR ^= alphaTo[modnn(rs, int(indexOf[lambda[i]])+int(s[r-i-1]))]
 			}
 		}
 		discrR = indexOf[discrR] // Index form
@@ -214,7 +207,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 			t[0] = lambda[0]
 			for i = 0; i < nroots; i++ {
 				if int(b[i]) != A0 {
-					t[i+1] = lambda[i+1] ^ alphaTo[modnn(int(discrR)+int(b[i]))]
+					t[i+1] = lambda[i+1] ^ alphaTo[modnn(rs, int(discrR)+int(b[i]))]
 				} else {
 					t[i+1] = lambda[i+1]
 				}
@@ -226,7 +219,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 					if lambda[i] == 0 {
 						b[i] = byte(A0)
 					} else {
-						b[i] = byte(modnn(int(indexOf[lambda[i]]) - int(discrR) + nn))
+						b[i] = byte(modnn(rs, int(indexOf[lambda[i]])-int(discrR)+nn))
 					}
 				}
 			} else {
@@ -252,11 +245,11 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 	// memcpy(&reg[1],&lambda[1],NROOTS*sizeof(reg[0]));
 	copy(reg[1:nroots+1], lambda[1:nroots+1])
 	count = 0 // Number of roots of lambda(x)
-	for i, k = 1, iprim-1; i <= nn; i, k = i+1, modnn(k+iprim) {
+	for i, k = 1, iprim-1; i <= nn; i, k = i+1, int(modnn(rs, k+iprim)) {
 		q = 1 // lambda[0] is always 0
 		for j = degLambda; j > 0; j-- {
 			if int(reg[j]) != A0 {
-				reg[j] = byte(modnn(int(reg[j]) + j))
+				reg[j] = byte(modnn(rs, int(reg[j])+j))
 				q ^= alphaTo[reg[j]]
 			}
 		}
@@ -294,7 +287,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 		}
 		for ; j >= 0; j-- {
 			if int(s[i-j]) != A0 && int(lambda[j]) != A0 {
-				tmp ^= alphaTo[modnn(int(s[i-j])+int(lambda[j]))]
+				tmp ^= alphaTo[modnn(rs, int(s[i-j])+int(lambda[j]))]
 			}
 		}
 		if tmp != 0 {
@@ -310,10 +303,10 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 		num1 = 0
 		for i = degOmega; i >= 0; i-- {
 			if int(omega[i]) != A0 {
-				num1 ^= alphaTo[modnn(int(omega[i])+i*int(root[j]))]
+				num1 ^= alphaTo[modnn(rs, int(omega[i])+i*int(root[j]))]
 			}
 		}
-		num2 = alphaTo[modnn(int(root[j])*(fcr-1)+nn)]
+		num2 = alphaTo[modnn(rs, int(root[j])*(fcr-1)+nn)]
 		den = 0
 
 		// lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i]
@@ -325,7 +318,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 		}
 		for i = maxI & ^1; i >= 0; i -= 2 {
 			if int(lambda[i+1]) != A0 {
-				den ^= alphaTo[modnn(int(lambda[i+1])+i*int(root[j]))]
+				den ^= alphaTo[modnn(rs, int(lambda[i+1])+i*int(root[j]))]
 			}
 		}
 		if den == 0 {
@@ -337,7 +330,7 @@ func decode_rs_char(rs *C.struct_rs, data *C.uchar, eras_pos *C.int, no_eras C.i
 		}
 		// Apply error to data
 		if num1 != 0 {
-			dataSlice[loc[j]] ^= alphaTo[modnn(int(indexOf[num1])+int(indexOf[num2])+nn-int(indexOf[den]))]
+			dataSlice[loc[j]] ^= alphaTo[modnn(rs, int(indexOf[num1])+int(indexOf[num2])+nn-int(indexOf[den]))]
 		}
 	}
 finish:
