@@ -127,7 +127,7 @@ const CLOSE_ENOUGH = 8 // How many bits can be wrong in tag yet consider it a ma
 
 //export fx25_tag_find_match
 func fx25_tag_find_match(t C.uint64_t) C.int {
-	for c := int(C.CTAG_MIN); c <= int(C.CTAG_MAX); c++ {
+	for c := CTAG_MIN; c <= CTAG_MAX; c++ {
 		if bits.OnesCount64(uint64(t)^tags[c].value) <= CLOSE_ENOUGH {
 			return C.int(c)
 		}
@@ -190,10 +190,10 @@ func fx25_init(debug_level C.int) {
 		}
 	}
 
-	for j := int(C.CTAG_MIN); j <= int(C.CTAG_MAX); j++ {
+	for j := CTAG_MIN; j <= CTAG_MAX; j++ {
 		Assert(tags[j].n_block_radio-tags[j].k_data_radio == int(fx25Tab[tags[j].itab].nroots))
 		Assert(tags[j].n_block_rs-tags[j].k_data_rs == int(fx25Tab[tags[j].itab].nroots))
-		Assert(tags[j].n_block_rs == C.FX25_BLOCK_SIZE)
+		Assert(tags[j].n_block_rs == FX25_BLOCK_SIZE)
 	}
 
 	Assert(C.fx25_pick_mode(100+1, 239) == 1)
@@ -237,7 +237,7 @@ func fx25_init(debug_level C.int) {
 
 //export fx25_get_rs
 func fx25_get_rs(ctag_num C.int) *C.struct_rs {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
 	return fx25Tab[tags[ctag_num].itab].rs
@@ -245,25 +245,25 @@ func fx25_get_rs(ctag_num C.int) *C.struct_rs {
 
 //export fx25_get_ctag_value
 func fx25_get_ctag_value(ctag_num C.int) C.uint64_t {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.uint64_t(tags[ctag_num].value)
 }
 
 //export fx25_get_k_data_radio
 func fx25_get_k_data_radio(ctag_num C.int) C.int {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(tags[ctag_num].k_data_radio)
 }
 
 //export fx25_get_k_data_rs
 func fx25_get_k_data_rs(ctag_num C.int) C.int {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(tags[ctag_num].k_data_rs)
 }
 
 //export fx25_get_nroots
 func fx25_get_nroots(ctag_num C.int) C.int {
-	Assert(ctag_num >= C.CTAG_MIN && ctag_num <= C.CTAG_MAX)
+	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(fx25Tab[tags[ctag_num].itab].nroots)
 }
 
@@ -306,7 +306,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	// Specify a specific tag by adding 100 to the number.
 	// Fails if data won't fit.
 
-	if fx_mode-100 >= C.CTAG_MIN && fx_mode-100 <= C.CTAG_MAX {
+	if fx_mode-100 >= CTAG_MIN && fx_mode-100 <= CTAG_MAX {
 		if dlen <= C.fx25_get_k_data_radio(fx_mode-100) {
 			return fx_mode - 100
 		} else {
@@ -318,7 +318,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	// Pick the shortest one that can handle the required data length.
 
 	if fx_mode == 16 || fx_mode == 32 || fx_mode == 64 {
-		for k := int(C.CTAG_MAX); k >= int(C.CTAG_MIN); k-- {
+		for k := CTAG_MAX; k >= CTAG_MIN; k-- {
 			if fx_mode == C.fx25_get_nroots(C.int(k)) && dlen <= C.fx25_get_k_data_radio(C.int(k)) {
 				return C.int(k)
 			}

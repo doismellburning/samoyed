@@ -83,14 +83,4 @@ int fx25_pick_mode (int fx_mode, int dlen);
 void fx_hex_dump(unsigned char *x, int len);
 
 
-
-#define CTAG_MIN 0x01
-#define CTAG_MAX 0x0B
-
-// Maximum sizes of "data" and "check" parts.
-
-#define FX25_MAX_DATA 239	// i.e. RS(255,239)
-#define FX25_MAX_CHECK 64	// e.g. RS(255, 191)
-#define FX25_BLOCK_SIZE 255	// Block size always 255 for 8 bit symbols.
-
 #endif // FX25_H

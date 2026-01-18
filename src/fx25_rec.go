@@ -97,7 +97,7 @@ func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 		}
 
 		var c = C.fx25_tag_find_match(F.accum)
-		if c >= C.CTAG_MIN && c <= C.CTAG_MAX {
+		if c >= CTAG_MIN && c <= CTAG_MAX {
 
 			F.ctag_num = c
 			F.k_data_radio = C.fx25_get_k_data_radio(F.ctag_num)

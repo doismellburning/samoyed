@@ -85,7 +85,7 @@ func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, t
 	// and the data size.
 	var ctag_num = C.fx25_pick_mode(fx_mode, dlen)
 
-	if ctag_num < C.CTAG_MIN || ctag_num > C.CTAG_MAX {
+	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.\n", channel, fx_mode, dlen)
 		return (-1)

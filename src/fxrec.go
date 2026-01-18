@@ -21,7 +21,7 @@ func FxrecMain() {
 	C.fx25_init(3)
 
 	var i C.int
-	for i = C.CTAG_MIN; i <= C.CTAG_MAX; i++ {
+	for i = CTAG_MIN; i <= CTAG_MAX; i++ {
 		var fname = fmt.Sprintf("fx%02x.dat", i)
 		var fp = C.fopen(C.CString(fname), C.CString("rb"))
 		if fp == nil {
