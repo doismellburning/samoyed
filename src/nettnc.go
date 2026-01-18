@@ -295,7 +295,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 				var retries C.retry_t
 
 				var spectrum = C.CString("Network TNC")
-				C.dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+				dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel_override)

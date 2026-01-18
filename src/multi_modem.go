@@ -342,7 +342,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 		if drop_it {
 			ax25_delete(pp)
 		} else {
-			C.dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, C.CString(""))
+			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, C.CString(""))
 		}
 		return
 	}
@@ -555,7 +555,7 @@ func pick_best_candidate(channel C.int) {
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)
-		C.dlq_rec_frame(channel, j, k,
+		dlq_rec_frame(channel, j, k,
 			candidate[channel][j][k].packet_p,
 			candidate[channel][j][k].alevel,
 			candidate[channel][j][k].fec_type,

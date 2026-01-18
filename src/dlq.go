@@ -196,7 +196,6 @@ func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packe
 
 } /* end dlq_rec_frame */
 
-//export dlq_rec_frame
 func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum *C.char) {
 	if ATEST_C {
 		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
@@ -654,7 +653,6 @@ func dlq_unregister_callsign(addr *C.char, channel C.int, client C.int) {
  *
  *--------------------------------------------------------------------*/
 
-//export dlq_channel_busy
 func dlq_channel_busy(channel C.int, activity C.int, status C.int) {
 
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
