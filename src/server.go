@@ -127,7 +127,6 @@ package direwolf
 // #include <stddef.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "dlq.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 

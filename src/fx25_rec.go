@@ -12,7 +12,7 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>
 // #include <stdlib.h>
-// #include "dlq.h"
+// #include "audio.h"
 import "C"
 
 import (

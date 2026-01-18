@@ -89,7 +89,6 @@ package direwolf
 // #include <sys/types.h>
 // #include <assert.h>
 // #include "audio.h"
-// #include "dlq.h"
 import "C"
 
 import (
@@ -204,7 +203,7 @@ func recv_process() {
 
 			if pitem != nil {
 				switch pitem._type {
-				case C.DLQ_REC_FRAME:
+				case DLQ_REC_FRAME:
 					/*
 					 * This is the traditional processing.
 					 * For all frames:
@@ -223,23 +222,23 @@ func recv_process() {
 					 * Link processing.
 					 */
 					lm_data_indication(pitem)
-				case C.DLQ_CONNECT_REQUEST:
+				case DLQ_CONNECT_REQUEST:
 					dl_connect_request(pitem)
-				case C.DLQ_DISCONNECT_REQUEST:
+				case DLQ_DISCONNECT_REQUEST:
 					dl_disconnect_request(pitem)
-				case C.DLQ_XMIT_DATA_REQUEST:
+				case DLQ_XMIT_DATA_REQUEST:
 					dl_data_request(pitem)
-				case C.DLQ_REGISTER_CALLSIGN:
+				case DLQ_REGISTER_CALLSIGN:
 					dl_register_callsign(pitem)
-				case C.DLQ_UNREGISTER_CALLSIGN:
+				case DLQ_UNREGISTER_CALLSIGN:
 					dl_unregister_callsign(pitem)
-				case C.DLQ_OUTSTANDING_FRAMES_REQUEST:
+				case DLQ_OUTSTANDING_FRAMES_REQUEST:
 					dl_outstanding_frames_request(pitem)
-				case C.DLQ_CHANNEL_BUSY:
+				case DLQ_CHANNEL_BUSY:
 					lm_channel_busy(pitem)
-				case C.DLQ_SEIZE_CONFIRM:
+				case DLQ_SEIZE_CONFIRM:
 					lm_seize_confirm(pitem)
-				case C.DLQ_CLIENT_CLEANUP:
+				case DLQ_CLIENT_CLEANUP:
 					dl_client_cleanup(pitem)
 				}
 

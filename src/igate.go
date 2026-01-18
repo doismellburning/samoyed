@@ -41,7 +41,6 @@ package direwolf
 // #include "ax25_pad.h"
 // #include "version.h"
 // #include "digipeater.h"
-// #include "dlq.h"
 // #include "latlong.h"
 import "C"
 
@@ -1091,9 +1090,9 @@ func igate_recv_thread() {
 					// See what happens with -2 and follow up on this.
 					// Do we need something else here?
 					var slice C.int = 0
-					var fec_type C.fec_type_t = C.fec_type_none
+					var fec_type fec_type_t = fec_type_none
 					var spectrum = C.CString("APRS-IS")
-					C.dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, C.RETRY_NONE, spectrum)
+					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, C.RETRY_NONE, spectrum)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)

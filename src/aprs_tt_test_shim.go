@@ -13,7 +13,6 @@ package direwolf
 // #include "version.h"
 // #include "ax25_pad.h"
 // #include "latlong.h"
-// #include "dlq.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"

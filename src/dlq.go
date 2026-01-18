@@ -26,18 +26,123 @@ package direwolf
 // #include <errno.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "dlq.h"
 import "C"
 
 import (
+	"slices"
 	"sync"
 	"time"
 	"unsafe"
 )
 
+/* A transmit or receive data block for connected mode. */
+
+const TXDATA_MAGIC = 0x09110911
+
+type cdata_t struct {
+	magic C.int /* For integrity checking. */
+
+	next *cdata_t /* Pointer to next when part of a list. */
+
+	pid C.int /* Protocol id. */
+
+	size C.int /* Number of bytes allocated. */
+
+	len C.int /* Number of bytes actually used. */
+
+	data []C.char /* Variable length data. */
+}
+
+// FIXME KG cdata_t.data?
+
+/* Types of things that can be in queue. */
+
+type dlq_type_t int
+
+const (
+	DLQ_REC_FRAME dlq_type_t = iota
+	DLQ_CONNECT_REQUEST
+	DLQ_DISCONNECT_REQUEST
+	DLQ_XMIT_DATA_REQUEST
+	DLQ_REGISTER_CALLSIGN
+	DLQ_UNREGISTER_CALLSIGN
+	DLQ_OUTSTANDING_FRAMES_REQUEST
+	DLQ_CHANNEL_BUSY
+	DLQ_SEIZE_CONFIRM
+	DLQ_CLIENT_CLEANUP
+)
+
+type fec_type_t int
+
+const (
+	fec_type_none fec_type_t = 0
+	fec_type_fx25 fec_type_t = 1
+	fec_type_il2p fec_type_t = 2
+)
+
+/* A queue item. */
+
+// TODO: call this event rather than item.
+// TODO: should add fences.
+
+type dlq_item_t struct {
+	nextp *dlq_item_t /* Next item in queue. */
+
+	_type dlq_type_t /* Type of item. */
+	/* See enum definition above. */
+
+	_chan C.int /* Radio channel of origin. */
+
+	// I'm not worried about amount of memory used but this might be a
+	// little clearer if a union was used for the different event types.
+
+	// Used for received frame.
+
+	subchan C.int /* Winning "subchannel" when using multiple */
+	/* decoders on one channel.  */
+	/* Special case, -1 means DTMF decoder. */
+	/* Maybe we should have a different type in this case? */
+
+	slice C.int /* Winning slicer. */
+
+	pp C.packet_t /* Pointer to frame structure. */
+
+	alevel C.alevel_t /* Audio level. */
+
+	fec_type fec_type_t // Type of FEC for received signal: none, FX.25, or IL2P.
+
+	retries C.retry_t /* Effort expended to get a valid CRC. */
+	/* Bits changed for regular AX.25. */
+	/* Number of bytes fixed for FX.25. */
+
+	spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]C.char /* "Spectrum" display for multi-decoders. */
+
+	// Used by requests from a client application, connect, etc.
+
+	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+
+	num_addr C.int /* Range 2 .. 10. */
+
+	client C.int
+
+	// Used only by client request to transmit connected data.
+
+	txdata *cdata_t
+
+	// Used for channel activity change.
+	// It is useful to know when the channel is busy either for carrier detect
+	// or when we are transmitting.
+
+	activity C.int /* OCTYPE_PTT for my transmission start/end. */
+	/* OCTYPE_DCD if we hear someone else. */
+
+	status C.int /* 1 for active or 0 for quiet. */
+
+}
+
 /* The queue is a linked list of these. */
 
-var dlq_queue_head *C.struct_dlq_item_s /* Head of linked list for queue. */
+var dlq_queue_head *dlq_item_t /* Head of linked list for queue. */
 
 var dlq_mutex sync.Mutex /* Critical section for updating queues. */
 
@@ -138,7 +243,7 @@ func dlq_init() {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum *C.char) {
+func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries C.retry_t, spectrum *C.char) {
 
 	/* TODO KG
 	#if DEBUG
@@ -167,7 +272,7 @@ func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packe
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
 	if s_new_count > s_delete_count+50 {
@@ -176,7 +281,7 @@ func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packe
 	}
 
 	pnew.nextp = nil
-	pnew._type = C.DLQ_REC_FRAME
+	pnew._type = DLQ_REC_FRAME
 	pnew._chan = channel
 	pnew.slice = slice
 	pnew.subchan = subchannel
@@ -196,8 +301,7 @@ func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp C.packe
 
 } /* end dlq_rec_frame */
 
-//export dlq_rec_frame
-func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type C.fec_type_t, retries C.retry_t, spectrum *C.char) {
+func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries C.retry_t, spectrum *C.char) {
 	if ATEST_C {
 		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	} else {
@@ -224,7 +328,7 @@ func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, 
  *
  *--------------------------------------------------------------------*/
 
-func append_to_queue(pnew *C.struct_dlq_item_s) {
+func append_to_queue(pnew *dlq_item_t) {
 
 	if !was_init {
 		dlq_init()
@@ -240,7 +344,7 @@ func append_to_queue(pnew *C.struct_dlq_item_s) {
 	*/
 	dlq_mutex.Lock()
 
-	var plast *C.struct_dlq_item_s
+	var plast *dlq_item_t
 	var queue_length int
 	if dlq_queue_head == nil {
 		dlq_queue_head = pnew
@@ -362,10 +466,10 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_ad
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_CONNECT_REQUEST
+	pnew._type = DLQ_CONNECT_REQUEST
 	pnew._chan = channel
 	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
 	pnew.num_addr = num_addr
@@ -413,10 +517,10 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_DISCONNECT_REQUEST
+	pnew._type = DLQ_DISCONNECT_REQUEST
 	pnew._chan = channel
 	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
 	pnew.num_addr = num_addr
@@ -469,10 +573,10 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.c
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_OUTSTANDING_FRAMES_REQUEST
+	pnew._type = DLQ_OUTSTANDING_FRAMES_REQUEST
 	pnew._chan = channel
 	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
 	pnew.num_addr = num_addr
@@ -529,10 +633,10 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_XMIT_DATA_REQUEST
+	pnew._type = DLQ_XMIT_DATA_REQUEST
 	pnew._chan = channel
 	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
 	pnew.num_addr = num_addr
@@ -587,10 +691,10 @@ func dlq_register_callsign(addr *C.char, channel C.int, client C.int) {
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_REGISTER_CALLSIGN
+	pnew._type = DLQ_REGISTER_CALLSIGN
 	pnew._chan = channel
 	C.strcpy(&pnew.addrs[0][0], addr)
 	pnew.num_addr = 1
@@ -615,10 +719,10 @@ func dlq_unregister_callsign(addr *C.char, channel C.int, client C.int) {
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_UNREGISTER_CALLSIGN
+	pnew._type = DLQ_UNREGISTER_CALLSIGN
 	pnew._chan = channel
 	C.strcpy(&pnew.addrs[0][0], addr)
 	pnew.num_addr = 1
@@ -654,7 +758,6 @@ func dlq_unregister_callsign(addr *C.char, channel C.int, client C.int) {
  *
  *--------------------------------------------------------------------*/
 
-//export dlq_channel_busy
 func dlq_channel_busy(channel C.int, activity C.int, status C.int) {
 
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
@@ -667,10 +770,10 @@ func dlq_channel_busy(channel C.int, activity C.int, status C.int) {
 
 		/* Allocate a new queue item. */
 
-		var pnew = new(C.struct_dlq_item_s)
+		var pnew = new(dlq_item_t)
 		s_new_count++
 
-		pnew._type = C.DLQ_CHANNEL_BUSY
+		pnew._type = DLQ_CHANNEL_BUSY
 		pnew._chan = channel
 		pnew.activity = activity
 		pnew.status = status
@@ -710,10 +813,10 @@ func dlq_seize_confirm(channel C.int) {
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
-	pnew._type = C.DLQ_SEIZE_CONFIRM
+	pnew._type = DLQ_SEIZE_CONFIRM
 	pnew._chan = channel
 
 	/* Put it into queue. */
@@ -751,12 +854,12 @@ func dlq_client_cleanup(client C.int) {
 
 	/* Allocate a new queue item. */
 
-	var pnew = new(C.struct_dlq_item_s)
+	var pnew = new(dlq_item_t)
 	s_new_count++
 
 	// All we care about is the client number.
 
-	pnew._type = C.DLQ_CLIENT_CLEANUP
+	pnew._type = DLQ_CLIENT_CLEANUP
 	pnew.client = client
 
 	/* Put it into queue. */
@@ -846,7 +949,7 @@ func dlq_wait_while_empty(timeout C.double) C.int {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_remove() *C.struct_dlq_item_s {
+func dlq_remove() *dlq_item_t {
 
 	/* TODO KG
 	#if DEBUG1
@@ -861,7 +964,7 @@ func dlq_remove() *C.struct_dlq_item_s {
 
 	dlq_mutex.Lock()
 
-	var result *C.struct_dlq_item_s
+	var result *dlq_item_t
 	if dlq_queue_head != nil {
 		result = dlq_queue_head
 		dlq_queue_head = dlq_queue_head.nextp
@@ -904,7 +1007,7 @@ func dlq_remove() *C.struct_dlq_item_s {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_delete(pitem *C.struct_dlq_item_s) {
+func dlq_delete(pitem *dlq_item_t) {
 	if pitem == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: dlq_delete()  given nil pointer.\n")
@@ -948,7 +1051,7 @@ func dlq_delete(pitem *C.struct_dlq_item_s) {
  *
  *--------------------------------------------------------------------*/
 
-func cdata_new(pid C.int, data *C.char, length C.int) *C.cdata_t {
+func cdata_new(pid C.int, data *C.char, length C.int) *cdata_t {
 
 	s_cdata_new_count++
 
@@ -958,9 +1061,9 @@ func cdata_new(pid C.int, data *C.char, length C.int) *C.cdata_t {
 
 	var size = (length + 127) & ^0x7f
 
-	var cdata = (*C.cdata_t)(C.malloc(C.size_t(C.sizeof_cdata_t + size)))
+	var cdata = new(cdata_t)
 
-	cdata.magic = C.TXDATA_MAGIC
+	cdata.magic = TXDATA_MAGIC
 	cdata.next = nil
 	cdata.pid = pid
 	cdata.size = size
@@ -968,9 +1071,12 @@ func cdata_new(pid C.int, data *C.char, length C.int) *C.cdata_t {
 
 	Assert(length >= 0 && length <= size)
 	if data == nil {
-		C.memset(unsafe.Pointer(&cdata.data), C.int('?'), C.size_t(size))
+		cdata.data = slices.Repeat([]C.char{'?'}, int(size))
 	} else {
-		C.memcpy(unsafe.Pointer(&cdata.data), unsafe.Pointer(data), C.size_t(length))
+		cdata.data = make([]C.char, size)
+		for i, b := range C.GoBytes(unsafe.Pointer(data), length) {
+			cdata.data[i] = C.char(b)
+		}
 	}
 	return (cdata)
 
@@ -986,14 +1092,14 @@ func cdata_new(pid C.int, data *C.char, length C.int) *C.cdata_t {
  *
  *--------------------------------------------------------------------*/
 
-func cdata_delete(cdata *C.cdata_t) {
+func cdata_delete(cdata *cdata_t) {
 	if cdata == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: cdata_delete()  given nil pointer.\n")
 		return
 	}
 
-	if cdata.magic != C.TXDATA_MAGIC {
+	if cdata.magic != TXDATA_MAGIC {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: cdata_delete()  given corrupted data.\n")
 		return

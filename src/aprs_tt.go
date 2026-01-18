@@ -37,7 +37,7 @@ package direwolf
 // #include "version.h"
 // #include "ax25_pad.h"
 // #include "latlong.h"
-// #include "dlq.h"
+// #include "audio.h"
 // // geotranz
 // #include "utm.h"
 // #include "mgrs.h"
@@ -1654,7 +1654,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 		alevel.mark = -2
 		alevel.space = -2
 
-		C.dlq_rec_frame(C.int(channel), -1, 0, pp, alevel, 0, C.RETRY_NONE, C.CString("tt"))
+		dlq_rec_frame(C.int(channel), -1, 0, pp, alevel, fec_type_none, C.RETRY_NONE, C.CString("tt"))
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)

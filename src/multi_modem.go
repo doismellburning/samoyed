@@ -69,8 +69,8 @@ package direwolf
 // #include <stdio.h>
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "dlq.h"
 // #include "version.h"
+// #include "audio.h"
 import "C"
 
 import (
@@ -91,8 +91,8 @@ type candidate_t struct {
 	packet_p    C.packet_t
 	alevel      C.alevel_t
 	speed_error C.float
-	fec_type    C.fec_type_t // Type of FEC: none(0), fx25, il2p
-	retries     C.retry_t    // For the old "fix bits" strategy, this is the
+	fec_type    fec_type_t // Type of FEC: none(0), fx25, il2p
+	retries     C.retry_t  // For the old "fix bits" strategy, this is the
 	// number of bits that were modified to get a good CRC.
 	// It would be 0 to something around 4.
 	// For FX.25, it is the number of corrected.
@@ -270,7 +270,7 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel C.alevel_t, retries C.retry_t, fec_type C.fec_type_t) {
+func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel C.alevel_t, retries C.retry_t, fec_type fec_type_t) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < C.MAX_SUBCHANS)
@@ -309,7 +309,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries C.retry_t, fec_type C.fec_type_t) {
+func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries C.retry_t, fec_type fec_type_t) {
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -342,7 +342,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 		if drop_it {
 			ax25_delete(pp)
 		} else {
-			C.dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, C.CString(""))
+			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, C.CString(""))
 		}
 		return
 	}
@@ -413,7 +413,7 @@ func pick_best_candidate(channel C.int) {
 
 		if candidate[channel][j][k].packet_p == nil {
 			spectrum[n] = '_'
-		} else if candidate[channel][j][k].fec_type != C.fec_type_none { // FX.25 or IL2P
+		} else if candidate[channel][j][k].fec_type != fec_type_none { // FX.25 or IL2P
 			// FIXME: using retries both as an enum and later int too.
 			if (int)(candidate[channel][j][k].retries) <= 9 {
 				spectrum[n] = '0' + C.char(candidate[channel][j][k].retries)
@@ -433,7 +433,7 @@ func pick_best_candidate(channel C.int) {
 		if candidate[channel][j][k].packet_p == nil {
 			candidate[channel][j][k].score = 0
 		} else {
-			if candidate[channel][j][k].fec_type != C.fec_type_none {
+			if candidate[channel][j][k].fec_type != fec_type_none {
 				candidate[channel][j][k].score = 9000 - 100*C.int(candidate[channel][j][k].retries) // has FEC
 			} else {
 				/* Originally, this produced 0 for the PASSALL case. */
@@ -555,7 +555,7 @@ func pick_best_candidate(channel C.int) {
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)
-		C.dlq_rec_frame(channel, j, k,
+		dlq_rec_frame(channel, j, k,
 			candidate[channel][j][k].packet_p,
 			candidate[channel][j][k].alevel,
 			candidate[channel][j][k].fec_type,
