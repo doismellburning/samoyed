@@ -122,7 +122,7 @@ func kisspt_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_init(mc *C.struct_misc_config_s) {
+func kisspt_init(mc *misc_config_s) {
 	/*
 	 * This reads messages from client.
 	 */

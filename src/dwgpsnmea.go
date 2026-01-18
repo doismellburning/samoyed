@@ -46,7 +46,7 @@ import (
 // TODO KG var s_debug = 0 /* Enable debug output. */
 /* See dwgpsnmea_init description for values. */
 
-var s_save_configp *C.struct_misc_config_s
+var s_save_configp *misc_config_s
 
 /*-------------------------------------------------------------------
  *
@@ -88,7 +88,7 @@ var s_save_configp *C.struct_misc_config_s
 
 var s_gpsnmea_port_fd *term.Term
 
-func dwgpsnmea_init(pconfig *C.struct_misc_config_s, debug C.int) C.int {
+func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
 	//dwgps_info_t info;
 	//int e;
 

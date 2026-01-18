@@ -36,7 +36,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	ptt_init(audioConfig)
 	tq_init(audioConfig)
 
-	var miscConfig = new(C.struct_misc_config_s)
+	var miscConfig = new(misc_config_s)
 	ax25_link_init(miscConfig, 1)
 
 	list_head = nil

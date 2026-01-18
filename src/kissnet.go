@@ -158,7 +158,6 @@ same direwolf instance.
 // #include <stddef.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "config.h"
 // void hex_dump (unsigned char *p, int len);	// This should be in a .h file.
 import "C"
 
@@ -169,7 +168,7 @@ import (
 	"unsafe"
 )
 
-var s_misc_config_p *C.struct_misc_config_s
+var s_misc_config_p *misc_config_s
 
 // Each TCP port has its own status block.
 // There is a variable number so use a linked list.
@@ -202,10 +201,10 @@ func kiss_net_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_init(mc *C.struct_misc_config_s) {
+func kissnet_init(mc *misc_config_s) {
 	s_misc_config_p = mc
 
-	for i := range C.MAX_KISS_TCP_PORTS {
+	for i := range MAX_KISS_TCP_PORTS {
 		if mc.kiss_port[i] != 0 {
 			var kps = new(kissport_status_s)
 

@@ -184,7 +184,7 @@ func avahi_mainloop() {
 	avahiCleanup()
 }
 
-func dns_sd_announce(mc *C.struct_misc_config_s) {
+func dns_sd_announce(mc *misc_config_s) {
 	text_color_set(DW_COLOR_DEBUG)
 	avahiKISSPort = C.uint16_t(mc.kiss_port[0]) // FIXME:  Quick hack until I can handle multiple TCP ports properly.
 

@@ -303,7 +303,7 @@ func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEMessage) {
  *
  *--------------------------------------------------------------------*/
 
-func server_init(audio_config_p *C.struct_audio_s, mc *C.struct_misc_config_s) {
+func server_init(audio_config_p *C.struct_audio_s, mc *misc_config_s) {
 
 	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
