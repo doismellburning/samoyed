@@ -4,7 +4,6 @@ package direwolf
 
 // #include "direwolf.h"
 // #include "audio.h"
-// #include "fsk_demod_state.h"
 import "C"
 
 import (
@@ -14,18 +13,11 @@ import (
 	"runtime"
 )
 
-const BP_WINDOW_TRUNCATED = C.BP_WINDOW_TRUNCATED
-const BP_WINDOW_COSINE = C.BP_WINDOW_COSINE
-const BP_WINDOW_HAMMING = C.BP_WINDOW_HAMMING
-const BP_WINDOW_BLACKMAN = C.BP_WINDOW_BLACKMAN
-const BP_WINDOW_FLATTOP = C.BP_WINDOW_FLATTOP
-
 const MAX_RADIO_CHANS = C.MAX_RADIO_CHANS
 const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
 const MAX_SUBCHANS = C.MAX_SUBCHANS
 const MAX_SLICERS = C.MAX_SLICERS
 const MAX_ADEVS = C.MAX_ADEVS
-const MAX_FILTER_SIZE = C.MAX_FILTER_SIZE
 
 const MIN_SAMPLES_PER_SEC = C.MIN_SAMPLES_PER_SEC
 const MAX_SAMPLES_PER_SEC = C.MAX_SAMPLES_PER_SEC

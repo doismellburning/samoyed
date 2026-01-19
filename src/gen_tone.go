@@ -16,8 +16,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <assert.h>
 // #include "audio.h"
-// #include "fsk_demod_state.h"	/* for MAX_FILTER_SIZE which might be overly generous for here. */
-// 				/* but safe if we use same size as for receive. */
 import "C"
 
 import (

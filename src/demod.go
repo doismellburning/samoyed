@@ -20,7 +20,6 @@ package direwolf
 // #include <assert.h>
 // #include <ctype.h>
 // #include "audio.h"
-// #include "fsk_demod_state.h"
 import "C"
 
 import (
@@ -36,7 +35,7 @@ var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.
 
 // Current state of all the decoders.
 
-var demodulator_state [MAX_RADIO_CHANS][MAX_SUBCHANS]C.struct_demodulator_state_s
+var demodulator_state [MAX_RADIO_CHANS][MAX_SUBCHANS]demodulator_state_s
 
 var sample_sum [MAX_RADIO_CHANS][MAX_SUBCHANS]C.int
 var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]C.int

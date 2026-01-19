@@ -1,6 +1,5 @@
 package direwolf
 
-// #include "fsk_demod_state.h"
 import "C"
 
 import (
@@ -67,7 +66,7 @@ func GenericDCDConfig() *DCDConfig {
 	return c
 }
 
-func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *C.struct_demodulator_state_s, slice C.int, dpll_phase C.int) {
+func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *demodulator_state_s, slice C.int, dpll_phase C.int) {
 	if dpll_phase > -dcdConfig.DCD_GOOD_WIDTH*1024*1024 && dpll_phase < dcdConfig.DCD_GOOD_WIDTH*1024*1024 {
 		D.slicer[slice].good_flag = 1
 	} else {
@@ -75,7 +74,7 @@ func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *C.struct_demodulator_st
 	}
 }
 
-func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *C.struct_demodulator_state_s, channel C.int, subchan C.int, slice C.int) {
+func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel C.int, subchan C.int, slice C.int) {
 	D.slicer[slice].good_hist <<= 1
 	D.slicer[slice].good_hist |= C.uchar(D.slicer[slice].good_flag)
 	D.slicer[slice].good_flag = 0

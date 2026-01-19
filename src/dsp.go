@@ -15,7 +15,6 @@ package direwolf
 // #include <ctype.h>
 // #include <assert.h>
 // #include "audio.h"
-// #include "fsk_demod_state.h"
 import "C"
 
 import (
@@ -44,7 +43,7 @@ import (
  *
  *----------------------------------------------------------------*/
 
-func window(windowType C.bp_window_t, _size C.int, _j C.int) C.float {
+func window(windowType bp_window_t, _size C.int, _j C.int) C.float {
 
 	var size = float64(_size) // Save on a lot of casting later
 	var j = float64(_j)
@@ -97,7 +96,7 @@ func window(windowType C.bp_window_t, _size C.int, _j C.int) C.float {
  *
  *----------------------------------------------------------------*/
 
-func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype C.bp_window_t) {
+func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype bp_window_t) {
 
 	/*
 		#if DEBUG1
@@ -165,7 +164,7 @@ func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype C.bp_
  *
  *----------------------------------------------------------------*/
 
-func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int, wtype C.bp_window_t) {
+func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int, wtype bp_window_t) {
 
 	var center = 0.5 * C.float(filter_size-1)
 
@@ -242,7 +241,7 @@ func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int
  *
  *----------------------------------------------------------------*/
 
-func gen_ms(fc C.int, sps C.int, sin_table []C.float, cos_table []C.float, filter_size C.int, wtype C.bp_window_t) {
+func gen_ms(fc C.int, sps C.int, sin_table []C.float, cos_table []C.float, filter_size C.int, wtype bp_window_t) {
 
 	var Gs C.float = 0
 	var Gc C.float = 0

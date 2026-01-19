@@ -20,8 +20,7 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-//
-// #include "fsk_demod_state.h"
+// #include "audio.h"
 import "C"
 
 import (
@@ -119,7 +118,7 @@ func agc(in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float
  *
  *----------------------------------------------------------------*/
 
-func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *C.struct_demodulator_state_s) {
+func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *demodulator_state_s) {
 
 	if upsample < 1 {
 		upsample = 1
@@ -128,7 +127,8 @@ func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsa
 		upsample = 4
 	}
 
-	C.memset(unsafe.Pointer(D), 0, C.sizeof_struct_demodulator_state_s)
+	*D = demodulator_state_s{} //nolint:exhaustruct
+
 	D.modem_type = modem_type
 	D.num_slicers = 1
 
@@ -148,7 +148,7 @@ func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsa
 	// Just round to nearest integer.
 	D.lp_filter_taps = C.int((C.float(D.lp_filter_width_sym) * C.float(original_sample_rate) / C.float(baud)) + 0.5)
 
-	D.lp_window = C.BP_WINDOW_COSINE
+	D.lp_window = BP_WINDOW_COSINE
 
 	D.lpf_baud = 1.00
 
@@ -175,7 +175,7 @@ func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsa
 
 	// PLL needs to use the upsampled rate.
 
-	D.pll_step_per_sample = C.int(math.Round(float64(C.TICKS_PER_PLL_CYCLE * C.double(baud) / C.double(original_sample_rate*upsample))))
+	D.pll_step_per_sample = C.int(math.Round(float64(TICKS_PER_PLL_CYCLE * C.double(baud) / C.double(original_sample_rate*upsample))))
 
 	/* TODO KG
 	#ifdef TUNE_LP_WINDOW
@@ -356,7 +356,7 @@ func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsa
  *
  *--------------------------------------------------------------------*/
 
-func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *C.struct_demodulator_state_s) {
+func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *demodulator_state_s) {
 
 	/* TODO KG
 	#if DEBUG4
@@ -397,7 +397,7 @@ func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *C.st
 	}
 }
 
-func process_filtered_sample(channel C.int, fsam C.float, D *C.struct_demodulator_state_s) {
+func process_filtered_sample(channel C.int, fsam C.float, D *demodulator_state_s) {
 
 	var subchannel C.int = 0
 
@@ -563,7 +563,7 @@ func process_filtered_sample(channel C.int, fsam C.float, D *C.struct_demodulato
  *
  *--------------------------------------------------------------------*/
 
-func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.float, D *C.struct_demodulator_state_s) {
+func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.float, D *demodulator_state_s) {
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.

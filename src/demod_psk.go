@@ -66,14 +66,12 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// #include "fsk_demod_state.h"
 // #include "audio.h"
 import "C"
 
 import (
 	"math"
 	"unicode"
-	"unsafe"
 )
 
 var DCD_CONFIG_PSK = &DCDConfig{
@@ -135,11 +133,11 @@ var phase_to_gray_v27 = [8]C.int{1, 0, 2, 3, 7, 6, 4, 5}
  *
  *----------------------------------------------------------------*/
 
-func demod_psk_init(modem_type C.enum_modem_t, v26_alt C.enum_v26_e, _samples_per_sec C.int, bps C.int, profile C.char, D *C.struct_demodulator_state_s) {
+func demod_psk_init(modem_type C.enum_modem_t, v26_alt C.enum_v26_e, _samples_per_sec C.int, bps C.int, profile C.char, D *demodulator_state_s) {
 
 	var samples_per_sec = float64(_samples_per_sec)
 
-	C.memset(unsafe.Pointer(D), 0, C.sizeof_struct_demodulator_state_s)
+	*D = demodulator_state_s{} //nolint:exhaustruct
 
 	D.modem_type = modem_type
 	D.u.psk.v26_alt = v26_alt
@@ -371,7 +369,7 @@ func demod_psk_init(modem_type C.enum_modem_t, v26_alt C.enum_v26_e, _samples_pe
 	 * The audio sample rate must be at least a few times the data rate.
 	 */
 
-	D.pll_step_per_sample = C.int(math.Round((C.TICKS_PER_PLL_CYCLE * float64(correct_baud)) / (samples_per_sec)))
+	D.pll_step_per_sample = C.int(math.Round((TICKS_PER_PLL_CYCLE * float64(correct_baud)) / (samples_per_sec)))
 
 	/*
 	 * Convert number of symbol times to number of taps.
@@ -622,7 +620,7 @@ func phase_shift_to_symbol(phase_shift C.float, bits_per_symbol C.int, bit_quali
  *
  *--------------------------------------------------------------------*/
 
-func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *C.struct_demodulator_state_s) {
+func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *demodulator_state_s) {
 	var slice C.int = 0 // Would it make sense to have more than one?
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
@@ -709,7 +707,7 @@ func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *C.s
 
 } /* end demod_psk_process_sample */
 
-func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.int, D *C.struct_demodulator_state_s, bit_quality []C.int) {
+func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.int, D *demodulator_state_s, bit_quality []C.int) {
 
 	/*
 	 * Finally, a PLL is used to sample near the centers of the data bits.
