@@ -21,20 +21,22 @@ package direwolf
 // #include <assert.h>
 // #include <ctype.h>
 //
-// // Fine tuning for different demodulator types.
-// // Don't remove this section.  It is here for a reason.
-// #define DCD_THRESH_ON 32                // Hysteresis: Can miss 0 out of 32 for detecting lock.
-//                                         // This is best for actual on-the-air signals.
-//                                         // Still too many brief false matches.
-// #define DCD_THRESH_OFF 8                // Might want a little more fine tuning.
-// #define DCD_GOOD_WIDTH 1024             // No more than 1024!!!
-// #include "fsk_demod_state.h"		// Values above override defaults.
+// #include "fsk_demod_state.h"
 import "C"
 
 import (
 	"math"
 	"unsafe"
 )
+
+var DCD_CONFIG_9600 = &DCDConfig{
+	// Hysteresis: Can miss 0 out of 32 for detecting lock.
+	// This is best for actual on-the-air signals.
+	// Still too many brief false matches.
+	DCD_THRESH_ON:  32,
+	DCD_THRESH_OFF: 8,
+	DCD_GOOD_WIDTH: 1024,
+}
 
 var slice_point [MAX_SUBCHANS]C.float
 
@@ -575,7 +577,7 @@ func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
 
-		C.pll_dcd_each_symbol2(D, channel, subchannel, slice)
+		pll_dcd_each_symbol2(DCD_CONFIG_9600, D, channel, subchannel, slice)
 	}
 
 	/*
@@ -586,7 +588,7 @@ func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.
 
 		// Note:  Test for this demodulator, not overall for channel.
 
-		C.pll_dcd_signal_transition2(D, slice, D.slicer[slice].data_clock_pll)
+		pll_dcd_signal_transition2(DCD_CONFIG_9600, D, slice, D.slicer[slice].data_clock_pll)
 
 		var target = C.float(D.pll_step_per_sample) * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f)
 
