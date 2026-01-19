@@ -39,7 +39,6 @@ package direwolf
 // #include <time.h>
 // #include "direwolf.h"
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -258,7 +257,7 @@ func igate_get_dnl_cnt() C.int {
  *
  *--------------------------------------------------------------------*/
 
-func igate_init(p_audio_config *C.struct_audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level C.int) {
+func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level C.int) {
 
 	s_debug = debug_level
 	dp_queue_head = nil
@@ -1090,7 +1089,7 @@ func igate_recv_thread() {
 					var slice C.int = 0
 					var fec_type fec_type_t = fec_type_none
 					var spectrum = C.CString("APRS-IS")
-					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, C.RETRY_NONE, spectrum)
+					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)

@@ -32,7 +32,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	var THEIR_CALL = C.CString("2E0KGG")
 	const CHANNEL C.int = 1
 
-	var audioConfig = new(C.struct_audio_s)
+	var audioConfig = new(audio_s)
 	ptt_init(audioConfig)
 	tq_init(audioConfig)
 

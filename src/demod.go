@@ -19,7 +19,7 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// #include "audio.h"
+// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -57,7 +57,7 @@ var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]C.int
  *
  *----------------------------------------------------------------*/
 
-func demod_init(pa *C.struct_audio_s) C.int {
+func demod_init(pa *audio_s) C.int {
 
 	/*
 	 * Save audio configuration for later use.
@@ -263,7 +263,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 				dw_printf(", Tx %s", layer2_tx[(save_audio_config_p.achan[channel].layer2_xmit)])
-				if save_audio_config_p.achan[channel].dtmf_decode != C.DTMF_DECODE_OFF {
+				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 					dw_printf(", DTMF decoder enabled")
 				}
 				dw_printf(".\n")
@@ -452,7 +452,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 				// a default.  My current thinking is that we default to direwolf <= 1.5
 				// compatible for version 1.6 and MFJ compatible after that.
 
-				if save_audio_config_p.achan[channel].v26_alternative == C.V26_UNSPECIFIED {
+				if save_audio_config_p.achan[channel].v26_alternative == V26_UNSPECIFIED {
 
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
@@ -463,7 +463,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 					dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
 					dw_printf("The default is now MFJ-2400 compatibility mode.\n")
 
-					save_audio_config_p.achan[channel].v26_alternative = C.V26_DEFAULT
+					save_audio_config_p.achan[channel].v26_alternative = V26_DEFAULT
 				}
 
 				// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
@@ -487,13 +487,13 @@ func demod_init(pa *C.struct_audio_s) C.int {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 				dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
-				if save_audio_config_p.achan[channel].v26_alternative == C.V26_B {
+				if save_audio_config_p.achan[channel].v26_alternative == V26_B {
 					dw_printf(", compatible with MFJ-2400")
 				} else {
 					dw_printf(", compatible with earlier direwolf")
 				}
 
-				if save_audio_config_p.achan[channel].dtmf_decode != C.DTMF_DECODE_OFF {
+				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 					dw_printf(", DTMF decoder enabled")
 				}
 				dw_printf(".\n")
@@ -548,7 +548,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 				dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
-				if save_audio_config_p.achan[channel].dtmf_decode != C.DTMF_DECODE_OFF {
+				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 					dw_printf(", DTMF decoder enabled")
 				}
 				dw_printf(".\n")
@@ -681,7 +681,7 @@ func demod_init(pa *C.struct_audio_s) C.int {
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].upsample)
 					dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
-					if save_audio_config_p.achan[channel].dtmf_decode != C.DTMF_DECODE_OFF {
+					if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 						dw_printf(", DTMF decoder enabled")
 					}
 					dw_printf(".\n")

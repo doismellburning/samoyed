@@ -13,7 +13,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -223,7 +222,7 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 
 			if pp != nil {
 				var alevel = demod_get_audio_level(channel, subchannel)
-				var retries = C.retry_t(F.corrected)
+				var retries = retry_t(F.corrected)
 				var fec_type fec_type_t = fec_type_il2p
 
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?

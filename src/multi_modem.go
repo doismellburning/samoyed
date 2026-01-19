@@ -69,7 +69,6 @@ package direwolf
 // #include <stdio.h>
 // #include <unistd.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -91,7 +90,7 @@ type candidate_t struct {
 	alevel      C.alevel_t
 	speed_error C.float
 	fec_type    fec_type_t // Type of FEC: none(0), fx25, il2p
-	retries     C.retry_t  // For the old "fix bits" strategy, this is the
+	retries     retry_t    // For the old "fix bits" strategy, this is the
 	// number of bits that were modified to get a good CRC.
 	// It would be 0 to something around 4.
 	// For FX.25, it is the number of corrected.
@@ -124,7 +123,7 @@ var process_age [MAX_RADIO_CHANS]C.int
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *C.struct_audio_s) {
+func multi_modem_init(pa *audio_s) {
 
 	/*
 	 * Save audio configuration for later use.
@@ -140,13 +139,13 @@ func multi_modem_init(pa *C.struct_audio_s) {
 			if save_audio_config_p.achan[channel].baud <= 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
-				save_audio_config_p.achan[channel].baud = C.DEFAULT_BAUD
+				save_audio_config_p.achan[channel].baud = DEFAULT_BAUD
 			}
 			var real_baud = save_audio_config_p.achan[channel].baud
-			if save_audio_config_p.achan[channel].modem_type == C.MODEM_QPSK {
+			if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
 				real_baud = save_audio_config_p.achan[channel].baud / 2
 			}
-			if save_audio_config_p.achan[channel].modem_type == C.MODEM_8PSK {
+			if save_audio_config_p.achan[channel].modem_type == MODEM_8PSK {
 				real_baud = save_audio_config_p.achan[channel].baud / 3
 			}
 
@@ -269,7 +268,7 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel C.alevel_t, retries C.retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel C.alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < C.MAX_SUBCHANS)
@@ -280,7 +279,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 	var pp C.packet_t
 
 	switch save_audio_config_p.achan[channel].modem_type {
-	case C.MODEM_AIS:
+	case MODEM_AIS:
 		var nmea = ais_to_nmea(C.GoBytes(unsafe.Pointer(fbuf), flen))
 
 		// The intention is for the AIS sentences to go only to attached applications.
@@ -294,7 +293,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 		pp = ax25_from_text(C.CString(monfmt), 1)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
-	case C.MODEM_EAS:
+	case MODEM_EAS:
 		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, C.GoString((*C.char)(unsafe.Pointer(fbuf))))
 		pp = ax25_from_text(C.CString(monfmt), 1)
 
@@ -308,7 +307,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries C.retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -419,9 +418,9 @@ func pick_best_candidate(channel C.int) {
 			} else {
 				spectrum[n] = '+'
 			}
-		} else if candidate[channel][j][k].retries == C.RETRY_NONE { // AX.25 below
+		} else if candidate[channel][j][k].retries == RETRY_NONE { // AX.25 below
 			spectrum[n] = '|'
-		} else if candidate[channel][j][k].retries == C.RETRY_INVERT_SINGLE {
+		} else if candidate[channel][j][k].retries == RETRY_INVERT_SINGLE {
 			spectrum[n] = ':'
 		} else {
 			spectrum[n] = '.'
@@ -440,7 +439,7 @@ func pick_best_candidate(channel C.int) {
 				/* Around 1.3 dev H, we add an extra 1 in here so the minimum */
 				/* score should now be 1 for anything received.  */
 
-				candidate[channel][j][k].score = C.RETRY_MAX*1000 - C.int(candidate[channel][j][k].retries*1000) + 1
+				candidate[channel][j][k].score = C.int(RETRY_MAX)*1000 - C.int(candidate[channel][j][k].retries*1000) + 1
 			}
 		}
 	}

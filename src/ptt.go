@@ -135,7 +135,6 @@ package direwolf
 // #include <dirent.h>
 // #include <hamlib/rig.h>
 // #include <gpiod.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -144,7 +143,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -576,7 +574,7 @@ var rig [MAX_RADIO_CHANS][NUM_OCTYPES]*C.RIG
 
 var otnames [NUM_OCTYPES]string
 
-func ptt_init(audio_config_p *C.struct_audio_s) {
+func ptt_init(audio_config_p *audio_s) {
 
 	save_audio_config_p = audio_config_p
 
@@ -940,7 +938,7 @@ func ptt_init(audio_config_p *C.struct_audio_s) {
 	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
 		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := 0; ot < NUM_OCTYPES; ot++ {
-				if audio_config_p.achan[ch].octrl[ot].ptt_method == C.PTT_METHOD_CM108 {
+				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("Using %s GPIO %d for channel %d %s control.\n",
 						C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]),
@@ -1073,19 +1071,19 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 		ptt_fd[channel][ot] != nil {
 
 		switch save_audio_config_p.achan[channel].octrl[ot].ptt_line {
-		case C.PTT_LINE_RTS:
+		case PTT_LINE_RTS:
 			if ptt != 0 {
 				RTS_ON(ptt_fd[channel][ot].Fd())
 			} else {
 				RTS_OFF(ptt_fd[channel][ot].Fd())
 			}
-		case C.PTT_LINE_DTR:
-
+		case PTT_LINE_DTR:
 			if ptt != 0 {
 				DTR_ON(ptt_fd[channel][ot].Fd())
 			} else {
 				DTR_OFF(ptt_fd[channel][ot].Fd())
 			}
+		case PTT_LINE_NONE:
 		}
 
 		/*
@@ -1093,18 +1091,19 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 		 */
 
 		switch save_audio_config_p.achan[channel].octrl[ot].ptt_line2 {
-		case C.PTT_LINE_RTS:
+		case PTT_LINE_RTS:
 			if ptt2 != 0 {
 				RTS_ON(ptt_fd[channel][ot].Fd())
 			} else {
 				RTS_OFF(ptt_fd[channel][ot].Fd())
 			}
-		case C.PTT_LINE_DTR:
+		case PTT_LINE_DTR:
 			if ptt2 != 0 {
 				DTR_ON(ptt_fd[channel][ot].Fd())
 			} else {
 				DTR_OFF(ptt_fd[channel][ot].Fd())
 			}
+		case PTT_LINE_NONE:
 		}
 		/* else neither one */
 
@@ -1218,7 +1217,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 	 * Using CM108 USB Audio adapter GPIO?
 	 */
 
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == C.PTT_METHOD_CM108 {
+	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 
 		if cm108_set_gpio_pin(&save_audio_config_p.achan[channel].octrl[ot].ptt_device[0],
 			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt) != 0 {
@@ -1345,7 +1344,7 @@ func ptt_term() {
 
 func PTTTestMain() {
 
-	var my_audio_config C.struct_audio_s
+	var my_audio_config audio_s
 
 	my_audio_config.adev[0].num_channels = 2
 
@@ -1354,13 +1353,13 @@ func PTTTestMain() {
 	// TODO: device should be command line argument.
 	C.strcpy(&my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device[0], C.CString("COM3"))
 	//strlcpy (my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device, "/dev/ttyUSB0", sizeof(my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device));
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_line = C.PTT_LINE_RTS
+	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 
 	my_audio_config.chan_medium[1] = MEDIUM_RADIO
 	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
 	C.strcpy(&my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device[0], C.CString("COM3"))
 	//strlcpy (my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device, "/dev/ttyUSB0", sizeof(my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device));
-	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_line = C.PTT_LINE_DTR
+	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
 
 	/* initialize - both off */
 
@@ -1427,7 +1426,7 @@ func PTTTestMain() {
 
 	// #if __arm__
 
-	C.memset(unsafe.Pointer(&my_audio_config), 0, C.sizeof_struct_audio_s)
+	my_audio_config = audio_s{} //nolint:exhaustruct
 	my_audio_config.adev[0].num_channels = 1
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO

@@ -12,7 +12,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>
 // #include <stdlib.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -271,7 +270,7 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 
-					multi_modem_process_rec_frame(channel, subchannel, slice, &frame_buf[0], frame_len-2, alevel, C.retry_t(derrors), 1) /* len-2 to remove FCS. */
+					multi_modem_process_rec_frame(channel, subchannel, slice, &frame_buf[0], frame_len-2, alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}
 
 			} else {

@@ -157,7 +157,6 @@ same direwolf instance.
 // #include <string.h>
 // #include <stddef.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 // void hex_dump (unsigned char *p, int len);	// This should be in a .h file.
 import "C"
 

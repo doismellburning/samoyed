@@ -41,7 +41,6 @@ package direwolf
 // #include <stddef.h>
 // #include "direwolf.h"
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -130,7 +129,7 @@ var audio_out_dev_mutex [C.MAX_ADEVS]sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func xmit_init(p_modem *C.struct_audio_s, debug_xmit_packet C.int) {
+func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);

@@ -1,7 +1,6 @@
 package direwolf
 
 // #include <stdint.h>          // int64_t
-// #include "audio.h"		// for enum modem_t
 import "C"
 
 /*
@@ -53,7 +52,7 @@ type demodulator_state_s struct {
 	/*
 	 * These are set once during initialization.
 	 */
-	modem_type C.enum_modem_t // MODEM_AFSK, MODEM_8PSK, etc.
+	modem_type modem_t // MODEM_AFSK, MODEM_8PSK, etc.
 
 	//	enum v26_e v26_alt;			// Which alternative when V.26.
 
@@ -368,7 +367,7 @@ type demodulator_state_s struct {
 		//////////////////////////////////////////////////////////////////////////////////
 
 		psk struct {
-			v26_alt C.enum_v26_e // Which alternative when V.26.
+			v26_alt v26_e // Which alternative when V.26.
 
 			sin_table256 [256]C.float // Precomputed sin table for speed.
 

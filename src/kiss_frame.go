@@ -66,7 +66,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -168,7 +167,7 @@ var KISSUTIL = false // Dynamic replacement for the old #define
  *
  *-----------------------------------------------------------------*/
 
-func kiss_frame_init(pa *C.struct_audio_s) {
+func kiss_frame_init(pa *audio_s) {
 	save_audio_config_p = pa
 }
 
@@ -625,7 +624,8 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			return
 		}
 
-		C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_struct_audio_s)
+		C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_struct_alevel_s)
+
 		var pp = ax25_from_frame((*C.uchar)(C.CBytes(kiss_msg_bytes[1:])), kiss_len-1, alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)

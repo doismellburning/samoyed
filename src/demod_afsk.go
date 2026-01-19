@@ -28,7 +28,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// #include "audio.h"
 import "C"
 
 import (

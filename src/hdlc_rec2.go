@@ -73,7 +73,6 @@ package direwolf
 // //Optimize processing by accessing directly to decoded bits
 // #define RRBB_C 1
 // #include "ax25_pad.h"
-// #include "audio.h"		/* for struct audio_s */
 // //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
 import "C"
 
@@ -101,7 +100,7 @@ const RETRY_TYPE_NONE = 0
 const RETRY_TYPE_SWAP = 1
 
 type retry_conf_t struct {
-	retry C.retry_t
+	retry retry_t
 	mode  retry_mode_t
 	_type retry_type_t
 
@@ -190,7 +189,7 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_init(p_audio_config *C.struct_audio_s) {
+func hdlc_rec2_init(p_audio_config *audio_s) {
 	save_audio_config_p = p_audio_config
 }
 
@@ -242,11 +241,11 @@ func hdlc_rec2_block(block *rrbb_t) {
 
 	retry_cfg._type = RETRY_TYPE_NONE
 	retry_cfg.mode = RETRY_MODE_CONTIGUOUS
-	retry_cfg.retry = C.RETRY_NONE
+	retry_cfg.retry = RETRY_NONE
 	retry_cfg.contig.nr_bits = 0
 	retry_cfg.contig.bit_idx = 0
 
-	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, (passall > 0) && (fix_bits == C.RETRY_NONE))
+	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, (passall > 0) && (fix_bits == RETRY_NONE))
 	if ok {
 		/* TODO KG
 		#if DEBUG
@@ -330,7 +329,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 	/*
 	 * Try inverting one bit.
 	 */
-	if fix_bits < C.RETRY_INVERT_SINGLE {
+	if fix_bits < RETRY_INVERT_SINGLE {
 
 		/* Stop before single bit fix up. */
 
@@ -338,7 +337,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 	}
 	/* Try to swap one bit */
 	retry_cfg._type = RETRY_TYPE_SWAP
-	retry_cfg.retry = C.RETRY_INVERT_SINGLE
+	retry_cfg.retry = RETRY_INVERT_SINGLE
 	retry_cfg.contig.nr_bits = 1
 
 	for i := C.int(0); i < length; i++ {
@@ -359,11 +358,11 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 	/*
 	 * Try inverting two adjacent bits.
 	 */
-	if fix_bits < C.RETRY_INVERT_DOUBLE {
+	if fix_bits < RETRY_INVERT_DOUBLE {
 		return false
 	}
 	/* Try to swap two contiguous bits */
-	retry_cfg.retry = C.RETRY_INVERT_DOUBLE
+	retry_cfg.retry = RETRY_INVERT_DOUBLE
 	retry_cfg.contig.nr_bits = 2
 
 	for i := C.int(0); i < length-1; i++ {
@@ -383,11 +382,11 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 	/*
 	 * Try inverting adjacent three bits.
 	 */
-	if fix_bits < C.RETRY_INVERT_TRIPLE {
+	if fix_bits < RETRY_INVERT_TRIPLE {
 		return false
 	}
 	/* Try to swap three contiguous bits */
-	retry_cfg.retry = C.RETRY_INVERT_TRIPLE
+	retry_cfg.retry = RETRY_INVERT_TRIPLE
 	retry_cfg.contig.nr_bits = 3
 
 	for i := C.int(0); i < length-2; i++ {
@@ -410,13 +409,13 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 	 *
 	 * Processing time is order N squared so time goes up rapidly with larger frames.
 	 */
-	if fix_bits < C.RETRY_INVERT_TWO_SEP {
+	if fix_bits < RETRY_INVERT_TWO_SEP {
 		return false
 	}
 
 	retry_cfg.mode = RETRY_MODE_SEPARATED
 	retry_cfg._type = RETRY_TYPE_SWAP
-	retry_cfg.retry = C.RETRY_INVERT_TWO_SEP
+	retry_cfg.retry = RETRY_INVERT_TWO_SEP
 	retry_cfg.sep.bit_idx_c = -1
 
 	/* TODO KG
@@ -476,7 +475,7 @@ func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel C.int, subchan C.int, sli
 
 		retry_cfg._type = RETRY_TYPE_NONE
 		retry_cfg.mode = RETRY_MODE_CONTIGUOUS
-		retry_cfg.retry = C.RETRY_NONE
+		retry_cfg.retry = RETRY_NONE
 		retry_cfg.contig.nr_bits = 0
 		retry_cfg.contig.bit_idx = 0
 
@@ -609,7 +608,7 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 		/* Get the value for the current bit */
 		var raw = rrbb_get_bit(block, i) > 0
 		/* If swap two sep mode , swap the bit if needed */
-		if retry_conf_retry == C.RETRY_INVERT_TWO_SEP {
+		if retry_conf_retry == RETRY_INVERT_TWO_SEP {
 			if is_sep_bit_modified(i, retry_conf) {
 				raw = !raw
 			}
@@ -753,7 +752,7 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 
 		var expected_fcs = fcs_calc(&H2.frame_buf[0], H2.frame_len-2)
 
-		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == C.MODEM_AIS {
+		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
 
 			// Sanity check for AIS.
 			if ais_check_length(int(H2.frame_buf[0]>>2)&0x3f, int(H2.frame_len)-2) == 0 {
@@ -775,13 +774,13 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 			return true                                                                                                           /* success */
 
 		} else if passall {
-			if retry_conf_retry == C.RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
+			if retry_conf_retry == RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
 
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
 
-				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, C.RETRY_MAX, 0) /* len-2 to remove FCS. */
-				return true                                                                                                      /* success */
+				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, RETRY_MAX, 0) /* len-2 to remove FCS. */
+				return true                                                                                                    /* success */
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("try_decode: internal error passall = %t, retry_conf_retry = %d, retry_conf_type = %d\n",
@@ -866,7 +865,7 @@ failure:
  *
  ***********************************************************************************/
 
-func sanity_check(_buf *C.uchar, blen C.int, bits_flipped C.retry_t, sanity_test C.enum_sanity_e) bool {
+func sanity_check(_buf *C.uchar, blen C.int, bits_flipped retry_t, sanity_test sanity_t) bool {
 
 	var buf = C.GoBytes(unsafe.Pointer(_buf), blen)
 
@@ -875,7 +874,7 @@ func sanity_check(_buf *C.uchar, blen C.int, bits_flipped C.retry_t, sanity_test
 	 * Should we have different levels of checking depending on
 	 * how much we try changing the raw data?
 	 */
-	if bits_flipped == C.RETRY_NONE {
+	if bits_flipped == RETRY_NONE {
 		return true
 	}
 
@@ -883,7 +882,7 @@ func sanity_check(_buf *C.uchar, blen C.int, bits_flipped C.retry_t, sanity_test
 	 * If using frames that do not conform to AX.25, it might be
 	 * desirable to skip the sanity check entirely.
 	 */
-	if sanity_test == C.SANITY_NONE {
+	if sanity_test == SANITY_NONE {
 		return true
 	}
 
@@ -958,7 +957,7 @@ func sanity_check(_buf *C.uchar, blen C.int, bits_flipped C.retry_t, sanity_test
 	 * That's good enough for the AX.25 sanity check.
 	 * Continue below for additional APRS checking.
 	 */
-	if sanity_test == C.SANITY_AX25 {
+	if sanity_test == SANITY_AX25 {
 		return true
 	}
 

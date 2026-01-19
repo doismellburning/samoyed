@@ -15,7 +15,6 @@ package direwolf
 // #include <string.h>
 // #include <stdlib.h>
 // #include <assert.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -111,7 +110,7 @@ var prev_dat [MAX_RADIO_CHANS]C.int // Previous data bit.  Used for G3RUH style.
 
 var amp16bit C.int /* for 9600 baud */
 
-func gen_tone_init(audio_config_p *C.struct_audio_s, amp C.int, gen_packets C.int) C.int {
+func gen_tone_init(audio_config_p *audio_s, amp C.int, gen_packets C.int) C.int {
 
 	/* TODO KG
 	#if DEBUG
@@ -158,7 +157,7 @@ func gen_tone_init(audio_config_p *C.struct_audio_s, amp C.int, gen_packets C.in
 
 			switch save_audio_config_p.achan[channel].modem_type {
 
-			case C.MODEM_QPSK:
+			case MODEM_QPSK:
 
 				audio_config_p.achan[channel].mark_freq = 1800
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
@@ -173,7 +172,7 @@ func gen_tone_init(audio_config_p *C.struct_audio_s, amp C.int, gen_packets C.in
 				// ??? Why?  We are only concerned with the difference
 				// from one symbol to the next.
 
-			case C.MODEM_8PSK:
+			case MODEM_8PSK:
 
 				audio_config_p.achan[channel].mark_freq = 1800
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
@@ -184,14 +183,14 @@ func gen_tone_init(audio_config_p *C.struct_audio_s, amp C.int, gen_packets C.in
 				f2_change_per_sample[channel] = f1_change_per_sample[channel] // Not used.
 				samples_per_symbol[channel] = 3. * C.float(audio_config_p.adev[a].samples_per_sec) / C.float(audio_config_p.achan[channel].baud)
 
-			case C.MODEM_BASEBAND, C.MODEM_SCRAMBLE, C.MODEM_AIS:
+			case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
 
 				// Tone is half baud.
 				ticks_per_bit[channel] = (C.int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
 				f1_change_per_sample[channel] = (C.uint)((float64(audio_config_p.achan[channel].baud) * 0.5 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
 				samples_per_symbol[channel] = C.float(audio_config_p.adev[a].samples_per_sec) / C.float(audio_config_p.achan[channel].baud)
 
-			case C.MODEM_EAS: //  EAS.
+			case MODEM_EAS: //  EAS.
 
 				// TODO: Proper fix would be to use float for baud, mark, space.
 
@@ -344,7 +343,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 
 	// TODO: change to switch instead of if if if
 
-	if save_audio_config_p.achan[channel].modem_type == C.MODEM_QPSK {
+	if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
 
 		dat &= 1 // Keep only LSB to be extra safe.
 
@@ -376,14 +375,14 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			#else
 		*/
 		tone_phase[channel] += symbol * PHASE_SHIFT_90
-		if save_audio_config_p.achan[channel].v26_alternative == C.V26_B {
+		if save_audio_config_p.achan[channel].v26_alternative == V26_B {
 			tone_phase[channel] += PHASE_SHIFT_45
 		}
 		//#endif
 		bit_count[channel]++
 	}
 
-	if save_audio_config_p.achan[channel].modem_type == C.MODEM_8PSK {
+	if save_audio_config_p.achan[channel].modem_type == MODEM_8PSK {
 
 		dat &= 1 // Keep only LSB to be extra safe.
 
@@ -407,8 +406,8 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 
 	// Would be logical to have MODEM_BASEBAND for IL2P rather than checking here.  But...
 	// That would mean putting in at least 3 places and testing all rather than just one.
-	if save_audio_config_p.achan[channel].modem_type == C.MODEM_SCRAMBLE &&
-		save_audio_config_p.achan[channel].layer2_xmit != C.LAYER2_IL2P {
+	if save_audio_config_p.achan[channel].modem_type == MODEM_SCRAMBLE &&
+		save_audio_config_p.achan[channel].layer2_xmit != LAYER2_IL2P {
 		var x = (dat ^ (lfsr[channel] >> 16) ^ (lfsr[channel] >> 11)) & 1
 		lfsr[channel] = (lfsr[channel] << 1) | (x & 1)
 		dat = x
@@ -424,7 +423,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 
 		switch save_audio_config_p.achan[channel].modem_type {
 
-		case C.MODEM_AFSK:
+		case MODEM_AFSK:
 
 			/* TODO KG
 			#if DEBUG2
@@ -447,7 +446,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
-		case C.MODEM_EAS:
+		case MODEM_EAS:
 
 			var change = f2_change_per_sample[channel]
 			if dat > 0 {
@@ -457,7 +456,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
-		case C.MODEM_QPSK:
+		case MODEM_QPSK:
 
 			/* TODO KG
 			#if DEBUG2
@@ -503,7 +502,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
-		case C.MODEM_8PSK:
+		case MODEM_8PSK:
 			/* TODO KG
 			#if DEBUG2
 				      text_color_set(DW_COLOR_DEBUG);
@@ -514,7 +513,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
-		case C.MODEM_BASEBAND, C.MODEM_SCRAMBLE, C.MODEM_AIS:
+		case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
 
 			if dat != prev_dat[channel] {
 				tone_phase[channel] += f1_change_per_sample[channel]
@@ -653,10 +652,10 @@ func GenToneMain() {
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
 
-	var my_audio_config C.struct_audio_s
-	C.strcpy(&my_audio_config.adev[0].adevice_in[0], C.CString(C.DEFAULT_ADEVICE))
-	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(C.DEFAULT_ADEVICE))
-	my_audio_config.chan_medium[0] = C.MEDIUM_RADIO // TODO KG ??
+	var my_audio_config audio_s
+	C.strcpy(&my_audio_config.adev[0].adevice_in[0], C.CString(DEFAULT_ADEVICE))
+	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(DEFAULT_ADEVICE))
+	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
 	audio_open(&my_audio_config)
 	gen_tone_init(&my_audio_config, 100, 0)
@@ -675,9 +674,9 @@ func GenToneMain() {
 
 	/* Now try stereo. */
 
-	my_audio_config = C.struct_audio_s{} //nolint:exhaustruct
-	C.strcpy(&my_audio_config.adev[0].adevice_in[0], C.CString(C.DEFAULT_ADEVICE))
-	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(C.DEFAULT_ADEVICE))
+	my_audio_config = audio_s{} //nolint:exhaustruct
+	C.strcpy(&my_audio_config.adev[0].adevice_in[0], C.CString(DEFAULT_ADEVICE))
+	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(DEFAULT_ADEVICE))
 	my_audio_config.adev[0].num_channels = 2
 
 	audio_open(&my_audio_config)

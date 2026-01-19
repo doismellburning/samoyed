@@ -30,7 +30,6 @@ package direwolf
 // #include <unistd.h>
 // #include <errno.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -147,7 +146,7 @@ func log_init(daily_names bool, path string) {
  *
  *------------------------------------------------------------------*/
 
-func log_write(channel int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries C.retry_t) { //nolint:gocritic
+func log_write(channel int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries retry_t) { //nolint:gocritic
 	if len(g_log_path) == 0 {
 		return
 	}

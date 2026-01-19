@@ -36,7 +36,7 @@ func tt_user_test_main(t *testing.T) {
 
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
-	var my_audio_config C.struct_audio_s
+	var my_audio_config audio_s
 
 	C.strcpy(&my_audio_config.mycall[0][0], C.CString("WB20SZ-15"))
 

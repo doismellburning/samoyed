@@ -9,7 +9,6 @@ package direwolf
 // #include <ctype.h>
 // #include <time.h>
 // #include <math.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -21,18 +20,18 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	// Copied from gen_packets without using all the CLI parsing...
 
-	var modem C.struct_audio_s
+	var modem audio_s
 	modem.adev[0].defined = 1
-	modem.adev[0].num_channels = C.DEFAULT_NUM_CHANNELS
-	modem.adev[0].samples_per_sec = C.DEFAULT_SAMPLES_PER_SEC
-	modem.adev[0].bits_per_sample = C.DEFAULT_BITS_PER_SAMPLE
+	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
+	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 	for channel := range C.MAX_RADIO_CHANS {
-		modem.achan[channel].modem_type = C.MODEM_AFSK
-		modem.achan[channel].mark_freq = C.DEFAULT_MARK_FREQ
-		modem.achan[channel].space_freq = C.DEFAULT_SPACE_FREQ
-		modem.achan[channel].baud = C.DEFAULT_BAUD
+		modem.achan[channel].modem_type = MODEM_AFSK
+		modem.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+		modem.achan[channel].baud = DEFAULT_BAUD
 	}
-	modem.chan_medium[0] = C.MEDIUM_RADIO
+	modem.chan_medium[0] = MEDIUM_RADIO
 
 	GEN_PACKETS = true
 

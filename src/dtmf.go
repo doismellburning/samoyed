@@ -19,7 +19,6 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -82,7 +81,7 @@ var s_amplitude C.int = 100 // range of 0 .. 100
  *
  *----------------------------------------------------------------*/
 
-func dtmf_init(p_audio_config *C.struct_audio_s, amp C.int) {
+func dtmf_init(p_audio_config *audio_s, amp C.int) {
 
 	s_amplitude = amp
 
@@ -97,7 +96,7 @@ func dtmf_init(p_audio_config *C.struct_audio_s, amp C.int) {
 
 		D.sample_rate = p_audio_config.adev[a].samples_per_sec
 
-		if p_audio_config.achan[c].dtmf_decode != C.DTMF_DECODE_OFF {
+		if p_audio_config.achan[c].dtmf_decode != DTMF_DECODE_OFF {
 
 			/* TODO KG
 			#if DEBUG
