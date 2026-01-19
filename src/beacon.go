@@ -18,7 +18,6 @@ package direwolf
 // #include <time.h>
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "version.h"
 import "C"
 
 import (
@@ -658,7 +657,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	if bp.dest != nil {
 		beacon_text += C.GoString(bp.dest)
 	} else {
-		var stemp = fmt.Sprintf("%s%1d%1d", C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION)
+		var stemp = fmt.Sprintf("%s%1d%1d", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION)
 		beacon_text += stemp
 	}
 
