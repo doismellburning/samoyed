@@ -14,7 +14,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <math.h>
-// #include "config.h"
 // #include "ax25_pad.h"
 import "C"
 
@@ -55,7 +54,7 @@ func Walk96Main() {
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
 	serial_port_write(tnc, []byte(cmd))
 
-	var config C.struct_misc_config_s
+	var config misc_config_s
 	C.strcpy(&config.gpsnmea_port[0], C.CString(gpsSerialPort))
 
 	var debug_gps C.int = 0

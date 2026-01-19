@@ -576,7 +576,7 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
  * Configuration settings from file or command line.
  */
 
-// TODO KG Static global fun // var g_misc_config_p *C.struct_misc_config_s
+// TODO KG Static global fun // var g_misc_config_p *misc_config_s
 
 /*-------------------------------------------------------------------
  *
@@ -593,7 +593,7 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
  *
  *--------------------------------------------------------------------*/
 
-func ax25_link_init(pconfig *C.struct_misc_config_s, debug C.int) {
+func ax25_link_init(pconfig *misc_config_s, debug C.int) {
 
 	/*
 	 * Save parameters for later use.

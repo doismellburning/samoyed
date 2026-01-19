@@ -30,7 +30,6 @@ package direwolf
 // #endif
 // #include "ax25_pad.h"
 // #include "audio.h"
-// #include "config.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"
@@ -48,6 +47,235 @@ import (
 	"unicode"
 	"unsafe"
 )
+
+/*
+ * All the leftovers.
+ * This wasn't thought out.  It just happened.
+ */
+
+type beacon_type_e int
+
+const (
+	BEACON_IGNORE beacon_type_e = iota
+	BEACON_POSITION
+	BEACON_OBJECT
+	BEACON_TRACKER
+	BEACON_CUSTOM
+	BEACON_IGATE
+)
+
+type sendto_type_e int
+
+const (
+	SENDTO_XMIT sendto_type_e = iota
+	SENDTO_IGATE
+	SENDTO_RECV
+)
+
+const MAX_BEACONS = 30
+const MAX_KISS_TCP_PORTS = (MAX_RADIO_CHANS + 1)
+
+const WPL_FORMAT_NMEA_GENERIC = 0x01 /* N	$GPWPL */
+const WPL_FORMAT_GARMIN = 0x02       /* G	$PGRMW */
+const WPL_FORMAT_MAGELLAN = 0x04     /* M	$PMGNWPL */
+const WPL_FORMAT_KENWOOD = 0x08      /* K	$PKWDWPL */
+const WPL_FORMAT_AIS = 0x10          /* A	!AIVDM */
+
+type beacon_s struct {
+	btype beacon_type_e /* Position or object. */
+
+	lineno C.int /* Line number from config file for later error messages. */
+
+	sendto_type sendto_type_e
+
+	/* SENDTO_XMIT	- Usually beacons go to a radio transmitter. */
+	/*		  chan, below is the channel number. */
+	/* SENDTO_IGATE	- Send to IGate, probably to announce my position */
+	/* 		  rather than relying on someone else to hear */
+	/* 		  me on the radio and report me. */
+	/* SENDTO_RECV	- Pretend this was heard on the specified */
+	/* 		  radio channel.  Mostly for testing. It is a */
+	/* 		  convenient way to send packets to attached apps. */
+
+	sendto_chan C.int /* Transmit or simulated receive channel for above.  Should be 0 for IGate. */
+
+	delay C.int /* Seconds to delay before first transmission. */
+
+	slot C.int /* Seconds after hour for slotted time beacons. */
+	/* If specified, it overrides any 'delay' value. */
+
+	every C.int /* Time between transmissions, seconds. */
+	/* Remains fixed for PBEACON and OBEACON. */
+	/* Dynamically adjusted for TBEACON. */
+
+	next C.time_t /* Unix time to transmit next one. */
+
+	source *C.char /* NULL or explicit AX.25 source address to use */
+	/* instead of the mycall value for the channel. */
+
+	dest *C.char /* NULL or explicit AX.25 destination to use */
+	/* instead of the software version such as APDW11. */
+
+	compress C.int /* Use more compact form? */
+
+	objname [10]C.char /* Object name.  Any printable characters. */
+
+	via *C.char /* Path, e.g. "WIDE1-1,WIDE2-1" or NULL. */
+
+	custom_info *C.char /* Info part for handcrafted custom beacon. */
+	/* Ignore the rest below if this is set. */
+
+	custom_infocmd *C.char /* Command to generate info part. */
+	/* Again, other options below are then ignored. */
+
+	messaging C.int /* Set messaging attribute for position report. */
+	/* i.e. Data Type Indicator of '=' rather than '!' */
+
+	lat       C.double /* Latitude and longitude. */
+	lon       C.double
+	ambiguity C.int   /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
+	alt_m     C.float /* Altitude in meters. */
+
+	symtab C.char /* Symbol table: / or \ or overlay character. */
+	symbol C.char /* Symbol code. */
+
+	power  C.float /* For PHG. */
+	height C.float /* HAAT in feet */
+	gain   C.float /* Original protocol spec was unclear. */
+	/* Addendum 1.1 clarifies it is dBi not dBd. */
+
+	dir [3]C.char /* 1 or 2 of N,E,W,S, or empty for omni. */
+
+	freq   C.float /* MHz. */
+	tone   C.float /* Hz. */
+	offset C.float /* MHz. */
+
+	comment    *C.char /* Comment or NULL. */
+	commentcmd *C.char /* Command to append more to Comment or NULL. */
+}
+
+type misc_config_s struct {
+	agwpe_port C.int /* TCP Port number for the "AGW TCPIP Socket Interface" */
+
+	// Previously we allowed only a single TCP port for KISS.
+	// An increasing number of people want to run multiple radios.
+	// Unfortunately, most applications don't know how to deal with multi-radio TNCs.
+	// They ignore the channel on receive and always transmit to channel 0.
+	// Running multiple instances of direwolf is a work-around but this leads to
+	// more complex configuration and we lose the cross-channel digipeating capability.
+	// In release 1.7 we add a new feature to assign a single radio channel to a TCP port.
+	// e.g.
+	//	KISSPORT 8001		# default, all channels.  Radio channel = KISS channel.
+	//
+	//	KISSPORT 7000 0		# Only radio channel 0 for receive.
+	//				# Transmit to radio channel 0, ignoring KISS channel.
+	//
+	//	KISSPORT 7001 1		# Only radio channel 1 for receive.  KISS channel set to 0.
+	//				# Transmit to radio channel 1, ignoring KISS channel.
+
+	kiss_port [MAX_KISS_TCP_PORTS]C.int /* TCP Port number for the "TCP KISS" protocol. */
+	kiss_chan [MAX_KISS_TCP_PORTS]C.int /* Radio Channel number for this port or -1 for all.  */
+
+	kiss_copy      C.int /* Data from network KISS client is copied to all others. */
+	enable_kiss_pt C.int /* Enable pseudo terminal for KISS. */
+	/* Want this to be off by default because it hangs */
+	/* after a while if nothing is reading from other end. */
+
+	kiss_serial_port [20]C.char
+	/* Serial port name for our end of the */
+	/* virtual null modem for native Windows apps. */
+	/* Version 1.5 add same capability for Linux. */
+
+	kiss_serial_speed C.int /* Speed, in bps, for the KISS serial port. */
+	/* If 0, just leave what was already there. */
+
+	kiss_serial_poll C.int /* When using Bluetooth KISS, the /dev/rfcomm0 device */
+	/* will appear and disappear as the remote application */
+	/* opens and closes the virtual COM port. */
+	/* When this is non-zero, we will check periodically to */
+	/* see if the device has appeared and we will open it. */
+
+	gpsnmea_port [20]C.char /* Serial port name for reading NMEA sentences from GPS. */
+	/* e.g. COM22, /dev/ttyACM0 */
+
+	gpsnmea_speed C.int /* Speed for above, baud, default 4800. */
+
+	gpsd_host [20]C.char /* Host for gpsd server. */
+	/* e.g. localhost, 192.168.1.2 */
+
+	gpsd_port C.int /* Port number for gpsd server. */
+	/* Default is  2947. */
+
+	waypoint_serial_port [20]C.char /* Serial port name for sending NMEA waypoint sentences */
+	/* to a GPS map display or other mapping application. */
+	/* e.g. COM22, /dev/ttyACM0 */
+	/* Currently no option for setting non-standard speed. */
+	/* This was done in 2014 and no one has complained yet. */
+
+	waypoint_udp_hostname [80]C.char /* Destination host when using UDP. */
+
+	waypoint_udp_portnum C.int /* UDP port. */
+
+	waypoint_formats C.int /* Which sentence formats should be generated? */
+
+	log_daily_names C.int /* True to generate new log file each day. */
+
+	log_path [80]C.char /* Either directory or full file name depending on above. */
+
+	dns_sd_enabled C.int      /* DNS Service Discovery announcement enabled. */
+	dns_sd_name    [64]C.char /* Name announced on dns-sd; defaults to "Dire Wolf on <hostname>" */
+
+	sb_configured C.int /* TRUE if SmartBeaconing is configured. */
+	sb_fast_speed C.int /* MPH */
+	sb_fast_rate  C.int /* seconds */
+	sb_slow_speed C.int /* MPH */
+	sb_slow_rate  C.int /* seconds */
+	sb_turn_time  C.int /* seconds */
+	sb_turn_angle C.int /* degrees */
+	sb_turn_slope C.int /* degrees * MPH */
+
+	// AX.25 connected mode.
+
+	frack C.int /* Number of seconds to wait for ack to transmission. */
+
+	retry C.int /* Number of times to retry before giving up. */
+
+	paclen C.int /* Max number of bytes in information part of frame. */
+
+	maxframe_basic C.int /* Max frames to send before ACK.  mod 8 "Window" size. */
+
+	maxframe_extended C.int /* Max frames to send before ACK.  mod 128 "Window" size. */
+
+	maxv22 C.int /* Maximum number of unanswered SABME frames sent before */
+	/* switching to SABM.  This is to handle the case of an old */
+	/* TNC which simply ignores SABME rather than replying with FRMR. */
+
+	v20_addrs **C.char /* Stations known to understand only AX.25 v2.0 so we don't */
+	/* waste time trying v2.2 first. */
+
+	v20_count C.int /* Number of station addresses in array above. */
+
+	noxid_addrs **C.char /* Stations known not to understand XID command so don't */
+	/* waste time sending it and eventually giving up. */
+	/* AX.25 for Linux is the one known case, so far, where */
+	/* SABME is implemented but XID is not. */
+
+	noxid_count C.int /* Number of station addresses in array above. */
+
+	// Beacons.
+
+	num_beacons C.int /* Number of beacons defined. */
+
+	beacon [MAX_BEACONS]beacon_s
+}
+
+const MIN_IP_PORT_NUMBER = 1024
+const MAX_IP_PORT_NUMBER = 49151
+
+const DEFAULT_AGWPE_PORT = 8000 /* Like everyone else. */
+const DEFAULT_KISS_PORT = 8001  /* Above plus 1. */
+
+const DEFAULT_NULLMODEM = "COM3" /* should be equiv. to /dev/ttyS2 on Cygwin */
 
 /*
  * Conversions from various units to meters.
@@ -620,7 +848,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
-	p_misc_config *C.struct_misc_config_s) {
+	p_misc_config *misc_config_s) {
 
 	/* TODO KG
 	#if DEBUG
@@ -756,7 +984,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 
-	for i := 0; i < C.MAX_KISS_TCP_PORTS; i++ {
+	for i := 0; i < MAX_KISS_TCP_PORTS; i++ {
 		p_misc_config.kiss_port[i] = 0 // entry not used.
 		p_misc_config.kiss_chan[i] = -1
 	}
@@ -4306,7 +4534,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				var hostname, portStr, _ = strings.Cut(t, ":")
 				C.strcpy(&p_igate_config.t2_server_name[0], C.CString(hostname))
 				var port, portErr = strconv.Atoi(portStr)
-				if port >= C.MIN_IP_PORT_NUMBER && port <= C.MAX_IP_PORT_NUMBER && portErr == nil {
+				if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
 					p_igate_config.t2_server_port = C.int(port)
 				} else {
 					p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
@@ -4321,7 +4549,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			t = split("", false)
 			if t != "" {
 				var n, _ = strconv.Atoi(t)
-				if n >= C.MIN_IP_PORT_NUMBER && n <= C.MAX_IP_PORT_NUMBER {
+				if n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER {
 					p_igate_config.t2_server_port = C.int(n)
 				} else {
 					p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
@@ -4627,7 +4855,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// A duplicate TCP port number will overwrite the previous value.
 
 				var slot = -1
-				for i := 0; i < C.MAX_KISS_TCP_PORTS && slot == -1; i++ {
+				for i := 0; i < MAX_KISS_TCP_PORTS && slot == -1; i++ {
 					if p_misc_config.kiss_port[i] == tcp_port { //nolint:staticcheck
 						slot = i
 						if !(slot == 0 && tcp_port == DEFAULT_KISS_PORT) {
@@ -4941,7 +5169,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			// TODO: maybe add proportional pathing so multiple beacon timing does not need to be manually constructed?
 			// http://www.aprs.org/newN/ProportionalPathing.txt
 
-			if p_misc_config.num_beacons < C.MAX_BEACONS {
+			if p_misc_config.num_beacons < MAX_BEACONS {
 
 				if strings.EqualFold(t, "PBEACON") {
 					p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_POSITION
@@ -5375,9 +5603,9 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(cmd string, b *C.struct_beacon_s, line int, p_audio_config *C.struct_audio_s) error {
+func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *C.struct_audio_s) error {
 
-	b.sendto_type = C.SENDTO_XMIT
+	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
 	b.slot = G_UNKNOWN
@@ -5487,7 +5715,7 @@ func beacon_options(cmd string, b *C.struct_beacon_s, line int, p_audio_config *
 					continue
 				}
 
-				b.sendto_type = C.SENDTO_XMIT
+				b.sendto_type = SENDTO_XMIT
 				b.sendto_chan = C.int(n)
 			} else {
 				var n, _ = strconv.Atoi(value)
@@ -5496,7 +5724,7 @@ func beacon_options(cmd string, b *C.struct_beacon_s, line int, p_audio_config *
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
 					continue
 				}
-				b.sendto_type = C.SENDTO_XMIT
+				b.sendto_type = SENDTO_XMIT
 				b.sendto_chan = C.int(n)
 			}
 		} else if strings.EqualFold(keyword, "SOURCE") {
@@ -5719,7 +5947,7 @@ func beacon_options(cmd string, b *C.struct_beacon_s, line int, p_audio_config *
 
 	/* Check is here because could be using default channel when SENDTO= is not specified. */
 
-	if b.sendto_type == C.SENDTO_XMIT {
+	if b.sendto_type == SENDTO_XMIT {
 
 		if (b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE) && p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE {
 			text_color_set(DW_COLOR_ERROR)

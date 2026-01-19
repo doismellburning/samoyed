@@ -114,7 +114,7 @@ var s_gps_mutex sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_init(pconfig *C.struct_misc_config_s, debug C.int) {
+func dwgps_init(pconfig *misc_config_s, debug C.int) {
 
 	dwgps_clear(s_dwgps_info) // Init the global
 

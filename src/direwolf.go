@@ -21,7 +21,6 @@ package direwolf
 // #include <hamlib/rig.h>
 // #include "version.h"
 // #include "audio.h"
-// #include "config.h"
 // #include "ax25_pad.h"
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
@@ -73,7 +72,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 
 var audio_config *C.struct_audio_s
 var dw_tt_config tt_config_s
-var misc_config *C.struct_misc_config_s
+var misc_config *misc_config_s
 
 /*-------------------------------------------------------------------
  *
@@ -307,7 +306,7 @@ x = Silence FX.25 information.`)
 	symbols_init()
 
 	audio_config = new(C.struct_audio_s)
-	misc_config = new(C.struct_misc_config_s)
+	misc_config = new(misc_config_s)
 	var digi_config digi_config_s
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s

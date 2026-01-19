@@ -18,7 +18,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <time.h>
-// #include "config.h"
 import "C"
 
 import (
@@ -72,7 +71,7 @@ func waypoint_set_debug(n int) {
  *
  *---------------------------------------------------------------*/
 
-func waypoint_init(mc *C.struct_misc_config_s) {
+func waypoint_init(mc *misc_config_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set (DW_COLOR_DEBUG);

@@ -122,7 +122,7 @@ func kissserial_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_init(mc *C.struct_misc_config_s) {
+func kissserial_init(mc *misc_config_s) {
 	g_misc_config_p = mc
 	kf = new(kiss_frame_t)
 
