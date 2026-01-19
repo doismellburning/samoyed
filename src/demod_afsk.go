@@ -37,6 +37,8 @@ import (
 	"unsafe"
 )
 
+var DCD_CONFIG_AFSK = GenericDCDConfig()
+
 func TUNE(envvar string, param any, name string, fmt string) {
 	/*
 	   TODO KG
@@ -793,7 +795,7 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 				  D.slicer[slice].pll_symbol_count++;
 			#endif
 		*/
-		C.pll_dcd_each_symbol2(D, channel, subchannel, slice)
+		pll_dcd_each_symbol2(DCD_CONFIG_AFSK, D, channel, subchannel, slice)
 	}
 
 	// Transitions nudge the DPLL phase toward the incoming signal.
@@ -801,7 +803,7 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 	var demod_data = demod_out > 0
 	if demod_data != (D.slicer[slice].prev_demod_data != 0) {
 
-		C.pll_dcd_signal_transition2(D, slice, D.slicer[slice].data_clock_pll)
+		pll_dcd_signal_transition2(DCD_CONFIG_AFSK, D, slice, D.slicer[slice].data_clock_pll)
 
 		// TODO:	  signed int before = (signed int)(D.slicer[slice].data_clock_pll);	// Treat as signed.
 		if D.slicer[slice].data_detect != 0 {

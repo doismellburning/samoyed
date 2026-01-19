@@ -66,11 +66,7 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// // Fine tuning for different demodulator types.
-// #define DCD_THRESH_ON 30		// Hysteresis: Can miss 2 out of 32 for detecting lock.
-// #define DCD_THRESH_OFF 6		// Might want a little more fine tuning.
-// #define DCD_GOOD_WIDTH 512
-// #include "fsk_demod_state.h"		// Values above override defaults.
+// #include "fsk_demod_state.h"
 // #include "audio.h"
 import "C"
 
@@ -79,6 +75,12 @@ import (
 	"unicode"
 	"unsafe"
 )
+
+var DCD_CONFIG_PSK = &DCDConfig{
+	DCD_THRESH_ON:  30, // Hysteresis: Can miss 2 out of 32 for detecting lock.
+	DCD_THRESH_OFF: 6,  // Might want a little more fine tuning.
+	DCD_GOOD_WIDTH: 512,
+}
 
 /* TODO KG
 #define TUNE(envvar,param,name,fmt) { 				\
@@ -764,7 +766,7 @@ func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.in
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
 		D.slicer[slice].pll_symbol_count++
-		C.pll_dcd_each_symbol2(D, channel, subchannel, slice)
+		pll_dcd_each_symbol2(DCD_CONFIG_PSK, D, channel, subchannel, slice)
 	}
 
 	/*
@@ -778,7 +780,7 @@ func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.in
 
 	if demod_bits != D.slicer[slice].prev_demod_data {
 
-		C.pll_dcd_signal_transition2(D, slice, D.slicer[slice].data_clock_pll)
+		pll_dcd_signal_transition2(DCD_CONFIG_PSK, D, slice, D.slicer[slice].data_clock_pll)
 
 		var before C.int = (D.slicer[slice].data_clock_pll) // Treat as signed.
 		if D.slicer[slice].data_detect != 0 {
