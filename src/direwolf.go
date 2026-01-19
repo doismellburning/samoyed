@@ -19,7 +19,6 @@ package direwolf
 // #include <netinet/in.h>
 // #include <netdb.h>
 // #include <hamlib/rig.h>
-// #include "version.h"
 // #include "audio.h"
 // #include "ax25_pad.h"
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
@@ -1081,7 +1080,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 
 		// FIXME: partial implementation.
 
-		var user_def_da = C.CString("{" + string(C.USER_DEF_USER_ID) + string(C.USER_DEF_TYPE_AIS))
+		var user_def_da = C.CString("{" + string(USER_DEF_USER_ID) + string(USER_DEF_TYPE_AIS))
 
 		if C.strncmp((*C.char)(unsafe.Pointer(pinfo)), user_def_da, 3) == 0 {
 			waypoint_send_ais([]byte(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
@@ -1097,7 +1096,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 					0, 0, 0, &A.g_comment[0]) // freq, tone, offset
 
 				// TODO Bodge
-				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", C.GoString(&A.g_src[0]), C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, ais_obj_info)
+				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", C.GoString(&A.g_src[0]), APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, ais_obj_info)
 				C.strcpy(&ais_obj_packet[0], C.CString(_ais_obj_packet))
 
 				dw_printf("[%d.AIS] %s\n", channel, _ais_obj_packet)
