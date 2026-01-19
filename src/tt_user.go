@@ -23,7 +23,6 @@ package direwolf
 // #include <ctype.h>
 // #include <time.h>
 // #include <assert.h>
-// #include "version.h"
 // #include "ax25_pad.h"
 import "C"
 
@@ -697,7 +696,7 @@ func xmit_object_report(i int, first_time bool) {
 		stemp = C.GoString(&save_audio_config_p.mycall[save_tt_config_p.obj_recv_chan][0])
 	}
 	stemp += ">"
-	stemp += C.APP_TOCALL
+	stemp += APP_TOCALL
 	stemp += string('0' + C.MAJOR_VERSION)
 	stemp += string('0' + C.MINOR_VERSION) // TODO KG This seems to assume some limits on version numbers...
 

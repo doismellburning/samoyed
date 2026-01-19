@@ -44,7 +44,6 @@ package direwolf
 // #include <string.h>
 // #include <time.h>
 // #include "ax25_pad.h"
-// #include "version.h"
 import "C"
 
 import (

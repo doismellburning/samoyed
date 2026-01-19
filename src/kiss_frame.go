@@ -66,7 +66,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include "ax25_pad.h"
-// #include "version.h"
 // #include "audio.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"

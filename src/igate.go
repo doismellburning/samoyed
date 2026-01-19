@@ -39,7 +39,6 @@ package direwolf
 // #include <time.h>
 // #include "direwolf.h"
 // #include "ax25_pad.h"
-// #include "version.h"
 // #include "audio.h"
 import "C"
 
@@ -1486,7 +1485,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 	if ig_to_tx_allow(pp3, to_chan) {
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
 			C.GoString(&save_audio_config_p.mycall[to_chan][0]),
-			C.APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION,
+			APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION,
 			C.GoString(&save_igate_config_p.tx_via[0]),
 			payload)
 

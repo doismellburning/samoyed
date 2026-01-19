@@ -18,7 +18,6 @@
 
 #include "direwolf.h"		/* for MAX_RADIO_CHANS and MAX_TOTAL_CHANS used throughout the application. */
 #include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
-#include "version.h"
 				
 
 /*
