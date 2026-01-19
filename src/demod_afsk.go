@@ -29,12 +29,10 @@ package direwolf
 // #include <assert.h>
 // #include <ctype.h>
 // #include "audio.h"
-// #include "fsk_demod_state.h"
 import "C"
 
 import (
 	"math"
-	"unsafe"
 )
 
 var DCD_CONFIG_AFSK = GenericDCDConfig()
@@ -120,7 +118,7 @@ const MAX_G = 4.0
  *----------------------------------------------------------------*/
 
 func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
-	space_freq C.int, profile C.char, D *C.struct_demodulator_state_s) {
+	space_freq C.int, profile C.char, D *demodulator_state_s) {
 
 	var samples_per_sec = C.float(_samples_per_sec)
 	var baud = C.float(_baud)
@@ -129,7 +127,8 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		fcos256_table[j] = C.float(math.Cos(float64(j) * 2.0 * math.Pi / 256.0))
 	}
 
-	C.memset(unsafe.Pointer(D), 0, C.sizeof_struct_demodulator_state_s)
+	*D = demodulator_state_s{} //nolint:exhaustruct
+
 	D.num_slicers = 1
 
 	/*
@@ -167,11 +166,11 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 			// It turns out that narrower is better.
 
 			D.pre_filter_len_sym = 383 * 1200. / 44100. // about 8 symbols
-			D.pre_window = C.BP_WINDOW_TRUNCATED
+			D.pre_window = BP_WINDOW_TRUNCATED
 		} else {
 			D.prefilter_baud = 0.87 // TODO: fine tune
 			D.pre_filter_len_sym = 1.857
-			D.pre_window = C.BP_WINDOW_COSINE
+			D.pre_window = BP_WINDOW_COSINE
 		}
 
 		// Local oscillators for Mark and Space tones.
@@ -191,7 +190,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		} else {
 			D.lpf_baud = 0.14
 			D.lp_filter_width_sym = 1.388
-			D.lp_window = C.BP_WINDOW_TRUNCATED
+			D.lp_window = BP_WINDOW_TRUNCATED
 		}
 
 		D.agc_fast_attack = 0.70
@@ -224,11 +223,11 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 			// It turns out that narrower is better.
 
 			D.pre_filter_len_sym = 8.163 // Filter length in symbol times.
-			D.pre_window = C.BP_WINDOW_TRUNCATED
+			D.pre_window = BP_WINDOW_TRUNCATED
 		} else {
 			D.prefilter_baud = 0.87 // TODO: fine tune
 			D.pre_filter_len_sym = 1.857
-			D.pre_window = C.BP_WINDOW_COSINE
+			D.pre_window = BP_WINDOW_COSINE
 		}
 
 		// Local oscillator for Center frequency.
@@ -245,7 +244,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		} else {
 			D.lpf_baud = 0.5
 			D.lp_filter_width_sym = 1.714286 //  63 * 1200. / 44100.;
-			D.lp_window = C.BP_WINDOW_TRUNCATED
+			D.lp_window = BP_WINDOW_TRUNCATED
 		}
 
 		// For scaling phase shift into normalized -1 to +1 range for mark and space.
@@ -295,9 +294,9 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 	 * A fraction if a Hz would make no difference for the filters.
 	 */
 	if baud == 521 {
-		D.pll_step_per_sample = C.int(math.Round((C.TICKS_PER_PLL_CYCLE * 520.83) / float64(samples_per_sec)))
+		D.pll_step_per_sample = C.int(math.Round((TICKS_PER_PLL_CYCLE * 520.83) / float64(samples_per_sec)))
 	} else {
-		D.pll_step_per_sample = C.int(math.Round((C.TICKS_PER_PLL_CYCLE * float64(baud)) / float64(samples_per_sec)))
+		D.pll_step_per_sample = C.int(math.Round((TICKS_PER_PLL_CYCLE * float64(baud)) / float64(samples_per_sec)))
 	}
 
 	/*
@@ -315,7 +314,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		// TODO:  Size comes out to 417 for 1200 bps with 48000 sample rate.
 		// The message is upsetting.  Can we handle this better?
 
-		if D.pre_filter_taps > C.MAX_FILTER_SIZE {
+		if D.pre_filter_taps > MAX_FILTER_SIZE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Warning: Calculated pre filter size of %d is too large.\n", D.pre_filter_taps)
 			dw_printf("Decrease the audio sample rate or increase the decimation factor.\n")
@@ -323,7 +322,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 			dw_printf("before demodulating.  This greatly decreases the CPU requirements with little\n")
 			dw_printf("impact on the decoding performance.  This is useful for a slow ARM processor,\n")
 			dw_printf("such as with a Raspberry Pi model 1.\n")
-			D.pre_filter_taps = (C.MAX_FILTER_SIZE - 1) | 1
+			D.pre_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
 		var f1 = C.float(min(mark_freq, space_freq)) - D.prefilter_baud*C.float(baud)
@@ -356,30 +355,30 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (RRC)", "%d")
 
-		if D.lp_filter_taps > C.MAX_FILTER_SIZE {
+		if D.lp_filter_taps > MAX_FILTER_SIZE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Calculated RRC low pass filter size of %d is too large.\n", D.lp_filter_taps)
 			dw_printf("Decrease the audio sample rate or increase the decimation factor or\n")
-			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", C.MAX_FILTER_SIZE)
-			D.lp_filter_taps = (C.MAX_FILTER_SIZE - 1) | 1
+			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", MAX_FILTER_SIZE)
+			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
-		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= C.MAX_FILTER_SIZE)
+		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 		gen_rrc_lowpass(D.lp_filter[:], D.lp_filter_taps, D.u.afsk.rrc_rolloff, samples_per_sec/baud)
 	} else {
 		D.lp_filter_taps = C.int(math.Round(float64(D.lp_filter_width_sym * samples_per_sec / baud)))
 
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
-		if D.lp_filter_taps > C.MAX_FILTER_SIZE {
+		if D.lp_filter_taps > MAX_FILTER_SIZE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Calculated FIR low pass filter size of %d is too large.\n", D.lp_filter_taps)
 			dw_printf("Decrease the audio sample rate or increase the decimation factor or\n")
-			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", C.MAX_FILTER_SIZE)
-			D.lp_filter_taps = (C.MAX_FILTER_SIZE - 1) | 1
+			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", MAX_FILTER_SIZE)
+			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
-		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= C.MAX_FILTER_SIZE)
+		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 
 		var fc = C.float(baud) * D.lpf_baud / samples_per_sec
 		gen_lowpass(fc, D.lp_filter[:], D.lp_filter_taps, D.lp_window)
@@ -476,7 +475,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
  * The amplitude ratio varies from 1.48 to 3.41 with a median of 2.70.
  */
 
-func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *C.struct_demodulator_state_s) {
+func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *demodulator_state_s) {
 	/*
 		#if DEBUG4
 			static FILE *demod_log_fp = NULL;
@@ -744,7 +743,7 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *C.
  * because this happens for each transition from the demodulator.
  */
 
-func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.float, D *C.struct_demodulator_state_s, amplitude C.float) {
+func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.float, D *demodulator_state_s, amplitude C.float) {
 
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
