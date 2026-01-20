@@ -56,21 +56,6 @@ import (
 	"unsafe"
 )
 
-type agwpe_s struct {
-	Portx        byte
-	Reserved1    byte
-	Reserved2    byte
-	Reserved3    byte
-	DataKind     byte
-	Reserved4    byte
-	PID          byte
-	Reserved5    byte
-	CallFrom     [10]byte
-	CallTo       [10]byte
-	DataLen      uint32
-	UserReserved [4]byte
-}
-
 /*------------------------------------------------------------------
  *
  * Name: 	main
@@ -229,7 +214,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 	 * It also discards the via path.
 	 */
 
-	var mon_cmd = new(agwpe_s)
+	var mon_cmd = new(AGWPEHeader)
 	mon_cmd.DataKind = 'k'
 
 	binary.Write(conn, binary.LittleEndian, mon_cmd)
