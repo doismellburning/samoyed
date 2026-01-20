@@ -1008,7 +1008,6 @@ func ptt_init(audio_config_p *audio_s) {
 
 // JWL - save status and new get_ptt function.
 
-//export ptt_set_real
 func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 
 	var ptt = ptt_signal
@@ -1240,7 +1239,6 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
  *
  * ------------------------------------------------------------------*/
 
-//export get_input_real
 func get_input_real(it C.int, channel C.int) C.int {
 	Assert(it >= 0 && it < NUM_ICTYPES)
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)

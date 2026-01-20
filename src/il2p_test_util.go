@@ -34,7 +34,6 @@ func tone_gen_put_bit_fake(channel C.int, data C.int) {
 	il2p_rec_bit(channel, 0, 0, data)
 }
 
-//export tone_gen_put_bit
 func tone_gen_put_bit(channel C.int, data C.int) {
 	if IL2P_TEST {
 		tone_gen_put_bit_fake(channel, data)

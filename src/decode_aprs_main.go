@@ -151,7 +151,7 @@ func DecodeAPRSLine(line string) {
 			var kiss_frame = bytes
 
 			fmt.Printf("--- KISS frame ---\n")
-			C.hex_dump((*C.uchar)(C.CBytes(kiss_frame)), C.int(len(kiss_frame)))
+			hex_dump((*C.uchar)(C.CBytes(kiss_frame)), C.int(len(kiss_frame)))
 
 			// Put FEND at end to keep kiss_unwrap happy.
 			// Having one at the beginning is optional.

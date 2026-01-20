@@ -423,7 +423,6 @@ func cm108_inventory(max_things C.int) ([]*thing_s, error) {
  *
  *------------------------------------------------------------------*/
 
-//export cm108_find_ptt
 func cm108_find_ptt(output_audio_device *C.char, ptt_device *C.char, ptt_device_size C.int) {
 
 	//dw_printf ("DEBUG: cm108_find_ptt('%s')\n", output_audio_device);
@@ -492,7 +491,6 @@ func cm108_find_ptt(output_audio_device *C.char, ptt_device *C.char, ptt_device_
  *
  *------------------------------------------------------------------*/
 
-//export cm108_set_gpio_pin
 func cm108_set_gpio_pin(name *C.char, num C.int, state C.int) C.int {
 
 	if num < 1 || num > 8 {

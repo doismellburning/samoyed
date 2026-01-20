@@ -912,7 +912,6 @@ func audio_put_fake(a C.int, c C.int) C.int {
 
 } /* end audio_put */
 
-//export audio_put
 func audio_put(a C.int, c C.int) C.int {
 	if GEN_PACKETS {
 		return audio_put_fake(a, c)
@@ -925,7 +924,6 @@ func audio_flush_fake(a C.int) C.int {
 	return 0
 }
 
-//export audio_flush
 func audio_flush(a C.int) C.int {
 	if GEN_PACKETS {
 		return audio_flush_fake(a)
@@ -938,7 +936,6 @@ func audio_flush(a C.int) C.int {
 func dcd_change_fake(channel C.int, subchan C.int, slice C.int, state C.int) {
 }
 
-//export dcd_change
 func dcd_change(channel C.int, subchan C.int, slice C.int, state C.int) {
 	if GEN_PACKETS {
 		dcd_change_fake(channel, subchan, slice, state)
