@@ -23,7 +23,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <netdb.h>
 // #include <sys/types.h>
@@ -38,7 +37,6 @@ package direwolf
 // #include <assert.h>
 // #include <ctype.h>
 // #include <string.h>
-// #include "direwolf.h"
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"
 

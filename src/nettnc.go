@@ -8,7 +8,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"		// Sets _WIN32_WINNT for XP API level needed by ws2tcpip.h
 // #include <stdlib.h>
 // #include <sys/types.h>
 // #include <sys/ioctl.h>

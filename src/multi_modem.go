@@ -62,7 +62,6 @@ package direwolf
  *------------------------------------------------------------------*/
 
 // #define DIGIPEATER_C		// Why?
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
@@ -99,7 +98,7 @@ type candidate_t struct {
 	score C.int
 }
 
-var candidate [MAX_RADIO_CHANS][C.MAX_SUBCHANS][C.MAX_SLICERS]candidate_t
+var candidate [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
 //#define PROCESS_AFTER_BITS 2		// version 1.4.  Was a little short for skew of PSK with different modem types, optional pre-filter
 
@@ -206,14 +205,14 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
 	//assert (save_audio_config_p.achan[channel].num_subchan > 0 && save_audio_config_p.achan[channel].num_subchan <= MAX_SUBCHANS);
 	//assert (save_audio_config_p.achan[channel].num_slicers > 0 && save_audio_config_p.achan[channel].num_slicers <= MAX_SLICERS);
 
-	if save_audio_config_p.achan[channel].num_subchan <= 0 || save_audio_config_p.achan[channel].num_subchan > C.MAX_SUBCHANS ||
-		save_audio_config_p.achan[channel].num_slicers <= 0 || save_audio_config_p.achan[channel].num_slicers > C.MAX_SLICERS {
+	if save_audio_config_p.achan[channel].num_subchan <= 0 || save_audio_config_p.achan[channel].num_subchan > MAX_SUBCHANS ||
+		save_audio_config_p.achan[channel].num_slicers <= 0 || save_audio_config_p.achan[channel].num_slicers > MAX_SLICERS {
 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR!  Something is seriously wrong in multi_modem_process_sample\n")
 		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
-			save_audio_config_p.achan[channel].num_subchan, C.MAX_SUBCHANS,
-			save_audio_config_p.achan[channel].num_slicers, C.MAX_SLICERS)
+			save_audio_config_p.achan[channel].num_subchan, MAX_SUBCHANS,
+			save_audio_config_p.achan[channel].num_slicers, MAX_SLICERS)
 		dw_printf("Please report this message and include a copy of your configuration file.\n")
 		os.Exit(1)
 	}
@@ -270,8 +269,8 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
 func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchan >= 0 && subchan < C.MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < C.MAX_SLICERS)
+	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+	Assert(slice >= 0 && slice < MAX_SLICERS)
 
 	// Special encapsulation for AIS & EAS so they can be treated normally pretty much everywhere else.
 
@@ -400,7 +399,7 @@ func pick_best_candidate(channel C.int) {
 	}
 	var num_bars = save_audio_config_p.achan[channel].num_slicers * save_audio_config_p.achan[channel].num_subchan
 
-	var spectrum [C.MAX_SUBCHANS*C.MAX_SLICERS + 1]C.char
+	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]C.char
 
 	for n := C.int(0); n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
@@ -565,7 +564,7 @@ func pick_best_candidate(channel C.int) {
 
 	/* Clear in preparation for next time. */
 
-	candidate[channel] = [C.MAX_SUBCHANS][C.MAX_SLICERS]candidate_t{} // TODO KG Gotta be a nicer way to do this
+	candidate[channel] = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{} // TODO KG Gotta be a nicer way to do this
 
 } /* end pick_best_candidate */
 

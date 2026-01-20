@@ -38,7 +38,6 @@ package direwolf
  *--------------------------------------------------------------------*/
 
 // #define X 1
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>
@@ -127,7 +126,7 @@ const EXPERIMENT_H = true
 func AtestMain() {
 	ATEST_C = true
 
-	var count [C.MAX_SUBCHANS]int // Experiments G and H
+	var count [MAX_SUBCHANS]int // Experiments G and H
 
 	text_color_init(1)
 	text_color_set(DW_COLOR_INFO)
@@ -142,7 +141,7 @@ func AtestMain() {
 	my_audio_config.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
 	my_audio_config.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 
-	for channel := range C.MAX_RADIO_CHANS {
+	for channel := range MAX_RADIO_CHANS {
 		my_audio_config.achan[channel].modem_type = MODEM_AFSK
 
 		my_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
@@ -562,13 +561,13 @@ o = DCD output control
 		fmt.Printf("\n\n")
 
 		if EXPERIMENT_G {
-			for j := range C.MAX_SUBCHANS {
+			for j := range MAX_SUBCHANS {
 				var db = 20.0 * C.log10f(space_gain[j])
 				fmt.Printf("%+.1f dB, %d\n", db, count[j])
 			}
 		}
 		if EXPERIMENT_H {
-			for j := range C.MAX_SUBCHANS {
+			for j := range MAX_SUBCHANS {
 				fmt.Printf("%d\n", count[j])
 			}
 		}

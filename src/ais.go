@@ -19,7 +19,6 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <assert.h>

@@ -1,7 +1,6 @@
 /* Test AX.25 connected mode between two TNCs */
 package direwolf
 
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <stddef.h>
 // #include <netdb.h>

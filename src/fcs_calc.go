@@ -4,7 +4,6 @@ package direwolf
  * Calculate the FCS for an AX.25 frame.
  */
 
-// #include "direwolf.h"
 // #include <stdio.h>
 import "C"
 

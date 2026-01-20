@@ -144,7 +144,6 @@ same direwolf instance.
 
 */
 
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <sys/types.h>
 // #include <sys/ioctl.h>

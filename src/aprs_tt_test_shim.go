@@ -1,7 +1,6 @@
 package direwolf
 
 // #define APRS_TT_C 1
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <math.h>
 // #include <string.h>

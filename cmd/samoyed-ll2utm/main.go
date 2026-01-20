@@ -3,7 +3,6 @@ package main
 
 // #cgo CFLAGS: -I../../src -I../../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 // #cgo LDFLAGS: -lm
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <math.h>

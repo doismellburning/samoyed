@@ -2,7 +2,6 @@
 package direwolf
 
 // #define DIREWOLF_C 1
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <math.h>
 // #include <stdlib.h>
@@ -660,7 +659,7 @@ x = Silence FX.25 information.`)
 				os.Exit(1)
 			}
 		}
-		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= C.MAX_RADIO_CHANS {
+		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= MAX_RADIO_CHANS {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
@@ -1206,7 +1205,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		 * Use only those with correct CRC (or using FEC.)
 		 */
 
-		if channel < C.MAX_RADIO_CHANS {
+		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
 				cdigipeater(channel, pp)
 			}

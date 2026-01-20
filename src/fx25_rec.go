@@ -6,7 +6,6 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <assert.h>
 // #include <string.h>

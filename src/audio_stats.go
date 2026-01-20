@@ -28,7 +28,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>
@@ -65,10 +64,10 @@ import (
 *
 *----------------------------------------------------------------*/
 
-var audioStatsLastTime [C.MAX_ADEVS]time.Time
-var audioStatsSampleCount [C.MAX_ADEVS]C.int
-var audioStatsErrorCount [C.MAX_ADEVS]C.int
-var audioStatsSuppressFirst [C.MAX_ADEVS]bool
+var audioStatsLastTime [MAX_ADEVS]time.Time
+var audioStatsSampleCount [MAX_ADEVS]C.int
+var audioStatsErrorCount [MAX_ADEVS]C.int
+var audioStatsSuppressFirst [MAX_ADEVS]bool
 
 func audio_stats(adev C.int, nchan C.int, nsamp C.int, interval C.int) {
 
@@ -78,7 +77,7 @@ func audio_stats(adev C.int, nchan C.int, nsamp C.int, interval C.int) {
 		return
 	}
 
-	Assert(adev >= 0 && adev < C.MAX_ADEVS)
+	Assert(adev >= 0 && adev < MAX_ADEVS)
 
 	/*
 	 * Print information about the sample rate as a troubleshooting aid.

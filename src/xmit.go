@@ -30,7 +30,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>
@@ -39,7 +38,6 @@ package direwolf
 // #include <math.h>
 // #include <errno.h>
 // #include <stddef.h>
-// #include "direwolf.h"
 import "C"
 
 import (
@@ -104,7 +102,7 @@ func MS_TO_BITS(ms C.int, ch C.int) C.int {
  * We are not clever enough to multiplex them so use this
  * so only one is activte at the same time.
  */
-var audio_out_dev_mutex [C.MAX_ADEVS]sync.Mutex
+var audio_out_dev_mutex [MAX_ADEVS]sync.Mutex
 
 /*-------------------------------------------------------------------
  *
