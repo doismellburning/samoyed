@@ -7,7 +7,6 @@ package direwolf
 // #include <stdio.h>
 // #include <ctype.h>
 // #include <math.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -42,8 +41,8 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	list_head = nil
 
 	var E *dlq_item_t
-	var pp C.packet_t
-	var addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
+	var pp *packet_t
+	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
 
 	// Setup done, let's do stuff!
 

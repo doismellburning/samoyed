@@ -65,7 +65,6 @@ package direwolf
 // #include <ctype.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "ax25_pad.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -547,7 +546,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		channel = C.int(kiss_msg_bytes[0]>>4) & 0xf
 	}
 
-	var alevel C.alevel_t
+	var alevel alevel_t
 	var cmd = kiss_msg_bytes[0] & 0xf
 
 	switch cmd {
@@ -624,7 +623,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 			return
 		}
 
-		C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_struct_alevel_s)
+		alevel = alevel_t{} //nolint:exhaustruct
 
 		var pp = ax25_from_frame((*C.uchar)(C.CBytes(kiss_msg_bytes[1:])), kiss_len-1, alevel)
 		if pp == nil {

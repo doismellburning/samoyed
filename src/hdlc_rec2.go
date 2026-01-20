@@ -72,8 +72,6 @@ package direwolf
 // #include <string.h>
 // //Optimize processing by accessing directly to decoded bits
 // #define RRBB_C 1
-// #include "ax25_pad.h"
-// //#include "ax25_pad.h"		/* for AX25_MAX_ADDR_LEN */
 import "C"
 
 import (
@@ -85,9 +83,9 @@ import (
  * Minimum & maximum sizes of an AX.25 frame including the 2 octet FCS.
  */
 
-const MIN_FRAME_LEN = ((C.AX25_MIN_PACKET_LEN) + 2)
+const MIN_FRAME_LEN = ((AX25_MIN_PACKET_LEN) + 2)
 
-const MAX_FRAME_LEN = ((C.AX25_MAX_PACKET_LEN) + 2)
+const MAX_FRAME_LEN = ((AX25_MAX_PACKET_LEN) + 2)
 
 type retry_mode_t int
 
@@ -314,7 +312,7 @@ func hdlc_rec2_block(block *rrbb_t) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t) bool {
+func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel alevel_t) bool {
 
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	//int passall = save_audio_config_p.achan[channel].passall;
@@ -453,7 +451,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 
 // TODO:  Remove this.  but first figure out what to do in atest.c
 
-func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t) bool {
+func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel alevel_t) bool {
 	//int len;
 	//retry_t fix_bits = save_audio_config_p.achan[channel].fix_bits;
 	var passall = save_audio_config_p.achan[channel].passall > 0
@@ -559,7 +557,7 @@ func is_sep_bit_modified(bit_idx C.int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel C.alevel_t, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel alevel_t, retry_conf *retry_conf_t, passall bool) bool {
 	// FIXME KG int i;
 
 	/* TODO KG

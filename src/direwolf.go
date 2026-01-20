@@ -19,7 +19,6 @@ package direwolf
 // #include <netinet/in.h>
 // #include <netdb.h>
 // #include <hamlib/rig.h>
-// #include "ax25_pad.h"
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm
@@ -807,7 +806,7 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
-func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
+func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 	/* FIXME KG
 	assert (chan >= 0 && chan < MAX_TOTAL_CHANS);		// TOTAL for virtual channels
 	assert (subchan >= -3 && subchan < MAX_SUBCHANS);
@@ -844,7 +843,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	/* Who are we hearing?   Original station or digipeater. */
 
 	var h C.int
-	var heard [C.AX25_MAX_ADDR_LEN]C.char
+	var heard [AX25_MAX_ADDR_LEN]C.char
 	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
@@ -861,11 +860,11 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	if !q_h_opt && alevel.rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
-			if h != -1 && h != C.AX25_SOURCE {
+			if h != -1 && h != AX25_SOURCE {
 				dw_printf("Digipeater ")
 			}
 
-			var alevel_text [C.AX25_ALEVEL_TO_TEXT_SIZE]C.char
+			var alevel_text [AX25_ALEVEL_TO_TEXT_SIZE]C.char
 
 			ax25_alevel_to_text(alevel, &alevel_text[0])
 
@@ -883,11 +882,11 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 			/* we are actually hearing the preceding station in the path. */
 
 			var _heard = C.GoString(&heard[0]) // TODO Quick convenience hack
-			if h >= C.AX25_REPEATER_2 &&
+			if h >= AX25_REPEATER_2 &&
 				strings.EqualFold(_heard[:4], "WIDE") &&
 				unicode.IsDigit(rune(_heard[4])) &&
 				len(_heard) == 5 {
-				var probably_really [C.AX25_MAX_ADDR_LEN]C.char
+				var probably_really [AX25_MAX_ADDR_LEN]C.char
 				ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
 
 				// audio level applies only for internal modem channels.
@@ -977,7 +976,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	}
 
 	if ax25_is_aprs(pp) == 0 {
-		var cr C.cmdres_t
+		var cr cmdres_t
 		var desc [80]C.char
 		var pf, nr, ns C.int
 
@@ -987,7 +986,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		info_len = ax25_get_info(pp, &pinfo)
 
 		dw_printf("(%s)", C.GoString(&desc[0]))
-		if ftype == C.frame_type_U_XID {
+		if ftype == frame_type_U_XID {
 			var param xid_param_s
 			var info2text [150]C.char
 
@@ -1123,7 +1122,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
 	// We see the same sequence in tt_user.c.
 
-	var fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
+	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
 	var flen = ax25_pack(pp, &fbuf[0])
 
 	server_send_rec_packet(channel, pp, &fbuf[0], flen)                                                                // AGW net protocol
@@ -1134,7 +1133,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = ax25_from_text(&ais_obj_packet[0], 1)
 		if ao_pp != nil {
-			var ao_fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
+			var ao_fbuf [AX25_MAX_PACKET_LEN]C.uchar
 			var ao_flen = ax25_pack(ao_pp, &ao_fbuf[0])
 
 			server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)

@@ -154,7 +154,6 @@ package direwolf
 // #include <stdio.h>
 // #include <ctype.h>
 // #include <math.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -165,9 +164,9 @@ import (
 
 // Limits and defaults for parameters.
 
-const AX25_N1_PACLEN_MIN = 1                 // Max bytes in Information part of frame.
-const AX25_N1_PACLEN_DEFAULT = 256           // some v2.0 implementations have 128
-const AX25_N1_PACLEN_MAX = AX25_MAX_INFO_LEN // from ax25_pad.h
+const AX25_N1_PACLEN_MIN = 1       // Max bytes in Information part of frame.
+const AX25_N1_PACLEN_DEFAULT = 256 // some v2.0 implementations have 128
+const AX25_N1_PACLEN_MAX = AX25_MAX_INFO_LEN
 
 const AX25_N2_RETRY_MIN = 1 // Number of times to retry before giving up.
 const AX25_N2_RETRY_DEFAULT = 10
@@ -278,7 +277,7 @@ type ax25_dlsm_t struct {
 	// which client should receive the data or
 	// notifications about state changes.
 
-	addrs [C.AX25_MAX_ADDRS][C.AX25_MAX_ADDR_LEN]C.char
+	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
 	// Up to 10 addresses, same order as in frame.
 
 	num_addr C.int // Number of addresses.  Should be in range 2 .. 10.
@@ -288,7 +287,7 @@ type ax25_dlsm_t struct {
 
 	state dlsm_state_e // Current state.
 
-	modulo C.int // 8 or 128.
+	modulo ax25_modulo_t // 8 or 128.
 	// Determines whether we have one or two control
 	// octets.  128 allows a much larger window size.
 
@@ -419,7 +418,7 @@ type ax25_dlsm_t struct {
 	// Counting outgoing could probably be done in lm_data_request so
 	// it would not have to be scattered all over the place.  TBD
 
-	count_recv_frame_type [C.frame_not_AX25 + 1]int
+	count_recv_frame_type [frame_not_AX25 + 1]int
 
 	peak_rc_value C.int // Peak value of retry count (rc).
 
@@ -503,7 +502,7 @@ func SET_VS(S *ax25_dlsm_t, n C.int) {
 		var __func__ = runtime.FuncForPC(pc).Name()
 		dw_printf("V(S) = %d at %s %d\n", S.vs, __func__, __LINE__)
 	}
-	Assert(S.vs >= 0 && S.vs < S.modulo)
+	Assert(S.vs >= 0 && S.vs < C.int(S.modulo))
 }
 
 // If other guy acks reception of an I frame, we should never get an REJ or SREJ
@@ -521,7 +520,7 @@ func SET_VA(S *ax25_dlsm_t, n C.int) {
 		dw_printf("V(A) = %d at %s %d\n", S.va, __func__, __LINE__)
 	}
 
-	Assert(S.va >= 0 && S.va < S.modulo)
+	Assert(S.va >= 0 && S.va < C.int(S.modulo))
 
 	var x = AX25MODULO(n-1, S.modulo)
 	for S.txdata_by_ns[x] != nil {
@@ -539,7 +538,7 @@ func SET_VR(S *ax25_dlsm_t, n C.int) {
 		var __func__ = runtime.FuncForPC(pc).Name()
 		dw_printf("V(R) = %d at %s %d\n", S.vr, __func__, __LINE__)
 	}
-	Assert(S.vr >= 0 && S.vr < S.modulo)
+	Assert(S.vr >= 0 && S.vr < C.int(S.modulo))
 }
 
 func SET_RC(S *ax25_dlsm_t, n C.int) {
@@ -552,7 +551,7 @@ func SET_RC(S *ax25_dlsm_t, n C.int) {
 	}
 }
 
-func AX25MODULO(n C.int, m C.int) C.int {
+func AX25MODULO(n C.int, m ax25_modulo_t) C.int {
 	if m != 8 && m != 128 {
 		var pc, file, line, _ = runtime.Caller(1)
 		var _func = runtime.FuncForPC(pc).Name()
@@ -561,7 +560,7 @@ func AX25MODULO(n C.int, m C.int) C.int {
 		m = 8
 	}
 	// Use masking, rather than % operator, so negative numbers are handled properly.
-	return (n & (m - 1))
+	return (n & (C.int(m) - 1))
 }
 
 // Test whether we can send more or if we need to wait
@@ -1253,7 +1252,7 @@ func dl_data_request(E *dlq_item_t) {
 
 	C.memcpy(unsafe.Pointer(&first_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
 
-	var new_txdata = cdata_new(C.AX25_PID_SEGMENTATION_FRAGMENT, &first_segment.header, seglen+2)
+	var new_txdata = cdata_new(AX25_PID_SEGMENTATION_FRAGMENT, &first_segment.header, seglen+2)
 
 	data_request_good_size(S, new_txdata)
 
@@ -1284,7 +1283,7 @@ func dl_data_request(E *dlq_item_t) {
 
 		C.memcpy(unsafe.Pointer(&subsequent_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
 
-		new_txdata = cdata_new(C.AX25_PID_SEGMENTATION_FRAGMENT, &subsequent_segment.header, seglen+1)
+		new_txdata = cdata_new(AX25_PID_SEGMENTATION_FRAGMENT, &subsequent_segment.header, seglen+1)
 
 		data_request_good_size(S, new_txdata)
 
@@ -1551,7 +1550,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 	}
 
 	var count2 C.int = 0
-	for k := C.int(0); k < S.modulo; k++ {
+	for k := C.int(0); k < C.int(S.modulo); k++ {
 		if S.txdata_by_ns[k] != nil {
 			count2++
 		}
@@ -1739,7 +1738,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 		// Ready state.
 
-		if pid != C.AX25_PID_SEGMENTATION_FRAGMENT {
+		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
 			server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
 			return
 		} else if dataBytes[0]&0x80 > 0 {
@@ -1760,7 +1759,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 		// Reassembling data state
 
-		if pid != C.AX25_PID_SEGMENTATION_FRAGMENT {
+		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
 
 			server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
 
@@ -2022,7 +2021,7 @@ func lm_data_indication(E *dlq_item_t) {
 	// That is all we need at this point.
 
 	var desc [80]C.char
-	var cr C.cmdres_t
+	var cr cmdres_t
 	var pf, nr, ns C.int
 	var ftype = ax25_frame_type(E.pp, &cr, &desc[0], &pf, &nr, &ns)
 
@@ -2253,7 +2252,7 @@ func lm_data_indication(E *dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func i_frame(S *ax25_dlsm_t, cr C.cmdres_t, p C.int, nr C.int, ns C.int, pid C.int, info_ptr *C.char, info_len C.int) {
+func i_frame(S *ax25_dlsm_t, cr cmdres_t, p C.int, nr C.int, ns C.int, pid C.int, info_ptr *C.char, info_len C.int) {
 	switch S.state {
 
 	case state_0_disconnected:
@@ -2298,7 +2297,7 @@ func i_frame(S *ax25_dlsm_t, cr C.cmdres_t, p C.int, nr C.int, ns C.int, pid C.i
 		// used to negotiate a maximum info length but with v2.0, there is no way for the
 		// other end to know our paclen value.
 
-		if info_len >= 0 && info_len <= C.AX25_MAX_INFO_LEN {
+		if info_len >= 0 && info_len <= AX25_MAX_INFO_LEN {
 
 			if is_good_nr(S, nr) {
 
@@ -3001,7 +3000,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []C.int, count C.int, allow_f1 bool
 
 		for i := C.int(1); i < count; i++ { // skip first one
 
-			if resend[i] < 0 || resend[i] >= S.modulo {
+			if resend[i] < 0 || resend[i] >= C.int(S.modulo) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("INTERNAL ERROR, additional nr=%d, modulo=%d\n", resend[i], S.modulo)
 			}
@@ -3032,7 +3031,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []C.int, count C.int, allow_f1 bool
 			S.acknowledge_pending = false
 		}
 
-		if nr < 0 || nr >= S.modulo {
+		if nr < 0 || nr >= C.int(S.modulo) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("INTERNAL ERROR, nr=%d, modulo=%d\n", nr, S.modulo)
 			nr = AX25MODULO(nr, S.modulo)
@@ -3064,7 +3063,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []C.int, count C.int, allow_f1 bool
 			S.acknowledge_pending = false
 		}
 
-		if nr < 0 || nr >= S.modulo {
+		if nr < 0 || nr >= C.int(S.modulo) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("INTERNAL ERROR, nr=%d, modulo=%d\n", nr, S.modulo)
 			nr = AX25MODULO(nr, S.modulo)
@@ -3124,7 +3123,7 @@ func RR_OR_RNR(ready bool) ax25_frame_type_t {
 	return ft
 }
 
-func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr C.cmdres_t, pf C.int, nr C.int) {
+func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf C.int, nr C.int) {
 
 	// dw_printf ("rr_rnr_frame (ready=%d, cr=%d, pf=%d, nr=%d) state=%d\n", ready, cr, pf, nr, S.state);
 
@@ -3368,7 +3367,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr C.cmdres_t, pf C.int, nr C.int)
  *
  *------------------------------------------------------------------------------*/
 
-func rej_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, nr C.int) {
+func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, nr C.int) {
 
 	switch S.state {
 
@@ -3612,7 +3611,7 @@ func rej_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, nr C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func srej_frame(S *ax25_dlsm_t, cr C.cmdres_t, f C.int, nr C.int, info *C.uchar, info_len C.int) {
+func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f C.int, nr C.int, info *C.uchar, info_len C.int) {
 
 	switch S.state {
 
@@ -4628,7 +4627,7 @@ func frmr_frame(S *ax25_dlsm_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ui_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int) {
+func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int) {
 	if cr == cr_cmd && pf == 1 {
 
 		switch S.state {
@@ -4702,7 +4701,7 @@ func ui_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func xid_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_len C.int) {
+func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_len C.int) {
 
 	switch S.mdl_state {
 
@@ -4823,7 +4822,7 @@ func xid_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_
  *
  *------------------------------------------------------------------------------*/
 
-func test_frame(S *ax25_dlsm_t, cr C.cmdres_t, pf C.int, info_ptr *C.uchar, info_len C.int) {
+func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_len C.int) {
 	var res = cr_res
 	var f = pf
 	var nopid C.int = 0
@@ -5642,7 +5641,7 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr C.cmdres_t, pf C.int) {
+func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr cmdres_t, pf C.int) {
 	if cr == cr_cmd && pf == 1 {
 		var f C.int = 1
 		enquiry_response(S, frame_type, f)
@@ -6167,7 +6166,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 		param.srej = srej_none
 	}
 
-	param.modulo = uint32(S.modulo)
+	param.modulo = S.modulo
 	param.i_field_length_rx = S.n1_paclen // Hmmmm.  Should we ask for what the user
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
@@ -6205,10 +6204,10 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// Other end might want 8.
 	// Seems unlikely.  If it implements XID it should have modulo 128.
 
-	if param.modulo == C.modulo_unknown {
-		param.modulo = 8 // Not specified.  Set default.
+	if param.modulo == modulo_unknown {
+		param.modulo = modulo_8 // Not specified.  Set default.
 	} else {
-		param.modulo = min(param.modulo, 128)
+		param.modulo = min(param.modulo, modulo_128)
 	}
 
 	// We can do REJ or SREJ but won't combine them.
@@ -6293,9 +6292,9 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 		S.srej_enable = param.srej
 	}
 
-	if param.modulo != C.modulo_unknown {
+	if param.modulo != modulo_unknown {
 		// Disaster if aren't agreeing on this.
-		S.modulo = C.int(param.modulo)
+		S.modulo = param.modulo
 	}
 
 	if param.i_field_length_rx != G_UNKNOWN {

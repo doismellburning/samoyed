@@ -30,7 +30,6 @@ package direwolf
 // #include <string.h>
 // #include <math.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"			// for packet_t, AX25_MAX_ADDR_LEN
 import "C"
 
 import (

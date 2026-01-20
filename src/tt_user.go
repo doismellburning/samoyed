@@ -23,7 +23,6 @@ package direwolf
 // #include <ctype.h>
 // #include <time.h>
 // #include <assert.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -764,7 +763,7 @@ func xmit_object_report(i int, first_time bool) {
 	 */
 
 	if first_time && save_tt_config_p.obj_send_to_app > 0 {
-		var fbuf [C.AX25_MAX_PACKET_LEN]C.uchar
+		var fbuf [AX25_MAX_PACKET_LEN]C.uchar
 
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.

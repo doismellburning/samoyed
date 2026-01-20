@@ -16,7 +16,6 @@ package direwolf
 // #include <ctype.h>
 // #include <time.h>
 // #include <assert.h>
-// #include "ax25_pad.h"
 // extern int TT_TESTS_RUNNING;
 import "C"
 

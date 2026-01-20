@@ -23,7 +23,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <stdio.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -92,7 +91,7 @@ type pfstate_t struct {
 	/*
 	 * Packet object.
 	 */
-	pp C.packet_t
+	pp *packet_t
 
 	/*
 	 * Are we processing APRS or connected mode?
@@ -162,7 +161,7 @@ func bool2text(val C.int) string {
  *
  *--------------------------------------------------------------------*/
 
-func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp C.packet_t, is_aprs C.int) C.int {
+func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_aprs C.int) C.int {
 
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)

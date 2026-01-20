@@ -10,7 +10,6 @@ package direwolf
 // #include <errno.h>
 // #include <ctype.h>
 // #include <assert.h>
-// #include "ax25_pad.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"

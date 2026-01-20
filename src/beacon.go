@@ -16,14 +16,12 @@ package direwolf
 // #include <string.h>
 // #include <math.h>
 // #include <time.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
 	"fmt"
 	"math"
 	"strings"
-	"unsafe"
 )
 
 /*
@@ -760,7 +758,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 				A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(gpsinfo.altitude)))
 
 				/* Fake channel of 999 to distinguish from real data. */
-				var alevel C.struct_alevel_s
+				var alevel alevel_t
 				log_write(999, &A, nil, alevel, 0)
 			}
 		} else {
@@ -832,8 +830,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 
-			var alevel C.alevel_t
-			C.memset(unsafe.Pointer(&alevel), 0xff, C.sizeof_alevel_t)
+			var alevel alevel_t
 			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, C.CString(""))
 		default:
 			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)

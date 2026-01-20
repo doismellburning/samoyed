@@ -114,14 +114,12 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #define AX25_PAD_C		/* this will affect behavior of ax25_pad.h */
 // #include "direwolf.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <assert.h>
 // #include <stdio.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -166,7 +164,7 @@ import (
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr C.cmdres_t, ftype ax25_frame_type_t, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) C.packet_t {
+func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t, ftype ax25_frame_type_t, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) *packet_t {
 
 	var this_p = ax25_new()
 
@@ -184,8 +182,8 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	}
 
 	var ctrl C.int
-	var t C.cmdres_t // 1 = must be cmd, 0 = must be response, 2 = can be either.
-	var i = false    // Is Info part allowed?
+	var t cmdres_t // 1 = must be cmd, 0 = must be response, 2 = can be either.
+	var i = false  // Is Info part allowed?
 	switch ftype {
 	// 1 = cmd only, 0 = res only, 2 = either
 	case frame_type_U_SABME:
@@ -250,7 +248,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 		if pid < 0 || pid == 0 || pid == 0xff {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Internal error in ax25_u_frame: U frame, Invalid pid value 0x%02x.\n", pid)
-			pid = C.AX25_PID_NO_LAYER_3
+			pid = AX25_PID_NO_LAYER_3
 		}
 		*p = C.uchar(pid)
 		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
@@ -277,8 +275,8 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	*p = 0
 
 	// TODO KG Assert(p == this_p.frame_data+this_p.frame_len)
-	Assert(this_p.magic1 == C.MAGIC)
-	Assert(this_p.magic2 == C.MAGIC)
+	Assert(this_p.magic1 == MAGIC)
+	Assert(this_p.magic2 == MAGIC)
 
 	return (this_p)
 } /* end ax25_u_frame */
@@ -319,14 +317,14 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 func ax25_s_frame(
 	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char,
 	num_addr C.int,
-	cr C.cmdres_t,
+	cr cmdres_t,
 	ftype ax25_frame_type_t,
-	modulo C.int,
+	modulo ax25_modulo_t,
 	nr C.int,
 	pf C.int,
 	pinfo *C.uchar,
 	info_len C.int,
-) C.packet_t {
+) *packet_t {
 
 	var this_p = ax25_new()
 
@@ -348,10 +346,10 @@ func ax25_s_frame(
 	}
 	this_p.modulo = modulo
 
-	if nr < 0 || nr >= modulo {
+	if nr < 0 || nr >= C.int(modulo) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Invalid N(R) %d for S frame.\n", nr)
-		nr &= (modulo - 1)
+		nr &= C.int(modulo - 1)
 	}
 
 	// Erratum: The AX.25 spec is not clear about whether SREJ should be command, response, or both.
@@ -421,8 +419,8 @@ func ax25_s_frame(
 	*p = 0
 
 	// TODO KG Assert(p == this_p.frame_data+this_p.frame_len)
-	Assert(this_p.magic1 == C.MAGIC)
-	Assert(this_p.magic2 == C.MAGIC)
+	Assert(this_p.magic1 == MAGIC)
+	Assert(this_p.magic2 == MAGIC)
 
 	return (this_p)
 
@@ -461,7 +459,18 @@ func ax25_s_frame(
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr C.cmdres_t, modulo C.int, nr C.int, ns C.int, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) C.packet_t {
+func ax25_i_frame(
+	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char,
+	num_addr C.int,
+	cr cmdres_t,
+	modulo ax25_modulo_t,
+	nr C.int,
+	ns C.int,
+	pf C.int,
+	pid C.int,
+	pinfo *C.uchar,
+	info_len C.int,
+) *packet_t {
 
 	var this_p = ax25_new()
 
@@ -483,16 +492,16 @@ func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	}
 	this_p.modulo = modulo
 
-	if nr < 0 || nr >= modulo {
+	if nr < 0 || nr >= C.int(modulo) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Invalid N(R) %d for I frame.\n", nr)
-		nr &= (modulo - 1)
+		nr &= C.int(modulo - 1)
 	}
 
-	if ns < 0 || ns >= modulo {
+	if ns < 0 || ns >= C.int(modulo) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Invalid N(S) %d for I frame.\n", ns)
-		ns &= (modulo - 1)
+		ns &= C.int(modulo - 1)
 	}
 
 	var p = (*C.uchar)(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len))
@@ -527,7 +536,7 @@ func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	if pid < 0 || pid == 0 || pid == 0xff {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Warning: Client application provided invalid PID value, 0x%02x, for I frame.\n", pid)
-		pid = C.AX25_PID_NO_LAYER_3
+		pid = AX25_PID_NO_LAYER_3
 	}
 	*p = C.uchar(pid)
 	p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
@@ -547,8 +556,8 @@ func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	*p = 0
 
 	// TODO KG Assert(p == this_p.frame_data+this_p.frame_len)
-	Assert(this_p.magic1 == C.MAGIC)
-	Assert(this_p.magic2 == C.MAGIC)
+	Assert(this_p.magic1 == MAGIC)
+	Assert(this_p.magic2 == MAGIC)
 
 	return (this_p)
 
@@ -578,12 +587,12 @@ func ax25_i_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
  *
  *------------------------------------------------------------------------------*/
 
-func set_addrs(pp C.packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr C.cmdres_t) C.int {
+func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t) C.int {
 
 	Assert(pp.frame_len == 0)
 	Assert(cr == cr_cmd || cr == cr_res)
 
-	if num_addr < C.AX25_MIN_ADDRS || num_addr > AX25_MAX_ADDRS {
+	if num_addr < AX25_MIN_ADDRS || num_addr > AX25_MAX_ADDRS {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("INTERNAL ERROR: set_addrs, num_addr = %d\n", num_addr)
 		return (0)

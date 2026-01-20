@@ -29,7 +29,6 @@ package direwolf
 // #include <assert.h>
 // #include <stdio.h>
 // #include <unistd.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -107,7 +106,7 @@ type xid_param_s struct {
 
 	srej srej_e
 
-	modulo C.enum_ax25_modulo_e
+	modulo ax25_modulo_t
 
 	i_field_length_rx C.int /* In bytes.  XID has it in bits. */
 
@@ -156,7 +155,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 
 	result.full_duplex = G_UNKNOWN
 	result.srej = srej_not_specified
-	result.modulo = C.modulo_unknown
+	result.modulo = modulo_unknown
 	result.i_field_length_rx = G_UNKNOWN
 	result.window_size_rx = G_UNKNOWN
 	result.ack_timer = G_UNKNOWN
@@ -264,10 +263,10 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 			}
 
 			if (pval&PV_HDLC_Optional_Functions_Modulo_8) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_128) == 0 {
-				result.modulo = C.modulo_8
+				result.modulo = modulo_8
 				desc += "modulo-8 "
 			} else if (pval&PV_HDLC_Optional_Functions_Modulo_128) > 0 && (pval&PV_HDLC_Optional_Functions_Modulo_8) == 0 {
-				result.modulo = C.modulo_128
+				result.modulo = modulo_128
 				desc += "modulo-128 "
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -420,7 +419,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *xid_param_s, _info *C.uchar, cr C.cmdres_t) C.int {
+func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 
 	var info [40]byte
 	var i C.int = 0
@@ -516,7 +515,7 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr C.cmdres_t) C.int {
 		}
 	}
 
-	if param.modulo == C.modulo_128 {
+	if param.modulo == modulo_128 {
 		x |= PV_HDLC_Optional_Functions_Modulo_128
 	} else { // includes modulo_8 and modulo_unknown
 		x |= PV_HDLC_Optional_Functions_Modulo_8

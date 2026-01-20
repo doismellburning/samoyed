@@ -29,7 +29,6 @@ package direwolf
 // #include <stdlib.h>
 // #include <string.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -214,7 +213,7 @@ func mheard_dump() {
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_rf(channel C.int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries retry_t) {
+func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) {
 
 	var now = time.Now()
 

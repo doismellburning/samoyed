@@ -19,7 +19,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -974,7 +973,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
 
-func demod_get_audio_level_real(channel C.int, subchan C.int) C.alevel_t {
+func demod_get_audio_level_real(channel C.int, subchan C.int) alevel_t {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
@@ -988,7 +987,7 @@ func demod_get_audio_level_real(channel C.int, subchan C.int) C.alevel_t {
 	}
 
 	var D = &demodulator_state[channel][subchan]
-	var alevel C.alevel_t
+	var alevel alevel_t
 
 	// Take half of peak-to-peak for received audio level.
 

@@ -39,7 +39,6 @@ package direwolf
 // #include <ctype.h>
 // #include <string.h>
 // #include "direwolf.h"
-// #include "ax25_pad.h"
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0
 import "C"
 
@@ -109,7 +108,7 @@ func TTCalcMain() {
 
 		if mon_cmd.DataKind == 'K' {
 			var channel = mon_cmd.Portx
-			var alevel C.alevel_t
+			var alevel alevel_t
 			var pp = ax25_from_frame((*C.uchar)(&data[1]), C.int(mon_cmd.DataLen-1), alevel)
 
 			var result [400]C.char
@@ -152,7 +151,7 @@ func TTCalcMain() {
 				hdr.Portx = channel
 				hdr.DataKind = 'K'
 
-				var reply_uchars [C.AX25_MAX_PACKET_LEN]C.uchar
+				var reply_uchars [AX25_MAX_PACKET_LEN]C.uchar
 				var reply_len = ax25_pack(reply_pp, &reply_uchars[0])
 				hdr.DataLen = 1 + uint32(reply_len)
 

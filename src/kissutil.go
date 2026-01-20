@@ -30,7 +30,6 @@ package direwolf
 // #include <getopt.h>
 // #include <dirent.h>
 // #include <sys/stat.h>
-// #include "ax25_pad.h"
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
 import "C"
@@ -301,7 +300,7 @@ func process_input(stuff string) {
 	 */
 	if unicode.IsUpper(rune(stuff[0])) || unicode.IsNumber(rune(stuff[0])) {
 		// Parse the "TNC2 monitor format" and convert to AX.25 frame.
-		var frame_data [C.AX25_MAX_PACKET_LEN]C.uchar
+		var frame_data [AX25_MAX_PACKET_LEN]C.uchar
 		var pp = ax25_from_text(C.CString(stuff), 1)
 		if pp != nil {
 			ax25_pack(pp, &frame_data[0])
@@ -365,9 +364,9 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 		cmd = 0
 	}
 
-	if len(data) > C.AX25_MAX_PACKET_LEN-1 {
-		fmt.Printf("ERROR - Invalid data length %d - must be in range 0 to %d.\n", len(data), C.AX25_MAX_PACKET_LEN-1)
-		data = data[:C.AX25_MAX_PACKET_LEN-1]
+	if len(data) > AX25_MAX_PACKET_LEN-1 {
+		fmt.Printf("ERROR - Invalid data length %d - must be in range 0 to %d.\n", len(data), AX25_MAX_PACKET_LEN-1)
+		data = data[:AX25_MAX_PACKET_LEN-1]
 	}
 
 	var temp = []byte{byte((channel << 4) | cmd)}
@@ -520,7 +519,7 @@ func tnc_listen_serial() {
  *-----------------------------------------------------------------*/
 
 func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
-	var alevel C.alevel_t
+	var alevel alevel_t
 
 	// Hacks to work around the dodgy C/Go/callback bodges I had to do
 	var kiss_len = C.int(_kiss_len)
@@ -544,7 +543,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 				prefix = fmt.Sprintf("[%d]", channel)
 			}
 
-			var addrs [C.AX25_MAX_ADDRS * C.AX25_MAX_ADDR_LEN]C.char // Like source>dest,digi,...,digi:
+			var addrs [AX25_MAX_ADDRS * AX25_MAX_ADDR_LEN]C.char // Like source>dest,digi,...,digi:
 
 			ax25_format_addrs(pp, &addrs[0])
 

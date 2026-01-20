@@ -56,7 +56,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <math.h>
-// #include "ax25_pad.h"
 // int audio_flush_real (int a);
 // int audio_put_real (int a, int c);
 // void dcd_change_real (int chan, int subchan, int slice, int state);
@@ -801,7 +800,7 @@ func send_packet(str string) {
 			pinfo = (*C.uchar)(unsafe.Pointer(C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))) // pinfo += 3
 		}
 
-		var repeat = ax25_get_ssid(pp, C.AX25_DESTINATION)
+		var repeat = ax25_get_ssid(pp, AX25_DESTINATION)
 		if repeat == 0 {
 			repeat = 1
 		}
@@ -816,7 +815,7 @@ func send_packet(str string) {
 			return
 		}
 
-		var fbuf [C.AX25_MAX_PACKET_LEN + 2]C.uchar
+		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
 		ax25_pack(pp, &fbuf[0])
 
 		// If stereo, put same thing in each channel.

@@ -38,7 +38,6 @@ package direwolf
 // #include <string.h>
 // #include <time.h>
 // #include "direwolf.h"
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -131,7 +130,7 @@ const MIN_SATGATE_DELAY = 5
 const MAX_SATGATE_DELAY = 30
 
 var dp_mutex sync.Mutex /* Critical section for delayed packet queue. */
-var dp_queue_head C.packet_t
+var dp_queue_head *packet_t
 
 var igate_sock net.Conn
 
@@ -469,7 +468,7 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* by a carriage return, line feed sequence. No line may exceed 512 bytes */
 /* including the CR/LF sequence." */
 
-func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
+func igate_send_rec_packet(channel C.int, recv_pp *packet_t) {
 
 	if igate_sock == nil {
 		return /* Silently discard if not connected. */
@@ -664,7 +663,7 @@ func igate_send_rec_packet(channel C.int, recv_pp C.packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func send_packet_to_server(pp C.packet_t, channel C.int) {
+func send_packet_to_server(pp *packet_t, channel C.int) {
 
 	var pinfo *C.uchar
 	ax25_get_info(pp, &pinfo)
@@ -1079,7 +1078,7 @@ func igate_recv_thread() {
 				var pp3 = ax25_from_text((*C.char)(C.CBytes(stemp)), 0) // 0 means not strict
 				if pp3 != nil {
 
-					var alevel C.alevel_t
+					var alevel alevel_t
 					alevel.mark = -2 // FIXME: Do we want some other special case?
 					alevel.space = -2
 
@@ -1136,7 +1135,7 @@ func igate_recv_thread() {
  *
  *--------------------------------------------------------------------*/
 
-func satgate_delay_packet(pp C.packet_t, channel C.int) {
+func satgate_delay_packet(pp *packet_t, channel C.int) {
 
 	//if (s_debug >= 1) {
 	text_color_set(DW_COLOR_INFO)
@@ -1148,7 +1147,7 @@ func satgate_delay_packet(pp C.packet_t, channel C.int) {
 
 	dp_mutex.Lock()
 
-	var pnext, plast C.packet_t
+	var pnext, plast *packet_t
 	if dp_queue_head == nil {
 		dp_queue_head = pp
 	} else {
@@ -1611,7 +1610,7 @@ func rx_to_ig_init() {
 	rx2ig_insert_next = 0
 }
 
-func rx_to_ig_remember(pp C.packet_t) {
+func rx_to_ig_remember(pp *packet_t) {
 
 	// No need to save the information if we are not doing duplicate checking.
 
@@ -1645,7 +1644,7 @@ func rx_to_ig_remember(pp C.packet_t) {
 	}
 }
 
-func rx_to_ig_allow(pp C.packet_t) bool {
+func rx_to_ig_allow(pp *packet_t) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
@@ -1906,7 +1905,7 @@ func ig_to_tx_init() {
 	ig2tx_insert_next = 0
 }
 
-func ig_to_tx_remember(pp C.packet_t, channel C.int, bydigi C.int) {
+func ig_to_tx_remember(pp *packet_t, channel C.int, bydigi C.int) {
 	var now = time.Now()
 	var crc = ax25_dedupe_crc(pp)
 
@@ -1938,7 +1937,7 @@ func ig_to_tx_remember(pp C.packet_t, channel C.int, bydigi C.int) {
 	}
 }
 
-func ig_to_tx_allow(pp C.packet_t, channel C.int) bool {
+func ig_to_tx_allow(pp *packet_t, channel C.int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 

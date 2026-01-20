@@ -41,7 +41,6 @@ package direwolf
 // #include <ctype.h>	/* for isdigit, isupper */
 // #include "regex.h"
 // #include <unistd.h>
-// #include "ax25_pad.h"
 import "C"
 
 import (
@@ -151,7 +150,7 @@ func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func digipeater(from_chan C.int, pp C.packet_t) {
+func digipeater(from_chan C.int, pp *packet_t) {
 	// Network TNC is OK for UI frames where we don't care about timing.
 
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
@@ -286,7 +285,7 @@ func digipeater(from_chan C.int, pp C.packet_t) {
 
 func digipeat_match(
 	from_chan C.int,
-	pp C.packet_t,
+	pp *packet_t,
 	mycall_rec *C.char,
 	mycall_xmit *C.char,
 	alias *C.regex_t,
@@ -295,7 +294,7 @@ func digipeat_match(
 	preempt preempt_e,
 	atgp *C.char,
 	filter_str *C.char,
-) C.packet_t {
+) *packet_t {
 	/*
 	 * First check if filtering has been configured.
 	 */
@@ -331,7 +330,7 @@ func digipeat_match(
 	 */
 	var r = ax25_get_first_not_repeated(pp)
 
-	if r < C.AX25_REPEATER_1 {
+	if r < AX25_REPEATER_1 {
 		return (nil)
 	}
 
@@ -606,7 +605,7 @@ func digipeat_match(
  *
  *------------------------------------------------------------------------------*/
 
-func digi_regen(from_chan C.int, pp C.packet_t) {
+func digi_regen(from_chan C.int, pp *packet_t) {
 	/*
 		packet_t result;
 	*/

@@ -74,7 +74,6 @@ package direwolf
 // #include <string.h>
 // #include <sys/types.h>
 // #include <sys/stat.h>
-// #include "ax25_pad.h"
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -210,10 +209,10 @@ func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen
 		var leader = byte((channel << 4) | kiss_cmd)
 		stemp = append([]byte{leader}, fbuf...)
 
-		if flen > C.AX25_MAX_PACKET_LEN {
+		if flen > AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
-			fbuf = fbuf[:C.AX25_MAX_PACKET_LEN]
+			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
 
 		if kissserial_debug >= 2 {

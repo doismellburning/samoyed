@@ -27,7 +27,6 @@ package direwolf
 // #include <ctype.h>	/* for isdigit, isupper */
 // #include "regex.h"
 // #include <unistd.h>
-// #include "ax25_pad.h"
 import "C"
 
 /*
@@ -113,7 +112,7 @@ func cdigipeater_init(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeater(from_chan C.int, pp C.packet_t) {
+func cdigipeater(from_chan C.int, pp *packet_t) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 
@@ -211,7 +210,7 @@ func cdigipeater(from_chan C.int, pp C.packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeat_match(from_chan C.int, pp C.packet_t, mycall_rec *C.char, mycall_xmit *C.char, has_alias C.int, alias *C.regex_t, to_chan C.int, cfilter_str *C.char) C.packet_t {
+func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec *C.char, mycall_xmit *C.char, has_alias C.int, alias *C.regex_t, to_chan C.int, cfilter_str *C.char) *packet_t {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:
@@ -241,11 +240,11 @@ func cdigipeat_match(from_chan C.int, pp C.packet_t, mycall_rec *C.char, mycall_
 	 */
 	var r = ax25_get_first_not_repeated(pp)
 
-	if r < C.AX25_REPEATER_1 {
+	if r < AX25_REPEATER_1 {
 		return (nil) // Nothing to do.
 	}
 
-	var repeater [C.AX25_MAX_ADDR_LEN]C.char
+	var repeater [AX25_MAX_ADDR_LEN]C.char
 	ax25_get_addr_with_ssid(pp, r, &repeater[0])
 
 	/*

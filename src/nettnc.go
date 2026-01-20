@@ -22,7 +22,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN
 // void hex_dump (unsigned char *p, int len);
 import "C"
 
@@ -285,7 +284,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 
 			var subchan C.int = -3
 			var slice C.int = 0
-			var alevel C.alevel_t
+			var alevel alevel_t
 			var pp = ax25_from_frame((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])), alevel)
 
 			if pp != nil {
@@ -332,7 +331,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
  *
  *-----------------------------------------------------------------*/
 
-func nettnc_send_packet(channel C.int, pp C.packet_t) {
+func nettnc_send_packet(channel C.int, pp *packet_t) {
 
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.

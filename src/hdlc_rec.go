@@ -10,7 +10,6 @@ package direwolf
 // #include <stdio.h>
 // #include <string.h>
 // #include <stdint.h>          // uint64_t
-// #include "ax25_pad.h"
 import "C"
 
 import (
