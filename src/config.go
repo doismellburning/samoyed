@@ -13,7 +13,6 @@ package direwolf
  *---------------------------------------------------------------*/
 
 // #define CONFIG_C 1		// influences behavior of aprs_tt.h
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>

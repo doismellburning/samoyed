@@ -49,7 +49,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <getopt.h>
@@ -125,7 +124,7 @@ func GenPacketsMain() {
 	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC /* -r option */
 	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE /* -8 for 8 instead of 16 bits */
 
-	for channel := range C.MAX_RADIO_CHANS {
+	for channel := range MAX_RADIO_CHANS {
 		modem.achan[channel].modem_type = MODEM_AFSK         /* change with -g */
 		modem.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
 		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ /* -s option */

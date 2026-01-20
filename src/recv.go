@@ -80,7 +80,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>
@@ -116,7 +115,7 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
 func recv_init(pa *audio_s) {
 	save_pa = pa
 
-	for a := range C.MAX_ADEVS {
+	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
 			go recv_adev_thread(a)
 		}

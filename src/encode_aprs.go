@@ -13,7 +13,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <string.h>
 // #include <stdio.h>

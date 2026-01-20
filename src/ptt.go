@@ -117,7 +117,6 @@ package direwolf
 	We'd be starting from scratch to figure out how to do it.
 */
 
-// #include "direwolf.h"		// should be first.   This includes windows.h.
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>

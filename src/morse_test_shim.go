@@ -1,6 +1,5 @@
 package direwolf
 
-// #include "direwolf.h"
 // #include <stdio.h>
 // #include <unistd.h>
 // #include <stdlib.h>
@@ -25,7 +24,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
 	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
 	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
-	for channel := range C.MAX_RADIO_CHANS {
+	for channel := range MAX_RADIO_CHANS {
 		modem.achan[channel].modem_type = MODEM_AFSK
 		modem.achan[channel].mark_freq = DEFAULT_MARK_FREQ
 		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ

@@ -6,7 +6,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"		// should be first
 // #include <stdio.h>
 // #include <stdlib.h>
 // #include <ctype.h>

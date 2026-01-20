@@ -1,6 +1,5 @@
 package direwolf
 
-// #include "direwolf.h"
 // #include <assert.h>
 // #include <string.h>
 // #include <stdio.h>

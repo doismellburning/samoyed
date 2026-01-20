@@ -2,7 +2,6 @@ package direwolf
 
 // Assorted utilities when porting from C to Go
 
-// #include "direwolf.h"
 import "C"
 
 import (
@@ -11,12 +10,6 @@ import (
 	"os"
 	"runtime"
 )
-
-const MAX_RADIO_CHANS = C.MAX_RADIO_CHANS
-const MAX_TOTAL_CHANS = C.MAX_TOTAL_CHANS
-const MAX_SUBCHANS = C.MAX_SUBCHANS
-const MAX_SLICERS = C.MAX_SLICERS
-const MAX_ADEVS = C.MAX_ADEVS
 
 func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!

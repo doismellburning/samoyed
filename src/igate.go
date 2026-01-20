@@ -23,7 +23,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"		// Sets _WIN32_WINNT for XP API level needed by ws2tcpip.h
 // #include <stdlib.h>
 // #include <netdb.h>
 // #include <sys/types.h>
@@ -37,7 +36,6 @@ package direwolf
 // #include <assert.h>
 // #include <string.h>
 // #include <time.h>
-// #include "direwolf.h"
 import "C"
 
 import (

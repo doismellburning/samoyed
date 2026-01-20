@@ -25,7 +25,6 @@ package direwolf
 // Touch Tone sequence should be appropriate.
 // What do we call the parts separated by * key?  Field.
 
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <math.h>
 // #include <string.h>

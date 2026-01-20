@@ -13,7 +13,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include "direwolf.h"
 // #include <stdlib.h>
 // #include <stdio.h>
 // #include <math.h>
@@ -269,7 +268,7 @@ func dtmf_sample(c C.int, input C.float) C.char {
 			if decoded != ' ' {
 				_tmpIntBool = 1
 			}
-			dcd_change(c, C.MAX_SUBCHANS, 0, _tmpIntBool)
+			dcd_change(c, MAX_SUBCHANS, 0, _tmpIntBool)
 
 			/* Reset timeout timer. */
 			if decoded != ' ' {
