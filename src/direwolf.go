@@ -19,7 +19,6 @@ package direwolf
 // #include <netinet/in.h>
 // #include <netdb.h>
 // #include <hamlib/rig.h>
-// #include "audio.h"
 // #include "ax25_pad.h"
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod libudev
 // #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
@@ -69,7 +68,7 @@ var q_d_opt bool /* "-q d" Quiet, suppress the printing of description of APRS p
 
 var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." */
 
-var audio_config *C.struct_audio_s
+var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 
@@ -97,7 +96,7 @@ func DirewolfMain() {
 	var audioStatsInterval = pflag.IntP("audio-stats-interval", "a", 0, "Audio statistics interval in seconds.  0 to disable.")
 	var configFileName = pflag.StringP("config-file", "c", "direwolf.conf", "Configuration file name.")
 	var enablePseudoTerminal = pflag.BoolP("enable-ptty", "p", false, "Enable pseudo terminal for KISS protocol.")
-	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(C.DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
+	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
 300 bps defaults to AFSK tones of 1600 & 1800.
 1200 bps uses AFSK tones of 1200 & 2200.
 2400 bps uses QPSK based on V.26 standard.
@@ -304,7 +303,7 @@ x = Silence FX.25 information.`)
 
 	symbols_init()
 
-	audio_config = new(C.struct_audio_s)
+	audio_config = new(audio_s)
 	misc_config = new(misc_config_s)
 	var digi_config digi_config_s
 	var cdigi_config cdigi_config_s
@@ -313,7 +312,7 @@ x = Silence FX.25 information.`)
 	config_init(C.CString(*configFileName), audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
 
 	if *audioSampleRate != 0 {
-		if *audioSampleRate < C.MIN_SAMPLES_PER_SEC || *audioSampleRate > C.MAX_SAMPLES_PER_SEC {
+		if *audioSampleRate < MIN_SAMPLES_PER_SEC || *audioSampleRate > MAX_SAMPLES_PER_SEC {
 			fmt.Printf("-r option, audio samples/sec, is out of range.\n")
 			os.Exit(1)
 		}
@@ -327,7 +326,7 @@ x = Silence FX.25 information.`)
 		}
 		audio_config.adev[0].num_channels = C.int(*audioChannels)
 		if *audioChannels == 2 {
-			audio_config.chan_medium[1] = C.MEDIUM_RADIO
+			audio_config.chan_medium[1] = MEDIUM_RADIO
 		}
 	}
 
@@ -358,42 +357,42 @@ x = Silence FX.25 information.`)
 		/* that need to be kept in sync.  Maybe it could be a common function someday. */
 
 		if audio_config.achan[0].baud < 600 {
-			audio_config.achan[0].modem_type = C.MODEM_AFSK
+			audio_config.achan[0].modem_type = MODEM_AFSK
 			audio_config.achan[0].mark_freq = 1600 // Typical for HF SSB.
 			audio_config.achan[0].space_freq = 1800
 			audio_config.achan[0].decimate = 3 // Reduce CPU load.
 		} else if audio_config.achan[0].baud < 1800 {
-			audio_config.achan[0].modem_type = C.MODEM_AFSK
-			audio_config.achan[0].mark_freq = C.DEFAULT_MARK_FREQ
-			audio_config.achan[0].space_freq = C.DEFAULT_SPACE_FREQ
+			audio_config.achan[0].modem_type = MODEM_AFSK
+			audio_config.achan[0].mark_freq = DEFAULT_MARK_FREQ
+			audio_config.achan[0].space_freq = DEFAULT_SPACE_FREQ
 		} else if audio_config.achan[0].baud < 3600 {
-			audio_config.achan[0].modem_type = C.MODEM_QPSK
+			audio_config.achan[0].modem_type = MODEM_QPSK
 			audio_config.achan[0].mark_freq = 0
 			audio_config.achan[0].space_freq = 0
 			if audio_config.achan[0].baud != 2400 {
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", audio_config.achan[0].baud)
 			}
 		} else if audio_config.achan[0].baud < 7200 {
-			audio_config.achan[0].modem_type = C.MODEM_8PSK
+			audio_config.achan[0].modem_type = MODEM_8PSK
 			audio_config.achan[0].mark_freq = 0
 			audio_config.achan[0].space_freq = 0
 			if audio_config.achan[0].baud != 4800 {
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", audio_config.achan[0].baud)
 			}
 		} else if audio_config.achan[0].baud == 0xA15A15 {
-			audio_config.achan[0].modem_type = C.MODEM_AIS
+			audio_config.achan[0].modem_type = MODEM_AIS
 			audio_config.achan[0].baud = 9600
 			audio_config.achan[0].mark_freq = 0
 			audio_config.achan[0].space_freq = 0
 		} else if audio_config.achan[0].baud == 0xEA5EA5 {
-			audio_config.achan[0].modem_type = C.MODEM_EAS
+			audio_config.achan[0].modem_type = MODEM_EAS
 			audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
 			// Will make more precise in afsk demod init.
 			audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
 			audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
 			C.strcpy(&audio_config.achan[0].profiles[0], C.CString("A"))
 		} else {
-			audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
+			audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 			audio_config.achan[0].mark_freq = 0
 			audio_config.achan[0].space_freq = 0
 		}
@@ -403,7 +402,7 @@ x = Silence FX.25 information.`)
 		// Force G3RUH mode, overriding default for speed.
 		//   Example:   -B 2400 -g
 
-		audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
+		audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 		audio_config.achan[0].mark_freq = 0
 		audio_config.achan[0].space_freq = 0
 	}
@@ -412,8 +411,8 @@ x = Silence FX.25 information.`)
 		// V.26 compatible with earlier versions of direwolf.
 		//   Example:   -B 2400 -j    or simply   -j
 
-		audio_config.achan[0].v26_alternative = C.V26_A
-		audio_config.achan[0].modem_type = C.MODEM_QPSK
+		audio_config.achan[0].v26_alternative = V26_A
+		audio_config.achan[0].modem_type = MODEM_QPSK
 		audio_config.achan[0].mark_freq = 0
 		audio_config.achan[0].space_freq = 0
 		audio_config.achan[0].baud = 2400
@@ -423,8 +422,8 @@ x = Silence FX.25 information.`)
 		// V.26 compatible with MFJ and maybe others.
 		//   Example:   -B 2400 -J     or simply   -J
 
-		audio_config.achan[0].v26_alternative = C.V26_B
-		audio_config.achan[0].modem_type = C.MODEM_QPSK
+		audio_config.achan[0].v26_alternative = V26_B
+		audio_config.achan[0].modem_type = MODEM_QPSK
 		audio_config.achan[0].mark_freq = 0
 		audio_config.achan[0].space_freq = 0
 		audio_config.achan[0].baud = 2400
@@ -516,7 +515,7 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 		audio_config.achan[0].fx25_strength = C.int(*fx25CheckBytes)
-		audio_config.achan[0].layer2_xmit = C.LAYER2_FX25
+		audio_config.achan[0].layer2_xmit = LAYER2_FX25
 	}
 
 	if *il2pNormal != -1 && *il2pInverted != -1 {
@@ -525,7 +524,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *il2pNormal >= 0 {
-		audio_config.achan[0].layer2_xmit = C.LAYER2_IL2P
+		audio_config.achan[0].layer2_xmit = LAYER2_IL2P
 		if *il2pNormal > 0 {
 			audio_config.achan[0].il2p_max_fec = 1
 		}
@@ -536,7 +535,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *il2pInverted >= 0 {
-		audio_config.achan[0].layer2_xmit = C.LAYER2_IL2P
+		audio_config.achan[0].layer2_xmit = LAYER2_IL2P
 		if *il2pInverted > 0 {
 			audio_config.achan[0].il2p_max_fec = 1
 		}
@@ -617,7 +616,7 @@ x = Silence FX.25 information.`)
 	if !(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2) { //nolint:staticcheck
 		panic("assert(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2)")
 	}
-	if !(audio_config.adev[0].samples_per_sec >= C.MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= C.MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
+	if !(audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
 		panic("assert(audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
 	}
 
@@ -669,13 +668,13 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
-		if audio_config.chan_medium[transmitCalibrationChannel] == C.MEDIUM_RADIO {
+		if audio_config.chan_medium[transmitCalibrationChannel] == MEDIUM_RADIO {
 			if audio_config.achan[transmitCalibrationChannel].mark_freq != 0 && audio_config.achan[transmitCalibrationChannel].space_freq != 0 {
 				var max_duration = 60
 				var n = audio_config.achan[transmitCalibrationChannel].baud * C.int(max_duration)
 
 				text_color_set(DW_COLOR_INFO)
-				ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
+				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
 
 				switch transmitCalibrationType {
 				default:
@@ -707,7 +706,7 @@ x = Silence FX.25 information.`)
 					SLEEP_SEC(max_duration)
 				}
 
-				ptt_set(C.OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
+				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
 				text_color_set(DW_COLOR_INFO)
 				os.Exit(0)
 			} else {
@@ -808,7 +807,7 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
-func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries C.retry_t, spectrum string) {
+func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 	/* FIXME KG
 	assert (chan >= 0 && chan < MAX_TOTAL_CHANS);		// TOTAL for virtual channels
 	assert (subchan >= -3 && subchan < MAX_SUBCHANS);
@@ -827,8 +826,8 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		display_retries = " IL2P "
 	default:
 		// Possible fix_bits indication.
-		if audio_config.achan[channel].fix_bits != C.RETRY_NONE || audio_config.achan[channel].passall > 0 {
-			// FIXME KG assert(retries >= C.RETRY_NONE && retries <= C.RETRY_MAX)
+		if audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall > 0 {
+			// FIXME KG assert(retries >= RETRY_NONE && retries <= RETRY_MAX)
 			display_retries = fmt.Sprintf(" [%s] ", retry_text[int(retries)])
 		}
 	}
@@ -1181,7 +1180,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if ax25_is_aprs(pp) > 0 && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			igate_send_rec_packet(channel, pp)
 		}
 
@@ -1199,7 +1198,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) > 0 && (retries == C.RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if ax25_is_aprs(pp) > 0 && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			digipeater(channel, pp)
 		}
 
@@ -1209,7 +1208,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp C.pack
 		 */
 
 		if channel < C.MAX_RADIO_CHANS {
-			if retries == C.RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
+			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
 				cdigipeater(channel, pp)
 			}
 		}

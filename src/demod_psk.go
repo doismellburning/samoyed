@@ -66,7 +66,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -133,7 +132,7 @@ var phase_to_gray_v27 = [8]C.int{1, 0, 2, 3, 7, 6, 4, 5}
  *
  *----------------------------------------------------------------*/
 
-func demod_psk_init(modem_type C.enum_modem_t, v26_alt C.enum_v26_e, _samples_per_sec C.int, bps C.int, profile C.char, D *demodulator_state_s) {
+func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, bps C.int, profile C.char, D *demodulator_state_s) {
 
 	var samples_per_sec = float64(_samples_per_sec)
 
@@ -664,7 +663,7 @@ func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *dem
 		var gray C.int
 		var bit_quality [3]C.int
 		if D.modem_type == MODEM_QPSK {
-			if D.u.psk.v26_alt == C.V26_B {
+			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2, bit_quality[:]) // MFJ compatible
 			} else {
 				gray = phase_shift_to_symbol(delta, 2, bit_quality[:]) // Classic
@@ -694,7 +693,7 @@ func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *dem
 		var delta = C.float(math.Atan2(float64(I), float64(Q)))
 
 		if D.modem_type == MODEM_QPSK {
-			if D.u.psk.v26_alt == C.V26_B {
+			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+C.float(math.Pi/2), 2, bit_quality[:]) // MFJ compatible
 			} else {
 				gray = phase_shift_to_symbol(delta+C.float(3*math.Pi/4), 2, bit_quality[:]) // Classic

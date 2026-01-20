@@ -22,7 +22,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// #include "audio.h"		// configuration.
 // #include "ax25_pad.h"		// for AX25_MAX_PACKET_LEN
 // void hex_dump (unsigned char *p, int len);
 import "C"
@@ -54,7 +53,7 @@ var s_kiss_debug = 0
  *
  *--------------------------------------------------------------------*/
 
-func nettnc_init(pa *C.struct_audio_s) {
+func nettnc_init(pa *audio_s) {
 
 	for i := C.int(0); i < MAX_TOTAL_CHANS; i++ {
 
@@ -291,7 +290,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 
 			if pp != nil {
 				var fec_type fec_type_t = fec_type_none
-				var retries C.retry_t
+				var retries retry_t
 
 				var spectrum = C.CString("Network TNC")
 				dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)

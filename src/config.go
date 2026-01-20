@@ -29,7 +29,6 @@ package direwolf
 // #define DEFAULT_GPSD_PORT "2947"
 // #endif
 // #include "ax25_pad.h"
-// #include "audio.h"
 // #include "utm.h"
 // #include "mgrs.h"
 // #include "usng.h"
@@ -843,7 +842,7 @@ func rtfm() {
 	dw_printf("    general APRS info:    https://how.aprs.works\n")
 }
 
-func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
+func config_init(fname *C.char, p_audio_config *audio_s,
 	p_digi_config *digi_config_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
@@ -902,37 +901,37 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 		p_audio_config.achan[channel].num_freq = 1
 		p_audio_config.achan[channel].offset = 0
 
-		p_audio_config.achan[channel].layer2_xmit = C.LAYER2_AX25
+		p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25
 		p_audio_config.achan[channel].il2p_max_fec = 1
 		p_audio_config.achan[channel].il2p_invert_polarity = 0
 
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
-		p_audio_config.achan[channel].sanity_test = C.SANITY_APRS
+		p_audio_config.achan[channel].sanity_test = SANITY_APRS
 		p_audio_config.achan[channel].passall = 0
 
-		for ot := 0; ot < C.NUM_OCTYPES; ot++ {
-			p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_NONE
+		for ot := 0; ot < NUM_OCTYPES; ot++ {
+			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
 			C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(""))
-			p_audio_config.achan[channel].octrl[ot].ptt_line = C.PTT_LINE_NONE
-			p_audio_config.achan[channel].octrl[ot].ptt_line2 = C.PTT_LINE_NONE
+			p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE
+			p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE
 			p_audio_config.achan[channel].octrl[ot].out_gpio_num = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
 		}
 
-		for it := 0; it < C.NUM_ICTYPES; it++ {
-			p_audio_config.achan[channel].ictrl[it].method = C.PTT_METHOD_NONE
+		for it := 0; it < NUM_ICTYPES; it++ {
+			p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE
 			p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0
 			p_audio_config.achan[channel].ictrl[it].invert = 0
 		}
 
-		p_audio_config.achan[channel].dwait = C.DEFAULT_DWAIT
-		p_audio_config.achan[channel].slottime = C.DEFAULT_SLOTTIME
-		p_audio_config.achan[channel].persist = C.DEFAULT_PERSIST
-		p_audio_config.achan[channel].txdelay = C.DEFAULT_TXDELAY
-		p_audio_config.achan[channel].txtail = C.DEFAULT_TXTAIL
-		p_audio_config.achan[channel].fulldup = C.DEFAULT_FULLDUP
+		p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
+		p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME
+		p_audio_config.achan[channel].persist = DEFAULT_PERSIST
+		p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY
+		p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL
+		p_audio_config.achan[channel].fulldup = DEFAULT_FULLDUP
 	}
 
 	p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
@@ -1782,7 +1781,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 							dw_printf("Line %d: %s option can only be used with 2400 bps PSK.\n", line, t)
 							continue
 						}
-						p_audio_config.achan[channel].v26_alternative = uint32(IfThenElse((strings.EqualFold(t, "V26A")), C.V26_A, C.V26_B))
+						p_audio_config.achan[channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Unrecognized option for MODEM: %s\n", line, t)
@@ -1813,7 +1812,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 
-			p_audio_config.achan[channel].dtmf_decode = C.DTMF_DECODE_ON
+			p_audio_config.achan[channel].dtmf_decode = DTMF_DECODE_ON
 
 		} else if strings.EqualFold(t, "FIX_BITS") {
 
@@ -1837,8 +1836,8 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			if n >= RETRY_NONE && n < RETRY_MAX { // MAX is actually last valid +1
-				p_audio_config.achan[channel].fix_bits = C.enum_retry_e(n)
+			if retry_t(n) >= RETRY_NONE && retry_t(n) < RETRY_MAX { // MAX is actually last valid +1
+				p_audio_config.achan[channel].fix_bits = retry_t(n)
 			} else {
 				p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
 				text_color_set(DW_COLOR_ERROR)
@@ -1861,11 +1860,11 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// If more than one sanity test, we silently take the last one.
 
 				if strings.EqualFold(t, "APRS") {
-					p_audio_config.achan[channel].sanity_test = C.SANITY_APRS
+					p_audio_config.achan[channel].sanity_test = SANITY_APRS
 				} else if strings.EqualFold(t, "AX25") || strings.EqualFold(t, "AX.25") {
-					p_audio_config.achan[channel].sanity_test = C.SANITY_AX25
+					p_audio_config.achan[channel].sanity_test = SANITY_AX25
 				} else if strings.EqualFold(t, "NONE") {
-					p_audio_config.achan[channel].sanity_test = C.SANITY_NONE
+					p_audio_config.achan[channel].sanity_test = SANITY_NONE
 				} else if strings.EqualFold(t, "PASSALL") {
 					p_audio_config.achan[channel].passall = 1
 					text_color_set(DW_COLOR_ERROR)
@@ -1952,7 +1951,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 					p_audio_config.achan[channel].octrl[ot].out_gpio_num = C.int(gpio)
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 				}
-				p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_GPIO
+				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO
 				// #endif
 			} else if strings.EqualFold(t, "GPIOD") {
 				/*
@@ -2002,7 +2001,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 					p_audio_config.achan[channel].octrl[ot].out_gpio_num = C.int(gpio)
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 				}
-				p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_GPIOD
+				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD
 				/* TODO KG
 				#else
 					      text_color_set(DW_COLOR_ERROR);
@@ -2032,7 +2031,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 					p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = C.int(lpt)
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 				}
-				p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_LPT
+				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT
 				/*
 					#else
 						      text_color_set(DW_COLOR_ERROR);
@@ -2095,7 +2094,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 					dw_printf("Config file line %d: %s was not expected after model & port for hamlib.\n", line, t)
 				}
 
-				p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_HAMLIB
+				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB
 
 				// #else
 				/* TODO KG
@@ -2185,7 +2184,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 					dw_printf("See Interface Guide for details.\n")
 					continue
 				}
-				p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_CM108
+				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_CM108
 
 				/* TODO KG
 				#else
@@ -2212,16 +2211,16 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				}
 
 				if strings.EqualFold(t, "rts") {
-					p_audio_config.achan[channel].octrl[ot].ptt_line = C.PTT_LINE_RTS
+					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 				} else if strings.EqualFold(t, "dtr") {
-					p_audio_config.achan[channel].octrl[ot].ptt_line = C.PTT_LINE_DTR
+					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 				} else if strings.EqualFold(t, "-rts") {
-					p_audio_config.achan[channel].octrl[ot].ptt_line = C.PTT_LINE_RTS
+					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
 				} else if strings.EqualFold(t, "-dtr") {
-					p_audio_config.achan[channel].octrl[ot].ptt_line = C.PTT_LINE_DTR
+					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
 				} else {
 					text_color_set(DW_COLOR_ERROR)
@@ -2230,7 +2229,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 					continue
 				}
 
-				p_audio_config.achan[channel].octrl[ot].ptt_method = C.PTT_METHOD_SERIAL
+				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_SERIAL
 
 				/* In version 1.2, we allow a second one for same serial port. */
 				/* Some interfaces want the two control lines driven with opposite polarity. */
@@ -2240,16 +2239,16 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				if t != "" {
 
 					if strings.EqualFold(t, "rts") {
-						p_audio_config.achan[channel].octrl[ot].ptt_line2 = C.PTT_LINE_RTS
+						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
 						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
 					} else if strings.EqualFold(t, "dtr") {
-						p_audio_config.achan[channel].octrl[ot].ptt_line2 = C.PTT_LINE_DTR
+						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
 						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
 					} else if strings.EqualFold(t, "-rts") {
-						p_audio_config.achan[channel].octrl[ot].ptt_line2 = C.PTT_LINE_RTS
+						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
 						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 1
 					} else if strings.EqualFold(t, "-dtr") {
-						p_audio_config.achan[channel].octrl[ot].ptt_line2 = C.PTT_LINE_DTR
+						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
 						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 1
 					} else {
 						text_color_set(DW_COLOR_ERROR)
@@ -2311,13 +2310,13 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 
 				var gpio, _ = strconv.Atoi(t)
 				if gpio < 0 {
-					p_audio_config.achan[channel].ictrl[C.ICTYPE_TXINH].in_gpio_num = -1 * C.int(gpio)
-					p_audio_config.achan[channel].ictrl[C.ICTYPE_TXINH].invert = 1
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * C.int(gpio)
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 1
 				} else {
-					p_audio_config.achan[channel].ictrl[C.ICTYPE_TXINH].in_gpio_num = C.int(gpio)
-					p_audio_config.achan[channel].ictrl[C.ICTYPE_TXINH].invert = 0
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = C.int(gpio)
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 0
 				}
-				p_audio_config.achan[channel].ictrl[C.ICTYPE_TXINH].method = C.PTT_METHOD_GPIO
+				p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 				// #endif
 			}
 		} else if strings.EqualFold(t, "DWAIT") {
@@ -2344,7 +2343,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			if n >= 0 && n <= 255 {
 				p_audio_config.achan[channel].dwait = C.int(n)
 			} else {
-				p_audio_config.achan[channel].dwait = C.DEFAULT_DWAIT
+				p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid delay time for DWAIT. Using %d.\n",
 					line, p_audio_config.achan[channel].dwait)
@@ -2373,7 +2372,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				// 50 = Half second.  User might think it is mSec and use 100.
 				p_audio_config.achan[channel].slottime = C.int(n)
 			} else {
-				p_audio_config.achan[channel].slottime = C.DEFAULT_SLOTTIME
+				p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid delay time for persist algorithm. Using default %d.\n",
 					line, p_audio_config.achan[channel].slottime)
@@ -2402,7 +2401,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			if n >= 5 && n <= 250 {
 				p_audio_config.achan[channel].persist = C.int(n)
 			} else {
-				p_audio_config.achan[channel].persist = C.DEFAULT_PERSIST
+				p_audio_config.achan[channel].persist = DEFAULT_PERSIST
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid probability for persist algorithm. Using default %d.\n",
 					line, p_audio_config.achan[channel].persist)
@@ -2447,7 +2446,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				}
 				p_audio_config.achan[channel].txdelay = C.int(n)
 			} else {
-				p_audio_config.achan[channel].txdelay = C.DEFAULT_TXDELAY
+				p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid time for transmit delay. Using %d.\n",
 					line, p_audio_config.achan[channel].txdelay)
@@ -2488,7 +2487,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				}
 				p_audio_config.achan[channel].txtail = C.int(n)
 			} else {
-				p_audio_config.achan[channel].txtail = C.DEFAULT_TXTAIL
+				p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid time for transmit timing. Using %d.\n",
 					line, p_audio_config.achan[channel].txtail)
@@ -2576,10 +2575,10 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 200 {
 				p_audio_config.achan[channel].fx25_strength = C.int(n)
-				p_audio_config.achan[channel].layer2_xmit = C.LAYER2_FX25
+				p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25
 			} else {
 				p_audio_config.achan[channel].fx25_strength = 1
-				p_audio_config.achan[channel].layer2_xmit = C.LAYER2_FX25
+				p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unreasonable value for FX.25 transmission mode. Using %d.\n",
 					line, p_audio_config.achan[channel].fx25_strength)
@@ -2632,7 +2631,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 				dw_printf("Line %d: IL2PTX can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
 				continue
 			}
-			p_audio_config.achan[channel].layer2_xmit = C.LAYER2_IL2P
+			p_audio_config.achan[channel].layer2_xmit = LAYER2_IL2P
 			p_audio_config.achan[channel].il2p_max_fec = 1
 			p_audio_config.achan[channel].il2p_invert_polarity = 0
 
@@ -5603,7 +5602,7 @@ func config_init(fname *C.char, p_audio_config *C.struct_audio_s,
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *C.struct_audio_s) error {
+func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) error {
 
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0

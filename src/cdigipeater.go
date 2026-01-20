@@ -65,7 +65,7 @@ type cdigi_config_s struct {
  * Set by cdigipeater_init and used later.
  */
 
-var save_audio_config_p *C.struct_audio_s
+var save_audio_config_p *audio_s
 var save_cdigi_config_p *cdigi_config_s
 
 /*
@@ -94,7 +94,7 @@ func cdigipeater_get_count(from_chan int, to_chan int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeater_init(p_audio_config *C.struct_audio_s, p_cdigi_config *cdigi_config_s) {
+func cdigipeater_init(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) {
 	save_audio_config_p = p_audio_config
 	save_cdigi_config_p = p_cdigi_config
 }

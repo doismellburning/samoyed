@@ -2,7 +2,7 @@ package direwolf
 
 // #include "direwolf.h"
 // #include <stdio.h>
-// #include "audio.h"
+// #include <string.h>
 // #include "ax25_pad.h"
 import "C"
 
@@ -48,9 +48,9 @@ var number_of_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "
  *
  *--------------------------------------------------------------*/
 
-func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config_p *C.struct_audio_s) C.int {
+func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config_p *audio_s) C.int {
 
-	if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_IL2P { //nolint:staticcheck
+	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
 
 		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
 		if n > 0 {
@@ -59,7 +59,7 @@ func layer2_send_frame(channel C.int, pp C.packet_t, bad_fcs C.int, audio_config
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
 		// Not sure if we should fall back to AX.25 or not here.
-	} else if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_FX25 {
+	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
 		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
 		var flen = ax25_pack(pp, &fbuf[0])
 		var n = fx25_send_frame(channel, &fbuf[0], flen, audio_config_p.achan[channel].fx25_strength, false)
@@ -142,7 +142,7 @@ func ax25_only_hdlc_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, bad_fc
  *
  *--------------------------------------------------------------*/
 
-func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_config_p *C.struct_audio_s) C.int {
+func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_config_p *audio_s) C.int {
 
 	number_of_bits_sent[channel] = 0
 
@@ -160,7 +160,7 @@ func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_
 	// For IL2P, it is 01010101 without NRZI.
 
 	for j := C.int(0); j < nbytes; j++ {
-		if audio_config_p.achan[channel].layer2_xmit == C.LAYER2_IL2P {
+		if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P {
 			send_byte_msb_first(channel, IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
 		} else {
 			send_control_nrzi(channel, 0x7e)

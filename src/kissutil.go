@@ -31,7 +31,6 @@ package direwolf
 // #include <dirent.h>
 // #include <sys/stat.h>
 // #include "ax25_pad.h"
-// #include "audio.h"		// for DEFAULT_TXDELAY, etc.
 // #define DIR_CHAR "/"
 // void hex_dump (unsigned char *p, int len);
 import "C"
@@ -314,16 +313,16 @@ func process_input(stuff string) {
 	} else if unicode.IsLower(rune(stuff[0])) {
 		switch stuff[0] {
 		case 'd': // txDelay, 10ms units
-			var value = parse_number(stuff[1:], C.DEFAULT_TXDELAY)
+			var value = parse_number(stuff[1:], DEFAULT_TXDELAY)
 			send_to_kiss_tnc(channel, KISS_CMD_TXDELAY, []byte{byte(value)})
 		case 'p': // Persistence
-			var value = parse_number(stuff[1:], C.DEFAULT_PERSIST)
+			var value = parse_number(stuff[1:], DEFAULT_PERSIST)
 			send_to_kiss_tnc(channel, KISS_CMD_PERSISTENCE, []byte{byte(value)})
 		case 's': // Slot time, 10ms units
-			var value = parse_number(stuff[1:], C.DEFAULT_SLOTTIME)
+			var value = parse_number(stuff[1:], DEFAULT_SLOTTIME)
 			send_to_kiss_tnc(channel, KISS_CMD_SLOTTIME, []byte{byte(value)})
 		case 't': // txTail, 10ms units
-			var value = parse_number(stuff[1:], C.DEFAULT_TXTAIL)
+			var value = parse_number(stuff[1:], DEFAULT_TXTAIL)
 			send_to_kiss_tnc(channel, KISS_CMD_TXTAIL, []byte{byte(value)})
 		case 'f': // Full duplex
 			var value = parse_number(stuff[1:], 0)

@@ -15,7 +15,6 @@ package direwolf
 // #include <ctype.h>
 // #include <time.h>
 // #include <math.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -127,7 +126,7 @@ var SineTable [256]int
  *
  *----------------------------------------------------------------*/
 
-func morse_init(audio_config_p *C.struct_audio_s, amp C.int) {
+func morse_init(audio_config_p *audio_s, amp C.int) {
 	/*
 	 * Save away modem parameters for later use.
 	 */

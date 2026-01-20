@@ -88,14 +88,13 @@ package direwolf
 // #include <stddef.h>
 // #include <sys/types.h>
 // #include <assert.h>
-// #include "audio.h"
 import "C"
 
 import (
 	"os"
 )
 
-var save_pa *C.struct_audio_s /* Keep pointer to audio configuration for later use. */
+var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
 
 /*------------------------------------------------------------------
  *
@@ -114,7 +113,7 @@ var save_pa *C.struct_audio_s /* Keep pointer to audio configuration for later u
  *
  *----------------------------------------------------------------*/
 
-func recv_init(pa *C.struct_audio_s) {
+func recv_init(pa *audio_s) {
 	save_pa = pa
 
 	for a := range C.MAX_ADEVS {
@@ -166,7 +165,7 @@ func recv_adev_thread(a int) {
 			/* channel.  This shouldn't be a problem unless we have multiple */
 			/* sequences arriving at the same instant. */
 
-			if save_pa.achan[first_chan+c].dtmf_decode != C.DTMF_DECODE_OFF {
+			if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
 				var tt = dtmf_sample(first_chan+c, C.float(audio_sample)/16384.)
 				if tt != ' ' {
 					aprs_tt_button(int(first_chan+c), rune(tt))

@@ -56,7 +56,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <math.h>
-// #include "audio.h"
 // #include "ax25_pad.h"
 // int audio_flush_real (int a);
 // int audio_put_real (int a, int c);
@@ -96,7 +95,7 @@ const MY_RAND_MAX = 0x7fffffff
 
 var GEN_PACKETS = false // Switch between fakes and reals at runtime
 
-var modem C.struct_audio_s
+var modem audio_s
 var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
 var g_noise_level C.float = 0
@@ -123,25 +122,25 @@ func GenPacketsMain() {
 	 */
 
 	modem.adev[0].defined = 1
-	modem.adev[0].num_channels = C.DEFAULT_NUM_CHANNELS       /* -2 stereo */
-	modem.adev[0].samples_per_sec = C.DEFAULT_SAMPLES_PER_SEC /* -r option */
-	modem.adev[0].bits_per_sample = C.DEFAULT_BITS_PER_SAMPLE /* -8 for 8 instead of 16 bits */
+	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS       /* -2 stereo */
+	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC /* -r option */
+	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE /* -8 for 8 instead of 16 bits */
 
 	for channel := range C.MAX_RADIO_CHANS {
-		modem.achan[channel].modem_type = C.MODEM_AFSK         /* change with -g */
-		modem.achan[channel].mark_freq = C.DEFAULT_MARK_FREQ   /* -m option */
-		modem.achan[channel].space_freq = C.DEFAULT_SPACE_FREQ /* -s option */
-		modem.achan[channel].baud = C.DEFAULT_BAUD             /* -b option */
+		modem.achan[channel].modem_type = MODEM_AFSK         /* change with -g */
+		modem.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
+		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ /* -s option */
+		modem.achan[channel].baud = DEFAULT_BAUD             /* -b option */
 	}
 
-	modem.chan_medium[0] = C.MEDIUM_RADIO
+	modem.chan_medium[0] = MEDIUM_RADIO
 
 	/*
 	 * Set up other default values.
 	 */
 	var packet_count = 0
 
-	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(C.DEFAULT_BAUD), `Bits / second for data.  Proper modem automatically selected for speed.
+	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits / second for data.  Proper modem automatically selected for speed.
 300 bps defaults to AFSK tones of 1600 & 1800.
 1200 bps uses AFSK tones of 1200 & 2200.
 2400 bps uses QPSK based on V.26 standard.
@@ -158,7 +157,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var noisyPacketCount = pflag.IntP("noisy-packet-count", "n", 0, "Generate specified number of frames with increasing noise.")
 	var packetCount = pflag.IntP("packet-count", "N", 0, "Generate specified number of frames.")
 	var amplitude = pflag.IntP("amplitude", "a", 50, "Signal amplitude in range of 0 - 200%.") // 100% is actually half of the digital signal range so we have some headroom for adding noise, etc.
-	var audioSampleRate = pflag.IntP("audio-sample-rate", "r", C.DEFAULT_SAMPLES_PER_SEC, "Audio sample rate.")
+	var audioSampleRate = pflag.IntP("audio-sample-rate", "r", DEFAULT_SAMPLES_PER_SEC, "Audio sample rate.")
 	// var leadingZeros = pflag.IntP("leading-zeros", "z", 12, "Number of leading zero bits before frame. 12 is .01 seconds at 1200 bits/sec.") // -z option TODO: not implemented, should replace with txdelay frames.
 	var eightBitsPerSample = pflag.BoolP("eight-bps", "8", false, "8 bit audio rather than 16.")
 	var twoSoundChannels = pflag.BoolP("two-sound-channels", "2", false, "2 channels (stereo) audio rather than one channel.")
@@ -232,14 +231,14 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		g_add_noise = false
 	}
 
-	if *audioSampleRate != C.DEFAULT_SAMPLES_PER_SEC {
+	if *audioSampleRate != DEFAULT_SAMPLES_PER_SEC {
 		modem.adev[0].samples_per_sec = C.int(*audioSampleRate)
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Audio sample rate set to %d samples / second.\n", modem.adev[0].samples_per_sec)
-		if modem.adev[0].samples_per_sec < C.MIN_SAMPLES_PER_SEC || modem.adev[0].samples_per_sec > C.MAX_SAMPLES_PER_SEC {
+		if modem.adev[0].samples_per_sec < MIN_SAMPLES_PER_SEC || modem.adev[0].samples_per_sec > MAX_SAMPLES_PER_SEC {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable audio sample rate in range of %d - %d, not %d.\n",
-				C.MIN_SAMPLES_PER_SEC, C.MAX_SAMPLES_PER_SEC, *audioSampleRate)
+				MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC, *audioSampleRate)
 			os.Exit(1)
 		}
 	}
@@ -266,7 +265,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if *twoSoundChannels {
 		modem.adev[0].num_channels = 2
-		modem.chan_medium[1] = C.MEDIUM_RADIO
+		modem.chan_medium[1] = MEDIUM_RADIO
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("2 channels of sound rather than 1.\n")
 	}
@@ -308,25 +307,25 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		// that need to be kept in sync.  Maybe it could be a common function someday.
 
 		if modem.achan[0].baud == 100 { // What was this for?
-			modem.achan[0].modem_type = C.MODEM_AFSK
+			modem.achan[0].modem_type = MODEM_AFSK
 			modem.achan[0].mark_freq = 1615
 			modem.achan[0].space_freq = 1785
 		} else if modem.achan[0].baud == 0xEA5EA5 {
 			modem.achan[0].baud = 521 // Fine tuned later. 520.83333
 			// Proper fix is to make this float.
-			modem.achan[0].modem_type = C.MODEM_EAS
+			modem.achan[0].modem_type = MODEM_EAS
 			modem.achan[0].mark_freq = 2083 // Ideally these should be floating point.
 			modem.achan[0].space_freq = 1563
 		} else if modem.achan[0].baud < 600 {
-			modem.achan[0].modem_type = C.MODEM_AFSK
+			modem.achan[0].modem_type = MODEM_AFSK
 			modem.achan[0].mark_freq = 1600 // Typical for HF SSB
 			modem.achan[0].space_freq = 1800
 		} else if modem.achan[0].baud < 1800 {
-			modem.achan[0].modem_type = C.MODEM_AFSK
-			modem.achan[0].mark_freq = C.DEFAULT_MARK_FREQ
-			modem.achan[0].space_freq = C.DEFAULT_SPACE_FREQ
+			modem.achan[0].modem_type = MODEM_AFSK
+			modem.achan[0].mark_freq = DEFAULT_MARK_FREQ
+			modem.achan[0].space_freq = DEFAULT_SPACE_FREQ
 		} else if modem.achan[0].baud < 3600 {
-			modem.achan[0].modem_type = C.MODEM_QPSK
+			modem.achan[0].modem_type = MODEM_QPSK
 			modem.achan[0].mark_freq = 0
 			modem.achan[0].space_freq = 0
 			fmt.Printf("Using V.26 QPSK rather than AFSK.\n")
@@ -335,7 +334,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", modem.achan[0].baud)
 			}
 		} else if modem.achan[0].baud < 7200 {
-			modem.achan[0].modem_type = C.MODEM_8PSK
+			modem.achan[0].modem_type = MODEM_8PSK
 			modem.achan[0].mark_freq = 0
 			modem.achan[0].space_freq = 0
 			fmt.Printf("Using V.27 8PSK rather than AFSK.\n")
@@ -344,13 +343,13 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", modem.achan[0].baud)
 			}
 		} else {
-			modem.achan[0].modem_type = C.MODEM_SCRAMBLE
+			modem.achan[0].modem_type = MODEM_SCRAMBLE
 			text_color_set(DW_COLOR_INFO)
 			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
 		}
-		if modem.achan[0].baud != 100 && (modem.achan[0].baud < C.MIN_BAUD || modem.achan[0].baud > C.MAX_BAUD) {
+		if modem.achan[0].baud != 100 && (modem.achan[0].baud < MIN_BAUD || modem.achan[0].baud > MAX_BAUD) {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", C.MIN_BAUD, C.MAX_BAUD)
+			fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
 			os.Exit(1)
 		}
 	}
@@ -389,28 +388,28 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	if *g3ruh { /* -g for g3ruh scrambling */
-		modem.achan[0].modem_type = C.MODEM_SCRAMBLE
+		modem.achan[0].modem_type = MODEM_SCRAMBLE
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using G3RUH mode regardless of bit rate.\n")
 	}
 
 	if *direwolf15compat { /* -j V.26 compatible with earlier direwolf. */
-		modem.achan[0].v26_alternative = C.V26_A
-		modem.achan[0].modem_type = C.MODEM_QPSK
+		modem.achan[0].v26_alternative = V26_A
+		modem.achan[0].modem_type = MODEM_QPSK
 		modem.achan[0].mark_freq = 0
 		modem.achan[0].space_freq = 0
 		modem.achan[0].baud = 2400
 	}
 
 	if *mfj2400compat { /* -J V.26 compatible with MFJ-2400. */
-		modem.achan[0].v26_alternative = C.V26_B
-		modem.achan[0].modem_type = C.MODEM_QPSK
+		modem.achan[0].v26_alternative = V26_B
+		modem.achan[0].modem_type = MODEM_QPSK
 		modem.achan[0].mark_freq = 0
 		modem.achan[0].space_freq = 0
 		modem.achan[0].baud = 2400
 	}
 
-	if modem.achan[0].modem_type == C.MODEM_QPSK && modem.achan[0].v26_alternative == C.V26_UNSPECIFIED {
+	if modem.achan[0].modem_type == MODEM_QPSK && modem.achan[0].v26_alternative == V26_UNSPECIFIED {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("ERROR: Either -j or -J must be specified when using 2400 bps QPSK.\n")
 		pflag.Usage()
@@ -424,7 +423,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			os.Exit(1)
 		}
 		modem.achan[0].fx25_strength = C.int(*fx25CheckBytes)
-		modem.achan[0].layer2_xmit = C.LAYER2_FX25
+		modem.achan[0].layer2_xmit = LAYER2_FX25
 	}
 
 	if *il2pNormal >= 0 && *il2pInverted >= 0 {
@@ -436,7 +435,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if *il2pNormal >= 0 {
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using IL2P normal polarity.\n")
-		modem.achan[0].layer2_xmit = C.LAYER2_IL2P
+		modem.achan[0].layer2_xmit = LAYER2_IL2P
 		if *il2pNormal > 0 {
 			modem.achan[0].il2p_max_fec = 1
 		}
@@ -446,7 +445,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if *il2pInverted >= 0 {
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using IL2P inverted polarity.\n")
-		modem.achan[0].layer2_xmit = C.LAYER2_IL2P
+		modem.achan[0].layer2_xmit = LAYER2_IL2P
 		if *il2pInverted > 0 {
 			modem.achan[0].il2p_max_fec = 1
 		}
@@ -492,7 +491,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if !(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2) { //nolint:staticcheck
 		panic("assert(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2)")
 	}
-	if !(modem.adev[0].samples_per_sec >= C.MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= C.MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
+	if !(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
 		panic("assert(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
 	}
 
@@ -597,7 +596,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		// This should send a total of 6.
 		// Note that sticking in the user defined type {DE is optional.
 
-		if modem.achan[0].modem_type == C.MODEM_EAS {
+		if modem.achan[0].modem_type == MODEM_EAS {
 			send_packet("X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
 			send_packet("X>X-2:{DENNNN")
 			send_packet("X>X:NNNN")
@@ -635,20 +634,20 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
  *
  *----------------------------------------------------------------*/
 
-func audio_file_open(fname string, pa *C.struct_audio_s) int {
+func audio_file_open(fname string, pa *audio_s) int {
 	/*
 	 * Fill in defaults for any missing values.
 	 */
 	if pa.adev[0].num_channels == 0 {
-		pa.adev[0].num_channels = C.DEFAULT_NUM_CHANNELS
+		pa.adev[0].num_channels = DEFAULT_NUM_CHANNELS
 	}
 
 	if pa.adev[0].samples_per_sec == 0 {
-		pa.adev[0].samples_per_sec = C.DEFAULT_SAMPLES_PER_SEC
+		pa.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
 	}
 
 	if pa.adev[0].bits_per_sample == 0 {
-		pa.adev[0].bits_per_sample = C.DEFAULT_BITS_PER_SAMPLE
+		pa.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 	}
 
 	/*
@@ -775,7 +774,7 @@ func send_packet(str string) {
 		// For one thing, this is not in TNC-2 monitor format.
 
 		morse_send(0, str, C.int(g_morse_wpm), 100, 100)
-	} else if modem.achan[0].modem_type == C.MODEM_EAS {
+	} else if modem.achan[0].modem_type == MODEM_EAS {
 		// Generate EAS SAME signal FOR RESEARCH AND TESTING ONLY!!!
 		// There could be legal consequences for sending unauhorized SAME
 		// over the radio so don't do it!
@@ -828,9 +827,9 @@ func send_packet(str string) {
 			// Insert random amount of quiet time.
 
 			switch modem.achan[c].modem_type {
-			case C.MODEM_QPSK:
+			case MODEM_QPSK:
 				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 2)
-			case C.MODEM_8PSK:
+			case MODEM_8PSK:
 				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 3)
 			default:
 				samples_per_symbol = modem.adev[0].samples_per_sec / modem.achan[c].baud

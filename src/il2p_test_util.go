@@ -6,7 +6,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -48,7 +47,7 @@ func tone_gen_put_bit(channel C.int, data C.int) {
 
 // This is called when a complete frame has been deserialized.
 
-func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries C.retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries retry_t, fec_type fec_type_t) {
 	if rec_count < 0 {
 		return // Skip check before serdes test.
 	}
@@ -73,7 +72,7 @@ func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice 
 }
 
 //export multi_modem_process_rec_packet
-func multi_modem_process_rec_packet(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries C.retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet(channel C.int, subchannel C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, retries retry_t, fec_type fec_type_t) {
 	if IL2P_TEST {
 		multi_modem_process_rec_packet_fake(channel, subchannel, slice, pp, alevel, retries, fec_type)
 	} else {

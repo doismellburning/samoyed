@@ -6,8 +6,6 @@ package direwolf
 // #include <math.h>
 // #include <assert.h>
 // #include <string.h>
-// #include "audio.h"
-// void ptt_init (struct audio_s *p_modem);
 import "C"
 
 import "testing"
@@ -16,12 +14,12 @@ func dtmf_test_main(t *testing.T) {
 	t.Helper()
 
 	var c C.int = 0 // radio channel.
-	var my_audio_config C.struct_audio_s
+	var my_audio_config audio_s
 
 	my_audio_config.adev[ACHAN2ADEV(c)].defined = 1
 	my_audio_config.adev[ACHAN2ADEV(c)].samples_per_sec = 44100
-	my_audio_config.chan_medium[c] = C.MEDIUM_RADIO
-	my_audio_config.achan[c].dtmf_decode = C.DTMF_DECODE_ON
+	my_audio_config.chan_medium[c] = MEDIUM_RADIO
+	my_audio_config.achan[c].dtmf_decode = DTMF_DECODE_ON
 
 	// Let's try to set up audio?
 	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1

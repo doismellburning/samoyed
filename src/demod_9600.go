@@ -20,7 +20,6 @@ package direwolf
 // #include <string.h>
 // #include <assert.h>
 // #include <ctype.h>
-// #include "audio.h"
 import "C"
 
 import (
@@ -118,7 +117,7 @@ func agc(in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float
  *
  *----------------------------------------------------------------*/
 
-func demod_9600_init(modem_type C.enum_modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *demodulator_state_s) {
+func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *demodulator_state_s) {
 
 	if upsample < 1 {
 		upsample = 1

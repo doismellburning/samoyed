@@ -30,7 +30,6 @@ package direwolf
 // #include <string.h>
 // #include <ctype.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -215,7 +214,7 @@ func mheard_dump() {
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_rf(channel C.int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries C.retry_t) {
+func mheard_save_rf(channel C.int, A *decode_aprs_t, pp C.packet_t, alevel C.alevel_t, retries retry_t) {
 
 	var now = time.Now()
 

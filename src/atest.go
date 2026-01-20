@@ -48,7 +48,6 @@ package direwolf
 // #include <getopt.h>
 // #include <ctype.h>
 // #include <math.h>
-// #include "audio.h"
 // #include "ax25_pad.h"
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
@@ -107,7 +106,7 @@ var packets_decoded_total = 0
 var decimate = 0 /* Reduce that sampling rate if set. 1 = normal, 2 = half, 3 = 1/3, etc. */
 var upsample = 0 /* Upsample for G3RUH decoder. Non-zero will override the default. */
 
-var my_audio_config *C.struct_audio_s
+var my_audio_config *audio_s
 
 var space_gain [MAX_SUBCHANS]C.float
 
@@ -134,39 +133,39 @@ func AtestMain() {
 	text_color_init(1)
 	text_color_set(DW_COLOR_INFO)
 
-	my_audio_config = (*C.struct_audio_s)(C.malloc(C.sizeof_struct_audio_s))
+	my_audio_config = new(audio_s)
 
 	/*
 	 * First apply defaults.
 	 */
 
-	my_audio_config.adev[0].num_channels = C.DEFAULT_NUM_CHANNELS
-	my_audio_config.adev[0].samples_per_sec = C.DEFAULT_SAMPLES_PER_SEC
-	my_audio_config.adev[0].bits_per_sample = C.DEFAULT_BITS_PER_SAMPLE
+	my_audio_config.adev[0].num_channels = DEFAULT_NUM_CHANNELS
+	my_audio_config.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+	my_audio_config.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 
 	for channel := range C.MAX_RADIO_CHANS {
-		my_audio_config.achan[channel].modem_type = C.MODEM_AFSK
+		my_audio_config.achan[channel].modem_type = MODEM_AFSK
 
-		my_audio_config.achan[channel].mark_freq = C.DEFAULT_MARK_FREQ
-		my_audio_config.achan[channel].space_freq = C.DEFAULT_SPACE_FREQ
-		my_audio_config.achan[channel].baud = C.DEFAULT_BAUD
+		my_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+		my_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+		my_audio_config.achan[channel].baud = DEFAULT_BAUD
 
 		C.strcpy(&my_audio_config.achan[channel].profiles[0], C.CString("A"))
 
 		my_audio_config.achan[channel].num_freq = 1
 		my_audio_config.achan[channel].offset = 0
 
-		my_audio_config.achan[channel].fix_bits = C.RETRY_NONE
+		my_audio_config.achan[channel].fix_bits = RETRY_NONE
 
-		my_audio_config.achan[channel].sanity_test = C.SANITY_APRS
-		// my_audio_config.achan[channel].sanity_test = C.SANITY_AX25;
-		// my_audio_config.achan[channel].sanity_test = C.SANITY_NONE;
+		my_audio_config.achan[channel].sanity_test = SANITY_APRS
+		// my_audio_config.achan[channel].sanity_test = SANITY_AX25;
+		// my_audio_config.achan[channel].sanity_test = SANITY_NONE;
 
 		my_audio_config.achan[channel].passall = 0
 		// my_audio_config.achan[channel].passall = 1;
 	}
 
-	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(C.DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
+	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
 300 bps defaults to AFSK tones of 1600 & 1800.
 1200 bps uses AFSK tones of 1200 & 2200.
 2400 bps uses QPSK based on V.26 standard.
@@ -259,12 +258,12 @@ o = DCD output control
 		my_audio_config.achan[0].upsample = C.int(*upsample)
 	}
 
-	if *fixBits < C.RETRY_NONE || *fixBits > C.RETRY_MAX {
-		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", C.RETRY_NONE, C.RETRY_MAX, *fixBits)
+	if retry_t(*fixBits) < RETRY_NONE || retry_t(*fixBits) > RETRY_MAX {
+		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", RETRY_NONE, RETRY_MAX, *fixBits)
 		pflag.Usage()
 		os.Exit(1)
 	}
-	my_audio_config.achan[0].fix_bits = uint32(*fixBits)
+	my_audio_config.achan[0].fix_bits = retry_t(*fixBits)
 
 	var channelFlagCount int
 	for _, b := range []bool{*channel0, *channel1, *channel2} {
@@ -323,52 +322,52 @@ o = DCD output control
 	/* that need to be kept in sync.  Maybe it could be a common function someday. */
 
 	if my_audio_config.achan[0].baud == 100 { // What was this for?
-		my_audio_config.achan[0].modem_type = C.MODEM_AFSK
+		my_audio_config.achan[0].modem_type = MODEM_AFSK
 		my_audio_config.achan[0].mark_freq = 1615
 		my_audio_config.achan[0].space_freq = 1785
 	} else if my_audio_config.achan[0].baud < 600 { // e.g. HF SSB packet
-		my_audio_config.achan[0].modem_type = C.MODEM_AFSK
+		my_audio_config.achan[0].modem_type = MODEM_AFSK
 		my_audio_config.achan[0].mark_freq = 1600
 		my_audio_config.achan[0].space_freq = 1800
 		// Previously we had a "D" which was fine tuned for 300 bps.
 		// In v1.7, it's not clear if we should use "B" or just stick with "A".
 	} else if my_audio_config.achan[0].baud < 1800 { // common 1200
-		my_audio_config.achan[0].modem_type = C.MODEM_AFSK
-		my_audio_config.achan[0].mark_freq = C.DEFAULT_MARK_FREQ
-		my_audio_config.achan[0].space_freq = C.DEFAULT_SPACE_FREQ
+		my_audio_config.achan[0].modem_type = MODEM_AFSK
+		my_audio_config.achan[0].mark_freq = DEFAULT_MARK_FREQ
+		my_audio_config.achan[0].space_freq = DEFAULT_SPACE_FREQ
 	} else if my_audio_config.achan[0].baud < 3600 {
-		my_audio_config.achan[0].modem_type = C.MODEM_QPSK
+		my_audio_config.achan[0].modem_type = MODEM_QPSK
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(""))
 	} else if my_audio_config.achan[0].baud < 7200 {
-		my_audio_config.achan[0].modem_type = C.MODEM_8PSK
+		my_audio_config.achan[0].modem_type = MODEM_8PSK
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(""))
 	} else if my_audio_config.achan[0].baud == 0xA15A15 { // Hack for different use of 9600
-		my_audio_config.achan[0].modem_type = C.MODEM_AIS
+		my_audio_config.achan[0].modem_type = MODEM_AIS
 		my_audio_config.achan[0].baud = 9600
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(" ")) // avoid getting default later.
 	} else if my_audio_config.achan[0].baud == 0xEA5EA5 {
-		my_audio_config.achan[0].modem_type = C.MODEM_EAS
+		my_audio_config.achan[0].modem_type = MODEM_EAS
 		my_audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
 		// Will make more precise in afsk demod init.
 		my_audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
 		my_audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString("A"))
 	} else {
-		my_audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
+		my_audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(" ")) // avoid getting default later.
 	}
 
-	if my_audio_config.achan[0].baud < C.MIN_BAUD || my_audio_config.achan[0].baud > C.MAX_BAUD {
+	if my_audio_config.achan[0].baud < MIN_BAUD || my_audio_config.achan[0].baud > MAX_BAUD {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", C.MIN_BAUD, C.MAX_BAUD)
+		fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
 		os.Exit(1)
 	}
 
@@ -377,7 +376,7 @@ o = DCD output control
 	 */
 
 	if *g3ruh {
-		my_audio_config.achan[0].modem_type = C.MODEM_SCRAMBLE
+		my_audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(" ")) // avoid getting default later.
@@ -390,8 +389,8 @@ o = DCD output control
 		// V.26 compatible with earlier versions of direwolf.
 		//   Example:   -B 2400 -j    or simply   -j
 
-		my_audio_config.achan[0].v26_alternative = C.V26_A
-		my_audio_config.achan[0].modem_type = C.MODEM_QPSK
+		my_audio_config.achan[0].v26_alternative = V26_A
+		my_audio_config.achan[0].modem_type = MODEM_QPSK
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		my_audio_config.achan[0].baud = 2400
@@ -401,8 +400,8 @@ o = DCD output control
 		// V.26 compatible with MFJ and maybe others.
 		//   Example:   -B 2400 -J     or simply   -J
 
-		my_audio_config.achan[0].v26_alternative = C.V26_B
-		my_audio_config.achan[0].modem_type = C.MODEM_QPSK
+		my_audio_config.achan[0].v26_alternative = V26_B
+		my_audio_config.achan[0].modem_type = MODEM_QPSK
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		my_audio_config.achan[0].baud = 2400
@@ -415,7 +414,7 @@ o = DCD output control
 		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(*modemProfile))
 	}
 
-	C.memcpy(unsafe.Pointer(&my_audio_config.achan[1]), unsafe.Pointer(&my_audio_config.achan[0]), C.sizeof_struct_achan_param_s)
+	my_audio_config.achan[1] = my_audio_config.achan[0]
 
 	if len(pflag.Args()) == 0 {
 		text_color_set(DW_COLOR_ERROR)
@@ -503,9 +502,9 @@ o = DCD output control
 		my_audio_config.adev[0].bits_per_sample = C.int(format.wbitspersample)
 		my_audio_config.adev[0].num_channels = C.int(format.nchannels)
 
-		my_audio_config.chan_medium[0] = C.MEDIUM_RADIO
+		my_audio_config.chan_medium[0] = MEDIUM_RADIO
 		if format.nchannels == 2 {
-			my_audio_config.chan_medium[1] = C.MEDIUM_RADIO
+			my_audio_config.chan_medium[1] = MEDIUM_RADIO
 		}
 
 		text_color_set(DW_COLOR_INFO)
@@ -637,7 +636,7 @@ func audio_get(a C.int) C.int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries C.retry_t, spectrum *C.char) {
+func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t, alevel C.alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
 
 	packets_decoded_one++
 	if hdlc_rec_data_detect_any(channel) == 0 {
@@ -714,7 +713,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp C.packet_t
 			// No fix_bits or passall specified.
 			dw_printf("%s audio level = %s     %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
 		} else {
-			Assert(retries >= RETRY_NONE && retries <= C.RETRY_MAX) // validate array index.
+			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
 			dw_printf("%s audio level = %s   [%s]   %s\n", heard, C.GoString(&alevel_text[0]), retry_text[int(retries)], C.GoString(spectrum))
 		}
 	}

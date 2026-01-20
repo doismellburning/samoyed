@@ -17,7 +17,6 @@ package direwolf
 // #include <math.h>
 // #include <time.h>
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -31,7 +30,7 @@ import (
  * Save pointers to configuration settings.
  */
 
-var g_modem_config_p *C.struct_audio_s
+var g_modem_config_p *audio_s
 var g_misc_config_p *misc_config_s
 var g_igate_config_p *igate_config_s
 
@@ -68,7 +67,7 @@ func beacon_tracker_set_debug(level int) {
  *
  *--------------------------------------------------------------------*/
 
-func beacon_init(pmodem *C.struct_audio_s, pconfig *misc_config_s, pigate *igate_config_s) {
+func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) {
 	/*  FIXME KG
 	struct tm tm;
 	int j;

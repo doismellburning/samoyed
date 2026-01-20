@@ -11,7 +11,6 @@ package direwolf
 // #include <string.h>
 // #include <stdint.h>          // uint64_t
 // #include "ax25_pad.h"
-// #include "audio.h"
 import "C"
 
 import (
@@ -98,9 +97,9 @@ var composite_dcd [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 
 var hdlcRecWasInit = false
 
-var g_audio_p *C.struct_audio_s
+var g_audio_p *audio_s
 
-func hdlc_rec_init(pa *C.struct_audio_s) {
+func hdlc_rec_init(pa *audio_s) {
 
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("hdlc_rec_init (%p) \n", pa);
@@ -773,7 +772,7 @@ func hdlc_rec_data_detect_any(channel C.int) C.int {
 		}
 	}
 
-	if get_input(C.ICTYPE_TXINH, channel) == 1 {
+	if get_input(ICTYPE_TXINH, channel) == 1 {
 		return (1)
 	}
 
