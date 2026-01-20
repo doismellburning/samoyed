@@ -840,7 +840,7 @@ func rtfm() {
 	dw_printf("    general APRS info:    https://how.aprs.works\n")
 }
 
-func config_init(fname *C.char, p_audio_config *audio_s,
+func config_init(fname string, p_audio_config *audio_s,
 	p_digi_config *digi_config_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
@@ -1062,9 +1062,9 @@ func config_init(fname *C.char, p_audio_config *audio_s,
 	 * In version 1.8, I will attempt to display the full absolute path so there
 	 * is no confusion.
 	 */
-	var absFilePath, absFilePathErr = filepath.Abs(C.GoString(fname))
+	var absFilePath, absFilePathErr = filepath.Abs(fname)
 	if absFilePathErr != nil {
-		dw_printf("Error getting absolute path for config file %s: %s\n", C.GoString(fname), absFilePathErr)
+		dw_printf("Error getting absolute path for config file %s: %s\n", fname, absFilePathErr)
 		os.Exit(1)
 	}
 
