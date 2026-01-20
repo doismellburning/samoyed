@@ -783,7 +783,7 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 		*/
 
 		// #if 1
-		hdlc_rec_bit(channel, subchannel, slice, C.int(IfThenElse(demod_out > 0, 1, 0)), 0, quality)
+		hdlc_rec_bit(channel, subchannel, slice, C.int(IfThenElse(demod_out > 0, 1, 0)), false, quality)
 		/*
 			#else  // TODO: new feature to measure data speed error.
 			// Maybe hdlc_rec_bit could provide indication when frame starts.
