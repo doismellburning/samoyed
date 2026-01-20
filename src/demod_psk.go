@@ -747,18 +747,18 @@ func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.in
 
 			var gray = demod_bits
 
-			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, 0, bit_quality[1],
+			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, 0, bit_quality[0],
+			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		} else {
 			var gray = demod_bits
 
-			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>2)&1, 0, bit_quality[2],
+			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>2)&1, false, bit_quality[2],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, 0, bit_quality[1],
+			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, 0, bit_quality[0],
+			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
 		D.slicer[slice].pll_symbol_count++

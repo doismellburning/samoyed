@@ -570,7 +570,7 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 
 	var H2 hdlc_state2_s
 
-	H2.is_scrambled = rrbb_get_is_scrambled(block) > 0
+	H2.is_scrambled = rrbb_get_is_scrambled(block)
 	H2.prev_descram = rrbb_get_prev_descram(block)
 	H2.lfsr = rrbb_get_descram_state(block)
 	H2.prev_raw = rrbb_get_bit(block, 0) > 0 /* Actually last bit of the */

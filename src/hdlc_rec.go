@@ -124,7 +124,7 @@ func hdlc_rec_init(pa *audio_s) {
 					// TODO: FIX13 wasteful if not needed.
 					// Should loop on number of slicers, not max.
 
-					H.rrbb = rrbb_new(ch, sub, slice, C.int(IfThenElse(pa.achan[ch].modem_type == MODEM_SCRAMBLE, 1, 0)), H.lfsr, H.prev_descram)
+					H.rrbb = rrbb_new(ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE, H.lfsr, H.prev_descram)
 				}
 			}
 		}
@@ -384,11 +384,11 @@ a good modem here and providing a result when it is received.
 var dummyll C.int64_t
 var dummy C.int
 
-func hdlc_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, is_scrambled C.int, not_used_remove C.int) {
+func hdlc_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, is_scrambled bool, not_used_remove C.int) {
 	hdlc_rec_bit_new(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
 }
 
-func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, is_scrambled C.int, not_used_remove C.int,
+func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, is_scrambled bool, not_used_remove C.int,
 	pll_nudge_total *C.int64_t, pll_symbol_count *C.int) {
 
 	var raw = _raw != 0
@@ -433,7 +433,7 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 	 */
 
 	var dbit bool /* Data bit after undoing NRZI. */
-	if is_scrambled != 0 {
+	if is_scrambled {
 		var descram = descramble(C.int(IfThenElse(raw, 1, 0)), &(H.lfsr))
 
 		dbit = (descram == H.prev_descram)

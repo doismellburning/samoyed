@@ -42,7 +42,7 @@ type rrbb_t struct {
 	speed_error C.float  /* Received data speed error as percentage. */
 	length      C.uint   /* Current number of samples in array. */
 
-	is_scrambled  C.int /* Is data scrambled G3RUH / K9NG style? */
+	is_scrambled  bool  /* Is data scrambled G3RUH / K9NG style? */
 	descram_state C.int /* Descrambler state before first data bit of frame. */
 	prev_descram  C.int /* Previous descrambled bit. */
 
@@ -75,7 +75,7 @@ type rrbb_t struct {
  *
  ***********************************************************************************/
 
-func rrbb_new(channel C.int, subchannel C.int, slice C.int, is_scrambled C.int, descram_state C.int, prev_descram C.int) *rrbb_t {
+func rrbb_new(channel C.int, subchannel C.int, slice C.int, is_scrambled bool, descram_state C.int, prev_descram C.int) *rrbb_t {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
@@ -117,12 +117,11 @@ func rrbb_new(channel C.int, subchannel C.int, slice C.int, is_scrambled C.int, 
  *
  ***********************************************************************************/
 
-func rrbb_clear(b *rrbb_t, is_scrambled C.int, descram_state C.int, prev_descram C.int) {
+func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state C.int, prev_descram C.int) {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
 
-	Assert(is_scrambled == 0 || is_scrambled == 1)
 	Assert(prev_descram == 0 || prev_descram == 1)
 
 	b.nextp = nil
@@ -447,7 +446,7 @@ func rrbb_get_speed_error(b *rrbb_t) C.float {
  *
  ***********************************************************************************/
 
-func rrbb_get_is_scrambled(b *rrbb_t) C.int {
+func rrbb_get_is_scrambled(b *rrbb_t) bool {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
