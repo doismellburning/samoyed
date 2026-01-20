@@ -121,7 +121,7 @@ func get_field_signed(base []byte, start uint, length uint) int32 {
 	return (result)
 }
 
-func get_field_lat(base []byte, start uint, length uint) C.double {
+func get_field_lat(base []byte, start uint, length uint) float64 {
 	// Latitude of 0x3412140 (91 deg) means not available.
 	// Message type 27 uses lower resolution, 17 bits rather than 27.
 	// It encodes minutes/10 rather than normal minutes/10000.
@@ -131,18 +131,18 @@ func get_field_lat(base []byte, start uint, length uint) C.double {
 		if n == 91*600 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600.0
+			return float64(n) / 600.0
 		}
 	} else {
 		if n == 91*600000 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600000.0
+			return float64(n) / 600000.0
 		}
 	}
 }
 
-func get_field_lon(base []byte, start uint, length uint) C.double {
+func get_field_lon(base []byte, start uint, length uint) float64 {
 	// Longitude of 0x6791AC0 (181 deg) means not available.
 	// Message type 27 uses lower resolution, 18 bits rather than 28.
 	// It encodes minutes/10 rather than normal minutes/10000.
@@ -152,18 +152,18 @@ func get_field_lon(base []byte, start uint, length uint) C.double {
 		if n == 181*600 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600.0
+			return float64(n) / 600.0
 		}
 	} else {
 		if n == 181*600000 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600000.0
+			return float64(n) / 600000.0
 		}
 	}
 }
 
-func get_field_speed(base []byte, start uint, length uint) C.float {
+func get_field_speed(base []byte, start uint, length uint) float64 {
 	// Raw 1023 means not available.
 	// Multiply by 0.1 to get knots.
 	// For aircraft it is knots, not deciknots.
@@ -176,18 +176,18 @@ func get_field_speed(base []byte, start uint, length uint) C.float {
 		if n == 63 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n)
+			return float64(n)
 		}
 	} else {
 		if n == 1023 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n) * 0.1
+			return float64(n) * 0.1
 		}
 	}
 }
 
-func get_field_course(base []byte, start uint, length uint) C.float {
+func get_field_course(base []byte, start uint, length uint) float64 {
 	// Raw 3600 means not available.
 	// Multiply by 0.1 to get degrees
 	// Message type 27 uses lower resolution, 9 bits rather than 12.
@@ -198,13 +198,13 @@ func get_field_course(base []byte, start uint, length uint) C.float {
 		if n == 360 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n)
+			return float64(n)
 		}
 	} else {
 		if n == 3600 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n) * 0.1
+			return float64(n) * 0.1
 		}
 	}
 }
