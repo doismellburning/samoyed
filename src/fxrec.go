@@ -1,12 +1,5 @@
 package direwolf
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stdint.h>
-// #include <stdlib.h>
-import "C"
-
 import (
 	"fmt"
 	"os"
@@ -18,18 +11,27 @@ func FxrecMain() {
 
 	fx25_init(3)
 
-	var i C.int
-	for i = CTAG_MIN; i <= CTAG_MAX; i++ {
+	for i := CTAG_MIN; i <= CTAG_MAX; i++ {
 		var fname = fmt.Sprintf("fx%02x.dat", i)
-		var fp = C.fopen(C.CString(fname), C.CString("rb"))
-		if fp == nil {
-			fmt.Printf("****** Could not open %s ******\n", fname)
+		var fp, err = os.Open(fname)
+		if err != nil {
+			fmt.Printf("****** Could not open %s: %s ******\n", fname, err)
 			fmt.Printf("****** Did you generate the test files first? ******\n")
 			os.Exit(1)
 		}
+		defer fp.Close()
 
-		var ch C.uchar
-		for C.fread(unsafe.Pointer(&ch), 1, 1, fp) == 1 {
+		var ch = make([]byte, 1)
+		for {
+			var n, readErr = fp.Read(ch)
+			if n == 0 && readErr = io.EOF {
+				break
+			}
+
+			if readErr != nil {
+				panic(readErr)
+			}
+
 			var imask C.uchar
 			for imask = 0x01; imask != 0; imask <<= 1 {
 				fx25_rec_bit(0, 0, 0, C.int(ch&imask))
