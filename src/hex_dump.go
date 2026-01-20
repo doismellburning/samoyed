@@ -7,7 +7,6 @@ import (
 	"unsafe"
 )
 
-//export hex_dump
 func hex_dump(_p *C.uchar, length C.int) {
 	var p = C.GoBytes(unsafe.Pointer(_p), length)
 	var offset = 0

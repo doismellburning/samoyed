@@ -2460,7 +2460,7 @@ func ax25_hex_dump(this_p *packet_t) {
 
 	}
 
-	C.hex_dump(&fptr[0], flen)
+	hex_dump(&fptr[0], flen)
 
 } /* end ax25_hex_dump */
 

@@ -376,7 +376,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 
 	if verbose {
 		fmt.Printf("Sending to KISS TNC:\n")
-		C.hex_dump((*C.uchar)(C.CBytes(kissed)), C.int(klen))
+		hex_dump((*C.uchar)(C.CBytes(kissed)), C.int(klen))
 	}
 
 	if using_tcp {

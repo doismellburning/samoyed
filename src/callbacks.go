@@ -16,7 +16,6 @@ Only use Go types for the variable because C types end up different (C.int vs di
 
 var KISS_PROCESS_MSG_OVERRIDE func(unsafe.Pointer, int)
 
-//export kiss_process_msg_override
 func kiss_process_msg_override(_kiss_msg *C.uchar, kiss_len C.int) {
 	if KISS_PROCESS_MSG_OVERRIDE == nil {
 		panic("kiss_process_msg_override called but KISS_PROCESS_MSG_OVERRIDE not set!")

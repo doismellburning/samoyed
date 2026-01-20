@@ -621,7 +621,6 @@ func audio_get_fake(a C.int) C.int {
 	return (ch)
 }
 
-//export audio_get
 func audio_get(a C.int) C.int {
 	if ATEST_C {
 		return audio_get_fake(a)
@@ -806,7 +805,6 @@ func ptt_set_fake(ot C.int, channel C.int, ptt_signal C.int) {
 	}
 }
 
-//export ptt_set
 func ptt_set(ot C.int, channel C.int, ptt_signal C.int) {
 	if ATEST_C {
 		ptt_set_fake(ot, channel, ptt_signal)
@@ -819,11 +817,10 @@ func get_input_fake(it C.int, channel C.int) C.int {
 	return -1
 }
 
-//export get_input
 func get_input(it C.int, channel C.int) C.int {
 	if ATEST_C {
 		return get_input_fake(it, channel)
 	} else {
-		return C.get_input_real(it, channel)
+		return get_input_real(it, channel)
 	}
 }
