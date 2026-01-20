@@ -223,7 +223,7 @@ o = DCD output control
 		os.Exit(1)
 	}
 
-	var d_x_opt = C.int(0)
+	var d_x_opt = 0
 	var d_2_opt = C.int(0)
 	for _, debugFlag := range *debugFlags {
 		switch debugFlag {

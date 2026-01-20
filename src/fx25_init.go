@@ -157,9 +157,9 @@ func free_rs_char(rs *rs_t) {
  *
  *--------------------------------------------------------------*/
 
-var g_debug_level C.int
+var g_debug_level int
 
-func fx25_init(debug_level C.int) {
+func fx25_init(debug_level int) {
 	g_debug_level = debug_level
 
 	for i := 0; i < FX25_NTAB; i++ {
@@ -256,7 +256,7 @@ func fx25_get_nroots(ctag_num C.int) C.int {
 	return C.int(fx25Tab[tags[ctag_num].itab].nroots)
 }
 
-func fx25_get_debug() C.int {
+func fx25_get_debug() int {
 	return g_debug_level
 }
 
