@@ -493,9 +493,9 @@ func igate_send_rec_packet(channel C.int, recv_pp *packet_t) {
 	// Client app to ICHANNEL is outside of radio channel range.
 
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && // in radio channel range
-		save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS] != nil {
+		save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS] != "" {
 
-		if pfilter(channel, MAX_TOTAL_CHANS, save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, 1) != 1 {
+		if pfilter(channel, MAX_TOTAL_CHANS, C.CString(save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS]), recv_pp, 1) != 1 {
 
 			// Is this useful troubleshooting information or just distracting noise?
 			// Originally this was always printed but there was a request to add a "quiet" option to suppress this.
@@ -503,7 +503,7 @@ func igate_send_rec_packet(channel C.int, recv_pp *packet_t) {
 
 			if s_debug >= 1 {
 				text_color_set(DW_COLOR_INFO)
-				dw_printf("Packet from channel %d to IGate was rejected by filter: %s\n", channel, C.GoString(save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS]))
+				dw_printf("Packet from channel %d to IGate was rejected by filter: %s\n", channel, save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS])
 			}
 			return
 		}
@@ -1401,9 +1401,9 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 
 	if !msp_special_case {
 
-		if save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan] != nil {
+		if save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
 
-			if pfilter(MAX_TOTAL_CHANS, to_chan, save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, 1) != 1 {
+			if pfilter(MAX_TOTAL_CHANS, to_chan, C.CString(save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan]), pp3, 1) != 1 {
 
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.

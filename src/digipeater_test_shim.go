@@ -12,14 +12,10 @@ https://github.com/golang/go/issues/4030
 // #include <ctype.h>
 // #include "regex.h"
 // #include <unistd.h>
-// char *mycall;
-// regex_t alias_re;
-// regex_t wide_re;
-// int failed;
-// char *config_atgp = "HOP";
 import "C"
 
 import (
+	"regexp"
 	"testing"
 	"time"
 	"unsafe"
@@ -27,6 +23,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var digipeaterTestMyCall string
+var digipeaterTestAliasRegexp *regexp.Regexp
+var digipeaterTestWideRegexp *regexp.Regexp
+var digipeaterTestConfigATGP = "HOP"
+var digipeaterTestFailed = 0
 var preempt = PREEMPT_OFF
 
 func digipeater_test(t *testing.T, _in, out string) {
@@ -92,7 +93,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
-	var result = digipeat_match(0, pp, C.mycall, C.mycall, &C.alias_re, &C.wide_re, 0, preempt, C.config_atgp, nil)
+	var result = digipeat_match(0, pp, digipeaterTestMyCall, digipeaterTestMyCall, digipeaterTestAliasRegexp, digipeaterTestWideRegexp, 0, preempt, digipeaterTestConfigATGP, "")
 
 	var xmit [256]C.char
 	if result != nil {
@@ -109,7 +110,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 	dw_printf("Xmit\t%s\n", C.GoString(&xmit[0]))
 
 	if !assert.Equal(t, out, C.GoString(&xmit[0])) { //nolint:testifylint
-		C.failed++
+		digipeaterTestFailed++
 	}
 
 	dw_printf("\n")
@@ -118,34 +119,15 @@ func digipeater_test(t *testing.T, _in, out string) {
 func digipeater_test_main(t *testing.T) bool {
 	t.Helper()
 
-	C.mycall = C.CString("WB2OSZ-9")
+	digipeaterTestMyCall = "WB2OSZ-9"
 
 	dedupe_init(4 * time.Second)
 
 	/*
 	 * Compile the patterns.
 	 */
-	var e C.int
-	var message *C.char
-	e = C.regcomp(&C.alias_re, C.CString("^WIDE[4-7]-[1-7]|CITYD$"), C.REG_EXTENDED|C.REG_NOSUB)
-	if e != 0 {
-		C.regerror(e, &C.alias_re, message, 256)
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n%s\n\n", C.GoString(message))
-		C.exit(1)
-	}
-
-	e = C.regcomp(
-		&C.wide_re,
-		C.CString("^WIDE[1-7]-[1-7]$|^TRACE[1-7]-[1-7]$|^MA[1-7]-[1-7]$|^HOP[1-7]-[1-7]$"),
-		C.REG_EXTENDED|C.REG_NOSUB,
-	)
-	if e != 0 {
-		C.regerror(e, &C.wide_re, message, 256)
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n%s\n\n", C.GoString(message))
-		C.exit(1)
-	}
+	digipeaterTestAliasRegexp = regexp.MustCompile("^WIDE[4-7]-[1-7]|CITYD$")
+	digipeaterTestWideRegexp = regexp.MustCompile("^WIDE[1-7]-[1-7]$|^TRACE[1-7]-[1-7]$|^MA[1-7]-[1-7]$|^HOP[1-7]-[1-7]$")
 
 	/*
 	 * Let's start with the most basic cases.
@@ -344,41 +326,41 @@ func digipeater_test_main(t *testing.T) bool {
 
 	// Examples given for desired result.
 
-	C.mycall = C.CString("CLNGMN-1")
+	digipeaterTestMyCall = "CLNGMN-1"
 	digipeater_test(t, "W1ABC>TEST60,HOP7-7,HOP7-7:",
 		"W1ABC>TEST60,CLNGMN-1*,HOP7-6,HOP7-7:")
 	digipeater_test(t, "W1ABC>TEST61,ROAN-3*,HOP7-6,HOP7-7:",
 		"W1ABC>TEST61,CLNGMN-1*,HOP7-5,HOP7-7:")
 
-	C.mycall = C.CString("GDHILL-8")
+	digipeaterTestMyCall = "GDHILL-8"
 	digipeater_test(t, "W1ABC>TEST62,MDMTNS-7*,HOP7-1,HOP7-7:",
 		"W1ABC>TEST62,GDHILL-8,HOP7*,HOP7-7:")
 	digipeater_test(t, "W1ABC>TEST63,CAMLBK-9*,HOP7-1,HOP7-7:",
 		"W1ABC>TEST63,GDHILL-8,HOP7*,HOP7-7:")
 
-	C.mycall = C.CString("MDMTNS-7")
+	digipeaterTestMyCall = "MDMTNS-7"
 	digipeater_test(t, "W1ABC>TEST64,GDHILL-8*,HOP7*,HOP7-7:",
 		"W1ABC>TEST64,MDMTNS-7*,HOP7-6:")
 
-	C.mycall = C.CString("CAMLBK-9")
+	digipeaterTestMyCall = "CAMLBK-9"
 	digipeater_test(t, "W1ABC>TEST65,GDHILL-8,HOP7*,HOP7-7:",
 		"W1ABC>TEST65,CAMLBK-9*,HOP7-6:")
 
-	C.mycall = C.CString("KATHDN-15")
+	digipeaterTestMyCall = "KATHDN-15"
 	digipeater_test(t, "W1ABC>TEST66,MTWASH-14*,HOP7-1:",
 		"W1ABC>TEST66,KATHDN-15,HOP7*:")
 
-	C.mycall = C.CString("SPRNGR-1")
+	digipeaterTestMyCall = "SPRNGR-1"
 	digipeater_test(t, "W1ABC>TEST67,CLNGMN-1*,HOP7-1:",
 		"W1ABC>TEST67,SPRNGR-1,HOP7*:")
 
-	if C.failed == 0 {
+	if digipeaterTestFailed == 0 {
 		dw_printf("SUCCESS -- All digipeater tests passed.\n")
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - %d digipeater tests failed.\n", C.failed)
+		dw_printf("ERROR - %d digipeater tests failed.\n", digipeaterTestFailed)
 		t.Fail()
 	}
 
-	return (C.failed != 0)
+	return (digipeaterTestFailed != 0)
 } /* end main */

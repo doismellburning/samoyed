@@ -43,6 +43,8 @@ package direwolf
 import "C"
 
 import (
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -64,32 +66,32 @@ const (
 )
 
 type digi_config_s struct {
-	dedupe_time C.int /* Don't digipeat duplicate packets */
+	dedupe_time int /* Don't digipeat duplicate packets */
 	/* within this number of seconds. */
 
 	/*
 	 * Rules for each of the [from_chan][to_chan] combinations.
 	 */
 
-	alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.regex_t
+	alias [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
 
-	wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.regex_t
+	wide [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]*regexp.Regexp
 
-	enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.int
+	enabled [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool
 
 	preempt [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]preempt_e
 
 	// ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
 	// DO NOT put this in the User Guide.  On a need to know basis.
 
-	atgp [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS][AX25_MAX_ADDR_LEN]C.char
+	atgp [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]string
 
-	filter_str [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]*C.char
+	filter_str [MAX_TOTAL_CHANS + 1][MAX_TOTAL_CHANS + 1]string
 	// NULL or optional Packet Filter strings such as "t/m".
 	// Notice the size of arrays is one larger than normal.
 	// That extra position is for the IGate.
 
-	regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]C.int // Regenerate packet.
+	regen [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]bool // Regenerate packet.
 	// Sort of like digipeating but passed along unchanged.
 }
 
@@ -193,13 +195,13 @@ func digipeater(from_chan C.int, pp *packet_t) {
 	 */
 
 	for to_chan := range C.int(MAX_TOTAL_CHANS) {
-		if save_digi_config_p.enabled[from_chan][to_chan] > 0 {
+		if save_digi_config_p.enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
-				var result = digipeat_match(from_chan, pp, C.CString(digipeater_audio_config.mycall[from_chan]),
-					C.CString(digipeater_audio_config.mycall[to_chan]),
-					&save_digi_config_p.alias[from_chan][to_chan], &save_digi_config_p.wide[from_chan][to_chan],
+				var result = digipeat_match(from_chan, pp, digipeater_audio_config.mycall[from_chan],
+					digipeater_audio_config.mycall[to_chan],
+					save_digi_config_p.alias[from_chan][to_chan], save_digi_config_p.wide[from_chan][to_chan],
 					to_chan, save_digi_config_p.preempt[from_chan][to_chan],
-					&save_digi_config_p.atgp[from_chan][to_chan][0],
+					save_digi_config_p.atgp[from_chan][to_chan],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
 					dedupe_remember(pp, to_chan)
@@ -217,13 +219,13 @@ func digipeater(from_chan C.int, pp *packet_t) {
 	 */
 
 	for to_chan := range C.int(MAX_TOTAL_CHANS) {
-		if save_digi_config_p.enabled[from_chan][to_chan] > 0 {
+		if save_digi_config_p.enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
-				var result = digipeat_match(from_chan, pp, C.CString(digipeater_audio_config.mycall[from_chan]),
-					C.CString(digipeater_audio_config.mycall[to_chan]),
-					&save_digi_config_p.alias[from_chan][to_chan], &save_digi_config_p.wide[from_chan][to_chan],
+				var result = digipeat_match(from_chan, pp, digipeater_audio_config.mycall[from_chan],
+					digipeater_audio_config.mycall[to_chan],
+					save_digi_config_p.alias[from_chan][to_chan], save_digi_config_p.wide[from_chan][to_chan],
 					to_chan, save_digi_config_p.preempt[from_chan][to_chan],
-					&save_digi_config_p.atgp[from_chan][to_chan][0],
+					save_digi_config_p.atgp[from_chan][to_chan],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
 					dedupe_remember(pp, to_chan)
@@ -285,20 +287,20 @@ func digipeater(from_chan C.int, pp *packet_t) {
 func digipeat_match(
 	from_chan C.int,
 	pp *packet_t,
-	mycall_rec *C.char,
-	mycall_xmit *C.char,
-	alias *C.regex_t,
-	wide *C.regex_t,
+	mycall_rec string,
+	mycall_xmit string,
+	alias *regexp.Regexp,
+	wide *regexp.Regexp,
 	to_chan C.int,
 	preempt preempt_e,
-	atgp *C.char,
-	filter_str *C.char,
+	atgp string,
+	filter_str string,
 ) *packet_t {
 	/*
 	 * First check if filtering has been configured.
 	 */
-	if filter_str != nil {
-		if pfilter(from_chan, to_chan, filter_str, pp, 1) != 1 {
+	if filter_str != "" {
+		if pfilter(from_chan, to_chan, C.CString(filter_str), pp, 1) != 1 {
 			return (nil)
 		}
 	}
@@ -333,8 +335,9 @@ func digipeat_match(
 		return (nil)
 	}
 
-	var repeater [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, r, &repeater[0])
+	var _repeater [AX25_MAX_ADDR_LEN]C.char
+	ax25_get_addr_with_ssid(pp, r, &_repeater[0])
+	var repeater = C.GoString(&_repeater[0])
 	var ssid = ax25_get_ssid(pp, r)
 
 	/* TODO KG
@@ -354,13 +357,13 @@ func digipeat_match(
 	 * correctly.  I would expect it only for testing purposes.
 	 */
 
-	if C.strcmp(&repeater[0], mycall_rec) == 0 {
+	if repeater == mycall_rec {
 		var result = ax25_dup(pp)
 		// FIXME KG assert (result != nil);
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_addr(result, r, C.CString(mycall_xmit))
 		ax25_set_h(result, r)
 		return (result)
 	}
@@ -372,7 +375,7 @@ func digipeat_match(
 	 */
 	var source [AX25_MAX_ADDR_LEN]C.char
 	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &source[0])
-	if C.strcmp(&source[0], mycall_rec) == 0 {
+	if C.GoString(&source[0]) == mycall_rec {
 		return (nil)
 	}
 
@@ -409,19 +412,14 @@ func digipeat_match(
 	 * My call should be an implied member of this set.
 	 * In this implementation, we already caught it further up.
 	 */
-	var err = C.regexec(alias, &repeater[0], 0, nil, 0)
-	if err == 0 {
+
+	if alias.MatchString(repeater) {
 		var result = ax25_dup(pp)
 		// FIXME KG assert (result != nil);
 
-		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_addr(result, r, C.CString(mycall_xmit))
 		ax25_set_h(result, r)
 		return (result)
-	} else if err != C.REG_NOMATCH {
-		var err_msg [100]C.char
-		C.regerror(err, alias, &err_msg[0], C.ulong(len(err_msg)))
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s\n", C.GoString(&err_msg[0]))
 	}
 
 	/*
@@ -435,19 +433,19 @@ func digipeat_match(
 
 	if preempt != PREEMPT_OFF {
 		for r2 := r + 1; r2 < ax25_get_num_addr(pp); r2++ {
-			var repeater2 [AX25_MAX_ADDR_LEN]C.char
+			var _repeater2 [AX25_MAX_ADDR_LEN]C.char
 
-			ax25_get_addr_with_ssid(pp, r2, &repeater2[0])
+			ax25_get_addr_with_ssid(pp, r2, &_repeater2[0])
+			var repeater2 = C.GoString(&_repeater2[0])
 
 			// text_color_set (DW_COLOR_DEBUG);
 			// dw_printf ("test match %d %s\n", r2, repeater2);
 
-			if C.strcmp(&repeater2[0], mycall_rec) == 0 ||
-				C.regexec(alias, &repeater2[0], 0, nil, 0) == 0 {
+			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
 				var result = ax25_dup(pp)
 				// FIXME KG assert (result != nil);
 
-				ax25_set_addr(result, r2, mycall_xmit)
+				ax25_set_addr(result, r2, C.CString(mycall_xmit))
 				ax25_set_h(result, r2)
 
 				switch preempt {
@@ -507,14 +505,13 @@ func digipeat_match(
 	 * For the wide pattern, we check the ssid and decrement it.
 	 */
 
-	err = C.regexec(wide, &repeater[0], 0, nil, 0)
-	if err == 0 {
+	if wide.MatchString(repeater) {
 		// Special hack added for ATGP to behave like some combination of options in some old TNC
 		// so the via path does not continue to grow and exceed the 8 available positions.
 		// The strange thing about this is that the used up digipeater is left there but
 		// removed by the next digipeater.
 
-		if C.strlen(atgp) > 0 && C.strncasecmp(&repeater[0], atgp, C.strlen(atgp)) == 0 {
+		if len(atgp) > 0 && strings.HasPrefix(strings.ToLower(repeater), strings.ToLower(atgp)) {
 			if ssid >= 1 && ssid <= 7 {
 				var result = ax25_dup(pp)
 				// FIXME KG assert (result != nil);
@@ -534,7 +531,7 @@ func digipeat_match(
 
 				// Insert own call at beginning and mark it used.
 
-				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
+				ax25_insert_addr(result, AX25_REPEATER_1, C.CString(mycall_xmit))
 				ax25_set_h(result, AX25_REPEATER_1)
 				return (result)
 			}
@@ -554,7 +551,7 @@ func digipeat_match(
 			var result = ax25_dup(pp)
 			// FIXME KG assert (result != nil);
 
-			ax25_set_addr(result, r, mycall_xmit)
+			ax25_set_addr(result, r, C.CString(mycall_xmit))
 			ax25_set_h(result, r)
 			return (result)
 		}
@@ -566,16 +563,11 @@ func digipeat_match(
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
 			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
-				ax25_insert_addr(result, r, mycall_xmit)
+				ax25_insert_addr(result, r, C.CString(mycall_xmit))
 				ax25_set_h(result, r)
 			}
 			return (result)
 		}
-	} else if err != C.REG_NOMATCH {
-		var err_msg [100]C.char
-		C.regerror(err, wide, &err_msg[0], C.ulong(len(err_msg)))
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s\n", C.GoString(&err_msg[0]))
 	}
 
 	/*
@@ -614,7 +606,7 @@ func digi_regen(from_chan C.int, pp *packet_t) {
 	// FIXME KG assert (from_chan >= 0 && from_chan < MAX_TOTAL_CHANS);
 
 	for to_chan := range C.int(MAX_TOTAL_CHANS) {
-		if save_digi_config_p.regen[from_chan][to_chan] > 0 {
+		if save_digi_config_p.regen[from_chan][to_chan] {
 			var result = ax25_dup(pp)
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
