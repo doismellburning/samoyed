@@ -82,13 +82,13 @@ func xid_test_main(t *testing.T) {
 	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, 1, n)
-	assert.Equal(t, C.int(0), param.full_duplex)
+	assert.Equal(t, 0, param.full_duplex)
 	assert.Equal(t, srej_single, param.srej)
 	assert.Equal(t, modulo_128, param.modulo)
-	assert.Equal(t, C.int(128), param.i_field_length_rx)
-	assert.Equal(t, C.int(2), param.window_size_rx)
-	assert.Equal(t, C.int(4096), param.ack_timer)
-	assert.Equal(t, C.int(3), param.retries)
+	assert.Equal(t, 128, param.i_field_length_rx)
+	assert.Equal(t, 2, param.window_size_rx)
+	assert.Equal(t, 4096, param.ack_timer)
+	assert.Equal(t, 3, param.retries)
 
 	/* encode and verify it comes out the same. */
 
@@ -116,13 +116,13 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, C.int(1), param2.full_duplex)
+	assert.Equal(t, 1, param2.full_duplex)
 	assert.Equal(t, srej_none, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, C.int(2048), param2.i_field_length_rx)
-	assert.Equal(t, C.int(3), param2.window_size_rx)
-	assert.Equal(t, C.int(1234), param2.ack_timer)
-	assert.Equal(t, C.int(12), param2.retries)
+	assert.Equal(t, 2048, param2.i_field_length_rx)
+	assert.Equal(t, 3, param2.window_size_rx)
+	assert.Equal(t, 1234, param2.ack_timer)
+	assert.Equal(t, 12, param2.retries)
 
 	/* Other values, single srej. */
 
@@ -143,13 +143,13 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, C.int(0), param2.full_duplex)
+	assert.Equal(t, 0, param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, C.int(61), param2.i_field_length_rx)
-	assert.Equal(t, C.int(4), param2.window_size_rx)
-	assert.Equal(t, C.int(5555), param2.ack_timer)
-	assert.Equal(t, C.int(9), param2.retries)
+	assert.Equal(t, 61, param2.i_field_length_rx)
+	assert.Equal(t, 4, param2.window_size_rx)
+	assert.Equal(t, 5555, param2.ack_timer)
+	assert.Equal(t, 9, param2.retries)
 
 	/* Other values, multi srej. */
 
@@ -170,13 +170,13 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, C.int(0), param2.full_duplex)
+	assert.Equal(t, 0, param2.full_duplex)
 	assert.Equal(t, srej_multi, param2.srej)
 	assert.Equal(t, modulo_128, param2.modulo)
-	assert.Equal(t, C.int(61), param2.i_field_length_rx)
-	assert.Equal(t, C.int(4), param2.window_size_rx)
-	assert.Equal(t, C.int(5555), param2.ack_timer)
-	assert.Equal(t, C.int(9), param2.retries)
+	assert.Equal(t, 61, param2.i_field_length_rx)
+	assert.Equal(t, 4, param2.window_size_rx)
+	assert.Equal(t, 5555, param2.ack_timer)
+	assert.Equal(t, 9, param2.retries)
 
 	/* Specify some and not others. */
 
@@ -197,13 +197,13 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, C.int(0), param2.full_duplex)
+	assert.Equal(t, 0, param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.i_field_length_rx)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.window_size_rx)
-	assert.Equal(t, C.int(999), param2.ack_timer)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.retries)
+	assert.Equal(t, G_UNKNOWN, param2.i_field_length_rx)
+	assert.Equal(t, G_UNKNOWN, param2.window_size_rx)
+	assert.Equal(t, 999, param2.ack_timer)
+	assert.Equal(t, G_UNKNOWN, param2.retries)
 
 	/* Default values for empty info field. */
 
@@ -216,13 +216,13 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, C.int(G_UNKNOWN), param2.full_duplex)
+	assert.Equal(t, G_UNKNOWN, param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)
 	assert.Equal(t, modulo_unknown, param2.modulo)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.i_field_length_rx)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.window_size_rx)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.ack_timer)
-	assert.Equal(t, C.int(G_UNKNOWN), param2.retries)
+	assert.Equal(t, G_UNKNOWN, param2.i_field_length_rx)
+	assert.Equal(t, G_UNKNOWN, param2.window_size_rx)
+	assert.Equal(t, G_UNKNOWN, param2.ack_timer)
+	assert.Equal(t, G_UNKNOWN, param2.retries)
 
 	text_color_set(DW_COLOR_REC)
 	dw_printf("XID test:  Success.\n")

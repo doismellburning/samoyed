@@ -23,13 +23,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <unistd.h>
-import "C"
-
 import (
 	"fmt"
 )
@@ -100,19 +93,19 @@ const (
 )
 
 type xid_param_s struct {
-	full_duplex C.int
+	full_duplex int
 
 	srej srej_e
 
 	modulo ax25_modulo_t
 
-	i_field_length_rx C.int /* In bytes.  XID has it in bits. */
+	i_field_length_rx int /* In bytes.  XID has it in bits. */
 
-	window_size_rx C.int
+	window_size_rx int
 
-	ack_timer C.int /* "T1" in mSec. */
+	ack_timer int /* "T1" in mSec. */
 
-	retries C.int /* "N1" */
+	retries int /* "N1" */
 }
 
 /*-------------------------------------------------------------------
@@ -140,7 +133,6 @@ type xid_param_s struct {
  *--------------------------------------------------------------------*/
 
 func xid_parse(info []byte) (*xid_param_s, string, int) {
-
 	// What should we do when some fields are missing?
 
 	// The  AX.25 v2.2 protocol spec says, for most of these,
@@ -148,7 +140,6 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 
 	// We set the numeric values to our usual G_UNKNOWN to mean undefined and let the caller deal with it.
 	// rej and modulo are enum so we can't use G_UNKNOWN there.
-
 	var result = new(xid_param_s)
 
 	result.full_duplex = G_UNKNOWN
@@ -173,33 +164,40 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: First byte of info field should be Format Indicator, %02x.\n", FI_Format_Indicator)
 		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], len(info))
+
 		return result, desc, 0
 	}
+
 	i++
 
 	if info[i] != GI_Group_Identifier {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: Second byte of info field should be Group Indicator, %d.\n", GI_Group_Identifier)
+
 		return result, desc, 0
 	}
+
 	i++
 
 	var group_len = int(info[i])
+
 	i++
 	group_len = (group_len << 8) + int(info[i])
 	i++
 
 	for i < 4+group_len {
-
 		var pind = info[i]
+
 		i++
 
 		var plen = info[i] // should have sanity checking
+
 		i++
 
 		if plen < 1 || plen > 4 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("XID error: Length ?????   TODO   ????  %d.\n", plen)
+
 			return result, desc, 1 // got this far.
 		}
 
@@ -210,9 +208,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		}
 
 		switch pind {
-
 		case PI_Classes_of_Procedures:
-
 			if (pval & PV_Classes_Procedures_Balanced_ABM) == 0 { //nolint:staticcheck
 				//  https://groups.io/g/bpq32/topic/113348033#msg44169
 				//text_color_set (DW_COLOR_ERROR);
@@ -233,15 +229,15 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 		case PI_HDLC_Optional_Functions:
-
 			// Pick highest of those offered.
-
 			if pval&PV_HDLC_Optional_Functions_REJ_cmd_resp > 0 {
 				desc += "REJ "
 			}
+
 			if pval&PV_HDLC_Optional_Functions_SREJ_cmd_resp > 0 {
 				desc += "SREJ "
 			}
+
 			if pval&PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp > 0 {
 				desc += "Multi-SREJ "
 			}
@@ -255,6 +251,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Expected at least one of REJ, SREJ, Multi-SREJ to be set.\n")
+
 				result.srej = srej_none
 			}
 
@@ -291,8 +288,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 		case PI_I_Field_Length_Rx:
-
-			result.i_field_length_rx = C.int(pval / 8)
+			result.i_field_length_rx = pval / 8
 
 			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", result.i_field_length_rx)
 
@@ -302,14 +298,14 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 		case PI_Window_Size_Rx:
-
-			result.window_size_rx = C.int(pval)
+			result.window_size_rx = pval
 
 			desc += fmt.Sprintf("Window-Size-Rx=%d ", result.window_size_rx)
 
 			if pval < 1 || pval > 127 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Window Size Rx, %d, is not in range of 1 thru 127.\n", pval)
+
 				result.window_size_rx = 127
 				// Let the caller deal with modulo 8 consideration.
 			}
@@ -317,12 +313,12 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			//continue here with more error checking.
 
 		case PI_Ack_Timer:
-			result.ack_timer = C.int(pval)
+			result.ack_timer = pval
 
 			desc += fmt.Sprintf("Ack-Timer=%d ", result.ack_timer)
 
 		case PI_Retries: // Is it retrys or retries?
-			result.retries = C.int(pval)
+			result.retries = pval
 
 			desc += fmt.Sprintf("Retries=%d ", result.retries)
 
@@ -336,7 +332,6 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	}
 
 	return result, desc, 1
-
 } /* end xid_parse */
 
 /*-------------------------------------------------------------------
@@ -410,7 +405,6 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
  *--------------------------------------------------------------------*/
 
 func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
-
 	var info []byte
 
 	info = append(info, FI_Format_Indicator)
@@ -418,16 +412,20 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	info = append(info, 0)
 
 	var m byte = 4 // classes of procedures
-	m += 5         // HDLC optional features
+
+	m += 5 // HDLC optional features
 	if param.i_field_length_rx != G_UNKNOWN {
 		m += 4
 	}
+
 	if param.window_size_rx != G_UNKNOWN {
 		m += 3
 	}
+
 	if param.ack_timer != G_UNKNOWN {
 		m += 4
 	}
+
 	if param.retries != G_UNKNOWN {
 		m += 3
 	}
@@ -441,7 +439,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	info = append(info, PI_Classes_of_Procedures)
 	info = append(info, 2)
 
-	var x int = PV_Classes_Procedures_Balanced_ABM
+	var x = PV_Classes_Procedures_Balanced_ABM
 
 	if param.full_duplex == 1 {
 		x |= PV_Classes_Procedures_Full_Duplex
@@ -514,6 +512,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 		info = append(info, 2)
 
 		var x = param.i_field_length_rx * 8
+
 		info = append(info, byte(x>>8)&0xff)
 		info = append(info, byte(x)&0xff)
 	}

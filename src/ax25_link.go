@@ -6157,12 +6157,12 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	param.modulo = S.modulo
-	param.i_field_length_rx = S.n1_paclen // Hmmmm.  Should we ask for what the user
+	param.i_field_length_rx = int(S.n1_paclen) // Hmmmm.  Should we ask for what the user
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
-	param.window_size_rx = S.k_maxframe
-	param.ack_timer = g_misc_config_p.frack * 1000
-	param.retries = S.n2_retry
+	param.window_size_rx = int(S.k_maxframe)
+	param.ack_timer = int(g_misc_config_p.frack * 1000)
+	param.retries = int(S.n2_retry)
 }
 
 /*------------------------------------------------------------------------------
@@ -6249,13 +6249,13 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	if param.ack_timer == G_UNKNOWN {
 		param.ack_timer = 3000 // not specified, set default.
 	} else {
-		param.ack_timer = max(param.ack_timer, g_misc_config_p.frack*1000)
+		param.ack_timer = max(param.ack_timer, int(g_misc_config_p.frack*1000))
 	}
 
 	if param.retries == G_UNKNOWN {
 		param.retries = 10 // not specified, set default.
 	} else {
-		param.retries = max(param.retries, S.n2_retry)
+		param.retries = max(param.retries, int(S.n2_retry))
 	}
 
 	// IMPORTANT:  Take values we have agreed upon and put into my running configuration.
@@ -6288,11 +6288,11 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	if param.i_field_length_rx != G_UNKNOWN {
-		S.n1_paclen = param.i_field_length_rx
+		S.n1_paclen = C.int(param.i_field_length_rx)
 	}
 
 	if param.window_size_rx != G_UNKNOWN {
-		S.k_maxframe = param.window_size_rx
+		S.k_maxframe = C.int(param.window_size_rx)
 	}
 
 	if param.ack_timer != G_UNKNOWN {
@@ -6300,7 +6300,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	if param.retries != G_UNKNOWN {
-		S.n2_retry = param.retries
+		S.n2_retry = C.int(param.retries)
 	}
 }
 
