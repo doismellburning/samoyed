@@ -446,12 +446,12 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 
 	tnctest_server_sock[my_index] = conn
 
-	var mon_cmd *agwpe_s
+	var mon_cmd *AGWPEHeader
 
 	/*
 	 * Send command to toggle reception of frames in raw format.
 	 */
-	mon_cmd = new(agwpe_s)
+	mon_cmd = new(AGWPEHeader)
 	mon_cmd.DataKind = 'k'
 
 	binary.Write(conn, binary.LittleEndian, mon_cmd)
@@ -461,7 +461,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	 * Not really needed when we initiate the connection.
 	 */
 
-	mon_cmd = new(agwpe_s)
+	mon_cmd = new(AGWPEHeader)
 	mon_cmd.DataKind = 'X'
 	copy(mon_cmd.CallFrom[:], tnc_address)
 
@@ -687,7 +687,7 @@ func tnc_connect(from int, to int) {
 	fmt.Printf("%*s[T %.3f] *** Send connect request ***\n", from*column_width, "", time.Since(start_time).Seconds())
 
 	if tnctest_using_tcp[from] {
-		var cmd agwpe_s
+		var cmd AGWPEHeader
 
 		cmd.DataKind = 'C'
 		copy(cmd.CallFrom[:], tnc_address[from])
@@ -718,7 +718,7 @@ func tnc_disconnect(from int, to int) {
 	fmt.Printf("%*s[T %.3f] *** Send disconnect request ***\n", from*column_width, "", time.Since(start_time).Seconds())
 
 	if tnctest_using_tcp[from] {
-		var cmd agwpe_s
+		var cmd AGWPEHeader
 
 		cmd.DataKind = 'd'
 		copy(cmd.CallFrom[:], tnc_address[from])
@@ -771,7 +771,7 @@ func tnc_send_data(from int, to int, data string) {
 	fmt.Printf("%*s[T %.3f] %s\n", from*column_width, "", time.Since(start_time).Seconds(), data)
 
 	if tnctest_using_tcp[from] {
-		var header agwpe_s
+		var header AGWPEHeader
 
 		header.DataKind = 'D'
 		header.PID = 0xf0

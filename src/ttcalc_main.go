@@ -70,7 +70,7 @@ func TTCalcMain() {
 	 * Note: Monitor format is only for UI frames.
 	 */
 
-	var mon_cmd agwpe_s
+	var mon_cmd AGWPEHeader
 	mon_cmd.DataKind = 'k'
 
 	binary.Write(server_sock, binary.LittleEndian, mon_cmd)
@@ -145,7 +145,7 @@ func TTCalcMain() {
 				 * where the tones were heard.  We could also send AX.25 frames to
 				 * other radio channels.
 				 */
-				var hdr agwpe_s
+				var hdr AGWPEHeader
 				hdr.Portx = channel
 				hdr.DataKind = 'K'
 
