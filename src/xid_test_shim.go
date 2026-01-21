@@ -1,12 +1,5 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <unistd.h>
-import "C"
-
 import (
 	"testing"
 
@@ -77,7 +70,6 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-	C.sleep(1)
 
 	text_color_set(DW_COLOR_ERROR)
 
@@ -112,7 +104,6 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-	C.sleep(1)
 
 	text_color_set(DW_COLOR_ERROR)
 
@@ -139,7 +130,6 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-	C.sleep(1)
 
 	text_color_set(DW_COLOR_ERROR)
 
@@ -166,7 +156,6 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-	C.sleep(1)
 
 	text_color_set(DW_COLOR_ERROR)
 
@@ -193,7 +182,6 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-	C.sleep(1)
 
 	text_color_set(DW_COLOR_ERROR)
 
@@ -212,7 +200,6 @@ func xid_test_main(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-	C.sleep(1)
 
 	text_color_set(DW_COLOR_ERROR)
 
