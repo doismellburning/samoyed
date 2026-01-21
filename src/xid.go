@@ -380,12 +380,8 @@ func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
  *
  *		cr	- Is it a command or response?
  *
- * Outputs:	info	- Information part of XID frame.
+ * Returns:	info	- Information part of XID frame.
  *			  Does not include the control byte.
- *			  Use buffer of 40 bytes just to be safe.
- *
- * Returns:	Number of bytes in the info part.  Should be at most 27.
- *		Again, provide a larger space just to be safe in case this ever changes.
  *
  * Description:	6.3.2  "Parameter negotiation occurs at any time. It is accomplished by sending
  *		the XID command frame and receiving the XID response frame. Implementations of
@@ -416,17 +412,13 @@ func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
+func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 
-	var info [40]byte
-	var i C.int = 0
+	var info []byte
 
-	info[i] = FI_Format_Indicator
-	i++
-	info[i] = GI_Group_Identifier
-	i++
-	info[i] = 0
-	i++
+	info = append(info, FI_Format_Indicator)
+	info = append(info, GI_Group_Identifier)
+	info = append(info, 0)
 
 	var m byte = 4 // classes of procedures
 	m += 5         // HDLC optional features
@@ -443,17 +435,14 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 		m += 3
 	}
 
-	info[i] = m // 0x17 if all present.
-	i++
+	info = append(info, m) // 0x17 if all present.
 
 	// "Classes of Procedures" has half / full duplex.
 
 	// We always send this.
 
-	info[i] = PI_Classes_of_Procedures
-	i++
-	info[i] = 2
-	i++
+	info = append(info, PI_Classes_of_Procedures)
+	info = append(info, 2)
 
 	var x C.int = PV_Classes_Procedures_Balanced_ABM
 
@@ -463,20 +452,16 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 		x |= PV_Classes_Procedures_Half_Duplex
 	}
 
-	info[i] = byte(x>>8) & 0xff
-	i++
-	info[i] = byte(x) & 0xff
-	i++
+	info = append(info, byte(x>>8)&0xff)
+	info = append(info, byte(x)&0xff)
 
 	// "HDLC Optional Functions" contains REJ/SREJ & modulo 8/128.
 
 	// We always send this.
 	// Watch out for unknown values and do something reasonable.
 
-	info[i] = PI_HDLC_Optional_Functions
-	i++
-	info[i] = 3
-	i++
+	info = append(info, PI_HDLC_Optional_Functions)
+	info = append(info, 3)
 
 	x = PV_HDLC_Optional_Functions_Extended_Address |
 		PV_HDLC_Optional_Functions_TEST_cmd_resp |
@@ -518,12 +503,9 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 		x |= PV_HDLC_Optional_Functions_Modulo_8
 	}
 
-	info[i] = byte(x>>16) & 0xff
-	i++
-	info[i] = byte(x>>8) & 0xff
-	i++
-	info[i] = byte(x) & 0xff
-	i++
+	info = append(info, byte(x>>16)&0xff)
+	info = append(info, byte(x>>8)&0xff)
+	info = append(info, byte(x)&0xff)
 
 	// The rest are skipped if undefined values.
 
@@ -531,53 +513,38 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 	// This is in bits.  8191 would be max number of bytes to fit in field.
 
 	if param.i_field_length_rx != G_UNKNOWN {
-		info[i] = byte(PI_I_Field_Length_Rx)
-		i++
-		info[i] = 2
-		i++
+		info = append(info, byte(PI_I_Field_Length_Rx))
+		info = append(info, 2)
+
 		x = param.i_field_length_rx * 8
-		info[i] = byte(x>>8) & 0xff
-		i++
-		info[i] = byte(x) & 0xff
-		i++
+		info = append(info, byte(x>>8)&0xff)
+		info = append(info, byte(x)&0xff)
 	}
 
 	// "Window Size Rx"
 
 	if param.window_size_rx != G_UNKNOWN {
-		info[i] = byte(PI_Window_Size_Rx)
-		i++
-		info[i] = 1
-		i++
-		info[i] = byte(param.window_size_rx)
-		i++
+		info = append(info, byte(PI_Window_Size_Rx))
+		info = append(info, 1)
+		info = append(info, byte(param.window_size_rx))
 	}
 
 	// "Ack Timer" milliseconds.  We could handle up to 65535 here.
 
 	if param.ack_timer != G_UNKNOWN {
-		info[i] = byte(PI_Ack_Timer)
-		i++
-		info[i] = 2
-		i++
-		info[i] = byte(param.ack_timer>>8) & 0xff
-		i++
-		info[i] = byte(param.ack_timer) & 0xff
-		i++
+		info = append(info, byte(PI_Ack_Timer))
+		info = append(info, 2)
+		info = append(info, byte(param.ack_timer>>8)&0xff)
+		info = append(info, byte(param.ack_timer)&0xff)
 	}
 
 	// "Retries."
 
 	if param.retries != G_UNKNOWN {
-		info[i] = byte(PI_Retries)
-		i++
-		info[i] = 1
-		i++
-		info[i] = byte(param.retries)
-		i++
+		info = append(info, byte(PI_Retries))
+		info = append(info, 1)
+		info = append(info, byte(param.retries))
 	}
 
-	C.memcpy(unsafe.Pointer(_info), C.CBytes(info[:i]), C.ulong(i))
-
-	return i
+	return info
 } /* end xid_encode */

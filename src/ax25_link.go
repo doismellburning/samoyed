@@ -4719,13 +4719,12 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 				if ok > 0 {
 					negotiation_response(S, param)
 
-					var xinfo [40]C.uchar
 					var res = cr_res
-					var xlen = xid_encode(param, &xinfo[0], res)
+					var xinfo = xid_encode(param, res)
 
 					var nopid C.int = 0
 					var f C.int = -1
-					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, &xinfo[0], xlen)
+					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
 					lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 				}
 			} else {
@@ -5143,10 +5142,9 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			var param xid_param_s
 			initiate_negotiation(S, &param)
 
-			var xinfo [40]C.uchar
-			var xlen = xid_encode(&param, &xinfo[0], cmd)
+			var xinfo = xid_encode(&param, cmd)
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, &xinfo[0], xlen)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			START_TM201(S)
@@ -6121,13 +6119,12 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 		var param xid_param_s
 		initiate_negotiation(S, &param)
 
-		var xinfo [40]C.uchar
 		var cmd = cr_cmd
-		var xlen = xid_encode(&param, &xinfo[0], cmd)
+		var xinfo = xid_encode(&param, cmd)
 
 		var p C.int = 1
 		var nopid C.int = 0
-		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, &xinfo[0], xlen)
+		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.mdl_rc = 0

@@ -9,7 +9,6 @@ import "C"
 
 import (
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +16,7 @@ import (
 /* From Figure 4.6. Typical XID frame, from AX.25 protocol spec, v. 2.2 */
 /* This is the info part after a control byte of 0xAF. */
 
-var xid_example []C.uchar = []C.uchar{
+var xid_example = []byte{
 
 	/* FI */ 0x82, /* Format indicator */
 	/* GI */ 0x80, /* Group Identifier - parameter negotiation */
@@ -71,11 +70,10 @@ func xid_test_main(t *testing.T) {
 	*/
 
 	var param2 *xid_param_s
-	var info [40]C.uchar
 
 	/* parse example. */
 
-	var param, desc, n = xid_parse(&xid_example[0], C.int(len(xid_example)))
+	var param, desc, n = xid_parse((*C.uchar)(C.CBytes(xid_example)), C.int(len(xid_example)))
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -94,11 +92,10 @@ func xid_test_main(t *testing.T) {
 
 	/* encode and verify it comes out the same. */
 
-	var bytes = xid_encode(param, &info[0], cr_cmd)
-	assert.Equal(t, C.int(len(xid_example)), bytes)
+	var info = xid_encode(param, cr_cmd)
+	assert.Len(t, info, len(xid_example))
 
-	var cmp = C.memcmp(unsafe.Pointer(&info[0]), unsafe.Pointer(&xid_example[0]), 27)
-	assert.Equal(t, C.int(0), cmp, "n: %d, info: %v, xid_example[0]: %v", n, C.GoBytes(unsafe.Pointer(&info[0]), 27), C.GoBytes(unsafe.Pointer(&xid_example[0]), 27))
+	assert.Equal(t, info, xid_example, "n: %d, info: %v, xid_example[0]: %v", n, info, xid_example)
 
 	/* try a couple different values, no srej. */
 
@@ -110,8 +107,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 1234
 	param.retries = 12
 
-	bytes = xid_encode(param, &info[0], cr_cmd)
-	param2, desc, _ = xid_parse(&info[0], bytes)
+	info = xid_encode(param, cr_cmd)
+	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -137,8 +134,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 5555
 	param.retries = 9
 
-	bytes = xid_encode(param, &info[0], cr_cmd)
-	param2, desc, _ = xid_parse(&info[0], bytes)
+	info = xid_encode(param, cr_cmd)
+	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -164,8 +161,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 5555
 	param.retries = 9
 
-	bytes = xid_encode(param, &info[0], cr_cmd)
-	param2, desc, _ = xid_parse(&info[0], bytes)
+	info = xid_encode(param, cr_cmd)
+	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -191,8 +188,8 @@ func xid_test_main(t *testing.T) {
 	param.ack_timer = 999
 	param.retries = G_UNKNOWN
 
-	bytes = xid_encode(param, &info[0], cr_cmd)
-	param2, desc, _ = xid_parse(&info[0], bytes)
+	info = xid_encode(param, cr_cmd)
+	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -210,8 +207,8 @@ func xid_test_main(t *testing.T) {
 
 	/* Default values for empty info field. */
 
-	bytes = 0
-	param2, desc, _ = xid_parse(&info[0], bytes)
+	info = []byte{}
+	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
