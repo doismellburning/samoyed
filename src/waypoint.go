@@ -81,7 +81,7 @@ func waypoint_init(mc *misc_config_s) {
 
 	s_waypoint_udp_sock = nil
 	if mc.waypoint_udp_portnum > 0 {
-		var addr = net.JoinHostPort(C.GoString(&mc.waypoint_udp_hostname[0]), strconv.Itoa(int(mc.waypoint_udp_portnum)))
+		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(int(mc.waypoint_udp_portnum)))
 		var conn, err = net.Dial("udp", addr)
 
 		if err != nil {
@@ -98,11 +98,11 @@ func waypoint_init(mc *misc_config_s) {
 	 * First try to get fd if they have same device name.
 	 * If that fails, do own serial port open.
 	 */
-	if C.strlen(&mc.waypoint_serial_port[0]) > 0 {
-		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(&mc.waypoint_serial_port[0], 4800)
+	if mc.waypoint_serial_port != "" {
+		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(C.CString(mc.waypoint_serial_port), 4800)
 
 		if s_waypoint_serial_port_fd == nil {
-			s_waypoint_serial_port_fd = serial_port_open(C.GoString(&mc.waypoint_serial_port[0]), 4800)
+			s_waypoint_serial_port_fd = serial_port_open(mc.waypoint_serial_port, 4800)
 		} else {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Note: Sharing same port for GPS input and waypoint output.\n")
@@ -110,7 +110,7 @@ func waypoint_init(mc *misc_config_s) {
 
 		if s_waypoint_serial_port_fd == nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unable to open serial port %s for waypoint output.\n", C.GoString(&mc.waypoint_serial_port[0]))
+			dw_printf("Unable to open serial port %s for waypoint output.\n", mc.waypoint_serial_port)
 		}
 	}
 

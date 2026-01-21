@@ -42,7 +42,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unsafe"
 )
 
 /*
@@ -107,23 +106,19 @@ type beacon_s struct {
 
 	next C.time_t /* Unix time to transmit next one. */
 
-	source *C.char /* NULL or explicit AX.25 source address to use */
-	/* instead of the mycall value for the channel. */
+	source string /* Empty or explicit AX.25 source address to use instead of the mycall value for the channel. */
 
-	dest *C.char /* NULL or explicit AX.25 destination to use */
-	/* instead of the software version such as APDW11. */
+	dest string /* Empty or explicit AX.25 destination to use instead of the software version such as APDW11. */
 
 	compress C.int /* Use more compact form? */
 
-	objname [10]C.char /* Object name.  Any printable characters. */
+	objname string /* Object name.  Any printable characters. */
 
-	via *C.char /* Path, e.g. "WIDE1-1,WIDE2-1" or NULL. */
+	via string /* Path, e.g. "WIDE1-1,WIDE2-1" or NULL. */
 
-	custom_info *C.char /* Info part for handcrafted custom beacon. */
-	/* Ignore the rest below if this is set. */
+	custom_info string /* Info part for handcrafted custom beacon. Ignore the rest below if this is set. */
 
-	custom_infocmd *C.char /* Command to generate info part. */
-	/* Again, other options below are then ignored. */
+	custom_infocmd string /* Command to generate info part. Again, other options below are then ignored. */
 
 	messaging C.int /* Set messaging attribute for position report. */
 	/* i.e. Data Type Indicator of '=' rather than '!' */
@@ -141,14 +136,14 @@ type beacon_s struct {
 	gain   C.float /* Original protocol spec was unclear. */
 	/* Addendum 1.1 clarifies it is dBi not dBd. */
 
-	dir [3]C.char /* 1 or 2 of N,E,W,S, or empty for omni. */
+	dir string /* 1 or 2 of N,E,W,S, or empty for omni. */
 
 	freq   C.float /* MHz. */
 	tone   C.float /* Hz. */
 	offset C.float /* MHz. */
 
-	comment    *C.char /* Comment or NULL. */
-	commentcmd *C.char /* Command to append more to Comment or NULL. */
+	comment    string /* Comment or empty. */
+	commentcmd string /* Command to append more to Comment or empty. */
 }
 
 type misc_config_s struct {
@@ -178,7 +173,7 @@ type misc_config_s struct {
 	/* Want this to be off by default because it hangs */
 	/* after a while if nothing is reading from other end. */
 
-	kiss_serial_port [20]C.char
+	kiss_serial_port string
 	/* Serial port name for our end of the */
 	/* virtual null modem for native Windows apps. */
 	/* Version 1.5 add same capability for Linux. */
@@ -192,24 +187,22 @@ type misc_config_s struct {
 	/* When this is non-zero, we will check periodically to */
 	/* see if the device has appeared and we will open it. */
 
-	gpsnmea_port [20]C.char /* Serial port name for reading NMEA sentences from GPS. */
-	/* e.g. COM22, /dev/ttyACM0 */
+	gpsnmea_port string /* Serial port name for reading NMEA sentences from GPS. e.g. COM22, /dev/ttyACM0 */
 
 	gpsnmea_speed C.int /* Speed for above, baud, default 4800. */
 
-	gpsd_host [20]C.char /* Host for gpsd server. */
-	/* e.g. localhost, 192.168.1.2 */
+	gpsd_host string /* Host for gpsd server. e.g. localhost, 192.168.1.2 */
 
 	gpsd_port C.int /* Port number for gpsd server. */
 	/* Default is  2947. */
 
-	waypoint_serial_port [20]C.char /* Serial port name for sending NMEA waypoint sentences */
+	waypoint_serial_port string /* Serial port name for sending NMEA waypoint sentences */
 	/* to a GPS map display or other mapping application. */
 	/* e.g. COM22, /dev/ttyACM0 */
 	/* Currently no option for setting non-standard speed. */
 	/* This was done in 2014 and no one has complained yet. */
 
-	waypoint_udp_hostname [80]C.char /* Destination host when using UDP. */
+	waypoint_udp_hostname string /* Destination host when using UDP. */
 
 	waypoint_udp_portnum C.int /* UDP port. */
 
@@ -217,10 +210,10 @@ type misc_config_s struct {
 
 	log_daily_names C.int /* True to generate new log file each day. */
 
-	log_path [80]C.char /* Either directory or full file name depending on above. */
+	log_path string /* Either directory or full file name depending on above. */
 
-	dns_sd_enabled C.int      /* DNS Service Discovery announcement enabled. */
-	dns_sd_name    [64]C.char /* Name announced on dns-sd; defaults to "Dire Wolf on <hostname>" */
+	dns_sd_enabled C.int  /* DNS Service Discovery announcement enabled. */
+	dns_sd_name    string /* Name announced on dns-sd; defaults to "Dire Wolf on <hostname>" */
 
 	sb_configured C.int /* TRUE if SmartBeaconing is configured. */
 	sb_fast_speed C.int /* MPH */
@@ -247,12 +240,11 @@ type misc_config_s struct {
 	/* switching to SABM.  This is to handle the case of an old */
 	/* TNC which simply ignores SABME rather than replying with FRMR. */
 
-	v20_addrs **C.char /* Stations known to understand only AX.25 v2.0 so we don't */
-	/* waste time trying v2.2 first. */
+	v20_addrs []string /* Stations known to understand only AX.25 v2.0 so we don't waste time trying v2.2 first. */
 
 	v20_count C.int /* Number of station addresses in array above. */
 
-	noxid_addrs **C.char /* Stations known not to understand XID command so don't */
+	noxid_addrs []string /* Stations known not to understand XID command so don't */
 	/* waste time sending it and eventually giving up. */
 	/* AX.25 for Linux is the one known case, so far, where */
 	/* SABME is implemented but XID is not. */
@@ -490,12 +482,10 @@ func parse_ll(str string, which parse_ll_which_e, line int) C.double {
  *
  *----------------------------------------------------------------*/
 
-func parse_utm_zone(_szone *C.char, latband *C.char, hemi *C.char) C.long {
+func parse_utm_zone(szone string, latband *C.char, hemi *C.char) C.long {
 
 	*latband = ' '
 	*hemi = 'N' /* default */
-
-	var szone = C.GoString(_szone)
 
 	var lastRune = rune(szone[len(szone)-1])
 	if unicode.IsLetter(lastRune) {
@@ -1015,15 +1005,15 @@ func config_init(fname string, p_audio_config *audio_s,
 	/* Ideally we'd like to figure out if com0com is installed */
 	/* and automatically enable this.  */
 
-	C.strcpy(&p_misc_config.kiss_serial_port[0], C.CString(""))
+	p_misc_config.kiss_serial_port = ""
 	p_misc_config.kiss_serial_speed = 0
 	p_misc_config.kiss_serial_poll = 0
 
-	C.strcpy(&p_misc_config.gpsnmea_port[0], C.CString(""))
-	C.strcpy(&p_misc_config.waypoint_serial_port[0], C.CString(""))
+	p_misc_config.gpsnmea_port = ""
+	p_misc_config.waypoint_serial_port = ""
 
 	p_misc_config.log_daily_names = 0
-	C.strcpy(&p_misc_config.log_path[0], C.CString(""))
+	p_misc_config.log_path = ""
 
 	/* connected mode. */
 
@@ -1903,24 +1893,24 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			var ot C.int
-			var otname [8]C.char
+			var otname string
 
 			if strings.EqualFold(t, "PTT") {
 				ot = OCTYPE_PTT
-				C.strcpy(&otname[0], C.CString("PTT"))
+				otname = "PTT"
 			} else if strings.EqualFold(t, "DCD") {
 				ot = OCTYPE_DCD
-				C.strcpy(&otname[0], C.CString("DCD"))
+				otname = "DCD"
 			} else {
 				ot = OCTYPE_CON
-				C.strcpy(&otname[0], C.CString("CON"))
+				otname = "CON"
 			}
 
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Missing output control device for %s command.\n",
-					line, C.GoString(&otname[0]))
+					line, otname)
 				continue
 			}
 
@@ -1937,7 +1927,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, otname)
 					continue
 				}
 
@@ -1955,14 +1945,14 @@ func config_init(fname string, p_audio_config *audio_s,
 				/*
 					#if __WIN32__
 						      text_color_set(DW_COLOR_ERROR);
-						      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, C.GoString(&otname[0]));
+						      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, otname);
 					#else
 				*/
 				// #if defined(USE_GPIOD)
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO chip name for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing GPIO chip name for %s.\n", line, otname)
 					dw_printf("Use the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines.\n")
 					continue
 				}
@@ -1987,7 +1977,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, otname)
 					continue
 				}
 
@@ -2017,7 +2007,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing LPT bit number for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing LPT bit number for %s.\n", line, otname)
 					continue
 				}
 
@@ -2033,7 +2023,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				/*
 					#else
 						      text_color_set(DW_COLOR_ERROR);
-						      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, C.GoString(&otname[0]));
+						      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
 					#endif
 				*/
 			} else if strings.EqualFold(t, "RIG") {
@@ -2103,7 +2093,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				   #else
 				*/
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", line, C.GoString(&otname[0]))
+				dw_printf("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", line, otname)
 				dw_printf("You must rebuild direwolf with hamlib support.\n")
 				dw_printf("See User Guide for details.\n")
 				// #endif
@@ -2123,7 +2113,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					// Let's keep it simple with just PTT for the first stab at this.
 
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: PTT CM108 option is only valid for PTT, not %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: PTT CM108 option is only valid for PTT, not %s.\n", line, otname)
 					continue
 				}
 
@@ -2187,7 +2177,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				/* TODO KG
 				#else
 					      text_color_set(DW_COLOR_ERROR);
-					      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", line, C.GoString(&otname[0]));
+					      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", line, otname);
 					      dw_printf ("You must rebuild direwolf with CM108 Audio Adapter GPIO PTT support.\n");
 					      dw_printf ("See Interface Guide for details.\n");
 					      rtfm();
@@ -2204,7 +2194,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing RTS or DTR after %s device name.\n",
-						line, C.GoString(&otname[0]))
+						line, otname)
 					continue
 				}
 
@@ -2223,7 +2213,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
-						line, C.GoString(&otname[0]))
+						line, otname)
 					continue
 				}
 
@@ -4889,11 +4879,11 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing serial port name on line %d.\n", line)
 				continue
 			} else {
-				if C.strlen(&p_misc_config.kiss_serial_port[0]) > 0 {
+				if p_misc_config.kiss_serial_port != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", line)
 				}
-				C.strcpy(&p_misc_config.kiss_serial_port[0], C.CString(t))
+				p_misc_config.kiss_serial_port = t
 				p_misc_config.kiss_serial_speed = 0
 				p_misc_config.kiss_serial_poll = 0
 			}
@@ -4915,11 +4905,11 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing serial port name on line %d.\n", line)
 				continue
 			} else {
-				if C.strlen(&p_misc_config.kiss_serial_port[0]) > 0 {
+				if p_misc_config.kiss_serial_port != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", line)
 				}
-				C.strcpy(&p_misc_config.kiss_serial_port[0], C.CString(t))
+				p_misc_config.kiss_serial_port = t
 				p_misc_config.kiss_serial_speed = 0
 				p_misc_config.kiss_serial_poll = 1 // set polling.
 			}
@@ -4959,7 +4949,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing service name for DNSSDNAME.\n", line)
 				continue
 			} else {
-				C.strcpy(&p_misc_config.dns_sd_name[0], C.CString(t))
+				p_misc_config.dns_sd_name = t
 			}
 		} else if strings.EqualFold(t, "gpsnmea") {
 
@@ -4972,7 +4962,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file, line %d: Missing serial port name for GPS receiver.\n", line)
 				continue
 			}
-			C.strcpy(&p_misc_config.gpsnmea_port[0], C.CString(t))
+			p_misc_config.gpsnmea_port = t
 
 			t = split("", false)
 			if t != "" {
@@ -5001,12 +4991,12 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			dw_printf("Warning: GPSD support currently disabled pending a rewrite of the integration.\n")
 
-			C.strcpy(&p_misc_config.gpsd_host[0], C.CString("localhost"))
+			p_misc_config.gpsd_host = "localhost"
 			p_misc_config.gpsd_port = C.atoi(C.CString(C.DEFAULT_GPSD_PORT))
 
 			t = split("", false)
 			if t != "" {
-				C.strcpy(&p_misc_config.gpsd_host[0], C.CString(t))
+				p_misc_config.gpsd_host = t
 
 				t = split("", false)
 				if t != "" {
@@ -5055,9 +5045,9 @@ func config_init(fname string, p_audio_config *audio_s,
 				var hostname, portStr, _ = strings.Cut(t, ":")
 				var port, _ = strconv.Atoi(portStr)
 				if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER {
-					C.strcpy(&p_misc_config.waypoint_udp_hostname[0], C.CString(hostname))
-					if C.strlen(&p_misc_config.waypoint_udp_hostname[0]) == 0 {
-						C.strcpy(&p_misc_config.waypoint_udp_hostname[0], C.CString("localhost"))
+					p_misc_config.waypoint_udp_hostname = hostname
+					if p_misc_config.waypoint_udp_hostname == "" {
+						p_misc_config.waypoint_udp_hostname = "localhost"
 					}
 					p_misc_config.waypoint_udp_portnum = C.int(port)
 				} else {
@@ -5065,7 +5055,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("Line %d: Invalid UDP port number %d for sending waypoints.\n", line, port)
 				}
 			} else {
-				C.strcpy(&p_misc_config.waypoint_serial_port[0], C.CString(t))
+				p_misc_config.waypoint_serial_port = t
 			}
 
 			/* Anything remaining is the formats to enable. */
@@ -5100,12 +5090,12 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing directory name for LOGDIR on line %d.\n", line)
 				continue
 			} else {
-				if C.strlen(&p_misc_config.log_path[0]) > 0 {
+				if p_misc_config.log_path != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: LOGDIR on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line)
 				}
 				p_misc_config.log_daily_names = 1
-				C.strcpy(&p_misc_config.log_path[0], C.CString(t))
+				p_misc_config.log_path = t
 			}
 			t = split("", false)
 			if t != "" {
@@ -5123,12 +5113,12 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing file name for LOGFILE on line %d.\n", line)
 				continue
 			} else {
-				if C.strlen(&p_misc_config.log_path[0]) > 0 {
+				if p_misc_config.log_path != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: LOGFILE on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line)
 				}
 				p_misc_config.log_daily_names = 0
-				C.strcpy(&p_misc_config.log_path[0], C.CString(t))
+				p_misc_config.log_path = t
 			}
 			t = split("", false)
 			if t != "" {
@@ -5405,8 +5395,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				var heard C.int
 
 				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
-					p_misc_config.v20_addrs = (**C.char)(C.realloc(unsafe.Pointer(p_misc_config.v20_addrs), C.size_t(C.int(unsafe.Sizeof(p_misc_config.v20_addrs))*(p_misc_config.v20_count+1))))
-					C.strcpy((*C.char)(unsafe.Add(unsafe.Pointer(p_misc_config.v20_addrs), p_misc_config.v20_count)), C.CString(t))
+					p_misc_config.v20_addrs = append(p_misc_config.v20_addrs, t)
 					p_misc_config.v20_count++
 				} else {
 					text_color_set(DW_COLOR_ERROR)
@@ -5439,8 +5428,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				var heard C.int
 
 				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
-					p_misc_config.noxid_addrs = (**C.char)(C.realloc(unsafe.Pointer(p_misc_config.noxid_addrs), C.size_t(C.int(unsafe.Sizeof(p_misc_config.noxid_addrs))*(p_misc_config.noxid_count+1))))
-					C.strcpy((*C.char)(unsafe.Add(unsafe.Pointer(p_misc_config.noxid_addrs), p_misc_config.noxid_count)), C.CString(t))
+					p_misc_config.noxid_addrs = append(p_misc_config.noxid_addrs, t)
 					p_misc_config.noxid_count++
 				} else {
 					text_color_set(DW_COLOR_ERROR)
@@ -5618,8 +5606,8 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	b.freq = G_UNKNOWN
 	b.tone = G_UNKNOWN
 	b.offset = G_UNKNOWN
-	b.source = nil
-	b.dest = nil
+	b.source = ""
+	b.dest = ""
 
 	var zone string
 	var temp_symbol string
@@ -5725,14 +5713,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = C.int(n)
 			}
 		} else if strings.EqualFold(keyword, "SOURCE") {
-			b.source = C.CString(strings.ToUpper(value)) /* silently force upper case. */
+			b.source = strings.ToUpper(value) /* silently force upper case. */
 			/* TODO KG Cap length
 			if C.strlen(b.source) > 9 {
 				b.source[9] = 0
 			}
 			*/
 		} else if strings.EqualFold(keyword, "DEST") {
-			b.dest = C.CString(strings.ToUpper(value)) /* silently force upper case. */
+			b.dest = strings.ToUpper(value) /* silently force upper case. */
 			/* TODO KG Cap length
 			if C.strlen(b.dest) > 9 {
 				b.dest[9] = 0
@@ -5743,7 +5731,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			// #if 1	// proper checking
 
 			if check_via_path(value) >= 0 {
-				b.via = C.CString(value)
+				b.via = value
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: invalid via path.\n", line)
@@ -5760,11 +5748,11 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			   #endif
 			*/
 		} else if strings.EqualFold(keyword, "INFO") {
-			b.custom_info = C.CString(value)
+			b.custom_info = value
 		} else if strings.EqualFold(keyword, "INFOCMD") {
-			b.custom_infocmd = C.CString(value)
+			b.custom_infocmd = value
 		} else if strings.EqualFold(keyword, "OBJNAME") {
-			C.strcpy(&b.objname[0], C.CString(value))
+			b.objname = value
 		} else if strings.EqualFold(keyword, "LAT") {
 			b.lat = parse_ll(value, LAT, line)
 		} else if strings.EqualFold(keyword, "LONG") || strings.EqualFold(keyword, "LON") {
@@ -5841,7 +5829,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var n, _ = strconv.ParseFloat(value, 64)
 			b.gain = C.float(n)
 		} else if strings.EqualFold(keyword, "DIR") || strings.EqualFold(keyword, "DIRECTION") {
-			C.strcpy(&b.dir[0], C.CString(value))
+			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
 			var f, _ = strconv.ParseFloat(value, 64)
 			b.freq = C.float(f)
@@ -5852,9 +5840,9 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var f, _ = strconv.ParseFloat(value, 64)
 			b.offset = C.float(f)
 		} else if strings.EqualFold(keyword, "COMMENT") {
-			b.comment = C.CString(value)
+			b.comment = value
 		} else if strings.EqualFold(keyword, "COMMENTCMD") {
-			b.commentcmd = C.CString(value)
+			b.commentcmd = value
 		} else if strings.EqualFold(keyword, "COMPRESS") || strings.EqualFold(keyword, "COMPRESSED") {
 			var n, _ = strconv.Atoi(value)
 			b.compress = C.int(n)
@@ -5868,7 +5856,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		}
 	}
 
-	if b.custom_info != nil && b.custom_infocmd != nil {
+	if b.custom_info != "" && b.custom_infocmd != "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Can't use both INFO and INFOCMD at the same time.\n", line)
 	}
@@ -5888,7 +5876,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 			var latband C.char
 			var hemi C.char
-			var lzone = parse_utm_zone(C.CString(zone), &latband, &hemi)
+			var lzone = parse_utm_zone(zone, &latband, &hemi)
 
 			var dlat C.double
 			var dlon C.double

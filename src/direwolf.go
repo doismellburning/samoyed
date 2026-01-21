@@ -491,10 +491,10 @@ x = Silence FX.25 information.`)
 
 	if *logFile != "" {
 		misc_config.log_daily_names = 0
-		C.strcpy(&misc_config.log_path[0], C.CString(*logFile))
+		misc_config.log_path = *logFile
 	} else if *logDir != "" {
 		misc_config.log_daily_names = 1
-		C.strcpy(&misc_config.log_path[0], C.CString(*logDir))
+		misc_config.log_path = *logDir
 	}
 
 	if *enablePseudoTerminal {
@@ -762,7 +762,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	log_init((misc_config.log_daily_names > 0), C.GoString(&misc_config.log_path[0]))
+	log_init((misc_config.log_daily_names > 0), misc_config.log_path)
 	mheard_init(d_m_opt)
 	beacon_init(audio_config, misc_config, &igate_config)
 

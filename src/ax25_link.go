@@ -6113,13 +6113,11 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 	// The configuration file can contain a list of stations known not to respond to XID.
 	// Obviously this applies only to v2.2 because XID was not part of v2.0.
 
-	/* FIXME KG Dealing with a char** from Go is too painful, let's just port this once misc_config_p is ported
-	for n := C.int(0); n < g_misc_config_p.noxid_count; n++ {
-		if C.strcmp(&S.addrs[PEERCALL][0], g_misc_config_p.noxid_addrs[n]) == 0 {
+	for _, addr := range g_misc_config_p.noxid_addrs {
+		if C.GoString(&S.addrs[PEERCALL][0]) == addr {
 			return
 		}
 	}
-	*/
 
 	switch S.mdl_state {
 

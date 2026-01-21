@@ -53,7 +53,7 @@ func Walk96Main() {
 	serial_port_write(tnc, []byte(cmd))
 
 	var config misc_config_s
-	C.strcpy(&config.gpsnmea_port[0], C.CString(gpsSerialPort))
+	config.gpsnmea_port = gpsSerialPort
 
 	var debug_gps C.int = 0
 	dwgps_init(&config, debug_gps)
