@@ -11,7 +11,7 @@ import (
 
 func DWGPSNMEAMain() {
 	var config misc_config_s
-	C.strcpy(&config.gpsnmea_port[0], C.CString("COM22"))
+	config.gpsnmea_port = "COM22"
 
 	dwgps_init(&config, 3)
 

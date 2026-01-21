@@ -99,7 +99,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
 		dw_printf("dwgpsnmea_init()\n")
 	}
 
-	if C.strlen(&pconfig.gpsnmea_port[0]) == 0 {
+	if pconfig.gpsnmea_port == "" {
 
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return (0)
@@ -109,13 +109,13 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = serial_port_open(C.GoString(&pconfig.gpsnmea_port[0]), int(pconfig.gpsnmea_speed))
+	s_gpsnmea_port_fd = serial_port_open(pconfig.gpsnmea_port, int(pconfig.gpsnmea_speed))
 
 	if s_gpsnmea_port_fd != nil {
 		go read_gpsnmea_thread(s_gpsnmea_port_fd)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open serial port %s for GPS receiver.\n", C.GoString(&pconfig.gpsnmea_port[0]))
+		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
 		return (-1)
 	}
 
@@ -127,7 +127,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
 /* Return fd to share if waypoint wants same device. */
 
 func dwgpsnmea_get_fd(wp_port_name *C.char, speed C.int) *term.Term {
-	if C.strcmp(&s_save_configp.gpsnmea_port[0], wp_port_name) == 0 && speed == s_save_configp.gpsnmea_speed {
+	if s_save_configp.gpsnmea_port == C.GoString(wp_port_name) && speed == s_save_configp.gpsnmea_speed {
 		return (s_gpsnmea_port_fd)
 	}
 	return nil

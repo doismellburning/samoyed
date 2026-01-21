@@ -124,22 +124,22 @@ func kissserial_init(mc *misc_config_s) {
 	g_misc_config_p = mc
 	kf = new(kiss_frame_t)
 
-	if C.strlen(&g_misc_config_p.kiss_serial_port[0]) > 0 {
+	if g_misc_config_p.kiss_serial_port != "" {
 		if g_misc_config_p.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
 
-			serialport_fd = serial_port_open(C.GoString(&g_misc_config_p.kiss_serial_port[0]), int(g_misc_config_p.kiss_serial_speed))
+			serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, int(g_misc_config_p.kiss_serial_speed))
 
 			if serialport_fd != nil {
 				text_color_set(DW_COLOR_INFO)
-				dw_printf("Opened %s for serial port KISS.\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
+				dw_printf("Opened %s for serial port KISS.\n", g_misc_config_p.kiss_serial_port)
 			} else { //nolint:staticcheck
 				// An error message was already displayed.
 			}
 		} else {
 			// Polling case.   Defer until read and device not opened.
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Will be checking periodically for %s\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
+			dw_printf("Will be checking periodically for %s\n", g_misc_config_p.kiss_serial_port)
 		}
 
 		if g_misc_config_p.kiss_serial_poll != 0 || serialport_fd != nil {
@@ -329,16 +329,16 @@ func kissserial_get() (byte, error) {
 			// Not open.  Wait for it to appear and try opening.
 			SLEEP_SEC(int(g_misc_config_p.kiss_serial_poll))
 
-			var _, statErr = os.Stat(C.GoString(&g_misc_config_p.kiss_serial_port[0]))
+			var _, statErr = os.Stat(g_misc_config_p.kiss_serial_port)
 
 			if statErr == nil {
 				// It's there now.  Try to open.
 
-				serialport_fd = serial_port_open(C.GoString(&g_misc_config_p.kiss_serial_port[0]), int(g_misc_config_p.kiss_serial_speed))
+				serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, int(g_misc_config_p.kiss_serial_speed))
 
 				if serialport_fd != nil {
 					text_color_set(DW_COLOR_INFO)
-					dw_printf("\nOpened %s for serial port KISS.\n\n", C.GoString(&g_misc_config_p.kiss_serial_port[0]))
+					dw_printf("\nOpened %s for serial port KISS.\n\n", g_misc_config_p.kiss_serial_port)
 
 					kf = new(kiss_frame_t) // Start with clean state.
 				} else { //nolint:staticcheck

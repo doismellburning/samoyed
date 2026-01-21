@@ -198,7 +198,7 @@ func dns_sd_announce(mc *misc_config_s) {
 	}
 
 	if mc.dns_sd_name[0] != 0 {
-		avahiName = C.avahi_strdup(&mc.dns_sd_name[0])
+		avahiName = C.avahi_strdup(C.CString(mc.dns_sd_name))
 	} else {
 		avahiName = C.CString(dns_sd_default_service_name())
 	}
