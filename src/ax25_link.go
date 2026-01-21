@@ -4714,20 +4714,17 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
 
-				var param xid_param_s
-				var desc [150]C.char
-				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
+				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
 
 				if ok > 0 {
-					negotiation_response(S, &param)
+					negotiation_response(S, param)
 
-					var xinfo [40]C.uchar
 					var res = cr_res
-					var xlen = xid_encode(&param, &xinfo[0], res)
+					var xinfo = xid_encode(param, res)
 
 					var nopid C.int = 0
 					var f C.int = -1
-					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, &xinfo[0], xlen)
+					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
 					lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 				}
 			} else {
@@ -4747,12 +4744,10 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 
 				// Got expected response.  Copy into my working parameters.
 
-				var param xid_param_s
-				var desc [150]C.char
-				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
+				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
 
 				if ok > 0 {
-					complete_negotiation(S, &param)
+					complete_negotiation(S, param)
 				}
 
 				S.mdl_state = mdl_state_0_ready
@@ -5147,10 +5142,9 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			var param xid_param_s
 			initiate_negotiation(S, &param)
 
-			var xinfo [40]C.uchar
-			var xlen = xid_encode(&param, &xinfo[0], cmd)
+			var xinfo = xid_encode(&param, cmd)
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, &xinfo[0], xlen)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			START_TM201(S)
@@ -6125,13 +6119,12 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 		var param xid_param_s
 		initiate_negotiation(S, &param)
 
-		var xinfo [40]C.uchar
 		var cmd = cr_cmd
-		var xlen = xid_encode(&param, &xinfo[0], cmd)
+		var xinfo = xid_encode(&param, cmd)
 
 		var p C.int = 1
 		var nopid C.int = 0
-		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, &xinfo[0], xlen)
+		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.mdl_rc = 0
@@ -6164,12 +6157,12 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	param.modulo = S.modulo
-	param.i_field_length_rx = S.n1_paclen // Hmmmm.  Should we ask for what the user
+	param.i_field_length_rx = int(S.n1_paclen) // Hmmmm.  Should we ask for what the user
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
-	param.window_size_rx = S.k_maxframe
-	param.ack_timer = g_misc_config_p.frack * 1000
-	param.retries = S.n2_retry
+	param.window_size_rx = int(S.k_maxframe)
+	param.ack_timer = int(g_misc_config_p.frack * 1000)
+	param.retries = int(S.n2_retry)
 }
 
 /*------------------------------------------------------------------------------
@@ -6256,13 +6249,13 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	if param.ack_timer == G_UNKNOWN {
 		param.ack_timer = 3000 // not specified, set default.
 	} else {
-		param.ack_timer = max(param.ack_timer, g_misc_config_p.frack*1000)
+		param.ack_timer = max(param.ack_timer, int(g_misc_config_p.frack*1000))
 	}
 
 	if param.retries == G_UNKNOWN {
 		param.retries = 10 // not specified, set default.
 	} else {
-		param.retries = max(param.retries, S.n2_retry)
+		param.retries = max(param.retries, int(S.n2_retry))
 	}
 
 	// IMPORTANT:  Take values we have agreed upon and put into my running configuration.
@@ -6295,11 +6288,11 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	if param.i_field_length_rx != G_UNKNOWN {
-		S.n1_paclen = param.i_field_length_rx
+		S.n1_paclen = C.int(param.i_field_length_rx)
 	}
 
 	if param.window_size_rx != G_UNKNOWN {
-		S.k_maxframe = param.window_size_rx
+		S.k_maxframe = C.int(param.window_size_rx)
 	}
 
 	if param.ack_timer != G_UNKNOWN {
@@ -6307,7 +6300,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	if param.retries != G_UNKNOWN {
-		S.n2_retry = param.retries
+		S.n2_retry = C.int(param.retries)
 	}
 }
 

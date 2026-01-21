@@ -23,16 +23,8 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <unistd.h>
-import "C"
-
 import (
 	"fmt"
-	"unsafe"
 )
 
 const FI_Format_Indicator = 0x82
@@ -101,19 +93,19 @@ const (
 )
 
 type xid_param_s struct {
-	full_duplex C.int
+	full_duplex int
 
 	srej srej_e
 
 	modulo ax25_modulo_t
 
-	i_field_length_rx C.int /* In bytes.  XID has it in bits. */
+	i_field_length_rx int /* In bytes.  XID has it in bits. */
 
-	window_size_rx C.int
+	window_size_rx int
 
-	ack_timer C.int /* "T1" in mSec. */
+	ack_timer int /* "T1" in mSec. */
 
-	retries C.int /* "N1" */
+	retries int /* "N1" */
 }
 
 /*-------------------------------------------------------------------
@@ -127,13 +119,11 @@ type xid_param_s struct {
  *		info_len	- Number of bytes in information part of frame.
  *				  Could be 0.
  *
- *		desc_size	- Size of desc.  100 is good.
- *
- * Outputs:	result		- Structure with extracted values.
+ * Returns:	result		- Structure with extracted values.
  *
  *		desc		- Text description for troubleshooting.
  *
- * Returns:	1 for mostly successful (with possible error messages), 0 for failure.
+ * statusNo -	1 for mostly successful (with possible error messages), 0 for failure.
  *
  * Description:	6.3.2 "The receipt of an XID response from the other station
  *		establishes that both stations are using AX.25 version
@@ -142,8 +132,7 @@ type xid_param_s struct {
  *
  *--------------------------------------------------------------------*/
 
-func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.char, desc_size C.int) C.int {
-
+func xid_parse(info []byte) (*xid_param_s, string, int) {
 	// What should we do when some fields are missing?
 
 	// The  AX.25 v2.2 protocol spec says, for most of these,
@@ -151,6 +140,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 
 	// We set the numeric values to our usual G_UNKNOWN to mean undefined and let the caller deal with it.
 	// rej and modulo are enum so we can't use G_UNKNOWN there.
+	var result = new(xid_param_s)
 
 	result.full_duplex = G_UNKNOWN
 	result.srej = srej_not_specified
@@ -160,62 +150,65 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 	result.ack_timer = G_UNKNOWN
 	result.retries = G_UNKNOWN
 
+	var desc string
+
 	/* Information field is optional but that seems pretty lame. */
 
-	if info_len == 0 {
-		return (1)
+	if len(info) == 0 {
+		return result, desc, 1
 	}
 
-	var info = C.GoBytes(unsafe.Pointer(_info), info_len)
-
-	var i C.int = 0
+	var i = 0
 
 	if info[i] != FI_Format_Indicator {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: First byte of info field should be Format Indicator, %02x.\n", FI_Format_Indicator)
-		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], info_len)
-		return 0
+		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], len(info))
+
+		return result, desc, 0
 	}
+
 	i++
 
 	if info[i] != GI_Group_Identifier {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: Second byte of info field should be Group Indicator, %d.\n", GI_Group_Identifier)
-		return 0
+
+		return result, desc, 0
 	}
+
 	i++
 
-	var group_len = C.int(info[i])
-	i++
-	group_len = (group_len << 8) + C.int(info[i])
-	i++
+	var group_len = int(info[i])
 
-	var desc string
+	i++
+	group_len = (group_len << 8) + int(info[i])
+	i++
 
 	for i < 4+group_len {
-
 		var pind = info[i]
+
 		i++
 
 		var plen = info[i] // should have sanity checking
+
 		i++
 
 		if plen < 1 || plen > 4 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("XID error: Length ?????   TODO   ????  %d.\n", plen)
-			return (1) // got this far.
+
+			return result, desc, 1 // got this far.
 		}
 
-		var pval C.int = 0
+		var pval = 0
 		for j := byte(0); j < plen; j++ {
-			pval = (pval << 8) + C.int(info[i])
+			pval = (pval << 8) + int(info[i])
 			i++
 		}
 
 		switch pind {
-
 		case PI_Classes_of_Procedures:
-
 			if (pval & PV_Classes_Procedures_Balanced_ABM) == 0 { //nolint:staticcheck
 				//  https://groups.io/g/bpq32/topic/113348033#msg44169
 				//text_color_set (DW_COLOR_ERROR);
@@ -236,15 +229,15 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 			}
 
 		case PI_HDLC_Optional_Functions:
-
 			// Pick highest of those offered.
-
 			if pval&PV_HDLC_Optional_Functions_REJ_cmd_resp > 0 {
 				desc += "REJ "
 			}
+
 			if pval&PV_HDLC_Optional_Functions_SREJ_cmd_resp > 0 {
 				desc += "SREJ "
 			}
+
 			if pval&PV_HDLC_Optional_Functions_Multi_SREJ_cmd_resp > 0 {
 				desc += "Multi-SREJ "
 			}
@@ -258,6 +251,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Expected at least one of REJ, SREJ, Multi-SREJ to be set.\n")
+
 				result.srej = srej_none
 			}
 
@@ -294,7 +288,6 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 			}
 
 		case PI_I_Field_Length_Rx:
-
 			result.i_field_length_rx = pval / 8
 
 			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", result.i_field_length_rx)
@@ -305,7 +298,6 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 			}
 
 		case PI_Window_Size_Rx:
-
 			result.window_size_rx = pval
 
 			desc += fmt.Sprintf("Window-Size-Rx=%d ", result.window_size_rx)
@@ -313,6 +305,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 			if pval < 1 || pval > 127 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Window Size Rx, %d, is not in range of 1 thru 127.\n", pval)
+
 				result.window_size_rx = 127
 				// Let the caller deal with modulo 8 consideration.
 			}
@@ -333,15 +326,12 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 		}
 	}
 
-	if i != info_len {
+	if i != len(info) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: Frame / Group Length mismatch.\n")
 	}
 
-	C.strcpy(_desc, C.CString(desc))
-
-	return (1)
-
+	return result, desc, 1
 } /* end xid_parse */
 
 /*-------------------------------------------------------------------
@@ -382,12 +372,8 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
  *
  *		cr	- Is it a command or response?
  *
- * Outputs:	info	- Information part of XID frame.
+ * Returns:	info	- Information part of XID frame.
  *			  Does not include the control byte.
- *			  Use buffer of 40 bytes just to be safe.
- *
- * Returns:	Number of bytes in the info part.  Should be at most 27.
- *		Again, provide a larger space just to be safe in case this ever changes.
  *
  * Description:	6.3.2  "Parameter negotiation occurs at any time. It is accomplished by sending
  *		the XID command frame and receiving the XID response frame. Implementations of
@@ -418,46 +404,42 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
  *
  *--------------------------------------------------------------------*/
 
-func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
+func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
+	var info []byte
 
-	var info [40]byte
-	var i C.int = 0
-
-	info[i] = FI_Format_Indicator
-	i++
-	info[i] = GI_Group_Identifier
-	i++
-	info[i] = 0
-	i++
+	info = append(info, FI_Format_Indicator)
+	info = append(info, GI_Group_Identifier)
+	info = append(info, 0)
 
 	var m byte = 4 // classes of procedures
-	m += 5         // HDLC optional features
+
+	m += 5 // HDLC optional features
 	if param.i_field_length_rx != G_UNKNOWN {
 		m += 4
 	}
+
 	if param.window_size_rx != G_UNKNOWN {
 		m += 3
 	}
+
 	if param.ack_timer != G_UNKNOWN {
 		m += 4
 	}
+
 	if param.retries != G_UNKNOWN {
 		m += 3
 	}
 
-	info[i] = m // 0x17 if all present.
-	i++
+	info = append(info, m) // 0x17 if all present.
 
 	// "Classes of Procedures" has half / full duplex.
 
 	// We always send this.
 
-	info[i] = PI_Classes_of_Procedures
-	i++
-	info[i] = 2
-	i++
+	info = append(info, PI_Classes_of_Procedures)
+	info = append(info, 2)
 
-	var x C.int = PV_Classes_Procedures_Balanced_ABM
+	var x = PV_Classes_Procedures_Balanced_ABM
 
 	if param.full_duplex == 1 {
 		x |= PV_Classes_Procedures_Full_Duplex
@@ -465,20 +447,16 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 		x |= PV_Classes_Procedures_Half_Duplex
 	}
 
-	info[i] = byte(x>>8) & 0xff
-	i++
-	info[i] = byte(x) & 0xff
-	i++
+	info = append(info, byte(x>>8)&0xff)
+	info = append(info, byte(x)&0xff)
 
 	// "HDLC Optional Functions" contains REJ/SREJ & modulo 8/128.
 
 	// We always send this.
 	// Watch out for unknown values and do something reasonable.
 
-	info[i] = PI_HDLC_Optional_Functions
-	i++
-	info[i] = 3
-	i++
+	info = append(info, PI_HDLC_Optional_Functions)
+	info = append(info, 3)
 
 	x = PV_HDLC_Optional_Functions_Extended_Address |
 		PV_HDLC_Optional_Functions_TEST_cmd_resp |
@@ -520,12 +498,9 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 		x |= PV_HDLC_Optional_Functions_Modulo_8
 	}
 
-	info[i] = byte(x>>16) & 0xff
-	i++
-	info[i] = byte(x>>8) & 0xff
-	i++
-	info[i] = byte(x) & 0xff
-	i++
+	info = append(info, byte(x>>16)&0xff)
+	info = append(info, byte(x>>8)&0xff)
+	info = append(info, byte(x)&0xff)
 
 	// The rest are skipped if undefined values.
 
@@ -533,53 +508,39 @@ func xid_encode(param *xid_param_s, _info *C.uchar, cr cmdres_t) C.int {
 	// This is in bits.  8191 would be max number of bytes to fit in field.
 
 	if param.i_field_length_rx != G_UNKNOWN {
-		info[i] = byte(PI_I_Field_Length_Rx)
-		i++
-		info[i] = 2
-		i++
-		x = param.i_field_length_rx * 8
-		info[i] = byte(x>>8) & 0xff
-		i++
-		info[i] = byte(x) & 0xff
-		i++
+		info = append(info, byte(PI_I_Field_Length_Rx))
+		info = append(info, 2)
+
+		var x = param.i_field_length_rx * 8
+
+		info = append(info, byte(x>>8)&0xff)
+		info = append(info, byte(x)&0xff)
 	}
 
 	// "Window Size Rx"
 
 	if param.window_size_rx != G_UNKNOWN {
-		info[i] = byte(PI_Window_Size_Rx)
-		i++
-		info[i] = 1
-		i++
-		info[i] = byte(param.window_size_rx)
-		i++
+		info = append(info, byte(PI_Window_Size_Rx))
+		info = append(info, 1)
+		info = append(info, byte(param.window_size_rx))
 	}
 
 	// "Ack Timer" milliseconds.  We could handle up to 65535 here.
 
 	if param.ack_timer != G_UNKNOWN {
-		info[i] = byte(PI_Ack_Timer)
-		i++
-		info[i] = 2
-		i++
-		info[i] = byte(param.ack_timer>>8) & 0xff
-		i++
-		info[i] = byte(param.ack_timer) & 0xff
-		i++
+		info = append(info, byte(PI_Ack_Timer))
+		info = append(info, 2)
+		info = append(info, byte(param.ack_timer>>8)&0xff)
+		info = append(info, byte(param.ack_timer)&0xff)
 	}
 
 	// "Retries."
 
 	if param.retries != G_UNKNOWN {
-		info[i] = byte(PI_Retries)
-		i++
-		info[i] = 1
-		i++
-		info[i] = byte(param.retries)
-		i++
+		info = append(info, byte(PI_Retries))
+		info = append(info, 1)
+		info = append(info, byte(param.retries))
 	}
 
-	C.memcpy(unsafe.Pointer(_info), C.CBytes(info[:i]), C.ulong(i))
-
-	return i
+	return info
 } /* end xid_encode */
