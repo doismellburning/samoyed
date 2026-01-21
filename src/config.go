@@ -39,6 +39,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -2932,21 +2933,19 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			t = split("", false)
 			if t != "" {
-				var e = C.regcomp(&(p_cdigi_config.alias[from_chan][to_chan]), C.CString(t), C.REG_EXTENDED|C.REG_NOSUB)
-				if e == 0 {
-					p_cdigi_config.has_alias[from_chan][to_chan] = 1
+				var r, err = regexp.Compile(t)
+				if err == nil {
+					p_cdigi_config.alias[from_chan][to_chan] = r
+					p_cdigi_config.has_alias[from_chan][to_chan] = true
 				} else {
-					var message [100]C.char
-					C.regerror(e, &(p_cdigi_config.alias[from_chan][to_chan]), &message[0], C.size_t(len(message)))
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n",
-						line, C.GoString(&message[0]))
+					dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n", line, err)
 					continue
 				}
 				t = split("", false)
 			}
 
-			p_cdigi_config.enabled[from_chan][to_chan] = 1
+			p_cdigi_config.enabled[from_chan][to_chan] = true
 
 			if t != "" {
 				text_color_set(DW_COLOR_ERROR)
@@ -3151,7 +3150,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = " " /* Empty means permit nothing. */
 			}
 
-			p_cdigi_config.cfilter_str[from_chan][to_chan] = C.CString(t)
+			p_cdigi_config.cfilter_str[from_chan][to_chan] = t
 
 			//TODO1.2:  Do a test run to see errors now instead of waiting.
 
@@ -5489,18 +5488,18 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			/* Connected mode digipeating. */
 
-			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && p_cdigi_config.enabled[i][j] != 0 {
+			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && p_cdigi_config.enabled[i][j] {
 
 				if IsNoCall(p_audio_config.mycall[i]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
-					p_cdigi_config.enabled[i][j] = 0
+					p_cdigi_config.enabled[i][j] = false
 				}
 
 				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
-					p_cdigi_config.enabled[i][j] = 0
+					p_cdigi_config.enabled[i][j] = false
 				}
 
 				var b = 0
