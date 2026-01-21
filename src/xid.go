@@ -127,13 +127,11 @@ type xid_param_s struct {
  *		info_len	- Number of bytes in information part of frame.
  *				  Could be 0.
  *
- *		desc_size	- Size of desc.  100 is good.
- *
- * Outputs:	result		- Structure with extracted values.
+ * Returns:	result		- Structure with extracted values.
  *
  *		desc		- Text description for troubleshooting.
  *
- * Returns:	1 for mostly successful (with possible error messages), 0 for failure.
+ * statusNo -	1 for mostly successful (with possible error messages), 0 for failure.
  *
  * Description:	6.3.2 "The receipt of an XID response from the other station
  *		establishes that both stations are using AX.25 version
@@ -142,7 +140,7 @@ type xid_param_s struct {
  *
  *--------------------------------------------------------------------*/
 
-func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.char, desc_size C.int) C.int {
+func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
 
 	// What should we do when some fields are missing?
 
@@ -152,6 +150,8 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 	// We set the numeric values to our usual G_UNKNOWN to mean undefined and let the caller deal with it.
 	// rej and modulo are enum so we can't use G_UNKNOWN there.
 
+	var result = new(xid_param_s)
+
 	result.full_duplex = G_UNKNOWN
 	result.srej = srej_not_specified
 	result.modulo = modulo_unknown
@@ -160,10 +160,12 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 	result.ack_timer = G_UNKNOWN
 	result.retries = G_UNKNOWN
 
+	var desc string
+
 	/* Information field is optional but that seems pretty lame. */
 
 	if info_len == 0 {
-		return (1)
+		return result, desc, 1
 	}
 
 	var info = C.GoBytes(unsafe.Pointer(_info), info_len)
@@ -174,14 +176,14 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: First byte of info field should be Format Indicator, %02x.\n", FI_Format_Indicator)
 		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], info_len)
-		return 0
+		return result, desc, 0
 	}
 	i++
 
 	if info[i] != GI_Group_Identifier {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: Second byte of info field should be Group Indicator, %d.\n", GI_Group_Identifier)
-		return 0
+		return result, desc, 0
 	}
 	i++
 
@@ -189,8 +191,6 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 	i++
 	group_len = (group_len << 8) + C.int(info[i])
 	i++
-
-	var desc string
 
 	for i < 4+group_len {
 
@@ -203,7 +203,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 		if plen < 1 || plen > 4 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("XID error: Length ?????   TODO   ????  %d.\n", plen)
-			return (1) // got this far.
+			return result, desc, 1 // got this far.
 		}
 
 		var pval C.int = 0
@@ -338,9 +338,7 @@ func xid_parse(_info *C.uchar, info_len C.int, result *xid_param_s, _desc *C.cha
 		dw_printf("XID error: Frame / Group Length mismatch.\n")
 	}
 
-	C.strcpy(_desc, C.CString(desc))
-
-	return (1)
+	return result, desc, 1
 
 } /* end xid_parse */
 

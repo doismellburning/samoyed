@@ -4714,16 +4714,14 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
 
-				var param xid_param_s
-				var desc [150]C.char
-				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
+				var param, _, ok = xid_parse(info_ptr, info_len)
 
 				if ok > 0 {
-					negotiation_response(S, &param)
+					negotiation_response(S, param)
 
 					var xinfo [40]C.uchar
 					var res = cr_res
-					var xlen = xid_encode(&param, &xinfo[0], res)
+					var xlen = xid_encode(param, &xinfo[0], res)
 
 					var nopid C.int = 0
 					var f C.int = -1
@@ -4747,12 +4745,10 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 
 				// Got expected response.  Copy into my working parameters.
 
-				var param xid_param_s
-				var desc [150]C.char
-				var ok = xid_parse(info_ptr, info_len, &param, &desc[0], C.int(len(desc)))
+				var param, _, ok = xid_parse(info_ptr, info_len)
 
 				if ok > 0 {
-					complete_negotiation(S, &param)
+					complete_negotiation(S, param)
 				}
 
 				S.mdl_state = mdl_state_0_ready
