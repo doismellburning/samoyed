@@ -109,8 +109,7 @@ type beacon_s struct {
 
 	source string /* Empty or explicit AX.25 source address to use instead of the mycall value for the channel. */
 
-	dest *C.char /* NULL or explicit AX.25 destination to use */
-	/* instead of the software version such as APDW11. */
+	dest string /* Empty or explicit AX.25 destination to use instead of the software version such as APDW11. */
 
 	compress C.int /* Use more compact form? */
 
@@ -5618,7 +5617,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	b.tone = G_UNKNOWN
 	b.offset = G_UNKNOWN
 	b.source = ""
-	b.dest = nil
+	b.dest = ""
 
 	var zone string
 	var temp_symbol string
@@ -5731,7 +5730,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			}
 			*/
 		} else if strings.EqualFold(keyword, "DEST") {
-			b.dest = C.CString(strings.ToUpper(value)) /* silently force upper case. */
+			b.dest = strings.ToUpper(value) /* silently force upper case. */
 			/* TODO KG Cap length
 			if C.strlen(b.dest) > 9 {
 				b.dest[9] = 0
