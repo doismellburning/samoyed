@@ -949,7 +949,7 @@ func xmit_speech(c C.int, pp *packet_t) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
-	if C.strlen(&save_audio_config_p.tts_script[0]) == 0 {
+	if save_audio_config_p.tts_script == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
 		ax25_delete(pp)
@@ -965,7 +965,7 @@ func xmit_speech(c C.int, pp *packet_t) {
 	 * Invoke the speech-to-text script.
 	 */
 
-	xmit_speak_it(&save_audio_config_p.tts_script[0], c, (*C.char)(unsafe.Pointer(pinfo)))
+	xmit_speak_it(C.CString(save_audio_config_p.tts_script), c, (*C.char)(unsafe.Pointer(pinfo)))
 
 	/*
 	 * Turn off transmitter.
@@ -998,8 +998,8 @@ func xmit_speak_it(script *C.char, c C.int, msg *C.char) error {
 }
 
 func timestampPrefix() string {
-	if C.strlen(&save_audio_config_p.timestamp_format[0]) > 0 {
-		var formattedTime, _ = strftime.Format(C.GoString(&save_audio_config_p.timestamp_format[0]), time.Now())
+	if save_audio_config_p.timestamp_format != "" {
+		var formattedTime, _ = strftime.Format(save_audio_config_p.timestamp_format, time.Now())
 		return " " + formattedTime // space after channel.
 	}
 

@@ -20,7 +20,6 @@ import "C"
 import (
 	"fmt"
 	"math"
-	"strings"
 )
 
 /*
@@ -102,9 +101,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 		if g_modem_config_p.chan_medium[channel] == MEDIUM_RADIO ||
 			g_modem_config_p.chan_medium[channel] == MEDIUM_NETTNC {
-			if C.GoString(&g_modem_config_p.mycall[channel][0]) != "" &&
-				!strings.EqualFold(C.GoString(&g_modem_config_p.mycall[channel][0]), "N0CALL") &&
-				!strings.EqualFold(C.GoString(&g_modem_config_p.mycall[channel][0]), "NOCALL") {
+			if !IsNoCall(g_modem_config_p.mycall[channel]) {
 				switch g_misc_config_p.beacon[j].btype {
 				case BEACON_OBJECT:
 
@@ -625,12 +622,12 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 
 	if g_modem_config_p.chan_medium[bp.sendto_chan] == MEDIUM_IGATE { // ICHANNEL uses chan 0 mycall.
 		// TODO: Maybe it should be allowed to have own.
-		mycall = C.GoString(&g_modem_config_p.mycall[0][0])
+		mycall = g_modem_config_p.mycall[0]
 	} else {
-		mycall = C.GoString(&g_modem_config_p.mycall[bp.sendto_chan][0])
+		mycall = g_modem_config_p.mycall[bp.sendto_chan]
 	}
 
-	if mycall == "" || mycall == "NOCALL" {
+	if IsNoCall(mycall) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("MYCALL not set for beacon to chan %d in config file line %d.\n", bp.sendto_chan, bp.lineno)
 		return

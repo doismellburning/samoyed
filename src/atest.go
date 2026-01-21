@@ -148,7 +148,7 @@ func AtestMain() {
 		my_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
 		my_audio_config.achan[channel].baud = DEFAULT_BAUD
 
-		C.strcpy(&my_audio_config.achan[channel].profiles[0], C.CString("A"))
+		my_audio_config.achan[channel].profiles = "A"
 
 		my_audio_config.achan[channel].num_freq = 1
 		my_audio_config.achan[channel].offset = 0
@@ -337,30 +337,30 @@ o = DCD output control
 		my_audio_config.achan[0].modem_type = MODEM_QPSK
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(""))
+		my_audio_config.achan[0].profiles = ""
 	} else if my_audio_config.achan[0].baud < 7200 {
 		my_audio_config.achan[0].modem_type = MODEM_8PSK
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(""))
+		my_audio_config.achan[0].profiles = ""
 	} else if my_audio_config.achan[0].baud == 0xA15A15 { // Hack for different use of 9600
 		my_audio_config.achan[0].modem_type = MODEM_AIS
 		my_audio_config.achan[0].baud = 9600
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(" ")) // avoid getting default later.
+		my_audio_config.achan[0].profiles = " " // avoid getting default later.
 	} else if my_audio_config.achan[0].baud == 0xEA5EA5 {
 		my_audio_config.achan[0].modem_type = MODEM_EAS
 		my_audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
 		// Will make more precise in afsk demod init.
 		my_audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
 		my_audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString("A"))
+		my_audio_config.achan[0].profiles = "A"
 	} else {
 		my_audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(" ")) // avoid getting default later.
+		my_audio_config.achan[0].profiles = " " // avoid getting default later.
 	}
 
 	if my_audio_config.achan[0].baud < MIN_BAUD || my_audio_config.achan[0].baud > MAX_BAUD {
@@ -377,7 +377,7 @@ o = DCD output control
 		my_audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(" ")) // avoid getting default later.
+		my_audio_config.achan[0].profiles = " " // avoid getting default later.
 	}
 
 	/*
@@ -392,7 +392,7 @@ o = DCD output control
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		my_audio_config.achan[0].baud = 2400
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(""))
+		my_audio_config.achan[0].profiles = ""
 	}
 	if *mfj2400compat {
 		// V.26 compatible with MFJ and maybe others.
@@ -403,13 +403,13 @@ o = DCD output control
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		my_audio_config.achan[0].baud = 2400
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(""))
+		my_audio_config.achan[0].profiles = ""
 	}
 
 	// Needs to be after -B, -j, -J.
 	if *modemProfile != "" {
 		fmt.Printf("Demodulator profile set to \"%s\"\n", *modemProfile)
-		C.strcpy(&my_audio_config.achan[0].profiles[0], C.CString(*modemProfile))
+		my_audio_config.achan[0].profiles = *modemProfile
 	}
 
 	my_audio_config.achan[1] = my_audio_config.achan[0]

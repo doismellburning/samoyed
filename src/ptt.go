@@ -300,10 +300,10 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 
 	if direction > 0 {
 		gpio_num = save_audio_config_p.achan[ch].octrl[ot].out_gpio_num
-		gpio_name = C.GoString(&save_audio_config_p.achan[ch].octrl[ot].out_gpio_name[0])
+		gpio_name = save_audio_config_p.achan[ch].octrl[ot].out_gpio_name
 	} else {
 		gpio_num = save_audio_config_p.achan[ch].ictrl[ot].in_gpio_num
-		gpio_name = C.GoString(&save_audio_config_p.achan[ch].ictrl[ot].in_gpio_name[0])
+		gpio_name = save_audio_config_p.achan[ch].ictrl[ot].in_gpio_name
 	}
 
 	const gpio_export_path = "/sys/class/gpio/export"
@@ -589,9 +589,9 @@ func ptt_init(audio_config_p *audio_s) {
 					ch,
 					otnames[ot],
 					audio_config_p.achan[ch].octrl[ot].ptt_method,
-					C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]),
+					audio_config_p.achan[ch].octrl[ot].ptt_device,
 					audio_config_p.achan[ch].octrl[ot].ptt_line,
-					C.GoString(&audio_config_p.achan[ch].octrl[ot].out_gpio_name[0]),
+					audio_config_p.achan[ch].octrl[ot].out_gpio_name,
 					audio_config_p.achan[ch].octrl[ot].out_gpio_num,
 					audio_config_p.achan[ch].octrl[ot].ptt_lpt_bit,
 					audio_config_p.achan[ch].octrl[ot].ptt_invert)
@@ -617,15 +617,15 @@ func ptt_init(audio_config_p *audio_s) {
 					/* Translate Windows device name into Linux name. */
 					/* COM1 -> /dev/ttyS0, etc. */
 
-					if C.strncasecmp(&audio_config_p.achan[ch].octrl[ot].ptt_device[0], C.CString("COM"), 3) == 0 {
-						var n = C.atoi(&audio_config_p.achan[ch].octrl[ot].ptt_device[3])
+					if strings.HasPrefix(strings.ToUpper(audio_config_p.achan[ch].octrl[ot].ptt_device), "COM") {
+						var n, _ = strconv.Atoi(audio_config_p.achan[ch].octrl[ot].ptt_device[3:])
 						text_color_set(DW_COLOR_INFO)
-						dw_printf("Converted %s device '%s'", C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]), otnames[ot])
+						dw_printf("Converted %s device '%s'", audio_config_p.achan[ch].octrl[ot].ptt_device, otnames[ot])
 						if n < 1 {
 							n = 1
 						}
-						C.strcpy(&audio_config_p.achan[ch].octrl[ot].ptt_device[0], C.CString(fmt.Sprintf("/dev/ttyS%d", n-1)))
-						dw_printf(" to Linux equivalent '%s'\n", C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]))
+						audio_config_p.achan[ch].octrl[ot].ptt_device = fmt.Sprintf("/dev/ttyS%d", n-1)
+						dw_printf(" to Linux equivalent '%s'\n", audio_config_p.achan[ch].octrl[ot].ptt_device)
 					}
 					/* Can't open the same device more than once so we */
 					/* need more logic to look for the case of multiple radio */
@@ -642,7 +642,7 @@ func ptt_init(audio_config_p *audio_s) {
 								k = ot - 1
 							}
 							for ; k >= 0; k-- {
-								if C.strcmp(&audio_config_p.achan[ch].octrl[ot].ptt_device[0], &audio_config_p.achan[j].octrl[k].ptt_device[0]) == 0 {
+								if audio_config_p.achan[ch].octrl[ot].ptt_device == audio_config_p.achan[j].octrl[k].ptt_device {
 									fd = ptt_fd[j][k]
 									same_device_used = true
 								}
@@ -656,7 +656,7 @@ func ptt_init(audio_config_p *audio_s) {
 						/* Was hanging with some USB-serial adapters. */
 						/* https://bugs.launchpad.net/ubuntu/+source/linux/+bug/661321/comments/12 */
 
-						fd, openErr = os.Open(C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]))
+						fd, openErr = os.Open(audio_config_p.achan[ch].octrl[ot].ptt_device)
 					}
 
 					if openErr == nil {
@@ -664,7 +664,7 @@ func ptt_init(audio_config_p *audio_s) {
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("ERROR can't open device %s for channel %d PTT control.\n",
-							C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]), ch)
+							audio_config_p.achan[ch].octrl[ot].ptt_device, ch)
 						dw_printf("%s\n", openErr)
 						/* Don't try using it later if device open failed. */
 
@@ -716,7 +716,7 @@ func ptt_init(audio_config_p *audio_s) {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
-					var rc = gpiod_probe(C.GoString(&chip_name[0]), line_number)
+					var rc = gpiod_probe(chip_name, line_number)
 					if rc < 0 {
 						text_color_set(DW_COLOR_ERROR)
 						//No, people won't notice the error message and be confused.  Just terminate.
@@ -783,7 +783,7 @@ func ptt_init(audio_config_p *audio_s) {
 								k = ot - 1
 							}
 							for ; k >= 0; k-- {
-								if C.strcmp(&audio_config_p.achan[ch].octrl[ot].ptt_device[0], &audio_config_p.achan[j].octrl[k].ptt_device[0]) == 0 {
+								if audio_config_p.achan[ch].octrl[ot].ptt_device == audio_config_p.achan[j].octrl[k].ptt_device {
 									fd = ptt_fd[j][k]
 									same_device_used = true
 								}
@@ -940,7 +940,7 @@ func ptt_init(audio_config_p *audio_s) {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("Using %s GPIO %d for channel %d %s control.\n",
-						C.GoString(&audio_config_p.achan[ch].octrl[ot].ptt_device[0]),
+						audio_config_p.achan[ch].octrl[ot].ptt_device,
 						audio_config_p.achan[ch].octrl[ot].out_gpio_num,
 						ch,
 						otnames[ot])
@@ -1113,7 +1113,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIO {
 
-		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", C.GoString(&save_audio_config_p.achan[channel].octrl[ot].out_gpio_name[0]))
+		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", save_audio_config_p.achan[channel].octrl[ot].out_gpio_name)
 
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0)
 		if err != nil {
@@ -1217,7 +1217,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 
-		if cm108_set_gpio_pin(&save_audio_config_p.achan[channel].octrl[ot].ptt_device[0],
+		if cm108_set_gpio_pin(C.CString(save_audio_config_p.achan[channel].octrl[ot].ptt_device),
 			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt) != 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR:  %s for channel %d has failed.  See User Guide for troubleshooting tips.\n", otnames[ot], channel)
@@ -1250,7 +1250,7 @@ func get_input_real(it C.int, channel C.int) C.int {
 	}
 
 	if save_audio_config_p.achan[channel].ictrl[it].method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", C.GoString(&save_audio_config_p.achan[channel].ictrl[it].in_gpio_name[0]))
+		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", save_audio_config_p.achan[channel].ictrl[it].in_gpio_name)
 
 		get_access_to_gpio(gpio_value_path)
 
@@ -1348,14 +1348,12 @@ func PTTTestMain() {
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
 	// TODO: device should be command line argument.
-	C.strcpy(&my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device[0], C.CString("COM3"))
-	//strlcpy (my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device, "/dev/ttyUSB0", sizeof(my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device));
+	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_device = "COM3"
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 
 	my_audio_config.chan_medium[1] = MEDIUM_RADIO
 	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
-	C.strcpy(&my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device[0], C.CString("COM3"))
-	//strlcpy (my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device, "/dev/ttyUSB0", sizeof(my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device));
+	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_device = "COM3"
 	my_audio_config.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
 
 	/* initialize - both off */

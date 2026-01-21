@@ -190,8 +190,8 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 
 		var ts string // optional time stamp.
 
-		if C.strlen(&save_audio_config_p.timestamp_format[0]) > 0 {
-			var formattedTime, _ = strftime.Format(C.GoString(&save_audio_config_p.timestamp_format[0]), time.Now())
+		if save_audio_config_p.timestamp_format != "" {
+			var formattedTime, _ = strftime.Format(save_audio_config_p.timestamp_format, time.Now())
 			ts = " " + formattedTime // space after channel.
 		}
 

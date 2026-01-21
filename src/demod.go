@@ -109,7 +109,7 @@ func demod_init(pa *audio_s) C.int {
 				var num_letters = 0
 				var just_letters string
 				var have_plus = 0
-				var profileStr = C.GoString(&save_audio_config_p.achan[channel].profiles[0])
+				var profileStr = save_audio_config_p.achan[channel].profiles
 				for i, p := range profileStr {
 					if unicode.IsLower(p) {
 						just_letters += string(unicode.ToUpper(p))
@@ -122,20 +122,20 @@ func demod_init(pa *audio_s) C.int {
 						if i+1 != len(profileStr) {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Channel %d: + option must appear at end of demodulator types \"%s\" \n",
-								channel, C.GoString(&save_audio_config_p.achan[channel].profiles[0]))
+								channel, save_audio_config_p.achan[channel].profiles)
 						}
 					} else if p == '-' {
 						have_plus = -1
 						if i+1 != len(profileStr) {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Channel %d: - option must appear at end of demodulator types \"%s\" \n",
-								channel, C.GoString(&save_audio_config_p.achan[channel].profiles[0]))
+								channel, save_audio_config_p.achan[channel].profiles)
 						}
 
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.\n",
-							channel, C.GoString(&save_audio_config_p.achan[channel].profiles[0]))
+							channel, save_audio_config_p.achan[channel].profiles)
 					}
 				}
 
@@ -206,12 +206,12 @@ func demod_init(pa *audio_s) C.int {
 					have_plus = 0
 				}
 
-				C.strcpy(&save_audio_config_p.achan[channel].profiles[0], C.CString(just_letters))
+				save_audio_config_p.achan[channel].profiles = just_letters
 
-				Assert(C.strlen(&save_audio_config_p.achan[channel].profiles[0]) >= 1)
+				Assert(len(save_audio_config_p.achan[channel].profiles) >= 1)
 
 				if have_plus != 0 {
-					C.strcat(&save_audio_config_p.achan[channel].profiles[0], C.CString("+"))
+					save_audio_config_p.achan[channel].profiles += "+"
 				}
 
 				/* These can be increased later for the multi-frequency case. */
@@ -240,7 +240,7 @@ func demod_init(pa *audio_s) C.int {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.\n", channel)
 
-					save_audio_config_p.achan[channel].profiles[1] = 0
+					save_audio_config_p.achan[channel].profiles = string(save_audio_config_p.achan[channel].profiles[0])
 					num_letters = 1
 				}
 
@@ -255,7 +255,7 @@ func demod_init(pa *audio_s) C.int {
 				dw_printf("Channel %d: %d baud, AFSK %d & %d Hz, %s, %d sample rate",
 					channel, save_audio_config_p.achan[channel].baud,
 					save_audio_config_p.achan[channel].mark_freq, save_audio_config_p.achan[channel].space_freq,
-					C.GoString(&save_audio_config_p.achan[channel].profiles[0]),
+					save_audio_config_p.achan[channel].profiles,
 					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
 				if save_audio_config_p.achan[channel].decimate != 1 {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
@@ -290,7 +290,7 @@ func demod_init(pa *audio_s) C.int {
 					if save_audio_config_p.achan[channel].num_subchan != C.int(num_letters) {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
-							channel, save_audio_config_p.achan[channel].num_subchan, C.GoString(&save_audio_config_p.achan[channel].profiles[0]))
+							channel, save_audio_config_p.achan[channel].num_subchan, save_audio_config_p.achan[channel].profiles)
 					}
 
 					if save_audio_config_p.achan[channel].num_freq != 1 {
@@ -317,7 +317,7 @@ func demod_init(pa *audio_s) C.int {
 							save_audio_config_p.achan[channel].baud,
 							mark,
 							space,
-							profile,
+							C.char(profile),
 							D)
 
 						if have_plus != 0 {
@@ -371,7 +371,7 @@ func demod_init(pa *audio_s) C.int {
 						save_audio_config_p.achan[channel].baud,
 						save_audio_config_p.achan[channel].mark_freq,
 						save_audio_config_p.achan[channel].space_freq,
-						save_audio_config_p.achan[channel].profiles[0],
+						C.char(save_audio_config_p.achan[channel].profiles[0]),
 						D)
 
 					if have_plus != 0 {
@@ -395,7 +395,7 @@ func demod_init(pa *audio_s) C.int {
 					if num_letters != 1 {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-							channel, C.GoString(&save_audio_config_p.achan[channel].profiles[0]))
+							channel, save_audio_config_p.achan[channel].profiles)
 					}
 
 					save_audio_config_p.achan[channel].num_subchan = save_audio_config_p.achan[channel].num_freq
@@ -419,7 +419,7 @@ func demod_init(pa *audio_s) C.int {
 						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 							save_audio_config_p.achan[channel].baud,
 							mark, space,
-							profile,
+							C.char(profile),
 							D)
 
 						if have_plus != 0 {
@@ -466,20 +466,20 @@ func demod_init(pa *audio_s) C.int {
 
 				// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
 
-				if C.strlen(&save_audio_config_p.achan[channel].profiles[0]) == 0 {
+				if save_audio_config_p.achan[channel].profiles == "" {
 					//#if __arm__
 					//	        strlcpy (save_audio_config_p.achan[channel].profiles, "R", sizeof(save_audio_config_p.achan[channel].profiles));
 					//#else
-					C.strcpy(&save_audio_config_p.achan[channel].profiles[0], C.CString("PQRS"))
+					save_audio_config_p.achan[channel].profiles = "PQRS"
 					//#endif
 				}
-				save_audio_config_p.achan[channel].num_subchan = C.int(C.strlen(&save_audio_config_p.achan[channel].profiles[0]))
+				save_audio_config_p.achan[channel].num_subchan = C.int(len(save_audio_config_p.achan[channel].profiles))
 
 				save_audio_config_p.achan[channel].decimate = 1 // think about this later.
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
 					channel, save_audio_config_p.achan[channel].baud,
-					C.GoString(&save_audio_config_p.achan[channel].profiles[0]),
+					save_audio_config_p.achan[channel].profiles,
 					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
 				if save_audio_config_p.achan[channel].decimate != 1 {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
@@ -510,7 +510,7 @@ func demod_init(pa *audio_s) C.int {
 						save_audio_config_p.achan[channel].v26_alternative,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
-						profile,
+						C.char(profile),
 						D)
 
 					//text_color_set(DW_COLOR_DEBUG);
@@ -527,20 +527,20 @@ func demod_init(pa *audio_s) C.int {
 
 				// TODO: See how much CPU this takes on ARM and decide if we should have different defaults.
 
-				if C.strlen(&save_audio_config_p.achan[channel].profiles[0]) == 0 {
+				if save_audio_config_p.achan[channel].profiles == "" {
 					//#if __arm__
 					//	        strlcpy (save_audio_config_p.achan[channel].profiles, "V", sizeof(save_audio_config_p.achan[channel].profiles));
 					//#else
-					C.strcpy(&save_audio_config_p.achan[channel].profiles[0], C.CString("TUVW"))
+					save_audio_config_p.achan[channel].profiles = "TUVW"
 					//#endif
 				}
-				save_audio_config_p.achan[channel].num_subchan = C.int(C.strlen(&save_audio_config_p.achan[channel].profiles[0]))
+				save_audio_config_p.achan[channel].num_subchan = C.int(len(save_audio_config_p.achan[channel].profiles))
 
 				save_audio_config_p.achan[channel].decimate = 1 // think about this later
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
 					channel, save_audio_config_p.achan[channel].baud,
-					C.GoString(&save_audio_config_p.achan[channel].profiles[0]),
+					save_audio_config_p.achan[channel].profiles,
 					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
 				if save_audio_config_p.achan[channel].decimate != 1 {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
@@ -565,7 +565,7 @@ func demod_init(pa *audio_s) C.int {
 						save_audio_config_p.achan[channel].v26_alternative,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
-						profile,
+						C.char(profile),
 						D)
 
 					//text_color_set(DW_COLOR_DEBUG);
@@ -604,7 +604,7 @@ func demod_init(pa *audio_s) C.int {
 						}
 					}
 
-					if C.strcmp(&save_audio_config_p.achan[channel].profiles[0], C.CString("")) == 0 {
+					if save_audio_config_p.achan[channel].profiles == "" {
 
 						/* Apply default if not set earlier. */
 						/* Not sure if it should be on for ARM too. */
@@ -614,7 +614,7 @@ func demod_init(pa *audio_s) C.int {
 						/* We want higher performance to be the default. */
 						/* "MODEM 9600 -" can be used on very slow CPU if necessary. */
 
-						C.strcpy(&save_audio_config_p.achan[channel].profiles[0], C.CString("+"))
+						save_audio_config_p.achan[channel].profiles = "+"
 					}
 
 					/*
@@ -675,7 +675,7 @@ func demod_init(pa *audio_s) C.int {
 						channel,
 						save_audio_config_p.achan[channel].baud,
 						IfThenElse(save_audio_config_p.achan[channel].modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
-						C.GoString(&save_audio_config_p.achan[channel].profiles[0]),
+						save_audio_config_p.achan[channel].profiles,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].upsample)
 					dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
@@ -689,7 +689,7 @@ func demod_init(pa *audio_s) C.int {
 					save_audio_config_p.achan[channel].num_subchan = 1
 					save_audio_config_p.achan[channel].num_slicers = 1
 
-					if strings.Contains(C.GoString(&save_audio_config_p.achan[channel].profiles[0]), "+") {
+					if strings.Contains(save_audio_config_p.achan[channel].profiles, "+") {
 
 						/* I'm not happy about putting this hack here. */
 						/* This belongs in demod_9600_init but it doesn't have access to the audio config. */
@@ -723,7 +723,7 @@ func demod_init(pa *audio_s) C.int {
 						save_audio_config_p.achan[channel].upsample,
 						save_audio_config_p.achan[channel].baud, D)
 
-					if strings.Contains(C.GoString(&save_audio_config_p.achan[channel].profiles[0]), "+") {
+					if strings.Contains(save_audio_config_p.achan[channel].profiles, "+") {
 
 						/* I'm not happy about putting this hack here. */
 						/* should pass in as a parameter rather than adding on later. */

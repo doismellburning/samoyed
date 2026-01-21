@@ -855,8 +855,8 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	for adevice := 0; adevice < MAX_ADEVS; adevice++ {
 
-		C.strcpy(&p_audio_config.adev[adevice].adevice_in[0], C.CString(DEFAULT_ADEVICE))
-		C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], C.CString(DEFAULT_ADEVICE))
+		p_audio_config.adev[adevice].adevice_in = DEFAULT_ADEVICE
+		p_audio_config.adev[adevice].adevice_out = DEFAULT_ADEVICE
 
 		p_audio_config.adev[adevice].defined = 0
 		p_audio_config.adev[adevice].copy_from = -1
@@ -884,7 +884,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		p_audio_config.achan[channel].baud = DEFAULT_BAUD             /* -b option */
 
 		/* None.  Will set default later based on other factors. */
-		// TODO KG C.strcpy(&p_audio_config.achan[channel].profiles[0], C.CString(""))
+		p_audio_config.achan[channel].profiles = ""
 
 		p_audio_config.achan[channel].num_freq = 1
 		p_audio_config.achan[channel].offset = 0
@@ -899,7 +899,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 		for ot := 0; ot < NUM_OCTYPES; ot++ {
 			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
-			C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(""))
+			p_audio_config.achan[channel].octrl[ot].ptt_device = ""
 			p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE
 			p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE
 			p_audio_config.achan[channel].octrl[ot].out_gpio_num = 0
@@ -1166,13 +1166,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				// This might be changed to UDP or STDIN when the device name is examined.
 				p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO
 
-				C.strcpy(&p_audio_config.adev[adevice].adevice_in[0], C.CString(t))
-				C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], C.CString(t))
+				p_audio_config.adev[adevice].adevice_in = t
+				p_audio_config.adev[adevice].adevice_out = t
 
 				t = split("", false)
 				if t != "" {
 					// Different audio devices for receive and transmit.
-					C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], C.CString(t))
+					p_audio_config.adev[adevice].adevice_out = t
 				}
 			}
 		} else if strings.EqualFold(t, "PAIDEVICE") {
@@ -1221,7 +1221,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			/* First channel of device is valid. */
 			p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO
 
-			C.strcpy(&p_audio_config.adev[adevice].adevice_in[0], C.CString(t))
+			p_audio_config.adev[adevice].adevice_in = t
 		} else if strings.EqualFold(t, "PAODEVICE") {
 			adevice = 0
 			if unicode.IsDigit(rune(t[9])) {
@@ -1247,7 +1247,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			/* First channel of device is valid. */
 			p_audio_config.chan_medium[ADEVFIRSTCHAN(adevice)] = MEDIUM_RADIO
 
-			C.strcpy(&p_audio_config.adev[adevice].adevice_out[0], C.CString(t))
+			p_audio_config.adev[adevice].adevice_out = t
 		} else if strings.EqualFold(t, "ARATE") {
 
 			/*
@@ -1415,7 +1415,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing network TNC address for NCHANNEL command.\n", line)
 				continue
 			}
-			C.strcpy(&p_audio_config.nettnc_addr[nchan][0], C.CString(t))
+			p_audio_config.nettnc_addr[nchan] = t
 
 			t = split("", false)
 			if t == "" {
@@ -1456,12 +1456,8 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				for c := 0; c < MAX_TOTAL_CHANS; c++ {
 
-					if c == channel ||
-						C.strlen(&p_audio_config.mycall[c][0]) == 0 ||
-						C.strcasecmp(&p_audio_config.mycall[c][0], C.CString("NOCALL")) == 0 ||
-						C.strcasecmp(&p_audio_config.mycall[c][0], C.CString("N0CALL")) == 0 {
-
-						C.strcpy(&p_audio_config.mycall[c][0], C.CString(t))
+					if c == channel || IsNoCall(p_audio_config.mycall[c]) {
+						p_audio_config.mycall[c] = t
 					}
 				}
 			}
@@ -1641,9 +1637,9 @@ func config_init(fname string, p_audio_config *audio_s,
 							dw_printf("Line %d: Demodulator type can only contain letters and + character.\n", line)
 						}
 
-						C.strcpy(&p_audio_config.achan[channel].profiles[0], C.CString(t))
+						p_audio_config.achan[channel].profiles = t
 						t = split("", false)
-						if C.strlen(&p_audio_config.achan[channel].profiles[0]) > 1 && t != "" {
+						if len(p_audio_config.achan[channel].profiles) > 1 && t != "" {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Can't combine multiple demodulator types and multiple frequencies.\n", line)
 							continue
@@ -1735,7 +1731,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					} else if alllettersorpm(t) { /* profile of letter(s) + - */
 
 						// Will be validated later.
-						C.strcpy(&p_audio_config.achan[channel].profiles[0], C.CString(t))
+						p_audio_config.achan[channel].profiles = t
 					} else if t[0] == '/' { /* /div */
 						var n, _ = strconv.Atoi(t[1:])
 
@@ -1965,13 +1961,11 @@ func config_init(fname string, p_audio_config *audio_s,
 				// While we are here, also allow only the number as used by the gpiod utilities.
 
 				if t[0] == '/' { // Looks like device path.  Use as given.
-					C.strcpy(&p_audio_config.achan[channel].octrl[ot].out_gpio_name[0], C.CString(t))
+					p_audio_config.achan[channel].octrl[ot].out_gpio_name = t
 				} else if unicode.IsDigit(rune(t[0])) { // or if digit, prepend "/dev/gpiochip"
-					C.strcpy(&p_audio_config.achan[channel].octrl[ot].out_gpio_name[0], C.CString("/dev/gpiochip"))
-					C.strcat(&p_audio_config.achan[channel].octrl[ot].out_gpio_name[0], C.CString(t))
+					p_audio_config.achan[channel].octrl[ot].out_gpio_name = "/dev/gpiochip" + t
 				} else { // otherwise, prepend "/dev/" to the name
-					C.strcpy(&p_audio_config.achan[channel].octrl[ot].out_gpio_name[0], C.CString("/dev/"))
-					C.strcat(&p_audio_config.achan[channel].octrl[ot].out_gpio_name[0], C.CString(t))
+					p_audio_config.achan[channel].octrl[ot].out_gpio_name = "/dev/" + t
 				}
 
 				t = split("", false)
@@ -2061,7 +2055,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("Config file line %d: Missing port for hamlib.\n", line)
 					continue
 				}
-				C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(t))
+				p_audio_config.achan[channel].octrl[ot].ptt_device = t
 
 				// Optional serial port rate for CAT control PTT.
 
@@ -2120,16 +2114,16 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_audio_config.achan[channel].octrl[ot].out_gpio_num = 3 // All known designs use GPIO 3.
 				// User can override for special cases.
 				p_audio_config.achan[channel].octrl[ot].ptt_invert = 0 // High for transmit.
-				C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(""))
+				p_audio_config.achan[channel].octrl[ot].ptt_device = ""
 
 				// Try to find PTT device for audio output device.
 				// Simplifiying assumption is that we have one radio per USB Audio Adapter.
 				// Failure at this point is not an error.
 				// See if config file sets it explicitly before complaining.
 
-				cm108_find_ptt(&p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out[0],
-					&p_audio_config.achan[channel].octrl[ot].ptt_device[0],
-					C.int(len(p_audio_config.achan[channel].octrl[ot].ptt_device)))
+				var _cm108_ptt [100]C.char
+				cm108_find_ptt(C.CString(p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out), &_cm108_ptt[0], C.int(len(_cm108_ptt)))
+				p_audio_config.achan[channel].octrl[ot].ptt_device = C.GoString(&_cm108_ptt[0])
 
 				for {
 					t = split("", false)
@@ -2145,7 +2139,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						p_audio_config.achan[channel].octrl[ot].out_gpio_num = C.int(gpio)
 						p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
 					} else if t[0] == '/' {
-						C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(t))
+						p_audio_config.achan[channel].octrl[ot].ptt_device = t
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1.\n", line, t)
@@ -2158,10 +2152,10 @@ func config_init(fname string, p_audio_config *audio_s,
 						p_audio_config.achan[channel].octrl[ot].out_gpio_num)
 					continue
 				}
-				if C.strlen(&p_audio_config.achan[channel].octrl[ot].ptt_device[0]) == 0 {
+				if p_audio_config.achan[channel].octrl[ot].ptt_device == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", line,
-						C.GoString(&p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out[0]))
+						p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out)
 					/* TODO KG
 					#if __WIN32__
 						        dw_printf ("You must explicitly mention a HID path.\n");
@@ -2188,7 +2182,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				/* serial port case. */
 
-				C.strcpy(&p_audio_config.achan[channel].octrl[ot].ptt_device[0], C.CString(t))
+				p_audio_config.achan[channel].octrl[ot].ptt_device = t
 
 				t = split("", false)
 				if t == "" {
@@ -5466,19 +5460,13 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if p_digi_config.enabled[i][j] != 0 {
 
-				if C.GoString(&p_audio_config.mycall[i][0]) == "" ||
-					C.GoString(&p_audio_config.mycall[i][0]) == "NOCALL" ||
-					C.GoString(&p_audio_config.mycall[i][0]) == "N0CALL" {
-
+				if IsNoCall(p_audio_config.mycall[i]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
 					p_digi_config.enabled[i][j] = 0
 				}
 
-				if C.GoString(&p_audio_config.mycall[j][0]) == "" ||
-					C.GoString(&p_audio_config.mycall[j][0]) == "NOCALL" ||
-					C.GoString(&p_audio_config.mycall[j][0]) == "N0CALL" {
-
+				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
 					p_digi_config.enabled[i][j] = 0
@@ -5503,19 +5491,13 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && p_cdigi_config.enabled[i][j] != 0 {
 
-				if C.GoString(&p_audio_config.mycall[i][0]) == "" ||
-					C.GoString(&p_audio_config.mycall[i][0]) == "NOCALL" ||
-					C.GoString(&p_audio_config.mycall[i][0]) == "N0CALL" {
-
+				if IsNoCall(p_audio_config.mycall[i]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
 					p_cdigi_config.enabled[i][j] = 0
 				}
 
-				if C.GoString(&p_audio_config.mycall[j][0]) == "" ||
-					C.GoString(&p_audio_config.mycall[j][0]) == "NOCALL" ||
-					C.GoString(&p_audio_config.mycall[j][0]) == "N0CALL" {
-
+				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
 					p_cdigi_config.enabled[i][j] = 0
@@ -5540,18 +5522,14 @@ func config_init(fname string, p_audio_config *audio_s,
 		if C.strlen(&p_igate_config.t2_login[0]) > 0 &&
 			(p_audio_config.chan_medium[i] == MEDIUM_RADIO || p_audio_config.chan_medium[i] == MEDIUM_NETTNC) {
 
-			if C.GoString(&p_audio_config.mycall[i][0]) == "NOCALL" || C.GoString(&p_audio_config.mycall[i][0]) == "N0CALL" {
+			if IsNoCall(p_audio_config.mycall[i]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for receive channel %d before Rx IGate is allowed.\n", i)
 				C.strcpy(&p_igate_config.t2_login[0], C.CString(""))
 			}
 			// Currently we can have only one transmit channel.
 			// This might be generalized someday to allow more.
-			if p_igate_config.tx_chan >= 0 &&
-				(C.GoString(&p_audio_config.mycall[p_igate_config.tx_chan][0]) == "" ||
-					C.GoString(&p_audio_config.mycall[p_igate_config.tx_chan][0]) == "NOCALL" ||
-					C.GoString(&p_audio_config.mycall[p_igate_config.tx_chan][0]) == "N0CALL") {
-
+			if p_igate_config.tx_chan >= 0 && IsNoCall(p_audio_config.mycall[p_igate_config.tx_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for transmit channel %d before Tx IGate is allowed.\n", i)
 				p_igate_config.tx_chan = -1
@@ -5942,19 +5920,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_IGATE { // Prevent subscript out of bounds.
 			// Will be using call from chan 0 later.
-			if C.GoString(&p_audio_config.mycall[0][0]) == "" ||
-				C.GoString(&p_audio_config.mycall[0][0]) == "NOCALL" ||
-				C.GoString(&p_audio_config.mycall[0][0]) == "N0CALL" {
-
+			if IsNoCall(p_audio_config.mycall[0]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0)
 				return errors.New("TODO")
 			}
 		} else {
-			if C.GoString(&p_audio_config.mycall[b.sendto_chan][0]) == "" ||
-				C.GoString(&p_audio_config.mycall[b.sendto_chan][0]) == "NOCALL" ||
-				C.GoString(&p_audio_config.mycall[b.sendto_chan][0]) == "N0CALL" {
-
+			if IsNoCall(p_audio_config.mycall[b.sendto_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan)
 				return errors.New("TODO")
@@ -5965,4 +5937,6 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	return nil
 }
 
-/* end config.c */
+func IsNoCall(callsign string) bool {
+	return callsign == "" || strings.EqualFold(callsign, "NOCALL") || strings.EqualFold(callsign, "N0CALL")
+}

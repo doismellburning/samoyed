@@ -133,8 +133,8 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 	for to_chan := range C.int(MAX_RADIO_CHANS) {
 		if save_cdigi_config_p.enabled[from_chan][to_chan] > 0 {
 			if to_chan == from_chan {
-				var result = cdigipeat_match(from_chan, pp, &save_audio_config_p.mycall[from_chan][0],
-					&save_audio_config_p.mycall[to_chan][0],
+				var result = cdigipeat_match(from_chan, pp, C.CString(save_audio_config_p.mycall[from_chan]),
+					C.CString(save_audio_config_p.mycall[to_chan]),
 					save_cdigi_config_p.has_alias[from_chan][to_chan],
 					&(save_cdigi_config_p.alias[from_chan][to_chan]), to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
@@ -153,8 +153,8 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 	for to_chan := range C.int(MAX_RADIO_CHANS) {
 		if save_cdigi_config_p.enabled[from_chan][to_chan] > 0 {
 			if to_chan != from_chan {
-				var result = cdigipeat_match(from_chan, pp, &save_audio_config_p.mycall[from_chan][0],
-					&save_audio_config_p.mycall[to_chan][0],
+				var result = cdigipeat_match(from_chan, pp, C.CString(save_audio_config_p.mycall[from_chan]),
+					C.CString(save_audio_config_p.mycall[to_chan]),
 					save_cdigi_config_p.has_alias[from_chan][to_chan],
 					&(save_cdigi_config_p.alias[from_chan][to_chan]), to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
