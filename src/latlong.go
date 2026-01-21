@@ -10,16 +10,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <ctype.h>
-// #include <time.h>
-// #include <math.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"errors"
 	"fmt"
@@ -65,19 +55,22 @@ const G_UNKNOWN = (-999999)
  *----------------------------------------------------------------*/
 
 func latitude_to_str(dlat float64, ambiguity int) string {
-
 	if dlat < -90. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Latitude is less than -90.  Changing to -90.\n")
+
 		dlat = -90.
 	}
+
 	if dlat > 90. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
+
 		dlat = 90.
 	}
 
 	var hemi rune /* Hemisphere: N or S */
+
 	if dlat < 0 {
 		dlat = (-dlat)
 		hemi = 'S'
@@ -85,7 +78,8 @@ func latitude_to_str(dlat float64, ambiguity int) string {
 		hemi = 'N'
 	}
 
-	var ideg = int(dlat)                    /* whole number of degrees. */
+	var ideg = int(dlat) /* whole number of degrees. */
+
 	var dmin = (dlat - float64(ideg)) * 60. /* Minutes after removing degrees. */
 
 	// dmin is known to be in range of 0 <= dmin < 60.
@@ -142,19 +136,22 @@ func latitude_to_str(dlat float64, ambiguity int) string {
  *----------------------------------------------------------------*/
 
 func longitude_to_str(dlong float64, ambiguity int) string {
-
 	if dlong < -180. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Longitude is less than -180.  Changing to -180.\n")
+
 		dlong = -180.
 	}
+
 	if dlong > 180. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Longitude is greater than 180.  Changing to 180.\n")
+
 		dlong = 180.
 	}
 
 	var hemi rune /* Hemisphere: E or W */
+
 	if dlong < 0 {
 		dlong = (-dlong)
 		hemi = 'W'
@@ -162,7 +159,8 @@ func longitude_to_str(dlong float64, ambiguity int) string {
 		hemi = 'E'
 	}
 
-	var ideg = int(dlong)                    /* whole number of degrees. */
+	var ideg = int(dlong) /* whole number of degrees. */
+
 	var dmin = (dlong - float64(ideg)) * 60. /* Minutes after removing degrees. */
 
 	var smin = fmt.Sprintf("%05.2f", dmin)
@@ -213,27 +211,32 @@ func longitude_to_str(dlong float64, ambiguity int) string {
  *----------------------------------------------------------------*/
 
 func latitude_to_comp_str(dlat float64) string {
-
 	if dlat < -90. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Latitude is less than -90.  Changing to -90.\n")
+
 		dlat = -90.
 	}
+
 	if dlat > 90. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
+
 		dlat = 90.
 	}
 
 	var y = int(math.Round(380926. * (90. - dlat)))
 
 	var y0 = y / (91 * 91 * 91)
+
 	y -= y0 * (91 * 91 * 91)
 
 	var y1 = y / (91 * 91)
+
 	y -= y1 * (91 * 91)
 
 	var y2 = y / (91)
+
 	y -= y2 * (91)
 
 	var y3 = y
@@ -255,27 +258,32 @@ func latitude_to_comp_str(dlat float64) string {
  *----------------------------------------------------------------*/
 
 func longitude_to_comp_str(dlong float64) string {
-
 	if dlong < -180. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Longitude is less than -180.  Changing to -180.\n")
+
 		dlong = -180.
 	}
+
 	if dlong > 180. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Longitude is greater than 180.  Changing to 180.\n")
+
 		dlong = 180.
 	}
 
 	var x = int(math.Round(190463. * (180. + dlong)))
 
 	var x0 = x / (91 * 91 * 91)
+
 	x -= x0 * (91 * 91 * 91)
 
 	var x1 = x / (91 * 91)
+
 	x -= x1 * (91 * 91)
 
 	var x2 = x / (91)
+
 	x -= x2 * (91)
 
 	var x3 = x
@@ -297,7 +305,6 @@ func longitude_to_comp_str(dlong float64) string {
  *----------------------------------------------------------------*/
 
 func latitude_to_nmea(dlat float64) (string, string) {
-
 	if dlat == G_UNKNOWN {
 		return "", ""
 	}
@@ -305,15 +312,19 @@ func latitude_to_nmea(dlat float64) (string, string) {
 	if dlat < -90. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Latitude is less than -90.  Changing to -90.\n")
+
 		dlat = -90.
 	}
+
 	if dlat > 90. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
+
 		dlat = 90.
 	}
 
 	var hemi string
+
 	if dlat < 0 {
 		dlat = (-dlat)
 		hemi = "S"
@@ -321,7 +332,8 @@ func latitude_to_nmea(dlat float64) (string, string) {
 		hemi = "N"
 	}
 
-	var ideg = int(dlat)                    /* whole number of degrees. */
+	var ideg = int(dlat) /* whole number of degrees. */
+
 	var dmin = (dlat - float64(ideg)) * 60. /* Minutes after removing degrees. */
 
 	var smin = fmt.Sprintf("%07.4f", dmin)
@@ -334,7 +346,6 @@ func latitude_to_nmea(dlat float64) (string, string) {
 	var slat = fmt.Sprintf("%02d%s", ideg, smin)
 
 	return slat, hemi
-
 }
 
 /*------------------------------------------------------------------
@@ -351,7 +362,6 @@ func latitude_to_nmea(dlat float64) (string, string) {
  *----------------------------------------------------------------*/
 
 func longitude_to_nmea(dlong float64) (string, string) {
-
 	if dlong == G_UNKNOWN {
 		return "", ""
 	}
@@ -359,15 +369,19 @@ func longitude_to_nmea(dlong float64) (string, string) {
 	if dlong < -180. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("longitude is less than -180.  Changing to -180.\n")
+
 		dlong = -180.
 	}
+
 	if dlong > 180. {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("longitude is greater than 180.  Changing to 180.\n")
+
 		dlong = 180.
 	}
 
 	var hemi string
+
 	if dlong < 0 {
 		dlong = (-dlong)
 		hemi = "W"
@@ -375,7 +389,8 @@ func longitude_to_nmea(dlong float64) (string, string) {
 		hemi = "E"
 	}
 
-	var ideg = int(dlong)                    /* whole number of degrees. */
+	var ideg = int(dlong) /* whole number of degrees. */
+
 	var dmin = (dlong - float64(ideg)) * 60. /* Minutes after removing degrees. */
 
 	var smin = fmt.Sprintf("%07.4f", dmin)
@@ -416,10 +431,10 @@ func longitude_to_nmea(dlong float64) (string, string) {
  *------------------------------------------------------------------*/
 
 func latitude_from_nmea(pstr string, phemi byte) float64 {
-
 	if len(pstr) < 5 {
 		return (G_UNKNOWN)
 	}
+
 	if !unicode.IsDigit(rune(pstr[0])) {
 		return (G_UNKNOWN)
 	}
@@ -428,8 +443,11 @@ func latitude_from_nmea(pstr string, phemi byte) float64 {
 		return (G_UNKNOWN)
 	}
 
-	var lat = float64(pstr[0]-'0')*10 + float64(pstr[1]-'0')
-	var mins, _ = strconv.ParseFloat(pstr[2:], 64)
+	var (
+		lat     = float64(pstr[0]-'0')*10 + float64(pstr[1]-'0')
+		mins, _ = strconv.ParseFloat(pstr[2:], 64)
+	)
+
 	lat += mins / 60.0
 
 	if lat < 0 || lat > 90 {
@@ -482,10 +500,10 @@ func latitude_from_nmea(pstr string, phemi byte) float64 {
  *------------------------------------------------------------------*/
 
 func longitude_from_nmea(pstr string, phemi byte) float64 {
-
 	if len(pstr) < 6 {
 		return (G_UNKNOWN)
 	}
+
 	if !unicode.IsDigit(rune(pstr[0])) {
 		return (G_UNKNOWN)
 	}
@@ -494,8 +512,11 @@ func longitude_from_nmea(pstr string, phemi byte) float64 {
 		return (G_UNKNOWN)
 	}
 
-	var lon = float64(pstr[0]-'0')*100 + float64(pstr[1]-'0')*10 + float64(pstr[2]-'0')
-	var mins, _ = strconv.ParseFloat(pstr[3:], 64)
+	var (
+		lon     = float64(pstr[0]-'0')*100 + float64(pstr[1]-'0')*10 + float64(pstr[2]-'0')
+		mins, _ = strconv.ParseFloat(pstr[3:], 64)
+	)
+
 	lon += mins / 60.0
 
 	if lon < 0 || lon > 180 {
@@ -533,7 +554,6 @@ func longitude_from_nmea(pstr string, phemi byte) float64 {
 const R_KM = 6371
 
 func ll_distance_km(lat1, lon1, lat2, lon2 float64) float64 {
-
 	lat1 *= math.Pi / 180
 	lon1 *= math.Pi / 180
 	lat2 *= math.Pi / 180
@@ -560,7 +580,6 @@ func ll_distance_km(lat1, lon1, lat2, lon2 float64) float64 {
  *------------------------------------------------------------------*/
 
 func ll_bearing_deg(lat1, lon1, lat2, lon2 float64) float64 {
-
 	lat1 *= math.Pi / 180
 	lon1 *= math.Pi / 180
 	lat2 *= math.Pi / 180
@@ -595,7 +614,6 @@ func ll_bearing_deg(lat1, lon1, lat2, lon2 float64) float64 {
  *------------------------------------------------------------------*/
 
 func ll_dest_lat(lat1, _, dist, bearing float64) float64 {
-
 	lat1 *= math.Pi / 180.0 // Everything to radians.
 	bearing *= math.Pi / 180.0
 
@@ -607,7 +625,6 @@ func ll_dest_lat(lat1, _, dist, bearing float64) float64 {
 }
 
 func ll_dest_lon(lat1, lon1, dist, bearing float64) float64 {
-
 	lat1 *= math.Pi / 180 // Everything to radians.
 	lon1 *= math.Pi / 180
 	bearing *= math.Pi / 180
@@ -675,26 +692,30 @@ var MHPairs = []*mhPair{
 } // Even so we can get center of square.
 
 func ll_from_grid_square(maidenhead string) (float64, float64, error) {
-
 	var np = len(maidenhead) / 2 /* Number of pairs of characters. */
 
 	if len(maidenhead)%2 != 0 || np < MH_MIN_PAIR || np > MH_MAX_PAIR {
 		text_color_set(DW_COLOR_ERROR)
+
 		var s = fmt.Sprintf("Maidenhead locator \"%s\" must from 1 to %d pairs of characters.\n", maidenhead, MH_MAX_PAIR)
 		dw_printf("%s", s)
+
 		return 0, 0, errors.New(s)
 	}
 
 	var mh = strings.ToUpper(maidenhead)
 
 	var ilat, ilon int
+
 	for n := 0; n < np; n++ {
 		if mh[2*n] < MHPairs[n].min_ch || mh[2*n] > MHPairs[n].max_ch ||
 			mh[2*n+1] < MHPairs[n].min_ch || mh[2*n+1] > MHPairs[n].max_ch {
 			text_color_set(DW_COLOR_ERROR)
+
 			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
 				MHPairs[n].position, maidenhead, MHPairs[n].min_ch, MHPairs[n].max_ch)
 			dw_printf("%s", s)
+
 			return 0, 0, errors.New(s)
 		}
 
@@ -707,8 +728,10 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 		}
 	}
 
-	var dlat = float64(ilat)/MH_UNITS*180. - 90.
-	var dlon = float64(ilon)/MH_UNITS*360. - 180.
+	var (
+		dlat = float64(ilat)/MH_UNITS*180. - 90.
+		dlon = float64(ilon)/MH_UNITS*360. - 180.
+	)
 
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf("DEBUG: Maidenhead conversion \"%s\" -> %.6f %.6f\n", maidenhead, *dlat, *dlon);
