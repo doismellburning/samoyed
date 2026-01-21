@@ -1893,24 +1893,24 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			var ot C.int
-			var otname [8]C.char
+			var otname string
 
 			if strings.EqualFold(t, "PTT") {
 				ot = OCTYPE_PTT
-				C.strcpy(&otname[0], C.CString("PTT"))
+				otname = "PTT"
 			} else if strings.EqualFold(t, "DCD") {
 				ot = OCTYPE_DCD
-				C.strcpy(&otname[0], C.CString("DCD"))
+				otname = "DCD"
 			} else {
 				ot = OCTYPE_CON
-				C.strcpy(&otname[0], C.CString("CON"))
+				otname = "CON"
 			}
 
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Missing output control device for %s command.\n",
-					line, C.GoString(&otname[0]))
+					line, otname)
 				continue
 			}
 
@@ -1927,7 +1927,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, otname)
 					continue
 				}
 
@@ -1945,14 +1945,14 @@ func config_init(fname string, p_audio_config *audio_s,
 				/*
 					#if __WIN32__
 						      text_color_set(DW_COLOR_ERROR);
-						      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, C.GoString(&otname[0]));
+						      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", line, otname);
 					#else
 				*/
 				// #if defined(USE_GPIOD)
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO chip name for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing GPIO chip name for %s.\n", line, otname)
 					dw_printf("Use the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines.\n")
 					continue
 				}
@@ -1977,7 +1977,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, otname)
 					continue
 				}
 
@@ -2007,7 +2007,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing LPT bit number for %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: Missing LPT bit number for %s.\n", line, otname)
 					continue
 				}
 
@@ -2023,7 +2023,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				/*
 					#else
 						      text_color_set(DW_COLOR_ERROR);
-						      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, C.GoString(&otname[0]));
+						      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", line, otname);
 					#endif
 				*/
 			} else if strings.EqualFold(t, "RIG") {
@@ -2093,7 +2093,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				   #else
 				*/
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", line, C.GoString(&otname[0]))
+				dw_printf("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", line, otname)
 				dw_printf("You must rebuild direwolf with hamlib support.\n")
 				dw_printf("See User Guide for details.\n")
 				// #endif
@@ -2113,7 +2113,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					// Let's keep it simple with just PTT for the first stab at this.
 
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: PTT CM108 option is only valid for PTT, not %s.\n", line, C.GoString(&otname[0]))
+					dw_printf("Config file line %d: PTT CM108 option is only valid for PTT, not %s.\n", line, otname)
 					continue
 				}
 
@@ -2177,7 +2177,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				/* TODO KG
 				#else
 					      text_color_set(DW_COLOR_ERROR);
-					      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", line, C.GoString(&otname[0]));
+					      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", line, otname);
 					      dw_printf ("You must rebuild direwolf with CM108 Audio Adapter GPIO PTT support.\n");
 					      dw_printf ("See Interface Guide for details.\n");
 					      rtfm();
@@ -2194,7 +2194,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing RTS or DTR after %s device name.\n",
-						line, C.GoString(&otname[0]))
+						line, otname)
 					continue
 				}
 
@@ -2213,7 +2213,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
-						line, C.GoString(&otname[0]))
+						line, otname)
 					continue
 				}
 
