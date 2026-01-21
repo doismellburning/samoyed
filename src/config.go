@@ -107,8 +107,7 @@ type beacon_s struct {
 
 	next C.time_t /* Unix time to transmit next one. */
 
-	source *C.char /* NULL or explicit AX.25 source address to use */
-	/* instead of the mycall value for the channel. */
+	source string /* Empty or explicit AX.25 source address to use instead of the mycall value for the channel. */
 
 	dest *C.char /* NULL or explicit AX.25 destination to use */
 	/* instead of the software version such as APDW11. */
@@ -5618,7 +5617,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	b.freq = G_UNKNOWN
 	b.tone = G_UNKNOWN
 	b.offset = G_UNKNOWN
-	b.source = nil
+	b.source = ""
 	b.dest = nil
 
 	var zone string
@@ -5725,7 +5724,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = C.int(n)
 			}
 		} else if strings.EqualFold(keyword, "SOURCE") {
-			b.source = C.CString(strings.ToUpper(value)) /* silently force upper case. */
+			b.source = strings.ToUpper(value) /* silently force upper case. */
 			/* TODO KG Cap length
 			if C.strlen(b.source) > 9 {
 				b.source[9] = 0

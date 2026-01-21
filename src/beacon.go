@@ -643,8 +643,8 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	 */
 
 	var beacon_text string
-	if bp.source != nil {
-		beacon_text = C.GoString(bp.source)
+	if bp.source != "" {
+		beacon_text = bp.source
 	} else {
 		beacon_text = mycall
 	}
