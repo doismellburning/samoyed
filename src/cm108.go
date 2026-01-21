@@ -181,26 +181,26 @@ const MAXX_HIDRAW_NAME_LEN = 150
  */
 
 type thing_s struct {
-	vid           C.int      // vendor id, displayed as four hexadecimal digits.
-	pid           C.int      // product id, displayed as four hexadecimal digits.
-	card_number   [8]C.char  // "Card" Number.  e.g.  2 for plughw:2,0
-	card_name     [32]C.char // Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
-	product       [32]C.char // product name (e.g. manufacturer, model)
-	devnode_sound [22]C.char // e.g. /dev/snd/pcmC0D0p
-	plughw        [72]C.char // Above in more familiar format e.g. plughw:0,0
+	vid           int    // vendor id, displayed as four hexadecimal digits.
+	pid           int    // product id, displayed as four hexadecimal digits.
+	card_number   string // "Card" Number.  e.g.  2 for plughw:2,0
+	card_name     string // Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
+	product       string // product name (e.g. manufacturer, model)
+	devnode_sound string // e.g. /dev/snd/pcmC0D0p
+	plughw        string // Above in more familiar format e.g. plughw:0,0
 	// Oversized to silence a compiler warning.
-	plughw2        [72]C.char  // With name rather than number.
-	devpath        [128]C.char // Kernel dev path.  Does not include /sys mount point.
-	devnode_hidraw [MAXX_HIDRAW_NAME_LEN]C.char
+	plughw2        string // With name rather than number.
+	devpath        string // Kernel dev path.  Does not include /sys mount point.
+	devnode_hidraw string
 	// e.g. /dev/hidraw3  -  for Linux - was length 17
 	// The Windows path for a HID looks like this, lengths up to 95 seen.
 	// \\?\hid#vid_0d8c&pid_000c&mi_03#8&164d11c9&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
-	devnode_usb [25]C.char // e.g. /dev/bus/usb/001/012
+	devnode_usb string // e.g. /dev/bus/usb/001/012
 	// This is what we use to match up audio and HID.
 }
 
 // Test for supported devices.
-func GOOD_DEVICE(v, p C.int) bool {
+func GOOD_DEVICE(v, p int) bool {
 	return (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) || p == CMEDIA_PID_CM108AH || p == CMEDIA_PID_CM108AH_alt || p == CMEDIA_PID_CM108B || p == CMEDIA_PID_CM119A || p == CMEDIA_PID_CM119B)) ||
 		(v == SSS_VID && (p == SSS_PID1 || p == SSS_PID2 || p == SSS_PID3)) ||
 		(v == AIOC_VID && p == AIOC_PID)
@@ -225,7 +225,7 @@ const MAXX_THINGS = 60
  *
  *------------------------------------------------------------------*/
 
-func cm108_inventory(max_things C.int) ([]*thing_s, error) {
+func cm108_inventory(max_things int) ([]*thing_s, error) {
 
 	var things []*thing_s
 
@@ -288,17 +288,17 @@ func cm108_inventory(max_things C.int) ([]*thing_s, error) {
 					pid = C.int(C.strtol(p, nil, 16))
 				}
 
-				if C.int(len(things)) < max_things {
+				if len(things) < max_things {
 					var thing = new(thing_s)
 
-					thing.vid = vid
-					thing.pid = pid
-					C.strcpy(&thing.card_name[0], pattrs_id)
-					C.strcpy(&thing.card_number[0], pattrs_number)
-					C.strcpy(&thing.product[0], C.udev_device_get_sysattr_value(parentdev, C.CString("product")))
-					C.strcpy(&thing.devnode_sound[0], devnode)
-					C.strcpy(&thing.devnode_usb[0], C.udev_device_get_devnode(parentdev))
-					C.strcpy(&thing.devpath[0], &card_devpath[0])
+					thing.vid = int(vid)
+					thing.pid = int(pid)
+					thing.card_name = C.GoString(pattrs_id)
+					thing.card_number = C.GoString(pattrs_number)
+					thing.product = C.GoString(C.udev_device_get_sysattr_value(parentdev, C.CString("product")))
+					thing.devnode_sound = C.GoString(devnode)
+					thing.devnode_usb = C.GoString(C.udev_device_get_devnode(parentdev))
+					thing.devpath = C.GoString(&card_devpath[0])
 
 					things = append(things, thing)
 				}
@@ -348,22 +348,22 @@ func cm108_inventory(max_things C.int) ([]*thing_s, error) {
 				// Add hidraw name to any matching existing.
 				var matched = false
 				for _, thing := range things {
-					if thing.vid == vid && thing.pid == pid && usb != nil && C.strcmp(&thing.devnode_usb[0], usb) == 0 {
+					if C.int(thing.vid) == vid && C.int(thing.pid) == pid && usb != nil && thing.devnode_usb == C.GoString(usb) {
 						matched = true
-						C.strcpy(&thing.devnode_hidraw[0], devnode)
+						thing.devnode_hidraw = C.GoString(devnode)
 					}
 				}
 
 				// If it did not match to existing, add new entry.
-				if !matched && C.int(len(things)) < max_things {
+				if !matched && len(things) < max_things {
 					var thing = new(thing_s)
 
-					thing.vid = vid
-					thing.pid = pid
-					C.strcpy(&thing.product[0], C.udev_device_get_sysattr_value(parentdev, C.CString("product")))
-					C.strcpy(&thing.devnode_hidraw[0], devnode)
-					C.strcpy(&thing.devnode_usb[0], usb)
-					C.strcpy(&thing.devpath[0], C.udev_device_get_devpath(dev))
+					thing.vid = int(vid)
+					thing.pid = int(pid)
+					thing.product = C.GoString(C.udev_device_get_sysattr_value(parentdev, C.CString("product")))
+					thing.devnode_hidraw = C.GoString(devnode)
+					thing.devnode_usb = C.GoString(usb)
+					thing.devpath = C.GoString(C.udev_device_get_devpath(dev))
 
 					things = append(things, thing)
 				}
@@ -384,14 +384,14 @@ func cm108_inventory(max_things C.int) ([]*thing_s, error) {
 	var pcm_re = regexp.MustCompile("pcmC([0-9]+)D([0-9]+)[cp]")
 
 	for _, thing := range things {
-		var matches = pcm_re.FindStringSubmatch(C.GoString(&thing.devnode_sound[0]))
+		var matches = pcm_re.FindStringSubmatch(thing.devnode_sound)
 
 		if matches != nil {
 			var c = matches[1]
 			var d = matches[2]
 
-			C.strcpy(&thing.plughw[0], C.CString(fmt.Sprintf("plughw:%s,%s", c, d)))
-			C.strcpy(&thing.plughw2[0], C.CString(fmt.Sprintf("plughw:%s,%s", C.GoString(&thing.card_name[0]), d)))
+			thing.plughw = fmt.Sprintf("plughw:%s,%s", c, d)
+			thing.plughw2 = fmt.Sprintf("plughw:%s,%s", thing.card_name, d)
 		}
 	}
 
@@ -414,27 +414,23 @@ func cm108_inventory(max_things C.int) ([]*thing_s, error) {
  *					plughw:2,3
  *				  In our case we just need to extract the card number or name.
  *
- *		ptt_device_size	- Size of result area to avoid buffer overflow.
- *
- * Outputs:	ptt_device	- Device name, something like /dev/hidraw2.
+ * Returns:	ptt_device	- Device name, something like /dev/hidraw2.
  *				  Will be empty string if no match found.
- *
- * Returns:	none
  *
  *------------------------------------------------------------------*/
 
-func cm108_find_ptt(output_audio_device *C.char, ptt_device *C.char, ptt_device_size C.int) {
+func cm108_find_ptt(output_audio_device string) string {
 
 	//dw_printf ("DEBUG: cm108_find_ptt('%s')\n", output_audio_device);
 
-	C.strlcpy(ptt_device, C.CString(""), C.size_t(ptt_device_size))
+	var ptt_device = ""
 
 	// Possible improvement: Skip if inventory already taken.
 	var things, _ = cm108_inventory(MAXX_THINGS)
 
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 
-	var matches = sound_re.FindStringSubmatch(C.GoString(output_audio_device))
+	var matches = sound_re.FindStringSubmatch(output_audio_device)
 	var num_or_name string
 
 	if matches != nil {
@@ -444,24 +440,26 @@ func cm108_find_ptt(output_audio_device *C.char, ptt_device *C.char, ptt_device_
 
 	if len(num_or_name) == 0 {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not extract card number or name from %s\n", C.GoString(output_audio_device))
+		dw_printf("Could not extract card number or name from %s\n", output_audio_device)
 		dw_printf("Can't automatically find matching HID for PTT.\n")
-		return
+		return ptt_device
 	}
 
 	for _, thing := range things {
 		//dw_printf ("DEBUG: i=%d, card_name='%s', card_number='%s'\n", i, things[i].card_name, things[i].card_number);
-		if num_or_name == C.GoString(&thing.card_name[0]) || num_or_name == C.GoString(&thing.card_number[0]) {
+		if num_or_name == thing.card_name || num_or_name == thing.card_number {
 			//dw_printf ("DEBUG: success! returning '%s'\n", things[i].devnode_hidraw);
-			C.strlcpy(ptt_device, &thing.devnode_hidraw[0], C.size_t(ptt_device_size))
+			ptt_device = thing.devnode_hidraw
 			if !GOOD_DEVICE(thing.vid, thing.pid) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Warning: USB audio card %s (%s) is not a device known to work with GPIO PTT.\n",
-					C.GoString(&thing.card_number[0]), C.GoString(&thing.card_name[0]))
+					thing.card_number, thing.card_name)
 			}
-			return
+			return ptt_device
 		}
 	}
+
+	return ptt_device
 }
 
 /*-------------------------------------------------------------------
@@ -491,23 +489,23 @@ func cm108_find_ptt(output_audio_device *C.char, ptt_device *C.char, ptt_device_
  *
  *------------------------------------------------------------------*/
 
-func cm108_set_gpio_pin(name *C.char, num C.int, state C.int) C.int {
+func cm108_set_gpio_pin(name string, num int, state int) int {
 
 	if num < 1 || num > 8 {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s CM108 GPIO number %d must be in range of 1 thru 8.\n", C.GoString(name), num)
+		dw_printf("%s CM108 GPIO number %d must be in range of 1 thru 8.\n", name, num)
 		return (-1)
 	}
 
 	if state != 0 && state != 1 {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s CM108 GPIO state %d must be 0 or 1.\n", C.GoString(name), state)
+		dw_printf("%s CM108 GPIO state %d must be 0 or 1.\n", name, state)
 		return (-1)
 	}
 
 	var iomask = 1 << (num - 1)     // 0=input, 1=output
 	var iodata = state << (num - 1) // 0=low, 1=high
-	return (cm108_write(name, C.int(iomask), iodata))
+	return cm108_write(name, iomask, iodata)
 } /* end cm108_set_gpio_pin */
 
 /*-------------------------------------------------------------------
@@ -533,7 +531,7 @@ func cm108_set_gpio_pin(name *C.char, num C.int, state C.int) C.int {
  *
  *------------------------------------------------------------------*/
 
-func cm108_write(name *C.char, iomask C.int, iodata C.int) C.int {
+func cm108_write(name string, iomask int, iodata int) int {
 
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("TEMP DEBUG cm108_write:  %s %d %d\n", name, iomask, iodata);
@@ -571,10 +569,10 @@ func cm108_write(name *C.char, iomask C.int, iodata C.int) C.int {
 	 * audio group to use the USB Audio adapter for sound.
 	 */
 
-	var fd, err = os.OpenFile(C.GoString(name), os.O_RDWR, 0000)
+	var fd, err = os.OpenFile(name, os.O_RDWR, 0000)
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open %s for write: %s\n", C.GoString(name), err)
+		dw_printf("Could not open %s for write: %s\n", name, err)
 		/* TODO KG UX
 		if errno == EACCES { // 13
 			dw_printf("Type \"ls -l %s\" and verify that it has audio group rw similar to this:\n", name)
@@ -591,12 +589,12 @@ func cm108_write(name *C.char, iomask C.int, iodata C.int) C.int {
 
 	var info, ioctlErr = unix.IoctlHIDGetRawInfo(int(fd.Fd()))
 	if ioctlErr == nil {
-		if !GOOD_DEVICE(C.int(info.Vendor), C.int(info.Product)) {
+		if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", C.GoString(name), ioctlErr)
+			dw_printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", name, ioctlErr)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", C.GoString(name), info.Vendor, info.Product)
+			dw_printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
 		}
 	}
 
@@ -616,7 +614,7 @@ func cm108_write(name *C.char, iomask C.int, iodata C.int) C.int {
 		//  as root		EPIPE           32      /* Broken pipe - Happens if we send 4 bytes */
 
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Write to %s failed, n=%d, err=%d\n", C.GoString(name), n, err)
+		dw_printf("Write to %s failed, n=%d, err=%d\n", name, n, err)
 
 		/* TODO KG UX
 		if errno == EACCES {
