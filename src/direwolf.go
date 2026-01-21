@@ -986,7 +986,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 		dw_printf("(%s)", C.GoString(&desc[0]))
 		if ftype == frame_type_U_XID {
-			var _, info2text, _ = xid_parse(pinfo, info_len)
+			var _, info2text, _ = xid_parse(C.GoBytes(unsafe.Pointer(pinfo), info_len))
 			dw_printf(" %s\n", info2text)
 		} else {
 			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)

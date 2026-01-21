@@ -32,7 +32,6 @@ import "C"
 
 import (
 	"fmt"
-	"unsafe"
 )
 
 const FI_Format_Indicator = 0x82
@@ -140,7 +139,7 @@ type xid_param_s struct {
  *
  *--------------------------------------------------------------------*/
 
-func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
+func xid_parse(info []byte) (*xid_param_s, string, int) {
 
 	// What should we do when some fields are missing?
 
@@ -164,18 +163,16 @@ func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
 
 	/* Information field is optional but that seems pretty lame. */
 
-	if info_len == 0 {
+	if len(info) == 0 {
 		return result, desc, 1
 	}
 
-	var info = C.GoBytes(unsafe.Pointer(_info), info_len)
-
-	var i C.int = 0
+	var i = 0
 
 	if info[i] != FI_Format_Indicator {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: First byte of info field should be Format Indicator, %02x.\n", FI_Format_Indicator)
-		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], info_len)
+		dw_printf("XID info part: %02x %02x %02x %02x %02x ... length=%d\n", info[0], info[1], info[2], info[3], info[4], len(info))
 		return result, desc, 0
 	}
 	i++
@@ -192,7 +189,7 @@ func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
 	group_len = (group_len << 8) + C.int(info[i])
 	i++
 
-	for i < 4+group_len {
+	for C.int(i) < 4+group_len {
 
 		var pind = info[i]
 		i++
@@ -333,7 +330,7 @@ func xid_parse(_info *C.uchar, info_len C.int) (*xid_param_s, string, int) {
 		}
 	}
 
-	if i != info_len {
+	if i != len(info) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("XID error: Frame / Group Length mismatch.\n")
 	}

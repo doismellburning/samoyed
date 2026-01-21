@@ -73,7 +73,7 @@ func xid_test_main(t *testing.T) {
 
 	/* parse example. */
 
-	var param, desc, n = xid_parse((*C.uchar)(C.CBytes(xid_example)), C.int(len(xid_example)))
+	var param, desc, n = xid_parse(xid_example)
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -108,7 +108,7 @@ func xid_test_main(t *testing.T) {
 	param.retries = 12
 
 	info = xid_encode(param, cr_cmd)
-	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
+	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -135,7 +135,7 @@ func xid_test_main(t *testing.T) {
 	param.retries = 9
 
 	info = xid_encode(param, cr_cmd)
-	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
+	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -162,7 +162,7 @@ func xid_test_main(t *testing.T) {
 	param.retries = 9
 
 	info = xid_encode(param, cr_cmd)
-	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
+	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -189,7 +189,7 @@ func xid_test_main(t *testing.T) {
 	param.retries = G_UNKNOWN
 
 	info = xid_encode(param, cr_cmd)
-	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
+	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
@@ -208,7 +208,7 @@ func xid_test_main(t *testing.T) {
 	/* Default values for empty info field. */
 
 	info = []byte{}
-	param2, desc, _ = xid_parse((*C.uchar)(C.CBytes(info)), C.int(len(info)))
+	param2, desc, _ = xid_parse(info)
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)

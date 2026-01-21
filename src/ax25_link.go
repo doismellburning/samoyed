@@ -4714,7 +4714,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
 
-				var param, _, ok = xid_parse(info_ptr, info_len)
+				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
 
 				if ok > 0 {
 					negotiation_response(S, param)
@@ -4744,7 +4744,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 
 				// Got expected response.  Copy into my working parameters.
 
-				var param, _, ok = xid_parse(info_ptr, info_len)
+				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
 
 				if ok > 0 {
 					complete_negotiation(S, param)
