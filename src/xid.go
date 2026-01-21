@@ -184,12 +184,12 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	}
 	i++
 
-	var group_len = C.int(info[i])
+	var group_len = int(info[i])
 	i++
-	group_len = (group_len << 8) + C.int(info[i])
+	group_len = (group_len << 8) + int(info[i])
 	i++
 
-	for C.int(i) < 4+group_len {
+	for i < 4+group_len {
 
 		var pind = info[i]
 		i++
@@ -203,9 +203,9 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			return result, desc, 1 // got this far.
 		}
 
-		var pval C.int = 0
+		var pval = 0
 		for j := byte(0); j < plen; j++ {
-			pval = (pval << 8) + C.int(info[i])
+			pval = (pval << 8) + int(info[i])
 			i++
 		}
 
@@ -292,7 +292,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 
 		case PI_I_Field_Length_Rx:
 
-			result.i_field_length_rx = pval / 8
+			result.i_field_length_rx = C.int(pval / 8)
 
 			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", result.i_field_length_rx)
 
@@ -303,7 +303,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 
 		case PI_Window_Size_Rx:
 
-			result.window_size_rx = pval
+			result.window_size_rx = C.int(pval)
 
 			desc += fmt.Sprintf("Window-Size-Rx=%d ", result.window_size_rx)
 
@@ -317,12 +317,12 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			//continue here with more error checking.
 
 		case PI_Ack_Timer:
-			result.ack_timer = pval
+			result.ack_timer = C.int(pval)
 
 			desc += fmt.Sprintf("Ack-Timer=%d ", result.ack_timer)
 
 		case PI_Retries: // Is it retrys or retries?
-			result.retries = pval
+			result.retries = C.int(pval)
 
 			desc += fmt.Sprintf("Retries=%d ", result.retries)
 
@@ -441,7 +441,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	info = append(info, PI_Classes_of_Procedures)
 	info = append(info, 2)
 
-	var x C.int = PV_Classes_Procedures_Balanced_ABM
+	var x int = PV_Classes_Procedures_Balanced_ABM
 
 	if param.full_duplex == 1 {
 		x |= PV_Classes_Procedures_Full_Duplex
@@ -513,7 +513,7 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 		info = append(info, byte(PI_I_Field_Length_Rx))
 		info = append(info, 2)
 
-		x = param.i_field_length_rx * 8
+		var x = param.i_field_length_rx * 8
 		info = append(info, byte(x>>8)&0xff)
 		info = append(info, byte(x)&0xff)
 	}
