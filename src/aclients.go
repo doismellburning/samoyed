@@ -259,13 +259,9 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			var alevel alevel_t
 			var dataUChar = byteSliceToCUChars(data[1:])
 			var pp = ax25_from_frame(&dataUChar[0], C.int(mon_cmd.DataLen-1), alevel)
-			var result [400]C.char
-			ax25_format_addrs(pp, &result[0])
-			var pinfo *C.uchar
-			var info_len = ax25_get_info(pp, &pinfo)
-			_ = info_len
-
-			var fullResult = C.GoString(&result[0]) + C.GoString((*C.char)(unsafe.Pointer(pinfo)))
+			var result = ax25_format_addrs(pp)
+			var info = ax25_get_info(pp)
+			var fullResult = result + string(info)
 			packetChan <- fullResult
 			ax25_delete(pp)
 			packet_count[my_index]++

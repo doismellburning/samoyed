@@ -1978,14 +1978,14 @@ func lm_data_indication(E *dlq_item_t) {
 		return
 	}
 
-	E.num_addr = ax25_get_num_addr(E.pp)
+	E.num_addr = C.int(ax25_get_num_addr(E.pp))
 
 	// Digipeating is not done here so consider only those with no unused digipeater addresses.
 
 	var any_unused_digi = false
 
-	for n := C.int(AX25_REPEATER_1); n < E.num_addr; n++ {
-		if ax25_get_h(E.pp, n) == 0 {
+	for n := AX25_REPEATER_1; C.int(n) < E.num_addr; n++ {
+		if !ax25_get_h(E.pp, n) {
 			any_unused_digi = true
 		}
 	}
@@ -2000,8 +2000,9 @@ func lm_data_indication(E *dlq_item_t) {
 
 	// Copy addresses from frame into event structure.
 
-	for n := C.int(0); n < E.num_addr; n++ {
-		ax25_get_addr_with_ssid(E.pp, n, &E.addrs[n][0])
+	for n := 0; C.int(n) < E.num_addr; n++ {
+		var addr = ax25_get_addr_with_ssid(E.pp, n)
+		C.strcpy(&E.addrs[n][0], C.CString(addr))
 	}
 
 	if s_debug_radio {
@@ -2105,10 +2106,9 @@ func lm_data_indication(E *dlq_item_t) {
 	case frame_type_I: // Information
 		{
 			var pid = ax25_get_pid(E.pp)
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
+			var info = ax25_get_info(E.pp)
 
-			i_frame(S, cr, pf, nr, ns, pid, (*C.char)(unsafe.Pointer(info_ptr)), info_len)
+			i_frame(S, cr, pf, nr, ns, pid, info)
 		}
 
 	case frame_type_S_RR: // Receive Ready - System Ready To Receive
@@ -2122,9 +2122,8 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_S_SREJ: // Selective Reject - Ask for selective frame(s) repeat
 		{
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
-			srej_frame(S, cr, pf, nr, info_ptr, info_len)
+			var info = ax25_get_info(E.pp)
+			srej_frame(S, cr, pf, nr, info)
 		}
 
 	case frame_type_U_SABME: // Set Async Balanced Mode, Extended
@@ -2150,18 +2149,16 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_U_XID: // Exchange Identification
 		{
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
+			var info = ax25_get_info(E.pp)
 
-			xid_frame(S, cr, pf, info_ptr, info_len)
+			xid_frame(S, cr, pf, info)
 		}
 
 	case frame_type_U_TEST: // Test
 		{
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
+			var info = ax25_get_info(E.pp)
 
-			test_frame(S, cr, pf, info_ptr, info_len)
+			test_frame(S, cr, pf, info)
 		}
 
 	case frame_type_U: // other Unnumbered, not used by AX.25.
@@ -2251,7 +2248,7 @@ func lm_data_indication(E *dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func i_frame(S *ax25_dlsm_t, cr cmdres_t, p C.int, nr C.int, ns C.int, pid C.int, info_ptr *C.char, info_len C.int) {
+func i_frame(S *ax25_dlsm_t, cr cmdres_t, p C.int, nr C.int, ns C.int, pid C.int, info []byte) {
 	switch S.state {
 
 	case state_0_disconnected:
@@ -2296,7 +2293,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p C.int, nr C.int, ns C.int, pid C.int
 		// used to negotiate a maximum info length but with v2.0, there is no way for the
 		// other end to know our paclen value.
 
-		if info_len >= 0 && info_len <= AX25_MAX_INFO_LEN {
+		if len(info) >= 0 && len(info) <= AX25_MAX_INFO_LEN {
 
 			if is_good_nr(S, nr) {
 
@@ -2377,7 +2374,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p C.int, nr C.int, ns C.int, pid C.int
 
 				} else { // Own receiver not busy.
 
-					i_frame_continued(S, p, ns, pid, (*C.char)(unsafe.Pointer(info_ptr)), info_len)
+					i_frame_continued(S, p, ns, pid, info)
 				}
 
 			} else { // N(R) not in expected range.
@@ -2389,7 +2386,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p C.int, nr C.int, ns C.int, pid C.int
 			// Wouldn't even get to CRC check if not octet aligned.
 
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, info_len, AX25_MAX_INFO_LEN)
+			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, len(info), AX25_MAX_INFO_LEN)
 
 			establish_data_link(S)
 			S.layer_3_initiated = false
@@ -2507,7 +2504,7 @@ func TODO_SABME_SABM(S *ax25_dlsm_t) dlsm_state_e { // FIXME KG TERRIBLE NAME - 
  *
  *------------------------------------------------------------------------------*/
 
-func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info_ptr *C.char, info_len C.int) {
+func i_frame_continued(S *ax25_dlsm_t, p C.int, ns C.int, pid C.int, info []byte) {
 
 	if ns == S.vr {
 
@@ -3610,7 +3607,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, nr C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f C.int, nr C.int, info *C.uchar, info_len C.int) {
+func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f C.int, nr C.int, info []byte) {
 
 	switch S.state {
 
@@ -3662,7 +3659,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f C.int, nr C.int, info *C.uchar, i
 			START_T3(S)
 			select_t1_value(S)
 
-			var num_resent = resend_for_srej(S, nr, info, info_len)
+			var num_resent = resend_for_srej(S, nr, info)
 			if num_resent > 0 {
 
 				// my addition
@@ -3746,7 +3743,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f C.int, nr C.int, info *C.uchar, i
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("state 4 timer recovery, send requested frame(s) \n");
 
-				var num_resent = resend_for_srej(S, nr, info, info_len)
+				var num_resent = resend_for_srej(S, nr, info)
 				if num_resent > 0 {
 					// my addition
 					// Erratum: We sent I frame(s) and want to timeout if no ack comes back.
@@ -3793,7 +3790,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f C.int, nr C.int, info *C.uchar, i
  *
  *------------------------------------------------------------------------------*/
 
-func resend_for_srej(S *ax25_dlsm_t, nr C.int, info *C.uchar, info_len C.int) C.int {
+func resend_for_srej(S *ax25_dlsm_t, nr C.int, info []byte) C.int {
 	var cr = cr_cmd
 	var i_frame_nr = S.vr
 	var i_frame_ns = nr
@@ -3817,9 +3814,9 @@ func resend_for_srej(S *ax25_dlsm_t, nr C.int, info *C.uchar, info_len C.int) C.
 
 	// Multi-SREJ if there is an information part.
 
-	var infoBytes = C.GoBytes(unsafe.Pointer(info), info_len)
+	var infoBytes = info
 
-	for j := C.int(0); j < info_len; j++ {
+	for j := 0; j < len(info); j++ {
 
 		// We can have a single sequence number like this:
 		//    	xxx00000	(mod 8)
@@ -4700,7 +4697,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_len C.int) {
+func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info []byte) {
 
 	switch S.mdl_state {
 
@@ -4714,7 +4711,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
 
-				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
+				var param, _, ok = xid_parse(info)
 
 				if ok > 0 {
 					negotiation_response(S, param)
@@ -4744,7 +4741,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
 
 				// Got expected response.  Copy into my working parameters.
 
-				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
+				var param, _, ok = xid_parse(info)
 
 				if ok > 0 {
 					complete_negotiation(S, param)
@@ -4816,13 +4813,13 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_le
  *
  *------------------------------------------------------------------------------*/
 
-func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info_ptr *C.uchar, info_len C.int) {
+func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf C.int, info []byte) {
 	var res = cr_res
 	var f = pf
 	var nopid C.int = 0
 
 	if cr == cr_cmd {
-		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info_ptr, info_len)
+		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, (*C.char)(C.CBytes(info)), C.int(len(info)))
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 	}
 } /* end test_frame */
