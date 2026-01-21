@@ -482,12 +482,10 @@ func parse_ll(str string, which parse_ll_which_e, line int) C.double {
  *
  *----------------------------------------------------------------*/
 
-func parse_utm_zone(_szone *C.char, latband *C.char, hemi *C.char) C.long {
+func parse_utm_zone(szone string, latband *C.char, hemi *C.char) C.long {
 
 	*latband = ' '
 	*hemi = 'N' /* default */
-
-	var szone = C.GoString(_szone)
 
 	var lastRune = rune(szone[len(szone)-1])
 	if unicode.IsLetter(lastRune) {
@@ -5878,7 +5876,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 			var latband C.char
 			var hemi C.char
-			var lzone = parse_utm_zone(C.CString(zone), &latband, &hemi)
+			var lzone = parse_utm_zone(zone, &latband, &hemi)
 
 			var dlat C.double
 			var dlon C.double
