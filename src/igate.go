@@ -724,9 +724,9 @@ func send_packet_to_server(pp *packet_t, channel C.int) {
 		msg += ",qAO," // new for version 1.4.
 	}
 
-	var mycall = C.GoString(&save_audio_config_p.mycall[0][0])
+	var mycall = save_audio_config_p.mycall[0]
 	if channel >= 0 {
-		mycall = C.GoString(&save_audio_config_p.mycall[channel][0])
+		mycall = save_audio_config_p.mycall[channel]
 	}
 	msg += mycall
 	msg += ":"
@@ -1456,7 +1456,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 
 	var dest [AX25_MAX_ADDR_LEN]C.char /* Destination field. */
 	ax25_get_addr_with_ssid(pp3, AX25_DESTINATION, &dest[0])
-	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), C.GoString(&dest[0]), C.GoString(&save_audio_config_p.mycall[to_chan][0]), pinfo)
+	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), C.GoString(&dest[0]), save_audio_config_p.mycall[to_chan], pinfo)
 
 	/* TODO KG
 	#if DEBUGx
@@ -1480,7 +1480,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 	 */
 	if ig_to_tx_allow(pp3, to_chan) {
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
-			C.GoString(&save_audio_config_p.mycall[to_chan][0]),
+			save_audio_config_p.mycall[to_chan],
 			APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION,
 			C.GoString(&save_igate_config_p.tx_via[0]),
 			payload)

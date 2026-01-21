@@ -146,10 +146,9 @@ type adev_param_s struct {
 	/* original device and can't be changed. */
 	/* -1 for normal case. */
 
-	adevice_in [80]C.char /* Name of the audio input device (or file?). */
-	/* Can be udp:nnn for UDP or "-" to read from stdin. */
+	adevice_in string /* Name of the audio input device (or file?). Can be udp:nnn for UDP or "-" to read from stdin. */
 
-	adevice_out [80]C.char /* Name of the audio output device (or file?). */
+	adevice_out string /* Name of the audio output device (or file?). */
 
 	num_channels    C.int /* Should be 1 for mono or 2 for stereo. */
 	samples_per_sec C.int /* Audio sampling rate.  Typically 11025, 22050, 44100, or 48000. */
@@ -289,7 +288,7 @@ type achan_param_s struct {
 
 	/* Next 3 come from config file or command line. */
 
-	profiles [16]C.char /* zero or more of ABC etc, optional + */
+	profiles string /* zero or more of ABC etc, optional + */
 
 	num_freq C.int /* Number of different frequency pairs for decoders. */
 
@@ -326,7 +325,7 @@ type achan_param_s struct {
 	octrl [NUM_OCTYPES]struct {
 		ptt_method ptt_method_t /* none, serial port, GPIO, LPT, HAMLIB, CM108. */
 
-		ptt_device [128]C.char /* Serial device name for PTT.  e.g. COM1 or /dev/ttyS0 */
+		ptt_device string /* Serial device name for PTT.  e.g. COM1 or /dev/ttyS0 */
 		/* Also used for HAMLIB.  Could be host:port when model is 1. */
 		/* For years, 20 characters was plenty then we start getting extreme names like this: */
 		/* /dev/serial/by-id/usb-FTDI_Navigator__CAT___2nd_PTT__00000000-if00-port0 */
@@ -346,7 +345,7 @@ type achan_param_s struct {
 		/* octrl array is indexed by PTT, DCD, or CONnected indicator. */
 		/* For CM108/CM119, this should be in range of 1-8. */
 
-		out_gpio_name [MAX_GPIO_NAME_LEN]C.char
+		out_gpio_name string
 		/* originally, gpio number NN was assumed to simply */
 		/* have the name gpioNN but this turned out not to be */
 		/* the case for CubieBoard where it was longer. */
@@ -376,7 +375,7 @@ type achan_param_s struct {
 
 		in_gpio_num C.int /* GPIO number */
 
-		in_gpio_name [MAX_GPIO_NAME_LEN]C.char
+		in_gpio_name string
 		/* originally, gpio number NN was assumed to simply */
 		/* have the name gpioNN but this turned out not to be */
 		/* the case for CubieBoard where it was longer. */
@@ -425,7 +424,7 @@ type audio_s struct {
 
 	/* Common to all channels. */
 
-	tts_script [80]C.char /* Script for text to speech. */
+	tts_script string /* Script for text to speech. */
 
 	statistics_interval C.int /* Number of seconds between the audio */
 	/* statistics reports.  This is set by */
@@ -449,7 +448,7 @@ type audio_s struct {
 	/* and is part of the KISS TNC functionality rather than our data link layer. */
 	/* Future: not used yet. */
 
-	timestamp_format [40]C.char /* -T option */
+	timestamp_format string /* -T option */
 	/* Precede received & transmitted frames with timestamp. */
 	/* Command line option uses "strftime" format string. */
 
@@ -466,7 +465,7 @@ type audio_s struct {
 
 	// Properties for all channels.
 
-	mycall [MAX_TOTAL_CHANS][AX25_MAX_ADDR_LEN]C.char /* Call associated with this radio channel. */
+	mycall [MAX_TOTAL_CHANS]string /* Call associated with this radio channel. */
 	/* Could all be the same or different. */
 
 	chan_medium [MAX_TOTAL_CHANS]medium_e
@@ -482,7 +481,7 @@ type audio_s struct {
 
 	// Applies only to network TNC type channels.
 
-	nettnc_addr [MAX_TOTAL_CHANS][80]C.char // Network TNC address:  hostname or IP addr.
+	nettnc_addr [MAX_TOTAL_CHANS]string // Network TNC address:  hostname or IP addr.
 
 	nettnc_port [MAX_TOTAL_CHANS]C.int // Network TNC TCP port.
 
@@ -779,17 +778,17 @@ func audio_open(pa *audio_s) C.int {
 
 			adev[a].g_audio_in_type = AUDIO_IN_TYPE_SOUNDCARD
 
-			if strings.EqualFold(C.GoString(&pa.adev[a].adevice_in[0]), "stdin") || C.GoString(&pa.adev[a].adevice_in[0]) == "-" {
+			if strings.EqualFold(pa.adev[a].adevice_in, "stdin") || pa.adev[a].adevice_in == "-" {
 				adev[a].g_audio_in_type = AUDIO_IN_TYPE_STDIN
 				/* Change "-" to stdin for readability. */
-				C.strcpy(&pa.adev[a].adevice_in[0], C.CString("stdin"))
+				pa.adev[a].adevice_in = "stdin"
 			}
-			if strings.HasPrefix(strings.ToLower(C.GoString(&pa.adev[a].adevice_in[0])), "udp:") {
+			if strings.HasPrefix(strings.ToLower(pa.adev[a].adevice_in), "udp:") {
 				adev[a].g_audio_in_type = AUDIO_IN_TYPE_SDR_UDP
 				/* Supply default port if none specified. */
-				if strings.EqualFold(C.GoString(&pa.adev[a].adevice_in[0]), "udp") ||
-					strings.EqualFold(C.GoString(&pa.adev[a].adevice_in[0]), "udp:") {
-					C.strcpy(&pa.adev[a].adevice_in[0], C.CString(fmt.Sprintf("udp:%d", DEFAULT_UDP_AUDIO_PORT)))
+				if strings.EqualFold(pa.adev[a].adevice_in, "udp") ||
+					strings.EqualFold(pa.adev[a].adevice_in, "udp:") {
+					pa.adev[a].adevice_in = fmt.Sprintf("udp:%d", DEFAULT_UDP_AUDIO_PORT)
 				}
 			}
 
@@ -797,8 +796,8 @@ func audio_open(pa *audio_s) C.int {
 
 			/* If not specified, the device names should be "default". */
 
-			var audio_in_name = C.GoString(&pa.adev[a].adevice_in[0])
-			var audio_out_name = C.GoString(&pa.adev[a].adevice_out[0])
+			var audio_in_name = pa.adev[a].adevice_in
+			var audio_out_name = pa.adev[a].adevice_out
 
 			var ctemp string
 

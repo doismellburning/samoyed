@@ -652,8 +652,8 @@ func GenToneMain() {
 	/* one channel.  2 times:  one second of each tone. */
 
 	var my_audio_config audio_s
-	C.strcpy(&my_audio_config.adev[0].adevice_in[0], C.CString(DEFAULT_ADEVICE))
-	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(DEFAULT_ADEVICE))
+	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
+	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
 	audio_open(&my_audio_config)
@@ -674,8 +674,8 @@ func GenToneMain() {
 	/* Now try stereo. */
 
 	my_audio_config = audio_s{} //nolint:exhaustruct
-	C.strcpy(&my_audio_config.adev[0].adevice_in[0], C.CString(DEFAULT_ADEVICE))
-	C.strcpy(&my_audio_config.adev[0].adevice_out[0], C.CString(DEFAULT_ADEVICE))
+	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
+	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.adev[0].num_channels = 2
 
 	audio_open(&my_audio_config)

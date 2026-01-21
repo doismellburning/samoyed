@@ -689,9 +689,9 @@ func xmit_object_report(i int, first_time bool) {
 
 	var stemp string
 	if save_tt_config_p.obj_xmit_chan >= 0 {
-		stemp = C.GoString(&save_audio_config_p.mycall[save_tt_config_p.obj_xmit_chan][0])
+		stemp = save_audio_config_p.mycall[save_tt_config_p.obj_xmit_chan]
 	} else {
-		stemp = C.GoString(&save_audio_config_p.mycall[save_tt_config_p.obj_recv_chan][0])
+		stemp = save_audio_config_p.mycall[save_tt_config_p.obj_recv_chan]
 	}
 	stemp += ">"
 	stemp += APP_TOCALL

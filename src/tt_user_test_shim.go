@@ -36,7 +36,7 @@ func tt_user_test_main(t *testing.T) {
 
 	var my_audio_config audio_s
 
-	C.strcpy(&my_audio_config.mycall[0][0], C.CString("WB20SZ-15"))
+	my_audio_config.mycall[0] = "WB20SZ-15"
 
 	/* Fake TT gateway config. */
 

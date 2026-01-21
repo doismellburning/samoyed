@@ -388,7 +388,7 @@ x = Silence FX.25 information.`)
 			// Will make more precise in afsk demod init.
 			audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
 			audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
-			C.strcpy(&audio_config.achan[0].profiles[0], C.CString("A"))
+			audio_config.achan[0].profiles = "A"
 		} else {
 			audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 			audio_config.achan[0].mark_freq = 0
@@ -436,7 +436,7 @@ x = Silence FX.25 information.`)
 
 	if *modemProfile != "" {
 		/* -P for modem profile. */
-		C.strcpy(&audio_config.achan[0].profiles[0], C.CString(*modemProfile))
+		audio_config.achan[0].profiles = *modemProfile
 	}
 
 	if *decimate != 0 {
@@ -461,7 +461,7 @@ x = Silence FX.25 information.`)
 		audio_config.achan[0].upsample = C.int(*upsample)
 	}
 
-	C.strcpy(&audio_config.timestamp_format[0], C.CString(*timestampFormat))
+	audio_config.timestamp_format = *timestampFormat
 
 	// temp - only xmit errors.
 
@@ -502,7 +502,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if input_file != "" {
-		C.strcpy(&audio_config.adev[0].adevice_in[0], C.CString(input_file))
+		audio_config.adev[0].adevice_in = input_file
 	}
 
 	audio_config.recv_ber = C.float(*bitErrorRate)
@@ -932,8 +932,8 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 	var ts string // optional time stamp
 
-	if C.strlen(&audio_config.timestamp_format[0]) > 0 {
-		var formattedTime, _ = strftime.Format(C.GoString(&audio_config.timestamp_format[0]), time.Now())
+	if len(audio_config.timestamp_format) > 0 {
+		var formattedTime, _ = strftime.Format(audio_config.timestamp_format, time.Now())
 		ts = " " + formattedTime // space after channel.
 	}
 

@@ -195,8 +195,8 @@ func digipeater(from_chan C.int, pp *packet_t) {
 	for to_chan := range C.int(MAX_TOTAL_CHANS) {
 		if save_digi_config_p.enabled[from_chan][to_chan] > 0 {
 			if to_chan == from_chan {
-				var result = digipeat_match(from_chan, pp, &digipeater_audio_config.mycall[from_chan][0],
-					&digipeater_audio_config.mycall[to_chan][0],
+				var result = digipeat_match(from_chan, pp, C.CString(digipeater_audio_config.mycall[from_chan]),
+					C.CString(digipeater_audio_config.mycall[to_chan]),
 					&save_digi_config_p.alias[from_chan][to_chan], &save_digi_config_p.wide[from_chan][to_chan],
 					to_chan, save_digi_config_p.preempt[from_chan][to_chan],
 					&save_digi_config_p.atgp[from_chan][to_chan][0],
@@ -219,8 +219,8 @@ func digipeater(from_chan C.int, pp *packet_t) {
 	for to_chan := range C.int(MAX_TOTAL_CHANS) {
 		if save_digi_config_p.enabled[from_chan][to_chan] > 0 {
 			if to_chan != from_chan {
-				var result = digipeat_match(from_chan, pp, &digipeater_audio_config.mycall[from_chan][0],
-					&digipeater_audio_config.mycall[to_chan][0],
+				var result = digipeat_match(from_chan, pp, C.CString(digipeater_audio_config.mycall[from_chan]),
+					C.CString(digipeater_audio_config.mycall[to_chan]),
 					&save_digi_config_p.alias[from_chan][to_chan], &save_digi_config_p.wide[from_chan][to_chan],
 					to_chan, save_digi_config_p.preempt[from_chan][to_chan],
 					&save_digi_config_p.atgp[from_chan][to_chan][0],
