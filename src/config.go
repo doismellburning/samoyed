@@ -42,7 +42,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unsafe"
 )
 
 /*
@@ -245,7 +244,7 @@ type misc_config_s struct {
 
 	v20_count C.int /* Number of station addresses in array above. */
 
-	noxid_addrs **C.char /* Stations known not to understand XID command so don't */
+	noxid_addrs []string /* Stations known not to understand XID command so don't */
 	/* waste time sending it and eventually giving up. */
 	/* AX.25 for Linux is the one known case, so far, where */
 	/* SABME is implemented but XID is not. */
@@ -5431,8 +5430,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				var heard C.int
 
 				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
-					p_misc_config.noxid_addrs = (**C.char)(C.realloc(unsafe.Pointer(p_misc_config.noxid_addrs), C.size_t(C.int(unsafe.Sizeof(p_misc_config.noxid_addrs))*(p_misc_config.noxid_count+1))))
-					C.strcpy((*C.char)(unsafe.Add(unsafe.Pointer(p_misc_config.noxid_addrs), p_misc_config.noxid_count)), C.CString(t))
+					p_misc_config.noxid_addrs = append(p_misc_config.noxid_addrs, t)
 					p_misc_config.noxid_count++
 				} else {
 					text_color_set(DW_COLOR_ERROR)
