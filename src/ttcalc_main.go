@@ -80,7 +80,7 @@ func TTCalcMain() {
 	 */
 
 	for {
-		var readErr = binary.Read(server_sock, binary.LittleEndian, mon_cmd)
+		var readErr = binary.Read(server_sock, binary.LittleEndian, &mon_cmd)
 
 		if readErr != nil {
 			if readErr == io.EOF {
