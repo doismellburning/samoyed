@@ -313,7 +313,7 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
 							save_audio_config_p.achan[channel].baud,
 							mark,
 							space,
@@ -367,7 +367,7 @@ func demod_init(pa *audio_s) C.int {
 
 					save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
 
-					demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+					demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
 						save_audio_config_p.achan[channel].mark_freq,
 						save_audio_config_p.achan[channel].space_freq,
@@ -416,7 +416,7 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
 							save_audio_config_p.achan[channel].baud,
 							mark, space,
 							C.char(profile),
@@ -508,7 +508,7 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
 						C.char(profile),
 						D)
@@ -563,7 +563,7 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
 						save_audio_config_p.achan[channel].baud,
 						C.char(profile),
 						D)
@@ -719,7 +719,7 @@ func demod_init(pa *audio_s) C.int {
 					}
 
 					demod_9600_init(save_audio_config_p.achan[channel].modem_type,
-						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
+						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec),
 						save_audio_config_p.achan[channel].upsample,
 						save_audio_config_p.achan[channel].baud, D)
 

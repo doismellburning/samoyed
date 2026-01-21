@@ -76,18 +76,18 @@ type atest_chunk_t struct {
 }
 
 type atest_format_t struct {
-	wformattag      C.short /* 1 for PCM. */
-	nchannels       C.short /* 1 for mono, 2 for stereo. */
-	nsamplespersec  C.int   /* sampling freq, Hz. */
-	navgbytespersec C.int   /* = nblockalign*nsamplespersec. */
-	nblockalign     C.short /* = wbitspersample/8 * nchannels. */
-	wbitspersample  C.short /* 16 or 8. */
+	wformattag      int16 /* 1 for PCM. */
+	nchannels       int16 /* 1 for mono, 2 for stereo. */
+	nsamplespersec  int32 /* sampling freq, Hz. */
+	navgbytespersec int32 /* = nblockalign*nsamplespersec. */
+	nblockalign     int16 /* = wbitspersample/8 * nchannels. */
+	wbitspersample  int16 /* 16 or 8. */
 	extras          [4]C.char
 }
 
 type atest_wav_data_t struct {
 	data     [4]C.char /* "data" */
-	datasize C.int
+	datasize int32
 }
 
 var ATEST_C = false
@@ -496,9 +496,9 @@ o = DCD output control
 			os.Exit(1)
 		}
 
-		my_audio_config.adev[0].samples_per_sec = format.nsamplespersec
-		my_audio_config.adev[0].bits_per_sample = C.int(format.wbitspersample)
-		my_audio_config.adev[0].num_channels = C.int(format.nchannels)
+		my_audio_config.adev[0].samples_per_sec = int(format.nsamplespersec)
+		my_audio_config.adev[0].bits_per_sample = int(format.wbitspersample)
+		my_audio_config.adev[0].num_channels = int(format.nchannels)
 
 		my_audio_config.chan_medium[0] = MEDIUM_RADIO
 		if format.nchannels == 2 {
@@ -511,7 +511,7 @@ o = DCD output control
 			my_audio_config.adev[0].bits_per_sample,
 			(my_audio_config.adev[0].num_channels))
 		// nnum_channels is known to be 1 or 2.
-		var one_filetime = wav_data.datasize /
+		var one_filetime = int(wav_data.datasize) /
 			((my_audio_config.adev[0].bits_per_sample / 8) * (my_audio_config.adev[0].num_channels) * my_audio_config.adev[0].samples_per_sec)
 		total_filetime += C.double(one_filetime)
 
@@ -529,11 +529,11 @@ o = DCD output control
 
 		e_o_f = false
 		for !e_o_f {
-			for c := C.int(0); c < (my_audio_config.adev[0].num_channels); c++ {
+			for c := 0; c < (my_audio_config.adev[0].num_channels); c++ {
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
 
-				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
+				var audio_sample = demod_get_sample(ACHAN2ADEV(C.int(c)))
 
 				if audio_sample >= 256*256 {
 					e_o_f = true
@@ -551,7 +551,7 @@ o = DCD output control
 					continue
 				}
 
-				multi_modem_process_sample(c, audio_sample)
+				multi_modem_process_sample(C.int(c), audio_sample)
 			}
 
 			/* When a complete frame is accumulated, */

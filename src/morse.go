@@ -332,7 +332,7 @@ func morse_quiet_ms(channel C.int, ms C.int) {
 		return
 	}
 
-	var nsamples = int(float64(ms*save_audio_config_p.adev[a].samples_per_sec/1000.) + 0.5)
+	var nsamples = int(float64(ms*C.int(save_audio_config_p.adev[a].samples_per_sec)/1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
 		gen_tone_put_sample(channel, a, sam)

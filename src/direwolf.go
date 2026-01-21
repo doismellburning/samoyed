@@ -314,7 +314,7 @@ x = Silence FX.25 information.`)
 			fmt.Printf("-r option, audio samples/sec, is out of range.\n")
 			os.Exit(1)
 		}
-		audio_config.adev[0].samples_per_sec = C.int(*audioSampleRate)
+		audio_config.adev[0].samples_per_sec = *audioSampleRate
 	}
 
 	if *audioChannels != 0 {
@@ -322,7 +322,7 @@ x = Silence FX.25 information.`)
 			fmt.Printf("-n option, number of audio channels, is out of range.\n")
 			os.Exit(1)
 		}
-		audio_config.adev[0].num_channels = C.int(*audioChannels)
+		audio_config.adev[0].num_channels = *audioChannels
 		if *audioChannels == 2 {
 			audio_config.chan_medium[1] = MEDIUM_RADIO
 		}
@@ -334,7 +334,7 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
-		audio_config.adev[0].bits_per_sample = C.int(*bitsPerSample)
+		audio_config.adev[0].bits_per_sample = *bitsPerSample
 	}
 
 	if *bitrateStr != "" {

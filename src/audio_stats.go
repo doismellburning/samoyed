@@ -65,11 +65,11 @@ import (
 *----------------------------------------------------------------*/
 
 var audioStatsLastTime [MAX_ADEVS]time.Time
-var audioStatsSampleCount [MAX_ADEVS]C.int
-var audioStatsErrorCount [MAX_ADEVS]C.int
+var audioStatsSampleCount [MAX_ADEVS]int
+var audioStatsErrorCount [MAX_ADEVS]int
 var audioStatsSuppressFirst [MAX_ADEVS]bool
 
-func audio_stats(adev C.int, nchan C.int, nsamp C.int, interval C.int) {
+func audio_stats(adev C.int, nchan int, nsamp int, interval C.int) {
 
 	/* Gather numbers for read from audio device. */
 

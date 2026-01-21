@@ -136,11 +136,11 @@ type adev_param_s struct {
 
 	/* Properties of the sound device. */
 
-	defined C.int /* Was device defined?   0=no.  >0 for yes.  */
+	defined int /* Was device defined?   0=no.  >0 for yes.  */
 	/* First channel defaults to 2 for yes with default config. */
 	/* 1 means it was defined by user. */
 
-	copy_from C.int /* >=0  means copy contents from another audio device. */
+	copy_from int /* >=0  means copy contents from another audio device. */
 	/* In this case we don't have device names, below. */
 	/* Num channels, samples/sec, and bit/sample are copied from */
 	/* original device and can't be changed. */
@@ -150,9 +150,9 @@ type adev_param_s struct {
 
 	adevice_out string /* Name of the audio output device (or file?). */
 
-	num_channels    C.int /* Should be 1 for mono or 2 for stereo. */
-	samples_per_sec C.int /* Audio sampling rate.  Typically 11025, 22050, 44100, or 48000. */
-	bits_per_sample C.int /* 8 (unsigned char) or 16 (signed short). */
+	num_channels    int /* Should be 1 for mono or 2 for stereo. */
+	samples_per_sec int /* Audio sampling rate.  Typically 11025, 22050, 44100, or 48000. */
+	bits_per_sample int /* 8 (unsigned char) or 16 (signed short). */
 
 }
 
@@ -625,11 +625,11 @@ var adev [MAX_ADEVS]*adev_s
 
 const ONE_BUF_TIME = 10
 
-func roundup1k(n C.int) C.int {
+func roundup1k(n int) int {
 	return (((n) + 0x3ff) & ^0x3ff)
 }
 
-func calcbufsize(rate C.int, chans C.int, bits C.int) C.int {
+func calcbufsize(rate int, chans int, bits int) int {
 	var size1 = (rate * chans * bits / 8 * ONE_BUF_TIME) / 1000
 	var size2 = roundup1k(size1)
 	/* TODO KG
@@ -1080,8 +1080,7 @@ func set_alsa_params(a C.int, handle *C.snd_pcm_t, pa *audio_s, devname *C.char,
 			pa.adev[a].samples_per_sec, val)
 		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
 
-		pa.adev[a].samples_per_sec = C.int(val)
-
+		pa.adev[a].samples_per_sec = int(val)
 	}
 
 	/* Original: */
@@ -1163,9 +1162,9 @@ func set_alsa_params(a C.int, handle *C.snd_pcm_t, pa *audio_s, devname *C.char,
 
 	adev[a].bytes_per_frame = C.int(C.snd_pcm_frames_to_bytes(handle, 1))
 
-	Assert(adev[a].bytes_per_frame == pa.adev[a].num_channels*pa.adev[a].bits_per_sample/8)
+	Assert(adev[a].bytes_per_frame == C.int(pa.adev[a].num_channels*pa.adev[a].bits_per_sample/8))
 
-	buf_size_in_bytes = C.int(fpp) * adev[a].bytes_per_frame
+	buf_size_in_bytes = int(fpp) * int(adev[a].bytes_per_frame)
 
 	/* TODO KG
 	#if DEBUG
@@ -1183,7 +1182,7 @@ func set_alsa_params(a C.int, handle *C.snd_pcm_t, pa *audio_s, devname *C.char,
 		dw_printf("Using %d to attempt recovery.\n", buf_size_in_bytes)
 	}
 
-	return (buf_size_in_bytes)
+	return C.int(buf_size_in_bytes)
 
 } /* end alsa_set_params */
 
@@ -1519,7 +1518,7 @@ func audio_get_real(a C.int) C.int {
 
 				audio_stats(a,
 					save_audio_config_p.adev[a].num_channels,
-					C.int(n),
+					int(n),
 					save_audio_config_p.statistics_interval)
 
 			} else if n == 0 {
@@ -1681,7 +1680,7 @@ func audio_get_real(a C.int) C.int {
 
 			audio_stats(a,
 				save_audio_config_p.adev[a].num_channels,
-				C.int(n)/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
+				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 				save_audio_config_p.statistics_interval)
 
 		}
@@ -1701,7 +1700,7 @@ func audio_get_real(a C.int) C.int {
 
 			audio_stats(a,
 				save_audio_config_p.adev[a].num_channels,
-				C.int(res)/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
+				int(res)/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 				save_audio_config_p.statistics_interval)
 
 			adev[a].inbuf_len = C.int(res)
