@@ -28,6 +28,10 @@ package direwolf
 // #include <unistd.h>
 import "C"
 
+import (
+	"regexp"
+)
+
 /*
  * Information required for Connected mode digipeating.
  *
@@ -44,17 +48,17 @@ type cdigi_config_s struct {
 	// For APRS digipeater, we use MAX_TOTAL_CHANS because we use external TNCs.
 	// Connected mode packet must use internal modems we we use MAX_RADIO_CHANS.
 
-	enabled [MAX_RADIO_CHANS][MAX_RADIO_CHANS]C.int // Is it enabled for from/to pair?
+	enabled [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // Is it enabled for from/to pair?
 
-	has_alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]C.int // If there was no alias in the config file,
+	has_alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]bool // If there was no alias in the config file,
 	// the structure below will not be set up
 	// properly and an attempt to use it could
 	// result in a crash.  (fixed v1.5)
 	// Not needed for [APRS] DIGIPEAT because
 	// the alias is mandatory there.
-	alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]C.regex_t
+	alias [MAX_RADIO_CHANS][MAX_RADIO_CHANS]*regexp.Regexp
 
-	cfilter_str [MAX_RADIO_CHANS][MAX_RADIO_CHANS]*C.char
+	cfilter_str [MAX_RADIO_CHANS][MAX_RADIO_CHANS]string
 	// NULL or optional Packet Filter strings such as "t/m".
 }
 
@@ -131,12 +135,12 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 	 */
 
 	for to_chan := range C.int(MAX_RADIO_CHANS) {
-		if save_cdigi_config_p.enabled[from_chan][to_chan] > 0 {
+		if save_cdigi_config_p.enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
-				var result = cdigipeat_match(from_chan, pp, C.CString(save_audio_config_p.mycall[from_chan]),
-					C.CString(save_audio_config_p.mycall[to_chan]),
+				var result = cdigipeat_match(from_chan, pp, save_audio_config_p.mycall[from_chan],
+					save_audio_config_p.mycall[to_chan],
 					save_cdigi_config_p.has_alias[from_chan][to_chan],
-					&(save_cdigi_config_p.alias[from_chan][to_chan]), to_chan,
+					save_cdigi_config_p.alias[from_chan][to_chan], to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
 				if result != nil {
 					tq_append(to_chan, TQ_PRIO_0_HI, result)
@@ -151,12 +155,12 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 	 */
 
 	for to_chan := range C.int(MAX_RADIO_CHANS) {
-		if save_cdigi_config_p.enabled[from_chan][to_chan] > 0 {
+		if save_cdigi_config_p.enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
-				var result = cdigipeat_match(from_chan, pp, C.CString(save_audio_config_p.mycall[from_chan]),
-					C.CString(save_audio_config_p.mycall[to_chan]),
+				var result = cdigipeat_match(from_chan, pp, save_audio_config_p.mycall[from_chan],
+					save_audio_config_p.mycall[to_chan],
 					save_cdigi_config_p.has_alias[from_chan][to_chan],
-					&(save_cdigi_config_p.alias[from_chan][to_chan]), to_chan,
+					save_cdigi_config_p.alias[from_chan][to_chan], to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
 				if result != nil {
 					tq_append(to_chan, TQ_PRIO_0_HI, result)
@@ -209,7 +213,7 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec *C.char, mycall_xmit *C.char, has_alias C.int, alias *C.regex_t, to_chan C.int, cfilter_str *C.char) *packet_t {
+func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan C.int, cfilter_str string) *packet_t {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:
@@ -226,8 +230,8 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec *C.char, mycall_x
 	 * But here we only have to do it once.
 	 */
 
-	if cfilter_str != nil {
-		if pfilter(from_chan, to_chan, cfilter_str, pp, 0) != 1 {
+	if cfilter_str != "" {
+		if pfilter(from_chan, to_chan, C.CString(cfilter_str), pp, 0) != 1 {
 			return (nil)
 		}
 	}
@@ -243,15 +247,16 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec *C.char, mycall_x
 		return (nil) // Nothing to do.
 	}
 
-	var repeater [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, r, &repeater[0])
+	var _repeater [AX25_MAX_ADDR_LEN]C.char
+	ax25_get_addr_with_ssid(pp, r, &_repeater[0])
+	var repeater = C.GoString(&_repeater[0])
 
 	/*
 	 * First check for explicit use of my call.
 	 * Note that receive and transmit channels could have different callsigns.
 	 */
 
-	if C.strcmp(&repeater[0], mycall_rec) == 0 {
+	if repeater == mycall_rec {
 		var result = ax25_dup(pp)
 		if result == nil {
 			panic("assert (result != nil)")
@@ -259,7 +264,7 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec *C.char, mycall_x
 
 		/* If using multiple radio channels, they could have different calls. */
 
-		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_addr(result, r, C.CString(mycall_xmit))
 		ax25_set_h(result, r)
 		return (result)
 	}
@@ -267,22 +272,16 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec *C.char, mycall_x
 	/*
 	 * If we have an alias match, substitute MYCALL.
 	 */
-	if has_alias > 0 {
-		var err = C.regexec(alias, &repeater[0], 0, nil, 0)
-		if err == 0 {
+	if has_alias {
+		if alias.MatchString(repeater) {
 			var result = ax25_dup(pp)
 			if result == nil {
 				panic("assert (result != nil)")
 			}
 
-			ax25_set_addr(result, r, mycall_xmit)
+			ax25_set_addr(result, r, C.CString(mycall_xmit))
 			ax25_set_h(result, r)
 			return (result)
-		} else if err != C.REG_NOMATCH {
-			var err_msg [100]C.char
-			C.regerror(err, alias, &err_msg[0], C.ulong(len(err_msg)))
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", C.GoString(&err_msg[0]))
 		}
 	}
 
