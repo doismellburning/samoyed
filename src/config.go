@@ -2717,15 +2717,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing alias pattern on line %d.\n", line)
 				continue
 			}
-			var e = C.regcomp(&(p_digi_config.alias[from_chan][to_chan]), C.CString(t), C.REG_EXTENDED|C.REG_NOSUB)
-			var message [100]C.char
-			if e != 0 {
-				C.regerror(e, &(p_digi_config.alias[from_chan][to_chan]), &message[0], C.size_t(len(message)))
+			var r, err = regexp.Compile(t)
+			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n",
-					line, C.GoString(&message[0]))
+				dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n", line, err)
 				continue
 			}
+			p_digi_config.alias[from_chan][to_chan] = r
 
 			t = split("", false)
 			if t == "" {
@@ -2733,16 +2731,16 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing wide pattern on line %d.\n", line)
 				continue
 			}
-			e = C.regcomp(&(p_digi_config.wide[from_chan][to_chan]), C.CString(t), C.REG_EXTENDED|C.REG_NOSUB)
-			if e != 0 {
-				C.regerror(e, &(p_digi_config.wide[from_chan][to_chan]), &message[0], C.size_t(len(message)))
+
+			r, err = regexp.Compile(t)
+			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Invalid wide matching pattern on line %d:\n%s\n",
-					line, C.GoString(&message[0]))
+				dw_printf("Config file: Invalid wide matching pattern on line %d:\n%s\n", line, err)
 				continue
 			}
+			p_digi_config.wide[from_chan][to_chan] = r
 
-			p_digi_config.enabled[from_chan][to_chan] = 1
+			p_digi_config.enabled[from_chan][to_chan] = true
 			p_digi_config.preempt[from_chan][to_chan] = PREEMPT_OFF
 
 			t = split("", false)
@@ -2768,7 +2766,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_TRACE
 					t = split("", false)
 				} else if strings.HasPrefix(strings.ToUpper(t), "ATGP=") {
-					C.strcpy(&p_digi_config.atgp[from_chan][to_chan][0], C.CString(t[5:]))
+					p_digi_config.atgp[from_chan][to_chan] = t[5:]
 					t = split("", false)
 				}
 			}
@@ -2791,7 +2789,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 600 {
-				p_digi_config.dedupe_time = C.int(n)
+				p_digi_config.dedupe_time = n
 			} else {
 				p_digi_config.dedupe_time = DEFAULT_DEDUPE
 				text_color_set(DW_COLOR_ERROR)
@@ -2859,7 +2857,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 
-			p_digi_config.regen[from_chan][to_chan] = 1
+			p_digi_config.regen[from_chan][to_chan] = true
 
 		} else if strings.EqualFold(t, "CDIGIPEAT") || strings.EqualFold(t, "CDIGIPEATER") {
 
@@ -3075,13 +3073,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = " " /* Empty means permit nothing. */
 			}
 
-			if p_digi_config.filter_str[from_chan][to_chan] != nil {
+			if p_digi_config.filter_str[from_chan][to_chan] != "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Replacing previous filter for same from/to pair:\n        %s\n", line, C.GoString(p_digi_config.filter_str[from_chan][to_chan]))
-				p_digi_config.filter_str[from_chan][to_chan] = nil
+				dw_printf("Config file, line %d: Replacing previous filter for same from/to pair:\n        %s\n", line, p_digi_config.filter_str[from_chan][to_chan])
+				p_digi_config.filter_str[from_chan][to_chan] = ""
 			}
 
-			p_digi_config.filter_str[from_chan][to_chan] = C.CString(t)
+			p_digi_config.filter_str[from_chan][to_chan] = t
 
 			//TODO:  Do a test run to see errors now instead of waiting.
 
@@ -5457,18 +5455,18 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			/* APRS digipeating. */
 
-			if p_digi_config.enabled[i][j] != 0 {
+			if p_digi_config.enabled[i][j] {
 
 				if IsNoCall(p_audio_config.mycall[i]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
-					p_digi_config.enabled[i][j] = 0
+					p_digi_config.enabled[i][j] = false
 				}
 
 				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
-					p_digi_config.enabled[i][j] = 0
+					p_digi_config.enabled[i][j] = false
 				}
 
 				var b = 0
@@ -5542,8 +5540,8 @@ func config_init(fname string, p_audio_config *audio_s,
 	if C.strlen(&p_igate_config.t2_login[0]) > 0 {
 		for j := 0; j < MAX_TOTAL_CHANS; j++ {
 			if p_audio_config.chan_medium[j] == MEDIUM_RADIO || p_audio_config.chan_medium[j] == MEDIUM_NETTNC {
-				if p_digi_config.filter_str[MAX_TOTAL_CHANS][j] == nil {
-					C.strcpy(p_digi_config.filter_str[MAX_TOTAL_CHANS][j], C.CString("i/180"))
+				if p_digi_config.filter_str[MAX_TOTAL_CHANS][j] == "" {
+					p_digi_config.filter_str[MAX_TOTAL_CHANS][j] = "i/180"
 				}
 			}
 		}
