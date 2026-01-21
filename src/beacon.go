@@ -110,7 +110,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 					/* Object name is required. */
 
-					if C.GoString(&g_misc_config_p.beacon[j].objname[0]) == "" {
+					if g_misc_config_p.beacon[j].objname == "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: OBJNAME is required for OBEACON.\n", g_misc_config_p.beacon[j].lineno)
 						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
@@ -132,7 +132,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
-					if g_misc_config_p.beacon[j].custom_info != nil || g_misc_config_p.beacon[j].custom_infocmd != nil {
+					if g_misc_config_p.beacon[j].custom_info != "" || g_misc_config_p.beacon[j].custom_infocmd != "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
 						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
@@ -158,7 +158,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
-					if g_misc_config_p.beacon[j].custom_info != nil || g_misc_config_p.beacon[j].custom_infocmd != nil {
+					if g_misc_config_p.beacon[j].custom_info != "" || g_misc_config_p.beacon[j].custom_infocmd != "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
 						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
@@ -172,7 +172,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 					/* INFO or INFOCMD is required. */
 
-					if g_misc_config_p.beacon[j].custom_info == nil && g_misc_config_p.beacon[j].custom_infocmd == nil {
+					if g_misc_config_p.beacon[j].custom_info == "" && g_misc_config_p.beacon[j].custom_infocmd == "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: INFO or INFOCMD is required for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
 						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
@@ -657,8 +657,8 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 		beacon_text += stemp
 	}
 
-	if bp.via != nil {
-		beacon_text += "," + C.GoString(bp.via)
+	if bp.via != "" {
+		beacon_text += "," + bp.via
 	}
 	beacon_text += ":"
 
@@ -670,13 +670,13 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	// TODO: test & document.
 
 	var super_comment = ""
-	if bp.comment != nil {
-		super_comment = C.GoString(bp.comment)
+	if bp.comment != "" {
+		super_comment = bp.comment
 	}
 
-	if bp.commentcmd != nil {
+	if bp.commentcmd != "" {
 		/* Run given command to get variable part of comment. */
-		var var_comment, k = dw_run_cmd(C.GoString(bp.commentcmd), 2)
+		var var_comment, k = dw_run_cmd(bp.commentcmd, 2)
 
 		if k == nil {
 			super_comment += string(var_comment)
@@ -696,16 +696,16 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			bp.lat, bp.lon, bp.ambiguity,
 			C.int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
 			bp.symtab, bp.symbol,
-			C.int(bp.power), C.int(bp.height), C.int(bp.gain), &bp.dir[0],
+			C.int(bp.power), C.int(bp.height), C.int(bp.gain), C.CString(bp.dir),
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
 			bp.freq, bp.tone, bp.offset,
 			C.CString(super_comment))
 
 	case BEACON_OBJECT:
 
-		beacon_text += encode_object(&bp.objname[0], bp.compress, 1, bp.lat, bp.lon, bp.ambiguity,
+		beacon_text += encode_object(C.CString(bp.objname), bp.compress, 1, bp.lat, bp.lon, bp.ambiguity,
 			bp.symtab, bp.symbol,
-			C.int(bp.power), C.int(bp.height), C.int(bp.gain), &bp.dir[0],
+			C.int(bp.power), C.int(bp.height), C.int(bp.gain), C.CString(bp.dir),
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
 			bp.freq, bp.tone, bp.offset, C.CString(super_comment))
 
@@ -730,7 +730,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			beacon_text += encode_position(bp.messaging, bp.compress,
 				gpsinfo.dlat, gpsinfo.dlon, bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
-				C.int(bp.power), C.int(bp.height), C.int(bp.gain), &bp.dir[0],
+				C.int(bp.power), C.int(bp.height), C.int(bp.gain), C.CString(bp.dir),
 				coarse, C.int(math.Round(float64(gpsinfo.speed_knots))),
 				bp.freq, bp.tone, bp.offset,
 				C.CString(super_comment))
@@ -766,13 +766,13 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 
 	case BEACON_CUSTOM:
 
-		if bp.custom_info != nil {
+		if bp.custom_info != "" {
 			/* Fixed handcrafted text. */
-			beacon_text += C.GoString(bp.custom_info)
-		} else if bp.custom_infocmd != nil {
+			beacon_text += bp.custom_info
+		} else if bp.custom_infocmd != "" {
 			/* Run given command to obtain the info part for packet. */
 
-			var info_part, k = dw_run_cmd(C.GoString(bp.custom_infocmd), 2)
+			var info_part, k = dw_run_cmd(bp.custom_infocmd, 2)
 
 			if k == nil {
 				beacon_text += string(info_part)

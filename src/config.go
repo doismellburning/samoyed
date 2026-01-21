@@ -113,15 +113,13 @@ type beacon_s struct {
 
 	compress C.int /* Use more compact form? */
 
-	objname [10]C.char /* Object name.  Any printable characters. */
+	objname string /* Object name.  Any printable characters. */
 
-	via *C.char /* Path, e.g. "WIDE1-1,WIDE2-1" or NULL. */
+	via string /* Path, e.g. "WIDE1-1,WIDE2-1" or NULL. */
 
-	custom_info *C.char /* Info part for handcrafted custom beacon. */
-	/* Ignore the rest below if this is set. */
+	custom_info string /* Info part for handcrafted custom beacon. Ignore the rest below if this is set. */
 
-	custom_infocmd *C.char /* Command to generate info part. */
-	/* Again, other options below are then ignored. */
+	custom_infocmd string /* Command to generate info part. Again, other options below are then ignored. */
 
 	messaging C.int /* Set messaging attribute for position report. */
 	/* i.e. Data Type Indicator of '=' rather than '!' */
@@ -139,14 +137,14 @@ type beacon_s struct {
 	gain   C.float /* Original protocol spec was unclear. */
 	/* Addendum 1.1 clarifies it is dBi not dBd. */
 
-	dir [3]C.char /* 1 or 2 of N,E,W,S, or empty for omni. */
+	dir string /* 1 or 2 of N,E,W,S, or empty for omni. */
 
 	freq   C.float /* MHz. */
 	tone   C.float /* Hz. */
 	offset C.float /* MHz. */
 
-	comment    *C.char /* Comment or NULL. */
-	commentcmd *C.char /* Command to append more to Comment or NULL. */
+	comment    string /* Comment or empty. */
+	commentcmd string /* Command to append more to Comment or empty. */
 }
 
 type misc_config_s struct {
@@ -5741,7 +5739,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			// #if 1	// proper checking
 
 			if check_via_path(value) >= 0 {
-				b.via = C.CString(value)
+				b.via = value
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: invalid via path.\n", line)
@@ -5758,11 +5756,11 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			   #endif
 			*/
 		} else if strings.EqualFold(keyword, "INFO") {
-			b.custom_info = C.CString(value)
+			b.custom_info = value
 		} else if strings.EqualFold(keyword, "INFOCMD") {
-			b.custom_infocmd = C.CString(value)
+			b.custom_infocmd = value
 		} else if strings.EqualFold(keyword, "OBJNAME") {
-			C.strcpy(&b.objname[0], C.CString(value))
+			b.objname = value
 		} else if strings.EqualFold(keyword, "LAT") {
 			b.lat = parse_ll(value, LAT, line)
 		} else if strings.EqualFold(keyword, "LONG") || strings.EqualFold(keyword, "LON") {
@@ -5839,7 +5837,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var n, _ = strconv.ParseFloat(value, 64)
 			b.gain = C.float(n)
 		} else if strings.EqualFold(keyword, "DIR") || strings.EqualFold(keyword, "DIRECTION") {
-			C.strcpy(&b.dir[0], C.CString(value))
+			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
 			var f, _ = strconv.ParseFloat(value, 64)
 			b.freq = C.float(f)
@@ -5850,9 +5848,9 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var f, _ = strconv.ParseFloat(value, 64)
 			b.offset = C.float(f)
 		} else if strings.EqualFold(keyword, "COMMENT") {
-			b.comment = C.CString(value)
+			b.comment = value
 		} else if strings.EqualFold(keyword, "COMMENTCMD") {
-			b.commentcmd = C.CString(value)
+			b.commentcmd = value
 		} else if strings.EqualFold(keyword, "COMPRESS") || strings.EqualFold(keyword, "COMPRESSED") {
 			var n, _ = strconv.Atoi(value)
 			b.compress = C.int(n)
@@ -5866,7 +5864,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		}
 	}
 
-	if b.custom_info != nil && b.custom_infocmd != nil {
+	if b.custom_info != "" && b.custom_infocmd != "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Can't use both INFO and INFOCMD at the same time.\n", line)
 	}
