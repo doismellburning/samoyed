@@ -6,18 +6,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <ctype.h>
-// #include <fcntl.h>
-// #include <termios.h>
-// #include <unistd.h>
-// #include <sys/ioctl.h>
-// #include <errno.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
 import (
 	"github.com/pkg/term"
 )
