@@ -27,6 +27,7 @@ linters:
     - "whitespace"  # I do not have the energy to deal with extraneous leading/trailing newlines right now
     - "wrapcheck"  # Error wrapping is the least of my concerns
     - "wsl"  # Avoid deprecation warning from enabling all
+    - "wsl_v5"  # This seems to do some odd things around variable declarations that I'm not going to deal with right now
   settings:
     cyclop:
       max-complexity: 60  # I sure wish this could be lower
