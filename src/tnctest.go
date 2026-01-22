@@ -1,30 +1,11 @@
 /* Test AX.25 connected mode between two TNCs */
 package direwolf
 
-// #include <stdlib.h>
-// #include <stddef.h>
-// #include <netdb.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <sys/socket.h>
-// #include <arpa/inet.h>
-// #include <netinet/in.h>
-// #include <netinet/tcp.h>
-// #include <fcntl.h>
-// //#include <termios.h>
-// #include <sys/errno.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <ctype.h>
-// #include <string.h>
-// #include <time.h>
-import "C"
-
 import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -612,36 +593,33 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 	 */
 
 	for {
-		var result [500]C.char
-		var length int
+		var buffer []byte
 
 		var done = false
 		for !done {
-			var ch, err = serial_port_get1(tnctest_serial_fd[my_index])
+			var b, err = serial_port_get1(tnctest_serial_fd[my_index])
 
 			if err != nil {
 				fmt.Printf("TNC %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)
 			}
 
-			if ch == '\r' || ch == '\n' {
+			if b == '\r' || b == '\n' {
 				done = true
-			} else if ch == XOFF {
+			} else if b == XOFF {
 				fmt.Printf("%*s[R %.3f] <XOFF>\n", my_index*column_width, "", time.Since(start_time).Seconds())
 				busy[my_index] = true
-			} else if ch == XON {
+			} else if b == XON {
 				fmt.Printf("%*s[R %.3f] <XON>\n", my_index*column_width, "", time.Since(start_time).Seconds())
 				busy[my_index] = false
-			} else if unicode.IsPrint(rune(ch)) {
-				result[length] = C.char(ch)
-				length++
+			} else if unicode.IsPrint(rune(b)) {
+				buffer = append(buffer, b)
 			} else {
-				var hex = fmt.Sprintf("<x%02x>", ch)
-				C.strcat(&result[0], C.CString(hex))
-				length = len(result)
+				var hex = fmt.Sprintf("<x%02x>", b)
+				buffer = append(buffer, []byte(hex)...)
 			}
 
-			if C.GoString(&result[0]) == "cmd:" {
+			if string(buffer) == "cmd:" {
 				done = true
 				have_cmd_prompt[my_index] = true
 			} else {
@@ -649,28 +627,28 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 			}
 		}
 
-		var _result = C.GoString(&result[0])
+		var result = string(buffer)
 
-		if length > 0 {
-			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), _result)
+		if len(result) > 0 {
+			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), result)
 
-			if _result == "*** CONNECTED" {
+			if result == "*** CONNECTED" {
 				is_connected[my_index] = 1
 			}
 
-			if _result == "*** DISCONNECTED" {
+			if result == "*** DISCONNECTED" {
 				is_connected[my_index] = 0
 			}
 
-			if _result == "Not while connected" {
+			if result == "Not while connected" {
 				// Not expecting this.
 				// What to do?
 				panic("???")
 			}
 
-			process_rec_data(my_index, _result)
+			process_rec_data(my_index, result)
 
-			var before, after, _ = strings.Cut(_result, " ")
+			var before, after, _ = strings.Cut(result, " ")
 
 			if unicode.IsDigit(rune(before[0])) && unicode.IsDigit(rune(before[1])) && unicode.IsDigit(rune(before[2])) && unicode.IsDigit(rune(before[3])) &&
 				strings.HasPrefix(after, "send") {
@@ -746,6 +724,9 @@ func tnc_disconnect(from int, to int) {
 }
 
 func tnc_reset(from int, to int) {
+
+	_ = to // Upstream doesn't use it, it's not clear to me why / what it might have been for /KG
+
 	fmt.Printf("%*s[T %.3f] *** Send reset ***\n", from*column_width, "", time.Since(start_time).Seconds())
 
 	if tnctest_using_tcp[from] {
@@ -779,7 +760,10 @@ func tnc_send_data(from int, to int, data string) {
 		copy(header.CallFrom[:], tnc_address[from])
 		copy(header.CallTo[:], tnc_address[to])
 
-		header.DataLen = uint32(len(data))
+		if len(data) > math.MaxUint32 {
+			panic("len(data) exceeds uint32 maximum!")
+		}
+		header.DataLen = uint32(len(data)) //nolint:gosec
 
 		binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
 
