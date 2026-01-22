@@ -68,7 +68,7 @@ func CM108Main() {
 		var state = 0
 		for {
 			fmt.Printf("%d", state)
-			var err = cm108_set_gpio_pin(C.CString(path), C.int(gpio), C.int(state))
+			var err = cm108_set_gpio_pin(path, gpio, state)
 			if err != 0 {
 				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO!\n")
 				cm108_usage()
@@ -82,6 +82,11 @@ func CM108Main() {
 	// Take inventory of USB Audio adapters and other HID devices.
 
 	var things, _ = cm108_inventory(MAXX_THINGS)
+
+	if len(things) == 0 {
+		fmt.Printf("No relevant USB devices found!\n")
+		return
+	}
 
 	/////////////////////////////////////////////
 	//                Linux
@@ -106,11 +111,11 @@ func CM108Main() {
 		fmt.Printf("%2s  %04x %04x  %-*s %-*s %-*s %-*s %s %-*s\n",
 			good,
 			things[i].vid, things[i].pid,
-			len(things[i].product), C.GoString(&things[i].product[0]),
-			len(things[i].devnode_sound), C.GoString(&things[i].devnode_sound[0]),
-			len(things[0].plughw)/5, C.GoString(&things[i].plughw[0]),
-			len(things[0].plughw2)/4, C.GoString(&things[i].plughw2[0]),
-			C.GoString(&things[i].devnode_hidraw[0]), len(things[i].devnode_usb), C.GoString(&things[i].devnode_usb[0]))
+			len(things[i].product), things[i].product,
+			len(things[i].devnode_sound), things[i].devnode_sound,
+			len(things[0].plughw)/5, things[i].plughw,
+			len(things[0].plughw2)/4, things[i].plughw2,
+			things[i].devnode_hidraw, len(things[i].devnode_usb), things[i].devnode_usb)
 		// fmt.Printf ("             %-*s\n", len(things[i].devpath), things[i].devpath);
 	}
 	fmt.Printf("\n")
@@ -136,8 +141,8 @@ func CM108Main() {
 	// Drop any "/sys" at the beginning.
 	var r = regexp.MustCompile("(/devices/.+/card)[0-9]$") // TODO KG Was REG_EXTENDED - may need some fiddling/checking? Can't easily test...
 	for i := 0; i < len(things); i++ {
-		if i == 0 || C.GoString(&things[i].devpath[0]) != C.GoString(&things[i-1].devpath[0]) {
-			var matches = r.FindStringSubmatch(C.GoString(&things[i].devpath[0]))
+		if i == 0 || things[i].devpath != things[i-1].devpath {
+			var matches = r.FindStringSubmatch(things[i].devpath)
 			if len(matches) > 0 {
 				var without_number = matches[0]
 				fmt.Printf("DEVPATH==\"%s?\", ATTR{id}=\"%s\"\n", without_number, suggested_names[iname])

@@ -2122,9 +2122,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				// Failure at this point is not an error.
 				// See if config file sets it explicitly before complaining.
 
-				var _cm108_ptt [100]C.char
-				cm108_find_ptt(C.CString(p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out), &_cm108_ptt[0], C.int(len(_cm108_ptt)))
-				p_audio_config.achan[channel].octrl[ot].ptt_device = C.GoString(&_cm108_ptt[0])
+				p_audio_config.achan[channel].octrl[ot].ptt_device = cm108_find_ptt(p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out)
 
 				for {
 					t = split("", false)
