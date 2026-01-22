@@ -614,7 +614,7 @@ func cm108_write(name string, iomask int, iodata int) int {
 		//  as root		EPIPE           32      /* Broken pipe - Happens if we send 4 bytes */
 
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Write to %s failed, n=%d, err=%d\n", name, n, err)
+		dw_printf("Write to %s failed, n=%d, err=%v\n", name, n, writeErr)
 
 		/* TODO KG UX
 		if errno == EACCES {
