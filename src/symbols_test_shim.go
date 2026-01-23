@@ -15,27 +15,27 @@ func symbols_test_main(t *testing.T) {
 
 	symbols_init()
 
-	var symtabB, symbolB byte
+	var symtab, symbol byte
 
-	symtabB, symbolB = symbols_from_dest_or_src('T', "W1ABC", "GPSC43")
-	assert.Equal(t, byte('/'), symtabB, "ERROR 1-1")
-	assert.Equal(t, byte('K'), symbolB, "ERROR 1-1")
+	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "GPSC43")
+	assert.Equal(t, byte('/'), symtab, "ERROR 1-1")
+	assert.Equal(t, byte('K'), symbol, "ERROR 1-1")
 
-	symtabB, symbolB = symbols_from_dest_or_src('T', "W1ABC", "GPSE87")
-	assert.Equal(t, byte('\\'), symtabB, "ERROR 1-2")
-	assert.Equal(t, byte('w'), symbolB, "ERROR 1-2")
+	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "GPSE87")
+	assert.Equal(t, byte('\\'), symtab, "ERROR 1-2")
+	assert.Equal(t, byte('w'), symbol, "ERROR 1-2")
 
-	symtabB, symbolB = symbols_from_dest_or_src('T', "W1ABC", "SPCBL")
-	assert.Equal(t, byte('/'), symtabB, "ERROR 1-3")
-	assert.Equal(t, byte('+'), symbolB, "ERROR 1-3")
+	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "SPCBL")
+	assert.Equal(t, byte('/'), symtab, "ERROR 1-3")
+	assert.Equal(t, byte('+'), symbol, "ERROR 1-3")
 
-	symtabB, symbolB = symbols_from_dest_or_src('T', "W1ABC", "SYMST")
-	assert.Equal(t, byte('\\'), symtabB, "ERROR 1-4")
-	assert.Equal(t, byte('t'), symbolB, "ERROR 1-4")
+	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "SYMST")
+	assert.Equal(t, byte('\\'), symtab, "ERROR 1-4")
+	assert.Equal(t, byte('t'), symbol, "ERROR 1-4")
 
-	symtabB, symbolB = symbols_from_dest_or_src('T', "W1ABC", "GPSOD9")
-	assert.Equal(t, byte('9'), symtabB, "ERROR 1-5")
-	assert.Equal(t, byte('#'), symbolB, "ERROR 1-5")
+	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "GPSOD9")
+	assert.Equal(t, byte('9'), symtab, "ERROR 1-5")
+	assert.Equal(t, byte('#'), symbol, "ERROR 1-5")
 
 	/*
 		TODO 2025-07-18 KG Figure out correct behaviour
@@ -61,9 +61,6 @@ func symbols_test_main(t *testing.T) {
 		assert.Equal(t, C.char('/'), symtab, "ERROR 1-7")
 		assert.Equal(t, C.char('k'), symbol, "ERROR 1-7")
 	*/
-
-	var symtab C.char
-	var symbol C.char
 
 	var dest string
 
@@ -113,35 +110,31 @@ func symbols_test_main(t *testing.T) {
 	description = symbols_get_description('/', ' ')
 	assert.Equal(t, "--no-symbol--", description, "ERROR 3-6")
 
-	_symbols_code_from_description('5', "girl scouts", &symtab, &symbol)
-	assert.Equal(t, C.char('5'), symtab, "ERROR 4-1")
-	assert.Equal(t, C.char(','), symbol, "ERROR 4-1")
+	symtab, symbol, _ = symbols_code_from_description('5', "girl scouts")
+	assert.Equal(t, byte('5'), symtab, "ERROR 4-1")
+	assert.Equal(t, byte(','), symbol, "ERROR 4-1")
 
-	_symbols_code_from_description(' ', "scouts", &symtab, &symbol)
-	assert.Equal(t, C.char('/'), symtab, "ERROR 4-2")
-	assert.Equal(t, C.char(','), symbol, "ERROR 4-2")
+	symtab, symbol, _ = symbols_code_from_description(' ', "scouts")
+	assert.Equal(t, byte('/'), symtab, "ERROR 4-2")
+	assert.Equal(t, byte(','), symbol, "ERROR 4-2")
 
-	_symbols_code_from_description(' ', "girl scouts", &symtab, &symbol)
-	assert.Equal(t, C.char('\\'), symtab, "ERROR 4-3")
-	assert.Equal(t, C.char(','), symbol, "ERROR 4-3")
+	symtab, symbol, _ = symbols_code_from_description(' ', "girl scouts")
+	assert.Equal(t, byte('\\'), symtab, "ERROR 4-3")
+	assert.Equal(t, byte(','), symbol, "ERROR 4-3")
 
-	_symbols_code_from_description(' ', "jet ski", &symtab, &symbol)
-	assert.Equal(t, C.char('J'), symtab, "ERROR 4-4")
-	assert.Equal(t, C.char('s'), symbol, "ERROR 4-4")
+	symtab, symbol, _ = symbols_code_from_description(' ', "jet ski")
+	assert.Equal(t, byte('J'), symtab, "ERROR 4-4")
+	assert.Equal(t, byte('s'), symbol, "ERROR 4-4")
 
-	_symbols_code_from_description(' ', "girl scouts", &symtab, &symbol)
-	assert.Equal(t, C.char('\\'), symtab, "ERROR 4-5")
-	assert.Equal(t, C.char(','), symbol, "ERROR 4-5")
+	symtab, symbol, _ = symbols_code_from_description(' ', "girl scouts")
+	assert.Equal(t, byte('\\'), symtab, "ERROR 4-5")
+	assert.Equal(t, byte(','), symbol, "ERROR 4-5")
 
-	_symbols_code_from_description(' ', "yen", &symtab, &symbol)
-	assert.Equal(t, C.char('Y'), symtab, "ERROR 4-6")
-	assert.Equal(t, C.char('$'), symbol, "ERROR 4-6")
+	symtab, symbol, _ = symbols_code_from_description(' ', "yen")
+	assert.Equal(t, byte('Y'), symtab, "ERROR 4-6")
+	assert.Equal(t, byte('$'), symbol, "ERROR 4-6")
 
-	_symbols_code_from_description(' ', "taco bell", &symtab, &symbol)
-	assert.Equal(t, C.char('T'), symtab, "ERROR 4-7")
-	assert.Equal(t, C.char('R'), symbol, "ERROR 4-7")
-}
-
-func _symbols_code_from_description(overlay rune, description string, symtab *C.char, symbol *C.char) int {
-	return int(symbols_code_from_description(C.char(overlay), C.CString(description), symtab, symbol))
+	symtab, symbol, _ = symbols_code_from_description(' ', "taco bell")
+	assert.Equal(t, byte('T'), symtab, "ERROR 4-7")
+	assert.Equal(t, byte('R'), symbol, "ERROR 4-7")
 }

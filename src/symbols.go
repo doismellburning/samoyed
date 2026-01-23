@@ -761,14 +761,11 @@ func symbols_get_description(symtab byte, symbol byte) string {
  *
  * Outputs:	symtab		/, \, 0-9, A-Z
  *		symbol		any printable character ! to ~
- *
- * Returns:	1 for success, 0 for failure.
+ *      ok          true for success, false for failure.
  *
  *------------------------------------------------------------------*/
 
-func symbols_code_from_description(overlay C.char, _description *C.char, symtab *C.char, symbol *C.char) C.int {
-
-	var description = C.GoString(_description)
+func symbols_code_from_description(overlay byte, description string) (byte, byte, bool) {
 
 	symbols_init()
 
@@ -781,9 +778,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
 		for j, s := range alternate_symtab {
 			if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-				*symtab = overlay
-				*symbol = C.char(j + ' ')
-				return (1)
+				return overlay, byte(j + ' '), true
 			}
 		}
 		/* If that fails should we give up or ignore the overlay and keep trying? */
@@ -794,9 +789,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 */
 	for j, s := range primary_symtab {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			*symtab = '/'
-			*symbol = C.char(j + ' ')
-			return (1)
+			return '/', byte(j + ' '), true
 		}
 	}
 
@@ -805,9 +798,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 */
 	for j, s := range alternate_symtab {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			*symtab = '\\'
-			*symbol = C.char(j + ' ')
-			return (1)
+			return '\\', byte(j + ' '), true
 		}
 	}
 
@@ -818,9 +809,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 */
 	for _, s := range new_sym_ptr {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			*symtab = s.overlay
-			*symbol = s.symbol
-			return (1)
+			return byte(s.overlay), byte(s.symbol), true
 		}
 	}
 
@@ -828,10 +817,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 * Default to something generic like house.
 	 * Caller is responsible for issuing error message.
 	 */
-	*symtab = '/'
-	*symbol = '-'
-	return (0)
-
+	return '/', '-', false
 } /* end symbols_code_from_description */
 
 /*------------------------------------------------------------------
