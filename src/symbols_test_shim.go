@@ -65,26 +65,30 @@ func symbols_test_main(t *testing.T) {
 	var symtab C.char
 	var symbol C.char
 
-	var dest [80]C.char
+	var dest string
 
-	_symbols_into_dest('/', 'K', &dest[0])
-	assert.Equal(t, C.GoString(&dest[0]), "GPSC43", "ERROR 2-1")
+	dest, _ = symbols_into_dest('/', 'K')
+	assert.Equal(t, "GPSC43", dest, "ERROR 2-1")
 
-	_symbols_into_dest('\\', 'w', &dest[0])
-	assert.Equal(t, C.GoString(&dest[0]), "GPSE87", "ERROR 2-2")
+	dest, _ = symbols_into_dest(byte('\\'), 'w')
+	assert.Equal(t, "GPSE87", dest, "ERROR 2-2")
 
-	_symbols_into_dest('3', 'A', &dest[0])
-	assert.Equal(t, C.GoString(&dest[0]), "GPSAA3", "ERROR 2-3")
+	dest, _ = symbols_into_dest(byte('3'), 'A')
+	assert.Equal(t, "GPSAA3", dest, "ERROR 2-3")
 
 	// Expect to see this:
 	//   Could not convert symbol " A" to GPSxyz destination format.
 	//   Could not convert symbol "/ " to GPSxyz destination format.
 
-	_symbols_into_dest(' ', 'A', &dest[0])
-	assert.Equal(t, C.GoString(&dest[0]), "GPS???", "ERROR 2-4")
+	var ok bool
 
-	_symbols_into_dest('/', ' ', &dest[0])
-	assert.Equal(t, C.GoString(&dest[0]), "GPS???", "ERROR 2-5")
+	dest, ok = symbols_into_dest(' ', 'A')
+	assert.Equal(t, "GPS???", dest, "ERROR 2-4")
+	assert.False(t, ok)
+
+	dest, ok = symbols_into_dest('/', ' ')
+	assert.Equal(t, "GPS???", dest, "ERROR 2-5")
+	assert.False(t, ok)
 
 	var description [80]C.char
 
@@ -136,10 +140,6 @@ func symbols_test_main(t *testing.T) {
 	_symbols_code_from_description(' ', "taco bell", &symtab, &symbol)
 	assert.Equal(t, C.char('T'), symtab, "ERROR 4-7")
 	assert.Equal(t, C.char('R'), symbol, "ERROR 4-7")
-}
-
-func _symbols_into_dest(symtab rune, symbol rune, dest *C.char) int {
-	return int(symbols_into_dest(C.char(symtab), C.char(symbol), dest))
 }
 
 func _symbols_get_description(symtab rune, symbol rune, description *C.char, desc_size int) {

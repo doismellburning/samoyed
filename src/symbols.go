@@ -641,40 +641,36 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
  * Inputs:	symtab		/, \, 0-9, A-Z
  *		symbol		any printable character ! to ~
  *
- * Outputs:	dest		6 character "destination" of the forms
+ * Returns:	dest		6 character "destination" of the forms
  *					GPSCnn  - primary table.
  *					GPSEnn  - alternate table.
  *					GPSxyz  - alternate with overlay.
  *
- * Returns:	0 for success, 1 for error.
+ *          ok	true for success, false for error.
  *
  *------------------------------------------------------------------*/
 
-func symbols_into_dest(symtab C.char, symbol C.char, dest *C.char) C.int {
+func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
 
 	if symbol >= '!' && symbol <= '~' && symtab == '/' {
 
 		/* Primary Symbol table. */
-		C.strcpy(dest, C.CString(fmt.Sprintf("GPSC%02d", symbol-' ')))
-		return (0)
+		return fmt.Sprintf("GPSC%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && symtab == '\\' {
 
 		/* Alternate Symbol table. */
-		C.strcpy(dest, C.CString(fmt.Sprintf("GPSE%02d", symbol-' ')))
-		return (0)
+		return fmt.Sprintf("GPSE%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
 
 		/* Alternate Symbol table with overlay. */
-		C.strcpy(dest, C.CString(fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab)))
-		return (0)
+		return fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab), true
 	}
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Could not convert symbol \"%c%c\" to GPSxyz destination format.\n",
 		symtab, symbol)
 
-	C.strcpy(dest, C.CString("GPS???")) /* Error. */
-	return (1)
+	return "GPS???", false
 }
 
 /*------------------------------------------------------------------
