@@ -275,8 +275,8 @@ const NEW_SYM_INIT_SIZE = 20
 const NEW_SYM_DESC_LEN = 29
 
 type new_sym_t struct {
-	overlay     C.char
-	symbol      C.char
+	overlay     byte
+	symbol      byte
 	description string
 }
 
@@ -369,8 +369,8 @@ func symbols_init() {
 		}
 
 		var newSymbol = new(new_sym_t)
-		newSymbol.overlay = C.char(line[COL1_OVERLAY])
-		newSymbol.symbol = C.char(line[COL2_SYMBOL])
+		newSymbol.overlay = line[COL1_OVERLAY]
+		newSymbol.symbol = line[COL2_SYMBOL]
 		newSymbol.description = strings.TrimSpace(line[COL6_DESC:])
 
 		new_sym_ptr = append(new_sym_ptr, newSymbol)
@@ -427,8 +427,8 @@ func symbols_list() {
 	dw_printf("---  ------  ------  ------   ----\n")
 
 	for _, s := range new_sym_ptr {
-		var overlay = byte(s.overlay)
-		var symbol = byte(s.symbol)
+		var overlay = s.overlay
+		var symbol = s.symbol
 		var index = int(symbol - ' ')
 
 		var tones = symbols_to_tones(overlay, symbol)
@@ -729,7 +729,7 @@ func symbols_get_description(symtab byte, symbol byte) string {
 	// First try to match with the "new" symbols.
 
 	for _, s := range new_sym_ptr {
-		if C.char(symtab) == s.overlay && C.char(symbol) == s.symbol {
+		if symtab == s.overlay && symbol == s.symbol {
 			return s.description
 		}
 	}
@@ -808,7 +808,7 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
 	 */
 	for _, s := range new_sym_ptr {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			return byte(s.overlay), byte(s.symbol), true
+			return s.overlay, s.symbol, true
 		}
 	}
 
