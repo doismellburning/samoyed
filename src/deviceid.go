@@ -10,12 +10,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"cmp"
 	"io"
@@ -91,7 +85,7 @@ func deviceid_init() {
 	var fp *os.File
 	for _, location := range search_locations {
 		var err error
-		fp, err = os.Open(location)
+		fp, err = os.Open(location) //nolint:gosec // It's fine to use a variable here, we still control the contents
 
 		if err == nil {
 			defer fp.Close()
