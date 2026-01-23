@@ -517,7 +517,9 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 
 		if pinfo[0] != ':' && pinfo[0] != '}' {
-			symbols_from_dest_or_src(C.char(pinfo[0]), &A.g_src[0], &A.g_dest[0], &A.g_symbol_table, &A.g_symbol_code)
+			var symtab, symbol = symbols_from_dest_or_src(pinfo[0], C.GoString(&A.g_src[0]), C.GoString(&A.g_dest[0]))
+			A.g_symbol_table = C.char(symtab)
+			A.g_symbol_code = C.char(symbol)
 		}
 
 		//dw_printf ("DEBUG decode_aprs@end2 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);

@@ -523,9 +523,7 @@ var ssid_to_sym = [16]byte{
 	'v',  /* 15 - Van */
 }
 
-func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.char, symbol *C.char) {
-
-	var dest = C.GoString(_dest)
+func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
 
 	/*
 	 * This part does not apply to MIC-E format because the destination
@@ -540,9 +538,7 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 		if strings.HasPrefix(dest, "GPSC") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
-				*symtab = '/' /* Primary */
-				*symbol = C.char(' ' + nn)
-				return
+				return '/', byte(' ' + nn) // Primary
 			}
 		}
 
@@ -553,9 +549,7 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 		if strings.HasPrefix(dest, "GPSE") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
-				*symtab = '\\' /* Alternate. */
-				*symbol = C.char(' ' + nn)
-				return
+				return '\\', byte(' ' + nn) // Alternate
 			}
 		}
 
@@ -571,9 +565,7 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 
 			for nn := 1; nn <= 94; nn++ {
 				if xy == primary_symtab[nn].xy {
-					*symtab = '/' /* Primary. */
-					*symbol = C.char(' ' + nn)
-					return
+					return '/', byte(' ' + nn) // Primary
 				}
 			}
 		}
@@ -597,16 +589,14 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 
 			for nn := 1; nn <= 94; nn++ {
 				if xy == alternate_symtab[nn].xy {
-					*symtab = '\\' /* Alternate. */
-					*symbol = C.char(' ' + nn)
+					var symtab byte = '\\' // Alternate
 					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
-						*symtab = C.char(z)
+						symtab = z
 					}
-					return
+					return symtab, byte(' ' + nn)
 				}
 			}
 		}
-
 	} /* end not MIC-E */
 
 	/*
@@ -630,17 +620,16 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 	// for the system type.
 
 	if dti == '$' {
-		var _, ssidStr, found = strings.Cut(C.GoString(src), "-")
+		var _, ssidStr, found = strings.Cut(src, "-")
 		if found {
 			var ssid, _ = strconv.Atoi(ssidStr)
 			if ssid >= 1 && ssid <= 15 {
-				*symtab = '/' /* All in Primary table. */
-				*symbol = C.char(ssid_to_sym[ssid])
-				return
+				return '/', ssid_to_sym[ssid] // All in Primary table
 			}
 		}
 	}
 
+	return 0, 0
 } /* symbols_from_dest_or_src */
 
 /*------------------------------------------------------------------
