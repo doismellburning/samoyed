@@ -427,12 +427,11 @@ func symbols_list() {
 	dw_printf("---  ------  ------  ------   ----\n")
 
 	for _, s := range new_sym_ptr {
-		var overlay = s.overlay
-		var symbol = s.symbol
-		var tones [12]C.char
+		var overlay = byte(s.overlay)
+		var symbol = byte(s.symbol)
 		var index = int(symbol - ' ')
 
-		symbols_to_tones(overlay, symbol, &tones[0], C.size_t(len(tones)))
+		var tones = symbols_to_tones(overlay, symbol)
 
 		if overlay == '/' {
 			if index >= len(primary_symtab) {
@@ -441,7 +440,7 @@ func symbols_list() {
 			}
 			dw_printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
 				primary_symtab[index].xy, ' ',
-				index, C.GoString(&tones[0]),
+				index, tones,
 				s.description)
 		} else if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
 			if index >= len(alternate_symtab) {
@@ -450,7 +449,7 @@ func symbols_list() {
 			}
 			dw_printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
 				alternate_symtab[index].xy, overlay,
-				C.GoString(&tones[0]),
+				tones,
 				s.description)
 		} else {
 			if index >= len(alternate_symtab) {
@@ -459,7 +458,7 @@ func symbols_list() {
 			}
 			dw_printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
 				alternate_symtab[index].xy, ' ',
-				symbol-' ', C.GoString(&tones[0]),
+				symbol-' ', tones,
 				s.description)
 		}
 	}
@@ -841,22 +840,22 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
  *
  *------------------------------------------------------------------*/
 
-func symbols_to_tones(symtab C.char, symbol C.char, tones *C.char, tonessiz C.size_t) {
+func symbols_to_tones(symtab byte, symbol byte) string {
 
 	if symtab == '/' {
-		C.strncpy(tones, C.CString(fmt.Sprintf("AB1%02d", symbol-' ')), tonessiz)
+		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
 
 		var text [2]C.char
 		var tt [8]C.char
 
-		text[0] = symtab
+		text[0] = C.char(symtab)
 		text[1] = 0
 
 		tt_text_to_two_key(&text[0], 0, &tt[0])
 
-		C.strncpy(tones, C.CString(fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))), tonessiz)
+		return fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))
 	} else {
-		C.strncpy(tones, C.CString(fmt.Sprintf("AB2%02d", symbol-' ')), tonessiz)
+		return fmt.Sprintf("AB2%02d", symbol-' ')
 	}
 } /* end symbols_to_tones */
