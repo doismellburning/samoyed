@@ -553,13 +553,12 @@ func decode_aprs_print(A *decode_aprs_t) {
 	//dw_printf ("DEBUG decode_aprs_print symbol_code=%c=0x%02x\n", A.g_symbol_code, A.g_symbol_code);
 
 	if A.g_symbol_code != ' ' {
-		var symbol_description [100]C.char
-		symbols_get_description(A.g_symbol_table, A.g_symbol_code, &symbol_description[0], C.size_t(len(symbol_description)))
+		var symbol_description = symbols_get_description(byte(A.g_symbol_table), byte(A.g_symbol_code))
 
 		//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 
 		stemp += ", "
-		stemp += C.GoString(&symbol_description[0])
+		stemp += symbol_description
 	}
 
 	//dw_printf ("DEBUG decode_aprs_print stemp3=%s mfr=%s\n", stemp, A.g_mfr);

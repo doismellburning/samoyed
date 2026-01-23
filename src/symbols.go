@@ -694,11 +694,7 @@ func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
  *
  *------------------------------------------------------------------*/
 
-func symbols_get_description(symtab C.char, symbol C.char, description *C.char, desc_size C.size_t) {
-	/* FIXME KG
-	char tmp2[2];
-	int j;
-	*/
+func symbols_get_description(symtab byte, symbol byte) string {
 
 	symbols_init()
 
@@ -720,8 +716,7 @@ func symbols_get_description(symtab C.char, symbol C.char, description *C.char, 
 		/* We do the latter. */
 
 		symbol = ' '
-		C.strcpy(description, C.CString(primary_symtab[symbol-' '].description))
-		return
+		return primary_symtab[symbol-' '].description
 	}
 
 	// Bounds check before using symbol as index into table.
@@ -735,24 +730,23 @@ func symbols_get_description(symtab C.char, symbol C.char, description *C.char, 
 	// First try to match with the "new" symbols.
 
 	for _, s := range new_sym_ptr {
-		if symtab == s.overlay && symbol == s.symbol {
-			C.strcpy(description, C.CString(s.description))
-			return
+		if C.char(symtab) == s.overlay && C.char(symbol) == s.symbol {
+			return s.description
 		}
 	}
 
 	// Otherwise use the original symbol tables.
 
 	if symtab == '/' {
-		C.strcpy(description, C.CString(primary_symtab[symbol-' '].description))
+		return primary_symtab[symbol-' '].description
 	} else {
-		C.strcpy(description, C.CString(alternate_symtab[symbol-' '].description))
+		var description = alternate_symtab[symbol-' '].description
 		if symtab != '\\' {
-			C.strcat(description, C.CString(" w/overlay "))
-			C.strcat(description, C.CString(string(rune(symtab))))
+			description += " w/overlay "
+			description += string(rune(symtab))
 		}
+		return description
 	}
-
 } /* end symbols_get_description */
 
 /*------------------------------------------------------------------

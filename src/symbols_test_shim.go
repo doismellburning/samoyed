@@ -90,28 +90,28 @@ func symbols_test_main(t *testing.T) {
 	assert.Equal(t, "GPS???", dest, "ERROR 2-5")
 	assert.False(t, ok)
 
-	var description [80]C.char
+	var description string
 
-	_symbols_get_description('J', 's', &description[0], len(description))
-	assert.Equal(t, C.GoString(&description[0]), "Jet Ski", "ERROR 3-1")
+	description = symbols_get_description('J', 's')
+	assert.Equal(t, "Jet Ski", description, "ERROR 3-1")
 
-	_symbols_get_description('/', 'O', &description[0], len(description))
-	assert.Equal(t, C.GoString(&description[0]), "Original Balloon (think Ham balloon)", "ERROR 3-2")
+	description = symbols_get_description('/', 'O')
+	assert.Equal(t, "Original Balloon (think Ham balloon)", description, "ERROR 3-2")
 
-	_symbols_get_description('\\', 'T', &description[0], len(description))
-	assert.Equal(t, C.GoString(&description[0]), "Thunderstorm", "ERROR 3-3")
+	description = symbols_get_description('\\', 'T')
+	assert.Equal(t, "Thunderstorm", description, "ERROR 3-3")
 
-	_symbols_get_description('5', 'T', &description[0], len(description))
-	assert.Equal(t, C.GoString(&description[0]), "Thunderstorm w/overlay 5", "ERROR 3-4")
+	description = symbols_get_description('5', 'T')
+	assert.Equal(t, "Thunderstorm w/overlay 5", description, "ERROR 3-4")
 
 	// Expect to see this:
 	//   Symbol table identifier is not '/' (primary), '\' (alternate), or valid overlay character.
 
-	_symbols_get_description(' ', 'T', &description[0], len(description))
-	assert.Equal(t, C.GoString(&description[0]), "--no-symbol--", "ERROR 3-5")
+	description = symbols_get_description(' ', 'T')
+	assert.Equal(t, "--no-symbol--", description, "ERROR 3-5")
 
-	_symbols_get_description('/', ' ', &description[0], len(description))
-	assert.Equal(t, C.GoString(&description[0]), "--no-symbol--", "ERROR 3-6")
+	description = symbols_get_description('/', ' ')
+	assert.Equal(t, "--no-symbol--", description, "ERROR 3-6")
 
 	_symbols_code_from_description('5', "girl scouts", &symtab, &symbol)
 	assert.Equal(t, C.char('5'), symtab, "ERROR 4-1")
@@ -140,10 +140,6 @@ func symbols_test_main(t *testing.T) {
 	_symbols_code_from_description(' ', "taco bell", &symtab, &symbol)
 	assert.Equal(t, C.char('T'), symtab, "ERROR 4-7")
 	assert.Equal(t, C.char('R'), symbol, "ERROR 4-7")
-}
-
-func _symbols_get_description(symtab rune, symbol rune, description *C.char, desc_size int) {
-	symbols_get_description(C.char(symtab), C.char(symbol), description, C.size_t(desc_size))
 }
 
 func _symbols_code_from_description(overlay rune, description string, symtab *C.char, symbol *C.char) int {
