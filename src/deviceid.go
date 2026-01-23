@@ -85,7 +85,7 @@ func deviceid_init() {
 	var fp *os.File
 	for _, location := range search_locations {
 		var err error
-		fp, err = os.Open(location) //nolint:gosec // It's fine to use a variable here, we still control the contents
+		fp, err = os.Open(location) //nolint:gosec // G304: location comes from hardcoded search_locations (allowlisted search paths), not user input
 
 		if err == nil {
 			defer fp.Close()
