@@ -68,7 +68,6 @@ package direwolf
 // #include <sys/types.h>
 // #include <sys/ioctl.h>
 // #include <errno.h>
-// void hex_dump (unsigned char *p, int len);
 import "C"
 
 import (
@@ -299,7 +298,7 @@ func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.i
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
+			hex_dump(fbuf)
 		}
 
 		kiss_buff = kiss_encapsulate(stemp)

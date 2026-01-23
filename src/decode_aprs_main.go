@@ -60,7 +60,6 @@ package direwolf
 // #include <ctype.h>	/* for isdigit */
 // #include <fcntl.h>
 // #include "regex.h"
-// void hex_dump (unsigned char *p, int len);
 // #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -O0
 import "C"
 
@@ -151,7 +150,7 @@ func DecodeAPRSLine(line string) {
 			var kiss_frame = bytes
 
 			fmt.Printf("--- KISS frame ---\n")
-			hex_dump((*C.uchar)(C.CBytes(kiss_frame)), C.int(len(kiss_frame)))
+			hex_dump(kiss_frame)
 
 			// Put FEND at end to keep kiss_unwrap happy.
 			// Having one at the beginning is optional.

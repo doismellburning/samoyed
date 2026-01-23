@@ -148,7 +148,6 @@ package direwolf
 // #include <stdio.h>
 // #include <ctype.h>
 // #include "regex.h"
-// void hex_dump (unsigned char *p, int len);
 import "C"
 
 import (
@@ -2460,7 +2459,7 @@ func ax25_hex_dump(this_p *packet_t) {
 
 	}
 
-	hex_dump(&fptr[0], flen)
+	hex_dump(C.GoBytes(unsafe.Pointer(&fptr[0]), flen))
 
 } /* end ax25_hex_dump */
 

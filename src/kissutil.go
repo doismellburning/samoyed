@@ -30,7 +30,6 @@ package direwolf
 // #include <dirent.h>
 // #include <sys/stat.h>
 // #define DIR_CHAR "/"
-// void hex_dump (unsigned char *p, int len);
 import "C"
 
 import (
@@ -376,7 +375,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 
 	if verbose {
 		fmt.Printf("Sending to KISS TNC:\n")
-		hex_dump((*C.uchar)(C.CBytes(kissed)), C.int(klen))
+		hex_dump(kissed)
 	}
 
 	if using_tcp {

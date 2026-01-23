@@ -21,7 +21,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// void hex_dump (unsigned char *p, int len);
 import "C"
 
 import (
@@ -275,7 +274,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 				dw_printf("Frame content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				hex_dump((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped[1:])))
+				hex_dump(unwrapped[1:])
 			}
 
 			// Convert to packet object and send to received packet queue.
