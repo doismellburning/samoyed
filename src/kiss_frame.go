@@ -346,7 +346,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 		}
 	}
 
-	hex_dump((*C.uchar)(C.CBytes(pmsg)), C.int(len(pmsg)))
+	hex_dump(pmsg)
 }
 
 /*-------------------------------------------------------------------
@@ -476,7 +476,7 @@ func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 				dw_printf("Packet content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				hex_dump((*C.uchar)(C.CBytes(unwrapped[1:])), C.int(len(unwrapped)-1))
+				hex_dump(unwrapped[1:])
 			}
 
 			kiss_process_msg((*C.uchar)(C.CBytes(unwrapped)), C.int(ulen), debug, kps, client, sendfun)

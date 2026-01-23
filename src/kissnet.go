@@ -155,7 +155,6 @@ same direwolf instance.
 // #include <assert.h>
 // #include <string.h>
 // #include <stddef.h>
-// void hex_dump (unsigned char *p, int len);	// This should be in a .h file.
 import "C"
 
 import (
@@ -444,7 +443,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 								text_color_set(DW_COLOR_DEBUG)
 								dw_printf("\n")
 								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
+								hex_dump(fbuf)
 							}
 
 							kiss_buff = kiss_encapsulate(stemp)

@@ -3,16 +3,12 @@ package direwolf
 // #include <ctype.h>
 import "C"
 
-import (
-	"unsafe"
-)
-
-func hex_dump(_p *C.uchar, length C.int) {
-	var p = C.GoBytes(unsafe.Pointer(_p), length)
+func hex_dump(p []byte) {
 	var offset = 0
+	var length = len(p)
 
 	for length > 0 {
-		var n = int(min(length, 16))
+		var n = min(length, 16)
 
 		dw_printf("  %03x: ", offset)
 		for i := 0; i < n; i++ {
@@ -32,6 +28,6 @@ func hex_dump(_p *C.uchar, length C.int) {
 		dw_printf("\n")
 		p = p[n:]
 		offset += n
-		length -= C.int(n)
+		length -= n
 	}
 }

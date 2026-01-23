@@ -124,7 +124,6 @@ package direwolf
 // #include <time.h>
 // #include <ctype.h>
 // #include <stddef.h>
-// void hex_dump (unsigned char *p, int len);
 import "C"
 
 import (
@@ -275,7 +274,7 @@ func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEMessage) {
 	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
 	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
 
-	hex_dump((*C.uchar)(C.CBytes(pmsg.Data)), C.int(pmsg.Header.DataLen))
+	hex_dump(pmsg.Data[:pmsg.Header.DataLen])
 }
 
 /*-------------------------------------------------------------------
