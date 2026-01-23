@@ -275,8 +275,8 @@ const NEW_SYM_INIT_SIZE = 20
 const NEW_SYM_DESC_LEN = 29
 
 type new_sym_t struct {
-	overlay     C.char
-	symbol      C.char
+	overlay     byte
+	symbol      byte
 	description string
 }
 
@@ -369,8 +369,8 @@ func symbols_init() {
 		}
 
 		var newSymbol = new(new_sym_t)
-		newSymbol.overlay = C.char(line[COL1_OVERLAY])
-		newSymbol.symbol = C.char(line[COL2_SYMBOL])
+		newSymbol.overlay = line[COL1_OVERLAY]
+		newSymbol.symbol = line[COL2_SYMBOL]
 		newSymbol.description = strings.TrimSpace(line[COL6_DESC:])
 
 		new_sym_ptr = append(new_sym_ptr, newSymbol)
@@ -429,10 +429,9 @@ func symbols_list() {
 	for _, s := range new_sym_ptr {
 		var overlay = s.overlay
 		var symbol = s.symbol
-		var tones [12]C.char
 		var index = int(symbol - ' ')
 
-		symbols_to_tones(overlay, symbol, &tones[0], C.size_t(len(tones)))
+		var tones = symbols_to_tones(overlay, symbol)
 
 		if overlay == '/' {
 			if index >= len(primary_symtab) {
@@ -441,7 +440,7 @@ func symbols_list() {
 			}
 			dw_printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
 				primary_symtab[index].xy, ' ',
-				index, C.GoString(&tones[0]),
+				index, tones,
 				s.description)
 		} else if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
 			if index >= len(alternate_symtab) {
@@ -450,7 +449,7 @@ func symbols_list() {
 			}
 			dw_printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
 				alternate_symtab[index].xy, overlay,
-				C.GoString(&tones[0]),
+				tones,
 				s.description)
 		} else {
 			if index >= len(alternate_symtab) {
@@ -459,7 +458,7 @@ func symbols_list() {
 			}
 			dw_printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
 				alternate_symtab[index].xy, ' ',
-				symbol-' ', C.GoString(&tones[0]),
+				symbol-' ', tones,
 				s.description)
 		}
 	}
@@ -481,8 +480,9 @@ func symbols_list() {
  *		dest	- Destination address.
  *			  Don't care if SSID is present or not.
  *
- * Outputs:	*symtab
- *		*symbol
+ * Returns:	symtab
+ *		symbol
+ *      ok
  *
  * Description:	There are 3 different ways to specify the symbol,
  *		in this order of precedence:
@@ -523,9 +523,7 @@ var ssid_to_sym = [16]byte{
 	'v',  /* 15 - Van */
 }
 
-func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.char, symbol *C.char) {
-
-	var dest = C.GoString(_dest)
+func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bool) {
 
 	/*
 	 * This part does not apply to MIC-E format because the destination
@@ -540,9 +538,7 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 		if strings.HasPrefix(dest, "GPSC") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
-				*symtab = '/' /* Primary */
-				*symbol = C.char(' ' + nn)
-				return
+				return '/', byte(' ' + nn), true // Primary
 			}
 		}
 
@@ -553,9 +549,7 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 		if strings.HasPrefix(dest, "GPSE") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
-				*symtab = '\\' /* Alternate. */
-				*symbol = C.char(' ' + nn)
-				return
+				return '\\', byte(' ' + nn), true // Alternate
 			}
 		}
 
@@ -571,9 +565,7 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 
 			for nn := 1; nn <= 94; nn++ {
 				if xy == primary_symtab[nn].xy {
-					*symtab = '/' /* Primary. */
-					*symbol = C.char(' ' + nn)
-					return
+					return '/', byte(' ' + nn), true // Primary
 				}
 			}
 		}
@@ -597,16 +589,14 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 
 			for nn := 1; nn <= 94; nn++ {
 				if xy == alternate_symtab[nn].xy {
-					*symtab = '\\' /* Alternate. */
-					*symbol = C.char(' ' + nn)
+					var symtab byte = '\\' // Alternate
 					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
-						*symtab = C.char(z)
+						symtab = z
 					}
-					return
+					return symtab, byte(' ' + nn), true
 				}
 			}
 		}
-
 	} /* end not MIC-E */
 
 	/*
@@ -630,17 +620,16 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
 	// for the system type.
 
 	if dti == '$' {
-		var _, ssidStr, found = strings.Cut(C.GoString(src), "-")
+		var _, ssidStr, found = strings.Cut(src, "-")
 		if found {
 			var ssid, _ = strconv.Atoi(ssidStr)
 			if ssid >= 1 && ssid <= 15 {
-				*symtab = '/' /* All in Primary table. */
-				*symbol = C.char(ssid_to_sym[ssid])
-				return
+				return '/', ssid_to_sym[ssid], true // All in Primary table
 			}
 		}
 	}
 
+	return 0, 0, false
 } /* symbols_from_dest_or_src */
 
 /*------------------------------------------------------------------
@@ -652,40 +641,36 @@ func symbols_from_dest_or_src(dti C.char, src *C.char, _dest *C.char, symtab *C.
  * Inputs:	symtab		/, \, 0-9, A-Z
  *		symbol		any printable character ! to ~
  *
- * Outputs:	dest		6 character "destination" of the forms
+ * Returns:	dest		6 character "destination" of the forms
  *					GPSCnn  - primary table.
  *					GPSEnn  - alternate table.
  *					GPSxyz  - alternate with overlay.
  *
- * Returns:	0 for success, 1 for error.
+ *          ok	true for success, false for error.
  *
  *------------------------------------------------------------------*/
 
-func symbols_into_dest(symtab C.char, symbol C.char, dest *C.char) C.int {
+func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
 
 	if symbol >= '!' && symbol <= '~' && symtab == '/' {
 
 		/* Primary Symbol table. */
-		C.strcpy(dest, C.CString(fmt.Sprintf("GPSC%02d", symbol-' ')))
-		return (0)
+		return fmt.Sprintf("GPSC%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && symtab == '\\' {
 
 		/* Alternate Symbol table. */
-		C.strcpy(dest, C.CString(fmt.Sprintf("GPSE%02d", symbol-' ')))
-		return (0)
+		return fmt.Sprintf("GPSE%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
 
 		/* Alternate Symbol table with overlay. */
-		C.strcpy(dest, C.CString(fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab)))
-		return (0)
+		return fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab), true
 	}
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Could not convert symbol \"%c%c\" to GPSxyz destination format.\n",
 		symtab, symbol)
 
-	C.strcpy(dest, C.CString("GPS???")) /* Error. */
-	return (1)
+	return "GPS???", false
 }
 
 /*------------------------------------------------------------------
@@ -709,11 +694,7 @@ func symbols_into_dest(symtab C.char, symbol C.char, dest *C.char) C.int {
  *
  *------------------------------------------------------------------*/
 
-func symbols_get_description(symtab C.char, symbol C.char, description *C.char, desc_size C.size_t) {
-	/* FIXME KG
-	char tmp2[2];
-	int j;
-	*/
+func symbols_get_description(symtab byte, symbol byte) string {
 
 	symbols_init()
 
@@ -735,8 +716,7 @@ func symbols_get_description(symtab C.char, symbol C.char, description *C.char, 
 		/* We do the latter. */
 
 		symbol = ' '
-		C.strcpy(description, C.CString(primary_symtab[symbol-' '].description))
-		return
+		return primary_symtab[symbol-' '].description
 	}
 
 	// Bounds check before using symbol as index into table.
@@ -751,23 +731,22 @@ func symbols_get_description(symtab C.char, symbol C.char, description *C.char, 
 
 	for _, s := range new_sym_ptr {
 		if symtab == s.overlay && symbol == s.symbol {
-			C.strcpy(description, C.CString(s.description))
-			return
+			return s.description
 		}
 	}
 
 	// Otherwise use the original symbol tables.
 
 	if symtab == '/' {
-		C.strcpy(description, C.CString(primary_symtab[symbol-' '].description))
+		return primary_symtab[symbol-' '].description
 	} else {
-		C.strcpy(description, C.CString(alternate_symtab[symbol-' '].description))
+		var description = alternate_symtab[symbol-' '].description
 		if symtab != '\\' {
-			C.strcat(description, C.CString(" w/overlay "))
-			C.strcat(description, C.CString(string(rune(symtab))))
+			description += " w/overlay "
+			description += string(rune(symtab))
 		}
+		return description
 	}
-
 } /* end symbols_get_description */
 
 /*------------------------------------------------------------------
@@ -782,14 +761,11 @@ func symbols_get_description(symtab C.char, symbol C.char, description *C.char, 
  *
  * Outputs:	symtab		/, \, 0-9, A-Z
  *		symbol		any printable character ! to ~
- *
- * Returns:	1 for success, 0 for failure.
+ *      ok          true for success, false for failure.
  *
  *------------------------------------------------------------------*/
 
-func symbols_code_from_description(overlay C.char, _description *C.char, symtab *C.char, symbol *C.char) C.int {
-
-	var description = C.GoString(_description)
+func symbols_code_from_description(overlay byte, description string) (byte, byte, bool) {
 
 	symbols_init()
 
@@ -802,9 +778,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
 		for j, s := range alternate_symtab {
 			if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-				*symtab = overlay
-				*symbol = C.char(j + ' ')
-				return (1)
+				return overlay, byte(j + ' '), true
 			}
 		}
 		/* If that fails should we give up or ignore the overlay and keep trying? */
@@ -815,9 +789,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 */
 	for j, s := range primary_symtab {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			*symtab = '/'
-			*symbol = C.char(j + ' ')
-			return (1)
+			return '/', byte(j + ' '), true
 		}
 	}
 
@@ -826,9 +798,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 */
 	for j, s := range alternate_symtab {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			*symtab = '\\'
-			*symbol = C.char(j + ' ')
-			return (1)
+			return '\\', byte(j + ' '), true
 		}
 	}
 
@@ -839,9 +809,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 */
 	for _, s := range new_sym_ptr {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
-			*symtab = s.overlay
-			*symbol = s.symbol
-			return (1)
+			return s.overlay, s.symbol, true
 		}
 	}
 
@@ -849,10 +817,7 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
 	 * Default to something generic like house.
 	 * Caller is responsible for issuing error message.
 	 */
-	*symtab = '/'
-	*symbol = '-'
-	return (0)
-
+	return '/', '-', false
 } /* end symbols_code_from_description */
 
 /*------------------------------------------------------------------
@@ -876,22 +841,22 @@ func symbols_code_from_description(overlay C.char, _description *C.char, symtab 
  *
  *------------------------------------------------------------------*/
 
-func symbols_to_tones(symtab C.char, symbol C.char, tones *C.char, tonessiz C.size_t) {
+func symbols_to_tones(symtab byte, symbol byte) string {
 
 	if symtab == '/' {
-		C.strncpy(tones, C.CString(fmt.Sprintf("AB1%02d", symbol-' ')), tonessiz)
+		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
 
 		var text [2]C.char
 		var tt [8]C.char
 
-		text[0] = symtab
+		text[0] = C.char(symtab)
 		text[1] = 0
 
 		tt_text_to_two_key(&text[0], 0, &tt[0])
 
-		C.strncpy(tones, C.CString(fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))), tonessiz)
+		return fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))
 	} else {
-		C.strncpy(tones, C.CString(fmt.Sprintf("AB2%02d", symbol-' ')), tonessiz)
+		return fmt.Sprintf("AB2%02d", symbol-' ')
 	}
 } /* end symbols_to_tones */
