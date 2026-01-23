@@ -17,23 +17,23 @@ func symbols_test_main(t *testing.T) {
 
 	var symtab, symbol byte
 
-	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "GPSC43")
+	symtab, symbol, _ = symbols_from_dest_or_src('T', "W1ABC", "GPSC43")
 	assert.Equal(t, byte('/'), symtab, "ERROR 1-1")
 	assert.Equal(t, byte('K'), symbol, "ERROR 1-1")
 
-	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "GPSE87")
+	symtab, symbol, _ = symbols_from_dest_or_src('T', "W1ABC", "GPSE87")
 	assert.Equal(t, byte('\\'), symtab, "ERROR 1-2")
 	assert.Equal(t, byte('w'), symbol, "ERROR 1-2")
 
-	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "SPCBL")
+	symtab, symbol, _ = symbols_from_dest_or_src('T', "W1ABC", "SPCBL")
 	assert.Equal(t, byte('/'), symtab, "ERROR 1-3")
 	assert.Equal(t, byte('+'), symbol, "ERROR 1-3")
 
-	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "SYMST")
+	symtab, symbol, _ = symbols_from_dest_or_src('T', "W1ABC", "SYMST")
 	assert.Equal(t, byte('\\'), symtab, "ERROR 1-4")
 	assert.Equal(t, byte('t'), symbol, "ERROR 1-4")
 
-	symtab, symbol = symbols_from_dest_or_src('T', "W1ABC", "GPSOD9")
+	symtab, symbol, _ = symbols_from_dest_or_src('T', "W1ABC", "GPSOD9")
 	assert.Equal(t, byte('9'), symtab, "ERROR 1-5")
 	assert.Equal(t, byte('#'), symbol, "ERROR 1-5")
 

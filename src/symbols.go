@@ -480,8 +480,9 @@ func symbols_list() {
  *		dest	- Destination address.
  *			  Don't care if SSID is present or not.
  *
- * Outputs:	*symtab
- *		*symbol
+ * Returns:	symtab
+ *		symbol
+ *      ok
  *
  * Description:	There are 3 different ways to specify the symbol,
  *		in this order of precedence:
@@ -522,7 +523,7 @@ var ssid_to_sym = [16]byte{
 	'v',  /* 15 - Van */
 }
 
-func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
+func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bool) {
 
 	/*
 	 * This part does not apply to MIC-E format because the destination
@@ -537,7 +538,7 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
 		if strings.HasPrefix(dest, "GPSC") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
-				return '/', byte(' ' + nn) // Primary
+				return '/', byte(' ' + nn), true // Primary
 			}
 		}
 
@@ -548,7 +549,7 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
 		if strings.HasPrefix(dest, "GPSE") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
-				return '\\', byte(' ' + nn) // Alternate
+				return '\\', byte(' ' + nn), true // Alternate
 			}
 		}
 
@@ -564,7 +565,7 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
 
 			for nn := 1; nn <= 94; nn++ {
 				if xy == primary_symtab[nn].xy {
-					return '/', byte(' ' + nn) // Primary
+					return '/', byte(' ' + nn), true // Primary
 				}
 			}
 		}
@@ -592,7 +593,7 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
 					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
 						symtab = z
 					}
-					return symtab, byte(' ' + nn)
+					return symtab, byte(' ' + nn), true
 				}
 			}
 		}
@@ -623,12 +624,12 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte) {
 		if found {
 			var ssid, _ = strconv.Atoi(ssidStr)
 			if ssid >= 1 && ssid <= 15 {
-				return '/', ssid_to_sym[ssid] // All in Primary table
+				return '/', ssid_to_sym[ssid], true // All in Primary table
 			}
 		}
 	}
 
-	return 0, 0
+	return 0, 0, false
 } /* symbols_from_dest_or_src */
 
 /*------------------------------------------------------------------
