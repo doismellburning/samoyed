@@ -90,7 +90,7 @@ func fsin256(x C.uint) C.float {
 const MIN_G = 0.5
 const MAX_G = 4.0
 
-/* TODO: static */ // TODO KG float space_gain[MAX_SUBCHANS];
+var afskSpaceGain [MAX_SUBCHANS]C.float
 
 /*------------------------------------------------------------------
  *
@@ -386,10 +386,10 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 	 * Starting with version 1.2
 	 * try using multiple slicing points instead of the traditional AGC.
 	 */
-	space_gain[0] = MIN_G
+	afskSpaceGain[0] = MIN_G
 	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SUBCHANS-1))
 	for j := 1; j < MAX_SUBCHANS; j++ {
-		space_gain[j] = space_gain[j-1] * C.float(step)
+		afskSpaceGain[j] = afskSpaceGain[j-1] * C.float(step)
 	}
 
 } /* demod_afsk_init */
@@ -590,8 +590,8 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 				D.s_peak, D.s_valley, _ = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
 
 				for slice := C.int(0); slice < D.num_slicers; slice++ {
-					var demod_out = m_amp - s_amp*space_gain[slice]
-					var amp = 0.5 * (D.m_peak - D.m_valley + (D.s_peak-D.s_valley)*space_gain[slice])
+					var demod_out = m_amp - s_amp*afskSpaceGain[slice]
+					var amp = 0.5 * (D.m_peak - D.m_valley + (D.s_peak-D.s_valley)*afskSpaceGain[slice])
 					if amp < 0.0000001 {
 						amp = 1 // avoid divide by zero with no signal.
 					}
