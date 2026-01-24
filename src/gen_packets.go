@@ -298,7 +298,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		} else {
 			bitrate, _ = strconv.Atoi(*bitrateStr)
 		}
-		modem.achan[0].baud = C.int(bitrate)
+		modem.achan[0].baud = bitrate
 		fmt.Printf("Data rate set to %d bits / second.\n", modem.achan[0].baud)
 
 		// We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c,
@@ -354,7 +354,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	// These must be processed after -B option.
 	if *markFrequency > 0 {
-		modem.achan[0].mark_freq = C.int(*markFrequency)
+		modem.achan[0].mark_freq = *markFrequency
 		fmt.Printf("Mark frequency set to %d Hz.\n", modem.achan[0].mark_freq)
 		if modem.achan[0].mark_freq < 300 || modem.achan[0].mark_freq > 3000 {
 			text_color_set(DW_COLOR_ERROR)
@@ -364,7 +364,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	if *spaceFrequency > 0 {
-		modem.achan[0].space_freq = C.int(*spaceFrequency)
+		modem.achan[0].space_freq = *spaceFrequency
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Space frequency set to %d Hz.\n", modem.achan[0].space_freq)
 		if modem.achan[0].space_freq < 300 || modem.achan[0].space_freq > 3000 {
@@ -381,7 +381,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			pflag.Usage()
 			os.Exit(1)
 		}
-		modem.achan[0].baud = C.int(bitrateOverride)
+		modem.achan[0].baud = bitrateOverride
 		fmt.Printf("Data rate set to %d bits / second.\n", modem.achan[0].baud)
 	}
 
@@ -420,7 +420,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			fmt.Printf("Can't mix -X with -I or -i.\n")
 			os.Exit(1)
 		}
-		modem.achan[0].fx25_strength = C.int(*fx25CheckBytes)
+		modem.achan[0].fx25_strength = *fx25CheckBytes
 		modem.achan[0].layer2_xmit = LAYER2_FX25
 	}
 
@@ -555,7 +555,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 		for speed_error := -variable_speed_max_error; speed_error <= variable_speed_max_error+0.001; speed_error += variable_speed_increment {
 			// Baud is int so we get some roundoff.  Make it real?
-			modem.achan[0].baud = C.int(float64(normal_speed) * (1. + speed_error/100.))
+			modem.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
 			gen_tone_init(&modem, C.int(*amplitude/2), 1)
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error)
@@ -820,17 +820,17 @@ func send_packet(str string) {
 		// If stereo, put same thing in each channel.
 
 		for c := 0; c < modem.adev[0].num_channels; c++ {
-			var samples_per_symbol C.int
+			var samples_per_symbol int
 
 			// Insert random amount of quiet time.
 
 			switch modem.achan[c].modem_type {
 			case MODEM_QPSK:
-				samples_per_symbol = C.int(modem.adev[0].samples_per_sec) / (modem.achan[c].baud / 2)
+				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 2)
 			case MODEM_8PSK:
-				samples_per_symbol = C.int(modem.adev[0].samples_per_sec) / (modem.achan[c].baud / 3)
+				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 3)
 			default:
-				samples_per_symbol = C.int(modem.adev[0].samples_per_sec) / modem.achan[c].baud
+				samples_per_symbol = modem.adev[0].samples_per_sec / modem.achan[c].baud
 			}
 
 			// Provide enough time for the DCD to drop.

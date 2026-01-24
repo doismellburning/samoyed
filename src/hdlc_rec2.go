@@ -242,7 +242,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 	retry_cfg.contig.nr_bits = 0
 	retry_cfg.contig.bit_idx = 0
 
-	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, (passall > 0) && (fix_bits == RETRY_NONE))
+	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
 	if ok {
 		/* TODO KG
 		#if DEBUG
@@ -263,7 +263,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 		return
 	}
 
-	if passall > 0 {
+	if passall {
 		/* Exhausted all desired fix up attempts. */
 		/* Let thru even with bad CRC.  Of course, it still */
 		/* needs to be a minimum number of whole octets. */
@@ -453,7 +453,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel C.int, subchan C.int, slice C.i
 func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel alevel_t) bool {
 	//int len;
 	//retry_t fix_bits = save_audio_config_p.achan[channel].fix_bits;
-	var passall = save_audio_config_p.achan[channel].passall > 0
+	var passall = save_audio_config_p.achan[channel].passall
 	/* TODO KG
 	#if DEBUG_LATER
 		double tstart, tend;

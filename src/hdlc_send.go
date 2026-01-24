@@ -50,7 +50,7 @@ func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_
 
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
 
-		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
+		var n = il2p_send_frame(channel, pp, C.int(audio_config_p.achan[channel].il2p_max_fec), C.int(audio_config_p.achan[channel].il2p_invert_polarity))
 		if n > 0 {
 			return (n)
 		}
@@ -60,7 +60,7 @@ func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_
 	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
 		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
 		var flen = ax25_pack(pp, &fbuf[0])
-		var n = fx25_send_frame(channel, &fbuf[0], flen, audio_config_p.achan[channel].fx25_strength, false)
+		var n = fx25_send_frame(channel, &fbuf[0], flen, C.int(audio_config_p.achan[channel].fx25_strength), false)
 		if n > 0 {
 			return (n)
 		}
@@ -159,7 +159,7 @@ func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_
 
 	for j := C.int(0); j < nbytes; j++ {
 		if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P {
-			send_byte_msb_first(channel, IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
+			send_byte_msb_first(channel, IL2P_PREAMBLE, C.int(audio_config_p.achan[channel].il2p_invert_polarity))
 		} else {
 			send_control_nrzi(channel, 0x7e)
 		}
