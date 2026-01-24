@@ -162,12 +162,12 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
 	 */
 
 	for j := 0; j < MAX_RADIO_CHANS; j++ {
-		xmit_bits_per_sec[j] = p_modem.achan[j].baud
-		xmit_slottime[j] = p_modem.achan[j].slottime
-		xmit_persist[j] = p_modem.achan[j].persist
-		xmit_txdelay[j] = p_modem.achan[j].txdelay
-		xmit_txtail[j] = p_modem.achan[j].txtail
-		xmit_fulldup[j] = p_modem.achan[j].fulldup
+		xmit_bits_per_sec[j] = C.int(p_modem.achan[j].baud)
+		xmit_slottime[j] = C.int(p_modem.achan[j].slottime)
+		xmit_persist[j] = C.int(p_modem.achan[j].persist)
+		xmit_txdelay[j] = C.int(p_modem.achan[j].txdelay)
+		xmit_txtail[j] = C.int(p_modem.achan[j].txtail)
+		xmit_fulldup[j] = bool2Cint(p_modem.achan[j].fulldup)
 	}
 
 	/* TODO KG
@@ -1197,7 +1197,7 @@ func wait_for_clear_channel(channel C.int, slottime C.int, persist C.int, fulldu
 		 */
 
 		if save_audio_config_p.achan[channel].dwait > 0 {
-			SLEEP_MS(int(save_audio_config_p.achan[channel].dwait) * 10)
+			SLEEP_MS(save_audio_config_p.achan[channel].dwait * 10)
 		}
 
 		if hdlc_rec_data_detect_any(channel) > 0 {

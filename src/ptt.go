@@ -295,7 +295,7 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 	// When we "export" GPIO number, we will store the corresponding
 	// device name for future use when we want to access it.
 
-	var gpio_num C.int
+	var gpio_num int
 	var gpio_name string
 
 	if direction > 0 {
@@ -318,7 +318,7 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 		os.Exit(1)
 	}
 
-	var stemp = strconv.Itoa(int(gpio_num))
+	var stemp = strconv.Itoa(gpio_num)
 	var n, writeErr = fd.WriteString(stemp)
 	if n != len(stemp) || writeErr != nil { //nolint: staticcheck
 		/* TODO KG Figure out write errs here
@@ -585,7 +585,7 @@ func ptt_init(audio_config_p *audio_s) {
 		for ot := 0; ot < NUM_OCTYPES; ot++ {
 			if ptt_debug_level >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%d\n",
+				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%t\n",
 					ch,
 					otnames[ot],
 					audio_config_p.achan[ch].octrl[ot].ptt_method,
@@ -716,7 +716,7 @@ func ptt_init(audio_config_p *audio_s) {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
-					var rc = gpiod_probe(chip_name, line_number)
+					var rc = gpiod_probe(chip_name, C.int(line_number))
 					if rc < 0 {
 						text_color_set(DW_COLOR_ERROR)
 						//No, people won't notice the error message and be confused.  Just terminate.
@@ -743,13 +743,13 @@ func ptt_init(audio_config_p *audio_s) {
 			// output control type, PTT, DCD, CON, ...
 			for ot := C.int(0); ot < NUM_OCTYPES; ot++ {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
+					export_gpio(ch, ot, bool2Cint(audio_config_p.achan[ch].octrl[ot].ptt_invert), 1)
 				}
 			}
 			// input control type
 			for it := C.int(0); it < NUM_ICTYPES; it++ {
 				if audio_config_p.achan[ch].ictrl[it].method == PTT_METHOD_GPIO {
-					export_gpio(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
+					export_gpio(ch, it, bool2Cint(audio_config_p.achan[ch].ictrl[it].invert), 0)
 				}
 			}
 		}
@@ -1037,7 +1037,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 	// I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 
 	// #ifndef TEST
-	if ot == OCTYPE_PTT && save_audio_config_p.achan[channel].fulldup == 0 {
+	if ot == OCTYPE_PTT && !save_audio_config_p.achan[channel].fulldup {
 		demod_mute_input(channel, ptt_signal)
 	}
 	// #endif
@@ -1055,10 +1055,10 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 	 * Inverted output?
 	 */
 
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_invert != 0 {
+	if save_audio_config_p.achan[channel].octrl[ot].ptt_invert {
 		ptt = 1 - ptt
 	}
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_invert2 != 0 {
+	if save_audio_config_p.achan[channel].octrl[ot].ptt_invert2 {
 		ptt2 = 1 - ptt2
 	}
 
@@ -1218,7 +1218,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 
 		if cm108_set_gpio_pin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
-			int(save_audio_config_p.achan[channel].octrl[ot].out_gpio_num), int(ptt)) != 0 {
+			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, int(ptt)) != 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR:  %s for channel %d has failed.  See User Guide for troubleshooting tips.\n", otnames[ot], channel)
 		}
@@ -1274,7 +1274,7 @@ func get_input_real(it C.int, channel C.int) C.int {
 		fd.Close()
 
 		var v, _ = strconv.Atoi(string(vtemp))
-		if C.int(v) != save_audio_config_p.achan[channel].ictrl[it].invert {
+		if C.int(v) != bool2Cint(save_audio_config_p.achan[channel].ictrl[it].invert) {
 			return 1
 		} else {
 			return 0
@@ -1389,7 +1389,7 @@ func PTTTestMain() {
 
 	/* Same thing again but invert RTS. */
 
-	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = 1
+	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
 	ptt_init(&my_audio_config)
 

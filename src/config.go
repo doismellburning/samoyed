@@ -896,7 +896,6 @@ func config_init(fname string, p_audio_config *audio_s,
 
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
 		p_audio_config.achan[channel].sanity_test = SANITY_APRS
-		p_audio_config.achan[channel].passall = 0
 
 		for ot := 0; ot < NUM_OCTYPES; ot++ {
 			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
@@ -905,14 +904,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_NONE
 			p_audio_config.achan[channel].octrl[ot].out_gpio_num = 0
 			p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = 0
-			p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
-			p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
 		}
 
 		for it := 0; it < NUM_ICTYPES; it++ {
 			p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE
 			p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0
-			p_audio_config.achan[channel].ictrl[it].invert = 0
 		}
 
 		p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
@@ -1504,7 +1500,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				n, _ = strconv.Atoi(t)
 			}
 			if n >= MIN_BAUD && n <= MAX_BAUD {
-				p_audio_config.achan[channel].baud = C.int(n)
+				p_audio_config.achan[channel].baud = n
 				if n != 300 && n != 1200 && n != 2400 && n != 4800 && n != 9600 && n != 19200 && n != MAX_BAUD-1 && n != MAX_BAUD-2 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?\n", line, n)
@@ -1577,7 +1573,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				/* Of course the MIC and SPKR connections won't */
 				/* have enough bandwidth so radios must be modified. */
 				if n >= 300 && n <= 5000 {
-					p_audio_config.achan[channel].mark_freq = C.int(n)
+					p_audio_config.achan[channel].mark_freq = n
 				} else {
 					p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
 					text_color_set(DW_COLOR_ERROR)
@@ -1595,7 +1591,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 				n, _ = strconv.Atoi(t)
 				if n >= 300 && n <= 5000 {
-					p_audio_config.achan[channel].space_freq = C.int(n)
+					p_audio_config.achan[channel].space_freq = n
 				} else {
 					p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
 					text_color_set(DW_COLOR_ERROR)
@@ -1657,7 +1653,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						dw_printf("Line %d: Number of demodulators is out of range. Using 3.\n", line)
 						n = 3
 					}
-					p_audio_config.achan[channel].num_freq = C.int(n)
+					p_audio_config.achan[channel].num_freq = n
 
 					t = split("", false)
 					if t != "" {
@@ -1667,7 +1663,7 @@ func config_init(fname string, p_audio_config *audio_s,
 							dw_printf("Line %d: Unreasonable value for offset between modems.  Using 50 Hz.\n", line)
 							n = 50
 						}
-						p_audio_config.achan[channel].offset = C.int(n)
+						p_audio_config.achan[channel].offset = n
 
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: New style for multiple demodulators is %d@%d\n", line,
@@ -1688,8 +1684,8 @@ func config_init(fname string, p_audio_config *audio_s,
 						var mark, _ = strconv.Atoi(markStr)
 						var space, _ = strconv.Atoi(spaceStr)
 
-						p_audio_config.achan[channel].mark_freq = C.int(mark)
-						p_audio_config.achan[channel].space_freq = C.int(space)
+						p_audio_config.achan[channel].mark_freq = mark
+						p_audio_config.achan[channel].space_freq = space
 
 						if p_audio_config.achan[channel].mark_freq == 0 && p_audio_config.achan[channel].space_freq == 0 {
 							p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE
@@ -1714,8 +1710,8 @@ func config_init(fname string, p_audio_config *audio_s,
 						var num, _ = strconv.Atoi(numStr)
 						var offset, _ = strconv.Atoi(offsetStr)
 
-						p_audio_config.achan[channel].num_freq = C.int(num)
-						p_audio_config.achan[channel].offset = C.int(offset)
+						p_audio_config.achan[channel].num_freq = num
+						p_audio_config.achan[channel].offset = offset
 
 						if p_audio_config.achan[channel].num_freq < 1 || p_audio_config.achan[channel].num_freq > MAX_SUBCHANS {
 							text_color_set(DW_COLOR_ERROR)
@@ -1724,7 +1720,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						}
 
 						if p_audio_config.achan[channel].offset < 5 ||
-							p_audio_config.achan[channel].offset > C.abs(p_audio_config.achan[channel].mark_freq-p_audio_config.achan[channel].space_freq)/2 {
+							float64(p_audio_config.achan[channel].offset) > math.Abs(float64(p_audio_config.achan[channel].mark_freq-p_audio_config.achan[channel].space_freq))/2 {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Offset between demodulators is unreasonable. Using 50 Hz.\n", line)
 							p_audio_config.achan[channel].offset = 50
@@ -1737,7 +1733,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						var n, _ = strconv.Atoi(t[1:])
 
 						if n >= 1 && n <= 8 {
-							p_audio_config.achan[channel].decimate = C.int(n)
+							p_audio_config.achan[channel].decimate = n
 						} else {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Ignoring unreasonable sample rate division factor of %d.\n", line, n)
@@ -1746,7 +1742,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						var n, _ = strconv.Atoi(t[1:])
 
 						if n >= 1 && n <= 4 {
-							p_audio_config.achan[channel].upsample = C.int(n)
+							p_audio_config.achan[channel].upsample = n
 						} else {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Ignoring unreasonable upsample ratio of %d.\n", line, n)
@@ -1851,7 +1847,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				} else if strings.EqualFold(t, "NONE") {
 					p_audio_config.achan[channel].sanity_test = SANITY_NONE
 				} else if strings.EqualFold(t, "PASSALL") {
-					p_audio_config.achan[channel].passall = 1
+					p_audio_config.achan[channel].passall = true
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: There is an old saying, \"Be careful what you ask for because you might get it.\"\n", line)
 					dw_printf("The PASSALL option means allow all frames even when they are invalid.\n")
@@ -1930,11 +1926,11 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var gpio, _ = strconv.Atoi(t)
 				if gpio < 0 {
-					p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * C.int(gpio)
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
+					p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * gpio
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = true
 				} else {
-					p_audio_config.achan[channel].octrl[ot].out_gpio_num = C.int(gpio)
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
+					p_audio_config.achan[channel].octrl[ot].out_gpio_num = gpio
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				}
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO
 				// #endif
@@ -1978,11 +1974,11 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var gpio, _ = strconv.Atoi(t)
 				if gpio < 0 {
-					p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * C.int(gpio)
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
+					p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * gpio
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = true
 				} else {
-					p_audio_config.achan[channel].octrl[ot].out_gpio_num = C.int(gpio)
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
+					p_audio_config.achan[channel].octrl[ot].out_gpio_num = gpio
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				}
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD
 				/* TODO KG
@@ -2008,11 +2004,11 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var lpt, _ = strconv.Atoi(t)
 				if lpt < 0 {
-					p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = -1 * C.int(lpt)
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
+					p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = -1 * lpt
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = true
 				} else {
-					p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = C.int(lpt)
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
+					p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = lpt
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				}
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT
 				/*
@@ -2047,7 +2043,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						dw_printf("Config file line %d: Unreasonable model number %d for hamlib.\n", line, n)
 						continue
 					}
-					p_audio_config.achan[channel].octrl[ot].ptt_model = C.int(n)
+					p_audio_config.achan[channel].octrl[ot].ptt_model = n
 				}
 
 				t = split("", false)
@@ -2068,7 +2064,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						continue
 					}
 					var n, _ = strconv.Atoi(t)
-					p_audio_config.achan[channel].octrl[ot].ptt_rate = C.int(n)
+					p_audio_config.achan[channel].octrl[ot].ptt_rate = n
 				}
 
 				t = split("", false)
@@ -2114,7 +2110,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				p_audio_config.achan[channel].octrl[ot].out_gpio_num = 3 // All known designs use GPIO 3.
 				// User can override for special cases.
-				p_audio_config.achan[channel].octrl[ot].ptt_invert = 0 // High for transmit.
+				p_audio_config.achan[channel].octrl[ot].ptt_invert = false // High for transmit.
 				p_audio_config.achan[channel].octrl[ot].ptt_device = ""
 
 				// Try to find PTT device for audio output device.
@@ -2131,12 +2127,12 @@ func config_init(fname string, p_audio_config *audio_s,
 					}
 					if t[0] == '-' {
 						var gpio, _ = strconv.Atoi(t[1:])
-						p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * C.int(gpio)
-						p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
+						p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * gpio
+						p_audio_config.achan[channel].octrl[ot].ptt_invert = true
 					} else if unicode.IsDigit(rune(t[0])) {
 						var gpio, _ = strconv.Atoi(t)
-						p_audio_config.achan[channel].octrl[ot].out_gpio_num = C.int(gpio)
-						p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
+						p_audio_config.achan[channel].octrl[ot].out_gpio_num = gpio
+						p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 					} else if t[0] == '/' {
 						p_audio_config.achan[channel].octrl[ot].ptt_device = t
 					} else {
@@ -2193,16 +2189,16 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				if strings.EqualFold(t, "rts") {
 					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				} else if strings.EqualFold(t, "dtr") {
 					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 0
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				} else if strings.EqualFold(t, "-rts") {
 					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_RTS
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = true
 				} else if strings.EqualFold(t, "-dtr") {
 					p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_DTR
-					p_audio_config.achan[channel].octrl[ot].ptt_invert = 1
+					p_audio_config.achan[channel].octrl[ot].ptt_invert = true
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
@@ -2221,16 +2217,16 @@ func config_init(fname string, p_audio_config *audio_s,
 
 					if strings.EqualFold(t, "rts") {
 						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
-						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
+						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = false
 					} else if strings.EqualFold(t, "dtr") {
 						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
-						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 0
+						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = false
 					} else if strings.EqualFold(t, "-rts") {
 						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
-						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 1
+						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = true
 					} else if strings.EqualFold(t, "-dtr") {
 						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
-						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = 1
+						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = true
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file line %d: Expected RTS or DTR after first RTS or DTR.\n",
@@ -2291,11 +2287,11 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var gpio, _ = strconv.Atoi(t)
 				if gpio < 0 {
-					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * C.int(gpio)
-					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 1
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * gpio
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = true
 				} else {
-					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = C.int(gpio)
-					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = 0
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = gpio
+					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = false
 				}
 				p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 				// #endif
@@ -2322,7 +2318,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n <= 255 {
-				p_audio_config.achan[channel].dwait = C.int(n)
+				p_audio_config.achan[channel].dwait = n
 			} else {
 				p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
 				text_color_set(DW_COLOR_ERROR)
@@ -2351,7 +2347,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				// 0 = User has no clue.  This would be no delay.
 				// 10 = Default.
 				// 50 = Half second.  User might think it is mSec and use 100.
-				p_audio_config.achan[channel].slottime = C.int(n)
+				p_audio_config.achan[channel].slottime = n
 			} else {
 				p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME
 				text_color_set(DW_COLOR_ERROR)
@@ -2380,7 +2376,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= 5 && n <= 250 {
-				p_audio_config.achan[channel].persist = C.int(n)
+				p_audio_config.achan[channel].persist = n
 			} else {
 				p_audio_config.achan[channel].persist = DEFAULT_PERSIST
 				text_color_set(DW_COLOR_ERROR)
@@ -2425,7 +2421,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("section, to understand what this means.\n")
 					dw_printf("Why don't you just use the default?\n")
 				}
-				p_audio_config.achan[channel].txdelay = C.int(n)
+				p_audio_config.achan[channel].txdelay = n
 			} else {
 				p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY
 				text_color_set(DW_COLOR_ERROR)
@@ -2466,7 +2462,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("section, to understand what this means.\n")
 					dw_printf("Why don't you just use the default?\n")
 				}
-				p_audio_config.achan[channel].txtail = C.int(n)
+				p_audio_config.achan[channel].txtail = n
 			} else {
 				p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL
 				text_color_set(DW_COLOR_ERROR)
@@ -2491,11 +2487,11 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			if strings.EqualFold(t, "ON") {
-				p_audio_config.achan[channel].fulldup = 1
+				p_audio_config.achan[channel].fulldup = true
 			} else if strings.EqualFold(t, "OFF") {
-				p_audio_config.achan[channel].fulldup = 0
+				p_audio_config.achan[channel].fulldup = false
 			} else {
-				p_audio_config.achan[channel].fulldup = 0
+				p_audio_config.achan[channel].fulldup = false
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Expected ON or OFF for FULLDUP.\n", line)
 			}
@@ -2555,7 +2551,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 200 {
-				p_audio_config.achan[channel].fx25_strength = C.int(n)
+				p_audio_config.achan[channel].fx25_strength = n
 				p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25
 			} else {
 				p_audio_config.achan[channel].fx25_strength = 1

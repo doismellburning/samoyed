@@ -349,7 +349,7 @@ x = Silence FX.25 information.`)
 			os.Exit(1)
 		}
 
-		audio_config.achan[0].baud = C.int(bitrate)
+		audio_config.achan[0].baud = bitrate
 
 		/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
 		/* that need to be kept in sync.  Maybe it could be a common function someday. */
@@ -446,7 +446,7 @@ x = Silence FX.25 information.`)
 		}
 
 		// Reduce audio sampling rate to reduce CPU requirements.
-		audio_config.achan[0].decimate = C.int(*decimate)
+		audio_config.achan[0].decimate = *decimate
 	}
 
 	if *upsample != 0 {
@@ -458,7 +458,7 @@ x = Silence FX.25 information.`)
 		// Increase G3RUH audio sampling rate to improve performance.
 		// The value is normally determined automatically based on audio
 		// sample rate and baud.  This allows override for experimentation.
-		audio_config.achan[0].upsample = C.int(*upsample)
+		audio_config.achan[0].upsample = *upsample
 	}
 
 	audio_config.timestamp_format = *timestampFormat
@@ -512,7 +512,7 @@ x = Silence FX.25 information.`)
 			fmt.Printf("Can't mix -X with -I or -i.\n")
 			os.Exit(1)
 		}
-		audio_config.achan[0].fx25_strength = C.int(*fx25CheckBytes)
+		audio_config.achan[0].fx25_strength = *fx25CheckBytes
 		audio_config.achan[0].layer2_xmit = LAYER2_FX25
 	}
 
@@ -669,7 +669,7 @@ x = Silence FX.25 information.`)
 		if audio_config.chan_medium[transmitCalibrationChannel] == MEDIUM_RADIO {
 			if audio_config.achan[transmitCalibrationChannel].mark_freq != 0 && audio_config.achan[transmitCalibrationChannel].space_freq != 0 {
 				var max_duration = 60
-				var n = audio_config.achan[transmitCalibrationChannel].baud * C.int(max_duration)
+				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
 				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
@@ -682,7 +682,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
 					for n > 0 {
-						tone_gen_put_bit(C.int(transmitCalibrationChannel), n&1)
+						tone_gen_put_bit(C.int(transmitCalibrationChannel), C.int(n)&1)
 						n--
 					}
 				case 'm': // "Mark" tone: -x m
@@ -824,7 +824,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		display_retries = " IL2P "
 	default:
 		// Possible fix_bits indication.
-		if audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall > 0 {
+		if audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall {
 			// FIXME KG assert(retries >= RETRY_NONE && retries <= RETRY_MAX)
 			display_retries = fmt.Sprintf(" [%s] ", retry_text[int(retries)])
 		}

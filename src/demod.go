@@ -93,10 +93,10 @@ func demod_init(pa *audio_s) C.int {
 						dw_printf("Channel %d: FIX_BITS option has been turned off for EAS.\n", channel)
 						save_audio_config_p.achan[channel].fix_bits = RETRY_NONE
 					}
-					if save_audio_config_p.achan[channel].passall != 0 {
+					if save_audio_config_p.achan[channel].passall {
 						text_color_set(DW_COLOR_INFO)
 						dw_printf("Channel %d: PASSALL option has been turned off for EAS.\n", channel)
-						save_audio_config_p.achan[channel].passall = 0
+						save_audio_config_p.achan[channel].passall = false
 					}
 				}
 
@@ -216,7 +216,7 @@ func demod_init(pa *audio_s) C.int {
 
 				/* These can be increased later for the multi-frequency case. */
 
-				save_audio_config_p.achan[channel].num_subchan = C.int(num_letters)
+				save_audio_config_p.achan[channel].num_subchan = num_letters
 				save_audio_config_p.achan[channel].num_slicers = 1
 
 				/*
@@ -285,9 +285,9 @@ func demod_init(pa *audio_s) C.int {
 					 * In version 1.3 this can be combined with the + option.
 					 */
 
-					save_audio_config_p.achan[channel].num_subchan = C.int(num_letters)
+					save_audio_config_p.achan[channel].num_subchan = num_letters
 
-					if save_audio_config_p.achan[channel].num_subchan != C.int(num_letters) {
+					if save_audio_config_p.achan[channel].num_subchan != num_letters {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
 							channel, save_audio_config_p.achan[channel].num_subchan, save_audio_config_p.achan[channel].profiles)
@@ -299,7 +299,7 @@ func demod_init(pa *audio_s) C.int {
 							channel, save_audio_config_p.achan[channel].num_freq)
 					}
 
-					for d := C.int(0); d < save_audio_config_p.achan[channel].num_subchan; d++ {
+					for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
 						Assert(d >= 0 && d < MAX_SUBCHANS)
 
 						var D = &demodulator_state[channel][d]
@@ -313,10 +313,10 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
-							save_audio_config_p.achan[channel].baud,
-							mark,
-							space,
+						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
+							C.int(save_audio_config_p.achan[channel].baud),
+							C.int(mark),
+							C.int(space),
 							C.char(profile),
 							D)
 
@@ -367,10 +367,10 @@ func demod_init(pa *audio_s) C.int {
 
 					save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
 
-					demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
-						save_audio_config_p.achan[channel].mark_freq,
-						save_audio_config_p.achan[channel].space_freq,
+					demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
+						C.int(save_audio_config_p.achan[channel].baud),
+						C.int(save_audio_config_p.achan[channel].mark_freq),
+						C.int(save_audio_config_p.achan[channel].space_freq),
 						C.char(save_audio_config_p.achan[channel].profiles[0]),
 						D)
 
@@ -400,7 +400,7 @@ func demod_init(pa *audio_s) C.int {
 
 					save_audio_config_p.achan[channel].num_subchan = save_audio_config_p.achan[channel].num_freq
 
-					for d := C.int(0); d < save_audio_config_p.achan[channel].num_freq; d++ {
+					for d := 0; d < save_audio_config_p.achan[channel].num_freq; d++ {
 						Assert(d >= 0 && d < MAX_SUBCHANS)
 
 						var D = &demodulator_state[channel][d]
@@ -416,9 +416,9 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
-							save_audio_config_p.achan[channel].baud,
-							mark, space,
+						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
+							C.int(save_audio_config_p.achan[channel].baud),
+							C.int(mark), C.int(space),
 							C.char(profile),
 							D)
 
@@ -473,7 +473,7 @@ func demod_init(pa *audio_s) C.int {
 					save_audio_config_p.achan[channel].profiles = "PQRS"
 					//#endif
 				}
-				save_audio_config_p.achan[channel].num_subchan = C.int(len(save_audio_config_p.achan[channel].profiles))
+				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
 				save_audio_config_p.achan[channel].decimate = 1 // think about this later.
 				text_color_set(DW_COLOR_DEBUG)
@@ -496,7 +496,7 @@ func demod_init(pa *audio_s) C.int {
 				}
 				dw_printf(".\n")
 
-				for d := C.int(0); d < save_audio_config_p.achan[channel].num_subchan; d++ {
+				for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
 
 					Assert(d >= 0 && d < MAX_SUBCHANS)
 					var D = &demodulator_state[channel][d]
@@ -508,8 +508,8 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
+						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
+						C.int(save_audio_config_p.achan[channel].baud),
 						C.char(profile),
 						D)
 
@@ -534,7 +534,7 @@ func demod_init(pa *audio_s) C.int {
 					save_audio_config_p.achan[channel].profiles = "TUVW"
 					//#endif
 				}
-				save_audio_config_p.achan[channel].num_subchan = C.int(len(save_audio_config_p.achan[channel].profiles))
+				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
 				save_audio_config_p.achan[channel].decimate = 1 // think about this later
 				text_color_set(DW_COLOR_DEBUG)
@@ -551,7 +551,7 @@ func demod_init(pa *audio_s) C.int {
 				}
 				dw_printf(".\n")
 
-				for d := C.int(0); d < save_audio_config_p.achan[channel].num_subchan; d++ {
+				for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
 
 					Assert(d >= 0 && d < MAX_SUBCHANS)
 					var D = &demodulator_state[channel][d]
@@ -563,8 +563,8 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)/save_audio_config_p.achan[channel].decimate,
-						save_audio_config_p.achan[channel].baud,
+						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
+						C.int(save_audio_config_p.achan[channel].baud),
 						C.char(profile),
 						D)
 
@@ -597,10 +597,10 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("Channel %d: FIX_BITS option has been turned off for AIS.\n", channel)
 							save_audio_config_p.achan[channel].fix_bits = RETRY_NONE
 						}
-						if save_audio_config_p.achan[channel].passall != 0 {
+						if save_audio_config_p.achan[channel].passall {
 							text_color_set(DW_COLOR_INFO)
 							dw_printf("Channel %d: PASSALL option has been turned off for AIS.\n", channel)
-							save_audio_config_p.achan[channel].passall = 0
+							save_audio_config_p.achan[channel].passall = false
 						}
 					}
 
@@ -720,8 +720,8 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_9600_init(save_audio_config_p.achan[channel].modem_type,
 						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec),
-						save_audio_config_p.achan[channel].upsample,
-						save_audio_config_p.achan[channel].baud, D)
+						C.int(save_audio_config_p.achan[channel].upsample),
+						C.int(save_audio_config_p.achan[channel].baud), D)
 
 					if strings.Contains(save_audio_config_p.achan[channel].profiles, "+") {
 
@@ -934,8 +934,8 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 
 			sample_sum[channel][subchan] += sam
 			sample_count[channel][subchan]++
-			if sample_count[channel][subchan] >= save_audio_config_p.achan[channel].decimate {
-				demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/save_audio_config_p.achan[channel].decimate, D)
+			if sample_count[channel][subchan] >= C.int(save_audio_config_p.achan[channel].decimate) {
+				demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/C.int(save_audio_config_p.achan[channel].decimate), D)
 				sample_sum[channel][subchan] = 0
 				sample_count[channel][subchan] = 0
 			}
@@ -962,7 +962,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 		  case MODEM_AIS:
 		*/
 
-		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
+		demod_9600_process_sample(channel, sam, C.int(save_audio_config_p.achan[channel].upsample), D)
 
 	} /* switch modem_type */
 } /* end demod_process_sample */

@@ -158,9 +158,6 @@ func AtestMain() {
 		my_audio_config.achan[channel].sanity_test = SANITY_APRS
 		// my_audio_config.achan[channel].sanity_test = SANITY_AX25;
 		// my_audio_config.achan[channel].sanity_test = SANITY_NONE;
-
-		my_audio_config.achan[channel].passall = 0
-		// my_audio_config.achan[channel].passall = 1;
 	}
 
 	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
@@ -245,7 +242,7 @@ o = DCD output control
 		pflag.Usage()
 		os.Exit(1)
 	}
-	my_audio_config.achan[0].decimate = C.int(*decimate)
+	my_audio_config.achan[0].decimate = *decimate
 
 	if *upsample != 0 {
 		if *upsample < 1 || *upsample > 8 {
@@ -253,7 +250,7 @@ o = DCD output control
 			pflag.Usage()
 			os.Exit(1)
 		}
-		my_audio_config.achan[0].upsample = C.int(*upsample)
+		my_audio_config.achan[0].upsample = *upsample
 	}
 
 	if retry_t(*fixBits) < RETRY_NONE || retry_t(*fixBits) > RETRY_MAX {
@@ -314,7 +311,7 @@ o = DCD output control
 	/*    4800 implies V.27 8PSK. */
 	/*    9600 implies G3RUH baseband scrambled. */
 
-	my_audio_config.achan[0].baud = C.int(bitrate)
+	my_audio_config.achan[0].baud = bitrate
 
 	/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
 	/* that need to be kept in sync.  Maybe it could be a common function someday. */
@@ -706,7 +703,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 		dw_printf("%s audio level = %s   IL2P  %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
 	default:
 		//case fec_type_none:
-		if my_audio_config.achan[channel].fix_bits == RETRY_NONE && my_audio_config.achan[channel].passall == 0 {
+		if my_audio_config.achan[channel].fix_bits == RETRY_NONE && !my_audio_config.achan[channel].passall {
 			// No fix_bits or passall specified.
 			dw_printf("%s audio level = %s     %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
 		} else {

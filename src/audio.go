@@ -246,13 +246,13 @@ type achan_param_s struct {
 	// we leave reception enabled all the time as we do with FX.25.
 	// TODO:  FX.25 should probably be put here rather than global for all channels.
 
-	fx25_strength C.int // Strength of FX.25 FEC.
+	fx25_strength int // Strength of FX.25 FEC.
 	// 16, 23, 64 for specific number of parity symbols.
 	// 1 for automatic selection based on frame size.
 
-	il2p_max_fec C.int // 1 for max FEC length, 0 for automatic based on size.
+	il2p_max_fec int // 1 for max FEC length, 0 for automatic based on size.
 
-	il2p_invert_polarity C.int // 1 means invert on transmit.  Receive handles either automatically.
+	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
 
 	v26_alternative v26_e
 
@@ -274,15 +274,15 @@ type achan_param_s struct {
 	/* and process as APRStt.  Someday we might want to separate */
 	/* these but for now, we have a single off/on. */
 
-	decimate C.int /* Reduce AFSK sample rate by this factor to */
+	decimate int /* Reduce AFSK sample rate by this factor to */
 	/* decrease computational requirements. */
 
-	upsample C.int /* Upsample by this factor for G3RUH. */
+	upsample int /* Upsample by this factor for G3RUH. */
 
-	mark_freq  C.int /* Two tones for AFSK modulation, in Hz. */
-	space_freq C.int /* Standard tones are 1200 and 2200 for 1200 baud. */
+	mark_freq  int /* Two tones for AFSK modulation, in Hz. */
+	space_freq int /* Standard tones are 1200 and 2200 for 1200 baud. */
 
-	baud C.int /* Data bits per second. */
+	baud int /* Data bits per second. */
 	/* Standard rates are 1200 for VHF and 300 for HF. */
 	/* This should really be called bits per second. */
 
@@ -290,16 +290,16 @@ type achan_param_s struct {
 
 	profiles string /* zero or more of ABC etc, optional + */
 
-	num_freq C.int /* Number of different frequency pairs for decoders. */
+	num_freq int /* Number of different frequency pairs for decoders. */
 
-	offset C.int /* Spacing between filter frequencies. */
+	offset int /* Spacing between filter frequencies. */
 
-	num_slicers C.int /* Number of different threshold points to decide */
+	num_slicers int /* Number of different threshold points to decide */
 	/* between mark or space. */
 
 	/* This is derived from above by demod_init. */
 
-	num_subchan C.int /* Total number of modems for each channel. */
+	num_subchan int /* Total number of modems for each channel. */
 
 	/* These are for dealing with imperfect frames. */
 
@@ -313,7 +313,7 @@ type achan_param_s struct {
 	/* CRC after making a change. */
 	/* Must look like APRS, AX.25, or anything. */
 
-	passall C.int /* Allow thru even with bad CRC. */
+	passall bool /* Allow thru even with bad CRC. */
 
 	/* Additional properties for transmit. */
 
@@ -340,7 +340,7 @@ type achan_param_s struct {
 		ptt_line  ptt_line_t /* Control line when using serial port. PTT_LINE_RTS, PTT_LINE_DTR. */
 		ptt_line2 ptt_line_t /* Optional second one:  PTT_LINE_NONE when not used. */
 
-		out_gpio_num C.int /* GPIO number.  Originally this was only for PTT. */
+		out_gpio_num int /* GPIO number.  Originally this was only for PTT. */
 		/* It is now more general. */
 		/* octrl array is indexed by PTT, DCD, or CONnected indicator. */
 		/* For CM108/CM119, this should be in range of 1-8. */
@@ -355,16 +355,16 @@ type achan_param_s struct {
 
 		/* This could probably be collapsed into ptt_device instead of being separate. */
 
-		ptt_lpt_bit C.int /* Bit number for parallel printer port.  */
+		ptt_lpt_bit int /* Bit number for parallel printer port.  */
 		/* Bit 0 = pin 2, ..., bit 7 = pin 9. */
 
-		ptt_invert  C.int /* Invert the output. */
-		ptt_invert2 C.int /* Invert the secondary output. */
+		ptt_invert  bool /* Invert the output. */
+		ptt_invert2 bool /* Invert the secondary output. */
 
 		//#ifdef USE_HAMLIB
 
-		ptt_model C.int /* HAMLIB model.  -1 for AUTO.  2 for rigctld.  Others are radio model. */
-		ptt_rate  C.int /* Serial port speed when using hamlib CAT control for PTT. */
+		ptt_model int /* HAMLIB model.  -1 for AUTO.  2 for rigctld.  Others are radio model. */
+		ptt_rate  int /* Serial port speed when using hamlib CAT control for PTT. */
 		/* If zero, hamlib will come up with a default for pariticular rig. */
 		//#endif
 
@@ -373,7 +373,7 @@ type achan_param_s struct {
 	ictrl [NUM_ICTYPES]struct {
 		method ptt_method_t /* none, serial port, GPIO, LPT. */
 
-		in_gpio_num C.int /* GPIO number */
+		in_gpio_num int /* GPIO number */
 
 		in_gpio_name string
 		/* originally, gpio number NN was assumed to simply */
@@ -382,35 +382,35 @@ type achan_param_s struct {
 		/* This is filled in by ptt_init so we don't have to */
 		/* recalculate it each time we access it. */
 
-		invert C.int /* 1 = active low */
+		invert bool /* true = active low */
 	}
 
 	/* Transmit timing. */
 
-	dwait C.int /* First wait extra time for receiver squelch. */
+	dwait int /* First wait extra time for receiver squelch. */
 	/* Default 0 units of 10 mS each . */
 
-	slottime C.int /* Slot time in 10 mS units for persistence algorithm. */
+	slottime int /* Slot time in 10 mS units for persistence algorithm. */
 	/* Typical value is 10 meaning 100 milliseconds. */
 
-	persist C.int /* Sets probability for transmitting after each */
+	persist int /* Sets probability for transmitting after each */
 	/* slot time delay.  Transmit if a random number */
 	/* in range of 0 - 255 <= persist value.  */
 	/* Otherwise wait another slot time and try again. */
 	/* Default value is 63 for 25% probability. */
 
-	txdelay C.int /* After turning on the transmitter, */
+	txdelay int /* After turning on the transmitter, */
 	/* send "flags" for txdelay * 10 mS. */
 	/* Default value is 30 meaning 300 milliseconds. */
 
-	txtail C.int /* Amount of time to keep transmitting after we */
+	txtail int /* Amount of time to keep transmitting after we */
 	/* are done sending the data.  This is to avoid */
 	/* dropping PTT too soon and chopping off the end */
 	/* of the frame.  Again 10 mS units. */
 	/* At this point, I'm thinking of 10 (= 100 mS) as the default */
 	/* because we're not quite sure when the soundcard audio stops. */
 
-	fulldup C.int /* Full Duplex. */
+	fulldup bool /* Full Duplex. */
 
 }
 
@@ -574,9 +574,9 @@ const MAX_BAUD = 40000 // Anyone want to try 38.4 k baud?
 const DEFAULT_DWAIT = 0
 const DEFAULT_SLOTTIME = 10 // *10mS = 100mS
 const DEFAULT_PERSIST = 63
-const DEFAULT_TXDELAY = 30 // *10mS = 300mS
-const DEFAULT_TXTAIL = 10  // *10mS = 100mS
-const DEFAULT_FULLDUP = 0  // false = half duplex
+const DEFAULT_TXDELAY = 30    // *10mS = 300mS
+const DEFAULT_TXTAIL = 10     // *10mS = 100mS
+const DEFAULT_FULLDUP = false // false = half duplex
 
 /* Audio configuration. */
 

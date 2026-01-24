@@ -147,7 +147,7 @@ func multi_modem_init(pa *audio_s) {
 				real_baud = save_audio_config_p.achan[channel].baud / 3
 			}
 
-			process_age[channel] = PROCESS_AFTER_BITS * C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec) / real_baud
+			process_age[channel] = C.int(PROCESS_AFTER_BITS * save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud)
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}
@@ -221,13 +221,13 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
 	/* 1.2: We can feed one demodulator but end up with multiple outputs. */
 
 	/* Send same thing to all. */
-	for d := C.int(0); d < save_audio_config_p.achan[channel].num_subchan; d++ {
-		demod_process_sample(channel, d, audio_sample)
+	for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+		demod_process_sample(channel, C.int(d), audio_sample)
 	}
 
-	for subchan := C.int(0); subchan < save_audio_config_p.achan[channel].num_subchan; subchan++ {
+	for subchan := 0; subchan < save_audio_config_p.achan[channel].num_subchan; subchan++ {
 
-		for slice := C.int(0); slice < save_audio_config_p.achan[channel].num_slicers; slice++ {
+		for slice := 0; slice < save_audio_config_p.achan[channel].num_slicers; slice++ {
 
 			if candidate[channel][subchan][slice].packet_p != nil {
 				candidate[channel][subchan][slice].age++
@@ -383,13 +383,13 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 /* multiple slicers are of questionable value for HF SSB. */
 
 // #define subchan_from_n(x) ((x) % save_audio_config_p.achan[channel].num_subchan)
-func subchan_from_n(channel C.int, x C.int) C.int {
-	return ((x) % save_audio_config_p.achan[channel].num_subchan)
+func subchan_from_n(channel C.int, x int) C.int {
+	return C.int((x) % save_audio_config_p.achan[channel].num_subchan)
 }
 
 // #define slice_from_n(x)   ((x) / save_audio_config_p.achan[channel].num_subchan)
-func slice_from_n(channel C.int, x C.int) C.int {
-	return ((x) / save_audio_config_p.achan[channel].num_subchan)
+func slice_from_n(channel C.int, x int) C.int {
+	return C.int((x) / save_audio_config_p.achan[channel].num_subchan)
 }
 
 func pick_best_candidate(channel C.int) {
@@ -401,7 +401,7 @@ func pick_best_candidate(channel C.int) {
 
 	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]C.char
 
-	for n := C.int(0); n < num_bars; n++ {
+	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 
@@ -446,30 +446,30 @@ func pick_best_candidate(channel C.int) {
 
 	/* Bump it up slightly if others nearby have the same CRC. */
 
-	for n := C.int(0); n < num_bars; n++ {
+	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 
 		if candidate[channel][j][k].packet_p != nil {
 
-			for m := C.int(0); m < num_bars; m++ {
+			for m := 0; m < num_bars; m++ {
 
 				var mj = subchan_from_n(channel, m)
 				var mk = slice_from_n(channel, m)
 
 				if m != n && candidate[channel][mj][mk].packet_p != nil {
 					if candidate[channel][j][k].crc == candidate[channel][mj][mk].crc {
-						candidate[channel][j][k].score += (num_bars + 1) - C.int(math.Abs(float64(m-n)))
+						candidate[channel][j][k].score += C.int(num_bars+1) - C.int(math.Abs(float64(m-n)))
 					}
 				}
 			}
 		}
 	}
 
-	var best_n C.int = 0
+	var best_n = 0
 	var best_score C.int = 0
 
-	for n := C.int(0); n < num_bars; n++ {
+	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 
@@ -518,7 +518,7 @@ func pick_best_candidate(channel C.int) {
 
 	/* Delete those not chosen. */
 
-	for n := C.int(0); n < num_bars; n++ {
+	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 		if n != best_n && candidate[channel][j][k].packet_p != nil {

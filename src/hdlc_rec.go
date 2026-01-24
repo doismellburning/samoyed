@@ -109,7 +109,7 @@ func hdlc_rec_init(pa *audio_s) {
 
 		if pa.chan_medium[ch] == MEDIUM_RADIO {
 
-			num_subchannel[ch] = pa.achan[ch].num_subchan
+			num_subchannel[ch] = C.int(pa.achan[ch].num_subchan)
 
 			Assert(num_subchannel[ch] >= 1 && num_subchannel[ch] <= MAX_SUBCHANS)
 
