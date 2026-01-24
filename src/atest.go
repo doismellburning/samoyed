@@ -53,7 +53,11 @@ package direwolf
 import "C"
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -65,29 +69,28 @@ import (
 )
 
 type atest_header_t struct {
-	riff     [4]C.char /* "RIFF" */
-	filesize C.int     /* file length - 8 */
-	wave     [4]C.char /* "WAVE" */
+	RIFF     [4]byte /* "RIFF" */
+	Filesize int32   /* file length - 8 */
+	WAVE     [4]byte /* "WAVE" */
 }
 
 type atest_chunk_t struct {
-	id       [4]C.char /* "LIST" or "fmt " */
-	datasize C.int
+	Id       [4]byte /* "LIST" or "fmt " */
+	Datasize int32
 }
 
 type atest_format_t struct {
-	wformattag      int16 /* 1 for PCM. */
-	nchannels       int16 /* 1 for mono, 2 for stereo. */
-	nsamplespersec  int32 /* sampling freq, Hz. */
-	navgbytespersec int32 /* = nblockalign*nsamplespersec. */
-	nblockalign     int16 /* = wbitspersample/8 * nchannels. */
-	wbitspersample  int16 /* 16 or 8. */
-	extras          [4]C.char
+	Wformattag      int16 /* 1 for PCM. */
+	Nchannels       int16 /* 1 for mono, 2 for stereo. */
+	Nsamplespersec  int32 /* sampling freq, Hz. */
+	Navgbytespersec int32 /* = nblockalign*nsamplespersec. */
+	Nblockalign     int16 /* = wbitspersample/8 * nchannels. */
+	Wbitspersample  int16 /* 16 or 8. */
 }
 
 type atest_wav_data_t struct {
-	data     [4]C.char /* "data" */
-	datasize int32
+	Data     [4]byte /* "data" */
+	Datasize int32
 }
 
 var ATEST_C = false
@@ -97,7 +100,7 @@ var chunk atest_chunk_t
 var format atest_format_t
 var wav_data atest_wav_data_t
 
-var atestFP *C.FILE // FIXME KG WAS fp
+var atestFP *os.File
 var e_o_f bool
 var packets_decoded_one = 0
 var packets_decoded_total = 0
@@ -106,7 +109,7 @@ var upsample = 0 /* Upsample for G3RUH decoder. Non-zero will override the defau
 
 var my_audio_config *audio_s
 
-var space_gain [MAX_SUBCHANS]C.float
+var space_gain [MAX_SUBCHANS]float64
 
 var sample_number = -1 /* Sample number from the file. */
 /* Incremented only for channel 0. */
@@ -221,7 +224,7 @@ o = DCD output control
 	}
 
 	var d_x_opt = 0
-	var d_2_opt = C.int(0)
+	var d_2_opt = 0
 	for _, debugFlag := range *debugFlags {
 		switch debugFlag {
 		case "x":
@@ -419,17 +422,18 @@ o = DCD output control
 	}
 
 	fx25_init(d_x_opt)
-	il2p_init(d_2_opt)
+	il2p_init(C.int(d_2_opt))
 
 	var start_time = time.Now()
-	var total_filetime C.double
+	var total_filetime float64
 	var packets_decoded_total = 0
 
 	for _, wavFileName := range pflag.Args() {
-		atestFP = C.fopen(C.CString(wavFileName), C.CString("rb"))
-		if atestFP == nil {
+		var err error
+		atestFP, err = os.Open(wavFileName)
+		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Couldn't open file for read: %s\n", wavFileName)
+			fmt.Printf("Couldn't open file %s for read: %s\n", wavFileName, err)
 			// perror ("more info?");
 			os.Exit(1)
 		}
@@ -439,66 +443,74 @@ o = DCD output control
 		 * Doesn't handle all possible cases but good enough for our purposes.
 		 */
 
-		C.fread(unsafe.Pointer(&header), 12, 1, atestFP)
+		binary.Read(atestFP, binary.LittleEndian, &header)
 
-		if C.strncmp(&header.riff[0], C.CString("RIFF"), 4) != 0 || C.strncmp(&header.wave[0], C.CString("WAVE"), 4) != 0 {
+		if string(header.RIFF[:]) != "RIFF" || string(header.WAVE[:]) != "WAVE" {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("This is not a .WAV format file.\n")
 			os.Exit(1)
 		}
 
-		C.fread(unsafe.Pointer(&chunk), 8, 1, atestFP)
+		binary.Read(atestFP, binary.LittleEndian, &chunk)
 
-		if C.strncmp(&chunk.id[0], C.CString("LIST"), 4) == 0 {
-			C.fseek(atestFP, C.long(chunk.datasize), C.SEEK_CUR)
-			C.fread(unsafe.Pointer(&chunk), 8, 1, atestFP)
+		if string(chunk.Id[:]) == "LIST" {
+			atestFP.Seek(int64(chunk.Datasize), io.SeekCurrent)
+			binary.Read(atestFP, binary.LittleEndian, &chunk)
 		}
 
-		if C.strncmp(&chunk.id[0], C.CString("fmt "), 4) != 0 {
+		if string(chunk.Id[:]) != "fmt " {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("WAV file error: Found \"%4.4s\" where \"fmt \" was expected.\n", C.GoString(&chunk.id[0]))
-			os.Exit(1)
-		}
-		if chunk.datasize != 16 && chunk.datasize != 18 {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("WAV file error: Need fmt chunk datasize of 16 or 18.  Found %d.\n", chunk.datasize)
+			fmt.Printf("WAV file error: Found \"%4.4s\" where \"fmt \" was expected.\n", string(chunk.Id[:]))
 			os.Exit(1)
 		}
 
-		C.fread(unsafe.Pointer(&format), C.ulong(chunk.datasize), 1, atestFP)
-
-		C.fread(unsafe.Pointer(&wav_data), 8, 1, atestFP)
-
-		if C.strncmp(&wav_data.data[0], C.CString("data"), 4) != 0 {
+		if chunk.Datasize != 16 && chunk.Datasize != 18 {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("WAV file error: Found \"%4.4s\" where \"data\" was expected.\n", C.GoString(&wav_data.data[0]))
+			fmt.Printf("WAV file error: Need fmt chunk datasize of 16 or 18.  Found %d.\n", chunk.Datasize)
 			os.Exit(1)
 		}
 
-		if format.wformattag != 1 {
+		binary.Read(atestFP, binary.LittleEndian, &format)
+
+		// KG If Datasize > sizeof(format), skip until the actual data
+		var formatSize = int32(unsafe.Sizeof(format))
+		if chunk.Datasize > formatSize {
+			var extra = chunk.Datasize - formatSize
+			atestFP.Seek(int64(extra), io.SeekCurrent)
+		}
+
+		binary.Read(atestFP, binary.LittleEndian, &wav_data)
+
+		if string(wav_data.Data[:]) != "data" {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Sorry, I only understand audio format 1 (PCM).  This file has %d.\n", format.wformattag)
+			fmt.Printf("WAV file error: Found \"%4.4s\" where \"data\" was expected.\n", string(wav_data.Data[:]))
 			os.Exit(1)
 		}
 
-		if format.nchannels != 1 && format.nchannels != 2 {
+		if format.Wformattag != 1 {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Sorry, I only understand 1 or 2 channels.  This file has %d.\n", format.nchannels)
+			fmt.Printf("Sorry, I only understand audio format 1 (PCM).  This file has %d.\n", format.Wformattag)
 			os.Exit(1)
 		}
 
-		if format.wbitspersample != 8 && format.wbitspersample != 16 {
+		if format.Nchannels != 1 && format.Nchannels != 2 {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Sorry, I only understand 8 or 16 bits per sample.  This file has %d.\n", format.wbitspersample)
+			fmt.Printf("Sorry, I only understand 1 or 2 channels.  This file has %d.\n", format.Nchannels)
 			os.Exit(1)
 		}
 
-		my_audio_config.adev[0].samples_per_sec = int(format.nsamplespersec)
-		my_audio_config.adev[0].bits_per_sample = int(format.wbitspersample)
-		my_audio_config.adev[0].num_channels = int(format.nchannels)
+		if format.Wbitspersample != 8 && format.Wbitspersample != 16 {
+			text_color_set(DW_COLOR_ERROR)
+			fmt.Printf("Sorry, I only understand 8 or 16 bits per sample.  This file has %d.\n", format.Wbitspersample)
+			os.Exit(1)
+		}
+
+		my_audio_config.adev[0].samples_per_sec = int(format.Nsamplespersec)
+		my_audio_config.adev[0].bits_per_sample = int(format.Wbitspersample)
+		my_audio_config.adev[0].num_channels = int(format.Nchannels)
 
 		my_audio_config.chan_medium[0] = MEDIUM_RADIO
-		if format.nchannels == 2 {
+		if format.Nchannels == 2 {
 			my_audio_config.chan_medium[1] = MEDIUM_RADIO
 		}
 
@@ -508,13 +520,13 @@ o = DCD output control
 			my_audio_config.adev[0].bits_per_sample,
 			(my_audio_config.adev[0].num_channels))
 		// nnum_channels is known to be 1 or 2.
-		var one_filetime = int(wav_data.datasize) /
-			((my_audio_config.adev[0].bits_per_sample / 8) * (my_audio_config.adev[0].num_channels) * my_audio_config.adev[0].samples_per_sec)
-		total_filetime += C.double(one_filetime)
+		var one_filetime = float64(wav_data.Datasize) /
+			float64((my_audio_config.adev[0].bits_per_sample/8)*(my_audio_config.adev[0].num_channels)*my_audio_config.adev[0].samples_per_sec)
+		total_filetime += one_filetime
 
 		fmt.Printf("%d audio bytes in file.  Duration = %.1f seconds.\n",
-			wav_data.datasize,
-			float64(one_filetime))
+			wav_data.Datasize,
+			one_filetime)
 		fmt.Printf("Fix Bits level = %d\n", my_audio_config.achan[0].fix_bits)
 
 		/*
@@ -559,7 +571,7 @@ o = DCD output control
 
 		if EXPERIMENT_G {
 			for j := range MAX_SUBCHANS {
-				var db = 20.0 * C.log10f(space_gain[j])
+				var db = 20.0 * math.Log10(space_gain[j])
 				fmt.Printf("%+.1f dB, %d\n", db, count[j])
 			}
 		}
@@ -572,12 +584,12 @@ o = DCD output control
 		fmt.Printf("%d from %s\n", packets_decoded_one, wavFileName)
 		packets_decoded_total += packets_decoded_one
 
-		C.fclose(atestFP)
+		atestFP.Close()
 	}
 
 	var elapsed = time.Since(start_time)
 
-	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/C.double(elapsed.Seconds()))
+	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/float64(elapsed.Seconds()))
 	if d_o_opt > 0 {
 		fmt.Printf("DCD count = %d\n", dcd_count)
 		fmt.Printf("DCD missing errors = %d\n", dcd_missing_errors)
@@ -599,23 +611,26 @@ o = DCD output control
  * Simulate sample from the audio device.
  */
 
-func audio_get_fake(a C.int) C.int {
+func audio_get_fake(_ C.int) C.int {
 
-	if wav_data.datasize <= 0 {
+	if wav_data.Datasize <= 0 {
 		e_o_f = true
 		return (-1)
 	}
 
-	var ch = C.getc(atestFP)
-	wav_data.datasize--
+	var data = make([]byte, 1)
+	var _, err = atestFP.Read(data)
+	wav_data.Datasize--
 
-	if ch < 0 {
+	if errors.Is(err, io.EOF) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected end of file.\n")
 		e_o_f = true
 	}
 
-	return (ch)
+	// TODO KG Better error handling
+
+	return C.int(data[0])
 }
 
 func audio_get(a C.int) C.int {
