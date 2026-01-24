@@ -282,7 +282,7 @@ o = DCD output control
 		decode_only = 2
 	}
 
-	my_audio_config.recv_ber = C.float(*bitErrorRate)
+	my_audio_config.recv_ber = *bitErrorRate
 
 	// Options from atest.c
 	if *hexDisplay {

@@ -403,8 +403,8 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 	// Bit Error Rate (BER) for testing.
 
 	if g_audio_p.recv_ber != 0 {
-		var r = C.double(hdlcRecRand()) / C.double(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
-		if g_audio_p.recv_ber > C.float(r) {
+		var r = float64(hdlcRecRand()) / float64(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
+		if g_audio_p.recv_ber > r {
 
 			// FIXME
 			//text_color_set(DW_COLOR_DEBUG);

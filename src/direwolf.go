@@ -431,7 +431,7 @@ x = Silence FX.25 information.`)
 		if *audioStatsInterval < 10 {
 			fmt.Printf("Setting such a small audio statistics interval (<10) will produce inaccurate sample rate display.\n")
 		}
-		audio_config.statistics_interval = C.int(*audioStatsInterval)
+		audio_config.statistics_interval = *audioStatsInterval
 	}
 
 	if *modemProfile != "" {
@@ -473,14 +473,14 @@ x = Silence FX.25 information.`)
 				fmt.Printf("-ER must be in range of 1 to 99.\n")
 				E_rx_opt = 10
 			}
-			audio_config.recv_error_rate = C.int(E_rx_opt)
+			audio_config.recv_error_rate = E_rx_opt
 		} else {
 			var E_tx_opt, _ = strconv.Atoi(e)
 			if E_tx_opt < 1 || E_tx_opt > 99 {
 				fmt.Printf("-E must be in range of 1 to 99.\n")
 				E_tx_opt = 10
 			}
-			audio_config.xmit_error_rate = C.int(E_tx_opt)
+			audio_config.xmit_error_rate = E_tx_opt
 		}
 	}
 
@@ -505,7 +505,7 @@ x = Silence FX.25 information.`)
 		audio_config.adev[0].adevice_in = input_file
 	}
 
-	audio_config.recv_ber = C.float(*bitErrorRate)
+	audio_config.recv_ber = *bitErrorRate
 
 	if *fx25CheckBytes > 0 {
 		if *il2pNormal != -1 || *il2pInverted != -1 {
@@ -858,7 +858,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 	if !q_h_opt && alevel.rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
-		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
+		if channel != C.int(audio_config.igate_vchannel) { // suppress if from ICHANNEL
 			if h != -1 && h != AX25_SOURCE {
 				dw_printf("Digipeater ")
 			}
@@ -918,7 +918,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		dw_printf("Audio input level is too high. This may cause distortion and reduced decode performance.\n")
 		dw_printf("Solution is to decrease the audio input level.\n")
 		dw_printf("Setting audio input level so most stations are around 50 will provide good dyanmic range.\n")
-	} else if alevel.rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
+	} else if alevel.rec < 5 && channel != C.int(audio_config.igate_vchannel) && subchan != -3 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Audio input level is too low.  Increase so most stations are around 50.\n")
@@ -1146,7 +1146,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	 * Don't do anything with it after printing and sending to client apps.
 	 */
 
-	if channel == audio_config.igate_vchannel {
+	if channel == C.int(audio_config.igate_vchannel) {
 		return
 	}
 

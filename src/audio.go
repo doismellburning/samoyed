@@ -426,21 +426,21 @@ type audio_s struct {
 
 	tts_script string /* Script for text to speech. */
 
-	statistics_interval C.int /* Number of seconds between the audio */
+	statistics_interval int /* Number of seconds between the audio */
 	/* statistics reports.  This is set by */
 	/* the "-a" option.  0 to disable feature. */
 
-	xmit_error_rate C.int /* For testing purposes, we can generate frames with an invalid CRC */
+	xmit_error_rate int /* For testing purposes, we can generate frames with an invalid CRC */
 	/* to simulate corruption while going over the air. */
 	/* This is the probability, in per cent, of randomly corrupting it. */
 	/* Normally this is 0.  25 would mean corrupt it 25% of the time. */
 
-	recv_error_rate C.int /* Similar but the % probability of dropping a received frame. */
+	recv_error_rate int /* Similar but the % probability of dropping a received frame. */
 
-	recv_ber C.float /* Receive Bit Error Rate (BER). */
+	recv_ber float64 /* Receive Bit Error Rate (BER). */
 	/* Probability of inverting a bit coming out of the modem. */
 
-	fx25_auto_enable C.int /* Turn on FX.25 for current connected mode session */
+	fx25_auto_enable int /* Turn on FX.25 for current connected mode session */
 	/* under poor conditions. */
 	/* Set to 0 to disable feature. */
 	/* I put it here, rather than with the rest of the link layer */
@@ -474,7 +474,7 @@ type audio_s struct {
 	// MEDIUM_IGATE allows application access to IGate.
 	// MEDIUM_NETTNC for external TNC via TCP.
 
-	igate_vchannel C.int /* Virtual channel mapped to APRS-IS. */
+	igate_vchannel int /* Virtual channel mapped to APRS-IS. */
 	/* -1 for none. */
 	/* Redundant but it makes things quicker and simpler */
 	/* than always searching thru above. */
@@ -483,13 +483,13 @@ type audio_s struct {
 
 	nettnc_addr [MAX_TOTAL_CHANS]string // Network TNC address:  hostname or IP addr.
 
-	nettnc_port [MAX_TOTAL_CHANS]C.int // Network TNC TCP port.
+	nettnc_port [MAX_TOTAL_CHANS]int // Network TNC TCP port.
 
 	achan [MAX_RADIO_CHANS]achan_param_s
 
 	/* TODO KG
 	//#ifdef USE_HAMLIB
-	rigs C.int            // Total number of configured rigs
+	rigs int              // Total number of configured rigs
 	rig  [MAX_RIGS]*C.RIG // HAMLib rig instances
 	//#endif
 	*/

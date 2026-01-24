@@ -1357,7 +1357,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 					// This is redundant but saves the time of searching through all
 					// the channels for each packet.
-					p_audio_config.igate_vchannel = C.int(ichan)
+					p_audio_config.igate_vchannel = ichan
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: ICHANNEL can't use channel %d because it is already in use.\n", line, ichan)
@@ -1421,7 +1421,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			p_audio_config.nettnc_port[nchan] = C.int(n)
+			p_audio_config.nettnc_port[nchan] = n
 		} else if strings.EqualFold(t, "mycall") {
 
 			/*
@@ -2584,7 +2584,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 20 {
-				p_audio_config.fx25_auto_enable = C.int(n)
+				p_audio_config.fx25_auto_enable = n
 			} else {
 				p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
 				text_color_set(DW_COLOR_ERROR)
