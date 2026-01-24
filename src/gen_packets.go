@@ -230,7 +230,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	if *audioSampleRate != DEFAULT_SAMPLES_PER_SEC {
-		modem.adev[0].samples_per_sec = C.int(*audioSampleRate)
+		modem.adev[0].samples_per_sec = *audioSampleRate
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Audio sample rate set to %d samples / second.\n", modem.adev[0].samples_per_sec)
 		if modem.adev[0].samples_per_sec < MIN_SAMPLES_PER_SEC || modem.adev[0].samples_per_sec > MAX_SAMPLES_PER_SEC {
@@ -681,7 +681,7 @@ func audio_file_open(fname string, pa *audio_s) int {
 	gen_header.wformattag = 1 // 1 for PCM.
 
 	gen_header.nchannels = C.short(pa.adev[0].num_channels)
-	gen_header.nsamplespersec = pa.adev[0].samples_per_sec
+	gen_header.nsamplespersec = C.int(pa.adev[0].samples_per_sec)
 	gen_header.wbitspersample = C.short(pa.adev[0].bits_per_sample)
 
 	gen_header.nblockalign = gen_header.wbitspersample / 8 * gen_header.nchannels
@@ -819,18 +819,18 @@ func send_packet(str string) {
 
 		// If stereo, put same thing in each channel.
 
-		for c := C.int(0); c < modem.adev[0].num_channels; c++ {
+		for c := 0; c < modem.adev[0].num_channels; c++ {
 			var samples_per_symbol C.int
 
 			// Insert random amount of quiet time.
 
 			switch modem.achan[c].modem_type {
 			case MODEM_QPSK:
-				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 2)
+				samples_per_symbol = C.int(modem.adev[0].samples_per_sec) / (modem.achan[c].baud / 2)
 			case MODEM_8PSK:
-				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 3)
+				samples_per_symbol = C.int(modem.adev[0].samples_per_sec) / (modem.achan[c].baud / 3)
 			default:
-				samples_per_symbol = modem.adev[0].samples_per_sec / modem.achan[c].baud
+				samples_per_symbol = C.int(modem.adev[0].samples_per_sec) / modem.achan[c].baud
 			}
 
 			// Provide enough time for the DCD to drop.
@@ -840,12 +840,12 @@ func send_packet(str string) {
 			var n = int(float64(samples_per_symbol) * (32 + float64(genPacketsRand())/float64(MY_RAND_MAX)))
 
 			for range n {
-				gen_tone_put_sample(c, 0, 0)
+				gen_tone_put_sample(C.int(c), 0, 0)
 			}
 
-			layer2_preamble_postamble(c, 32, 0, &modem)
-			layer2_send_frame(c, pp, 0, &modem)
-			layer2_preamble_postamble(c, 2, 1, &modem)
+			layer2_preamble_postamble(C.int(c), 32, 0, &modem)
+			layer2_send_frame(C.int(c), pp, 0, &modem)
+			layer2_preamble_postamble(C.int(c), 2, 1, &modem)
 		}
 		ax25_delete(pp)
 	}

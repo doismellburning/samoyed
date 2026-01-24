@@ -147,7 +147,7 @@ func multi_modem_init(pa *audio_s) {
 				real_baud = save_audio_config_p.achan[channel].baud / 3
 			}
 
-			process_age[channel] = PROCESS_AFTER_BITS * save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
+			process_age[channel] = PROCESS_AFTER_BITS * C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec) / real_baud
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}

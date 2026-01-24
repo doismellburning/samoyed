@@ -1263,7 +1263,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= MIN_SAMPLES_PER_SEC && n <= MAX_SAMPLES_PER_SEC {
-				p_audio_config.adev[adevice].samples_per_sec = C.int(n)
+				p_audio_config.adev[adevice].samples_per_sec = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Use a more reasonable audio sample rate in range of %d - %d.\n",
@@ -1283,7 +1283,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n == 1 || n == 2 {
-				p_audio_config.adev[adevice].num_channels = C.int(n)
+				p_audio_config.adev[adevice].num_channels = n
 
 				/* Set valid channels depending on mono or stereo. */
 

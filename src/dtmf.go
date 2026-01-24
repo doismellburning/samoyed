@@ -93,7 +93,7 @@ func dtmf_init(p_audio_config *audio_s, amp C.int) {
 		var D = &(dd[c])
 		var a = ACHAN2ADEV(c)
 
-		D.sample_rate = p_audio_config.adev[a].samples_per_sec
+		D.sample_rate = C.int(p_audio_config.adev[a].samples_per_sec)
 
 		if p_audio_config.achan[c].dtmf_decode != DTMF_DECODE_OFF {
 
