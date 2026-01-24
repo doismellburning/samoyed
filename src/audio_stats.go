@@ -69,7 +69,7 @@ var audioStatsSampleCount [MAX_ADEVS]int
 var audioStatsErrorCount [MAX_ADEVS]int
 var audioStatsSuppressFirst [MAX_ADEVS]bool
 
-func audio_stats(adev C.int, nchan int, nsamp int, interval C.int) {
+func audio_stats(adev C.int, nchan int, nsamp int, interval int) {
 
 	/* Gather numbers for read from audio device. */
 

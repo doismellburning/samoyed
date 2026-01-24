@@ -57,7 +57,7 @@ func nettnc_init(pa *audio_s) {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
-			var e = nettnc_attach(i, pa.nettnc_addr[i], int(pa.nettnc_port[i]))
+			var e = nettnc_attach(i, pa.nettnc_addr[i], pa.nettnc_port[i])
 			if e < 0 {
 				os.Exit(1)
 			}

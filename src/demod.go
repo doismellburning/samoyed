@@ -748,7 +748,7 @@ func demod_init(pa *audio_s) C.int {
 
 	// Now the virtual channels.  FIXME:  could be single loop.
 
-	for channel := C.int(MAX_RADIO_CHANS); channel < MAX_TOTAL_CHANS; channel++ {
+	for channel := MAX_RADIO_CHANS; channel < MAX_TOTAL_CHANS; channel++ {
 
 		// FIXME dw_printf ("-------- virtual channel loop %d \n", channel);
 
