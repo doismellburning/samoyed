@@ -4621,7 +4621,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if p_igate_config.t2_filter != "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Warning - Earlier IGFILTER value will be replaced by this one.\n", line)
+				dw_printf("Line %d: Warning - IGFILTER already configured (%s), this one (%s) will be ignored.\n", line, p_igate_config.t2_filter, t)
 				continue
 			}
 
