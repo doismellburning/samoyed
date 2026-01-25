@@ -108,16 +108,16 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 
 	// TODO (high, bug):    Why do we see !4237.13N/07120.84W=PHG0000...   when all values set to unknown.
 
-	var messaging C.int = 0
-	var compressed C.int = 0
+	var messaging = false
+	var compressed = false
 
 	var info = encode_position(messaging, compressed,
-		C.double(lat), C.double(lon), 0, C.int(DW_METERS_TO_FEET(alt)),
+		lat, lon, 0, int(DW_METERS_TO_FEET(alt)),
 		'/', '=',
-		G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, C.CString(""), // PHGd
-		C.int(course), C.int(knots),
+		G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "", // PHGd
+		int(course), int(knots),
 		445.925, 0, 0,
-		C.CString(comment))
+		comment)
 
 	var position_report = fmt.Sprintf("%s>WALK96:%s", MYCALL, info)
 

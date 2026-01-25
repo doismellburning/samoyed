@@ -13,16 +13,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <ctype.h>
-// #include <time.h>
-// #include <math.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -54,24 +44,24 @@ func normal_position_string(p *position_t) string {
 	return fmt.Sprintf("%s%c%s%c", string(p.Lat[:]), p.SymTableId, string(p.Lon[:]), p.SymbolCode)
 }
 
-func normal_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double, ambiguity C.int) *position_t {
+func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *position_t {
 	var presult = new(position_t)
 
-	copy(presult.Lat[:], latitude_to_str(float64(dlat), int(ambiguity)))
+	copy(presult.Lat[:], latitude_to_str(dlat, ambiguity))
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
 	}
-	presult.SymTableId = byte(symtab)
+	presult.SymTableId = symtab
 
-	copy(presult.Lon[:], longitude_to_str(float64(dlong), int(ambiguity)))
+	copy(presult.Lon[:], longitude_to_str(dlong, ambiguity))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not in range of ! to ~\n")
 	}
-	presult.SymbolCode = byte(symbol)
+	presult.SymbolCode = symbol
 
 	return presult
 }
@@ -116,9 +106,9 @@ func compressed_position_string(p *compressed_position_t) string {
 	return fmt.Sprintf("%c%s%s%c%c%c%c", p.SymTableId, string(p.Y[:]), string(p.X[:]), p.SymbolCode, p.C, p.S, p.T)
 }
 
-func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.double,
-	power C.int, height C.int, gain C.int,
-	course C.int, speed C.int) *compressed_position_t {
+func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
+	power int, height int, gain int,
+	course int, speed int) *compressed_position_t {
 
 	var presult = new(compressed_position_t)
 
@@ -134,16 +124,16 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 	if unicode.IsDigit(rune(symtab)) {
 		symtab = symtab - '0' + 'a'
 	}
-	presult.SymTableId = byte(symtab)
+	presult.SymTableId = symtab
 
-	copy(presult.Y[:], latitude_to_comp_str(float64(dlat)))
-	copy(presult.X[:], longitude_to_comp_str(float64(dlong)))
+	copy(presult.Y[:], latitude_to_comp_str(dlat))
+	copy(presult.X[:], longitude_to_comp_str(dlong))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not in range of ! to ~\n")
 	}
-	presult.SymbolCode = byte(symbol)
+	presult.SymbolCode = symbol
 
 	/*
 	 * The cst field is complicated.
@@ -166,7 +156,7 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 	 */
 
 	if speed > 0 {
-		var c C.int
+		var c int
 
 		if course != G_UNKNOWN {
 			c = (course + 2) / 4
@@ -244,17 +234,19 @@ func compressed_position(symtab C.char, symbol C.char, dlat C.double, dlong C.do
 // Callers originally checked for any not zero.
 // now they check for any > 0.
 
+/*
 type phg_t struct {
-	P C.char
-	H C.char
-	G C.char
-	p C.char
-	h C.char
-	g C.char
-	d C.char
+	P byte
+	H byte
+	G byte
+	p byte
+	h byte
+	g byte
+	d byte
 }
+*/
 
-func phg_data_extension(power C.int, height C.int, gain C.int, _dir *C.char) string {
+func phg_data_extension(power int, height int, gain int, dir string) string {
 	var p = math.Round(math.Sqrt(float64(power))) + '0'
 	if p < '0' {
 		p = '0'
@@ -276,7 +268,6 @@ func phg_data_extension(power C.int, height C.int, gain C.int, _dir *C.char) str
 	}
 
 	var d = '0'
-	var dir = C.GoString(_dir)
 	if dir != "" {
 		if strings.EqualFold(dir, "NE") {
 			d = '1'
@@ -297,7 +288,7 @@ func phg_data_extension(power C.int, height C.int, gain C.int, _dir *C.char) str
 		}
 	}
 
-	return fmt.Sprintf("PHG%c%c%c%c", C.char(p), C.char(h), C.char(g), d)
+	return fmt.Sprintf("PHG%c%c%c%c", byte(p), byte(h), byte(g), d)
 }
 
 /*------------------------------------------------------------------
@@ -319,9 +310,9 @@ func phg_data_extension(power C.int, height C.int, gain C.int, _dir *C.char) str
  *
  *----------------------------------------------------------------*/
 
-func cse_spd_data_extension(course C.int, speed C.int) string {
+func cse_spd_data_extension(course int, speed int) string {
 
-	var cse C.int
+	var cse int
 	if course != G_UNKNOWN {
 		cse = course
 		for cse < 1 {
@@ -376,7 +367,7 @@ func cse_spd_data_extension(course C.int, speed C.int) string {
  *
  *----------------------------------------------------------------*/
 
-func frequency_spec(freq C.float, tone C.float, offset C.float) string {
+func frequency_spec(freq float64, tone float64, offset float64) string {
 	var result string
 
 	if freq > 0 {
@@ -450,29 +441,31 @@ func frequency_spec(freq C.float, tone C.float, offset C.float) string {
  *
  *----------------------------------------------------------------*/
 
+/*
 type aprs_ll_pos_t struct {
-	dti C.char /* ! or = */
+	dti byte // ! or =
 	pos position_t
-	/* Comment up to 43 characters. */
-	/* Start of comment could be data extension(s). */
+	// Comment up to 43 characters.
+	// Start of comment could be data extension(s).
 }
 
 type aprs_compressed_pos_t struct {
-	dti  C.char /* ! or = */
+	dti  byte // ! or =
 	cpos compressed_position_t
-	/* Comment up to 40 characters. */
-	/* No data extension allowed for compressed location. */
+	// Comment up to 40 characters.
+	// No data extension allowed for compressed location.
 }
+*/
 
-func encode_position(messaging C.int, compressed C.int, lat C.double, lon C.double, ambiguity C.int, alt_ft C.int,
-	symtab C.char, symbol C.char,
-	power C.int, height C.int, gain C.int, dir *C.char,
-	course C.int, speed C.int,
-	freq C.float, tone C.float, offset C.float,
-	comment *C.char) string {
+func encode_position(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft int,
+	symtab byte, symbol byte,
+	power int, height int, gain int, dir string,
+	course int, speed int,
+	freq float64, tone float64, offset float64,
+	comment string) string {
 	var result string
 
-	if compressed > 0 {
+	if compressed {
 		// Thought:
 		// https://groups.io/g/direwolf/topic/92718535#6886
 		// When speed is zero, we could put the altitude in the compressed
@@ -482,7 +475,7 @@ func encode_position(messaging C.int, compressed C.int, lat C.double, lon C.doub
 		// flip back and forth between two different representations.
 
 		var dti = '!'
-		if messaging > 0 {
+		if messaging {
 			dti = '='
 		}
 		var c = compressed_position(symtab, symbol, lat, lon,
@@ -492,7 +485,7 @@ func encode_position(messaging C.int, compressed C.int, lat C.double, lon C.doub
 		result = string(dti) + compressed_position_string(c)
 	} else {
 		var dti = '!'
-		if messaging > 0 {
+		if messaging {
 			dti = '='
 		}
 		var n = normal_position(symtab, symbol, lat, lon, ambiguity)
@@ -540,10 +533,7 @@ func encode_position(messaging C.int, compressed C.int, lat C.double, lon C.doub
 	}
 
 	/* Finally, comment text. */
-
-	if comment != nil {
-		result += C.GoString(comment)
-	}
+	result += comment
 
 	return result
 } /* end encode_position */
@@ -586,39 +576,40 @@ func encode_position(messaging C.int, compressed C.int, lat C.double, lon C.doub
  *
  *----------------------------------------------------------------*/
 
+/*
 type aprs_object_t struct {
 	o struct {
-		dti         rune /* ; */
+		dti         rune // ;
 		name        [9]rune
-		live_killed rune /* * for live or _ for killed */
+		live_killed rune // * for live or _ for killed
 		time_stamp  [7]rune
 	}
 	u struct { // TODO KG Was union
-		pos  position_t            /* Up to 43 char comment.  First 7 bytes could be data extension. */
-		cpos compressed_position_t /* Up to 40 char comment.  No PHG data extension in this case. */
+		pos  position_t            // Up to 43 char comment.  First 7 bytes could be data extension.
+		cpos compressed_position_t // Up to 40 char comment.  No PHG data extension in this case.
 	}
 }
+*/
 
-func encode_object(name *C.char, compressed C.int, thyme C.time_t, lat C.double, lon C.double, ambiguity C.int,
-	symtab C.char, symbol C.char,
-	power C.int, height C.int, gain C.int, dir *C.char,
-	course C.int, speed C.int,
-	freq C.float, tone C.float, offset C.float, comment *C.char) string {
+func encode_object(name string, compressed bool, thyme time.Time, lat float64, lon float64, ambiguity int,
+	symtab byte, symbol byte,
+	power int, height int, gain int, dir string,
+	course int, speed int,
+	freq float64, tone float64, offset float64, comment string) string {
 
 	var dti = ';'
 	var liveKilled = '*'
 
 	var timestamp string
-	if thyme != 0 {
-		var tm = time.Unix(int64(thyme), 0)
-		timestamp = tm.Format("020304z")
+	if !thyme.IsZero() {
+		timestamp = thyme.Format("020304z")
 	} else {
 		timestamp = "111111z"
 	}
 
-	var result = fmt.Sprintf("%c%-9.9s%c%-7.7s", dti, C.GoString(name), liveKilled, timestamp)
+	var result = fmt.Sprintf("%c%-9.9s%c%-7.7s", dti, name, liveKilled, timestamp)
 
-	if compressed > 0 {
+	if compressed {
 		result += compressed_position_string(compressed_position(symtab, symbol, lat, lon,
 			power, height, gain,
 			course, speed))
@@ -643,10 +634,7 @@ func encode_object(name *C.char, compressed C.int, thyme C.time_t, lat C.double,
 	}
 
 	/* Finally, comment text. */
-
-	if comment != nil {
-		result += C.GoString(comment)
-	}
+	result += comment
 
 	return result
 } /* end encode_object */
@@ -667,10 +655,9 @@ func encode_object(name *C.char, compressed C.int, thyme C.time_t, lat C.double,
  *
  *----------------------------------------------------------------*/
 
-func encode_message(addressee *C.char, text *C.char, _id *C.char) string {
-	var result = fmt.Sprintf(":%-9.9s:%s", C.GoString(addressee), C.GoString(text))
+func encode_message(addressee string, text string, id string) string {
+	var result = fmt.Sprintf(":%-9.9s:%s", addressee, text)
 
-	var id = C.GoString(_id)
 	if len(id) > 0 {
 		result += "{" + id
 	}
