@@ -1249,8 +1249,7 @@ func filt_i(pf *pfstate_t) C.int {
 
 	if len(parts) > 1 {
 		if len(parts[1]) > 0 {
-			_maxhops, _ := strconv.Atoi(parts[1])
-			maxhops = C.int(_maxhops)
+			maxhops, _ = strconv.Atoi(parts[1])
 		} else {
 			print_error(pf, "Missing max digipeater hops for IGate message filter.")
 			return (-1)
@@ -1314,7 +1313,7 @@ func filt_i(pf *pfstate_t) C.int {
 	 *	 period (range defined as digi hops, distance, or both)."
 	 */
 
-	var was_heard = mheard_was_recently_nearby(C.CString("addressee"), &pf.decoded.g_addressee[0], heardtime, maxhops, C.double(dlat), C.double(dlon), C.double(km))
+	var was_heard = mheard_was_recently_nearby(C.CString("addressee"), &pf.decoded.g_addressee[0], heardtime, C.int(maxhops), C.double(dlat), C.double(dlon), C.double(km))
 
 	if was_heard {
 		return (0)

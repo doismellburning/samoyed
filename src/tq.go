@@ -208,7 +208,7 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 			dw_printf("\n")
 
-			igate_send_rec_packet(channel, pp)
+			igate_send_rec_packet(int(channel), pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */

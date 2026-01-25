@@ -680,9 +680,8 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
  *
  *------------------------------------------------------------------*/
 
-func mheard_set_msp(_callsign *C.char, num C.int) {
+func mheard_set_msp(callsign string, num C.int) {
 
-	var callsign = C.GoString(_callsign)
 	var mptr = mheard_db[callsign]
 
 	if mptr != nil {
@@ -713,15 +712,15 @@ func mheard_set_msp(_callsign *C.char, num C.int) {
  *
  *------------------------------------------------------------------*/
 
-func mheard_get_msp(callsign *C.char) C.int {
+func mheard_get_msp(callsign string) C.int {
 
-	var mptr = mheard_db[C.GoString(callsign)]
+	var mptr = mheard_db[callsign]
 
 	if mptr != nil {
 
 		if mheard_debug > 0 {
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("MSP for %s is %d\n", C.GoString(callsign), mptr.msp)
+			dw_printf("MSP for %s is %d\n", callsign, mptr.msp)
 		}
 		return (mptr.msp) // Should we have a time limit?
 	}
