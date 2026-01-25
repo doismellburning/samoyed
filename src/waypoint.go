@@ -31,8 +31,8 @@ import (
 
 var s_waypoint_serial_port_fd *term.Term
 var s_waypoint_udp_sock net.Conn
-var s_waypoint_formats C.int = 0 // which formats should we generate?
-var s_waypoint_debug = 0         // Print information flowing to attached device.
+var s_waypoint_formats = 0 // which formats should we generate?
+var s_waypoint_debug = 0   // Print information flowing to attached device.
 
 func waypoint_set_debug(n int) {
 	s_waypoint_debug = n
@@ -81,7 +81,7 @@ func waypoint_init(mc *misc_config_s) {
 
 	s_waypoint_udp_sock = nil
 	if mc.waypoint_udp_portnum > 0 {
-		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(int(mc.waypoint_udp_portnum)))
+		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))
 		var conn, err = net.Dial("udp", addr)
 
 		if err != nil {

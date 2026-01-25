@@ -127,7 +127,7 @@ func kisspt_init(mc *misc_config_s) {
 
 	kisspt_kf = new(kiss_frame_t)
 
-	if mc.enable_kiss_pt > 0 {
+	if mc.enable_kiss_pt {
 		kisspt_open_pt()
 
 		if pt_master != nil {

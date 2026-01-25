@@ -246,7 +246,7 @@ const PEERCALL = AX25_DESTINATION
 // Multiply FRACK by 2*m+1, where m is number of digipeaters.
 
 func INIT_T1V_SRT(S *ax25_dlsm_t) {
-	S.t1v = time.Duration((g_misc_config_p.frack)*(2*(S.num_addr-2)+1)) * time.Second
+	S.t1v = time.Duration(C.int(g_misc_config_p.frack)*(2*(S.num_addr-2)+1)) * time.Second
 	S.srt = S.t1v / 2
 }
 
@@ -887,7 +887,7 @@ func dl_connect_request(E *dlq_item_t) {
 		// See if destination station is in list for v2.0 only.
 
 		var old_version = false
-		for n := C.int(0); n < g_misc_config_p.v20_count && !old_version; n++ {
+		for n := 0; n < g_misc_config_p.v20_count && !old_version; n++ {
 			/* FIXME KG pointer array aliasing argh
 			if C.GoString(&E.addrs[AX25_DESTINATION][0]) == C.GoString(g_misc_config_p.v20_addrs[n]) {
 				old_version = true
@@ -4925,7 +4925,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 		// MAXV22 hack.
 		// If we already sent the maximum number of SABME, fall back to v2.0 SABM.
 
-		if S.state == state_5_awaiting_v22_connection && S.rc == g_misc_config_p.maxv22 {
+		if S.state == state_5_awaiting_v22_connection && S.rc == C.int(g_misc_config_p.maxv22) {
 			set_version_2_0(S)
 			enter_new_state(S, state_1_awaiting_connection)
 		}
@@ -5796,7 +5796,7 @@ func select_t1_value(S *ax25_dlsm_t) {
 	// TODO: Add some instrumentation to record where this was called from and all the values in the printf below.
 
 	// TODO KG #if 1
-	if S.t1v < 250*time.Millisecond || S.t1v > 2*time.Duration(g_misc_config_p.frack*(2*(S.num_addr-2)+1))*time.Second {
+	if S.t1v < 250*time.Millisecond || S.t1v > 2*time.Duration(C.int(g_misc_config_p.frack)*(2*(S.num_addr-2)+1))*time.Second {
 		INIT_T1V_SRT(S)
 	}
 	/* TODO KG
@@ -5821,9 +5821,9 @@ func select_t1_value(S *ax25_dlsm_t) {
 func set_version_2_0(S *ax25_dlsm_t) {
 	S.srej_enable = srej_none
 	S.modulo = 8
-	S.n1_paclen = g_misc_config_p.paclen
-	S.k_maxframe = g_misc_config_p.maxframe_basic
-	S.n2_retry = g_misc_config_p.retry
+	S.n1_paclen = C.int(g_misc_config_p.paclen)
+	S.k_maxframe = C.int(g_misc_config_p.maxframe_basic)
+	S.n2_retry = C.int(g_misc_config_p.retry)
 } /* end set_version_2_0 */
 
 /*------------------------------------------------------------------------------
@@ -5836,9 +5836,9 @@ func set_version_2_2(S *ax25_dlsm_t) {
 	S.srej_enable = srej_single // Start with single.
 	// Can be increased to multi with XID exchange.
 	S.modulo = 128
-	S.n1_paclen = g_misc_config_p.paclen
-	S.k_maxframe = g_misc_config_p.maxframe_extended
-	S.n2_retry = g_misc_config_p.retry
+	S.n1_paclen = C.int(g_misc_config_p.paclen)
+	S.k_maxframe = C.int(g_misc_config_p.maxframe_extended)
+	S.n2_retry = C.int(g_misc_config_p.retry)
 } /* end set_version_2_2 */
 
 /*------------------------------------------------------------------------------
@@ -6161,7 +6161,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
 	param.window_size_rx = int(S.k_maxframe)
-	param.ack_timer = int(g_misc_config_p.frack * 1000)
+	param.ack_timer = g_misc_config_p.frack * 1000
 	param.retries = int(S.n2_retry)
 }
 
@@ -6249,7 +6249,7 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	if param.ack_timer == G_UNKNOWN {
 		param.ack_timer = 3000 // not specified, set default.
 	} else {
-		param.ack_timer = max(param.ack_timer, int(g_misc_config_p.frack*1000))
+		param.ack_timer = max(param.ack_timer, g_misc_config_p.frack*1000)
 	}
 
 	if param.retries == G_UNKNOWN {

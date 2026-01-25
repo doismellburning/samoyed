@@ -127,7 +127,7 @@ func kissserial_init(mc *misc_config_s) {
 		if g_misc_config_p.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
 
-			serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, int(g_misc_config_p.kiss_serial_speed))
+			serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 			if serialport_fd != nil {
 				text_color_set(DW_COLOR_INFO)
@@ -326,14 +326,14 @@ func kissserial_get() (byte, error) {
 			serialport_fd = nil
 		} else {
 			// Not open.  Wait for it to appear and try opening.
-			SLEEP_SEC(int(g_misc_config_p.kiss_serial_poll))
+			SLEEP_SEC(g_misc_config_p.kiss_serial_poll)
 
 			var _, statErr = os.Stat(g_misc_config_p.kiss_serial_port)
 
 			if statErr == nil {
 				// It's there now.  Try to open.
 
-				serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, int(g_misc_config_p.kiss_serial_speed))
+				serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 				if serialport_fd != nil {
 					text_color_set(DW_COLOR_INFO)
