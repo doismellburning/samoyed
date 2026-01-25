@@ -422,7 +422,7 @@ o = DCD output control
 	}
 
 	fx25_init(d_x_opt)
-	il2p_init(C.int(d_2_opt))
+	il2p_init(d_2_opt)
 
 	var start_time = time.Now()
 	var total_filetime float64

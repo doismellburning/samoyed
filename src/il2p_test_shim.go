@@ -30,7 +30,7 @@ func il2p_test_main(t *testing.T) {
 	var enable_color = 1
 	text_color_init(enable_color)
 
-	var enable_debug_out C.int = 0
+	var enable_debug_out = 0
 	il2p_init(enable_debug_out)
 
 	fmt.Println("Begin IL2P unit tests.")
