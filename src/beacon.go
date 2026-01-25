@@ -209,9 +209,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 	 * Calculate first time for each beacon from the 'slot' or 'delay' value.
 	 */
 
-	var now = C.time(nil)
-	var tm C.struct_tm
-	C.localtime_r(&now, &tm)
+	var now = time.Now()
 
 	for j := C.int(0); j < g_misc_config_p.num_beacons; j++ {
 		var bp = &(g_misc_config_p.beacon[j])
@@ -239,7 +237,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 				// Try to make it valid by adjusting up or down.
 
-				for n := C.int(1); ; n++ {
+				for n := 1; ; n++ {
 					var e = bp.every + n
 					if e > 3600 {
 						bp.every = 3600
@@ -265,7 +263,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 			/*
 			 * Determine when next slot time will arrive.
 			 */
-			bp.delay = bp.slot - (tm.tm_min*60 + tm.tm_sec)
+			bp.delay = bp.slot - (now.Minute()*60 + now.Second())
 			for bp.delay > bp.every {
 				bp.delay -= bp.every
 			}
@@ -274,7 +272,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 			}
 		}
 
-		g_misc_config_p.beacon[j].next = now + C.long(g_misc_config_p.beacon[j].delay)
+		g_misc_config_p.beacon[j].next = now.Add(time.Duration(g_misc_config_p.beacon[j].delay) * time.Second)
 	}
 
 	/*
@@ -293,7 +291,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 	}
 } /* end beacon_init */
 
-func IS_GOOD(x C.int) bool {
+func IS_GOOD(x int) bool {
 	return (3600/(x))*(x) == 3600
 }
 
@@ -330,9 +328,9 @@ func beacon_thread() {
 		}
 	}
 
-	var now = C.time(nil)
-	var sb_prev_time C.time_t = 0  /* Time of most recent transmission. */
-	var sb_prev_course C.float = 0 /* Most recent course reported. */
+	var now = time.Now()
+	var sb_prev_time time.Time /* Time of most recent transmission. */
+	var sb_prev_course float64 /* Most recent course reported. */
 
 	for {
 		/*
@@ -340,26 +338,35 @@ func beacon_thread() {
 		 * the soonest we could transmit due to corner pegging.
 		 */
 
-		var earliest = now + 60*60
+		var earliest = now.Add(time.Hour)
 		for j := range g_misc_config_p.num_beacons {
 			if g_misc_config_p.beacon[j].btype != BEACON_IGNORE {
-				earliest = min(g_misc_config_p.beacon[j].next, earliest)
+				var t = g_misc_config_p.beacon[j].next
+				if t.Before(earliest) {
+					earliest = t
+				}
 			}
 		}
 
 		if g_misc_config_p.sb_configured > 0 && number_of_tbeacons > 0 {
-			earliest = min(now+C.long(g_misc_config_p.sb_turn_time), earliest)
-			earliest = min(now+C.long(g_misc_config_p.sb_fast_rate), earliest)
+			var t = now.Add(time.Duration(g_misc_config_p.sb_turn_time) * time.Second)
+			if t.Before(earliest) {
+				earliest = t
+			}
+			t = now.Add(time.Duration(g_misc_config_p.sb_fast_rate) * time.Second)
+			if t.Before(earliest) {
+				earliest = t
+			}
 		}
 
-		if earliest > now {
-			SLEEP_SEC(int(earliest - now))
+		if earliest.After(now) {
+			SLEEP_SEC(int(earliest.Sub(now).Seconds()))
 		}
 
 		/*
 		 * Woke up.  See what needs to be done.
 		 */
-		now = C.time(nil)
+		now = time.Now()
 
 		/*
 		 * Get information from GPS if being used.
@@ -373,20 +380,16 @@ func beacon_thread() {
 			var my_speed_mph = DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))
 
 			if g_tracker_debug_level >= 1 {
-				var tm C.struct_tm
-				C.localtime_r(&now, &tm)
-
-				var hms [20]C.char
-				C.strftime(&hms[0], C.ulong(len(hms)), C.CString("%H:%M:%S"), &tm)
+				var hms = now.Format("15:04:05")
 
 				text_color_set(DW_COLOR_DEBUG)
 				switch fix {
 				case DWFIX_3D:
-					dw_printf("%s  3D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0, %.1f m\n", C.GoString(&hms[0]), gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track, gpsinfo.altitude)
+					dw_printf("%s  3D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0, %.1f m\n", hms, gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track, gpsinfo.altitude)
 				case DWFIX_2D:
-					dw_printf("%s  2D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0\n", C.GoString(&hms[0]), gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track)
+					dw_printf("%s  2D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0\n", hms, gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track)
 				default:
-					dw_printf("%s  No GPS fix\n", C.GoString(&hms[0]))
+					dw_printf("%s  No GPS fix\n", hms)
 				}
 			}
 
@@ -398,14 +401,14 @@ func beacon_thread() {
 			 */
 			if g_misc_config_p.sb_configured > 0 && fix >= DWFIX_2D {
 				var tnext = sb_calculate_next_time(now,
-					C.float(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))), gpsinfo.track,
+					DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots)), float64(gpsinfo.track),
 					sb_prev_time, sb_prev_course)
 
 				for j := range g_misc_config_p.num_beacons {
 					if g_misc_config_p.beacon[j].btype == BEACON_TRACKER {
 						/* Haven't thought about the consequences of SmartBeaconing */
 						/* and having more than one tbeacon configured. */
-						if tnext < g_misc_config_p.beacon[j].next {
+						if tnext.Before(g_misc_config_p.beacon[j].next) {
 							g_misc_config_p.beacon[j].next = tnext
 						}
 					}
@@ -423,7 +426,7 @@ func beacon_thread() {
 				continue
 			}
 
-			if bp.next <= now {
+			if !bp.next.After(now) {
 				/* Send the beacon. */
 
 				beacon_send(int(j), &gpsinfo)
@@ -437,32 +440,32 @@ func beacon_thread() {
 
 						if g_misc_config_p.sb_configured > 0 {
 							/* Try again in a couple seconds. */
-							bp.next = now + 2
+							bp.next = now.Add(2 * time.Second)
 						} else {
 							/* Stay with the schedule. */
 							/* Important for slotted.  Might reconsider otherwise. */
-							bp.next += C.long(bp.every)
+							bp.next = bp.next.Add(time.Duration(bp.every) * time.Second)
 						}
 					} else if g_misc_config_p.sb_configured > 0 {
 						/* Remember most recent tracker beacon. */
 						/* Compute next time if not turning. */
 
 						sb_prev_time = now
-						sb_prev_course = gpsinfo.track
+						sb_prev_course = float64(gpsinfo.track)
 
 						bp.next = sb_calculate_next_time(now,
-							C.float(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))), gpsinfo.track,
+							float64(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))), float64(gpsinfo.track),
 							sb_prev_time, sb_prev_course)
 					} else {
 						/* Tracker beacon, fixed spacing. */
-						bp.next += C.long(bp.every)
+						bp.next = bp.next.Add(time.Duration(bp.every) * time.Second)
 					}
 				} else {
 					/* Non-tracker beacon, fixed spacing. */
 					/* Increment by 'every' so slotted times come out right. */
 					/* i.e. Don't take relative to now in case there was some delay. */
 
-					bp.next += C.long(bp.every)
+					bp.next = bp.next.Add(time.Duration(bp.every) * time.Second)
 
 					// https://github.com/wb2osz/direwolf/pull/301
 					// https://github.com/wb2osz/direwolf/pull/301
@@ -474,8 +477,8 @@ func beacon_thread() {
 
 					/* craigerl: if next beacon is scheduled in the past, then set next beacon relative to now (happens when NTP pushes clock AHEAD) */
 					/* fixme: if NTP sets clock BACK an hour, this thread will sleep for that hour */
-					if bp.next < now {
-						bp.next = now + C.long(bp.every)
+					if bp.next.Before(now) {
+						bp.next = now.Add(time.Duration(bp.every) * time.Second)
 						text_color_set(DW_COLOR_INFO)
 						dw_printf("\nSystem clock appears to have jumped forward.  Beacon schedule updated.\n\n")
 					}
@@ -523,8 +526,8 @@ func beacon_thread() {
 
 /* Difference between two angles. */
 
-func heading_change(a, b C.float) C.float {
-	var diff = C.float(math.Abs(float64(a) - float64(b)))
+func heading_change(a, b float64) float64 {
+	var diff = math.Abs(a - b)
 
 	if diff <= 180. {
 		return (diff)
@@ -533,22 +536,22 @@ func heading_change(a, b C.float) C.float {
 	}
 }
 
-func sb_calculate_next_time(now C.time_t, current_speed_mph C.float, current_course C.float, last_xmit_time C.time_t, last_xmit_course C.float) C.time_t {
-	var beacon_rate C.int
+func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_course float64, last_xmit_time time.Time, last_xmit_course float64) time.Time {
+	var beacon_rate int
 
 	/*
 	 * Compute time between beacons for travelling in a straight line.
 	 */
 
 	if current_speed_mph == G_UNKNOWN {
-		beacon_rate = C.int(math.Round(float64(g_misc_config_p.sb_fast_rate+g_misc_config_p.sb_slow_rate) / 2.))
-	} else if current_speed_mph > C.float(g_misc_config_p.sb_fast_speed) {
-		beacon_rate = g_misc_config_p.sb_fast_rate
-	} else if current_speed_mph < C.float(g_misc_config_p.sb_slow_speed) {
-		beacon_rate = g_misc_config_p.sb_slow_rate
+		beacon_rate = int(math.Round(float64(g_misc_config_p.sb_fast_rate+g_misc_config_p.sb_slow_rate) / 2.))
+	} else if current_speed_mph > float64(g_misc_config_p.sb_fast_speed) {
+		beacon_rate = int(g_misc_config_p.sb_fast_rate)
+	} else if current_speed_mph < float64(g_misc_config_p.sb_slow_speed) {
+		beacon_rate = int(g_misc_config_p.sb_slow_rate)
 	} else {
 		/* Can't divide by 0 assuming sb_slow_speed > 0. */
-		beacon_rate = C.int(math.Round(float64(C.float(g_misc_config_p.sb_fast_rate*g_misc_config_p.sb_fast_speed) / current_speed_mph)))
+		beacon_rate = int(math.Round(float64(g_misc_config_p.sb_fast_rate*g_misc_config_p.sb_fast_speed) / current_speed_mph))
 	}
 
 	if g_tracker_debug_level >= 2 {
@@ -556,7 +559,7 @@ func sb_calculate_next_time(now C.time_t, current_speed_mph C.float, current_cou
 		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %.1f MPH\n", beacon_rate, current_speed_mph)
 	}
 
-	var next_time = last_xmit_time + C.long(beacon_rate)
+	var next_time = last_xmit_time.Add(time.Duration(beacon_rate) * time.Second)
 
 	/*
 	 * Test for "Corner Pegging" if moving.
@@ -564,9 +567,9 @@ func sb_calculate_next_time(now C.time_t, current_speed_mph C.float, current_cou
 	if current_speed_mph != G_UNKNOWN && current_speed_mph >= 1.0 &&
 		current_course != G_UNKNOWN && last_xmit_course != G_UNKNOWN {
 		var change = heading_change(current_course, last_xmit_course)
-		var turn_threshold = C.float(g_misc_config_p.sb_turn_angle) + C.float(g_misc_config_p.sb_turn_slope)/current_speed_mph
+		var turn_threshold = float64(g_misc_config_p.sb_turn_angle) + float64(g_misc_config_p.sb_turn_slope)/current_speed_mph
 
-		if change > turn_threshold && now >= last_xmit_time+C.long(g_misc_config_p.sb_turn_time) {
+		if change > turn_threshold && !now.Before(last_xmit_time.Add(time.Duration(g_misc_config_p.sb_turn_time)*time.Second)) {
 			if g_tracker_debug_level >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("SmartBeaconing: Send now for heading change of %.0f\n", change)
@@ -690,22 +693,22 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	switch bp.btype {
 	case BEACON_POSITION:
 
-		beacon_text += encode_position(bp.messaging != 0, bp.compress != 0,
-			float64(bp.lat), float64(bp.lon), int(bp.ambiguity),
+		beacon_text += encode_position(bp.messaging, bp.compress,
+			bp.lat, bp.lon, bp.ambiguity,
 			int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
-			byte(bp.symtab), byte(bp.symbol),
+			bp.symtab, bp.symbol,
 			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			float64(bp.freq), float64(bp.tone), float64(bp.offset),
+			bp.freq, bp.tone, bp.offset,
 			super_comment)
 
 	case BEACON_OBJECT:
 
-		beacon_text += encode_object(bp.objname, bp.compress != 0, time.Now(), float64(bp.lat), float64(bp.lon), int(bp.ambiguity),
-			byte(bp.symtab), byte(bp.symbol),
+		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), bp.lat, bp.lon, bp.ambiguity,
+			bp.symtab, bp.symbol,
 			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			float64(bp.freq), float64(bp.tone), float64(bp.offset), super_comment)
+			bp.freq, bp.tone, bp.offset, super_comment)
 
 	case BEACON_TRACKER:
 
@@ -725,9 +728,9 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 				coarse = int(math.Round(float64(gpsinfo.track)))
 			}
 
-			beacon_text += encode_position(bp.messaging != 0, bp.compress != 0,
-				float64(gpsinfo.dlat), float64(gpsinfo.dlon), int(bp.ambiguity), my_alt_ft,
-				byte(bp.symtab), byte(bp.symbol),
+			beacon_text += encode_position(bp.messaging, bp.compress,
+				float64(gpsinfo.dlat), float64(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
+				bp.symtab, bp.symbol,
 				int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 				coarse, int(math.Round(float64(gpsinfo.speed_knots))),
 				float64(bp.freq), float64(bp.tone), float64(bp.offset),
@@ -746,8 +749,8 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 				A.g_dcs = G_UNKNOWN
 
 				C.strcpy(&A.g_src[0], C.CString(mycall))
-				A.g_symbol_table = bp.symtab
-				A.g_symbol_code = bp.symbol
+				A.g_symbol_table = C.char(bp.symtab)
+				A.g_symbol_code = C.char(bp.symbol)
 				A.g_lat = gpsinfo.dlat
 				A.g_lon = gpsinfo.dlon
 				A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots)))
@@ -828,9 +831,9 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			/* Simulated reception from radio. */
 
 			var alevel alevel_t
-			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, C.CString(""))
+			dlq_rec_frame(C.int(bp.sendto_chan), 0, 0, pp, alevel, fec_type_none, 0, C.CString(""))
 		default:
-			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
+			tq_append(C.int(bp.sendto_chan), TQ_PRIO_1_LO, pp)
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
