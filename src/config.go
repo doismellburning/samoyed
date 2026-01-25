@@ -149,7 +149,7 @@ type beacon_s struct {
 }
 
 type misc_config_s struct {
-	agwpe_port C.int /* TCP Port number for the "AGW TCPIP Socket Interface" */
+	agwpe_port int /* TCP Port number for the "AGW TCPIP Socket Interface" */
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
@@ -167,11 +167,11 @@ type misc_config_s struct {
 	//	KISSPORT 7001 1		# Only radio channel 1 for receive.  KISS channel set to 0.
 	//				# Transmit to radio channel 1, ignoring KISS channel.
 
-	kiss_port [MAX_KISS_TCP_PORTS]C.int /* TCP Port number for the "TCP KISS" protocol. */
-	kiss_chan [MAX_KISS_TCP_PORTS]C.int /* Radio Channel number for this port or -1 for all.  */
+	kiss_port [MAX_KISS_TCP_PORTS]int /* TCP Port number for the "TCP KISS" protocol. */
+	kiss_chan [MAX_KISS_TCP_PORTS]int /* Radio Channel number for this port or -1 for all.  */
 
-	kiss_copy      C.int /* Data from network KISS client is copied to all others. */
-	enable_kiss_pt C.int /* Enable pseudo terminal for KISS. */
+	kiss_copy      bool /* Data from network KISS client is copied to all others. */
+	enable_kiss_pt bool /* Enable pseudo terminal for KISS. */
 	/* Want this to be off by default because it hangs */
 	/* after a while if nothing is reading from other end. */
 
@@ -180,22 +180,22 @@ type misc_config_s struct {
 	/* virtual null modem for native Windows apps. */
 	/* Version 1.5 add same capability for Linux. */
 
-	kiss_serial_speed C.int /* Speed, in bps, for the KISS serial port. */
+	kiss_serial_speed int /* Speed, in bps, for the KISS serial port. */
 	/* If 0, just leave what was already there. */
 
-	kiss_serial_poll C.int /* When using Bluetooth KISS, the /dev/rfcomm0 device */
+	kiss_serial_poll int /* When using Bluetooth KISS, the /dev/rfcomm0 device */
 	/* will appear and disappear as the remote application */
 	/* opens and closes the virtual COM port. */
-	/* When this is non-zero, we will check periodically to */
+	/* When this is n>0, we will check every n seconds to */
 	/* see if the device has appeared and we will open it. */
 
 	gpsnmea_port string /* Serial port name for reading NMEA sentences from GPS. e.g. COM22, /dev/ttyACM0 */
 
-	gpsnmea_speed C.int /* Speed for above, baud, default 4800. */
+	gpsnmea_speed int /* Speed for above, baud, default 4800. */
 
 	gpsd_host string /* Host for gpsd server. e.g. localhost, 192.168.1.2 */
 
-	gpsd_port C.int /* Port number for gpsd server. */
+	gpsd_port int /* Port number for gpsd server. */
 	/* Default is  2947. */
 
 	waypoint_serial_port string /* Serial port name for sending NMEA waypoint sentences */
@@ -206,56 +206,56 @@ type misc_config_s struct {
 
 	waypoint_udp_hostname string /* Destination host when using UDP. */
 
-	waypoint_udp_portnum C.int /* UDP port. */
+	waypoint_udp_portnum int /* UDP port. */
 
-	waypoint_formats C.int /* Which sentence formats should be generated? */
+	waypoint_formats int /* Which sentence formats should be generated? */
 
-	log_daily_names C.int /* True to generate new log file each day. */
+	log_daily_names bool /* True to generate new log file each day. */
 
 	log_path string /* Either directory or full file name depending on above. */
 
-	dns_sd_enabled C.int  /* DNS Service Discovery announcement enabled. */
+	dns_sd_enabled bool   /* DNS Service Discovery announcement enabled. */
 	dns_sd_name    string /* Name announced on dns-sd; defaults to "Dire Wolf on <hostname>" */
 
-	sb_configured C.int /* TRUE if SmartBeaconing is configured. */
-	sb_fast_speed C.int /* MPH */
-	sb_fast_rate  C.int /* seconds */
-	sb_slow_speed C.int /* MPH */
-	sb_slow_rate  C.int /* seconds */
-	sb_turn_time  C.int /* seconds */
-	sb_turn_angle C.int /* degrees */
-	sb_turn_slope C.int /* degrees * MPH */
+	sb_configured bool /* TRUE if SmartBeaconing is configured. */
+	sb_fast_speed int  /* MPH */
+	sb_fast_rate  int  /* seconds */
+	sb_slow_speed int  /* MPH */
+	sb_slow_rate  int  /* seconds */
+	sb_turn_time  int  /* seconds */
+	sb_turn_angle int  /* degrees */
+	sb_turn_slope int  /* degrees * MPH */
 
 	// AX.25 connected mode.
 
-	frack C.int /* Number of seconds to wait for ack to transmission. */
+	frack int /* Number of seconds to wait for ack to transmission. */
 
-	retry C.int /* Number of times to retry before giving up. */
+	retry int /* Number of times to retry before giving up. */
 
-	paclen C.int /* Max number of bytes in information part of frame. */
+	paclen int /* Max number of bytes in information part of frame. */
 
-	maxframe_basic C.int /* Max frames to send before ACK.  mod 8 "Window" size. */
+	maxframe_basic int /* Max frames to send before ACK.  mod 8 "Window" size. */
 
-	maxframe_extended C.int /* Max frames to send before ACK.  mod 128 "Window" size. */
+	maxframe_extended int /* Max frames to send before ACK.  mod 128 "Window" size. */
 
-	maxv22 C.int /* Maximum number of unanswered SABME frames sent before */
+	maxv22 int /* Maximum number of unanswered SABME frames sent before */
 	/* switching to SABM.  This is to handle the case of an old */
 	/* TNC which simply ignores SABME rather than replying with FRMR. */
 
 	v20_addrs []string /* Stations known to understand only AX.25 v2.0 so we don't waste time trying v2.2 first. */
 
-	v20_count C.int /* Number of station addresses in array above. */
+	v20_count int /* Number of station addresses in array above. */
 
 	noxid_addrs []string /* Stations known not to understand XID command so don't */
 	/* waste time sending it and eventually giving up. */
 	/* AX.25 for Linux is the one known case, so far, where */
 	/* SABME is implemented but XID is not. */
 
-	noxid_count C.int /* Number of station addresses in array above. */
+	noxid_count int /* Number of station addresses in array above. */
 
 	// Beacons.
 
-	num_beacons C.int /* Number of beacons defined. */
+	num_beacons int /* Number of beacons defined. */
 
 	beacon [MAX_BEACONS]beacon_s
 }
@@ -976,21 +976,21 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_misc_config.kiss_port[0] = DEFAULT_KISS_PORT
 	p_misc_config.kiss_chan[0] = -1 // all channels.
 
-	p_misc_config.enable_kiss_pt = 0 /* -p option */
-	p_misc_config.kiss_copy = 0
+	p_misc_config.enable_kiss_pt = false /* -p option */
+	p_misc_config.kiss_copy = false
 
-	p_misc_config.dns_sd_enabled = 1
+	p_misc_config.dns_sd_enabled = true
 
 	/* Defaults from http://info.aprs.net/index.php?title=SmartBeaconing */
 
-	p_misc_config.sb_configured = 0   /* TRUE if SmartBeaconing is configured. */
-	p_misc_config.sb_fast_speed = 60  /* MPH */
-	p_misc_config.sb_fast_rate = 180  /* seconds */
-	p_misc_config.sb_slow_speed = 5   /* MPH */
-	p_misc_config.sb_slow_rate = 1800 /* seconds */
-	p_misc_config.sb_turn_time = 15   /* seconds */
-	p_misc_config.sb_turn_angle = 30  /* degrees */
-	p_misc_config.sb_turn_slope = 255 /* degrees * MPH */
+	p_misc_config.sb_configured = false /* TRUE if SmartBeaconing is configured. */
+	p_misc_config.sb_fast_speed = 60    /* MPH */
+	p_misc_config.sb_fast_rate = 180    /* seconds */
+	p_misc_config.sb_slow_speed = 5     /* MPH */
+	p_misc_config.sb_slow_rate = 1800   /* seconds */
+	p_misc_config.sb_turn_time = 15     /* seconds */
+	p_misc_config.sb_turn_angle = 30    /* degrees */
+	p_misc_config.sb_turn_slope = 255   /* degrees * MPH */
 
 	p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
 	p_igate_config.tx_chan = -1 /* IS to RF not enabled */
@@ -1010,7 +1010,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_misc_config.gpsnmea_port = ""
 	p_misc_config.waypoint_serial_port = ""
 
-	p_misc_config.log_daily_names = 0
+	p_misc_config.log_daily_names = false
 	p_misc_config.log_path = ""
 
 	/* connected mode. */
@@ -4759,7 +4759,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
-				p_misc_config.agwpe_port = C.int(n)
+				p_misc_config.agwpe_port = n
 			} else {
 				p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 				text_color_set(DW_COLOR_ERROR)
@@ -4795,9 +4795,9 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
-			var tcp_port C.int
+			var tcp_port int
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
-				tcp_port = C.int(n)
+				tcp_port = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\n", line)
@@ -4840,7 +4840,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 				if slot >= 0 {
 					p_misc_config.kiss_port[slot] = tcp_port
-					p_misc_config.kiss_chan[slot] = C.int(channel)
+					p_misc_config.kiss_chan[slot] = channel
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Too many KISSPORT commands.\n", line)
@@ -4875,7 +4875,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			t = split("", false)
 			if t != "" {
-				p_misc_config.kiss_serial_speed = C.atoi(C.CString(t))
+				p_misc_config.kiss_serial_speed, _ = strconv.Atoi(t)
 			}
 		} else if strings.EqualFold(t, "SERIALKISSPOLL") {
 
@@ -4905,7 +4905,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *			  This does not apply to pseudo terminal KISS.
 			 */
 
-			p_misc_config.kiss_copy = 1
+			p_misc_config.kiss_copy = true
 		} else if strings.EqualFold(t, "DNSSD") {
 
 			/*
@@ -4921,9 +4921,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n == 0 || n == 1 {
-				p_misc_config.dns_sd_enabled = C.int(n)
+				p_misc_config.dns_sd_enabled = n != 0
 			} else {
-				p_misc_config.dns_sd_enabled = 0
+				p_misc_config.dns_sd_enabled = false
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", line)
 			}
@@ -4952,7 +4952,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			t = split("", false)
 			if t != "" {
 				var n, _ = strconv.Atoi(t)
-				p_misc_config.gpsnmea_speed = C.int(n)
+				p_misc_config.gpsnmea_speed = n
 			} else {
 				p_misc_config.gpsnmea_speed = 4800 // The standard at one time.
 			}
@@ -4977,7 +4977,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			dw_printf("Warning: GPSD support currently disabled pending a rewrite of the integration.\n")
 
 			p_misc_config.gpsd_host = "localhost"
-			p_misc_config.gpsd_port = C.atoi(C.CString(C.DEFAULT_GPSD_PORT))
+			p_misc_config.gpsd_port, _ = strconv.Atoi(C.DEFAULT_GPSD_PORT)
 
 			t = split("", false)
 			if t != "" {
@@ -4988,9 +4988,9 @@ func config_init(fname string, p_audio_config *audio_s,
 
 					var n, _ = strconv.Atoi(t)
 					if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
-						p_misc_config.gpsd_port = C.int(n)
+						p_misc_config.gpsd_port = n
 					} else {
-						p_misc_config.gpsd_port = C.atoi(C.CString(C.DEFAULT_GPSD_PORT))
+						p_misc_config.gpsd_port, _ = strconv.Atoi(C.DEFAULT_GPSD_PORT)
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Invalid port number for GPSD Socket Interface. Using default of %d.\n",
 							line, p_misc_config.gpsd_port)
@@ -5034,7 +5034,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					if p_misc_config.waypoint_udp_hostname == "" {
 						p_misc_config.waypoint_udp_hostname = "localhost"
 					}
-					p_misc_config.waypoint_udp_portnum = C.int(port)
+					p_misc_config.waypoint_udp_portnum = port
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Invalid UDP port number %d for sending waypoints.\n", line, port)
@@ -5079,7 +5079,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: LOGDIR on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line)
 				}
-				p_misc_config.log_daily_names = 1
+				p_misc_config.log_daily_names = true
 				p_misc_config.log_path = t
 			}
 			t = split("", false)
@@ -5102,7 +5102,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: LOGFILE on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line)
 				}
-				p_misc_config.log_daily_names = 0
+				p_misc_config.log_daily_names = false
 				p_misc_config.log_path = t
 			}
 			t = split("", false)
@@ -5253,7 +5253,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_T1V_FRACK_MIN && n <= AX25_T1V_FRACK_MAX {
-				p_misc_config.frack = C.int(n)
+				p_misc_config.frack = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid FRACK time. Using default %d.\n", line, p_misc_config.frack)
@@ -5272,7 +5272,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_N2_RETRY_MIN && n <= AX25_N2_RETRY_MAX {
-				p_misc_config.retry = C.int(n)
+				p_misc_config.retry = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid RETRY number. Using default %d.\n", line, p_misc_config.retry)
@@ -5291,7 +5291,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_N1_PACLEN_MIN && n <= AX25_N1_PACLEN_MAX {
-				p_misc_config.paclen = C.int(n)
+				p_misc_config.paclen = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid PACLEN value. Using default %d.\n", line, p_misc_config.paclen)
@@ -5312,7 +5312,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_K_MAXFRAME_BASIC_MIN && n <= AX25_K_MAXFRAME_BASIC_MAX {
-				p_misc_config.maxframe_basic = C.int(n)
+				p_misc_config.maxframe_basic = n
 			} else {
 				p_misc_config.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 				text_color_set(DW_COLOR_ERROR)
@@ -5333,7 +5333,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_K_MAXFRAME_EXTENDED_MIN && n <= AX25_K_MAXFRAME_EXTENDED_MAX {
-				p_misc_config.maxframe_extended = C.int(n)
+				p_misc_config.maxframe_extended = n
 			} else {
 				p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 				text_color_set(DW_COLOR_ERROR)
@@ -5353,7 +5353,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n <= AX25_N2_RETRY_MAX {
-				p_misc_config.maxv22 = C.int(n)
+				p_misc_config.maxv22 = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid MAXV22 number. Will use half of RETRY.\n", line)
@@ -5464,7 +5464,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				var b = 0
-				for k := C.int(0); k < p_misc_config.num_beacons; k++ {
+				for k := 0; k < p_misc_config.num_beacons; k++ {
 					if C.int(p_misc_config.beacon[k].sendto_chan) == j {
 						b++
 					}
@@ -5495,7 +5495,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				var b = 0
-				for k := C.int(0); k < p_misc_config.num_beacons; k++ {
+				for k := 0; k < p_misc_config.num_beacons; k++ {
 					if C.int(p_misc_config.beacon[k].sendto_chan) == j {
 						b++
 					}

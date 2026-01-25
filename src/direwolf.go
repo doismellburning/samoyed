@@ -490,15 +490,15 @@ x = Silence FX.25 information.`)
 	}
 
 	if *logFile != "" {
-		misc_config.log_daily_names = 0
+		misc_config.log_daily_names = false
 		misc_config.log_path = *logFile
 	} else if *logDir != "" {
-		misc_config.log_daily_names = 1
+		misc_config.log_daily_names = true
 		misc_config.log_path = *logDir
 	}
 
 	if *enablePseudoTerminal {
-		misc_config.enable_kiss_pt = 1
+		misc_config.enable_kiss_pt = true
 	}
 
 	if input_file != "" {
@@ -738,7 +738,7 @@ x = Silence FX.25 information.`)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
-	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled > 0 {
+	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled {
 		dns_sd_announce(misc_config)
 	}
 
@@ -762,7 +762,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	log_init((misc_config.log_daily_names > 0), misc_config.log_path)
+	log_init(misc_config.log_daily_names, misc_config.log_path)
 	mheard_init(d_m_opt)
 	beacon_init(audio_config, misc_config, &igate_config)
 

@@ -358,7 +358,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
  *
  *--------------------------------------------------------------------*/
 
-func server_connect_listen_thread(server_port C.int) {
+func server_connect_listen_thread(server_port int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);

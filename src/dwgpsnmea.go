@@ -109,7 +109,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = serial_port_open(pconfig.gpsnmea_port, int(pconfig.gpsnmea_speed))
+	s_gpsnmea_port_fd = serial_port_open(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
 	if s_gpsnmea_port_fd != nil {
 		go read_gpsnmea_thread(s_gpsnmea_port_fd)
@@ -126,7 +126,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
 
 /* Return fd to share if waypoint wants same device. */
 
-func dwgpsnmea_get_fd(wp_port_name *C.char, speed C.int) *term.Term {
+func dwgpsnmea_get_fd(wp_port_name *C.char, speed int) *term.Term {
 	if s_save_configp.gpsnmea_port == C.GoString(wp_port_name) && speed == s_save_configp.gpsnmea_speed {
 		return (s_gpsnmea_port_fd)
 	}

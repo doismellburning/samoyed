@@ -90,7 +90,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 	// optional, or not allowed for each beacon type.  Options which
 	// are not applicable are often silently ignored, causing confusion.
 
-	for j := C.int(0); j < g_misc_config_p.num_beacons; j++ {
+	for j := 0; j < g_misc_config_p.num_beacons; j++ {
 		var channel = g_misc_config_p.beacon[j].sendto_chan
 
 		if channel < 0 {
@@ -211,7 +211,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 	var now = time.Now()
 
-	for j := C.int(0); j < g_misc_config_p.num_beacons; j++ {
+	for j := 0; j < g_misc_config_p.num_beacons; j++ {
 		var bp = &(g_misc_config_p.beacon[j])
 		/* FIXME KG
 		#if DEBUG
@@ -280,7 +280,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 	 */
 
 	var count = 0
-	for j := C.int(0); j < g_misc_config_p.num_beacons; j++ {
+	for j := 0; j < g_misc_config_p.num_beacons; j++ {
 		if g_misc_config_p.beacon[j].btype != BEACON_IGNORE {
 			count++
 		}
@@ -348,7 +348,7 @@ func beacon_thread() {
 			}
 		}
 
-		if g_misc_config_p.sb_configured > 0 && number_of_tbeacons > 0 {
+		if g_misc_config_p.sb_configured && number_of_tbeacons > 0 {
 			var t = now.Add(time.Duration(g_misc_config_p.sb_turn_time) * time.Second)
 			if t.Before(earliest) {
 				earliest = t
@@ -399,7 +399,7 @@ func beacon_thread() {
 			/*
 			 * Run SmartBeaconing calculation if configured and GPS data available.
 			 */
-			if g_misc_config_p.sb_configured > 0 && fix >= DWFIX_2D {
+			if g_misc_config_p.sb_configured && fix >= DWFIX_2D {
 				var tnext = sb_calculate_next_time(now,
 					DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots)), float64(gpsinfo.track),
 					sb_prev_time, sb_prev_course)
@@ -429,7 +429,7 @@ func beacon_thread() {
 			if !bp.next.After(now) {
 				/* Send the beacon. */
 
-				beacon_send(int(j), &gpsinfo)
+				beacon_send(j, &gpsinfo)
 
 				/* Calculate when the next one should be sent. */
 				/* Easy for fixed interval.  SmartBeaconing takes more effort. */
@@ -438,7 +438,7 @@ func beacon_thread() {
 					if gpsinfo.fix < DWFIX_2D {
 						/* Fix not available so beacon was not sent. */
 
-						if g_misc_config_p.sb_configured > 0 {
+						if g_misc_config_p.sb_configured {
 							/* Try again in a couple seconds. */
 							bp.next = now.Add(2 * time.Second)
 						} else {
@@ -446,7 +446,7 @@ func beacon_thread() {
 							/* Important for slotted.  Might reconsider otherwise. */
 							bp.next = bp.next.Add(time.Duration(bp.every) * time.Second)
 						}
-					} else if g_misc_config_p.sb_configured > 0 {
+					} else if g_misc_config_p.sb_configured {
 						/* Remember most recent tracker beacon. */
 						/* Compute next time if not turning. */
 
@@ -546,9 +546,9 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
 	if current_speed_mph == G_UNKNOWN {
 		beacon_rate = int(math.Round(float64(g_misc_config_p.sb_fast_rate+g_misc_config_p.sb_slow_rate) / 2.))
 	} else if current_speed_mph > float64(g_misc_config_p.sb_fast_speed) {
-		beacon_rate = int(g_misc_config_p.sb_fast_rate)
+		beacon_rate = g_misc_config_p.sb_fast_rate
 	} else if current_speed_mph < float64(g_misc_config_p.sb_slow_speed) {
-		beacon_rate = int(g_misc_config_p.sb_slow_rate)
+		beacon_rate = g_misc_config_p.sb_slow_rate
 	} else {
 		/* Can't divide by 0 assuming sb_slow_speed > 0. */
 		beacon_rate = int(math.Round(float64(g_misc_config_p.sb_fast_rate*g_misc_config_p.sb_fast_speed) / current_speed_mph))

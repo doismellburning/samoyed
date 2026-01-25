@@ -204,8 +204,8 @@ func kissnet_init(mc *misc_config_s) {
 		if mc.kiss_port[i] != 0 {
 			var kps = new(kissport_status_s)
 
-			kps.tcp_port = mc.kiss_port[i]
-			kps.channel = mc.kiss_chan[i]
+			kps.tcp_port = C.int(mc.kiss_port[i])
+			kps.channel = C.int(mc.kiss_chan[i])
 
 			kissnet_init_one(kps)
 
@@ -502,7 +502,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 
 func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_kps *kissport_status_s, from_client C.int) {
 	var msg = C.GoBytes(unsafe.Pointer(in_msg), in_len)
-	if s_misc_config_p.kiss_copy > 0 {
+	if s_misc_config_p.kiss_copy {
 		for kps := all_ports; kps != nil; kps = kps.pnext {
 			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
 				// To all but origin.
