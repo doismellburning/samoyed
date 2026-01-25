@@ -180,9 +180,9 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 					/* Doesn't make sense if IGate is not configured. */
 
-					if C.GoString(&g_igate_config_p.t2_server_name[0]) == "" ||
-						C.GoString(&g_igate_config_p.t2_login[0]) == "" ||
-						C.GoString(&g_igate_config_p.t2_passcode[0]) == "" {
+					if g_igate_config_p.t2_server_name == "" ||
+						g_igate_config_p.t2_login == "" ||
+						g_igate_config_p.t2_passcode == "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured.\n", g_misc_config_p.beacon[j].lineno)
 						dw_printf("IBEACON has been disabled.\n")
@@ -793,7 +793,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 				igate_get_msg_cnt(),
 				igate_get_pkt_cnt(),
 				mheard_count(0, last_minutes),
-				mheard_count(g_igate_config_p.max_digi_hops, last_minutes),
+				mheard_count(C.int(g_igate_config_p.max_digi_hops), last_minutes),
 				mheard_count(8, last_minutes),
 				igate_get_upl_cnt(),
 				igate_get_dnl_cnt())

@@ -4498,16 +4498,16 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing IGate server name for IGSERVER command.\n", line)
 				continue
 			}
-			C.strcpy(&p_igate_config.t2_server_name[0], C.CString(t))
+			p_igate_config.t2_server_name = t
 
 			/* If there is a : in the name, split it out as the port number. */
 
 			if strings.Contains(t, ":") {
 				var hostname, portStr, _ = strings.Cut(t, ":")
-				C.strcpy(&p_igate_config.t2_server_name[0], C.CString(hostname))
+				p_igate_config.t2_server_name = hostname
 				var port, portErr = strconv.Atoi(portStr)
 				if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
-					p_igate_config.t2_server_port = C.int(port)
+					p_igate_config.t2_server_port = port
 				} else {
 					p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
 					text_color_set(DW_COLOR_ERROR)
@@ -4522,7 +4522,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t != "" {
 				var n, _ = strconv.Atoi(t)
 				if n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER {
-					p_igate_config.t2_server_port = C.int(n)
+					p_igate_config.t2_server_port = n
 				} else {
 					p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
 					text_color_set(DW_COLOR_ERROR)
@@ -4546,7 +4546,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			// TODO: Wouldn't hurt to do validity checking of format.
-			C.strcpy(&p_igate_config.t2_login[0], C.CString(t))
+			p_igate_config.t2_login = t
 
 			t = split("", false)
 			if t == "" {
@@ -4554,7 +4554,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing passcode for IGLOGIN command.\n", line)
 				continue
 			}
-			C.strcpy(&p_igate_config.t2_passcode[0], C.CString(t))
+			p_igate_config.t2_passcode = t
 		} else if strings.EqualFold(t, "IGTXVIA") {
 
 			/*
@@ -4577,7 +4577,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					MAX_TOTAL_CHANS-1, line)
 				continue
 			}
-			p_igate_config.tx_chan = C.int(n)
+			p_igate_config.tx_chan = n
 
 			t = split("", false)
 			if t != "" {
@@ -4586,9 +4586,8 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				n = check_via_path(t)
 				if n >= 0 {
-					p_igate_config.max_digi_hops = C.int(n)
-					p_igate_config.tx_via[0] = ','
-					C.strcpy(&p_igate_config.tx_via[1], C.CString(t))
+					p_igate_config.max_digi_hops = n
+					p_igate_config.tx_via = "," + t
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: invalid via path.\n", line)
@@ -4620,14 +4619,14 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			t = split("", true) /* Take rest of line as one string. */
 
-			if p_igate_config.t2_filter != nil {
+			if p_igate_config.t2_filter != "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Warning - Earlier IGFILTER value will be replaced by this one.\n", line)
 				continue
 			}
 
 			if t != "" {
-				p_igate_config.t2_filter = C.CString(t)
+				p_igate_config.t2_filter = t
 
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Warning - IGFILTER is a rarely needed expert level feature.\n", line)
@@ -4655,7 +4654,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if n < 1 {
 				p_igate_config.tx_limit_1 = 1
 			} else if n <= IGATE_TX_LIMIT_1_MAX {
-				p_igate_config.tx_limit_1 = C.int(n)
+				p_igate_config.tx_limit_1 = n
 			} else {
 				p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_MAX
 				text_color_set(DW_COLOR_ERROR)
@@ -4675,7 +4674,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if n < 1 {
 				p_igate_config.tx_limit_5 = 1
 			} else if n <= IGATE_TX_LIMIT_5_MAX {
-				p_igate_config.tx_limit_5 = C.int(n)
+				p_igate_config.tx_limit_5 = n
 			} else {
 				p_igate_config.tx_limit_5 = IGATE_TX_LIMIT_5_MAX
 				text_color_set(DW_COLOR_ERROR)
@@ -4696,7 +4695,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var n, _ = strconv.Atoi(t)
 				if n >= 0 && n <= 10 {
-					p_igate_config.igmsp = C.int(n)
+					p_igate_config.igmsp = n
 				} else {
 					p_igate_config.igmsp = 1
 					text_color_set(DW_COLOR_ERROR)
@@ -4723,7 +4722,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var n, _ = strconv.Atoi(t)
 				if n >= MIN_SATGATE_DELAY && n <= MAX_SATGATE_DELAY {
-					p_igate_config.satgate_delay = C.int(n)
+					p_igate_config.satgate_delay = n
 				} else {
 					p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY
 					text_color_set(DW_COLOR_ERROR)
@@ -5510,13 +5509,13 @@ func config_init(fname string, p_audio_config *audio_s,
 
 		/* When IGate is enabled, all radio channels must have a callsign associated. */
 
-		if C.strlen(&p_igate_config.t2_login[0]) > 0 &&
+		if len(p_igate_config.t2_login) > 0 &&
 			(p_audio_config.chan_medium[i] == MEDIUM_RADIO || p_audio_config.chan_medium[i] == MEDIUM_NETTNC) {
 
 			if IsNoCall(p_audio_config.mycall[i]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for receive channel %d before Rx IGate is allowed.\n", i)
-				C.strcpy(&p_igate_config.t2_login[0], C.CString(""))
+				p_igate_config.t2_login = ""
 			}
 			// Currently we can have only one transmit channel.
 			// This might be generalized someday to allow more.
@@ -5531,7 +5530,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	// Apply default IS>RF IGate filter if none specified.  New in 1.4.
 	// This will handle eventual case of multiple transmit channels.
 
-	if C.strlen(&p_igate_config.t2_login[0]) > 0 {
+	if len(p_igate_config.t2_login) > 0 {
 		for j := 0; j < MAX_TOTAL_CHANS; j++ {
 			if p_audio_config.chan_medium[j] == MEDIUM_RADIO || p_audio_config.chan_medium[j] == MEDIUM_NETTNC {
 				if p_digi_config.filter_str[MAX_TOTAL_CHANS][j] == "" {

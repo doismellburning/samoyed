@@ -725,7 +725,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the digipeater and IGate functions.
 	 */
 	digipeater_init(audio_config, &digi_config)
-	igate_init(audio_config, &igate_config, &digi_config, C.int(d_i_opt))
+	igate_init(audio_config, &igate_config, &digi_config, d_i_opt)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(misc_config, C.int(d_c_opt))
@@ -1176,7 +1176,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		 * confidence that it is correct.
 		 */
 		if ax25_is_aprs(pp) > 0 && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			igate_send_rec_packet(channel, pp)
+			igate_send_rec_packet(int(channel), pp)
 		}
 
 		/* Send out a regenerated copy. Applies to all types, not just APRS. */

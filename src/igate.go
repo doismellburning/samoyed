@@ -56,19 +56,19 @@ type igate_config_s struct {
 	/*
 	 * For logging into the IGate server.
 	 */
-	t2_server_name [40]C.char /* Tier 2 IGate server name. */
+	t2_server_name string /* Tier 2 IGate server name. */
 
-	t2_server_port C.int /* Typically 14580. */
+	t2_server_port int /* Typically 14580. */
 
-	t2_login [AX25_MAX_ADDR_LEN]C.char /* e.g. WA9XYZ-15 */
+	t2_login string /* e.g. WA9XYZ-15 */
 	/* Note that the ssid could be any two alphanumeric */
 	/* characters not just 1 thru 15. */
 	/* Could be same or different than the radio call(s). */
 	/* Not sure what the consequences would be. */
 
-	t2_passcode [8]C.char /* Max. 5 digits. Could be "-1". */
+	t2_passcode string /* Max. 5 digits. Could be "-1". */
 
-	t2_filter *C.char /* Optional filter for IS -> RF direction. */
+	t2_filter string /* Optional filter for IS -> RF direction. */
 	/* This is the "server side" filter. */
 	/* A better name would be subscription or something */
 	/* like that because we can only ask for more. */
@@ -76,28 +76,28 @@ type igate_config_s struct {
 	/*
 	 * For transmitting.
 	 */
-	tx_chan C.int /* Radio channel for transmitting. */
+	tx_chan int /* Radio channel for transmitting. */
 	/* 0=first, etc.  -1 for none. */
 	/* Presently IGate can transmit on only a single channel. */
 	/* A future version might generalize this.  */
 	/* Each transmit channel would have its own client side filtering. */
 
-	tx_via [80]C.char /* VIA path for transmitting third party packets. */
+	tx_via string /* VIA path for transmitting third party packets. */
 	/* Usual text representation.  */
 	/* Must start with "," if not empty so it can */
 	/* simply be inserted after the destination address. */
 
-	max_digi_hops C.int /* Maximum number of digipeater hops possible for via path. */
+	max_digi_hops int /* Maximum number of digipeater hops possible for via path. */
 	/* Derived from the SSID when last character of address is a digit. */
 	/* e.g.  "WIDE1-1,WIDE5-2" would be 3. */
 	/* This is useful to know so we can determine how many */
 	/* stations we might be able to reach. */
 
-	tx_limit_1 C.int /* Max. packets to transmit in 1 minute. */
+	tx_limit_1 int /* Max. packets to transmit in 1 minute. */
 
-	tx_limit_5 C.int /* Max. packets to transmit in 5 minutes. */
+	tx_limit_5 int /* Max. packets to transmit in 5 minutes. */
 
-	igmsp C.int /* Number of message sender position reports to allow. */
+	igmsp int /* Number of message sender position reports to allow. */
 	/* Common practice is to default to 1.  */
 	/* We allow additional flexibility of 0 to disable feature */
 	/* or a small number to allow more. */
@@ -105,12 +105,12 @@ type igate_config_s struct {
 	/*
 	 * Receiver to IS data options.
 	 */
-	rx2ig_dedupe_time C.int /* seconds.  0 to disable. */
+	rx2ig_dedupe_time int /* seconds.  0 to disable. */
 
 	/*
 	 * Special SATgate mode to delay packets heard directly.
 	 */
-	satgate_delay C.int /* seconds.  0 to disable. */
+	satgate_delay int /* seconds.  0 to disable. */
 }
 
 const IGATE_TX_LIMIT_1_DEFAULT = 6
@@ -152,7 +152,7 @@ var ok_to_send = false
 var save_igate_config_p *igate_config_s
 
 // TODO KG static struct digi_config_s 	*save_digi_config_p;
-var s_debug C.int
+var s_debug int
 
 /*
  * Statistics for IGate function.
@@ -161,13 +161,13 @@ var s_debug C.int
  * TODO: should have debug option to print these occasionally.
  */
 
-var stats_failed_connect C.int /* Number of times we tried to connect to */
+var stats_failed_connect int /* Number of times we tried to connect to */
 /* a server and failed.  A small number is not */
 /* a bad thing.  Each name should have a bunch */
 /* of addresses for load balancing and */
 /* redundancy. */
 
-var stats_connects C.int /* Number of successful connects to a server. */
+var stats_connects int /* Number of successful connects to a server. */
 /* Normally you'd expect this to be 1.  */
 /* Could be larger if one disappears and we */
 /* try again to find a different one. */
@@ -175,28 +175,28 @@ var stats_connects C.int /* Number of successful connects to a server. */
 var stats_connect_at time.Time /* Most recent time connection was established. */
 /* can be used to determine elapsed connect time. */
 
-var stats_rf_recv_packets C.int /* Number of candidate packets from the radio. */
+var stats_rf_recv_packets int /* Number of candidate packets from the radio. */
 /* This is not the total number of AX.25 frames received */
 /* over the radio; only APRS packets get this far. */
 
-var stats_uplink_packets C.int /* Number of packets passed along to the IGate */
+var stats_uplink_packets int /* Number of packets passed along to the IGate */
 /* server after filtering. */
 
 var stats_uplink_bytes int /* Total number of bytes sent to IGate server */
 /* including login, packets, and heartbeats. */
 
-var stats_downlink_bytes C.int /* Total number of bytes from IGate server including */
+var stats_downlink_bytes int /* Total number of bytes from IGate server including */
 /* packets, heartbeats, other messages. */
 
-var stats_downlink_packets C.int /* Number of packets from IGate server for possible transmission. */
+var stats_downlink_packets int /* Number of packets from IGate server for possible transmission. */
 /* Fewer might be transmitted due to filtering or rate limiting. */
 
-var stats_rf_xmit_packets C.int /* Number of packets passed along to radio, for the IGate function, */
+var stats_rf_xmit_packets int /* Number of packets passed along to radio, for the IGate function, */
 /* after filtering, rate limiting, or other restrictions. */
 /* Number of packets transmitted for beacons, digipeating, */
 /* or client applications are not included here. */
 
-var stats_msg_cnt C.int /* Number of "messages" transmitted.  Subset of above. */
+var stats_msg_cnt int /* Number of "messages" transmitted.  Subset of above. */
 /* A "message" has the data type indicator of ":" and it is */
 /* not the special case of telemetry metadata. */
 
@@ -209,19 +209,19 @@ var stats_msg_cnt C.int /* Number of "messages" transmitted.  Subset of above. *
  * PKT_CNT is other (non-message) packets.  Followed precedent of APRSISCE32.
  */
 
-func igate_get_msg_cnt() C.int {
+func igate_get_msg_cnt() int {
 	return (stats_msg_cnt)
 }
 
-func igate_get_pkt_cnt() C.int {
+func igate_get_pkt_cnt() int {
 	return (stats_rf_xmit_packets - stats_msg_cnt)
 }
 
-func igate_get_upl_cnt() C.int {
+func igate_get_upl_cnt() int {
 	return (stats_uplink_packets)
 }
 
-func igate_get_dnl_cnt() C.int {
+func igate_get_dnl_cnt() int {
 	return (stats_downlink_packets)
 }
 
@@ -254,7 +254,7 @@ func igate_get_dnl_cnt() C.int {
  *
  *--------------------------------------------------------------------*/
 
-func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level C.int) {
+func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level int) {
 
 	s_debug = debug_level
 	dp_queue_head = nil
@@ -295,9 +295,9 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 	/*
 	 * Continue only if we have server name, login, and passcode.
 	 */
-	if C.strlen(&p_igate_config.t2_server_name[0]) == 0 ||
-		C.strlen(&p_igate_config.t2_login[0]) == 0 ||
-		C.strlen(&p_igate_config.t2_passcode[0]) == 0 {
+	if len(p_igate_config.t2_server_name) == 0 ||
+		len(p_igate_config.t2_login) == 0 ||
+		len(p_igate_config.t2_passcode) == 0 {
 		return
 	}
 
@@ -354,7 +354,7 @@ func connect_thread() {
 	#endif
 	*/
 
-	var server_name = C.GoString(&save_igate_config_p.t2_server_name[0])
+	var server_name = save_igate_config_p.t2_server_name
 
 	/*
 	 * Repeat forever.
@@ -367,7 +367,7 @@ func connect_thread() {
 		 */
 
 		if igate_sock == nil {
-			var conn, connErr = net.Dial("tcp", net.JoinHostPort(server_name, strconv.Itoa(int(save_igate_config_p.t2_server_port))))
+			var conn, connErr = net.Dial("tcp", net.JoinHostPort(server_name, strconv.Itoa(save_igate_config_p.t2_server_port)))
 			stats_connects++
 			stats_connect_at = time.Now()
 
@@ -401,12 +401,12 @@ func connect_thread() {
 				 */
 
 				SLEEP_SEC(3)
-				var stemp = fmt.Sprintf("user %s pass %s vers Dire-Wolf %d.%d",
-					C.GoString(&save_igate_config_p.t2_login[0]), C.GoString(&save_igate_config_p.t2_passcode[0]),
-					C.MAJOR_VERSION, C.MINOR_VERSION)
-				if save_igate_config_p.t2_filter != nil {
+				var stemp = fmt.Sprintf("user %s pass %s vers Samoyed %s",
+					save_igate_config_p.t2_login, save_igate_config_p.t2_passcode,
+					SAMOYED_VERSION)
+				if save_igate_config_p.t2_filter != "" {
 					stemp += " filter "
-					stemp += C.GoString(save_igate_config_p.t2_filter)
+					stemp += save_igate_config_p.t2_filter
 				}
 				send_msg_to_server(stemp)
 
@@ -466,7 +466,7 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* by a carriage return, line feed sequence. No line may exceed 512 bytes */
 /* including the CR/LF sequence." */
 
-func igate_send_rec_packet(channel C.int, recv_pp *packet_t) {
+func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 
 	if igate_sock == nil {
 		return /* Silently discard if not connected. */
@@ -495,7 +495,7 @@ func igate_send_rec_packet(channel C.int, recv_pp *packet_t) {
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && // in radio channel range
 		save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS] != "" {
 
-		if pfilter(channel, MAX_TOTAL_CHANS, C.CString(save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS]), recv_pp, 1) != 1 {
+		if pfilter(C.int(channel), MAX_TOTAL_CHANS, C.CString(save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS]), recv_pp, 1) != 1 {
 
 			// Is this useful troubleshooting information or just distracting noise?
 			// Originally this was always printed but there was a request to add a "quiet" option to suppress this.
@@ -661,7 +661,7 @@ func igate_send_rec_packet(channel C.int, recv_pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func send_packet_to_server(pp *packet_t, channel C.int) {
+func send_packet_to_server(pp *packet_t, channel int) {
 
 	var pinfo *C.uchar
 	ax25_get_info(pp, &pinfo)
@@ -1133,7 +1133,7 @@ func igate_recv_thread() {
  *
  *--------------------------------------------------------------------*/
 
-func satgate_delay_packet(pp *packet_t, channel C.int) {
+func satgate_delay_packet(pp *packet_t, channel int) {
 
 	//if (s_debug >= 1) {
 	text_color_set(DW_COLOR_INFO)
@@ -1179,7 +1179,7 @@ func satgate_delay_packet(pp *packet_t, channel C.int) {
  *--------------------------------------------------------------------*/
 
 func satgate_delay_thread() {
-	var channel C.int = 0 // TODO:  get receive channel somehow.
+	var channel = 0 // TODO:  get receive channel somehow.
 	// only matters if multi channel with different names.
 
 	for {
@@ -1278,7 +1278,7 @@ func is_message_message(infop string) bool {
 	return true // message, including ack, rej
 }
 
-func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
+func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 
 	Assert(to_chan >= 0 && to_chan < MAX_TOTAL_CHANS)
 
@@ -1403,7 +1403,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 
 		if save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
 
-			if pfilter(MAX_TOTAL_CHANS, to_chan, C.CString(save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan]), pp3, 1) != 1 {
+			if pfilter(MAX_TOTAL_CHANS, C.int(to_chan), C.CString(save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan]), pp3, 1) != 1 {
 
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
@@ -1482,7 +1482,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
 			save_audio_config_p.mycall[to_chan],
 			APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION,
-			C.GoString(&save_igate_config_p.tx_via[0]),
+			save_igate_config_p.tx_via,
 			payload)
 
 		var pradio = ax25_from_text(C.CString(radio), 1)
@@ -1496,7 +1496,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 			#else
 			*/
 			/* This consumes packet so don't reference it again! */
-			tq_append(to_chan, TQ_PRIO_1_LO, pradio)
+			tq_append(C.int(to_chan), TQ_PRIO_1_LO, pradio)
 			// TODO KG #endif
 			stats_rf_xmit_packets++ // Any type of packet.
 
@@ -1507,7 +1507,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 
 				stats_msg_cnt++ // Update statistics.
 
-				mheard_set_msp((*C.char)(C.CBytes(src)), save_igate_config_p.igmsp)
+				mheard_set_msp((*C.char)(C.CBytes(src)), C.int(save_igate_config_p.igmsp))
 			}
 
 			ig_to_tx_remember(pp3, save_igate_config_p.tx_chan, 0) // correct. version before encapsulating it.
@@ -1596,9 +1596,9 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan C.int) {
 
 const RX2IG_HISTORY_MAX = 30 /* Remember the last 30 sent to IGate server. */
 
-var rx2ig_insert_next C.int
+var rx2ig_insert_next int
 var rx2ig_time_stamp [RX2IG_HISTORY_MAX]time.Time
-var rx2ig_checksum [RX2IG_HISTORY_MAX]C.ushort
+var rx2ig_checksum [RX2IG_HISTORY_MAX]int
 
 func rx_to_ig_init() {
 	for n := 0; n < RX2IG_HISTORY_MAX; n++ {
@@ -1617,7 +1617,7 @@ func rx_to_ig_remember(pp *packet_t) {
 	}
 
 	rx2ig_time_stamp[rx2ig_insert_next] = time.Now()
-	rx2ig_checksum[rx2ig_insert_next] = ax25_dedupe_crc(pp)
+	rx2ig_checksum[rx2ig_insert_next] = int(ax25_dedupe_crc(pp))
 
 	if s_debug >= 3 {
 		var src [AX25_MAX_ADDR_LEN]C.char
@@ -1672,7 +1672,7 @@ func rx_to_ig_allow(pp *packet_t) bool {
 	// Yes, check for duplicates within certain time.
 
 	for j := 0; j < RX2IG_HISTORY_MAX; j++ {
-		if rx2ig_checksum[j] == crc && !rx2ig_time_stamp[j].Before(now.Add(-time.Duration(save_igate_config_p.rx2ig_dedupe_time)*time.Second)) {
+		if rx2ig_checksum[j] == int(crc) && !rx2ig_time_stamp[j].Before(now.Add(-time.Duration(save_igate_config_p.rx2ig_dedupe_time)*time.Second)) {
 			if s_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				// could be multiple entries and this might not be the most recent.
@@ -1887,11 +1887,11 @@ const IG2TX_HISTORY_MAX = 50               /* Remember the last 50 sent from ser
 /* Ideally this should be a critical region because */
 /* it is being written by two threads but I'm not that concerned. */
 
-var ig2tx_insert_next C.int
+var ig2tx_insert_next int
 var ig2tx_time_stamp [IG2TX_HISTORY_MAX]time.Time
-var ig2tx_checksum [IG2TX_HISTORY_MAX]C.ushort
-var ig2tx_chan [IG2TX_HISTORY_MAX]C.int
-var ig2tx_bydigi [IG2TX_HISTORY_MAX]C.int
+var ig2tx_checksum [IG2TX_HISTORY_MAX]int
+var ig2tx_chan [IG2TX_HISTORY_MAX]int
+var ig2tx_bydigi [IG2TX_HISTORY_MAX]int
 
 func ig_to_tx_init() {
 	for n := 0; n < IG2TX_HISTORY_MAX; n++ {
@@ -1903,7 +1903,7 @@ func ig_to_tx_init() {
 	ig2tx_insert_next = 0
 }
 
-func ig_to_tx_remember(pp *packet_t, channel C.int, bydigi C.int) {
+func ig_to_tx_remember(pp *packet_t, channel int, bydigi int) {
 	var now = time.Now()
 	var crc = ax25_dedupe_crc(pp)
 
@@ -1925,7 +1925,7 @@ func ig_to_tx_remember(pp *packet_t, channel C.int, bydigi C.int) {
 	}
 
 	ig2tx_time_stamp[ig2tx_insert_next] = now
-	ig2tx_checksum[ig2tx_insert_next] = crc
+	ig2tx_checksum[ig2tx_insert_next] = int(crc)
 	ig2tx_chan[ig2tx_insert_next] = channel
 	ig2tx_bydigi[ig2tx_insert_next] = bydigi
 
@@ -1935,7 +1935,7 @@ func ig_to_tx_remember(pp *packet_t, channel C.int, bydigi C.int) {
 	}
 }
 
-func ig_to_tx_allow(pp *packet_t, channel C.int) bool {
+func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
@@ -1956,7 +1956,7 @@ func ig_to_tx_allow(pp *packet_t, channel C.int) bool {
 	/* Consider transmissions on this channel only by either digi or IGate. */
 
 	for j := 0; j < IG2TX_HISTORY_MAX; j++ {
-		if ig2tx_checksum[j] == crc && ig2tx_chan[j] == channel && !ig2tx_time_stamp[j].Before(now.Add(-IG2TX_DEDUPE_TIME)) {
+		if ig2tx_checksum[j] == int(crc) && ig2tx_chan[j] == channel && !ig2tx_time_stamp[j].Before(now.Add(-IG2TX_DEDUPE_TIME)) {
 
 			/* We have a duplicate within some time period. */
 
@@ -1990,8 +1990,8 @@ func ig_to_tx_allow(pp *packet_t, channel C.int) bool {
 
 	/* IGate transmit counts must not include digipeater transmissions. */
 
-	var count_1 C.int = 0
-	var count_5 C.int = 0
+	var count_1 = 0
+	var count_5 = 0
 	for j := 0; j < IG2TX_HISTORY_MAX; j++ {
 		if ig2tx_chan[j] == channel && ig2tx_bydigi[j] == 0 {
 			if !ig2tx_time_stamp[j].Before(time.Now().Add(-60 * time.Second)) {
@@ -2011,7 +2011,7 @@ func ig_to_tx_allow(pp *packet_t, channel C.int) bool {
 	/* messages, in case something goes terribly wrong, but we can triple */
 	/* the normal limit for them. */
 
-	var increase_limit C.int = 1
+	var increase_limit = 1
 	if is_message_message(C.GoString((*C.char)(unsafe.Pointer(pinfo)))) {
 		increase_limit = 3
 	}
