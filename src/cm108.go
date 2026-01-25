@@ -78,27 +78,14 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <locale.h>
-// #include <unistd.h>
-// #include <string.h>
-// #include <regex.h>
-// #include <libudev.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <sys/ioctl.h>			// ioctl, _IOR
-// #include <fcntl.h>
-// #include <errno.h>
-// #include <linux/hidraw.h>		// for HIDIOCGRAWINFO
-import "C"
-
 import (
 	"errors"
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 
+	"github.com/jochenvg/go-udev"
 	"golang.org/x/sys/unix"
 )
 
@@ -233,124 +220,106 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 	 * First get a list of the USB audio devices.
 	 * This is based on the example in http://www.signal11.us/oss/udev/
 	 */
-	var udev = C.udev_new()
-	if udev == nil {
+	var u = udev.Udev{}
+	var e = u.NewEnumerate()
+	e.AddMatchSubsystem("sound")
+	var devices, devicesErr = e.Devices()
+	if devicesErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't create udev"
-		dw_printf("%s.\n", msg)
+		var msg = "INTERNAL ERROR: Can't enumerate udev devices"
+		dw_printf("%s: %v.\n", msg, devicesErr)
 		return things, errors.New(msg)
 	}
 
-	var enumerate = C.udev_enumerate_new(udev)
-	C.udev_enumerate_add_match_subsystem(enumerate, C.CString("sound"))
-	C.udev_enumerate_scan_devices(enumerate)
-	var devices = C.udev_enumerate_get_list_entry(enumerate)
+	var cardDevpath string
+	var pattrsID string
+	var pattrsNumber string
 
-	var card_devpath [128]C.char
-	var pattrs_id *C.char
-	var pattrs_number *C.char
+	for _, dev := range devices {
+		var devnode = dev.Devnode()
 
-	/* KG Taken from udev.h:
-		#define udev_list_entry_foreach(list_entry, first_entry) \
-	        for (list_entry = first_entry; \
-	             list_entry; \
-	             list_entry = udev_list_entry_get_next(list_entry))
-	*/
-	// udev_list_entry_foreach(dev_list_entry, devices) {
-
-	for dev_list_entry := devices; dev_list_entry != nil; dev_list_entry = C.udev_list_entry_get_next(dev_list_entry) {
-		var path = C.udev_list_entry_get_name(dev_list_entry)
-		var dev = C.udev_device_new_from_syspath(udev, path)
-		var devnode = C.udev_device_get_devnode(dev)
-
-		if devnode == nil {
+		if devnode == "" {
 			// I'm not happy with this but couldn't figure out how
 			// to get attributes from one level up from the pcmC?D?? node.
-			C.strcpy(&card_devpath[0], path)
-			pattrs_id = C.udev_device_get_sysattr_value(dev, C.CString("id"))
-			pattrs_number = C.udev_device_get_sysattr_value(dev, C.CString("number"))
-			//dw_printf (" >card_devpath = %s\n", card_devpath);
-			//dw_printf (" >>pattrs_id = %s\n", pattrs_id);
-			//dw_printf (" >>pattrs_number = %s\n", pattrs_number);
+			cardDevpath = dev.Syspath()
+			pattrsID = dev.SysattrValue("id")
+			pattrsNumber = dev.SysattrValue("number")
 		} else {
-			var parentdev = C.udev_device_get_parent_with_subsystem_devtype(dev, C.CString("usb"), C.CString("usb_device"))
+			var parentdev = dev.ParentWithSubsystemDevtype("usb", "usb_device")
 			if parentdev != nil {
-				var vid C.int = 0
-				var pid C.int = 0
+				var vid int
+				var pid int
 
-				var p = C.udev_device_get_sysattr_value(parentdev, C.CString("idVendor"))
-				if p != nil {
-					vid = C.int(C.strtol(p, nil, 16))
+				var p = parentdev.SysattrValue("idVendor")
+				if p != "" {
+					var vid64, _ = strconv.ParseInt(p, 16, 0)
+					vid = int(vid64)
 				}
 
-				p = C.udev_device_get_sysattr_value(parentdev, C.CString("idProduct"))
-				if p != nil {
-					pid = C.int(C.strtol(p, nil, 16))
+				p = parentdev.SysattrValue("idProduct")
+				if p != "" {
+					var pid64, _ = strconv.ParseInt(p, 16, 0)
+					pid = int(pid64)
 				}
 
 				if len(things) < max_things {
 					var thing = new(thing_s)
 
-					thing.vid = int(vid)
-					thing.pid = int(pid)
-					thing.card_name = C.GoString(pattrs_id)
-					thing.card_number = C.GoString(pattrs_number)
-					thing.product = C.GoString(C.udev_device_get_sysattr_value(parentdev, C.CString("product")))
-					thing.devnode_sound = C.GoString(devnode)
-					thing.devnode_usb = C.GoString(C.udev_device_get_devnode(parentdev))
-					thing.devpath = C.GoString(&card_devpath[0])
+					thing.vid = vid
+					thing.pid = pid
+					thing.card_name = pattrsID
+					thing.card_number = pattrsNumber
+					thing.product = parentdev.SysattrValue("product")
+					thing.devnode_sound = devnode
+					thing.devnode_usb = parentdev.Devnode()
+					thing.devpath = cardDevpath
 
 					things = append(things, thing)
 				}
-				C.udev_device_unref(parentdev)
 			}
 		}
 	}
-	C.udev_enumerate_unref(enumerate)
-	C.udev_unref(udev)
 
 	/*
 	 * Now merge in all of the USB HID.
 	 */
-	udev = C.udev_new()
-	if udev == nil {
+	var e2 = u.NewEnumerate()
+	e2.AddMatchSubsystem("hidraw")
+	var hidDevices, hidDevicesErr = e2.Devices()
+	if hidDevicesErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't create udev"
-		dw_printf("%s.\n", msg)
+		var msg = "INTERNAL ERROR: Can't enumerate udev hidraw devices"
+		dw_printf("%s: %v.\n", msg, hidDevicesErr)
 		return nil, errors.New(msg)
 	}
 
-	enumerate = C.udev_enumerate_new(udev)
-	C.udev_enumerate_add_match_subsystem(enumerate, C.CString("hidraw"))
-	C.udev_enumerate_scan_devices(enumerate)
-	devices = C.udev_enumerate_get_list_entry(enumerate)
-	for dev_list_entry := devices; dev_list_entry != nil; dev_list_entry = C.udev_list_entry_get_next(dev_list_entry) {
-		var path = C.udev_list_entry_get_name(dev_list_entry)
-		var dev = C.udev_device_new_from_syspath(udev, path)
-		var devnode = C.udev_device_get_devnode(dev)
-		if devnode != nil {
-			var parentdev = C.udev_device_get_parent_with_subsystem_devtype(dev, C.CString("usb"), C.CString("usb_device"))
+	for _, dev := range hidDevices {
+		var devnode = dev.Devnode()
+		if devnode != "" {
+			var parentdev = dev.ParentWithSubsystemDevtype("usb", "usb_device")
 			if parentdev != nil {
-				var vid C.int = 0
-				var pid C.int = 0
+				var vid int
+				var pid int
 
-				var p = C.udev_device_get_sysattr_value(parentdev, C.CString("idVendor"))
-				if p != nil {
-					vid = C.int(C.strtol(p, nil, 16))
+				var p = parentdev.SysattrValue("idVendor")
+				if p != "" {
+					var vid64, _ = strconv.ParseInt(p, 16, 0)
+					vid = int(vid64)
 				}
-				p = C.udev_device_get_sysattr_value(parentdev, C.CString("idProduct"))
-				if p != nil {
-					pid = C.int(C.strtol(p, nil, 16))
+				p = parentdev.SysattrValue("idProduct")
+				if p != "" {
+					var pid64, _ = strconv.ParseInt(p, 16, 0)
+					pid = int(pid64)
 				}
 
-				var usb = C.udev_device_get_devnode(parentdev)
+				var usb = parentdev.Devnode()
 
 				// Add hidraw name to any matching existing.
 				var matched = false
 				for _, thing := range things {
-					if C.int(thing.vid) == vid && C.int(thing.pid) == pid && usb != nil && thing.devnode_usb == C.GoString(usb) {
+					if thing.vid == vid && thing.pid == pid && usb != "" && thing.devnode_usb == usb {
 						matched = true
-						thing.devnode_hidraw = C.GoString(devnode)
+						thing.devnode_hidraw = devnode
 					}
 				}
 
@@ -358,21 +327,18 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 				if !matched && len(things) < max_things {
 					var thing = new(thing_s)
 
-					thing.vid = int(vid)
-					thing.pid = int(pid)
-					thing.product = C.GoString(C.udev_device_get_sysattr_value(parentdev, C.CString("product")))
-					thing.devnode_hidraw = C.GoString(devnode)
-					thing.devnode_usb = C.GoString(usb)
-					thing.devpath = C.GoString(C.udev_device_get_devpath(dev))
+					thing.vid = vid
+					thing.pid = pid
+					thing.product = parentdev.SysattrValue("product")
+					thing.devnode_hidraw = devnode
+					thing.devnode_usb = usb
+					thing.devpath = dev.Devpath()
 
 					things = append(things, thing)
 				}
-				C.udev_device_unref(parentdev)
 			}
 		}
 	}
-	C.udev_enumerate_unref(enumerate)
-	C.udev_unref(udev)
 
 	/*
 	 * Seeing the form /dev/snd/pcmC4D0p will be confusing to many because we
@@ -569,7 +535,7 @@ func cm108_write(name string, iomask int, iodata int) int {
 	 * audio group to use the USB Audio adapter for sound.
 	 */
 
-	var fd, err = os.OpenFile(name, os.O_RDWR, 0000)
+	var fd, err = os.OpenFile(name, os.O_RDWR, 0000) //nolint:gosec // This comes from user-supplied config, all we can really do is trust it
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not open %s for write: %s\n", name, err)
