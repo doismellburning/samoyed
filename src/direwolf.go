@@ -584,7 +584,7 @@ x = Silence FX.25 information.`)
 	 */
 	multi_modem_init(audio_config)
 	fx25_init(d_x_opt)
-	il2p_init(C.int(d_2_opt))
+	il2p_init(d_2_opt)
 
 	/*
 	 * New in 1.8 - Allow a channel to be mapped to a network TNC rather than
