@@ -42,6 +42,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -81,7 +82,7 @@ const WPL_FORMAT_AIS = 0x10          /* A	!AIVDM */
 type beacon_s struct {
 	btype beacon_type_e /* Position or object. */
 
-	lineno C.int /* Line number from config file for later error messages. */
+	lineno int /* Line number from config file for later error messages. */
 
 	sendto_type sendto_type_e
 
@@ -94,24 +95,24 @@ type beacon_s struct {
 	/* 		  radio channel.  Mostly for testing. It is a */
 	/* 		  convenient way to send packets to attached apps. */
 
-	sendto_chan C.int /* Transmit or simulated receive channel for above.  Should be 0 for IGate. */
+	sendto_chan int /* Transmit or simulated receive channel for above.  Should be 0 for IGate. */
 
-	delay C.int /* Seconds to delay before first transmission. */
+	delay int /* Seconds to delay before first transmission. */
 
-	slot C.int /* Seconds after hour for slotted time beacons. */
+	slot int /* Seconds after hour for slotted time beacons. */
 	/* If specified, it overrides any 'delay' value. */
 
-	every C.int /* Time between transmissions, seconds. */
+	every int /* Time between transmissions, seconds. */
 	/* Remains fixed for PBEACON and OBEACON. */
 	/* Dynamically adjusted for TBEACON. */
 
-	next C.time_t /* Unix time to transmit next one. */
+	next time.Time /* Unix time to transmit next one. */
 
 	source string /* Empty or explicit AX.25 source address to use instead of the mycall value for the channel. */
 
 	dest string /* Empty or explicit AX.25 destination to use instead of the software version such as APDW11. */
 
-	compress C.int /* Use more compact form? */
+	compress bool /* Use more compact form? */
 
 	objname string /* Object name.  Any printable characters. */
 
@@ -121,27 +122,27 @@ type beacon_s struct {
 
 	custom_infocmd string /* Command to generate info part. Again, other options below are then ignored. */
 
-	messaging C.int /* Set messaging attribute for position report. */
+	messaging bool /* Set messaging attribute for position report. */
 	/* i.e. Data Type Indicator of '=' rather than '!' */
 
-	lat       C.double /* Latitude and longitude. */
-	lon       C.double
-	ambiguity C.int   /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
-	alt_m     C.float /* Altitude in meters. */
+	lat       float64 /* Latitude and longitude. */
+	lon       float64
+	ambiguity int     /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
+	alt_m     float64 /* Altitude in meters. */
 
-	symtab C.char /* Symbol table: / or \ or overlay character. */
-	symbol C.char /* Symbol code. */
+	symtab byte /* Symbol table: / or \ or overlay character. */
+	symbol byte /* Symbol code. */
 
-	power  C.float /* For PHG. */
-	height C.float /* HAAT in feet */
-	gain   C.float /* Original protocol spec was unclear. */
+	power  float64 /* For PHG. */
+	height float64 /* HAAT in feet */
+	gain   float64 /* Original protocol spec was unclear. */
 	/* Addendum 1.1 clarifies it is dBi not dBd. */
 
 	dir string /* 1 or 2 of N,E,W,S, or empty for omni. */
 
-	freq   C.float /* MHz. */
-	tone   C.float /* Hz. */
-	offset C.float /* MHz. */
+	freq   float64 /* MHz. */
+	tone   float64 /* Hz. */
+	offset float64 /* MHz. */
 
 	comment    string /* Comment or empty. */
 	commentcmd string /* Command to append more to Comment or empty. */
@@ -372,7 +373,7 @@ type parse_ll_which_e int
 const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
-func parse_ll(str string, which parse_ll_which_e, line int) C.double {
+func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 
 	var stemp = str
 
@@ -450,7 +451,7 @@ func parse_ll(str string, which parse_ll_which_e, line int) C.double {
 			IfThenElse(which == LAT, "latitude", "longitude"))
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
-	return C.double(degrees)
+	return degrees
 }
 
 /*------------------------------------------------------------------
@@ -581,7 +582,7 @@ main ()
  *
  *----------------------------------------------------------------*/
 
-func parse_interval(str string, line int) C.int {
+func parse_interval(str string, line int) int {
 
 	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
 
@@ -598,7 +599,7 @@ func parse_interval(str string, line int) C.int {
 	}
 	*/
 
-	return C.int(interval)
+	return interval
 } /* end parse_interval */
 
 /*------------------------------------------------------------------
@@ -5155,7 +5156,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				/* Save line number because some errors will be reported later. */
-				p_misc_config.beacon[p_misc_config.num_beacons].lineno = C.int(line)
+				p_misc_config.beacon[p_misc_config.num_beacons].lineno = line
 
 				if beacon_options(text[len("xBEACON")+1:], &(p_misc_config.beacon[p_misc_config.num_beacons]), line, p_audio_config) == nil {
 					p_misc_config.num_beacons++
@@ -5464,7 +5465,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var b = 0
 				for k := C.int(0); k < p_misc_config.num_beacons; k++ {
-					if p_misc_config.beacon[k].sendto_chan == j {
+					if C.int(p_misc_config.beacon[k].sendto_chan) == j {
 						b++
 					}
 				}
@@ -5495,7 +5496,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var b = 0
 				for k := C.int(0); k < p_misc_config.num_beacons; k++ {
-					if p_misc_config.beacon[k].sendto_chan == j {
+					if C.int(p_misc_config.beacon[k].sendto_chan) == j {
 						b++
 					}
 				}
@@ -5659,7 +5660,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 					continue
 				}
 				b.sendto_type = SENDTO_RECV
-				b.sendto_chan = C.int(n)
+				b.sendto_chan = n
 			} else if value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X' {
 				var n, _ = strconv.Atoi(value[1:])
 				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
@@ -5669,7 +5670,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				}
 
 				b.sendto_type = SENDTO_XMIT
-				b.sendto_chan = C.int(n)
+				b.sendto_chan = n
 			} else {
 				var n, _ = strconv.Atoi(value)
 				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
@@ -5678,7 +5679,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 					continue
 				}
 				b.sendto_type = SENDTO_XMIT
-				b.sendto_chan = C.int(n)
+				b.sendto_chan = n
 			}
 		} else if strings.EqualFold(keyword, "SOURCE") {
 			b.source = strings.ToUpper(value) /* silently force upper case. */
@@ -5728,7 +5729,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "AMBIGUITY") || strings.EqualFold(keyword, "AMBIG") {
 			var n, _ = strconv.Atoi(value)
 			if n >= 0 && n <= 4 {
-				b.ambiguity = C.int(n)
+				b.ambiguity = n
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Location ambiguity, on line %d, must be in range of 0 to 4.\n", line)
@@ -5757,16 +5758,16 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 					dw_printf("Line %d: Unrecognized unit '%s' for altitude.  Using meter.\n", line, unit)
 					dw_printf("Try using singular form.  e.g.  ft or foot rather than feet.\n")
 					var f, _ = strconv.ParseFloat(value, 64)
-					b.alt_m = C.float(f)
+					b.alt_m = f
 				} else {
 					// valid unit
 					var f, _ = strconv.ParseFloat(value, 64)
-					b.alt_m = C.float(f * meters)
+					b.alt_m = f * meters
 				}
 			} else {
 				// no unit specified
 				var f, _ = strconv.ParseFloat(value, 64)
-				b.alt_m = C.float(f)
+				b.alt_m = f
 			}
 		} else if strings.EqualFold(keyword, "ZONE") {
 			zone = value
@@ -5781,42 +5782,42 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			temp_symbol = value
 		} else if strings.EqualFold(keyword, "OVERLAY") {
 			if len(value) == 1 && (unicode.IsUpper(rune(value[0])) || unicode.IsDigit(rune(value[0]))) {
-				b.symtab = C.char(value[0])
+				b.symtab = value[0]
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Overlay must be one character in range of 0-9 or A-Z, upper case only, on line %d.\n", line)
 			}
 		} else if strings.EqualFold(keyword, "POWER") {
 			var n, _ = strconv.ParseFloat(value, 64)
-			b.power = C.float(n)
+			b.power = n
 		} else if strings.EqualFold(keyword, "HEIGHT") { // This is in feet.
 			var n, _ = strconv.ParseFloat(value, 64)
-			b.height = C.float(n)
+			b.height = n
 			// TODO: ability to add units suffix, e.g.  10m
 		} else if strings.EqualFold(keyword, "GAIN") {
 			var n, _ = strconv.ParseFloat(value, 64)
-			b.gain = C.float(n)
+			b.gain = n
 		} else if strings.EqualFold(keyword, "DIR") || strings.EqualFold(keyword, "DIRECTION") {
 			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
 			var f, _ = strconv.ParseFloat(value, 64)
-			b.freq = C.float(f)
+			b.freq = f
 		} else if strings.EqualFold(keyword, "TONE") {
 			var f, _ = strconv.ParseFloat(value, 64)
-			b.tone = C.float(f)
+			b.tone = f
 		} else if strings.EqualFold(keyword, "OFFSET") || strings.EqualFold(keyword, "OFF") {
 			var f, _ = strconv.ParseFloat(value, 64)
-			b.offset = C.float(f)
+			b.offset = f
 		} else if strings.EqualFold(keyword, "COMMENT") {
 			b.comment = value
 		} else if strings.EqualFold(keyword, "COMMENTCMD") {
 			b.commentcmd = value
 		} else if strings.EqualFold(keyword, "COMPRESS") || strings.EqualFold(keyword, "COMPRESSED") {
 			var n, _ = strconv.Atoi(value)
-			b.compress = C.int(n)
+			b.compress = n != 0
 		} else if strings.EqualFold(keyword, "MESSAGING") {
 			var n, _ = strconv.Atoi(value)
-			b.messaging = C.int(n)
+			b.messaging = n != 0
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Invalid option keyword, %s.\n", line, keyword)
@@ -5829,7 +5830,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		dw_printf("Config file, line %d: Can't use both INFO and INFOCMD at the same time.\n", line)
 	}
 
-	if b.compress != 0 && b.ambiguity != 0 {
+	if b.compress && b.ambiguity != 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Position ambiguity can't be used with compressed location format.\n", line)
 		b.ambiguity = 0
@@ -5851,8 +5852,8 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var lerr = C.Convert_UTM_To_Geodetic(lzone, hemi, easting, northing, &dlat, &dlon)
 
 			if lerr == 0 {
-				b.lat = C.double(R2D(float64(dlat)))
-				b.lon = C.double(R2D(float64(dlon)))
+				b.lat = R2D(float64(dlat))
+				b.lon = R2D(float64(dlon))
 			} else {
 				var message [300]C.char
 
@@ -5881,19 +5882,19 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 			/* Explicit table and symbol. */
 
-			if C.isupper(C.int(b.symtab)) != 0 || C.isdigit(C.int(b.symtab)) != 0 {
-				b.symbol = C.char(temp_symbol[1])
+			if unicode.IsUpper(rune(b.symtab)) || unicode.IsDigit(rune(b.symtab)) {
+				b.symbol = temp_symbol[1]
 			} else {
-				b.symtab = C.char(temp_symbol[0])
-				b.symbol = C.char(temp_symbol[1])
+				b.symtab = temp_symbol[0]
+				b.symbol = temp_symbol[1]
 			}
 		} else {
 
 			/* Try to look up by description. */
-			var symtab, symbol, ok = symbols_code_from_description(byte(b.symtab), temp_symbol)
+			var symtab, symbol, ok = symbols_code_from_description(b.symtab, temp_symbol)
 			if ok {
-				b.symtab = C.char(symtab)
-				b.symbol = C.char(symbol)
+				b.symtab = symtab
+				b.symbol = symbol
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Could not find symbol matching %s.\n", line, temp_symbol)
