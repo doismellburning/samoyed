@@ -48,8 +48,8 @@ var g_il2p_debug = 0
  *
  *--------------------------------------------------------------*/
 
-func il2p_init(il2p_debug C.int) {
-	g_il2p_debug = int(il2p_debug)
+func il2p_init(il2p_debug int) {
+	g_il2p_debug = il2p_debug
 
 	for i := 0; i < NTAB; i++ {
 		Assert(Tab[i].nroots <= MAX_NROOTS)
@@ -63,12 +63,12 @@ func il2p_init(il2p_debug C.int) {
 
 } // end il2p_init
 
-func il2p_get_debug() C.int {
-	return C.int(g_il2p_debug)
+func il2p_get_debug() int {
+	return g_il2p_debug
 }
 
-func il2p_set_debug(debug C.int) {
-	g_il2p_debug = int(debug)
+func il2p_set_debug(debug int) {
+	g_il2p_debug = debug
 }
 
 // Find RS codec control block for specified number of parity symbols.
