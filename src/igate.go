@@ -1384,7 +1384,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 
 	if info_len >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") {
 
-		var n = mheard_get_msp((*C.char)(C.CBytes(src)))
+		var n = mheard_get_msp(string(src))
 
 		if n > 0 {
 
@@ -1395,7 +1395,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 				dw_printf("Special case, allow position from message sender %s, %d remaining.\n", src, n-1)
 			}
 
-			mheard_set_msp((*C.char)(C.CBytes(src)), n-1)
+			mheard_set_msp(string(src), n-1)
 		}
 	}
 
@@ -1507,7 +1507,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 
 				stats_msg_cnt++ // Update statistics.
 
-				mheard_set_msp((*C.char)(C.CBytes(src)), C.int(save_igate_config_p.igmsp))
+				mheard_set_msp(string(src), C.int(save_igate_config_p.igmsp))
 			}
 
 			ig_to_tx_remember(pp3, save_igate_config_p.tx_chan, 0) // correct. version before encapsulating it.
