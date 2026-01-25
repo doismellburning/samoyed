@@ -20,6 +20,7 @@ import "C"
 import (
 	"fmt"
 	"math"
+	"time"
 )
 
 /*
@@ -689,22 +690,22 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	switch bp.btype {
 	case BEACON_POSITION:
 
-		beacon_text += encode_position(bp.messaging, bp.compress,
-			bp.lat, bp.lon, bp.ambiguity,
-			C.int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
-			bp.symtab, bp.symbol,
-			C.int(bp.power), C.int(bp.height), C.int(bp.gain), C.CString(bp.dir),
+		beacon_text += encode_position(bp.messaging != 0, bp.compress != 0,
+			float64(bp.lat), float64(bp.lon), int(bp.ambiguity),
+			int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
+			byte(bp.symtab), byte(bp.symbol),
+			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			bp.freq, bp.tone, bp.offset,
-			C.CString(super_comment))
+			float64(bp.freq), float64(bp.tone), float64(bp.offset),
+			super_comment)
 
 	case BEACON_OBJECT:
 
-		beacon_text += encode_object(C.CString(bp.objname), bp.compress, 1, bp.lat, bp.lon, bp.ambiguity,
-			bp.symtab, bp.symbol,
-			C.int(bp.power), C.int(bp.height), C.int(bp.gain), C.CString(bp.dir),
+		beacon_text += encode_object(bp.objname, bp.compress != 0, time.Now(), float64(bp.lat), float64(bp.lon), int(bp.ambiguity),
+			byte(bp.symtab), byte(bp.symbol),
+			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			bp.freq, bp.tone, bp.offset, C.CString(super_comment))
+			float64(bp.freq), float64(bp.tone), float64(bp.offset), super_comment)
 
 	case BEACON_TRACKER:
 
@@ -713,24 +714,24 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
 
-			var my_alt_ft C.int = G_UNKNOWN
+			var my_alt_ft int = G_UNKNOWN
 			if gpsinfo.fix >= 3 && gpsinfo.altitude != G_UNKNOWN && bp.alt_m > 0 {
-				my_alt_ft = C.int(math.Round(DW_METERS_TO_FEET(float64(gpsinfo.altitude))))
+				my_alt_ft = int(math.Round(DW_METERS_TO_FEET(float64(gpsinfo.altitude))))
 			}
 
 			/* Round to nearest integer. retaining unknown state. */
-			var coarse C.int = G_UNKNOWN
+			var coarse int = G_UNKNOWN
 			if gpsinfo.track != G_UNKNOWN {
-				coarse = C.int(math.Round(float64(gpsinfo.track)))
+				coarse = int(math.Round(float64(gpsinfo.track)))
 			}
 
-			beacon_text += encode_position(bp.messaging, bp.compress,
-				gpsinfo.dlat, gpsinfo.dlon, bp.ambiguity, my_alt_ft,
-				bp.symtab, bp.symbol,
-				C.int(bp.power), C.int(bp.height), C.int(bp.gain), C.CString(bp.dir),
-				coarse, C.int(math.Round(float64(gpsinfo.speed_knots))),
-				bp.freq, bp.tone, bp.offset,
-				C.CString(super_comment))
+			beacon_text += encode_position(bp.messaging != 0, bp.compress != 0,
+				float64(gpsinfo.dlat), float64(gpsinfo.dlon), int(bp.ambiguity), my_alt_ft,
+				byte(bp.symtab), byte(bp.symbol),
+				int(bp.power), int(bp.height), int(bp.gain), bp.dir,
+				coarse, int(math.Round(float64(gpsinfo.speed_knots))),
+				float64(bp.freq), float64(bp.tone), float64(bp.offset),
+				super_comment)
 
 			/* Write to log file for testing. */
 			/* The idea is to run log2gpx and map the result rather than */
