@@ -546,19 +546,18 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		return (nil)
 	}
 
-	var ssid_temp, heard_temp C.int
-	var atemp [AX25_MAX_ADDR_LEN]C.char
+	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), IfThenElse(strict, 1, 0))
 
-	if ax25_parse_addr(AX25_SOURCE, C.CString(string(pa)), bool2Cint(strict), &atemp[0], &ssid_temp, &heard_temp) == 0 {
+	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad source address\n")
 		ax25_delete(this_p)
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_SOURCE, &atemp[0])
-	ax25_set_h(this_p, AX25_SOURCE) // c/r in this position
-	ax25_set_ssid(this_p, AX25_SOURCE, ssid_temp)
+	ax25_set_addr(this_p, AX25_SOURCE, C.CString(addrTemp))
+	ax25_set_h(this_p, AX25_SOURCE) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
+	ax25_set_ssid(this_p, AX25_SOURCE, C.int(ssidTemp))
 
 	/*
 	 * Destination address.
@@ -567,16 +566,18 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	pa, stuff, _ = bytes.Cut(stuff, []byte{','})
 	// Note: if no comma found, pa contains the destination and stuff is empty (no digipeaters)
 
-	if ax25_parse_addr(AX25_DESTINATION, C.CString(string(pa)), bool2Cint(strict), &atemp[0], &ssid_temp, &heard_temp) == 0 {
+	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), IfThenElse(strict, 1, 0))
+
+	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad destination address\n")
 		ax25_delete(this_p)
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_DESTINATION, &atemp[0])
-	ax25_set_h(this_p, AX25_DESTINATION) // c/r in this position
-	ax25_set_ssid(this_p, AX25_DESTINATION, ssid_temp)
+	ax25_set_addr(this_p, AX25_DESTINATION, C.CString(addrTemp))
+	ax25_set_h(this_p, AX25_DESTINATION) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
+	ax25_set_ssid(this_p, AX25_DESTINATION, C.int(ssidTemp))
 
 	/*
 	 * VIA path.
@@ -610,21 +611,23 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			pa[2] = byte(unicode.ToUpper(rune(pa[2])))
 		}
 
-		if ax25_parse_addr(k, C.CString(string(pa)), bool2Cint(strict), &atemp[0], &ssid_temp, &heard_temp) == 0 {
+		var heardTemp bool
+		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(int(k), string(pa), IfThenElse(strict, 1, 0))
+		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
 			ax25_delete(this_p)
 			return (nil)
 		}
 
-		ax25_set_addr(this_p, k, &atemp[0])
-		ax25_set_ssid(this_p, k, ssid_temp)
+		ax25_set_addr(this_p, k, C.CString(addrTemp))
+		ax25_set_ssid(this_p, k, C.int(ssidTemp))
 
 		// Does it have an "*" at the end?
 		// TODO: Complain if more than one "*".
 		// Could also check for all has been repeated bits are adjacent.
 
-		if heard_temp != 0 {
+		if heardTemp {
 			for ; k >= AX25_REPEATER_1; k-- {
 				ax25_set_h(this_p, k)
 			}
@@ -796,7 +799,7 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *
  *		in_addr		- Input such as "WB2OSZ-15*"
  *
- * 		strict		- 1 (true) for strict checking (6 characters, no lower case,
+ * 		strictness		- 1 (true) for strict checking (6 characters, no lower case,
  *				  SSID must be in range of 0 to 15).
  *				  Strict is appropriate for packets sent
  *				  over the radio.  Communication with IGate
@@ -808,15 +811,15 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *
  *				  2 (extra true) will complain if * is found at end.
  *
- * Outputs:	out_addr	- Address without any SSID.
+ * Returns:	out_addr	- Address without any SSID.
  *				  Must be at least AX25_MAX_ADDR_LEN bytes.
  *
  *		out_ssid	- Numeric value of SSID.
  *
  *		out_heard	- True if "*" found.
  *
- * Returns:	True (1) if OK, false (0) if any error.
- *		When 0, out_addr, out_ssid, and out_heard are undefined.
+ *      ok -	True if OK, false if any error.
+ *		When false, out_addr, out_ssid, and out_heard are undefined.
  *
  *
  *------------------------------------------------------------------------------*/
@@ -826,13 +829,11 @@ var position_name = [1 + AX25_MAX_ADDRS]string{
 	"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
 	"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
 
-func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *C.char, out_ssid *C.int, out_heard *C.int) C.int {
+func ax25_parse_addr(position int, in_addr string, strictness int) (string, int, bool, bool) {
 
-	var in_addr = C.GoString(_in_addr)
-
-	*_out_addr = 0
-	*out_ssid = 0
-	*out_heard = 0
+	var out_addr string
+	var ssid int
+	var heard bool
 
 	// dw_printf ("ax25_parse_addr in: position=%d, '%s', strict=%d\n", position, in_addr, strict);
 
@@ -847,10 +848,10 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 	if len(in_addr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%sAddress \"%s\" is empty.\n", position_name[position], in_addr)
-		return 0
+		return out_addr, ssid, heard, false
 	}
 
-	if strict != 0 && len(in_addr) >= 2 && strings.HasPrefix(in_addr, "qA") {
+	if strictness > 0 && len(in_addr) >= 2 && strings.HasPrefix(in_addr, "qA") {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%sAddress \"%s\" is a \"q-construct\" used for communicating with\n", position_name[position], in_addr)
 		dw_printf("APRS Internet Servers.  It should never appear when going over the radio.\n")
@@ -858,8 +859,7 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 
 	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
 
-	var maxlen = IfThenElse(strict != 0, 6, (AX25_MAX_ADDR_LEN - 1))
-	var out_addr string
+	var maxlen = IfThenElse(strictness > 0, 6, (AX25_MAX_ADDR_LEN - 1))
 	for i, p := range in_addr {
 		if p == '-' || p == '*' {
 			break
@@ -868,13 +868,13 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 		if i >= maxlen {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sAddress is too long. \"%s\" has more than %d characters.\n", position_name[position], in_addr, maxlen)
-			return 0
+			return out_addr, ssid, heard, false
 		}
 
 		if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sAddress, \"%s\" contains character other than letter or digit in character position %d.\n", position_name[position], in_addr, i)
-			return 0
+			return out_addr, ssid, heard, false
 		}
 
 		out_addr += string(p)
@@ -883,19 +883,18 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 			// Hack when running in decode_aprs utility
 			// Exempt the "qA..." case because it was already mentioned.
 
-			if strict != 0 && unicode.IsLower(p) && !strings.HasPrefix(in_addr, "qA") {
+			if strictness > 0 && unicode.IsLower(p) && !strings.HasPrefix(in_addr, "qA") {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
 			}
 		} else {
-			if strict != 0 && unicode.IsLower(p) {
+			if strictness > 0 && unicode.IsLower(p) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
-				return 0
+				return out_addr, ssid, heard, false
 			}
 		}
 	}
-	C.strcpy(_out_addr, C.CString(out_addr))
 
 	// Chomp
 	in_addr = in_addr[len(out_addr):]
@@ -910,38 +909,38 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 			if i >= 2 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sSSID is too long. SSID part of \"%s\" has more than 2 characters.\n", position_name[position], in_addr)
-				return 0
+				return out_addr, ssid, heard, false
 			}
 			sstr += string(p)
-			if strict != 0 && !unicode.IsDigit(p) {
+			if strictness > 0 && !unicode.IsDigit(p) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sSSID must be digits. \"%s\" has letters in SSID.\n", position_name[position], in_addr)
-				return 0
+				return out_addr, ssid, heard, false
 			}
 		}
 		var k, kErr = strconv.Atoi(sstr)
 		if kErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sMalformed SSID: \"%s\" could not be parsed.\n", position_name[position], in_addr)
-			return 0
+			return out_addr, ssid, heard, false
 		}
 		if k < 0 || k > 15 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sSSID out of range. SSID of \"%s\" not in range of 0 to 15.\n", position_name[position], in_addr)
-			return 0
+			return out_addr, ssid, heard, false
 		}
-		*out_ssid = C.int(k)
+		ssid = k
 
 		// Chomp
 		in_addr = in_addr[len(sstr):]
 	}
 
 	if len(in_addr) > 0 && in_addr[0] == '*' {
-		*out_heard = 1
-		if strict == 2 {
+		heard = true
+		if strictness == 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\"*\" is not allowed at end of address \"%s\" here.\n", in_addr)
-			return 0
+			return out_addr, ssid, heard, false
 		}
 		in_addr = in_addr[1:]
 	}
@@ -949,12 +948,12 @@ func ax25_parse_addr(position C.int, _in_addr *C.char, strict C.int, _out_addr *
 	if len(in_addr) != 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid character \"%c\" found in %saddress \"%s\".\n", in_addr[0], position_name[position], in_addr)
-		return 0
+		return out_addr, ssid, heard, false
 	}
 
 	// dw_printf ("ax25_parse_addr out: '%s' %d %d\n", out_addr, *out_ssid, *out_heard);
 
-	return (1)
+	return out_addr, ssid, heard, true
 
 } /* end ax25_parse_addr */
 
@@ -1008,9 +1007,9 @@ func ax25_check_addresses(pp *packet_t) C.int {
 		var addr [AX25_MAX_ADDR_LEN]C.char
 		ax25_get_addr_with_ssid(pp, n, &addr[0])
 
-		var ignore1 [AX25_MAX_ADDR_LEN]C.char
-		var ignore2, ignore3 C.int
-		all_ok = all_ok && (ax25_parse_addr(n, &addr[0], 1, &ignore1[0], &ignore2, &ignore3) != 0)
+		var _, _, _, ok = ax25_parse_addr(int(n), C.GoString(&addr[0]), 1)
+
+		all_ok = all_ok && ok
 	}
 
 	if !all_ok {
@@ -1103,16 +1102,17 @@ func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
 		// Messages from IGate have q-constructs.
 		// We use this to parse it and later remove unwanted parts.
 
-		var atemp [AX25_MAX_ADDR_LEN]C.char
-		var ssid_temp, heard_temp C.int
-		ax25_parse_addr(n, ad, 0, &atemp[0], &ssid_temp, &heard_temp)
+		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(int(n), C.GoString(ad), 0)
 
 		C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
 
-		for i := C.int(0); i < 6 && atemp[i] != 0; i++ {
-			this_p.frame_data[n*7+i] = C.uchar(atemp[i] << 1)
+		for i, c := range addrTemp {
+			if i >= 6 {
+				break
+			}
+			this_p.frame_data[n*7+C.int(i)] = C.uchar(c << 1)
 		}
-		ax25_set_ssid(this_p, n, ssid_temp)
+		ax25_set_ssid(this_p, n, C.int(ssidTemp))
 	} else if n == this_p.num_addr {
 
 		//dw_printf ("ax25_set_addr , appending case\n");
@@ -1194,15 +1194,16 @@ func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
 	// Messages from IGate have q-constructs.
 	// We use this to parse it and later remove unwanted parts.
 
-	var atemp [AX25_MAX_ADDR_LEN]C.char
-	var ssid_temp, heard_temp C.int
-	ax25_parse_addr(n, ad, 0, &atemp[0], &ssid_temp, &heard_temp)
+	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(int(n), C.GoString(ad), 0)
 	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
-	for i := C.int(0); i < 6 && atemp[i] != 0; i++ {
-		this_p.frame_data[n*7+i] = C.uchar(atemp[i] << 1)
+	for i, c := range addrTemp {
+		if i >= 6 {
+			break
+		}
+		this_p.frame_data[n*7+C.int(i)] = C.uchar(c << 1)
 	}
 
-	ax25_set_ssid(this_p, n, ssid_temp)
+	ax25_set_ssid(this_p, n, C.int(ssidTemp))
 
 	// Sanity check after messing with number of addresses.
 

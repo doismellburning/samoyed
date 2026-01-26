@@ -600,14 +600,11 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, nu
 	for n := C.int(0); n < num_addr; n++ {
 
 		var pa = (*C.uchar)(unsafe.Add(unsafe.Pointer(&pp.frame_data[0]), n*7))
-		var strict C.int = 1
-		var oaddr [AX25_MAX_ADDR_LEN]C.char
-		var ssid C.int
-		var heard C.int
+		var strictness = 1
 
-		var ok = ax25_parse_addr(n, &addrs[n][0], strict, &oaddr[0], &ssid, &heard)
+		var oaddr, ssid, _, ok = ax25_parse_addr(int(n), C.GoString(&addrs[n][0]), strictness)
 
-		if ok == 0 {
+		if !ok {
 			return (0)
 		}
 
@@ -615,8 +612,8 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, nu
 
 		C.memset(unsafe.Pointer(pa), ' '<<1, 6)
 		var pb = pa
-		for j := 0; oaddr[j] != 0; j++ {
-			*pb = C.uchar(oaddr[j] << 1)
+		for _, c := range oaddr {
+			*pb = C.uchar(c << 1)
 			pb = (*C.uchar)(unsafe.Add(unsafe.Pointer(pb), 1))
 		}
 		pa = (*C.uchar)(unsafe.Add(unsafe.Pointer(pa), 6))

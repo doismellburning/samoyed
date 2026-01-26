@@ -656,13 +656,10 @@ func check_via_path(via_path string) int {
 	for _, part := range parts {
 		num_digi++
 
-		var strict C.int = 2
-		var addr [AX25_MAX_ADDR_LEN]C.char
-		var ssid C.int
-		var heard C.int
-		var ok = ax25_parse_addr(AX25_REPEATER_1-1+C.int(num_digi), C.CString(part), strict, &addr[0], &ssid, &heard)
+		var strictness = 2
+		var addr, ssid, _, ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, part, strictness)
 
-		if ok == 0 {
+		if !ok {
 			/* TODO KG
 			#if DEBUG8
 				    text_color_set(DW_COLOR_DEBUG);
@@ -675,8 +672,8 @@ func check_via_path(via_path string) int {
 		/* Based on assumption that a callsign can't end with a digit. */
 		/* For something of the form xxx9-9, we take the ssid as max hop count. */
 
-		if ssid > 0 && C.strlen(&addr[0]) >= 2 && C.isdigit(C.int(addr[C.strlen(&addr[0])-1])) != 0 {
-			max_digi_hops += int(ssid)
+		if ssid > 0 && len(addr) >= 2 && unicode.IsDigit(rune(addr[len(addr)-1])) {
+			max_digi_hops += ssid
 		} else {
 			max_digi_hops++
 		}
@@ -1434,16 +1431,15 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file: Missing value for MYCALL command on line %d.\n", line)
 				continue
 			} else {
-				var strict C.int = 2
-				var call_no_ssid [AX25_MAX_ADDR_LEN]C.char
-				var ssid C.int
-				var heard C.int
+				var strictness = 2
 
 				/* Silently force upper case. */
 				/* Might change to warning someday. */
 				t = strings.ToUpper(t)
 
-				if ax25_parse_addr(-1, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) == 0 {
+				var _, _, _, ok = ax25_parse_addr(-1, t, strictness)
+
+				if !ok {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Invalid value for MYCALL command on line %d.\n", line)
 					continue
@@ -5374,12 +5370,10 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 
 			for t != "" {
-				var strict C.int = 2
-				var call_no_ssid [AX25_MAX_ADDR_LEN]C.char
-				var ssid C.int
-				var heard C.int
+				var strictness = 2
+				var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, strictness)
 
-				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
+				if ok {
 					p_misc_config.v20_addrs = append(p_misc_config.v20_addrs, t)
 					p_misc_config.v20_count++
 				} else {
@@ -5407,12 +5401,10 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 
 			for t != "" {
-				var strict C.int = 2
-				var call_no_ssid [AX25_MAX_ADDR_LEN]C.char
-				var ssid C.int
-				var heard C.int
+				var strictness = 2
+				var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, strictness)
 
-				if ax25_parse_addr(AX25_DESTINATION, C.CString(t), strict, &call_no_ssid[0], &ssid, &heard) != 0 {
+				if ok {
 					p_misc_config.noxid_addrs = append(p_misc_config.noxid_addrs, t)
 					p_misc_config.noxid_count++
 				} else {
