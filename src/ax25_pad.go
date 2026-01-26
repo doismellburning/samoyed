@@ -968,7 +968,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  * Errors:	Print error message.
  *
- * Returns:	1 for all valid.  0 if not.
+ * Returns:	True for all valid.  False if not.
  *
  * Examples:	I was surprised to get this from an APRS-IS server with
  *		a lower case source address.
@@ -1000,7 +1000,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t) C.int {
+func ax25_check_addresses(pp *packet_t) bool {
 
 	var all_ok = true
 	for n := C.int(0); n < ax25_get_num_addr(pp); n++ {
@@ -1019,7 +1019,7 @@ func ax25_check_addresses(pp *packet_t) C.int {
 		dw_printf("\n")
 	}
 
-	return C.int(IfThenElse(all_ok, 1, 0))
+	return all_ok
 } /* end ax25_check_addresses */
 
 /*------------------------------------------------------------------------------
