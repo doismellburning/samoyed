@@ -2085,7 +2085,7 @@ func ax25_pack(this_p *packet_t, result *C.uchar) C.int {
  *
  * Inputs:	this_p	- pointer to packet object.
  *
- * Outputs:	desc	- Text description such as "I frame" or
+ * Returns:	desc	- Text description such as "I frame" or
  *			  "U frame SABME".
  *			  Supply 56 bytes to be safe.
  *
@@ -2097,7 +2097,7 @@ func ax25_pack(this_p *packet_t, result *C.uchar) C.int {
  *
  *		ns	- N(S) - send sequence or -1 if not applicable.
  *
- * Returns:	Frame type from  enum ax25_frame_type_e.
+ *      frameType:	Frame type from  enum ax25_frame_type_e.
  *
  *------------------------------------------------------------------*/
 
@@ -2105,22 +2105,29 @@ func ax25_pack(this_p *packet_t, result *C.uchar) C.int {
 // Should pass in as parameter.
 const DESC_SIZ = 56
 
-func ax25_frame_type(this_p *packet_t, cr *cmdres_t, desc *C.char, pf *C.int, nr *C.int, ns *C.int) ax25_frame_type_t {
+func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
+	var _, _, _, _, _, frameType = ax25_frame_type(this_p) //nolint:dogsled
+
+	return frameType
+}
+
+func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int, ns int, frameType ax25_frame_type_t) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	C.strcpy(desc, C.CString("????"))
-	*cr = cr_11
-	*pf = -1
-	*nr = -1
-	*ns = -1
+	desc = "????"
+	cr = cr_11
+	pf = -1
+	nr = -1
+	ns = -1
 
 	// U frames are always one control byte.
-	var c = ax25_get_control(this_p)
+	var c = int(ax25_get_control(this_p))
 	if c < 0 {
-		C.strcpy(desc, C.CString("Not AX.25"))
-		return (frame_not_AX25)
+		desc = "Not AX.25"
+		frameType = frame_not_AX25
+		return
 	}
 
 	/*
@@ -2154,9 +2161,9 @@ func ax25_frame_type(this_p *packet_t, cr *cmdres_t, desc *C.char, pf *C.int, nr
 		this_p.modulo = modulo_128
 	}
 
-	var c2 C.int // I & S frames can have second Control byte.
+	var c2 int // I & S frames can have second Control byte.
 	if this_p.modulo == modulo_128 {
-		c2 = ax25_get_c2(this_p)
+		c2 = int(ax25_get_c2(this_p))
 	}
 
 	var dst_c = this_p.frame_data[AX25_DESTINATION*7+6] & SSID_H_MASK
@@ -2167,21 +2174,21 @@ func ax25_frame_type(this_p *packet_t, cr *cmdres_t, desc *C.char, pf *C.int, nr
 
 	if dst_c != 0 {
 		if src_c != 0 {
-			*cr = cr_11
+			cr = cr_11
 			cr_text = "cc=11"
 			pf_text = "p/f"
 		} else {
-			*cr = cr_cmd
+			cr = cr_cmd
 			cr_text = "cmd"
 			pf_text = "p"
 		}
 	} else {
 		if src_c != 0 {
-			*cr = cr_res
+			cr = cr_res
 			cr_text = "res"
 			pf_text = "f"
 		} else {
-			*cr = cr_00
+			cr = cr_00
 			cr_text = "cc=00"
 			pf_text = "p/f"
 		}
@@ -2192,90 +2199,106 @@ func ax25_frame_type(this_p *packet_t, cr *cmdres_t, desc *C.char, pf *C.int, nr
 		// Information 			rrr p sss 0		or	sssssss 0  rrrrrrr p
 
 		if this_p.modulo == modulo_128 {
-			*ns = (c >> 1) & 0x7f
-			*pf = c2 & 1
-			*nr = (c2 >> 1) & 0x7f
+			ns = (c >> 1) & 0x7f
+			pf = c2 & 1
+			nr = (c2 >> 1) & 0x7f
 		} else {
-			*ns = (c >> 1) & 7
-			*pf = (c >> 4) & 1
-			*nr = (c >> 5) & 7
+			ns = (c >> 1) & 7
+			pf = (c >> 4) & 1
+			nr = (c >> 5) & 7
 		}
 
-		//snprintf (desc, DESC_SIZ, "I %s, n(s)=%d, n(r)=%d, %s=%d", cr_text, *ns, *nr, pf_text, *pf);
-		C.strcpy(desc, C.CString(fmt.Sprintf("I %s, n(s)=%d, n(r)=%d, %s=%d, pid=0x%02x", cr_text, *ns, *nr, pf_text, *pf, ax25_get_pid(this_p))))
-		return (frame_type_I)
+		//snprintf (desc, DESC_SIZ, "I %s, n(s)=%d, n(r)=%d, %s=%d", cr_text, *ns, nr, pf_text, pf);
+		desc = fmt.Sprintf("I %s, n(s)=%d, n(r)=%d, %s=%d, pid=0x%02x", cr_text, ns, nr, pf_text, pf, ax25_get_pid(this_p))
+		frameType = frame_type_I
+		return
 	} else if (c & 2) == 0 {
 
 		// Supervisory			rrr p/f ss 0 1		or	0000 ss 0 1  rrrrrrr p/f
 
 		if this_p.modulo == modulo_128 {
-			*pf = c2 & 1
-			*nr = (c2 >> 1) & 0x7f
+			pf = c2 & 1
+			nr = (c2 >> 1) & 0x7f
 		} else {
-			*pf = (c >> 4) & 1
-			*nr = (c >> 5) & 7
+			pf = (c >> 4) & 1
+			nr = (c >> 5) & 7
 		}
 
 		// The exhaustive linter is wrong about exhaustiveness(!)
 		switch (c >> 2) & 3 { //nolint:exhaustive
 		case 0:
-			C.strcpy(desc, C.CString(fmt.Sprintf("RR %s, n(r)=%d, %s=%d", cr_text, *nr, pf_text, *pf)))
-			return (frame_type_S_RR)
+			desc = fmt.Sprintf("RR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
+			frameType = (frame_type_S_RR)
+			return
 		case 1:
-			C.strcpy(desc, C.CString(fmt.Sprintf("RNR %s, n(r)=%d, %s=%d", cr_text, *nr, pf_text, *pf)))
-			return (frame_type_S_RNR)
+			desc = fmt.Sprintf("RNR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
+			frameType = (frame_type_S_RNR)
+			return
 		case 2:
-			C.strcpy(desc, C.CString(fmt.Sprintf("REJ %s, n(r)=%d, %s=%d", cr_text, *nr, pf_text, *pf)))
-			return (frame_type_S_REJ)
+			desc = fmt.Sprintf("REJ %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
+			frameType = (frame_type_S_REJ)
+			return
 		case 3:
-			C.strcpy(desc, C.CString(fmt.Sprintf("SREJ %s, n(r)=%d, %s=%d", cr_text, *nr, pf_text, *pf)))
-			return (frame_type_S_SREJ)
+			desc = fmt.Sprintf("SREJ %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
+			frameType = (frame_type_S_SREJ)
+			return
 		}
 	} else {
 
 		// Unnumbered			mmm p/f mm 1 1
 
-		*pf = (c >> 4) & 1
+		pf = (c >> 4) & 1
 
 		switch c & 0xef {
 
 		case 0x6f:
-			C.strcpy(desc, C.CString(fmt.Sprintf("SABME %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_SABME)
+			desc = fmt.Sprintf("SABME %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_SABME)
+			return
 		case 0x2f:
-			C.strcpy(desc, C.CString(fmt.Sprintf("SABM %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_SABM)
+			desc = fmt.Sprintf("SABM %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_SABM)
+			return
 		case 0x43:
-			C.strcpy(desc, C.CString(fmt.Sprintf("DISC %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_DISC)
+			desc = fmt.Sprintf("DISC %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_DISC)
+			return
 		case 0x0f:
-			C.strcpy(desc, C.CString(fmt.Sprintf("DM %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_DM)
+			desc = fmt.Sprintf("DM %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_DM)
+			return
 		case 0x63:
-			C.strcpy(desc, C.CString(fmt.Sprintf("UA %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_UA)
+			desc = fmt.Sprintf("UA %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_UA)
+			return
 		case 0x87:
-			C.strcpy(desc, C.CString(fmt.Sprintf("FRMR %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_FRMR)
+			desc = fmt.Sprintf("FRMR %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_FRMR)
+			return
 		case 0x03:
-			C.strcpy(desc, C.CString(fmt.Sprintf("UI %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_UI)
+			desc = fmt.Sprintf("UI %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_UI)
+			return
 		case 0xaf:
-			C.strcpy(desc, C.CString(fmt.Sprintf("XID %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_XID)
+			desc = fmt.Sprintf("XID %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_XID)
+			return
 		case 0xe3:
-			C.strcpy(desc, C.CString(fmt.Sprintf("TEST %s, %s=%d", cr_text, pf_text, *pf)))
-			return (frame_type_U_TEST)
+			desc = fmt.Sprintf("TEST %s, %s=%d", cr_text, pf_text, pf)
+			frameType = (frame_type_U_TEST)
+			return
 		default:
-			C.strcpy(desc, C.CString("U other???"))
-			return (frame_type_U)
+			desc = "U other???"
+			frameType = (frame_type_U)
+			return
 		}
 	}
 
 	// Should be unreachable but compiler doesn't realize that.
 	// Here only to suppress "warning: control reaches end of non-void function"
 
-	return (frame_not_AX25)
+	frameType = (frame_not_AX25)
+	return
 
 } /* end ax25_frame_type */
 
@@ -2599,12 +2622,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
 		return
 	}
 
-	var cr cmdres_t // command or response.
-	var description [64]C.char
-	var pf C.int     // Poll/Final.
-	var nr, ns C.int // Sequence numbers.
-
-	var frame_type = ax25_frame_type(this_p, &cr, &description[0], &pf, &nr, &ns)
+	var frame_type = ax25_frame_type_only(this_p)
 
 	if frame_type != frame_type_I && frame_type != frame_type_U_UI {
 		text_color_set(DW_COLOR_ERROR)
@@ -2635,7 +2653,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_get_pid(this_p *packet_t) C.int {
+func ax25_get_pid(this_p *packet_t) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2647,7 +2665,7 @@ func ax25_get_pid(this_p *packet_t) C.int {
 	}
 
 	if this_p.num_addr >= 2 {
-		return C.int(this_p.frame_data[ax25_get_pid_offset(this_p)])
+		return int(this_p.frame_data[ax25_get_pid_offset(this_p)])
 	}
 	return (-1)
 }

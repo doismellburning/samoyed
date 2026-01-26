@@ -163,7 +163,7 @@ import (
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t, ftype ax25_frame_type_t, pf C.int, pid C.int, pinfo *C.uchar, info_len C.int) *packet_t {
+func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, pinfo *C.uchar, info_len C.int) *packet_t {
 
 	var this_p = ax25_new()
 
@@ -319,8 +319,8 @@ func ax25_s_frame(
 	cr cmdres_t,
 	ftype ax25_frame_type_t,
 	modulo ax25_modulo_t,
-	nr C.int,
-	pf C.int,
+	nr int,
+	pf int,
 	pinfo *C.uchar,
 	info_len C.int,
 ) *packet_t {
@@ -345,10 +345,10 @@ func ax25_s_frame(
 	}
 	this_p.modulo = modulo
 
-	if nr < 0 || nr >= C.int(modulo) {
+	if nr < 0 || nr >= int(modulo) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Invalid N(R) %d for S frame.\n", nr)
-		nr &= C.int(modulo - 1)
+		nr &= int(modulo - 1)
 	}
 
 	// Erratum: The AX.25 spec is not clear about whether SREJ should be command, response, or both.
@@ -359,7 +359,7 @@ func ax25_s_frame(
 		dw_printf("Internal error in ax25_s_frame: SREJ must be response.\n")
 	}
 
-	var ctrl C.int
+	var ctrl int
 	switch ftype {
 	case frame_type_S_RR:
 		ctrl = 0x01
@@ -463,10 +463,10 @@ func ax25_i_frame(
 	num_addr C.int,
 	cr cmdres_t,
 	modulo ax25_modulo_t,
-	nr C.int,
-	ns C.int,
-	pf C.int,
-	pid C.int,
+	nr int,
+	ns int,
+	pf int,
+	pid int,
 	pinfo *C.uchar,
 	info_len C.int,
 ) *packet_t {
@@ -491,21 +491,21 @@ func ax25_i_frame(
 	}
 	this_p.modulo = modulo
 
-	if nr < 0 || nr >= C.int(modulo) {
+	if nr < 0 || nr >= int(modulo) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Invalid N(R) %d for I frame.\n", nr)
-		nr &= C.int(modulo - 1)
+		nr &= int(modulo - 1)
 	}
 
-	if ns < 0 || ns >= C.int(modulo) {
+	if ns < 0 || ns >= int(modulo) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Invalid N(S) %d for I frame.\n", ns)
-		ns &= C.int(modulo - 1)
+		ns &= int(modulo - 1)
 	}
 
 	var p = (*C.uchar)(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len))
 
-	var ctrl C.int
+	var ctrl int
 	if modulo == 8 {
 		ctrl = (nr << 5) | (ns << 1)
 		if pf != 0 {

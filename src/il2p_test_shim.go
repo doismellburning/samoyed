@@ -359,12 +359,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	var cr cmdres_t // command or response.
-	var description [64]C.char
-	var pf C.int     // Poll/Final.
-	var nr, ns C.int // Sequence numbers.
-
-	var frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	var frame_type = ax25_frame_type_only(pp)
 	_ = frame_type // TODO Check this?
 
 	// TODO: compare binary.
@@ -440,7 +435,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	frame_type = ax25_frame_type_only(pp)
 	_ = frame_type
 
 	// TODO: compare binary.
@@ -522,7 +517,7 @@ func test_example_headers(t *testing.T) {
 		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	*/
 
-	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	frame_type = ax25_frame_type_only(pp)
 	_ = frame_type
 
 	// TODO: compare binary.
@@ -600,7 +595,7 @@ func all_frame_types(t *testing.T) {
 
 	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
 	var pinfo *C.uchar
-	var pid C.int = 0xf0
+	var pid = 0xf0
 	var info_len C.int
 
 	C.strcpy(&addrs[0][0], C.CString("W2UB"))
@@ -614,7 +609,7 @@ func all_frame_types(t *testing.T) {
 	dw_printf("\nU frames...\n")
 
 	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
-		for pf := C.int(0); pf <= 1; pf++ {
+		for pf := 0; pf <= 1; pf++ {
 			var cmin, cmax cmdres_t
 
 			switch ftype {
@@ -669,9 +664,9 @@ func all_frame_types(t *testing.T) {
 	dw_printf("\nS frames...\n")
 
 	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
-		for pf := C.int(0); pf <= 1; pf++ {
+		for pf := 0; pf <= 1; pf++ {
 			var modulo = modulo_8
-			var nr = C.int(modulo/2 + 1)
+			var nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
 				// SREJ can only be response.
@@ -689,7 +684,7 @@ func all_frame_types(t *testing.T) {
 			}
 
 			modulo = modulo_128
-			nr = C.int(modulo/2 + 1)
+			nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= cr_cmd; cr++ {
 				// SREJ can only be response.
@@ -713,9 +708,9 @@ func all_frame_types(t *testing.T) {
 	var srej_info []C.uchar = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
 	var ftype = frame_type_S_SREJ
-	for pf := C.int(0); pf <= 1; pf++ {
+	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_128
-		var nr C.int = 127
+		var nr = 127
 		var cr cmdres_t = cr_res
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
@@ -734,10 +729,10 @@ func all_frame_types(t *testing.T) {
 	pinfo = (*C.uchar)(unsafe.Pointer(C.strdup(C.CString("The rain in Spain stays mainly on the plain."))))
 	info_len = C.int(C.strlen((*C.char)(unsafe.Pointer(pinfo))))
 
-	for pf := C.int(0); pf <= 1; pf++ {
+	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_8
-		var nr = 0x55 & C.int(modulo-1)
-		var ns = 0xaa & C.int(modulo-1)
+		var nr = 0x55 & int(modulo-1)
+		var ns = 0xaa & int(modulo-1)
 
 		for cr := cmdres_t(1); cr <= 1; cr++ { // can only be command
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
@@ -750,8 +745,8 @@ func all_frame_types(t *testing.T) {
 		}
 
 		modulo = modulo_128
-		nr = 0x55 & C.int(modulo-1)
-		ns = 0xaa & C.int(modulo-1)
+		nr = 0x55 & int(modulo-1)
+		ns = 0xaa & int(modulo-1)
 
 		for cr := cmdres_t(1); cr <= 1; cr++ {
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)

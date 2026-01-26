@@ -850,13 +850,9 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
 	if !ax25_is_aprs(pp) {
-		var cr cmdres_t
-		var desc [80]C.char
-		var pf, nr, ns C.int
+		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
 
-		var ftype = ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
-
-		dw_printf("(%s)", C.GoString(&desc[0]))
+		dw_printf("(%s)", desc)
 
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(C.GoBytes(unsafe.Pointer(pinfo), info_len))
