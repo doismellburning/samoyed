@@ -628,7 +628,7 @@ func mon_addrs(channel C.int, pp *packet_t) []byte {
 	if num_digi > 0 {
 		var via string // complete via path
 
-		for j := 0; C.int(j) < num_digi; j++ {
+		for j := 0; j < num_digi; j++ {
 			if j != 0 {
 				via += "," // comma if not first address
 			}
@@ -640,7 +640,7 @@ func mon_addrs(channel C.int, pp *packet_t) []byte {
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
 				#else */
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
-			if C.int(AX25_REPEATER_1+j) == ax25_get_heard(pp) {
+			if AX25_REPEATER_1+j == ax25_get_heard(pp) {
 				// #endif
 				via += "*"
 			}
@@ -1244,7 +1244,7 @@ func cmd_listen_thread(client C.int) {
 				ax25_set_info(pp, (*C.uchar)(C.CBytes(data)), C.int(cmd.Header.DataLen)-ndigi*10-1)
 
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-				ax25_set_pid(pp, C.int(pid))
+				ax25_set_pid(pp, pid)
 
 				/* This goes into the low priority queue because it is an original. */
 
@@ -1494,7 +1494,7 @@ func cmd_listen_thread(client C.int) {
 
 				ax25_set_info(pp, (*C.uchar)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-				ax25_set_pid(pp, C.int(pid))
+				ax25_set_pid(pp, pid)
 
 				tq_append(C.int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 			}

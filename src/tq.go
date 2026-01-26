@@ -205,14 +205,14 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
 			dw_printf("\n")
 
 			igate_send_rec_packet(int(channel), pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
 			dw_printf("\n")
 
 			nettnc_send_packet(channel, pp)
@@ -262,7 +262,7 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if ax25_is_aprs(pp) > 0 && tq_count(channel, prio, C.CString(""), C.CString(""), 0) > 100 {
+	if ax25_is_aprs(pp) && tq_count(channel, prio, C.CString(""), C.CString(""), 0) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")

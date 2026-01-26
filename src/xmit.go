@@ -294,14 +294,10 @@ const (
 
 func frame_flavor(pp *packet_t) flavor_t {
 
-	if ax25_is_aprs(pp) > 0 { // UI frame, PID 0xF0.
+	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
 
-		var _dest [AX25_MAX_ADDR_LEN]C.char
-
-		ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_dest[0])
-
-		var dest = C.GoString(&_dest[0])
+		var dest = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
 
 		if dest == "SPEECH" {
 			return (FLAVOR_SPEECH)
@@ -490,7 +486,7 @@ func xmit_thread(channel C.int) {
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", stemp) /* stations followed by : */
-					ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
+					ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
 					dw_printf("\n")
 					ax25_delete(pp)
 				} /* wait for clear channel error. */
@@ -809,7 +805,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp *packet_t, max_bundle C.int)
 
 func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 
-	if ax25_is_null_frame(pp) > 0 {
+	if ax25_is_null_frame(pp) {
 
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
@@ -853,7 +849,7 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 
-	if ax25_is_aprs(pp) == 0 {
+	if !ax25_is_aprs(pp) {
 		var cr cmdres_t
 		var desc [80]C.char
 		var pf, nr, ns C.int
@@ -866,11 +862,11 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 			var _, info2text, _ = xid_parse(C.GoBytes(unsafe.Pointer(pinfo), info_len))
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
+			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
 			dw_printf("\n")
 		}
 	} else {
-		ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
+		ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
 		dw_printf("\n")
 	}
 

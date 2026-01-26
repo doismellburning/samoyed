@@ -253,7 +253,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = int(ax25_get_heard(pp))
+				h = ax25_get_heard(pp)
 				heard = ax25_get_addr_with_ssid(pp, h)
 			}
 
@@ -377,7 +377,7 @@ func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = int(ax25_get_heard(pp))
+				h = ax25_get_heard(pp)
 				heard = ax25_get_addr_with_ssid(pp, h)
 			}
 

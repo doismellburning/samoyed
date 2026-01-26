@@ -846,7 +846,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = int(ax25_get_heard(pp))
+		h = ax25_get_heard(pp)
 		heard = ax25_get_addr_with_ssid(pp, h)
 	}
 
@@ -945,7 +945,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		text_color_set(DW_COLOR_REC)
 		dw_printf("[%d%s] ", channel, ts)
 	default:
-		if ax25_is_aprs(pp) > 0 {
+		if ax25_is_aprs(pp) {
 			text_color_set(DW_COLOR_REC)
 		} else {
 			text_color_set(DW_COLOR_DECODED)
@@ -967,11 +967,11 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
 	var asciiOnly C.int = 0 // Quick bodge because these C bools are ints...
-	if (ax25_is_aprs(pp) == 0) && !d_u_opt {
+	if !ax25_is_aprs(pp) && !d_u_opt {
 		asciiOnly = 1
 	}
 
-	if ax25_is_aprs(pp) == 0 {
+	if !ax25_is_aprs(pp) {
 		var cr cmdres_t
 		var desc [80]C.char
 		var pf, nr, ns C.int
@@ -1035,7 +1035,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	 */
 	var ais_obj_packet [300]C.char
 
-	if ax25_is_aprs(pp) > 0 {
+	if ax25_is_aprs(pp) {
 		var A decode_aprs_t
 
 		// we still want to decode it for logging and other processing.
@@ -1172,7 +1172,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) > 0 && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			igate_send_rec_packet(int(channel), pp)
 		}
 
@@ -1190,7 +1190,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		 * However, if it used FEC mode (FX.25. IL2P), we have much higher level of
 		 * confidence that it is correct.
 		 */
-		if ax25_is_aprs(pp) > 0 && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
+		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
 			digipeater(channel, pp)
 		}
 
