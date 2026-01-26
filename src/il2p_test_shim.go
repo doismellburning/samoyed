@@ -836,13 +836,13 @@ func test_serdes(t *testing.T) {
 	// try combinations of header type, max_fec, polarity, errors.
 
 	for hdr_type := range 1 {
-		var packet *C.char
+		var packet string
 		if hdr_type == 1 {
-			packet = C.CString(fmt.Sprintf("%s:%s", addrs2, text))
+			packet = fmt.Sprintf("%s:%s", addrs2, text)
 		} else {
-			packet = C.CString(fmt.Sprintf("%s:%s", addrs3, text))
+			packet = fmt.Sprintf("%s:%s", addrs3, text)
 		}
-		var pp = ax25_from_text(packet, 1)
+		var pp = ax25_from_text(packet, true)
 		assert.NotNil(t, pp)
 
 		var channel C.int

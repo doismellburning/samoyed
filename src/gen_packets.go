@@ -786,7 +786,7 @@ func send_packet(str string) {
 		//	X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-
 		//	X>X:NNNN
 
-		var pp = ax25_from_text(C.CString(str), 1)
+		var pp = ax25_from_text(str, true)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
@@ -807,7 +807,7 @@ func send_packet(str string) {
 		eas_send(0, pinfo, repeat, 500, 500)
 		ax25_delete(pp)
 	} else {
-		var pp = ax25_from_text(C.CString(str), 1)
+		var pp = ax25_from_text(str, true)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)

@@ -288,12 +288,12 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 		// if it happens to get onto RF somehow.
 
 		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
-		pp = ax25_from_text(C.CString(monfmt), 1)
+		pp = ax25_from_text(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
 		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, C.GoString((*C.char)(unsafe.Pointer(fbuf))))
-		pp = ax25_from_text(C.CString(monfmt), 1)
+		pp = ax25_from_text(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:

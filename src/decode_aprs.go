@@ -305,7 +305,7 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 		// e.g.  WR2X-2>APRS,WA1PLE-13*:}
 		//		K1BOS-B>APOSB,TCPIP,WR2X-2*:@122015z4221.42ND07111.93W&/A=000000SharkRF openSPOT3 MMDVM446.025 MA/SW
 
-		var pp_payload = ax25_from_text(C.CString(string(pinfo[1:])), 0)
+		var pp_payload = ax25_from_text(string(pinfo[1:]), false)
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})

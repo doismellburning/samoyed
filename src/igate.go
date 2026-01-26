@@ -1073,7 +1073,7 @@ func igate_recv_thread() {
 
 				var stemp = append([]byte("X>X:}"), message...)
 
-				var pp3 = ax25_from_text((*C.char)(C.CBytes(stemp)), 0) // 0 means not strict
+				var pp3 = ax25_from_text(string(stemp), false)
 				if pp3 != nil {
 
 					var alevel alevel_t
@@ -1302,7 +1302,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	 * Potential Bug:  Up to 8 digipeaters are allowed in radio format.
 	 * Is there a possibility of finding a larger number here?
 	 */
-	var pp3 = ax25_from_text((*C.char)(C.CBytes(message)), 0)
+	var pp3 = ax25_from_text(string(message), false)
 	if pp3 == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
@@ -1485,7 +1485,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			save_igate_config_p.tx_via,
 			payload)
 
-		var pradio = ax25_from_text(C.CString(radio), 1)
+		var pradio = ax25_from_text(radio, true)
 		if pradio != nil {
 
 			/* TODO KG

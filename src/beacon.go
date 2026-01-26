@@ -814,8 +814,8 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 		return
 	}
 
-	var strict C.int = 1 // Strict packet checking because they will go over air.
-	var pp = ax25_from_text(C.CString(beacon_text), strict)
+	var strict = true // Strict packet checking because they will go over air.
+	var pp = ax25_from_text(beacon_text, strict)
 
 	if pp != nil {
 		/* Send to desired destination. */

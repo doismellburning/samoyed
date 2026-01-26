@@ -476,7 +476,7 @@ func ax25_delete(this_p *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_text(monitor *C.char, strict C.int) *packet_t {
+func ax25_from_text(monitor string, strict bool) *packet_t {
 
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
@@ -494,7 +494,7 @@ func ax25_from_text(monitor *C.char, strict C.int) *packet_t {
 	/* It is possible that will convert <0x00> to a nul character later. */
 	/* There we need to maintain a separate length and not use normal C string functions. */
 
-	var stuff = C.GoBytes(unsafe.Pointer(monitor), C.int(C.strlen(monitor)))
+	var stuff = []byte(monitor)
 
 	/*
 	 * Initialize the packet structure with two addresses and control/pid
@@ -549,7 +549,7 @@ func ax25_from_text(monitor *C.char, strict C.int) *packet_t {
 	var ssid_temp, heard_temp C.int
 	var atemp [AX25_MAX_ADDR_LEN]C.char
 
-	if ax25_parse_addr(AX25_SOURCE, C.CString(string(pa)), strict, &atemp[0], &ssid_temp, &heard_temp) == 0 {
+	if ax25_parse_addr(AX25_SOURCE, C.CString(string(pa)), bool2Cint(strict), &atemp[0], &ssid_temp, &heard_temp) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad source address\n")
 		ax25_delete(this_p)
@@ -567,7 +567,7 @@ func ax25_from_text(monitor *C.char, strict C.int) *packet_t {
 	pa, stuff, _ = bytes.Cut(stuff, []byte{','})
 	// Note: if no comma found, pa contains the destination and stuff is empty (no digipeaters)
 
-	if ax25_parse_addr(AX25_DESTINATION, C.CString(string(pa)), strict, &atemp[0], &ssid_temp, &heard_temp) == 0 {
+	if ax25_parse_addr(AX25_DESTINATION, C.CString(string(pa)), bool2Cint(strict), &atemp[0], &ssid_temp, &heard_temp) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad destination address\n")
 		ax25_delete(this_p)
@@ -605,12 +605,12 @@ func ax25_from_text(monitor *C.char, strict C.int) *packet_t {
 
 		// Hack for q construct, from APRS-IS, so it does not cause panic later.
 
-		if strict == 0 && len(pa) >= 3 && pa[0] == 'q' && pa[1] == 'A' {
+		if !strict && len(pa) >= 3 && pa[0] == 'q' && pa[1] == 'A' {
 			pa[0] = 'Q'
 			pa[2] = byte(unicode.ToUpper(rune(pa[2])))
 		}
 
-		if ax25_parse_addr(k, C.CString(string(pa)), strict, &atemp[0], &ssid_temp, &heard_temp) == 0 {
+		if ax25_parse_addr(k, C.CString(string(pa)), bool2Cint(strict), &atemp[0], &ssid_temp, &heard_temp) == 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
 			ax25_delete(this_p)
@@ -1047,12 +1047,12 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 	}
 
 	var info_p *C.uchar
-	ax25_get_info(from_pp, &info_p)
+	var info_len = ax25_get_info(from_pp, &info_p)
 
 	// Want strict because addresses should conform to AX.25 here.
 	// That's not the case for something from an Internet Server.
 
-	var result_pp = ax25_from_text((*C.char)(unsafe.Add(unsafe.Pointer(info_p), 1)), 1)
+	var result_pp = ax25_from_text(string(C.GoBytes(unsafe.Add(unsafe.Pointer(info_p), 1), info_len-1)), true)
 
 	return (result_pp)
 }

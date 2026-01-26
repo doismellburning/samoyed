@@ -199,7 +199,7 @@ func DecodeAPRSLine(line string) {
 	} else {
 		// Normal monitoring format.
 
-		var pp = ax25_from_text(C.CString(line), 1)
+		var pp = ax25_from_text(line, true)
 		if pp != nil {
 			var A decode_aprs_t
 

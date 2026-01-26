@@ -30,10 +30,8 @@ var digipeaterTestConfigATGP = "HOP"
 var digipeaterTestFailed = 0
 var preempt = PREEMPT_OFF
 
-func digipeater_test(t *testing.T, _in, out string) {
+func digipeater_test(t *testing.T, in, out string) {
 	t.Helper()
-
-	var in = C.CString(_in)
 
 	dw_printf("\n")
 
@@ -41,7 +39,7 @@ func digipeater_test(t *testing.T, _in, out string) {
 	 * As an extra test, change text to internal format back to
 	 * text again to make sure it comes out the same.
 	 */
-	var pp = ax25_from_text(in, 1)
+	var pp = ax25_from_text(in, true)
 	assert.NotNil(t, pp)
 
 	var rec [256]C.char
@@ -50,9 +48,9 @@ func digipeater_test(t *testing.T, _in, out string) {
 	ax25_get_info(pp, &pinfo)
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
 
-	if C.strcmp(in, &rec[0]) != 0 {
+	if in != C.GoString(&rec[0]) {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text/internal/text error-1 %s -> %s\n", C.GoString(in), C.GoString(&rec[0]))
+		dw_printf("Text/internal/text error-1 %s -> %s\n", in, C.GoString(&rec[0]))
 	}
 
 	/*
@@ -75,11 +73,11 @@ func digipeater_test(t *testing.T, _in, out string) {
 	ax25_get_info(pp, &pinfo)
 	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
 
-	if C.strcmp(in, &rec[0]) != 0 {
+	if in != C.GoString(&rec[0]) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf(
 			"internal/frame/internal/text error-2 %s -> %s\n",
-			C.GoString(in),
+			in,
 			C.GoString(&rec[0]),
 		)
 	}
