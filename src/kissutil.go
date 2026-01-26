@@ -299,7 +299,7 @@ func process_input(stuff string) {
 	if unicode.IsUpper(rune(stuff[0])) || unicode.IsNumber(rune(stuff[0])) {
 		// Parse the "TNC2 monitor format" and convert to AX.25 frame.
 		var frame_data [AX25_MAX_PACKET_LEN]C.uchar
-		var pp = ax25_from_text(C.CString(stuff), 1)
+		var pp = ax25_from_text(stuff, true)
 		if pp != nil {
 			ax25_pack(pp, &frame_data[0])
 			send_to_kiss_tnc(channel, KISS_CMD_DATA_FRAME, []byte(C.GoString((*C.char)(unsafe.Pointer(&frame_data[0])))))

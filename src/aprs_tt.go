@@ -496,7 +496,7 @@ func aprs_tt_sequence(channel int, msg string) {
 
 	var audible_response = fmt.Sprintf("APRSTT>%s:%s", C.GoString(&tt_config.response[err].method[0]), response)
 
-	var pp = ax25_from_text(C.CString(audible_response), 0)
+	var pp = ax25_from_text(audible_response, false)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -1629,7 +1629,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 	var dest = fmt.Sprintf("%s%d%d", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION)
 	var raw_tt_msg = fmt.Sprintf("%s>%s:t%s", src, dest, msg)
 
-	var pp = ax25_from_text(C.CString(raw_tt_msg), 1)
+	var pp = ax25_from_text(raw_tt_msg, true)
 
 	/*
 	 * Process like a normal received frame.

@@ -1240,7 +1240,7 @@ func cmd_listen_thread(client C.int) {
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("Transmit '%s'\n", stemp);
 
-				var pp = ax25_from_text(C.CString(stemp), 1)
+				var pp = ax25_from_text(stemp, true)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
@@ -1493,7 +1493,7 @@ func cmd_listen_thread(client C.int) {
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("Transmit '%s'\n", stemp);
 
-				var pp = ax25_from_text(C.CString(stemp), 1)
+				var pp = ax25_from_text(stemp, true)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)

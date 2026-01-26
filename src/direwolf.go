@@ -1127,7 +1127,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
-		var ao_pp = ax25_from_text(&ais_obj_packet[0], 1)
+		var ao_pp = ax25_from_text(C.GoString(&ais_obj_packet[0]), true)
 		if ao_pp != nil {
 			var ao_fbuf [AX25_MAX_PACKET_LEN]C.uchar
 			var ao_flen = ax25_pack(ao_pp, &ao_fbuf[0])

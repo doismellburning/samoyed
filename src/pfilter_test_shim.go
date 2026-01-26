@@ -251,7 +251,7 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("test number %d\n", test_num)
 
-	var pp = ax25_from_text(C.CString(monitor), 1)
+	var pp = ax25_from_text(monitor, true)
 	assert.NotNil(t, pp)
 
 	var result = pfilter(0, 0, C.CString(filter), pp, 1)
