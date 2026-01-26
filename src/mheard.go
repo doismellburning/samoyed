@@ -259,12 +259,10 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 	// HACK - Reduce hop count by number of used WIDEn-0 addresses.
 
 	if hops > 1 {
-		for k := C.int(0); k < ax25_get_num_repeaters(pp); k++ {
-			var _digi [AX25_MAX_ADDR_LEN]C.char
-			ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k, &_digi[0])
-			var digi = C.GoString(&_digi[0])
-			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+int(k))
-			var used = ax25_get_h(pp, AX25_REPEATER_1+int(k))
+		for k := 0; k < ax25_get_num_repeaters(pp); k++ {
+			var digi = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k)
+			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+k)
+			var used = ax25_get_h(pp, AX25_REPEATER_1+k)
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Examining %s-%d  used=%d.\n", digi, ssid, used);
@@ -293,7 +291,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 		mptr.callsign = source
 		mptr.count = 1
 		mptr.channel = channel
-		mptr.num_digi_hops = hops
+		mptr.num_digi_hops = C.int(hops)
 		mptr.last_heard_rf = now
 		// Why did I do this instead of saving the location for a position report?
 		mptr.dlat = G_UNKNOWN
@@ -311,7 +309,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 		 * We are interested in the shortest path if heard very recently.
 		 */
 
-		if hops > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
+		if C.int(hops) > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
 
 			if mheard_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -326,7 +324,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 
 			mptr.count++
 			mptr.channel = channel
-			mptr.num_digi_hops = hops
+			mptr.num_digi_hops = C.int(hops)
 			mptr.last_heard_rf = now
 		}
 	}

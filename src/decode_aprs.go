@@ -260,9 +260,7 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 	// W1KU-4>APDW15,W1IMD,WIDE1,KQ1L-8,N3LLO-3,WIDE2*:}EB1EBT-9>NOGATE,TCPIP,W1KU-4*::DF1AKR-9 :73{4
 	// NE1CU-10>RFONLY,KB1AEV-15,N3LLO-3,WIDE2*:}W1HS-11>APMI06,TCPIP,NE1CU-10*:T#050,190,039,008,095,20403,00000000
 
-	var _atemp [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &_atemp[0])
-	var atemp = C.GoString(&_atemp[0])
+	var atemp = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
 
 	if quiet == 0 {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
@@ -274,8 +272,8 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 
 	// Complain if obsolete WIDE or RELAY is found in via path.
 
-	for i := C.int(0); i < ax25_get_num_repeaters(pp); i++ {
-		ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i, &_atemp[0])
+	for i := 0; i < ax25_get_num_repeaters(pp); i++ {
+		atemp = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i)
 		if quiet == 0 {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
 				text_color_set(DW_COLOR_ERROR)

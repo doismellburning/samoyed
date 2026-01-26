@@ -228,39 +228,28 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 
 	// Destination and source addresses go into low bits 0-5 for bytes 0-11.
 
-	var dst_addr [AX25_MAX_ADDR_LEN]C.char
-	var src_addr [AX25_MAX_ADDR_LEN]C.char
-
-	ax25_get_addr_no_ssid(pp, AX25_DESTINATION, &dst_addr[0])
+	var dst_addr = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
 	var dst_ssid = ax25_get_ssid(pp, AX25_DESTINATION)
 
-	ax25_get_addr_no_ssid(pp, AX25_SOURCE, &src_addr[0])
+	var src_addr = ax25_get_addr_no_ssid(pp, AX25_SOURCE)
 	var src_ssid = ax25_get_ssid(pp, AX25_SOURCE)
 
-	for i := 0; ; i++ {
-		var a = (*C.uchar)(unsafe.Add(unsafe.Pointer(&dst_addr[0]), i))
-		if *a == 0 {
-			break
-		}
-		if *a < ' ' || *a > '_' {
+	for i, b := range dst_addr {
+		if b < ' ' || b > '_' {
 			// Shouldn't happen but follow the rule.
 			return (-1)
 		}
 		var h = (*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i))
-		*h = ascii_to_sixbit(*a)
+		*h = ascii_to_sixbit(C.uchar(b))
 	}
 
-	for i := 0; ; i++ {
-		var a = (*C.uchar)(unsafe.Add(unsafe.Pointer(&src_addr[0]), i))
-		if *a == 0 {
-			break
-		}
-		if *a < ' ' || *a > '_' {
+	for i, b := range src_addr {
+		if b < ' ' || b > '_' {
 			// Shouldn't happen but follow the rule.
 			return (-1)
 		}
 		var h = (*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 6+i))
-		*h = ascii_to_sixbit(*a)
+		*h = ascii_to_sixbit(C.uchar(b))
 	}
 
 	// Byte 12 has DEST SSID in upper nybble and SRC SSID in lower nybble and

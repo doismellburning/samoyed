@@ -521,7 +521,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	 */
 	for ax25_get_dti(pp) == '}' {
 
-		for n := 0; C.int(n) < ax25_get_num_repeaters(pp); n++ {
+		for n := 0; n < ax25_get_num_repeaters(pp); n++ {
 			/* includes ssid. Do we want to ignore it? */
 			var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
 
@@ -557,7 +557,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	/*
 	 * Do not relay packets with TCPIP, TCPXX, RFONLY, or NOGATE in the via path.
 	 */
-	for n := 0; C.int(n) < ax25_get_num_repeaters(pp); n++ {
+	for n := 0; n < ax25_get_num_repeaters(pp); n++ {
 		/* includes ssid. Do we want to ignore it? */
 		var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
 
@@ -1313,7 +1313,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	 *	NOGATE or RFONLY - means IGate should not pass them.
 	 *	TCPXX or qAX - means it came from somewhere that did not identify itself correctly.
 	 */
-	for n := 0; C.int(n) < ax25_get_num_repeaters(pp3); n++ {
+	for n := 0; n < ax25_get_num_repeaters(pp3); n++ {
 		/* includes ssid. Do we want to ignore it? */
 		var via = ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1)
 

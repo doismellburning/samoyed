@@ -525,14 +525,13 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		}
 
 		if pfilter_debug >= 2 {
-			var path [100]C.char
+			var path = ax25_format_via_path(pf.pp)
 
-			ax25_format_via_path(pf.pp, &path[0], C.size_t(len(path)))
-			if C.strlen(&path[0]) == 0 {
-				C.strcpy(&path[0], C.CString("no digipeater path"))
+			if len(path) == 0 {
+				path = "no digipeater path"
 			}
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&path[0]))
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
 		}
 	} else if pf.token_str[0] == 'v' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* v - via not used */
@@ -548,14 +547,13 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		}
 
 		if pfilter_debug >= 2 {
-			var path [100]C.char
+			var path = ax25_format_via_path(pf.pp)
 
-			ax25_format_via_path(pf.pp, &path[0], C.size_t(len(path)))
-			if C.strlen(&path[0]) == 0 {
-				C.strcpy(&path[0], C.CString("no digipeater path"))
+			if len(path) == 0 {
+				path = "no digipeater path"
 			}
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&path[0]))
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
 		}
 	} else if pf.token_str[0] == 'g' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* g - Addressee of message. e.g. "BLN*" for bulletins. */

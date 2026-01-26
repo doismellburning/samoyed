@@ -670,7 +670,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = int(ax25_get_heard(pp))
+		h = ax25_get_heard(pp)
 		heard = ax25_get_addr_with_ssid(pp, h)
 	}
 
@@ -727,7 +727,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 
 	// Display channel with subchannel/slice if applicable.
 
-	if ax25_is_aprs(pp) != 0 {
+	if ax25_is_aprs(pp) {
 		text_color_set(DW_COLOR_REC)
 	} else {
 		text_color_set(DW_COLOR_DEBUG)

@@ -329,7 +329,7 @@ func digipeat_match(
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = int(ax25_get_first_not_repeated(pp))
+	var r = ax25_get_first_not_repeated(pp)
 
 	if r < AX25_REPEATER_1 {
 		return (nil)
@@ -362,7 +362,7 @@ func digipeat_match(
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
 		ax25_set_addr(result, r, mycall_xmit)
-		ax25_set_h(result, C.int(r))
+		ax25_set_h(result, r)
 		return (result)
 	}
 
@@ -415,7 +415,7 @@ func digipeat_match(
 		// FIXME KG assert (result != nil);
 
 		ax25_set_addr(result, r, mycall_xmit)
-		ax25_set_h(result, C.int(r))
+		ax25_set_h(result, r)
 		return (result)
 	}
 
@@ -440,7 +440,7 @@ func digipeat_match(
 				// FIXME KG assert (result != nil);
 
 				ax25_set_addr(result, r2, mycall_xmit)
-				ax25_set_h(result, C.int(r2))
+				ax25_set_h(result, r2)
 
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
@@ -460,7 +460,7 @@ func digipeat_match(
 
 					r2--
 					for r2 >= AX25_REPEATER_1 && ax25_get_h(result, r2) == 0 {
-						ax25_set_h(result, C.int(r2))
+						ax25_set_h(result, r2)
 						r2--
 					}
 				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
@@ -520,7 +520,7 @@ func digipeat_match(
 				ssid--
 				ax25_set_ssid(result, r, ssid) // could be zero.
 				if ssid == 0 {
-					ax25_set_h(result, C.int(r))
+					ax25_set_h(result, r)
 				}
 
 				// Insert own call at beginning and mark it used.
@@ -546,7 +546,7 @@ func digipeat_match(
 			// FIXME KG assert (result != nil);
 
 			ax25_set_addr(result, r, mycall_xmit)
-			ax25_set_h(result, C.int(r))
+			ax25_set_h(result, r)
 			return (result)
 		}
 
@@ -558,7 +558,7 @@ func digipeat_match(
 
 			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
 				ax25_insert_addr(result, r, mycall_xmit)
-				ax25_set_h(result, C.int(r))
+				ax25_set_h(result, r)
 			}
 			return (result)
 		}
