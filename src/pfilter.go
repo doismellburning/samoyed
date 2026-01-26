@@ -497,13 +497,12 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* b - budlist */
 		/* Budlist - AX.25 source address */
 		/* Could be different than source encapsulated by 3rd party header. */
-		var addr [AX25_MAX_ADDR_LEN]C.char
-		ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &addr[0])
-		result = filt_bodgu(pf, C.GoString(&addr[0]))
+		var addr = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
+		result = filt_bodgu(pf, addr)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&addr[0]))
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
 		}
 	} else if pf.token_str[0] == 'o' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* o - object or item name */
@@ -517,12 +516,11 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
-		for n := C.int(AX25_REPEATER_1); result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
 			// Consider only those with the H (has-been-used) bit set.
 			if ax25_get_h(pf.pp, n) > 0 {
-				var addr [AX25_MAX_ADDR_LEN]C.char
-				ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
-				result = filt_bodgu(pf, C.GoString(&addr[0]))
+				var addr = ax25_get_addr_with_ssid(pf.pp, n)
+				result = filt_bodgu(pf, addr)
 			}
 		}
 
@@ -540,13 +538,12 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
-		for n := C.int(AX25_REPEATER_1); result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
 			if ax25_get_h(pf.pp, n) == 0 {
-				var addr [AX25_MAX_ADDR_LEN]C.char
-				ax25_get_addr_with_ssid(pf.pp, n, &addr[0])
-				result = filt_bodgu(pf, C.GoString(&addr[0]))
+				var addr = ax25_get_addr_with_ssid(pf.pp, n)
+				result = filt_bodgu(pf, addr)
 			}
 		}
 
@@ -587,13 +584,12 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		/* because destination is used for part of location. */
 
 		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
-			var addr [AX25_MAX_ADDR_LEN]C.char
-			ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION, &addr[0])
-			result = filt_bodgu(pf, C.GoString(&addr[0]))
+			var addr = ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION)
+			result = filt_bodgu(pf, addr)
 
 			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&addr[0]))
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), addr)
 			}
 		} else {
 			result = 0
@@ -751,8 +747,7 @@ func filt_bodgu(pf *pfstate_t, arg string) C.int {
 
 func filt_t(pf *pfstate_t) C.int {
 
-	var src [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE, &src[0])
+	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
 
 	var infop *C.uchar
 	ax25_get_info(pf.pp, (&infop))

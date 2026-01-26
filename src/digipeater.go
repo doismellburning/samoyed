@@ -329,15 +329,13 @@ func digipeat_match(
 	 *
 	 * r = index of the address position in the frame.
 	 */
-	var r = ax25_get_first_not_repeated(pp)
+	var r = int(ax25_get_first_not_repeated(pp))
 
 	if r < AX25_REPEATER_1 {
 		return (nil)
 	}
 
-	var _repeater [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, r, &_repeater[0])
-	var repeater = C.GoString(&_repeater[0])
+	var repeater = ax25_get_addr_with_ssid(pp, r)
 	var ssid = ax25_get_ssid(pp, r)
 
 	/* TODO KG
@@ -363,8 +361,8 @@ func digipeat_match(
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		ax25_set_addr(result, r, C.CString(mycall_xmit))
-		ax25_set_h(result, r)
+		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_h(result, C.int(r))
 		return (result)
 	}
 
@@ -373,9 +371,8 @@ func digipeat_match(
 	 * Alternatively we might feed everything transmitted into
 	 * dedupe_remember rather than only frames out of digipeater.
 	 */
-	var source [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &source[0])
-	if C.GoString(&source[0]) == mycall_rec {
+	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	if source == mycall_rec {
 		return (nil)
 	}
 
@@ -417,8 +414,8 @@ func digipeat_match(
 		var result = ax25_dup(pp)
 		// FIXME KG assert (result != nil);
 
-		ax25_set_addr(result, r, C.CString(mycall_xmit))
-		ax25_set_h(result, r)
+		ax25_set_addr(result, r, mycall_xmit)
+		ax25_set_h(result, C.int(r))
 		return (result)
 	}
 
@@ -433,10 +430,7 @@ func digipeat_match(
 
 	if preempt != PREEMPT_OFF {
 		for r2 := r + 1; r2 < ax25_get_num_addr(pp); r2++ {
-			var _repeater2 [AX25_MAX_ADDR_LEN]C.char
-
-			ax25_get_addr_with_ssid(pp, r2, &_repeater2[0])
-			var repeater2 = C.GoString(&_repeater2[0])
+			var repeater2 = ax25_get_addr_with_ssid(pp, r2)
 
 			// text_color_set (DW_COLOR_DEBUG);
 			// dw_printf ("test match %d %s\n", r2, repeater2);
@@ -445,8 +439,8 @@ func digipeat_match(
 				var result = ax25_dup(pp)
 				// FIXME KG assert (result != nil);
 
-				ax25_set_addr(result, r2, C.CString(mycall_xmit))
-				ax25_set_h(result, r2)
+				ax25_set_addr(result, r2, mycall_xmit)
+				ax25_set_h(result, C.int(r2))
 
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
@@ -466,7 +460,7 @@ func digipeat_match(
 
 					r2--
 					for r2 >= AX25_REPEATER_1 && ax25_get_h(result, r2) == 0 {
-						ax25_set_h(result, r2)
+						ax25_set_h(result, C.int(r2))
 						r2--
 					}
 				/* 2025-07-29 KG Commenting out the PREEMPT_TRACE handling so it falls through to the default case,
@@ -526,12 +520,12 @@ func digipeat_match(
 				ssid--
 				ax25_set_ssid(result, r, ssid) // could be zero.
 				if ssid == 0 {
-					ax25_set_h(result, r)
+					ax25_set_h(result, C.int(r))
 				}
 
 				// Insert own call at beginning and mark it used.
 
-				ax25_insert_addr(result, AX25_REPEATER_1, C.CString(mycall_xmit))
+				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
 				ax25_set_h(result, AX25_REPEATER_1)
 				return (result)
 			}
@@ -551,8 +545,8 @@ func digipeat_match(
 			var result = ax25_dup(pp)
 			// FIXME KG assert (result != nil);
 
-			ax25_set_addr(result, r, C.CString(mycall_xmit))
-			ax25_set_h(result, r)
+			ax25_set_addr(result, r, mycall_xmit)
+			ax25_set_h(result, C.int(r))
 			return (result)
 		}
 
@@ -563,8 +557,8 @@ func digipeat_match(
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
 			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
-				ax25_insert_addr(result, r, C.CString(mycall_xmit))
-				ax25_set_h(result, r)
+				ax25_insert_addr(result, r, mycall_xmit)
+				ax25_set_h(result, C.int(r))
 			}
 			return (result)
 		}

@@ -467,13 +467,11 @@ func server_send_rec_packet(channel C.int, pp *packet_t, fbuf *C.uchar, flen C.i
 
 			agwpe_msg.Header.DataKind = 'K'
 
-			var callFrom [AX25_MAX_ADDR_LEN]C.char
-			ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
-			copy(agwpe_msg.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(&callFrom[0]), AX25_MAX_ADDR_LEN))
+			var callFrom = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo [AX25_MAX_ADDR_LEN]C.char
-			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
-			copy(agwpe_msg.Header.CallTo[:], C.GoBytes(unsafe.Pointer(&callTo[0]), AX25_MAX_ADDR_LEN))
+			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			agwpe_msg.Header.DataLen = uint32(flen + 1)
 			agwpe_msg.Data = make([]byte, flen+1)
@@ -521,13 +519,11 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
 
-			var callFrom [AX25_MAX_ADDR_LEN]C.char
-			ax25_get_addr_with_ssid(pp, AX25_SOURCE, &callFrom[0])
-			copy(agwpe_msg.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(&callFrom[0]), AX25_MAX_ADDR_LEN))
+			var callFrom = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			copy(agwpe_msg.Header.CallFrom[:], []byte(callFrom))
 
-			var callTo [AX25_MAX_ADDR_LEN]C.char
-			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &callTo[0])
-			copy(agwpe_msg.Header.CallTo[:], C.GoBytes(unsafe.Pointer(&callTo[0]), AX25_MAX_ADDR_LEN))
+			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
 			/* http://uz7ho.org.ua/includes/agwpeapi.htm#_Toc500723812 */
 
@@ -623,40 +619,36 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 
 func mon_addrs(channel C.int, pp *packet_t) []byte {
 
-	var src [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
-	var dst [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst[0])
+	var dst = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 	var num_digi = ax25_get_num_repeaters(pp)
 
 	if num_digi > 0 {
 		var via string // complete via path
 
-		for j := C.int(0); j < num_digi; j++ {
-			var digiaddr [AX25_MAX_ADDR_LEN]C.char
-
+		for j := 0; C.int(j) < num_digi; j++ {
 			if j != 0 {
 				via += "," // comma if not first address
 			}
 
-			ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j, &digiaddr[0])
-			via += C.GoString(&digiaddr[0])
+			var digiaddr = ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j)
+			via += digiaddr
 			/*
 				#if 0  // Mark each used with * as seen in UZ7HO SoundModem.
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
 				#else */
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
-			if AX25_REPEATER_1+j == ax25_get_heard(pp) {
+			if C.int(AX25_REPEATER_1+j) == ax25_get_heard(pp) {
 				// #endif
 				via += "*"
 			}
 
 		}
-		return []byte(fmt.Sprintf(" %d:Fm %s To %s Via %s ", channel+1, C.GoString(&src[0]), C.GoString(&dst[0]), via))
+		return []byte(fmt.Sprintf(" %d:Fm %s To %s Via %s ", channel+1, src, dst, via))
 	} else {
-		return []byte(fmt.Sprintf(" %d:Fm %s To %s ", channel+1, C.GoString(&src[0]), C.GoString(&dst[0])))
+		return []byte(fmt.Sprintf(" %d:Fm %s To %s ", channel+1, src, dst))
 	}
 }
 

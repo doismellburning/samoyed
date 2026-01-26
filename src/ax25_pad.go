@@ -555,9 +555,9 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_SOURCE, C.CString(addrTemp))
+	ax25_set_addr(this_p, AX25_SOURCE, addrTemp)
 	ax25_set_h(this_p, AX25_SOURCE) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
-	ax25_set_ssid(this_p, AX25_SOURCE, C.int(ssidTemp))
+	ax25_set_ssid(this_p, AX25_SOURCE, ssidTemp)
 
 	/*
 	 * Destination address.
@@ -575,9 +575,9 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_DESTINATION, C.CString(addrTemp))
+	ax25_set_addr(this_p, AX25_DESTINATION, addrTemp)
 	ax25_set_h(this_p, AX25_DESTINATION) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
-	ax25_set_ssid(this_p, AX25_DESTINATION, C.int(ssidTemp))
+	ax25_set_ssid(this_p, AX25_DESTINATION, ssidTemp)
 
 	/*
 	 * VIA path.
@@ -620,8 +620,8 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			return (nil)
 		}
 
-		ax25_set_addr(this_p, k, C.CString(addrTemp))
-		ax25_set_ssid(this_p, k, C.int(ssidTemp))
+		ax25_set_addr(this_p, int(k), addrTemp)
+		ax25_set_ssid(this_p, int(k), ssidTemp)
 
 		// Does it have an "*" at the end?
 		// TODO: Complain if more than one "*".
@@ -1003,11 +1003,10 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 func ax25_check_addresses(pp *packet_t) bool {
 
 	var all_ok = true
-	for n := C.int(0); n < ax25_get_num_addr(pp); n++ {
-		var addr [AX25_MAX_ADDR_LEN]C.char
-		ax25_get_addr_with_ssid(pp, n, &addr[0])
+	for n := 0; n < ax25_get_num_addr(pp); n++ {
+		var addr = ax25_get_addr_with_ssid(pp, n)
 
-		var _, _, _, ok = ax25_parse_addr(int(n), C.GoString(&addr[0]), 1)
+		var _, _, _, ok = ax25_parse_addr(n, addr, 1)
 
 		all_ok = all_ok && ok
 	}
@@ -1078,7 +1077,7 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
+func ax25_set_addr(this_p *packet_t, n int, ad string) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1086,12 +1085,12 @@ func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
 
 	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
 
-	if C.strlen(ad) == 0 {
+	if len(ad) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
 	}
 
-	if n >= 0 && n < this_p.num_addr {
+	if n >= 0 && C.int(n) < this_p.num_addr {
 
 		//dw_printf ("ax25_set_addr , existing case\n");
 		/*
@@ -1102,7 +1101,7 @@ func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
 		// Messages from IGate have q-constructs.
 		// We use this to parse it and later remove unwanted parts.
 
-		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(int(n), C.GoString(ad), 0)
+		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
 
 		C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
 
@@ -1110,10 +1109,10 @@ func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
 			if i >= 6 {
 				break
 			}
-			this_p.frame_data[n*7+C.int(i)] = C.uchar(c << 1)
+			this_p.frame_data[n*7+i] = C.uchar(c << 1)
 		}
-		ax25_set_ssid(this_p, n, C.int(ssidTemp))
-	} else if n == this_p.num_addr {
+		ax25_set_ssid(this_p, n, ssidTemp)
+	} else if C.int(n) == this_p.num_addr {
 
 		//dw_printf ("ax25_set_addr , appending case\n");
 		/*
@@ -1123,7 +1122,7 @@ func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
 		ax25_insert_addr(this_p, n, ad)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, ax25_set_addr, bad position %d for '%s'\n", n, C.GoString(ad))
+		dw_printf("Internal error, ax25_set_addr, bad position %d for '%s'\n", n, ad)
 	}
 
 	//dw_printf ("------\n");
@@ -1159,7 +1158,7 @@ func ax25_set_addr(this_p *packet_t, n C.int, ad *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
+func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1167,7 +1166,7 @@ func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
 
 	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
 
-	if C.strlen(ad) == 0 {
+	if len(ad) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
 	}
@@ -1183,7 +1182,7 @@ func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
 
 	this_p.num_addr++
 
-	C.memmove(unsafe.Pointer(&this_p.frame_data[(n+1)*7]), unsafe.Pointer(&this_p.frame_data[n*7]), C.size_t(this_p.frame_len-(n*7)))
+	C.memmove(unsafe.Pointer(&this_p.frame_data[(n+1)*7]), unsafe.Pointer(&this_p.frame_data[n*7]), C.size_t(this_p.frame_len-C.int(n*7)))
 	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
 	this_p.frame_len += 7
 	this_p.frame_data[n*7+6] = SSID_RR_MASK
@@ -1194,22 +1193,22 @@ func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
 	// Messages from IGate have q-constructs.
 	// We use this to parse it and later remove unwanted parts.
 
-	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(int(n), C.GoString(ad), 0)
+	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
 	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
 	for i, c := range addrTemp {
 		if i >= 6 {
 			break
 		}
-		this_p.frame_data[n*7+C.int(i)] = C.uchar(c << 1)
+		this_p.frame_data[n*7+i] = C.uchar(c << 1)
 	}
 
-	ax25_set_ssid(this_p, n, C.int(ssidTemp))
+	ax25_set_ssid(this_p, n, ssidTemp)
 
 	// Sanity check after messing with number of addresses.
 
 	var expect = this_p.num_addr
 	this_p.num_addr = (-1)
-	if expect != ax25_get_num_addr(this_p) {
+	if expect != C.int(ax25_get_num_addr(this_p)) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
@@ -1234,7 +1233,7 @@ func ax25_insert_addr(this_p *packet_t, n C.int, ad *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_remove_addr(this_p *packet_t, n C.int) {
+func ax25_remove_addr(this_p *packet_t, n int) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1246,7 +1245,7 @@ func ax25_remove_addr(this_p *packet_t, n C.int) {
 
 	this_p.num_addr--
 
-	C.memmove(unsafe.Pointer(&this_p.frame_data[n*7]), unsafe.Pointer(&this_p.frame_data[(n+1)*7]), C.size_t(this_p.frame_len-((n+1)*7)))
+	C.memmove(unsafe.Pointer(&this_p.frame_data[n*7]), unsafe.Pointer(&this_p.frame_data[(n+1)*7]), C.size_t(this_p.frame_len-C.int((n+1)*7)))
 	this_p.frame_len -= 7
 	SET_LAST_ADDR_FLAG(this_p)
 
@@ -1254,7 +1253,7 @@ func ax25_remove_addr(this_p *packet_t, n C.int) {
 
 	var expect = this_p.num_addr
 	this_p.num_addr = (-1)
-	if expect != ax25_get_num_addr(this_p) {
+	if expect != C.int(ax25_get_num_addr(this_p)) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
@@ -1276,7 +1275,7 @@ func ax25_remove_addr(this_p *packet_t, n C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_num_addr(this_p *packet_t) C.int {
+func ax25_get_num_addr(this_p *packet_t) int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1284,7 +1283,7 @@ func ax25_get_num_addr(this_p *packet_t) C.int {
 	/* Use cached value if already set. */
 
 	if this_p.num_addr >= 0 {
-		return (this_p.num_addr)
+		return int(this_p.num_addr)
 	}
 
 	/* Otherwise, determine the number ofaddresses. */
@@ -1305,7 +1304,7 @@ func ax25_get_num_addr(this_p *packet_t) C.int {
 		}
 	}
 
-	return (this_p.num_addr)
+	return int(this_p.num_addr)
 }
 
 /*------------------------------------------------------------------------------
@@ -1341,7 +1340,7 @@ func ax25_get_num_repeaters(this_p *packet_t) C.int {
  * Inputs:	n	- Index of address.   Use the symbols
  *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
  *
- * Outputs:	station - String representation of the station, including the SSID.
+ * Returns:	station - String representation of the station, including the SSID.
  *			e.g.  "WB2OSZ-15"
  *			  Usually variables will be AX25_MAX_ADDR_LEN bytes
  *			  but 10 would be adequate.
@@ -1355,7 +1354,7 @@ func ax25_get_num_repeaters(this_p *packet_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_addr_with_ssid(this_p *packet_t, n C.int, _station *C.char) {
+func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1364,16 +1363,14 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n C.int, _station *C.char) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
 		dw_printf("Address index, %d, is less than zero.\n", n)
-		C.strcpy(_station, C.CString("??????"))
-		return
+		return "??????"
 	}
 
-	if n >= this_p.num_addr {
+	if C.int(n) >= this_p.num_addr {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
 		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
-		C.strcpy(_station, C.CString("??????"))
-		return
+		return "??????"
 	}
 
 	// At one time this would stop at the first space, on the assumption we would have only trailing spaces.
@@ -1383,7 +1380,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n C.int, _station *C.char) {
 	// This will provide better information for troubleshooting.
 
 	var station string
-	for i := C.int(0); i < 6; i++ {
+	for i := 0; i < 6; i++ {
 		station += string((this_p.frame_data[n*7+i] >> 1) & 0x7f)
 	}
 
@@ -1404,7 +1401,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n C.int, _station *C.char) {
 		station += fmt.Sprintf("-%d", ssid)
 	}
 
-	C.strcpy(_station, C.CString(station))
+	return station
 } /* end ax25_get_addr_with_ssid */
 
 /*------------------------------------------------------------------------------
@@ -1488,13 +1485,13 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n C.int, _station *C.char) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_ssid(this_p *packet_t, n C.int) C.int {
+func ax25_get_ssid(this_p *packet_t, n int) int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	if n >= 0 && n < this_p.num_addr {
-		return C.int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
+	if n >= 0 && C.int(n) < this_p.num_addr {
+		return int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_get_ssid(%d), num_addr=%d\n", n, this_p.num_addr)
@@ -1519,12 +1516,12 @@ func ax25_get_ssid(this_p *packet_t, n C.int) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_ssid(this_p *packet_t, n C.int, ssid C.int) {
+func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	if n >= 0 && n < this_p.num_addr {
+	if n >= 0 && C.int(n) < this_p.num_addr {
 		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(C.uchar(SSID_SSID_MASK))) |
 			C.uchar((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
 	} else {
@@ -1550,14 +1547,14 @@ func ax25_set_ssid(this_p *packet_t, n C.int, ssid C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_h(this_p *packet_t, n C.int) C.int {
+func ax25_get_h(this_p *packet_t, n int) int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
-	Assert(n >= 0 && n < this_p.num_addr)
+	Assert(n >= 0 && C.int(n) < this_p.num_addr)
 
-	if n >= 0 && n < this_p.num_addr {
-		return C.int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
+	if n >= 0 && C.int(n) < this_p.num_addr {
+		return int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_get_h(%d), num_addr=%d\n", n, this_p.num_addr)
@@ -1618,10 +1615,10 @@ func ax25_get_heard(this_p *packet_t) C.int {
 
 	var result C.int = AX25_SOURCE
 
-	for i := C.int(AX25_REPEATER_1); i < ax25_get_num_addr(this_p); i++ {
+	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
 
 		if ax25_get_h(this_p, i) != 0 {
-			result = i
+			result = C.int(i)
 		}
 	}
 	return (result)
@@ -1648,10 +1645,10 @@ func ax25_get_first_not_repeated(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	for i := C.int(AX25_REPEATER_1); i < ax25_get_num_addr(this_p); i++ {
+	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
 
 		if ax25_get_h(this_p, i) == 0 {
-			return (i)
+			return C.int(i)
 		}
 	}
 	return (-1)
@@ -1940,7 +1937,7 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
  *
  * Inputs:	Current packet.
  *
- * Outputs:	result	- All addresses combined into a single string of the form:
+ * Returns:	result	- All addresses combined into a single string of the form:
  *
  *				"Source > Destination [ , repeater ... ] :"
  *
@@ -1960,41 +1957,39 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 
 // TODO: max len for result.  buffer overflow?
 
-func ax25_format_addrs(this_p *packet_t, result *C.char) {
+func ax25_format_addrs(this_p *packet_t) string {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
-	*result = 0
 
 	/* New in 0.9. */
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
 
 	if this_p.num_addr == 0 {
-		return
+		return ""
 	}
 
-	var stemp [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(this_p, AX25_SOURCE, &stemp[0])
-	// FIXME:  For ALL strcat: Pass in sizeof result and use strlcat.
-	C.strcat(result, &stemp[0])
-	C.strcat(result, C.CString(">"))
+	var result = ax25_get_addr_with_ssid(this_p, AX25_SOURCE)
 
-	ax25_get_addr_with_ssid(this_p, AX25_DESTINATION, &stemp[0])
-	C.strcat(result, &stemp[0])
+	result += ">"
+
+	result += ax25_get_addr_with_ssid(this_p, AX25_DESTINATION)
 
 	var heard = ax25_get_heard(this_p)
 
-	for i := C.int(AX25_REPEATER_1); i < this_p.num_addr; i++ {
-		ax25_get_addr_with_ssid(this_p, i, &stemp[0])
-		C.strcat(result, C.CString(","))
-		C.strcat(result, &stemp[0])
-		if i == heard {
-			C.strcat(result, C.CString("*"))
+	for i := AX25_REPEATER_1; C.int(i) < this_p.num_addr; i++ {
+		result += ","
+		result += ax25_get_addr_with_ssid(this_p, i)
+
+		if C.int(i) == heard {
+			result += "*"
 		}
 	}
 
-	C.strcat(result, C.CString(":"))
+	result += ":"
+
+	return result
 
 	// dw_printf ("DEBUG ax25_format_addrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
 }
@@ -2039,14 +2034,12 @@ func ax25_format_via_path(this_p *packet_t, _result *C.char, result_size C.size_
 	var heard = ax25_get_heard(this_p)
 	var result string
 
-	for i := C.int(AX25_REPEATER_1); i < this_p.num_addr; i++ {
+	for i := AX25_REPEATER_1; C.int(i) < this_p.num_addr; i++ {
 		if i > AX25_REPEATER_1 {
 			result += ","
 		}
-		var stemp [AX25_MAX_ADDR_LEN]C.char
-		ax25_get_addr_with_ssid(this_p, i, &stemp[0])
-		result += C.GoString(&stemp[0])
-		if i == heard {
+		result += ax25_get_addr_with_ssid(this_p, i)
+		if C.int(i) == heard {
 			result += "*"
 		}
 	}
@@ -2744,11 +2737,9 @@ func ax25_get_frame_data_ptr(this_p *packet_t) *C.uchar {
 
 func ax25_dedupe_crc(pp *packet_t) C.ushort {
 
-	var src [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
+	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
-	var dest [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 	var pinfo *C.uchar
 	var info_len = ax25_get_info(pp, &pinfo)
@@ -2769,8 +2760,8 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 	}
 
 	var crc C.ushort = 0xffff
-	crc = crc16((*C.uchar)(unsafe.Pointer(&src[0])), C.int(C.strlen(&src[0])), crc)
-	crc = crc16((*C.uchar)(unsafe.Pointer(&dest[0])), C.int(C.strlen(&dest[0])), crc)
+	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(src))), C.int(len(src)), crc)
+	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(dest))), C.int(len(dest)), crc)
 	crc = crc16(pinfo, info_len, crc)
 
 	return (crc)

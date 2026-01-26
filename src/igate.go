@@ -521,12 +521,9 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	 */
 	for ax25_get_dti(pp) == '}' {
 
-		for n := C.int(0); n < ax25_get_num_repeaters(pp); n++ {
-			var _via [AX25_MAX_ADDR_LEN]C.char /* includes ssid. Do we want to ignore it? */
-
-			ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1, &_via[0])
-
-			var via = C.GoString(&_via[0])
+		for n := 0; C.int(n) < ax25_get_num_repeaters(pp); n++ {
+			/* includes ssid. Do we want to ignore it? */
+			var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
 
 			if via == "TCPIP" ||
 				via == "TCPXX" ||
@@ -560,12 +557,9 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	/*
 	 * Do not relay packets with TCPIP, TCPXX, RFONLY, or NOGATE in the via path.
 	 */
-	for n := C.int(0); n < ax25_get_num_repeaters(pp); n++ {
-		var _via [AX25_MAX_ADDR_LEN]C.char /* includes ssid. Do we want to ignore it? */
-
-		ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1, &_via[0])
-
-		var via = C.GoString(&_via[0])
+	for n := 0; C.int(n) < ax25_get_num_repeaters(pp); n++ {
+		/* includes ssid. Do we want to ignore it? */
+		var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
 
 		if via == "TCPIP" ||
 			via == "TCPXX" ||
@@ -711,10 +705,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	 *		IGate that only gates to RF messages for stations heard directly.
 	 */
 
-	var _msg [IGATE_MAX_MSG]C.char
-	ax25_format_addrs(pp, &_msg[0])
-
-	var msg = C.GoString(&_msg[0])
+	var msg = ax25_format_addrs(pp)
 
 	msg = strings.TrimRight(msg, ":") /* Remove trailing ":" */
 
@@ -1322,12 +1313,9 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	 *	NOGATE or RFONLY - means IGate should not pass them.
 	 *	TCPXX or qAX - means it came from somewhere that did not identify itself correctly.
 	 */
-	for n := C.int(0); n < ax25_get_num_repeaters(pp3); n++ {
-		var _via [AX25_MAX_ADDR_LEN]C.char /* includes ssid. Do we want to ignore it? */
-
-		ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1, &_via[0])
-
-		var via = C.GoString(&_via[0])
+	for n := 0; C.int(n) < ax25_get_num_repeaters(pp3); n++ {
+		/* includes ssid. Do we want to ignore it? */
+		var via = ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1)
 
 		if via == "qAX" || // qAX deprecated. http://www.aprs-is.net/q.aspx
 			via == "TCPXX" || // TCPXX deprecated.
@@ -1454,9 +1442,9 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	 * Is it something new and improved that we should be using in the other direction?
 	 */
 
-	var dest [AX25_MAX_ADDR_LEN]C.char /* Destination field. */
-	ax25_get_addr_with_ssid(pp3, AX25_DESTINATION, &dest[0])
-	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), C.GoString(&dest[0]), save_audio_config_p.mycall[to_chan], pinfo)
+	/* Destination field. */
+	var dest = ax25_get_addr_with_ssid(pp3, AX25_DESTINATION)
+	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), dest, save_audio_config_p.mycall[to_chan], pinfo)
 
 	/* TODO KG
 	#if DEBUGx
@@ -1620,12 +1608,10 @@ func rx_to_ig_remember(pp *packet_t) {
 	rx2ig_checksum[rx2ig_insert_next] = int(ax25_dedupe_crc(pp))
 
 	if s_debug >= 3 {
-		var src [AX25_MAX_ADDR_LEN]C.char
-		var dest [AX25_MAX_ADDR_LEN]C.char
 		var pinfo *C.uchar
 
-		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 		ax25_get_info(pp, &pinfo)
 
 		text_color_set(DW_COLOR_DEBUG)
@@ -1633,7 +1619,7 @@ func rx_to_ig_remember(pp *packet_t) {
 			rx2ig_insert_next,
 			rx2ig_time_stamp[rx2ig_insert_next].String(),
 			rx2ig_checksum[rx2ig_insert_next],
-			C.GoString(&src[0]), C.GoString(&dest[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+			src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 	}
 
 	rx2ig_insert_next++
@@ -1647,16 +1633,14 @@ func rx_to_ig_allow(pp *packet_t) bool {
 	var now = time.Now()
 
 	if s_debug >= 2 {
-		var src [AX25_MAX_ADDR_LEN]C.char
-		var dest [AX25_MAX_ADDR_LEN]C.char
 		var pinfo *C.uchar
 
-		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 		ax25_get_info(pp, &pinfo)
 
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, C.GoString(&src[0]), C.GoString(&dest[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 	}
 
 	// Do we have duplicate checking at all in the RF>IS direction?
@@ -1908,12 +1892,10 @@ func ig_to_tx_remember(pp *packet_t, channel int, bydigi int) {
 	var crc = ax25_dedupe_crc(pp)
 
 	if s_debug >= 3 {
-		var src [AX25_MAX_ADDR_LEN]C.char
-		var dest [AX25_MAX_ADDR_LEN]C.char
 		var pinfo *C.uchar
 
-		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 		ax25_get_info(pp, &pinfo)
 
 		text_color_set(DW_COLOR_DEBUG)
@@ -1921,7 +1903,7 @@ func ig_to_tx_remember(pp *packet_t, channel int, bydigi int) {
 			ig2tx_insert_next,
 			channel, bydigi,
 			now.String(), crc,
-			C.GoString(&src[0]), C.GoString(&dest[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+			src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 	}
 
 	ig2tx_time_stamp[ig2tx_insert_next] = now
@@ -1943,14 +1925,11 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	ax25_get_info(pp, &pinfo)
 
 	if s_debug >= 2 {
-		var src [AX25_MAX_ADDR_LEN]C.char
-		var dest [AX25_MAX_ADDR_LEN]C.char
-
-		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src[0])
-		ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, C.GoString(&src[0]), C.GoString(&dest[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 	}
 
 	/* Consider transmissions on this channel only by either digi or IGate. */

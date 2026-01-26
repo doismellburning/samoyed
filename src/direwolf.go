@@ -830,8 +830,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		}
 	}
 
-	var stemp [500]C.char
-	ax25_format_addrs(pp, &stemp[0])
+	var stemp = ax25_format_addrs(pp)
 
 	var pinfo *C.uchar
 	var info_len = ax25_get_info(pp, &pinfo)
@@ -841,14 +840,14 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	/* Display audio input level. */
 	/* Who are we hearing?   Original station or digipeater. */
 
-	var h C.int
-	var heard [AX25_MAX_ADDR_LEN]C.char
+	var h int
+	var heard string
 	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = ax25_get_heard(pp)
-		ax25_get_addr_with_ssid(pp, h, &heard[0])
+		h = int(ax25_get_heard(pp))
+		heard = ax25_get_addr_with_ssid(pp, h)
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -880,28 +879,26 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 			/* WIDEn-0, it is quite likely (but not guaranteed), that */
 			/* we are actually hearing the preceding station in the path. */
 
-			var _heard = C.GoString(&heard[0]) // TODO Quick convenience hack
 			if h >= AX25_REPEATER_2 &&
-				strings.EqualFold(_heard[:4], "WIDE") &&
-				unicode.IsDigit(rune(_heard[4])) &&
-				len(_heard) == 5 {
-				var probably_really [AX25_MAX_ADDR_LEN]C.char
-				ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
+				strings.EqualFold(heard[:4], "WIDE") &&
+				unicode.IsDigit(rune(heard[4])) &&
+				len(heard) == 5 {
+				var probably_really = ax25_get_addr_with_ssid(pp, h-1)
 
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", _heard, C.GoString(&probably_really[0]), C.GoString(&alevel_text[0]), display_retries, spectrum)
+					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, C.GoString(&alevel_text[0]), display_retries, spectrum)
 				} else {
-					dw_printf("%s (probably %s)\n", _heard, C.GoString(&probably_really[0]))
+					dw_printf("%s (probably %s)\n", heard, probably_really)
 				}
-			} else if _heard == "DTMF" {
-				dw_printf("%s audio level = %s  tt\n", _heard, C.GoString(&alevel_text[0]))
+			} else if heard == "DTMF" {
+				dw_printf("%s audio level = %s  tt\n", heard, C.GoString(&alevel_text[0]))
 			} else {
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s audio level = %s  %s  %s\n", _heard, C.GoString(&alevel_text[0]), display_retries, spectrum)
+					dw_printf("%s audio level = %s  %s  %s\n", heard, C.GoString(&alevel_text[0]), display_retries, spectrum)
 				} else {
-					dw_printf("%s\n", _heard)
+					dw_printf("%s\n", heard)
 				}
 			}
 		}
@@ -965,7 +962,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		}
 	}
 
-	dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+	dw_printf("%s", stemp) /* stations followed by : */
 
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 

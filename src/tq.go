@@ -195,8 +195,8 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 			ts = " " + formattedTime // space after channel.
 		}
 
-		var stemp [256]C.char // Formated addresses.
-		ax25_format_addrs(pp, &stemp[0])
+		// Formated addresses.
+		var stemp = ax25_format_addrs(pp)
 		var pinfo *C.uchar
 		var info_len = ax25_get_info(pp, &pinfo)
 		text_color_set(DW_COLOR_XMIT)
@@ -204,14 +204,14 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
 
 			dw_printf("[%d>is%s] ", channel, ts)
-			dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			igate_send_rec_packet(int(channel), pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
-			dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 			dw_printf("\n")
 
@@ -914,8 +914,7 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 			var count_it C.int = 1
 
 			if source != nil && *source != 0 {
-				var frame_source [AX25_MAX_ADDR_LEN]C.char
-				ax25_get_addr_with_ssid(pp, AX25_SOURCE, &frame_source[0])
+				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 				/* TODO KG
 				#if DEBUG2
 					// I'm cringing at the thought of printing while in a critical region.  But it's only for temp debug.  :-(
@@ -923,13 +922,12 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 					    dw_printf ("tq_count: compare to frame source %s\n", frame_source);
 				#endif
 				*/
-				if C.strcmp(source, &frame_source[0]) != 0 {
+				if C.strcmp(source, C.CString(frame_source)) != 0 {
 					count_it = 0
 				}
 			}
 			if count_it > 0 && dest != nil && *dest != 0 {
-				var frame_dest [AX25_MAX_ADDR_LEN]C.char
-				ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &frame_dest[0])
+				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 				/* TODO KG
 				#if DEBUG2
 					// I'm cringing at the thought of printing while in a critical region.  But it's only for debug debug.  :-(
@@ -937,7 +935,7 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 					    dw_printf ("tq_count: compare to frame destination %s\n", frame_dest);
 				#endif
 				*/
-				if C.strcmp(dest, &frame_dest[0]) != 0 {
+				if C.strcmp(dest, C.CString(frame_dest)) != 0 {
 					count_it = 0
 				}
 			}

@@ -315,8 +315,8 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 			return
 		} else {
 			C.strcpy(&A.g_data_type_desc[0], C.CString("Third Party Header: Unable to parse payload."))
-			ax25_get_addr_with_ssid(pp, AX25_SOURCE, &A.g_src[0])
-			ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &A.g_dest[0])
+			C.strcpy(&A.g_src[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_SOURCE)))
+			C.strcpy(&A.g_dest[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_DESTINATION)))
 		}
 	}
 
@@ -326,9 +326,9 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 	if third_party_src != nil {
 		C.strcpy(&A.g_src[0], third_party_src)
 	} else {
-		ax25_get_addr_with_ssid(pp, AX25_SOURCE, &A.g_src[0])
+		C.strcpy(&A.g_src[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_SOURCE)))
 	}
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &A.g_dest[0])
+	C.strcpy(&A.g_dest[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_DESTINATION)))
 
 	//dw_printf ("DEBUG decode_aprs source=%s, dest=%s\n", A.g_src, A.g_dest);
 
@@ -1285,7 +1285,7 @@ MIC-E, JEEP, In Service
 
 */
 
-func mic_e_digit(A *decode_aprs_t, c C.char, mask int, std_msg *int, cust_msg *int) int {
+func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int) int {
 
 	if c >= '0' && c <= '9' {
 		return int(c - '0')
@@ -1353,8 +1353,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	/* Destination is really latitude of form ddmmhh. */
 	/* Message codes are buried in the first 3 digits. */
 
-	var dest [12]C.char
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dest[0])
+	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 	var std_msg = 0
 	var cust_msg = 0

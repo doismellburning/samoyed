@@ -171,15 +171,14 @@ func DecodeAPRSLine(line string) {
 
 		var pp = ax25_from_frame((*C.uchar)(C.CBytes(bytes)), C.int(len(bytes)), alevel)
 		if pp != nil {
-			var addrs [120]C.char
 			var pinfo *C.uchar
 
 			fmt.Printf("--- AX.25 frame ---\n")
 			ax25_hex_dump(pp)
 			fmt.Printf("-------------------\n")
 
-			ax25_format_addrs(pp, &addrs[0])
-			fmt.Printf("%s", C.GoString(&addrs[0]))
+			var addrs = ax25_format_addrs(pp)
+			fmt.Printf("%s", addrs)
 
 			var info_len = ax25_get_info(pp, &pinfo)
 			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1) // Display non-ASCII to hexadecimal.

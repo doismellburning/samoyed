@@ -354,11 +354,10 @@ func test_example_headers(t *testing.T) {
 	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	var dst_addr [AX25_MAX_ADDR_LEN]C.char
-	var src_addr [AX25_MAX_ADDR_LEN]C.char
-
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst_addr[0])
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src_addr[0])
+	/*
+		var dst_addr = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	*/
 
 	var cr cmdres_t // command or response.
 	var description [64]C.char
@@ -436,8 +435,10 @@ func test_example_headers(t *testing.T) {
 	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst_addr[0])
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src_addr[0])
+	/*
+		var dst_addr = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	*/
 
 	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type
@@ -516,8 +517,10 @@ func test_example_headers(t *testing.T) {
 	pp = il2p_decode_header_type_1(&header[0], 0)
 	assert.NotNil(t, pp)
 
-	ax25_get_addr_with_ssid(pp, AX25_DESTINATION, &dst_addr[0])
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &src_addr[0])
+	/*
+		var dst_addr = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+		var src_addr = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	*/
 
 	frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
 	_ = frame_type
