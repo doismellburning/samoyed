@@ -109,13 +109,12 @@ func TTCalcMain() {
 			var alevel alevel_t
 			var pp = ax25_from_frame((*C.uchar)(&data[1]), C.int(mon_cmd.DataLen-1), alevel)
 
-			var result [400]C.char
-			ax25_format_addrs(pp, &result[0])
+			var result = ax25_format_addrs(pp)
 
 			var pinfo *C.uchar
 			ax25_get_info(pp, &pinfo)
 
-			fmt.Printf("[%d] %s%s\n", channel, C.GoString(&result[0]), C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+			fmt.Printf("[%d] %s%s\n", channel, result, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
 			/*
 			 * Look for Special touch tone packet with "t" in first position of the Information part.

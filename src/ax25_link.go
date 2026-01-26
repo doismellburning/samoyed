@@ -1978,13 +1978,13 @@ func lm_data_indication(E *dlq_item_t) {
 		return
 	}
 
-	E.num_addr = ax25_get_num_addr(E.pp)
+	E.num_addr = C.int(ax25_get_num_addr(E.pp))
 
 	// Digipeating is not done here so consider only those with no unused digipeater addresses.
 
 	var any_unused_digi = false
 
-	for n := C.int(AX25_REPEATER_1); n < E.num_addr; n++ {
+	for n := AX25_REPEATER_1; C.int(n) < E.num_addr; n++ {
 		if ax25_get_h(E.pp, n) == 0 {
 			any_unused_digi = true
 		}
@@ -2000,8 +2000,8 @@ func lm_data_indication(E *dlq_item_t) {
 
 	// Copy addresses from frame into event structure.
 
-	for n := C.int(0); n < E.num_addr; n++ {
-		ax25_get_addr_with_ssid(E.pp, n, &E.addrs[n][0])
+	for n := 0; C.int(n) < E.num_addr; n++ {
+		C.strcpy(&E.addrs[n][0], C.CString(ax25_get_addr_with_ssid(E.pp, n)))
 	}
 
 	if s_debug_radio {

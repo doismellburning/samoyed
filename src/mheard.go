@@ -216,9 +216,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 
 	var now = time.Now()
 
-	var _source [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, AX25_SOURCE, &_source[0])
-	var source = C.GoString(&_source[0])
+	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
 	/*
 	 * How many digipeaters has it gone thru before we hear it?
@@ -265,8 +263,8 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 			var _digi [AX25_MAX_ADDR_LEN]C.char
 			ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k, &_digi[0])
 			var digi = C.GoString(&_digi[0])
-			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+k)
-			var used = ax25_get_h(pp, AX25_REPEATER_1+k)
+			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+int(k))
+			var used = ax25_get_h(pp, AX25_REPEATER_1+int(k))
 
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Examining %s-%d  used=%d.\n", digi, ssid, used);

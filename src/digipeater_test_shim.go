@@ -42,15 +42,14 @@ func digipeater_test(t *testing.T, in, out string) {
 	var pp = ax25_from_text(in, true)
 	assert.NotNil(t, pp)
 
-	var rec [256]C.char
 	var pinfo *C.uchar
-	ax25_format_addrs(pp, &rec[0])
+	var rec = ax25_format_addrs(pp)
 	ax25_get_info(pp, &pinfo)
-	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
+	rec += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
 
-	if in != C.GoString(&rec[0]) {
+	if in != rec {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text/internal/text error-1 %s -> %s\n", in, C.GoString(&rec[0]))
+		dw_printf("Text/internal/text error-1 %s -> %s\n", in, rec)
 	}
 
 	/*
@@ -69,16 +68,16 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	pp = ax25_from_frame(&frame[0], frame_len, alevel)
 	assert.NotNil(t, pp)
-	ax25_format_addrs(pp, &rec[0])
+	rec = ax25_format_addrs(pp)
 	ax25_get_info(pp, &pinfo)
-	C.strcat(&rec[0], (*C.char)(unsafe.Pointer(pinfo)))
+	rec += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
 
-	if in != C.GoString(&rec[0]) {
+	if in != rec {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf(
 			"internal/frame/internal/text error-2 %s -> %s\n",
 			in,
-			C.GoString(&rec[0]),
+			rec,
 		)
 	}
 
@@ -87,27 +86,25 @@ func digipeater_test(t *testing.T, in, out string) {
 	 */
 
 	text_color_set(DW_COLOR_REC)
-	dw_printf("Rec\t%s\n", C.GoString(&rec[0]))
+	dw_printf("Rec\t%s\n", rec)
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
 	var result = digipeat_match(0, pp, digipeaterTestMyCall, digipeaterTestMyCall, digipeaterTestAliasRegexp, digipeaterTestWideRegexp, 0, preempt, digipeaterTestConfigATGP, "")
 
-	var xmit [256]C.char
+	var xmit string
 	if result != nil {
 		dedupe_remember(result, 0)
-		ax25_format_addrs(result, &xmit[0])
+		xmit = ax25_format_addrs(result)
 		ax25_get_info(result, &pinfo)
-		C.strcat(&xmit[0], (*C.char)(unsafe.Pointer(pinfo)))
+		xmit += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
 		ax25_delete(result)
-	} else {
-		C.strcpy(&xmit[0], C.CString(""))
 	}
 
 	text_color_set(DW_COLOR_XMIT)
-	dw_printf("Xmit\t%s\n", C.GoString(&xmit[0]))
+	dw_printf("Xmit\t%s\n", xmit)
 
-	if !assert.Equal(t, out, C.GoString(&xmit[0])) { //nolint:testifylint
+	if !assert.Equal(t, out, xmit) { //nolint:testifylint
 		digipeaterTestFailed++
 	}
 

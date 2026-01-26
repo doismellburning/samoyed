@@ -652,8 +652,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 		dcd_missing_errors++
 	}
 
-	var stemp [500]C.char
-	ax25_format_addrs(pp, &stemp[0])
+	var stemp = ax25_format_addrs(pp)
 
 	var pinfo *C.uchar
 	var info_len = ax25_get_info(pp, &pinfo)
@@ -665,16 +664,14 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 	/* Display audio input level. */
 	/* Who are we hearing?   Original station or digipeater? */
 
-	var h C.int
+	var h int
 	var heard string
 	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
 	} else {
-		h = ax25_get_heard(pp)
-		var _heard [2*AX25_MAX_ADDR_LEN + 20]C.char
-		ax25_get_addr_with_ssid(pp, h, &_heard[0])
-		heard = C.GoString(&_heard[0])
+		h = int(ax25_get_heard(pp))
+		heard = ax25_get_addr_with_ssid(pp, h)
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
@@ -705,10 +702,9 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 		unicode.IsDigit(rune(heard[4])) &&
 		len(heard) == 5 {
 
-		var probably_really [AX25_MAX_ADDR_LEN]C.char
-		ax25_get_addr_with_ssid(pp, h-1, &probably_really[0])
+		var probably_really = ax25_get_addr_with_ssid(pp, h-1)
 
-		heard += " (probably " + C.GoString(&probably_really[0]) + ")"
+		heard += " (probably " + probably_really + ")"
 	}
 
 	switch fec_type {
@@ -747,7 +743,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 		dw_printf("[%d] ", channel)
 	}
 
-	dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+	dw_printf("%s", stemp) /* stations followed by : */
 	ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
 	dw_printf("\n")
 

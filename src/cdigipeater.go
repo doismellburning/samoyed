@@ -247,9 +247,7 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec string, mycall_xm
 		return (nil) // Nothing to do.
 	}
 
-	var _repeater [AX25_MAX_ADDR_LEN]C.char
-	ax25_get_addr_with_ssid(pp, r, &_repeater[0])
-	var repeater = C.GoString(&_repeater[0])
+	var repeater = ax25_get_addr_with_ssid(pp, int(r))
 
 	/*
 	 * First check for explicit use of my call.
@@ -264,7 +262,7 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec string, mycall_xm
 
 		/* If using multiple radio channels, they could have different calls. */
 
-		ax25_set_addr(result, r, C.CString(mycall_xmit))
+		ax25_set_addr(result, int(r), mycall_xmit)
 		ax25_set_h(result, r)
 		return (result)
 	}
@@ -279,7 +277,7 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec string, mycall_xm
 				panic("assert (result != nil)")
 			}
 
-			ax25_set_addr(result, r, C.CString(mycall_xmit))
+			ax25_set_addr(result, int(r), mycall_xmit)
 			ax25_set_h(result, r)
 			return (result)
 		}

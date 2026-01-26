@@ -429,7 +429,7 @@ func xmit_thread(channel C.int) {
 
 					case FLAVOR_MORSE:
 						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
-						var wpm C.int = MORSE_DEFAULT_WPM
+						var wpm = MORSE_DEFAULT_WPM
 						if ssid > 0 {
 							wpm = ssid * 2
 						}
@@ -444,7 +444,7 @@ func xmit_thread(channel C.int) {
 							//dw_printf ("APRStt morse xmit delay hack...\n");
 							SLEEP_MS(700)
 						}
-						xmit_morse(channel, pp, wpm)
+						xmit_morse(channel, pp, C.int(wpm))
 
 					case FLAVOR_DTMF:
 						var speed = ax25_get_ssid(pp, AX25_DESTINATION)
@@ -455,7 +455,7 @@ func xmit_thread(channel C.int) {
 							speed = 10
 						}
 
-						xmit_dtmf(channel, pp, speed)
+						xmit_dtmf(channel, pp, C.int(speed))
 
 					case FLAVOR_APRS_DIGI:
 						xmit_ax25_frames(channel, prio, pp, 1) /* 1 means don't bundle */
@@ -481,8 +481,7 @@ func xmit_thread(channel C.int) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
 
-					var stemp [1024]C.char /* max size needed? */
-					ax25_format_addrs(pp, &stemp[0])
+					var stemp = ax25_format_addrs(pp)
 
 					var pinfo *C.uchar
 					var info_len = ax25_get_info(pp, &pinfo)
@@ -490,7 +489,7 @@ func xmit_thread(channel C.int) {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
-					dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+					dw_printf("%s", stemp) /* stations followed by : */
 					ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1-ax25_is_aprs(pp))
 					dw_printf("\n")
 					ax25_delete(pp)
@@ -834,8 +833,7 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 
 	var ts = timestampPrefix()
 
-	var stemp [1024]C.char
-	ax25_format_addrs(pp, &stemp[0])
+	var stemp = ax25_format_addrs(pp)
 
 	var pinfo *C.uchar
 	var info_len = ax25_get_info(pp, &pinfo)
@@ -851,7 +849,7 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 	*/
 	dw_printf("[%d%c%s] ", c, priorityToRune(p), ts)
 	/* #endif */
-	dw_printf("%s", C.GoString(&stemp[0])) /* stations followed by : */
+	dw_printf("%s", stemp) /* stations followed by : */
 
 	/* Demystify non-APRS.  Use same format for received frames in direwolf.c. */
 

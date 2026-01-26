@@ -804,7 +804,7 @@ func send_packet(str string) {
 			repeat = 1
 		}
 
-		eas_send(0, pinfo, repeat, 500, 500)
+		eas_send(0, pinfo, C.int(repeat), 500, 500)
 		ax25_delete(pp)
 	} else {
 		var pp = ax25_from_text(str, true)

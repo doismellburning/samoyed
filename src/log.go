@@ -247,26 +247,21 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 		/* Similar code in direwolf.c.  Combine into one function? */
 
 		var heard = ""
-		var h C.int
+		var h int
 		if pp != nil {
 			if ax25_get_num_addr(pp) == 0 {
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = ax25_get_heard(pp)
-				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
-				ax25_get_addr_with_ssid(pp, h, &_heard[0])
-				heard = C.GoString(&_heard[0])
+				h = int(ax25_get_heard(pp))
+				heard = ax25_get_addr_with_ssid(pp, h)
 			}
 
 			if h >= AX25_REPEATER_2 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) &&
 				len(heard) == 5 {
-				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
-				ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
-				heard = C.GoString(&_heard[0])
-				heard += "?"
+				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
 			}
 		}
 
@@ -377,25 +372,20 @@ func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic
 		var heard = ""
 
 		if pp != nil {
-			var h C.int
+			var h int
 			if ax25_get_num_addr(pp) == 0 {
 				/* Not AX.25. No station to display below. */
 				h = -1
 			} else {
-				h = ax25_get_heard(pp)
-				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
-				ax25_get_addr_with_ssid(pp, h, &_heard[0])
-				heard = C.GoString(&_heard[0])
+				h = int(ax25_get_heard(pp))
+				heard = ax25_get_addr_with_ssid(pp, h)
 			}
 
 			if h >= AX25_REPEATER_2 &&
 				heard[:4] == "WIDE" &&
 				unicode.IsDigit(rune(heard[4])) &&
 				len(heard) == 5 {
-				var _heard [AX25_MAX_ADDR_LEN + 1]C.char
-				ax25_get_addr_with_ssid(pp, h-1, &_heard[0])
-				heard = C.GoString(&_heard[0])
-				heard += "?"
+				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
 			}
 
 			var src_c = ax25_get_h(pp, AX25_SOURCE)
