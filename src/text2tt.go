@@ -43,38 +43,36 @@ func Text2TTMain() {
 }
 
 func Text2TT(args []string) {
-	var goText = strings.Join(args, " ")
-	var text = C.CString(goText)
-	var _buttons [2000]C.char
-	var buttons = &_buttons[0]
-	var n C.int
+	var text = strings.Join(args, " ")
+	var buttons string
+	var errs int
 	var cs int
 
 	fmt.Printf("Push buttons for multi-press method:\n")
-	tt_text_to_multipress(text, 0, buttons)
-	cs = checksum(C.GoString(buttons))
-	fmt.Printf("\"%s\"    checksum for call = %d\n", C.GoString(buttons), cs)
+	buttons, _ = tt_text_to_multipress(text, false)
+	cs = checksum(buttons)
+	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
 	fmt.Printf("Push buttons for two-key method:\n")
-	tt_text_to_two_key(text, 0, buttons)
-	cs = checksum(C.GoString(buttons))
-	fmt.Printf("\"%s\"    checksum for call = %d\n", C.GoString(buttons), cs)
+	buttons, _ = tt_text_to_two_key(text, false)
+	cs = checksum(buttons)
+	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
-	n = tt_text_to_call10(text, 1, buttons)
-	if n == 0 {
+	buttons, errs = tt_text_to_call10(text, true)
+	if errs == 0 {
 		fmt.Printf("Push buttons for fixed length 10 digit callsign:\n")
-		fmt.Printf("\"%s\"\n", C.GoString(buttons))
+		fmt.Printf("\"%s\"\n", buttons)
 	}
 
-	n = tt_text_to_mhead(text, 1, buttons, C.ulong(len(_buttons)))
-	if n == 0 {
+	buttons, errs = tt_text_to_mhead(text, true)
+	if errs == 0 {
 		fmt.Printf("Push buttons for Maidenhead Grid Square Locator:\n")
-		fmt.Printf("\"%s\"\n", C.GoString(buttons))
+		fmt.Printf("\"%s\"\n", buttons)
 	}
 
-	n = tt_text_to_satsq(text, 1, buttons, C.ulong(len(_buttons)))
-	if n == 0 {
+	buttons, errs = tt_text_to_satsq(text, true)
+	if errs == 0 {
 		fmt.Printf("Push buttons for satellite gridsquare:\n")
-		fmt.Printf("\"%s\"\n", C.GoString(buttons))
+		fmt.Printf("\"%s\"\n", buttons)
 	}
 }

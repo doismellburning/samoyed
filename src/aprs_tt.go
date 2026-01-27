@@ -780,9 +780,11 @@ func parse_callsign(e string) int {
 
 		if length == 7 {
 			var tttemp = string(e[length-3]) + string(e[length-2])
-			var stemp [30]C.char
 
-			tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
+			var stemp, errs = tt_two_key_to_text(tttemp, false)
+			if errs != 0 {
+				stemp = "\000"
+			}
 
 			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
@@ -816,13 +818,11 @@ func parse_callsign(e string) int {
 
 		if unicode.IsUpper(rune(e[length-2])) {
 			var tttemp = e[1 : length-3]
-			var _m_callsign [30]C.char
-			tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
-			m_callsign = C.GoString(&_m_callsign[0])
+
+			m_callsign, _ = tt_two_key_to_text(tttemp, false)
 
 			tttemp = string(e[length-3]) + string(e[length-2])
-			var stemp [30]C.char
-			tt_two_key_to_text(C.CString(tttemp), 0, &stemp[0])
+			var stemp, _ = tt_two_key_to_text(tttemp, false)
 
 			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
@@ -834,9 +834,7 @@ func parse_callsign(e string) int {
 			}
 		} else {
 			var tttemp = e[1 : length-2]
-			var _m_callsign [30]C.char
-			tt_two_key_to_text(C.CString(tttemp), 0, &_m_callsign[0])
-			m_callsign = C.GoString(&_m_callsign[0])
+			m_callsign, _ = tt_two_key_to_text(tttemp, false)
 
 			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(e[length-2])
@@ -893,9 +891,9 @@ func parse_object_name(e string) int {
 	 */
 
 	if length >= 2+1 && length <= 30 {
-		var _m_callsign [30]C.char
-		if tt_two_key_to_text(C.CString(e[2:]), 0, &_m_callsign[0]) == 0 {
-			m_callsign = C.GoString(&_m_callsign[0])
+		var _m_callsign, errors = tt_two_key_to_text(e[2:], false)
+		if errors == 0 {
+			m_callsign = _m_callsign
 			if len(m_callsign) > 9 {
 				m_callsign = m_callsign[:9]
 			}
@@ -994,8 +992,8 @@ func parse_symbol(e string) int {
 
 		case '0':
 			if length >= 6 {
-				var stemp [30]C.char
-				if tt_two_key_to_text(C.CString(e[5:]), 0, &stemp[0]) == 0 {
+				var stemp, errors = tt_two_key_to_text(e[5:], false)
+				if errors == 0 {
 					m_symbol_code = rune(32 + nn)
 					m_symtab_or_overlay = rune(stemp[0])
 					if tt_debug > 0 {
@@ -1049,33 +1047,32 @@ func parse_aprstt3_call(e string) int {
 	}
 
 	if len(e) == 2+10 {
-		var call [12]C.char
+		var call, errors = tt_call10_to_text(e[2:], true)
 
-		if tt_call10_to_text(C.CString(e[2:]), 1, &call[0]) == 0 {
-			m_callsign = C.GoString(&call[0])
+		if errors == 0 {
+			m_callsign = call
 		} else {
 			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
 		}
 	} else if len(e) == 2+5 {
-		var suffix [8]C.char
-		if tt_call5_suffix_to_text(C.CString(e[2:]), 1, &suffix[0]) == 0 {
+		var suffix, errs = tt_call5_suffix_to_text(e[2:], true)
+		if errs == 0 {
 			if running_TT_MAIN_tests {
 				/* For unit test, use suffix rather than trying lookup. */
-				m_callsign = C.GoString(&suffix[0])
+				m_callsign = suffix
 			} else {
-				var _suffix = C.GoString(&suffix[0])
-				var _call, _idx = tt_3char_suffix_search(_suffix)
+				var _call, _idx = tt_3char_suffix_search(suffix)
 
 				/* In normal operation, try to find full callsign for the suffix received. */
 
 				if _idx >= 0 {
 					text_color_set(DW_COLOR_INFO)
-					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", _suffix, _call)
+					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, _call)
 
 					m_callsign = _call
 				} else {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", _suffix)
+					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
 					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
 				}
 			}
@@ -1361,12 +1358,12 @@ func parse_location(e string) int {
 			// text_color_set(DW_COLOR_DEBUG);
 			// dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
 
-			var mh [20]C.char
-			if tt_mhead_to_text(C.CString(stemp), 0, &mh[0], C.ulong(len(mh))) == 0 {
+			var mh, errs = tt_mhead_to_text(stemp, false)
+			if errs == 0 {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
 
-				m_loc_text = C.GoString(&mh[0])
+				m_loc_text = mh
 
 				var lat, lon, err = ll_from_grid_square(m_loc_text)
 				if err == nil {
@@ -1388,9 +1385,9 @@ func parse_location(e string) int {
 
 			/* Convert 4 digits to usual AA99 form, then to location. */
 
-			var mh [20]C.char
-			if tt_satsq_to_text(C.CString(xstr), 0, &mh[0]) == 0 {
-				m_loc_text = C.GoString(&mh[0])
+			var mh, errs = tt_satsq_to_text(xstr, false)
+			if errs == 0 {
+				m_loc_text = mh
 
 				var lat, lon, err = ll_from_grid_square(m_loc_text)
 				if err == nil {
@@ -1562,9 +1559,7 @@ func parse_comment(e string) int {
 	var length = len(e)
 
 	if e[1] == 'A' {
-		var _m_comment [200]C.char
-		tt_ascii2d_to_text(C.CString(e[2:]), 0, &_m_comment[0])
-		m_comment = C.GoString(&_m_comment[0])
+		m_comment, _ = tt_ascii2d_to_text(e[2:], false)
 
 		return (0)
 	}
@@ -1585,9 +1580,7 @@ func parse_comment(e string) int {
 		return (0)
 	}
 
-	var _m_comment [200]C.char
-	tt_multipress_to_text(C.CString(e[1:]), 0, &_m_comment[0])
-	m_comment = C.GoString(&_m_comment[0])
+	m_comment, _ = tt_multipress_to_text(e[1:], false)
 
 	return (0)
 }

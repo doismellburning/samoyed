@@ -333,9 +333,7 @@ func corral_slot() int {
 func digit_suffix(callsign string) string {
 	var suffix = []byte{'0', '0', '0'}
 
-	var _two_key [50]C.char
-	tt_text_to_two_key(C.CString(callsign), 0, &_two_key[0])
-	var two_key = C.GoString(&_two_key[0])
+	var two_key, _ = tt_text_to_two_key(callsign, false)
 
 	for _, t := range two_key {
 		if unicode.IsDigit(t) {

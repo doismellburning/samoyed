@@ -26,8 +26,7 @@ func TT2TextMain() {
 	TT2Text(goButtons)
 }
 
-func TT2Text(goButtons string) {
-	var buttons = C.CString(goButtons)
+func TT2Text(buttons string) {
 
 	switch tt_guess_type(buttons) {
 	case TT_MULTIPRESS:
@@ -38,33 +37,32 @@ func TT2Text(goButtons string) {
 		fmt.Printf("Could be either type of encoding.\n")
 	}
 
-	var _text [1000]C.char
-	var text = &_text[0]
-	var n C.int
+	var text string
+	var errs int
 
 	fmt.Printf("Decoded text from multi-press method:\n")
-	tt_multipress_to_text(buttons, 0, text)
-	fmt.Printf("\"%s\"\n", C.GoString(text))
+	text, _ = tt_multipress_to_text(buttons, false)
+	fmt.Printf("\"%s\"\n", text)
 
 	fmt.Printf("Decoded text from two-key method:\n")
-	tt_two_key_to_text(buttons, 0, text)
-	fmt.Printf("\"%s\"\n", C.GoString(text))
+	text, _ = tt_two_key_to_text(buttons, false)
+	fmt.Printf("\"%s\"\n", text)
 
-	n = tt_call10_to_text(buttons, 1, text)
-	if n == 0 {
+	text, errs = tt_call10_to_text(buttons, true)
+	if errs == 0 {
 		fmt.Printf("Decoded callsign from 10 digit method:\n")
-		fmt.Printf("\"%s\"\n", C.GoString(text))
+		fmt.Printf("\"%s\"\n", text)
 	}
 
-	n = tt_mhead_to_text(buttons, 1, text, C.ulong(len(_text)))
-	if n == 0 {
+	text, errs = tt_mhead_to_text(buttons, true)
+	if errs == 0 {
 		fmt.Printf("Decoded Maidenhead Locator from DTMF digits:\n")
-		fmt.Printf("\"%s\"\n", C.GoString(text))
+		fmt.Printf("\"%s\"\n", text)
 	}
 
-	n = tt_satsq_to_text(buttons, 1, text)
-	if n == 0 {
+	text, errs = tt_satsq_to_text(buttons, true)
+	if errs == 0 {
 		fmt.Printf("Decoded satellite gridsquare from 4 DTMF digits:\n")
-		fmt.Printf("\"%s\"\n", C.GoString(text))
+		fmt.Printf("\"%s\"\n", text)
 	}
 }
