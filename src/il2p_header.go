@@ -256,12 +256,7 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	var x = (*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12))
 	*x = C.uchar((dst_ssid << 4) | src_ssid)
 
-	var cr cmdres_t // command or response.
-	var description [64]C.char
-	var pf C.int     // Poll/Final.
-	var nr, ns C.int // Sequence numbers.
-
-	var frame_type = ax25_frame_type(pp, &cr, &description[0], &pf, &nr, &ns)
+	var cr, _, pf, nr, ns, frame_type = ax25_frame_type(pp)
 
 	//dw_printf ("%s(): %s-%d>%s-%d: %s\n", __func__, src_addr, src_ssid, dst_addr, dst_ssid, description);
 
@@ -282,7 +277,7 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 
 		SET_UI(hdr, 0)
 		SET_PID(hdr, 0)
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((IfThenElse((cr == cr_cmd), C.int(1), C.int(0)))|(IfThenElse((cr == cr_11), C.int(1), C.int(0))))<<2))
+		SET_CONTROL(hdr, C.int(pf<<6)|C.int(nr<<3)|(((IfThenElse((cr == cr_cmd), C.int(1), C.int(0)))|(IfThenElse((cr == cr_11), C.int(1), C.int(0))))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -344,7 +339,7 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 		// same bits.  We see this in the second example in the protocol spec.
 		// The original UI frame has both C bits of 0 so it is received as a response.
 
-		SET_CONTROL(hdr, (pf<<6)|(((IfThenElse((cr == cr_cmd), C.int(1), C.int(0)))|(IfThenElse((cr == cr_11), C.int(1), C.int(0))))<<2))
+		SET_CONTROL(hdr, C.int(pf<<6)|(((IfThenElse((cr == cr_cmd), C.int(1), C.int(0)))|(IfThenElse((cr == cr_11), C.int(1), C.int(0))))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -380,7 +375,7 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 		}
 		SET_PID(hdr, pid2)
 
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|ns)
+		SET_CONTROL(hdr, C.int((pf<<6)|(nr<<3)|ns))
 
 	default:
 		// case frame_type_U_SABME:		// Set Async Balanced Mode, Extended
@@ -552,8 +547,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 			ftype = frame_type_S_SREJ
 		}
 		var modulo = modulo_8
-		var nr = (control >> 3) & 0x07
-		var pf = (control >> 6) & 0x01
+		var nr = int(control>>3) & 0x07
+		var pf = int(control>>6) & 0x01
 		var pinfo *C.uchar // Any info for SREJ will be added later.
 		var info_len C.int = 0
 		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo, info_len))
@@ -564,7 +559,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
-		var axpid C.int = 0 // unused for U other than UI.
+		var axpid = 0 // unused for U other than UI.
 		var ftype ax25_frame_type_t
 		switch (control >> 3) & 0x7 {
 		case 0:
@@ -586,7 +581,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		default:
 			ftype = frame_type_U_TEST
 		}
-		var pf = (control >> 6) & 0x01
+		var pf = int(control>>6) & 0x01
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
 		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo, info_len))
@@ -598,11 +593,11 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var ftype = frame_type_U_UI
-		var pf = (control >> 6) & 0x01
+		var pf = int(control>>6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
-		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo, info_len))
+		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, int(axpid), pinfo, info_len))
 	} else {
 
 		// 'I' frame.
@@ -610,14 +605,14 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 
 		var control = GET_CONTROL(hdr)
 		var cr = cr_cmd // Always command.
-		var pf = (control >> 6) & 0x01
-		var nr = (control >> 3) & 0x7
-		var ns = control & 0x7
+		var pf = int(control>>6) & 0x01
+		var nr = int(control>>3) & 0x7
+		var ns = int(control & 0x7)
 		var modulo = modulo_8
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
 		var info_len C.int = 0
-		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo, info_len))
+		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, int(axpid), pinfo, info_len))
 	}
 } // end
 

@@ -26,7 +26,7 @@ import (
 func ax25_pad2_test_main(t *testing.T) {
 	t.Helper()
 
-	var pid C.int = 0xf0
+	var pid int = 0xf0
 	var pinfo *C.uchar
 	var info_len C.int
 
@@ -38,7 +38,7 @@ func ax25_pad2_test_main(t *testing.T) {
 	/* U frame */
 
 	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
-		for pf := C.int(0); pf <= 1; pf++ {
+		for pf := 0; pf <= 1; pf++ {
 			var cmin cmdres_t = 0
 			var cmax cmdres_t = 0
 
@@ -94,9 +94,9 @@ func ax25_pad2_test_main(t *testing.T) {
 	num_addr = 3
 
 	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
-		for pf := C.int(0); pf <= 1; pf++ {
+		for pf := 0; pf <= 1; pf++ {
 			var modulo = modulo_8
-			var nr = C.int(modulo/2 + 1)
+			var nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= 1; cr++ {
 				text_color_set(DW_COLOR_INFO)
@@ -110,7 +110,7 @@ func ax25_pad2_test_main(t *testing.T) {
 			}
 
 			modulo = modulo_128
-			nr = C.int(modulo/2 + 1)
+			nr = int(modulo/2 + 1)
 
 			for cr := cmdres_t(0); cr <= 1; cr++ {
 				text_color_set(DW_COLOR_INFO)
@@ -130,9 +130,9 @@ func ax25_pad2_test_main(t *testing.T) {
 	var srej_info = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
 	var ftype ax25_frame_type_t = frame_type_S_SREJ
-	for pf := C.int(0); pf <= 1; pf++ {
+	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_128
-		var nr C.int = 127
+		var nr = 127
 		var cr cmdres_t = cr_res
 
 		text_color_set(DW_COLOR_INFO)
@@ -152,10 +152,10 @@ func ax25_pad2_test_main(t *testing.T) {
 	pinfo = (*C.uchar)(unsafe.Pointer(C.strdup(C.CString("The rain in Spain stays mainly on the plain."))))
 	info_len = C.int(C.strlen((*C.char)(unsafe.Pointer(pinfo))))
 
-	for pf := C.int(0); pf <= 1; pf++ {
+	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_8
-		var nr = 0x55 & C.int(modulo-1)
-		var ns = 0xaa & C.int(modulo-1)
+		var nr = 0x55 & int(modulo-1)
+		var ns = 0xaa & int(modulo-1)
 
 		for cr := cmdres_t(0); cr <= 1; cr++ {
 			text_color_set(DW_COLOR_INFO)
@@ -169,8 +169,8 @@ func ax25_pad2_test_main(t *testing.T) {
 		}
 
 		modulo = modulo_128
-		nr = 0x55 & C.int(modulo-1)
-		ns = 0xaa & C.int(modulo-1)
+		nr = 0x55 & int(modulo-1)
+		ns = 0xaa & int(modulo-1)
 
 		for cr := cmdres_t(0); cr <= 1; cr++ {
 			text_color_set(DW_COLOR_INFO)
@@ -189,62 +189,43 @@ func ax25_pad2_test_main(t *testing.T) {
 	dw_printf("\nSUCCESS!\n")
 } /* end main */
 
-func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf C.int) {
+func check_ax25_u_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf int) {
 	t.Helper()
 
-	var check_cr cmdres_t
-	var check_desc [80]C.char
-	var check_pf C.int
-	var check_nr C.int
-	var check_ns C.int
+	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
 
-	var check_ftype = ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
-
-	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d\n", check_ftype, C.GoString(&check_desc[0]), check_pf)
+	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d\n", check_ftype, check_desc, check_pf)
 
 	assert.Equal(t, cr, check_cr)
 	assert.Equal(t, ftype, check_ftype)
 	assert.Equal(t, pf, check_pf)
-	assert.Equal(t, C.int(-1), check_nr)
-	assert.Equal(t, C.int(-1), check_ns)
+	assert.Equal(t, -1, check_nr)
+	assert.Equal(t, -1, check_ns)
 }
 
-func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf C.int, nr C.int) {
+func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_frame_type_t, pf int, nr int) {
 	t.Helper()
 
-	var check_cr cmdres_t
-	var check_desc [80]C.char
-	var check_pf C.int
-	var check_nr C.int
-	var check_ns C.int
-
 	// todo modulo must be input.
-	var check_ftype = ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
+	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
 
-	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d\n", check_ftype, C.GoString(&check_desc[0]), check_pf, check_nr)
+	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d\n", check_ftype, check_desc, check_pf, check_nr)
 
 	assert.Equal(t, cr, check_cr)
 	assert.Equal(t, ftype, check_ftype)
 	assert.Equal(t, pf, check_pf)
 	assert.Equal(t, nr, check_nr)
-	assert.Equal(t, C.int(-1), check_ns)
+	assert.Equal(t, -1, check_ns)
 }
 
-func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf C.int, nr C.int, ns C.int, pinfo *C.uchar, info_len C.int) {
+func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr int, ns int, pinfo *C.uchar, info_len C.int) {
 	t.Helper()
 
-	var check_cr cmdres_t
-	var check_desc [80]C.char
-	var check_pf C.int
-	var check_nr C.int
-	var check_ns C.int
+	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
+
+	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, check_desc, check_pf, check_nr, check_ns)
 
 	var check_pinfo *C.uchar
-
-	var check_ftype = ax25_frame_type(packet, &check_cr, &check_desc[0], &check_pf, &check_nr, &check_ns)
-
-	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, C.GoString(&check_desc[0]), check_pf, check_nr, check_ns)
-
 	var check_info_len = ax25_get_info(packet, &check_pinfo)
 
 	assert.Equal(t, cr, check_cr)

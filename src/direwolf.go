@@ -972,16 +972,12 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	}
 
 	if !ax25_is_aprs(pp) {
-		var cr cmdres_t
-		var desc [80]C.char
-		var pf, nr, ns C.int
-
-		var ftype = ax25_frame_type(pp, &cr, &desc[0], &pf, &nr, &ns)
+		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
 		info_len = ax25_get_info(pp, &pinfo)
 
-		dw_printf("(%s)", C.GoString(&desc[0]))
+		dw_printf("(%s)", desc)
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(C.GoBytes(unsafe.Pointer(pinfo), info_len))
 			dw_printf(" %s\n", info2text)

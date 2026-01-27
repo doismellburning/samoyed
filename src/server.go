@@ -664,13 +664,7 @@ func mon_addrs(channel C.int, pp *packet_t) []byte {
 
 func mon_desc(pp *packet_t) (byte, string) {
 
-	var cr cmdres_t       // command/response.
-	var ignore [80]C.char // direwolf description.  not used here.
-	var pf C.int          // poll/final bit.
-	var ns C.int          // N(S) Send sequence number.
-	var nr C.int          // N(R) Received sequence number.
-
-	var ftype = ax25_frame_type(pp, &cr, &ignore[0], &pf, &nr, &ns)
+	var cr, _, pf, nr, ns, ftype = ax25_frame_type(pp)
 	var pf_text string // P or F depending on whether command or response.
 
 	switch cr {
