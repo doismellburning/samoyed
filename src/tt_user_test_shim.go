@@ -46,7 +46,7 @@ func tt_user_test_main(t *testing.T) {
 
 	my_tt_config.retain_time = 20 /* Normally 80 minutes. */
 	my_tt_config.num_xmits = 3
-	assert.LessOrEqual(t, my_tt_config.num_xmits, C.int(TT_MAX_XMITS))
+	assert.LessOrEqual(t, my_tt_config.num_xmits, TT_MAX_XMITS)
 	my_tt_config.xmit_delay[0] = 3 /* Before initial transmission. */
 	my_tt_config.xmit_delay[1] = 5
 	my_tt_config.xmit_delay[2] = 5

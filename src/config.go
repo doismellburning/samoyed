@@ -959,10 +959,10 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_tt_config.status[9] = "/custom 1"
 
 	for m := 0; m < TT_ERROR_MAXP1; m++ {
-		C.strcpy(&p_tt_config.response[m].method[0], C.CString("MORSE"))
-		C.strcpy(&p_tt_config.response[m].mtext[0], C.CString("?"))
+		p_tt_config.response[m].method = "MORSE"
+		p_tt_config.response[m].mtext = "?"
 	}
-	C.strcpy(&p_tt_config.response[TT_ERROR_OK].mtext[0], C.CString("R"))
+	p_tt_config.response[TT_ERROR_OK].mtext = "R"
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 

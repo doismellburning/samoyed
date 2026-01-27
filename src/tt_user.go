@@ -531,7 +531,7 @@ func tt_user_background() {
 		Assert(i >= 0 && i < MAX_TT_USERS)
 
 		if tt_user[i].callsign != "" {
-			if C.int(tt_user[i].xmits) < save_tt_config_p.num_xmits && !tt_user[i].next_xmit.After(now) {
+			if tt_user[i].xmits < save_tt_config_p.num_xmits && !tt_user[i].next_xmit.After(now) {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("tt_user_background()  now = %d\n", (int)now);
 				// tt_user_dump ();
@@ -540,7 +540,7 @@ func tt_user_background() {
 
 				/* Increase count of number times this one was sent. */
 				tt_user[i].xmits++
-				if C.int(tt_user[i].xmits) < save_tt_config_p.num_xmits {
+				if tt_user[i].xmits < save_tt_config_p.num_xmits {
 					/* Schedule next one. */
 					tt_user[i].next_xmit = tt_user[i].next_xmit.Add(time.Duration(save_tt_config_p.xmit_delay[tt_user[i].xmits]) * time.Second)
 				}
@@ -634,7 +634,7 @@ func xmit_object_report(i int, first_time bool) {
 		var c_long = save_tt_config_p.corral_lon    // Corral longitude.
 		var c_offs = save_tt_config_p.corral_offset // Corral (latitude) offset.
 
-		olat = float64(c_lat - C.double(tt_user[i].corral_slot-1)*c_offs)
+		olat = float64(c_lat - float64(tt_user[i].corral_slot-1)*c_offs)
 		olong = float64(c_long)
 		oambig = 0
 	}
@@ -702,9 +702,9 @@ func xmit_object_report(i int, first_time bool) {
 	 * Append via path, for transmission, if specified.
 	 */
 
-	if !first_time && save_tt_config_p.obj_xmit_via[0] != 0 {
+	if !first_time && save_tt_config_p.obj_xmit_via != "" {
 		stemp += ","
-		stemp += C.GoString(&save_tt_config_p.obj_xmit_via[0])
+		stemp += save_tt_config_p.obj_xmit_via
 	}
 
 	stemp += ":"
@@ -769,25 +769,25 @@ func xmit_object_report(i int, first_time bool) {
 
 		var flen = ax25_pack(pp, &fbuf[0])
 
-		server_send_rec_packet(save_tt_config_p.obj_recv_chan, pp, &fbuf[0], flen)
-		kissnet_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
-		kissserial_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
-		kisspt_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
+		server_send_rec_packet(C.int(save_tt_config_p.obj_recv_chan), pp, &fbuf[0], flen)
+		kissnet_send_rec_packet(C.int(save_tt_config_p.obj_recv_chan), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
+		kissserial_send_rec_packet(C.int(save_tt_config_p.obj_recv_chan), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
+		kisspt_send_rec_packet(C.int(save_tt_config_p.obj_recv_chan), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
 	}
 
 	if first_time && save_tt_config_p.obj_send_to_ig > 0 {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
 
-		igate_send_rec_packet(int(save_tt_config_p.obj_recv_chan), pp)
+		igate_send_rec_packet(save_tt_config_p.obj_recv_chan, pp)
 	}
 
 	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
 
-		dedupe_remember(pp, save_tt_config_p.obj_xmit_chan)
+		dedupe_remember(pp, C.int(save_tt_config_p.obj_xmit_chan))
 
-		tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+		tq_append(C.int(save_tt_config_p.obj_xmit_chan), TQ_PRIO_1_LO, pp)
 	} else {
 		ax25_delete(pp)
 	}

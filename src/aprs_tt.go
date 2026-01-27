@@ -102,30 +102,30 @@ const (
 )
 
 type pointTTLoc struct {
-	lat C.double /* Specific locations. */
-	lon C.double
+	lat float64 /* Specific locations. */
+	lon float64
 }
 
 type vectorTTLoc struct {
-	lat   C.double /* For bearing/direction. */
-	lon   C.double
-	scale C.double /* conversion to meters */
+	lat   float64 /* For bearing/direction. */
+	lon   float64
+	scale float64 /* conversion to meters */
 }
 
 type gridTTLoc struct {
-	lat0 C.double /* yyy all zeros. */
-	lon0 C.double /* xxx */
-	lat9 C.double /* yyy all nines. */
-	lon9 C.double /* xxx */
+	lat0 float64 /* yyy all zeros. */
+	lon0 float64 /* xxx */
+	lat9 float64 /* yyy all nines. */
+	lon9 float64 /* xxx */
 }
 
 type utmTTLoc struct {
-	scale    C.double
-	x_offset C.double
-	y_offset C.double
-	lzone    C.long /* UTM zone, should be 1-60 */
-	latband  C.char /* Latitude band if specified, otherwise space or - */
-	hemi     C.char /* UTM Hemisphere, should be 'N' or 'S'. */
+	scale    float64
+	x_offset float64
+	y_offset float64
+	lzone    int  /* UTM zone, should be 1-60 */
+	latband  rune /* Latitude band if specified, otherwise space or - */
+	hemi     rune /* UTM Hemisphere, should be 'N' or 'S'. */
 }
 
 type mgrsTTLoc struct {
@@ -180,48 +180,48 @@ var aprs_tt_test_config = []*ttloc_s{
 }
 
 type tt_config_s struct {
-	gateway_enabled C.int /* Send DTMF sequences to APRStt gateway. */
+	gateway_enabled int /* Send DTMF sequences to APRStt gateway. */
 
-	obj_recv_chan C.int /* Channel to listen for tones. */
+	obj_recv_chan int /* Channel to listen for tones. */
 
-	obj_xmit_chan C.int /* Channel to transmit object report. */
+	obj_xmit_chan int /* Channel to transmit object report. */
 	/* -1 for none.  This could happen if we */
 	/* are only sending to application */
 	/* and/or IGate. */
 
-	obj_send_to_app C.int /* send to attached application(s). */
+	obj_send_to_app int /* send to attached application(s). */
 
-	obj_send_to_ig C.int /* send to IGate. */
+	obj_send_to_ig int /* send to IGate. */
 
-	obj_xmit_via [AX25_MAX_REPEATERS * (AX25_MAX_ADDR_LEN + 1)]C.char
+	obj_xmit_via string
 	/* e.g.  empty or "WIDE2-1,WIDE1-1" */
 
-	retain_time C.int /* Seconds to keep information about a user. */
+	retain_time int /* Seconds to keep information about a user. */
 
-	num_xmits C.int /* Number of times to transmit object report. */
+	num_xmits int /* Number of times to transmit object report. */
 
-	xmit_delay [TT_MAX_XMITS]C.int /* Delay between them. */
+	xmit_delay [TT_MAX_XMITS]int /* Delay between them. */
 	/* e.g.  3 seconds before first transmission then */
 	/* delays of 16, 32, seconds etc. in between repeats. */
 
 	ttloc_ptr  []*ttloc_s /* Variable length array of above. */
-	ttloc_size C.int      /* Number of elements allocated. */
-	ttloc_len  C.int      /* Number of elements actually used. */
+	ttloc_size int        /* Number of elements allocated. */
+	ttloc_len  int        /* Number of elements actually used. */
 
-	corral_lat       C.double /* The "corral" for unknown locations. */
-	corral_lon       C.double
-	corral_offset    C.double
-	corral_ambiguity C.int
+	corral_lat       float64 /* The "corral" for unknown locations. */
+	corral_lon       float64
+	corral_offset    float64
+	corral_ambiguity int
 
 	status [10]string /* Up to 9 status messages. e.g.  "/enroute" */
 	/* Position 0 means none and can't be changed. */
 
 	response [TT_ERROR_MAXP1]struct {
-		method [AX25_MAX_ADDR_LEN]C.char /* SPEECH or MORSE[-n] */
-		mtext  [TT_MTEXT_LEN]C.char      /* Message text. */
+		method string /* SPEECH or MORSE[-n] */
+		mtext  string /* Message text. */
 	}
 
-	ttcmd [80]C.char /* Command to generate custom audible response. */
+	ttcmd string /* Command to generate custom audible response. */
 }
 
 var aprs_tt_config *tt_config_s
@@ -266,7 +266,7 @@ func aprs_tt_init(p *tt_config_s, debug int) {
 
 	if p == nil {
 		/* For unit testing. */
-		var NUM_TEST_CONFIG C.int = 10 // TODO KG Hardcoded because cross-language sizing is fiddly
+		var NUM_TEST_CONFIG = 10 // TODO KG Hardcoded because cross-language sizing is fiddly
 		var config tt_config_s
 		config.ttloc_size = NUM_TEST_CONFIG
 		config.ttloc_ptr = aprs_tt_test_config
@@ -344,7 +344,7 @@ func aprs_tt_button(channel int, button rune) {
 		 * in the TTOBJ command.
 		 */
 
-		if C.int(channel) == tt_config.obj_recv_chan {
+		if channel == tt_config.obj_recv_chan {
 			poll_period++
 			if poll_period >= 39 {
 				poll_period = 0
@@ -476,8 +476,8 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * don't pass in the success / failure code to know the difference.
 	 */
 	var script_response string
-	if err == 0 && C.strlen(&tt_config.ttcmd[0]) > 0 {
-		var _script_response, _ = dw_run_cmd(C.GoString(&tt_config.ttcmd[0]), 1)
+	if err == 0 && len(tt_config.ttcmd) > 0 {
+		var _script_response, _ = dw_run_cmd(tt_config.ttcmd, 1)
 		script_response = string(_script_response)
 	}
 
@@ -489,12 +489,12 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * Anything from script, above, will override other predefined responses.
 	 */
 
-	var response = C.GoString(&tt_config.response[err].mtext[0])
+	var response = tt_config.response[err].mtext
 	if len(script_response) > 0 {
 		response = script_response
 	}
 
-	var audible_response = fmt.Sprintf("APRSTT>%s:%s", C.GoString(&tt_config.response[err].method[0]), response)
+	var audible_response = fmt.Sprintf("APRSTT>%s:%s", tt_config.response[err].method, response)
 
 	var pp = ax25_from_text(audible_response, false)
 
@@ -1269,17 +1269,17 @@ func parse_location(e string) int {
 			var y, _ = strconv.ParseFloat(ystr, 64)
 			var northing = y*float64(aprs_tt_config.ttloc_ptr[ipat].utm.scale) + float64(aprs_tt_config.ttloc_ptr[ipat].utm.y_offset)
 
-			if unicode.IsLetter(rune(aprs_tt_config.ttloc_ptr[ipat].utm.latband)) {
-				m_loc_text = fmt.Sprintf("%d%c %.0f %.0f", int(aprs_tt_config.ttloc_ptr[ipat].utm.lzone), aprs_tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
+			if unicode.IsLetter(aprs_tt_config.ttloc_ptr[ipat].utm.latband) {
+				m_loc_text = fmt.Sprintf("%d%c %.0f %.0f", aprs_tt_config.ttloc_ptr[ipat].utm.lzone, aprs_tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
 			} else if aprs_tt_config.ttloc_ptr[ipat].utm.latband == '-' {
-				m_loc_text = fmt.Sprintf("%d %.0f %.0f", int(-aprs_tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
+				m_loc_text = fmt.Sprintf("%d %.0f %.0f", -aprs_tt_config.ttloc_ptr[ipat].utm.lzone, easting, northing)
 			} else {
-				m_loc_text = fmt.Sprintf("%d %.0f %.0f", int(aprs_tt_config.ttloc_ptr[ipat].utm.lzone), easting, northing)
+				m_loc_text = fmt.Sprintf("%d %.0f %.0f", aprs_tt_config.ttloc_ptr[ipat].utm.lzone, easting, northing)
 			}
 
 			var lat0, lon0 C.double
-			var lerr = C.Convert_UTM_To_Geodetic(aprs_tt_config.ttloc_ptr[ipat].utm.lzone,
-				aprs_tt_config.ttloc_ptr[ipat].utm.hemi, C.double(easting), C.double(northing), &lat0, &lon0)
+			var lerr = C.Convert_UTM_To_Geodetic(C.long(aprs_tt_config.ttloc_ptr[ipat].utm.lzone),
+				C.char(aprs_tt_config.ttloc_ptr[ipat].utm.hemi), C.double(easting), C.double(northing), &lat0, &lon0)
 
 			if lerr == 0 {
 				m_latitude = R2D(float64(lat0))
@@ -1458,7 +1458,7 @@ func find_ttloc_match(e string) (string, string, string, string, string, int) {
 	// debug dw_printf ("find_ttloc_match: e=%s\n", e);
 	var xstr, ystr, zstr, bstr, dstr string
 
-	for ipat := C.int(0); ipat < tt_config.ttloc_len; ipat++ {
+	for ipat := 0; ipat < tt_config.ttloc_len; ipat++ {
 		var pattern = aprs_tt_config.ttloc_ptr[ipat].pattern
 		var length = len(pattern) /* Length of pattern we are trying to match. */
 
@@ -1516,7 +1516,7 @@ func find_ttloc_match(e string) (string, string, string, string, string, int) {
 			} /* for k */
 
 			if match {
-				return xstr, ystr, zstr, bstr, dstr, int(ipat)
+				return xstr, ystr, zstr, bstr, dstr, ipat
 			}
 		} /* if strlen */
 	}
