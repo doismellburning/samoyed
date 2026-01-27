@@ -1280,7 +1280,7 @@ func cmd_listen_thread(client C.int) {
 				// - Error message if a mismatch?
 
 				var alevel alevel_t
-				var pp = ax25_from_frame((*C.uchar)(C.CBytes(cmd.Data[1:])), C.int(cmd.Header.DataLen)-1, alevel)
+				var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)

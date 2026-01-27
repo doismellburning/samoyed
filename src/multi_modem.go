@@ -297,7 +297,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:
-		pp = ax25_from_frame(fbuf, flen, alevel)
+		pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(fbuf), flen), alevel)
 	}
 
 	multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)

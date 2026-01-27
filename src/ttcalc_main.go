@@ -107,7 +107,7 @@ func TTCalcMain() {
 		if mon_cmd.DataKind == 'K' {
 			var channel = mon_cmd.Portx
 			var alevel alevel_t
-			var pp = ax25_from_frame((*C.uchar)(&data[1]), C.int(mon_cmd.DataLen-1), alevel)
+			var pp = ax25_from_frame(data[1:mon_cmd.DataLen], alevel)
 
 			var result = ax25_format_addrs(pp)
 

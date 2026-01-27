@@ -216,7 +216,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = ax25_from_frame(&extracted[0], payload_len, alevel)
+		var pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&extracted[0]), payload_len), alevel)
 		return (pp)
 	}
 
