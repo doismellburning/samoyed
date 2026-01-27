@@ -2318,80 +2318,78 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 
 // TODO: use ax25_frame_type() instead.
 
-func ctrl_to_text(c C.int, out *C.char, outsiz C.size_t) {
+func ctrl_to_text(c int) string {
 	if (c & 1) == 0 {
-		C.strcpy(out, C.CString(fmt.Sprintf("I frame: n(r)=%d, p=%d, n(s)=%d", (c>>5)&7, (c>>4)&1, (c>>1)&7)))
+		return fmt.Sprintf("I frame: n(r)=%d, p=%d, n(s)=%d", (c>>5)&7, (c>>4)&1, (c>>1)&7)
 	} else if (c & 0xf) == 0x01 {
-		C.strcpy(out, C.CString(fmt.Sprintf("S frame RR: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)))
+		return fmt.Sprintf("S frame RR: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)
 	} else if (c & 0xf) == 0x05 {
-		C.strcpy(out, C.CString(fmt.Sprintf("S frame RNR: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)))
+		return fmt.Sprintf("S frame RNR: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)
 	} else if (c & 0xf) == 0x09 {
-		C.strcpy(out, C.CString(fmt.Sprintf("S frame REJ: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)))
+		return fmt.Sprintf("S frame REJ: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)
 	} else if (c & 0xf) == 0x0D {
-		C.strcpy(out, C.CString(fmt.Sprintf("S frame sREJ: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)))
+		return fmt.Sprintf("S frame sREJ: n(r)=%d, p/f=%d", (c>>5)&7, (c>>4)&1)
 	} else if (c & 0xef) == 0x6f {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame SABME: p=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame SABME: p=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0x2f {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame SABM: p=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame SABM: p=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0x43 {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame DISC: p=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame DISC: p=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0x0f {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame DM: f=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame DM: f=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0x63 {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame UA: f=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame UA: f=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0x87 {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame FRMR: f=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame FRMR: f=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0x03 {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame UI: p/f=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame UI: p/f=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0xAF {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame XID: p/f=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame XID: p/f=%d", (c>>4)&1)
 	} else if (c & 0xef) == 0xe3 {
-		C.strcpy(out, C.CString(fmt.Sprintf("U frame TEST: p/f=%d", (c>>4)&1)))
+		return fmt.Sprintf("U frame TEST: p/f=%d", (c>>4)&1)
 	} else {
-		C.strcpy(out, C.CString(fmt.Sprintf("Unknown frame type for control = 0x%02x", c)))
+		return fmt.Sprintf("Unknown frame type for control = 0x%02x", c)
 	}
 }
 
 /* Text description of protocol id octet. */
 
-const PID_TEXT_SIZE = 80
-
-func pid_to_text(p C.int, out *C.char) {
+func pid_to_text(p int) string {
 
 	if (p & 0x30) == 0x10 {
-		C.strcpy(out, C.CString("AX.25 layer 3 implemented."))
+		return "AX.25 layer 3 implemented."
 	} else if (p & 0x30) == 0x20 {
-		C.strcpy(out, C.CString("AX.25 layer 3 implemented."))
+		return "AX.25 layer 3 implemented."
 	} else if p == 0x01 {
-		C.strcpy(out, C.CString("ISO 8208/CCITT X.25 PLP"))
+		return "ISO 8208/CCITT X.25 PLP"
 	} else if p == 0x06 {
-		C.strcpy(out, C.CString("Compressed TCP/IP packet. Van Jacobson (RFC 1144)"))
+		return "Compressed TCP/IP packet. Van Jacobson (RFC 1144)"
 	} else if p == 0x07 {
-		C.strcpy(out, C.CString("Uncompressed TCP/IP packet. Van Jacobson (RFC 1144)"))
+		return "Uncompressed TCP/IP packet. Van Jacobson (RFC 1144)"
 	} else if p == 0x08 {
-		C.strcpy(out, C.CString("Segmentation fragment"))
+		return "Segmentation fragment"
 	} else if p == 0xC3 {
-		C.strcpy(out, C.CString("TEXNET datagram protocol"))
+		return "TEXNET datagram protocol"
 	} else if p == 0xC4 {
-		C.strcpy(out, C.CString("Link Quality Protocol"))
+		return "Link Quality Protocol"
 	} else if p == 0xCA {
-		C.strcpy(out, C.CString("Appletalk"))
+		return "Appletalk"
 	} else if p == 0xCB {
-		C.strcpy(out, C.CString("Appletalk ARP"))
+		return "Appletalk ARP"
 	} else if p == 0xCC {
-		C.strcpy(out, C.CString("ARPA Internet Protocol"))
+		return "ARPA Internet Protocol"
 	} else if p == 0xCD {
-		C.strcpy(out, C.CString("ARPA Address resolution"))
+		return "ARPA Address resolution"
 	} else if p == 0xCE {
-		C.strcpy(out, C.CString("FlexNet"))
+		return "FlexNet"
 	} else if p == 0xCF {
-		C.strcpy(out, C.CString("NET/ROM"))
+		return "NET/ROM"
 	} else if p == 0xF0 {
-		C.strcpy(out, C.CString("No layer 3 protocol implemented."))
+		return "No layer 3 protocol implemented."
 	} else if p == 0xFF {
-		C.strcpy(out, C.CString("Escape character. Next octet contains more Level 3 protocol information."))
+		return "Escape character. Next octet contains more Level 3 protocol information."
 	} else {
-		C.strcpy(out, C.CString(fmt.Sprintf("Unknown protocol id = 0x%02x", p)))
+		return fmt.Sprintf("Unknown protocol id = 0x%02x", p)
 	}
 }
 
@@ -2404,26 +2402,20 @@ func ax25_hex_dump(this_p *packet_t) {
 		var c = fptr[this_p.num_addr*7]
 		var p = fptr[this_p.num_addr*7+1]
 
-		var cp_text [120]C.char
-		ctrl_to_text(C.int(c), &cp_text[0], C.size_t(len(cp_text))) // TODO: use ax25_frame_type() instead.
+		var cp_text = ctrl_to_text(int(c)) // TODO: use ax25_frame_type() instead.
 
 		if (c&0x01) == 0 || /* I   xxxx xxx0 */
 			c == 0x03 || c == 0x13 { /* UI  000x 0011 */
 
-			var pid_text [PID_TEXT_SIZE]C.char
+			var pid_text = pid_to_text(int(p))
 
-			pid_to_text(C.int(p), &pid_text[0])
-
-			C.strcat(&cp_text[0], C.CString(", "))
-			C.strcat(&cp_text[0], &pid_text[0])
-
+			cp_text += ", " + pid_text
 		}
 
-		var l_text [20]C.char
-		C.strcpy(&l_text[0], C.CString(fmt.Sprintf(", length = %d", flen)))
-		C.strcat(&cp_text[0], &l_text[0])
+		var l_text = fmt.Sprintf(", length = %d", flen)
+		cp_text += l_text
 
-		dw_printf("%s\n", C.GoString(&cp_text[0]))
+		dw_printf("%s\n", cp_text)
 	}
 
 	// Address fields must be only upper case letters and digits.
