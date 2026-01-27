@@ -169,7 +169,7 @@ func DecodeAPRSLine(line string) {
 
 		var alevel alevel_t
 
-		var pp = ax25_from_frame((*C.uchar)(C.CBytes(bytes)), C.int(len(bytes)), alevel)
+		var pp = ax25_from_frame(bytes, alevel)
 		if pp != nil {
 			var pinfo *C.uchar
 

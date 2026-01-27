@@ -257,8 +257,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 
 			use_chan = int(mon_cmd.Portx)
 			var alevel alevel_t
-			var dataUChar = byteSliceToCUChars(data[1:])
-			var pp = ax25_from_frame(&dataUChar[0], C.int(mon_cmd.DataLen-1), alevel)
+			var pp = ax25_from_frame(data[1:mon_cmd.DataLen], alevel)
 			var result = ax25_format_addrs(pp)
 			var pinfo *C.uchar
 			var info_len = ax25_get_info(pp, &pinfo)

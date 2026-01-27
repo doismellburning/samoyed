@@ -528,7 +528,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 
 	switch cmd {
 	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
-		var pp = ax25_from_frame(&kiss_msg[1], kiss_len-1, alevel)
+		var pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&kiss_msg[0]), kiss_len)[1:], alevel)
 		if pp == nil {
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
 		} else {

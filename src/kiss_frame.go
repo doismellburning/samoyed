@@ -623,7 +623,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 
 		alevel = alevel_t{} //nolint:exhaustruct
 
-		var pp = ax25_from_frame((*C.uchar)(C.CBytes(kiss_msg_bytes[1:])), kiss_len-1, alevel)
+		var pp = ax25_from_frame(kiss_msg_bytes[1:kiss_len], alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")

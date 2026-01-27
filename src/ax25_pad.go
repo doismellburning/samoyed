@@ -705,9 +705,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *
  * Purpose:	Split apart an HDLC frame to components.
  *
- * Inputs:	fbuf	- Pointer to beginning of frame.
- *
- *		flen	- Length excluding the two FCS bytes.
+ * Inputs:	data	- Frame bytes
  *
  *		alevel	- Audio level of received signal.
  *			  Maximum range 0 - 100.
@@ -719,7 +717,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel alevel_t) *packet_t {
+func ax25_from_frame(data []byte, alevel alevel_t) *packet_t {
 
 	/*
 	 * First make sure we have an acceptable length:
@@ -738,6 +736,7 @@ func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel alevel_t) *packet_t {
 	 *
 	 */
 
+	var flen = len(data)
 	if flen < AX25_MIN_PACKET_LEN || flen > AX25_MAX_PACKET_LEN {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Frame length %d not in allowable range of %d to %d.\n", flen, AX25_MIN_PACKET_LEN, AX25_MAX_PACKET_LEN)
@@ -748,9 +747,9 @@ func ax25_from_frame(fbuf *C.uchar, flen C.int, alevel alevel_t) *packet_t {
 
 	/* Copy the whole thing intact. */
 
-	C.memcpy(unsafe.Pointer(&this_p.frame_data[0]), unsafe.Pointer(fbuf), C.size_t(flen))
+	C.memcpy(unsafe.Pointer(&this_p.frame_data[0]), C.CBytes(data), C.size_t(flen))
 	this_p.frame_data[flen] = 0
-	this_p.frame_len = flen
+	this_p.frame_len = C.int(flen)
 
 	/* Find number of addresses. */
 
