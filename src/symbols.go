@@ -847,15 +847,9 @@ func symbols_to_tones(symtab byte, symbol byte) string {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
 
-		var text [2]C.char
-		var tt [8]C.char
+		var tt, _ = tt_text_to_two_key(string(symtab), false)
 
-		text[0] = C.char(symtab)
-		text[1] = 0
-
-		tt_text_to_two_key(&text[0], 0, &tt[0])
-
-		return fmt.Sprintf("AB0%02d%s", symbol-' ', C.GoString(&tt[0]))
+		return fmt.Sprintf("AB0%02d%s", symbol-' ', tt)
 	} else {
 		return fmt.Sprintf("AB2%02d", symbol-' ')
 	}

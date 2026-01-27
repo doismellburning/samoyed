@@ -168,20 +168,16 @@ var grid = [10][10]string{
  *
  *		quiet	- True to suppress error messages.
  *
- * Outputs:	buttons	- Sequence of buttons to press.
+ * Returns:	buttons	- Sequence of buttons to press.
  *
  * Returns:     Number of errors detected.
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_multipress(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
-
-	var text = C.GoString(_text)
-	var quiet = _quiet != 0
-	*_buttons = 0
+func tt_text_to_multipress(text string, quiet bool) (string, int) {
 
 	var buttons = ""
-	var errors C.int = 0
+	var errors = 0
 
 	for _, c := range text {
 
@@ -245,9 +241,7 @@ func tt_text_to_multipress(_text *C.const_char, _quiet C.int, _buttons *C.char) 
 		}
 	}
 
-	C.strcpy(_buttons, C.CString(buttons))
-
-	return errors
+	return buttons, errors
 
 } /* end tt_text_to_multipress */
 
@@ -269,14 +263,10 @@ func tt_text_to_multipress(_text *C.const_char, _quiet C.int, _buttons *C.char) 
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_two_key(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
-
-	var text = C.GoString(_text)
-	var quiet = _quiet != 0
-	*_buttons = 0
+func tt_text_to_two_key(text string, quiet bool) (string, int) {
 
 	var buttons = ""
-	var errors C.int = 0
+	var errors = 0
 
 	for _, c := range text {
 		if unicode.IsDigit(c) {
@@ -319,9 +309,7 @@ func tt_text_to_two_key(_text *C.const_char, _quiet C.int, _buttons *C.char) C.i
 		}
 	}
 
-	C.strcpy(_buttons, C.CString(buttons))
-
-	return (errors)
+	return buttons, errors
 
 } /* end tt_text_to_two_key */
 
@@ -347,9 +335,9 @@ func tt_text_to_two_key(_text *C.const_char, _quiet C.int, _buttons *C.char) C.i
 
 // TODO:  need to test this.
 
-func tt_letter_to_two_digits(c rune, quiet bool) (string, C.int) {
+func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 
-	var errors C.int = 0
+	var errors = 0
 
 	var buttons string
 
@@ -407,15 +395,9 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, C.int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
+func tt_text_to_call10(text string, quiet bool) (string, int) {
 
-	var text = C.GoString(_text)
-	var quiet = _quiet != 0
-
-	var errors C.int = 0
-
-	// FIXME: Add parameter for sizeof buttons and use strlcpy
-	C.strcpy(_buttons, C.CString(""))
+	var errors = 0
 
 	/* Quick validity check. */
 
@@ -426,7 +408,7 @@ func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.in
 			dw_printf("Text to callsign 6+4: Callsign \"%s\" not between 1 and 6 characters.\n", text)
 		}
 		errors++
-		return (errors)
+		return "", errors
 	}
 
 	for _, t := range text {
@@ -436,7 +418,7 @@ func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.in
 				dw_printf("Text to callsign 6+4: Callsign \"%s\" can contain only letters and digits.\n", text)
 			}
 			errors++
-			return (errors)
+			return "", errors
 		}
 	}
 
@@ -480,9 +462,8 @@ func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.in
 	/* Binary to decimal for the columns. */
 
 	buttons += fmt.Sprintf("%04d", packed)
-	C.strcpy(_buttons, C.CString(buttons))
 
-	return (errors)
+	return buttons, errors
 
 } /* end tt_text_to_call10 */
 
@@ -507,14 +488,9 @@ func tt_text_to_call10(_text *C.const_char, _quiet C.int, _buttons *C.char) C.in
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, buttonsize C.size_t) C.int {
+func tt_text_to_satsq(text string, quiet bool) (string, int) {
 
-	var text = C.GoString(_text)
-	var quiet = _quiet != 0
-
-	C.strcpy(_buttons, C.CString(""))
-
-	var errors C.int = 0
+	var errors = 0
 
 	/* Quick validity check. */
 
@@ -525,7 +501,7 @@ func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 			dw_printf("Satellite Gridsquare to DTMF: Gridsquare \"%s\" must be 4 characters.\n", text)
 		}
 		errors++
-		return (errors)
+		return "", errors
 	}
 
 	/* Changing to upper case makes things easier later. */
@@ -539,7 +515,7 @@ func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 			dw_printf("Satellite Gridsquare to DTMF: First two characters \"%s\" must be letters in range of A to R.\n", text)
 		}
 		errors++
-		return (errors)
+		return "", errors
 	}
 
 	if !unicode.IsDigit(rune(text[2])) || !unicode.IsDigit(rune(text[3])) {
@@ -549,26 +525,25 @@ func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 			dw_printf("Satellite Gridsquare to DTMF: Last two characters \"%s\" must be digits.\n", text)
 		}
 		errors++
-		return (errors)
+		return "", errors
 	}
 
 	/* Search in the translation table. */
 
 	var found = false
+	var buttons string
 
 	for row := 0; row < 10 && !found; row++ {
 		for col := 0; col < 10 && !found; col++ {
 			if uc == grid[row][col] {
 
-				var btemp [8]C.char
+				buttons = string([]byte{
+					byte(row + '0'),
+					byte(col + '0'),
+					text[2],
+					text[3],
+				})
 
-				btemp[0] = C.char(row + '0')
-				btemp[1] = C.char(col + '0')
-				btemp[2] = C.char(text[2])
-				btemp[3] = C.char(text[3])
-				btemp[4] = 0
-
-				C.strlcpy(_buttons, &btemp[0], buttonsize)
 				found = true
 			}
 		}
@@ -583,7 +558,7 @@ func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 		}
 	}
 
-	return (errors)
+	return buttons, errors
 
 } /* end tt_text_to_satsq */
 
@@ -619,11 +594,9 @@ func tt_text_to_satsq(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_ascii2d(_text *C.const_char, _quiet C.int, _buttons *C.char) C.int {
+func tt_text_to_ascii2d(text string, quiet bool) (string, int) {
 
-	var text = C.GoString(_text)
-
-	var errors C.int = 0
+	var errors = 0
 	var buttons = ""
 
 	for _, c := range text {
@@ -640,9 +613,7 @@ func tt_text_to_ascii2d(_text *C.const_char, _quiet C.int, _buttons *C.char) C.i
 		buttons += string((n % 10) + '0')
 	}
 
-	C.strcpy(_buttons, C.CString(buttons))
-
-	return (errors)
+	return buttons, errors
 
 } /* end tt_text_to_ascii2d */
 
@@ -663,14 +634,10 @@ func tt_text_to_ascii2d(_text *C.const_char, _quiet C.int, _buttons *C.char) C.i
  *
  *----------------------------------------------------------------*/
 
-func tt_multipress_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
-
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
+func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 
 	var text string
-	var errors C.int = 0
+	var errors = 0
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
@@ -734,8 +701,7 @@ func tt_multipress_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) 
 		}
 	}
 
-	C.strcpy(_text, C.CString(text))
-	return errors
+	return text, errors
 } /* end tt_multipress_to_text */
 
 /*------------------------------------------------------------------
@@ -755,13 +721,9 @@ func tt_multipress_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) 
  *
  *----------------------------------------------------------------*/
 
-func tt_two_key_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
+func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
-
-	var errors C.int = 0
+	var errors = 0
 	var text string
 
 	for i := 0; i < len(buttons); i++ {
@@ -817,9 +779,7 @@ func tt_two_key_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.i
 		}
 	}
 
-	C.strcpy(_text, C.CString(text))
-
-	return (errors)
+	return text, errors
 
 } /* end tt_two_key_to_text */
 
@@ -843,14 +803,10 @@ func tt_two_key_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.i
  *
  *----------------------------------------------------------------*/
 
-func tt_two_digits_to_letter(_buttons *C.const_char, _quiet C.int, _text *C.char, textsiz C.size_t) C.int {
-
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
+func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 
 	var text string
-	var errors C.int = 0
+	var errors = 0
 
 	var c1 = buttons[0]
 	var c2 = buttons[1]
@@ -890,9 +846,7 @@ func tt_two_digits_to_letter(_buttons *C.const_char, _quiet C.int, _text *C.char
 		}
 	}
 
-	C.strlcpy(_text, C.CString(text), textsiz)
-
-	return (errors)
+	return text, errors
 
 } /* end tt_two_digits_to_letter */
 
@@ -913,14 +867,10 @@ func tt_two_digits_to_letter(_buttons *C.const_char, _quiet C.int, _text *C.char
  *
  *----------------------------------------------------------------*/
 
-func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
-
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0 /* result */
+func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 
 	var text string
-	var errors C.int = 0
+	var errors = 0
 
 	/* Validity check. */
 
@@ -931,7 +881,7 @@ func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.in
 			dw_printf("Callsign 6+4 to text: Encoded Callsign \"%s\" must be exactly 10 digits.\n", buttons)
 		}
 		errors++
-		return (errors)
+		return text, errors
 	}
 
 	for _, b := range buttons {
@@ -941,7 +891,7 @@ func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.in
 				dw_printf("Callsign 6+4 to text: Encoded Callsign \"%s\" can contain only digits.\n", buttons)
 			}
 			errors++
-			return (errors)
+			return text, errors
 		}
 	}
 
@@ -976,9 +926,7 @@ func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.in
 
 	text = strings.TrimSpace(text)
 
-	C.strcpy(_text, C.CString(text))
-
-	return (errors)
+	return text, errors
 
 } /* end tt_call10_to_text */
 
@@ -1000,14 +948,10 @@ func tt_call10_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.in
  *
  *----------------------------------------------------------------*/
 
-func tt_call5_suffix_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
-
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
+func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 
 	var text string
-	var errors C.int = 0
+	var errors = 0
 
 	/* Validity check. */
 
@@ -1018,7 +962,7 @@ func tt_call5_suffix_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char
 			dw_printf("Callsign 3+2 suffix to text: Encoded Callsign \"%s\" must be exactly 5 digits.\n", buttons)
 		}
 		errors++
-		return (errors)
+		return text, errors
 	}
 
 	for _, b := range buttons {
@@ -1028,7 +972,7 @@ func tt_call5_suffix_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char
 				dw_printf("Callsign 3+2 suffix to text: Encoded Callsign \"%s\" can contain only digits.\n", buttons)
 			}
 			errors++
-			return (errors)
+			return text, errors
 		}
 	}
 
@@ -1060,13 +1004,10 @@ func tt_call5_suffix_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char
 	}
 
 	if errors > 0 {
-		*_text = 0
-		return (errors)
+		return "", errors
 	}
 
-	C.strcpy(_text, C.CString(text))
-
-	return (errors)
+	return text, errors
 
 } /* end tt_call5_suffix_to_text */
 
@@ -1107,14 +1048,10 @@ var mhpair = [MAXMHPAIRS]mhpairType{
 	{"sixth", '0', '9'},
 }
 
-func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, textsiz C.size_t) C.int {
-
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
+func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 
 	var text string
-	var errors C.int = 0
+	var errors = 0
 
 	/* Validity check. */
 
@@ -1127,7 +1064,7 @@ func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, texts
 			dw_printf("DTMF to Maidenhead Gridsquare Locator: Input \"%s\" must be exactly 4, 6, 10, or 12 digits.\n", buttons)
 		}
 		errors++
-		return (errors)
+		return text, errors
 	}
 
 	for _, b := range buttons {
@@ -1137,7 +1074,7 @@ func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, texts
 				dw_printf("DTMF to Maidenhead Gridsquare Locator: Input \"%s\" can contain only digits.\n", buttons)
 			}
 			errors++
-			return (errors)
+			return text, errors
 		}
 	}
 
@@ -1148,14 +1085,17 @@ func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, texts
 	// Rely on earlier length check to ensure we don't run out of buttons
 	for n := 0; len(buttons) > 0; n++ {
 		if n%2 == 0 {
-			var t2 [2]C.char
+			var t2 string
+			var e2 int
 
-			errors += tt_two_digits_to_letter(C.CString(buttons), _quiet, &t2[0], C.size_t(len(t2)))
-			text += C.GoString(&t2[0])
+			t2, e2 = tt_two_digits_to_letter(buttons, quiet)
+			text += t2
+			errors += e2
 			buttons = buttons[2:]
 
-			errors += tt_two_digits_to_letter(C.CString(buttons), _quiet, &t2[0], C.size_t(len(t2)))
-			text += C.GoString(&t2[0])
+			t2, e2 = tt_two_digits_to_letter(buttons, quiet)
+			text += t2
+			errors += e2
 			buttons = buttons[2:]
 		} else {
 			text += buttons[0:2]
@@ -1169,9 +1109,7 @@ func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, texts
 		text = ""
 	}
 
-	C.strcpy(_text, C.CString(text))
-
-	return (errors)
+	return text, errors
 
 } /* end tt_mhead_to_text */
 
@@ -1196,13 +1134,9 @@ func tt_mhead_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char, texts
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, buttonsize C.size_t) C.int {
+func tt_text_to_mhead(text string, quiet bool) (string, int) {
 
-	var text = C.GoString(_text)
-	var quiet = _quiet != 0
-	*_buttons = 0
-
-	var errors C.int = 0
+	var errors = 0
 	var buttons string
 
 	var np = len(text) / 2
@@ -1214,7 +1148,7 @@ func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 			dw_printf("Maidenhead Gridsquare Locator to DTMF: Input \"%s\" must be even number of characters.\n", text)
 		}
 		errors++
-		return (errors)
+		return buttons, errors
 	}
 
 	if np < 1 || np > MAXMHPAIRS {
@@ -1224,7 +1158,7 @@ func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 			dw_printf("Maidenhead Gridsquare Locator to DTMF: Input \"%s\" must be 1 to %d pairs of characters.\n", text, np)
 		}
 		errors++
-		return (errors)
+		return buttons, errors
 	}
 
 	for i := 0; i < np; i++ {
@@ -1239,9 +1173,9 @@ func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 				dw_printf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
 					mhpair[i].position, text, mhpair[i].min_ch, mhpair[i].max_ch)
 			}
-			*_buttons = 0
+			buttons = ""
 			errors++
-			return (errors)
+			return buttons, errors
 		}
 
 		if mhpair[i].min_ch == 'A' { /* Should be letters */
@@ -1263,9 +1197,7 @@ func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
 		buttons = ""
 	}
 
-	C.strcpy(_buttons, C.CString(buttons))
-
-	return (errors)
+	return buttons, errors
 
 } /* tt_text_to_mhead */
 
@@ -1286,13 +1218,9 @@ func tt_text_to_mhead(_text *C.const_char, _quiet C.int, _buttons *C.char, butto
  *
  *----------------------------------------------------------------*/
 
-func tt_satsq_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
+func tt_satsq_to_text(buttons string, quiet bool) (string, int) {
 
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
-
-	var errors C.int = 0
+	var errors = 0
 
 	/* Validity check. */
 
@@ -1303,7 +1231,7 @@ func tt_satsq_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int
 			dw_printf("DTMF to Satellite Gridsquare: Input \"%s\" must be exactly 4 digits.\n", buttons)
 		}
 		errors++
-		return (errors)
+		return "", errors
 	}
 
 	for _, b := range buttons {
@@ -1313,19 +1241,16 @@ func tt_satsq_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int
 				dw_printf("DTMF to Satellite Gridsquare: Input \"%s\" can contain only digits.\n", buttons)
 			}
 			errors++
-			return (errors)
+			return "", errors
 		}
 	}
 
 	var row = buttons[0] - '0'
 	var col = buttons[1] - '0'
 
-	// FIXME: Add parameter for sizeof text and use strlcpy, strlcat.
 	var text = grid[row][col] + buttons[2:]
 
-	C.strcpy(_text, C.CString(text))
-
-	return (errors)
+	return text, errors
 
 } /* end tt_satsq_to_text */
 
@@ -1346,18 +1271,14 @@ func tt_satsq_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int
  *
  *----------------------------------------------------------------*/
 
-func tt_ascii2d_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.int {
-
-	var buttons = C.GoString(_buttons)
-	var quiet = _quiet != 0
-	*_text = 0
+func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
 
 	var text string
-	var errors C.int = 0
+	var errors = 0
 
 	// TODO KG
 	if len(buttons)%2 != 0 {
-		return 1
+		return text, 1
 	}
 
 	for i := range len(buttons) / 2 {
@@ -1378,7 +1299,7 @@ func tt_ascii2d_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.i
 			}
 		}
 	}
-	return (errors)
+	return text, errors
 
 } /* end tt_ascii2d_to_text */
 
@@ -1397,11 +1318,7 @@ func tt_ascii2d_to_text(_buttons *C.const_char, _quiet C.int, _text *C.char) C.i
  *
  *----------------------------------------------------------------*/
 
-func tt_guess_type(_buttons *C.char) tt_enc_t {
-
-	var buttons = C.GoString(_buttons)
-
-	var text [256]C.char
+func tt_guess_type(buttons string) tt_enc_t {
 
 	/* If it contains B, C, or D, it can't be multipress. */
 
@@ -1411,8 +1328,8 @@ func tt_guess_type(_buttons *C.char) tt_enc_t {
 
 	/* Try parsing quietly and see if one gets errors and the other doesn't. */
 
-	var err_mp = tt_multipress_to_text(_buttons, 1, &text[0])
-	var err_tk = tt_two_key_to_text(_buttons, 1, &text[0])
+	var _, err_mp = tt_multipress_to_text(buttons, true)
+	var _, err_tk = tt_two_key_to_text(buttons, true)
 
 	if err_mp == 0 && err_tk > 0 {
 		return (TT_MULTIPRESS)
