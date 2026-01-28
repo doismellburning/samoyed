@@ -114,7 +114,7 @@ func send_il2p_bytes(channel C.int, _b *C.uchar, count C.int, polarity C.int) {
 // for either polarity but other implementations might not.
 
 func send_il2p_bit(channel C.int, b C.int, polarity C.int) {
-	tone_gen_put_bit(channel, (b^polarity)&1)
+	tone_gen_put_bit(int(channel), int(b^polarity)&1)
 	number_of_il2p_bits_sent[channel]++
 }
 

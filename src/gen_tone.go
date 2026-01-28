@@ -58,7 +58,7 @@ const PHASE_SHIFT_45 = (C.uint(32) << 24)
 
 var bit_len_acc [MAX_RADIO_CHANS]C.int // To accumulate fractional samples per bit.
 
-var lfsr [MAX_RADIO_CHANS]C.int // Shift register for scrambler.
+var lfsr [MAX_RADIO_CHANS]int // Shift register for scrambler.
 
 var bit_count [MAX_RADIO_CHANS]C.int // Counter incremented for each bit transmitted
 // on the channel.   This is only used for QPSK.
@@ -71,9 +71,9 @@ var bit_count [MAX_RADIO_CHANS]C.int // Counter incremented for each bit transmi
 // For 8PSK, it has a different meaning.  It is the
 // number of bits in 'save_bit' so we can accumulate
 // three for each symbol.
-var save_bit [MAX_RADIO_CHANS]C.int
+var save_bit [MAX_RADIO_CHANS]int
 
-var prev_dat [MAX_RADIO_CHANS]C.int // Previous data bit.  Used for G3RUH style.
+var prev_dat [MAX_RADIO_CHANS]int // Previous data bit.  Used for G3RUH style.
 
 /*------------------------------------------------------------------
  *
@@ -322,9 +322,9 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 #endif
 */
 
-func tone_gen_put_bit_real(channel C.int, dat C.int) {
+func tone_gen_put_bit_real(channel int, dat int) {
 
-	var a = ACHAN2ADEV(channel) /* device for channel. */
+	var a = ACHAN2ADEV(C.int(channel)) /* device for channel. */
 
 	Assert(save_audio_config_p != nil)
 
@@ -443,7 +443,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			}
 			tone_phase[channel] += change
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			gen_tone_put_sample(C.int(channel), a, sam)
 
 		case MODEM_EAS:
 
@@ -453,7 +453,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			}
 			tone_phase[channel] += change
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			gen_tone_put_sample(C.int(channel), a, sam)
 
 		case MODEM_QPSK:
 
@@ -499,7 +499,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 				#else
 			*/
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			gen_tone_put_sample(C.int(channel), a, sam)
 
 		case MODEM_8PSK:
 			/* TODO KG
@@ -510,7 +510,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 			*/
 			tone_phase[channel] += f1_change_per_sample[channel]
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			gen_tone_put_sample(C.int(channel), a, sam)
 
 		case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
 
@@ -524,7 +524,7 @@ func tone_gen_put_bit_real(channel C.int, dat C.int) {
 				}
 			}
 			sam = C.int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			gen_tone_put_sample(C.int(channel), a, sam)
 
 		default:
 			text_color_set(DW_COLOR_ERROR)
