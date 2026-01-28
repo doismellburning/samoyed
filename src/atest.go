@@ -49,7 +49,6 @@ package direwolf
 // #include <math.h>
 // int audio_get_real (int a);
 // int get_input_real (int it, int chan);
-// void ptt_set_real (int ot, int chan, int ptt_signal);
 import "C"
 
 import (
@@ -782,7 +781,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 
 var dcd_start_time [MAX_RADIO_CHANS]C.double
 
-func ptt_set_fake(ot C.int, channel C.int, ptt_signal C.int) {
+func ptt_set_fake(ot int, channel int, ptt_signal int) {
 	// Should only get here for DCD output control.
 
 	if d_o_opt > 0 {
@@ -813,7 +812,7 @@ func ptt_set_fake(ot C.int, channel C.int, ptt_signal C.int) {
 	}
 }
 
-func ptt_set(ot C.int, channel C.int, ptt_signal C.int) {
+func ptt_set(ot int, channel int, ptt_signal int) {
 	if ATEST_C {
 		ptt_set_fake(ot, channel, ptt_signal)
 	} else {

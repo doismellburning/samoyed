@@ -672,7 +672,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
-				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
+				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 1)
 
 				switch transmitCalibrationType {
 				default:
@@ -704,7 +704,7 @@ x = Silence FX.25 information.`)
 					SLEEP_SEC(max_duration)
 				}
 
-				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
+				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
 				os.Exit(0)
 			} else {
