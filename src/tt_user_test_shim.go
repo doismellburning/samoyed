@@ -8,16 +8,6 @@ package direwolf
  *
  *----------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <ctype.h>
-// #include <time.h>
-// #include <assert.h>
-// extern int TT_TESTS_RUNNING;
-import "C"
-
 import (
 	"testing"
 
