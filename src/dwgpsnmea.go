@@ -87,11 +87,11 @@ var s_save_configp *misc_config_s
 
 var s_gpsnmea_port_fd *term.Term
 
-func dwgpsnmea_init(pconfig *misc_config_s, debug C.int) C.int {
+func dwgpsnmea_init(pconfig *misc_config_s, debug int) C.int {
 	//dwgps_info_t info;
 	//int e;
 
-	s_debug = int(debug)
+	s_debug = debug
 	s_save_configp = pconfig
 
 	if s_debug >= 2 {

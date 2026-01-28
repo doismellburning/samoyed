@@ -751,7 +751,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(misc_config, C.int(d_g_opt))
+	dwgps_init(misc_config, d_g_opt)
 
 	waypoint_init(misc_config)
 

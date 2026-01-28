@@ -55,7 +55,7 @@ func Walk96Main() {
 	var config misc_config_s
 	config.gpsnmea_port = gpsSerialPort
 
-	var debug_gps C.int = 0
+	var debug_gps = 0
 	dwgps_init(&config, debug_gps)
 
 	SLEEP_SEC(1) /* Wait for sample before reading. */
