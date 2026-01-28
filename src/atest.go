@@ -653,8 +653,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 
 	var stemp = ax25_format_addrs(pp)
 
-	var pinfo *C.uchar
-	var info_len = ax25_get_info(pp, &pinfo)
+	var info = ax25_get_info(pp)
 
 	/* Print so we can see what is going on. */
 
@@ -742,7 +741,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 	}
 
 	dw_printf("%s", stemp) /* stations followed by : */
-	ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
+	ax25_safe_print(info, 0)
 	dw_printf("\n")
 
 	/*
