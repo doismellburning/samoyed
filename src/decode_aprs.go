@@ -1792,11 +1792,11 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)))
 		A.g_message_subtype = message_subtype_telem_eqns
-		telemetry_coefficents_message(string(addressee), string(message[5:]), bool2Cint(quiet))
+		telemetry_coefficents_message(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)))
 		A.g_message_subtype = message_subtype_telem_bits
-		telemetry_bit_sense_message(string(addressee), string(message[5:]), bool2Cint(quiet))
+		telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
 	} else if message[0] == '?' {
 
 		/*
@@ -2574,7 +2574,9 @@ func aprs_telemetry(A *decode_aprs_t, info []byte, quiet C.int) {
 
 	C.strcpy(&A.g_data_type_desc[0], C.CString("Telemetry"))
 
-	telemetry_data_original(C.GoString(&A.g_src[0]), string(info), quiet, &A.g_telemetry[0], C.size_t(len(A.g_telemetry)), &A.g_comment[0], C.size_t(len(A.g_comment)))
+	var telemetry, comment = telemetry_data_original(C.GoString(&A.g_src[0]), string(info), quiet != 0)
+	C.strcpy(&A.g_telemetry[0], C.CString(telemetry))
+	C.strcpy(&A.g_comment[0], C.CString(comment))
 
 } /* end aprs_telemetry */
 
@@ -4221,7 +4223,8 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		//dw_printf("compressed telemetry data = \"%s\"\n", tdata);
 
-		telemetry_data_base91(C.GoString(&A.g_src[0]), string(tdata), &A.g_telemetry[0], C.size_t(len(A.g_telemetry)))
+		var telemetry = telemetry_data_base91(C.GoString(&A.g_src[0]), string(tdata))
+		C.strcpy(&A.g_telemetry[0], C.CString(telemetry))
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}

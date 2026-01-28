@@ -1,14 +1,5 @@
 package direwolf
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <math.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"testing"
 
@@ -18,12 +9,8 @@ import (
 func telemetry_test_main(t *testing.T) {
 	t.Helper()
 
-	var resultAlloc [120]C.char
-	var result = &resultAlloc[0]
-	var commentAlloc [40]C.char
-	var comment = &commentAlloc[0]
-	var sizeofResult = C.size_t(len(resultAlloc))
-	var sizeofComment = C.size_t(len(commentAlloc))
+	var result string
+	var comment string
 
 	dw_printf("Unit test for telemetry decoding functions...\n")
 
@@ -31,82 +18,82 @@ func telemetry_test_main(t *testing.T) {
 
 	// From protocol spec.
 
-	telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001", false)
 
-	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", C.GoString(result), "test 101")
-	assert.Empty(t, C.GoString(comment), "test 101")
+	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 101")
+	assert.Empty(t, comment, "test 101")
 
 	// Try adding a comment.
 
-	telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001Comment,with,commas", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001Comment,with,commas", false)
 
-	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", C.GoString(result), "test 102")
-	assert.Equal(t, "Comment,with,commas", C.GoString(comment), "test 102")
+	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 102")
+	assert.Equal(t, "Comment,with,commas", comment, "test 102")
 
 	// Error handling - Try shortening or omitting parts.
 
-	telemetry_data_original("WB2OSZ", "T005,199,000,255,073,123,0110", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T005,199,000,255,073,123,0110", false)
 
-	assert.Empty(t, C.GoString(result), "test 103")
-	assert.Empty(t, C.GoString(comment), "test 103")
+	assert.Empty(t, result, "test 103")
+	assert.Empty(t, comment, "test 103")
 
-	telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,0110", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,0110", false)
 
-	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0", C.GoString(result), "test 104")
-	assert.Empty(t, C.GoString(comment), "test 104")
+	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0", result, "test 104")
+	assert.Empty(t, comment, "test 104")
 
-	telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123", false)
 
-	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123", C.GoString(result), "test 105")
-	assert.Empty(t, C.GoString(comment), "test 105")
+	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123", result, "test 105")
+	assert.Empty(t, comment, "test 105")
 
-	telemetry_data_original("WB2OSZ", "T#005,199,000,255,,123,01101001", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,,123,01101001", false)
 
-	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", C.GoString(result), "test 106")
-	assert.Empty(t, C.GoString(comment), "test 106")
+	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 106")
+	assert.Empty(t, comment, "test 106")
 
-	telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101009", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101009", false)
 
-	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0", C.GoString(result), "test 107")
-	assert.Empty(t, C.GoString(comment), "test 107")
+	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0", result, "test 107")
+	assert.Empty(t, comment, "test 107")
 
 	// Local observation.
 
-	telemetry_data_original("WB2OSZ", "T#491,4.9,0.3,25.0,0.0,1.0,00000000", 0, result, sizeofResult, comment, sizeofComment)
+	result, comment = telemetry_data_original("WB2OSZ", "T#491,4.9,0.3,25.0,0.0,1.0,00000000", false)
 
-	assert.Equal(t, "Seq=491, A1=4.9, A2=0.3, A3=25.0, A4=0.0, A5=1.0, D1=0, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", C.GoString(result), "test 108")
-	assert.Empty(t, C.GoString(comment), "test 108")
+	assert.Equal(t, "Seq=491, A1=4.9, A2=0.3, A3=25.0, A4=0.0, A5=1.0, D1=0, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 108")
+	assert.Empty(t, comment, "test 108")
 
 	dw_printf("part 2\n")
 
 	// From protocol spec.
 
-	telemetry_data_base91("WB2OSZ", "ss11", result, sizeofResult)
+	result = telemetry_data_base91("WB2OSZ", "ss11")
 
-	assert.Equal(t, "Seq=7544, A1=1472", C.GoString(result), "test 201")
+	assert.Equal(t, "Seq=7544, A1=1472", result, "test 201")
 
-	telemetry_data_base91("WB2OSZ", "ss11223344{{!\"", result, sizeofResult)
+	result = telemetry_data_base91("WB2OSZ", "ss11223344{{!\"")
 
-	assert.Equal(t, "Seq=7544, A1=1472, A2=1564, A3=1656, A4=1748, A5=8280, D1=1, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", C.GoString(result), "test 202")
+	assert.Equal(t, "Seq=7544, A1=1472, A2=1564, A3=1656, A4=1748, A5=8280, D1=1, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 202")
 
 	// Error cases.  Should not happen in practice because function
 	// should be called only with valid data that matches the pattern.
 
-	telemetry_data_base91("WB2OSZ", "ss11223344{{!\"x", result, sizeofResult)
+	result = telemetry_data_base91("WB2OSZ", "ss11223344{{!\"x")
 
-	assert.Empty(t, C.GoString(result), "test 203")
+	assert.Empty(t, result, "test 203")
 
-	telemetry_data_base91("WB2OSZ", "ss1", result, sizeofResult)
+	result = telemetry_data_base91("WB2OSZ", "ss1")
 
-	assert.Empty(t, C.GoString(result), "test 204")
+	assert.Empty(t, result, "test 204")
 
-	telemetry_data_base91("WB2OSZ", "ss11223344{{!", result, sizeofResult)
+	result = telemetry_data_base91("WB2OSZ", "ss11223344{{!")
 
-	assert.Empty(t, C.GoString(result), "test 205")
+	assert.Empty(t, result, "test 205")
 
-	telemetry_data_base91("WB2OSZ", "s |1", result, sizeofResult)
+	result = telemetry_data_base91("WB2OSZ", "s |1")
 
-	assert.Equal(t, "Seq=?", C.GoString(result), "test 206")
+	assert.Equal(t, "Seq=?", result, "test 206")
 
 	dw_printf("part 3\n")
 
@@ -146,7 +133,7 @@ func telemetry_test_main(t *testing.T) {
 	assert.Empty(t, pm.unit[11], "test 302")
 	assert.Empty(t, pm.unit[12], "test 302")
 
-	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", 0)
+	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", false)
 
 	pm = t_get_metadata("N0QBF-11")
 
@@ -169,7 +156,7 @@ func telemetry_test_main(t *testing.T) {
 	// Error if less than 15 or empty field.
 	// Notice that we keep the previous value in this case.
 
-	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", 0)
+	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", false)
 
 	pm = t_get_metadata("N0QBF-11")
 
@@ -189,7 +176,7 @@ func telemetry_test_main(t *testing.T) {
 		assert.Fail(t, "Wrong result, test 304n\n")
 	}
 
-	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", 0)
+	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", false)
 
 	pm = t_get_metadata("N0QBF-11")
 
@@ -209,7 +196,7 @@ func telemetry_test_main(t *testing.T) {
 		assert.Fail(t, "Wrong result, test 305n\n")
 	}
 
-	telemetry_bit_sense_message("N0QBF-11", "10110000,N0QBF's Big Balloon", 0)
+	telemetry_bit_sense_message("N0QBF-11", "10110000,N0QBF's Big Balloon", false)
 
 	pm = t_get_metadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
@@ -219,7 +206,7 @@ func telemetry_test_main(t *testing.T) {
 	assert.Equal(t, "N0QBF's Big Balloon", pm.project, "test 306")
 
 	// Too few and invalid digits.
-	telemetry_bit_sense_message("N0QBF-11", "1011000", 0)
+	telemetry_bit_sense_message("N0QBF-11", "1011000", false)
 
 	pm = t_get_metadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
@@ -228,7 +215,7 @@ func telemetry_test_main(t *testing.T) {
 	}
 	assert.Empty(t, pm.project, "test 307")
 
-	telemetry_bit_sense_message("N0QBF-11", "10110008", 0)
+	telemetry_bit_sense_message("N0QBF-11", "10110008", false)
 
 	pm = t_get_metadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
@@ -239,30 +226,30 @@ func telemetry_test_main(t *testing.T) {
 
 	dw_printf("part 4\n")
 
-	telemetry_coefficents_message("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", 0)
-	telemetry_bit_sense_message("M0XER-3", "11111111,10mW research balloon", 0)
+	telemetry_coefficents_message("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", false)
+	telemetry_bit_sense_message("M0XER-3", "11111111,10mW research balloon", false)
 	telemetry_name_message("M0XER-3", "Vbat,Vsolar,Temp,Sat")
 	telemetry_unit_label_message("M0XER-3", "V,V,C,,m")
 
-	telemetry_data_base91("M0XER-3", "DyR.&^<A!.", result, sizeofResult)
+	result = telemetry_data_base91("M0XER-3", "DyR.&^<A!.")
 
-	assert.Equal(t, "10mW research balloon: Seq=3273, Vbat=4.472 V, Vsolar=0.516 V, Temp=-24.3 C, Sat=13", C.GoString(result), "test 401")
-	assert.Empty(t, C.GoString(comment), "test 401")
+	assert.Equal(t, "10mW research balloon: Seq=3273, Vbat=4.472 V, Vsolar=0.516 V, Temp=-24.3 C, Sat=13", result, "test 401")
+	assert.Empty(t, comment, "test 401")
 
-	telemetry_data_base91("M0XER-3", "cNOv'C?=!-", result, sizeofResult)
+	result = telemetry_data_base91("M0XER-3", "cNOv'C?=!-")
 
-	assert.Equal(t, "10mW research balloon: Seq=6051, Vbat=4.271 V, Vsolar=0.580 V, Temp=2.6 C, Sat=12", C.GoString(result), "test 402")
-	assert.Empty(t, C.GoString(comment), "test 402")
+	assert.Equal(t, "10mW research balloon: Seq=6051, Vbat=4.271 V, Vsolar=0.580 V, Temp=2.6 C, Sat=12", result, "test 402")
+	assert.Empty(t, comment, "test 402")
 
-	telemetry_data_base91("M0XER-3", "n0RS(:>b!+", result, sizeofResult)
+	result = telemetry_data_base91("M0XER-3", "n0RS(:>b!+")
 
-	assert.Equal(t, "10mW research balloon: Seq=7022, Vbat=4.509 V, Vsolar=0.662 V, Temp=-2.8 C, Sat=10", C.GoString(result), "test 403")
-	assert.Empty(t, C.GoString(comment), "test 403")
+	assert.Equal(t, "10mW research balloon: Seq=7022, Vbat=4.509 V, Vsolar=0.662 V, Temp=-2.8 C, Sat=10", result, "test 403")
+	assert.Empty(t, comment, "test 403")
 
-	telemetry_data_base91("M0XER-3", "x&G=!(8s!,", result, sizeofResult)
+	result = telemetry_data_base91("M0XER-3", "x&G=!(8s!,")
 
-	assert.Equal(t, "10mW research balloon: Seq=7922, Vbat=3.486 V, Vsolar=0.007 V, Temp=-55.7 C, Sat=11", C.GoString(result), "test 404")
-	assert.Empty(t, C.GoString(comment), "test 404")
+	assert.Equal(t, "10mW research balloon: Seq=7922, Vbat=3.486 V, Vsolar=0.007 V, Temp=-55.7 C, Sat=11", result, "test 404")
+	assert.Empty(t, comment, "test 404")
 
 	/* final score. */
 

@@ -165,8 +165,7 @@ func t_ndp(str string) int {
  *		info 	- Pointer to packet Information field.
  *		quiet	- suppress error messages.
  *
- * Outputs:	output	- Decoded telemetry in human readable format.
- *				TODO:  How big does it need to be?  (buffer overflow?)
+ * Returns:	output	- Decoded telemetry in human readable format.
  *		comment	- Any comment after the data.
  *
  * Description:	The first character, after the "T" data type indicator, must be "#"
@@ -191,9 +190,7 @@ func t_ndp(str string) int {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_data_original(station string, info string, _quiet C.int, output *C.char, outputsize C.size_t, comment *C.char, commentsize C.size_t) {
-
-	var quiet = _quiet != 0
+func telemetry_data_original(station string, info string, quiet bool) (string, string) {
 
 	/* TODO KG
 	   #if DEBUG1
@@ -202,9 +199,6 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
 	   	dw_printf ("\n%s\n\n", info);
 	   #endif
 	*/
-
-	C.strcpy(output, C.CString(""))
-	C.strcpy(comment, C.CString(""))
 
 	var pm = t_get_metadata(station)
 
@@ -225,7 +219,7 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error: Information part of telemetry packet must begin with \"T#\"\n")
 		}
-		return
+		return "", ""
 	}
 
 	/*
@@ -243,9 +237,10 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Nothing after \"T#\" for telemetry data.\n")
 		}
-		return
+		return "", ""
 	}
 
+	var comment string
 	var seq, _ = strconv.Atoi(seqStr)
 	var parts = strings.SplitN(rest, ",", T_NUM_ANALOG+1)
 	for n, p := range parts {
@@ -277,7 +272,7 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
 				}
 			}
 			if len(p) > 8 {
-				C.strcpy(comment, C.CString(p[8:]))
+				comment = p[8:]
 				p = p[:8]
 			}
 
@@ -320,7 +315,7 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
 		#endif
 	*/
 
-	t_data_process(pm, seq, araw, ndp, draw, output, outputsize)
+	return t_data_process(pm, seq, araw, ndp, draw), comment
 } /* end telemtry_data_original */
 
 /*-------------------------------------------------------------------
@@ -332,7 +327,7 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
  * Inputs:	station	- Name of station reporting telemetry.
  *		cdata 	- Compressed data as character string.
  *
- * Outputs:	output	- Telemetry in human readable form.
+ * Returns:	output	- Telemetry in human readable form.
  *
  * Description:	We are expecting from 2 to 7 pairs of base 91 digits.
  *		The first pair is the sequence number.
@@ -341,7 +336,7 @@ func telemetry_data_original(station string, info string, _quiet C.int, output *
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_data_base91(station string, cdata string, output *C.char, outputsize C.size_t) {
+func telemetry_data_base91(station string, cdata string) string {
 
 	/* TODO KG
 	#if DEBUG2
@@ -350,8 +345,6 @@ func telemetry_data_base91(station string, cdata string, output *C.char, outputs
 		dw_printf ("\n%s\n\n", cdata);
 	#endif
 	*/
-
-	C.strcpy(output, C.CString(""))
 
 	var pm = t_get_metadata(station)
 
@@ -370,7 +363,7 @@ func telemetry_data_base91(station string, cdata string, output *C.char, outputs
 	if len(cdata) < 4 || len(cdata) > 14 || (len(cdata)%2 == 1) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: Expected even number of 2 to 14 characters but got \"%s\"\n", cdata)
-		return
+		return ""
 	}
 
 	var seq = two_base91_to_i(cdata[0], cdata[1])
@@ -405,7 +398,7 @@ func telemetry_data_base91(station string, cdata string, output *C.char, outputs
 	#endif
 	*/
 
-	t_data_process(pm, seq, araw, ndp, draw, output, outputsize)
+	return t_data_process(pm, seq, araw, ndp, draw)
 
 } /* end telemtry_data_base91 */
 
@@ -551,9 +544,7 @@ func telemetry_unit_label_message(station string, msg string) {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_coefficents_message(station string, msg string, _quiet C.int) {
-
-	var quiet = _quiet != 0
+func telemetry_coefficents_message(station string, msg string, quiet bool) {
 
 	/* TODO
 	#if DEBUG3
@@ -634,9 +625,7 @@ func telemetry_coefficents_message(station string, msg string, _quiet C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_bit_sense_message(station string, msg string, _quiet C.int) {
-
-	var quiet = _quiet != 0
+func telemetry_bit_sense_message(station string, msg string, quiet bool) {
 
 	/* TODO KG
 	#if DEBUG3
@@ -744,7 +733,7 @@ func ival_to_str(x int) string {
 	}
 }
 
-func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]int, _output *C.char, outputsize C.size_t) {
+func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]int) string {
 
 	Assert(pm != nil)
 
@@ -808,7 +797,7 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 		}
 	}
 
-	C.strcpy(_output, C.CString(output))
+	return output
 
 	/* TODO KG
 	#if DEBUG4
@@ -819,5 +808,3 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 	*/
 
 } /* end t_data_process */
-
-/* end telemetry.c */
