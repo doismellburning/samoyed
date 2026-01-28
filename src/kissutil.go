@@ -544,15 +544,14 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 			// Like source>dest,digi,...,digi:
 			var addrs = ax25_format_addrs(pp)
 
-			var pinfo *C.uchar
-			var info_len = ax25_get_info(pp, &pinfo)
+			var pinfo = ax25_get_info(pp)
 
 			fmt.Printf("%s %s", prefix, addrs) // [channel] Addresses followed by :
 
 			// Safe print will replace any unprintable characters with
 			// hexadecimal representation.
 
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 0)
+			ax25_safe_print(pinfo, 0)
 			fmt.Printf("\n")
 
 			/*
@@ -568,7 +567,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 
 				fmt.Printf("Save received frame to %s\n", fullpath)
 
-				var content = fmt.Sprintf("%s %s%s\n", prefix, addrs, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+				var content = fmt.Sprintf("%s %s%s\n", prefix, addrs, string(pinfo))
 				var err = os.WriteFile(fullpath, []byte(content), 0644)
 
 				if err != nil {

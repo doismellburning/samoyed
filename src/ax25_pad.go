@@ -1043,13 +1043,12 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 		return (nil)
 	}
 
-	var info_p *C.uchar
-	var info_len = ax25_get_info(from_pp, &info_p)
+	var info = ax25_get_info(from_pp)
 
 	// Want strict because addresses should conform to AX.25 here.
 	// That's not the case for something from an Internet Server.
 
-	var result_pp = ax25_from_text(string(C.GoBytes(unsafe.Add(unsafe.Pointer(info_p), 1), info_len-1)), true)
+	var result_pp = ax25_from_text(string(info[1:]), true)
 
 	return (result_pp)
 }
@@ -1688,63 +1687,43 @@ func ax25_get_rr(this_p *packet_t, n int) int {
  *
  * Inputs:	this_p	- Packet object pointer.
  *
- * Outputs:	paddr	- Starting address of information part is returned here.
+ * Returns:	paddr	- Byte slice of the information part
+ *		Should have length in the range of AX25_MIN_INFO_LEN .. AX25_MAX_INFO_LEN.
  *
  * Assumption:	ax25_from_text or ax25_from_frame was called first.
  *
- * Returns:	Number of octets in the Information part.
- *		Should be in the range of AX25_MIN_INFO_LEN .. AX25_MAX_INFO_LEN.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_info(this_p *packet_t, paddr **C.uchar) C.int {
+func ax25_get_info(this_p *packet_t) []byte {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
-
-	var info_ptr *C.uchar
-	var info_len C.int
 
 	if this_p.num_addr >= 2 {
 
 		/* AX.25 */
 
-		info_ptr = &this_p.frame_data[ax25_get_info_offset(this_p)]
-		info_len = ax25_get_num_info(this_p)
+		return C.GoBytes(unsafe.Pointer(&this_p.frame_data[ax25_get_info_offset(this_p)]), ax25_get_num_info(this_p))
 	} else {
 
 		/* Not AX.25.  Treat Whole packet as info. */
-
-		info_ptr = &this_p.frame_data[0]
-		info_len = this_p.frame_len
+		return C.GoBytes(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len)
 	}
-
-	/* Add nul character in case caller treats as printable string. */
-
-	Assert(info_len >= 0)
-
-	*(*C.uchar)(unsafe.Add(unsafe.Pointer(info_ptr), info_len)) = 0
-
-	*paddr = info_ptr
-	return (info_len)
-
 } /* end ax25_get_info */
 
-func ax25_set_info(this_p *packet_t, new_info_ptr *C.uchar, new_info_len C.int) {
-	var old_info_ptr *C.uchar
-	var old_info_len = ax25_get_info(this_p, &old_info_ptr)
-	this_p.frame_len -= old_info_len
+func ax25_set_info(this_p *packet_t, new_info []byte) {
 
-	if new_info_len < 0 {
-		new_info_len = 0
+	var old_info = ax25_get_info(this_p)
+	this_p.frame_len -= C.int(len(old_info))
+
+	if len(new_info) > AX25_MAX_INFO_LEN {
+		new_info = new_info[:AX25_MAX_INFO_LEN]
 	}
 
-	if new_info_len > AX25_MAX_INFO_LEN {
-		new_info_len = AX25_MAX_INFO_LEN
-	}
+	C.memcpy(unsafe.Pointer(&this_p.frame_data[ax25_get_info_offset(this_p)]), C.CBytes(new_info), C.size_t(len(new_info)))
 
-	C.memcpy(unsafe.Pointer(old_info_ptr), unsafe.Pointer(new_info_ptr), C.size_t(new_info_len))
-	this_p.frame_len += new_info_len
+	this_p.frame_len += C.int(len(new_info))
 }
 
 /*------------------------------------------------------------------------------
@@ -1772,17 +1751,13 @@ func ax25_cut_at_crlf(this_p *packet_t) C.int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	var info_ptr *C.uchar
-	var info_len = ax25_get_info(this_p, &info_ptr)
-	var info = C.GoBytes(unsafe.Pointer(info_ptr), info_len)
+	var info = ax25_get_info(this_p)
 
-	// Can't use strchr because there is potential of nul character.
+	for j, b := range info {
 
-	for j := C.int(0); j < info_len; j++ {
+		if b == '\r' || b == '\n' {
 
-		if info[j] == '\r' || info[j] == '\n' {
-
-			var chop = info_len - j
+			var chop = C.int(len(info) - j)
 
 			this_p.frame_len -= chop
 			return (chop)
@@ -2747,13 +2722,11 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 
 	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
-	var pinfo *C.uchar
-	var info_len = ax25_get_info(pp, &pinfo)
-	var info = C.GoBytes(unsafe.Pointer(pinfo), info_len)
+	var info = ax25_get_info(pp)
 
-	for info_len >= 1 && (info[info_len-1] == '\r' ||
-		info[info_len-1] == '\n' ||
-		info[info_len-1] == ' ') {
+	for len(info) >= 1 && (info[len(info)-1] == '\r' ||
+		info[len(info)-1] == '\n' ||
+		info[len(info)-1] == ' ') {
 
 		// Temporary for debugging!
 
@@ -2762,13 +2735,13 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 		//    dw_printf ("DEBUG:  ax25_dedupe_crc ignoring trailing space.\n");
 		//  }
 
-		info_len--
+		info = info[:len(info)-1]
 	}
 
 	var crc C.ushort = 0xffff
 	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(src))), C.int(len(src)), crc)
 	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(dest))), C.int(len(dest)), crc)
-	crc = crc16(pinfo, info_len, crc)
+	crc = crc16((*C.uchar)(C.CBytes(info)), C.int(len(info)), crc)
 
 	return (crc)
 }
@@ -2815,9 +2788,7 @@ func ax25_m_m_crc(pp *packet_t) C.ushort {
  *		hexadecimal notation.   Note that character values
  *		<DEL>, 28, 29, 30, and 31 can appear in MIC-E message.
  *
- * Inputs:	pstr	- Pointer to string.
- *
- *		len	- Number of bytes.  If < 0 we use strlen().
+ * Inputs:	pstr	- Byte slice
  *
  *		ascii_only	- Restrict output to only ASCII.
  *				  Normally we allow UTF-8.
@@ -2853,23 +2824,16 @@ func ax25_m_m_crc(pp *packet_t) C.ushort {
 // #define MAXSAFE 500
 const MAXSAFE = AX25_MAX_INFO_LEN
 
-func ax25_safe_print(_pstr *C.char, length C.int, ascii_only C.int) {
+func ax25_safe_print(info []byte, ascii_only C.int) {
 
-	if length < 0 {
-		length = C.int(C.strlen(_pstr))
-	}
-
-	if length > MAXSAFE {
-		length = MAXSAFE
+	if len(info) > MAXSAFE {
+		info = info[:MAXSAFE]
 	}
 
 	var safe_str string
-	var pstr = C.GoString(_pstr)
+	var pstr = string(info)
 
 	for i, ch := range pstr {
-		if C.int(i) >= length {
-			break
-		}
 		if ch == ' ' && i == len(pstr)-1 {
 			safe_str += fmt.Sprintf("<0x%02x>", ch)
 		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||

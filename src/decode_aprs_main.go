@@ -70,7 +70,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"unsafe"
 )
 
 func byteSliceToCUChars(data []byte) []C.uchar {
@@ -107,7 +106,7 @@ func DecodeAPRSLine(line string) {
 	/* Try to process it. */
 
 	fmt.Printf("\n")
-	ax25_safe_print(C.CString(line), -1, 0)
+	ax25_safe_print([]byte(line), 0)
 	fmt.Printf("\n")
 
 	// Do we have monitor format, KISS, or AX.25 frame?
@@ -171,8 +170,6 @@ func DecodeAPRSLine(line string) {
 
 		var pp = ax25_from_frame(bytes, alevel)
 		if pp != nil {
-			var pinfo *C.uchar
-
 			fmt.Printf("--- AX.25 frame ---\n")
 			ax25_hex_dump(pp)
 			fmt.Printf("-------------------\n")
@@ -180,8 +177,8 @@ func DecodeAPRSLine(line string) {
 			var addrs = ax25_format_addrs(pp)
 			fmt.Printf("%s", addrs)
 
-			var info_len = ax25_get_info(pp, &pinfo)
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1) // Display non-ASCII to hexadecimal.
+			var info = ax25_get_info(pp)
+			ax25_safe_print(info, 1) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
 			var A decode_aprs_t

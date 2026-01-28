@@ -602,11 +602,15 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		result = filt_t(pf)
 
 		if pfilter_debug >= 2 {
-			var infop *C.uchar
-			ax25_get_info(pf.pp, &infop)
+			var infop = ax25_get_info(pf.pp)
 
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), *infop)
+			if len(infop) > 0 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("   %s returns %s for %c data type indicator\n", pf.token_str, bool2text(result), infop[0])
+			} else {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("   %s returns %s for empty info part\n", pf.token_str, bool2text(result))
+			}
 		}
 	} else if pf.token_str[0] == 'r' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* r - range */
@@ -639,9 +643,6 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		result = filt_i(pf)
 
 		if pfilter_debug >= 2 {
-			var infop *C.uchar
-			ax25_get_info(pf.pp, &infop)
-
 			text_color_set(DW_COLOR_DEBUG)
 			if pf.decoded.g_packet_type == packet_type_message {
 				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), C.GoString(&pf.decoded.g_addressee[0]))
@@ -747,10 +748,9 @@ func filt_t(pf *pfstate_t) C.int {
 
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
 
-	var infop *C.uchar
-	ax25_get_info(pf.pp, (&infop))
+	var infop = ax25_get_info(pf.pp)
 
-	Assert(infop != nil)
+	Assert(len(infop) > 0)
 
 	for _, f := range pf.token_str[2:] {
 		switch f {

@@ -831,8 +831,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	var stemp = ax25_format_addrs(pp)
 
-	var pinfo *C.uchar
-	var info_len = ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	/* Print so we can see what is going on. */
 
@@ -972,14 +971,14 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
-		info_len = ax25_get_info(pp, &pinfo)
+		pinfo = ax25_get_info(pp)
 
 		dw_printf("(%s)", desc)
 		if ftype == frame_type_U_XID {
-			var _, info2text, _ = xid_parse(C.GoBytes(unsafe.Pointer(pinfo), info_len))
+			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
+			ax25_safe_print(pinfo, asciiOnly)
 			dw_printf("\n")
 		}
 	} else {
@@ -989,7 +988,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
 
-		ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, asciiOnly)
+		ax25_safe_print(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
 
@@ -997,8 +996,8 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	if d_u_opt {
 		var hasNonPrintable = false
-		for _, r := range C.GoString((*C.char)(unsafe.Pointer(pinfo))) {
-			if !unicode.IsPrint(r) {
+		for _, r := range pinfo {
+			if !unicode.IsPrint(rune(r)) {
 				hasNonPrintable = true
 				break
 			}
@@ -1006,7 +1005,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		if hasNonPrintable {
 			text_color_set(DW_COLOR_DEBUG)
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, 1)
+			ax25_safe_print(pinfo, 1)
 			dw_printf("\n")
 		}
 	}
@@ -1064,10 +1063,10 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		// FIXME: partial implementation.
 
-		var user_def_da = C.CString("{" + string(USER_DEF_USER_ID) + string(USER_DEF_TYPE_AIS))
+		var user_def_da = "{" + string(USER_DEF_USER_ID) + string(USER_DEF_TYPE_AIS)
 
-		if C.strncmp((*C.char)(unsafe.Pointer(pinfo)), user_def_da, 3) == 0 {
-			waypoint_send_ais([]byte(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))
+		if strings.HasPrefix(string(pinfo), user_def_da) {
+			waypoint_send_ais(pinfo[3:])
 
 			if A_opt_ais_to_obj && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
 				var ais_obj_info = encode_object(C.GoString(&A.g_name[0]), false, time.Now(),
@@ -1149,14 +1148,14 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	 */
 
 	if subchan == -1 { // from DTMF decoder
-		if dw_tt_config.gateway_enabled > 0 && info_len >= 2 {
-			aprs_tt_sequence(channel, C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
+		if dw_tt_config.gateway_enabled > 0 && len(pinfo) >= 2 {
+			aprs_tt_sequence(channel, string(pinfo[1:]))
 		}
-	} else if *pinfo == 't' && info_len >= 2 && dw_tt_config.gateway_enabled > 0 {
+	} else if len(pinfo) >= 2 && pinfo[0] == 't' && dw_tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		aprs_tt_sequence(channel, C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
+		aprs_tt_sequence(channel, string(pinfo[1:]))
 	} else {
 		/*
 		 * Send to the IGate processing.

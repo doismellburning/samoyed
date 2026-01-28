@@ -42,10 +42,9 @@ func digipeater_test(t *testing.T, in, out string) {
 	var pp = ax25_from_text(in, true)
 	assert.NotNil(t, pp)
 
-	var pinfo *C.uchar
 	var rec = ax25_format_addrs(pp)
-	ax25_get_info(pp, &pinfo)
-	rec += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
+	var pinfo = ax25_get_info(pp)
+	rec += string(pinfo)
 
 	if in != rec {
 		text_color_set(DW_COLOR_ERROR)
@@ -69,8 +68,8 @@ func digipeater_test(t *testing.T, in, out string) {
 	pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&frame[0]), frame_len), alevel)
 	assert.NotNil(t, pp)
 	rec = ax25_format_addrs(pp)
-	ax25_get_info(pp, &pinfo)
-	rec += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
+	pinfo = ax25_get_info(pp)
+	rec += string(pinfo)
 
 	if in != rec {
 		text_color_set(DW_COLOR_ERROR)
@@ -96,8 +95,8 @@ func digipeater_test(t *testing.T, in, out string) {
 	if result != nil {
 		dedupe_remember(result, 0)
 		xmit = ax25_format_addrs(result)
-		ax25_get_info(result, &pinfo)
-		xmit += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
+		pinfo = ax25_get_info(result)
+		xmit += string(pinfo)
 		ax25_delete(result)
 	}
 

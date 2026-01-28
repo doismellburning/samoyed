@@ -6,10 +6,6 @@ package direwolf
 // #include <assert.h>
 import "C"
 
-import (
-	"unsafe"
-)
-
 /*-------------------------------------------------------------
  *
  * Purpose:	Mock functions for unit tests for IL2P protocol functions.
@@ -53,10 +49,9 @@ func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice 
 
 	// Does it have the the expected content?
 
-	var pinfo *C.uchar
-	var length = ax25_get_info(pp, &pinfo)
-	Assert(length == C.int(len(text)))
-	Assert(text == C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+	var pinfo = ax25_get_info(pp)
+	Assert(len(text) == len(pinfo))
+	Assert(text == string(pinfo))
 
 	dw_printf("Number of symbols corrected: %d\n", retries)
 	if polarity == 2 { // expecting errors corrected.

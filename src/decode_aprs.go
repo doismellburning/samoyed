@@ -216,14 +216,11 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 
-	var _pinfo *C.uchar
-	var info_len = ax25_get_info(pp, &_pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 
 	A.g_quiet = quiet
-
-	var pinfo = C.GoBytes(unsafe.Pointer(_pinfo), info_len)
 
 	if unicode.IsPrint(rune(pinfo[0])) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])))
@@ -762,12 +759,12 @@ func decode_aprs_print(A *decode_aprs_t) {
 		n--
 	}
 	if n > 0 {
-		ax25_safe_print(&A.g_weather[0], -1, 0)
+		ax25_safe_print([]byte(C.GoString(&A.g_weather[0])), 0)
 		dw_printf("\n")
 	}
 
 	if C.strlen(&A.g_telemetry[0]) > 0 {
-		ax25_safe_print(&A.g_telemetry[0], -1, 0)
+		ax25_safe_print([]byte(C.GoString(&A.g_telemetry[0])), 0)
 		dw_printf("\n")
 	}
 
@@ -781,7 +778,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 		n--
 	}
 	if n > 0 {
-		ax25_safe_print(&A.g_comment[0], -1, 0)
+		ax25_safe_print([]byte(C.GoString(&A.g_comment[0])), 0)
 		dw_printf("\n")
 
 		/*

@@ -46,7 +46,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unsafe"
 )
 
 const DEFAULT_IGATE_PORT = 14580
@@ -603,13 +602,12 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 		}
 	}
 
-	var pinfo *C.uchar
-	var info_len = ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	/*
 	 * Someone around here occasionally sends a packet with no information part.
 	 */
-	if info_len == 0 {
+	if len(pinfo) == 0 {
 
 		if s_debug >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -657,8 +655,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 
 func send_packet_to_server(pp *packet_t, channel int) {
 
-	var pinfo *C.uchar
-	ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	/*
 	 * We will often see the same packet multiple times close together due to digipeating.
@@ -777,7 +774,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	// KG Go strings can contain null bytes, so we're all good!
 	// (Except I'm not convinced everything is correct here with type conversions...)
 
-	msg += C.GoString((*C.char)(unsafe.Pointer(pinfo)))
+	msg += string(pinfo)
 
 	// TODO KG Check against IGATE_MAX_MSG size?
 
@@ -831,7 +828,7 @@ func send_msg_to_server(imsg string) {
 	if s_debug >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		ax25_safe_print(C.CString(imsg), C.int(len(imsg)), 0)
+		ax25_safe_print([]byte(imsg), 0)
 		dw_printf("\n")
 	}
 
@@ -988,7 +985,7 @@ func igate_recv_thread() {
 			if !ok_to_send {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				ax25_safe_print((*C.char)(C.CBytes(message)), C.int(len(message)), 0)
+				ax25_safe_print(message, 0)
 				dw_printf("\n")
 			}
 		} else {
@@ -1001,7 +998,7 @@ func igate_recv_thread() {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			ax25_safe_print((*C.char)(C.CBytes(message)), C.int(len(message)), 0)
+			ax25_safe_print(message, 0)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {
@@ -1364,13 +1361,11 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	// TODO: Not quite this simple.  Should have a function to check for position.
 	// $ raw gps could be a position.  @ could be weather data depending on symbol.
 
-	var _pinfo *C.uchar
-	var info_len = ax25_get_info(pp3, (&_pinfo))
-	var pinfo = C.GoBytes(unsafe.Pointer(_pinfo), info_len)
+	var pinfo = ax25_get_info(pp3)
 
 	var msp_special_case = false
 
-	if info_len >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") {
+	if len(pinfo) >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") {
 
 		var n = mheard_get_msp(string(src))
 
@@ -1608,18 +1603,16 @@ func rx_to_ig_remember(pp *packet_t) {
 	rx2ig_checksum[rx2ig_insert_next] = int(ax25_dedupe_crc(pp))
 
 	if s_debug >= 3 {
-		var pinfo *C.uchar
-
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		ax25_get_info(pp, &pinfo)
+		var pinfo = ax25_get_info(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
 			rx2ig_insert_next,
 			rx2ig_time_stamp[rx2ig_insert_next].String(),
 			rx2ig_checksum[rx2ig_insert_next],
-			src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+			src, dest, string(pinfo))
 	}
 
 	rx2ig_insert_next++
@@ -1633,14 +1626,12 @@ func rx_to_ig_allow(pp *packet_t) bool {
 	var now = time.Now()
 
 	if s_debug >= 2 {
-		var pinfo *C.uchar
-
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		ax25_get_info(pp, &pinfo)
+		var pinfo = ax25_get_info(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, string(pinfo))
 	}
 
 	// Do we have duplicate checking at all in the RF>IS direction?
@@ -1892,18 +1883,16 @@ func ig_to_tx_remember(pp *packet_t, channel int, bydigi int) {
 	var crc = ax25_dedupe_crc(pp)
 
 	if s_debug >= 3 {
-		var pinfo *C.uchar
-
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		ax25_get_info(pp, &pinfo)
+		var pinfo = ax25_get_info(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
 			ig2tx_insert_next,
 			channel, bydigi,
 			now.String(), crc,
-			src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+			src, dest, string(pinfo))
 	}
 
 	ig2tx_time_stamp[ig2tx_insert_next] = now
@@ -1921,15 +1910,14 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
-	var pinfo *C.uchar
-	ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	if s_debug >= 2 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, string(pinfo))
 	}
 
 	/* Consider transmissions on this channel only by either digi or IGate. */
@@ -1939,7 +1927,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 
 			/* We have a duplicate within some time period. */
 
-			if is_message_message(C.GoString((*C.char)(unsafe.Pointer(pinfo)))) {
+			if is_message_message(string(pinfo)) {
 
 				/* I think I want to avoid the duplicate suppression for "messages." */
 				/* Suppose we transmit a message from station X and it doesn't get an ack back. */
@@ -1991,7 +1979,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	/* the normal limit for them. */
 
 	var increase_limit = 1
-	if is_message_message(C.GoString((*C.char)(unsafe.Pointer(pinfo)))) {
+	if is_message_message(string(pinfo)) {
 		increase_limit = 3
 	}
 

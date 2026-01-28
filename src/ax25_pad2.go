@@ -154,16 +154,14 @@ import (
  *				  Normally 0xf0 meaning no level 3.
  *				  Could be other values for NET/ROM, etc.
  *
- *		pinfo		- Pointer to data for Info field.  Allowed only for UI, XID, TEST, FRMR.
- *
- *		info_len	- Length for Info field.
+ *		info		- Info field.  Allowed only for UI, XID, TEST, FRMR.
  *
  *
  * Returns:	Pointer to new packet object.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, pinfo *C.uchar, info_len C.int) *packet_t {
+func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
 
 	var this_p = ax25_new()
 
@@ -255,18 +253,18 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 	}
 
 	if i {
-		if pinfo != nil && info_len > 0 {
-			if info_len > AX25_MAX_INFO_LEN {
+		if len(info) > 0 {
+			if len(info) > AX25_MAX_INFO_LEN {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal error in ax25_u_frame: U frame, Invalid information field length %d.\n", info_len)
-				info_len = AX25_MAX_INFO_LEN
+				dw_printf("Internal error in ax25_u_frame: U frame, Invalid information field length %d.\n", len(info))
+				info = info[:AX25_MAX_INFO_LEN]
 			}
-			C.memcpy(unsafe.Pointer(p), unsafe.Pointer(pinfo), C.size_t(info_len))
-			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), info_len))
-			this_p.frame_len += info_len
+			C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
+			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
+			this_p.frame_len += C.int(len(info))
 		}
 	} else {
-		if pinfo != nil && info_len > 0 {
+		if len(info) > 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Internal error in ax25_u_frame: Info part not allowed for U frame type.\n")
 		}
@@ -304,9 +302,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
  *
  *		pf		- Poll/Final flag.
  *
- *		pinfo		- Pointer to data for Info field.  Allowed only for SREJ.
- *
- *		info_len	- Length for Info field.
+ *		info		- Info field.  Allowed only for SREJ.
  *
  *
  * Returns:	Pointer to new packet object.
@@ -321,8 +317,7 @@ func ax25_s_frame(
 	modulo ax25_modulo_t,
 	nr int,
 	pf int,
-	pinfo *C.uchar,
-	info_len C.int,
+	info []byte,
 ) *packet_t {
 
 	var this_p = ax25_new()
@@ -399,18 +394,18 @@ func ax25_s_frame(
 	}
 
 	if ftype == frame_type_S_SREJ {
-		if pinfo != nil && info_len > 0 {
-			if info_len > AX25_MAX_INFO_LEN {
+		if len(info) > 0 {
+			if len(info) > AX25_MAX_INFO_LEN {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal error in ax25_s_frame: SREJ frame, Invalid information field length %d.\n", info_len)
-				info_len = AX25_MAX_INFO_LEN
+				dw_printf("Internal error in ax25_s_frame: SREJ frame, Invalid information field length %d.\n", len(info))
+				info = info[:AX25_MAX_INFO_LEN]
 			}
-			C.memcpy(unsafe.Pointer(p), unsafe.Pointer(pinfo), C.size_t(info_len))
-			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), info_len))
-			this_p.frame_len += info_len
+			C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
+			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
+			this_p.frame_len += C.int(len(info))
 		}
 	} else {
-		if pinfo != nil || info_len != 0 {
+		if len(info) > 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Internal error in ax25_s_frame: Info part not allowed for RR, RNR, REJ frame.\n")
 		}
@@ -449,9 +444,7 @@ func ax25_s_frame(
  *				  Normally 0xf0 meaning no level 3.
  *				  Could be other values for NET/ROM, etc.
  *
- *		pinfo		- Pointer to data for Info field.
- *
- *		info_len	- Length for Info field.
+ *		info		- Info field.
  *
  *
  * Returns:	Pointer to new packet object.
@@ -467,8 +460,7 @@ func ax25_i_frame(
 	ns int,
 	pf int,
 	pid int,
-	pinfo *C.uchar,
-	info_len C.int,
+	info []byte,
 ) *packet_t {
 
 	var this_p = ax25_new()
@@ -541,15 +533,15 @@ func ax25_i_frame(
 	p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
 	this_p.frame_len++
 
-	if pinfo != nil && info_len > 0 {
-		if info_len > AX25_MAX_INFO_LEN {
+	if len(info) > 0 {
+		if len(info) > AX25_MAX_INFO_LEN {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error in ax25_i_frame: I frame, Invalid information field length %d.\n", info_len)
-			info_len = AX25_MAX_INFO_LEN
+			dw_printf("Internal error in ax25_i_frame: I frame, Invalid information field length %d.\n", len(info))
+			info = info[:AX25_MAX_INFO_LEN]
 		}
-		C.memcpy(unsafe.Pointer(p), unsafe.Pointer(pinfo), C.size_t(info_len))
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), info_len))
-		this_p.frame_len += info_len
+		C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
+		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
+		this_p.frame_len += C.int(len(info))
 	}
 
 	*p = 0

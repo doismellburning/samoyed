@@ -111,16 +111,15 @@ func TTCalcMain() {
 
 			var result = ax25_format_addrs(pp)
 
-			var pinfo *C.uchar
-			ax25_get_info(pp, &pinfo)
+			var pinfo = ax25_get_info(pp)
 
-			fmt.Printf("[%d] %s%s\n", channel, result, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+			fmt.Printf("[%d] %s%s\n", channel, result, string(pinfo))
 
 			/*
 			 * Look for Special touch tone packet with "t" in first position of the Information part.
 			 */
 
-			if *pinfo == 't' {
+			if len(pinfo) > 0 && pinfo[0] == 't' {
 				/*
 				 * Send touch tone sequence to calculator and get the answer.
 				 *
@@ -128,7 +127,7 @@ func TTCalcMain() {
 				 *
 				 *  http://www.tapr.org/pipermail/aprssig/2015-January/044069.html
 				 */
-				var n = calculator(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
+				var n = calculator(string(pinfo[1:]))
 				fmt.Printf("\nCalculator returns %d\n\n", n)
 
 				/*

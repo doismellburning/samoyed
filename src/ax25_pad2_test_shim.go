@@ -9,7 +9,6 @@ import "C"
 
 import (
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -27,8 +26,7 @@ func ax25_pad2_test_main(t *testing.T) {
 	t.Helper()
 
 	var pid int = 0xf0
-	var pinfo *C.uchar
-	var info_len C.int
+	var info []byte
 
 	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
 	C.strcpy(&addrs[0][0], C.CString("W2UB"))
@@ -78,7 +76,7 @@ func ax25_pad2_test_main(t *testing.T) {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct U frame, cr=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo, info_len)
+				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, nil)
 				check_ax25_u_frame(t, pp, cr, ftype, pf)
 				ax25_hex_dump(pp)
 				ax25_delete(pp)
@@ -102,7 +100,7 @@ func ax25_pad2_test_main(t *testing.T) {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 				ax25_hex_dump(pp)
@@ -116,7 +114,7 @@ func ax25_pad2_test_main(t *testing.T) {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nConstruct S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil, 0)
+				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 				ax25_hex_dump(pp)
@@ -127,7 +125,7 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	/* SREJ is only S frame which can have information part. */
 
-	var srej_info = []C.uchar{1 << 1, 2 << 1, 3 << 1, 4 << 1}
+	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
 	var ftype ax25_frame_type_t = frame_type_S_SREJ
 	for pf := 0; pf <= 1; pf++ {
@@ -138,7 +136,7 @@ func ax25_pad2_test_main(t *testing.T) {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, &srej_info[0], C.int(len(srej_info)))
+		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 		check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
 		ax25_hex_dump(pp)
@@ -149,8 +147,7 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	/* I frame */
 
-	pinfo = (*C.uchar)(unsafe.Pointer(C.strdup(C.CString("The rain in Spain stays mainly on the plain."))))
-	info_len = C.int(C.strlen((*C.char)(unsafe.Pointer(pinfo))))
+	info = []byte("The rain in Spain stays mainly on the plain.")
 
 	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_8
@@ -161,8 +158,8 @@ func ax25_pad2_test_main(t *testing.T) {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
-			check_ax25_i_frame(t, pp, cr, pf, nr, ns, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
+			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
 
 			ax25_hex_dump(pp)
 			ax25_delete(pp)
@@ -176,8 +173,8 @@ func ax25_pad2_test_main(t *testing.T) {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nConstruct I frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
-			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, pinfo, info_len)
-			check_ax25_i_frame(t, pp, cr, pf, nr, ns, pinfo, info_len)
+			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
+			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
 
 			ax25_hex_dump(pp)
 			ax25_delete(pp)
@@ -218,15 +215,14 @@ func check_ax25_s_frame(t *testing.T, packet *packet_t, cr cmdres_t, ftype ax25_
 	assert.Equal(t, -1, check_ns)
 }
 
-func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr int, ns int, pinfo *C.uchar, info_len C.int) {
+func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr int, ns int, info []byte) {
 	t.Helper()
 
 	var check_cr, check_desc, check_pf, check_nr, check_ns, check_ftype = ax25_frame_type(packet)
 
 	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, check_desc, check_pf, check_nr, check_ns)
 
-	var check_pinfo *C.uchar
-	var check_info_len = ax25_get_info(packet, &check_pinfo)
+	var check_info = ax25_get_info(packet)
 
 	assert.Equal(t, cr, check_cr)
 	assert.Equal(t, frame_type_I, check_ftype)
@@ -234,6 +230,5 @@ func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr 
 	assert.Equal(t, nr, check_nr)
 	assert.Equal(t, ns, check_ns)
 
-	assert.Equal(t, info_len, check_info_len)
-	assert.Equal(t, C.int(0), C.strcmp((*C.char)(unsafe.Pointer(check_pinfo)), (*C.char)(unsafe.Pointer(pinfo)))) //nolint:testifylint
+	assert.Equal(t, info, check_info)
 }
