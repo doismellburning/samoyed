@@ -591,7 +591,7 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
  *
  *--------------------------------------------------------------------*/
 
-func ax25_link_init(pconfig *misc_config_s, debug C.int) {
+func ax25_link_init(pconfig *misc_config_s, debug int) {
 
 	/*
 	 * Save parameters for later use.

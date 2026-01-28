@@ -728,7 +728,7 @@ x = Silence FX.25 information.`)
 	igate_init(audio_config, &igate_config, &digi_config, d_i_opt)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
-	ax25_link_init(misc_config, C.int(d_c_opt))
+	ax25_link_init(misc_config, d_c_opt)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
