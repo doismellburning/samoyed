@@ -557,7 +557,6 @@ x = Silence FX.25 information.`)
 	text_color_init(*textColor)
 	printVersion(false)
 
-	C.setlinebuf(C.stdout)
 	setup_sigint_handler()
 
 	/*
