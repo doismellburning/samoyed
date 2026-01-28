@@ -6,13 +6,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"bufio"
 	"fmt"
@@ -344,7 +337,7 @@ func symbols_init() {
 
 	for _, l := range SymbolsSearchLocations {
 		var openErr error
-		fp, openErr = os.Open(l)
+		fp, openErr = os.Open(l) //nolint:gosec // We're supplying the locations, we can trust them
 		if openErr == nil {
 			break
 		}
