@@ -84,7 +84,7 @@ var xmit_bits_per_sec [MAX_RADIO_CHANS]C.int /* Data transmission rate. */
 /* 1200 & 9600 cases but could be different with other */
 /* modulation techniques. */
 
-var g_debug_xmit_packet C.int /* print packet in hexadecimal form for debugging. */
+var g_debug_xmit_packet bool /* print packet in hexadecimal form for debugging. */
 
 // #define BITS_TO_MS(b,ch) (((b)*1000)/xmit_bits_per_sec[(ch)])
 func BITS_TO_MS(b C.int, ch C.int) C.int {
@@ -126,7 +126,7 @@ var audio_out_dev_mutex [MAX_ADEVS]sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
+func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -594,7 +594,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp *packet_t, max_bundle C.int)
 	   	dw_printf ("xmit_thread: t=%.3f, Turn on PTT now for channel %d. speed = %d\n", dtime_now()-time_ptt, chan, xmit_bits_per_sec[chan]);
 	   #endif
 	*/
-	ptt_set(OCTYPE_PTT, channel, 1)
+	ptt_set(OCTYPE_PTT, int(channel), 1)
 
 	// Inform data link state machine that we are now transmitting.
 
@@ -780,7 +780,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp *packet_t, max_bundle C.int)
 	#endif
 	*/
 
-	ptt_set(OCTYPE_PTT, channel, 0)
+	ptt_set(OCTYPE_PTT, int(channel), 0)
 } /* end xmit_ax25_frames */
 
 /*-------------------------------------------------------------------
@@ -870,7 +870,7 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 
 	/* Optional hex dump of packet. */
 
-	if g_debug_xmit_packet > 0 {
+	if g_debug_xmit_packet {
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
@@ -946,7 +946,7 @@ func xmit_speech(c C.int, pp *packet_t) {
 	/*
 	 * Turn on transmitter.
 	 */
-	ptt_set(OCTYPE_PTT, c, 1)
+	ptt_set(OCTYPE_PTT, int(c), 1)
 
 	/*
 	 * Invoke the speech-to-text script.
@@ -958,7 +958,7 @@ func xmit_speech(c C.int, pp *packet_t) {
 	 * Turn off transmitter.
 	 */
 
-	ptt_set(OCTYPE_PTT, c, 0)
+	ptt_set(OCTYPE_PTT, int(c), 0)
 	ax25_delete(pp)
 } /* end xmit_speech */
 
@@ -1024,7 +1024,7 @@ func xmit_morse(c C.int, pp *packet_t, wpm C.int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
-	ptt_set(OCTYPE_PTT, c, 1)
+	ptt_set(OCTYPE_PTT, int(c), 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1041,7 +1041,7 @@ func xmit_morse(c C.int, pp *packet_t, wpm C.int) {
 		SLEEP_MS(int(timeToWait.Milliseconds()))
 	}
 
-	ptt_set(OCTYPE_PTT, c, 0)
+	ptt_set(OCTYPE_PTT, int(c), 0)
 	ax25_delete(pp)
 } /* end xmit_morse */
 
@@ -1076,7 +1076,7 @@ func xmit_dtmf(c C.int, pp *packet_t, speed C.int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
 
-	ptt_set(OCTYPE_PTT, c, 1)
+	ptt_set(OCTYPE_PTT, int(c), 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1096,7 +1096,7 @@ func xmit_dtmf(c C.int, pp *packet_t, speed C.int) {
 		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
 	}
 
-	ptt_set(OCTYPE_PTT, c, 0)
+	ptt_set(OCTYPE_PTT, int(c), 0)
 	ax25_delete(pp)
 } /* end xmit_dtmf */
 

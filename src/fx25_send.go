@@ -181,13 +181,13 @@ func send_bytes(channel C.int, _b *C.uchar, count C.int) {
  * data 1 bit -> no change.
  * data 0 bit -> invert signal.
  */
-var sendBitOutput [MAX_RADIO_CHANS]C.int
+var sendBitOutput [MAX_RADIO_CHANS]int
 
 func send_bit(channel C.int, b C.int) {
 	if b == 0 {
 		sendBitOutput[channel] = 1 - sendBitOutput[channel]
 	}
-	tone_gen_put_bit(channel, sendBitOutput[channel])
+	tone_gen_put_bit(int(channel), sendBitOutput[channel])
 	fx25BitsSent[channel]++
 }
 

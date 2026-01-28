@@ -591,7 +591,7 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
  *
  *--------------------------------------------------------------------*/
 
-func ax25_link_init(pconfig *misc_config_s, debug C.int) {
+func ax25_link_init(pconfig *misc_config_s, debug int) {
 
 	/*
 	 * Save parameters for later use.
@@ -6073,11 +6073,11 @@ func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
 	if (new_state == state_3_connected || new_state == state_4_timer_recovery) &&
 		S.state != state_3_connected && S.state != state_4_timer_recovery {
 
-		ptt_set(OCTYPE_CON, S.channel, 1) // Turn on connected indicator if configured.
+		ptt_set(OCTYPE_CON, int(S.channel), 1) // Turn on connected indicator if configured.
 	} else if (new_state != state_3_connected && new_state != state_4_timer_recovery) &&
 		(S.state == state_3_connected || S.state == state_4_timer_recovery) {
 
-		ptt_set(OCTYPE_CON, S.channel, 0) // Turn off connected indicator if configured.
+		ptt_set(OCTYPE_CON, int(S.channel), 0) // Turn off connected indicator if configured.
 		// Ideally we should look at any other link state machines
 		// for this channel and leave the indicator on if any
 		// are connected.  I'm not that worried about it.

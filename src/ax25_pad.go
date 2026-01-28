@@ -2902,7 +2902,7 @@ func ax25_safe_print(_pstr *C.char, length C.int, ascii_only C.int) {
  *
  * Inputs:	alevel	- Audio levels collected from demodulator.
  *
- * Outputs:	text	- Text representation for presentation to user.
+ * Returns:	text	- Text representation for presentation to user.
  *			  Currently it will look something like this:
  *
  *				r(m/s)
@@ -2912,9 +2912,6 @@ func ax25_safe_print(_pstr *C.char, length C.int, ascii_only C.int) {
  *			  ends up is in a CSV format file.
  *
  *			  size should be AX25_ALEVEL_TO_TEXT_SIZE.
- *
- * Returns:	True if something to print.  (currently if alevel.original >= 0)
- *		False if not.
  *
  * Description:	Audio level used to be simple; it was a single number.
  *		In version 1.2, we start collecting more details.
@@ -2927,11 +2924,10 @@ func ax25_safe_print(_pstr *C.char, length C.int, ascii_only C.int) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_alevel_to_text(alevel alevel_t, text *C.char) C.int {
+func ax25_alevel_to_text(alevel alevel_t) string {
 
 	if alevel.rec < 0 {
-		C.strcpy(text, C.CString(""))
-		return (0)
+		return ""
 	}
 
 	// TODO1.2: haven't thought much about non-AFSK cases yet.
@@ -2940,22 +2936,20 @@ func ax25_alevel_to_text(alevel alevel_t, text *C.char) C.int {
 	// For DTMF omit the two extra numbers.
 
 	if alevel.mark >= 0 && alevel.space < 0 { /* baseband */
-		C.strcpy(text, C.CString(fmt.Sprintf("%d(%+d/%+d)", alevel.rec, alevel.mark, alevel.space)))
+		return fmt.Sprintf("%d(%+d/%+d)", alevel.rec, alevel.mark, alevel.space)
 	} else if (alevel.mark == -1 && alevel.space == -1) || /* PSK */
 		(alevel.mark == -99 && alevel.space == -99) { /* v. 1.7 "B" FM demodulator. */
 		// ?? Where does -99 come from?
 
-		C.strcpy(text, C.CString(fmt.Sprintf("%d", alevel.rec)))
+		return fmt.Sprintf("%d", alevel.rec)
 	} else if alevel.mark == -2 && alevel.space == -2 { /* DTMF - single number. */
 
-		C.strcpy(text, C.CString(fmt.Sprintf("%d", alevel.rec)))
+		return fmt.Sprintf("%d", alevel.rec)
 	} else { /* AFSK */
 
 		//snprintf (text, AX25_ALEVEL_TO_TEXT_SIZE, "%d:%d(%d/%d=%05.3f=)", alevel.original, alevel.rec, alevel.mark, alevel.space, alevel.ms_ratio);
-		C.strcpy(text, C.CString(fmt.Sprintf("%d(%d/%d)", alevel.rec, alevel.mark, alevel.space)))
+		return fmt.Sprintf("%d(%d/%d)", alevel.rec, alevel.mark, alevel.space)
 	}
-	return (1)
-
 } /* end ax25_alevel_to_text */
 
 /*

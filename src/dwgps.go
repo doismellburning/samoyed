@@ -73,7 +73,7 @@ type dwgps_info_t struct {
 	altitude    C.float  /* meters above mean sea level. Valid if fix == 3. */
 }
 
-var s_dwgps_debug C.int = 0 /* Enable debug output. */
+var s_dwgps_debug = 0 /* Enable debug output. */
 /* >= 2 show updates from GPS. */
 /* >= 1 show results from dwgps_read. */
 
@@ -113,7 +113,7 @@ var s_gps_mutex sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_init(pconfig *misc_config_s, debug C.int) {
+func dwgps_init(pconfig *misc_config_s, debug int) {
 
 	dwgps_clear(s_dwgps_info) // Init the global
 

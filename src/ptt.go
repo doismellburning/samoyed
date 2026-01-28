@@ -606,11 +606,11 @@ func ptt_init(audio_config_p *audio_s) {
 	 * Set up serial ports.
 	 */
 
-	for ch := C.int(0); ch < MAX_RADIO_CHANS; ch++ {
+	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
 
 		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 
-			for ot := C.int(0); ot < NUM_OCTYPES; ot++ {
+			for ot := 0; ot < NUM_OCTYPES; ot++ {
 
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_SERIAL {
 
@@ -637,7 +637,7 @@ func ptt_init(audio_config_p *audio_s) {
 
 					for j := ch; j >= 0; j-- {
 						if audio_config_p.chan_medium[j] == MEDIUM_RADIO {
-							var k C.int = NUM_OCTYPES - 1
+							var k = NUM_OCTYPES - 1
 							if j == ch {
 								k = ot - 1
 							}
@@ -710,9 +710,9 @@ func ptt_init(audio_config_p *audio_s) {
 		get_access_to_gpio("/sys/class/gpio/export")
 	}
 	// GPIOD
-	for ch := C.int(0); ch < MAX_RADIO_CHANS; ch++ {
+	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
 		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := C.int(0); ot < NUM_OCTYPES; ot++ {
+			for ot := 0; ot < NUM_OCTYPES; ot++ {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
@@ -763,9 +763,9 @@ func ptt_init(audio_config_p *audio_s) {
 	 * 	For x86 Linux only.
 	 */
 
-	for ch := C.int(0); ch < MAX_RADIO_CHANS; ch++ {
+	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
 		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
-			for ot := C.int(0); ot < NUM_OCTYPES; ot++ {
+			for ot := 0; ot < NUM_OCTYPES; ot++ {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_LPT {
 
 					/* Can't open the same device more than once so we */
@@ -778,7 +778,7 @@ func ptt_init(audio_config_p *audio_s) {
 
 					for j := ch; j >= 0; j-- {
 						if audio_config_p.chan_medium[j] == MEDIUM_RADIO {
-							var k C.int = NUM_OCTYPES - 1
+							var k = NUM_OCTYPES - 1
 							if j == ch {
 								k = ot - 1
 							}
@@ -1008,7 +1008,7 @@ func ptt_init(audio_config_p *audio_s) {
 
 // JWL - save status and new get_ptt function.
 
-func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
+func ptt_set_real(ot int, channel int, ptt_signal int) {
 
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
@@ -1038,7 +1038,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 
 	// #ifndef TEST
 	if ot == OCTYPE_PTT && !save_audio_config_p.achan[channel].fulldup {
-		demod_mute_input(channel, ptt_signal)
+		demod_mute_input(C.int(channel), C.int(ptt_signal))
 	}
 	// #endif
 
@@ -1048,7 +1048,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 	 */
 
 	// #ifndef TEST
-	dlq_channel_busy(channel, ot, ptt_signal)
+	dlq_channel_busy(C.int(channel), C.int(ot), C.int(ptt_signal))
 	// #endif
 
 	/*
@@ -1124,7 +1124,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 		}
 		defer fd.Close()
 
-		var stemp = fmt.Sprintf("%d", ptt)
+		var stemp = strconv.Itoa(ptt)
 
 		var _, writeErr = fd.WriteString(stemp)
 		if writeErr != nil {
@@ -1218,7 +1218,7 @@ func ptt_set_real(ot C.int, channel C.int, ptt_signal C.int) {
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
 
 		if cm108_set_gpio_pin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
-			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, int(ptt)) != 0 {
+			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt) != 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR:  %s for channel %d has failed.  See User Guide for troubleshooting tips.\n", otnames[ot], channel)
 		}
@@ -1301,7 +1301,7 @@ func ptt_term() {
 	for n := 0; n < MAX_RADIO_CHANS; n++ {
 		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
 			for ot := 0; ot < NUM_OCTYPES; ot++ {
-				ptt_set(C.int(ot), C.int(n), 0)
+				ptt_set(ot, n, 0)
 			}
 		}
 	}
@@ -1363,7 +1363,7 @@ func PTTTestMain() {
 	SLEEP_SEC(2)
 
 	/* flash each a few times. */
-	var channel C.int
+	var channel int
 
 	dw_printf("turn on RTS a few times...\n")
 

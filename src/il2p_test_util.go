@@ -30,11 +30,11 @@ var IL2P_TEST = false
 
 // Serializing calls this which then simulates the demodulator output.
 
-func tone_gen_put_bit_fake(channel C.int, data C.int) {
-	il2p_rec_bit(channel, 0, 0, data)
+func tone_gen_put_bit_fake(channel int, data int) {
+	il2p_rec_bit(C.int(channel), 0, 0, C.int(data))
 }
 
-func tone_gen_put_bit(channel C.int, data C.int) {
+func tone_gen_put_bit(channel int, data int) {
 	if IL2P_TEST {
 		tone_gen_put_bit_fake(channel, data)
 	} else {

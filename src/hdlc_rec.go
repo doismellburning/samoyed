@@ -726,7 +726,7 @@ func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) 
 	var newVal = hdlc_rec_data_detect_any(channel)
 
 	if newVal != old {
-		ptt_set(OCTYPE_DCD, channel, newVal)
+		ptt_set(OCTYPE_DCD, int(channel), int(newVal))
 	}
 }
 

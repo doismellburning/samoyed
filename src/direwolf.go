@@ -557,7 +557,6 @@ x = Silence FX.25 information.`)
 	text_color_init(*textColor)
 	printVersion(false)
 
-	C.setlinebuf(C.stdout)
 	setup_sigint_handler()
 
 	/*
@@ -622,7 +621,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmit_init(audio_config, IfThenElse(d_p_opt, C.int(1), C.int(0)))
+	xmit_init(audio_config, d_p_opt)
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
@@ -672,7 +671,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
-				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 1)
+				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 1)
 
 				switch transmitCalibrationType {
 				default:
@@ -682,21 +681,21 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
 					for n > 0 {
-						tone_gen_put_bit(C.int(transmitCalibrationChannel), C.int(n)&1)
+						tone_gen_put_bit(transmitCalibrationChannel, n&1)
 						n--
 					}
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 					for n > 0 {
-						tone_gen_put_bit(C.int(transmitCalibrationChannel), 1)
+						tone_gen_put_bit(transmitCalibrationChannel, 1)
 						n--
 					}
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 					for n > 0 {
-						tone_gen_put_bit(C.int(transmitCalibrationChannel), 0)
+						tone_gen_put_bit(transmitCalibrationChannel, 0)
 						n--
 					}
 				case 'p': // Silence - set PTT only: -x p
@@ -704,7 +703,7 @@ x = Silence FX.25 information.`)
 					SLEEP_SEC(max_duration)
 				}
 
-				ptt_set(OCTYPE_PTT, C.int(transmitCalibrationChannel), 0)
+				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
 				os.Exit(0)
 			} else {
@@ -728,7 +727,7 @@ x = Silence FX.25 information.`)
 	igate_init(audio_config, &igate_config, &digi_config, d_i_opt)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
-	ax25_link_init(misc_config, C.int(d_c_opt))
+	ax25_link_init(misc_config, d_c_opt)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
@@ -752,7 +751,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(misc_config, C.int(d_g_opt))
+	dwgps_init(misc_config, d_g_opt)
 
 	waypoint_init(misc_config)
 
@@ -805,7 +804,7 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
-func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
+func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 	/* FIXME KG
 	assert (chan >= 0 && chan < MAX_TOTAL_CHANS);		// TOTAL for virtual channels
 	assert (subchan >= -3 && subchan < MAX_SUBCHANS);
@@ -857,14 +856,12 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 	if !q_h_opt && alevel.rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
-		if channel != C.int(audio_config.igate_vchannel) { // suppress if from ICHANNEL
+		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
 			if h != -1 && h != AX25_SOURCE {
 				dw_printf("Digipeater ")
 			}
 
-			var alevel_text [AX25_ALEVEL_TO_TEXT_SIZE]C.char
-
-			ax25_alevel_to_text(alevel, &alevel_text[0])
+			var alevel_text = ax25_alevel_to_text(alevel)
 
 			// Experiment: try displaying the DC bias.
 			// Should be 0 for soundcard but could show mistuning with SDR.
@@ -887,16 +884,16 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, C.GoString(&alevel_text[0]), display_retries, spectrum)
+					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, alevel_text, display_retries, spectrum)
 				} else {
 					dw_printf("%s (probably %s)\n", heard, probably_really)
 				}
 			} else if heard == "DTMF" {
-				dw_printf("%s audio level = %s  tt\n", heard, C.GoString(&alevel_text[0]))
+				dw_printf("%s audio level = %s  tt\n", heard, alevel_text)
 			} else {
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s audio level = %s  %s  %s\n", heard, C.GoString(&alevel_text[0]), display_retries, spectrum)
+					dw_printf("%s audio level = %s  %s  %s\n", heard, alevel_text, display_retries, spectrum)
 				} else {
 					dw_printf("%s\n", heard)
 				}
@@ -915,7 +912,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		dw_printf("Audio input level is too high. This may cause distortion and reduced decode performance.\n")
 		dw_printf("Solution is to decrease the audio input level.\n")
 		dw_printf("Setting audio input level so most stations are around 50 will provide good dyanmic range.\n")
-	} else if alevel.rec < 5 && channel != C.int(audio_config.igate_vchannel) && subchan != -3 {
+	} else if alevel.rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Audio input level is too low.  Increase so most stations are around 50.\n")
@@ -1053,14 +1050,14 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 		// Send to log file.
 
-		log_write(int(channel), &A, pp, alevel, retries)
+		log_write(channel, &A, pp, alevel, retries)
 
 		// temp experiment.
 		// log_rr_bits (&A, pp);
 
 		// Add to list of stations heard over the radio.
 
-		mheard_save_rf(channel, &A, pp, alevel, retries)
+		mheard_save_rf(C.int(channel), &A, pp, alevel, retries)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.
@@ -1114,10 +1111,10 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
 	var flen = ax25_pack(pp, &fbuf[0])
 
-	server_send_rec_packet(channel, pp, &fbuf[0], flen)                                                                // AGW net protocol
-	kissnet_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)    // KISS TCP
-	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1) // KISS serial port
-	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
+	server_send_rec_packet(C.int(channel), pp, &fbuf[0], flen)                                                                // AGW net protocol
+	kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)    // KISS TCP
+	kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1) // KISS serial port
+	kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = ax25_from_text(C.GoString(&ais_obj_packet[0]), true)
@@ -1125,10 +1122,10 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 			var ao_fbuf [AX25_MAX_PACKET_LEN]C.uchar
 			var ao_flen = ax25_pack(ao_pp, &ao_fbuf[0])
 
-			server_send_rec_packet(channel, ao_pp, &ao_fbuf[0], ao_flen)
-			kissnet_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
-			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
-			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
+			server_send_rec_packet(C.int(channel), ao_pp, &ao_fbuf[0], ao_flen)
+			kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
+			kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
+			kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
 			ax25_delete(ao_pp)
 		}
 	}
@@ -1139,7 +1136,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 	 * Don't do anything with it after printing and sending to client apps.
 	 */
 
-	if channel == C.int(audio_config.igate_vchannel) {
+	if channel == audio_config.igate_vchannel {
 		return
 	}
 
@@ -1153,13 +1150,13 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 	if subchan == -1 { // from DTMF decoder
 		if dw_tt_config.gateway_enabled > 0 && info_len >= 2 {
-			aprs_tt_sequence(int(channel), C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
+			aprs_tt_sequence(channel, C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
 		}
 	} else if *pinfo == 't' && info_len >= 2 && dw_tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		aprs_tt_sequence(int(channel), C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
+		aprs_tt_sequence(channel, C.GoString((*C.char)(unsafe.Pointer(pinfo)))[1:])
 	} else {
 		/*
 		 * Send to the IGate processing.
@@ -1169,7 +1166,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		 * confidence that it is correct.
 		 */
 		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			igate_send_rec_packet(int(channel), pp)
+			igate_send_rec_packet(channel, pp)
 		}
 
 		/* Send out a regenerated copy. Applies to all types, not just APRS. */
@@ -1177,7 +1174,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		/* Initial feedback was positive but it fell by the wayside. */
 		/* Should follow up with testers and either document this or clean out the clutter. */
 
-		digi_regen(channel, pp)
+		digi_regen(C.int(channel), pp)
 
 		/*
 		 * Send to APRS digipeater.
@@ -1187,7 +1184,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 		 * confidence that it is correct.
 		 */
 		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			digipeater(channel, pp)
+			digipeater(C.int(channel), pp)
 		}
 
 		/*
@@ -1197,7 +1194,7 @@ func app_process_rec_packet(channel C.int, subchan C.int, slice C.int, pp *packe
 
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
-				cdigipeater(channel, pp)
+				cdigipeater(C.int(channel), pp)
 			}
 		}
 	}

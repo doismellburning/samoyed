@@ -184,7 +184,7 @@ func send_byte_msb_first(channel C.int, x C.int, polarity C.int) {
 		if (x & 0x80) != 0 {
 			dbit = 1
 		}
-		tone_gen_put_bit(channel, (dbit^polarity)&1)
+		tone_gen_put_bit(int(channel), int(dbit^polarity)&1)
 		x <<= 1
 		number_of_bits_sent[channel]++
 	}
@@ -232,7 +232,7 @@ func send_data_nrzi(channel C.int, x C.int) {
  * data 0 bit -> invert signal.
  */
 
-var nrziBitOutput [MAX_RADIO_CHANS]C.int
+var nrziBitOutput [MAX_RADIO_CHANS]int
 
 func send_bit_nrzi(channel C.int, b C.int) {
 
@@ -240,7 +240,7 @@ func send_bit_nrzi(channel C.int, b C.int) {
 		nrziBitOutput[channel] = 1 - nrziBitOutput[channel]
 	}
 
-	tone_gen_put_bit(channel, nrziBitOutput[channel])
+	tone_gen_put_bit(int(channel), nrziBitOutput[channel])
 
 	number_of_bits_sent[channel]++
 }
@@ -275,7 +275,7 @@ func send_bit_nrzi(channel C.int, b C.int) {
 
 func eas_put_byte(channel C.int, b C.uchar) {
 	for n := 0; n < 8; n++ {
-		tone_gen_put_bit(channel, C.int(b&1))
+		tone_gen_put_bit(int(channel), int(b&1))
 		b >>= 1
 	}
 }
