@@ -861,9 +861,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 				dw_printf("Digipeater ")
 			}
 
-			var alevel_text [AX25_ALEVEL_TO_TEXT_SIZE]C.char
-
-			ax25_alevel_to_text(alevel, &alevel_text[0])
+			var alevel_text = ax25_alevel_to_text(alevel)
 
 			// Experiment: try displaying the DC bias.
 			// Should be 0 for soundcard but could show mistuning with SDR.
@@ -886,16 +884,16 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, C.GoString(&alevel_text[0]), display_retries, spectrum)
+					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, alevel_text, display_retries, spectrum)
 				} else {
 					dw_printf("%s (probably %s)\n", heard, probably_really)
 				}
 			} else if heard == "DTMF" {
-				dw_printf("%s audio level = %s  tt\n", heard, C.GoString(&alevel_text[0]))
+				dw_printf("%s audio level = %s  tt\n", heard, alevel_text)
 			} else {
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s audio level = %s  %s  %s\n", heard, C.GoString(&alevel_text[0]), display_retries, spectrum)
+					dw_printf("%s audio level = %s  %s  %s\n", heard, alevel_text, display_retries, spectrum)
 				} else {
 					dw_printf("%s\n", heard)
 				}

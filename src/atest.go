@@ -689,8 +689,7 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 		dw_printf("Digipeater ")
 	}
 
-	var alevel_text [AX25_ALEVEL_TO_TEXT_SIZE]C.char
-	ax25_alevel_to_text(alevel, &alevel_text[0])
+	var alevel_text = ax25_alevel_to_text(alevel)
 
 	/* As suggested by KJ4ERJ, if we are receiving from */
 	/* WIDEn-0, it is quite likely (but not guaranteed), that */
@@ -708,17 +707,17 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 
 	switch fec_type {
 	case fec_type_fx25:
-		dw_printf("%s audio level = %s   FX.25  %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
+		dw_printf("%s audio level = %s   FX.25  %s\n", heard, alevel_text, C.GoString(spectrum))
 	case fec_type_il2p:
-		dw_printf("%s audio level = %s   IL2P  %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
+		dw_printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, C.GoString(spectrum))
 	default:
 		//case fec_type_none:
 		if my_audio_config.achan[channel].fix_bits == RETRY_NONE && !my_audio_config.achan[channel].passall {
 			// No fix_bits or passall specified.
-			dw_printf("%s audio level = %s     %s\n", heard, C.GoString(&alevel_text[0]), C.GoString(spectrum))
+			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, C.GoString(spectrum))
 		} else {
 			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
-			dw_printf("%s audio level = %s   [%s]   %s\n", heard, C.GoString(&alevel_text[0]), retry_text[int(retries)], C.GoString(spectrum))
+			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retry_text[int(retries)], C.GoString(spectrum))
 		}
 	}
 

@@ -265,9 +265,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			}
 		}
 
-		var _alevel_text [40]C.char
-		ax25_alevel_to_text(alevel, &_alevel_text[0])
-		var alevel_text = C.GoString(&_alevel_text[0])
+		var alevel_text = ax25_alevel_to_text(alevel)
 
 		var sdti string
 		if pp != nil {
