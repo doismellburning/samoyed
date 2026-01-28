@@ -62,37 +62,37 @@ const MORSE_DEFAULT_WPM = 10
  * and some can be changed later by commands from connected applications.
  */
 
-var xmit_slottime [MAX_RADIO_CHANS]C.int /* Slot time in 10 mS units for persistence algorithm. */
+var xmit_slottime [MAX_RADIO_CHANS]int /* Slot time in 10 mS units for persistence algorithm. */
 
-var xmit_persist [MAX_RADIO_CHANS]C.int /* Sets probability for transmitting after each */
+var xmit_persist [MAX_RADIO_CHANS]int /* Sets probability for transmitting after each */
 /* slot time delay.  Transmit if a random number */
 /* in range of 0 - 255 <= persist value.  */
 /* Otherwise wait another slot time and try again. */
 
-var xmit_txdelay [MAX_RADIO_CHANS]C.int /* After turning on the transmitter, */
+var xmit_txdelay [MAX_RADIO_CHANS]int /* After turning on the transmitter, */
 /* send "flags" for txdelay * 10 mS. */
 
-var xmit_txtail [MAX_RADIO_CHANS]C.int /* Amount of time to keep transmitting after we */
+var xmit_txtail [MAX_RADIO_CHANS]int /* Amount of time to keep transmitting after we */
 /* are done sending the data.  This is to avoid */
 /* dropping PTT too soon and chopping off the end */
 /* of the frame.  Again 10 mS units. */
 
-var xmit_fulldup [MAX_RADIO_CHANS]C.int /* Full duplex if non-zero. */
+var xmit_fulldup [MAX_RADIO_CHANS]bool /* Full duplex if true */
 
-var xmit_bits_per_sec [MAX_RADIO_CHANS]C.int /* Data transmission rate. */
+var xmit_bits_per_sec [MAX_RADIO_CHANS]int /* Data transmission rate. */
 /* Often called baud rate which is equivalent for */
 /* 1200 & 9600 cases but could be different with other */
 /* modulation techniques. */
 
-var g_debug_xmit_packet C.int /* print packet in hexadecimal form for debugging. */
+var g_debug_xmit_packet int /* print packet in hexadecimal form for debugging. */
 
 // #define BITS_TO_MS(b,ch) (((b)*1000)/xmit_bits_per_sec[(ch)])
-func BITS_TO_MS(b C.int, ch C.int) C.int {
+func BITS_TO_MS(b int, ch int) int {
 	return b * 1000 / xmit_bits_per_sec[ch]
 }
 
 // #define MS_TO_BITS(ms,ch) (((ms)*xmit_bits_per_sec[(ch)])/1000)
-func MS_TO_BITS(ms C.int, ch C.int) C.int {
+func MS_TO_BITS(ms int, ch int) int {
 	return ms * xmit_bits_per_sec[ch] / 1000
 }
 
@@ -126,7 +126,7 @@ var audio_out_dev_mutex [MAX_ADEVS]sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
+func xmit_init(p_modem *audio_s, debug_xmit_packet int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -162,12 +162,12 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
 	 */
 
 	for j := 0; j < MAX_RADIO_CHANS; j++ {
-		xmit_bits_per_sec[j] = C.int(p_modem.achan[j].baud)
-		xmit_slottime[j] = C.int(p_modem.achan[j].slottime)
-		xmit_persist[j] = C.int(p_modem.achan[j].persist)
-		xmit_txdelay[j] = C.int(p_modem.achan[j].txdelay)
-		xmit_txtail[j] = C.int(p_modem.achan[j].txtail)
-		xmit_fulldup[j] = bool2Cint(p_modem.achan[j].fulldup)
+		xmit_bits_per_sec[j] = p_modem.achan[j].baud
+		xmit_slottime[j] = p_modem.achan[j].slottime
+		xmit_persist[j] = p_modem.achan[j].persist
+		xmit_txdelay[j] = p_modem.achan[j].txdelay
+		xmit_txtail[j] = p_modem.achan[j].txtail
+		xmit_fulldup[j] = p_modem.achan[j].fulldup
 	}
 
 	/* TODO KG
@@ -188,7 +188,7 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
 	//TODO:  xmit thread should be higher priority to avoid
 	// underrun on the audio output device.
 
-	for j := C.int(0); j < MAX_RADIO_CHANS; j++ {
+	for j := 0; j < MAX_RADIO_CHANS; j++ {
 		if p_modem.chan_medium[j] == MEDIUM_RADIO {
 			go xmit_thread(j)
 		}
@@ -230,31 +230,31 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_set_txdelay(channel C.int, value C.int) {
+func xmit_set_txdelay(channel int, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
 		xmit_txdelay[channel] = value
 	}
 }
 
-func xmit_set_persist(channel C.int, value C.int) {
+func xmit_set_persist(channel int, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
 		xmit_persist[channel] = value
 	}
 }
 
-func xmit_set_slottime(channel C.int, value C.int) {
+func xmit_set_slottime(channel int, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
 		xmit_slottime[channel] = value
 	}
 }
 
-func xmit_set_txtail(channel C.int, value C.int) {
+func xmit_set_txtail(channel int, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
 		xmit_txtail[channel] = value
 	}
 }
 
-func xmit_set_fulldup(channel C.int, value C.int) {
+func xmit_set_fulldup(channel int, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
 		xmit_fulldup[channel] = value
 	}
@@ -371,7 +371,7 @@ func frame_flavor(pp *packet_t) flavor_t {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_thread(channel C.int) {
+func xmit_thread(channel int) {
 
 	for {
 		tq_wait_while_empty(channel)
@@ -573,7 +573,7 @@ func priorityToRune(prio C.int) rune {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_ax25_frames(channel C.int, prio C.int, pp *packet_t, max_bundle C.int) {
+func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	/*
 	 * These are for timing of a transmission.
 	 * All are in usual unix time (seconds since 1/1/1970) but higher resolution
