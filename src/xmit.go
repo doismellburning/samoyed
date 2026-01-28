@@ -84,7 +84,7 @@ var xmit_bits_per_sec [MAX_RADIO_CHANS]C.int /* Data transmission rate. */
 /* 1200 & 9600 cases but could be different with other */
 /* modulation techniques. */
 
-var g_debug_xmit_packet C.int /* print packet in hexadecimal form for debugging. */
+var g_debug_xmit_packet bool /* print packet in hexadecimal form for debugging. */
 
 // #define BITS_TO_MS(b,ch) (((b)*1000)/xmit_bits_per_sec[(ch)])
 func BITS_TO_MS(b C.int, ch C.int) C.int {
@@ -126,7 +126,7 @@ var audio_out_dev_mutex [MAX_ADEVS]sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func xmit_init(p_modem *audio_s, debug_xmit_packet C.int) {
+func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -870,7 +870,7 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 
 	/* Optional hex dump of packet. */
 
-	if g_debug_xmit_packet > 0 {
+	if g_debug_xmit_packet {
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")

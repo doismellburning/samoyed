@@ -622,7 +622,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmit_init(audio_config, IfThenElse(d_p_opt, C.int(1), C.int(0)))
+	xmit_init(audio_config, d_p_opt)
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
