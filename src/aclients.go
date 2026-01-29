@@ -24,26 +24,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <netdb.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <sys/socket.h>
-// #include <arpa/inet.h>
-// #include <netinet/in.h>
-// #include <netinet/tcp.h>
-// #include <fcntl.h>
-// #include <termios.h>
-// #include <errno.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <ctype.h>
-// #include <stddef.h>
-// #include <string.h>
-// #include <time.h>
-import "C"
-
 import (
 	"encoding/binary"
 	"fmt"
@@ -301,11 +281,10 @@ func client_thread_serial(my_index int, port string, description string, packetC
 	 */
 
 	for {
-		var length int
 		var done = false
-		var result [500]C.char
+		var buffer []byte
 		for !done {
-			var ch, err = serial_port_get1(fd)
+			var b, err = serial_port_get1(fd)
 
 			if err != nil {
 				fmt.Printf("Client %d fatal read error: %s.\n", my_index, err)
@@ -326,26 +305,24 @@ func client_thread_serial(my_index int, port string, description string, packetC
 			 *
 			 * Anyhow, ignore the return character if preceded by >:
 			 */
-			if ch == '\r' {
-				if length >= 10 && result[length-2] == '>' && result[length-1] == ':' {
+			if b == '\r' {
+				if len(buffer) >= 10 && buffer[len(buffer)-2] == '>' && buffer[len(buffer)-1] == ':' {
 					continue
 				}
 				done = true
 				continue
 			}
-			if ch == '\n' {
+			if b == '\n' {
 				continue
 			}
-			result[length] = C.char(ch)
-			length++
+			buffer = append(buffer, b)
 		}
-		result[length] = 0
 
 		/*
 		 * Print it and add to counter.
 		 */
-		if length > 0 {
-			packetChan <- C.GoString(&result[0])
+		if len(buffer) > 0 {
+			packetChan <- string(buffer)
 		}
 	}
 }
