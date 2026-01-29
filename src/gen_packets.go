@@ -68,7 +68,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"unsafe"
 
 	"github.com/spf13/pflag"
 )
@@ -793,10 +792,9 @@ func send_packet(str string) {
 			return
 		}
 
-		var pinfo *C.uchar
-		var info_len = ax25_get_info(pp, &pinfo)
-		if info_len >= 3 && C.strncmp((*C.char)(unsafe.Pointer(pinfo)), C.CString("{DE"), 3) == 0 {
-			pinfo = (*C.uchar)(unsafe.Pointer(C.CString(C.GoString((*C.char)(unsafe.Pointer(pinfo)))[3:]))) // pinfo += 3
+		var pinfo = ax25_get_info(pp)
+		if len(pinfo) >= 3 && strings.HasPrefix(string(pinfo), "{DE") {
+			pinfo = pinfo[3:]
 		}
 
 		var repeat = ax25_get_ssid(pp, AX25_DESTINATION)
@@ -804,7 +802,7 @@ func send_packet(str string) {
 			repeat = 1
 		}
 
-		eas_send(0, pinfo, C.int(repeat), 500, 500)
+		eas_send(0, (*C.uchar)(C.CBytes(pinfo)), C.int(repeat), 500, 500)
 		ax25_delete(pp)
 	} else {
 		var pp = ax25_from_text(str, true)

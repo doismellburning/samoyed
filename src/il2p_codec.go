@@ -67,10 +67,9 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 		}
 
 		// Payload is AX.25 info part.
-		var pinfo *C.uchar
-		var info_len = ax25_get_info(pp, &pinfo)
+		var pinfo = ax25_get_info(pp)
 
-		var k = il2p_encode_payload(pinfo, info_len, max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
+		var k = il2p_encode_payload((*C.uchar)(C.CBytes(pinfo)), C.int(len(pinfo)), max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
 		if k > 0 {
 			out_len += k
 			// Success. Info part was <= 1023 bytes.
@@ -191,7 +190,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
 			}
 
-			ax25_set_info(pp, &extracted[0], payload_len)
+			ax25_set_info(pp, C.GoBytes(unsafe.Pointer(&extracted[0]), payload_len))
 		}
 		return (pp)
 	} else {

@@ -47,7 +47,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/lestrrat-go/strftime"
 )
@@ -479,14 +478,13 @@ func xmit_thread(channel C.int) {
 
 					var stemp = ax25_format_addrs(pp)
 
-					var pinfo *C.uchar
-					var info_len = ax25_get_info(pp, &pinfo)
+					var pinfo = ax25_get_info(pp)
 
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", stemp) /* stations followed by : */
-					ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
+					ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
 					dw_printf("\n")
 					ax25_delete(pp)
 				} /* wait for clear channel error. */
@@ -831,8 +829,7 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 
 	var stemp = ax25_format_addrs(pp)
 
-	var pinfo *C.uchar
-	var info_len = ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	text_color_set(DW_COLOR_XMIT)
 	/*
@@ -855,14 +852,14 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 		dw_printf("(%s)", desc)
 
 		if ftype == frame_type_U_XID {
-			var _, info2text, _ = xid_parse(C.GoBytes(unsafe.Pointer(pinfo), info_len))
+			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
+			ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
 			dw_printf("\n")
 		}
 	} else {
-		ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
+		ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
 		dw_printf("\n")
 	}
 
@@ -930,11 +927,10 @@ func xmit_speech(c C.int, pp *packet_t) {
 
 	var ts = timestampPrefix()
 
-	var pinfo *C.uchar
-	ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 
 	text_color_set(DW_COLOR_XMIT)
-	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
 
 	if save_audio_config_p.tts_script == "" {
 		text_color_set(DW_COLOR_ERROR)
@@ -952,7 +948,7 @@ func xmit_speech(c C.int, pp *packet_t) {
 	 * Invoke the speech-to-text script.
 	 */
 
-	xmit_speak_it(C.CString(save_audio_config_p.tts_script), c, (*C.char)(unsafe.Pointer(pinfo)))
+	xmit_speak_it(C.CString(save_audio_config_p.tts_script), c, C.CString(string(pinfo)))
 
 	/*
 	 * Turn off transmitter.
@@ -1019,17 +1015,16 @@ func xmit_morse(c C.int, pp *packet_t, wpm C.int) {
 
 	var ts = timestampPrefix()
 
-	var pinfo *C.uchar
-	ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 	text_color_set(DW_COLOR_XMIT)
-	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
 
 	ptt_set(OCTYPE_PTT, int(c), 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = morse_send(c, C.GoString((*C.char)(unsafe.Pointer(pinfo))), wpm, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
+	var _length_ms = morse_send(c, string(pinfo), wpm, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
@@ -1071,17 +1066,16 @@ func xmit_dtmf(c C.int, pp *packet_t, speed C.int) {
 
 	var ts = timestampPrefix()
 
-	var pinfo *C.uchar
-	ax25_get_info(pp, &pinfo)
+	var pinfo = ax25_get_info(pp)
 	text_color_set(DW_COLOR_XMIT)
-	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, C.GoString((*C.char)(unsafe.Pointer(pinfo))))
+	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
 
 	ptt_set(OCTYPE_PTT, int(c), 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = dtmf_send(c, (*C.char)(unsafe.Pointer(pinfo)), speed, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
+	var _length_ms = dtmf_send(c, C.CString(string(pinfo)), speed, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.

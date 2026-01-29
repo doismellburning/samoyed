@@ -992,7 +992,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		SET_RC(S, 0)
 		var p1 = 1
 		var nopid0 = 0
-		var pp15 = ax25_u_frame(S.addrs, S.num_addr, cr_cmd, frame_type_U_DISC, p1, nopid0, nil, 0)
+		var pp15 = ax25_u_frame(S.addrs, S.num_addr, cr_cmd, frame_type_U_DISC, p1, nopid0, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp15)
 
 		STOP_T1(S) // started in establish_data_link.
@@ -1016,7 +1016,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 			var p = 0
 			var nopid = 0 // PID applies only to I and UI frames.
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, p, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, p, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // HI means expedited.
 
 			// Erratum: Shouldn't we inform the user when going to disconnected state?
@@ -1039,7 +1039,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		var p = 1
 		var nopid = 0
 
-		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil, 0)
+		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		STOP_T3(S)
@@ -2102,10 +2102,9 @@ func lm_data_indication(E *dlq_item_t) {
 	case frame_type_I: // Information
 		{
 			var pid = ax25_get_pid(E.pp)
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
+			var info = ax25_get_info(E.pp)
 
-			i_frame(S, cr, pf, nr, ns, pid, (*C.char)(unsafe.Pointer(info_ptr)), info_len)
+			i_frame(S, cr, pf, nr, ns, pid, info)
 		}
 
 	case frame_type_S_RR: // Receive Ready - System Ready To Receive
@@ -2119,9 +2118,8 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_S_SREJ: // Selective Reject - Ask for selective frame(s) repeat
 		{
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
-			srej_frame(S, cr, pf, nr, info_ptr, info_len)
+			var info = ax25_get_info(E.pp)
+			srej_frame(S, cr, pf, nr, info)
 		}
 
 	case frame_type_U_SABME: // Set Async Balanced Mode, Extended
@@ -2147,18 +2145,16 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_U_XID: // Exchange Identification
 		{
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
+			var info = ax25_get_info(E.pp)
 
-			xid_frame(S, cr, pf, info_ptr, info_len)
+			xid_frame(S, cr, pf, info)
 		}
 
 	case frame_type_U_TEST: // Test
 		{
-			var info_ptr *C.uchar
-			var info_len = ax25_get_info(E.pp, &info_ptr)
+			var info = ax25_get_info(E.pp)
 
-			test_frame(S, cr, pf, info_ptr, info_len)
+			test_frame(S, cr, pf, info)
 		}
 
 	case frame_type_U: // other Unnumbered, not used by AX.25.
@@ -2196,9 +2192,7 @@ func lm_data_indication(E *dlq_item_t) {
  *		nr	- N(R) from the frame.  Next expected seq. for other end.
  *		ns	- N(S) from the frame.  Seq. number of this incoming frame.
  *		pid	- protocol id.
- *		info_ptr - pointer to information part of frame.
- *		info_len - Number of bytes in information part of frame.
- *			   Should be in range of 0 thru n1_paclen.
+ *		info - information part of frame.
  *
  * Description:
  *		6.4.2. Receiving I Frames
@@ -2248,7 +2242,7 @@ func lm_data_indication(E *dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_ptr *C.char, info_len C.int) {
+func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info []byte) {
 	switch S.state {
 
 	case state_0_disconnected:
@@ -2260,7 +2254,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_p
 			var f = p
 			var nopid = 0 // PID applies only for I and UI frames.
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
@@ -2277,7 +2271,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_p
 			var f = 1
 			var nopid = 0 // PID applies only for I and UI frames.
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
@@ -2293,7 +2287,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_p
 		// used to negotiate a maximum info length but with v2.0, there is no way for the
 		// other end to know our paclen value.
 
-		if info_len >= 0 && info_len <= AX25_MAX_INFO_LEN {
+		if len(info) <= AX25_MAX_INFO_LEN {
 
 			if is_good_nr(S, nr) {
 
@@ -2350,7 +2344,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_p
 						var f = 1
 						var nr = S.vr
 
-						var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil, 0)
+						var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
 
 						// I wonder if this difference is intentional or if only one place was
 						// was modified after a cut-n-paste of the flow chart segment.
@@ -2374,7 +2368,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_p
 
 				} else { // Own receiver not busy.
 
-					i_frame_continued(S, p, ns, pid, (*C.char)(unsafe.Pointer(info_ptr)), info_len)
+					i_frame_continued(S, p, ns, pid, info)
 				}
 
 			} else { // N(R) not in expected range.
@@ -2386,7 +2380,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info_p
 			// Wouldn't even get to CRC check if not octet aligned.
 
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, info_len, AX25_MAX_INFO_LEN)
+			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, len(info), AX25_MAX_INFO_LEN)
 
 			establish_data_link(S)
 			S.layer_3_initiated = false
@@ -2424,8 +2418,7 @@ func TODO_SABME_SABM(S *ax25_dlsm_t) dlsm_state_e { // FIXME KG TERRIBLE NAME - 
  *		p	- Poll bit.
  *		ns	- N(S) from the frame.  Seq. number of this incoming frame.
  *		pid	- protocol id.
- *		info_ptr - pointer to information part of frame.
- *		info_len - Number of bytes in information part of frame.  Already verified.
+ *		info - information part of frame.
  *
  * Description:
  *
@@ -2504,7 +2497,7 @@ func TODO_SABME_SABM(S *ax25_dlsm_t) dlsm_state_e { // FIXME KG TERRIBLE NAME - 
  *
  *------------------------------------------------------------------------------*/
 
-func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char, info_len C.int) {
+func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 	if ns == S.vr {
 
@@ -2519,11 +2512,11 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 		if s_debug_client_app {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, \"", ns, S.vr)
-			ax25_safe_print(info_ptr, info_len, 1)
+			ax25_safe_print(info, 1)
 			dw_printf("\"\n")
 		}
 
-		dl_data_indication(S, C.int(pid), info_ptr, info_len)
+		dl_data_indication(S, C.int(pid), (*C.char)(C.CBytes(info)), C.int(len(info)))
 
 		if S.rxdata_by_ns[ns] != nil {
 			// There is a possibility that we might have another received frame stashed
@@ -2542,7 +2535,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 			if s_debug_client_app {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
-				ax25_safe_print((*C.char)(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data)), S.rxdata_by_ns[S.vr].len, 1)
+				ax25_safe_print(C.GoBytes(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data), S.rxdata_by_ns[S.vr].len), 1)
 				dw_printf("\"\n")
 			}
 
@@ -2566,7 +2559,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 			var nr = S.vr   // Next expected sequence number.
 			var cr = cr_res // response with F set to 1.
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil, 0)
+			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		} else if !S.acknowledge_pending {
@@ -2594,7 +2587,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 			var nr = S.vr   // Next expected sequence number.
 			var cr = cr_res // response with F set to 1.
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil, 0)
+			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
@@ -2619,7 +2612,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 			dw_printf("sending REJ, SREJ not enabled case, V(R)=%d", S.vr)
 		}
 
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil, 0)
+		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
@@ -2649,11 +2642,11 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 				cdata_delete(S.rxdata_by_ns[ns])
 				S.rxdata_by_ns[ns] = nil
 			}
-			S.rxdata_by_ns[ns] = cdata_new(C.int(pid), info_ptr, info_len)
+			S.rxdata_by_ns[ns] = cdata_new(C.int(pid), (*C.char)(C.CBytes(info)), C.int(len(info)))
 
 			if s_debug_misc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
-				ax25_safe_print(info_ptr, info_len, 1)
+				ax25_safe_print(info, 1)
 				dw_printf("\"\n")
 			}
 
@@ -2665,7 +2658,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info_ptr *C.char,
 				var f = 0       // we know p=0 here.
 				var nr = S.vr
 
-				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil, 0)
+				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
 				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			} else if S.rxdata_by_ns[AX25MODULO(ns-1, S.modulo)] == nil {
 
@@ -2991,8 +2984,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 	if S.srej_enable == srej_multi && count > 1 {
 
-		var info [128]C.uchar
-		var info_len C.int = 0
+		var info []byte
 
 		for i := 1; i < count; i++ { // skip first one
 
@@ -3005,11 +2997,10 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			// think it is worth the effort to generate it.  Maybe later.
 
 			if S.modulo == 8 {
-				info[info_len] = C.uchar(resend[i] << 5)
+				info = append(info, byte(resend[i])<<5)
 			} else {
-				info[info_len] = C.uchar(resend[i] << 1)
+				info = append(info, byte(resend[i])<<1)
 			}
-			info_len++
 		}
 
 		var nr = resend[0]
@@ -3038,7 +3029,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			_f = 1
 		}
 
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, &info[0], info_len)
+		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, info)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		return
 	}
@@ -3070,7 +3061,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			_f = 1
 		}
 
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, nil, 0)
+		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 	}
 
@@ -3131,7 +3122,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			var r = cr_res // DM response with F taken from P.
 			var f = pf
 			var nopid int = 0 // PID only for I and UI frames.
-			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
@@ -3148,7 +3139,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			var f int = 1
 			var nopid int = 0 // PID applies only for I and UI frames.
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
@@ -3376,7 +3367,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			var f = pf
 			var nopid int = 0 // PID is only for I and UI.
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
@@ -3390,7 +3381,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			var f int = 1
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
@@ -3607,7 +3598,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
  *
  *------------------------------------------------------------------------------*/
 
-func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info *C.uchar, info_len C.int) {
+func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) {
 
 	switch S.state {
 
@@ -3659,7 +3650,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info *C.uchar, info_
 			START_T3(S)
 			select_t1_value(S)
 
-			var num_resent = resend_for_srej(S, nr, info, info_len)
+			var num_resent = resend_for_srej(S, nr, info)
 			if num_resent > 0 {
 
 				// my addition
@@ -3743,7 +3734,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info *C.uchar, info_
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("state 4 timer recovery, send requested frame(s) \n");
 
-				var num_resent = resend_for_srej(S, nr, info, info_len)
+				var num_resent = resend_for_srej(S, nr, info)
 				if num_resent > 0 {
 					// my addition
 					// Erratum: We sent I frame(s) and want to timeout if no ack comes back.
@@ -3781,7 +3772,6 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info *C.uchar, info_
  * Inputs:	S	- Data Link State Machine.
  *		nr	- N(R) from the frame.  Peer has asked for a resend of I frame with this N(S).
  *		info	- Information field, might contain additional sequence numbers for Multi-SREJ.
- *		info_len - Information field length, bytes.
  *
  * Returns:	Number of frames sent.  Should be at least one.
  *
@@ -3790,7 +3780,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info *C.uchar, info_
  *
  *------------------------------------------------------------------------------*/
 
-func resend_for_srej(S *ax25_dlsm_t, nr int, info *C.uchar, info_len C.int) int {
+func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 	var cr = cr_cmd
 	var i_frame_nr = S.vr
 	var i_frame_ns = nr
@@ -3803,7 +3793,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info *C.uchar, info_len C.int) int 
 	var txdata = S.txdata_by_ns[i_frame_ns]
 
 	if txdata != nil {
-		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, int(txdata.pid), (*C.uchar)(unsafe.Pointer(&txdata.data)), txdata.len)
+		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, int(txdata.pid), C.GoBytes(unsafe.Pointer(&txdata.data[0]), txdata.len))
 		// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		num_resent++
@@ -3814,9 +3804,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info *C.uchar, info_len C.int) int 
 
 	// Multi-SREJ if there is an information part.
 
-	var infoBytes = C.GoBytes(unsafe.Pointer(info), info_len)
-
-	for j := C.int(0); j < info_len; j++ {
+	for j := 0; j < len(info); j++ {
 
 		// We can have a single sequence number like this:
 		//    	xxx00000	(mod 8)
@@ -3830,14 +3818,14 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info *C.uchar, info_len C.int) int 
 		// with it set.
 
 		if S.modulo == 8 {
-			i_frame_ns = int(infoBytes[j]>>5) & 0x07 // no provision for span.
+			i_frame_ns = int(info[j]>>5) & 0x07 // no provision for span.
 		} else {
-			i_frame_ns = int(infoBytes[j]>>1) & 0x7f // TODO: test LSB and possible loop here.
+			i_frame_ns = int(info[j]>>1) & 0x7f // TODO: test LSB and possible loop here.
 		}
 
 		txdata = S.txdata_by_ns[i_frame_ns]
 		if txdata != nil {
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, int(txdata.pid), (*C.uchar)(unsafe.Pointer(&txdata.data)), txdata.len)
+			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, int(txdata.pid), C.GoBytes(unsafe.Pointer(&txdata.data), txdata.len))
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			num_resent++
 		} else {
@@ -3918,7 +3906,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		// but we dutifully copy it into "F" for the UA response.
 		var nopid int = 0 // PID is only for I and UI.
 
-		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		clear_exception_conditions(S)
@@ -3953,7 +3941,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			enter_new_state(S, state_5_awaiting_v22_connection)
 		} else { // SABM - respond with UA.
@@ -3966,7 +3954,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			// stay in state 1.
 		}
@@ -3978,7 +3966,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			// stay in state 5
 		} else { // SABM, respond with UA, enter state 1
@@ -3986,7 +3974,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			enter_new_state(S, state_1_awaiting_connection)
 		}
@@ -4001,7 +3989,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
 			// stay in state 2.
 		}
@@ -4013,7 +4001,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			// State 3 & 4 handling are the same except for this one difference.
@@ -4093,7 +4081,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 		// keep current state, 0, 1, or 5.
@@ -4105,7 +4093,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
 		}
 		// keep current state, 2.
@@ -4119,7 +4107,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var f = p
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			// dl disconnect *indication*
@@ -4633,7 +4621,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
 				var r = cr_res    // DM response with F taken from P.
 				var nopid int = 0 // PID applies only for I and UI frames.
 
-				var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, pf, nopid, nil, 0)
+				var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, pf, nopid, nil)
 				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			}
 
@@ -4697,7 +4685,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
  *
  *------------------------------------------------------------------------------*/
 
-func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info_ptr *C.uchar, info_len C.int) {
+func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 
 	switch S.mdl_state {
 
@@ -4711,7 +4699,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info_ptr *C.uchar, info_len 
 				// Generally we take minimum of what he wants and what I can do.
 				// Adjust my working configuration and send it back.
 
-				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
+				var param, _, ok = xid_parse(info)
 
 				if ok > 0 {
 					negotiation_response(S, param)
@@ -4721,7 +4709,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info_ptr *C.uchar, info_len 
 
 					var nopid int = 0
 					var f int = -1
-					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
+					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, xinfo)
 					lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 				}
 			} else {
@@ -4741,7 +4729,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info_ptr *C.uchar, info_len 
 
 				// Got expected response.  Copy into my working parameters.
 
-				var param, _, ok = xid_parse(C.GoBytes(unsafe.Pointer(info_ptr), info_len))
+				var param, _, ok = xid_parse(info)
 
 				if ok > 0 {
 					complete_negotiation(S, param)
@@ -4813,13 +4801,13 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info_ptr *C.uchar, info_len 
  *
  *------------------------------------------------------------------------------*/
 
-func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info_ptr *C.uchar, info_len C.int) {
+func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 	var res = cr_res
 	var f = pf
 	var nopid int = 0
 
 	if cr == cr_cmd {
-		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info_ptr, info_len)
+		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 	}
 } /* end test_frame */
@@ -4947,7 +4935,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			if S.state == state_5_awaiting_v22_connection {
 				_s = frame_type_U_SABME
 			}
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, _s, p, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, _s, p, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			select_t1_value(S)
 			START_T1(S)
@@ -4971,7 +4959,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 				S.peak_rc_value = S.rc
 			}
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			select_t1_value(S)
 			START_T1(S)
@@ -5025,7 +5013,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			var f int = 0   // Erratum: Assuming F=0 because it is not response to P=1
 			var nopid int = 0
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, f, nopid, nil, 0)
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			enter_new_state(S, state_0_disconnected)
@@ -5141,7 +5129,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 
 			var xinfo = xid_encode(&param, cmd)
 
-			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
+			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			START_TM201(S)
@@ -5212,7 +5200,7 @@ func establish_data_link(S *ax25_dlsm_t) {
 		frameType = frame_type_U_SABME
 	}
 
-	var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frameType, p, nopid, nil, 0)
+	var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frameType, p, nopid, nil)
 	lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 	STOP_T3(S)
@@ -5309,7 +5297,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
 	if S.own_receiver_busy {
 		ft = frame_type_S_RNR
 	}
-	var pp = ax25_s_frame(S.addrs, S.num_addr, cmd, ft, S.modulo, nr, p, nil, 0)
+	var pp = ax25_s_frame(S.addrs, S.num_addr, cmd, ft, S.modulo, nr, p, nil)
 
 	lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
@@ -5378,7 +5366,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 
 			// I'm busy.
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil, 0)
+			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
@@ -5427,7 +5415,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 
 				// Not waiting for fill in of missing frames.		X.25 2.4.6.11 c)
 
-				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil, 0)
+				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 				S.acknowledge_pending = false
@@ -5446,7 +5434,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 				dw_printf("\n****** ENQUIRY RESPONSE srej not enbled, sending RR resp F=%d ******\n\n", f)
 			}
 
-			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil, 0)
+			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false
@@ -5460,7 +5448,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 		if S.own_receiver_busy {
 			_r = frame_type_S_RNR
 		}
-		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, _r, S.modulo, nr, f, nil, 0)
+		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, _r, S.modulo, nr, f, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
@@ -5545,7 +5533,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 			}
 
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p,
-				int(S.txdata_by_ns[ns].pid), (*C.uchar)(unsafe.Pointer(&S.txdata_by_ns[ns].data)), S.txdata_by_ns[ns].len)
+				int(S.txdata_by_ns[ns].pid), C.GoBytes(unsafe.Pointer(&S.txdata_by_ns[ns].data[0]), S.txdata_by_ns[ns].len))
 
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			// Keep it around in case we need to send again.
@@ -5984,7 +5972,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 				// ax25_safe_print (txdata.data, txdata.len, 1);
 				// dw_printf ("\"\n");
 			}
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, int(txdata.pid), (*C.uchar)(unsafe.Pointer(&txdata.data)), txdata.len)
+			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, int(txdata.pid), C.GoBytes(unsafe.Pointer(&txdata.data[0]), txdata.len))
 
 			if s_debug_misc { //nolint:staticcheck
 				// text_color_set(DW_COLOR_DEBUG);
@@ -6121,7 +6109,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 
 		var p int = 1
 		var nopid int = 0
-		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, (*C.uchar)(C.CBytes(xinfo)), C.int(len(xinfo)))
+		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.mdl_rc = 0

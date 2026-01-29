@@ -393,15 +393,13 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 	SET_FEC_LEVEL(hdr, max_fec)
 	SET_HDR_TYPE(hdr, 1)
 
-	var pinfo *C.uchar
-
-	var info_len = ax25_get_info(pp, &pinfo)
-	if info_len < 0 || info_len > IL2P_MAX_PAYLOAD_SIZE {
+	var pinfo = ax25_get_info(pp)
+	if len(pinfo) > IL2P_MAX_PAYLOAD_SIZE {
 		return (-2)
 	}
 
-	SET_PAYLOAD_BYTE_COUNT(hdr, info_len)
-	return (info_len)
+	SET_PAYLOAD_BYTE_COUNT(hdr, C.int(len(pinfo)))
+	return C.int(len(pinfo))
 }
 
 // This should create a packet from the IL2P header.
@@ -549,9 +547,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		var modulo = modulo_8
 		var nr = int(control>>3) & 0x07
 		var pf = int(control>>6) & 0x01
-		var pinfo *C.uchar // Any info for SREJ will be added later.
-		var info_len C.int = 0
-		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo, info_len))
+		var pinfo []byte // Any info for SREJ will be added later.
+		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo))
 	} else if pid == 1 {
 
 		// 'U' frame other than 'UI'.
@@ -582,9 +579,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 			ftype = frame_type_U_TEST
 		}
 		var pf = int(control>>6) & 0x01
-		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
-		var info_len C.int = 0
-		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo, info_len))
+		var pinfo []byte // Any info for UI, XID, TEST will be added later.
+		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else if ui != 0 {
 
 		// 'UI' frame.
@@ -595,9 +591,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		var ftype = frame_type_U_UI
 		var pf = int(control>>6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))
-		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
-		var info_len C.int = 0
-		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, int(axpid), pinfo, info_len))
+		var pinfo []byte // Any info for UI, XID, TEST will be added later.
+		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, int(axpid), pinfo))
 	} else {
 
 		// 'I' frame.
@@ -610,9 +605,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		var ns = int(control & 0x7)
 		var modulo = modulo_8
 		var axpid = decode_pid(GET_PID(hdr))
-		var pinfo *C.uchar // Any info for UI, XID, TEST will be added later.
-		var info_len C.int = 0
-		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, int(axpid), pinfo, info_len))
+		var pinfo []byte // Any info for UI, XID, TEST will be added later.
+		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, int(axpid), pinfo))
 	}
 } // end
 

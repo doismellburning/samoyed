@@ -569,16 +569,14 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 
 			// Information if any with \r.
 
-			var pinfo *C.uchar
-			var info_len = ax25_get_info(pp, &pinfo)
+			var pinfo = ax25_get_info(pp)
 			var msg_data_len = len(agwpe_msg.Data) // result length so far
 
-			if info_len > 0 && pinfo != nil {
+			if len(pinfo) > 0 {
 				// Issue 367: Use of strlcat truncated information part at any nul character.
 				// Use memcpy instead to preserve binary data, e.g. NET/ROM.
-				var _pinfo = C.GoBytes(unsafe.Pointer(pinfo), info_len)
-				agwpe_msg.Data = append(agwpe_msg.Data, _pinfo...)
-				msg_data_len += int(info_len)
+				agwpe_msg.Data = append(agwpe_msg.Data, pinfo...)
+				msg_data_len += len(pinfo)
 				agwpe_msg.Data = append(agwpe_msg.Data, '\r')
 				msg_data_len++
 			}
@@ -682,16 +680,16 @@ func mon_desc(pp *packet_t) (byte, string) {
 		pf_text = "PF"
 	}
 
-	var pinfo *C.uchar // I, UI, XID, SREJ, TEST can have information part.
-	var info_len = ax25_get_info(pp, &pinfo)
+	// I, UI, XID, SREJ, TEST can have information part.
+	var pinfo = ax25_get_info(pp)
 
 	switch ftype {
 
 	case frame_type_I:
-		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, ax25_get_pid(pp), info_len, pf_text, pf)
+		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, ax25_get_pid(pp), len(pinfo), pf_text, pf)
 
 	case frame_type_U_UI:
-		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", ax25_get_pid(pp), info_len, pf_text, pf)
+		return 'U', fmt.Sprintf("<UI pid=%02X Len=%d %s=%d >", ax25_get_pid(pp), len(pinfo), pf_text, pf)
 
 	case frame_type_S_RR:
 		return 'S', fmt.Sprintf("<RR R%d %s=%d >", nr, pf_text, pf)
@@ -703,7 +701,7 @@ func mon_desc(pp *packet_t) (byte, string) {
 		return 'S', fmt.Sprintf("<REJ R%d %s=%d >", nr, pf_text, pf)
 
 	case frame_type_S_SREJ:
-		return 'S', fmt.Sprintf("<SREJ R%d %s=%d Len=%d >", nr, pf_text, pf, info_len)
+		return 'S', fmt.Sprintf("<SREJ R%d %s=%d Len=%d >", nr, pf_text, pf, len(pinfo))
 
 	case frame_type_U_SABME:
 		return 'S', fmt.Sprintf("<SABME %s=%d >", pf_text, pf)
@@ -724,10 +722,10 @@ func mon_desc(pp *packet_t) (byte, string) {
 		return 'S', fmt.Sprintf("<FRMR %s=%d >", pf_text, pf)
 
 	case frame_type_U_XID:
-		return 'S', fmt.Sprintf("<XID %s=%d Len=%d >", pf_text, pf, info_len)
+		return 'S', fmt.Sprintf("<XID %s=%d Len=%d >", pf_text, pf, len(pinfo))
 
 	case frame_type_U_TEST:
-		return 'S', fmt.Sprintf("<TEST %s=%d Len=%d >", pf_text, pf, info_len)
+		return 'S', fmt.Sprintf("<TEST %s=%d Len=%d >", pf_text, pf, len(pinfo))
 
 	default:
 		// Also case frame_type_U:
@@ -1235,7 +1233,7 @@ func cmd_listen_thread(client C.int) {
 				}
 
 				var data = cmd.Data[1+10*ndigi:]
-				ax25_set_info(pp, (*C.uchar)(C.CBytes(data)), C.int(cmd.Header.DataLen)-ndigi*10-1)
+				ax25_set_info(pp, data)
 
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 				ax25_set_pid(pp, pid)
@@ -1486,7 +1484,7 @@ func cmd_listen_thread(client C.int) {
 					dw_printf("Failed to create frame from AGW 'M' message.\n")
 				}
 
-				ax25_set_info(pp, (*C.uchar)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
+				ax25_set_info(pp, cmd.Data)
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 				ax25_set_pid(pp, pid)
 

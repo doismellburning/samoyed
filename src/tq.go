@@ -25,7 +25,6 @@ import "C"
 import (
 	"sync"
 	"time"
-	"unsafe"
 
 	"github.com/lestrrat-go/strftime"
 )
@@ -197,22 +196,21 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 
 		// Formated addresses.
 		var stemp = ax25_format_addrs(pp)
-		var pinfo *C.uchar
-		var info_len = ax25_get_info(pp, &pinfo)
+		var pinfo = ax25_get_info(pp)
 		text_color_set(DW_COLOR_XMIT)
 
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
 
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
+			ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
 			dw_printf("\n")
 
 			igate_send_rec_packet(int(channel), pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			ax25_safe_print((*C.char)(unsafe.Pointer(pinfo)), info_len, bool2Cint(!ax25_is_aprs(pp)))
+			ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
 			dw_printf("\n")
 
 			nettnc_send_packet(channel, pp)
