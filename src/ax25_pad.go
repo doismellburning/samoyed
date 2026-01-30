@@ -156,6 +156,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 	"unsafe"
 )
@@ -243,8 +244,7 @@ type packet_t struct {
 
 	seq int /* unique sequence number for debugging. */
 
-	release_time C.double /* Time stamp in format returned by dtime_now(). */
-	/* When to release from the SATgate mode delay queue. */
+	release_time time.Time /* When to release from the SATgate mode delay queue. */
 
 	nextp *packet_t /* Pointer to next in queue. */
 
@@ -1839,11 +1839,11 @@ func ax25_get_nextp(this_p *packet_t) *packet_t {
  *
  * Inputs:	this_p		- Current packet object.
  *
- *		release_time	- Time as returned by dtime_monotonic().
+ *		release_time	- Time
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_release_time(this_p *packet_t, release_time C.double) {
+func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1858,7 +1858,7 @@ func ax25_set_release_time(this_p *packet_t, release_time C.double) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_release_time(this_p *packet_t) C.double {
+func ax25_get_release_time(this_p *packet_t) time.Time {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
