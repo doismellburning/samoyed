@@ -19,13 +19,6 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <ctype.h>
-// #include <string.h>
-import "C"
-
 import (
 	"fmt"
 	"strconv"
@@ -114,14 +107,14 @@ func set_field(base []byte, start uint, length uint, val int) { // TODO KG int32
 }
 
 func get_field_signed(base []byte, start uint, length uint) int32 {
-	var result = int32(get_field(base, start, length))
+	var result = int32(get_field(base, start, length)) //nolint:gosec // G115 integer overflow
 	// Sign extend.
 	result <<= (32 - length)
 	result >>= (32 - length)
 	return (result)
 }
 
-func get_field_lat(base []byte, start uint, length uint) C.double {
+func get_field_lat(base []byte, start uint, length uint) float64 {
 	// Latitude of 0x3412140 (91 deg) means not available.
 	// Message type 27 uses lower resolution, 17 bits rather than 27.
 	// It encodes minutes/10 rather than normal minutes/10000.
@@ -131,18 +124,18 @@ func get_field_lat(base []byte, start uint, length uint) C.double {
 		if n == 91*600 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600.0
+			return float64(n) / 600.0
 		}
 	} else {
 		if n == 91*600000 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600000.0
+			return float64(n) / 600000.0
 		}
 	}
 }
 
-func get_field_lon(base []byte, start uint, length uint) C.double {
+func get_field_lon(base []byte, start uint, length uint) float64 {
 	// Longitude of 0x6791AC0 (181 deg) means not available.
 	// Message type 27 uses lower resolution, 18 bits rather than 28.
 	// It encodes minutes/10 rather than normal minutes/10000.
@@ -152,18 +145,18 @@ func get_field_lon(base []byte, start uint, length uint) C.double {
 		if n == 181*600 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600.0
+			return float64(n) / 600.0
 		}
 	} else {
 		if n == 181*600000 {
 			return G_UNKNOWN
 		} else {
-			return C.double(n) / 600000.0
+			return float64(n) / 600000.0
 		}
 	}
 }
 
-func get_field_speed(base []byte, start uint, length uint) C.float {
+func get_field_speed(base []byte, start uint, length uint) float64 {
 	// Raw 1023 means not available.
 	// Multiply by 0.1 to get knots.
 	// For aircraft it is knots, not deciknots.
@@ -176,18 +169,18 @@ func get_field_speed(base []byte, start uint, length uint) C.float {
 		if n == 63 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n)
+			return float64(n)
 		}
 	} else {
 		if n == 1023 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n) * 0.1
+			return float64(n) * 0.1
 		}
 	}
 }
 
-func get_field_course(base []byte, start uint, length uint) C.float {
+func get_field_course(base []byte, start uint, length uint) float64 {
 	// Raw 3600 means not available.
 	// Multiply by 0.1 to get degrees
 	// Message type 27 uses lower resolution, 9 bits rather than 12.
@@ -198,13 +191,13 @@ func get_field_course(base []byte, start uint, length uint) C.float {
 		if n == 360 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n)
+			return float64(n)
 		}
 	} else {
 		if n == 3600 {
 			return G_UNKNOWN
 		} else {
-			return C.float(n) * 0.1
+			return float64(n) * 0.1
 		}
 	}
 }
@@ -284,7 +277,7 @@ func ais_to_nmea(ais []byte) []byte {
 
 	var payload []byte
 	// Number of resulting characters for payload.
-	var ns = uint(len(ais)*8+5) / 6
+	var ns = uint(len(ais)*8+5) / 6 //nolint:gosec // G115 integer overflow
 	for k := uint(0); k < ns; k++ {
 		payload = append(payload, sextet_to_char(get_field(ais, k*6, 6)))
 	}
@@ -298,7 +291,7 @@ func ais_to_nmea(ais []byte) []byte {
 	// decoding application can drop this number of bits from the end.
 	// At least, I think that is the way it should work.
 	// The examples all have 0.
-	var pad_bytes = fmt.Sprintf(",%d", int(ns)*6-len(ais)*8)
+	var pad_bytes = fmt.Sprintf(",%d", int(ns)*6-len(ais)*8) //nolint:gosec // G115 integer overflow
 	nmea = append(nmea, []byte(pad_bytes)...)
 
 	// Finally the NMEA style checksum.
@@ -323,17 +316,9 @@ func ais_to_nmea(ais []byte) []byte {
  *
  *		quiet		Suppress printing of error messages.
  *
- * Outputs:	descr		Description of AIS message type.
- *		mssi		9 digit identifier.
- *		odlat		latitude.
- *		odlon		longitude.
- *		ofknots		speed, knots.
- *		ofcourse	direction of travel.
- *		ofalt_m		altitude, meters.
- *		symtab		APRS symbol table.
- *		symbol		APRS symbol code.
+ * Returns:	*AISData	Structured AIS message data
  *
- * Returns:	0 for success, -1 for error.
+ * 			errcode 	0 for success, -1 for error.
  *
  *--------------------------------------------------------------------*/
 
@@ -341,19 +326,30 @@ func ais_to_nmea(ais []byte) []byte {
 // Make buffer considerably larger to be safe.
 const NMEA_MAX_LEN = 240
 
-func ais_parse(sentence *C.char, _quiet C.int, descr *C.char, descr_size C.int, mssi *C.char, mssi_size C.int, odlat *C.double, odlon *C.double,
-	ofknots *C.float, ofcourse *C.float, ofalt_m *C.float, symtab *C.char, symbol *C.char, comment *C.char, comment_size C.int) C.int {
+type AISData struct {
+	description string //Description of AIS message type.
+	mssi        string //9 digit identifier.
+	lat         float64
+	lon         float64
+	knots       float64
+	course      float64
+	alt_m       float64
+	symtab      byte
+	symbol      byte
+	comment     string
+}
 
-	var quiet = _quiet != 0
+func ais_parse(sentence string, quiet bool) (*AISData, int) {
 
-	C.strcpy(mssi, C.CString("?"))
-	*odlat = G_UNKNOWN
-	*odlon = G_UNKNOWN
-	*ofknots = G_UNKNOWN
-	*ofcourse = G_UNKNOWN
-	*ofalt_m = G_UNKNOWN
+	var aisData = new(AISData)
+	aisData.mssi = "?"
+	aisData.lat = G_UNKNOWN
+	aisData.lon = G_UNKNOWN
+	aisData.knots = G_UNKNOWN
+	aisData.course = G_UNKNOWN
+	aisData.alt_m = G_UNKNOWN
 
-	var stemp = C.GoString(sentence)
+	var stemp = sentence
 
 	// Verify and remove checksum.
 
@@ -373,7 +369,7 @@ func ais_parse(sentence *C.char, _quiet C.int, descr *C.char, descr_size C.int, 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Missing AIS sentence checksum.\n")
 		}
-		return (-1)
+		return aisData, -1
 	}
 
 	var _checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
@@ -384,7 +380,7 @@ func ais_parse(sentence *C.char, _quiet C.int, descr *C.char, descr_size C.int, 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("AIS sentence checksum error. Expected %02x but found %s.\n", calculatedChecksum, checksumStr)
 		}
-		return (-1)
+		return aisData, -1
 	}
 
 	// Extract the comma separated fields.
@@ -411,7 +407,7 @@ func ais_parse(sentence *C.char, _quiet C.int, descr *C.char, descr_size C.int, 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Payload is missing from AIS sentence.\n")
 		}
-		return (-1)
+		return aisData, -1
 	}
 
 	// Convert character representation to bit vector.
@@ -419,7 +415,7 @@ func ais_parse(sentence *C.char, _quiet C.int, descr *C.char, descr_size C.int, 
 	var ais = make([]byte, 256)
 
 	for i, b := range payload {
-		set_field(ais, uint(i)*6, 6, char_to_sextet(byte(b)))
+		set_field(ais, uint(i)*6, 6, char_to_sextet(byte(b))) //nolint:gosec // G115 integer overflow
 	}
 
 	// Verify number of filler bits.
@@ -442,101 +438,101 @@ func ais_parse(sentence *C.char, _quiet C.int, descr *C.char, descr_size C.int, 
 	var aisType = get_field(ais, 0, 6)
 
 	if aisType >= 1 && aisType <= 27 {
-		C.strcpy(mssi, C.CString(fmt.Sprintf("%09d", get_field(ais, 8, 30))))
+		aisData.mssi = fmt.Sprintf("%09d", get_field(ais, 8, 30))
 	}
 
 	switch aisType {
 
 	case 1, 2, 3: // Position Report Class A
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: Position Report Class A", aisType)))
-		*symtab = '/'
-		*symbol = 's' // Power boat (ship) side view
-		*odlon = get_field_lon(ais, 61, 28)
-		*odlat = get_field_lat(ais, 89, 27)
-		*ofknots = get_field_speed(ais, 50, 10)
-		*ofcourse = get_field_course(ais, 116, 12)
-		C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+		aisData.description = fmt.Sprintf("AIS %d: Position Report Class A", aisType)
+		aisData.symtab = '/'
+		aisData.symbol = 's' // Power boat (ship) side view
+		aisData.lon = get_field_lon(ais, 61, 28)
+		aisData.lat = get_field_lat(ais, 89, 27)
+		aisData.knots = get_field_speed(ais, 50, 10)
+		aisData.course = get_field_course(ais, 116, 12)
+		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 4: // Base Station Report
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: Base Station Report", aisType)))
-		*symtab = '\\'
-		*symbol = 'L' // Lighthouse
+		aisData.description = fmt.Sprintf("AIS %d: Base Station Report", aisType)
+		aisData.symtab = '\\'
+		aisData.symbol = 'L' // Lighthouse
 		//year = get_field(ais, 38, 14);
 		//month = get_field(ais, 52, 4);
 		//day = get_field(ais, 56, 5);
 		//hour = get_field(ais, 61, 5);
 		//minute = get_field(ais, 66, 6);
 		//second = get_field(ais, 72, 6);
-		*odlon = get_field_lon(ais, 79, 28)
-		*odlat = get_field_lat(ais, 107, 27)
+		aisData.lon = get_field_lon(ais, 79, 28)
+		aisData.lat = get_field_lat(ais, 107, 27)
 		// Is this suitable or not?  Doesn't hurt, I suppose.
-		C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 5: // Static and Voyage Related Data
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: Static and Voyage Related Data", aisType)))
-		*symtab = '/'
-		*symbol = 's' // Power boat (ship) side view
+		aisData.description = fmt.Sprintf("AIS %d: Static and Voyage Related Data", aisType)
+		aisData.symtab = '/'
+		aisData.symbol = 's' // Power boat (ship) side view
 		{
 			var callsign = get_field_string(ais, 70, 42)
 			var shipname = get_field_string(ais, 112, 120)
 			var destination = get_field_string(ais, 302, 120)
-			save_ship_data(C.GoString(mssi), shipname, callsign, destination)
-			C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+			save_ship_data(aisData.mssi, shipname, callsign, destination)
+			aisData.comment = get_ship_data(aisData.mssi)
 		}
 
 	case 9: // Standard SAR Aircraft Position Report
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)))
-		*symtab = '/'
-		*symbol = '\''                             // Small AIRCRAFT
-		*ofalt_m = C.float(get_field(ais, 38, 12)) // meters, 4095 means not available
-		*odlon = get_field_lon(ais, 61, 28)
-		*odlat = get_field_lat(ais, 89, 27)
-		*ofknots = get_field_speed(ais, 50, 10) // plane is knots, not knots/10
-		if *ofknots != G_UNKNOWN {
-			*ofknots *= 10.0
+		aisData.description = fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)
+		aisData.symtab = '/'
+		aisData.symbol = '\''                           // Small AIRCRAFT
+		aisData.alt_m = float64(get_field(ais, 38, 12)) // meters, 4095 means not available
+		aisData.lon = get_field_lon(ais, 61, 28)
+		aisData.lat = get_field_lat(ais, 89, 27)
+		aisData.knots = get_field_speed(ais, 50, 10) // plane is knots, not knots/10
+		if aisData.knots != G_UNKNOWN {
+			aisData.knots *= 10.0
 		}
-		*ofcourse = get_field_course(ais, 116, 12)
-		C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+		aisData.course = get_field_course(ais, 116, 12)
+		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 18: // Standard Class B CS Position Report
 		// As an oversimplification, Class A is commercial, B is recreational.
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: Standard Class B CS Position Report", aisType)))
-		*symtab = '/'
-		*symbol = 'Y' // YACHT (sail)
-		*odlon = get_field_lon(ais, 57, 28)
-		*odlat = get_field_lat(ais, 85, 27)
-		C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+		aisData.description = fmt.Sprintf("AIS %d: Standard Class B CS Position Report", aisType)
+		aisData.symtab = '/'
+		aisData.symbol = 'Y' // YACHT (sail)
+		aisData.lon = get_field_lon(ais, 57, 28)
+		aisData.lat = get_field_lat(ais, 85, 27)
+		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 19: // Extended Class B CS Position Report
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: Extended Class B CS Position Report", aisType)))
-		*symtab = '/'
-		*symbol = 'Y' // YACHT (sail)
-		*odlon = get_field_lon(ais, 57, 28)
-		*odlat = get_field_lat(ais, 85, 27)
-		C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+		aisData.description = fmt.Sprintf("AIS %d: Extended Class B CS Position Report", aisType)
+		aisData.symtab = '/'
+		aisData.symbol = 'Y' // YACHT (sail)
+		aisData.lon = get_field_lon(ais, 57, 28)
+		aisData.lat = get_field_lat(ais, 85, 27)
+		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 27: // Long Range AIS Broadcast message
 
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS %d: Long Range AIS Broadcast message", aisType)))
-		*symtab = '\\'
-		*symbol = 's'                       // OVERLAY SHIP/boat (top view)
-		*odlon = get_field_lon(ais, 44, 18) // Note: minutes/10 rather than usual /10000.
-		*odlat = get_field_lat(ais, 62, 17)
-		*ofknots = get_field_speed(ais, 79, 6)   // Note: knots, not deciknots.
-		*ofcourse = get_field_course(ais, 85, 9) // Note: degrees, not decidegrees.
-		C.strcpy(comment, C.CString(get_ship_data(C.GoString(mssi))))
+		aisData.description = fmt.Sprintf("AIS %d: Long Range AIS Broadcast message", aisType)
+		aisData.symtab = '\\'
+		aisData.symbol = 's'                     // OVERLAY SHIP/boat (top view)
+		aisData.lon = get_field_lon(ais, 44, 18) // Note: minutes/10 rather than usual /10000.
+		aisData.lat = get_field_lat(ais, 62, 17)
+		aisData.knots = get_field_speed(ais, 79, 6)   // Note: knots, not deciknots.
+		aisData.course = get_field_course(ais, 85, 9) // Note: degrees, not decidegrees.
+		aisData.comment = get_ship_data(aisData.mssi)
 
 	default:
-		C.strcpy(descr, C.CString(fmt.Sprintf("AIS message type %d", aisType)))
+		aisData.description = fmt.Sprintf("AIS message type %d", aisType)
 	}
 
-	return (0)
+	return aisData, 0
 
 } /* end ais_parse */
 
