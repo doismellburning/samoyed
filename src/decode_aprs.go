@@ -2598,18 +2598,19 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("{DM")) { // Official after registering {D*
 		aprs_morse_code(A, info)
 	} else if info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
-		var lat, lon C.double
-		var knots, course, alt_meters C.float
+		var aisData, _ = ais_parse(string(info[3:]), false)
 
-		ais_parse(C.CString(string(info[3:])), 0, &A.g_data_type_desc[0], C.int(len(A.g_data_type_desc)), &A.g_name[0], C.int(len(A.g_name)),
-			&lat, &lon, &knots, &course, &alt_meters, &(A.g_symbol_table), &(A.g_symbol_code),
-			&A.g_comment[0], C.int(len(A.g_comment)))
+		C.strcpy(&A.g_data_type_desc[0], C.CString(aisData.description))
+		C.strcpy(&A.g_name[0], C.CString(aisData.mssi))
+		A.g_lat = C.double(aisData.lat)
+		A.g_lon = C.double(aisData.lon)
+		A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(aisData.knots))
+		A.g_course = C.float(aisData.course)
+		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(aisData.alt_m))
+		A.g_symbol_table = C.char(aisData.symtab)
+		A.g_symbol_code = C.char(aisData.symbol)
+		C.strcpy(&A.g_comment[0], C.CString(aisData.comment))
 
-		A.g_lat = lat
-		A.g_lon = lon
-		A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(knots)))
-		A.g_course = course
-		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(alt_meters)))
 		C.strcpy(&A.g_mfr[0], C.CString(""))
 	} else if bytes.HasPrefix(info, []byte("{{")) {
 		C.strcpy(&A.g_data_type_desc[0], C.CString("User-Defined Experimental"))
