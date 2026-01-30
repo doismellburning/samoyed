@@ -1108,7 +1108,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	// We see the same sequence in tt_user.c.
 
 	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
-	var flen = ax25_pack(pp, &fbuf[0])
+	var flen = C.int(ax25_pack(pp, &fbuf[0]))
 
 	server_send_rec_packet(C.int(channel), pp, &fbuf[0], flen)                                                                // AGW net protocol
 	kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)    // KISS TCP
@@ -1119,7 +1119,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		var ao_pp = ax25_from_text(C.GoString(&ais_obj_packet[0]), true)
 		if ao_pp != nil {
 			var ao_fbuf [AX25_MAX_PACKET_LEN]C.uchar
-			var ao_flen = ax25_pack(ao_pp, &ao_fbuf[0])
+			var ao_flen = C.int(ax25_pack(ao_pp, &ao_fbuf[0]))
 
 			server_send_rec_packet(C.int(channel), ao_pp, &ao_fbuf[0], ao_flen)
 			kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)

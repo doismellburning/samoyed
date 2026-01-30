@@ -65,7 +65,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	alevel.mark = 50
 	alevel.space = 50
 
-	pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&frame[0]), frame_len), alevel)
+	pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&frame[0]), C.int(frame_len)), alevel)
 	assert.NotNil(t, pp)
 	rec = ax25_format_addrs(pp)
 	pinfo = ax25_get_info(pp)

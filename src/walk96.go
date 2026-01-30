@@ -144,7 +144,7 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Encapsulate as KISS and send to TNC.
 	 */
 
-	var kiss_frame = kiss_encapsulate(C.GoBytes(unsafe.Pointer(&ax25_frame[0]), frame_len+1))
+	var kiss_frame = kiss_encapsulate(C.GoBytes(unsafe.Pointer(&ax25_frame[0]), C.int(frame_len)+1))
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 

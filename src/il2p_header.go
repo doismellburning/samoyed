@@ -647,8 +647,8 @@ func il2p_type_0_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 		return (-2)
 	}
 
-	SET_PAYLOAD_BYTE_COUNT(hdr, frame_len)
-	return (frame_len)
+	SET_PAYLOAD_BYTE_COUNT(hdr, C.int(frame_len))
+	return C.int(frame_len)
 }
 
 /***********************************************************************************

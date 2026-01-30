@@ -940,7 +940,7 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 
 			if count_it > 0 {
 				if bytes > 0 {
-					n += ax25_get_frame_len(pp)
+					n += C.int(ax25_get_frame_len(pp))
 				} else {
 					n++
 				}

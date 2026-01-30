@@ -765,7 +765,7 @@ func xmit_object_report(i int, first_time bool) {
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.
 
-		var flen = ax25_pack(pp, &fbuf[0])
+		var flen = C.int(ax25_pack(pp, &fbuf[0]))
 
 		server_send_rec_packet(C.int(save_tt_config_p.obj_recv_chan), pp, &fbuf[0], flen)
 		kissnet_send_rec_packet(C.int(save_tt_config_p.obj_recv_chan), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)
