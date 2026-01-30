@@ -990,15 +990,15 @@ func demod_get_audio_level_real(channel C.int, subchan C.int) alevel_t {
 
 	// Take half of peak-to-peak for received audio level.
 
-	alevel.rec = C.int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
+	alevel.rec = int((D.alevel_rec_peak-D.alevel_rec_valley)*50.0 + 0.5)
 
 	switch save_audio_config_p.achan[channel].modem_type {
 	case MODEM_AFSK, MODEM_EAS:
 
 		/* For AFSK, we have mark and space amplitudes. */
 
-		alevel.mark = (C.int)((D.alevel_mark_peak)*100.0 + 0.5)
-		alevel.space = (C.int)((D.alevel_space_peak)*100.0 + 0.5)
+		alevel.mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
+		alevel.space = (int)((D.alevel_space_peak)*100.0 + 0.5)
 	case MODEM_QPSK, MODEM_8PSK:
 		alevel.mark = -1
 		alevel.space = -1
@@ -1009,8 +1009,8 @@ func demod_get_audio_level_real(channel C.int, subchan C.int) alevel_t {
 		/* Normally we'd expect them to be about the same. */
 		/* However, with SDR, or other DC coupling, we could have an offset. */
 
-		alevel.mark = (C.int)((D.alevel_mark_peak)*200.0 + 0.5)
-		alevel.space = (C.int)((D.alevel_space_peak)*200.0 - 0.5)
+		alevel.mark = (int)((D.alevel_mark_peak)*200.0 + 0.5)
+		alevel.space = (int)((D.alevel_space_peak)*200.0 - 0.5)
 
 		/* TODO KG
 		#else

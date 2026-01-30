@@ -317,9 +317,9 @@ const (
  */
 
 type alevel_t struct {
-	rec   C.int
-	mark  C.int
-	space C.int
+	rec   int
+	mark  int
+	space int
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
@@ -2905,10 +2905,10 @@ func ax25_alevel_to_text(alevel alevel_t) string {
 		(alevel.mark == -99 && alevel.space == -99) { /* v. 1.7 "B" FM demodulator. */
 		// ?? Where does -99 come from?
 
-		return fmt.Sprintf("%d", alevel.rec)
+		return strconv.Itoa(alevel.rec)
 	} else if alevel.mark == -2 && alevel.space == -2 { /* DTMF - single number. */
 
-		return fmt.Sprintf("%d", alevel.rec)
+		return strconv.Itoa(alevel.rec)
 	} else { /* AFSK */
 
 		//snprintf (text, AX25_ALEVEL_TO_TEXT_SIZE, "%d:%d(%d/%d=%05.3f=)", alevel.original, alevel.rec, alevel.mark, alevel.space, alevel.ms_ratio);
