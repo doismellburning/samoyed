@@ -2824,7 +2824,7 @@ func ax25_m_m_crc(pp *packet_t) C.ushort {
 // #define MAXSAFE 500
 const MAXSAFE = AX25_MAX_INFO_LEN
 
-func ax25_safe_print(info []byte, ascii_only C.int) {
+func ax25_safe_print(info []byte, ascii_only bool) {
 
 	if len(info) > MAXSAFE {
 		info = info[:MAXSAFE]
@@ -2837,7 +2837,7 @@ func ax25_safe_print(info []byte, ascii_only C.int) {
 		if ch == ' ' && i == len(pstr)-1 {
 			safe_str += fmt.Sprintf("<0x%02x>", ch)
 		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||
-			(ascii_only != 0 && ch >= 0x80) {
+			(ascii_only && ch >= 0x80) {
 
 			/* Control codes and delete. */
 			/* UTF-8 does not use fe and ff except in a possible */

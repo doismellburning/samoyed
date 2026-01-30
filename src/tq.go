@@ -203,14 +203,14 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
+			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			igate_send_rec_packet(int(channel), pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
+			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			nettnc_send_packet(channel, pp)

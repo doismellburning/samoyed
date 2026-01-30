@@ -962,9 +962,9 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
-	var asciiOnly C.int = 0 // Quick bodge because these C bools are ints...
+	var asciiOnly = false
 	if !ax25_is_aprs(pp) && !d_u_opt {
-		asciiOnly = 1
+		asciiOnly = true
 	}
 
 	if !ax25_is_aprs(pp) {
@@ -1005,7 +1005,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		if hasNonPrintable {
 			text_color_set(DW_COLOR_DEBUG)
-			ax25_safe_print(pinfo, 1)
+			ax25_safe_print(pinfo, true)
 			dw_printf("\n")
 		}
 	}

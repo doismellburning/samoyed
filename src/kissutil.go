@@ -551,7 +551,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 			// Safe print will replace any unprintable characters with
 			// hexadecimal representation.
 
-			ax25_safe_print(pinfo, 0)
+			ax25_safe_print(pinfo, false)
 			fmt.Printf("\n")
 
 			/*
