@@ -261,7 +261,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
 			}
 			C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
 			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
-			this_p.frame_len += C.int(len(info))
+			this_p.frame_len += len(info)
 		}
 	} else {
 		if len(info) > 0 {
@@ -402,7 +402,7 @@ func ax25_s_frame(
 			}
 			C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
 			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
-			this_p.frame_len += C.int(len(info))
+			this_p.frame_len += len(info)
 		}
 	} else {
 		if len(info) > 0 {
@@ -541,7 +541,7 @@ func ax25_i_frame(
 		}
 		C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
 		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
-		this_p.frame_len += C.int(len(info))
+		this_p.frame_len += len(info)
 	}
 
 	*p = 0
@@ -637,6 +637,6 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, nu
 		pp.frame_len += 7
 	}
 
-	pp.num_addr = num_addr
+	pp.num_addr = int(num_addr)
 	return (1)
 } /* end set_addrs */

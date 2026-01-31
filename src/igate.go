@@ -828,7 +828,7 @@ func send_msg_to_server(imsg string) {
 	if s_debug >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		ax25_safe_print([]byte(imsg), 0)
+		ax25_safe_print([]byte(imsg), false)
 		dw_printf("\n")
 	}
 
@@ -985,7 +985,7 @@ func igate_recv_thread() {
 			if !ok_to_send {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				ax25_safe_print(message, 0)
+				ax25_safe_print(message, false)
 				dw_printf("\n")
 			}
 		} else {
@@ -998,7 +998,7 @@ func igate_recv_thread() {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			ax25_safe_print(message, 0)
+			ax25_safe_print(message, false)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {
@@ -1128,7 +1128,7 @@ func satgate_delay_packet(pp *packet_t, channel int) {
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
 	//}
 
-	ax25_set_release_time(pp, C.double(float64(time.Now().UnixNano())/1e9)+C.double(save_igate_config_p.satgate_delay))
+	ax25_set_release_time(pp, time.Now().Add(time.Duration(save_igate_config_p.satgate_delay)*time.Second))
 	//TODO: save channel too.
 
 	dp_mutex.Lock()
@@ -1177,11 +1177,9 @@ func satgate_delay_thread() {
 
 		if dp_queue_head != nil {
 
-			var now = C.double(float64(time.Now().UnixNano()) / 1e9)
-
 			var release_time = ax25_get_release_time(dp_queue_head)
 
-			if now > release_time {
+			if time.Now().After(release_time) {
 				dp_mutex.Lock()
 
 				var pp = dp_queue_head

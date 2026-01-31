@@ -32,7 +32,6 @@ import (
 	"syscall"
 	"time"
 	"unicode"
-	"unsafe"
 
 	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
 	"github.com/lestrrat-go/strftime"
@@ -962,9 +961,9 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
-	var asciiOnly C.int = 0 // Quick bodge because these C bools are ints...
+	var asciiOnly = false
 	if !ax25_is_aprs(pp) && !d_u_opt {
-		asciiOnly = 1
+		asciiOnly = true
 	}
 
 	if !ax25_is_aprs(pp) {
@@ -1005,7 +1004,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		if hasNonPrintable {
 			text_color_set(DW_COLOR_DEBUG)
-			ax25_safe_print(pinfo, 1)
+			ax25_safe_print(pinfo, true)
 			dw_printf("\n")
 		}
 	}
@@ -1107,24 +1106,22 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
 	// We see the same sequence in tt_user.c.
 
-	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
-	var flen = ax25_pack(pp, &fbuf[0])
+	var fbuf = ax25_pack(pp)
 
-	server_send_rec_packet(C.int(channel), pp, &fbuf[0], flen)                                                                // AGW net protocol
-	kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)    // KISS TCP
-	kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1) // KISS serial port
-	kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&fbuf[0]), flen), flen, nil, -1)     // KISS pseudo terminal
+	server_send_rec_packet(C.int(channel), pp, fbuf)                                          // AGW net protocol
+	kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)    // KISS TCP
+	kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
+	kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = ax25_from_text(C.GoString(&ais_obj_packet[0]), true)
 		if ao_pp != nil {
-			var ao_fbuf [AX25_MAX_PACKET_LEN]C.uchar
-			var ao_flen = ax25_pack(ao_pp, &ao_fbuf[0])
+			var ao_fbuf = ax25_pack(ao_pp)
 
-			server_send_rec_packet(C.int(channel), ao_pp, &ao_fbuf[0], ao_flen)
-			kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
-			kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
-			kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, C.GoBytes(unsafe.Pointer(&ao_fbuf[0]), ao_flen), ao_flen, nil, -1)
+			server_send_rec_packet(C.int(channel), ao_pp, ao_fbuf)
+			kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			ax25_delete(ao_pp)
 		}
 	}

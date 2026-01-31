@@ -143,21 +143,14 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <ctype.h>
-// #include "regex.h"
-import "C"
-
 import (
 	"bytes"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
-	"unsafe"
 )
 
 const AX25_MAX_REPEATERS = 8
@@ -239,22 +232,21 @@ const SSID_SSID_SHIFT = 1
 const SSID_LAST_MASK = 0x01
 
 type packet_t struct {
-	magic1 C.int /* for error checking. */
+	magic1 int /* for error checking. */
 
-	seq C.int /* unique sequence number for debugging. */
+	seq int /* unique sequence number for debugging. */
 
-	release_time C.double /* Time stamp in format returned by dtime_now(). */
-	/* When to release from the SATgate mode delay queue. */
+	release_time time.Time /* When to release from the SATgate mode delay queue. */
 
 	nextp *packet_t /* Pointer to next in queue. */
 
-	num_addr C.int /* Number of addresses in frame. */
+	num_addr int /* Number of addresses in frame. */
 	/* Range of AX25_MIN_ADDRS .. AX25_MAX_ADDRS for AX.25. */
 	/* It will be 0 if it doesn't look like AX.25. */
 	/* -1 is used temporarily at allocation to mean */
 	/* not determined yet. */
 
-	frame_len C.int /* Frame length without CRC. */
+	frame_len int /* Frame length without CRC. */
 
 	modulo ax25_modulo_t /* I & S frames have sequence numbers of either 3 bits (modulo 8) */
 	/* or 7 bits (modulo 128).  This is conveyed by either 1 or 2 */
@@ -266,10 +258,10 @@ type packet_t struct {
 	/* For U frames:   	set to 0 - not applicable */
 	/* For I & S frames:	8 or 128 if known.  0 if unknown. */
 
-	frame_data [AX25_MAX_PACKET_LEN + 1]C.uchar
+	frame_data [AX25_MAX_PACKET_LEN + 1]byte
 	/* Raw frame contents, without the CRC. */
 
-	magic2 C.int /* Will get stomped on if above overflows. */
+	magic2 int /* Will get stomped on if above overflows. */
 }
 
 type cmdres_t int
@@ -317,9 +309,9 @@ const (
  */
 
 type alevel_t struct {
-	rec   C.int
-	mark  C.int
-	space C.int
+	rec   int
+	mark  int
+	space int
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
@@ -331,13 +323,13 @@ type alevel_t struct {
 
 var ax25_new_count = 0
 var ax25_delete_count = 0
-var last_seq_num C.int = 0
+var last_seq_num int = 0
 
 // Runtime replacement for DECAMAIN define
 var DECODE_APRS_UTIL = false
 
 func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {
-	this_p.frame_data[this_p.num_addr*7-1] &= ^(C.uchar(SSID_LAST_MASK))
+	this_p.frame_data[this_p.num_addr*7-1] &= ^(byte(SSID_LAST_MASK))
 }
 
 func SET_LAST_ADDR_FLAG(this_p *packet_t) {
@@ -500,10 +492,10 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	 * Initialize the packet structure with two addresses and control/pid
 	 * for APRS.
 	 */
-	C.memset(unsafe.Pointer(&this_p.frame_data[AX25_DESTINATION*7]), ' '<<1, 6)
+	copy(this_p.frame_data[AX25_DESTINATION*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_data[AX25_DESTINATION*7+6] = SSID_H_MASK | SSID_RR_MASK
 
-	C.memset(unsafe.Pointer(&this_p.frame_data[AX25_SOURCE*7]), ' '<<1, 6)
+	copy(this_p.frame_data[AX25_SOURCE*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_data[AX25_SOURCE*7+6] = SSID_RR_MASK | SSID_LAST_MASK
 
 	this_p.frame_data[14] = AX25_UI_FRAME
@@ -612,7 +604,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		}
 
 		var heardTemp bool
-		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(int(k), string(pa), IfThenElse(strict, 1, 0))
+		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), IfThenElse(strict, 1, 0))
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
@@ -620,8 +612,8 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			return (nil)
 		}
 
-		ax25_set_addr(this_p, int(k), addrTemp)
-		ax25_set_ssid(this_p, int(k), ssidTemp)
+		ax25_set_addr(this_p, k, addrTemp)
+		ax25_set_ssid(this_p, k, ssidTemp)
 
 		// Does it have an "*" at the end?
 		// TODO: Complain if more than one "*".
@@ -629,7 +621,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 
 		if heardTemp {
 			for ; k >= AX25_REPEATER_1; k-- {
-				ax25_set_h(this_p, int(k))
+				ax25_set_h(this_p, k)
 			}
 		}
 
@@ -658,9 +650,15 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	   #endif
 	*/
 
-	var info_len = 0
-	var info_part [AX25_MAX_INFO_LEN + 1]C.char
-	for len(pinfo) > 0 && info_len < AX25_MAX_INFO_LEN {
+	var info_part []byte
+	for len(pinfo) > 0 {
+		if len(info_part) >= AX25_MAX_INFO_LEN {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
+			ax25_delete(this_p)
+			return (nil)
+		}
+
 		if len(pinfo) >= 6 &&
 			pinfo[0] == '<' &&
 			pinfo[1] == '0' &&
@@ -670,16 +668,13 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			pinfo[5] == '>' {
 
 			var hexVal, _ = strconv.ParseInt(string(pinfo[3:5]), 16, 64)
-			info_part[info_len] = C.char(hexVal)
-			info_len++
+			info_part = append(info_part, byte(hexVal))
 			pinfo = pinfo[6:]
 		} else {
-			info_part[info_len] = C.char(pinfo[0])
-			info_len++
+			info_part = append(info_part, pinfo[0])
 			pinfo = pinfo[1:]
 		}
 	}
-	info_part[info_len] = 0
 
 	/*
 		#if DEBUG14H
@@ -693,8 +688,8 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	/*
 	 * Append the info part.
 	 */
-	C.memcpy(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len), unsafe.Pointer(&info_part[0]), C.size_t(info_len))
-	this_p.frame_len += C.int(info_len)
+	var copied = copy(this_p.frame_data[this_p.frame_len:], info_part)
+	this_p.frame_len += copied
 
 	return (this_p)
 }
@@ -717,7 +712,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_frame(data []byte, alevel alevel_t) *packet_t {
+func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
 
 	/*
 	 * First make sure we have an acceptable length:
@@ -747,9 +742,9 @@ func ax25_from_frame(data []byte, alevel alevel_t) *packet_t {
 
 	/* Copy the whole thing intact. */
 
-	C.memcpy(unsafe.Pointer(&this_p.frame_data[0]), C.CBytes(data), C.size_t(flen))
+	copy(this_p.frame_data[:], data)
 	this_p.frame_data[flen] = 0
-	this_p.frame_len = C.int(flen)
+	this_p.frame_len = flen
 
 	/* Find number of addresses. */
 
@@ -999,7 +994,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t) bool {
+func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
 
 	var all_ok = true
 	for n := 0; n < ax25_get_num_addr(pp); n++ {
@@ -1088,7 +1083,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
 	}
 
-	if n >= 0 && C.int(n) < this_p.num_addr {
+	if n >= 0 && n < this_p.num_addr {
 
 		//dw_printf ("ax25_set_addr , existing case\n");
 		/*
@@ -1101,16 +1096,16 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 
 		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
 
-		C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
+		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
 		for i, c := range addrTemp {
 			if i >= 6 {
 				break
 			}
-			this_p.frame_data[n*7+i] = C.uchar(c << 1)
+			this_p.frame_data[n*7+i] = byte(c << 1)
 		}
 		ax25_set_ssid(this_p, n, ssidTemp)
-	} else if C.int(n) == this_p.num_addr {
+	} else if n == this_p.num_addr {
 
 		//dw_printf ("ax25_set_addr , appending case\n");
 		/*
@@ -1180,8 +1175,8 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 
 	this_p.num_addr++
 
-	C.memmove(unsafe.Pointer(&this_p.frame_data[(n+1)*7]), unsafe.Pointer(&this_p.frame_data[n*7]), C.size_t(this_p.frame_len-C.int(n*7)))
-	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
+	copy(this_p.frame_data[(n+1)*7:], this_p.frame_data[n*7:this_p.frame_len])
+	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_len += 7
 	this_p.frame_data[n*7+6] = SSID_RR_MASK
 
@@ -1192,12 +1187,12 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	// We use this to parse it and later remove unwanted parts.
 
 	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
-	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
+	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	for i, c := range addrTemp {
 		if i >= 6 {
 			break
 		}
-		this_p.frame_data[n*7+i] = C.uchar(c << 1)
+		this_p.frame_data[n*7+i] = byte(c << 1)
 	}
 
 	ax25_set_ssid(this_p, n, ssidTemp)
@@ -1206,7 +1201,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 
 	var expect = this_p.num_addr
 	this_p.num_addr = (-1)
-	if expect != C.int(ax25_get_num_addr(this_p)) {
+	if expect != ax25_get_num_addr(this_p) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
@@ -1243,7 +1238,7 @@ func ax25_remove_addr(this_p *packet_t, n int) {
 
 	this_p.num_addr--
 
-	C.memmove(unsafe.Pointer(&this_p.frame_data[n*7]), unsafe.Pointer(&this_p.frame_data[(n+1)*7]), C.size_t(this_p.frame_len-C.int((n+1)*7)))
+	copy(this_p.frame_data[n*7:], this_p.frame_data[(n+1)*7:this_p.frame_len])
 	this_p.frame_len -= 7
 	SET_LAST_ADDR_FLAG(this_p)
 
@@ -1251,7 +1246,7 @@ func ax25_remove_addr(this_p *packet_t, n int) {
 
 	var expect = this_p.num_addr
 	this_p.num_addr = (-1)
-	if expect != C.int(ax25_get_num_addr(this_p)) {
+	if expect != ax25_get_num_addr(this_p) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
@@ -1281,15 +1276,15 @@ func ax25_get_num_addr(this_p *packet_t) int {
 	/* Use cached value if already set. */
 
 	if this_p.num_addr >= 0 {
-		return int(this_p.num_addr)
+		return this_p.num_addr
 	}
 
 	/* Otherwise, determine the number ofaddresses. */
 
 	this_p.num_addr = 0 /* Number of addresses extracted. */
 
-	var addr_bytes C.int = 0
-	for a := C.int(0); a < this_p.frame_len && addr_bytes == 0; a++ {
+	var addr_bytes = 0
+	for a := 0; a < this_p.frame_len && addr_bytes == 0; a++ {
 		if this_p.frame_data[a]&SSID_LAST_MASK != 0 {
 			addr_bytes = a + 1
 		}
@@ -1302,7 +1297,7 @@ func ax25_get_num_addr(this_p *packet_t) int {
 		}
 	}
 
-	return int(this_p.num_addr)
+	return this_p.num_addr
 }
 
 /*------------------------------------------------------------------------------
@@ -1323,7 +1318,7 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
 	Assert(this_p.magic2 == MAGIC)
 
 	if this_p.num_addr >= 2 {
-		return int(this_p.num_addr - 2)
+		return this_p.num_addr - 2
 	}
 
 	return (0)
@@ -1364,7 +1359,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 		return "??????"
 	}
 
-	if C.int(n) >= this_p.num_addr {
+	if n >= this_p.num_addr {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
 		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
@@ -1437,7 +1432,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 		return "??????"
 	}
 
-	if C.int(n) >= this_p.num_addr {
+	if n >= this_p.num_addr {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_no_with_ssid.\n")
 		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
@@ -1485,7 +1480,7 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	if n >= 0 && C.int(n) < this_p.num_addr {
+	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -1516,9 +1511,9 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	if n >= 0 && C.int(n) < this_p.num_addr {
-		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(C.uchar(SSID_SSID_MASK))) |
-			C.uchar((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
+	if n >= 0 && n < this_p.num_addr {
+		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(byte(SSID_SSID_MASK))) |
+			byte((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_set_ssid(%d,%d), num_addr=%d\n", n, ssid, this_p.num_addr)
@@ -1546,9 +1541,9 @@ func ax25_get_h(this_p *packet_t, n int) int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
-	Assert(n >= 0 && C.int(n) < this_p.num_addr)
+	Assert(n >= 0 && n < this_p.num_addr)
 
-	if n >= 0 && C.int(n) < this_p.num_addr {
+	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -1579,7 +1574,7 @@ func ax25_set_h(this_p *packet_t, n int) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	if n >= 0 && C.int(n) < this_p.num_addr {
+	if n >= 0 && n < this_p.num_addr {
 		this_p.frame_data[n*7+6] |= SSID_H_MASK
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -1668,9 +1663,9 @@ func ax25_get_rr(this_p *packet_t, n int) int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
-	Assert(n >= 0 && C.int(n) < this_p.num_addr)
+	Assert(n >= 0 && n < this_p.num_addr)
 
-	if n >= 0 && C.int(n) < this_p.num_addr {
+	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_RR_MASK) >> SSID_RR_SHIFT)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -1704,26 +1699,26 @@ func ax25_get_info(this_p *packet_t) []byte {
 
 		/* AX.25 */
 
-		return C.GoBytes(unsafe.Pointer(&this_p.frame_data[ax25_get_info_offset(this_p)]), ax25_get_num_info(this_p))
+		return this_p.frame_data[ax25_get_info_offset(this_p):this_p.frame_len]
 	} else {
 
 		/* Not AX.25.  Treat Whole packet as info. */
-		return C.GoBytes(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len)
+		return ax25_get_frame_data(this_p)
 	}
 } /* end ax25_get_info */
 
 func ax25_set_info(this_p *packet_t, new_info []byte) {
 
 	var old_info = ax25_get_info(this_p)
-	this_p.frame_len -= C.int(len(old_info))
+	this_p.frame_len -= len(old_info)
 
 	if len(new_info) > AX25_MAX_INFO_LEN {
 		new_info = new_info[:AX25_MAX_INFO_LEN]
 	}
 
-	C.memcpy(unsafe.Pointer(&this_p.frame_data[ax25_get_info_offset(this_p)]), C.CBytes(new_info), C.size_t(len(new_info)))
+	copy(this_p.frame_data[ax25_get_info_offset(this_p):], new_info)
 
-	this_p.frame_len += C.int(len(new_info))
+	this_p.frame_len += len(new_info)
 }
 
 /*------------------------------------------------------------------------------
@@ -1746,7 +1741,7 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_cut_at_crlf(this_p *packet_t) C.int {
+func ax25_cut_at_crlf(this_p *packet_t) int {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
@@ -1757,7 +1752,7 @@ func ax25_cut_at_crlf(this_p *packet_t) C.int {
 
 		if b == '\r' || b == '\n' {
 
-			var chop = C.int(len(info) - j)
+			var chop = len(info) - j
 
 			this_p.frame_len -= chop
 			return (chop)
@@ -1786,7 +1781,7 @@ func ax25_get_dti(this_p *packet_t) byte {
 	Assert(this_p.magic2 == MAGIC)
 
 	if this_p.num_addr >= 2 {
-		return byte(this_p.frame_data[ax25_get_info_offset(this_p)])
+		return this_p.frame_data[ax25_get_info_offset(this_p)]
 	}
 	return (' ')
 }
@@ -1839,11 +1834,11 @@ func ax25_get_nextp(this_p *packet_t) *packet_t {
  *
  * Inputs:	this_p		- Current packet object.
  *
- *		release_time	- Time as returned by dtime_monotonic().
+ *		release_time	- Time
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_release_time(this_p *packet_t, release_time C.double) {
+func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1858,7 +1853,7 @@ func ax25_set_release_time(this_p *packet_t, release_time C.double) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_release_time(this_p *packet_t) C.double {
+func ax25_get_release_time(this_p *packet_t) time.Time {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1949,7 +1944,7 @@ func ax25_format_addrs(this_p *packet_t) string {
 
 	var heard = ax25_get_heard(this_p)
 
-	for i := AX25_REPEATER_1; C.int(i) < this_p.num_addr; i++ {
+	for i := AX25_REPEATER_1; i < this_p.num_addr; i++ {
 		result += ","
 		result += ax25_get_addr_with_ssid(this_p, i)
 
@@ -2005,7 +2000,7 @@ func ax25_format_via_path(this_p *packet_t) string {
 	var heard = ax25_get_heard(this_p)
 	var result string
 
-	for i := AX25_REPEATER_1; C.int(i) < this_p.num_addr; i++ {
+	for i := AX25_REPEATER_1; i < this_p.num_addr; i++ {
 		if i > AX25_REPEATER_1 {
 			result += ","
 		}
@@ -2026,27 +2021,21 @@ func ax25_format_via_path(this_p *packet_t) string {
  *
  * Inputs:	this_p	- pointer to packet object.
  *
- * Outputs:	result		- Frame buffer, AX25_MAX_PACKET_LEN bytes.
- *				Should also have two extra for FCS to be
- *				added later.
- *
- * Returns:	Number of octets in the frame buffer.
- *		Does NOT include the extra 2 for FCS.
- *
- * Errors:	Returns -1.
+ * Returns:	result		- Frame buffer
  *
  *------------------------------------------------------------------*/
 
-func ax25_pack(this_p *packet_t, result *C.uchar) C.int {
+func ax25_pack(this_p *packet_t) []byte {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
-	C.memcpy(unsafe.Pointer(result), unsafe.Pointer(&this_p.frame_data[0]), C.size_t(this_p.frame_len))
+	var result = make([]byte, this_p.frame_len)
+	copy(result, this_p.frame_data[:this_p.frame_len])
 
-	return (this_p.frame_len)
+	return result
 }
 
 /*------------------------------------------------------------------
@@ -2097,7 +2086,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 	ns = -1
 
 	// U frames are always one control byte.
-	var c = int(ax25_get_control(this_p))
+	var c = ax25_get_control(this_p)
 	if c < 0 {
 		desc = "Not AX.25"
 		frameType = frame_not_AX25
@@ -2137,7 +2126,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 
 	var c2 int // I & S frames can have second Control byte.
 	if this_p.modulo == modulo_128 {
-		c2 = int(ax25_get_c2(this_p))
+		c2 = ax25_get_c2(this_p)
 	}
 
 	var dst_c = this_p.frame_data[AX25_DESTINATION*7+6] & SSID_H_MASK
@@ -2370,7 +2359,6 @@ func pid_to_text(p int) string {
 
 func ax25_hex_dump(this_p *packet_t) {
 	var fptr = this_p.frame_data
-	var flen = this_p.frame_len
 
 	if this_p.num_addr >= AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
 
@@ -2387,7 +2375,7 @@ func ax25_hex_dump(this_p *packet_t) {
 			cp_text += ", " + pid_text
 		}
 
-		var l_text = fmt.Sprintf(", length = %d", flen)
+		var l_text = fmt.Sprintf(", length = %d", this_p.frame_len)
 		cp_text += l_text
 
 		dw_printf("%s\n", cp_text)
@@ -2422,7 +2410,7 @@ func ax25_hex_dump(this_p *packet_t) {
 		(fptr[13]&SSID_RR_MASK)>>SSID_RR_SHIFT,
 		fptr[13]&SSID_LAST_MASK)
 
-	for n := C.int(2); n < this_p.num_addr; n++ {
+	for n := 2; n < this_p.num_addr; n++ {
 
 		dw_printf(" digi %d  %c%c%c%c%c%c %2d   h=%d res=%d last=%d\n",
 			n-1,
@@ -2439,7 +2427,7 @@ func ax25_hex_dump(this_p *packet_t) {
 
 	}
 
-	hex_dump(C.GoBytes(unsafe.Pointer(&fptr[0]), flen))
+	hex_dump(fptr[:this_p.frame_len])
 
 } /* end ax25_hex_dump */
 
@@ -2521,7 +2509,7 @@ func ax25_is_null_frame(this_p *packet_t) bool {
 *
 *------------------------------------------------------------------*/
 
-func ax25_get_control(this_p *packet_t) C.int {
+func ax25_get_control(this_p *packet_t) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2530,12 +2518,12 @@ func ax25_get_control(this_p *packet_t) C.int {
 	}
 
 	if this_p.num_addr >= 2 {
-		return C.int(this_p.frame_data[ax25_get_control_offset(this_p)])
+		return int(this_p.frame_data[ax25_get_control_offset(this_p)])
 	}
 	return (-1)
 }
 
-func ax25_get_c2(this_p *packet_t) C.int {
+func ax25_get_c2(this_p *packet_t) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2547,7 +2535,7 @@ func ax25_get_c2(this_p *packet_t) C.int {
 		var offset2 = ax25_get_control_offset(this_p) + 1
 
 		if offset2 < this_p.frame_len {
-			return C.int(this_p.frame_data[offset2])
+			return int(this_p.frame_data[offset2])
 		} else {
 			return (-1) /* attempt to go beyond the end of frame. */
 		}
@@ -2598,7 +2586,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
 
 	// TODO: handle 2 control byte case.
 	if this_p.num_addr >= 2 {
-		this_p.frame_data[ax25_get_pid_offset(this_p)] = C.uchar(pid)
+		this_p.frame_data[ax25_get_pid_offset(this_p)] = pid
 	}
 }
 
@@ -2649,7 +2637,7 @@ func ax25_get_pid(this_p *packet_t) int {
  *
  *------------------------------------------------------------------*/
 
-func ax25_get_frame_len(this_p *packet_t) C.int {
+func ax25_get_frame_len(this_p *packet_t) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2659,11 +2647,11 @@ func ax25_get_frame_len(this_p *packet_t) C.int {
 
 } /* end ax25_get_frame_len */
 
-func ax25_get_frame_data_ptr(this_p *packet_t) *C.uchar {
+func ax25_get_frame_data(this_p *packet_t) []byte {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	return (&this_p.frame_data[0])
+	return this_p.frame_data[:this_p.frame_len]
 
 } /* end ax25_get_frame_data_ptr */
 
@@ -2716,7 +2704,7 @@ func ax25_get_frame_data_ptr(this_p *packet_t) *C.uchar {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_dedupe_crc(pp *packet_t) C.ushort {
+func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
@@ -2738,10 +2726,10 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 		info = info[:len(info)-1]
 	}
 
-	var crc C.ushort = 0xffff
-	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(src))), C.int(len(src)), crc)
-	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(dest))), C.int(len(dest)), crc)
-	crc = crc16((*C.uchar)(C.CBytes(info)), C.int(len(info)), crc)
+	var crc uint16 = 0xffff
+	crc = crc16([]byte(src), crc)
+	crc = crc16([]byte(dest), crc)
+	crc = crc16(info, crc)
 
 	return (crc)
 }
@@ -2768,14 +2756,13 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 
  *------------------------------------------------------------------------------*/
 
-func ax25_m_m_crc(pp *packet_t) C.ushort {
+func ax25_m_m_crc(pp *packet_t) uint16 {
 
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
-	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
-	var flen = ax25_pack(pp, &fbuf[0])
+	var fbuf = ax25_pack(pp)
 
-	var crc C.ushort = 0xffff
-	crc = crc16(&fbuf[0], flen, crc)
+	var crc uint16 = 0xffff
+	crc = crc16(fbuf, crc)
 
 	return (crc)
 }
@@ -2824,7 +2811,7 @@ func ax25_m_m_crc(pp *packet_t) C.ushort {
 // #define MAXSAFE 500
 const MAXSAFE = AX25_MAX_INFO_LEN
 
-func ax25_safe_print(info []byte, ascii_only C.int) {
+func ax25_safe_print(info []byte, ascii_only bool) {
 
 	if len(info) > MAXSAFE {
 		info = info[:MAXSAFE]
@@ -2837,7 +2824,7 @@ func ax25_safe_print(info []byte, ascii_only C.int) {
 		if ch == ' ' && i == len(pstr)-1 {
 			safe_str += fmt.Sprintf("<0x%02x>", ch)
 		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||
-			(ascii_only != 0 && ch >= 0x80) {
+			(ascii_only && ch >= 0x80) {
 
 			/* Control codes and delete. */
 			/* UTF-8 does not use fe and ff except in a possible */
@@ -2905,10 +2892,10 @@ func ax25_alevel_to_text(alevel alevel_t) string {
 		(alevel.mark == -99 && alevel.space == -99) { /* v. 1.7 "B" FM demodulator. */
 		// ?? Where does -99 come from?
 
-		return fmt.Sprintf("%d", alevel.rec)
+		return strconv.Itoa(alevel.rec)
 	} else if alevel.mark == -2 && alevel.space == -2 { /* DTMF - single number. */
 
-		return fmt.Sprintf("%d", alevel.rec)
+		return strconv.Itoa(alevel.rec)
 	} else { /* AFSK */
 
 		//snprintf (text, AX25_ALEVEL_TO_TEXT_SIZE, "%d:%d(%d/%d=%05.3f=)", alevel.original, alevel.rec, alevel.mark, alevel.space, alevel.ms_ratio);
@@ -2924,11 +2911,11 @@ func ax25_alevel_to_text(alevel alevel_t) string {
 
 //#define DEBUGX 1
 
-func ax25_get_control_offset(this_p *packet_t) C.int {
+func ax25_get_control_offset(this_p *packet_t) int {
 	return (this_p.num_addr * 7)
 }
 
-func ax25_get_num_control(this_p *packet_t) C.int {
+func ax25_get_num_control(this_p *packet_t) int {
 
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
@@ -2972,20 +2959,20 @@ func ax25_get_num_control(this_p *packet_t) C.int {
  * protocol but the more general case is 0, 1 or 2 protocol ID octets.
  */
 
-func ax25_get_pid_offset(this_p *packet_t) C.int {
+func ax25_get_pid_offset(this_p *packet_t) int {
 	return (ax25_get_control_offset(this_p) + ax25_get_num_control(this_p))
 }
 
-func ax25_get_num_pid(this_p *packet_t) C.int {
+func ax25_get_num_pid(this_p *packet_t) int {
 
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
-	var pid C.int
+	var pid int
 
 	if (c&0x01) == 0 || /* I   xxxx xxx0 */
 		c == 0x03 || c == 0x13 { /* UI  000x 0011 */
 
-		pid = C.int(this_p.frame_data[ax25_get_pid_offset(this_p)])
+		pid = int(this_p.frame_data[ax25_get_pid_offset(this_p)])
 		/*
 			#if DEBUGX
 				  dw_printf ("ax25_get_num_pid, %02x is I or UI frame, pid = %02x, returns %d\n", c, pid, (pid==AX25_PID_ESCAPE_CHARACTER) ? 2 : 1);
@@ -3018,7 +3005,7 @@ func ax25_get_num_pid(this_p *packet_t) C.int {
  * APRS always has an Information field with at least one octet for the Data Type Indicator.
  */
 
-func ax25_get_info_offset(this_p *packet_t) C.int {
+func ax25_get_info_offset(this_p *packet_t) int {
 	var offset = ax25_get_control_offset(this_p) + ax25_get_num_control(this_p) + ax25_get_num_pid(this_p)
 	/*
 		#if DEBUGX
@@ -3028,7 +3015,7 @@ func ax25_get_info_offset(this_p *packet_t) C.int {
 	return (offset)
 }
 
-func ax25_get_num_info(this_p *packet_t) C.int {
+func ax25_get_num_info(this_p *packet_t) int { //nolint:unused
 
 	/* assuming AX.25 frame. */
 

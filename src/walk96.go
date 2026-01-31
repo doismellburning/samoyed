@@ -18,7 +18,6 @@ import "C"
 import (
 	"fmt"
 	"os"
-	"unsafe"
 
 	"github.com/pkg/term"
 )
@@ -134,17 +133,17 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 		os.Exit(1)
 	}
 
-	var ax25_frame [AX25_MAX_PACKET_LEN]C.uchar
-	ax25_frame[0] = 0 // Insert channel before KISS encapsulation.
+	var ax25_frame = []byte{0} // Insert channel before KISS encapsulation.
 
-	var frame_len = ax25_pack(pp, &ax25_frame[1])
+	ax25_frame = append(ax25_frame, ax25_pack(pp)...)
+
 	ax25_delete(pp)
 
 	/*
 	 * Encapsulate as KISS and send to TNC.
 	 */
 
-	var kiss_frame = kiss_encapsulate(C.GoBytes(unsafe.Pointer(&ax25_frame[0]), frame_len+1))
+	var kiss_frame = kiss_encapsulate(ax25_frame)
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 

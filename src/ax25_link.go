@@ -2512,7 +2512,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		if s_debug_client_app {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, \"", ns, S.vr)
-			ax25_safe_print(info, 1)
+			ax25_safe_print(info, true)
 			dw_printf("\"\n")
 		}
 
@@ -2535,7 +2535,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			if s_debug_client_app {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
-				ax25_safe_print(C.GoBytes(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data), S.rxdata_by_ns[S.vr].len), 1)
+				ax25_safe_print(C.GoBytes(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data), S.rxdata_by_ns[S.vr].len), true)
 				dw_printf("\"\n")
 			}
 
@@ -2646,7 +2646,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 			if s_debug_misc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
-				ax25_safe_print(info, 1)
+				ax25_safe_print(info, true)
 				dw_printf("\"\n")
 			}
 

@@ -759,12 +759,12 @@ func decode_aprs_print(A *decode_aprs_t) {
 		n--
 	}
 	if n > 0 {
-		ax25_safe_print([]byte(C.GoString(&A.g_weather[0])), 0)
+		ax25_safe_print([]byte(C.GoString(&A.g_weather[0])), false)
 		dw_printf("\n")
 	}
 
 	if C.strlen(&A.g_telemetry[0]) > 0 {
-		ax25_safe_print([]byte(C.GoString(&A.g_telemetry[0])), 0)
+		ax25_safe_print([]byte(C.GoString(&A.g_telemetry[0])), false)
 		dw_printf("\n")
 	}
 
@@ -778,7 +778,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 		n--
 	}
 	if n > 0 {
-		ax25_safe_print([]byte(C.GoString(&A.g_comment[0])), 0)
+		ax25_safe_print([]byte(C.GoString(&A.g_comment[0])), false)
 		dw_printf("\n")
 
 		/*

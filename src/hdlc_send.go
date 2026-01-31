@@ -58,9 +58,8 @@ func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
-		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
-		var flen = ax25_pack(pp, &fbuf[0])
-		var n = fx25_send_frame(channel, &fbuf[0], flen, C.int(audio_config_p.achan[channel].fx25_strength), false)
+		var fbuf = ax25_pack(pp)
+		var n = fx25_send_frame(channel, (*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)), C.int(audio_config_p.achan[channel].fx25_strength), false)
 		if n > 0 {
 			return (n)
 		}
@@ -70,9 +69,8 @@ func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_
 		// the FX.25 frame length is so limited.
 	}
 
-	var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
-	var flen = ax25_pack(pp, &fbuf[0])
-	return (ax25_only_hdlc_send_frame(channel, &fbuf[0], flen, bad_fcs))
+	var fbuf = ax25_pack(pp)
+	return (ax25_only_hdlc_send_frame(channel, (*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)), bad_fcs))
 }
 
 func ax25_only_hdlc_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, bad_fcs C.int) C.int {

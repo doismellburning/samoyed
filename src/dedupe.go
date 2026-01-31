@@ -170,7 +170,7 @@ func dedupe_init(ttl time.Duration) {
 
 func dedupe_remember(pp *packet_t, channel C.int) {
 	history[insert_next].time_stamp = time.Now()
-	history[insert_next].checksum = ax25_dedupe_crc(pp)
+	history[insert_next].checksum = C.ushort(ax25_dedupe_crc(pp))
 	history[insert_next].xmit_channel = channel
 
 	insert_next++
@@ -205,7 +205,7 @@ func dedupe_check(pp *packet_t, channel C.int) bool {
 	var now = time.Now()
 
 	for _, h := range history {
-		if h.checksum != crc {
+		if h.checksum != C.ushort(crc) {
 			continue
 		}
 

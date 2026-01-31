@@ -484,7 +484,7 @@ func xmit_thread(channel C.int) {
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", stemp) /* stations followed by : */
-					ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
+					ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 					dw_printf("\n")
 					ax25_delete(pp)
 				} /* wait for clear channel error. */
@@ -855,11 +855,11 @@ func send_one_frame(c C.int, p C.int, pp *packet_t) C.int {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
+			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 		}
 	} else {
-		ax25_safe_print(pinfo, bool2Cint(!ax25_is_aprs(pp)))
+		ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 		dw_printf("\n")
 	}
 

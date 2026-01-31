@@ -298,11 +298,10 @@ func process_input(stuff string) {
 	 */
 	if unicode.IsUpper(rune(stuff[0])) || unicode.IsNumber(rune(stuff[0])) {
 		// Parse the "TNC2 monitor format" and convert to AX.25 frame.
-		var frame_data [AX25_MAX_PACKET_LEN]C.uchar
 		var pp = ax25_from_text(stuff, true)
 		if pp != nil {
-			ax25_pack(pp, &frame_data[0])
-			send_to_kiss_tnc(channel, KISS_CMD_DATA_FRAME, []byte(C.GoString((*C.char)(unsafe.Pointer(&frame_data[0])))))
+			var frame_data = ax25_pack(pp)
+			send_to_kiss_tnc(channel, KISS_CMD_DATA_FRAME, frame_data)
 			ax25_delete(pp)
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
@@ -551,7 +550,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 			// Safe print will replace any unprintable characters with
 			// hexadecimal representation.
 
-			ax25_safe_print(pinfo, 0)
+			ax25_safe_print(pinfo, false)
 			fmt.Printf("\n")
 
 			/*
