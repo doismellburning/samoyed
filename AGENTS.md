@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Style
+
+* Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary like with a `for` loop variable
+
 ## Licensing
 
 * `make reuse` checks [REUSE](https://reuse.software/) compliance and must always pass
