@@ -158,7 +158,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unsafe"
 )
 
 const AX25_MAX_REPEATERS = 8
@@ -2712,7 +2711,7 @@ func ax25_get_frame_data(this_p *packet_t) []byte {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_dedupe_crc(pp *packet_t) C.ushort {
+func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
@@ -2734,10 +2733,10 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 		info = info[:len(info)-1]
 	}
 
-	var crc C.ushort = 0xffff
-	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(src))), C.int(len(src)), crc)
-	crc = crc16((*C.uchar)(unsafe.Pointer(C.CString(dest))), C.int(len(dest)), crc)
-	crc = crc16((*C.uchar)(C.CBytes(info)), C.int(len(info)), crc)
+	var crc uint16 = 0xffff
+	crc = crc16([]byte(src), crc)
+	crc = crc16([]byte(dest), crc)
+	crc = crc16(info, crc)
 
 	return (crc)
 }
@@ -2764,13 +2763,13 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 
  *------------------------------------------------------------------------------*/
 
-func ax25_m_m_crc(pp *packet_t) C.ushort {
+func ax25_m_m_crc(pp *packet_t) uint16 {
 
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
 	var fbuf = ax25_pack(pp)
 
-	var crc C.ushort = 0xffff
-	crc = crc16((*C.uchar)(unsafe.Pointer(&fbuf[0])), C.int(len(fbuf)), crc)
+	var crc uint16 = 0xffff
+	crc = crc16(fbuf, crc)
 
 	return (crc)
 }
