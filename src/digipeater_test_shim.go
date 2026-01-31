@@ -18,7 +18,6 @@ import (
 	"regexp"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -56,8 +55,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * again, and make sure it is still the same.
 	 */
 
-	var frame [AX25_MAX_PACKET_LEN]C.uchar
-	var frame_len = ax25_pack(pp, &frame[0])
+	var frame = ax25_pack(pp)
 	ax25_delete(pp)
 
 	var alevel alevel_t
@@ -65,7 +63,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	alevel.mark = 50
 	alevel.space = 50
 
-	pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&frame[0]), C.int(frame_len)), alevel)
+	pp = ax25_from_frame(frame, alevel)
 	assert.NotNil(t, pp)
 	rec = ax25_format_addrs(pp)
 	pinfo = ax25_get_info(pp)

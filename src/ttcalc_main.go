@@ -47,7 +47,6 @@ import (
 	"net"
 	"os"
 	"unicode"
-	"unsafe"
 )
 
 func TTCalcMain() {
@@ -147,18 +146,13 @@ func TTCalcMain() {
 				hdr.Portx = channel
 				hdr.DataKind = 'K'
 
-				var reply_uchars [AX25_MAX_PACKET_LEN]C.uchar
-				var reply_len = ax25_pack(reply_pp, &reply_uchars[0])
-				hdr.DataLen = 1 + uint32(reply_len)
+				var reply_bytes = ax25_pack(reply_pp)
+				hdr.DataLen = 1 + uint32(len(reply_bytes))
 
 				binary.Write(server_sock, binary.LittleEndian, hdr)
 				server_sock.Write([]byte{0x0})
 
-				var reply_bytes = make([]byte, reply_len)
-				for i := range reply_len {
-					reply_bytes[i] = byte(reply_uchars[i])
-				}
-				server_sock.Write(unsafe.Slice(&reply_bytes[0], hdr.DataLen-1))
+				server_sock.Write(reply_bytes)
 
 				ax25_delete(reply_pp)
 			}

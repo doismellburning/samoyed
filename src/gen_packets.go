@@ -812,9 +812,6 @@ func send_packet(str string) {
 			return
 		}
 
-		var fbuf [AX25_MAX_PACKET_LEN + 2]C.uchar
-		ax25_pack(pp, &fbuf[0])
-
 		// If stereo, put same thing in each channel.
 
 		for c := 0; c < modem.adev[0].num_channels; c++ {

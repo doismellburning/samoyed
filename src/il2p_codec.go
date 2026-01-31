@@ -92,9 +92,9 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 			// Payload is entire AX.25 frame.
 
-			var frame_data_ptr = ax25_get_frame_data_ptr(pp)
+			var frame_data = ax25_get_frame_data(pp)
 			var frame_len = ax25_get_frame_len(pp)
-			var k = il2p_encode_payload(frame_data_ptr, C.int(frame_len), max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
+			var k = il2p_encode_payload((*C.uchar)(C.CBytes(frame_data)), C.int(frame_len), max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
 			if k > 0 {
 				out_len += k
 				// Success. Entire AX.25 frame <= 1023 bytes.

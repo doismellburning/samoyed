@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"unsafe"
 
@@ -568,12 +569,12 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 		// Is it the same after encoding to IL2P and then decoding?
 
 		var len1 = ax25_get_frame_len(pp1)
-		var data1 = ax25_get_frame_data_ptr(pp1)
+		var data1 = ax25_get_frame_data(pp1)
 
 		var len2 = ax25_get_frame_len(pp2)
-		var data2 = ax25_get_frame_data_ptr(pp2)
+		var data2 = ax25_get_frame_data(pp2)
 
-		if len1 != len2 || C.memcmp(unsafe.Pointer(data1), unsafe.Pointer(data2), C.ulong(len1)) != 0 {
+		if len1 != len2 || !slices.Equal(data1, data2) {
 			dw_printf("\nEncode/Decode Error.  Original:\n")
 			ax25_hex_dump(pp1)
 
