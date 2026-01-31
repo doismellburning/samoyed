@@ -181,10 +181,9 @@ func DecodeAPRSLine(line string) {
 			ax25_safe_print(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
-			var A decode_aprs_t
-			decode_aprs(&A, pp, 0, nil) // Extract information into structure.
+			var A = decode_aprs(pp, false, "") // Extract information into structure.
 
-			decode_aprs_print(&A) // Now print it in human readable format.
+			decode_aprs_print(A) // Now print it in human readable format.
 
 			ax25_check_addresses(pp) // Errors for invalid addresses.
 
@@ -197,11 +196,9 @@ func DecodeAPRSLine(line string) {
 
 		var pp = ax25_from_text(line, true)
 		if pp != nil {
-			var A decode_aprs_t
+			var A = decode_aprs(pp, false, "") // Extract information into structure.
 
-			decode_aprs(&A, pp, 0, nil) // Extract information into structure.
-
-			decode_aprs_print(&A) // Now print it in human readable format.
+			decode_aprs_print(A) // Now print it in human readable format.
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.

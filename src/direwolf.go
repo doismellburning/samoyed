@@ -1027,17 +1027,15 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	var ais_obj_packet [300]C.char
 
 	if ax25_is_aprs(pp) {
-		var A decode_aprs_t
-
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
 
-		decode_aprs(&A, pp, IfThenElse(q_d_opt, C.int(1), C.int(0)), nil)
+		var A = decode_aprs(pp, q_d_opt, "")
 
 		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
 
-			decode_aprs_print(&A)
+			decode_aprs_print(A)
 		}
 
 		/*
@@ -1048,14 +1046,14 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		// Send to log file.
 
-		log_write(channel, &A, pp, alevel, retries)
+		log_write(channel, A, pp, alevel, retries)
 
 		// temp experiment.
 		// log_rr_bits (&A, pp);
 
 		// Add to list of stations heard over the radio.
 
-		mheard_save_rf(C.int(channel), &A, pp, alevel, retries)
+		mheard_save_rf(C.int(channel), A, pp, alevel, retries)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.
@@ -1068,17 +1066,17 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			waypoint_send_ais(pinfo[3:])
 
 			if A_opt_ais_to_obj && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-				var ais_obj_info = encode_object(C.GoString(&A.g_name[0]), false, time.Now(),
+				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
 					float64(A.g_lat), float64(A.g_lon), 0, // no ambiguity
-					byte(A.g_symbol_table), byte(A.g_symbol_code),
+					A.g_symbol_table, A.g_symbol_code,
 					0, 0, 0, "", // power, height, gain, direction.
 					// Unknown not handled properly.
 					// Should encode_object take floating point here?
 					int(A.g_course+0.5), int(DW_MPH_TO_KNOTS(float64(A.g_speed_mph))+0.5),
-					0, 0, 0, C.GoString(&A.g_comment[0])) // freq, tone, offset
+					0, 0, 0, A.g_comment) // freq, tone, offset
 
 				// TODO Bodge
-				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", C.GoString(&A.g_src[0]), APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, ais_obj_info)
+				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, ais_obj_info)
 				C.strcpy(&ais_obj_packet[0], C.CString(_ais_obj_packet))
 
 				dw_printf("[%d.AIS] %s\n", channel, _ais_obj_packet)
@@ -1090,15 +1088,15 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// Convert to NMEA waypoint sentence if we have a location.
 
 		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-			var nameIn = &A.g_src[0]
-			if C.strlen(&A.g_name[0]) > 0 {
-				nameIn = &A.g_name[0]
+			var nameIn = A.g_src
+			if len(A.g_name) > 0 {
+				nameIn = A.g_name
 			}
 
-			waypoint_send_sentence(C.GoString(nameIn),
-				float64(A.g_lat), float64(A.g_lon), rune(A.g_symbol_table), byte(A.g_symbol_code),
+			waypoint_send_sentence(nameIn,
+				float64(A.g_lat), float64(A.g_lon), rune(A.g_symbol_table), A.g_symbol_code,
 				DW_FEET_TO_METERS(float64(A.g_altitude_ft)), float64(A.g_course), DW_MPH_TO_KNOTS(float64(A.g_speed_mph)),
-				C.GoString(&A.g_comment[0]))
+				A.g_comment)
 		}
 	}
 
