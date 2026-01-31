@@ -143,13 +143,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <ctype.h>
-// #include "regex.h"
-import "C"
-
 import (
 	"bytes"
 	"fmt"
@@ -719,7 +712,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_frame(data []byte, alevel alevel_t) *packet_t {
+func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
 
 	/*
 	 * First make sure we have an acceptable length:
@@ -1001,7 +994,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t) bool {
+func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
 
 	var all_ok = true
 	for n := 0; n < ax25_get_num_addr(pp); n++ {
@@ -3022,7 +3015,7 @@ func ax25_get_info_offset(this_p *packet_t) int {
 	return (offset)
 }
 
-func ax25_get_num_info(this_p *packet_t) int {
+func ax25_get_num_info(this_p *packet_t) int { //nolint:unused
 
 	/* assuming AX.25 frame. */
 
