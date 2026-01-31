@@ -89,13 +89,12 @@ func fcs_calc(_data *C.uchar, length C.int) C.ushort {
  *	crc = crc16 (region3, sizeof(region3), crc);
  */
 
-func crc16(_data *C.uchar, length C.int, seed C.ushort) C.ushort {
+func crc16(data []byte, seed uint16) uint16 {
 	var crc = seed
-	var data = unsafe.Slice(_data, length)
 
-	for j := C.int(0); j < length; j++ {
+	for _, b := range data {
 
-		crc = ((crc) >> 8) ^ ccitt_table[((crc)^C.ushort(data[j]))&0xff]
+		crc = ((crc) >> 8) ^ uint16(ccitt_table[((crc)^uint16(b))&0xff])
 	}
 
 	return (crc ^ 0xffff)
