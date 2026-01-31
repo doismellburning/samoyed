@@ -356,8 +356,7 @@ func connect_listen_thread(kps *kissport_status_s) {
  *
 // TODO: add kiss_cmd
  *
- *		fbuf		- Address of raw received frame buffer
- *				  or a text string.
+ *		fbuf		- Raw received frame buffer
  *
  *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
  *				  KISS_CMD_SET_HARDWARE when responding to a query.
@@ -386,7 +385,7 @@ func connect_listen_thread(kps *kissport_status_s) {
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.int,
+func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen int,
 	onlykps *kissport_status_s, onlyclient C.int) {
 	// Something received over the radio would normally be sent to all attached clients.
 	// However, there are times we want to send a response only to a particular client.
@@ -412,7 +411,6 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.
 							dw_printf("For best results, configure for a KISS-only TNC to avoid this.\n")
 							dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
 
-							flen = C.int(len(fbuf))
 							if kiss_debug > 0 {
 								kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 							}

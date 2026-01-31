@@ -270,7 +270,7 @@ func kisspt_open_pt() {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.int, kps *kissport_status_s, client C.int) {
+func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen int, kps *kissport_status_s, client C.int) {
 	if pt_master == nil {
 		return
 	}

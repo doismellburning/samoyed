@@ -334,11 +334,10 @@ func nettnc_send_packet(channel C.int, pp *packet_t) {
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
 
-	var fbuf = ax25_get_frame_data_ptr(pp)
-	var flen = ax25_get_frame_len(pp)
+	var fbuf = ax25_get_frame_data(pp)
 
 	var frame_buff = []byte{0} // For now, set channel to 0.
-	frame_buff = append(frame_buff, C.GoBytes(unsafe.Pointer(fbuf), C.int(flen))...)
+	frame_buff = append(frame_buff, fbuf...)
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.
 

@@ -394,7 +394,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
  * Let's try to keep it happy by sending back a command prompt.
  */
 
-type kiss_sendfun func(C.int, C.int, []byte, C.int, *kissport_status_s, C.int)
+type kiss_sendfun func(C.int, C.int, []byte, int, *kissport_status_s, C.int)
 
 func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 	kps *kissport_status_s, client C.int,
@@ -856,7 +856,7 @@ func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", C.MAJOR_VERSION, C.MINOR_VERSION)
-			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
+			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -865,7 +865,7 @@ func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport
 
 			var n = tq_count(channel, -1, C.CString(""), C.CString(""), 1)
 			var response = fmt.Sprintf("TXBUF:%d", n)
-			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), C.int(len(response)), kps, client)
+			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS Set Hardware unrecognized command: %s.\n", cmd)

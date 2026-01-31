@@ -439,8 +439,7 @@ func server_connect_listen_thread(server_port int) {
  *
  *		pp		- Identifier for packet object.
  *
- *		fbuf		- Address of raw received frame buffer.
- *		flen		- Length of raw received frame.
+ *		fbuf		- Frame buffer.
  *
  *
  * Description:	Send message to client if connected.
@@ -452,7 +451,7 @@ func server_connect_listen_thread(server_port int) {
  *
  *--------------------------------------------------------------------*/
 
-func server_send_rec_packet(channel C.int, pp *packet_t, fbuf *C.uchar, flen C.int) {
+func server_send_rec_packet(channel C.int, pp *packet_t, fbuf []byte) {
 
 	/*
 	 * RAW format
@@ -473,14 +472,14 @@ func server_send_rec_packet(channel C.int, pp *packet_t, fbuf *C.uchar, flen C.i
 			var callTo = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 			copy(agwpe_msg.Header.CallTo[:], []byte(callTo))
 
-			agwpe_msg.Header.DataLen = uint32(flen + 1)
-			agwpe_msg.Data = make([]byte, flen+1)
+			agwpe_msg.Header.DataLen = uint32(len(fbuf) + 1)
+			agwpe_msg.Data = make([]byte, len(fbuf)+1)
 
 			/* Stick in extra byte for the "TNC" to use. */
 
 			agwpe_msg.Data[0] = byte(channel) << 4 // Was 0.  Fixed in 1.8.
 
-			copy(agwpe_msg.Data[1:], C.GoBytes(unsafe.Pointer(fbuf), flen))
+			copy(agwpe_msg.Data[1:], fbuf)
 
 			if debug_client > 0 {
 				debug_print(TO_CLIENT, client, agwpe_msg)

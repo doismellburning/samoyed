@@ -186,7 +186,7 @@ func kissserial_init(mc *misc_config_s) {
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen C.int,
+func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen int,
 	notused1 *kissport_status_s, notused2 C.int) {
 	/*
 	 * Quietly discard if we don't have open connection.

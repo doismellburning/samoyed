@@ -266,7 +266,7 @@ type packet_t struct {
 	/* For U frames:   	set to 0 - not applicable */
 	/* For I & S frames:	8 or 128 if known.  0 if unknown. */
 
-	frame_data [AX25_MAX_PACKET_LEN + 1]C.uchar
+	frame_data [AX25_MAX_PACKET_LEN + 1]byte
 	/* Raw frame contents, without the CRC. */
 
 	magic2 int /* Will get stomped on if above overflows. */
@@ -337,7 +337,7 @@ var last_seq_num int = 0
 var DECODE_APRS_UTIL = false
 
 func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {
-	this_p.frame_data[this_p.num_addr*7-1] &= ^(C.uchar(SSID_LAST_MASK))
+	this_p.frame_data[this_p.num_addr*7-1] &= ^(byte(SSID_LAST_MASK))
 }
 
 func SET_LAST_ADDR_FLAG(this_p *packet_t) {
@@ -1107,7 +1107,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 			if i >= 6 {
 				break
 			}
-			this_p.frame_data[n*7+i] = C.uchar(c << 1)
+			this_p.frame_data[n*7+i] = byte(c << 1)
 		}
 		ax25_set_ssid(this_p, n, ssidTemp)
 	} else if n == this_p.num_addr {
@@ -1197,7 +1197,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 		if i >= 6 {
 			break
 		}
-		this_p.frame_data[n*7+i] = C.uchar(c << 1)
+		this_p.frame_data[n*7+i] = byte(c << 1)
 	}
 
 	ax25_set_ssid(this_p, n, ssidTemp)
@@ -1517,8 +1517,8 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
 	Assert(this_p.magic2 == MAGIC)
 
 	if n >= 0 && n < this_p.num_addr {
-		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(C.uchar(SSID_SSID_MASK))) |
-			C.uchar((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
+		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(byte(SSID_SSID_MASK))) |
+			byte((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_set_ssid(%d,%d), num_addr=%d\n", n, ssid, this_p.num_addr)
@@ -1786,7 +1786,7 @@ func ax25_get_dti(this_p *packet_t) byte {
 	Assert(this_p.magic2 == MAGIC)
 
 	if this_p.num_addr >= 2 {
-		return byte(this_p.frame_data[ax25_get_info_offset(this_p)])
+		return this_p.frame_data[ax25_get_info_offset(this_p)]
 	}
 	return (' ')
 }
@@ -2026,27 +2026,21 @@ func ax25_format_via_path(this_p *packet_t) string {
  *
  * Inputs:	this_p	- pointer to packet object.
  *
- * Outputs:	result		- Frame buffer, AX25_MAX_PACKET_LEN bytes.
- *				Should also have two extra for FCS to be
- *				added later.
- *
- * Returns:	Number of octets in the frame buffer.
- *		Does NOT include the extra 2 for FCS.
- *
- * Errors:	Returns -1.
+ * Returns:	result		- Frame buffer
  *
  *------------------------------------------------------------------*/
 
-func ax25_pack(this_p *packet_t, result *C.uchar) int {
+func ax25_pack(this_p *packet_t) []byte {
 
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
-	C.memcpy(unsafe.Pointer(result), unsafe.Pointer(&this_p.frame_data[0]), C.size_t(this_p.frame_len))
+	var result = make([]byte, this_p.frame_len)
+	copy(result, this_p.frame_data[:this_p.frame_len])
 
-	return (this_p.frame_len)
+	return result
 }
 
 /*------------------------------------------------------------------
@@ -2598,7 +2592,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
 
 	// TODO: handle 2 control byte case.
 	if this_p.num_addr >= 2 {
-		this_p.frame_data[ax25_get_pid_offset(this_p)] = C.uchar(pid)
+		this_p.frame_data[ax25_get_pid_offset(this_p)] = pid
 	}
 }
 
@@ -2659,11 +2653,11 @@ func ax25_get_frame_len(this_p *packet_t) int {
 
 } /* end ax25_get_frame_len */
 
-func ax25_get_frame_data_ptr(this_p *packet_t) *C.uchar {
+func ax25_get_frame_data(this_p *packet_t) []byte {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	return (&this_p.frame_data[0])
+	return this_p.frame_data[:this_p.frame_len]
 
 } /* end ax25_get_frame_data_ptr */
 
@@ -2771,11 +2765,10 @@ func ax25_dedupe_crc(pp *packet_t) C.ushort {
 func ax25_m_m_crc(pp *packet_t) C.ushort {
 
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
-	var fbuf [AX25_MAX_PACKET_LEN]C.uchar
-	var flen = ax25_pack(pp, &fbuf[0])
+	var fbuf = ax25_pack(pp)
 
 	var crc C.ushort = 0xffff
-	crc = crc16(&fbuf[0], C.int(flen), crc)
+	crc = crc16((*C.uchar)(unsafe.Pointer(&fbuf[0])), C.int(len(fbuf)), crc)
 
 	return (crc)
 }
