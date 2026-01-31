@@ -17,8 +17,7 @@ package direwolf
 // #include <sys/socket.h>
 // #include <netinet/in.h>
 // #include <netdb.h>
-// #cgo pkg-config: alsa
-// #cgo CFLAGS: -DUSE_CM108 -DUSE_ALSA
+// #cgo CFLAGS: -DUSE_CM108
 // #cgo LDFLAGS: -lm
 import "C"
 
