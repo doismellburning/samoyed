@@ -500,10 +500,10 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	 * Initialize the packet structure with two addresses and control/pid
 	 * for APRS.
 	 */
-	C.memset(unsafe.Pointer(&this_p.frame_data[AX25_DESTINATION*7]), ' '<<1, 6)
+	copy(this_p.frame_data[AX25_DESTINATION*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_data[AX25_DESTINATION*7+6] = SSID_H_MASK | SSID_RR_MASK
 
-	C.memset(unsafe.Pointer(&this_p.frame_data[AX25_SOURCE*7]), ' '<<1, 6)
+	copy(this_p.frame_data[AX25_SOURCE*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_data[AX25_SOURCE*7+6] = SSID_RR_MASK | SSID_LAST_MASK
 
 	this_p.frame_data[14] = AX25_UI_FRAME
@@ -658,9 +658,15 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	   #endif
 	*/
 
-	var info_len = 0
-	var info_part [AX25_MAX_INFO_LEN + 1]C.char
-	for len(pinfo) > 0 && info_len < AX25_MAX_INFO_LEN {
+	var info_part []byte
+	for len(pinfo) > 0 {
+		if len(info_part) >= AX25_MAX_INFO_LEN {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
+			ax25_delete(this_p)
+			return (nil)
+		}
+
 		if len(pinfo) >= 6 &&
 			pinfo[0] == '<' &&
 			pinfo[1] == '0' &&
@@ -670,16 +676,13 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			pinfo[5] == '>' {
 
 			var hexVal, _ = strconv.ParseInt(string(pinfo[3:5]), 16, 64)
-			info_part[info_len] = C.char(hexVal)
-			info_len++
+			info_part = append(info_part, byte(hexVal))
 			pinfo = pinfo[6:]
 		} else {
-			info_part[info_len] = C.char(pinfo[0])
-			info_len++
+			info_part = append(info_part, pinfo[0])
 			pinfo = pinfo[1:]
 		}
 	}
-	info_part[info_len] = 0
 
 	/*
 		#if DEBUG14H
@@ -693,8 +696,8 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	/*
 	 * Append the info part.
 	 */
-	C.memcpy(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len), unsafe.Pointer(&info_part[0]), C.size_t(info_len))
-	this_p.frame_len += info_len
+	var copied = copy(this_p.frame_data[this_p.frame_len:], info_part)
+	this_p.frame_len += copied
 
 	return (this_p)
 }
@@ -747,7 +750,7 @@ func ax25_from_frame(data []byte, alevel alevel_t) *packet_t {
 
 	/* Copy the whole thing intact. */
 
-	C.memcpy(unsafe.Pointer(&this_p.frame_data[0]), C.CBytes(data), C.size_t(flen))
+	copy(this_p.frame_data[:], data)
 	this_p.frame_data[flen] = 0
 	this_p.frame_len = flen
 
@@ -1101,7 +1104,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 
 		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
 
-		C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
+		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
 		for i, c := range addrTemp {
 			if i >= 6 {
@@ -1180,8 +1183,8 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 
 	this_p.num_addr++
 
-	C.memmove(unsafe.Pointer(&this_p.frame_data[(n+1)*7]), unsafe.Pointer(&this_p.frame_data[n*7]), C.size_t(this_p.frame_len-(n*7)))
-	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
+	copy(this_p.frame_data[(n+1)*7:], this_p.frame_data[n*7:this_p.frame_len])
+	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	this_p.frame_len += 7
 	this_p.frame_data[n*7+6] = SSID_RR_MASK
 
@@ -1192,7 +1195,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	// We use this to parse it and later remove unwanted parts.
 
 	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
-	C.memset(unsafe.Pointer(&this_p.frame_data[n*7]), ' '<<1, 6)
+	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 	for i, c := range addrTemp {
 		if i >= 6 {
 			break
@@ -1243,7 +1246,7 @@ func ax25_remove_addr(this_p *packet_t, n int) {
 
 	this_p.num_addr--
 
-	C.memmove(unsafe.Pointer(&this_p.frame_data[n*7]), unsafe.Pointer(&this_p.frame_data[(n+1)*7]), C.size_t(this_p.frame_len-((n+1)*7)))
+	copy(this_p.frame_data[n*7:], this_p.frame_data[(n+1)*7:this_p.frame_len])
 	this_p.frame_len -= 7
 	SET_LAST_ADDR_FLAG(this_p)
 
@@ -1704,11 +1707,11 @@ func ax25_get_info(this_p *packet_t) []byte {
 
 		/* AX.25 */
 
-		return C.GoBytes(unsafe.Pointer(&this_p.frame_data[ax25_get_info_offset(this_p)]), C.int(ax25_get_num_info(this_p)))
+		return this_p.frame_data[ax25_get_info_offset(this_p):this_p.frame_len]
 	} else {
 
 		/* Not AX.25.  Treat Whole packet as info. */
-		return C.GoBytes(unsafe.Pointer(&this_p.frame_data[0]), C.int(this_p.frame_len))
+		return ax25_get_frame_data(this_p)
 	}
 } /* end ax25_get_info */
 
@@ -1721,7 +1724,7 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
 		new_info = new_info[:AX25_MAX_INFO_LEN]
 	}
 
-	C.memcpy(unsafe.Pointer(&this_p.frame_data[ax25_get_info_offset(this_p)]), C.CBytes(new_info), C.size_t(len(new_info)))
+	copy(this_p.frame_data[ax25_get_info_offset(this_p):], new_info)
 
 	this_p.frame_len += len(new_info)
 }
@@ -2364,7 +2367,6 @@ func pid_to_text(p int) string {
 
 func ax25_hex_dump(this_p *packet_t) {
 	var fptr = this_p.frame_data
-	var flen = this_p.frame_len
 
 	if this_p.num_addr >= AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
 
@@ -2381,7 +2383,7 @@ func ax25_hex_dump(this_p *packet_t) {
 			cp_text += ", " + pid_text
 		}
 
-		var l_text = fmt.Sprintf(", length = %d", flen)
+		var l_text = fmt.Sprintf(", length = %d", this_p.frame_len)
 		cp_text += l_text
 
 		dw_printf("%s\n", cp_text)
@@ -2433,7 +2435,7 @@ func ax25_hex_dump(this_p *packet_t) {
 
 	}
 
-	hex_dump(C.GoBytes(unsafe.Pointer(&fptr[0]), C.int(flen)))
+	hex_dump(fptr[:this_p.frame_len])
 
 } /* end ax25_hex_dump */
 
