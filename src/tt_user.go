@@ -780,7 +780,7 @@ func xmit_object_report(i int, first_time bool) {
 	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
 
-		dedupe_remember(pp, C.int(save_tt_config_p.obj_xmit_chan))
+		dedupe_remember(pp, save_tt_config_p.obj_xmit_chan)
 
 		tq_append(C.int(save_tt_config_p.obj_xmit_chan), TQ_PRIO_1_LO, pp)
 	} else {

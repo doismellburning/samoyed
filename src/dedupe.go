@@ -74,14 +74,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #define DEDUPE_C
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <time.h>
-import "C"
-
 import (
 	"time"
 )
@@ -117,11 +109,11 @@ var insert_next int /* Index, in array below, where next */
 type historyEntry struct {
 	time_stamp time.Time /* When the packet was transmitted. */
 
-	checksum C.ushort /* Some sort of checksum for the */
+	checksum uint16 /* Some sort of checksum for the */
 	/* source, destination, and information. */
 	/* is is not used anywhere else. */
 
-	xmit_channel C.int /* Radio channel number. */
+	xmit_channel int /* Radio channel number. */
 
 }
 
@@ -168,9 +160,9 @@ func dedupe_init(ttl time.Duration) {
  *
  *------------------------------------------------------------------------------*/
 
-func dedupe_remember(pp *packet_t, channel C.int) {
+func dedupe_remember(pp *packet_t, channel int) {
 	history[insert_next].time_stamp = time.Now()
-	history[insert_next].checksum = C.ushort(ax25_dedupe_crc(pp))
+	history[insert_next].checksum = ax25_dedupe_crc(pp)
 	history[insert_next].xmit_channel = channel
 
 	insert_next++
@@ -182,7 +174,7 @@ func dedupe_remember(pp *packet_t, channel C.int) {
 	/* want to do it again if it comes from APRS-IS. */
 	/* Not sure about the other way around. */
 
-	ig_to_tx_remember(pp, int(channel), 1)
+	ig_to_tx_remember(pp, channel, 1)
 }
 
 /*------------------------------------------------------------------------------
@@ -200,12 +192,12 @@ func dedupe_remember(pp *packet_t, channel C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-func dedupe_check(pp *packet_t, channel C.int) bool {
+func dedupe_check(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
 	for _, h := range history {
-		if h.checksum != C.ushort(crc) {
+		if h.checksum != crc {
 			continue
 		}
 
