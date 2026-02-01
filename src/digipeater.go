@@ -151,7 +151,7 @@ func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func digipeater(from_chan C.int, pp *packet_t) {
+func digipeater(from_chan int, pp *packet_t) {
 	// Network TNC is OK for UI frames where we don't care about timing.
 
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
@@ -194,7 +194,7 @@ func digipeater(from_chan C.int, pp *packet_t) {
 	 *
 	 */
 
-	for to_chan := range C.int(MAX_TOTAL_CHANS) {
+	for to_chan := range MAX_TOTAL_CHANS {
 		if save_digi_config_p.enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
 				var result = digipeat_match(from_chan, pp, digipeater_audio_config.mycall[from_chan],
@@ -204,8 +204,8 @@ func digipeater(from_chan C.int, pp *packet_t) {
 					save_digi_config_p.atgp[from_chan][to_chan],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
-					dedupe_remember(pp, int(to_chan))
-					tq_append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+					dedupe_remember(pp, to_chan)
+					tq_append(C.int(to_chan), TQ_PRIO_0_HI, result) //  High priority queue.
 					digi_count[from_chan][to_chan]++
 				}
 			}
@@ -218,7 +218,7 @@ func digipeater(from_chan C.int, pp *packet_t) {
 	 * These are lower priority
 	 */
 
-	for to_chan := range C.int(MAX_TOTAL_CHANS) {
+	for to_chan := range MAX_TOTAL_CHANS {
 		if save_digi_config_p.enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
 				var result = digipeat_match(from_chan, pp, digipeater_audio_config.mycall[from_chan],
@@ -228,8 +228,8 @@ func digipeater(from_chan C.int, pp *packet_t) {
 					save_digi_config_p.atgp[from_chan][to_chan],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
-					dedupe_remember(pp, int(to_chan))
-					tq_append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+					dedupe_remember(pp, to_chan)
+					tq_append(C.int(to_chan), TQ_PRIO_1_LO, result) // Low priority queue.
 					digi_count[from_chan][to_chan]++
 				}
 			}
@@ -285,13 +285,13 @@ func digipeater(from_chan C.int, pp *packet_t) {
  *------------------------------------------------------------------------------*/
 
 func digipeat_match(
-	from_chan C.int,
+	from_chan int,
 	pp *packet_t,
 	mycall_rec string,
 	mycall_xmit string,
 	alias *regexp.Regexp,
 	wide *regexp.Regexp,
-	to_chan C.int,
+	to_chan int,
 	preempt preempt_e,
 	atgp string,
 	filter_str string,
@@ -300,7 +300,7 @@ func digipeat_match(
 	 * First check if filtering has been configured.
 	 */
 	if filter_str != "" {
-		if pfilter(from_chan, to_chan, C.CString(filter_str), pp, 1) != 1 {
+		if pfilter(C.int(from_chan), C.int(to_chan), C.CString(filter_str), pp, 1) != 1 {
 			return (nil)
 		}
 	}
@@ -391,7 +391,7 @@ func digipeat_match(
 	 *
 	 */
 
-	if dedupe_check(pp, int(to_chan)) {
+	if dedupe_check(pp, to_chan) {
 		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */
@@ -590,7 +590,7 @@ func digipeat_match(
  *
  *------------------------------------------------------------------------------*/
 
-func digi_regen(from_chan C.int, pp *packet_t) {
+func digi_regen(from_chan int, pp *packet_t) {
 	/*
 		packet_t result;
 	*/
@@ -599,12 +599,12 @@ func digi_regen(from_chan C.int, pp *packet_t) {
 
 	// FIXME KG assert (from_chan >= 0 && from_chan < MAX_TOTAL_CHANS);
 
-	for to_chan := range C.int(MAX_TOTAL_CHANS) {
+	for to_chan := range MAX_TOTAL_CHANS {
 		if save_digi_config_p.regen[from_chan][to_chan] {
 			var result = ax25_dup(pp)
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				tq_append(to_chan, TQ_PRIO_1_LO, result)
+				tq_append(C.int(to_chan), TQ_PRIO_1_LO, result)
 			}
 		}
 	}
