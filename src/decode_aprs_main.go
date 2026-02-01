@@ -51,18 +51,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <time.h>
-// #include <assert.h>
-// #include <stdlib.h>	/* for atof */
-// #include <string.h>	/* for strtok */
-// #include <math.h>	/* for pow */
-// #include <ctype.h>	/* for isdigit */
-// #include <fcntl.h>
-// #include "regex.h"
-// #cgo CFLAGS: -I../../src -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -O0
-import "C"
-
 import (
 	"bufio"
 	"encoding/hex"
@@ -71,16 +59,6 @@ import (
 	"regexp"
 	"strings"
 )
-
-func byteSliceToCUChars(data []byte) []C.uchar {
-	var chars = make([]C.uchar, len(data))
-
-	for i, b := range data {
-		chars[i] = C.uchar(b)
-	}
-
-	return chars
-}
 
 func DecodeAPRSMain() {
 	DECODE_APRS_UTIL = true // DECAMAIN define replacement
