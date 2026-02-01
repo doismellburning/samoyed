@@ -272,17 +272,17 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			sdti = string(rune(ax25_get_dti(pp)))
 		}
 
-		var sname = C.GoString(&A.g_src[0])
-		if C.strlen(&A.g_name[0]) > 0 {
-			sname = C.GoString(&A.g_name[0])
+		var sname = A.g_src
+		if len(A.g_name) > 0 {
+			sname = A.g_name
 		}
 
 		var ssymbol string = string(rune(A.g_symbol_table)) + string(rune(A.g_symbol_code))
 
-		var smfr = C.GoString(&A.g_mfr[0])
-		var sstatus = C.GoString(&A.g_mic_e_status[0])
-		var stelemetry = C.GoString(&A.g_telemetry[0])
-		var scomment = C.GoString(&A.g_comment[0])
+		var smfr = A.g_mfr
+		var sstatus = A.g_mic_e_status
+		var stelemetry = A.g_telemetry
+		var scomment = A.g_comment
 
 		var slat = ""
 		if A.g_lat != G_UNKNOWN {
@@ -330,7 +330,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 		var w = csv.NewWriter(g_log_fp)
 		w.Write([]string{
 			strconv.Itoa(channel), strconv.Itoa(int(now.Unix())), itime,
-			C.GoString(&A.g_src[0]), heard, alevel_text, strconv.Itoa(int(retries)), sdti,
+			A.g_src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
 			sname, ssymbol,
 			slat, slon, sspd, scse, salt,
 			sfreq, soffs, stone,
@@ -362,7 +362,7 @@ func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
 
-		var smfr = strings.ReplaceAll(C.GoString(&A.g_mfr[0]), ",", ".")
+		var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
 
 		/* Who are we hearing?   Original station or digipeater? */
 		/* Similar code in direwolf.c.  Combine into one function? */
@@ -402,7 +402,7 @@ func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic
 			dw_printf("%d %d%d  %d %d%d,%s,%s,%s\n",
 				src_c, (src_rr>>1)&1, src_rr&1,
 				dst_c, (dst_rr>>1)&1, dst_rr&1,
-				smfr, C.GoString(&A.g_src[0]), heard)
+				smfr, A.g_src, heard)
 		}
 	}
 } /* end log_rr_bits */

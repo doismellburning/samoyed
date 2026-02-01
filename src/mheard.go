@@ -336,8 +336,8 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 
 	if A.g_packet_type == packet_type_position {
 		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-			mptr.dlat = A.g_lat
-			mptr.dlon = A.g_lon
+			mptr.dlat = C.double(A.g_lat)
+			mptr.dlon = C.double(A.g_lon)
 		}
 	}
 

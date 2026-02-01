@@ -748,14 +748,14 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 				A.g_tone = G_UNKNOWN
 				A.g_dcs = G_UNKNOWN
 
-				C.strcpy(&A.g_src[0], C.CString(mycall))
-				A.g_symbol_table = C.char(bp.symtab)
-				A.g_symbol_code = C.char(bp.symbol)
-				A.g_lat = gpsinfo.dlat
-				A.g_lon = gpsinfo.dlon
-				A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots)))
-				A.g_course = C.float(coarse)
-				A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(gpsinfo.altitude)))
+				A.g_src = mycall
+				A.g_symbol_table = bp.symtab
+				A.g_symbol_code = bp.symbol
+				A.g_lat = float64(gpsinfo.dlat)
+				A.g_lon = float64(gpsinfo.dlon)
+				A.g_speed_mph = DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))
+				A.g_course = float64(coarse)
+				A.g_altitude_ft = DW_METERS_TO_FEET(float64(gpsinfo.altitude))
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel alevel_t

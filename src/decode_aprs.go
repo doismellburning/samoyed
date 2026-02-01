@@ -36,7 +36,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unsafe"
 )
 
 type packet_type_e int
@@ -73,16 +72,16 @@ const (
 )
 
 type decode_aprs_t struct {
-	g_quiet C.int /* Suppress error messages when decoding. */
+	g_quiet bool /* Suppress error messages when decoding. */
 
-	g_src [AX25_MAX_ADDR_LEN]C.char // In the case of a packet encapsulated by a 3rd party
+	g_src string // In the case of a packet encapsulated by a 3rd party
 	// header, this is the encapsulated source.
 
-	g_dest [AX25_MAX_ADDR_LEN]C.char
+	g_dest string
 
-	g_data_type_desc [100]C.char /* APRS data type description.  Telemetry descriptions get pretty long. */
+	g_data_type_desc string /* APRS data type description.  Telemetry descriptions get pretty long. */
 
-	g_symbol_table C.char /* The Symbol Table Identifier character selects one */
+	g_symbol_table byte /* The Symbol Table Identifier character selects one */
 	/* of the two Symbol Tables, or it may be used as */
 	/* single-character (alpha or numeric) overlay, as follows: */
 
@@ -99,89 +98,89 @@ type decode_aprs_t struct {
 
 	/*	A-Z	Alpha overlay. Symbol from Alternate Symbol Table */
 
-	g_symbol_code C.char /* Where the Symbol Table Identifier is 0-9 or A-Z (or a-j */
+	g_symbol_code byte /* Where the Symbol Table Identifier is 0-9 or A-Z (or a-j */
 	/* with compressed position data only), the symbol comes from */
 	/* the Alternate Symbol Table, and is overlaid with the */
 	/* identifier (as a single digit or a capital letter). */
 
-	g_aprstt_loc [APRSTT_LOC_DESC_LEN]C.char /* APRStt location from !DAO! */
+	g_aprstt_loc string /* APRStt location from !DAO! */
 
-	g_lat C.double
-	g_lon C.double /* Location, degrees.  Negative for South or West. */
+	g_lat float64
+	g_lon float64 /* Location, degrees.  Negative for South or West. */
 	/* Set to G_UNKNOWN if missing or error. */
 
-	g_maidenhead [12]C.char /* 4 or 6 (or 8?) character maidenhead locator. */
+	g_maidenhead string /* 4 or 6 (or 8?) character maidenhead locator. */
 
-	g_name [12]C.char /* Object or item name. Max. 9 characters. */
+	g_name string /* Object or item name. Max. 9 characters. */
 
-	g_addressee [12]C.char /* Addressee for a "message."  Max. 9 characters. */
+	g_addressee string /* Addressee for a "message."  Max. 9 characters. */
 	/* Also for Directed Station Query which is a */
 	/* special case of message. */
 
 	// This is so pfilter.c:filt_t does not need to duplicate the same work.
 
-	g_has_thirdparty_header C.int
+	g_has_thirdparty_header bool
 	g_packet_type           packet_type_e
 
 	g_message_subtype message_subtype_e /* Various cases of the overloaded "message." */
 
-	g_message_number [12]C.char /* Message number.  Should be 1 - 5 alphanumeric characters if used. */
+	g_message_number string /* Message number.  Should be 1 - 5 alphanumeric characters if used. */
 	/* Addendum 1.1 has new format {mm} or {mm}aa with only two */
 	/* characters for message number and an ack riding piggyback. */
 
-	g_speed_mph C.float /* Speed in MPH.  */
+	g_speed_mph float64 /* Speed in MPH.  */
 	/* The APRS transmission uses knots so watch out for */
 	/* conversions when sending and receiving APRS packets. */
 
-	g_course C.float /* 0 = North, 90 = East, etc. */
+	g_course float64 /* 0 = North, 90 = East, etc. */
 
-	g_power C.int /* Transmitter power in watts. */
+	g_power int /* Transmitter power in watts. */
 
-	g_height C.int /* Antenna height above average terrain, feet. */
+	g_height int /* Antenna height above average terrain, feet. */
 	// TODO:  rename to g_height_ft
 
-	g_gain C.int /* Antenna gain in dBi. */
+	g_gain int /* Antenna gain in dBi. */
 
-	g_directivity [12]C.char /* Direction of max signal strength */
+	g_directivity string /* Direction of max signal strength */
 
-	g_range C.float /* Precomputed radio range in miles. */
+	g_range float64 /* Precomputed radio range in miles. */
 
-	g_altitude_ft C.float /* Feet above median sea level.  */
+	g_altitude_ft float64 /* Feet above median sea level.  */
 	/* I used feet here because the APRS specification */
 	/* has units of feet for altitude.  Meters would be */
 	/* more natural to the other 96% of the world. */
 
-	g_mfr [80]C.char /* Manufacturer or application. */
+	g_mfr string /* Manufacturer or application. */
 
-	g_mic_e_status [32]C.char /* MIC-E message. */
+	g_mic_e_status string /* MIC-E message. */
 
-	g_freq C.double /* Frequency, MHz */
+	g_freq float64 /* Frequency, MHz */
 
-	g_tone C.float /* CTCSS tone, Hz, one fractional digit */
+	g_tone float64 /* CTCSS tone, Hz, one fractional digit */
 
-	g_dcs C.int /* Digital coded squelch, print as 3 octal digits. */
+	g_dcs int /* Digital coded squelch, print as 3 octal digits. */
 
-	g_offset C.int /* Transmit offset, kHz */
+	g_offset int /* Transmit offset, kHz */
 
-	g_query_type [12]C.char /* General Query: APRS, IGATE, WX, ... */
+	g_query_type string /* General Query: APRS, IGATE, WX, ... */
 	/* Addressee is NOT set. */
 
 	/* Directed Station Query: exactly 5 characters. */
 	/* APRSD, APRST, PING?, ... */
 	/* Addressee is set. */
 
-	g_footprint_lat    C.double /* A general query may contain a foot print. */
-	g_footprint_lon    C.double /* Set all to G_UNKNOWN if not used. */
-	g_footprint_radius C.float  /* Radius in miles. */
+	g_footprint_lat    float64 /* A general query may contain a foot print. */
+	g_footprint_lon    float64 /* Set all to G_UNKNOWN if not used. */
+	g_footprint_radius float64 /* Radius in miles. */
 
-	g_query_callsign [12]C.char /* Directed query may contain callsign.  */
+	g_query_callsign string /* Directed query may contain callsign.  */
 	/* e.g. tell me all objects from that callsign. */
 
-	g_weather [500]C.char /* Weather.  Can get quite long. Rethink max size. */
+	g_weather string /* Weather */
 
-	g_telemetry [256]C.char /* Telemetry data.  Rethink max size. */
+	g_telemetry string /* Telemetry data */
 
-	g_comment [256]C.char /* Comment. */
+	g_comment string /* Comment. */
 
 }
 
@@ -212,7 +211,7 @@ type decode_aprs_t struct {
  *
  *------------------------------------------------------------------*/
 
-func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C.char) {
+func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
 
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 
@@ -220,12 +219,14 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 
+	var A = new(decode_aprs_t)
+
 	A.g_quiet = quiet
 
 	if unicode.IsPrint(rune(pinfo[0])) {
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])))
+		A.g_data_type_desc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])
 	} else {
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])))
+		A.g_data_type_desc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])
 	}
 
 	A.g_symbol_table = '/' /* Default to primary table. */
@@ -259,7 +260,7 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 
 	var atemp = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
 
-	if quiet == 0 {
+	if !quiet {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("RFONLY and NOGATE must not appear in the destination address field.\n")
@@ -271,7 +272,7 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 
 	for i := 0; i < ax25_get_num_repeaters(pp); i++ {
 		atemp = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i)
-		if quiet == 0 {
+		if !quiet {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("RELAY, TRACE, and WIDE (not WIDEn) are obsolete.\n")
@@ -304,26 +305,26 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
-			A.g_has_thirdparty_header = 1
-			decode_aprs(A, pp_payload, quiet, C.CString(string(payload_src))) // 1 means used recursively
+			A = decode_aprs(pp_payload, quiet, string(payload_src)) // 1 means used recursively
+			A.g_has_thirdparty_header = true
 			ax25_delete(pp_payload)
-			return
+			return A
 		} else {
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Third Party Header: Unable to parse payload."))
-			C.strcpy(&A.g_src[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_SOURCE)))
-			C.strcpy(&A.g_dest[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_DESTINATION)))
+			A.g_data_type_desc = "Third Party Header: Unable to parse payload."
+			A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+			A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 		}
 	}
 
 	/*
 	 * Extract source and destination including the SSID.
 	 */
-	if third_party_src != nil {
-		C.strcpy(&A.g_src[0], third_party_src)
+	if third_party_src != "" {
+		A.g_src = third_party_src
 	} else {
-		C.strcpy(&A.g_src[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_SOURCE)))
+		A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 	}
-	C.strcpy(&A.g_dest[0], C.CString(ax25_get_addr_with_ssid(pp, AX25_DESTINATION)))
+	A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 	//dw_printf ("DEBUG decode_aprs source=%s, dest=%s\n", A.g_src, A.g_dest);
 
@@ -344,11 +345,11 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 	 *    This is wrong, it should be using UTF-8.
 	 */
 
-	if (A.g_quiet == 0) && bytes.Contains(pinfo, []byte{0}) {
+	if !A.g_quiet && bytes.Contains(pinfo, []byte{0}) {
 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("'nul' character found in Information part.  This should never happen with APRS.\n")
-		dw_printf("If this is meant to be APRS, %s is transmitting with defective software.\n", C.GoString(&A.g_src[0]))
+		dw_printf("If this is meant to be APRS, %s is transmitting with defective software.\n", A.g_src)
 
 		if bytes.HasPrefix(pinfo, []byte("4P")) {
 			dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n")
@@ -367,7 +368,7 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 	case '`': /* Current Mic-E Data */
 
 	default:
-		C.strcpy(&A.g_mfr[0], C.CString(deviceid_decode_dest(C.GoString(&A.g_dest[0]))))
+		A.g_mfr = deviceid_decode_dest(A.g_dest)
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -422,7 +423,7 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 		/* Directed Station Query */
 		/* Telemetry metadata. */
 
-		aprs_message(A, pinfo, quiet > 0)
+		aprs_message(A, pinfo, quiet)
 
 		switch A.g_message_subtype {
 		case message_subtype_message, message_subtype_ack, message_subtype_rej:
@@ -512,16 +513,17 @@ func decode_aprs(A *decode_aprs_t, pp *packet_t, quiet C.int, third_party_src *C
 		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 
 		if pinfo[0] != ':' && pinfo[0] != '}' {
-			var symtab, symbol, ok = symbols_from_dest_or_src(pinfo[0], C.GoString(&A.g_src[0]), C.GoString(&A.g_dest[0]))
+			var symtab, symbol, ok = symbols_from_dest_or_src(pinfo[0], A.g_src, A.g_dest)
 			if ok {
-				A.g_symbol_table = C.char(symtab)
-				A.g_symbol_code = C.char(symbol)
+				A.g_symbol_table = symtab
+				A.g_symbol_code = symbol
 			}
 		}
 
 		//dw_printf ("DEBUG decode_aprs@end2 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 	}
 
+	return A
 } /* end decode_aprs */
 
 func decode_aprs_print(A *decode_aprs_t) {
@@ -535,13 +537,13 @@ func decode_aprs_print(A *decode_aprs_t) {
 	 * - mic-e status
 	 * - power/height/gain, range
 	 */
-	var stemp = C.GoString(&A.g_data_type_desc[0])
+	var stemp = A.g_data_type_desc
 
 	//dw_printf ("DEBUG decode_aprs_print stemp1=%s\n", stemp);
 
-	if C.strlen(&A.g_name[0]) > 0 {
+	if len(A.g_name) > 0 {
 		stemp += ", \""
-		stemp += C.GoString(&A.g_name[0])
+		stemp += A.g_name
 		stemp += "\""
 	}
 
@@ -550,7 +552,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 	//dw_printf ("DEBUG decode_aprs_print symbol_code=%c=0x%02x\n", A.g_symbol_code, A.g_symbol_code);
 
 	if A.g_symbol_code != ' ' {
-		var symbol_description = symbols_get_description(byte(A.g_symbol_table), byte(A.g_symbol_code))
+		var symbol_description = symbols_get_description(A.g_symbol_table, A.g_symbol_code)
 
 		//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 
@@ -560,29 +562,27 @@ func decode_aprs_print(A *decode_aprs_t) {
 
 	//dw_printf ("DEBUG decode_aprs_print stemp3=%s mfr=%s\n", stemp, A.g_mfr);
 
-	if C.strlen(&A.g_mfr[0]) > 0 {
-		if C.strcmp(&A.g_dest[0], C.CString("APRS")) == 0 ||
-			C.strcmp(&A.g_dest[0], C.CString("BEACON")) == 0 ||
-			C.strcmp(&A.g_dest[0], C.CString("ID")) == 0 {
+	if len(A.g_mfr) > 0 {
+		if A.g_dest == "APRS" || A.g_dest == "BEACON" || A.g_dest == "ID" {
 			stemp += "\nUse of \""
-			stemp += C.GoString(&A.g_dest[0])
+			stemp += A.g_dest
 			stemp += "\" in the destination field is obsolete."
 			stemp += "  You can help to improve the quality of APRS signals."
 			stemp += "\nTell the sender ("
-			stemp += C.GoString(&A.g_src[0])
+			stemp += A.g_src
 			stemp += ") to use the proper product identifier from"
 			stemp += " https://github.com/aprsorg/aprs-deviceid "
 		} else {
 			stemp += ", "
-			stemp += C.GoString(&A.g_mfr[0])
+			stemp += A.g_mfr
 		}
 	}
 
 	//dw_printf ("DEBUG decode_aprs_print stemp4=%s\n", stemp);
 
-	if C.strlen(&A.g_mic_e_status[0]) > 0 {
+	if len(A.g_mic_e_status) > 0 {
 		stemp += ", "
-		stemp += C.GoString(&A.g_mic_e_status[0])
+		stemp += A.g_mic_e_status
 	}
 
 	//dw_printf ("DEBUG decode_aprs_print stemp5=%s\n", stemp);
@@ -593,7 +593,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 		/* http://eng.usna.navy.mil/~bruninga/aprs/aprs11.html */
 		/* "The Antenna Gain in the PHG format on page 28 is in dBi." */
 
-		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", A.g_power, A.g_height, DW_FEET_TO_METERS(float64(A.g_height)), A.g_gain, C.GoString(&A.g_directivity[0]))
+		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", A.g_power, A.g_height, DW_FEET_TO_METERS(float64(A.g_height)), A.g_gain, A.g_directivity)
 	}
 
 	if A.g_range > 0 {
@@ -624,17 +624,17 @@ func decode_aprs_print(A *decode_aprs_t) {
 	 * http://www.amsat.org/cgi-bin/gridconv
 	 */
 
-	if C.strlen(&A.g_maidenhead[0]) > 0 {
+	if len(A.g_maidenhead) > 0 {
 
 		if A.g_lat == G_UNKNOWN && A.g_lon == G_UNKNOWN {
-			var lat, lon, err = ll_from_grid_square(C.GoString(&A.g_maidenhead[0]))
+			var lat, lon, err = ll_from_grid_square(A.g_maidenhead)
 			if err == nil {
-				A.g_lat = C.double(lat)
-				A.g_lon = C.double(lon)
+				A.g_lat = lat
+				A.g_lon = lon
 			}
 		}
 
-		dw_printf("Grid square = %s, ", C.GoString(&A.g_maidenhead[0]))
+		dw_printf("Grid square = %s, ", A.g_maidenhead)
 	}
 
 	stemp = ""
@@ -645,7 +645,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 		// Have location but it is possible one part is invalid.
 
 		if A.g_lat != G_UNKNOWN {
-			var absll C.double
+			var absll float64
 			var news rune
 
 			if A.g_lat >= 0 {
@@ -656,14 +656,14 @@ func decode_aprs_print(A *decode_aprs_t) {
 				news = 'S'
 			}
 			var deg = int(absll)
-			var _min = (absll - C.double(deg)) * 60.0
+			var _min = (absll - float64(deg)) * 60.0
 			s_lat = fmt.Sprintf("%c %02d°%07.4f", news, deg, _min)
 		} else {
 			s_lat = "Invalid Latitude"
 		}
 
 		if A.g_lon != G_UNKNOWN {
-			var absll C.double
+			var absll float64
 			var news rune
 
 			if A.g_lon >= 0 {
@@ -674,7 +674,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 				news = 'W'
 			}
 			var deg = int(absll)
-			var _min = (absll - C.double(deg)) * 60.0
+			var _min = (absll - float64(deg)) * 60.0
 			s_lon = fmt.Sprintf("%c %03d°%07.4f", news, deg, _min)
 		} else {
 			s_lon = "Invalid Longitude"
@@ -683,11 +683,11 @@ func decode_aprs_print(A *decode_aprs_t) {
 		stemp = fmt.Sprintf("%s, %s", s_lat, s_lon)
 	}
 
-	if C.strlen(&A.g_aprstt_loc[0]) > 0 {
+	if len(A.g_aprstt_loc) > 0 {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
-		stemp += C.GoString(&A.g_aprstt_loc[0])
+		stemp += A.g_aprstt_loc
 	}
 
 	if A.g_speed_mph != G_UNKNOWN {
@@ -749,36 +749,22 @@ func decode_aprs_print(A *decode_aprs_t) {
 	 * Drop annoying trailing CR LF.  Anyone who cares can see it in the raw datA->
 	 */
 
-	var n = C.strlen(&A.g_weather[0])
-	if n >= 1 && A.g_weather[n-1] == '\n' {
-		A.g_weather[n-1] = 0
-		n--
-	}
-	if n >= 1 && A.g_weather[n-1] == '\r' {
-		A.g_weather[n-1] = 0
-		n--
-	}
-	if n > 0 {
-		ax25_safe_print([]byte(C.GoString(&A.g_weather[0])), false)
+	A.g_weather = strings.TrimSpace(A.g_weather)
+
+	if len(A.g_weather) > 0 {
+		ax25_safe_print([]byte(A.g_weather), false)
 		dw_printf("\n")
 	}
 
-	if C.strlen(&A.g_telemetry[0]) > 0 {
-		ax25_safe_print([]byte(C.GoString(&A.g_telemetry[0])), false)
+	if len(A.g_telemetry) > 0 {
+		ax25_safe_print([]byte(A.g_telemetry), false)
 		dw_printf("\n")
 	}
 
-	n = C.strlen(&A.g_comment[0])
-	if n >= 1 && A.g_comment[n-1] == '\n' {
-		A.g_comment[n-1] = 0
-		n--
-	}
-	if n >= 1 && A.g_comment[n-1] == '\r' {
-		A.g_comment[n-1] = 0
-		n--
-	}
-	if n > 0 {
-		ax25_safe_print([]byte(C.GoString(&A.g_comment[0])), false)
+	A.g_comment = strings.TrimSpace(A.g_comment)
+
+	if len(A.g_comment) > 0 {
+		ax25_safe_print([]byte(A.g_comment), false)
 		dw_printf("\n")
 
 		/*
@@ -809,17 +795,17 @@ func decode_aprs_print(A *decode_aprs_t) {
 		// Should we?
 		// Reference:   https://www.fileformat.info/info/unicode/utf8test.htm
 
-		if A.g_quiet == 0 {
-
-			for j := C.size_t(0); j < n; j++ {
-				if byte(A.g_comment[j]) == 0xb0 && (j == 0 || (byte(A.g_comment[j-1])&0x80) == 0) {
+		if !A.g_quiet {
+			var n = len(A.g_comment)
+			for j := 0; j < n; j++ {
+				if A.g_comment[j] == 0xb0 && (j == 0 || (A.g_comment[j-1])&0x80 == 0) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Character code 0xb0 is probably an attempt at a degree symbol.\n")
 					dw_printf("The correct encoding is 0xc2 0xb0 in UTF-8.\n")
 				}
 			}
-			for j := C.size_t(0); j < n; j++ {
-				if byte(A.g_comment[j]) == 0xf8 && (j == n-1 || (byte(A.g_comment[j+1])&0xc0) != 0xc0) {
+			for j := 0; j < n; j++ {
+				if A.g_comment[j] == 0xf8 && (j == n-1 || (A.g_comment[j+1]&0xc0) != 0xc0) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Character code 0xf8 is probably an attempt at a degree symbol.\n")
 					dw_printf("The correct encoding is 0xc2 0xb0 in UTF-8.\n")
@@ -872,7 +858,7 @@ func aprs_ll_pos(A *decode_aprs_t, info []byte) {
 	}
 	var q aprs_compressed_pos_s
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Position"))
+	A.g_data_type_desc = "Position"
 
 	var ll_bytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var compressed_bytes, _ = binary.Decode(info, binary.NativeEndian, &q)
@@ -885,7 +871,7 @@ func aprs_ll_pos(A *decode_aprs_t, info []byte) {
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
 
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report"))
+			A.g_data_type_desc = "Weather Report"
 			weather_data(A, info[ll_bytes:], true)
 			/*
 			   Here is an interesting case.
@@ -927,7 +913,7 @@ func aprs_ll_pos(A *decode_aprs_t, info []byte) {
 			/* compressed data so we don't expect a 7 byte "data */
 			/* extension" for them. */
 
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report"))
+			A.g_data_type_desc = "Weather Report"
 			weather_data(A, info[compressed_bytes:], false)
 		} else {
 			/* Regular position report. */
@@ -988,7 +974,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 	}
 	var q aprs_compressed_pos_time_s
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Position with time"))
+	A.g_data_type_desc = "Position with time"
 
 	var ts time.Time
 
@@ -1004,7 +990,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
 
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report"))
+			A.g_data_type_desc = "Weather Report"
 			weather_data(A, info[llBytes:], true)
 		} else {
 			/* Regular position report. */
@@ -1022,7 +1008,7 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 			/* compressed data so we don't expect a 7 byte "data */
 			/* extension" for them. */
 
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report"))
+			A.g_data_type_desc = "Weather Report"
 			weather_data(A, info[compressedBytes:], false)
 		} else {
 			/* Regular position report. */
@@ -1065,21 +1051,31 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
+
+	var g_lat C.double = G_UNKNOWN
+	var g_lon C.double = G_UNKNOWN
+
 	if bytes.HasPrefix(info, []byte("$GPRMC,")) ||
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
+		var g_course C.float = G_UNKNOWN
 		var speed_knots C.float = G_UNKNOWN
 
-		dwgpsnmea_gprmc(C.CString(string(info)), A.g_quiet, &(A.g_lat), &(A.g_lon), &speed_knots, &(A.g_course))
-		A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(speed_knots)))
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Raw GPS data"))
+		dwgpsnmea_gprmc(C.CString(string(info)), bool2Cint(A.g_quiet), &(g_lat), &(g_lon), &speed_knots, &(g_course))
+		A.g_lat = float64(g_lat)
+		A.g_lon = float64(g_lon)
+		A.g_course = float64(g_course)
+		A.g_speed_mph = DW_KNOTS_TO_MPH(float64(speed_knots))
+		A.g_data_type_desc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
 		var alt_meters C.float = G_UNKNOWN
 		var num_sat C.int = 0
 
-		dwgpsnmea_gpgga(C.CString(string(info)), A.g_quiet, &(A.g_lat), &(A.g_lon), &alt_meters, &num_sat)
-		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(alt_meters)))
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Raw GPS data"))
+		dwgpsnmea_gpgga(C.CString(string(info)), bool2Cint(A.g_quiet), &(g_lat), &(g_lon), &alt_meters, &num_sat)
+		A.g_lat = float64(g_lat)
+		A.g_lon = float64(g_lon)
+		A.g_altitude_ft = DW_METERS_TO_FEET(float64(alt_meters))
+		A.g_data_type_desc = "Raw GPS data"
 	}
 
 	// TODO (low): add a few other sentence types.
@@ -1314,7 +1310,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 		return (0)
 	}
 
-	if A.g_quiet == 0 {
+	if !A.g_quiet {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid character \"%c\" in MIC-E destination/latitude.\n", c)
 	}
@@ -1331,11 +1327,11 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		SymTableId  byte
 	}
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("MIC-E"))
+	A.g_data_type_desc = "MIC-E"
 
 	var sizeof_struct_aprs_mic_e_s = 9
 	if len(info) < sizeof_struct_aprs_mic_e_s {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("MIC-E format must have at least %d characters in the information part.\n", sizeof_struct_aprs_mic_e_s)
 		}
@@ -1352,9 +1348,9 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	var std_msg = 0
 	var cust_msg = 0
-	A.g_lat = C.double(mic_e_digit(A, dest[0], 4, &std_msg, &cust_msg)*10+
+	A.g_lat = float64(mic_e_digit(A, dest[0], 4, &std_msg, &cust_msg)*10+
 		mic_e_digit(A, dest[1], 2, &std_msg, &cust_msg)) +
-		C.double(mic_e_digit(A, dest[2], 1, &std_msg, &cust_msg)*1000+
+		float64(mic_e_digit(A, dest[2], 1, &std_msg, &cust_msg)*1000+
 			mic_e_digit(A, dest[3], 0, &std_msg, &cust_msg)*100+
 			mic_e_digit(A, dest[4], 0, &std_msg, &cust_msg)*10+
 			mic_e_digit(A, dest[5], 0, &std_msg, &cust_msg))/6000.0
@@ -1367,7 +1363,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	} else if dest[3] >= 'P' && dest[3] <= 'Z' {
 		/* North */
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid MIC-E N/S encoding in 4th character of destination.\n")
 		}
@@ -1383,7 +1379,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		offset = true
 	} else {
 		offset = false
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid MIC-E Longitude Offset in 5th character of destination.\n")
 		}
@@ -1398,16 +1394,16 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	var ch = p.Lon[0]
 
 	if offset && ch >= 118 && ch <= 127 {
-		A.g_lon = C.double(ch - 118) /* 0 - 9 degrees */
+		A.g_lon = float64(ch - 118) /* 0 - 9 degrees */
 	} else if !offset && ch >= 38 && ch <= 127 {
-		A.g_lon = C.double(ch-38) + 10 /* 10 - 99 degrees */
+		A.g_lon = float64(ch-38) + 10 /* 10 - 99 degrees */
 	} else if offset && ch >= 108 && ch <= 117 {
-		A.g_lon = C.double(ch-108) + 100 /* 100 - 109 degrees */
+		A.g_lon = float64(ch-108) + 100 /* 100 - 109 degrees */
 	} else if offset && ch >= 38 && ch <= 107 {
-		A.g_lon = C.double(ch-38) + 110 /* 110 - 179 degrees */
+		A.g_lon = float64(ch-38) + 110 /* 110 - 179 degrees */
 	} else {
 		A.g_lon = G_UNKNOWN
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid character 0x%02x for MIC-E Longitude Degrees.\n", ch)
 		}
@@ -1434,12 +1430,12 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		ch = p.Lon[1]
 
 		if ch >= 88 && ch <= 97 {
-			A.g_lon += C.double(ch-88) / 60.0 /* 0 - 9 minutes*/
+			A.g_lon += float64(ch-88) / 60.0 /* 0 - 9 minutes*/
 		} else if ch >= 38 && ch <= 87 {
-			A.g_lon += C.double((ch-38)+10) / 60.0 /* 10 - 59 minutes */
+			A.g_lon += float64((ch-38)+10) / 60.0 /* 10 - 59 minutes */
 		} else {
 			A.g_lon = G_UNKNOWN
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid character 0x%02x for MIC-E Longitude Minutes.\n", ch)
 			}
@@ -1453,10 +1449,10 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 			ch = p.Lon[2]
 
 			if ch >= 28 && ch <= 127 {
-				A.g_lon += C.double((ch-28)+0) / 6000.0 /* 0 - 99 hundredths of minutes*/
+				A.g_lon += float64((ch-28)+0) / 6000.0 /* 0 - 99 hundredths of minutes*/
 			} else {
 				A.g_lon = G_UNKNOWN
-				if A.g_quiet == 0 {
+				if !A.g_quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Invalid character 0x%02x for MIC-E Longitude hundredths of Minutes.\n", ch)
 				}
@@ -1483,7 +1479,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 			A.g_lon = (-A.g_lon)
 		}
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid MIC-E E/W encoding in 6th character of destination.\n")
 		}
@@ -1491,11 +1487,11 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	/* Symbol table and codes like everyone else. */
 
-	A.g_symbol_table = C.char(p.SymTableId)
-	A.g_symbol_code = C.char(p.SymbolCode)
+	A.g_symbol_table = p.SymTableId
+	A.g_symbol_code = p.SymbolCode
 
 	if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid symbol table code not one of / \\ A-Z 0-9\n")
 		}
@@ -1508,13 +1504,13 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	var cust_text = []string{"Emergency", "Custom-6", "Custom-5", "Custom-4", "Custom-3", "Custom-2", "Custom-1", "Custom-0"}
 
 	if std_msg == 0 && cust_msg == 0 {
-		C.strcpy(&A.g_mic_e_status[0], C.CString("Emergency"))
+		A.g_mic_e_status = "Emergency"
 	} else if std_msg == 0 && cust_msg != 0 {
-		C.strcpy(&A.g_mic_e_status[0], C.CString(cust_text[cust_msg]))
+		A.g_mic_e_status = cust_text[cust_msg]
 	} else if std_msg != 0 && cust_msg == 0 {
-		C.strcpy(&A.g_mic_e_status[0], C.CString(std_text[std_msg]))
+		A.g_mic_e_status = std_text[std_msg]
 	} else {
-		C.strcpy(&A.g_mic_e_status[0], C.CString("Unknown MIC-E Message Type"))
+		A.g_mic_e_status = "Unknown MIC-E Message Type"
 	}
 
 	/* Speed and course from next 3 bytes. */
@@ -1524,7 +1520,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		n -= 800
 	}
 
-	A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(n)))
+	A.g_speed_mph = DW_KNOTS_TO_MPH(float64(n))
 
 	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
 	if n >= 400 {
@@ -1540,7 +1536,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	case 360:
 		A.g_course = 0
 	default:
-		A.g_course = C.float(n)
+		A.g_course = float64(n)
 	}
 
 	// The rest is a comment which can have other information cryptically embedded.
@@ -1549,7 +1545,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	if len(info) <= sizeof_struct_aprs_mic_e_s {
 		// Too short for a comment.  We are finished.
-		C.strcpy(&A.g_mfr[0], C.CString("UNKNOWN vendor/model"))
+		A.g_mfr = "UNKNOWN vendor/model"
 		return
 	}
 
@@ -1561,7 +1557,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		mcomment = mcomment[:len(mcomment)-1]
 		if len(mcomment) == 0 {
 			// Nothing left after removing trailing CR.
-			C.strcpy(&A.g_mfr[0], C.CString("UNKNOWN vendor/model"))
+			A.g_mfr = "UNKNOWN vendor/model"
 			return
 		}
 	}
@@ -1571,7 +1567,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	// Comment with vendor/model removed.
 	var trimmed, device = deviceid_decode_mice(string(mcomment))
-	C.strcpy(&A.g_mfr[0], C.CString(device))
+	A.g_mfr = device
 
 	// Possible altitude at beginning of remaining comment.
 	// Three base 91 characters followed by }
@@ -1582,7 +1578,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		isdigit91(trimmed[2]) &&
 		trimmed[3] == '}' {
 
-		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
+		A.g_altitude_ft = DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000)
 
 		process_comment(A, []byte(trimmed)[4:])
 		return
@@ -1672,7 +1668,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	var headerBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
 	var message = info[headerBytes:]
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("APRS Message"))
+	A.g_data_type_desc = "APRS Message"
 	A.g_message_subtype = message_subtype_message /* until found otherwise */
 
 	if len(info) < 11 {
@@ -1719,7 +1715,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		dw_printf("Please tell message sender this is invalid.\n")
 	}
 
-	C.strcpy(&A.g_addressee[0], C.CString(string(addressee)))
+	A.g_addressee = string(addressee)
 
 	/*
 	 * Addressee starting with BLN or NWS is a bulletin.
@@ -1732,18 +1728,18 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		// BLN9xxxxx	"group bulletin" has single digit group id and group name up to 5 characters.
 
 		if len(addressee) == 4 && unicode.IsDigit(rune(addressee[3])) {
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("General Bulletin with identifier \"%s\"", addressee[3:])))
+			A.g_data_type_desc = fmt.Sprintf("General Bulletin with identifier \"%s\"", addressee[3:])
 		} else if len(addressee) == 4 && unicode.IsUpper(rune(addressee[3])) {
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Announcement with identifier \"%s\"", addressee[3:])))
+			A.g_data_type_desc = fmt.Sprintf("Announcement with identifier \"%s\"", addressee[3:])
 		}
 		if len(addressee) >= 5 && unicode.IsDigit(rune(addressee[3])) {
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Group Bulletin with identifier \"%c\", group name \"%s\"", addressee[3], addressee[4:])))
+			A.g_data_type_desc = fmt.Sprintf("Group Bulletin with identifier \"%c\", group name \"%s\"", addressee[3], addressee[4:])
 		} else {
 			// Not one of the official formats.
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Bulletin with identifier \"%s\"", addressee[3:])))
+			A.g_data_type_desc = fmt.Sprintf("Bulletin with identifier \"%s\"", addressee[3:])
 		}
 		A.g_message_subtype = message_subtype_bulletin
-		C.strcpy(&A.g_comment[0], C.CString(string(message)))
+		A.g_comment = string(message)
 	} else if len(addressee) >= 3 && bytes.HasPrefix(addressee, []byte("NWS")) {
 
 		// Weather bulletins have addressee starting with NWS, SKY, CWA, or BOM.
@@ -1753,19 +1749,19 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		// alternative for the compressed format.  Xastir implements this.
 
 		if len(addressee) >= 4 && addressee[3] == '-' {
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])))
+			A.g_data_type_desc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
 		} else if len(addressee) >= 4 && addressee[3] == '_' {
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Compressed Weather bulletin with identifier \"%s\"", addressee[4:])))
+			A.g_data_type_desc = fmt.Sprintf("Compressed Weather bulletin with identifier \"%s\"", addressee[4:])
 		} else {
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Weather bulletin is missing - or _ after %.3s", addressee)))
+			A.g_data_type_desc = fmt.Sprintf("Weather bulletin is missing - or _ after %.3s", addressee)
 		}
 		A.g_message_subtype = message_subtype_nws
-		C.strcpy(&A.g_comment[0], C.CString(string(message)))
+		A.g_comment = string(message)
 	} else if len(addressee) >= 3 && (bytes.HasPrefix(addressee, []byte("SKY")) || bytes.HasPrefix(addressee, []byte("CWA")) || bytes.HasPrefix(addressee, []byte("BOM"))) {
 		// SKY... or CWA...   https://www.aprs-is.net/WX/
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])))
+		A.g_data_type_desc = fmt.Sprintf("Weather bulletin with identifier \"%s\"", addressee[4:])
 		A.g_message_subtype = message_subtype_nws
-		C.strcpy(&A.g_comment[0], C.CString(string(message)))
+		A.g_comment = string(message)
 	} else if bytes.HasPrefix(message, []byte("PARM.")) {
 
 		/*
@@ -1779,19 +1775,19 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		 * Why not use other characters after the "T" for metadata?
 		 */
 
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)))
+		A.g_data_type_desc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_parm
 		telemetry_name_message(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("UNIT.")) {
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)))
+		A.g_data_type_desc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_unit
 		telemetry_unit_label_message(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)))
+		A.g_data_type_desc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_eqns
 		telemetry_coefficents_message(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)))
+		A.g_data_type_desc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_bits
 		telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
 	} else if message[0] == '?' {
@@ -1800,7 +1796,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		 * If first character of message is "?" it is a query directed toward a specific station.
 		 */
 
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Directed Station Query"))
+		A.g_data_type_desc = "Directed Station Query"
 		A.g_message_subtype = message_subtype_directed_query
 
 		aprs_directed_station_query(A, addressee, message[1:], quiet)
@@ -1812,52 +1808,50 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR: \"%s\" must be lower case \"ack\"\n", message)
 		} else {
-			C.strcpy(&A.g_message_number[0], C.CString(string(message[3:])))
-			if C.strlen(&A.g_message_number[0]) == 0 {
+			A.g_message_number = string(message[3:])
+			if len(A.g_message_number) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("ERROR: Message number is missing after \"ack\".\n")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
-		var p = C.strchr(&A.g_message_number[0], '\r')
-		if p != nil {
+		if strings.Contains(A.g_message_number, "\r") {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
 			dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
-			*p = 0
+			A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 		}
 
-		if C.strlen(&A.g_message_number[0]) >= 3 && A.g_message_number[2] == '}' {
-			A.g_message_number[2] = 0
+		if len(A.g_message_number) >= 3 && A.g_message_number[2] == '}' {
+			A.g_message_number = A.g_message_number[:2]
 		}
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", C.GoString(&A.g_src[0]), C.GoString(&A.g_message_number[0]), addressee)))
+		A.g_data_type_desc = fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)
 		A.g_message_subtype = message_subtype_ack
 	} else if bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR: \"%s\" must be lower case \"rej\"\n", message)
 		} else {
-			C.strcpy(&A.g_message_number[0], C.CString(string(message[3:])))
-			if C.strlen(&A.g_message_number[0]) == 0 {
+			A.g_message_number = string(message[3:])
+			if len(A.g_message_number) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("ERROR: Message number is missing after \"rej\".\n")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
-		var p = C.strchr(&A.g_message_number[0], '\r')
-		if p != nil {
+		if strings.Contains(A.g_message_number, "\r") {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
 			dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
-			*p = 0
+			A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 		}
 
-		if C.strlen(&A.g_message_number[0]) >= 3 && A.g_message_number[2] == '}' {
-			A.g_message_number[2] = 0
+		if len(A.g_message_number) >= 3 && A.g_message_number[2] == '}' {
+			A.g_message_number = A.g_message_number[:2]
 		}
-		C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", C.GoString(&A.g_src[0]), C.GoString(&A.g_message_number[0]), addressee)))
+		A.g_data_type_desc = fmt.Sprintf("\"%s\" REJected message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)
 		A.g_message_subtype = message_subtype_ack
 	} else {
 
@@ -1878,55 +1872,52 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		// Normal messaage case.  Look for message number.
 		var _, after, found = bytes.Cut(message, []byte{'{'})
 		if found {
-			C.strcpy(&A.g_message_number[0], C.CString(string(after)))
+			A.g_message_number = string(after)
 
 			// Xastir puts a carriage return on the end.
-			var p = C.strchr(&A.g_message_number[0], '\r')
-			if p != nil {
+			if strings.Contains(A.g_message_number, "\r") {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
 				dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
-				*p = 0
+				A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 			}
 
-			var mlen = C.strlen(&A.g_message_number[0])
+			var mlen = len(A.g_message_number)
 			if mlen < 1 || mlen > 5 {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Message number \"%s\" has length outside range of 1 to 5.\n", C.GoString(&A.g_message_number[0]))
+				dw_printf("Message number \"%s\" has length outside range of 1 to 5.\n", A.g_message_number)
 			}
 
 			// TODO: Complain if not alphanumeric.
 
-			var ack [8]C.char
+			var ack string
 
 			if mlen >= 3 && A.g_message_number[2] == '}' {
 				//  New (1999) style.
-				A.g_message_number[2] = 0
-				C.strcpy(&ack[0], &A.g_message_number[3])
+				ack = A.g_message_number[3:]
+				A.g_message_number = A.g_message_number[:2]
 			}
 
-			if C.strlen(&ack[0]) > 0 {
+			if len(ack) > 0 {
 				// With ACK.  Message number should be 2 characters.
-				C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\", with ACK for \"%s\"", C.GoString(&A.g_message_number[0]), C.GoString(&A.g_src[0]), addressee, C.GoString(&ack[0]))))
+				A.g_data_type_desc = fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\", with ACK for \"%s\"", A.g_message_number, A.g_src, addressee, ack)
 			} else {
 				// Message number can be 1-5 characters.
-				C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\"", C.GoString(&A.g_message_number[0]), C.GoString(&A.g_src[0]), addressee)))
+				A.g_data_type_desc = fmt.Sprintf("APRS Message, number \"%s\", from \"%s\" to \"%s\"", A.g_message_number, A.g_src, addressee)
 			}
 		} else {
 			// No message number.
-			C.strcpy(&A.g_data_type_desc[0], C.CString(fmt.Sprintf("APRS Message, with no number, from \"%s\" to \"%s\"", C.GoString(&A.g_src[0]), addressee)))
+			A.g_data_type_desc = fmt.Sprintf("APRS Message, with no number, from \"%s\" to \"%s\"", A.g_src, addressee)
 		}
 
 		A.g_message_subtype = message_subtype_message
 
 		/* No location so don't use  process_comment () */
 
-		C.strcpy(&A.g_comment[0], C.CString(string(message)))
+		A.g_comment = string(message)
+
 		// Remove message number when displaying message text.
-		var pno = C.strchr(&A.g_comment[0], '{')
-		if pno != nil {
-			*pno = 0
-		}
+		A.g_comment, _, _ = strings.Cut(A.g_comment, "{")
 	}
 
 }
@@ -1979,22 +1970,16 @@ func aprs_object(A *decode_aprs_t, info []byte) {
 
 	//Assert (sizeof(A.g_name) > sizeof(p.name));
 
-	C.memcpy(unsafe.Pointer(&A.g_name[0]), C.CBytes(p.Name[:]), C.size_t(len(p.Name))) // copy exactly 9 bytes.
-
-	/* Trim trailing spaces. */
-	var i = C.int(C.strlen(&A.g_name[0])) - 1
-	for i >= 0 && A.g_name[i] == ' ' {
-		A.g_name[i] = 0
-		i--
-	}
+	A.g_name = string(p.Name[:])
+	A.g_name = strings.TrimSpace(A.g_name)
 
 	switch p.LiveOrKilled {
 	case '*':
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Object"))
+		A.g_data_type_desc = "Object"
 	case '_':
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Killed Object"))
+		A.g_data_type_desc = "Killed Object"
 	default:
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Object - invalid live/killed"))
+		A.g_data_type_desc = "Object - invalid live/killed"
 	}
 
 	var ts = get_timestamp(A, p.Timestamp)
@@ -2008,7 +1993,7 @@ func aprs_object(A *decode_aprs_t, info []byte) {
 			/* In this case, we expect 7 byte "data extension" */
 			/* for the wind direction and speed. */
 
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report with Object"))
+			A.g_data_type_desc = "Weather Report with Object"
 			weather_data(A, info[objectPosBytes:], true)
 		} else {
 			/* Regular object. */
@@ -2024,7 +2009,7 @@ func aprs_object(A *decode_aprs_t, info []byte) {
 			/* of weather report and object with compressed */
 			/* position. */
 
-			C.strcpy(&A.g_data_type_desc[0], C.CString("Weather Report with Object"))
+			A.g_data_type_desc = "Weather Report with Object"
 			weather_data(A, info[objectCompressedPosBytes:], false)
 		} else {
 			/* Regular position report. */
@@ -2089,22 +2074,22 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 
 	Assert(3 <= len(name) && len(name) <= 9)
 
-	C.strcpy(&A.g_name[0], C.CString(string(name)))
+	A.g_name = string(name)
 
 	var liveOrKilled = info[0]
 	info = info[1:]
 
 	switch liveOrKilled {
 	case '!':
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Item"))
+		A.g_data_type_desc = "Item"
 	case '_':
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Killed Item"))
+		A.g_data_type_desc = "Killed Item"
 	default:
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Item name not followed by ! or _.\n")
 		}
-		C.strcpy(&A.g_data_type_desc[0], C.CString("Object - invalid live/killed"))
+		A.g_data_type_desc = "Object - invalid live/killed"
 	}
 
 	var p position_t
@@ -2145,12 +2130,12 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 
 func aprs_station_capabilities(A *decode_aprs_t, info []byte) {
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Station Capabilities"))
+	A.g_data_type_desc = "Station Capabilities"
 
 	// 	process_comment() not applicable here because it
 	//	extracts information found in certain formats.
 
-	C.strcpy(&A.g_comment[0], C.CString(string(info[1:])))
+	A.g_comment = string(info[1:])
 
 } /* end aprs_station_capabilities */
 
@@ -2226,7 +2211,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 	}
 	var ps aprs_status_s
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Status Report"))
+	A.g_data_type_desc = "Status Report"
 
 	var ptBytes, _ = binary.Decode(info, binary.NativeEndian, &pt)
 	var pm4Bytes, _ = binary.Decode(info, binary.NativeEndian, &pm4)
@@ -2247,21 +2232,20 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		C.strcpy(&A.g_comment[0], C.CString(string(info[ptBytes:])))
+		A.g_comment = string(info[ptBytes:])
 	} else if get_maidenhead(A, pm6.Mhead6[:]) == 6 {
 
 		/*
 		 * Do we have format with 6 character Maidenhead locator?
 		 */
 
-		C.memset(unsafe.Pointer(&A.g_maidenhead[0]), 0, C.size_t(len(A.g_maidenhead)))
-		C.memcpy(unsafe.Pointer(&A.g_maidenhead[0]), C.CBytes(pm6.Mhead6[:]), C.size_t(len(pm6.Mhead6)))
+		A.g_maidenhead = string(pm6.Mhead6[:])
 
-		A.g_symbol_table = C.char(pm6.SymTableId)
-		A.g_symbol_code = C.char(pm6.SymbolCode)
+		A.g_symbol_table = pm6.SymTableId
+		A.g_symbol_code = pm6.SymbolCode
 
 		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
 			}
@@ -2269,7 +2253,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		}
 
 		if pm6.Space != ' ' && pm6.Space != 0 {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Error: Found '%c' instead of space required after symbol code.\n", pm6.Space)
 			}
@@ -2278,21 +2262,20 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		C.strcpy(&A.g_comment[0], C.CString(string(info[pm6Bytes:])))
+		A.g_comment = string(info[pm6Bytes:])
 	} else if get_maidenhead(A, pm4.Mhead4[:]) == 4 {
 
 		/*
 		 * Do we have format with 4 character Maidenhead locator?
 		 */
 
-		C.memset(unsafe.Pointer(&A.g_maidenhead[0]), 0, C.size_t(len(A.g_maidenhead)))
-		C.memcpy(unsafe.Pointer(&A.g_maidenhead[0]), C.CBytes(pm4.Mhead4[:]), C.size_t(len(pm4.Mhead4)))
+		A.g_maidenhead = string(pm4.Mhead4[:])
 
-		A.g_symbol_table = C.char(pm4.SymTableId)
-		A.g_symbol_code = C.char(pm4.SymbolCode)
+		A.g_symbol_table = pm4.SymTableId
+		A.g_symbol_code = pm4.SymbolCode
 
 		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
 			}
@@ -2300,7 +2283,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		}
 
 		if pm4.Space != ' ' && pm4.Space != 0 {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Error: Found '%c' instead of space required after symbol code.\n", pm4.Space)
 			}
@@ -2309,22 +2292,21 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 		// 	process_comment() not applicable here because it
 		//	extracts information found in certain formats.
 
-		C.strcpy(&A.g_comment[0], C.CString(string(info[pm4Bytes:])))
+		A.g_comment = string(info[pm4Bytes:])
 	} else {
 
 		/*
 		 * Whole thing is status text.
 		 */
-		C.strcpy(&A.g_comment[0], C.CString(string(info[psBytes:])))
+		A.g_comment = string(info[psBytes:])
 	}
 
 	/*
 	 * Last 3 characters can represent beam heading and ERP.
 	 */
 
-	if C.strlen(&A.g_comment[0]) >= 3 {
-		var _hp = &A.g_comment[C.strlen(&A.g_comment[0])-3]
-		var hp = C.GoString(_hp)
+	if len(A.g_comment) >= 3 {
+		var hp = A.g_comment[len(A.g_comment)-3:]
 
 		if hp[0] == '^' {
 
@@ -2346,7 +2328,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 			// TODO (low):  put result somewhere.
 			// could use A.g_directivity and need new variable for erp.
 
-			*_hp = 0
+			A.g_comment = A.g_comment[:len(A.g_comment)-3]
 			_ = beam
 			_ = erp
 		}
@@ -2399,28 +2381,28 @@ Assuming query responding is enabled, the following broadcast queries should be 
 
 */
 
-func aprs_general_query(A *decode_aprs_t, info []byte, quiet C.int) {
+func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) {
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("General Query"))
+	A.g_data_type_desc = "General Query"
 
 	/*
 	 * There should be another "?" after the query type.
 	 */
 	var before, after, found = bytes.Cut(info[1:], []byte{'?'})
 	if !found {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("General Query must have ? after the query type.\n")
 		}
 		return
 	}
 
-	C.strcpy(&A.g_query_type[0], C.CString(string(before)))
+	A.g_query_type = string(before)
 
 	// TODO: remove debug
 
 	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("DEBUG: General Query type = \"%s\"\n", C.GoString(&A.g_query_type[0]))
+	dw_printf("DEBUG: General Query type = \"%s\"\n", A.g_query_type)
 
 	if len(after) == 0 {
 		return
@@ -2437,7 +2419,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet C.int) {
 		var lat, latErr = strconv.ParseFloat(string(parts[0]), 64)
 
 		if latErr != nil || lat < -90 || lat > 90 {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid latitude for General Query footprint.\n")
 			}
@@ -2447,7 +2429,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet C.int) {
 		var lon, lonErr = strconv.ParseFloat(string(parts[1]), 64)
 
 		if lonErr != nil || lon < -180 || lon > 180 {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid longitude for General Query footprint.\n")
 			}
@@ -2457,7 +2439,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet C.int) {
 		var radius, radiusErr = strconv.ParseFloat(string(parts[1]), 64)
 
 		if radiusErr != nil || radius <= 0 || radius > 9999 {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid radius for General Query footprint.\n")
 			}
@@ -2468,11 +2450,11 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet C.int) {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("DEBUG: General Query footprint = %.6f %.6f %.2f\n", lat, lon, radius)
 
-		A.g_footprint_lat = C.double(lat)
-		A.g_footprint_lon = C.double(lon)
-		A.g_footprint_radius = C.float(radius)
+		A.g_footprint_lat = lat
+		A.g_footprint_lon = lon
+		A.g_footprint_radius = radius
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't parse latitude,longitude,radius for General Query footprint.\n")
 		}
@@ -2567,13 +2549,13 @@ func aprs_directed_station_query(A *decode_aprs_t, addressee []byte, query []byt
  *
  *------------------------------------------------------------------*/
 
-func aprs_telemetry(A *decode_aprs_t, info []byte, quiet C.int) {
+func aprs_telemetry(A *decode_aprs_t, info []byte, quiet bool) {
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Telemetry"))
+	A.g_data_type_desc = "Telemetry"
 
-	var telemetry, comment = telemetry_data_original(C.GoString(&A.g_src[0]), string(info), quiet != 0)
-	C.strcpy(&A.g_telemetry[0], C.CString(telemetry))
-	C.strcpy(&A.g_comment[0], C.CString(comment))
+	var telemetry, comment = telemetry_data_original(A.g_src, string(info), quiet)
+	A.g_telemetry = telemetry
+	A.g_comment = comment
 
 } /* end aprs_telemetry */
 
@@ -2600,22 +2582,22 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 	} else if info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
 		var aisData, _ = ais_parse(string(info[3:]), false)
 
-		C.strcpy(&A.g_data_type_desc[0], C.CString(aisData.description))
-		C.strcpy(&A.g_name[0], C.CString(aisData.mssi))
-		A.g_lat = C.double(aisData.lat)
-		A.g_lon = C.double(aisData.lon)
-		A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(aisData.knots))
-		A.g_course = C.float(aisData.course)
-		A.g_altitude_ft = C.float(DW_METERS_TO_FEET(aisData.alt_m))
-		A.g_symbol_table = C.char(aisData.symtab)
-		A.g_symbol_code = C.char(aisData.symbol)
-		C.strcpy(&A.g_comment[0], C.CString(aisData.comment))
+		A.g_data_type_desc = aisData.description
+		A.g_name = aisData.mssi
+		A.g_lat = aisData.lat
+		A.g_lon = aisData.lon
+		A.g_speed_mph = DW_KNOTS_TO_MPH(aisData.knots)
+		A.g_course = aisData.course
+		A.g_altitude_ft = DW_METERS_TO_FEET(aisData.alt_m)
+		A.g_symbol_table = aisData.symtab
+		A.g_symbol_code = aisData.symbol
+		A.g_comment = aisData.comment
 
-		C.strcpy(&A.g_mfr[0], C.CString(""))
+		A.g_mfr = ""
 	} else if bytes.HasPrefix(info, []byte("{{")) {
-		C.strcpy(&A.g_data_type_desc[0], C.CString("User-Defined Experimental"))
+		A.g_data_type_desc = "User-Defined Experimental"
 	} else {
-		C.strcpy(&A.g_data_type_desc[0], C.CString("User-Defined Data"))
+		A.g_data_type_desc = "User-Defined Data"
 	}
 
 } /* end aprs_user_defined */
@@ -2637,14 +2619,14 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 
 func aprs_raw_touch_tone(A *decode_aprs_t, info []byte) {
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Raw Touch Tone Data"))
+	A.g_data_type_desc = "Raw Touch Tone Data"
 
 	/* Just copy the info field without the message type. */
 
 	if info[0] == '{' {
-		C.strcpy(&A.g_comment[0], C.CString(string(info[3:])))
+		A.g_comment = string(info[3:])
 	} else {
-		C.strcpy(&A.g_comment[0], C.CString(string(info[1:])))
+		A.g_comment = string(info[1:])
 	}
 
 } /* end aprs_raw_touch_tone */
@@ -2664,14 +2646,14 @@ func aprs_raw_touch_tone(A *decode_aprs_t, info []byte) {
 
 func aprs_morse_code(A *decode_aprs_t, info []byte) {
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Morse Code Data"))
+	A.g_data_type_desc = "Morse Code Data"
 
 	/* Just copy the info field without the message type. */
 
 	if info[0] == '{' {
-		C.strcpy(&A.g_comment[0], C.CString(string(info[3:])))
+		A.g_comment = string(info[3:])
 	} else {
-		C.strcpy(&A.g_comment[0], C.CString(string(info[1:])))
+		A.g_comment = string(info[1:])
 	}
 
 } /* end aprs_morse_code */
@@ -2699,7 +2681,7 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 	}
 	var p aprs_positionless_weather_s
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Positionless Weather Report"))
+	A.g_data_type_desc = "Positionless Weather Report"
 
 	//time_t ts = 0;
 
@@ -2757,11 +2739,12 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-func getwdata(wpp []byte, id C.char, dlen C.int) (C.float, []byte, bool) {
+// Returns value, newWPP, found=True, or G_UNKNOWN, wpp, found=False
+func getwdata(wpp []byte, id rune, dlen int) (float64, []byte, bool) {
 
 	Assert(dlen >= 2 && dlen <= 6)
 
-	if C.char(wpp[0]) != id {
+	if rune(wpp[0]) != id {
 		return G_UNKNOWN, wpp, false
 	}
 
@@ -2778,7 +2761,7 @@ func getwdata(wpp []byte, id C.char, dlen C.int) (C.float, []byte, bool) {
 		return G_UNKNOWN, wpp, false
 	}
 
-	return C.float(f), wpp[dlen+1:], true
+	return f, wpp[dlen+1:], true
 }
 
 func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
@@ -2794,24 +2777,24 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			// Fine point:  Officially, should be values of 001-360.
 			// "000" or "..." or "   " means unknown.
 			// In practice we see do see "000" here.
-			A.g_course = C.float(n)
+			A.g_course = float64(n)
 		}
 		count, _ = fmt.Sscanf(string(wp[4:7]), "%3d", &n)
 		if count > 0 {
-			A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
+			A.g_speed_mph = DW_KNOTS_TO_MPH(float64(n)) /* yes, in knots */
 		}
 		wp = wp[7:]
 	} else if A.g_speed_mph == G_UNKNOWN {
 		A.g_course, wp, found = getwdata(wp, 'c', 3)
 		if !found {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Didn't find wind direction in form c999.\n")
 			}
 		}
 		A.g_speed_mph, wp, found = getwdata(wp, 's', 3) /* MPH here */
 		if !found {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Didn't find wind speed in form s999.\n")
 			}
@@ -2822,9 +2805,9 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 	// from one of three methods.
 
 	if A.g_speed_mph != G_UNKNOWN {
-		C.strcpy(&A.g_weather[0], C.CString(fmt.Sprintf("wind %.1f mph", A.g_speed_mph)))
+		A.g_weather = fmt.Sprintf("wind %.1f mph", A.g_speed_mph)
 		if A.g_course != G_UNKNOWN {
-			C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", direction %.0f", A.g_course)))
+			A.g_weather += fmt.Sprintf(", direction %.0f", A.g_course)
 		}
 	}
 
@@ -2838,15 +2821,15 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 	 * - gust (peak in mph last 5 minutes)
 	 * - temperature, degrees F, can be negative e.g. -01
 	 */
-	var fval C.float
+	var fval float64
 
 	fval, wp, found = getwdata(wp, 'g', 3)
 	if found {
 		if fval != G_UNKNOWN {
-			C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", gust %.0f", fval)))
+			A.g_weather += fmt.Sprintf(", gust %.0f", fval)
 		}
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Didn't find wind gust in form g999.\n")
 		}
@@ -2855,10 +2838,10 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 	fval, wp, found = getwdata(wp, 't', 3)
 	if found {
 		if fval != G_UNKNOWN {
-			C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", temperature %.0f", fval)))
+			A.g_weather += fmt.Sprintf(", temperature %.0f", fval)
 		}
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Didn't find temperature in form t999.\n")
 		}
@@ -2875,7 +2858,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* r = rainfall, 1/100 inch, last hour */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", rain %.2f in last hour", fval/100.)))
+				A.g_weather += fmt.Sprintf(", rain %.2f in last hour", fval/100.)
 			}
 			continue
 		}
@@ -2885,7 +2868,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* p = rainfall, 1/100 inch, last 24 hours */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", rain %.2f in last 24 hours", fval/100.)))
+				A.g_weather += fmt.Sprintf(", rain %.2f in last 24 hours", fval/100.)
 			}
 			continue
 		}
@@ -2895,7 +2878,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* P = rainfall, 1/100 inch, since midnight */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", rain %.2f since midnight", fval/100.)))
+				A.g_weather += fmt.Sprintf(", rain %.2f since midnight", fval/100.)
 			}
 			continue
 		}
@@ -2908,7 +2891,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 				if fval == 0 {
 					fval = 100
 				}
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", humidity %.0f", fval)))
+				A.g_weather += fmt.Sprintf(", humidity %.0f", fval)
 			}
 			continue
 		}
@@ -2919,8 +2902,8 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* Here, display as inches of mercury. */
 
 			if fval != G_UNKNOWN {
-				fval = C.float(DW_MBAR_TO_INHG(float64(fval) * 0.1))
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", barometer %.2f", fval)))
+				fval = DW_MBAR_TO_INHG(float64(fval) * 0.1)
+				A.g_weather += fmt.Sprintf(", barometer %.2f", fval)
 			}
 			continue
 		}
@@ -2930,7 +2913,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* L = Luminosity, watts/ sq meter, 000-999  */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", %.0f watts/m^2", fval)))
+				A.g_weather += fmt.Sprintf(", %.0f watts/m^2", fval)
 			}
 			continue
 		}
@@ -2940,7 +2923,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* l = Luminosity, watts/ sq meter, 1000-1999  */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", %.0f watts/m^2", fval+1000)))
+				A.g_weather += fmt.Sprintf(", %.0f watts/m^2", fval+1000)
 			}
 			continue
 		}
@@ -2954,7 +2937,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* position in the message so there is no confusion. */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", %.1f snow in 24 hours", fval)))
+				A.g_weather += fmt.Sprintf(", %.1f snow in 24 hours", fval)
 			}
 			continue
 		}
@@ -2964,7 +2947,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			/* # = Raw rain counter  */
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", raw rain counter %.f", fval)))
+				A.g_weather += fmt.Sprintf(", raw rain counter %.f", fval)
 			}
 			continue
 		}
@@ -2978,7 +2961,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 			// TODO: decode this properly
 
 			if fval != G_UNKNOWN {
-				C.strcat(&A.g_weather[0], C.CString(fmt.Sprintf(", nuclear Radiation %.f", fval)))
+				A.g_weather += fmt.Sprintf(", nuclear Radiation %.f", fval)
 			}
 			continue
 		}
@@ -2998,22 +2981,14 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
 	 *  / {UIV32N}
 	 */
 
-	C.strcat(&A.g_weather[0], C.CString(", \""))
-	C.strcat(&A.g_weather[0], C.CString(string(wp)))
+	A.g_weather += ", \""
+	A.g_weather += string(wp)
 	/*
 	 * Drop any CR / LF character at the end.
 	 */
-	var n = C.strlen(&A.g_weather[0])
-	if n >= 1 && A.g_weather[n-1] == '\n' {
-		A.g_weather[n-1] = 0
-	}
+	A.g_weather = strings.TrimSpace(A.g_weather)
 
-	n = C.strlen(&A.g_weather[0])
-	if n >= 1 && A.g_weather[n-1] == '\r' {
-		A.g_weather[n-1] = 0
-	}
-
-	C.strcat(&A.g_weather[0], C.CString("\""))
+	A.g_weather += "\""
 } /* end weather_data */
 
 /*------------------------------------------------------------------
@@ -3049,26 +3024,26 @@ func aprs_ultimeter(A *decode_aprs_t, info []byte) {
 
 	// Header = $ULTW
 	// Data Fields
-	var h_windpeak C.short  // 1. Wind Speed Peak over last 5 min. (0.1 kph)
-	var h_wdir C.short      // 2. Wind Direction of Wind Speed Peak (0-255)
-	var h_otemp C.short     // 3. Current Outdoor Temp (0.1 deg F)
-	var h_totrain C.short   // 4. Rain Long Term Total (0.01 in.)
-	var h_baro C.short      // 5. Current Barometer (0.1 mbar)
-	var h_barodelta C.short // 6. Barometer Delta Value(0.1 mbar)
-	var h_barocorrl C.short // 7. Barometer Corr. Factor(LSW)
-	var h_barocorrm C.short // 8. Barometer Corr. Factor(MSW)
-	var h_ohumid C.short    // 9. Current Outdoor Humidity (0.1%)
-	var h_date C.short      // 10. Date (day of year)
-	var h_time C.short      // 11. Time (minute of day)
-	var h_raintoday C.short // 12. Today's Rain Total (0.01 inches)*
-	var h_windave C.short   // 13. 5 Minute Wind Speed Average (0.1kph)*
+	var h_windpeak uint16  // 1. Wind Speed Peak over last 5 min. (0.1 kph)
+	var h_wdir uint16      // 2. Wind Direction of Wind Speed Peak (0-255)
+	var h_otemp uint16     // 3. Current Outdoor Temp (0.1 deg F)
+	var h_totrain uint16   // 4. Rain Long Term Total (0.01 in.)
+	var h_baro uint16      // 5. Current Barometer (0.1 mbar)
+	var h_barodelta uint16 // 6. Barometer Delta Value(0.1 mbar)
+	var h_barocorrl uint16 // 7. Barometer Corr. Factor(LSW)
+	var h_barocorrm uint16 // 8. Barometer Corr. Factor(MSW)
+	var h_ohumid uint16    // 9. Current Outdoor Humidity (0.1%)
+	var h_date uint16      // 10. Date (day of year)
+	var h_time uint16      // 11. Time (minute of day)
+	var h_raintoday uint16 // 12. Today's Rain Total (0.01 inches)*
+	var h_windave uint16   // 13. 5 Minute Wind Speed Average (0.1kph)*
 	// Carriage Return & Line Feed
 	// *Some instruments may not include field 13, some may
 	// not include 12 or 13.
 	// Total size: 44, 48 or 52 characters (hex digits) +
 	// header, carriage return and line feed.
 
-	C.strcpy(&A.g_data_type_desc[0], C.CString("Ultimeter"))
+	A.g_data_type_desc = "Ultimeter"
 
 	if info[0] == '$' {
 		var n, _ = fmt.Sscanf(string(info[5:]), "%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx%4hx",
@@ -3088,16 +3063,16 @@ func aprs_ultimeter(A *decode_aprs_t, info []byte) {
 
 		if n >= 11 && n <= 13 {
 
-			var windpeak, wdir, otemp, baro, ohumid C.float
+			var windpeak, wdir, otemp, baro, ohumid float64
 
-			windpeak = C.float(DW_KM_TO_MILES(float64(h_windpeak) * 0.1))
-			wdir = C.float(h_wdir&0xff) * 360. / 256.
-			otemp = C.float(h_otemp) * 0.1
-			baro = C.float(DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
-			ohumid = C.float(h_ohumid) * 0.1
+			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
+			wdir = float64(h_wdir&0xff) * 360. / 256.
+			otemp = float64(h_otemp) * 0.1
+			baro = float64(DW_MBAR_TO_INHG(float64(h_baro) * 0.1))
+			ohumid = float64(h_ohumid) * 0.1
 
-			C.strcpy(&A.g_weather[0], C.CString(fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f, barometer %.2f, humidity %.0f",
-				windpeak, wdir, otemp, baro, ohumid)))
+			A.g_weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f, barometer %.2f, humidity %.0f",
+				windpeak, wdir, otemp, baro, ohumid)
 		}
 	}
 
@@ -3129,14 +3104,14 @@ func aprs_ultimeter(A *decode_aprs_t, info []byte) {
 
 		if n == 4 {
 
-			var windpeak, wdir, otemp C.float
+			var windpeak, wdir, otemp float64
 
-			windpeak = C.float(DW_KM_TO_MILES(float64(h_windpeak) * 0.1))
-			wdir = C.float(h_wdir&0xff) * 360. / 256.
-			otemp = C.float(h_otemp) * 0.1
+			windpeak = DW_KM_TO_MILES(float64(h_windpeak) * 0.1)
+			wdir = float64(h_wdir&0xff) * 360. / 256.
+			otemp = float64(h_otemp) * 0.1
 
-			C.strcpy(&A.g_weather[0], C.CString(fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f\n",
-				windpeak, wdir, otemp)))
+			A.g_weather = fmt.Sprintf("wind %.1f mph, direction %.0f, temperature %.1f\n",
+				windpeak, wdir, otemp)
 		}
 
 	}
@@ -3163,11 +3138,11 @@ func aprs_ultimeter(A *decode_aprs_t, info []byte) {
 
 func decode_position(A *decode_aprs_t, ppos *position_t) {
 
-	A.g_lat = get_latitude_8(ppos.Lat, A.g_quiet > 0)
-	A.g_lon = get_longitude_9(ppos.Lon, A.g_quiet > 0)
+	A.g_lat = get_latitude_8(ppos.Lat, A.g_quiet)
+	A.g_lon = get_longitude_9(ppos.Lon, A.g_quiet)
 
-	A.g_symbol_table = C.char(ppos.SymTableId)
-	A.g_symbol_code = C.char(ppos.SymbolCode)
+	A.g_symbol_table = ppos.SymTableId
+	A.g_symbol_code = ppos.SymbolCode
 }
 
 /*------------------------------------------------------------------
@@ -3209,9 +3184,9 @@ func decode_position(A *decode_aprs_t, ppos *position_t) {
 
 func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) {
 	if isdigit91(pcpos.Y[0]) && isdigit91(pcpos.Y[1]) && isdigit91(pcpos.Y[2]) && isdigit91(pcpos.Y[3]) {
-		A.g_lat = 90 - C.double((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0
+		A.g_lat = 90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid character in compressed latitude.  Must be in range of '!' to '{'.\n")
 		}
@@ -3219,9 +3194,9 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 	}
 
 	if isdigit91(pcpos.X[0]) && isdigit91(pcpos.X[1]) && isdigit91(pcpos.X[2]) && isdigit91(pcpos.X[3]) {
-		A.g_lon = -180 + C.double((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0
+		A.g_lon = -180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid character in compressed longitude.  Must be in range of '!' to '{'.\n")
 		}
@@ -3230,31 +3205,31 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 
 	if pcpos.SymTableId == '/' || pcpos.SymTableId == '\\' || unicode.IsUpper(rune(pcpos.SymTableId)) {
 		/* primary or alternate or alternate with upper case overlay. */
-		A.g_symbol_table = C.char(pcpos.SymTableId)
+		A.g_symbol_table = pcpos.SymTableId
 	} else if pcpos.SymTableId >= 'a' && pcpos.SymTableId <= 'j' {
 		/* Lower case a-j are used to represent overlay characters 0-9 */
 		/* because a digit here would mean normal (non-compressed) location. */
-		A.g_symbol_table = C.char(pcpos.SymTableId) - 'a' + '0'
+		A.g_symbol_table = pcpos.SymTableId - 'a' + '0'
 	} else {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid symbol table id for compressed position.\n")
 		}
 		A.g_symbol_table = '/'
 	}
 
-	A.g_symbol_code = C.char(pcpos.SymbolCode)
+	A.g_symbol_code = pcpos.SymbolCode
 
 	if pcpos.C == ' ' {
 		/* ignore other two bytes */
 	} else if ((pcpos.T - 33) & 0x18) == 0x10 {
-		A.g_altitude_ft = C.float(math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33)))
+		A.g_altitude_ft = math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33))
 	} else if pcpos.C == '{' {
-		A.g_range = 2.0 * C.float(math.Pow(1.08, float64(pcpos.S-33)))
+		A.g_range = 2.0 * math.Pow(1.08, float64(pcpos.S-33))
 	} else if pcpos.C >= '!' && pcpos.C <= 'z' {
 		/* For a weather station, this is wind information. */
-		A.g_course = C.float(pcpos.C-33) * 4
-		A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
+		A.g_course = float64(pcpos.C-33) * 4
+		A.g_speed_mph = float64(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
 	}
 
 }
@@ -3291,7 +3266,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
  *
  *------------------------------------------------------------------*/
 
-func get_latitude_8(p [8]byte, quiet bool) C.double {
+func get_latitude_8(p [8]byte, quiet bool) float64 {
 	type lat_s struct {
 		Deg  [2]byte
 		Minn [2]byte
@@ -3303,10 +3278,10 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
 	var plat lat_s
 	binary.Decode(p[:], binary.NativeEndian, &plat)
 
-	var result C.double = 0
+	var result float64
 
 	if unicode.IsDigit(rune(plat.Deg[0])) {
-		result += C.double(plat.Deg[0]-'0') * 10
+		result += float64(plat.Deg[0]-'0') * 10
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -3316,7 +3291,7 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plat.Deg[1])) {
-		result += C.double(plat.Deg[1]-'0') * 1
+		result += float64(plat.Deg[1]-'0') * 1
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -3326,7 +3301,7 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
 	}
 
 	if plat.Minn[0] >= '0' && plat.Minn[0] <= '5' {
-		result += C.double(plat.Minn[0]-'0') * (10. / 60.)
+		result += float64(plat.Minn[0]-'0') * (10. / 60.)
 	} else if plat.Minn[0] == ' ' {
 
 	} else {
@@ -3338,7 +3313,7 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plat.Minn[1])) {
-		result += C.double(plat.Minn[1]-'0') * (1. / 60.)
+		result += float64(plat.Minn[1]-'0') * (1. / 60.)
 	} else if plat.Minn[1] == ' ' {
 
 	} else {
@@ -3358,7 +3333,7 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plat.HMin[0])) {
-		result += C.double(plat.HMin[0]-'0') * (0.1 / 60.)
+		result += float64(plat.HMin[0]-'0') * (0.1 / 60.)
 	} else if plat.HMin[0] == ' ' {
 
 	} else {
@@ -3370,7 +3345,7 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plat.HMin[1])) {
-		result += C.double(plat.HMin[1]-'0') * (0.01 / 60.)
+		result += float64(plat.HMin[1]-'0') * (0.01 / 60.)
 	} else if plat.HMin[1] == ' ' {
 
 	} else {
@@ -3439,7 +3414,7 @@ func get_latitude_8(p [8]byte, quiet bool) C.double {
  *
  *------------------------------------------------------------------*/
 
-func get_longitude_9(p [9]byte, quiet bool) C.double {
+func get_longitude_9(p [9]byte, quiet bool) float64 {
 	type lat_s struct {
 		Deg  [3]byte
 		Minn [2]byte
@@ -3451,10 +3426,10 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	var plon lat_s // TODO KG lon_s, no?
 	binary.Decode(p[:], binary.NativeEndian, &plon)
 
-	var result C.double = 0
+	var result float64 = 0
 
 	if plon.Deg[0] == '0' || plon.Deg[0] == '1' {
-		result += C.double((plon.Deg[0])-'0') * 100
+		result += float64((plon.Deg[0])-'0') * 100
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -3464,7 +3439,7 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plon.Deg[1])) {
-		result += C.double((plon.Deg[1])-'0') * 10
+		result += float64((plon.Deg[1])-'0') * 10
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -3474,7 +3449,7 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plon.Deg[2])) {
-		result += C.double((plon.Deg[2])-'0') * 1
+		result += float64((plon.Deg[2])-'0') * 1
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -3484,7 +3459,7 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	}
 
 	if plon.Minn[0] >= '0' && plon.Minn[0] <= '5' {
-		result += C.double((plon.Minn[0])-'0') * (10. / 60.)
+		result += float64((plon.Minn[0])-'0') * (10. / 60.)
 	} else if plon.Minn[0] == ' ' {
 	} else {
 		if !quiet {
@@ -3495,7 +3470,7 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plon.Minn[1])) {
-		result += C.double((plon.Minn[1])-'0') * (1. / 60.)
+		result += float64((plon.Minn[1])-'0') * (1. / 60.)
 	} else if plon.Minn[1] == ' ' {
 
 	} else {
@@ -3515,7 +3490,7 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plon.HMin[0])) {
-		result += C.double((plon.HMin[0])-'0') * (0.1 / 60.)
+		result += float64((plon.HMin[0])-'0') * (0.1 / 60.)
 	} else if plon.HMin[0] == ' ' {
 
 	} else {
@@ -3527,7 +3502,7 @@ func get_longitude_9(p [9]byte, quiet bool) C.double {
 	}
 
 	if unicode.IsDigit(rune(plon.HMin[1])) {
-		result += C.double((plon.HMin[1])-'0') * (0.01 / 60.)
+		result += float64((plon.HMin[1])-'0') * (0.01 / 60.)
 	} else if plon.HMin[1] == ' ' {
 
 	} else {
@@ -3731,7 +3706,7 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time {
  *
  *------------------------------------------------------------------*/
 
-func get_maidenhead(A *decode_aprs_t, p []byte) C.int {
+func get_maidenhead(A *decode_aprs_t, p []byte) int {
 
 	if unicode.ToUpper(rune(p[0])) >= 'A' && unicode.ToUpper(rune(p[0])) <= 'R' &&
 		unicode.ToUpper(rune(p[1])) >= 'A' && unicode.ToUpper(rune(p[1])) <= 'R' &&
@@ -3785,11 +3760,11 @@ func get_maidenhead(A *decode_aprs_t, p []byte) C.int {
 // TODO KG rename?
 var dir []string = []string{"omni", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
 
-func data_extension_comment(A *decode_aprs_t, pdext []byte) C.int {
+func data_extension_comment(A *decode_aprs_t, pdext []byte) bool {
 
-	if C.strlen(C.CString(string(pdext))) < 7 {
-		C.strcpy(&A.g_comment[0], C.CString(string(pdext)))
-		return 0
+	if len(pdext) < 7 {
+		A.g_comment = string(pdext)
+		return false
 	}
 
 	/* Tyy/Cxx - Area object descriptor. */
@@ -3799,7 +3774,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) C.int {
 		pdext[4] == 'C' {
 		/* not decoded at this time */
 		process_comment(A, pdext[7:])
-		return 1
+		return true
 	}
 
 	/* CSE/SPD */
@@ -3810,11 +3785,11 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) C.int {
 		var n int
 		var count, _ = fmt.Sscanf(string(pdext), "%3d", &n)
 		if count > 0 {
-			A.g_course = C.float(n)
+			A.g_course = float64(n)
 		}
 		count, _ = fmt.Sscanf(string(pdext[4:]), "%3d", &n)
 		if count > 0 {
-			A.g_speed_mph = C.float(DW_KNOTS_TO_MPH(float64(n)))
+			A.g_speed_mph = DW_KNOTS_TO_MPH(float64(n))
 		}
 
 		/* Bearing and Number/Range/Quality? */
@@ -3824,24 +3799,24 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) C.int {
 		} else {
 			process_comment(A, pdext[7:])
 		}
-		return 1
+		return true
 	}
 
 	/* check for Station power, height, gain. */
 
 	if bytes.HasPrefix(pdext, []byte("PHG")) {
-		A.g_power = C.int(pdext[3]-'0') * C.int(pdext[3]-'0')
-		A.g_height = C.int(1<<(pdext[4]-'0')) * 10
-		A.g_gain = C.int(pdext[5] - '0')
+		A.g_power = int(pdext[3]-'0') * int(pdext[3]-'0')
+		A.g_height = int(1<<(pdext[4]-'0')) * 10
+		A.g_gain = int(pdext[5] - '0')
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			C.strcpy(&A.g_directivity[0], C.CString(dir[pdext[6]-'0']))
+			A.g_directivity = dir[pdext[6]-'0']
 		}
 
 		// TODO: look for another 0-9 A-Z followed by a /
 		// http://www.aprs.org/aprs12/probes.txt
 
 		process_comment(A, pdext[7:])
-		return 1
+		return true
 	}
 
 	/* check for precalculated radio range. */
@@ -3850,28 +3825,28 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) C.int {
 		var n int
 		var count, _ = fmt.Sscanf(string(pdext[3:]), "%4d", &n)
 		if count > 0 {
-			A.g_range = C.float(n)
+			A.g_range = float64(n)
 		}
 		process_comment(A, pdext[7:])
-		return 1
+		return true
 	}
 
 	/* DF signal strength,  */
 
 	if bytes.HasPrefix(pdext, []byte("DFS")) {
 		//A.g_strength = pdext[3] - '0';
-		A.g_height = C.int(1<<(pdext[4]-'0')) * 10
-		A.g_gain = C.int(pdext[5] - '0')
+		A.g_height = int(1<<(pdext[4]-'0')) * 10
+		A.g_gain = int(pdext[5] - '0')
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			C.strcpy(&A.g_directivity[0], C.CString(dir[pdext[6]-'0']))
+			A.g_directivity = dir[pdext[6]-'0']
 		}
 
 		process_comment(A, pdext[7:])
-		return 1
+		return true
 	}
 
 	process_comment(A, pdext)
-	return 0
+	return false
 }
 
 /*------------------------------------------------------------------
@@ -3977,7 +3952,7 @@ var i_ctcss = [NUM_CTCSS]int{
 	171, 173, 177, 179, 183, 186, 189, 192, 196, 199,
 	203, 206, 210, 218, 225, 229, 233, 241, 250, 254}
 
-var f_ctcss = [NUM_CTCSS]C.float{
+var f_ctcss = [NUM_CTCSS]float64{
 	67.0, 69.3, 71.9, 74.4, 77.0, 79.7, 82.5, 85.4, 88.5, 91.5,
 	94.8, 97.4, 100.0, 103.5, 107.2, 110.9, 114.8, 118.8, 123.0, 127.3,
 	131.8, 136.5, 141.3, 146.2, 151.4, 156.7, 159.8, 162.2, 165.5, 167.9,
@@ -3999,7 +3974,7 @@ func cutBytes(b []byte, from int, to int) []byte {
 }
 
 // #define sign(x) (((x)>=0)?1:(-1))
-func aprsSign(x C.double) C.double {
+func aprsSign(x float64) float64 {
 	if x >= 0 {
 		return 1
 	} else {
@@ -4049,16 +4024,16 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	 */
 
 	if clen > len(A.g_comment)-1 {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Comment is extremely long, %d characters.\n", clen)
 			dw_printf("Please report this, along with surrounding lines, so we can find the cause.\n")
 		}
 	}
 
-	var atof = func(b []byte) C.float {
+	var atof = func(b []byte) float64 {
 		var f, _ = strconv.ParseFloat(string(b), 64)
-		return C.float(f)
+		return float64(f)
 	}
 
 	/*
@@ -4076,41 +4051,41 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		switch sftemp[0] {
 		case 'A':
-			A.g_freq = 1200 + C.double(atof(sftemp[1:]))
+			A.g_freq = 1200 + atof(sftemp[1:])
 		case 'B':
-			A.g_freq = 2300 + C.double(atof(sftemp[1:]))
+			A.g_freq = 2300 + atof(sftemp[1:])
 		case 'C':
-			A.g_freq = 2400 + C.double(atof(sftemp[1:]))
+			A.g_freq = 2400 + atof(sftemp[1:])
 		case 'D':
-			A.g_freq = 3400 + C.double(atof(sftemp[1:]))
+			A.g_freq = 3400 + atof(sftemp[1:])
 		case 'E':
-			A.g_freq = 5600 + C.double(atof(sftemp[1:]))
+			A.g_freq = 5600 + atof(sftemp[1:])
 		case 'F':
-			A.g_freq = 5700 + C.double(atof(sftemp[1:]))
+			A.g_freq = 5700 + atof(sftemp[1:])
 		case 'G':
-			A.g_freq = 5800 + C.double(atof(sftemp[1:]))
+			A.g_freq = 5800 + atof(sftemp[1:])
 		case 'H':
-			A.g_freq = 10100 + C.double(atof(sftemp[1:]))
+			A.g_freq = 10100 + atof(sftemp[1:])
 		case 'I':
-			A.g_freq = 10200 + C.double(atof(sftemp[1:]))
+			A.g_freq = 10200 + atof(sftemp[1:])
 		case 'J':
-			A.g_freq = 10300 + C.double(atof(sftemp[1:]))
+			A.g_freq = 10300 + atof(sftemp[1:])
 		case 'K':
-			A.g_freq = 10400 + C.double(atof(sftemp[1:]))
+			A.g_freq = 10400 + atof(sftemp[1:])
 		case 'L':
-			A.g_freq = 10500 + C.double(atof(sftemp[1:]))
+			A.g_freq = 10500 + atof(sftemp[1:])
 		case 'M':
-			A.g_freq = 24000 + C.double(atof(sftemp[1:]))
+			A.g_freq = 24000 + atof(sftemp[1:])
 		case 'N':
-			A.g_freq = 24100 + C.double(atof(sftemp[1:]))
+			A.g_freq = 24100 + atof(sftemp[1:])
 		case 'O':
-			A.g_freq = 24200 + C.double(atof(sftemp[1:]))
+			A.g_freq = 24200 + atof(sftemp[1:])
 		default:
-			A.g_freq = C.double(atof(sftemp))
+			A.g_freq = atof(sftemp)
 		}
 
 		if bytes.HasPrefix(smtemp, []byte("MHz")) {
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Warning: \"%s\" has non-standard capitalization and might not be recognized by some systems.\n", smtemp)
 				dw_printf("For best compatibility, it should be exactly like this: \"MHz\"  (upper,upper,lower case)\n")
@@ -4118,17 +4093,17 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		}
 
 		commentData = cutBytes(commentData, match[0], match[1])
-	} else if C.strlen(&A.g_name[0]) > 0 {
+	} else if len(A.g_name) > 0 {
 
 		// Try to extract sensible number from object/item name.
 
-		var x = atof(C.GoBytes(unsafe.Pointer(&A.g_name[0]), C.int(len(A.g_name))))
+		var x = atof([]byte(A.g_name))
 
 		if (x >= 144 && x <= 148) ||
 			(x >= 222 && x <= 225) ||
 			(x >= 420 && x <= 450) ||
 			(x >= 902 && x <= 928) {
-			A.g_freq = C.double(x)
+			A.g_freq = float64(x)
 		}
 	}
 
@@ -4144,8 +4119,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	var keep_going = true
 	for keep_going {
 		if match := std_tone_re.FindSubmatchIndex(commentData); match != nil {
-			var _sttemp = commentData[match[2]:match[3]] /* includes leading letter */
-			var sttemp = C.GoBytes(unsafe.Pointer(&_sttemp[0]), C.int(len(_sttemp)))
+			var sttemp = commentData[match[2]:match[3]] /* includes leading letter */
 
 			// Try to convert from integer to proper value.
 
@@ -4157,7 +4131,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 				}
 			}
 			if A.g_tone == G_UNKNOWN {
-				if A.g_quiet == 0 {
+				if !A.g_quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Bad CTCSS/PL specification: \"%s\"\n", sttemp)
 					dw_printf("Integer does not correspond to standard tone.\n")
@@ -4177,7 +4151,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 			var offset, _ = strconv.ParseUint(string(sttemp), 8, 64)
 
-			A.g_dcs = C.int(offset)
+			A.g_dcs = int(offset)
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_offset_re.FindSubmatchIndex(commentData); match != nil {
@@ -4186,7 +4160,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 			var offset, _ = strconv.Atoi(string(sttemp))
 
-			A.g_offset = 10 * C.int(offset)
+			A.g_offset = 10 * offset
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_range_re.FindSubmatchIndex(commentData); match != nil {
@@ -4197,9 +4171,9 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			var r, _ = strconv.Atoi(string(sttemp))
 
 			if string(sutemp) == "m" {
-				A.g_range = C.float(r)
+				A.g_range = float64(r)
 			} else {
-				A.g_range = C.float(DW_KM_TO_MILES(float64(r)))
+				A.g_range = DW_KM_TO_MILES(float64(r))
 			}
 
 			commentData = cutBytes(commentData, match[0], match[1])
@@ -4221,8 +4195,8 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		//dw_printf("compressed telemetry data = \"%s\"\n", tdata);
 
-		var telemetry = telemetry_data_base91(C.GoString(&A.g_src[0]), string(tdata))
-		C.strcpy(&A.g_telemetry[0], C.CString(telemetry))
+		var telemetry = telemetry_data_base91(A.g_src, string(tdata))
+		A.g_telemetry = telemetry
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
@@ -4254,13 +4228,13 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		if d == 'T' {
 			if a == ' ' && o == ' ' {
-				C.strcpy(&A.g_aprstt_loc[0], C.CString("APRStt corral location"))
+				A.g_aprstt_loc = "APRStt corral location"
 			} else if unicode.IsDigit(rune(a)) && o == ' ' {
-				C.strcpy(&A.g_aprstt_loc[0], C.CString(fmt.Sprintf("APRStt location %c of 10", a)))
+				A.g_aprstt_loc = fmt.Sprintf("APRStt location %c of 10", a)
 			} else if unicode.IsDigit(rune(a)) && unicode.IsDigit(rune(o)) {
-				C.strcpy(&A.g_aprstt_loc[0], C.CString(fmt.Sprintf("APRStt location %c%c of 100", a, o)))
+				A.g_aprstt_loc = fmt.Sprintf("APRStt location %c%c of 100", a, o)
 			} else if a == 'B' && unicode.IsDigit(rune(o)) {
-				C.strcpy(&A.g_aprstt_loc[0], C.CString(fmt.Sprintf("APRStt location %c%c...", a, o)))
+				A.g_aprstt_loc = fmt.Sprintf("APRStt location %c%c...", a, o)
 			}
 		} else if unicode.IsUpper(rune(d)) {
 			/*
@@ -4270,10 +4244,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			 *		Lon:	DDD HH.HHo
 			 */
 			if unicode.IsDigit(rune(a)) {
-				A.g_lat += C.double(a-'0') / 60000.0 * aprsSign(A.g_lat)
+				A.g_lat += float64(a-'0') / 60000.0 * aprsSign(A.g_lat)
 			}
 			if unicode.IsDigit(rune(o)) {
-				A.g_lon += C.double(o-'0') / 60000.0 * aprsSign(A.g_lon)
+				A.g_lon += float64(o-'0') / 60000.0 * aprsSign(A.g_lon)
 			}
 		} else if unicode.IsLower(rune(d)) {
 			/*
@@ -4326,10 +4300,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			 */
 
 			if isdigit91(a) {
-				A.g_lat += C.double(a-B91_MIN) * 1.1 / 600000.0 * aprsSign(A.g_lat)
+				A.g_lat += float64(a-B91_MIN) * 1.1 / 600000.0 * aprsSign(A.g_lat)
 			}
 			if isdigit91(o) {
-				A.g_lon += C.double(o-B91_MIN) * 1.1 / 600000.0 * aprsSign(A.g_lon)
+				A.g_lon += float64(o-B91_MIN) * 1.1 / 600000.0 * aprsSign(A.g_lon)
 			}
 		}
 
@@ -4347,7 +4321,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		var temp = commentData[match[0]:match[1]]
 
 		var altitude, _ = strconv.Atoi(string(temp[3:]))
-		A.g_altitude_ft = C.float(altitude)
+		A.g_altitude_ft = float64(altitude)
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
@@ -4371,14 +4345,14 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			(x >= 420 && x <= 450) ||
 			(x >= 902 && x <= 928) {
 
-			if A.g_quiet == 0 {
+			if !A.g_quiet {
 				var good = fmt.Sprintf("%07.3fMHz", x)
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\"%s\" in comment looks like a frequency in non-standard format.\n", bad)
 				dw_printf("For most systems to recognize it, use exactly this form \"%s\" at beginning of comment.\n", good)
 			}
 			if A.g_freq == G_UNKNOWN {
-				A.g_freq = C.double(x)
+				A.g_freq = float64(x)
 			}
 		}
 	}
@@ -4407,7 +4381,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		for i := 0; i < NUM_CTCSS; i++ {
 			if s_ctcss[i] == bad2 {
 
-				if A.g_quiet == 0 {
+				if !A.g_quiet {
 					var good = fmt.Sprintf("T%03d", i_ctcss[i])
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("\"%s\" in comment looks like it might be a CTCSS tone in non-standard format.\n", bad1)
@@ -4415,7 +4389,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 				}
 				if A.g_tone == G_UNKNOWN {
 					var tone, _ = strconv.ParseFloat(bad2, 64)
-					A.g_tone = C.float(tone)
+					A.g_tone = tone
 				}
 				break
 			}
@@ -4423,7 +4397,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	}
 
 	if (A.g_offset == 6000 || A.g_offset == -6000) && A.g_freq >= 144 && A.g_freq <= 148 {
-		if A.g_quiet == 0 {
+		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("A transmit offset of 6 MHz on the 2 meter band doesn't seem right.\n")
 			dw_printf("Each unit is 10 kHz so you should probably be using \"-060\" or \"+060\"\n")
@@ -4435,7 +4409,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	 */
 
 	// Finally copy what's left of commentData into g_comment
-	C.strcpy(&A.g_comment[0], C.CString(string(commentData)))
+	A.g_comment = string(commentData)
 }
 
 /* end process_comment */

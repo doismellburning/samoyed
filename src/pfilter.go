@@ -108,7 +108,7 @@ type pfstate_t struct {
 	 *		g_name		- for object or item
 	 *		g_comment
 	 */
-	decoded decode_aprs_t
+	decoded *decode_aprs_t
 
 	/*
 	 * These are set by next_token.
@@ -199,7 +199,7 @@ func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_ap
 	pfstate.is_aprs = is_aprs > 0
 
 	if is_aprs > 0 {
-		decode_aprs(&pfstate.decoded, pp, 1, nil)
+		pfstate.decoded = decode_aprs(pp, true, "")
 	}
 
 	next_token(&pfstate)
@@ -506,11 +506,11 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		}
 	} else if pf.token_str[0] == 'o' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* o - object or item name */
-		result = filt_bodgu(pf, C.GoString(&pf.decoded.g_name[0]))
+		result = filt_bodgu(pf, pf.decoded.g_name)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&pf.decoded.g_name[0]))
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_name)
 		}
 	} else if pf.token_str[0] == 'd' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* d - was digipeated by */
@@ -563,11 +563,11 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 			pf.decoded.g_message_subtype == message_subtype_bulletin ||
 			pf.decoded.g_message_subtype == message_subtype_nws ||
 			pf.decoded.g_message_subtype == message_subtype_directed_query {
-			result = filt_bodgu(pf, C.GoString(&pf.decoded.g_addressee[0]))
+			result = filt_bodgu(pf, pf.decoded.g_addressee)
 
 			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&pf.decoded.g_addressee[0]))
+				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
 			}
 		} else {
 			result = 0
@@ -645,7 +645,7 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			if pf.decoded.g_packet_type == packet_type_message {
-				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), C.GoString(&pf.decoded.g_addressee[0]))
+				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
 			} else {
 				dw_printf("   %s returns %s for not an APRS 'message'\n", pf.token_str, bool2text(result))
 			}
@@ -802,7 +802,7 @@ func filt_t(pf *pfstate_t) C.int {
 			}
 
 		case 'h': /* has third party Header - my extension */
-			if pf.decoded.g_has_thirdparty_header > 0 {
+			if pf.decoded.g_has_thirdparty_header {
 				return (1)
 			}
 
@@ -1306,7 +1306,7 @@ func filt_i(pf *pfstate_t) C.int {
 	 *	 period (range defined as digi hops, distance, or both)."
 	 */
 
-	var was_heard = mheard_was_recently_nearby(C.CString("addressee"), &pf.decoded.g_addressee[0], heardtime, C.int(maxhops), C.double(dlat), C.double(dlon), C.double(km))
+	var was_heard = mheard_was_recently_nearby(C.CString("addressee"), C.CString(pf.decoded.g_addressee), heardtime, C.int(maxhops), C.double(dlat), C.double(dlon), C.double(km))
 
 	if was_heard {
 		return (0)
@@ -1329,7 +1329,7 @@ func filt_i(pf *pfstate_t) C.int {
 	 * the past minute, rather than the usual 180 minutes for the addressee.
 	 */
 
-	was_heard = mheard_was_recently_nearby(C.CString("source"), &pf.decoded.g_src[0], 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
+	was_heard = mheard_was_recently_nearby(C.CString("source"), C.CString(pf.decoded.g_src), 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
 
 	if was_heard {
 		return (0)
