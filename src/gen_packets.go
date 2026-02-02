@@ -474,7 +474,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	gen_tone_init(&modem, C.int(*amplitude/2), 1)
 	morse_init(&modem, C.int(*amplitude/2))
-	dtmf_init(&modem, C.int(*amplitude/2))
+	dtmf_init(&modem, *amplitude/2)
 
 	// We don't have -d or -q options here.
 	// Just use the default of minimal information.
