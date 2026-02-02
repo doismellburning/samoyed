@@ -35,8 +35,8 @@ var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.
 
 var demodulator_state [MAX_RADIO_CHANS][MAX_SUBCHANS]demodulator_state_s
 
-var sample_sum [MAX_RADIO_CHANS][MAX_SUBCHANS]C.int
-var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]C.int
+var sample_sum [MAX_RADIO_CHANS][MAX_SUBCHANS]int
+var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
 
 /*------------------------------------------------------------------
  *
@@ -55,7 +55,7 @@ var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]C.int
  *
  *----------------------------------------------------------------*/
 
-func demod_init(pa *audio_s) C.int {
+func demod_init(pa *audio_s) int {
 
 	/*
 	 * Save audio configuration for later use.
@@ -63,7 +63,7 @@ func demod_init(pa *audio_s) C.int {
 
 	save_audio_config_p = pa
 
-	for channel := C.int(0); channel < MAX_RADIO_CHANS; channel++ {
+	for channel := int(0); channel < MAX_RADIO_CHANS; channel++ {
 
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 
@@ -313,11 +313,11 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
-							C.int(save_audio_config_p.achan[channel].baud),
-							C.int(mark),
-							C.int(space),
-							C.char(profile),
+						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+							save_audio_config_p.achan[channel].baud,
+							mark,
+							space,
+							rune(profile),
 							D)
 
 						if have_plus != 0 {
@@ -367,11 +367,11 @@ func demod_init(pa *audio_s) C.int {
 
 					save_audio_config_p.achan[channel].num_slicers = MAX_SLICERS
 
-					demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
-						C.int(save_audio_config_p.achan[channel].baud),
-						C.int(save_audio_config_p.achan[channel].mark_freq),
-						C.int(save_audio_config_p.achan[channel].space_freq),
-						C.char(save_audio_config_p.achan[channel].profiles[0]),
+					demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						save_audio_config_p.achan[channel].baud,
+						save_audio_config_p.achan[channel].mark_freq,
+						save_audio_config_p.achan[channel].space_freq,
+						rune(save_audio_config_p.achan[channel].profiles[0]),
 						D)
 
 					if have_plus != 0 {
@@ -416,10 +416,10 @@ func demod_init(pa *audio_s) C.int {
 							dw_printf("        %d.%d: %c %d & %d\n", channel, d, profile, mark, space)
 						}
 
-						demod_afsk_init(C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
-							C.int(save_audio_config_p.achan[channel].baud),
-							C.int(mark), C.int(space),
-							C.char(profile),
+						demod_afsk_init(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+							save_audio_config_p.achan[channel].baud,
+							mark, space,
+							rune(profile),
 							D)
 
 						if have_plus != 0 {
@@ -508,9 +508,9 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
-						C.int(save_audio_config_p.achan[channel].baud),
-						C.char(profile),
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						save_audio_config_p.achan[channel].baud,
+						rune(profile),
 						D)
 
 					//text_color_set(DW_COLOR_DEBUG);
@@ -563,9 +563,9 @@ func demod_init(pa *audio_s) C.int {
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
 						save_audio_config_p.achan[channel].v26_alternative,
-						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate),
-						C.int(save_audio_config_p.achan[channel].baud),
-						C.char(profile),
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						save_audio_config_p.achan[channel].baud,
+						rune(profile),
 						D)
 
 					//text_color_set(DW_COLOR_DEBUG);
@@ -622,7 +622,7 @@ func demod_init(pa *audio_s) C.int {
 					 * Easier to check here because demod_9600_init might have an adjusted sample rate.
 					 */
 
-					var ratio = C.float(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec) / C.float(save_audio_config_p.achan[channel].baud)
+					var ratio = float64(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec) / float64(save_audio_config_p.achan[channel].baud)
 
 					/*
 					 * Set reasonable upsample ratio if user did not override.
@@ -719,9 +719,9 @@ func demod_init(pa *audio_s) C.int {
 					}
 
 					demod_9600_init(save_audio_config_p.achan[channel].modem_type,
-						C.int(save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec),
-						C.int(save_audio_config_p.achan[channel].upsample),
-						C.int(save_audio_config_p.achan[channel].baud), D)
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
+						save_audio_config_p.achan[channel].upsample,
+						save_audio_config_p.achan[channel].baud, D)
 
 					if strings.Contains(save_audio_config_p.achan[channel].profiles, "+") {
 
@@ -786,7 +786,7 @@ func demod_init(pa *audio_s) C.int {
 
 const FSK_READ_ERR = (256 * 256)
 
-func demod_get_sample(a C.int) C.int {
+func demod_get_sample(a int) int {
 
 	Assert(save_audio_config_p.adev[a].bits_per_sample == 8 || save_audio_config_p.adev[a].bits_per_sample == 16)
 
@@ -795,7 +795,7 @@ func demod_get_sample(a C.int) C.int {
 
 	if save_audio_config_p.adev[a].bits_per_sample == 8 {
 
-		var x1 = audio_get(a)
+		var x1 = audio_get(C.int(a))
 		if x1 < 0 {
 			return (FSK_READ_ERR)
 		}
@@ -807,12 +807,12 @@ func demod_get_sample(a C.int) C.int {
 		sam = int16(x1-128) * 256
 
 	} else {
-		var x1 = audio_get(a) /* lower byte first */
+		var x1 = audio_get(C.int(a)) /* lower byte first */
 		if x1 < 0 {
 			return (FSK_READ_ERR)
 		}
 
-		var x2 = audio_get(a)
+		var x2 = audio_get(C.int(a))
 		if x2 < 0 {
 			return (FSK_READ_ERR)
 		}
@@ -823,7 +823,7 @@ func demod_get_sample(a C.int) C.int {
 		sam = int16(x2<<8) | int16(x1)
 	}
 
-	return C.int(sam)
+	return int(sam)
 }
 
 /*-------------------------------------------------------------------
@@ -863,7 +863,7 @@ func demod_get_sample(a C.int) C.int {
  *
  *--------------------------------------------------------------------*/
 
-var mute_input [MAX_RADIO_CHANS]C.int
+var mute_input [MAX_RADIO_CHANS]int
 
 // New in 1.7.
 // A few people have a really bad audio cross talk situation where they receive their own transmissions.
@@ -873,12 +873,12 @@ var mute_input [MAX_RADIO_CHANS]C.int
 // I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
 // This is called from ptt_set for half duplex.
 
-func demod_mute_input(channel C.int, mute_during_xmit C.int) {
+func demod_mute_input(channel int, mute_during_xmit int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	mute_input[channel] = mute_during_xmit
 }
 
-func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
+func demod_process_sample(channel int, subchan int, sam int) {
 	//int k;
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
@@ -892,7 +892,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 
 	/* Scale to nice number, actually -2.0 to +2.0 for extra headroom */
 
-	var fsam = C.float(sam) / 16384.0
+	var fsam = float64(sam) / 16384.0
 
 	/*
 	 * Accumulate measure of the input signal level.
@@ -934,8 +934,8 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 
 			sample_sum[channel][subchan] += sam
 			sample_count[channel][subchan]++
-			if sample_count[channel][subchan] >= C.int(save_audio_config_p.achan[channel].decimate) {
-				demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/C.int(save_audio_config_p.achan[channel].decimate), D)
+			if sample_count[channel][subchan] >= save_audio_config_p.achan[channel].decimate {
+				demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/save_audio_config_p.achan[channel].decimate, D)
 				sample_sum[channel][subchan] = 0
 				sample_count[channel][subchan] = 0
 			}
@@ -962,7 +962,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 		  case MODEM_AIS:
 		*/
 
-		demod_9600_process_sample(channel, sam, C.int(save_audio_config_p.achan[channel].upsample), D)
+		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
 
 	} /* switch modem_type */
 } /* end demod_process_sample */
@@ -972,7 +972,7 @@ func demod_process_sample(channel C.int, subchan C.int, sam C.int) {
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
 
-func demod_get_audio_level_real(channel C.int, subchan C.int) alevel_t {
+func demod_get_audio_level_real(channel int, subchan int) alevel_t {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)

@@ -50,13 +50,13 @@ func TUNE(envvar string, param any, name string, fmt string) {
 }
 
 // Cosine table indexed by unsigned byte.
-var fcos256_table [256]C.float
+var fcos256_table [256]float64
 
-func fcos256(x C.uint) C.float {
+func fcos256(x uint) float64 {
 	return (fcos256_table[((x)>>24)&0xff])
 }
 
-func fsin256(x C.uint) C.float {
+func fsin256(x uint) float64 {
 	return (fcos256_table[(((x)>>24)-64)&0xff])
 }
 
@@ -90,7 +90,7 @@ func fsin256(x C.uint) C.float {
 const MIN_G = 0.5
 const MAX_G = 4.0
 
-var afskSpaceGain [MAX_SUBCHANS]C.float
+var afskSpaceGain [MAX_SUBCHANS]float64
 
 /*------------------------------------------------------------------
  *
@@ -115,14 +115,14 @@ var afskSpaceGain [MAX_SUBCHANS]C.float
  *
  *----------------------------------------------------------------*/
 
-func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
-	space_freq C.int, profile C.char, D *demodulator_state_s) {
+func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
+	space_freq int, profile rune, D *demodulator_state_s) {
 
-	var samples_per_sec = C.float(_samples_per_sec)
-	var baud = C.float(_baud)
+	var samples_per_sec = float64(_samples_per_sec)
+	var baud = float64(_baud)
 
 	for j := 0; j < 256; j++ {
-		fcos256_table[j] = C.float(math.Cos(float64(j) * 2.0 * math.Pi / 256.0))
+		fcos256_table[j] = float64(math.Cos(float64(j) * 2.0 * math.Pi / 256.0))
 	}
 
 	*D = demodulator_state_s{} //nolint:exhaustruct
@@ -174,10 +174,10 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		// Local oscillators for Mark and Space tones.
 
 		D.u.afsk.m_osc_phase = 0
-		D.u.afsk.m_osc_delta = C.uint(math.Round(math.Pow(2., 32.) * float64(mark_freq) / float64(samples_per_sec)))
+		D.u.afsk.m_osc_delta = uint(math.Round(math.Pow(2., 32.) * float64(mark_freq) / float64(samples_per_sec)))
 
 		D.u.afsk.s_osc_phase = 0
-		D.u.afsk.s_osc_delta = C.uint(math.Round(math.Pow(2., 32.) * float64(space_freq) / float64(samples_per_sec)))
+		D.u.afsk.s_osc_delta = uint(math.Round(math.Pow(2., 32.) * float64(space_freq) / float64(samples_per_sec)))
 
 		D.u.afsk.use_rrc = 1
 		TUNE("TUNE_USE_RRC", D.u.afsk.use_rrc, "use_rrc", "%d")
@@ -231,7 +231,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		// Local oscillator for Center frequency.
 
 		D.u.afsk.c_osc_phase = 0
-		D.u.afsk.c_osc_delta = C.uint(math.Round(math.Pow(2., 32.) * 0.5 * float64(mark_freq+space_freq) / float64(samples_per_sec)))
+		D.u.afsk.c_osc_delta = uint(math.Round(math.Pow(2., 32.) * 0.5 * float64(mark_freq+space_freq) / float64(samples_per_sec)))
 
 		D.u.afsk.use_rrc = 1
 		TUNE("TUNE_USE_RRC", D.u.afsk.use_rrc, "use_rrc", "%d")
@@ -246,7 +246,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		}
 
 		// For scaling phase shift into normalized -1 to +1 range for mark and space.
-		D.u.afsk.normalize_rpsam = C.float(1.0 / (0.5 * math.Abs(float64(mark_freq-space_freq)) * 2 * math.Pi / float64(samples_per_sec)))
+		D.u.afsk.normalize_rpsam = float64(1.0 / (0.5 * math.Abs(float64(mark_freq-space_freq)) * 2 * math.Pi / float64(samples_per_sec)))
 
 		// New "B" demodulator does not use AGC but demod.c needs this to derive "quick" and
 		// "sluggish" values for overall signal amplitude.  That probably should be independent
@@ -292,9 +292,9 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 	 * A fraction if a Hz would make no difference for the filters.
 	 */
 	if baud == 521 {
-		D.pll_step_per_sample = C.int(math.Round((TICKS_PER_PLL_CYCLE * 520.83) / float64(samples_per_sec)))
+		D.pll_step_per_sample = int32(math.Round((TICKS_PER_PLL_CYCLE * 520.83) / float64(samples_per_sec)))
 	} else {
-		D.pll_step_per_sample = C.int(math.Round((TICKS_PER_PLL_CYCLE * float64(baud)) / float64(samples_per_sec)))
+		D.pll_step_per_sample = int32(math.Round((TICKS_PER_PLL_CYCLE * float64(baud)) / float64(samples_per_sec)))
 	}
 
 	/*
@@ -305,7 +305,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 	if D.use_prefilter != 0 {
 
 		// odd number is a little better
-		D.pre_filter_taps = C.int((D.pre_filter_len_sym * C.float(samples_per_sec) / C.float(baud))) | 1
+		D.pre_filter_taps = int((D.pre_filter_len_sym * float64(samples_per_sec) / float64(baud))) | 1
 
 		TUNE("TUNE_PRE_FILTER_TAPS", D.pre_filter_taps, "pre_filter_taps", "%d")
 
@@ -323,16 +323,16 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 			D.pre_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
-		var f1 = C.float(min(mark_freq, space_freq)) - D.prefilter_baud*C.float(baud)
-		var f2 = C.float(max(mark_freq, space_freq)) + D.prefilter_baud*C.float(baud)
+		var f1 = float64(min(mark_freq, space_freq)) - D.prefilter_baud*float64(baud)
+		var f2 = float64(max(mark_freq, space_freq)) + D.prefilter_baud*float64(baud)
 		/*
 			#if 0
 				  text_color_set(DW_COLOR_DEBUG);
 				  dw_printf ("Generating prefilter %.0f to %.0f Hz.\n", f1, f2);
 			#endif
 		*/
-		f1 /= C.float(samples_per_sec)
-		f2 /= C.float(samples_per_sec)
+		f1 /= float64(samples_per_sec)
+		f2 /= float64(samples_per_sec)
 
 		gen_bandpass(f1, f2, D.pre_filter[:], D.pre_filter_taps, D.pre_window)
 	}
@@ -349,7 +349,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		Assert(D.u.afsk.rrc_width_sym >= 1 && D.u.afsk.rrc_width_sym <= 16)
 		Assert(D.u.afsk.rrc_rolloff >= 0. && D.u.afsk.rrc_rolloff <= 1.)
 
-		D.lp_filter_taps = C.int((D.u.afsk.rrc_width_sym * C.float(samples_per_sec) / C.float(baud))) | 1 // odd works better
+		D.lp_filter_taps = int((D.u.afsk.rrc_width_sym * float64(samples_per_sec) / float64(baud))) | 1 // odd works better
 
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (RRC)", "%d")
 
@@ -364,7 +364,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 		gen_rrc_lowpass(D.lp_filter[:], D.lp_filter_taps, D.u.afsk.rrc_rolloff, samples_per_sec/baud)
 	} else {
-		D.lp_filter_taps = C.int(math.Round(float64(D.lp_filter_width_sym * samples_per_sec / baud)))
+		D.lp_filter_taps = int(math.Round(float64(D.lp_filter_width_sym * samples_per_sec / baud)))
 
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
@@ -378,7 +378,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 
 		Assert(D.lp_filter_taps > 8 && D.lp_filter_taps <= MAX_FILTER_SIZE)
 
-		var fc = C.float(baud) * D.lpf_baud / samples_per_sec
+		var fc = float64(baud) * D.lpf_baud / samples_per_sec
 		gen_lowpass(fc, D.lp_filter[:], D.lp_filter_taps, D.lp_window)
 	}
 
@@ -389,7 +389,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
 	afskSpaceGain[0] = MIN_G
 	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SUBCHANS-1))
 	for j := 1; j < MAX_SUBCHANS; j++ {
-		afskSpaceGain[j] = afskSpaceGain[j-1] * C.float(step)
+		afskSpaceGain[j] = afskSpaceGain[j-1] * float64(step)
 	}
 
 } /* demod_afsk_init */
@@ -473,7 +473,7 @@ func demod_afsk_init(_samples_per_sec C.int, _baud C.int, mark_freq C.int,
  * The amplitude ratio varies from 1.48 to 3.41 with a median of 2.70.
  */
 
-func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *demodulator_state_s) {
+func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodulator_state_s) {
 	/*
 		#if DEBUG4
 			static FILE *demod_log_fp = NULL;
@@ -496,7 +496,7 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 
 	/* Scale to nice number. */
 
-	var fsam = C.float(sam) / 16384.0
+	var fsam = float64(sam) / 16384.0
 
 	switch D.profile {
 
@@ -511,25 +511,25 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 			//	Cleaner & simpler than earlier 'A' thru 'E'
 
 			if D.use_prefilter != 0 {
-				push_sample(fsam, &D.raw_cb[0], D.pre_filter_taps)
+				push_sample(fsam, D.raw_cb[:], D.pre_filter_taps)
 				fsam = convolve(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
 			}
 
-			push_sample(fsam*fcos256(D.u.afsk.m_osc_phase), &D.u.afsk.m_I_raw[0], D.lp_filter_taps)
-			push_sample(fsam*fsin256(D.u.afsk.m_osc_phase), &D.u.afsk.m_Q_raw[0], D.lp_filter_taps)
+			push_sample(fsam*fcos256(D.u.afsk.m_osc_phase), D.u.afsk.m_I_raw[:], D.lp_filter_taps)
+			push_sample(fsam*fsin256(D.u.afsk.m_osc_phase), D.u.afsk.m_Q_raw[:], D.lp_filter_taps)
 			D.u.afsk.m_osc_phase += D.u.afsk.m_osc_delta
 
-			push_sample(fsam*fcos256(D.u.afsk.s_osc_phase), &D.u.afsk.s_I_raw[0], D.lp_filter_taps)
-			push_sample(fsam*fsin256(D.u.afsk.s_osc_phase), &D.u.afsk.s_Q_raw[0], D.lp_filter_taps)
+			push_sample(fsam*fcos256(D.u.afsk.s_osc_phase), D.u.afsk.s_I_raw[:], D.lp_filter_taps)
+			push_sample(fsam*fsin256(D.u.afsk.s_osc_phase), D.u.afsk.s_Q_raw[:], D.lp_filter_taps)
 			D.u.afsk.s_osc_phase += D.u.afsk.s_osc_delta
 
 			var m_I = convolve(D.u.afsk.m_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
 			var m_Q = convolve(D.u.afsk.m_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
-			var m_amp = C.float(math.Hypot(float64(m_I), float64(m_Q)))
+			var m_amp = float64(math.Hypot(float64(m_I), float64(m_Q)))
 
 			var s_I = convolve(D.u.afsk.s_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
 			var s_Q = convolve(D.u.afsk.s_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
-			var s_amp = C.float(math.Hypot(float64(s_I), float64(s_Q)))
+			var s_amp = float64(math.Hypot(float64(s_I), float64(s_Q)))
 
 			/*
 			 * Capture the mark and space peak amplitudes for display.
@@ -560,7 +560,7 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 				// the signal amplitude measurement, above.
 				// It works so let's move along to other topics.
 
-				var m_norm, s_norm C.float
+				var m_norm, s_norm float64
 				D.m_peak, D.m_valley, m_norm = agc(m_amp, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 				D.s_peak, D.s_valley, s_norm = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
 
@@ -589,7 +589,7 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 				D.m_peak, D.m_valley, _ = agc(m_amp, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 				D.s_peak, D.s_valley, _ = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
 
-				for slice := C.int(0); slice < D.num_slicers; slice++ {
+				for slice := int(0); slice < D.num_slicers; slice++ {
 					var demod_out = m_amp - s_amp*afskSpaceGain[slice]
 					var amp = 0.5 * (D.m_peak - D.m_valley + (D.s_peak-D.s_valley)*afskSpaceGain[slice])
 					if amp < 0.0000001 {
@@ -614,18 +614,18 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 			// New - Convert frequency to a value proportional to frequency.
 
 			if D.use_prefilter != 0 {
-				push_sample(fsam, &D.raw_cb[0], D.pre_filter_taps)
+				push_sample(fsam, D.raw_cb[:], D.pre_filter_taps)
 				fsam = convolve(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
 			}
 
-			push_sample(fsam*fcos256(D.u.afsk.c_osc_phase), &D.u.afsk.c_I_raw[0], D.lp_filter_taps)
-			push_sample(fsam*fsin256(D.u.afsk.c_osc_phase), &D.u.afsk.c_Q_raw[0], D.lp_filter_taps)
+			push_sample(fsam*fcos256(D.u.afsk.c_osc_phase), D.u.afsk.c_I_raw[:], D.lp_filter_taps)
+			push_sample(fsam*fsin256(D.u.afsk.c_osc_phase), D.u.afsk.c_Q_raw[:], D.lp_filter_taps)
 			D.u.afsk.c_osc_phase += D.u.afsk.c_osc_delta
 
 			var c_I = convolve(D.u.afsk.c_I_raw[:], D.lp_filter[:], D.lp_filter_taps)
 			var c_Q = convolve(D.u.afsk.c_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
 
-			var phase = C.float(math.Atan2(float64(c_Q), float64(c_I)))
+			var phase = float64(math.Atan2(float64(c_Q), float64(c_I)))
 			var rate = phase - D.u.afsk.prev_phase
 			if rate > math.Pi {
 				rate -= 2 * math.Pi
@@ -663,9 +663,9 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
 				// Assuming a 300 Hz shift, this would put slicing thresholds up
 				// to +-75 Hz from the center.
 
-				for slice := C.int(0); slice < D.num_slicers; slice++ {
+				for slice := int(0); slice < D.num_slicers; slice++ {
 
-					var offset = -0.5 + C.float(slice)*(1./C.float(D.num_slicers-1))
+					var offset = -0.5 + float64(slice)*(1./float64(D.num_slicers-1))
 					var demod_out = norm_rate + offset
 
 					//printf ("JWL DEBUG demod B slice %d, offset = %6.3f, demod_out = %6.2f\n", slice, offset, demod_out);
@@ -741,12 +741,12 @@ func demod_afsk_process_sample(channel C.int, subchannel C.int, sam C.int, D *de
  * because this happens for each transition from the demodulator.
  */
 
-func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.float, D *demodulator_state_s, amplitude C.float) {
+func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D *demodulator_state_s, amplitude float64) {
 
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (C.int)((C.uint)(D.slicer[slice].data_clock_pll) + (C.uint)(D.pll_step_per_sample))
+	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
 
 	//text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("prev = %lx, new data clock pll = %lx\n" D.prev_d_c_pll, D.data_clock_pll);
@@ -757,7 +757,7 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 		// Assign it a confidence level or quality, 0 to 100, based on the amplitude.
 		// Those very close to 0 are suspect.  We'll get back to this later.
 
-		var quality = C.int(math.Abs(float64(demod_out)) * 100.0 / float64(amplitude))
+		var quality = int(math.Abs(float64(demod_out)) * 100.0 / float64(amplitude))
 		if quality > 100 {
 			quality = 100
 		}
@@ -783,7 +783,7 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 		*/
 
 		// #if 1
-		hdlc_rec_bit(channel, subchannel, slice, C.int(IfThenElse(demod_out > 0, 1, 0)), false, quality)
+		hdlc_rec_bit(channel, subchannel, slice, IfThenElse(demod_out > 0, 1, 0), false, quality)
 		/*
 			#else  // TODO: new feature to measure data speed error.
 			// Maybe hdlc_rec_bit could provide indication when frame starts.
@@ -800,13 +800,13 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 	var demod_data = demod_out > 0
 	if demod_data != (D.slicer[slice].prev_demod_data != 0) {
 
-		pll_dcd_signal_transition2(DCD_CONFIG_AFSK, D, slice, D.slicer[slice].data_clock_pll)
+		pll_dcd_signal_transition2(DCD_CONFIG_AFSK, D, slice, int(D.slicer[slice].data_clock_pll))
 
 		// TODO:	  signed int before = (signed int)(D.slicer[slice].data_clock_pll);	// Treat as signed.
 		if D.slicer[slice].data_detect != 0 {
-			D.slicer[slice].data_clock_pll = C.int(C.float(D.slicer[slice].data_clock_pll) * D.pll_locked_inertia)
+			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll) * D.pll_locked_inertia)
 		} else {
-			D.slicer[slice].data_clock_pll = C.int(C.float(D.slicer[slice].data_clock_pll) * D.pll_searching_inertia)
+			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll) * D.pll_searching_inertia)
 		}
 		// TODO:	  D.slicer[slice].pll_nudge_total += (int64_t)((signed int)(D.slicer[slice].data_clock_pll)) - (int64_t)before;
 	}
@@ -814,6 +814,6 @@ func nudge_pll_afsk(channel C.int, subchannel C.int, slice C.int, demod_out C.fl
 	/*
 	 * Remember demodulator output so we can compare next time.
 	 */
-	D.slicer[slice].prev_demod_data = C.int(IfThenElse(demod_data, 1, 0))
+	D.slicer[slice].prev_demod_data = IfThenElse(demod_data, 1, 0)
 
 } /* end nudge_pll */

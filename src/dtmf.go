@@ -91,7 +91,7 @@ func dtmf_init(p_audio_config *audio_s, amp C.int) {
 
 	for c := C.int(0); c < MAX_RADIO_CHANS; c++ {
 		var D = &(dd[c])
-		var a = ACHAN2ADEV(c)
+		var a = ACHAN2ADEV(int(c))
 
 		D.sample_rate = C.int(p_audio_config.adev[a].samples_per_sec)
 
@@ -344,7 +344,7 @@ func dtmf_send(channel C.int, str *C.char, speed C.int, txdelay C.int, txtail C.
 
 	push_button(channel, ' ', txtail)
 
-	audio_flush(ACHAN2ADEV(channel))
+	audio_flush(C.int(ACHAN2ADEV(int(channel))))
 
 	return (txdelay +
 		C.int(1000.0*C.float(C.strlen(str))/C.float(speed)+0.5) +
@@ -480,7 +480,7 @@ func push_button_raw(channel C.int, button C.char, ms C.int, test_mode bool) {
 			// Amplitude of 100 would use full +-32k range.
 
 			var sam = C.int(dtmf * 16383.0 * C.float(s_amplitude) / 100.0)
-			gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
+			gen_tone_put_sample(channel, C.int(ACHAN2ADEV(int(channel))), sam)
 		}
 	}
 }

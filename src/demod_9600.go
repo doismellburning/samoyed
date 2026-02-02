@@ -23,7 +23,6 @@ import "C"
 
 import (
 	"math"
-	"unsafe"
 )
 
 var DCD_CONFIG_9600 = &DCDConfig{
@@ -35,19 +34,19 @@ var DCD_CONFIG_9600 = &DCDConfig{
 	DCD_GOOD_WIDTH: 1024,
 }
 
-var slice_point [MAX_SUBCHANS]C.float
+var slice_point [MAX_SUBCHANS]float64
 
 /* Add sample to buffer and shift the rest down. */
 
-func push_sample(val C.float, buff *C.float, size C.int) {
-	C.memmove(unsafe.Add(unsafe.Pointer(buff), C.sizeof_float), unsafe.Pointer(buff), C.size_t(size-1)*C.sizeof_float)
-	*buff = val
+func push_sample(val float64, buff []float64, size int) {
+	copy(buff[1:], buff[:size-1])
+	buff[0] = val
 }
 
 /* FIR filter kernel. */
 
-func convolve(data, filter []C.float, filter_size C.int) C.float {
-	var sum C.float = 0.0
+func convolve(data, filter []float64, filter_size int) float64 {
+	var sum float64 = 0.0
 
 	for j := range filter_size {
 		sum += filter[j] * data[j]
@@ -69,10 +68,10 @@ func convolve(data, filter []C.float, filter_size C.int) C.float {
 
 // Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5
 
-func agc(in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float, C.float, C.float) {
+func agc(in, fast_attack, slow_decay float64, inPeak, inValley float64) (float64, float64, float64) {
 
-	var outPeak C.float
-	var outValley C.float
+	var outPeak float64
+	var outValley float64
 
 	if in >= inPeak {
 		outPeak = in*fast_attack + inPeak*(1.0-fast_attack)
@@ -116,7 +115,7 @@ func agc(in, fast_attack, slow_decay C.float, inPeak, inValley C.float) (C.float
  *
  *----------------------------------------------------------------*/
 
-func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.int, baud C.int, D *demodulator_state_s) {
+func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int, baud int, D *demodulator_state_s) {
 
 	if upsample < 1 {
 		upsample = 1
@@ -144,7 +143,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.
 	//D.lp_filter_taps = ((int) (0.5f * ( D.lp_filter_width_sym * (float)original_sample_rate / (float)baud ))) * 2 + 1;
 
 	// Just round to nearest integer.
-	D.lp_filter_taps = C.int((C.float(D.lp_filter_width_sym) * C.float(original_sample_rate) / C.float(baud)) + 0.5)
+	D.lp_filter_taps = int((float64(D.lp_filter_width_sym) * float64(original_sample_rate) / float64(baud)) + 0.5)
 
 	D.lp_window = BP_WINDOW_COSINE
 
@@ -173,7 +172,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.
 
 	// PLL needs to use the upsampled rate.
 
-	D.pll_step_per_sample = C.int(math.Round(float64(TICKS_PER_PLL_CYCLE * C.double(baud) / C.double(original_sample_rate*upsample))))
+	D.pll_step_per_sample = int32(math.Round(float64(TICKS_PER_PLL_CYCLE * float64(baud) / float64(original_sample_rate*upsample))))
 
 	/* TODO KG
 	#ifdef TUNE_LP_WINDOW
@@ -207,7 +206,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.
 
 	// Initial filter (before scattering) is based on upsampled rate.
 
-	var fc = C.float(baud) * D.lpf_baud / C.float(original_sample_rate*upsample)
+	var fc = float64(baud) * D.lpf_baud / float64(original_sample_rate*upsample)
 
 	//dw_printf ("demod_9600_init: call gen_lowpass(fc=%.2f, , size=%d, )\n", fc, D.lp_filter_taps);
 
@@ -270,7 +269,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.
 	//
 
 	var k = 0
-	for i := C.int(0); i < D.lp_filter_taps; i++ {
+	for i := 0; i < D.lp_filter_taps; i++ {
 		D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k]
 		k++
 		if upsample >= 2 {
@@ -291,7 +290,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.
 	// Really didn't help that much because we should have a symmetrical signal.
 
 	for j := 0; j < MAX_SUBCHANS; j++ {
-		slice_point[j] = 0.02 * C.float(j-0.5*(MAX_SUBCHANS-1))
+		slice_point[j] = 0.02 * float64(j-0.5*(MAX_SUBCHANS-1))
 		//dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
 	}
 
@@ -354,7 +353,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate C.int, upsample C.
  *
  *--------------------------------------------------------------------*/
 
-func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *demodulator_state_s) {
+func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulator_state_s) {
 
 	/* TODO KG
 	#if DEBUG4
@@ -374,10 +373,10 @@ func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *demo
 	/* i.e.  input range +-16k becomes +-1 here and is */
 	/* displayed in the heard line as audio level 100. */
 
-	var fsam = C.float(sam) / 16384.0
+	var fsam = float64(sam) / 16384.0
 
 	// Low pass filter
-	push_sample(fsam, &D.u.bb.audio_in[0], D.lp_filter_taps)
+	push_sample(fsam, D.u.bb.audio_in[:], D.lp_filter_taps)
 
 	fsam = convolve(D.u.bb.audio_in[:], D.u.bb.lp_polyphase_1[:], D.lp_filter_taps)
 	process_filtered_sample(channel, fsam, D)
@@ -395,9 +394,9 @@ func demod_9600_process_sample(channel C.int, sam C.int, upsample C.int, D *demo
 	}
 }
 
-func process_filtered_sample(channel C.int, fsam C.float, D *demodulator_state_s) {
+func process_filtered_sample(channel int, fsam float64, D *demodulator_state_s) {
 
-	var subchannel C.int = 0
+	var subchannel int = 0
 
 	/*
 	 * Version 1.2: Capture the post-filtering amplitude for display.
@@ -432,7 +431,7 @@ func process_filtered_sample(channel C.int, fsam C.float, D *demodulator_state_s
 	 */
 	var demod_data bool /* Still scrambled. */
 
-	var demod_out C.float
+	var demod_out float64
 	D.m_peak, D.m_valley, demod_out = agc(fsam, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 
 	// TODO: There is potential for multiple decoders with one filter.
@@ -450,7 +449,7 @@ func process_filtered_sample(channel C.int, fsam C.float, D *demodulator_state_s
 	} else {
 		/* Multiple slicers each feeding its own HDLC decoder. */
 
-		for slice := C.int(0); slice < D.num_slicers; slice++ {
+		for slice := int(0); slice < D.num_slicers; slice++ {
 			demod_data = demod_out-slice_point[slice] > 0
 			nudge_pll_9600(channel, subchannel, slice, demod_out-slice_point[slice], D)
 		}
@@ -561,17 +560,17 @@ func process_filtered_sample(channel C.int, fsam C.float, D *demodulator_state_s
  *
  *--------------------------------------------------------------------*/
 
-func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.float, D *demodulator_state_s) {
+func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64, D *demodulator_state_s) {
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (C.int)((C.uint)(D.slicer[slice].data_clock_pll) + (C.uint)(D.pll_step_per_sample))
+	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
 
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
 
-		hdlc_rec_bit_new(channel, subchannel, slice, C.int(IfThenElse(demod_out_f > 0, 1, 0)), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
+		hdlc_rec_bit_new(channel, subchannel, slice, IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
 
@@ -586,17 +585,17 @@ func nudge_pll_9600(channel C.int, subchannel C.int, slice C.int, demod_out_f C.
 
 		// Note:  Test for this demodulator, not overall for channel.
 
-		pll_dcd_signal_transition2(DCD_CONFIG_9600, D, slice, D.slicer[slice].data_clock_pll)
+		pll_dcd_signal_transition2(DCD_CONFIG_9600, D, slice, int(D.slicer[slice].data_clock_pll))
 
-		var target = C.float(D.pll_step_per_sample) * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f)
+		var target = float64(D.pll_step_per_sample) * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f)
 
 		var before = D.slicer[slice].data_clock_pll // Treat as signed.
 		if D.slicer[slice].data_detect != 0 {
-			D.slicer[slice].data_clock_pll = C.int(C.float(D.slicer[slice].data_clock_pll)*D.pll_locked_inertia + target*(1.0-D.pll_locked_inertia))
+			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll)*D.pll_locked_inertia + target*(1.0-D.pll_locked_inertia))
 		} else {
-			D.slicer[slice].data_clock_pll = C.int(C.float(D.slicer[slice].data_clock_pll)*D.pll_searching_inertia + target*(1.0-D.pll_searching_inertia))
+			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll)*D.pll_searching_inertia + target*(1.0-D.pll_searching_inertia))
 		}
-		D.slicer[slice].pll_nudge_total += C.int64_t(D.slicer[slice].data_clock_pll) - C.int64_t(before)
+		D.slicer[slice].pll_nudge_total += int64(D.slicer[slice].data_clock_pll) - int64(before)
 	}
 
 	/* TODO KG

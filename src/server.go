@@ -1076,7 +1076,7 @@ func cmd_listen_thread(client C.int) {
 
 					case MEDIUM_RADIO:
 						// Misleading if using stdin or udp.
-						var a = ACHAN2ADEV(j)
+						var a = ACHAN2ADEV(int(j))
 						// If I was really ambitious, some description could be provided.
 						var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
 

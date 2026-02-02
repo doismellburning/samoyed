@@ -41,12 +41,12 @@ import (
  *--------------------------------------------------------------------*/
 
 type DCDConfig struct {
-	DCD_THRESH_ON C.int
+	DCD_THRESH_ON int
 
-	DCD_THRESH_OFF C.int
+	DCD_THRESH_OFF int
 
 	// No more than 1024!!!
-	DCD_GOOD_WIDTH C.int
+	DCD_GOOD_WIDTH int
 }
 
 // These values are good for 1200 bps AFSK.
@@ -66,7 +66,7 @@ func GenericDCDConfig() *DCDConfig {
 	return c
 }
 
-func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *demodulator_state_s, slice C.int, dpll_phase C.int) {
+func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *demodulator_state_s, slice int, dpll_phase int) {
 	if dpll_phase > -dcdConfig.DCD_GOOD_WIDTH*1024*1024 && dpll_phase < dcdConfig.DCD_GOOD_WIDTH*1024*1024 {
 		D.slicer[slice].good_flag = 1
 	} else {
@@ -74,13 +74,13 @@ func pll_dcd_signal_transition2(dcdConfig *DCDConfig, D *demodulator_state_s, sl
 	}
 }
 
-func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel C.int, subchan C.int, slice C.int) {
+func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel int, subchan int, slice int) {
 	D.slicer[slice].good_hist <<= 1
-	D.slicer[slice].good_hist |= C.uchar(D.slicer[slice].good_flag)
+	D.slicer[slice].good_hist |= byte(D.slicer[slice].good_flag)
 	D.slicer[slice].good_flag = 0
 
 	D.slicer[slice].bad_hist <<= 1
-	D.slicer[slice].bad_hist |= C.uchar(D.slicer[slice].bad_flag)
+	D.slicer[slice].bad_hist |= byte(D.slicer[slice].bad_flag)
 	D.slicer[slice].bad_flag = 0
 
 	D.slicer[slice].score <<= 1
@@ -91,16 +91,16 @@ func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel 
 		D.slicer[slice].score |= 1
 	}
 
-	var s = C.int(bits.OnesCount(uint(D.slicer[slice].score)))
+	var s = bits.OnesCount32(D.slicer[slice].score)
 	if s >= dcdConfig.DCD_THRESH_ON {
 		if D.slicer[slice].data_detect == 0 {
 			D.slicer[slice].data_detect = 1
-			dcd_change(channel, subchan, slice, D.slicer[slice].data_detect)
+			dcd_change(C.int(channel), C.int(subchan), C.int(slice), C.int(D.slicer[slice].data_detect))
 		}
 	} else if s <= dcdConfig.DCD_THRESH_OFF {
 		if D.slicer[slice].data_detect != 0 {
 			D.slicer[slice].data_detect = 0
-			dcd_change(channel, subchan, slice, D.slicer[slice].data_detect)
+			dcd_change(C.int(channel), C.int(subchan), C.int(slice), C.int(D.slicer[slice].data_detect))
 		}
 	}
 }

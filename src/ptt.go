@@ -1038,7 +1038,7 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 
 	// #ifndef TEST
 	if ot == OCTYPE_PTT && !save_audio_config_p.achan[channel].fulldup {
-		demod_mute_input(C.int(channel), C.int(ptt_signal))
+		demod_mute_input(channel, ptt_signal)
 	}
 	// #endif
 
