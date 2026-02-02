@@ -1168,7 +1168,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		/* Initial feedback was positive but it fell by the wayside. */
 		/* Should follow up with testers and either document this or clean out the clutter. */
 
-		digi_regen(C.int(channel), pp)
+		digi_regen(channel, pp)
 
 		/*
 		 * Send to APRS digipeater.
@@ -1178,7 +1178,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		 * confidence that it is correct.
 		 */
 		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			digipeater(C.int(channel), pp)
+			digipeater(channel, pp)
 		}
 
 		/*
