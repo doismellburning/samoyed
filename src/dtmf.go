@@ -29,7 +29,7 @@ const DTMF_TIMEOUT_SEC = 5 /* for normal operation. */
 
 const NUM_TONES = 8
 
-var DTMF_TONES = [NUM_TONES]C.int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
+var DTMF_TONES = [NUM_TONES]int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
 
 /*
  * Current state of the DTMF decoding.
@@ -37,22 +37,22 @@ var DTMF_TONES = [NUM_TONES]C.int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
 
 type dd_s struct { /* Separate for each audio channel. */
 
-	sample_rate C.int /* Samples per sec.  Typ. 44100, 8000, etc. */
-	block_size  C.int /* Number of samples to process in one block. */
-	coef        [NUM_TONES]C.float
+	sample_rate int /* Samples per sec.  Typ. 44100, 8000, etc. */
+	block_size  int /* Number of samples to process in one block. */
+	coef        [NUM_TONES]float64
 
-	n              C.int /* Samples processed in this block. */
-	Q1             [NUM_TONES]C.float
-	Q2             [NUM_TONES]C.float
-	prev_dec       C.char
-	debounced      C.char
-	prev_debounced C.char
-	timeout        C.int
+	n              int /* Samples processed in this block. */
+	Q1             [NUM_TONES]float64
+	Q2             [NUM_TONES]float64
+	prev_dec       rune
+	debounced      rune
+	prev_debounced rune
+	timeout        int
 }
 
 var dd [MAX_RADIO_CHANS]dd_s
 
-var s_amplitude C.int = 100 // range of 0 .. 100
+var s_amplitude int = 100 // range of 0 .. 100
 
 /*------------------------------------------------------------------
  *
@@ -80,7 +80,7 @@ var s_amplitude C.int = 100 // range of 0 .. 100
  *
  *----------------------------------------------------------------*/
 
-func dtmf_init(p_audio_config *audio_s, amp C.int) {
+func dtmf_init(p_audio_config *audio_s, amp int) {
 
 	s_amplitude = amp
 
@@ -89,11 +89,11 @@ func dtmf_init(p_audio_config *audio_s, amp C.int) {
 	 * Larger = narrower bandwidth, slower response.
 	 */
 
-	for c := C.int(0); c < MAX_RADIO_CHANS; c++ {
+	for c := int(0); c < MAX_RADIO_CHANS; c++ {
 		var D = &(dd[c])
-		var a = ACHAN2ADEV(int(c))
+		var a = ACHAN2ADEV(c)
 
-		D.sample_rate = C.int(p_audio_config.adev[a].samples_per_sec)
+		D.sample_rate = p_audio_config.adev[a].samples_per_sec
 
 		if p_audio_config.achan[c].dtmf_decode != DTMF_DECODE_OFF {
 
@@ -117,9 +117,9 @@ func dtmf_init(p_audio_config *audio_s, amp C.int) {
 				// What is to be gained?
 				// More consistent results for all the tones when k is not rounded off.
 
-				var k = C.float(D.block_size) * C.float(DTMF_TONES[j]) / C.float(D.sample_rate)
+				var k = float64(D.block_size) * float64(DTMF_TONES[j]) / float64(D.sample_rate)
 
-				D.coef[j] = C.float(2.0 * math.Cos(2.0*math.Pi*float64(k)/float64(D.block_size)))
+				D.coef[j] = float64(2.0 * math.Cos(2.0*math.Pi*float64(k)/float64(D.block_size)))
 
 				Assert(D.coef[j] > 0.0 && D.coef[j] < 2.0)
 				/* TODO KG
@@ -164,7 +164,7 @@ func dtmf_init(p_audio_config *audio_s, amp C.int) {
  *
  *----------------------------------------------------------------*/
 
-func dtmf_sample(c C.int, input C.float) C.char {
+func dtmf_sample(c int, input float64) rune {
 
 	// Only applies to radio channels.  Should not be here.
 	if c >= MAX_RADIO_CHANS {
@@ -172,7 +172,7 @@ func dtmf_sample(c C.int, input C.float) C.char {
 	}
 
 	var D = &(dd[c])
-	var Q0 C.float
+	var Q0 float64
 
 	for i := 0; i < NUM_TONES; i++ {
 		Q0 = input + D.Q1[i]*D.coef[i] - D.Q2[i]
@@ -185,12 +185,12 @@ func dtmf_sample(c C.int, input C.float) C.char {
 	 */
 	D.n++
 	if D.n == D.block_size {
-		var output [NUM_TONES]C.float
-		var decoded C.char
-		var row, col C.int
+		var output [NUM_TONES]float64
+		var decoded rune
+		var row, col int
 
 		for i := 0; i < NUM_TONES; i++ {
-			output[i] = C.float(math.Sqrt(float64(D.Q1[i]*D.Q1[i] + D.Q2[i]*D.Q2[i] - D.Q1[i]*D.Q2[i]*D.coef[i])))
+			output[i] = float64(math.Sqrt(float64(D.Q1[i]*D.Q1[i] + D.Q2[i]*D.Q2[i] - D.Q1[i]*D.Q2[i]*D.coef[i])))
 			D.Q1[i] = 0
 			D.Q2[i] = 0
 		}
@@ -247,7 +247,7 @@ func dtmf_sample(c C.int, input C.float) C.char {
 		}
 		*/
 
-		var rc2char = []C.char{'1', '2', '3', 'A',
+		var rc2char = []rune{'1', '2', '3', 'A',
 			'4', '5', '6', 'B',
 			'7', '8', '9', 'C',
 			'*', '0', '#', 'D'}
@@ -268,7 +268,7 @@ func dtmf_sample(c C.int, input C.float) C.char {
 			if decoded != ' ' {
 				_tmpIntBool = 1
 			}
-			dcd_change(c, MAX_SUBCHANS, 0, _tmpIntBool)
+			dcd_change(C.int(c), MAX_SUBCHANS, 0, _tmpIntBool)
 
 			/* Reset timeout timer. */
 			if decoded != ' ' {
@@ -280,7 +280,7 @@ func dtmf_sample(c C.int, input C.float) C.char {
 		// Return only new button pushes.
 		// Also report timeout after period of inactivity.
 
-		var ret C.char = '.'
+		var ret = '.'
 		if D.debounced != D.prev_debounced {
 			if D.debounced != ' ' {
 				ret = D.debounced
@@ -329,25 +329,24 @@ func dtmf_sample(c C.int, input C.float) C.char {
  *
  *--------------------------------------------------------------------*/
 
-func dtmf_send(channel C.int, str *C.char, speed C.int, txdelay C.int, txtail C.int) C.int {
+func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int {
 
 	// Length of tone or gap between.
-	var len_ms = C.int((500.0 / C.float(speed)) + 0.5)
+	var len_ms = int((500.0 / float64(speed)) + 0.5)
 
 	push_button(channel, ' ', txdelay)
 
-	var _str = C.GoString(str)
-	for _, p := range _str {
-		push_button(channel, C.char(p), len_ms)
+	for _, p := range str {
+		push_button(channel, p, len_ms)
 		push_button(channel, ' ', len_ms)
 	}
 
 	push_button(channel, ' ', txtail)
 
-	audio_flush(C.int(ACHAN2ADEV(int(channel))))
+	audio_flush(C.int(ACHAN2ADEV(channel)))
 
 	return (txdelay +
-		C.int(1000.0*C.float(C.strlen(str))/C.float(speed)+0.5) +
+		int(1000.0*float64(len(str))/float64(speed)+0.5) +
 		txtail)
 
 } /* end dtmf_send */
@@ -373,9 +372,9 @@ func dtmf_send(channel C.int, str *C.char, speed C.int, txdelay C.int, txtail C.
 // test_mode
 var push_button_result string
 
-func push_button_raw(channel C.int, button C.char, ms C.int, test_mode bool) {
+func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 
-	var fa, fb C.int
+	var fa, fb int
 	switch button {
 	case '1':
 		fa = DTMF_TONES[0]
@@ -446,10 +445,10 @@ func push_button_raw(channel C.int, button C.char, ms C.int, test_mode bool) {
 
 	//dw_printf ("push_button (%d, '%c', %d), fa=%.0f, fb=%.0f. %d samples\n", channel, button, ms, fa, fb, (ms*dd[channel].sample_rate)/1000);
 
-	var dtmf C.float // Audio.  Sum of two sine waves.
-	var phasea, phaseb C.float
+	var dtmf float64 // Audio.  Sum of two sine waves.
+	var phasea, phaseb float64
 
-	for i := C.int(0); i < (ms*dd[channel].sample_rate)/1000; i++ {
+	for i := int(0); i < (ms*dd[channel].sample_rate)/1000; i++ {
 
 		// This could be more efficient with a precomputed sine wave table
 		// but I'm not that worried about it.
@@ -457,9 +456,9 @@ func push_button_raw(channel C.int, button C.char, ms C.int, test_mode bool) {
 		// When transmitting tones, it briefly shoots up to about 33%.
 
 		if fa > 0 && fb > 0 {
-			dtmf = C.float(math.Sin(float64(phasea)) + math.Sin(float64(phaseb)))
-			phasea += 2.0 * C.float(math.Pi) * C.float(fa) / C.float(dd[channel].sample_rate)
-			phaseb += 2.0 * C.float(math.Pi) * C.float(fb) / C.float(dd[channel].sample_rate)
+			dtmf = float64(math.Sin(float64(phasea)) + math.Sin(float64(phaseb)))
+			phasea += 2.0 * float64(math.Pi) * float64(fa) / float64(dd[channel].sample_rate)
+			phaseb += 2.0 * float64(math.Pi) * float64(fb) / float64(dd[channel].sample_rate)
 		} else {
 			dtmf = 0
 		}
@@ -473,22 +472,22 @@ func push_button_raw(channel C.int, button C.char, ms C.int, test_mode bool) {
 			//x = dtmf_sample (0, dtmf * 0.001);
 
 			if x != ' ' && x != '.' {
-				push_button_result += string([]rune{rune(x)})
+				push_button_result += string([]rune{x})
 			}
 		} else {
 			// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
 			// Amplitude of 100 would use full +-32k range.
 
-			var sam = C.int(dtmf * 16383.0 * C.float(s_amplitude) / 100.0)
-			gen_tone_put_sample(channel, C.int(ACHAN2ADEV(int(channel))), sam)
+			var sam = C.int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
+			gen_tone_put_sample(C.int(channel), C.int(ACHAN2ADEV(channel)), sam)
 		}
 	}
 }
 
-func push_button(channel C.int, button C.char, ms C.int) {
+func push_button(channel int, button rune, ms int) {
 	push_button_raw(channel, button, ms, false)
 }
 
-func push_button_test(channel C.int, button C.char, ms C.int) {
+func push_button_test(channel int, button rune, ms int) {
 	push_button_raw(channel, button, ms, true)
 }
