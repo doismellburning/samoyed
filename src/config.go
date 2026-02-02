@@ -1315,14 +1315,14 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				if p_audio_config.chan_medium[n] != MEDIUM_RADIO {
 
-					if p_audio_config.adev[ACHAN2ADEV(C.int(n))].defined == 0 {
+					if p_audio_config.adev[ACHAN2ADEV(n)].defined == 0 {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Channel number %d is not valid because audio device %d is not defined.\n",
-							line, n, ACHAN2ADEV(C.int(n)))
+							line, n, ACHAN2ADEV(n))
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Channel number %d is not valid because audio device %d is not in stereo.\n",
-							line, n, ACHAN2ADEV(C.int(n)))
+							line, n, ACHAN2ADEV(n))
 					}
 				}
 			} else {
@@ -2115,7 +2115,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				// Failure at this point is not an error.
 				// See if config file sets it explicitly before complaining.
 
-				p_audio_config.achan[channel].octrl[ot].ptt_device = cm108_find_ptt(p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out)
+				p_audio_config.achan[channel].octrl[ot].ptt_device = cm108_find_ptt(p_audio_config.adev[ACHAN2ADEV(channel)].adevice_out)
 
 				for {
 					t = split("", false)
@@ -2147,7 +2147,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if p_audio_config.achan[channel].octrl[ot].ptt_device == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", line,
-						p_audio_config.adev[ACHAN2ADEV(C.int(channel))].adevice_out)
+						p_audio_config.adev[ACHAN2ADEV(channel)].adevice_out)
 					/* TODO KG
 					#if __WIN32__
 						        dw_printf ("You must explicitly mention a HID path.\n");

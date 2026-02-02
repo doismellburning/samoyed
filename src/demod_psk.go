@@ -88,8 +88,8 @@ var DCD_CONFIG_PSK = &DCDConfig{
 	} }
 */
 
-var phase_to_gray_v26 = [4]C.int{0, 1, 3, 2}
-var phase_to_gray_v27 = [8]C.int{1, 0, 2, 3, 7, 6, 4, 5}
+var phase_to_gray_v26 = [4]int{0, 1, 3, 2}
+var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
 
 /* Might replace this with faster, lower precision, approximation someday if it does not harm results. */
 
@@ -131,7 +131,7 @@ var phase_to_gray_v27 = [8]C.int{1, 0, 2, 3, 7, 6, 4, 5}
  *
  *----------------------------------------------------------------*/
 
-func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, bps C.int, profile C.char, D *demodulator_state_s) {
+func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps int, profile rune, D *demodulator_state_s) {
 
 	var samples_per_sec = float64(_samples_per_sec)
 
@@ -147,8 +147,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 	//#endif
 	TUNE("TUNE_PROFILE", profile, "profile", "%c")
 
-	var correct_baud C.int // baud is not same as bits/sec here!
-	var carrier_freq C.int
+	var correct_baud int // baud is not same as bits/sec here!
+	var carrier_freq int
 
 	if modem_type == MODEM_QPSK {
 
@@ -164,7 +164,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 			#endif
 		*/
 
-		switch unicode.ToUpper(rune(profile)) {
+		switch unicode.ToUpper(profile) {
 
 		case 'P': /* Self correlation technique. */
 
@@ -237,9 +237,9 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 		   	  D.u.psk.soffs =  math.Round( (13.f / 12.f) * samples_per_sec / carrier_freq );
 		   #else
 		*/
-		D.u.psk.coffs = C.int(math.Round((11.0 / 12.0) * samples_per_sec / float64(correct_baud)))
-		D.u.psk.boffs = C.int(math.Round(samples_per_sec / float64(correct_baud)))
-		D.u.psk.soffs = C.int(math.Round((13.0 / 12.0) * samples_per_sec / float64(correct_baud)))
+		D.u.psk.coffs = int(math.Round((11.0 / 12.0) * samples_per_sec / float64(correct_baud)))
+		D.u.psk.boffs = int(math.Round(samples_per_sec / float64(correct_baud)))
+		D.u.psk.soffs = int(math.Round((13.0 / 12.0) * samples_per_sec / float64(correct_baud)))
 		// #endif
 	} else {
 
@@ -253,7 +253,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 			#endif
 		*/
 
-		switch unicode.ToUpper(rune(profile)) {
+		switch unicode.ToUpper(profile) {
 
 		case 'T': /* Self correlation technique. */
 
@@ -317,18 +317,18 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 
 		D.u.psk.delay_line_width_sym = 1.25 // Delay line > 10/9 * symbol period
 
-		D.u.psk.coffs = C.int(math.Round((8.0 / 9.0) * samples_per_sec / float64(correct_baud)))
-		D.u.psk.boffs = C.int(math.Round(samples_per_sec / float64(correct_baud)))
-		D.u.psk.soffs = C.int(math.Round((10.0 / 9.0) * samples_per_sec / float64(correct_baud)))
+		D.u.psk.coffs = int(math.Round((8.0 / 9.0) * samples_per_sec / float64(correct_baud)))
+		D.u.psk.boffs = int(math.Round(samples_per_sec / float64(correct_baud)))
+		D.u.psk.soffs = int(math.Round((10.0 / 9.0) * samples_per_sec / float64(correct_baud)))
 	}
 
 	if D.u.psk.psk_use_lo != 0 {
-		D.u.psk.lo_step = C.uint(math.Round(256. * 256. * 256. * 256. * float64(carrier_freq) / samples_per_sec))
+		D.u.psk.lo_step = uint(math.Round(256. * 256. * 256. * 256. * float64(carrier_freq) / samples_per_sec))
 
 		// Our own sin table for speed later.
 
 		for j := 0; j < 256; j++ {
-			D.u.psk.sin_table256[j] = C.float(math.Sin(2.0 * math.Pi * float64(j) / 256.0))
+			D.u.psk.sin_table256[j] = float64(math.Sin(2.0 * math.Pi * float64(j) / 256.0))
 		}
 	}
 
@@ -367,19 +367,19 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 	 * The audio sample rate must be at least a few times the data rate.
 	 */
 
-	D.pll_step_per_sample = C.int(math.Round((TICKS_PER_PLL_CYCLE * float64(correct_baud)) / (samples_per_sec)))
+	D.pll_step_per_sample = int32(math.Round((TICKS_PER_PLL_CYCLE * float64(correct_baud)) / (samples_per_sec)))
 
 	/*
 	 * Convert number of symbol times to number of taps.
 	 */
 
-	D.u.psk.pre_filter_taps = C.int(math.Round(float64(D.u.psk.pre_filter_width_sym) * samples_per_sec / float64(correct_baud)))
+	D.u.psk.pre_filter_taps = int(math.Round(float64(D.u.psk.pre_filter_width_sym) * samples_per_sec / float64(correct_baud)))
 
 	// JWL experiment 11/7 - Should delay line be based on audio frequency?
-	D.u.psk.delay_line_taps = C.int(math.Round(float64(D.u.psk.delay_line_width_sym) * samples_per_sec / float64(correct_baud)))
-	D.u.psk.delay_line_taps = C.int(math.Round(float64(D.u.psk.delay_line_width_sym) * samples_per_sec / float64(correct_baud)))
+	D.u.psk.delay_line_taps = int(math.Round(float64(D.u.psk.delay_line_width_sym) * samples_per_sec / float64(correct_baud)))
+	D.u.psk.delay_line_taps = int(math.Round(float64(D.u.psk.delay_line_width_sym) * samples_per_sec / float64(correct_baud)))
 
-	D.u.psk.lp_filter_taps = C.int(math.Round(float64(D.u.psk.lp_filter_width_sym) * samples_per_sec / float64(correct_baud)))
+	D.u.psk.lp_filter_taps = int(math.Round(float64(D.u.psk.lp_filter_width_sym) * samples_per_sec / float64(correct_baud)))
 
 	//#ifdef TUNE_PRE_FILTER_TAPS
 	//	D.u.psk.pre_filter_taps = TUNE_PRE_FILTER_TAPS;
@@ -427,8 +427,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 	 */
 
 	if D.u.psk.use_prefilter != 0 {
-		var f1 = C.float(carrier_freq) - D.u.psk.prefilter_baud*C.float(correct_baud)
-		var f2 = C.float(carrier_freq) + D.u.psk.prefilter_baud*C.float(correct_baud)
+		var f1 = float64(carrier_freq) - D.u.psk.prefilter_baud*float64(correct_baud)
+		var f2 = float64(carrier_freq) + D.u.psk.prefilter_baud*float64(correct_baud)
 		/*
 			#if DEBUG1
 				  text_color_set(DW_COLOR_DEBUG);
@@ -441,8 +441,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 			f1 = 10
 		}
 
-		f1 /= C.float(samples_per_sec)
-		f2 /= C.float(samples_per_sec)
+		f1 /= float64(samples_per_sec)
+		f2 /= float64(samples_per_sec)
 
 		gen_bandpass(f1, f2, D.u.psk.pre_filter[:], D.u.psk.pre_filter_taps, D.u.psk.pre_window)
 	}
@@ -451,7 +451,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
 	 * Now the lowpass filter.
 	 */
 
-	var fc = C.float(correct_baud) * D.u.psk.lpf_baud / C.float(samples_per_sec)
+	var fc = float64(correct_baud) * D.u.psk.lpf_baud / float64(samples_per_sec)
 	gen_lowpass(fc, D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps, D.u.psk.lp_window)
 
 	/*
@@ -524,42 +524,42 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec C.int, b
  *
  *--------------------------------------------------------------------*/
 
-func phase_shift_to_symbol(phase_shift C.float, bits_per_symbol C.int, bit_quality []C.int) C.int {
+func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality []int) int {
 	// Number of different symbol states.
 	Assert(bits_per_symbol == 2 || bits_per_symbol == 3)
 	var N = 1 << bits_per_symbol
 	Assert(N == 4 || N == 8)
 
 	// Scale angle to 1 per symbol then separate into integer and fractional parts.
-	var a = phase_shift * C.float(N) / (math.Pi * 2.0)
-	for a >= C.float(N) {
-		a -= C.float(N)
+	var a = phase_shift * float64(N) / (math.Pi * 2.0)
+	for a >= float64(N) {
+		a -= float64(N)
 	}
 	for a < 0.0 {
-		a += C.float(N)
+		a += float64(N)
 	}
 	var i = int(a)
 	if i == N {
 		i = N - 1 // Should be < N. Watch out for possible roundoff errors.
 	}
-	var f = a - C.float(i)
+	var f = a - float64(i)
 	Assert(i >= 0 && i < N)
 	Assert(f >= -0.001 && f <= 1.001)
 
 	// Interpolate between the ideal angles to get a level of certainty.
-	var result C.int = 0
-	for b := C.int(0); b < bits_per_symbol; b++ {
-		var demod C.float
+	var result int = 0
+	for b := int(0); b < bits_per_symbol; b++ {
+		var demod float64
 		if bits_per_symbol == 2 {
-			demod = C.float((phase_to_gray_v26[i]>>b)&1)*(1.0-f) + C.float((phase_to_gray_v26[(i+1)&3]>>b)&1)*f
+			demod = float64((phase_to_gray_v26[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_v26[(i+1)&3]>>b)&1)*f
 		} else {
-			demod = C.float((phase_to_gray_v27[i]>>b)&1)*(1.0-f) + C.float((phase_to_gray_v27[(i+1)&7]>>b)&1)*f
+			demod = float64((phase_to_gray_v27[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_v27[(i+1)&7]>>b)&1)*f
 		}
 		// Slice to get boolean value and quality measurement.
 		if demod >= 0.5 {
 			result |= 1 << b
 		}
-		bit_quality[b] = C.int(math.Round(100.0 * 2.0 * math.Abs(float64(demod)-0.5)))
+		bit_quality[b] = int(math.Round(100.0 * 2.0 * math.Abs(float64(demod)-0.5)))
 	}
 	return (result)
 
@@ -618,22 +618,22 @@ func phase_shift_to_symbol(phase_shift C.float, bits_per_symbol C.int, bit_quali
  *
  *--------------------------------------------------------------------*/
 
-func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *demodulator_state_s) {
-	var slice C.int = 0 // Would it make sense to have more than one?
+func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulator_state_s) {
+	var slice int = 0 // Would it make sense to have more than one?
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 
 	/* Scale to nice number for plotting during debug. */
 
-	var fsam = C.float(sam) / 16384.0
+	var fsam = float64(sam) / 16384.0
 
 	/*
 	 * Optional bandpass filter before the phase detector.
 	 */
 
 	if D.u.psk.use_prefilter != 0 {
-		push_sample(fsam, &D.u.psk.audio_in[0], D.u.psk.pre_filter_taps)
+		push_sample(fsam, D.u.psk.audio_in[:], D.u.psk.pre_filter_taps)
 		fsam = convolve(D.u.psk.audio_in[:], D.u.psk.pre_filter[:], D.u.psk.pre_filter_taps)
 	}
 
@@ -645,22 +645,22 @@ func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *dem
 		 */
 
 		var sam_x_cos = fsam * D.u.psk.sin_table256[((D.u.psk.lo_phase>>24)+64)&0xff]
-		push_sample(sam_x_cos, &D.u.psk.I_raw[0], D.u.psk.lp_filter_taps)
+		push_sample(sam_x_cos, D.u.psk.I_raw[:], D.u.psk.lp_filter_taps)
 		var I = convolve(D.u.psk.I_raw[:], D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps)
 
 		var sam_x_sin = fsam * D.u.psk.sin_table256[(D.u.psk.lo_phase>>24)&0xff]
-		push_sample(sam_x_sin, &D.u.psk.Q_raw[0], D.u.psk.lp_filter_taps)
+		push_sample(sam_x_sin, D.u.psk.Q_raw[:], D.u.psk.lp_filter_taps)
 		var Q = convolve(D.u.psk.Q_raw[:], D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps)
 
-		var a = C.float(math.Atan2(float64(I), float64(Q)))
+		var a = float64(math.Atan2(float64(I), float64(Q)))
 
 		// This is just a delay line of one symbol time.
 
-		push_sample(a, &D.u.psk.delay_line[0], D.u.psk.delay_line_taps)
+		push_sample(a, D.u.psk.delay_line[:], D.u.psk.delay_line_taps)
 		var delta = a - D.u.psk.delay_line[D.u.psk.boffs]
 
-		var gray C.int
-		var bit_quality [3]C.int
+		var gray int
+		var bit_quality [3]int
 		if D.modem_type == MODEM_QPSK {
 			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2, bit_quality[:]) // MFJ compatible
@@ -677,25 +677,25 @@ func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *dem
 		/*
 		 * Correlate with previous symbol.  We are looking for the phase shift.
 		 */
-		push_sample(fsam, &D.u.psk.delay_line[0], D.u.psk.delay_line_taps)
+		push_sample(fsam, D.u.psk.delay_line[:], D.u.psk.delay_line_taps)
 
 		var sam_x_cos = fsam * D.u.psk.delay_line[D.u.psk.coffs]
-		push_sample(sam_x_cos, &D.u.psk.I_raw[0], D.u.psk.lp_filter_taps)
+		push_sample(sam_x_cos, D.u.psk.I_raw[:], D.u.psk.lp_filter_taps)
 		var I = convolve(D.u.psk.I_raw[:], D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps)
 
 		var sam_x_sin = fsam * D.u.psk.delay_line[D.u.psk.soffs]
-		push_sample(sam_x_sin, &D.u.psk.Q_raw[0], D.u.psk.lp_filter_taps)
+		push_sample(sam_x_sin, D.u.psk.Q_raw[:], D.u.psk.lp_filter_taps)
 		var Q = convolve(D.u.psk.Q_raw[:], D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps)
 
-		var gray C.int
-		var bit_quality [3]C.int
-		var delta = C.float(math.Atan2(float64(I), float64(Q)))
+		var gray int
+		var bit_quality [3]int
+		var delta = float64(math.Atan2(float64(I), float64(Q)))
 
 		if D.modem_type == MODEM_QPSK {
 			if D.u.psk.v26_alt == V26_B {
-				gray = phase_shift_to_symbol(delta+C.float(math.Pi/2), 2, bit_quality[:]) // MFJ compatible
+				gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 2, bit_quality[:]) // MFJ compatible
 			} else {
-				gray = phase_shift_to_symbol(delta+C.float(3*math.Pi/4), 2, bit_quality[:]) // Classic
+				gray = phase_shift_to_symbol(delta+float64(3*math.Pi/4), 2, bit_quality[:]) // Classic
 			}
 		} else {
 			gray = phase_shift_to_symbol(delta+(3*math.Pi/2), 3, bit_quality[:])
@@ -705,7 +705,7 @@ func demod_psk_process_sample(channel C.int, subchannel C.int, sam C.int, D *dem
 
 } /* end demod_psk_process_sample */
 
-func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.int, D *demodulator_state_s, bit_quality []C.int) {
+func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *demodulator_state_s, bit_quality []int) {
 
 	/*
 	 * Finally, a PLL is used to sample near the centers of the data bits.
@@ -736,7 +736,7 @@ func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.in
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
-	D.slicer[slice].data_clock_pll = (C.int)((C.uint)(D.slicer[slice].data_clock_pll) + (C.uint)(D.pll_step_per_sample))
+	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
 
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll >= 0 {
 
@@ -776,15 +776,15 @@ func nudge_pll_psk(channel C.int, subchannel C.int, slice C.int, demod_bits C.in
 
 	if demod_bits != D.slicer[slice].prev_demod_data {
 
-		pll_dcd_signal_transition2(DCD_CONFIG_PSK, D, slice, D.slicer[slice].data_clock_pll)
+		pll_dcd_signal_transition2(DCD_CONFIG_PSK, D, slice, int(D.slicer[slice].data_clock_pll))
 
-		var before C.int = (D.slicer[slice].data_clock_pll) // Treat as signed.
+		var before int32 = (D.slicer[slice].data_clock_pll) // Treat as signed.
 		if D.slicer[slice].data_detect != 0 {
-			D.slicer[slice].data_clock_pll = C.int(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_locked_inertia)))
+			D.slicer[slice].data_clock_pll = int32(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_locked_inertia)))
 		} else {
-			D.slicer[slice].data_clock_pll = C.int(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_searching_inertia)))
+			D.slicer[slice].data_clock_pll = int32(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_searching_inertia)))
 		}
-		D.slicer[slice].pll_nudge_total += (C.int64_t)(D.slicer[slice].data_clock_pll) - C.int64_t(before)
+		D.slicer[slice].pll_nudge_total += (int64)(D.slicer[slice].data_clock_pll) - int64(before)
 	}
 
 	/*

@@ -35,11 +35,11 @@ const (
 const CIC_LEN_MAX = 4000
 
 type cic_t struct {
-	len C.int // Number of elements used.
+	len int // Number of elements used.
 	// Might want to dynamically allocate.
-	in    [CIC_LEN_MAX]C.short // Samples coming in.
-	sum   C.int                // Running sum.
-	inext C.int                // Next position to fill.
+	in    [CIC_LEN_MAX]int16 // Samples coming in.
+	sum   int                // Running sum.
+	inext int                // Next position to fill.
 }
 
 const MAX_FILTER_SIZE = 480 /* 401 is needed for profile A, 300 baud & 44100. Revisit someday. */
@@ -56,10 +56,10 @@ type demodulator_state_s struct {
 
 	//	enum v26_e v26_alt;			// Which alternative when V.26.
 
-	profile C.char // 'A', 'B', etc.	Upper case.
+	profile rune // 'A', 'B', etc.	Upper case.
 	// Only needed to see if we are using 'F' to take fast path.
 
-	pll_step_per_sample C.int // PLL is advanced by this much each audio sample.
+	pll_step_per_sample int32 // PLL is advanced by this much each audio sample.
 	// Data is sampled when it overflows.
 
 	/*
@@ -73,56 +73,56 @@ type demodulator_state_s struct {
 	 * First is arbitrary number for quick IIR.
 	 * Second is frequency as ratio to baud rate for FIR.
 	 */
-	lpf_use_fir C.int /* 0 for IIR, 1 for FIR. */
+	lpf_use_fir int /* 0 for IIR, 1 for FIR. */
 
-	lpf_iir C.float /* Only if using IIR. */
+	lpf_iir float64 /* Only if using IIR. */
 
-	lpf_baud C.float /* Cutoff frequency as fraction of baud. */
+	lpf_baud float64 /* Cutoff frequency as fraction of baud. */
 	/* Intuitively we'd expect this to be somewhere */
 	/* in the range of 0.5 to 1. */
 	/* In practice, it turned out a little larger */
 	/* for profiles B, C, D. */
 
-	lp_filter_width_sym C.float /* Length in number of symbol times. */
+	lp_filter_width_sym float64 /* Length in number of symbol times. */
 
 	// TODO KG #define lp_filter_len_bits lp_filter_width_sym	// FIXME: temp hack
 
-	lp_filter_taps C.int /* Size of Low Pass filter, in audio samples. */
+	lp_filter_taps int /* Size of Low Pass filter, in audio samples. */
 
 	// TODO KG #define lp_filter_size lp_filter_taps		// FIXME: temp hack
 
 	/*
 	 * Automatic gain control.  Fast attack and slow decay factors.
 	 */
-	agc_fast_attack C.float
-	agc_slow_decay  C.float
+	agc_fast_attack float64
+	agc_slow_decay  float64
 
 	/*
 	 * Use a longer term view for reporting signal levels.
 	 */
-	quick_attack   C.float
-	sluggish_decay C.float
+	quick_attack   float64
+	sluggish_decay float64
 
 	/*
 	 * Hysteresis before final demodulator 0 / 1 decision.
 	 */
-	hysteresis  C.float
-	num_slicers C.int /* >1 for multiple slicers. */
+	hysteresis  float64
+	num_slicers int /* >1 for multiple slicers. */
 
 	/*
 	 * Phase Locked Loop (PLL) inertia.
 	 * Larger number means less influence by signal transitions.
 	 * It is more resistant to change when locked on to a signal.
 	 */
-	pll_locked_inertia    C.float
-	pll_searching_inertia C.float
+	pll_locked_inertia    float64
+	pll_searching_inertia float64
 
 	/*
 	 * Optional band pass pre-filter before mark/space detector.
 	 */
-	use_prefilter C.int /* True to enable it. */
+	use_prefilter int /* True to enable it. */
 
-	prefilter_baud C.float /* Cutoff frequencies, as fraction of */
+	prefilter_baud float64 /* Cutoff frequencies, as fraction of */
 	/* baud rate, beyond tones used.  */
 	/* Example, if we used 1600/1800 tones at */
 	/* 300 baud, and this was 0.5, the cutoff */
@@ -130,23 +130,23 @@ type demodulator_state_s struct {
 	/* lower = min(1600,1800) - 0.5 * 300 = 1450 */
 	/* upper = max(1600,1800) + 0.5 * 300 = 1950 */
 
-	pre_filter_len_sym C.float // Length in number of symbol times.
+	pre_filter_len_sym float64 // Length in number of symbol times.
 	// TODO KG #define pre_filter_len_bits pre_filter_len_sym 		// temp until all references changed.
 
 	pre_window bp_window_t // Window type for filter shaping.
 
-	pre_filter_taps C.int // Calculated number of filter taps.
+	pre_filter_taps int // Calculated number of filter taps.
 	// TODO KG #define pre_filter_size pre_filter_taps		// temp until all references changed.
 
-	pre_filter [MAX_FILTER_SIZE]C.float
+	pre_filter [MAX_FILTER_SIZE]float64
 
-	raw_cb [MAX_FILTER_SIZE]C.float // audio in,  need better name.
+	raw_cb [MAX_FILTER_SIZE]float64 // audio in,  need better name.
 
 	/*
 	 * The rest are continuously updated.
 	 */
 
-	lo_phase C.uint /* Local oscillator for PSK. */
+	lo_phase uint /* Local oscillator for PSK. */
 
 	/*
 	 * Use half of the AGC code to get a measure of input audio amplitude.
@@ -154,10 +154,10 @@ type demodulator_state_s struct {
 	 * AGC uses "fast" attack and "slow" decay.
 	 */
 
-	alevel_rec_peak   C.float
-	alevel_rec_valley C.float
-	alevel_mark_peak  C.float
-	alevel_space_peak C.float
+	alevel_rec_peak   float64
+	alevel_rec_valley float64
+	alevel_mark_peak  float64
+	alevel_space_peak float64
 
 	/*
 	 * Outputs from the mark and space amplitude detection,
@@ -165,11 +165,11 @@ type demodulator_state_s struct {
 	 * Kernel for the lowpass filters.
 	 */
 
-	lp_filter [MAX_FILTER_SIZE]C.float
+	lp_filter [MAX_FILTER_SIZE]float64
 
-	m_peak, s_peak         C.float
-	m_valley, s_valley     C.float
-	m_amp_prev, s_amp_prev C.float
+	m_peak, s_peak         float64
+	m_valley, s_valley     float64
+	m_amp_prev, s_amp_prev float64
 
 	/*
 	 * For the PLL and data bit timing.
@@ -200,40 +200,40 @@ type demodulator_state_s struct {
 	 *
 	 */
 	slicer [MAX_SLICERS]struct {
-		data_clock_pll C.int // PLL for data clock recovery.
+		data_clock_pll int32 // PLL for data clock recovery.
 		// It is incremented by pll_step_per_sample
 		// for each audio sample.
 		// Must be 32 bits!!!
 		// So far, this is the case for every compiler used.
 
-		prev_d_c_pll C.int // Previous value of above, before
+		prev_d_c_pll int32 // Previous value of above, before
 		// incrementing, to detect overflows.
 
-		pll_symbol_count C.int     // Number symbols during time nudge_total is accumulated.
-		pll_nudge_total  C.int64_t // Sum of DPLL nudge amounts.
+		pll_symbol_count int   // Number symbols during time nudge_total is accumulated.
+		pll_nudge_total  int64 // Sum of DPLL nudge amounts.
 		// Both of these are cleared at start of frame.
 		// At end of frame, we can see if incoming
 		// baud rate is a little off.
 
-		prev_demod_data C.int // Previous data bit detected.
+		prev_demod_data int // Previous data bit detected.
 		// Used to look for transitions.
-		prev_demod_out_f C.float
+		prev_demod_out_f float64
 
 		/* This is used only for "9600" baud data. */
 
-		lfsr C.int // Descrambler shift register.
+		lfsr int // Descrambler shift register.
 
 		// This is for detecting phase lock to incoming signal.
 
-		good_flag C.int // Set if transition is near where expected,
+		good_flag int // Set if transition is near where expected,
 		// i.e. at a good time.
-		bad_flag C.int // Set if transition is not where expected,
+		bad_flag int // Set if transition is not where expected,
 		// i.e. at a bad time.
-		good_hist C.uchar // History of good transitions for past octet.
-		bad_hist  C.uchar // History of bad transitions for past octet.
-		score     C.uint  // History of whether good triumphs over bad
+		good_hist byte   // History of good transitions for past octet.
+		bad_hist  byte   // History of bad transitions for past octet.
+		score     uint32 // History of whether good triumphs over bad
 		// for past 32 symbols.
-		data_detect C.int // True when locked on to signal.
+		data_detect int // True when locked on to signal.
 
 	} // Actual number in use is num_slicers.
 	// Should be in range 1 .. MAX_SLICERS,
@@ -256,39 +256,39 @@ type demodulator_state_s struct {
 		//////////////////////////////////////////////////////////////////////////////////
 
 		afsk struct {
-			m_osc_phase C.uint // Phase for Mark local oscillator.
-			m_osc_delta C.uint // How much to change for each audio sample.
+			m_osc_phase uint // Phase for Mark local oscillator.
+			m_osc_delta uint // How much to change for each audio sample.
 
-			s_osc_phase C.uint // Phase for Space local oscillator.
-			s_osc_delta C.uint // How much to change for each audio sample.
+			s_osc_phase uint // Phase for Space local oscillator.
+			s_osc_delta uint // How much to change for each audio sample.
 
-			c_osc_phase C.uint // Phase for Center frequency local oscillator.
-			c_osc_delta C.uint // How much to change for each audio sample.
+			c_osc_phase uint // Phase for Center frequency local oscillator.
+			c_osc_delta uint // How much to change for each audio sample.
 
 			// Need two mixers for profile "A".
 
-			m_I_raw [MAX_FILTER_SIZE]C.float
-			m_Q_raw [MAX_FILTER_SIZE]C.float
+			m_I_raw [MAX_FILTER_SIZE]float64
+			m_Q_raw [MAX_FILTER_SIZE]float64
 
-			s_I_raw [MAX_FILTER_SIZE]C.float
-			s_Q_raw [MAX_FILTER_SIZE]C.float
+			s_I_raw [MAX_FILTER_SIZE]float64
+			s_Q_raw [MAX_FILTER_SIZE]float64
 
 			// Only need one mixer for profile "B".  Reuse the same storage?
 
 			//#define c_I_raw m_I_raw
 			//#define c_Q_raw m_Q_raw
-			c_I_raw [MAX_FILTER_SIZE]C.float
-			c_Q_raw [MAX_FILTER_SIZE]C.float
+			c_I_raw [MAX_FILTER_SIZE]float64
+			c_Q_raw [MAX_FILTER_SIZE]float64
 
-			use_rrc C.int // Use RRC rather than generic low pass.
+			use_rrc int // Use RRC rather than generic low pass.
 
-			rrc_width_sym C.float /* Width of RRC filter in number of symbols.  */
+			rrc_width_sym float64 /* Width of RRC filter in number of symbols.  */
 
-			rrc_rolloff C.float /* Rolloff factor for RRC.  Between 0 and 1. */
+			rrc_rolloff float64 /* Rolloff factor for RRC.  Between 0 and 1. */
 
-			prev_phase C.float // To see phase shift between samples for FM demod.
+			prev_phase float64 // To see phase shift between samples for FM demod.
 
-			normalize_rpsam C.float // Normalize to -1 to +1 for expected tones.
+			normalize_rpsam float64 // Normalize to -1 to +1 for expected tones.
 
 		}
 
@@ -302,45 +302,45 @@ type demodulator_state_s struct {
 		// Either switch to that or take out all the related stuff.
 
 		bb struct {
-			rrc_width_sym C.float /* Width of RRC filter in number of symbols. */
+			rrc_width_sym float64 /* Width of RRC filter in number of symbols. */
 
-			rrc_rolloff C.float /* Rolloff factor for RRC.  Between 0 and 1. */
+			rrc_rolloff float64 /* Rolloff factor for RRC.  Between 0 and 1. */
 
-			rrc_filter_taps C.int // Number of elements used in the next two.
+			rrc_filter_taps int // Number of elements used in the next two.
 
 			// FIXME: TODO: reevaluate max size needed.
 
-			audio_in [MAX_FILTER_SIZE]C.float
+			audio_in [MAX_FILTER_SIZE]float64
 
-			lp_filter [MAX_FILTER_SIZE]C.float
+			lp_filter [MAX_FILTER_SIZE]float64
 
 			// New in 1.7 - Polyphase filter to reduce CPU requirements.
 
-			lp_polyphase_1 [MAX_FILTER_SIZE]C.float
-			lp_polyphase_2 [MAX_FILTER_SIZE]C.float
-			lp_polyphase_3 [MAX_FILTER_SIZE]C.float
-			lp_polyphase_4 [MAX_FILTER_SIZE]C.float
+			lp_polyphase_1 [MAX_FILTER_SIZE]float64
+			lp_polyphase_2 [MAX_FILTER_SIZE]float64
+			lp_polyphase_3 [MAX_FILTER_SIZE]float64
+			lp_polyphase_4 [MAX_FILTER_SIZE]float64
 
-			lp_1_iir_param C.float // very low pass filters to get DC offset.
-			lp_1_out       C.float
+			lp_1_iir_param float64 // very low pass filters to get DC offset.
+			lp_1_out       float64
 
-			lp_2_iir_param C.float
-			lp_2_out       C.float
+			lp_2_iir_param float64
+			lp_2_out       float64
 
-			agc_1_fast_attack C.float // Signal envelope detection.
-			agc_1_slow_decay  C.float
-			agc_1_peak        C.float
-			agc_1_valley      C.float
+			agc_1_fast_attack float64 // Signal envelope detection.
+			agc_1_slow_decay  float64
+			agc_1_peak        float64
+			agc_1_valley      float64
 
-			agc_2_fast_attack C.float
-			agc_2_slow_decay  C.float
-			agc_2_peak        C.float
-			agc_2_valley      C.float
+			agc_2_fast_attack float64
+			agc_2_slow_decay  float64
+			agc_2_peak        float64
+			agc_2_valley      float64
 
-			agc_3_fast_attack C.float
-			agc_3_slow_decay  C.float
-			agc_3_peak        C.float
-			agc_3_valley      C.float
+			agc_3_fast_attack float64
+			agc_3_slow_decay  float64
+			agc_3_peak        float64
+			agc_3_valley      float64
 
 			// CIC low pass filters to detect DC bias or low frequency changes.
 			// IIR behaves like an analog R-C filter.
@@ -369,70 +369,70 @@ type demodulator_state_s struct {
 		psk struct {
 			v26_alt v26_e // Which alternative when V.26.
 
-			sin_table256 [256]C.float // Precomputed sin table for speed.
+			sin_table256 [256]float64 // Precomputed sin table for speed.
 
 			// Optional band pass pre-filter before phase detector.
 
 			// TODO? put back into common section?
 			// TODO? Why was I thinking that?
 
-			use_prefilter C.int // True to enable it.
+			use_prefilter int // True to enable it.
 
-			prefilter_baud C.float // Cutoff frequencies, as fraction of baud rate, beyond tones used.
+			prefilter_baud float64 // Cutoff frequencies, as fraction of baud rate, beyond tones used.
 			// In the case of PSK, we use only a single tone of 1800 Hz.
 			// If we were using 2400 bps (= 1200 baud), this would be
 			// the fraction of 1200 for the cutoff below and above 1800.
 
-			pre_filter_width_sym C.float /* Length in number of symbol times. */
+			pre_filter_width_sym float64 /* Length in number of symbol times. */
 
-			pre_filter_taps C.int /* Size of pre filter, in audio samples. */
+			pre_filter_taps int /* Size of pre filter, in audio samples. */
 
 			pre_window bp_window_t
 
-			audio_in   [MAX_FILTER_SIZE]C.float
-			pre_filter [MAX_FILTER_SIZE]C.float
+			audio_in   [MAX_FILTER_SIZE]float64
+			pre_filter [MAX_FILTER_SIZE]float64
 
 			// Use local oscillator or correlate with previous sample.
 
-			psk_use_lo C.int /* Use local oscillator rather than self correlation. */
+			psk_use_lo int /* Use local oscillator rather than self correlation. */
 
-			lo_step C.uint /* How much to advance the local oscillator */
+			lo_step uint /* How much to advance the local oscillator */
 			/* phase for each audio sample. */
 
-			lo_phase C.uint /* Local oscillator phase accumulator for PSK. */
+			lo_phase uint /* Local oscillator phase accumulator for PSK. */
 
 			// After mixing with LO before low pass filter.
 
-			I_raw [MAX_FILTER_SIZE]C.float
-			Q_raw [MAX_FILTER_SIZE]C.float
+			I_raw [MAX_FILTER_SIZE]float64
+			Q_raw [MAX_FILTER_SIZE]float64
 
 			// Number of delay line taps into previous symbol.
 			// They are one symbol period and + or - 45 degrees of the carrier frequency.
 
-			boffs C.int /* symbol length based on sample rate and baud. */
-			coffs C.int /* to get cos component of previous symbol. */
-			soffs C.int /* to get sin component of previous symbol. */
+			boffs int /* symbol length based on sample rate and baud. */
+			coffs int /* to get cos component of previous symbol. */
+			soffs int /* to get sin component of previous symbol. */
 
-			delay_line_width_sym C.float
-			delay_line_taps      C.int // In audio samples.
+			delay_line_width_sym float64
+			delay_line_taps      int // In audio samples.
 
-			delay_line [MAX_FILTER_SIZE]C.float
+			delay_line [MAX_FILTER_SIZE]float64
 
 			// Low pass filter Second is frequency as ratio to baud rate for FIR.
 
 			// TODO? put back into common section?
 			// TODO? What are the tradeoffs?
-			lpf_baud C.float /* Cutoff frequency as fraction of baud. */
+			lpf_baud float64 /* Cutoff frequency as fraction of baud. */
 			/* Intuitively we'd expect this to be somewhere */
 			/* in the range of 0.5 to 1. */
 
-			lp_filter_width_sym C.float /* Length in number of symbol times. */
+			lp_filter_width_sym float64 /* Length in number of symbol times. */
 
-			lp_filter_taps C.int /* Size of Low Pass filter, in audio samples (i.e. filter taps). */
+			lp_filter_taps int /* Size of Low Pass filter, in audio samples (i.e. filter taps). */
 
 			lp_window bp_window_t
 
-			lp_filter [MAX_FILTER_SIZE]C.float
+			lp_filter [MAX_FILTER_SIZE]float64
 		}
 	} // end of union for different demodulator types.
 

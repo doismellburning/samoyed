@@ -41,7 +41,7 @@ import (
  *
  *----------------------------------------------------------------*/
 
-func window(windowType bp_window_t, _size C.int, _j C.int) C.float {
+func window(windowType bp_window_t, _size int, _j int) float64 {
 
 	var size = float64(_size) // Save on a lot of casting later
 	var j = float64(_j)
@@ -74,7 +74,7 @@ func window(windowType bp_window_t, _size C.int, _j C.int) C.float {
 		w = 1.0
 	}
 
-	return C.float(w)
+	return w
 }
 
 /*------------------------------------------------------------------
@@ -94,7 +94,7 @@ func window(windowType bp_window_t, _size C.int, _j C.int) C.float {
  *
  *----------------------------------------------------------------*/
 
-func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype bp_window_t) {
+func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_window_t) {
 
 	/*
 		#if DEBUG1
@@ -107,15 +107,15 @@ func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype bp_wi
 
 	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
-	for j := C.int(0); j < filter_size; j++ {
-		var sinc C.float
+	for j := 0; j < filter_size; j++ {
+		var sinc float64
 
-		var center = 0.5 * C.float(filter_size-1)
+		var center = 0.5 * float64(filter_size-1)
 
-		if C.float(j)-center == 0 {
+		if float64(j)-center == 0 {
 			sinc = 2 * fc
 		} else {
-			sinc = C.float(math.Sin(2*math.Pi*float64(fc*(C.float(j)-center))) / (math.Pi * float64(C.float(j)-center)))
+			sinc = math.Sin(2*math.Pi*(fc*(float64(j)-center))) / (math.Pi * (float64(j) - center))
 		}
 
 		var shape = window(wtype, filter_size, j)
@@ -131,11 +131,11 @@ func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype bp_wi
 	/*
 	 * Normalize lowpass for unity gain at DC.
 	 */
-	var G C.float = 0
-	for j := C.int(0); j < filter_size; j++ {
+	var G float64 = 0
+	for j := 0; j < filter_size; j++ {
 		G += lp_filter[j]
 	}
-	for j := C.int(0); j < filter_size; j++ {
+	for j := 0; j < filter_size; j++ {
 		lp_filter[j] /= G
 	}
 } /* end gen_lowpass */
@@ -162,9 +162,9 @@ func gen_lowpass(fc C.float, lp_filter []C.float, filter_size C.int, wtype bp_wi
  *
  *----------------------------------------------------------------*/
 
-func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int, wtype bp_window_t) {
+func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, wtype bp_window_t) {
 
-	var center = 0.5 * C.float(filter_size-1)
+	var center = 0.5 * float64(filter_size-1)
 
 	/*
 		#if DEBUG1
@@ -177,14 +177,14 @@ func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int
 
 	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
-	for j := C.int(0); j < filter_size; j++ {
-		var sinc C.float
+	for j := 0; j < filter_size; j++ {
+		var sinc float64
 
-		if C.float(j)-center == 0 {
+		if float64(j)-center == 0 {
 			sinc = 2 * (f2 - f1)
 		} else {
-			sinc = C.float(math.Sin(2*math.Pi*float64(f2)*float64(C.float(j)-center))/(math.Pi*float64(C.float(j)-center)) -
-				math.Sin(2*math.Pi*float64(f1)*float64(C.float(j)-center))/(math.Pi*float64(C.float(j)-center)))
+			sinc = math.Sin(2*math.Pi*f2*(float64(j)-center))/(math.Pi*(float64(j)-center)) -
+				math.Sin(2*math.Pi*f1*(float64(j)-center))/(math.Pi*(float64(j)-center))
 		}
 
 		var shape = window(wtype, filter_size, j)
@@ -203,10 +203,10 @@ func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int
 	 * Instead compute gain in middle of passband.
 	 * See http://dsp.stackexchange.com/questions/4693/fir-filter-gain
 	 */
-	var w = 2 * math.Pi * float64(f1+f2) / 2
-	var G C.float = 0
-	for j := C.int(0); j < filter_size; j++ {
-		G += 2 * bp_filter[j] * C.float(math.Cos(float64(C.float(j)-center)*w)) // is this correct?
+	var w = 2 * math.Pi * (f1 + f2) / 2
+	var G float64 = 0
+	for j := 0; j < filter_size; j++ {
+		G += 2 * bp_filter[j] * math.Cos((float64(j)-center)*w) // is this correct?
 	}
 
 	/*
@@ -214,7 +214,7 @@ func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int
 			dw_printf ("Before normalizing, G=%.3f\n", G);
 		#endif
 	*/
-	for j := C.int(0); j < filter_size; j++ {
+	for j := 0; j < filter_size; j++ {
 		bp_filter[j] /= G
 	}
 
@@ -239,23 +239,23 @@ func gen_bandpass(f1 C.float, f2 C.float, bp_filter []C.float, filter_size C.int
  *
  *----------------------------------------------------------------*/
 
-func gen_ms(fc C.int, sps C.int, sin_table []C.float, cos_table []C.float, filter_size C.int, wtype bp_window_t) {
+func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_size int, wtype bp_window_t) {
 
-	var Gs C.float = 0
-	var Gc C.float = 0
+	var Gs float64 = 0
+	var Gc float64 = 0
 
-	for j := C.int(0); j < filter_size; j++ {
+	for j := 0; j < filter_size; j++ {
 
-		var center = 0.5 * C.float(filter_size-1)
-		var am = ((C.float)(C.float(j)-center) / (C.float)(sps)) * ((C.float)(fc)) * (2.0 * (C.float)(math.Pi))
+		var center = 0.5 * float64(filter_size-1)
+		var am = ((float64(j) - center) / (float64)(sps)) * (float64(fc)) * (2.0 * (math.Pi))
 
 		var shape = window(wtype, filter_size, j)
 
-		sin_table[j] = C.float(math.Sin(float64(am))) * shape
-		cos_table[j] = C.float(math.Cos(float64(am))) * shape
+		sin_table[j] = math.Sin(float64(am)) * shape
+		cos_table[j] = math.Cos(float64(am)) * shape
 
-		Gs += sin_table[j] * C.float(math.Sin(float64(am)))
-		Gc += cos_table[j] * C.float(math.Cos(float64(am)))
+		Gs += sin_table[j] * math.Sin(float64(am))
+		Gc += cos_table[j] * math.Cos(float64(am))
 
 		/*
 			#if DEBUG1
@@ -273,7 +273,7 @@ func gen_ms(fc C.int, sps C.int, sin_table []C.float, cos_table []C.float, filte
 
 	   #endif
 	*/
-	for j := C.int(0); j < filter_size; j++ {
+	for j := 0; j < filter_size; j++ {
 		sin_table[j] /= Gs
 		cos_table[j] /= Gc
 	}
@@ -298,20 +298,20 @@ func gen_ms(fc C.int, sps C.int, sin_table []C.float, cos_table []C.float, filte
  *
  *----------------------------------------------------------------*/
 
-func rrc(t C.float, a C.float) C.float {
+func rrc(t float64, a float64) float64 {
 
-	var sinc, window, result C.float
+	var sinc, window, result float64
 
 	if t > -0.001 && t < 0.001 {
 		sinc = 1
 	} else {
-		sinc = C.float(math.Sin(math.Pi*float64(t)) / (math.Pi * float64(t)))
+		sinc = math.Sin(math.Pi*t) / (math.Pi * t)
 	}
 
-	if math.Abs(float64(a*t)) > 0.499 && math.Abs(float64(a*t)) < 0.501 {
-		window = C.float(math.Pi / 4)
+	if math.Abs(a*t) > 0.499 && math.Abs(a*t) < 0.501 {
+		window = math.Pi / 4
 	} else {
-		window = C.float(math.Cos(math.Pi*float64(a)*float64(t)) / (1 - math.Pow(2*float64(a)*float64(t), 2)))
+		window = math.Cos(math.Pi*float64(a)*float64(t)) / (1 - math.Pow(2*float64(a)*float64(t), 2))
 		// This made nicer looking waveforms for generating signal.
 		//window = math.Cos(math.Pi * a * t);
 
@@ -340,21 +340,21 @@ func rrc(t C.float, a C.float) C.float {
 
 // The Root Raised Cosine (RRC) low pass filter is suppposed to minimize Intersymbol Interference (ISI).
 
-func gen_rrc_lowpass(pfilter []C.float, filter_taps C.int, rolloff C.float, samples_per_symbol C.float) {
-	var t C.float
+func gen_rrc_lowpass(pfilter []float64, filter_taps int, rolloff float64, samples_per_symbol float64) {
+	var t float64
 
-	for k := C.int(0); k < filter_taps; k++ {
-		t = (C.float(k) - ((C.float(filter_taps) - 1.0) / 2.0)) / samples_per_symbol
+	for k := 0; k < filter_taps; k++ {
+		t = (float64(k) - ((float64(filter_taps) - 1.0) / 2.0)) / samples_per_symbol
 		pfilter[k] = rrc(t, rolloff)
 	}
 
 	// Scale it for unity gain.
 
 	t = 0
-	for k := C.int(0); k < filter_taps; k++ {
+	for k := 0; k < filter_taps; k++ {
 		t += pfilter[k]
 	}
-	for k := C.int(0); k < filter_taps; k++ {
+	for k := 0; k < filter_taps; k++ {
 		pfilter[k] /= t
 	}
 }

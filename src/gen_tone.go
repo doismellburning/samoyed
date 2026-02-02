@@ -131,7 +131,7 @@ func gen_tone_init(audio_config_p *audio_s, amp C.int, gen_packets C.int) C.int 
 
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 
-			var a = ACHAN2ADEV(channel)
+			var a = ACHAN2ADEV(int(channel))
 
 			/* TODO KG
 			#if DEBUG
@@ -324,7 +324,7 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 
 func tone_gen_put_bit_real(channel int, dat int) {
 
-	var a = ACHAN2ADEV(C.int(channel)) /* device for channel. */
+	var a = C.int(ACHAN2ADEV(channel)) /* device for channel. */
 
 	Assert(save_audio_config_p != nil)
 
@@ -621,7 +621,7 @@ func gen_tone_put_sample(channel C.int, a C.int, sam C.int) {
 
 func gen_tone_put_quiet_ms(channel C.int, time_ms C.int) {
 
-	var a = ACHAN2ADEV(channel) /* device for channel. */
+	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
 	var sam C.int = 0
 
 	var nsamples = C.int((float64(time_ms) * float64(save_audio_config_p.adev[a].samples_per_sec) / 1000.) + 0.5)

@@ -381,15 +381,15 @@ a good modem here and providing a result when it is received.
  *
  ***********************************************************************************/
 
-var dummyll C.int64_t
-var dummy C.int
+var dummyll int64
+var dummy int
 
-func hdlc_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, is_scrambled bool, not_used_remove C.int) {
+func hdlc_rec_bit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
 	hdlc_rec_bit_new(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
 }
 
-func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, is_scrambled bool, not_used_remove C.int,
-	pll_nudge_total *C.int64_t, pll_symbol_count *C.int) {
+func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
+	pll_nudge_total *int64, pll_symbol_count *int) {
 
 	var raw = _raw != 0
 
@@ -417,7 +417,7 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 	// EAS does not use HDLC.
 
 	if g_audio_p.achan[channel].modem_type == MODEM_EAS {
-		eas_rec_bit(channel, subchannel, slice, C.int(IfThenElse(raw, 1, 0)), not_used_remove)
+		eas_rec_bit(C.int(channel), C.int(subchannel), C.int(slice), C.int(IfThenElse(raw, 1, 0)), C.int(not_used_remove))
 		return
 	}
 
@@ -449,8 +449,8 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
 	if g_audio_p.achan[channel].modem_type != MODEM_AIS {
-		fx25_rec_bit(channel, subchannel, slice, C.int(IfThenElse(dbit, 1, 0)))
-		il2p_rec_bit(channel, subchannel, slice, C.int(IfThenElse(raw, 1, 0))) // Note: skip NRZI.
+		fx25_rec_bit(C.int(channel), C.int(subchannel), C.int(slice), C.int(IfThenElse(dbit, 1, 0)))
+		il2p_rec_bit(C.int(channel), C.int(subchannel), C.int(slice), C.int(IfThenElse(raw, 1, 0))) // Note: skip NRZI.
 	}
 
 	/*
@@ -567,14 +567,14 @@ func hdlc_rec_bit_new(channel C.int, subchannel C.int, slice C.int, _raw C.int, 
 			}
 			rrbb_set_speed_error(H.rrbb, speed_error)
 
-			var alevel = demod_get_audio_level(channel, subchannel)
+			var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
 
 			rrbb_set_audio_level(H.rrbb, alevel)
 			hdlc_rec2_block(H.rrbb)
 			/* Now owned by someone else who will free it. */
 			H.rrbb = nil
 
-			H.rrbb = rrbb_new(channel, subchannel, slice, is_scrambled, H.lfsr, H.prev_descram) /* Allocate a new one. */
+			H.rrbb = rrbb_new(C.int(channel), C.int(subchannel), C.int(slice), is_scrambled, H.lfsr, H.prev_descram) /* Allocate a new one. */
 		} else {
 
 			//JWL - start of frame

@@ -541,7 +541,7 @@ o = DCD output control
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
 
-				var audio_sample = demod_get_sample(ACHAN2ADEV(C.int(c)))
+				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
 
 				if audio_sample >= 256*256 {
 					e_o_f = true
@@ -559,7 +559,7 @@ o = DCD output control
 					continue
 				}
 
-				multi_modem_process_sample(C.int(c), audio_sample)
+				multi_modem_process_sample(C.int(c), C.int(audio_sample))
 			}
 
 			/* When a complete frame is accumulated, */

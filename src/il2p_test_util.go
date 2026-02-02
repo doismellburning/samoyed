@@ -80,6 +80,6 @@ func demod_get_audio_level(channel C.int, subchannel C.int) alevel_t {
 	if IL2P_TEST {
 		return demod_get_audio_level_fake(channel, subchannel)
 	} else {
-		return demod_get_audio_level_real(channel, subchannel)
+		return demod_get_audio_level_real(int(channel), int(subchannel))
 	}
 }

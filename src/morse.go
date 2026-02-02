@@ -206,7 +206,7 @@ func morse_send(channel C.int, str string, wpm C.int, txdelay C.int, txtail C.in
 		dw_printf("morse: Internal error.  Inconsistent length, %d vs. %d calculated.\n", time_units, morse_units_str(str))
 	}
 
-	audio_flush(ACHAN2ADEV(channel))
+	audio_flush(C.int(ACHAN2ADEV(int(channel))))
 
 	return (txdelay + C.int(TIME_UNITS_TO_MS(time_units, wpm)+0.5) + txtail)
 
@@ -235,7 +235,7 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 	#else
 	*/
 
-	var a = ACHAN2ADEV(channel) /* device for channel. */
+	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
@@ -285,7 +285,7 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
 		}
 	#else
 	*/
-	var a = ACHAN2ADEV(channel) /* device for channel. */
+	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
 	var sam C.int = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
@@ -323,7 +323,7 @@ func morse_quiet_ms(channel C.int, ms C.int) {
 	#if MTEST1
 	#else
 	*/
-	var a = ACHAN2ADEV(channel) /* device for channel. */
+	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
 	var sam C.int = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {

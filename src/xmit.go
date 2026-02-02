@@ -466,7 +466,7 @@ func xmit_thread(channel C.int) {
 
 					// Corresponding lock is in wait_for_clear_channel.
 
-					audio_out_dev_mutex[ACHAN2ADEV(channel)].Unlock()
+					audio_out_dev_mutex[ACHAN2ADEV(int(channel))].Unlock()
 				} else {
 					/*
 					 * Timeout waiting for clear channel.
@@ -727,7 +727,7 @@ func xmit_ax25_frames(channel C.int, prio C.int, pp *packet_t, max_bundle C.int)
 	 * about 40 mS of elapsed real time.
 	 */
 
-	audio_wait(ACHAN2ADEV(channel))
+	audio_wait(C.int(ACHAN2ADEV(int(channel))))
 
 	/*
 	 * Ideally we should be here just about the time when the audio is ending.
@@ -1217,7 +1217,7 @@ func wait_for_clear_channel(channel C.int, slottime C.int, persist C.int, fulldu
 
 	// TODO: review this.
 
-	for !audio_out_dev_mutex[ACHAN2ADEV(channel)].TryLock() {
+	for !audio_out_dev_mutex[ACHAN2ADEV(int(channel))].TryLock() {
 		SLEEP_MS(WAIT_CHECK_EVERY_MS)
 		n++
 		if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {

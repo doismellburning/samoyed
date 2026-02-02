@@ -22,7 +22,7 @@ func exit(x int) {
 }
 
 // #define ACHAN2ADEV(n) ((n)>>1)
-func ACHAN2ADEV(n C.int) C.int {
+func ACHAN2ADEV(n int) int {
 	return n >> 1
 }
 
