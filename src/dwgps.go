@@ -28,15 +28,9 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <time.h>
-import "C"
-
 import (
 	"sync"
+	"time"
 )
 
 /*
@@ -64,13 +58,13 @@ const (
 )
 
 type dwgps_info_t struct {
-	timestamp   C.time_t /* When last updated.  System time. */
-	fix         dwfix_t  /* Quality of position fix. */
-	dlat        C.double /* Latitude.  Valid if fix >= 2. */
-	dlon        C.double /* Longitude. Valid if fix >= 2. */
-	speed_knots C.float  /* libgps uses meters/sec but we use GPS usual knots. */
-	track       C.float  /* What is difference between track and course? */
-	altitude    C.float  /* meters above mean sea level. Valid if fix == 3. */
+	timestamp   time.Time /* When last updated.  System time. */
+	fix         dwfix_t   /* Quality of position fix. */
+	dlat        float64   /* Latitude.  Valid if fix >= 2. */
+	dlon        float64   /* Longitude. Valid if fix >= 2. */
+	speed_knots float64   /* libgps uses meters/sec but we use GPS usual knots. */
+	track       float64   /* What is difference between track and course? */
+	altitude    float64   /* meters above mean sea level. Valid if fix == 3. */
 }
 
 var s_dwgps_debug = 0 /* Enable debug output. */
@@ -140,7 +134,7 @@ func dwgps_init(pconfig *misc_config_s, debug int) {
  *--------------------------------------------------------------------*/
 
 func dwgps_clear(gpsinfo *dwgps_info_t) {
-	gpsinfo.timestamp = 0
+	gpsinfo.timestamp = time.Time{}
 	gpsinfo.fix = DWFIX_NOT_SEEN
 	gpsinfo.dlat = G_UNKNOWN
 	gpsinfo.dlon = G_UNKNOWN
@@ -172,7 +166,7 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
 
 	if s_dwgps_debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print(C.CString("gps_read: "), gpsinfo)
+		dwgps_print("gps_read: ", gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
@@ -194,11 +188,11 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_print(msg *C.char, gpsinfo *dwgps_info_t) {
+func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
 
-	dw_printf("%stime=%d fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
-		C.GoString(msg),
-		gpsinfo.timestamp, gpsinfo.fix,
+	dw_printf("%stime=%s fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
+		msg,
+		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
 		gpsinfo.dlat, gpsinfo.dlon,
 		gpsinfo.track, gpsinfo.speed_knots,
 		gpsinfo.altitude)

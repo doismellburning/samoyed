@@ -38,6 +38,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/term"
 )
@@ -165,7 +166,7 @@ func read_gpsnmea_thread(fd *term.Term) {
 	info.fix = DWFIX_NOT_SEEN /* clear not init state. */
 	if s_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print(C.CString("GPSNMEA: "), info)
+		dwgps_print("GPSNMEA: ", info)
 	}
 	dwgps_set_data(info)
 
@@ -188,7 +189,7 @@ func read_gpsnmea_thread(fd *term.Term) {
 			info.fix = DWFIX_ERROR
 			if s_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
-				dwgps_print(C.CString("GPSNMEA: "), info)
+				dwgps_print("GPSNMEA: ", info)
 			}
 			dwgps_set_data(info)
 
@@ -222,19 +223,33 @@ func read_gpsnmea_thread(fd *term.Term) {
 					// Fix and location will be updated by GxGGA.
 
 					var ignore_dlat, ignore_dlon C.double
+					var speed_knots C.float = G_UNKNOWN
+					var track C.float = G_UNKNOWN
 
-					var f = dwgpsnmea_gprmc(C.CString(gps_msg), 0, &ignore_dlat, &ignore_dlon, &info.speed_knots, &info.track)
+					var f = dwgpsnmea_gprmc(C.CString(gps_msg), 0, &ignore_dlat, &ignore_dlon, &speed_knots, &track)
 
 					if f == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
 						dw_printf("%s\n", gps_msg)
+					} else {
+						if speed_knots != G_UNKNOWN {
+							info.speed_knots = float64(speed_knots)
+						}
+
+						if track != G_UNKNOWN {
+							info.track = float64(track)
+						}
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
 					var nsat C.int
 
-					var f = dwgpsnmea_gpgga(C.CString(gps_msg), 0, &info.dlat, &info.dlon, &info.altitude, &nsat)
+					var dlat C.double = G_UNKNOWN
+					var dlon C.double = G_UNKNOWN
+					var altitude C.float = G_UNKNOWN
+
+					var f = dwgpsnmea_gpgga(C.CString(gps_msg), 0, &dlat, &dlon, &altitude, &nsat)
 
 					if f == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
@@ -242,6 +257,16 @@ func read_gpsnmea_thread(fd *term.Term) {
 						dw_printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
+						if dlat != G_UNKNOWN {
+							info.dlat = float64(dlat)
+						}
+						if dlon != G_UNKNOWN {
+							info.dlon = float64(dlon)
+						}
+						if altitude != G_UNKNOWN {
+							info.altitude = float64(altitude)
+						}
+
 						if f != info.fix { // Print change in location fix.
 							text_color_set(DW_COLOR_INFO)
 							if f == DWFIX_NO_FIX {
@@ -255,10 +280,10 @@ func read_gpsnmea_thread(fd *term.Term) {
 							}
 							info.fix = f
 						}
-						info.timestamp = C.time(nil)
+						info.timestamp = time.Now()
 						if s_debug >= 2 {
 							text_color_set(DW_COLOR_DEBUG)
-							dwgps_print(C.CString("GPSNMEA: "), info)
+							dwgps_print("GPSNMEA: ", info)
 						}
 						dwgps_set_data(info)
 					}
