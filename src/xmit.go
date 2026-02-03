@@ -1024,7 +1024,7 @@ func xmit_morse(c C.int, pp *packet_t, wpm C.int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = morse_send(c, string(pinfo), wpm, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
+	var _length_ms = morse_send(int(c), string(pinfo), int(wpm), int(max(xmit_txdelay[c]*10, 300)), int(max(xmit_txtail[c]*10, 250)))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
