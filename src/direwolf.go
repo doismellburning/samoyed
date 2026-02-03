@@ -603,7 +603,7 @@ x = Silence FX.25 information.`)
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	gen_tone_init(audio_config, audio_amplitude, 0)
+	gen_tone_init(audio_config, audio_amplitude, false)
 	morse_init(audio_config, audio_amplitude)
 
 	if !(audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16) { //nolint:staticcheck

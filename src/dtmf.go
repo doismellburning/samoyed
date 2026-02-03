@@ -478,8 +478,8 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 			// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
 			// Amplitude of 100 would use full +-32k range.
 
-			var sam = C.int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
-			gen_tone_put_sample(C.int(channel), C.int(ACHAN2ADEV(channel)), sam)
+			var sam = int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
+			gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
 		}
 	}
 }
