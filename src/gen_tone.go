@@ -548,7 +548,9 @@ func tone_gen_put_bit_real(channel int, dat int) {
 
 } /* end tone_gen_put_bit */
 
-func gen_tone_put_sample(channel C.int, a C.int, sam C.int) {
+func gen_tone_put_sample(channel C.int, _a C.int, sam C.int) {
+
+	var a = int(_a)
 
 	/* Ship out an audio sample. */
 	/* 16 bit is signed, little endian, range -32768 .. +32767 */
@@ -580,23 +582,23 @@ func gen_tone_put_sample(channel C.int, a C.int, sam C.int) {
 		/* Mono */
 
 		if save_audio_config_p.adev[a].bits_per_sample == 8 {
-			audio_put(a, ((sam+32768)>>8)&0xff)
+			audio_put(a, uint8(((sam+32768)>>8)&0xff))
 		} else {
-			audio_put(a, sam&0xff)
-			audio_put(a, (sam>>8)&0xff)
+			audio_put(a, uint8(sam&0xff))
+			audio_put(a, uint8((sam>>8)&0xff))
 		}
 	} else {
 
-		if channel == C.int(ADEVFIRSTCHAN(int(a))) {
+		if channel == C.int(ADEVFIRSTCHAN(a)) {
 
 			/* Stereo, left channel. */
 
 			if save_audio_config_p.adev[a].bits_per_sample == 8 {
-				audio_put(a, ((sam+32768)>>8)&0xff)
+				audio_put(a, uint8(((sam+32768)>>8)&0xff))
 				audio_put(a, 0)
 			} else {
-				audio_put(a, sam&0xff)
-				audio_put(a, (sam>>8)&0xff)
+				audio_put(a, uint8(sam&0xff))
+				audio_put(a, uint8((sam>>8)&0xff))
 
 				audio_put(a, 0)
 				audio_put(a, 0)
@@ -607,13 +609,13 @@ func gen_tone_put_sample(channel C.int, a C.int, sam C.int) {
 
 			if save_audio_config_p.adev[a].bits_per_sample == 8 {
 				audio_put(a, 0)
-				audio_put(a, ((sam+32768)>>8)&0xff)
+				audio_put(a, uint8(((sam+32768)>>8)&0xff))
 			} else {
 				audio_put(a, 0)
 				audio_put(a, 0)
 
-				audio_put(a, sam&0xff)
-				audio_put(a, (sam>>8)&0xff)
+				audio_put(a, uint8(sam&0xff))
+				audio_put(a, uint8((sam>>8)&0xff))
 			}
 		}
 	}

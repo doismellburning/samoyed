@@ -73,19 +73,19 @@ import (
 )
 
 type wav_header struct { /* .WAV file header. */
-	riff            [4]C.char /* "RIFF" */
-	filesize        C.int     /* file length - 8 */
-	wave            [4]C.char /* "WAVE" */
-	fmt             [4]C.char /* "fmt " */
-	fmtsize         C.int     /* 16. */
-	wformattag      C.short   /* 1 for PCM. */
-	nchannels       C.short   /* 1 for mono, 2 for stereo. */
-	nsamplespersec  C.int     /* sampling freq, Hz. */
-	navgbytespersec C.int     /* = nblockalign * nsamplespersec. */
-	nblockalign     C.short   /* = wbitspersample / 8 * nchannels. */
-	wbitspersample  C.short   /* 16 or 8. */
-	data            [4]C.char /* "data" */
-	datasize        C.int     /* number of bytes following. */
+	riff            [4]byte /* "RIFF" */
+	filesize        int32   /* file length - 8 */
+	wave            [4]byte /* "WAVE" */
+	fmt             [4]byte /* "fmt " */
+	fmtsize         int32   /* 16. */
+	wformattag      int16   /* 1 for PCM. */
+	nchannels       int16   /* 1 for mono, 2 for stereo. */
+	nsamplespersec  int32   /* sampling freq, Hz. */
+	navgbytespersec int32   /* = nblockalign * nsamplespersec. */
+	nblockalign     int16   /* = wbitspersample / 8 * nchannels. */
+	wbitspersample  int16   /* 16 or 8. */
+	data            [4]byte /* "data" */
+	datasize        int32   /* number of bytes following. */
 }
 
 const MY_RAND_MAX = 0x7fffffff
@@ -95,11 +95,11 @@ var GEN_PACKETS = false // Switch between fakes and reals at runtime
 var modem audio_s
 var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
-var g_noise_level C.float = 0
+var g_noise_level float64 = 0
 
 var out_fp *os.File
 
-var byte_count C.int /* Number of data bytes written to file. Will be written to header when file is closed. */
+var byte_count int /* Number of data bytes written to file. Will be written to header when file is closed. */
 
 var gen_header wav_header
 
@@ -569,19 +569,19 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		for i := 1; i <= packet_count; i++ {
 			if modem.achan[0].baud < 600 {
 				/* e.g. 300 bps AFSK - About 2/3 should be decoded properly. */
-				g_noise_level = C.float(float64(*amplitude) * .0048 * (float64(i) / float64(packet_count)))
+				g_noise_level = float64(*amplitude) * .0048 * (float64(i) / float64(packet_count))
 			} else if modem.achan[0].baud < 1800 {
 				/* e.g. 1200 bps AFSK - About 2/3 should be decoded properly. */
-				g_noise_level = C.float(float64(*amplitude) * .0023 * (float64(i) / float64(packet_count)))
+				g_noise_level = float64(*amplitude) * .0023 * (float64(i) / float64(packet_count))
 			} else if modem.achan[0].baud < 3600 {
 				/* e.g. 2400 bps QPSK - T.B.D. */
-				g_noise_level = C.float(float64(*amplitude) * .0015 * (float64(i) / float64(packet_count)))
+				g_noise_level = float64(*amplitude) * .0015 * (float64(i) / float64(packet_count))
 			} else if modem.achan[0].baud < 7200 {
 				/* e.g. 4800 bps - T.B.D. */
-				g_noise_level = C.float(float64(*amplitude) * .0007 * (float64(i) / float64(packet_count)))
+				g_noise_level = float64(*amplitude) * .0007 * (float64(i) / float64(packet_count))
 			} else {
 				/* e.g. 9600 */
-				g_noise_level = C.float(0.33 * (float64(*amplitude) / 200.0) * (float64(i) / float64(packet_count)))
+				g_noise_level = 0.33 * (float64(*amplitude) / 200.0) * (float64(i) / float64(packet_count))
 				// temp test
 				// g_noise_level = 0.20 * (amplitude / 200.0) * (float64(i) / float64(packet_count));
 			}
@@ -679,12 +679,12 @@ func audio_file_open(fname string, pa *audio_s) int {
 	gen_header.fmtsize = 16   // Always 16.
 	gen_header.wformattag = 1 // 1 for PCM.
 
-	gen_header.nchannels = C.short(pa.adev[0].num_channels)
-	gen_header.nsamplespersec = C.int(pa.adev[0].samples_per_sec)
-	gen_header.wbitspersample = C.short(pa.adev[0].bits_per_sample)
+	gen_header.nchannels = int16(pa.adev[0].num_channels)
+	gen_header.nsamplespersec = int32(pa.adev[0].samples_per_sec)
+	gen_header.wbitspersample = int16(pa.adev[0].bits_per_sample)
 
 	gen_header.nblockalign = gen_header.wbitspersample / 8 * gen_header.nchannels
-	gen_header.navgbytespersec = C.int(gen_header.nblockalign) * gen_header.nsamplespersec
+	gen_header.navgbytespersec = int32(gen_header.nblockalign) * gen_header.nsamplespersec
 	// C.memcpy(unsafe.Pointer(&gen_header.data[0]), unsafe.Pointer(C.CString("data")), 4)
 	gen_header.data[0] = 'd'
 	gen_header.data[1] = 'a'
@@ -733,8 +733,8 @@ func audio_file_close() int {
 	/*
 	 * Go back and fix up lengths in header.
 	 */
-	gen_header.filesize = byte_count + C.int(binary.Size(new(wav_header))) - 8
-	gen_header.datasize = byte_count
+	gen_header.filesize = int32(byte_count + binary.Size(new(wav_header)) - 8)
+	gen_header.datasize = int32(byte_count)
 
 	if out_fp == nil {
 		return (-1)
@@ -864,24 +864,24 @@ func send_packet(str string) {
 
 var sample16 int16
 
-func audio_put_fake(a C.int, c C.int) C.int {
+func audio_put_fake(a int, c uint8) int {
 
 	if g_add_noise {
 		if (byte_count & 1) == 0 {
-			sample16 = int16(c) & 0xff /* save lower byte. */
+			sample16 = int16(c) /* save lower byte. */
 			byte_count++
-			return c
+			return int(c)
 		} else {
-			sample16 |= int16((c << 8) & 0xff00) /* insert upper byte. */
+			sample16 |= int16(c) << 8 /* insert upper byte. */
 			byte_count++
-			var s = C.int(sample16) // sign extend.
+			var s = int32(sample16) // sign extend.
 
 			/* Add random noise to the signal. */
 			/* r should be in range of -1 .. +1. */
 
 			var r = (float64(genPacketsRand()) - float64(MY_RAND_MAX)/2.0) / (float64(MY_RAND_MAX) / 2.0)
 
-			s += C.int(5 * C.float(r) * g_noise_level * C.float(32767))
+			s += int32(5 * r * g_noise_level * 32767)
 
 			if s > 32767 {
 				s = 32767
@@ -894,47 +894,47 @@ func audio_put_fake(a C.int, c C.int) C.int {
 			if writeErr != nil {
 				return -1
 			}
-			return C.int(n)
+			return n
 		}
 	} else {
 		byte_count++
-		var n, writeErr = out_fp.Write([]byte{byte(c)})
+		var n, writeErr = out_fp.Write([]byte{c})
 		if writeErr != nil {
 			return -1
 		}
-		return C.int(n)
+		return n
 	}
 
 } /* end audio_put */
 
-func audio_put(a C.int, c C.int) C.int {
+func audio_put(a int, c uint8) int {
 	if GEN_PACKETS {
 		return audio_put_fake(a, c)
 	} else {
-		return audio_put_real(a, c)
+		return int(audio_put_real(C.int(a), C.int(c)))
 	}
 }
 
-func audio_flush_fake(a C.int) C.int {
+func audio_flush_fake(a int) int {
 	return 0
 }
 
-func audio_flush(a C.int) C.int {
+func audio_flush(a int) int {
 	if GEN_PACKETS {
 		return audio_flush_fake(a)
 	} else {
-		return audio_flush_real(a)
+		return int(audio_flush_real(C.int(a)))
 	}
 }
 
 // To keep dtmf.c happy.
-func dcd_change_fake(channel C.int, subchan C.int, slice C.int, state C.int) {
+func dcd_change_fake(channel int, subchan int, slice int, state int) {
 }
 
-func dcd_change(channel C.int, subchan C.int, slice C.int, state C.int) {
+func dcd_change(channel int, subchan int, slice int, state int) {
 	if GEN_PACKETS {
 		dcd_change_fake(channel, subchan, slice, state)
 	} else {
-		dcd_change_real(channel, subchan, slice, state)
+		dcd_change_real(C.int(channel), C.int(subchan), C.int(slice), C.int(state))
 	}
 }

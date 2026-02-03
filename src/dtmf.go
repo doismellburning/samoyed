@@ -264,11 +264,11 @@ func dtmf_sample(c int, input float64) rune {
 			D.debounced = decoded
 
 			// Update Data Carrier Detect Indicator.
-			var _tmpIntBool C.int = 0
+			var _tmpIntBool = 0
 			if decoded != ' ' {
 				_tmpIntBool = 1
 			}
-			dcd_change(C.int(c), MAX_SUBCHANS, 0, _tmpIntBool)
+			dcd_change(c, MAX_SUBCHANS, 0, _tmpIntBool)
 
 			/* Reset timeout timer. */
 			if decoded != ' ' {
@@ -343,7 +343,7 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
 
 	push_button(channel, ' ', txtail)
 
-	audio_flush(C.int(ACHAN2ADEV(channel)))
+	audio_flush(ACHAN2ADEV(channel))
 
 	return (txdelay +
 		int(1000.0*float64(len(str))/float64(speed)+0.5) +

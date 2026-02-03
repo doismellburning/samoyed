@@ -1761,7 +1761,7 @@ func audio_put_real(a C.int, c C.int) C.int {
 	adev[a].outbuf_len++
 
 	if adev[a].outbuf_len == adev[a].outbuf_size_in_bytes {
-		return (audio_flush(a))
+		return C.int(audio_flush(int(a)))
 	}
 
 	return (0)
@@ -1991,7 +1991,7 @@ func audio_flush_real(a C.int) C.int {
 
 func audio_wait(a C.int) {
 
-	audio_flush(a)
+	audio_flush(int(a))
 
 	// TODO KG #if USE_ALSA
 
