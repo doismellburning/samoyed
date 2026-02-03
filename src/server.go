@@ -165,13 +165,13 @@ var enable_send_monitor_to_client [MAX_NET_CLIENTS]bool
  *
  *--------------------------------------------------------------------*/
 
-var debug_client C.int = 0 /* Debug option: Print information flowing from and to client. */
+var debug_client int = 0 /* Debug option: Print information flowing from and to client. */
 
-func server_set_debug(n C.int) {
+func server_set_debug(n int) {
 	debug_client = n
 }
 
-func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEMessage) {
+func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
 
 	var direction, datakind string
 
@@ -334,7 +334,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	 * Currently we start up a separate thread for each potential connection.
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 		go cmd_listen_thread(client)
 	}
 }
@@ -451,12 +451,12 @@ func server_connect_listen_thread(server_port int) {
  *
  *--------------------------------------------------------------------*/
 
-func server_send_rec_packet(channel C.int, pp *packet_t, fbuf []byte) {
+func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
 
 	/*
 	 * RAW format
 	 */
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 
 		if enable_send_raw_to_client[client] && client_sock[client] != nil {
 
@@ -503,7 +503,7 @@ func server_send_rec_packet(channel C.int, pp *packet_t, fbuf []byte) {
 
 } /* end server_send_rec_packet */
 
-func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
+func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 	/*
 	 * MONITOR format - 	'I' for information frames.
 	 *			'U' for unnumbered information.
@@ -512,7 +512,7 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 	 *			'T' for own transmitted frames.
 	 */
 
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 		if enable_send_monitor_to_client[client] && client_sock[client] != nil {
 			var agwpe_msg = new(AGWPEMessage)
 
@@ -614,7 +614,7 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 // I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
 // rather than continuing to propagate historical inconsistencies.
 
-func mon_addrs(channel C.int, pp *packet_t) []byte {
+func mon_addrs(channel int, pp *packet_t) []byte {
 
 	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
@@ -754,7 +754,7 @@ func mon_desc(pp *packet_t) (byte, string) {
  *
  *--------------------------------------------------------------------*/
 
-func server_link_established(channel C.int, client C.int, remote_call *C.char, own_call *C.char, incoming C.int) {
+func server_link_established(channel int, client int, remote_call string, own_call string, incoming bool) {
 
 	var reply = new(AGWPEMessage)
 
@@ -768,10 +768,10 @@ func server_link_established(channel C.int, client C.int, remote_call *C.char, o
 
 	if incoming > 0 {
 		// Other end initiated the connection.
-		reply.Data = []byte(fmt.Sprintf("*** CONNECTED To Station %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** CONNECTED To Station %s\r", remote_call))
 	} else {
 		// We started the connection.
-		reply.Data = []byte(fmt.Sprintf("*** CONNECTED With Station %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** CONNECTED With Station %s\r", remote_call))
 	}
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
@@ -804,7 +804,7 @@ func server_link_established(channel C.int, client C.int, remote_call *C.char, o
  *
  *--------------------------------------------------------------------*/
 
-func server_link_terminated(channel C.int, client C.int, remote_call *C.char, own_call *C.char, timeout C.int) {
+func server_link_terminated(channel int, client int, remote_call string, own_call string, timeout bool) {
 
 	var reply = new(AGWPEMessage)
 
@@ -814,9 +814,9 @@ func server_link_terminated(channel C.int, client C.int, remote_call *C.char, ow
 	copy(reply.Header.CallTo[:], C.GoBytes(unsafe.Pointer(own_call), C.int(C.strlen(own_call))))
 
 	if timeout > 0 {
-		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED RETRYOUT With %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED RETRYOUT With %s\r", remote_call))
 	} else {
-		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED From Station %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED From Station %s\r", remote_call))
 	}
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
@@ -849,7 +849,7 @@ func server_link_terminated(channel C.int, client C.int, remote_call *C.char, ow
  *
  *--------------------------------------------------------------------*/
 
-func server_rec_conn_data(channel C.int, client C.int, remote_call *C.char, own_call *C.char, pid C.int, data_ptr *C.char, data_len C.int) {
+func server_rec_conn_data(channel int, client int, remote_call string, own_call string, pid int, data_ptr *C.char, data_len C.int) {
 
 	var reply = new(AGWPEMessage)
 
@@ -896,7 +896,7 @@ func server_rec_conn_data(channel C.int, client C.int, remote_call *C.char, own_
  *
  *--------------------------------------------------------------------*/
 
-func server_outstanding_frames_reply(channel C.int, client C.int, own_call *C.char, remote_call *C.char, count C.int) {
+func server_outstanding_frames_reply(channel int, client int, own_call string, remote_call string, count int) {
 
 	var reply = new(AGWPEMessage)
 
@@ -950,7 +950,7 @@ func send_to_client(client C.int, reply_p *AGWPEMessage) {
 	reply_p.Write(client_sock[client], binary.LittleEndian)
 }
 
-func cmd_listen_thread(client C.int) {
+func cmd_listen_thread(client int) {
 
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
@@ -1070,7 +1070,7 @@ func cmd_listen_thread(client C.int) {
 
 				var info = fmt.Sprintf("%d;", count)
 
-				for j := C.int(0); j < MAX_TOTAL_CHANS; j++ {
+				for j := 0; j < MAX_TOTAL_CHANS; j++ {
 
 					switch save_audio_config_p.chan_medium[j] {
 
@@ -1205,9 +1205,9 @@ func cmd_listen_thread(client C.int) {
 				stemp += ">"
 				stemp += string(cmd.Header.CallTo[:])
 
-				var ndigi = C.int(cmd.Data[0])
+				var ndigi = int(cmd.Data[0])
 
-				for k := C.int(0); k < ndigi; k++ {
+				for k := 0; k < ndigi; k++ {
 					var offset = 1 + 10*k
 					stemp += "," + string(cmd.Data[offset:offset+10])
 				}
