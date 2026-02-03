@@ -26,9 +26,9 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 
 	// Setup
 
-	var MY_CALL = C.CString("M6KGG")
-	var THEIR_CALL = C.CString("2E0KGG")
-	const CHANNEL C.int = 1
+	var MY_CALL = "M6KGG"
+	var THEIR_CALL = "2E0KGG"
+	const CHANNEL = 1
 
 	var audioConfig = new(audio_s)
 	ptt_init(audioConfig)
@@ -41,7 +41,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 
 	var E *dlq_item_t
 	var pp *packet_t
-	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+	var addrs [AX25_MAX_ADDRS]string
 
 	// Setup done, let's do stuff!
 
@@ -50,16 +50,16 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	E = new(dlq_item_t)
 	E._type = DLQ_CONNECT_REQUEST
 	E._chan = CHANNEL
-	C.strcpy(&E.addrs[OWNCALL][0], MY_CALL)
-	C.strcpy(&E.addrs[PEERCALL][0], THEIR_CALL)
+	E.addrs[OWNCALL] = MY_CALL
+	E.addrs[PEERCALL] = THEIR_CALL
 	E.num_addr = 2
 
 	dl_connect_request(E)
 
 	// Now acknowledge
 
-	C.strcpy(&addrs[OWNCALL][0], THEIR_CALL)
-	C.strcpy(&addrs[PEERCALL][0], MY_CALL)
+	addrs[OWNCALL] = THEIR_CALL
+	addrs[PEERCALL] = MY_CALL
 	pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UA, 1, 1, nil)
 	assert.NotNil(t, pp)
 

@@ -161,7 +161,7 @@ import (
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
+func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
 
 	var this_p = ax25_new()
 
@@ -310,8 +310,8 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.in
  *------------------------------------------------------------------------------*/
 
 func ax25_s_frame(
-	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char,
-	num_addr C.int,
+	addrs [AX25_MAX_ADDRS]string,
+	num_addr int,
 	cr cmdres_t,
 	ftype ax25_frame_type_t,
 	modulo ax25_modulo_t,
@@ -452,8 +452,8 @@ func ax25_s_frame(
  *------------------------------------------------------------------------------*/
 
 func ax25_i_frame(
-	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char,
-	num_addr C.int,
+	addrs [AX25_MAX_ADDRS]string,
+	num_addr int,
 	cr cmdres_t,
 	modulo ax25_modulo_t,
 	nr int,
@@ -578,7 +578,7 @@ func ax25_i_frame(
  *
  *------------------------------------------------------------------------------*/
 
-func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, cr cmdres_t) C.int {
+func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t) C.int {
 
 	Assert(pp.frame_len == 0)
 	Assert(cr == cr_cmd || cr == cr_res)
@@ -589,12 +589,12 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, nu
 		return (0)
 	}
 
-	for n := C.int(0); n < num_addr; n++ {
+	for n := 0; n < num_addr; n++ {
 
 		var pa = (*C.uchar)(unsafe.Add(unsafe.Pointer(&pp.frame_data[0]), n*7))
 		var strictness = 1
 
-		var oaddr, ssid, _, ok = ax25_parse_addr(int(n), C.GoString(&addrs[n][0]), strictness)
+		var oaddr, ssid, _, ok = ax25_parse_addr(n, addrs[n], strictness)
 
 		if !ok {
 			return (0)
@@ -637,6 +637,6 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, nu
 		pp.frame_len += 7
 	}
 
-	pp.num_addr = int(num_addr)
+	pp.num_addr = num_addr
 	return (1)
 } /* end set_addrs */

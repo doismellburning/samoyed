@@ -132,7 +132,6 @@ import (
 	"net"
 	"syscall"
 	"time"
-	"unsafe"
 )
 
 var client_sock [MAX_NET_CLIENTS]net.Conn
@@ -165,13 +164,13 @@ var enable_send_monitor_to_client [MAX_NET_CLIENTS]bool
  *
  *--------------------------------------------------------------------*/
 
-var debug_client C.int = 0 /* Debug option: Print information flowing from and to client. */
+var debug_client int = 0 /* Debug option: Print information flowing from and to client. */
 
-func server_set_debug(n C.int) {
+func server_set_debug(n int) {
 	debug_client = n
 }
 
-func debug_print(fromto fromto_t, client C.int, pmsg *AGWPEMessage) {
+func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
 
 	var direction, datakind string
 
@@ -334,7 +333,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	 * Currently we start up a separate thread for each potential connection.
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 		go cmd_listen_thread(client)
 	}
 }
@@ -451,12 +450,12 @@ func server_connect_listen_thread(server_port int) {
  *
  *--------------------------------------------------------------------*/
 
-func server_send_rec_packet(channel C.int, pp *packet_t, fbuf []byte) {
+func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
 
 	/*
 	 * RAW format
 	 */
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 
 		if enable_send_raw_to_client[client] && client_sock[client] != nil {
 
@@ -503,7 +502,7 @@ func server_send_rec_packet(channel C.int, pp *packet_t, fbuf []byte) {
 
 } /* end server_send_rec_packet */
 
-func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
+func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 	/*
 	 * MONITOR format - 	'I' for information frames.
 	 *			'U' for unnumbered information.
@@ -512,7 +511,7 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 	 *			'T' for own transmitted frames.
 	 */
 
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 		if enable_send_monitor_to_client[client] && client_sock[client] != nil {
 			var agwpe_msg = new(AGWPEMessage)
 
@@ -614,7 +613,7 @@ func server_send_monitored(channel C.int, pp *packet_t, own_xmit C.int) {
 // I think my opinion (which could change) is that we should try to be consistent with TNC-2 format
 // rather than continuing to propagate historical inconsistencies.
 
-func mon_addrs(channel C.int, pp *packet_t) []byte {
+func mon_addrs(channel int, pp *packet_t) []byte {
 
 	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
@@ -754,24 +753,24 @@ func mon_desc(pp *packet_t) (byte, string) {
  *
  *--------------------------------------------------------------------*/
 
-func server_link_established(channel C.int, client C.int, remote_call *C.char, own_call *C.char, incoming C.int) {
+func server_link_established(channel int, client int, remote_call string, own_call string, incoming bool) {
 
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'C'
 
-	copy(reply.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(remote_call), C.int(C.strlen(remote_call))))
-	copy(reply.Header.CallTo[:], C.GoBytes(unsafe.Pointer(own_call), C.int(C.strlen(own_call))))
+	copy(reply.Header.CallFrom[:], []byte(remote_call))
+	copy(reply.Header.CallTo[:], []byte(own_call))
 
 	// Question:  Should the via path be provided too?
 
-	if incoming > 0 {
+	if incoming {
 		// Other end initiated the connection.
-		reply.Data = []byte(fmt.Sprintf("*** CONNECTED To Station %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** CONNECTED To Station %s\r", remote_call))
 	} else {
 		// We started the connection.
-		reply.Data = []byte(fmt.Sprintf("*** CONNECTED With Station %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** CONNECTED With Station %s\r", remote_call))
 	}
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
@@ -804,19 +803,19 @@ func server_link_established(channel C.int, client C.int, remote_call *C.char, o
  *
  *--------------------------------------------------------------------*/
 
-func server_link_terminated(channel C.int, client C.int, remote_call *C.char, own_call *C.char, timeout C.int) {
+func server_link_terminated(channel int, client int, remote_call string, own_call string, timeout bool) {
 
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'd'
-	copy(reply.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(remote_call), C.int(C.strlen(remote_call))))
-	copy(reply.Header.CallTo[:], C.GoBytes(unsafe.Pointer(own_call), C.int(C.strlen(own_call))))
+	copy(reply.Header.CallFrom[:], []byte(remote_call))
+	copy(reply.Header.CallTo[:], []byte(own_call))
 
-	if timeout > 0 {
-		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED RETRYOUT With %s\r", C.GoString(remote_call)))
+	if timeout {
+		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED RETRYOUT With %s\r", remote_call))
 	} else {
-		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED From Station %s\r", C.GoString(remote_call)))
+		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED From Station %s\r", remote_call))
 	}
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
@@ -849,7 +848,7 @@ func server_link_terminated(channel C.int, client C.int, remote_call *C.char, ow
  *
  *--------------------------------------------------------------------*/
 
-func server_rec_conn_data(channel C.int, client C.int, remote_call *C.char, own_call *C.char, pid C.int, data_ptr *C.char, data_len C.int) {
+func server_rec_conn_data(channel int, client int, remote_call string, own_call string, pid int, data []byte) {
 
 	var reply = new(AGWPEMessage)
 
@@ -857,21 +856,18 @@ func server_rec_conn_data(channel C.int, client C.int, remote_call *C.char, own_
 	reply.Header.DataKind = 'D'
 	reply.Header.PID = byte(pid)
 
-	copy(reply.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(remote_call), C.int(C.strlen(remote_call))))
-	copy(reply.Header.CallTo[:], C.GoBytes(unsafe.Pointer(own_call), C.int(C.strlen(own_call))))
+	copy(reply.Header.CallFrom[:], []byte(remote_call))
+	copy(reply.Header.CallTo[:], []byte(own_call))
 
-	if data_len < 0 {
+	if len(data) > AX25_MAX_INFO_LEN {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid length %d for connected data to client %d.\n", data_len, client)
-		data_len = 0
-	} else if data_len > AX25_MAX_INFO_LEN {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid length %d for connected data to client %d.\n", data_len, client)
-		data_len = AX25_MAX_INFO_LEN
+		dw_printf("Invalid length %d for connected data to client %d.\n", len(data), client)
+		data = data[:AX25_MAX_INFO_LEN]
 	}
 
-	reply.Data = C.GoBytes(unsafe.Pointer(data_ptr), data_len)
-	reply.Header.DataLen = uint32(data_len)
+	reply.Data = make([]byte, len(data))
+	copy(reply.Data, data)
+	reply.Header.DataLen = uint32(len(data))
 
 	send_to_client(client, reply)
 
@@ -896,15 +892,15 @@ func server_rec_conn_data(channel C.int, client C.int, remote_call *C.char, own_
  *
  *--------------------------------------------------------------------*/
 
-func server_outstanding_frames_reply(channel C.int, client C.int, own_call *C.char, remote_call *C.char, count C.int) {
+func server_outstanding_frames_reply(channel int, client int, own_call string, remote_call string, count int) {
 
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
 	reply.Header.DataKind = 'Y'
 
-	copy(reply.Header.CallFrom[:], C.GoBytes(unsafe.Pointer(own_call), C.int(C.strlen(own_call))))
-	copy(reply.Header.CallTo[:], C.GoBytes(unsafe.Pointer(remote_call), C.int(C.strlen(remote_call))))
+	copy(reply.Header.CallFrom[:], []byte(own_call))
+	copy(reply.Header.CallTo[:], []byte(remote_call))
 
 	reply.Header.DataLen = 4
 	reply.Data = make([]byte, 4)
@@ -929,7 +925,7 @@ func server_outstanding_frames_reply(channel C.int, client C.int, own_call *C.ch
  *
  *--------------------------------------------------------------------*/
 
-func send_to_client(client C.int, reply_p *AGWPEMessage) {
+func send_to_client(client int, reply_p *AGWPEMessage) {
 
 	if client_sock[client] == nil {
 		return
@@ -950,7 +946,7 @@ func send_to_client(client C.int, reply_p *AGWPEMessage) {
 	reply_p.Write(client_sock[client], binary.LittleEndian)
 }
 
-func cmd_listen_thread(client C.int) {
+func cmd_listen_thread(client int) {
 
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
@@ -1070,13 +1066,13 @@ func cmd_listen_thread(client C.int) {
 
 				var info = fmt.Sprintf("%d;", count)
 
-				for j := C.int(0); j < MAX_TOTAL_CHANS; j++ {
+				for j := 0; j < MAX_TOTAL_CHANS; j++ {
 
 					switch save_audio_config_p.chan_medium[j] {
 
 					case MEDIUM_RADIO:
 						// Misleading if using stdin or udp.
-						var a = ACHAN2ADEV(int(j))
+						var a = ACHAN2ADEV(j)
 						// If I was really ambitious, some description could be provided.
 						var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
 
@@ -1205,9 +1201,9 @@ func cmd_listen_thread(client C.int) {
 				stemp += ">"
 				stemp += string(cmd.Header.CallTo[:])
 
-				var ndigi = C.int(cmd.Data[0])
+				var ndigi = int(cmd.Data[0])
 
-				for k := C.int(0); k < ndigi; k++ {
+				for k := 0; k < ndigi; k++ {
 					var offset = 1 + 10*k
 					stemp += "," + string(cmd.Data[offset:offset+10])
 				}
@@ -1318,13 +1314,13 @@ func cmd_listen_thread(client C.int) {
 				// The protocol spec says it is an error to register the same one more than once.
 				// Too much trouble.  Report success if the channel is valid.
 
-				var channel = cmd.Header.Portx
+				var channel = int(cmd.Header.Portx)
 
 				// Connected mode can only be used with internal modems.
 
 				if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 					ok = 1
-					dlq_register_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), C.int(channel), client)
+					dlq_register_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), channel, client)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1342,12 +1338,12 @@ func cmd_listen_thread(client C.int) {
 			}
 
 		case 'x': /* Unregister CallSign  */
-			var channel = cmd.Header.Portx
+			var channel = int(cmd.Header.Portx)
 
 			// Connected mode can only be used with internal modems.
 
 			if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-				dlq_unregister_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), C.int(channel), client)
+				dlq_unregister_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), channel, client)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1375,7 +1371,7 @@ func cmd_listen_thread(client C.int) {
 					pid = cmd.Header.PID /* non standard for NETROM, TCP/IP, etc. */
 				}
 
-				var num_calls C.int = 2 /* 2 plus any digipeaters. */
+				var num_calls = 2 /* 2 plus any digipeaters. */
 
 				if cmd.Header.DataKind == 'v' {
 					var v struct {
@@ -1404,7 +1400,7 @@ func cmd_listen_thread(client C.int) {
 					}
 				}
 
-				dlq_connect_request(callsigns, num_calls, C.int(cmd.Header.Portx), client, C.int(pid))
+				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, C.int(pid))
 			}
 
 		case 'D': /* Send Connected Data */
@@ -1416,7 +1412,7 @@ func cmd_listen_thread(client C.int) {
 				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
 				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
 
-				dlq_xmit_data_request(callsigns, num_calls, C.int(cmd.Header.Portx), client, C.int(cmd.Header.PID), (*C.char)(C.CBytes(cmd.Data)), C.int(cmd.Header.DataLen))
+				dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data)
 			}
 
 		case 'd': /* Disconnect, Terminate an AX.25 Connection */
@@ -1428,7 +1424,7 @@ func cmd_listen_thread(client C.int) {
 				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
 				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
 
-				dlq_disconnect_request(callsigns, num_calls, C.int(cmd.Header.Portx), client)
+				dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
 
 			}
 
@@ -1565,7 +1561,7 @@ func cmd_listen_thread(client C.int) {
 				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
 				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
 
-				dlq_outstanding_frames_request(callsigns, num_calls, C.int(cmd.Header.Portx), client)
+				dlq_outstanding_frames_request(callsigns, num_calls, int(cmd.Header.Portx), client)
 			}
 
 		default:

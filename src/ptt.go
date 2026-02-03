@@ -1048,7 +1048,7 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 	 */
 
 	// #ifndef TEST
-	dlq_channel_busy(C.int(channel), C.int(ot), C.int(ptt_signal))
+	dlq_channel_busy(channel, C.int(ot), C.int(ptt_signal))
 	// #endif
 
 	/*

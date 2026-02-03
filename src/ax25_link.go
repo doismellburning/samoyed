@@ -246,7 +246,7 @@ const PEERCALL = AX25_DESTINATION
 // Multiply FRACK by 2*m+1, where m is number of digipeaters.
 
 func INIT_T1V_SRT(S *ax25_dlsm_t) {
-	S.t1v = time.Duration(C.int(g_misc_config_p.frack)*(2*(S.num_addr-2)+1)) * time.Second
+	S.t1v = time.Duration(g_misc_config_p.frack*(2*(S.num_addr-2)+1)) * time.Second
 	S.srt = S.t1v / 2
 }
 
@@ -269,17 +269,17 @@ type ax25_dlsm_t struct {
 	stream_id int // Unique number for each stream.
 	// Internally we use a pointer but this is more user-friendly.
 
-	channel C.int // Radio channel being used.
+	channel int // Radio channel being used.
 
-	client C.int // We have have multiple client applications,
+	client int // We have have multiple client applications,
 	// each with their own links.  We need to know
 	// which client should receive the data or
 	// notifications about state changes.
 
-	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+	addrs [AX25_MAX_ADDRS]string
 	// Up to 10 addresses, same order as in frame.
 
-	num_addr C.int // Number of addresses.  Should be in range 2 .. 10.
+	num_addr int // Number of addresses.  Should be in range 2 .. 10.
 
 	start_time time.Time // Clock time when this was allocated.  Used only for
 	// debug output for timestamps relative to start.
@@ -295,7 +295,7 @@ type ax25_dlsm_t struct {
 	// Can be changed to 'srej_multi' with XID exchange.
 	// Should be used only with modulo 128.  (Is this enforced?)
 
-	n1_paclen C.int // Maximum length of information field, in bytes.
+	n1_paclen int // Maximum length of information field, in bytes.
 	// Starts out as 256 but can be negotiated higher.
 	// (Protocol Spec has this in bits.  It is in bytes here.)
 	// "PACLEN" in configuration file.
@@ -459,7 +459,7 @@ type ax25_dlsm_t struct {
 
 	ra_buff *cdata_t // Reassembler buffer.  nil when in ready state.
 
-	ra_following C.int // Most recent number following to predict next expected.
+	ra_following int // Most recent number following to predict next expected.
 
 }
 
@@ -483,8 +483,8 @@ const RC_MAGIC = 0x08291951
 
 type reg_callsign_t struct {
 	callsign string
-	channel  C.int
-	client   C.int
+	channel  int
+	client   int
 	next     *reg_callsign_t
 	magic    int
 }
@@ -670,12 +670,12 @@ func ax25_link_init(pconfig *misc_config_s, debug int) {
 
 var next_stream_id = 0
 
-func get_link_handle(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, channel C.int, client C.int, create bool) *ax25_dlsm_t {
+func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, create bool) *ax25_dlsm_t {
 
 	if s_debug_link_handle {
 		text_color_set(DW_COLOR_DECODED)
 		dw_printf("get_link_handle (%s>%s, chan=%d, client=%d, create=%t)\n",
-			C.GoString(&addrs[AX25_SOURCE][0]), C.GoString(&addrs[AX25_DESTINATION][0]), channel, client, create)
+			addrs[AX25_SOURCE], addrs[AX25_DESTINATION], channel, client, create)
 	}
 
 	// Look for existing.
@@ -685,8 +685,8 @@ func get_link_handle(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C
 		for p := list_head; p != nil; p = p.next {
 
 			if p.channel == channel &&
-				C.GoString(&addrs[AX25_DESTINATION][0]) == C.GoString(&p.addrs[OWNCALL][0]) &&
-				C.GoString(&addrs[AX25_SOURCE][0]) == C.GoString(&p.addrs[PEERCALL][0]) {
+				addrs[AX25_DESTINATION] == p.addrs[OWNCALL] &&
+				addrs[AX25_SOURCE] == p.addrs[PEERCALL] {
 
 				if s_debug_link_handle {
 					text_color_set(DW_COLOR_DECODED)
@@ -700,8 +700,8 @@ func get_link_handle(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C
 
 			if p.channel == channel &&
 				p.client == client &&
-				C.GoString(&addrs[AX25_SOURCE][0]) == C.GoString(&p.addrs[OWNCALL][0]) &&
-				C.GoString(&addrs[AX25_DESTINATION][0]) == C.GoString(&p.addrs[PEERCALL][0]) {
+				addrs[AX25_SOURCE] == p.addrs[OWNCALL] &&
+				addrs[AX25_DESTINATION] == p.addrs[PEERCALL] {
 
 				if s_debug_link_handle {
 					text_color_set(DW_COLOR_DECODED)
@@ -724,14 +724,14 @@ func get_link_handle(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C
 
 	// If it came from the radio, search for destination our registered callsign list.
 
-	var incoming_for_client C.int = -1 // which client app registered the callsign?
+	var incoming_for_client int = -1 // which client app registered the callsign?
 
 	if client == -1 { // from the radio.
 
 		var found *reg_callsign_t
 
 		for r := reg_callsign_list; r != nil && found == nil; r = r.next {
-			if C.GoString(&addrs[AX25_DESTINATION][0]) == r.callsign && channel == r.channel {
+			if addrs[AX25_DESTINATION] == r.callsign && channel == r.channel {
 				found = r
 				incoming_for_client = r.client
 			}
@@ -762,22 +762,20 @@ func get_link_handle(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C
 	// If it came in over the radio, we need to swap source/destination and reverse any digi path.
 
 	if incoming_for_client >= 0 {
-		C.strcpy(&p.addrs[AX25_SOURCE][0], &addrs[AX25_DESTINATION][0])
-		C.strcpy(&p.addrs[AX25_DESTINATION][0], &addrs[AX25_SOURCE][0])
+		p.addrs[AX25_SOURCE] = addrs[AX25_DESTINATION]
+		p.addrs[AX25_DESTINATION] = addrs[AX25_SOURCE]
 
 		var j = AX25_REPEATER_1
 		var k = num_addr - 1
 		for k >= AX25_REPEATER_1 {
-			C.strcpy(&p.addrs[j][0], &addrs[k][0])
+			p.addrs[j] = addrs[k]
 			j++
 			k--
 		}
 
 		p.client = incoming_for_client
 	} else {
-		for i, addr := range addrs {
-			C.strcpy(&p.addrs[i][0], &addr[0])
-		}
+		p.addrs = addrs
 		p.client = client
 	}
 
@@ -873,7 +871,7 @@ func dl_connect_request(E *dlq_item_t) {
 	}
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("Attempting connect to %s ...\n", C.GoString(&E.addrs[PEERCALL][0]))
+	dw_printf("Attempting connect to %s ...\n", E.addrs[PEERCALL])
 
 	var ok_to_create = true
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, E.client, ok_to_create)
@@ -888,11 +886,9 @@ func dl_connect_request(E *dlq_item_t) {
 
 		var old_version = false
 		for n := 0; n < g_misc_config_p.v20_count && !old_version; n++ {
-			/* FIXME KG pointer array aliasing argh
-			if C.GoString(&E.addrs[AX25_DESTINATION][0]) == C.GoString(g_misc_config_p.v20_addrs[n]) {
+			if E.addrs[AX25_DESTINATION] == g_misc_config_p.v20_addrs[n] {
 				old_version = true
 			}
-			*/
 		}
 
 		if old_version || g_misc_config_p.maxv22 == 0 { // Don't attempt v2.2.
@@ -960,7 +956,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 	}
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("Disconnect from %s ...\n", C.GoString(&E.addrs[PEERCALL][0]))
+	dw_printf("Disconnect from %s ...\n", E.addrs[PEERCALL])
 
 	var ok_to_create = true
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, E.client, ok_to_create)
@@ -971,8 +967,8 @@ func dl_disconnect_request(E *dlq_item_t) {
 
 		// DL-DISCONNECT *confirm*
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-		server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+		dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+		server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
 
@@ -987,18 +983,18 @@ func dl_disconnect_request(E *dlq_item_t) {
 		// New code v1.7 dev, May 6 2023
 
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("Stream %d: In progress connection attempt to %s terminated by user.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
+		dw_printf("Stream %d: In progress connection attempt to %s terminated by user.\n", S.stream_id, S.addrs[PEERCALL])
 		discard_i_queue(S)
 		SET_RC(S, 0)
 		var p1 = 1
 		var nopid0 = 0
 		var pp15 = ax25_u_frame(S.addrs, S.num_addr, cr_cmd, frame_type_U_DISC, p1, nopid0, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp15)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp15)
 
 		STOP_T1(S) // started in establish_data_link.
 		STOP_T3(S) // probably don't need.
 		enter_new_state(S, state_0_disconnected)
-		server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+		server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 
 	case state_2_awaiting_release:
 		{
@@ -1017,14 +1013,14 @@ func dl_disconnect_request(E *dlq_item_t) {
 			var nopid = 0 // PID applies only to I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, p, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // HI means expedited.
+			lm_data_request(C.int(S.channel), TQ_PRIO_0_HI, pp) // HI means expedited.
 
 			// Erratum: Shouldn't we inform the user when going to disconnected state?
 			// Notifying the application, here, is my own enhancement.
 
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
@@ -1040,7 +1036,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		var nopid = 0
 
 		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 		STOP_T3(S)
 		START_T1(S)
@@ -1054,7 +1050,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 
 // we add one to datalen for the original PID.
 // We subtract one from N1 for the segment identifier header.
-func DIVROUNDUP(a, b C.int) C.int {
+func DIVROUNDUP(a, b int) int {
 	return (a + b - 1) / b
 }
 
@@ -1124,14 +1120,14 @@ func dl_data_request(E *dlq_item_t) {
 
 	if S.modulo == 8 {
 
-		var num_frames C.int = 0
+		var num_frames = 0
 		var remaining_len = E.txdata.len
-		var offset C.int = 0
+		var offset = 0
 
 		for remaining_len > 0 {
 			var this_len = min(remaining_len, S.n1_paclen)
 
-			var new_txdata = cdata_new(E.txdata.pid, &E.txdata.data[offset], this_len)
+			var new_txdata = cdata_new(E.txdata.pid, E.txdata.data[offset:offset+this_len])
 			data_request_good_size(S, new_txdata)
 
 			offset += this_len
@@ -1223,24 +1219,24 @@ func dl_data_request(E *dlq_item_t) {
 		return
 	}
 
-	var orig_offset C.int = 0
+	var orig_offset = 0
 	var remaining_len = E.txdata.len
 
 	// First segment.
 
 	var first_segment struct {
-		header       C.char // 0x80 + number of segments to follow.
-		original_pid C.char
-		segdata      [AX25_N1_PACLEN_MAX]C.char
+		header       byte // 0x80 + number of segments to follow.
+		original_pid byte
+		segdata      [AX25_N1_PACLEN_MAX]byte
 	}
 
 	nseg_to_follow--
 
-	first_segment.header = C.char(0x80 | nseg_to_follow)
-	first_segment.original_pid = C.char(E.txdata.pid)
+	first_segment.header = byte(0x80 | nseg_to_follow)
+	first_segment.original_pid = byte(E.txdata.pid)
 	var seglen = min(S.n1_paclen-2, remaining_len)
 
-	if seglen < 1 || seglen > S.n1_paclen-2 || seglen > remaining_len || seglen > (C.int)(len(first_segment.segdata)) {
+	if seglen < 1 || seglen > S.n1_paclen-2 || seglen > remaining_len || seglen > len(first_segment.segdata) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d\n",
 			E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
@@ -1251,7 +1247,9 @@ func dl_data_request(E *dlq_item_t) {
 
 	C.memcpy(unsafe.Pointer(&first_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
 
-	var new_txdata = cdata_new(AX25_PID_SEGMENTATION_FRAGMENT, &first_segment.header, seglen+2)
+	var cdataData = []byte{first_segment.header, first_segment.original_pid}
+	cdataData = append(cdataData, first_segment.segdata[:seglen]...)
+	var new_txdata = cdata_new(AX25_PID_SEGMENTATION_FRAGMENT, cdataData)
 
 	data_request_good_size(S, new_txdata)
 
@@ -1262,16 +1260,16 @@ func dl_data_request(E *dlq_item_t) {
 
 	for {
 		var subsequent_segment struct {
-			header  C.char // Number of segments to follow.
-			segdata [AX25_N1_PACLEN_MAX]C.char
+			header  byte // Number of segments to follow.
+			segdata [AX25_N1_PACLEN_MAX]byte
 		}
 
 		nseg_to_follow--
 
-		subsequent_segment.header = C.char(nseg_to_follow)
+		subsequent_segment.header = byte(nseg_to_follow)
 		seglen = min(S.n1_paclen-1, remaining_len)
 
-		if seglen < 1 || seglen > S.n1_paclen-1 || seglen > remaining_len || seglen > (C.int)(len(subsequent_segment.segdata)) {
+		if seglen < 1 || seglen > S.n1_paclen-1 || seglen > remaining_len || seglen > len(subsequent_segment.segdata) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d\n",
 				E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
@@ -1282,7 +1280,9 @@ func dl_data_request(E *dlq_item_t) {
 
 		C.memcpy(unsafe.Pointer(&subsequent_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
 
-		new_txdata = cdata_new(AX25_PID_SEGMENTATION_FRAGMENT, &subsequent_segment.header, seglen+1)
+		cdataData = []byte{subsequent_segment.header}
+		cdataData = append(cdataData, subsequent_segment.segdata[:seglen]...)
+		new_txdata = cdata_new(AX25_PID_SEGMENTATION_FRAGMENT, cdataData)
 
 		data_request_good_size(S, new_txdata)
 
@@ -1363,7 +1363,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
 		if (!S.peer_receiver_busy) &&
 			WITHIN_WINDOW_SIZE(S) {
 			S.acknowledge_pending = true
-			lm_seize_request(S.channel)
+			lm_seize_request(C.int(S.channel))
 		}
 
 	default:
@@ -1399,11 +1399,11 @@ func dl_register_callsign(E *dlq_item_t) {
 
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dl_register_callsign (%s, chan=%d, client=%d)\n", C.GoString(&E.addrs[0][0]), E._chan, E.client)
+		dw_printf("dl_register_callsign (%s, chan=%d, client=%d)\n", E.addrs[0], E._chan, E.client)
 	}
 
 	var r = new(reg_callsign_t)
-	r.callsign = C.GoString(&E.addrs[0][0])
+	r.callsign = E.addrs[0]
 	r.channel = E._chan
 	r.client = E.client
 	r.next = reg_callsign_list
@@ -1416,7 +1416,7 @@ func dl_register_callsign(E *dlq_item_t) {
 func dl_unregister_callsign(E *dlq_item_t) {
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dl_unregister_callsign (%s, chan=%d, client=%d)\n", C.GoString(&E.addrs[0][0]), E._chan, E.client)
+		dw_printf("dl_unregister_callsign (%s, chan=%d, client=%d)\n", E.addrs[0], E._chan, E.client)
 	}
 
 	var prev *reg_callsign_t
@@ -1425,7 +1425,7 @@ func dl_unregister_callsign(E *dlq_item_t) {
 
 		Assert(r.magic == RC_MAGIC)
 
-		if r.callsign == C.GoString(&E.addrs[0][0]) && r.channel == E._chan && r.client == E.client {
+		if r.callsign == E.addrs[0] && r.channel == E._chan && r.client == E.client {
 
 			if r == reg_callsign_list {
 				reg_callsign_list = r.next
@@ -1506,7 +1506,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dl_outstanding_frames_request ( to %s )\n", C.GoString(&E.addrs[PEERCALL][0]))
+		dw_printf("dl_outstanding_frames_request ( to %s )\n", E.addrs[PEERCALL])
 	}
 
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, E.client, ok_to_create)
@@ -1517,16 +1517,16 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 		// this is communicating with the client app, not over the air,
 		// so we don't need to worry about digipeaters.
 
-		var swapped [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
-		C.strcpy(&swapped[PEERCALL][0], &E.addrs[OWNCALL][0])
-		C.strcpy(&swapped[OWNCALL][0], &E.addrs[PEERCALL][0])
+		var swapped [AX25_MAX_ADDRS]string
+		swapped[PEERCALL] = E.addrs[OWNCALL]
+		swapped[OWNCALL] = E.addrs[PEERCALL]
 		S = get_link_handle(swapped, E.num_addr, E._chan, E.client, ok_to_create)
 		if S != nil {
 			reversed_addrs = true
 		} else {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get outstanding frames for %s . %s, chan %d\n", C.GoString(&E.addrs[OWNCALL][0]), C.GoString(&E.addrs[PEERCALL][0]), E._chan)
-			server_outstanding_frames_reply(E._chan, E.client, &E.addrs[OWNCALL][0], &E.addrs[PEERCALL][0], 0)
+			dw_printf("Can't get outstanding frames for %s . %s, chan %d\n", E.addrs[OWNCALL], E.addrs[PEERCALL], E._chan)
+			server_outstanding_frames_reply(E._chan, E.client, E.addrs[OWNCALL], E.addrs[PEERCALL], 0)
 			return
 		}
 	}
@@ -1543,13 +1543,13 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 	//						// Indexed by N(S) in case it gets lost and needs to be sent again.
 	//						// Cleared out when we get ACK for it.
 
-	var count1 C.int = 0
+	var count1 int = 0
 	for incoming := S.i_frame_queue; incoming != nil; incoming = incoming.next {
 		count1++
 	}
 
-	var count2 C.int = 0
-	for k := C.int(0); k < C.int(S.modulo); k++ {
+	var count2 int = 0
+	for k := 0; k < int(S.modulo); k++ {
 		if S.txdata_by_ns[k] != nil {
 			count2++
 		}
@@ -1557,9 +1557,9 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 
 	if reversed_addrs {
 		// Other end initiated the link.
-		server_outstanding_frames_reply(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], count1+count2)
+		server_outstanding_frames_reply(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], count1+count2)
 	} else {
-		server_outstanding_frames_reply(S.channel, S.client, &S.addrs[OWNCALL][0], &S.addrs[PEERCALL][0], count1+count2)
+		server_outstanding_frames_reply(S.channel, S.client, S.addrs[OWNCALL], S.addrs[PEERCALL], count1+count2)
 	}
 } // end dl_outstanding_frames_request
 
@@ -1623,7 +1623,7 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 			if s_debug_client_app {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("dl_client_cleanup: remove %s>%s\n", C.GoString(&S.addrs[AX25_SOURCE][0]), C.GoString(&S.addrs[AX25_DESTINATION][0]))
+				dw_printf("dl_client_cleanup: remove %s>%s\n", S.addrs[AX25_SOURCE], S.addrs[AX25_DESTINATION])
 			}
 
 			discard_i_queue(S)
@@ -1725,9 +1725,7 @@ func dl_client_cleanup(E *dlq_item_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
-
-	var dataBytes = C.GoBytes(unsafe.Pointer(data), length)
+func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 
 	// Now it gets more interesting. We need to combine segments before passing it along.
 
@@ -1738,18 +1736,14 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 		// Ready state.
 
 		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
-			server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
+			server_rec_conn_data(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
 			return
 		} else if dataBytes[0]&0x80 > 0 {
 
 			// Ready state, First segment.
 
-			S.ra_following = C.int(dataBytes[0] & 0x7f)
-			var total = (S.ra_following+1)*(length-1) - 1 // len should be other side's N1
-			S.ra_buff = cdata_new(C.int(dataBytes[1]), nil, total)
-			S.ra_buff.size = total     // max that we are expecting.
-			S.ra_buff.len = length - 2 // how much accumulated so far.
-			C.memcpy(unsafe.Pointer(&S.ra_buff.data), C.CBytes(dataBytes[2:]), C.ulong(length-2))
+			S.ra_following = int(dataBytes[0] & 0x7f)
+			S.ra_buff = cdata_new(int(dataBytes[1]), dataBytes[2:])
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Not first segment in ready state.\n", S.stream_id)
@@ -1760,7 +1754,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
 
-			server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], pid, data, length)
+			server_rec_conn_data(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Not segment in reassembling state.\n", S.stream_id)
@@ -1783,10 +1777,10 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 			// Reassembling data state, Not first segment.
 
-			S.ra_following = C.int(dataBytes[0] & 0x7f)
-			if S.ra_buff.len+length-1 <= S.ra_buff.size {
-				C.memcpy(unsafe.Pointer(uintptr(unsafe.Pointer(&S.ra_buff.data))+uintptr(S.ra_buff.len)), C.CBytes(dataBytes[1:]), C.ulong(length-1))
-				S.ra_buff.len += length - 1
+			S.ra_following = int(dataBytes[0] & 0x7f)
+			if S.ra_buff.len+len(dataBytes)-1 <= S.ra_buff.size {
+				C.memcpy(unsafe.Pointer(uintptr(unsafe.Pointer(&S.ra_buff.data))+uintptr(S.ra_buff.len)), C.CBytes(dataBytes[1:]), C.ulong(len(dataBytes)-1))
+				S.ra_buff.len += len(dataBytes) - 1
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments exceed buffer space.\n", S.stream_id)
@@ -1797,7 +1791,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
 
 			if S.ra_following == 0 {
 				// Last one.
-				server_rec_conn_data(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], S.ra_buff.pid, (*C.char)(unsafe.Pointer(&S.ra_buff.data)), S.ra_buff.len)
+				server_rec_conn_data(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], S.ra_buff.pid, S.ra_buff.data[:S.ra_buff.len])
 				cdata_delete(S.ra_buff)
 				S.ra_buff = nil
 			}
@@ -1829,8 +1823,8 @@ func dl_data_indication(S *ax25_dlsm_t, pid C.int, data *C.char, length C.int) {
  *
  *------------------------------------------------------------------------------*/
 
-var dcd_status [MAX_RADIO_CHANS]C.int
-var ptt_status [MAX_RADIO_CHANS]C.int
+var dcd_status [MAX_RADIO_CHANS]int
+var ptt_status [MAX_RADIO_CHANS]int
 
 func lm_channel_busy(E *dlq_item_t) {
 	Assert(E._chan >= 0 && E._chan < MAX_RADIO_CHANS)
@@ -1846,7 +1840,7 @@ func lm_channel_busy(E *dlq_item_t) {
 			dw_printf("lm_channel_busy: DCD chan %d = %d\n", E._chan, E.status)
 		}
 
-		dcd_status[E._chan] = E.status
+		dcd_status[E._chan] = int(E.status)
 
 	case OCTYPE_PTT:
 
@@ -1855,7 +1849,7 @@ func lm_channel_busy(E *dlq_item_t) {
 			dw_printf("lm_channel_busy: PTT chan %d = %d\n", E._chan, E.status)
 		}
 
-		ptt_status[E._chan] = E.status
+		ptt_status[E._chan] = int(E.status)
 
 	default:
 		// Nothing to be done
@@ -1978,13 +1972,13 @@ func lm_data_indication(E *dlq_item_t) {
 		return
 	}
 
-	E.num_addr = C.int(ax25_get_num_addr(E.pp))
+	E.num_addr = ax25_get_num_addr(E.pp)
 
 	// Digipeating is not done here so consider only those with no unused digipeater addresses.
 
 	var any_unused_digi = false
 
-	for n := AX25_REPEATER_1; C.int(n) < E.num_addr; n++ {
+	for n := AX25_REPEATER_1; n < E.num_addr; n++ {
 		if ax25_get_h(E.pp, n) == 0 {
 			any_unused_digi = true
 		}
@@ -1993,20 +1987,20 @@ func lm_data_indication(E *dlq_item_t) {
 	if any_unused_digi {
 		if s_debug_radio {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("lm_data_indication (%d, %s>%s) - ignore due to unused digi address.\n", E._chan, C.GoString(&E.addrs[AX25_SOURCE][0]), C.GoString(&E.addrs[AX25_DESTINATION][0]))
+			dw_printf("lm_data_indication (%d, %s>%s) - ignore due to unused digi address.\n", E._chan, E.addrs[AX25_SOURCE], E.addrs[AX25_DESTINATION])
 		}
 		return
 	}
 
 	// Copy addresses from frame into event structure.
 
-	for n := 0; C.int(n) < E.num_addr; n++ {
-		C.strcpy(&E.addrs[n][0], C.CString(ax25_get_addr_with_ssid(E.pp, n)))
+	for n := 0; n < E.num_addr; n++ {
+		E.addrs[n] = ax25_get_addr_with_ssid(E.pp, n)
 	}
 
 	if s_debug_radio {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("lm_data_indication (%d, %s>%s)\n", E._chan, C.GoString(&E.addrs[AX25_SOURCE][0]), C.GoString(&E.addrs[AX25_DESTINATION][0]))
+		dw_printf("lm_data_indication (%d, %s>%s)\n", E._chan, E.addrs[AX25_SOURCE], E.addrs[AX25_DESTINATION])
 	}
 
 	// Look for existing, or possibly create new, link state matching addresses and channel.
@@ -2021,7 +2015,7 @@ func lm_data_indication(E *dlq_item_t) {
 
 	var ft = ax25_frame_type_only(E.pp)
 
-	var client_not_applicable C.int = -1
+	var client_not_applicable = -1
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, client_not_applicable,
 		(ft == frame_type_U_SABM) || (ft == frame_type_U_SABME))
 
@@ -2174,7 +2168,7 @@ func lm_data_indication(E *dlq_item_t) {
 		WITHIN_WINDOW_SIZE(S) {
 
 		//S.acknowledge_pending = 1;
-		lm_seize_request(S.channel)
+		lm_seize_request(C.int(S.channel))
 	}
 
 } /* end lm_data_indication */
@@ -2255,7 +2249,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			var nopid = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -2272,7 +2266,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			var nopid = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 
 	case state_3_connected, state_4_timer_recovery:
@@ -2353,14 +2347,14 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 							#if 0 // Erratum: Original - state 4 has expedited.
 
 								            if (S.state == state_4_timer_recovery) {
-								              lm_data_request (S.channel, TQ_PRIO_0_HI, pp);		// "expedited"
+								              lm_data_request (C.int(S.channel), TQ_PRIO_0_HI, pp);		// "expedited"
 								            } else {
-								              lm_data_request (S.channel, TQ_PRIO_1_LO, pp);
+								              lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
 								            }
 							#else // 2006 version - states 3 & 4 the same.
 						*/
 
-						lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+						lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 						// #endif
 						S.acknowledge_pending = false
@@ -2516,7 +2510,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			dw_printf("\"\n")
 		}
 
-		dl_data_indication(S, C.int(pid), (*C.char)(C.CBytes(info)), C.int(len(info)))
+		dl_data_indication(S, pid, info)
 
 		if S.rxdata_by_ns[ns] != nil {
 			// There is a possibility that we might have another received frame stashed
@@ -2535,11 +2529,11 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			if s_debug_client_app {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
-				ax25_safe_print(C.GoBytes(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data), S.rxdata_by_ns[S.vr].len), true)
+				ax25_safe_print(S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len], true)
 				dw_printf("\"\n")
 			}
 
-			dl_data_indication(S, S.rxdata_by_ns[S.vr].pid, (*C.char)(unsafe.Pointer(&S.rxdata_by_ns[S.vr].data)), S.rxdata_by_ns[S.vr].len)
+			dl_data_indication(S, S.rxdata_by_ns[S.vr].pid, S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len])
 
 			// Don't keep around anymore after sending it to client app.
 
@@ -2560,7 +2554,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			var cr = cr_res // response with F set to 1.
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		} else if !S.acknowledge_pending {
 
@@ -2573,7 +2567,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			// When that event arrives, we check acknowledge_pending and send something
 			// to be determined later.
 
-			lm_seize_request(S.channel)
+			lm_seize_request(C.int(S.channel))
 		}
 	} else if S.reject_exception {
 
@@ -2588,7 +2582,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			var cr = cr_res // response with F set to 1.
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
 	} else if S.srej_enable == srej_none {
@@ -2613,7 +2607,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
 	} else {
@@ -2642,7 +2636,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 				cdata_delete(S.rxdata_by_ns[ns])
 				S.rxdata_by_ns[ns] = nil
 			}
-			S.rxdata_by_ns[ns] = cdata_new(C.int(pid), (*C.char)(C.CBytes(info)), C.int(len(info)))
+			S.rxdata_by_ns[ns] = cdata_new(pid, info)
 
 			if s_debug_misc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
@@ -2659,7 +2653,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 				var nr = S.vr
 
 				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
-				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+				lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			} else if S.rxdata_by_ns[AX25MODULO(ns-1, S.modulo)] == nil {
 
 				// Ask for missing frames when we don't have N(S)-1 in the receive buffer.
@@ -3030,7 +3024,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, info)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		return
 	}
 
@@ -3062,7 +3056,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 	}
 
 } /* end send_srej_frames */
@@ -3123,7 +3117,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			var f = pf
 			var nopid int = 0 // PID only for I and UI frames.
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -3140,7 +3134,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			var nopid int = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 
 		// Erratum: We have a disagreement here between original and 2006 version.
@@ -3368,7 +3362,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			var nopid int = 0 // PID is only for I and UI.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -3382,7 +3376,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 
 		// Erratum: We have a disagreement here between original and 2006 version.
@@ -3793,9 +3787,9 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 	var txdata = S.txdata_by_ns[i_frame_ns]
 
 	if txdata != nil {
-		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, int(txdata.pid), C.GoBytes(unsafe.Pointer(&txdata.data[0]), txdata.len))
+		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
 		// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		num_resent++
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -3825,8 +3819,8 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 		txdata = S.txdata_by_ns[i_frame_ns]
 		if txdata != nil {
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, int(txdata.pid), C.GoBytes(unsafe.Pointer(&txdata.data), txdata.len))
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			num_resent++
 		} else {
 			text_color_set(DW_COLOR_ERROR)
@@ -3907,7 +3901,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		var nopid int = 0 // PID is only for I and UI.
 
 		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 		clear_exception_conditions(S)
 
@@ -3920,11 +3914,11 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		if extended {
 			_e = "v2.2"
 		}
-		dw_printf("Stream %d: Connected to %s.  (%s)\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]), _e)
+		dw_printf("Stream %d: Connected to %s.  (%s)\n", S.stream_id, S.addrs[PEERCALL], _e)
 
 		// dl connect indication - inform the client app.
-		var incoming C.int = 1
-		server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+		var incoming = true
+		server_link_established(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], incoming)
 
 		INIT_T1V_SRT(S)
 
@@ -3942,7 +3936,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			enter_new_state(S, state_5_awaiting_v22_connection)
 		} else { // SABM - respond with UA.
 
@@ -3955,7 +3949,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			// stay in state 1.
 		}
 
@@ -3967,7 +3961,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			// stay in state 5
 		} else { // SABM, respond with UA, enter state 1
 			var res = cr_res
@@ -3975,7 +3969,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			enter_new_state(S, state_1_awaiting_connection)
 		}
 
@@ -3990,7 +3984,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
+			lm_data_request(C.int(S.channel), TQ_PRIO_0_HI, pp) // expedited
 			// stay in state 2.
 		}
 
@@ -4002,7 +3996,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			// State 3 & 4 handling are the same except for this one difference.
 			if S.state == state_4_timer_recovery {
@@ -4021,8 +4015,8 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			if S.vs != S.va {
 				discard_i_queue(S)
 				// dl connect indication
-				var incoming C.int = 1
-				server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+				var incoming = true
+				server_link_established(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], incoming)
 			}
 			STOP_T1(S)
 			START_T3(S)
@@ -4082,7 +4076,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 		}
 		// keep current state, 0, 1, or 5.
 
@@ -4094,7 +4088,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
+			lm_data_request(C.int(S.channel), TQ_PRIO_0_HI, pp) // expedited
 		}
 		// keep current state, 2.
 
@@ -4108,12 +4102,12 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 
 			STOP_T1(S)
 			STOP_T3(S)
@@ -4195,8 +4189,8 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 			discard_i_queue(S)
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		}
@@ -4214,8 +4208,8 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 
 			// dl disconnect *confirm*
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		}
@@ -4229,8 +4223,8 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 		}
 		// dl disconnect *indication*
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-		server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+		dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+		server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 		discard_i_queue(S)
 		STOP_T1(S)
 		STOP_T3(S)
@@ -4248,8 +4242,8 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 				      discard_i_queue (S);
 				      // dl disconnect *indication*
 				      text_color_set(DW_COLOR_INFO);
-				      dw_printf ("Stream %d: Disconnected from %s.\n", S.stream_id, &S.addrs[PEERCALL][0]);
-				      server_link_terminated (S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0);
+				      dw_printf ("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL]);
+				      server_link_terminated (S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], 0);
 				      STOP_T1;
 				      enter_new_state (S, state_0_disconnected, __func__, __LINE__);
 				    } else {
@@ -4269,9 +4263,9 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 
 		if f == 1 {
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("%s doesn't understand AX.25 v2.2.  Trying v2.0 ...\n", C.GoString(&S.addrs[PEERCALL][0]))
+			dw_printf("%s doesn't understand AX.25 v2.2.  Trying v2.0 ...\n", S.addrs[PEERCALL])
 			dw_printf("You can avoid this failed attempt and speed up the\n")
-			dw_printf("process by putting \"V20 %s\" in the configuration file.\n", C.GoString(&S.addrs[PEERCALL][0]))
+			dw_printf("process by putting \"V20 %s\" in the configuration file.\n", S.addrs[PEERCALL])
 
 			INIT_T1V_SRT(S)
 
@@ -4359,13 +4353,13 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 					_v = "v2.2"
 				}
 				// TODO: add via if appropriate.
-				dw_printf("Stream %d: Connected to %s.  (%s)\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]), _v)
+				dw_printf("Stream %d: Connected to %s.  (%s)\n", S.stream_id, S.addrs[PEERCALL], _v)
 				// There is a subtle difference here between connect confirm and indication.
 				// connect *confirm* means "has been made"
 				// The AGW API distinguishes between incoming (initiated by other station) and
 				// outgoing (initiated by me) connections.
-				var incoming C.int = 0
-				server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+				var incoming = false
+				server_link_established(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], incoming)
 			} else if S.vs != S.va {
 				// #if 1
 				// Erratum: 2006 version has this.
@@ -4390,15 +4384,15 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 				if S.state == state_5_awaiting_v22_connection {
 					_v = "v2.2"
 				}
-				dw_printf("Stream %d: Connected to %s.  (%s)\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]), _v)
+				dw_printf("Stream %d: Connected to %s.  (%s)\n", S.stream_id, S.addrs[PEERCALL], _v)
 
 				// Erratum: 2006 version says DL-CONNECT *confirm* but original has *indication*.
 
 				// connect *indication* means "has been requested".
 				// *confirm* seems right because we got a reply from the other side.
 
-				var incoming C.int = 0
-				server_link_established(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], incoming)
+				var incoming = false
+				server_link_established(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], incoming)
 			}
 
 			STOP_T1(S)
@@ -4453,8 +4447,8 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 
 		if f == 1 {
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		} else {
@@ -4544,9 +4538,9 @@ func frmr_frame(S *ax25_dlsm_t) {
 	case state_5_awaiting_v22_connection:
 
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("%s doesn't understand AX.25 v2.2.  Trying v2.0 ...\n", C.GoString(&S.addrs[PEERCALL][0]))
+		dw_printf("%s doesn't understand AX.25 v2.2.  Trying v2.0 ...\n", S.addrs[PEERCALL])
 		dw_printf("You can avoid this failed attempt and speed up the\n")
-		dw_printf("process by putting \"V20 %s\" in the configuration file.\n", C.GoString(&S.addrs[PEERCALL][0]))
+		dw_printf("process by putting \"V20 %s\" in the configuration file.\n", S.addrs[PEERCALL])
 
 		INIT_T1V_SRT(S)
 
@@ -4622,7 +4616,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
 				var nopid int = 0 // PID applies only for I and UI frames.
 
 				var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, pf, nopid, nil)
-				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+				lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			}
 
 		case state_3_connected, state_4_timer_recovery:
@@ -4710,7 +4704,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 					var nopid int = 0
 					var f int = -1
 					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, xinfo)
-					lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+					lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -4751,7 +4745,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 				   	          packet_t pp;
 
 				   	          pp = ax25_u_frame (S.addrs, S.num_addr, cmd, frame_type_U_TEST, p, nopid, (unsigned char *)info, (int)strlen(info));
-				   	          lm_data_request (S.channel, TQ_PRIO_1_LO, pp);
+				   	          lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
 				   	        }
 				   #endif
 				*/
@@ -4808,7 +4802,7 @@ func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 
 	if cr == cr_cmd {
 		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 	}
 } /* end test_frame */
 
@@ -4918,8 +4912,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 		if S.rc == S.n2_retry {
 			discard_i_queue(S)
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Failed to connect to %s after %d tries.\n", C.GoString(&S.addrs[PEERCALL][0]), S.n2_retry)
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 1)
+			dw_printf("Failed to connect to %s after %d tries.\n", S.addrs[PEERCALL], S.n2_retry)
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], true)
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			var cmd = cr_cmd
@@ -4936,7 +4930,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 				_s = frame_type_U_SABME
 			}
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, _s, p, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			select_t1_value(S)
 			START_T1(S)
 			// Keep same state.
@@ -4946,8 +4940,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 
 		if S.rc == S.n2_retry {
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 0)
+			dw_printf("Stream %d: Disconnected from %s.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], false)
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			var cmd = cr_cmd
@@ -4960,7 +4954,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			}
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			select_t1_value(S)
 			START_T1(S)
 			// stay in same state
@@ -5004,8 +4998,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Stream %d: Disconnected from %s due to timeouts.\n", S.stream_id, C.GoString(&S.addrs[PEERCALL][0]))
-			server_link_terminated(S.channel, S.client, &S.addrs[PEERCALL][0], &S.addrs[OWNCALL][0], 1)
+			dw_printf("Stream %d: Disconnected from %s due to timeouts.\n", S.stream_id, S.addrs[PEERCALL])
+			server_link_terminated(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], true)
 
 			discard_i_queue(S)
 
@@ -5014,7 +5008,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			var nopid int = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			enter_new_state(S, state_0_disconnected)
 		} else {
@@ -5130,7 +5124,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			var xinfo = xid_encode(&param, cmd)
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			START_TM201(S)
 		}
@@ -5201,7 +5195,7 @@ func establish_data_link(S *ax25_dlsm_t) {
 	}
 
 	var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frameType, p, nopid, nil)
-	lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+	lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 	STOP_T3(S)
 	START_T1(S)
@@ -5299,7 +5293,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
 	}
 	var pp = ax25_s_frame(S.addrs, S.num_addr, cmd, ft, S.modulo, nr, p, nil)
 
-	lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+	lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 	S.acknowledge_pending = false
 	START_T1(S)
@@ -5367,7 +5361,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			// I'm busy.
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
 		} else if S.srej_enable == srej_single || S.srej_enable == srej_multi {
@@ -5416,7 +5410,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 				// Not waiting for fill in of missing frames.		X.25 2.4.6.11 c)
 
 				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+				lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 				S.acknowledge_pending = false
 			}
@@ -5435,7 +5429,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			}
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false
 		}
@@ -5449,7 +5443,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			_r = frame_type_S_RNR
 		}
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, _r, S.modulo, nr, f, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
 	}
@@ -5462,7 +5456,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 		// Erratum:  Flow chart says RR/RNR command but I'm confident it should be response.
 
 			pp = ax25_s_frame (S.addrs, S.num_addr, cr, S.own_receiver_busy ? frame_type_S_RNR : frame_type_S_RR, S.modulo, nr, f, nil, 0);
-			lm_data_request (S.channel, TQ_PRIO_1_LO, pp);
+			lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
 
 			S.acknowledge_pending = 0;
 
@@ -5533,9 +5527,9 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 			}
 
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p,
-				int(S.txdata_by_ns[ns].pid), C.GoBytes(unsafe.Pointer(&S.txdata_by_ns[ns].data[0]), S.txdata_by_ns[ns].len))
+				S.txdata_by_ns[ns].pid, S.txdata_by_ns[ns].data[:S.txdata_by_ns[ns].len])
 
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 			// Keep it around in case we need to send again.
 
 			sent_count++
@@ -5781,7 +5775,7 @@ func select_t1_value(S *ax25_dlsm_t) {
 	// TODO: Add some instrumentation to record where this was called from and all the values in the printf below.
 
 	// TODO KG #if 1
-	if S.t1v < 250*time.Millisecond || S.t1v > 2*time.Duration(C.int(g_misc_config_p.frack)*(2*(S.num_addr-2)+1))*time.Second {
+	if S.t1v < 250*time.Millisecond || S.t1v > 2*time.Duration(g_misc_config_p.frack*(2*(S.num_addr-2)+1))*time.Second {
 		INIT_T1V_SRT(S)
 	}
 	/* TODO KG
@@ -5806,7 +5800,7 @@ func select_t1_value(S *ax25_dlsm_t) {
 func set_version_2_0(S *ax25_dlsm_t) {
 	S.srej_enable = srej_none
 	S.modulo = 8
-	S.n1_paclen = C.int(g_misc_config_p.paclen)
+	S.n1_paclen = g_misc_config_p.paclen
 	S.k_maxframe = g_misc_config_p.maxframe_basic
 	S.n2_retry = g_misc_config_p.retry
 } /* end set_version_2_0 */
@@ -5821,7 +5815,7 @@ func set_version_2_2(S *ax25_dlsm_t) {
 	S.srej_enable = srej_single // Start with single.
 	// Can be increased to multi with XID exchange.
 	S.modulo = 128
-	S.n1_paclen = C.int(g_misc_config_p.paclen)
+	S.n1_paclen = g_misc_config_p.paclen
 	S.k_maxframe = g_misc_config_p.maxframe_extended
 	S.n2_retry = g_misc_config_p.retry
 } /* end set_version_2_2 */
@@ -5972,14 +5966,14 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 				// ax25_safe_print (txdata.data, txdata.len, 1);
 				// dw_printf ("\"\n");
 			}
-			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, int(txdata.pid), C.GoBytes(unsafe.Pointer(&txdata.data[0]), txdata.len))
+			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, txdata.pid, txdata.data[:txdata.len])
 
 			if s_debug_misc { //nolint:staticcheck
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
 			}
 
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 			// Stash in sent array in case it gets lost and needs to be sent again.
 
@@ -6061,11 +6055,11 @@ func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
 	if (new_state == state_3_connected || new_state == state_4_timer_recovery) &&
 		S.state != state_3_connected && S.state != state_4_timer_recovery {
 
-		ptt_set(OCTYPE_CON, int(S.channel), 1) // Turn on connected indicator if configured.
+		ptt_set(OCTYPE_CON, S.channel, 1) // Turn on connected indicator if configured.
 	} else if (new_state != state_3_connected && new_state != state_4_timer_recovery) &&
 		(S.state == state_3_connected || S.state == state_4_timer_recovery) {
 
-		ptt_set(OCTYPE_CON, int(S.channel), 0) // Turn off connected indicator if configured.
+		ptt_set(OCTYPE_CON, S.channel, 0) // Turn off connected indicator if configured.
 		// Ideally we should look at any other link state machines
 		// for this channel and leave the indicator on if any
 		// are connected.  I'm not that worried about it.
@@ -6093,7 +6087,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 	// Obviously this applies only to v2.2 because XID was not part of v2.0.
 
 	for _, addr := range g_misc_config_p.noxid_addrs {
-		if C.GoString(&S.addrs[PEERCALL][0]) == addr {
+		if S.addrs[PEERCALL] == addr {
 			return
 		}
 	}
@@ -6110,7 +6104,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 		var p int = 1
 		var nopid int = 0
 		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		lm_data_request(C.int(S.channel), TQ_PRIO_1_LO, pp)
 
 		S.mdl_rc = 0
 		START_TM201(S)
@@ -6142,7 +6136,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	param.modulo = S.modulo
-	param.i_field_length_rx = int(S.n1_paclen) // Hmmmm.  Should we ask for what the user
+	param.i_field_length_rx = S.n1_paclen // Hmmmm.  Should we ask for what the user
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
 	param.window_size_rx = S.k_maxframe
@@ -6273,7 +6267,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	if param.i_field_length_rx != G_UNKNOWN {
-		S.n1_paclen = C.int(param.i_field_length_rx)
+		S.n1_paclen = param.i_field_length_rx
 	}
 
 	if param.window_size_rx != G_UNKNOWN {

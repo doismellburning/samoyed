@@ -8,6 +8,8 @@ import "C"
 
 import (
 	"fmt"
+	"strings"
+	"unicode"
 	"unsafe"
 )
 
@@ -405,27 +407,6 @@ func il2p_type_1_header(pp *packet_t, max_fec C.int, hdr *C.uchar) C.int {
 // This should create a packet from the IL2P header.
 // The information part will not be filled in.
 
-func trim(stuff *C.char) {
-	if C.strlen(stuff) == 0 {
-		return
-	}
-
-	// strlen >= 1
-
-	for i := C.strlen(stuff) - 1; ; i-- {
-		if i == 0 {
-			break
-		}
-
-		var p = (*C.char)(unsafe.Add(unsafe.Pointer(stuff), i))
-		if *p == ' ' {
-			*p = 0
-		} else {
-			break
-		}
-	}
-}
-
 /*--------------------------------------------------------------------------------
  *
  * Function:	il2p_decode_header_type_1
@@ -453,9 +434,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 
 	// First get the addresses including SSID.
 
-	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
-	var num_addr C.int = 2
-	C.memset(unsafe.Pointer(&addrs[0]), 0, 2*AX25_MAX_ADDR_LEN)
+	var addrs [AX25_MAX_ADDRS]string
+	var num_addr = 2
 
 	// The IL2P header uses 2 parity symbols which means a single corrupted symbol (byte)
 	// can always be corrected.
@@ -480,12 +460,14 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 	// The address fields should be all binary zero values.
 	// Someone overly ambitious might check the addresses found in the first payload block.
 
+	var byteBuf []byte
 	for i := 0; i <= 5; i++ {
-		addrs[AX25_DESTINATION][i] = C.char(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i)) & C.uchar(0x3f)))
+		byteBuf = append(byteBuf, byte(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i))&C.uchar(0x3f))))
 	}
-	trim(&addrs[AX25_DESTINATION][0])
-	for i := C.int(0); i < C.int(C.strlen(&addrs[AX25_DESTINATION][0])); i++ {
-		if C.isupper(C.int(addrs[AX25_DESTINATION][i])) == 0 && C.isdigit(C.int(addrs[AX25_DESTINATION][i])) == 0 {
+	addrs[AX25_DESTINATION] = strings.TrimSpace(string(byteBuf))
+
+	for _, c := range addrs[AX25_DESTINATION] {
+		if !unicode.IsUpper(c) && !unicode.IsDigit(c) { // TODO KG How can this be true?
 			if num_sym_changed == 0 { //nolint:staticcheck
 				// This can pop up sporadically when receiving random noise.
 				// Would be better to show only when debug is enabled but variable not available here.
@@ -497,14 +479,16 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		}
 	}
 	var destSSID = int((*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12)) >> 4) & 0xf)
-	C.strcat(&addrs[AX25_DESTINATION][0], C.CString(fmt.Sprintf("-%d", destSSID))) // TODO KG This is a bit grim and makes some assumptions about lengths but should do for now
+	addrs[AX25_DESTINATION] += fmt.Sprintf("-%d", destSSID)
 
+	byteBuf = []byte{}
 	for i := 0; i <= 5; i++ {
-		addrs[AX25_SOURCE][i] = C.char(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i+6)) & C.uchar(0x3f)))
+		byteBuf = append(byteBuf, byte(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i+6))&C.uchar(0x3f))))
 	}
-	trim(&addrs[AX25_SOURCE][0])
-	for i := C.int(0); i < C.int(C.strlen(&addrs[AX25_SOURCE][0])); i++ {
-		if C.isupper(C.int(addrs[AX25_SOURCE][i])) == 0 && C.isdigit(C.int(addrs[AX25_SOURCE][i])) == 0 {
+	addrs[AX25_SOURCE] = strings.TrimSpace(string(byteBuf))
+
+	for _, c := range addrs[AX25_SOURCE] {
+		if !unicode.IsUpper(c) && !unicode.IsDigit(c) {
 			if num_sym_changed == 0 { //nolint:staticcheck
 				// This can pop up sporadically when receiving random noise.
 				// Would be better to show only when debug is enabled but variable not available here.
@@ -516,7 +500,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		}
 	}
 	var srcSSID = int((*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12))) & 0xf)
-	C.strcat(&addrs[AX25_SOURCE][0], C.CString(fmt.Sprintf("-%d", srcSSID))) // TODO KG This is a bit grim and makes some assumptions about lengths but should do for now
+	addrs[AX25_SOURCE] += fmt.Sprintf("-%d", srcSSID)
 
 	// The PID field gives us the general type.
 	// 0 = 'S' frame.

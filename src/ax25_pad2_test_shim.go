@@ -28,10 +28,10 @@ func ax25_pad2_test_main(t *testing.T) {
 	var pid int = 0xf0
 	var info []byte
 
-	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
-	C.strcpy(&addrs[0][0], C.CString("W2UB"))
-	C.strcpy(&addrs[1][0], C.CString("WB2OSZ-15"))
-	var num_addr C.int = 2
+	var addrs [AX25_MAX_ADDRS]string
+	addrs[0] = "W2UB"
+	addrs[1] = "WB2OSZ-15"
+	var num_addr = 2
 
 	/* U frame */
 
@@ -88,7 +88,7 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	/* S frame */
 
-	C.strcpy(&addrs[2][0], C.CString("DIGI1-1"))
+	addrs[2] = "DIGI1-1"
 	num_addr = 3
 
 	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
