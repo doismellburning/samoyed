@@ -1,14 +1,14 @@
 #!/bin/bash
 
-ATEST="$(dirname "$(realpath "$0")")/../dist/samoyed-atest"
+ATEST="${ATEST:-$(dirname "$(realpath "$0")")/../dist/samoyed-atest}"
 export ATEST
 
-FXSEND="$(dirname "$(realpath "$0")")/../dist/samoyed-fxsend"
+FXSEND="${FXSEND:-$(dirname "$(realpath "$0")")/../dist/samoyed-fxsend}"
 export FXSEND
-FXREC="$(dirname "$(realpath "$0")")/../dist/samoyed-fxrec"
+FXREC="${FXREC:-$(dirname "$(realpath "$0")")/../dist/samoyed-fxrec}"
 export FXREC
 
-GEN_PACKETS="$(dirname "$(realpath "$0")")/../dist/samoyed-gen_packets"
+GEN_PACKETS="${GEN_PACKETS:-$(dirname "$(realpath "$0")")/../dist/samoyed-gen_packets}"
 export GEN_PACKETS
 
 function goto_tmpdir() {
