@@ -235,7 +235,7 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 	#else
 	*/
 
-	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
+	var a = ACHAN2ADEV(int(channel)) /* device for channel. */
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
@@ -255,8 +255,8 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 	for j := 0; j < nsamples; j++ {
 
 		tone_phase += f1_change_per_sample
-		var sam = C.int(SineTable[(tone_phase>>24)&0xff])
-		gen_tone_put_sample(channel, a, sam)
+		var sam = SineTable[(tone_phase>>24)&0xff]
+		gen_tone_put_sample(int(channel), a, sam)
 	}
 
 	// TODO KG #endif
@@ -285,8 +285,8 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
 		}
 	#else
 	*/
-	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
-	var sam C.int = 0
+	var a = ACHAN2ADEV(int(channel)) /* device for channel. */
+	var sam = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
@@ -298,7 +298,7 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
 
 	for j := 0; j < nsamples; j++ {
 
-		gen_tone_put_sample(channel, a, sam)
+		gen_tone_put_sample(int(channel), a, sam)
 
 	}
 	// TODO KG #endif
@@ -323,8 +323,8 @@ func morse_quiet_ms(channel C.int, ms C.int) {
 	#if MTEST1
 	#else
 	*/
-	var a = C.int(ACHAN2ADEV(int(channel))) /* device for channel. */
-	var sam C.int = 0
+	var a = ACHAN2ADEV(int(channel)) /* device for channel. */
+	var sam = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
@@ -335,7 +335,7 @@ func morse_quiet_ms(channel C.int, ms C.int) {
 	var nsamples = int(float64(ms*C.int(save_audio_config_p.adev[a].samples_per_sec)/1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-		gen_tone_put_sample(channel, a, sam)
+		gen_tone_put_sample(int(channel), a, sam)
 	}
 
 	// TODO KG #endif
