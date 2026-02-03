@@ -6,16 +6,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <time.h>
-// #include <math.h>
-import "C"
-
 import (
 	"math"
 	"unicode"
@@ -28,7 +18,7 @@ import (
 
 const MORSE_TONE = 800
 
-func TIME_UNITS_TO_MS(tu C.int, wpm C.int) float64 {
+func TIME_UNITS_TO_MS(tu int, wpm int) float64 {
 	return (float64((tu)*1200.0) / float64(wpm))
 }
 
@@ -125,7 +115,7 @@ var SineTable [256]int
  *
  *----------------------------------------------------------------*/
 
-func morse_init(audio_config_p *audio_s, amp C.int) {
+func morse_init(audio_config_p *audio_s, amp int) {
 	/*
 	 * Save away modem parameters for later use.
 	 */
@@ -166,9 +156,9 @@ func morse_init(audio_config_p *audio_s, amp C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func morse_send(channel C.int, str string, wpm C.int, txdelay C.int, txtail C.int) C.int {
+func morse_send(channel int, str string, wpm int, txdelay int, txtail int) int {
 
-	var time_units C.int = 0
+	var time_units = 0
 
 	morse_quiet_ms(channel, txdelay)
 
@@ -206,9 +196,9 @@ func morse_send(channel C.int, str string, wpm C.int, txdelay C.int, txtail C.in
 		dw_printf("morse: Internal error.  Inconsistent length, %d vs. %d calculated.\n", time_units, morse_units_str(str))
 	}
 
-	audio_flush(ACHAN2ADEV(int(channel)))
+	audio_flush(ACHAN2ADEV(channel))
 
-	return (txdelay + C.int(TIME_UNITS_TO_MS(time_units, wpm)+0.5) + txtail)
+	return (txdelay + int(TIME_UNITS_TO_MS(time_units, wpm)+0.5) + txtail)
 
 } /* end morse_send */
 
@@ -224,7 +214,7 @@ func morse_send(channel C.int, str string, wpm C.int, txdelay C.int, txtail C.in
  *
  *--------------------------------------------------------------------*/
 
-func morse_tone(channel C.int, tu C.int, wpm C.int) {
+func morse_tone(channel int, tu int, wpm int) {
 
 	/* TODO KG
 	#if MTEST1
@@ -235,7 +225,7 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 	#else
 	*/
 
-	var a = ACHAN2ADEV(int(channel)) /* device for channel. */
+	var a = ACHAN2ADEV(channel) /* device for channel. */
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
@@ -245,10 +235,10 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 
 	// Phase accumulator for tone generation.
 	// Upper bits are used as index into sine table.
-	var tone_phase C.int = 0
+	var tone_phase = 0
 
 	// How much to advance phase for each audio sample.
-	var f1_change_per_sample = (C.int)(((MORSE_TONE * TICKS_PER_CYCLE) / float64(save_audio_config_p.adev[a].samples_per_sec)) + 0.5)
+	var f1_change_per_sample = (int)(((MORSE_TONE * TICKS_PER_CYCLE) / float64(save_audio_config_p.adev[a].samples_per_sec)) + 0.5)
 
 	var nsamples = (int)((TIME_UNITS_TO_MS(tu, wpm) * float64(save_audio_config_p.adev[a].samples_per_sec/1000.)) + 0.5)
 
@@ -256,7 +246,7 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
 
 		tone_phase += f1_change_per_sample
 		var sam = SineTable[(tone_phase>>24)&0xff]
-		gen_tone_put_sample(int(channel), a, sam)
+		gen_tone_put_sample(channel, a, sam)
 	}
 
 	// TODO KG #endif
@@ -275,7 +265,7 @@ func morse_tone(channel C.int, tu C.int, wpm C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func morse_quiet(channel C.int, tu C.int, wpm C.int) {
+func morse_quiet(channel int, tu int, wpm int) {
 
 	/* TODO KG
 	#if MTEST1
@@ -285,7 +275,7 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
 		}
 	#else
 	*/
-	var a = ACHAN2ADEV(int(channel)) /* device for channel. */
+	var a = ACHAN2ADEV(channel) /* device for channel. */
 	var sam = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
@@ -298,7 +288,7 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
 
 	for j := 0; j < nsamples; j++ {
 
-		gen_tone_put_sample(int(channel), a, sam)
+		gen_tone_put_sample(channel, a, sam)
 
 	}
 	// TODO KG #endif
@@ -317,13 +307,13 @@ func morse_quiet(channel C.int, tu C.int, wpm C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func morse_quiet_ms(channel C.int, ms C.int) {
+func morse_quiet_ms(channel int, ms int) {
 
 	/* TODO KG
 	#if MTEST1
 	#else
 	*/
-	var a = ACHAN2ADEV(int(channel)) /* device for channel. */
+	var a = ACHAN2ADEV(channel) /* device for channel. */
 	var sam = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
@@ -332,10 +322,10 @@ func morse_quiet_ms(channel C.int, ms C.int) {
 		return
 	}
 
-	var nsamples = int(float64(ms*C.int(save_audio_config_p.adev[a].samples_per_sec)/1000.) + 0.5)
+	var nsamples = int(float64(ms*save_audio_config_p.adev[a].samples_per_sec/1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-		gen_tone_put_sample(int(channel), a, sam)
+		gen_tone_put_sample(channel, a, sam)
 	}
 
 	// TODO KG #endif
@@ -391,7 +381,7 @@ func morse_lookup(ch rune) int {
  *
  *--------------------------------------------------------------------*/
 
-func morse_units_ch(ch rune) C.int {
+func morse_units_ch(ch rune) int {
 
 	var i = morse_lookup(ch)
 
@@ -400,7 +390,7 @@ func morse_units_ch(ch rune) C.int {
 	}
 
 	var enc = MORSE[i].enc
-	var length = C.int(len(enc))
+	var length = len(enc)
 	var units = length - 1
 
 	for _, k := range enc {
@@ -432,9 +422,9 @@ func morse_units_ch(ch rune) C.int {
  *
  *--------------------------------------------------------------------*/
 
-func morse_units_str(str string) C.int {
+func morse_units_str(str string) int {
 
-	var units = C.int(len(str)-1) * 3
+	var units = (len(str) - 1) * 3
 
 	for _, k := range str {
 		units += morse_units_ch(k)

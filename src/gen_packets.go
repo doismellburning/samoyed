@@ -473,7 +473,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	gen_tone_init(&modem, *amplitude/2, true)
-	morse_init(&modem, C.int(*amplitude/2))
+	morse_init(&modem, *amplitude/2)
 	dtmf_init(&modem, *amplitude/2)
 
 	// We don't have -d or -q options here.
@@ -770,7 +770,7 @@ func send_packet(str string) {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
 
-		morse_send(0, str, C.int(g_morse_wpm), 100, 100)
+		morse_send(0, str, g_morse_wpm, 100, 100)
 	} else if modem.achan[0].modem_type == MODEM_EAS {
 		// Generate EAS SAME signal FOR RESEARCH AND TESTING ONLY!!!
 		// There could be legal consequences for sending unauhorized SAME
