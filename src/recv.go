@@ -143,7 +143,7 @@ func recv_adev_thread(a int) {
 
 			// Future?  provide more flexible mapping.
 			// i.e. for each valid channel where audio_source[] is first_chan+c.
-			multi_modem_process_sample(first_chan+c, C.int(audio_sample))
+			multi_modem_process_sample(int(first_chan+c), audio_sample)
 
 			/* Originally, the DTMF decoder was always active. */
 			/* It took very little CPU time and the thinking was that an */

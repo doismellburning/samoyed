@@ -264,7 +264,7 @@ func eas_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, future
 			#endif
 		*/
 		var alevel = demod_get_audio_level(channel, subchannel)
-		multi_modem_process_rec_frame(channel, subchannel, slice, &H.frame_buf[0], H.frame_len, alevel, 0, 0)
+		multi_modem_process_rec_frame(int(channel), int(subchannel), int(slice), C.GoBytes(unsafe.Pointer(&H.frame_buf[0]), H.frame_len), alevel, 0, 0)
 		H.eas_gathering = false
 	}
 
