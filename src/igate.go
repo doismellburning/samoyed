@@ -1477,7 +1477,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			#else
 			*/
 			/* This consumes packet so don't reference it again! */
-			tq_append(C.int(to_chan), TQ_PRIO_1_LO, pradio)
+			tq_append(to_chan, TQ_PRIO_1_LO, pradio)
 			// TODO KG #endif
 			stats_rf_xmit_packets++ // Any type of packet.
 

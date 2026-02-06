@@ -150,7 +150,7 @@ func tq_init(audio_config_p *audio_s) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_append(channel C.int, prio C.int, pp *packet_t) {
+func tq_append(channel int, prio int, pp *packet_t) {
 
 	/* TODO KG
 	#if DEBUG
@@ -206,14 +206,14 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
-			igate_send_rec_packet(int(channel), pp)
+			igate_send_rec_packet(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
-			nettnc_send_packet(channel, pp)
+			nettnc_send_packet(C.int(channel), pp)
 
 		}
 
@@ -260,7 +260,7 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if ax25_is_aprs(pp) && tq_count(channel, prio, C.CString(""), C.CString(""), 0) > 100 {
+	if ax25_is_aprs(pp) && tq_count(channel, prio, "", "", false) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
@@ -383,7 +383,7 @@ func tq_append(channel C.int, prio C.int, pp *packet_t) {
 
 // TODO: FIXME:  this is a copy of tq_append.  Need to fine tune and explain why.
 
-func lm_data_request(channel C.int, prio C.int, pp *packet_t) {
+func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	/* TODO KG
 	#if DEBUG
@@ -428,7 +428,7 @@ func lm_data_request(channel C.int, prio C.int, pp *packet_t) {
 	 * Is transmit queue out of control?
 	 */
 
-	if tq_count(channel, prio, C.CString(""), C.CString(""), 0) > 250 {
+	if tq_count(channel, prio, "", "", false) > 250 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Warning: Transmit packet queue for channel %d is extremely long.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
@@ -542,7 +542,7 @@ func lm_data_request(channel C.int, prio C.int, pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func lm_seize_request(channel C.int) {
+func lm_seize_request(channel int) {
 
 	var prio = TQ_PRIO_1_LO
 
@@ -635,7 +635,7 @@ func lm_seize_request(channel C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_wait_while_empty(channel C.int) {
+func tq_wait_while_empty(channel int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -718,7 +718,7 @@ func tq_wait_while_empty(channel C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_remove(channel C.int, prio C.int) *packet_t {
+func tq_remove(channel int, prio int) *packet_t {
 
 	/* TODO KG
 	#if DEBUG
@@ -777,7 +777,7 @@ func tq_remove(channel C.int, prio C.int) *packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func tq_peek(channel C.int, prio C.int) *packet_t {
+func tq_peek(channel int, prio int) *packet_t {
 
 	/* TODO KG
 	#if DEBUG
@@ -826,7 +826,7 @@ func tq_peek(channel C.int, prio C.int) *packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func tq_is_empty(channel C.int) bool {
+func tq_is_empty(channel int) bool {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
@@ -867,7 +867,7 @@ func tq_is_empty(channel C.int) bool {
 
 //#define DEBUG2 1
 
-func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.int) C.int {
+func tq_count(channel int, prio int, source string, dest string, bytes bool) int {
 
 	/* TODO KG
 	#if DEBUG2
@@ -884,7 +884,7 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR - tq_count(%d, %d, \"%s\", \"%s\", %d)\n", channel, prio, C.GoString(source), C.GoString(dest), bytes)
+		dw_printf("INTERNAL ERROR - tq_count(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
 		return (0)
 	}
 
@@ -902,16 +902,16 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 
 	tq_mutex.Lock()
 
-	var n C.int = 0 // Result.  Number of bytes or packets.
+	var n = 0 // Result.  Number of bytes or packets.
 	var pp = queue_head[channel][prio]
 
 	for pp != nil {
 		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
 			// Consider only real packets.
 
-			var count_it C.int = 1
+			var count_it = 1
 
-			if source != nil && *source != 0 {
+			if source != "" {
 				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 				/* TODO KG
 				#if DEBUG2
@@ -920,11 +920,11 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 					    dw_printf ("tq_count: compare to frame source %s\n", frame_source);
 				#endif
 				*/
-				if C.strcmp(source, C.CString(frame_source)) != 0 {
+				if source != frame_source {
 					count_it = 0
 				}
 			}
-			if count_it > 0 && dest != nil && *dest != 0 {
+			if count_it > 0 && dest != "" {
 				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 				/* TODO KG
 				#if DEBUG2
@@ -933,14 +933,14 @@ func tq_count(channel C.int, prio C.int, source *C.char, dest *C.char, bytes C.i
 					    dw_printf ("tq_count: compare to frame destination %s\n", frame_dest);
 				#endif
 				*/
-				if C.strcmp(dest, C.CString(frame_dest)) != 0 {
+				if dest != frame_dest {
 					count_it = 0
 				}
 			}
 
 			if count_it > 0 {
-				if bytes > 0 {
-					n += C.int(ax25_get_frame_len(pp))
+				if bytes {
+					n += ax25_get_frame_len(pp)
 				} else {
 					n++
 				}

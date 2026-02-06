@@ -373,7 +373,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 func xmit_thread(channel int) {
 
 	for {
-		tq_wait_while_empty(C.int(channel))
+		tq_wait_while_empty(channel)
 		/* TODO KG
 		#if DEBUG
 			  text_color_set(DW_COLOR_DEBUG);
@@ -382,7 +382,7 @@ func xmit_thread(channel int) {
 		*/
 
 		// Does this extra loop offer any benefit?
-		for tq_peek(C.int(channel), TQ_PRIO_0_HI) != nil || tq_peek(C.int(channel), TQ_PRIO_1_LO) != nil {
+		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
 
 			/*
 			 * Wait for the channel to be clear.
@@ -391,12 +391,12 @@ func xmit_thread(channel int) {
 			 */
 			var ok = wait_for_clear_channel(channel, xmit_slottime[channel], xmit_persist[channel], xmit_fulldup[channel])
 
-			var prio C.int = TQ_PRIO_1_LO
-			var pp = tq_remove(C.int(channel), TQ_PRIO_0_HI)
+			var prio = TQ_PRIO_1_LO
+			var pp = tq_remove(channel, TQ_PRIO_0_HI)
 			if pp != nil {
 				prio = TQ_PRIO_0_HI
 			} else {
-				pp = tq_remove(C.int(channel), TQ_PRIO_1_LO)
+				pp = tq_remove(channel, TQ_PRIO_1_LO)
 			}
 
 			/* TODO KG
@@ -453,7 +453,7 @@ func xmit_thread(channel int) {
 						xmit_dtmf(channel, pp, speed)
 
 					case FLAVOR_APRS_DIGI:
-						xmit_ax25_frames(channel, int(prio), pp, 1) /* 1 means don't bundle */
+						xmit_ax25_frames(channel, prio, pp, 1) /* 1 means don't bundle */
 						// I don't know if this in some official specification
 						// somewhere, but it is generally agreed that APRS digipeaters
 						// should send only one frame at a time rather than
@@ -461,7 +461,7 @@ func xmit_thread(channel int) {
 						// Discussion here:  http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2021-September/049034.html
 
 					default:
-						xmit_ax25_frames(channel, int(prio), pp, 256)
+						xmit_ax25_frames(channel, prio, pp, 256)
 					}
 
 					// Corresponding lock is in wait_for_clear_channel.
@@ -481,7 +481,7 @@ func xmit_thread(channel int) {
 					var pinfo = ax25_get_info(pp)
 
 					text_color_set(DW_COLOR_INFO)
-					dw_printf("[%d%c] ", channel, priorityToRune(int(prio)))
+					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", stemp) /* stations followed by : */
 					ax25_safe_print(pinfo, !ax25_is_aprs(pp))
@@ -662,11 +662,11 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 		 * Don't remove from queue yet because it might not be eligible.
 		 */
 		prio = TQ_PRIO_1_LO
-		pp = tq_peek(C.int(channel), TQ_PRIO_0_HI)
+		pp = tq_peek(channel, TQ_PRIO_0_HI)
 		if pp != nil {
 			prio = TQ_PRIO_0_HI
 		} else {
-			pp = tq_peek(C.int(channel), TQ_PRIO_1_LO)
+			pp = tq_peek(channel, TQ_PRIO_1_LO)
 		}
 
 		if pp != nil {
@@ -678,7 +678,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
 
-				pp = tq_remove(C.int(channel), C.int(prio))
+				pp = tq_remove(channel, prio)
 				/* TODO KG
 				#if DEBUG
 					        text_color_set(DW_COLOR_DEBUG);
@@ -1190,7 +1190,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 		 * Wait random time.
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
-		for tq_peek(C.int(channel), TQ_PRIO_0_HI) == nil {
+		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(slottime * 10)
 
 			if hdlc_rec_data_detect_any(C.int(channel)) > 0 {
