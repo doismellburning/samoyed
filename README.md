@@ -12,7 +12,11 @@ and with reduced platform scope to cut complexity and make it easier to extend.
 * Improve testing and linting infrastructure to ensure consistency and benefit from tooling support
 * Lean on the Go stdlib to leverage existing tooling
 * Maintain broad-strokes compatibility with Dire Wolf to minimise switching costs
-* Reduce platform compatibility (drop win32 support, possibly Windows and Mac entirely, older versions of Linux etc) to reduce complexity
+* Reduce platform compatibility (drop win32 support, possibly Windows and Mac entirely, older versions of Linux etc) to reduce complexity of the initial porting effort. Specifically:
+    * [Pentium 3 support](https://github.com/wb2osz/direwolf/blob/041f396de0ab2111b9ccc07960f8f083a81f9ad0/src/direwolf.c#L384-L424) and [Windows XP support](https://github.com/wb2osz/direwolf/blob/a231971a652bfb574a4bae9a5d875fbce53d2267/src/direwolf.h#L15-L43) will go away completely
+    * During the port, nothing other than x86_64 Linux will be supported
+    * (Re)growing arm64 support will be a priority after that
+    * Windows and Mac support will depend on demand / testability / cost of support
 * Remove reliance on preprocessor defines for test infrastructure and tooling to reduce complexity
 
 ## Dire Wolf
