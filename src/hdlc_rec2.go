@@ -753,7 +753,15 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 
 			// Sanity check for AIS.
 			if ais_check_length(int(H2.frame_buf[0]>>2)&0x3f, int(H2.frame_len)-2) == 0 {
-				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
+				multi_modem_process_rec_frame(
+					int(channel),
+					int(subchan),
+					int(slice),
+					C.GoBytes(unsafe.Pointer(&H2.frame_buf[0]), H2.frame_len-2),
+					alevel,
+					retry_conf.retry,
+					0,
+				) /* len-2 to remove FCS. */
 				return true
 			} else {
 				return false /* did not pass sanity check */
@@ -767,8 +775,8 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 
 			Assert(rrbb_get_chan(block) == channel)
 			Assert(rrbb_get_subchan(block) == subchan)
-			multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
-			return true                                                                                                           /* success */
+			multi_modem_process_rec_frame(int(channel), int(subchan), int(slice), C.GoBytes(unsafe.Pointer(&H2.frame_buf[0]), H2.frame_len-2), alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
+			return true                                                                                                                                                     /* success */
 
 		} else if passall {
 			if retry_conf_retry == RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
@@ -776,8 +784,8 @@ func try_decode(block *rrbb_t, channel C.int, subchan C.int, slice C.int, alevel
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
 
-				multi_modem_process_rec_frame(channel, subchan, slice, &H2.frame_buf[0], H2.frame_len-2, alevel, RETRY_MAX, 0) /* len-2 to remove FCS. */
-				return true                                                                                                    /* success */
+				multi_modem_process_rec_frame(int(channel), int(subchan), int(slice), C.GoBytes(unsafe.Pointer(&H2.frame_buf[0]), H2.frame_len-2), alevel, RETRY_MAX, 0) /* len-2 to remove FCS. */
+				return true                                                                                                                                              /* success */
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("try_decode: internal error passall = %t, retry_conf_retry = %d, retry_conf_type = %d\n",

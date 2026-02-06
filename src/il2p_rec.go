@@ -226,7 +226,7 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
-				multi_modem_process_rec_packet(channel, subchannel, slice, pp, alevel, retries, fec_type)
+				multi_modem_process_rec_packet(int(channel), int(subchannel), int(slice), pp, alevel, retries, fec_type)
 			}
 		} // end block for local variables.
 

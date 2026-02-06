@@ -74,7 +74,6 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"unsafe"
 )
 
 // Properties of the radio channels.
@@ -86,16 +85,16 @@ import (
 type candidate_t struct {
 	packet_p    *packet_t
 	alevel      alevel_t
-	speed_error C.float
+	speed_error float64
 	fec_type    fec_type_t // Type of FEC: none(0), fx25, il2p
 	retries     retry_t    // For the old "fix bits" strategy, this is the
 	// number of bits that were modified to get a good CRC.
 	// It would be 0 to something around 4.
 	// For FX.25, it is the number of corrected.
 	// This could be from 0 thru 32.
-	age   C.int
-	crc   C.uint
-	score C.int
+	age   int
+	crc   uint16
+	score int
 }
 
 var candidate [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]candidate_t
@@ -104,7 +103,7 @@ var candidate [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]candidate_t
 
 const PROCESS_AFTER_BITS = 3
 
-var process_age [MAX_RADIO_CHANS]C.int
+var process_age [MAX_RADIO_CHANS]int
 
 /*------------------------------------------------------------------------------
  *
@@ -132,7 +131,7 @@ func multi_modem_init(pa *audio_s) {
 	demod_init(save_audio_config_p)
 	hdlc_rec_init(save_audio_config_p)
 
-	for channel := C.int(0); channel < MAX_RADIO_CHANS; channel++ {
+	for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			if save_audio_config_p.achan[channel].baud <= 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -147,7 +146,7 @@ func multi_modem_init(pa *audio_s) {
 				real_baud = save_audio_config_p.achan[channel].baud / 3
 			}
 
-			process_age[channel] = C.int(PROCESS_AFTER_BITS * save_audio_config_p.adev[ACHAN2ADEV(int(channel))].samples_per_sec / real_baud)
+			process_age[channel] = PROCESS_AFTER_BITS * save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec / real_baud
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}
@@ -185,20 +184,20 @@ func multi_modem_init(pa *audio_s) {
  *
  *------------------------------------------------------------------------------*/
 
-var dc_average [MAX_RADIO_CHANS]C.float
+var dc_average [MAX_RADIO_CHANS]float64
 
-func multi_modem_get_dc_average(channel C.int) C.int {
+func multi_modem_get_dc_average(channel int) int {
 	// Scale to +- 200 so it will like the deviation measurement.
 
-	return ((C.int)((C.float)(dc_average[channel]) * (200.0 / 32767.0)))
+	return int(float64(dc_average[channel]) * (200.0 / 32767.0))
 }
 
-func multi_modem_process_sample(channel C.int, audio_sample C.int) {
+func multi_modem_process_sample(channel int, audio_sample int) {
 
 	// Accumulate an average DC bias level.
 	// Shouldn't happen with a soundcard but could with mistuned SDR.
 
-	dc_average[channel] = dc_average[channel]*0.999 + C.float(audio_sample)*0.001
+	dc_average[channel] = dc_average[channel]*0.999 + float64(audio_sample)*0.001
 
 	// Issue 128.  Someone ran into this.
 
@@ -222,7 +221,7 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
 
 	/* Send same thing to all. */
 	for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
-		demod_process_sample(int(channel), d, int(audio_sample))
+		demod_process_sample(channel, d, audio_sample)
 	}
 
 	for subchan := 0; subchan < save_audio_config_p.achan[channel].num_subchan; subchan++ {
@@ -232,7 +231,7 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
 			if candidate[channel][subchan][slice].packet_p != nil {
 				candidate[channel][subchan][slice].age++
 				if candidate[channel][subchan][slice].age > process_age[channel] {
-					if fx25_rec_busy(channel) > 0 {
+					if fx25_rec_busy(C.int(channel)) > 0 {
 						candidate[channel][subchan][slice].age = 0
 					} else {
 						pick_best_candidate(channel)
@@ -266,7 +265,7 @@ func multi_modem_process_sample(channel C.int, audio_sample C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fbuf *C.uchar, flen C.int, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
@@ -278,7 +277,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 	switch save_audio_config_p.achan[channel].modem_type {
 	case MODEM_AIS:
-		var nmea = ais_to_nmea(C.GoBytes(unsafe.Pointer(fbuf), flen))
+		var nmea = ais_to_nmea(fbuf)
 
 		// The intention is for the AIS sentences to go only to attached applications.
 		// e.g. SARTrack knows how to parse the AIS sentences.
@@ -292,12 +291,12 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
-		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, C.GoString((*C.char)(unsafe.Pointer(fbuf))))
+		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
 		pp = ax25_from_text(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:
-		pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(fbuf), flen), alevel)
+		pp = ax25_from_frame(fbuf, alevel)
 	}
 
 	multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
@@ -305,7 +304,7 @@ func multi_modem_process_rec_frame(channel C.int, subchan C.int, slice C.int, fb
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -319,7 +318,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 	 */
 	if save_audio_config_p.achan[channel].num_subchan == 1 &&
 		save_audio_config_p.achan[channel].num_slicers == 1 &&
-		fx25_rec_busy(channel) == 0 {
+		fx25_rec_busy(C.int(channel)) == 0 {
 
 		var drop_it = false
 		if save_audio_config_p.recv_error_rate != 0 {
@@ -338,7 +337,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 		if drop_it {
 			ax25_delete(pp)
 		} else {
-			dlq_rec_frame(int(channel), int(subchan), int(slice), pp, alevel, fec_type, retries, "")
+			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
 		return
 	}
@@ -360,7 +359,7 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 	candidate[channel][subchan][slice].fec_type = fec_type
 	candidate[channel][subchan][slice].retries = retries
 	candidate[channel][subchan][slice].age = 0
-	candidate[channel][subchan][slice].crc = C.uint(ax25_m_m_crc(pp))
+	candidate[channel][subchan][slice].crc = ax25_m_m_crc(pp)
 }
 
 /*-------------------------------------------------------------------
@@ -383,23 +382,23 @@ func multi_modem_process_rec_packet_real(channel C.int, subchan C.int, slice C.i
 /* multiple slicers are of questionable value for HF SSB. */
 
 // #define subchan_from_n(x) ((x) % save_audio_config_p.achan[channel].num_subchan)
-func subchan_from_n(channel C.int, x int) C.int {
-	return C.int((x) % save_audio_config_p.achan[channel].num_subchan)
+func subchan_from_n(channel int, x int) int {
+	return x % save_audio_config_p.achan[channel].num_subchan
 }
 
 // #define slice_from_n(x)   ((x) / save_audio_config_p.achan[channel].num_subchan)
-func slice_from_n(channel C.int, x int) C.int {
-	return C.int((x) / save_audio_config_p.achan[channel].num_subchan)
+func slice_from_n(channel int, x int) int {
+	return x / save_audio_config_p.achan[channel].num_subchan
 }
 
-func pick_best_candidate(channel C.int) {
+func pick_best_candidate(channel int) {
 
 	if save_audio_config_p.achan[channel].num_slicers < 1 {
 		save_audio_config_p.achan[channel].num_slicers = 1
 	}
 	var num_bars = save_audio_config_p.achan[channel].num_slicers * save_audio_config_p.achan[channel].num_subchan
 
-	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]C.char
+	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]byte
 
 	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
@@ -412,7 +411,7 @@ func pick_best_candidate(channel C.int) {
 		} else if candidate[channel][j][k].fec_type != fec_type_none { // FX.25 or IL2P
 			// FIXME: using retries both as an enum and later int too.
 			if (int)(candidate[channel][j][k].retries) <= 9 {
-				spectrum[n] = '0' + C.char(candidate[channel][j][k].retries)
+				spectrum[n] = '0' + byte(candidate[channel][j][k].retries)
 			} else {
 				spectrum[n] = '+'
 			}
@@ -430,14 +429,14 @@ func pick_best_candidate(channel C.int) {
 			candidate[channel][j][k].score = 0
 		} else {
 			if candidate[channel][j][k].fec_type != fec_type_none {
-				candidate[channel][j][k].score = 9000 - 100*C.int(candidate[channel][j][k].retries) // has FEC
+				candidate[channel][j][k].score = 9000 - 100*int(candidate[channel][j][k].retries) // has FEC
 			} else {
 				/* Originally, this produced 0 for the PASSALL case. */
 				/* This didn't work so well when looking for the best score. */
 				/* Around 1.3 dev H, we add an extra 1 in here so the minimum */
 				/* score should now be 1 for anything received.  */
 
-				candidate[channel][j][k].score = C.int(RETRY_MAX)*1000 - C.int(candidate[channel][j][k].retries*1000) + 1
+				candidate[channel][j][k].score = int(RETRY_MAX)*1000 - int(candidate[channel][j][k].retries*1000) + 1
 			}
 		}
 	}
@@ -459,7 +458,7 @@ func pick_best_candidate(channel C.int) {
 
 				if m != n && candidate[channel][mj][mk].packet_p != nil {
 					if candidate[channel][j][k].crc == candidate[channel][mj][mk].crc {
-						candidate[channel][j][k].score += C.int(num_bars+1) - C.int(math.Abs(float64(m-n)))
+						candidate[channel][j][k].score += (num_bars + 1) - int(math.Abs(float64(m-n)))
 					}
 				}
 			}
@@ -467,7 +466,7 @@ func pick_best_candidate(channel C.int) {
 	}
 
 	var best_n = 0
-	var best_score C.int = 0
+	var best_score = 0
 
 	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
@@ -551,12 +550,12 @@ func pick_best_candidate(channel C.int) {
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)
-		dlq_rec_frame(int(channel), int(j), int(k),
+		dlq_rec_frame(channel, j, k,
 			candidate[channel][j][k].packet_p,
 			candidate[channel][j][k].alevel,
 			candidate[channel][j][k].fec_type,
 			(candidate[channel][j][k].retries),
-			C.GoString(&spectrum[0]))
+			string(spectrum[:num_bars]))
 
 		/* Someone else owns it now and will delete it later. */
 		candidate[channel][j][k].packet_p = nil

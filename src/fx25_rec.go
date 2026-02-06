@@ -15,6 +15,7 @@ import "C"
 
 import (
 	"math/bits"
+	"unsafe"
 )
 
 type FX25RecState int
@@ -269,7 +270,7 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 
-					multi_modem_process_rec_frame(channel, subchannel, slice, &frame_buf[0], frame_len-2, alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
+					multi_modem_process_rec_frame(int(channel), int(subchannel), int(slice), C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}
 
 			} else {

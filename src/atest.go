@@ -559,7 +559,7 @@ o = DCD output control
 					continue
 				}
 
-				multi_modem_process_sample(C.int(c), C.int(audio_sample))
+				multi_modem_process_sample(c, audio_sample)
 			}
 
 			/* When a complete frame is accumulated, */

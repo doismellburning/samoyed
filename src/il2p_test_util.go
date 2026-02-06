@@ -40,7 +40,7 @@ func tone_gen_put_bit(channel int, data int) {
 
 // This is called when a complete frame has been deserialized.
 
-func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 	if rec_count < 0 {
 		return // Skip check before serdes test.
 	}
@@ -63,7 +63,7 @@ func multi_modem_process_rec_packet_fake(channel C.int, subchannel C.int, slice 
 	ax25_delete(pp)
 }
 
-func multi_modem_process_rec_packet(channel C.int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
 	if IL2P_TEST {
 		multi_modem_process_rec_packet_fake(channel, subchannel, slice, pp, alevel, retries, fec_type)
 	} else {
