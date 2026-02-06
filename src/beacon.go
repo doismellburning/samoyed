@@ -833,7 +833,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			var alevel alevel_t
 			dlq_rec_frame(C.int(bp.sendto_chan), 0, 0, pp, alevel, fec_type_none, 0, C.CString(""))
 		default:
-			tq_append(C.int(bp.sendto_chan), TQ_PRIO_1_LO, pp)
+			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
