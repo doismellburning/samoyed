@@ -52,7 +52,7 @@ var s_kiss_debug = 0
 
 func nettnc_init(pa *audio_s) {
 
-	for i := C.int(0); i < MAX_TOTAL_CHANS; i++ {
+	for i := 0; i < MAX_TOTAL_CHANS; i++ {
 
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			text_color_set(DW_COLOR_DEBUG)
@@ -98,7 +98,7 @@ var s_tnc_host [MAX_TOTAL_CHANS]string
 var s_tnc_port [MAX_TOTAL_CHANS]int
 var s_tnc_sock [MAX_TOTAL_CHANS]net.Conn // Socket handle or file descriptor. -1 for invalid.
 
-func nettnc_attach(channel C.int, host string, port int) int {
+func nettnc_attach(channel int, host string, port int) int {
 
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
@@ -148,7 +148,7 @@ func nettnc_attach(channel C.int, host string, port int) int {
  *
  *--------------------------------------------------------------------*/
 
-func nettnc_listen_thread(channel C.int) {
+func nettnc_listen_thread(channel int) {
 
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
@@ -188,7 +188,7 @@ func nettnc_listen_thread(channel C.int) {
 			for j := 0; j < n; j++ {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
-				my_kiss_rec_byte(&kstate, C.uchar(buf[j]), s_kiss_debug, channel)
+				my_kiss_rec_byte(&kstate, buf[j], s_kiss_debug, channel)
 			}
 		} // s_tnc_sock != -1
 	} // while (1)
@@ -218,7 +218,7 @@ func nettnc_listen_thread(channel C.int) {
  *
  *-----------------------------------------------------------------*/
 
-func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C.int) {
+func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int) {
 
 	//dw_printf ("my_kiss_rec_byte ( %c %02x ) \n", b, b);
 
@@ -232,7 +232,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 			/* Start of frame.  */
 
 			kf.kiss_len = 0
-			kf.kiss_msg[kf.kiss_len] = b
+			kf.kiss_msg[kf.kiss_len] = C.uchar(b)
 			kf.kiss_len++
 			kf.state = KS_COLLECTING
 			return
@@ -247,7 +247,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 
 			if kf.kiss_len == 0 {
 				/* Empty frame.  Starting a new one. */
-				kf.kiss_msg[kf.kiss_len] = b
+				kf.kiss_msg[kf.kiss_len] = C.uchar(b)
 				kf.kiss_len++
 				return
 			}
@@ -256,7 +256,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 				return
 			}
 
-			kf.kiss_msg[kf.kiss_len] = b
+			kf.kiss_msg[kf.kiss_len] = C.uchar(b)
 			kf.kiss_len++
 			if debug > 0 {
 				/* As received over the wire from network TNC. */
@@ -290,7 +290,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 				var retries retry_t
 
 				var spectrum = C.CString("Network TNC")
-				dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+				dlq_rec_frame(C.int(channel_override), subchan, slice, pp, alevel, fec_type, retries, spectrum)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel_override)
@@ -301,7 +301,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
 		}
 
 		if kf.kiss_len < MAX_KISS_LEN {
-			kf.kiss_msg[kf.kiss_len] = b
+			kf.kiss_msg[kf.kiss_len] = C.uchar(b)
 			kf.kiss_len++
 		} else {
 			text_color_set(DW_COLOR_ERROR)
@@ -329,7 +329,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b C.uchar, debug int, channel_override C
  *
  *-----------------------------------------------------------------*/
 
-func nettnc_send_packet(channel C.int, pp *packet_t) {
+func nettnc_send_packet(channel int, pp *packet_t) {
 
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
