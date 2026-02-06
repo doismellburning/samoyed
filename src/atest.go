@@ -644,10 +644,10 @@ func audio_get(a C.int) C.int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 
 	packets_decoded_one++
-	if hdlc_rec_data_detect_any(channel) == 0 {
+	if hdlc_rec_data_detect_any(C.int(channel)) == 0 {
 		dcd_missing_errors++
 	}
 
@@ -706,17 +706,17 @@ func dlq_rec_frame_fake(channel C.int, subchan C.int, slice C.int, pp *packet_t,
 
 	switch fec_type {
 	case fec_type_fx25:
-		dw_printf("%s audio level = %s   FX.25  %s\n", heard, alevel_text, C.GoString(spectrum))
+		dw_printf("%s audio level = %s   FX.25  %s\n", heard, alevel_text, spectrum)
 	case fec_type_il2p:
-		dw_printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, C.GoString(spectrum))
+		dw_printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, spectrum)
 	default:
 		//case fec_type_none:
 		if my_audio_config.achan[channel].fix_bits == RETRY_NONE && !my_audio_config.achan[channel].passall {
 			// No fix_bits or passall specified.
-			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, C.GoString(spectrum))
+			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
 			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
-			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retry_text[int(retries)], C.GoString(spectrum))
+			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retry_text[int(retries)], spectrum)
 		}
 	}
 

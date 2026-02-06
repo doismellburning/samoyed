@@ -28,7 +28,6 @@ import "C"
 import (
 	"sync"
 	"time"
-	"unsafe"
 )
 
 /* A transmit or receive data block for connected mode. */
@@ -92,12 +91,12 @@ type dlq_item_t struct {
 
 	// Used for received frame.
 
-	subchan C.int /* Winning "subchannel" when using multiple */
+	subchan int /* Winning "subchannel" when using multiple */
 	/* decoders on one channel.  */
 	/* Special case, -1 means DTMF decoder. */
 	/* Maybe we should have a different type in this case? */
 
-	slice C.int /* Winning slicer. */
+	slice int /* Winning slicer. */
 
 	pp *packet_t /* Pointer to frame structure. */
 
@@ -109,7 +108,7 @@ type dlq_item_t struct {
 	/* Bits changed for regular AX.25. */
 	/* Number of bytes fixed for FX.25. */
 
-	spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]C.char /* "Spectrum" display for multi-decoders. */
+	spectrum string /* "Spectrum" display for multi-decoders. */
 
 	// Used by requests from a client application, connect, etc.
 
@@ -127,10 +126,10 @@ type dlq_item_t struct {
 	// It is useful to know when the channel is busy either for carrier detect
 	// or when we are transmitting.
 
-	activity C.int /* OCTYPE_PTT for my transmission start/end. */
+	activity int /* OCTYPE_PTT for my transmission start/end. */
 	/* OCTYPE_DCD if we hear someone else. */
 
-	status C.int /* 1 for active or 0 for quiet. */
+	status int /* 1 for active or 0 for quiet. */
 
 }
 
@@ -237,7 +236,7 @@ func dlq_init() {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_rec_frame_real(channel int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 
 	/* TODO KG
 	#if DEBUG
@@ -283,11 +282,7 @@ func dlq_rec_frame_real(channel int, subchannel C.int, slice C.int, pp *packet_t
 	pnew.alevel = alevel
 	pnew.fec_type = fec_type
 	pnew.retries = retries
-	if spectrum == nil {
-		C.strcpy(&pnew.spectrum[0], C.CString(""))
-	} else {
-		C.strcpy(&pnew.spectrum[0], spectrum)
-	}
+	pnew.spectrum = spectrum
 
 	/* Put it into queue. */
 
@@ -295,11 +290,11 @@ func dlq_rec_frame_real(channel int, subchannel C.int, slice C.int, pp *packet_t
 
 } /* end dlq_rec_frame */
 
-func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 	if ATEST_C {
 		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	} else {
-		dlq_rec_frame_real(int(channel), subchannel, slice, pp, alevel, fec_type, retries, spectrum)
+		dlq_rec_frame_real(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	}
 }
 
@@ -447,7 +442,7 @@ func append_to_queue(pnew *dlq_item_t) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int, pid C.int) {
+func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -465,7 +460,7 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_ad
 
 	pnew._type = DLQ_CONNECT_REQUEST
 	pnew._chan = channel
-	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
+	pnew.addrs = addrs
 	pnew.num_addr = num_addr
 	pnew.client = client
 
@@ -499,7 +494,7 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_ad
  *
  *--------------------------------------------------------------------*/
 
-func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int) {
+func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -516,7 +511,7 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num
 
 	pnew._type = DLQ_DISCONNECT_REQUEST
 	pnew._chan = channel
-	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
+	pnew.addrs = addrs
 	pnew.num_addr = num_addr
 	pnew.client = client
 
@@ -555,7 +550,7 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num
  *
  *--------------------------------------------------------------------*/
 
-func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int) {
+func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -572,7 +567,7 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.c
 
 	pnew._type = DLQ_OUTSTANDING_FRAMES_REQUEST
 	pnew._chan = channel
-	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
+	pnew.addrs = addrs
 	pnew.num_addr = num_addr
 	pnew.client = client
 
@@ -614,7 +609,7 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.c
  *
  *--------------------------------------------------------------------*/
 
-func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int, pid int, xdata []byte) {
+func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int, xdata []byte) {
 
 	/* TODO KG
 	#if DEBUG
@@ -632,7 +627,7 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_
 
 	pnew._type = DLQ_XMIT_DATA_REQUEST
 	pnew._chan = channel
-	C.memcpy(unsafe.Pointer(&pnew.addrs), unsafe.Pointer(&addrs), AX25_MAX_ADDRS*AX25_MAX_ADDR_LEN)
+	pnew.addrs = addrs
 	pnew.num_addr = num_addr
 	pnew.client = client
 
@@ -672,7 +667,7 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_
  *
  *--------------------------------------------------------------------*/
 
-func dlq_register_callsign(addr *C.char, channel int, client int) {
+func dlq_register_callsign(addr string, channel int, client int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -690,7 +685,7 @@ func dlq_register_callsign(addr *C.char, channel int, client int) {
 
 	pnew._type = DLQ_REGISTER_CALLSIGN
 	pnew._chan = channel
-	pnew.addrs[0] = C.GoString(addr)
+	pnew.addrs[0] = addr
 	pnew.num_addr = 1
 	pnew.client = client
 
@@ -700,7 +695,7 @@ func dlq_register_callsign(addr *C.char, channel int, client int) {
 
 } /* end dlq_register_callsign */
 
-func dlq_unregister_callsign(addr *C.char, channel int, client int) {
+func dlq_unregister_callsign(addr string, channel int, client int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -718,7 +713,7 @@ func dlq_unregister_callsign(addr *C.char, channel int, client int) {
 
 	pnew._type = DLQ_UNREGISTER_CALLSIGN
 	pnew._chan = channel
-	pnew.addrs[0] = C.GoString(addr)
+	pnew.addrs[0] = addr
 	pnew.num_addr = 1
 	pnew.client = client
 
@@ -752,7 +747,7 @@ func dlq_unregister_callsign(addr *C.char, channel int, client int) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_channel_busy(channel int, activity C.int, status C.int) {
+func dlq_channel_busy(channel int, activity int, status int) {
 
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
 		/* TODO KG
@@ -879,8 +874,8 @@ func dlq_client_cleanup(client int) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_wait_while_empty(timeout C.double) C.int {
-	var timed_out_result C.int = 0
+func dlq_wait_while_empty(timeout time.Time) bool {
+	var timed_out_result = false
 
 	/* TODO KG
 	#if DEBUG1
@@ -903,16 +898,15 @@ func dlq_wait_while_empty(timeout C.double) C.int {
 		*/
 
 		recv_thread_is_waiting = true
-		if timeout != 0.0 {
-			var timeoutAt = time.Unix(int64(timeout), 0) // TODO KG I suspect we were dropping ns when passing in :s
-			var waitFor = time.Until(timeoutAt)
+		if !timeout.IsZero() {
+			var waitFor = time.Until(timeout)
 
 			// KG: pthread_cond_timedwait in Go...
 			select {
 			case <-dlq_wake_up_chan:
 				// Signalled
 			case <-time.After(waitFor):
-				timed_out_result = 1
+				timed_out_result = true
 			}
 		} else {
 			<-dlq_wake_up_chan

@@ -831,7 +831,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			/* Simulated reception from radio. */
 
 			var alevel alevel_t
-			dlq_rec_frame(C.int(bp.sendto_chan), 0, 0, pp, alevel, fec_type_none, 0, C.CString(""))
+			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 		default:
 			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}

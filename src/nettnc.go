@@ -280,8 +280,8 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 			// Convert to packet object and send to received packet queue.
 			// Note that we use channel associated with the network TNC, not channel in KISS frame.
 
-			var subchan C.int = -3
-			var slice C.int = 0
+			var subchan = -3
+			var slice = 0
 			var alevel alevel_t
 			var pp = ax25_from_frame(unwrapped[1:], alevel)
 
@@ -289,8 +289,8 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 				var fec_type fec_type_t = fec_type_none
 				var retries retry_t
 
-				var spectrum = C.CString("Network TNC")
-				dlq_rec_frame(C.int(channel_override), subchan, slice, pp, alevel, fec_type, retries, spectrum)
+				var spectrum = "Network TNC"
+				dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel_override)

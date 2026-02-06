@@ -1197,9 +1197,9 @@ func cmd_listen_thread(client int) {
 				//	data part of message.
 
 				var pid = cmd.Header.PID
-				var stemp = string(cmd.Header.CallFrom[:])
+				var stemp = ByteArrayToString(cmd.Header.CallFrom[:])
 				stemp += ">"
-				stemp += string(cmd.Header.CallTo[:])
+				stemp += ByteArrayToString(cmd.Header.CallTo[:])
 
 				var ndigi = int(cmd.Data[0])
 
@@ -1320,7 +1320,7 @@ func cmd_listen_thread(client int) {
 
 				if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 					ok = 1
-					dlq_register_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), channel, client)
+					dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1343,7 +1343,7 @@ func cmd_listen_thread(client int) {
 			// Connected mode can only be used with internal modems.
 
 			if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-				dlq_unregister_callsign((*C.char)(C.CBytes(cmd.Header.CallFrom[:])), channel, client)
+				dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1362,9 +1362,9 @@ func cmd_listen_thread(client int) {
 					        }
 				*/
 
-				var callsigns [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
-				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
-				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
+				var callsigns [AX25_MAX_ADDRS]string
+				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
 				var pid byte = 0xf0 /* normal for AX.25 I frames. */
 				if cmd.Header.DataKind == 'c' {
@@ -1390,7 +1390,7 @@ func cmd_listen_thread(client int) {
 						}
 
 						for j := byte(0); j < v.num_digi; j++ {
-							C.strcpy(&callsigns[AX25_REPEATER_1+j][0], (*C.char)(C.CBytes(v.dcall[j][:])))
+							callsigns[AX25_REPEATER_1+j] = ByteArrayToString(v.dcall[j][:])
 							num_calls++
 						}
 					} else {
@@ -1400,17 +1400,17 @@ func cmd_listen_thread(client int) {
 					}
 				}
 
-				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, C.int(pid))
+				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
 			}
 
 		case 'D': /* Send Connected Data */
 
 			{
-				var callsigns [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+				var callsigns [AX25_MAX_ADDRS]string
 				const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
 
-				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
-				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
+				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
 				dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data)
 			}
@@ -1418,11 +1418,11 @@ func cmd_listen_thread(client int) {
 		case 'd': /* Disconnect, Terminate an AX.25 Connection */
 
 			{
-				var callsigns [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+				var callsigns [AX25_MAX_ADDRS]string
 				const num_calls = 2 // only first 2 used.
 
-				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
-				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
+				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
 				dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
 
@@ -1462,7 +1462,7 @@ func cmd_listen_thread(client int) {
 			{
 
 				var pid = cmd.Header.PID
-				var stemp = string(cmd.Header.CallFrom[:]) + ">" + string(cmd.Header.CallTo[:]) + ": "
+				var stemp = ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + ByteArrayToString(cmd.Header.CallTo[:]) + ": "
 
 				// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
 				// Originally, I just appended the information part as a text string.
@@ -1555,11 +1555,11 @@ func cmd_listen_thread(client int) {
 
 			{
 
-				var callsigns [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+				var callsigns [AX25_MAX_ADDRS]string
 				const num_calls = 2 // only first 2 used.
 
-				C.strcpy(&callsigns[AX25_SOURCE][0], (*C.char)(C.CBytes(cmd.Header.CallFrom[:])))
-				C.strcpy(&callsigns[AX25_DESTINATION][0], (*C.char)(C.CBytes(cmd.Header.CallTo[:])))
+				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
 				dlq_outstanding_frames_request(callsigns, num_calls, int(cmd.Header.Portx), client)
 			}
