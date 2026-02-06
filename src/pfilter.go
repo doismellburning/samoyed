@@ -77,8 +77,8 @@ const MAX_FILTER_LEN = 1024
 const MAX_TOKEN_LEN = 1024
 
 type pfstate_t struct {
-	from_chan C.int /* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
-	to_chan   C.int /* Used only for debug and error messages. */
+	from_chan int /* From and to channels.   MAX_TOTAL_CHANS is used for IGate. */
+	to_chan   int /* Used only for debug and error messages. */
 
 	/*
 	 * Original filter string from config file.
@@ -119,7 +119,7 @@ type pfstate_t struct {
 }
 
 // TODO KG Rename!
-func bool2text(val C.int) string {
+func bool2text(val int) string {
 	switch val {
 	case 1:
 		return "TRUE"
@@ -160,7 +160,7 @@ func bool2text(val C.int) string {
  *
  *--------------------------------------------------------------------*/
 
-func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_aprs C.int) C.int {
+func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) int {
 
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
@@ -171,12 +171,6 @@ func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_ap
 		return (-1)
 	}
 
-	if filter == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR in pfilter: nil filter string pointer. Please report this!\n")
-		return (-1)
-	}
-
 	var pfstate pfstate_t
 
 	pfstate.from_chan = from_chan
@@ -184,7 +178,7 @@ func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_ap
 
 	/* Copy filter string, changing any control characters to spaces. */
 
-	pfstate.filter_str = C.GoString(filter)
+	pfstate.filter_str = filter
 	pfstate.filter_str = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return ' '
@@ -196,15 +190,15 @@ func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_ap
 	pfstate.toBeParsed = pfstate.filter_str
 
 	pfstate.pp = pp
-	pfstate.is_aprs = is_aprs > 0
+	pfstate.is_aprs = is_aprs
 
-	if is_aprs > 0 {
+	if is_aprs {
 		pfstate.decoded = decode_aprs(pp, true, "")
 	}
 
 	next_token(&pfstate)
 
-	var result C.int
+	var result int
 	if pfstate.token_type == TOKEN_EOL {
 		/* Empty filter means reject all. */
 		result = 0
@@ -226,7 +220,7 @@ func pfilter(from_chan C.int, to_chan C.int, filter *C.char, pp *packet_t, is_ap
 			dw_printf(" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result))
 		} else if to_chan == MAX_TOTAL_CHANS {
 			dw_printf(" Packet filter from radio channel %d to IGate returns %s\n", from_chan, bool2text(result))
-		} else if is_aprs > 0 {
+		} else if is_aprs {
 			dw_printf(" Packet filter for APRS digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result))
 		} else {
 			dw_printf(" Packet filter for traditional digipeater from radio channel %d to %d returns %s\n", from_chan, to_chan, bool2text(result))
@@ -345,14 +339,14 @@ func next_token(pf *pfstate_t) {
  *
  *--------------------------------------------------------------------*/
 
-func parse_expr(pf *pfstate_t) C.int {
+func parse_expr(pf *pfstate_t) int {
 
 	return parse_or_expr(pf)
 }
 
 /* or_expr::	and_expr [ | and_expr ] ... */
 
-func parse_or_expr(pf *pfstate_t) C.int {
+func parse_or_expr(pf *pfstate_t) int {
 
 	var result = parse_and_expr(pf)
 	if result < 0 {
@@ -380,7 +374,7 @@ func parse_or_expr(pf *pfstate_t) C.int {
 
 /* and_expr::	primary [ & primary ] ... */
 
-func parse_and_expr(pf *pfstate_t) C.int {
+func parse_and_expr(pf *pfstate_t) int {
 
 	var result = parse_primary(pf)
 	if result < 0 {
@@ -410,9 +404,9 @@ func parse_and_expr(pf *pfstate_t) C.int {
 /* 		! primary	*/
 /*		filter_spec	*/
 
-func parse_primary(pf *pfstate_t) C.int {
+func parse_primary(pf *pfstate_t) int {
 
-	var result C.int
+	var result int
 
 	if pf.token_type == TOKEN_LPAREN { //nolint:staticcheck
 
@@ -472,10 +466,10 @@ func parse_primary(pf *pfstate_t) C.int {
  *
  *--------------------------------------------------------------------*/
 
-func parse_filter_spec(pf *pfstate_t) C.int {
+func parse_filter_spec(pf *pfstate_t) int {
 
 	// Yes this is always assigned over, but that requires a fair bit of reading to be sure of, so let's have an explicit default
-	var result C.int = -1 //nolint:wastedassign
+	var result int = -1 //nolint:wastedassign
 
 	if (!pf.is_aprs) && !strings.ContainsRune("01bdvu", rune(pf.token_str[0])) {
 		print_error(pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.")
@@ -615,13 +609,12 @@ func parse_filter_spec(pf *pfstate_t) C.int {
 	} else if pf.token_str[0] == 'r' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* r - range */
 		/* range */
-		var sdist [30]C.char
-		C.strcpy(&sdist[0], C.CString("unknown distance"))
-		result = filt_r(pf, &sdist[0])
+		var sdist string
+		result, sdist = filt_r(pf)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), C.GoString(&sdist[0]))
+			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), sdist)
 		}
 	} else if pf.token_str[0] == 's' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* s - symbol */
@@ -690,9 +683,9 @@ func parse_filter_spec(pf *pfstate_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_bodgu(pf *pfstate_t, arg string) C.int {
+func filt_bodgu(pf *pfstate_t, arg string) int {
 
-	var result C.int = 0
+	var result int = 0
 	var str = pf.token_str
 	var sep = str[1]
 	var cp = str[2:]
@@ -744,7 +737,7 @@ func filt_bodgu(pf *pfstate_t, arg string) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_t(pf *pfstate_t) C.int {
+func filt_t(pf *pfstate_t) int {
 
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
 
@@ -850,20 +843,21 @@ func filt_t(pf *pfstate_t) C.int {
  *
  *				decoded.g_lat & decoded.g_lon
  *
- * Outputs:	sdist	- Distance as a string for troubleshooting.
- *
  * Returns:	 1 = yes
  *		 0 = no
  *		-1 = error detected
+ *
+ *      sdist	- Distance as a string for troubleshooting.
+ *
  *
  * Description:
  *
  *------------------------------------------------------------------------------*/
 
-func filt_r(pf *pfstate_t, sdist *C.char) C.int {
+func filt_r(pf *pfstate_t) (int, string) {
 
 	if pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN {
-		return (0)
+		return 0, ""
 	}
 
 	var str = pf.token_str
@@ -874,34 +868,35 @@ func filt_r(pf *pfstate_t, sdist *C.char) C.int {
 
 	if len(parts) < 1 {
 		print_error(pf, "Missing latitude for Range filter.")
-		return (-1)
+		return -1, ""
 	}
 	var dlat, _ = strconv.ParseFloat(parts[0], 64)
 
 	if len(parts) < 2 {
 		print_error(pf, "Missing longitude for Range filter.")
-		return (-1)
+		return -1, ""
 	}
 	var dlon, _ = strconv.ParseFloat(parts[1], 64)
 
 	if len(parts) < 3 {
 		print_error(pf, "Missing distance for Range filter.")
-		return (-1)
+		return -1, ""
 	}
 	var ddist, _ = strconv.ParseFloat(parts[2], 64)
 
 	if len(parts) > 3 {
 		print_error(pf, "Too many parts for Range filter.")
-		return -1
+		return -1, ""
 	}
 
 	var km = ll_distance_km(dlat, dlon, float64(pf.decoded.g_lat), float64(pf.decoded.g_lon))
+	var sdist = fmt.Sprintf("%.2f km", km)
 
 	if km <= ddist {
-		return (1)
+		return 1, sdist
 	}
 
-	return (0)
+	return 0, sdist
 }
 
 /*------------------------------------------------------------------------------
@@ -969,7 +964,7 @@ func filt_r(pf *pfstate_t, sdist *C.char) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_s(pf *pfstate_t) C.int {
+func filt_s(pf *pfstate_t) int {
 
 	var str = pf.token_str
 	var sep = string(str[1])
@@ -1202,7 +1197,7 @@ func filt_s(pf *pfstate_t) C.int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_i(pf *pfstate_t) C.int {
+func filt_i(pf *pfstate_t) int {
 
 	// http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2020-July/048656.html
 	// Default of 3 hours should be good.
@@ -1212,11 +1207,11 @@ func filt_i(pf *pfstate_t) C.int {
 	// TODO: Should produce a warning if a user specified filter does not include "i".
 	// 3 hours * 60 min/hr = 180 minutes
 	// TODO KG: This was unused in the original C, but I think that was accidental given all the context here
-	var heardtime C.int = 180                       //nolint:wastedassign
+	var heardtime = 180                             //nolint:wastedassign
 	var maxhops = save_igate_config_p.max_digi_hops // from IGTXVIA config.
-	var dlat = C.float(G_UNKNOWN)
-	var dlon = C.float(G_UNKNOWN)
-	var km = C.float(G_UNKNOWN)
+	var dlat float64 = G_UNKNOWN
+	var dlon float64 = G_UNKNOWN
+	var km float64 = G_UNKNOWN
 
 	//char src[AX25_MAX_ADDR_LEN];
 	//char *infop = nil;
@@ -1233,8 +1228,7 @@ func filt_i(pf *pfstate_t) C.int {
 	// Get parameters or defaults.
 
 	if len(parts) > 0 && len(parts[0]) > 0 {
-		_heardtime, _ := strconv.Atoi(parts[0])
-		heardtime = C.int(_heardtime)
+		heardtime, _ = strconv.Atoi(parts[0])
 	} else {
 		print_error(pf, "Missing time limit for IGate message filter.")
 		return (-1)
@@ -1249,20 +1243,17 @@ func filt_i(pf *pfstate_t) C.int {
 		}
 
 		if len(parts) > 2 && len(parts[2]) > 0 {
-			_dlat, _ := strconv.ParseFloat(parts[2], 64)
-			dlat = C.float(_dlat)
+			dlat, _ = strconv.ParseFloat(parts[2], 64)
 
 			if len(parts) > 3 && len(parts[3]) > 0 {
-				_dlon, _ := strconv.ParseFloat(parts[3], 64)
-				dlon = C.float(_dlon)
+				dlon, _ = strconv.ParseFloat(parts[3], 64)
 			} else {
 				print_error(pf, "Missing longitude for IGate message filter.")
 				return (-1)
 			}
 
 			if len(parts) > 4 && len(parts[4]) > 0 {
-				_km, _ := strconv.ParseFloat(parts[4], 64)
-				km = C.float(_km)
+				km, _ = strconv.ParseFloat(parts[4], 64)
 			} else {
 				print_error(pf, "Missing distance, in km, for IGate message filter.")
 				return (-1)
@@ -1306,7 +1297,7 @@ func filt_i(pf *pfstate_t) C.int {
 	 *	 period (range defined as digi hops, distance, or both)."
 	 */
 
-	var was_heard = mheard_was_recently_nearby(C.CString("addressee"), C.CString(pf.decoded.g_addressee), heardtime, C.int(maxhops), C.double(dlat), C.double(dlon), C.double(km))
+	var was_heard = mheard_was_recently_nearby(C.CString("addressee"), C.CString(pf.decoded.g_addressee), C.int(heardtime), C.int(maxhops), C.double(dlat), C.double(dlon), C.double(km))
 
 	if was_heard {
 		return (0)

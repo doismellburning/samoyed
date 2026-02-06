@@ -494,7 +494,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && // in radio channel range
 		save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS] != "" {
 
-		if pfilter(C.int(channel), MAX_TOTAL_CHANS, C.CString(save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS]), recv_pp, 1) != 1 {
+		if pfilter(channel, MAX_TOTAL_CHANS, save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, true) != 1 {
 
 			// Is this useful troubleshooting information or just distracting noise?
 			// Originally this was always printed but there was a request to add a "quiet" option to suppress this.
@@ -1384,7 +1384,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 
 		if save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
 
-			if pfilter(MAX_TOTAL_CHANS, C.int(to_chan), C.CString(save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan]), pp3, 1) != 1 {
+			if pfilter(MAX_TOTAL_CHANS, to_chan, save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true) != 1 {
 
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
