@@ -43,3 +43,19 @@ func Test_DecodeAPRSLine3(t *testing.T) {
 		)
 	}, expected)
 }
+
+func Test_DecodeAPRSLine3NoSpaces(t *testing.T) {
+	deviceid_init()
+
+	DECODE_APRS_UTIL = true
+
+	defer func() { DECODE_APRS_UTIL = false }()
+
+	var expected = "Echolink"
+
+	AssertOutputContains(t, func() {
+		DecodeAPRSLine(
+			"0082a0aeae6260e0829668844040609c68b0ae8640e040ae92888a646303f03e454d36346e652f23204563686f6c696e6b203134352e3331302f313030687a20546f6e65",
+		)
+	}, expected)
+}

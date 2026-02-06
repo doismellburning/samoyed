@@ -18,6 +18,10 @@ package direwolf
  *
  *		00 82 a0 ae ae 62 60 e0 82 96 68 84 40 40 60 9c 68 b0 ae 86 40 e0 40 ae 92 88 8a 64 63 03 f0 3e 45 4d 36 34 6e 65 2f 23 20 45 63 68 6f 6c 69 6e 6b 20 31 34 35 2e 33 31 30 2f 31 30 30 68 7a 20 54 6f 6e 65
  *
+ *      or without spaces:
+ *
+ *      0082a0aeae6260e0829668844040609c68b0ae8640e040ae92888a646303f03e454d36346e652f23204563686f6c696e6b203134352e3331302f313030687a20546f6e65
+ *
  *		If it begins with 00 or C0 (which would be impossible for AX.25 address) process as KISS.
  *		Also print these formats.
  *
@@ -91,7 +95,7 @@ func DecodeAPRSLine(line string) {
 
 	line = strings.TrimLeft(line, " ")
 
-	var r = regexp.MustCompile("^[[:xdigit:]]{2}( [[:xdigit:]]{2})*$")
+	var r = regexp.MustCompile("^[[:xdigit:]]{2}( ?[[:xdigit:]]{2})*$")
 
 	if r.MatchString(line) {
 		// Documented input format is "DE AD BE EF"
