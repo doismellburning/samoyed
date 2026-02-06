@@ -791,13 +791,13 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	case BEACON_IGATE:
 
 		{
-			var last_minutes C.int = 30
+			var last_minutes = 30
 
 			var stuff = fmt.Sprintf("<IGATE,MSG_CNT=%d,PKT_CNT=%d,DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d,UPL_CNT=%d,DNL_CNT=%d",
 				igate_get_msg_cnt(),
 				igate_get_pkt_cnt(),
 				mheard_count(0, last_minutes),
-				mheard_count(C.int(g_igate_config_p.max_digi_hops), last_minutes),
+				mheard_count(g_igate_config_p.max_digi_hops, last_minutes),
 				mheard_count(8, last_minutes),
 				igate_get_upl_cnt(),
 				igate_get_dnl_cnt())
