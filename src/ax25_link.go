@@ -1778,16 +1778,8 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 			// Reassembling data state, Not first segment.
 
 			S.ra_following = int(dataBytes[0] & 0x7f)
-			if S.ra_buff.len+len(dataBytes)-1 <= S.ra_buff.size {
-				C.memcpy(unsafe.Pointer(uintptr(unsafe.Pointer(&S.ra_buff.data))+uintptr(S.ra_buff.len)), C.CBytes(dataBytes[1:]), C.ulong(len(dataBytes)-1))
-				S.ra_buff.len += len(dataBytes) - 1
-			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments exceed buffer space.\n", S.stream_id)
-				cdata_delete(S.ra_buff)
-				S.ra_buff = nil
-				return
-			}
+			S.ra_buff.data = append(S.ra_buff.data, dataBytes[1:]...)
+			S.ra_buff.len += len(dataBytes) - 1
 
 			if S.ra_following == 0 {
 				// Last one.

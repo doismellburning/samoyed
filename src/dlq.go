@@ -42,8 +42,6 @@ type cdata_t struct {
 
 	pid int /* Protocol id. */
 
-	size int /* Number of bytes allocated. */
-
 	len int /* Number of bytes actually used. */
 
 	data []byte /* Variable length data. */
@@ -1051,23 +1049,13 @@ func cdata_new(pid int, data []byte) *cdata_t {
 
 	s_cdata_new_count++
 
-	/* Round up the size to the next 128 bytes. */
-	/* The theory is that a smaller number of unique sizes might be */
-	/* beneficial for memory fragmentation and garbage collection. */
-
-	// TODO KG We have Go slices, we don't need to track this
-
-	var size = (len(data) + 127) & ^0x7f
-
 	var cdata = new(cdata_t)
 
 	cdata.magic = TXDATA_MAGIC
 	cdata.next = nil
 	cdata.pid = pid
-	cdata.size = size
 	cdata.len = len(data)
 
-	Assert(len(data) <= size)
 	if data != nil {
 		cdata.data = make([]byte, len(data))
 		copy(cdata.data, data)
