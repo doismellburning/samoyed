@@ -19,15 +19,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>	/* for isdigit, isupper */
-// #include "regex.h"
-// #include <unistd.h>
-import "C"
-
 import (
 	"regexp"
 )
@@ -76,7 +67,7 @@ var save_cdigi_config_p *cdigi_config_s
 
 var cdigi_count [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 
-func cdigipeater_get_count(from_chan int, to_chan int) int {
+func cdigipeater_get_count(from_chan int, to_chan int) int { //nolint:unused
 	return (cdigi_count[from_chan][to_chan])
 }
 
@@ -115,7 +106,7 @@ func cdigipeater_init(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeater(from_chan C.int, pp *packet_t) {
+func cdigipeater(from_chan int, pp *packet_t) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
 
@@ -134,7 +125,7 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 	 * Might not have a benefit here.
 	 */
 
-	for to_chan := range C.int(MAX_RADIO_CHANS) {
+	for to_chan := range MAX_RADIO_CHANS {
 		if save_cdigi_config_p.enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
 				var result = cdigipeat_match(from_chan, pp, save_audio_config_p.mycall[from_chan],
@@ -143,7 +134,7 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 					save_cdigi_config_p.alias[from_chan][to_chan], to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
 				if result != nil {
-					tq_append(int(to_chan), TQ_PRIO_0_HI, result)
+					tq_append(to_chan, TQ_PRIO_0_HI, result)
 					cdigi_count[from_chan][to_chan]++
 				}
 			}
@@ -154,7 +145,7 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 	 * Second pass:  Look at packets being digipeated to different channel.
 	 */
 
-	for to_chan := range C.int(MAX_RADIO_CHANS) {
+	for to_chan := range MAX_RADIO_CHANS {
 		if save_cdigi_config_p.enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
 				var result = cdigipeat_match(from_chan, pp, save_audio_config_p.mycall[from_chan],
@@ -163,7 +154,7 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
 					save_cdigi_config_p.alias[from_chan][to_chan], to_chan,
 					save_cdigi_config_p.cfilter_str[from_chan][to_chan])
 				if result != nil {
-					tq_append(int(to_chan), TQ_PRIO_0_HI, result)
+					tq_append(to_chan, TQ_PRIO_0_HI, result)
 					cdigi_count[from_chan][to_chan]++
 				}
 			}
@@ -213,7 +204,7 @@ func cdigipeater(from_chan C.int, pp *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan C.int, cfilter_str string) *packet_t {
+func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit string, has_alias bool, alias *regexp.Regexp, to_chan int, cfilter_str string) *packet_t {
 	/*
 	 * First check if filtering has been configured.
 	 * Note that we have three different config file filter commands:
@@ -231,7 +222,7 @@ func cdigipeat_match(from_chan C.int, pp *packet_t, mycall_rec string, mycall_xm
 	 */
 
 	if cfilter_str != "" {
-		if pfilter(int(from_chan), int(to_chan), cfilter_str, pp, false) != 1 {
+		if pfilter(from_chan, to_chan, cfilter_str, pp, false) != 1 {
 			return (nil)
 		}
 	}
