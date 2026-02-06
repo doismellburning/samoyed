@@ -1016,7 +1016,7 @@ func igate_recv_thread() {
 			/*
 			 * Record that we heard from the source address.
 			 */
-			mheard_save_is((*C.char)(C.CBytes(message)))
+			mheard_save_is(string(message))
 
 			stats_downlink_packets++
 
@@ -1488,7 +1488,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 
 				stats_msg_cnt++ // Update statistics.
 
-				mheard_set_msp(string(src), C.int(save_igate_config_p.igmsp))
+				mheard_set_msp(string(src), save_igate_config_p.igmsp)
 			}
 
 			ig_to_tx_remember(pp3, save_igate_config_p.tx_chan, 0) // correct. version before encapsulating it.

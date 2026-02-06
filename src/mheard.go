@@ -22,14 +22,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <time.h>
-// #include <assert.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"fmt"
 	"maps"
@@ -61,26 +53,24 @@ var mheard_mutex sync.Mutex
  */
 
 type mheard_t struct {
-	pnext *mheard_t // Pointer to next in list.
-
 	callsign string // Callsign from the AX.25 source field.
 
-	count C.int // Number of times heard.
+	count int // Number of times heard.
 	// We don't use this for anything.
 	// Just something potentially interesting when looking at data dump.
 
-	channel C.int // Most recent channel where heard.
+	channel int // Most recent channel where heard.
 
-	num_digi_hops C.int // Number of digipeater hops before we heard it.
+	num_digi_hops int // Number of digipeater hops before we heard it.
 	// over radio.  Zero when heard directly.
 
 	last_heard_rf time.Time // Timestamp when last heard over the radio.
 
 	last_heard_is time.Time // Timestamp when last heard from Internet Server.
 
-	dlat, dlon C.double // Last position.  G_UNKNOWN for unknown.
+	dlat, dlon float64 // Last position.  G_UNKNOWN for unknown.
 
-	msp C.int // Allow message sender position report.
+	msp int // Allow message sender position report.
 	// When non zero, an IS>RF position report is allowed.
 	// Then decremented.
 
@@ -136,7 +126,7 @@ func mheard_age(now, t time.Time) string {
 
 /* Convert latitude, longitude to text or - if not defined. */
 
-func mheard_latlon(dlat C.double, dlon C.double) string {
+func mheard_latlon(dlat float64, dlon float64) string {
 	if dlat != G_UNKNOWN && dlon != G_UNKNOWN {
 		return fmt.Sprintf("%6.2f %7.2f", dlat, dlon)
 	} else {
@@ -212,7 +202,7 @@ func mheard_dump() {
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) {
+func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) { //nolint:unparam
 
 	var now = time.Now()
 
@@ -291,7 +281,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 		mptr.callsign = source
 		mptr.count = 1
 		mptr.channel = channel
-		mptr.num_digi_hops = C.int(hops)
+		mptr.num_digi_hops = hops
 		mptr.last_heard_rf = now
 		// Why did I do this instead of saving the location for a position report?
 		mptr.dlat = G_UNKNOWN
@@ -309,7 +299,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 		 * We are interested in the shortest path if heard very recently.
 		 */
 
-		if C.int(hops) > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
+		if hops > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
 
 			if mheard_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -324,7 +314,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 
 			mptr.count++
 			mptr.channel = channel
-			mptr.num_digi_hops = C.int(hops)
+			mptr.num_digi_hops = hops
 			mptr.last_heard_rf = now
 		}
 	}
@@ -336,13 +326,13 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
 
 	if A.g_packet_type == packet_type_position {
 		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-			mptr.dlat = C.double(A.g_lat)
-			mptr.dlon = C.double(A.g_lon)
+			mptr.dlat = A.g_lat
+			mptr.dlon = A.g_lon
 		}
 	}
 
 	if mheard_debug >= 2 {
-		var limit C.int = 10 // normally 30 or 60.  more frequent when debugging.
+		var limit = 10 // normally 30 or 60.  more frequent when debugging.
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mheard_count(0, limit), mheard_count(2, limit), mheard_count(8, limit))
 	}
@@ -384,7 +374,7 @@ func mheard_save_rf(channel C.int, A *decode_aprs_t, pp *packet_t, alevel alevel
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_is(_ptext *C.char) {
+func mheard_save_is(ptext string) {
 
 	var now = time.Now()
 
@@ -392,7 +382,6 @@ func mheard_save_is(_ptext *C.char) {
 	// So we simply extract the source address, as text, from the beginning rather than
 	// using ax25_from_text() and ax25_get_addr_with_ssid().
 
-	var ptext = C.GoString(_ptext)
 	var source, _, _ = strings.Cut(ptext, ">")
 
 	/*
@@ -455,7 +444,7 @@ func mheard_save_is(_ptext *C.char) {
 	// The filter always includes a time since last heard over the radio.
 
 	if mheard_debug >= 2 {
-		var limit C.int = 10 // normally 30 or 60
+		var limit = 10 // normally 30 or 60
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mheard_count(0, limit), mheard_count(2, limit), mheard_count(8, limit))
 	}
@@ -529,12 +518,12 @@ func mheard_save_is(_ptext *C.char) {
  *
  *------------------------------------------------------------------*/
 
-func mheard_count(max_hops C.int, time_limit C.int) C.int {
+func mheard_count(max_hops int, time_limit int) int {
 
 	var limit = time.Duration(time_limit) * time.Minute
 	var since = time.Now().Add(-limit)
 
-	var count C.int = 0
+	var count = 0
 
 	for _, p := range mheard_db {
 		if !p.last_heard_rf.Before(since) && p.num_digi_hops <= max_hops {
@@ -571,22 +560,21 @@ func mheard_count(max_hops C.int, time_limit C.int) C.int {
  *		dlat, dlon, km	- Include only stations within distance of location.
  *				  Not used if G_UNKNOWN is supplied.
  *
- * Returns:	1 for true, 0 for false.
+ * Returns:	True or false
  *
  *------------------------------------------------------------------*/
 
-func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.int, max_hops C.int, dlat C.double, dlon C.double, km C.double) bool {
+func mheard_was_recently_nearby(role string, callsign string, _time_limit int, max_hops int, dlat float64, dlon float64, km float64) bool {
 
 	var time_limit = time.Duration(_time_limit) * time.Minute
-	var callsign = C.GoString(_callsign)
 
-	if role != nil && C.strlen(role) > 0 {
+	if role != "" {
 
 		text_color_set(DW_COLOR_INFO)
 		if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN {
 			dw_printf(
 				"Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops, and within %.1f km of %.2f %.2f?\n",
-				C.GoString(role),
+				role,
 				callsign,
 				int(time_limit.Minutes()),
 				max_hops,
@@ -595,7 +583,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 				dlon,
 			)
 		} else {
-			dw_printf("Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops?\n", C.GoString(role), callsign, int(time_limit.Minutes()), max_hops)
+			dw_printf("Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops?\n", role, callsign, int(time_limit.Minutes()), max_hops)
 		}
 	}
 
@@ -603,7 +591,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 
 	if mptr == nil || mptr.last_heard_rf.IsZero() {
 
-		if role != nil && C.strlen(role) > 0 {
+		if role != "" {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("No, we have not heard %s over the radio.\n", callsign)
 		}
@@ -615,7 +603,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 
 	if heard_ago > time_limit {
 
-		if role != nil && C.strlen(role) > 0 {
+		if role != "" {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("No, %s was last heard over the radio %d minutes ago with %d digipeater hops.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops)
 		}
@@ -624,7 +612,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 
 	if mptr.num_digi_hops > max_hops {
 
-		if role != nil && C.strlen(role) > 0 {
+		if role != "" {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("No, %s was last heard over the radio with %d digipeater hops %d minutes ago.\n", callsign, mptr.num_digi_hops, int(heard_ago.Minutes()))
 		}
@@ -635,17 +623,17 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 
 	if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN && mptr.dlat != G_UNKNOWN && mptr.dlon != G_UNKNOWN {
 
-		var dist = C.double(ll_distance_km(float64(mptr.dlat), float64(mptr.dlon), float64(dlat), float64(dlon)))
+		var dist = ll_distance_km(float64(mptr.dlat), float64(mptr.dlon), float64(dlat), float64(dlon))
 
 		if dist > km {
 
-			if role != nil && C.strlen(role) > 0 {
+			if role != "" {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("No, %s was %.1f km away although it was %d digipeater hops %d minutes ago.\n", callsign, dist, mptr.num_digi_hops, int(heard_ago.Minutes()))
 			}
 			return false
 		} else {
-			if role != nil && C.strlen(role) > 0 {
+			if role != "" {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Yes, %s last heard over radio %d minutes ago, %d digipeater hops.  Last location %.1f km away.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops, dist)
 			}
@@ -655,7 +643,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
 
 	// Passed all the tests.
 
-	if role != nil && C.strlen(role) > 0 {
+	if role != "" {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Yes, %s last heard over radio %d minutes ago, %d digipeater hops.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops)
 	}
@@ -676,7 +664,7 @@ func mheard_was_recently_nearby(role *C.char, _callsign *C.char, _time_limit C.i
  *
  *------------------------------------------------------------------*/
 
-func mheard_set_msp(callsign string, num C.int) {
+func mheard_set_msp(callsign string, num int) {
 
 	var mptr = mheard_db[callsign]
 
@@ -708,7 +696,7 @@ func mheard_set_msp(callsign string, num C.int) {
  *
  *------------------------------------------------------------------*/
 
-func mheard_get_msp(callsign string) C.int {
+func mheard_get_msp(callsign string) int {
 
 	var mptr = mheard_db[callsign]
 

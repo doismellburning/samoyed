@@ -1053,7 +1053,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		// Add to list of stations heard over the radio.
 
-		mheard_save_rf(C.int(channel), A, pp, alevel, retries)
+		mheard_save_rf(channel, A, pp, alevel, retries)
 
 		// For AIS, we have an option to convert the NMEA format, in User Defined data,
 		// into an APRS "Object Report" and send that to the clients as well.
