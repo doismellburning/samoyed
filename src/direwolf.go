@@ -1188,7 +1188,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
-				cdigipeater(C.int(channel), pp)
+				cdigipeater(channel, pp)
 			}
 		}
 	}
