@@ -22,15 +22,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <math.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"fmt"
 	"strconv"
