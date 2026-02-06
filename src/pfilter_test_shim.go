@@ -1,13 +1,5 @@
 package direwolf
 
-// #include <unistd.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"testing"
 
@@ -254,8 +246,8 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	var pp = ax25_from_text(monitor, true)
 	assert.NotNil(t, pp)
 
-	var result = pfilter(0, 0, C.CString(filter), pp, 1)
-	if !assert.Equal(t, result, C.int(expected), "Unexpected result for test number %d", test_num) {
+	var result = pfilter(0, 0, filter, pp, true)
+	if !assert.Equal(t, expected, result, "Unexpected result for test number %d", test_num) {
 		pftest_error_count++
 	}
 
