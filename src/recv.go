@@ -189,12 +189,11 @@ func recv_adev_thread(a int) {
 
 func recv_process() {
 	for {
-		var _timeout_value = ax25_link_get_next_timer_expiry()
-		var timeout_value = C.double(_timeout_value.Unix())
+		var timeout_value = ax25_link_get_next_timer_expiry()
 
 		var timed_out = dlq_wait_while_empty(timeout_value)
 
-		if timed_out > 0 {
+		if timed_out {
 			dl_timer_expiry()
 		} else {
 			var pitem = dlq_remove()
@@ -214,7 +213,7 @@ func recv_process() {
 					 *	- Digipeater.
 					 */
 
-					app_process_rec_packet(pitem._chan, int(pitem.subchan), int(pitem.slice), pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, C.GoString(&pitem.spectrum[0]))
+					app_process_rec_packet(pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
 
 					/*
 					 * Link processing.

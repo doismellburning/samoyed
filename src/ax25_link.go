@@ -1832,7 +1832,7 @@ func lm_channel_busy(E *dlq_item_t) {
 			dw_printf("lm_channel_busy: DCD chan %d = %d\n", E._chan, E.status)
 		}
 
-		dcd_status[E._chan] = int(E.status)
+		dcd_status[E._chan] = E.status
 
 	case OCTYPE_PTT:
 
@@ -1841,7 +1841,7 @@ func lm_channel_busy(E *dlq_item_t) {
 			dw_printf("lm_channel_busy: PTT chan %d = %d\n", E._chan, E.status)
 		}
 
-		ptt_status[E._chan] = int(E.status)
+		ptt_status[E._chan] = E.status
 
 	default:
 		// Nothing to be done

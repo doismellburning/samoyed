@@ -1068,13 +1068,13 @@ func igate_recv_thread() {
 					alevel.mark = -2 // FIXME: Do we want some other special case?
 					alevel.space = -2
 
-					var subchan C.int = -2 // FIXME: -1 is special case for APRStt.
+					var subchan = -2 // FIXME: -1 is special case for APRStt.
 					// See what happens with -2 and follow up on this.
 					// Do we need something else here?
-					var slice C.int = 0
+					var slice = 0
 					var fec_type fec_type_t = fec_type_none
-					var spectrum = C.CString("APRS-IS")
-					dlq_rec_frame(C.int(ichan), subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
+					var spectrum = "APRS-IS"
+					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)

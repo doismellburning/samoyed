@@ -1642,7 +1642,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 		alevel.mark = -2
 		alevel.space = -2
 
-		dlq_rec_frame(C.int(channel), -1, 0, pp, alevel, fec_type_none, RETRY_NONE, C.CString("tt"))
+		dlq_rec_frame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)
