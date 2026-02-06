@@ -27,7 +27,7 @@ test: gotest test-scripts
 
 .PHONY: gotest
 gotest:
-	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
+	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) -v $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
 # TODO Better output name, non-PHONY target, docs, etc.
 .PHONY: gotest-bin
