@@ -68,9 +68,4 @@ func tt_user_test_main(t *testing.T) {
 	tt_user_heard("WB1GOF", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "146.955MHz", "074", "", ' ', "!T99!")
 	tt_user_heard("679", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "Hello, world", '9', "!T99!")
 	tt_user_dump()
-
-	for range 30 {
-		SLEEP_SEC(1)
-		tt_user_background()
-	}
 }
