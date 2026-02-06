@@ -596,7 +596,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 
 	// Inform data link state machine that we are now transmitting.
 
-	dlq_seize_confirm(C.int(channel)) // C4.2.  "This primitive indicates, to the Data-link State
+	dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
 	// machine, that the transmission opportunity has arrived."
 
 	var pre_flags = MS_TO_BITS(xmit_txdelay[channel]*10, channel) / 8
@@ -813,7 +813,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 		// It shouldn't hurt if we send it redundantly.
 		// Added for 1.5 beta test 4.
 
-		dlq_seize_confirm(C.int(c)) // C4.2.  "This primitive indicates, to the Data-link State
+		dlq_seize_confirm(c) // C4.2.  "This primitive indicates, to the Data-link State
 		// machine, that the transmission opportunity has arrived."
 
 		SLEEP_MS(10) // Give data link state machine a chance to
@@ -895,7 +895,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
-	server_send_monitored(C.int(c), pp, 1)
+	server_send_monitored(c, pp, 1)
 
 	return int(nb)
 } /* end send_one_frame */

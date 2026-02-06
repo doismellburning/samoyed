@@ -214,7 +214,7 @@ func recv_process() {
 					 *	- Digipeater.
 					 */
 
-					app_process_rec_packet(int(pitem._chan), int(pitem.subchan), int(pitem.slice), pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, C.GoString(&pitem.spectrum[0]))
+					app_process_rec_packet(pitem._chan, int(pitem.subchan), int(pitem.slice), pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, C.GoString(&pitem.spectrum[0]))
 
 					/*
 					 * Link processing.

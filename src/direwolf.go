@@ -1106,7 +1106,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	var fbuf = ax25_pack(pp)
 
-	server_send_rec_packet(C.int(channel), pp, fbuf)                                          // AGW net protocol
+	server_send_rec_packet(channel, pp, fbuf)                                                 // AGW net protocol
 	kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)    // KISS TCP
 	kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
 	kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
@@ -1116,7 +1116,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		if ao_pp != nil {
 			var ao_fbuf = ax25_pack(ao_pp)
 
-			server_send_rec_packet(C.int(channel), ao_pp, ao_fbuf)
+			server_send_rec_packet(channel, ao_pp, ao_fbuf)
 			kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)

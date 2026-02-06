@@ -595,13 +595,13 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 func all_frame_types(t *testing.T) {
 	t.Helper()
 
-	var addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+	var addrs [AX25_MAX_ADDRS]string
 	var pinfo []byte
 	var pid = 0xf0
 
-	C.strcpy(&addrs[0][0], C.CString("W2UB"))
-	C.strcpy(&addrs[1][0], C.CString("WB2OSZ-12"))
-	var num_addr C.int = 2
+	addrs[0] = "W2UB"
+	addrs[1] = "WB2OSZ-12"
+	var num_addr = 2
 
 	dw_printf("Testing all frame types.\n")
 

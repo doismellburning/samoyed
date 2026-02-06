@@ -26,7 +26,6 @@ package direwolf
 import "C"
 
 import (
-	"slices"
 	"sync"
 	"time"
 	"unsafe"
@@ -37,17 +36,15 @@ import (
 const TXDATA_MAGIC = 0x09110911
 
 type cdata_t struct {
-	magic C.int /* For integrity checking. */
+	magic int /* For integrity checking. */
 
 	next *cdata_t /* Pointer to next when part of a list. */
 
-	pid C.int /* Protocol id. */
+	pid int /* Protocol id. */
 
-	size C.int /* Number of bytes allocated. */
+	len int /* Number of bytes actually used. */
 
-	len C.int /* Number of bytes actually used. */
-
-	data []C.char /* Variable length data. */
+	data []byte /* Variable length data. */
 }
 
 // FIXME KG cdata_t.data?
@@ -88,7 +85,7 @@ type dlq_item_t struct {
 	_type dlq_type_t /* Type of item. */
 	/* See enum definition above. */
 
-	_chan C.int /* Radio channel of origin. */
+	_chan int /* Radio channel of origin. */
 
 	// I'm not worried about amount of memory used but this might be a
 	// little clearer if a union was used for the different event types.
@@ -116,11 +113,11 @@ type dlq_item_t struct {
 
 	// Used by requests from a client application, connect, etc.
 
-	addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char
+	addrs [AX25_MAX_ADDRS]string
 
-	num_addr C.int /* Range 2 .. 10. */
+	num_addr int /* Range 2 .. 10. */
 
-	client C.int
+	client int
 
 	// Used only by client request to transmit connected data.
 
@@ -240,7 +237,7 @@ func dlq_init() {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_rec_frame_real(channel C.int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
+func dlq_rec_frame_real(channel int, subchannel C.int, slice C.int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum *C.char) {
 
 	/* TODO KG
 	#if DEBUG
@@ -302,7 +299,7 @@ func dlq_rec_frame(channel C.int, subchannel C.int, slice C.int, pp *packet_t, a
 	if ATEST_C {
 		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	} else {
-		dlq_rec_frame_real(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
+		dlq_rec_frame_real(int(channel), subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	}
 }
 
@@ -450,7 +447,7 @@ func append_to_queue(pnew *dlq_item_t) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, channel C.int, client C.int, pid C.int) {
+func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int, pid C.int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -502,7 +499,7 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_ad
  *
  *--------------------------------------------------------------------*/
 
-func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, channel C.int, client C.int) {
+func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -558,7 +555,7 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num
  *
  *--------------------------------------------------------------------*/
 
-func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, channel C.int, client C.int) {
+func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -617,7 +614,7 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.c
  *
  *--------------------------------------------------------------------*/
 
-func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr C.int, channel C.int, client C.int, pid C.int, xdata_ptr *C.char, xdata_len C.int) {
+func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_addr int, channel int, client int, pid int, xdata []byte) {
 
 	/* TODO KG
 	#if DEBUG
@@ -641,7 +638,7 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_
 
 	/* Attach the transmit data. */
 
-	pnew.txdata = cdata_new(pid, xdata_ptr, xdata_len)
+	pnew.txdata = cdata_new(pid, xdata)
 
 	/* Put it into queue. */
 
@@ -675,7 +672,7 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS][AX25_MAX_ADDR_LEN]C.char, num_
  *
  *--------------------------------------------------------------------*/
 
-func dlq_register_callsign(addr *C.char, channel C.int, client C.int) {
+func dlq_register_callsign(addr *C.char, channel int, client int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -693,7 +690,7 @@ func dlq_register_callsign(addr *C.char, channel C.int, client C.int) {
 
 	pnew._type = DLQ_REGISTER_CALLSIGN
 	pnew._chan = channel
-	C.strcpy(&pnew.addrs[0][0], addr)
+	pnew.addrs[0] = C.GoString(addr)
 	pnew.num_addr = 1
 	pnew.client = client
 
@@ -703,7 +700,7 @@ func dlq_register_callsign(addr *C.char, channel C.int, client C.int) {
 
 } /* end dlq_register_callsign */
 
-func dlq_unregister_callsign(addr *C.char, channel C.int, client C.int) {
+func dlq_unregister_callsign(addr *C.char, channel int, client int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -721,7 +718,7 @@ func dlq_unregister_callsign(addr *C.char, channel C.int, client C.int) {
 
 	pnew._type = DLQ_UNREGISTER_CALLSIGN
 	pnew._chan = channel
-	C.strcpy(&pnew.addrs[0][0], addr)
+	pnew.addrs[0] = C.GoString(addr)
 	pnew.num_addr = 1
 	pnew.client = client
 
@@ -755,7 +752,7 @@ func dlq_unregister_callsign(addr *C.char, channel C.int, client C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_channel_busy(channel C.int, activity C.int, status C.int) {
+func dlq_channel_busy(channel int, activity C.int, status C.int) {
 
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
 		/* TODO KG
@@ -799,7 +796,7 @@ func dlq_channel_busy(channel C.int, activity C.int, status C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_seize_confirm(channel C.int) {
+func dlq_seize_confirm(channel int) {
 
 	/* TODO KG
 	#if DEBUG
@@ -839,7 +836,7 @@ func dlq_seize_confirm(channel C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_client_cleanup(client C.int) {
+func dlq_client_cleanup(client int) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -1048,32 +1045,20 @@ func dlq_delete(pitem *dlq_item_t) {
  *
  *--------------------------------------------------------------------*/
 
-func cdata_new(pid C.int, data *C.char, length C.int) *cdata_t {
+func cdata_new(pid int, data []byte) *cdata_t {
 
 	s_cdata_new_count++
-
-	/* Round up the size to the next 128 bytes. */
-	/* The theory is that a smaller number of unique sizes might be */
-	/* beneficial for memory fragmentation and garbage collection. */
-
-	var size = (length + 127) & ^0x7f
 
 	var cdata = new(cdata_t)
 
 	cdata.magic = TXDATA_MAGIC
 	cdata.next = nil
 	cdata.pid = pid
-	cdata.size = size
-	cdata.len = length
+	cdata.len = len(data)
 
-	Assert(length >= 0 && length <= size)
-	if data == nil {
-		cdata.data = slices.Repeat([]C.char{'?'}, int(size))
-	} else {
-		cdata.data = make([]C.char, size)
-		for i, b := range C.GoBytes(unsafe.Pointer(data), length) {
-			cdata.data[i] = C.char(b)
-		}
+	if data != nil {
+		cdata.data = make([]byte, len(data))
+		copy(cdata.data, data)
 	}
 	return (cdata)
 
