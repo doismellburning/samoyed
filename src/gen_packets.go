@@ -802,7 +802,7 @@ func send_packet(str string) {
 			repeat = 1
 		}
 
-		eas_send(0, (*C.uchar)(C.CBytes(pinfo)), C.int(repeat), 500, 500)
+		eas_send(0, pinfo, repeat, 500, 500)
 		ax25_delete(pp)
 	} else {
 		var pp = ax25_from_text(str, true)
@@ -838,9 +838,9 @@ func send_packet(str string) {
 				gen_tone_put_sample(c, 0, 0)
 			}
 
-			layer2_preamble_postamble(C.int(c), 32, 0, &modem)
-			layer2_send_frame(C.int(c), pp, 0, &modem)
-			layer2_preamble_postamble(C.int(c), 2, 1, &modem)
+			layer2_preamble_postamble(c, 32, false, &modem)
+			layer2_send_frame(c, pp, false, &modem)
+			layer2_preamble_postamble(c, 2, true, &modem)
 		}
 		ax25_delete(pp)
 	}
