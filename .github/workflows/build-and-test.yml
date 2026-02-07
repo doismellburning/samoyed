@@ -17,6 +17,7 @@ jobs:
     - uses: "actions/setup-go@v6"
       with:
         go-version: "1.25"
+        cache: true
     - name: "Generate Version"
       id: "version"
       run: |
@@ -24,6 +25,13 @@ jobs:
         echo "Version: $SAMOYED_VERSION"
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT  # Output to be used by the release job
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV  # Env to be used by the make build
+    - name: "Cache apt packages"
+      uses: "actions/cache@v4"
+      with:
+        path: "/var/cache/apt/archives"
+        key: "apt-${{ runner.os }}-${{ hashFiles('.github/workflows/build-and-test.yml') }}"
+        restore-keys: |
+          apt-${{ runner.os }}-
     - run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev libasound2-dev libavahi-client-dev libbsd-dev libgpiod-dev libgps-dev"
     - run: "sudo apt install --yes morse2ascii"  # For decoding the morse
     - run: "make stats"
@@ -33,6 +41,11 @@ jobs:
     - run: "make test"
     - run: "make coveragereport"
     - run: "pipx install reuse"  # For validating the licence config
+    - name: "Cache golangci-lint"
+      uses: "actions/cache@v4"
+      with:
+        path: "bin/golangci-lint"
+        key: "golangci-lint-${{ runner.os }}-v2.4.0"
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
