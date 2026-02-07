@@ -31,24 +31,24 @@ var delete_count = 0
 const MAX_NUM_BITS = (MAX_FRAME_LEN * 8 * 6 / 5)
 
 type rrbb_t struct {
-	magic1 C.int
+	magic1 int
 	nextp  *rrbb_t /* Next pointer to maintain a queue. */
 
-	channel    C.int /* Radio channel from which it was received. */
-	subchannel C.int /* Which modem when more than one per channel. */
-	slice      C.int /* Which slicer. */
+	channel    int /* Radio channel from which it was received. */
+	subchannel int /* Which modem when more than one per channel. */
+	slice      int /* Which slicer. */
 
 	alevel      alevel_t /* Received audio level at time of frame capture. */
-	speed_error C.float  /* Received data speed error as percentage. */
-	length      C.uint   /* Current number of samples in array. */
+	speed_error float64  /* Received data speed error as percentage. */
+	length      int      /* Current number of samples in array. */
 
-	is_scrambled  bool  /* Is data scrambled G3RUH / K9NG style? */
-	descram_state C.int /* Descrambler state before first data bit of frame. */
-	prev_descram  C.int /* Previous descrambled bit. */
+	is_scrambled  bool /* Is data scrambled G3RUH / K9NG style? */
+	descram_state int  /* Descrambler state before first data bit of frame. */
+	prev_descram  int  /* Previous descrambled bit. */
 
-	fdata [MAX_NUM_BITS]C.uchar
+	fdata [MAX_NUM_BITS]byte
 
-	magic2 C.int
+	magic2 int
 }
 
 /***********************************************************************************
@@ -75,7 +75,7 @@ type rrbb_t struct {
  *
  ***********************************************************************************/
 
-func rrbb_new(channel C.int, subchannel C.int, slice C.int, is_scrambled bool, descram_state C.int, prev_descram C.int) *rrbb_t {
+func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram_state int, prev_descram int) *rrbb_t {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
@@ -117,7 +117,7 @@ func rrbb_new(channel C.int, subchannel C.int, slice C.int, is_scrambled bool, d
  *
  ***********************************************************************************/
 
-func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state C.int, prev_descram C.int) {
+func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram int) {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -148,7 +148,7 @@ func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state C.int, prev_descram 
  *
  ***********************************************************************************/
 
-func rrbb_append_bit(b *rrbb_t, val C.uchar) {
+func rrbb_append_bit(b *rrbb_t, val byte) {
 
 	if b.length >= MAX_NUM_BITS {
 		return /* Silently discard if full. */
@@ -190,12 +190,12 @@ func rrbb_chop8(b *rrbb_t) {
  *
  ***********************************************************************************/
 
-func rrbb_get_len(b *rrbb_t) C.int {
+func rrbb_get_len(b *rrbb_t) int {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
 
-	return C.int(b.length)
+	return b.length
 }
 
 /***********************************************************************************
@@ -209,7 +209,7 @@ func rrbb_get_len(b *rrbb_t) C.int {
  *
  ***********************************************************************************/
 
-func rrbb_get_bit(b *rrbb_t, ind C.int) C.uchar {
+func rrbb_get_bit(b *rrbb_t, ind int) byte {
 	return b.fdata[ind]
 }
 
@@ -308,7 +308,7 @@ func rrbb_get_nextp(b *rrbb_t) *rrbb_t {
  *
  ***********************************************************************************/
 
-func rrbb_get_chan(b *rrbb_t) C.int {
+func rrbb_get_chan(b *rrbb_t) int {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -328,7 +328,7 @@ func rrbb_get_chan(b *rrbb_t) C.int {
  *
  ***********************************************************************************/
 
-func rrbb_get_subchan(b *rrbb_t) C.int {
+func rrbb_get_subchan(b *rrbb_t) int {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -348,7 +348,7 @@ func rrbb_get_subchan(b *rrbb_t) C.int {
  *
  ***********************************************************************************/
 
-func rrbb_get_slice(b *rrbb_t) C.int {
+func rrbb_get_slice(b *rrbb_t) int {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -406,7 +406,7 @@ func rrbb_get_audio_level(b *rrbb_t) alevel_t {
  *
  ***********************************************************************************/
 
-func rrbb_set_speed_error(b *rrbb_t, speed_error C.float) {
+func rrbb_set_speed_error(b *rrbb_t, speed_error float64) {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -426,7 +426,7 @@ func rrbb_set_speed_error(b *rrbb_t, speed_error C.float) {
  *
  ***********************************************************************************/
 
-func rrbb_get_speed_error(b *rrbb_t) C.float {
+func rrbb_get_speed_error(b *rrbb_t) float64 {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -464,7 +464,7 @@ func rrbb_get_is_scrambled(b *rrbb_t) bool {
  *
  ***********************************************************************************/
 
-func rrbb_get_descram_state(b *rrbb_t) C.int {
+func rrbb_get_descram_state(b *rrbb_t) int {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -482,7 +482,7 @@ func rrbb_get_descram_state(b *rrbb_t) C.int {
  *
  ***********************************************************************************/
 
-func rrbb_get_prev_descram(b *rrbb_t) C.int {
+func rrbb_get_prev_descram(b *rrbb_t) int {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
