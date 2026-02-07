@@ -647,7 +647,7 @@ func audio_get(a C.int) C.int {
 func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
 
 	packets_decoded_one++
-	if hdlc_rec_data_detect_any(C.int(channel)) == 0 {
+	if hdlc_rec_data_detect_any(channel) == 0 {
 		dcd_missing_errors++
 	}
 

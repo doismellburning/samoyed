@@ -13,7 +13,6 @@ import "C"
 
 import (
 	"slices"
-	"unsafe"
 )
 
 /* Undo data scrambling for 9600 baud. */
@@ -174,7 +173,7 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func eas_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, future_use C.int) {
+func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int) {
 
 	/*
 	 * Different state information for each channel / subchannel / slice.
@@ -198,13 +197,13 @@ func eas_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, future
 		H.eas_gathering = true
 		H.eas_plus_found = false
 		H.eas_fields_after_plus = 0
-		C.strcpy((*C.char)(unsafe.Pointer(&H.frame_buf[0])), C.CString("ZCZC"))
+		copy(H.frame_buf[:], []byte("ZCZC"))
 		H.frame_len = 4
 	} else if H.eas_acc == PREAMBLE_NNNN {
 		//dw_printf ("NNNN\n");
 		H.olen = 0
 		H.eas_gathering = true
-		C.strcpy((*C.char)(unsafe.Pointer(&H.frame_buf[0])), C.CString("NNNN"))
+		copy(H.frame_buf[:], []byte("NNNN"))
 		H.frame_len = 4
 		done = true
 	} else if H.eas_gathering {
@@ -263,8 +262,8 @@ func eas_rec_bit(channel C.int, subchannel C.int, slice C.int, raw C.int, future
 				  dw_printf ("frame_buf %d = %s\n", slice, H.frame_buf);
 			#endif
 		*/
-		var alevel = demod_get_audio_level(channel, subchannel)
-		multi_modem_process_rec_frame(int(channel), int(subchannel), int(slice), H.frame_buf[:H.frame_len], alevel, 0, 0)
+		var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+		multi_modem_process_rec_frame(channel, subchannel, slice, H.frame_buf[:H.frame_len], alevel, 0, 0)
 		H.eas_gathering = false
 	}
 
@@ -417,7 +416,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 	// EAS does not use HDLC.
 
 	if g_audio_p.achan[channel].modem_type == MODEM_EAS {
-		eas_rec_bit(C.int(channel), C.int(subchannel), C.int(slice), C.int(IfThenElse(raw, 1, 0)), C.int(not_used_remove))
+		eas_rec_bit(channel, subchannel, slice, IfThenElse(raw, 1, 0), not_used_remove)
 		return
 	}
 
@@ -701,7 +700,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
  *
  *--------------------------------------------------------------------*/
 
-func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) {
+func dcd_change_real(channel int, subchannel int, slice int, state int) {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel <= MAX_SUBCHANS)
@@ -726,7 +725,7 @@ func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) 
 	var newVal = hdlc_rec_data_detect_any(channel)
 
 	if newVal != old {
-		ptt_set(OCTYPE_DCD, int(channel), int(newVal))
+		ptt_set(OCTYPE_DCD, channel, newVal)
 	}
 }
 
@@ -760,7 +759,7 @@ func dcd_change_real(channel C.int, subchannel C.int, slice C.int, state C.int) 
  *
  *--------------------------------------------------------------------*/
 
-func hdlc_rec_data_detect_any(channel C.int) C.int {
+func hdlc_rec_data_detect_any(channel int) int {
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
@@ -770,7 +769,7 @@ func hdlc_rec_data_detect_any(channel C.int) C.int {
 		}
 	}
 
-	if get_input(ICTYPE_TXINH, channel) == 1 {
+	if get_input(ICTYPE_TXINH, C.int(channel)) == 1 {
 		return (1)
 	}
 

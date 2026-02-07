@@ -935,6 +935,6 @@ func dcd_change(channel int, subchan int, slice int, state int) {
 	if GEN_PACKETS {
 		dcd_change_fake(channel, subchan, slice, state)
 	} else {
-		dcd_change_real(C.int(channel), C.int(subchan), C.int(slice), C.int(state))
+		dcd_change_real(channel, subchan, slice, state)
 	}
 }
