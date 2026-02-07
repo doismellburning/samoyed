@@ -42,7 +42,7 @@ jobs:
       uses: "actions/cache@v4"
       with:
         path: "bin/golangci-lint"
-        key: "golangci-lint-${{ runner.os }}-v2.4.0"
+        key: "golangci-lint-${{ runner.os }}-${{ hashFiles('Makefile') }}"
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
       run: "git diff --quiet && git diff --cached --quiet"
