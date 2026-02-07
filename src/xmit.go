@@ -1163,7 +1163,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 
 	start_over_again:
 
-		for hdlc_rec_data_detect_any(C.int(channel)) > 0 {
+		for hdlc_rec_data_detect_any(channel) > 0 {
 			SLEEP_MS(WAIT_CHECK_EVERY_MS)
 			n++
 			if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
@@ -1182,7 +1182,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 			SLEEP_MS(save_audio_config_p.achan[channel].dwait * 10)
 		}
 
-		if hdlc_rec_data_detect_any(C.int(channel)) > 0 {
+		if hdlc_rec_data_detect_any(channel) > 0 {
 			goto start_over_again
 		}
 
@@ -1193,7 +1193,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(slottime * 10)
 
-			if hdlc_rec_data_detect_any(C.int(channel)) > 0 {
+			if hdlc_rec_data_detect_any(channel) > 0 {
 				goto start_over_again
 			}
 
