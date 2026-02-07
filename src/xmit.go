@@ -602,7 +602,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	var pre_flags = MS_TO_BITS(xmit_txdelay[channel]*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
-	var num_bits = int(layer2_preamble_postamble(C.int(channel), C.int(pre_flags), 0, save_audio_config_p))
+	var num_bits = layer2_preamble_postamble(channel, pre_flags, false, save_audio_config_p)
 
 	/* TODO KG
 	#if DEBUG
@@ -710,7 +710,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	 */
 
 	var post_flags = MS_TO_BITS(xmit_txtail[channel]*10, channel) / 8
-	nb = int(layer2_preamble_postamble(C.int(channel), C.int(post_flags), 1, save_audio_config_p))
+	nb = layer2_preamble_postamble(channel, post_flags, true, save_audio_config_p)
 	num_bits += nb
 	/* TODO KG
 	#if DEBUG
@@ -877,7 +877,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 	/*
 	 * Transmit the frame.
 	 */
-	var send_invalid_fcs2 C.int = 0
+	var send_invalid_fcs2 = false
 
 	if save_audio_config_p.xmit_error_rate != 0 {
 		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.0:src/math/rand/rand.go;l=189
@@ -885,19 +885,19 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 		var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
 		if float64(save_audio_config_p.xmit_error_rate)/100.0 > r {
-			send_invalid_fcs2 = 1
+			send_invalid_fcs2 = true
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", save_audio_config_p.xmit_error_rate)
 		}
 	}
 
-	var nb = layer2_send_frame(C.int(c), pp, send_invalid_fcs2, save_audio_config_p)
+	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, save_audio_config_p)
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
 	server_send_monitored(c, pp, 1)
 
-	return int(nb)
+	return nb
 } /* end send_one_frame */
 
 /*-------------------------------------------------------------------

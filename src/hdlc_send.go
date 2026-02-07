@@ -4,11 +4,7 @@ package direwolf
 // #include <string.h>
 import "C"
 
-import (
-	"unsafe"
-)
-
-var number_of_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "hdlc_send_frame" or "hdlc_send_flags"
+var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hdlc_send_frame" or "hdlc_send_flags"
 
 /*-------------------------------------------------------------
  *
@@ -46,22 +42,22 @@ var number_of_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "
  *
  *--------------------------------------------------------------*/
 
-func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_p *audio_s) C.int {
+func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *audio_s) int {
 
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
 
-		var n = il2p_send_frame(channel, pp, C.int(audio_config_p.achan[channel].il2p_max_fec), C.int(audio_config_p.achan[channel].il2p_invert_polarity))
+		var n = il2p_send_frame(C.int(channel), pp, C.int(audio_config_p.achan[channel].il2p_max_fec), C.int(audio_config_p.achan[channel].il2p_invert_polarity))
 		if n > 0 {
-			return (n)
+			return int(n)
 		}
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
 		var fbuf = ax25_pack(pp)
-		var n = fx25_send_frame(channel, (*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)), C.int(audio_config_p.achan[channel].fx25_strength), false)
+		var n = fx25_send_frame(C.int(channel), (*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)), C.int(audio_config_p.achan[channel].fx25_strength), false)
 		if n > 0 {
-			return (n)
+			return int(n)
 		}
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send FX.25.  Falling back to regular AX.25.\n")
@@ -70,10 +66,10 @@ func layer2_send_frame(channel C.int, pp *packet_t, bad_fcs C.int, audio_config_
 	}
 
 	var fbuf = ax25_pack(pp)
-	return (ax25_only_hdlc_send_frame(channel, (*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)), bad_fcs))
+	return (ax25_only_hdlc_send_frame(channel, fbuf, bad_fcs))
 }
 
-func ax25_only_hdlc_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, bad_fcs C.int) C.int {
+func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 
 	number_of_bits_sent[channel] = 0
 
@@ -87,20 +83,19 @@ func ax25_only_hdlc_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, bad_fc
 
 	send_control_nrzi(channel, 0x7e) /* Start frame */
 
-	var fbuf = C.GoBytes(unsafe.Pointer(_fbuf), flen)
-	for j := C.int(0); j < flen; j++ {
-		send_data_nrzi(channel, C.int(fbuf[j]))
+	for j := 0; j < len(fbuf); j++ {
+		send_data_nrzi(channel, fbuf[j])
 	}
 
-	var fcs = fcs_calc(_fbuf, flen)
+	var fcs = fcs_calc((*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)))
 
-	if bad_fcs > 0 {
+	if bad_fcs {
 		/* For testing only - Simulate a frame getting corrupted along the way. */
-		send_data_nrzi(channel, C.int(^fcs)&0xff)
-		send_data_nrzi(channel, C.int((^fcs)>>8)&0xff)
+		send_data_nrzi(channel, byte(^fcs)&0xff)
+		send_data_nrzi(channel, byte((^fcs)>>8)&0xff)
 	} else {
-		send_data_nrzi(channel, C.int(fcs)&0xff)
-		send_data_nrzi(channel, C.int(fcs>>8)&0xff)
+		send_data_nrzi(channel, byte(fcs)&0xff)
+		send_data_nrzi(channel, byte(fcs>>8)&0xff)
 	}
 
 	send_control_nrzi(channel, 0x7e) /* End frame */
@@ -138,7 +133,7 @@ func ax25_only_hdlc_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, bad_fc
  *
  *--------------------------------------------------------------*/
 
-func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_config_p *audio_s) C.int {
+func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_config_p *audio_s) int {
 
 	number_of_bits_sent[channel] = 0
 
@@ -155,9 +150,9 @@ func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_
 	// For AX.25, it is the 01111110 "flag" pattern with NRZI and no bit stuffing.
 	// For IL2P, it is 01010101 without NRZI.
 
-	for j := C.int(0); j < nbytes; j++ {
+	for j := 0; j < nbytes; j++ {
 		if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P {
-			send_byte_msb_first(channel, IL2P_PREAMBLE, C.int(audio_config_p.achan[channel].il2p_invert_polarity))
+			send_byte_msb_first(channel, IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
 		} else {
 			send_control_nrzi(channel, 0x7e)
 		}
@@ -165,8 +160,8 @@ func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_
 
 	/* Push out the final partial buffer! */
 
-	if finish > 0 {
-		audio_flush(ACHAN2ADEV(int(channel)))
+	if finish {
+		audio_flush(ACHAN2ADEV(channel))
 	}
 
 	return (number_of_bits_sent[channel])
@@ -175,14 +170,14 @@ func layer2_preamble_postamble(channel C.int, nbytes C.int, finish C.int, audio_
 // The next one is only for IL2P.  No NRZI.
 // MSB first, opposite of AX.25.
 
-func send_byte_msb_first(channel C.int, x C.int, polarity C.int) {
+func send_byte_msb_first(channel int, x int, polarity int) {
 
 	for i := 0; i < 8; i++ {
-		var dbit C.int = 0
+		var dbit = 0
 		if (x & 0x80) != 0 {
 			dbit = 1
 		}
-		tone_gen_put_bit(int(channel), int(dbit^polarity)&1)
+		tone_gen_put_bit(channel, (dbit^polarity)&1)
 		x <<= 1
 		number_of_bits_sent[channel]++
 	}
@@ -192,29 +187,29 @@ func send_byte_msb_first(channel C.int, x C.int, polarity C.int) {
 // All bits are sent NRZI.
 // Data (non flags) use bit stuffing.
 
-var stuff [MAX_RADIO_CHANS]C.int // Count number of "1" bits to keep track of when we
+var stuff [MAX_RADIO_CHANS]int // Count number of "1" bits to keep track of when we
 // need to break up a long run by "bit stuffing."
 // Needs to be array because we could be transmitting
 // on multiple channels at the same time.
 
-func send_control_nrzi(channel C.int, x C.int) {
+func send_control_nrzi(channel int, x byte) {
 
 	for i := 0; i < 8; i++ {
-		send_bit_nrzi(channel, x&1)
+		send_bit_nrzi(channel, x&1 != 0)
 		x >>= 1
 	}
 
 	stuff[channel] = 0
 }
 
-func send_data_nrzi(channel C.int, x C.int) {
+func send_data_nrzi(channel int, x byte) {
 
 	for i := 0; i < 8; i++ {
-		send_bit_nrzi(channel, x&1)
+		send_bit_nrzi(channel, x&1 != 0)
 		if x&1 > 0 {
 			stuff[channel]++
 			if stuff[channel] == 5 {
-				send_bit_nrzi(channel, 0)
+				send_bit_nrzi(channel, false)
 				stuff[channel] = 0
 			}
 		} else {
@@ -232,13 +227,13 @@ func send_data_nrzi(channel C.int, x C.int) {
 
 var nrziBitOutput [MAX_RADIO_CHANS]int
 
-func send_bit_nrzi(channel C.int, b C.int) {
+func send_bit_nrzi(channel int, b bool) {
 
-	if b == 0 {
+	if !b {
 		nrziBitOutput[channel] = 1 - nrziBitOutput[channel]
 	}
 
-	tone_gen_put_bit(int(channel), nrziBitOutput[channel])
+	tone_gen_put_bit(channel, nrziBitOutput[channel])
 
 	number_of_bits_sent[channel]++
 }
@@ -271,43 +266,42 @@ func send_bit_nrzi(channel C.int, b C.int) {
  *
  *--------------------------------------------------------------------*/
 
-func eas_put_byte(channel C.int, b C.uchar) {
+func eas_put_byte(channel int, b byte) {
 	for n := 0; n < 8; n++ {
-		tone_gen_put_bit(int(channel), int(b&1))
+		tone_gen_put_bit(channel, int(b&1))
 		b >>= 1
 	}
 }
 
-func eas_send(channel C.int, _str *C.uchar, repeat C.int, txdelay C.int, txtail C.int) C.int {
-	var bytes_sent C.int = 0
-	const gap C.int = 1000
-	var gaps_sent C.int = 0
+func eas_send(channel int, str []byte, repeat int, txdelay int, txtail int) int {
+	var bytes_sent = 0
+	const gap = 1000
+	var gaps_sent = 0
 
-	gen_tone_put_quiet_ms(int(channel), int(txdelay))
+	gen_tone_put_quiet_ms(channel, txdelay)
 
-	for r := C.int(0); r < repeat; r++ {
+	for r := 0; r < repeat; r++ {
 		for j := 0; j < 16; j++ {
 			eas_put_byte(channel, 0xAB)
 			bytes_sent++
 		}
 
-		var str = C.GoBytes(unsafe.Pointer(_str), C.int(C.strlen((*C.char)(unsafe.Pointer(_str)))))
 		for _, p := range str {
-			eas_put_byte(channel, C.uchar(p))
+			eas_put_byte(channel, p)
 			bytes_sent++
 		}
 
 		if r < repeat-1 {
-			gen_tone_put_quiet_ms(int(channel), int(gap))
+			gen_tone_put_quiet_ms(channel, gap)
 			gaps_sent++
 		}
 	}
 
-	gen_tone_put_quiet_ms(int(channel), int(txtail))
+	gen_tone_put_quiet_ms(channel, txtail)
 
-	audio_flush(ACHAN2ADEV(int(channel)))
+	audio_flush(ACHAN2ADEV(channel))
 
-	var elapsed = txdelay + C.int(float64(bytes_sent)*8*1.92) + (gaps_sent * gap) + txtail
+	var elapsed = txdelay + int(float64(bytes_sent)*8*1.92) + (gaps_sent * gap) + txtail
 
 	// dw_printf ("DEBUG:  EAS total time = %d ms\n", elapsed);
 
