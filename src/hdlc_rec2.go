@@ -65,14 +65,6 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <ctype.h>
-// #include <string.h>
-// //Optimize processing by accessing directly to decoded bits
-// #define RRBB_C 1
-import "C"
-
 import (
 	"unicode"
 )
@@ -115,7 +107,7 @@ type retry_conf_t struct {
 		nr_bits int
 	}
 
-	insert_value int
+	insert_value int //nolint:unused
 }
 
 /*
@@ -449,7 +441,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 // TODO:  Remove this.  but first figure out what to do in atest.c
 
-func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool {
+func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool { //nolint:unused
 	//int len;
 	//retry_t fix_bits = save_audio_config_p.achan[channel].fix_bits;
 	var passall = save_audio_config_p.achan[channel].passall
