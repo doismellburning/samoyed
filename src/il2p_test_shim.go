@@ -792,7 +792,7 @@ func decode_bitstream(t *testing.T) {
 	for ch != C.EOF {
 		ch = C.fgetc(fp)
 		if ch == '0' || ch == '1' {
-			il2p_rec_bit(0, 0, 0, ch-'0')
+			il2p_rec_bit(0, 0, 0, int(ch-'0'))
 		}
 	}
 	C.fclose(fp)
@@ -843,11 +843,11 @@ func test_serdes(t *testing.T) {
 		var pp = ax25_from_text(packet, true)
 		assert.NotNil(t, pp)
 
-		var channel C.int
+		var channel = 0
 
-		for max_fec := C.int(0); max_fec <= 1; max_fec++ {
-			for polarity = C.int(0); polarity <= 2; polarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, polarity)
+		for max_fec := 0; max_fec <= 1; max_fec++ {
+			for polarity = 0; polarity <= 2; polarity++ { // 2 means throw in some errors.
+				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, int(polarity))
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.

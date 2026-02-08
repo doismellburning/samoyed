@@ -46,9 +46,9 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
 
-		var n = il2p_send_frame(C.int(channel), pp, C.int(audio_config_p.achan[channel].il2p_max_fec), C.int(audio_config_p.achan[channel].il2p_invert_polarity))
+		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
 		if n > 0 {
-			return int(n)
+			return n
 		}
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
@@ -87,7 +87,7 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 		send_data_nrzi(channel, fbuf[j])
 	}
 
-	var fcs = fcs_calc((*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)))
+	var fcs = fcs_calc(fbuf)
 
 	if bad_fcs {
 		/* For testing only - Simulate a frame getting corrupted along the way. */

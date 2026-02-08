@@ -70,7 +70,7 @@ var fx25_test_count = 0
 
 const FENCE = 0x55 // to detect buffer overflow.
 
-func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
+func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 	// Allocate context blocks only as needed.
 
@@ -222,7 +222,7 @@ func fx25_rec_busy(channel C.int) C.int {
  *
  ***********************************************************************************/
 
-func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_context_s) {
+func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
@@ -250,13 +250,13 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 			}
 		}
 
-		var frame_buf [FX25_MAX_DATA + 1]C.uchar // Out must be shorter than input.
-		var frame_len = my_unstuff(channel, subchannel, slice, F.block[:], F.dlen, frame_buf[:])
+		var frame_buf = my_unstuff(channel, subchannel, slice, F.block[:], int(F.dlen))
+		var frame_len = C.int(len(frame_buf))
 
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
 
-			var actual_fcs = C.ushort(frame_buf[frame_len-2]) | (C.ushort(frame_buf[frame_len-1]) << 8)
-			var expected_fcs = fcs_calc(&frame_buf[0], frame_len-2)
+			var actual_fcs = uint16(frame_buf[frame_len-2]) | (uint16(frame_buf[frame_len-1]) << 8)
+			var expected_fcs = fcs_calc(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2))
 			if actual_fcs == expected_fcs {
 
 				if fx25_get_debug() >= 3 {
@@ -268,9 +268,9 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 				if FXTEST {
 					fx25_test_count++
 				} else {
-					var alevel = demod_get_audio_level(channel, subchannel)
+					var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
 
-					multi_modem_process_rec_frame(int(channel), int(subchannel), int(slice), C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
+					multi_modem_process_rec_frame(channel, subchannel, slice, C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}
 
 			} else {
@@ -285,7 +285,9 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
 			fx_hex_dump(&F.block[0], F.dlen)
-			fx_hex_dump(&frame_buf[0], frame_len)
+			if frame_len > 0 {
+				fx_hex_dump(&frame_buf[0], frame_len)
+			}
 		}
 	} else if fx25_get_debug() >= 2 {
 		text_color_set(DW_COLOR_ERROR)
@@ -324,17 +326,16 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
  *
  ***********************************************************************************/
 
-func my_unstuff(channel C.int, subchannel C.int, slice C.int, pin []C.uchar, ilen C.int, frame_buf []C.uchar) C.int {
+func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int) []C.uchar {
 	var pat_det C.uchar = 0 // Pattern detector.
 	var oacc C.uchar = 0    // Accumulator for a byte out.
 	var olen C.int = 0      // Number of good bits in oacc.
-	var frame_len C.int = 0 // Number of bytes accumulated, including CRC.
 
 	if pin[0] != 0x7e {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d] error: Data section did not start with 0x7e.\n", channel, slice)
-		fx_hex_dump(&pin[0], ilen)
-		return (0)
+		fx_hex_dump(&pin[0], C.int(ilen))
+		return nil
 	}
 
 	for ilen > 0 && pin[0] == 0x7e {
@@ -342,7 +343,8 @@ func my_unstuff(channel C.int, subchannel C.int, slice C.int, pin []C.uchar, ile
 		pin = pin[1:] // Skip over leading flag byte(s).
 	}
 
-	for i := C.int(0); i < ilen; i++ {
+	var frame_buf []C.uchar
+	for i := 0; i < ilen; i++ {
 		for imask := C.uchar(0x01); imask != 0; imask <<= 1 {
 			var dbit C.uchar = C.uchar(IfThenElse((pin[i]&imask) != 0, 1, 0))
 
@@ -352,8 +354,8 @@ func my_unstuff(channel C.int, subchannel C.int, slice C.int, pin []C.uchar, ile
 			if pat_det == 0xfe {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.\n", channel, slice)
-				fx_hex_dump(&pin[i], ilen)
-				return 0
+				fx_hex_dump(&pin[i], C.int(ilen))
+				return nil
 			}
 
 			if dbit != 0 {
@@ -362,12 +364,12 @@ func my_unstuff(channel C.int, subchannel C.int, slice C.int, pin []C.uchar, ile
 			} else {
 				if pat_det == 0x7e { // "flag" pattern - End of frame.
 					if olen == 7 {
-						return (frame_len) // Whole number of bytes in result including CRC
+						return frame_buf // Whole number of bytes in result including CRC
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.\n", channel, slice)
-						fx_hex_dump(&pin[i], ilen)
-						return (0)
+						fx_hex_dump(&pin[i], C.int(ilen))
+						return nil
 					}
 				} else if (pat_det >> 2) == 0x1f {
 					continue // Five '1' bits in a row, followed by '0'.  Discard the '0'.
@@ -378,16 +380,15 @@ func my_unstuff(channel C.int, subchannel C.int, slice C.int, pin []C.uchar, ile
 			olen++
 			if olen&8 != 0 {
 				olen = 0
-				frame_buf[frame_len] = oacc
-				frame_len++
+				frame_buf = append(frame_buf, oacc)
 			}
 		}
 	} /* end of loop on all bits in block */
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.\n", channel, slice)
-	fx_hex_dump(&pin[0], ilen)
+	fx_hex_dump(&pin[0], C.int(ilen))
 
-	return (0) // Should never fall off the end.
+	return nil // Should never fall off the end.
 
 } // my_unstuff

@@ -52,14 +52,14 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent
  *
  *--------------------------------------------------------------*/
 
-func il2p_send_frame(channel C.int, pp *packet_t, max_fec C.int, polarity C.int) C.int {
+func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 	var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
 
 	encoded[0] = (IL2P_SYNC_WORD >> 16) & 0xff
 	encoded[1] = (IL2P_SYNC_WORD >> 8) & 0xff
 	encoded[2] = (IL2P_SYNC_WORD) & 0xff
 
-	var elen = il2p_encode_frame(pp, max_fec, &encoded[IL2P_SYNC_WORD_SIZE])
+	var elen = il2p_encode_frame(pp, C.int(max_fec), &encoded[IL2P_SYNC_WORD_SIZE])
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
@@ -85,20 +85,16 @@ func il2p_send_frame(channel C.int, pp *packet_t, max_fec C.int, polarity C.int)
 
 	// Send bits to modulator.
 
-	var preamble C.uchar = IL2P_PREAMBLE
+	send_il2p_bytes(channel, []byte{IL2P_PREAMBLE}, polarity)
+	send_il2p_bytes(channel, C.GoBytes(unsafe.Pointer(&encoded[0]), elen), polarity)
 
-	send_il2p_bytes(channel, &preamble, 1, polarity)
-	send_il2p_bytes(channel, &encoded[0], elen, polarity)
-
-	return (number_of_il2p_bits_sent[channel])
+	return int(number_of_il2p_bits_sent[channel])
 }
 
-func send_il2p_bytes(channel C.int, _b *C.uchar, count C.int, polarity C.int) {
-	var b = C.GoBytes(unsafe.Pointer(_b), count)
-	for j := C.int(0); j < count; j++ {
-		var x = C.int(b[j])
+func send_il2p_bytes(channel int, b []byte, polarity int) {
+	for _, x := range b {
 		for k := 0; k < 8; k++ {
-			var bit C.int = 0
+			var bit = 0
 			if (x & 0x80) != 0 {
 				bit = 1
 			}
@@ -113,8 +109,8 @@ func send_il2p_bytes(channel C.int, _b *C.uchar, count C.int, polarity C.int) {
 // The direwolf receive implementation will automatically compensate
 // for either polarity but other implementations might not.
 
-func send_il2p_bit(channel C.int, b C.int, polarity C.int) {
-	tone_gen_put_bit(int(channel), int(b^polarity)&1)
+func send_il2p_bit(channel int, b int, polarity int) {
+	tone_gen_put_bit(channel, (b^polarity)&1)
 	number_of_il2p_bits_sent[channel]++
 }
 

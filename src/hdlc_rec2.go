@@ -65,17 +65,8 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <ctype.h>
-// #include <string.h>
-// //Optimize processing by accessing directly to decoded bits
-// #define RRBB_C 1
-import "C"
-
 import (
 	"unicode"
-	"unsafe"
 )
 
 /*
@@ -116,7 +107,7 @@ type retry_conf_t struct {
 		nr_bits int
 	}
 
-	insert_value int
+	insert_value int //nolint:unused
 }
 
 /*
@@ -450,7 +441,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 // TODO:  Remove this.  but first figure out what to do in atest.c
 
-func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool {
+func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool { //nolint:unused
 	//int len;
 	//retry_t fix_bits = save_audio_config_p.achan[channel].fix_bits;
 	var passall = save_audio_config_p.achan[channel].passall
@@ -745,9 +736,9 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 		/* I think making a second pass over it and comparing is */
 		/* easier to understand. */
 
-		var actual_fcs = C.ushort(H2.frame_buf[H2.frame_len-2]) | (C.ushort(H2.frame_buf[H2.frame_len-1]) << 8)
+		var actual_fcs = uint16(H2.frame_buf[H2.frame_len-2]) | (uint16(H2.frame_buf[H2.frame_len-1]) << 8)
 
-		var expected_fcs = fcs_calc((*C.uchar)(unsafe.Pointer(&H2.frame_buf[0])), C.int(H2.frame_len-2))
+		var expected_fcs = fcs_calc(H2.frame_buf[:H2.frame_len-2])
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
 
