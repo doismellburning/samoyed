@@ -55,9 +55,9 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
 		var fbuf = ax25_pack(pp)
-		var n = fx25_send_frame(C.int(channel), (*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)), C.int(audio_config_p.achan[channel].fx25_strength), false)
+		var n = fx25_send_frame(channel, fbuf, audio_config_p.achan[channel].fx25_strength, false)
 		if n > 0 {
-			return int(n)
+			return n
 		}
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send FX.25.  Falling back to regular AX.25.\n")
