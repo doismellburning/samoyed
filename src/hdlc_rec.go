@@ -769,7 +769,7 @@ func hdlc_rec_data_detect_any(channel int) int {
 		}
 	}
 
-	if get_input(ICTYPE_TXINH, C.int(channel)) == 1 {
+	if get_input(ICTYPE_TXINH, channel) == 1 {
 		return (1)
 	}
 

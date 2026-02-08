@@ -818,11 +818,11 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 	}
 }
 
-func get_input_fake(it C.int, channel C.int) C.int {
+func get_input_fake(it int, channel int) int {
 	return -1
 }
 
-func get_input(it C.int, channel C.int) C.int {
+func get_input(it int, channel int) int {
 	if ATEST_C {
 		return get_input_fake(it, channel)
 	} else {
