@@ -1,11 +1,5 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
 /*-------------------------------------------------------------
  *
  * Purpose:	Mock functions for unit tests for IL2P protocol functions.
@@ -40,7 +34,7 @@ func tone_gen_put_bit(channel int, data int) {
 
 // This is called when a complete frame has been deserialized.
 
-func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) { //nolint:unparam
 	if rec_count < 0 {
 		return // Skip check before serdes test.
 	}
