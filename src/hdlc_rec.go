@@ -262,7 +262,7 @@ func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int
 				  dw_printf ("frame_buf %d = %s\n", slice, H.frame_buf);
 			#endif
 		*/
-		var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+		var alevel = demod_get_audio_level(channel, subchannel)
 		multi_modem_process_rec_frame(channel, subchannel, slice, H.frame_buf[:H.frame_len], alevel, 0, 0)
 		H.eas_gathering = false
 	}
@@ -566,7 +566,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 			}
 			rrbb_set_speed_error(H.rrbb, speed_error)
 
-			var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+			var alevel = demod_get_audio_level(channel, subchannel)
 
 			rrbb_set_audio_level(H.rrbb, alevel)
 			hdlc_rec2_block(H.rrbb)

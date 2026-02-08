@@ -71,15 +71,15 @@ func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *
 	}
 }
 
-func demod_get_audio_level_fake(channel C.int, subchannel C.int) alevel_t {
+func demod_get_audio_level_fake(channel int, subchannel int) alevel_t {
 	var alevel alevel_t
 	return (alevel)
 }
 
-func demod_get_audio_level(channel C.int, subchannel C.int) alevel_t {
+func demod_get_audio_level(channel int, subchannel int) alevel_t {
 	if IL2P_TEST {
 		return demod_get_audio_level_fake(channel, subchannel)
 	} else {
-		return demod_get_audio_level_real(int(channel), int(subchannel))
+		return demod_get_audio_level_real(channel, subchannel)
 	}
 }
