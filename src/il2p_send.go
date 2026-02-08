@@ -52,14 +52,14 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent
  *
  *--------------------------------------------------------------*/
 
-func il2p_send_frame(channel C.int, pp *packet_t, max_fec C.int, polarity C.int) C.int {
+func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 	var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
 
 	encoded[0] = (IL2P_SYNC_WORD >> 16) & 0xff
 	encoded[1] = (IL2P_SYNC_WORD >> 8) & 0xff
 	encoded[2] = (IL2P_SYNC_WORD) & 0xff
 
-	var elen = il2p_encode_frame(pp, max_fec, &encoded[IL2P_SYNC_WORD_SIZE])
+	var elen = il2p_encode_frame(pp, C.int(max_fec), &encoded[IL2P_SYNC_WORD_SIZE])
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
@@ -87,10 +87,10 @@ func il2p_send_frame(channel C.int, pp *packet_t, max_fec C.int, polarity C.int)
 
 	var preamble C.uchar = IL2P_PREAMBLE
 
-	send_il2p_bytes(channel, &preamble, 1, polarity)
-	send_il2p_bytes(channel, &encoded[0], elen, polarity)
+	send_il2p_bytes(C.int(channel), &preamble, 1, C.int(polarity))
+	send_il2p_bytes(C.int(channel), &encoded[0], elen, C.int(polarity))
 
-	return (number_of_il2p_bits_sent[channel])
+	return int(number_of_il2p_bits_sent[channel])
 }
 
 func send_il2p_bytes(channel C.int, _b *C.uchar, count C.int, polarity C.int) {
