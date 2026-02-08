@@ -17,13 +17,13 @@ import (
  *--------------------------------------------------------------------------------*/
 
 type il2p_payload_properties_t struct {
-	payload_byte_count       C.int // Total size, 0 thru 1023
-	payload_block_count      C.int
-	small_block_size         C.int
-	large_block_size         C.int
-	large_block_count        C.int
-	small_block_count        C.int
-	parity_symbols_per_block C.int // 2, 4, 6, 8, 16
+	payload_byte_count       int // Total size, 0 thru 1023
+	payload_block_count      int
+	small_block_size         int
+	large_block_size         int
+	large_block_count        int
+	small_block_count        int
+	parity_symbols_per_block int // 2, 4, 6, 8, 16
 }
 
 /*--------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ type il2p_payload_properties_t struct {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_payload_compute(payload_size C.int, max_fec C.int) (*il2p_payload_properties_t, C.int) {
+func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properties_t, int) {
 
 	var p = new(il2p_payload_properties_t)
 
@@ -121,17 +121,17 @@ func il2p_payload_compute(payload_size C.int, max_fec C.int) (*il2p_payload_prop
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, enc *C.uchar) C.int {
-	if payload_size > IL2P_MAX_PAYLOAD_SIZE {
-		return (-1)
+func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
+	if len(payload) > IL2P_MAX_PAYLOAD_SIZE {
+		return nil, -1
 	}
-	if payload_size == 0 {
-		return (0)
+	if len(payload) == 0 {
+		return nil, 0
 	}
 
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(payload_size, max_fec)
+	var ipp, e = il2p_payload_compute(len(payload), max_fec)
 	if e <= 0 {
 		return (e)
 	}
@@ -188,10 +188,11 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
  *				Expected result size based on header.
  *		max_fec		true for 16 parity symbols, false for automatic.
  *
- * Outputs:	payload_out	Recovered payload.
+ * Outputs:	
  *
  * In/Out:	symbols_corrected	Number of symbols corrected.
  *
+ * Returns: payload_out	Recovered payload.
  *
  * Returns:	Number of bytes extracted.  Should be same as payload_size going in.
  *		-3 for unexpected internal inconsistency.
@@ -204,10 +205,10 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, payload_out *C.uchar, symbols_corrected *C.int) C.int {
+func il2p_decode_payload(received []byte, max_fec int, symbols_corrected *int) ([]byte, int) {
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(payload_size, max_fec)
+	var ipp, e = il2p_payload_compute(len(received), max_fec)
 	if e <= 0 {
 		return (e)
 	}
