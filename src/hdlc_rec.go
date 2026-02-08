@@ -553,7 +553,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 				// Fudged to get +-2.0 with gen_packets -b 1224 & 1176.
 				// Also initialized the symbol counter to -1.
 
-				speed_error = float64((C.double)(*pll_nudge_total)*100./(256.*256.*256.*256.)/(C.double)(*pll_symbol_count) + 0.02)
+				speed_error = float64(*pll_nudge_total)*100./(256.*256.*256.*256.)/float64(*pll_symbol_count) + 0.02
 
 				text_color_set(DW_COLOR_DEBUG)
 
