@@ -141,7 +141,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 			F.imask = 0x01
 			F.clen++
 			if F.clen >= F.nroots {
-				process_rs_block(C.int(channel), C.int(subchannel), C.int(slice), F) // see below
+				process_rs_block(channel, subchannel, slice, F) // see below
 
 				F.ctag_num = -1
 				F.accum = 0
@@ -222,7 +222,7 @@ func fx25_rec_busy(channel C.int) C.int {
  *
  ***********************************************************************************/
 
-func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_context_s) {
+func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
@@ -251,7 +251,7 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 		}
 
 		var frame_buf [FX25_MAX_DATA + 1]C.uchar // Out must be shorter than input.
-		var frame_len = my_unstuff(channel, subchannel, slice, F.block[:], F.dlen, frame_buf[:])
+		var frame_len = my_unstuff(C.int(channel), C.int(subchannel), C.int(slice), F.block[:], F.dlen, frame_buf[:])
 
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
 
@@ -268,7 +268,7 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 				if FXTEST {
 					fx25_test_count++
 				} else {
-					var alevel = demod_get_audio_level(channel, subchannel)
+					var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
 
 					multi_modem_process_rec_frame(int(channel), int(subchannel), int(slice), C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}
