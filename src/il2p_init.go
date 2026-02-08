@@ -102,14 +102,22 @@ func il2p_find_rs(nparity C.int) *rs_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_rs(tx_data *C.uchar, data_size C.int, num_parity C.int, parity_out *C.uchar) {
+func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
+
+	var data_size = len(tx_data)
+
 	Assert(data_size >= 1)
+
 	Assert(num_parity == 2 || num_parity == 4 || num_parity == 6 || num_parity == 8 || num_parity == 16)
 	Assert(data_size+num_parity <= 255)
 
 	var rs_block [FX25_BLOCK_SIZE]C.uchar
-	C.memcpy(unsafe.Pointer(&rs_block[C.int(len(rs_block))-data_size-num_parity]), unsafe.Pointer(tx_data), C.size_t(data_size))
-	encode_rs_char(il2p_find_rs(num_parity), &rs_block[0], parity_out)
+	C.memcpy(unsafe.Pointer(&rs_block[len(rs_block)-data_size-num_parity]), C.CBytes(tx_data), C.size_t(data_size))
+
+	var parity_out = make([]C.uchar, num_parity)
+	encode_rs_char(il2p_find_rs(C.int(num_parity)), &rs_block[0], &parity_out[0])
+
+	return C.GoBytes(unsafe.Pointer(&parity_out[0]), C.int(num_parity))
 }
 
 /*-------------------------------------------------------------

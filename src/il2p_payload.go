@@ -139,7 +139,6 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
 	var pin = payload
 	var pout = enc
 	var encoded_length C.int = 0
-	var parity [IL2P_MAX_PARITY_SYMBOLS]C.uchar
 
 	// First the large blocks.
 
@@ -151,8 +150,8 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.large_block_size))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.large_block_size))
 		encoded_length += ipp.large_block_size
-		il2p_encode_rs((*C.uchar)(C.CBytes(scram)), ipp.large_block_size, ipp.parity_symbols_per_block, &parity[0])
-		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&parity[0]), C.size_t(ipp.parity_symbols_per_block))
+		var parity = il2p_encode_rs(scram, int(ipp.parity_symbols_per_block))
+		C.memcpy(unsafe.Pointer(pout), C.CBytes(parity), C.size_t(ipp.parity_symbols_per_block))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.parity_symbols_per_block))
 		encoded_length += ipp.parity_symbols_per_block
 	}
@@ -167,7 +166,7 @@ func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, en
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.small_block_size))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.small_block_size))
 		encoded_length += ipp.small_block_size
-		il2p_encode_rs((*C.uchar)(C.CBytes(scram)), ipp.small_block_size, ipp.parity_symbols_per_block, &parity[0])
+		var parity = il2p_encode_rs(scram, int(ipp.parity_symbols_per_block))
 		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&parity[0]), C.size_t(ipp.parity_symbols_per_block))
 		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.parity_symbols_per_block))
 		encoded_length += ipp.parity_symbols_per_block
