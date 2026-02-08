@@ -4,10 +4,7 @@ package direwolf
  * Calculate the FCS for an AX.25 frame.
  */
 
-// #include <stdio.h>
-import "C"
-
-var ccitt_table = [256]C.ushort{
+var ccitt_table = [256]uint16{
 
 	// from http://www.ietf.org/rfc/rfc1549.txt
 
@@ -52,8 +49,8 @@ var ccitt_table = [256]C.ushort{
 func fcs_calc(data []byte) uint16 {
 	var crc uint16 = 0xffff
 
-	for _, b := range(data) {
-		crc = ((crc) >> 8) ^ uint16(ccitt_table[((crc)^uint16(b))&0xff])
+	for _, b := range data {
+		crc = (crc >> 8) ^ ccitt_table[(crc^uint16(b))&0xff]
 	}
 
 	return (crc ^ 0xffff)
@@ -88,7 +85,7 @@ func crc16(data []byte, seed uint16) uint16 {
 
 	for _, b := range data {
 
-		crc = ((crc) >> 8) ^ uint16(ccitt_table[((crc)^uint16(b))&0xff])
+		crc = (crc >> 8) ^ ccitt_table[(crc^uint16(b))&0xff]
 	}
 
 	return (crc ^ 0xffff)
