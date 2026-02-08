@@ -70,7 +70,7 @@ var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
  *
  ***********************************************************************************/
 
-func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
+func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 	// Allocate context blocks only as needed.
 
@@ -220,13 +220,13 @@ func il2p_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 			}
 
 			if pp != nil {
-				var alevel = demod_get_audio_level(channel, subchannel)
+				var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
 				var retries = retry_t(F.corrected)
 				var fec_type fec_type_t = fec_type_il2p
 
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
-				multi_modem_process_rec_packet(int(channel), int(subchannel), int(slice), pp, alevel, retries, fec_type)
+				multi_modem_process_rec_packet(channel, subchannel, slice, pp, alevel, retries, fec_type)
 			}
 		} // end block for local variables.
 

@@ -449,7 +449,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 
 	if g_audio_p.achan[channel].modem_type != MODEM_AIS {
 		fx25_rec_bit(channel, subchannel, slice, IfThenElse(dbit, 1, 0))
-		il2p_rec_bit(C.int(channel), C.int(subchannel), C.int(slice), C.int(IfThenElse(raw, 1, 0))) // Note: skip NRZI.
+		il2p_rec_bit(channel, subchannel, slice, IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 
 	/*

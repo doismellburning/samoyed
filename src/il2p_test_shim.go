@@ -792,7 +792,7 @@ func decode_bitstream(t *testing.T) {
 	for ch != C.EOF {
 		ch = C.fgetc(fp)
 		if ch == '0' || ch == '1' {
-			il2p_rec_bit(0, 0, 0, ch-'0')
+			il2p_rec_bit(0, 0, 0, int(ch-'0'))
 		}
 	}
 	C.fclose(fp)
