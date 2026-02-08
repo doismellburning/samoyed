@@ -7,10 +7,6 @@ package direwolf
 // #include <stdio.h>
 import "C"
 
-import (
-	"unsafe"
-)
-
 var ccitt_table = [256]C.ushort{
 
 	// from http://www.ietf.org/rfc/rfc1549.txt
@@ -53,13 +49,11 @@ var ccitt_table = [256]C.ushort{
  * Use this for an AX.25 frame.
  */
 
-func fcs_calc(_data *C.uchar, length C.int) C.ushort {
-	var crc C.ushort = 0xffff
-	var data = unsafe.Slice(_data, length)
+func fcs_calc(data []byte) uint16 {
+	var crc uint16 = 0xffff
 
-	for j := C.int(0); j < length; j++ {
-
-		crc = ((crc) >> 8) ^ ccitt_table[((crc)^C.ushort(data[j]))&0xff]
+	for _, b := range(data) {
+		crc = ((crc) >> 8) ^ uint16(ccitt_table[((crc)^uint16(b))&0xff])
 	}
 
 	return (crc ^ 0xffff)

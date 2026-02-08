@@ -75,7 +75,6 @@ import "C"
 
 import (
 	"unicode"
-	"unsafe"
 )
 
 /*
@@ -745,9 +744,9 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 		/* I think making a second pass over it and comparing is */
 		/* easier to understand. */
 
-		var actual_fcs = C.ushort(H2.frame_buf[H2.frame_len-2]) | (C.ushort(H2.frame_buf[H2.frame_len-1]) << 8)
+		var actual_fcs = uint16(H2.frame_buf[H2.frame_len-2]) | (uint16(H2.frame_buf[H2.frame_len-1]) << 8)
 
-		var expected_fcs = fcs_calc((*C.uchar)(unsafe.Pointer(&H2.frame_buf[0])), C.int(H2.frame_len-2))
+		var expected_fcs = fcs_calc(H2.frame_buf[:H2.frame_len-2])
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
 

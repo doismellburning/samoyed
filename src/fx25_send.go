@@ -70,7 +70,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 	// Append the FCS.
 
-	var fcs = fcs_calc((*C.uchar)(C.CBytes(fbuf)), flen)
+	var fcs = fcs_calc(fbuf)
 	fbuf = append(fbuf, byte(fcs)&0xff)
 	fbuf = append(fbuf, byte(fcs>>8)&0xff)
 

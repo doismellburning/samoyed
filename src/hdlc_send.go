@@ -87,7 +87,7 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 		send_data_nrzi(channel, fbuf[j])
 	}
 
-	var fcs = fcs_calc((*C.uchar)(C.CBytes(fbuf)), C.int(len(fbuf)))
+	var fcs = fcs_calc(fbuf)
 
 	if bad_fcs {
 		/* For testing only - Simulate a frame getting corrupted along the way. */

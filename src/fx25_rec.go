@@ -255,8 +255,8 @@ func process_rs_block(channel C.int, subchannel C.int, slice C.int, F *fx_contex
 
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
 
-			var actual_fcs = C.ushort(frame_buf[frame_len-2]) | (C.ushort(frame_buf[frame_len-1]) << 8)
-			var expected_fcs = fcs_calc(&frame_buf[0], frame_len-2)
+			var actual_fcs = uint16(frame_buf[frame_len-2]) | (uint16(frame_buf[frame_len-1]) << 8)
+			var expected_fcs = fcs_calc(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2))
 			if actual_fcs == expected_fcs {
 
 				if fx25_get_debug() >= 3 {
