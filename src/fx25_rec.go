@@ -268,7 +268,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				if FXTEST {
 					fx25_test_count++
 				} else {
-					var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+					var alevel = demod_get_audio_level(channel, subchannel)
 
 					multi_modem_process_rec_frame(channel, subchannel, slice, C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}

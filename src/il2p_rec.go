@@ -220,7 +220,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 			}
 
 			if pp != nil {
-				var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+				var alevel = demod_get_audio_level(channel, subchannel)
 				var retries = retry_t(F.corrected)
 				var fec_type fec_type_t = fec_type_il2p
 

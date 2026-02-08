@@ -6,11 +6,6 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <string.h>
-// #include <stdint.h>          // uint64_t
-import "C"
-
 import (
 	"slices"
 )
@@ -140,7 +135,7 @@ var hdlcRecRandSeed int32 = 1
 var hdlcRecRandMax int32 = 0x7fffffff
 
 func hdlcRecRand() int32 {
-	hdlcRecRandSeed = int32((uint32(hdlcRecRandSeed)*1103515245)+12345) & hdlcRecRandMax
+	hdlcRecRandSeed = int32((uint32(hdlcRecRandSeed)*1103515245)+12345) & hdlcRecRandMax //nolint:gosec
 	return hdlcRecRandSeed
 }
 
@@ -173,7 +168,7 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int) {
+func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int) { //nolint:unparam
 
 	/*
 	 * Different state information for each channel / subchannel / slice.
@@ -262,7 +257,7 @@ func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int
 				  dw_printf ("frame_buf %d = %s\n", slice, H.frame_buf);
 			#endif
 		*/
-		var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+		var alevel = demod_get_audio_level(channel, subchannel)
 		multi_modem_process_rec_frame(channel, subchannel, slice, H.frame_buf[:H.frame_len], alevel, 0, 0)
 		H.eas_gathering = false
 	}
@@ -553,7 +548,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 				// Fudged to get +-2.0 with gen_packets -b 1224 & 1176.
 				// Also initialized the symbol counter to -1.
 
-				speed_error = float64((C.double)(*pll_nudge_total)*100./(256.*256.*256.*256.)/(C.double)(*pll_symbol_count) + 0.02)
+				speed_error = float64(*pll_nudge_total)*100./(256.*256.*256.*256.)/float64(*pll_symbol_count) + 0.02
 
 				text_color_set(DW_COLOR_DEBUG)
 
@@ -566,7 +561,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 			}
 			rrbb_set_speed_error(H.rrbb, speed_error)
 
-			var alevel = demod_get_audio_level(C.int(channel), C.int(subchannel))
+			var alevel = demod_get_audio_level(channel, subchannel)
 
 			rrbb_set_audio_level(H.rrbb, alevel)
 			hdlc_rec2_block(H.rrbb)
@@ -769,7 +764,7 @@ func hdlc_rec_data_detect_any(channel int) int {
 		}
 	}
 
-	if get_input(ICTYPE_TXINH, C.int(channel)) == 1 {
+	if get_input(ICTYPE_TXINH, channel) == 1 {
 		return (1)
 	}
 

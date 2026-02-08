@@ -1239,7 +1239,7 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
  *
  * ------------------------------------------------------------------*/
 
-func get_input_real(it C.int, channel C.int) C.int {
+func get_input_real(it int, channel int) int {
 	Assert(it >= 0 && it < NUM_ICTYPES)
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
