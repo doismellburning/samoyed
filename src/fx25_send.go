@@ -55,21 +55,22 @@ var fx25BitsSent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "fx25_se
  *
  *--------------------------------------------------------------*/
 
-func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, test_mode bool) C.int {
+func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
+
+	var flen = C.int(len(fbuf)) // Convenient compatibility
+
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
-		fx_hex_dump(_fbuf, flen)
+		fx_hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
 	}
 
 	fx25BitsSent[channel] = 0
 
-	var fbuf = C.GoBytes(unsafe.Pointer(_fbuf), flen)
-
 	// Append the FCS.
 
-	var fcs = fcs_calc(_fbuf, flen)
+	var fcs = fcs_calc((*C.uchar)(C.CBytes(fbuf)), flen)
 	fbuf = append(fbuf, byte(fcs)&0xff)
 	fbuf = append(fbuf, byte(fcs>>8)&0xff)
 
@@ -80,7 +81,7 @@ func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, t
 	// Pick suitable correlation tag depending on
 	// user's preference, for number of check bytes,
 	// and the data size.
-	var ctag_num = fx25_pick_mode(fx_mode, dlen)
+	var ctag_num = fx25_pick_mode(C.int(fx_mode), dlen)
 
 	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
 		text_color_set(DW_COLOR_ERROR)
@@ -156,13 +157,13 @@ func fx25_send_frame(channel C.int, _fbuf *C.uchar, flen C.int, fx_mode C.int, t
 
 		for k := 0; k < 8; k++ {
 			var b = C.uchar(ctag_value>>(k*8)) & 0xff
-			send_bytes(channel, &b, 1)
+			send_bytes(C.int(channel), &b, 1)
 		}
-		send_bytes(channel, data, k_data_radio)
-		send_bytes(channel, &check[0], C.int(rs.nroots))
+		send_bytes(C.int(channel), data, k_data_radio)
+		send_bytes(C.int(channel), &check[0], C.int(rs.nroots))
 	}
 
-	return (fx25BitsSent[channel])
+	return int(fx25BitsSent[channel])
 }
 
 func send_bytes(channel C.int, _b *C.uchar, count C.int) {
