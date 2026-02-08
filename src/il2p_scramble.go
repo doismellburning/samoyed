@@ -24,7 +24,7 @@ import (
 
 const INIT_TX_LFSR C.int = 0x00f
 
-func scramble_bit(in C.int, state *C.int) C.int {
+func scramble_bit(in int, state *int) int {
 	var out = ((*state >> 4) ^ *state) & 1
 	*state = ((((in ^ *state) & 1) << 9) | (*state ^ ((*state & 1) << 4))) >> 1
 	return (out)
@@ -54,7 +54,7 @@ func descramble_bit(in C.int, state *C.int) C.int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_scramble_block(in []byte) []byte {
-	var tx_lfsr_state = INIT_TX_LFSR
+	var tx_lfsr_state = int(INIT_TX_LFSR)
 
 	Assert(len(in) >= 1)
 
@@ -64,8 +64,8 @@ func il2p_scramble_block(in []byte) []byte {
 	var ob = 0          // Index to output byte.
 	var om byte = 0x80  // Output bit mask;
 	for ib := 0; ib < len(in); ib++ {
-		for im := C.int(0x80); im != 0; im >>= 1 {
-			var s = scramble_bit(IfThenElse(((C.int(in[ib])&im) != 0), C.int(1), C.int(0)), &tx_lfsr_state)
+		for im := byte(0x80); im != 0; im >>= 1 {
+			var s = scramble_bit(IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
 			if ib == 0 && im == 0x04 {
 				skipping = false
 			}
