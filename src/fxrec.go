@@ -32,7 +32,7 @@ func FxrecMain() {
 		for C.fread(unsafe.Pointer(&ch), 1, 1, fp) == 1 {
 			var imask C.uchar
 			for imask = 0x01; imask != 0; imask <<= 1 {
-				fx25_rec_bit(0, 0, 0, C.int(ch&imask))
+				fx25_rec_bit(0, 0, 0, int(ch&imask))
 			}
 		}
 		C.fclose(fp)

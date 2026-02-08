@@ -70,7 +70,7 @@ var fx25_test_count = 0
 
 const FENCE = 0x55 // to detect buffer overflow.
 
-func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
+func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 	// Allocate context blocks only as needed.
 
@@ -141,7 +141,7 @@ func fx25_rec_bit(channel C.int, subchannel C.int, slice C.int, dbit C.int) {
 			F.imask = 0x01
 			F.clen++
 			if F.clen >= F.nroots {
-				process_rs_block(channel, subchannel, slice, F) // see below
+				process_rs_block(C.int(channel), C.int(subchannel), C.int(slice), F) // see below
 
 				F.ctag_num = -1
 				F.accum = 0
