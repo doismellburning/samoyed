@@ -24,7 +24,7 @@ import (
 
 const INIT_TX_LFSR C.int = 0x00f
 
-func scramble_bit(in C.int, state *C.int) C.int {
+func scramble_bit(in int, state *int) int {
 	var out = ((*state >> 4) ^ *state) & 1
 	*state = ((((in ^ *state) & 1) << 9) | (*state ^ ((*state & 1) << 4))) >> 1
 	return (out)
@@ -53,24 +53,25 @@ func descramble_bit(in C.int, state *C.int) C.int {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
-	var tx_lfsr_state = INIT_TX_LFSR
+func il2p_scramble_block(in []byte) []byte {
+	var tx_lfsr_state = int(INIT_TX_LFSR)
 
-	var in = unsafe.Slice(_in, length)
-	var out = make([]C.uchar, length)
+	Assert(len(in) >= 1)
+
+	var out = make([]byte, len(in))
 
 	var skipping = true // Discard the first 5 out.
-	var ob C.int = 0    // Index to output byte.
-	var om C.int = 0x80 // Output bit mask;
-	for ib := C.int(0); ib < length; ib++ {
-		for im := C.int(0x80); im != 0; im >>= 1 {
-			var s = scramble_bit(IfThenElse(((C.int(in[ib])&im) != 0), C.int(1), C.int(0)), &tx_lfsr_state)
+	var ob = 0          // Index to output byte.
+	var om byte = 0x80  // Output bit mask;
+	for ib := 0; ib < len(in); ib++ {
+		for im := byte(0x80); im != 0; im >>= 1 {
+			var s = scramble_bit(IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
 			if ib == 0 && im == 0x04 {
 				skipping = false
 			}
 			if !skipping {
 				if s != 0 {
-					out[ob] |= C.uchar(om)
+					out[ob] |= (om)
 				}
 				om >>= 1
 				if om == 0 {
@@ -87,10 +88,10 @@ func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 	// Preserve the LFSR state from before flushing.
 	// This might be needed as the initial state for later payload blocks.
 	var x = tx_lfsr_state
-	for n := C.int(0); n < 5; n++ {
+	for n := 0; n < 5; n++ {
 		var s = scramble_bit(0, &x)
 		if s != 0 {
-			out[ob] |= C.uchar(om)
+			out[ob] |= (om)
 		}
 		om >>= 1
 		if om == 0 {
@@ -99,7 +100,7 @@ func il2p_scramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
 		}
 	}
 
-	C.memcpy(unsafe.Pointer(_out), unsafe.Pointer(&out[0]), C.size_t(length))
+	return out
 }
 
 /*--------------------------------------------------------------------------------

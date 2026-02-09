@@ -57,8 +57,13 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 	var e = il2p_type_1_header(pp, max_fec, &hdr[0])
 
 	if e >= 0 {
-		il2p_scramble_block(&hdr[0], iout, IL2P_HEADER_SIZE)
-		il2p_encode_rs(iout, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE)))
+		var _scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+
+		C.memcpy(unsafe.Pointer(iout), unsafe.Pointer(&_scrambled[0]), C.size_t(len(_scrambled)))
+
+		var parity = il2p_encode_rs(_scrambled, IL2P_HEADER_PARITY)
+		C.memcpy(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE), C.CBytes(parity), C.size_t(len(parity)))
+
 		out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
 
 		if e == 0 {
@@ -85,9 +90,13 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 		e = il2p_type_0_header(pp, max_fec, &hdr[0])
 		if e > 0 {
+			var _scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
 
-			il2p_scramble_block(&hdr[0], iout, IL2P_HEADER_SIZE)
-			il2p_encode_rs(iout, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE)))
+			C.memcpy(unsafe.Pointer(iout), unsafe.Pointer(&_scrambled[0]), C.size_t(len(_scrambled)))
+
+			var parity = il2p_encode_rs(_scrambled, IL2P_HEADER_PARITY)
+			C.memcpy(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE), C.CBytes(parity), C.size_t(len(parity)))
+
 			out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
 
 			// Payload is entire AX.25 frame.

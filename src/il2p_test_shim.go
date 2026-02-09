@@ -84,12 +84,11 @@ func test_scramble(t *testing.T) {
 
 	// First an example from the protocol specification to make sure I'm compatible.
 
-	var scramin1 []C.uchar = []C.uchar{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	var scramout1 []C.uchar = []C.uchar{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53}
-	var scramout []C.uchar = make([]C.uchar, len(scramin1))
+	var scramin1 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
+	var scramout1 = []byte{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53}
 
-	il2p_scramble_block(&scramin1[0], &scramout[0], C.int(len(scramin1)))
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&scramout[0]), unsafe.Pointer(&scramout1[0]), C.ulong(len(scramout1))))
+	var scramout = il2p_scramble_block(scramin1)
+	assert.Equal(t, scramout1, scramout)
 } // end test_scramble.
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,16 +104,15 @@ func test_rs(t *testing.T) {
 
 	fmt.Println("Test Reed Solomon functions...")
 
-	var example_s []C.uchar = []C.uchar{0x26, 0x57, 0x4d, 0x57, 0xf1, 0x96, 0xcc, 0x85, 0x42, 0xe7, 0x24, 0xf7, 0x2e, 0x8a, 0x97}
-	var parity_out [2]C.uchar
+	var example_s = []byte{0x26, 0x57, 0x4d, 0x57, 0xf1, 0x96, 0xcc, 0x85, 0x42, 0xe7, 0x24, 0xf7, 0x2e, 0x8a, 0x97}
 
-	il2p_encode_rs(&example_s[0], 13, 2, &parity_out[0])
+	var parity_out = il2p_encode_rs(example_s[:13], 2)
 	// dw_printf ("DEBUG RS encode %02x %02x\n", parity_out[0], parity_out[1]);
 	assert.Equal(t, example_s[13], parity_out[0])
 	assert.Equal(t, example_s[14], parity_out[1])
 
-	var example_u []C.uchar = []C.uchar{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53, 0x91, 0xbd}
-	il2p_encode_rs(&example_u[0], 13, 2, &parity_out[0])
+	var example_u = []byte{0x6a, 0xea, 0x9c, 0xc2, 0x01, 0x11, 0xfc, 0x14, 0x1f, 0xda, 0x6e, 0xf2, 0x53, 0x91, 0xbd}
+	parity_out = il2p_encode_rs(example_u[:13], 2)
 	// dw_printf ("DEBUG RS encode %02x %02x\n", parity_out[0], parity_out[1]);
 	assert.Equal(t, example_u[13], parity_out[0])
 	assert.Equal(t, example_u[14], parity_out[1])
@@ -125,7 +123,7 @@ func test_rs(t *testing.T) {
 	var corrected [15]C.uchar
 	var e C.int
 
-	e = il2p_decode_rs(&example_s[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs((*C.uchar)(C.CBytes(example_s)), 13, 2, &corrected[0])
 	assert.Zero(t, e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
 
@@ -135,7 +133,7 @@ func test_rs(t *testing.T) {
 	assert.Equal(t, C.int(1), e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
 
-	e = il2p_decode_rs(&example_u[0], 13, 2, &corrected[0])
+	e = il2p_decode_rs((*C.uchar)(C.CBytes(example_u)), 13, 2, &corrected[0])
 	assert.Zero(t, e)
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
 
@@ -316,7 +314,6 @@ func test_example_headers(t *testing.T) {
 	var sresult [32]C.uchar
 	C.memset(unsafe.Pointer(&header[0]), 0, IL2P_HEADER_SIZE)
 	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
-	var check [2]C.uchar
 	var alevel alevel_t
 
 	var pp = ax25_from_frame(example1, alevel)
@@ -333,22 +330,24 @@ func test_example_headers(t *testing.T) {
 
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), IL2P_HEADER_SIZE))
 
-	il2p_scramble_block(&header[0], &sresult[0], 13)
+	var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
+
 	// dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	il2p_encode_rs(&sresult[0], 13, 2, &check[0])
+	var check = il2p_encode_rs(C.GoBytes(unsafe.Pointer(&sresult[0]), 13), 2)
 
 	// dw_printf ("check = ");
 	// for (int i = 0 ; i < sizeof(check); i++) {
 	//     dw_printf (" %02x", check[i]);
 	// }
 	// dw_printf ("\n");
-	assert.Equal(t, C.uchar(0x8a), check[0])
-	assert.Equal(t, C.uchar(0x97), check[1])
+	assert.Equal(t, byte(0x8a), check[0])
+	assert.Equal(t, byte(0x97), check[1])
 
 	// Can we go from IL2P back to AX.25?
 
@@ -408,14 +407,16 @@ func test_example_headers(t *testing.T) {
 
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), C.ulong(len(header2))))
 
-	il2p_scramble_block(&header[0], &sresult[0], 13)
+	scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
+
 	// dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	il2p_encode_rs(&sresult[0], 13, 2, &check[0])
+	check = il2p_encode_rs(C.GoBytes(unsafe.Pointer(&sresult[0]), 13), 2)
 
 	// dw_printf ("expect checksum = 91 bd\n");
 	// dw_printf ("check = ");
@@ -423,8 +424,8 @@ func test_example_headers(t *testing.T) {
 	//     dw_printf (" %02x", check[i]);
 	// }
 	// dw_printf ("\n");
-	assert.Equal(t, C.uchar(0x91), check[0])
-	assert.Equal(t, C.uchar(0xbd), check[1])
+	assert.Equal(t, byte(0x91), check[0])
+	assert.Equal(t, byte(0xbd), check[1])
 
 	// Can we go from IL2P back to AX.25?
 
@@ -487,14 +488,16 @@ func test_example_headers(t *testing.T) {
 
 	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header3[0]), C.ulong(len(header))))
 
-	il2p_scramble_block(&header[0], &sresult[0], 13)
+	scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
+
 	// dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	il2p_encode_rs(&sresult[0], 13, 2, &check[0])
+	check = il2p_encode_rs(C.GoBytes(unsafe.Pointer(&sresult[0]), 13), 2)
 
 	// dw_printf ("expect checksum = 43 35\n");
 	// dw_printf ("check = ");
@@ -503,8 +506,8 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.uchar(0x43), check[0])
-	assert.Equal(t, C.uchar(0x35), check[1])
+	assert.Equal(t, byte(0x43), check[0])
+	assert.Equal(t, byte(0x35), check[1])
 
 	// That was only the header.  We will get to the info part in a later test.
 
