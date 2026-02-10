@@ -642,7 +642,7 @@ func il2p_type_0_header(pp *packet_t, max_fec int) ([]byte, int) {
  *
  * Inputs:      hdr	- IL2P header structure.
  *
- * Outputs:     hdr_type - 0 or 1.
+ * Returns:     hdr_type - 0 or 1.
  *
  *		max_fec	- 0 for automatic or 1 for fixed maximum size.
  *
@@ -650,11 +650,8 @@ func il2p_type_0_header(pp *packet_t, max_fec int) ([]byte, int) {
  *
  ***********************************************************************************/
 
-func il2p_get_header_attributes(_hdr *C.uchar, hdr_type *C.int, max_fec *C.int) C.int {
-	var hdr = C.GoBytes(unsafe.Pointer(_hdr), IL2P_HEADER_SIZE)
-	*hdr_type = C.int(GET_HDR_TYPE(hdr))
-	*max_fec = C.int(GET_FEC_LEVEL(hdr))
-	return C.int(GET_PAYLOAD_BYTE_COUNT(hdr))
+func il2p_get_header_attributes(hdr []byte) (int, int, int) {
+	return GET_HDR_TYPE(hdr), GET_FEC_LEVEL(hdr), GET_PAYLOAD_BYTE_COUNT(hdr)
 }
 
 /***********************************************************************************
