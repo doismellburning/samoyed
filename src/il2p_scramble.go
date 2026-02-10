@@ -6,19 +6,13 @@ package direwolf
  *
  *--------------------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
 // Scramble bits for il2p transmit.
 
 // Note that there is a delay of 5 until the first bit comes out.
 // So we need to need to ignore the first 5 out and stick in
 // an extra 5 filler bits to flush at the end.
 
-const INIT_TX_LFSR C.int = 0x00f
+const INIT_TX_LFSR int = 0x00f
 
 func scramble_bit(in int, state *int) int {
 	var out = ((*state >> 4) ^ *state) & 1
@@ -28,7 +22,7 @@ func scramble_bit(in int, state *int) int {
 
 // Undo data scrambling for il2p receive.
 
-const INIT_RX_LFSR C.int = 0x1f0
+const INIT_RX_LFSR int = 0x1f0
 
 func descramble_bit(in int, state *int) int {
 	var out = (in ^ *state) & 1
@@ -50,7 +44,7 @@ func descramble_bit(in int, state *int) int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_scramble_block(in []byte) []byte {
-	var tx_lfsr_state = int(INIT_TX_LFSR)
+	var tx_lfsr_state = INIT_TX_LFSR
 
 	Assert(len(in) >= 1)
 
@@ -112,7 +106,7 @@ func il2p_scramble_block(in []byte) []byte {
  *--------------------------------------------------------------------------------*/
 
 func il2p_descramble_block(in []byte) []byte {
-	var rx_lfsr_state = int(INIT_RX_LFSR)
+	var rx_lfsr_state = INIT_RX_LFSR
 
 	var out = make([]byte, len(in))
 
