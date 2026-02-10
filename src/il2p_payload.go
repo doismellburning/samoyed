@@ -104,11 +104,10 @@ func il2p_payload_compute(payload_size C.int, max_fec C.int) (*il2p_payload_prop
  * Purpose:	Split payload into multiple blocks such that each set
  *		of data and parity symbols fit into a 255 byte RS block.
  *
- * Inputs:	*payload	Array of bytes.
- *		payload_size	0 to 1023.  (IL2P_MAX_PAYLOAD_SIZE)
+ * Inputs:	payload	Slice of bytes.
  *		max_fec		true for 16 parity symbols, false for automatic.
  *
- * Outputs:	*enc		Encoded payload for transmission.
+ * Returns:	Encoded payload for transmission.
  *				Up to IL2P_MAX_ENCODED_SIZE bytes.
  *
  * Returns:	-1 for error (i.e. invalid size)
@@ -121,58 +120,60 @@ func il2p_payload_compute(payload_size C.int, max_fec C.int) (*il2p_payload_prop
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_encode_payload(payload *C.uchar, payload_size C.int, max_fec C.int, enc *C.uchar) C.int {
+func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
+
+	var payload_size = len(payload)
+
 	if payload_size > IL2P_MAX_PAYLOAD_SIZE {
-		return (-1)
+		return nil, -1
 	}
 	if payload_size == 0 {
-		return (0)
+		return nil, 0
 	}
 
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(payload_size, max_fec)
+	var ipp, e = il2p_payload_compute(C.int(payload_size), C.int(max_fec))
 	if e <= 0 {
-		return (e)
+		return nil, int(e)
 	}
 
 	var pin = payload
-	var pout = enc
+	var pout []byte
 	var encoded_length C.int = 0
 
 	// First the large blocks.
 
 	for b := C.int(0); b < ipp.large_block_count; b++ {
+		var scram = il2p_scramble_block(pin[:ipp.large_block_size])
+		pout = append(pout, scram...)
 
-		var _pin = unsafe.Slice((*byte)(unsafe.Pointer(pin)), ipp.large_block_size)
-		var scram = il2p_scramble_block(_pin)
-		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&scram[0]), C.size_t(ipp.large_block_size))
-		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.large_block_size))
-		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.large_block_size))
+		pin = pin[ipp.large_block_size:]
+
 		encoded_length += ipp.large_block_size
+
 		var parity = il2p_encode_rs(scram, int(ipp.parity_symbols_per_block))
-		C.memcpy(unsafe.Pointer(pout), C.CBytes(parity), C.size_t(ipp.parity_symbols_per_block))
-		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.parity_symbols_per_block))
+		pout = append(pout, parity...)
+
 		encoded_length += ipp.parity_symbols_per_block
 	}
 
 	// Then the small blocks.
 
 	for b := C.int(0); b < ipp.small_block_count; b++ {
+		var scram = il2p_scramble_block(pin[:ipp.small_block_size])
+		pout = append(pout, scram...)
 
-		var _pin = unsafe.Slice((*byte)(unsafe.Pointer(pin)), ipp.small_block_size)
-		var scram = il2p_scramble_block(_pin)
-		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&scram[0]), C.size_t(ipp.small_block_size))
-		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.small_block_size))
-		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.small_block_size))
+		pin = pin[ipp.small_block_size:]
 		encoded_length += ipp.small_block_size
+
 		var parity = il2p_encode_rs(scram, int(ipp.parity_symbols_per_block))
-		C.memcpy(unsafe.Pointer(pout), unsafe.Pointer(&parity[0]), C.size_t(ipp.parity_symbols_per_block))
-		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.parity_symbols_per_block))
+		pout = append(pout, parity...)
+
 		encoded_length += ipp.parity_symbols_per_block
 	}
 
-	return (encoded_length)
+	return pout, int(encoded_length)
 
 } // end il2p_encode_payload
 
