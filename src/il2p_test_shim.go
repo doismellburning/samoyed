@@ -308,17 +308,15 @@ func test_example_headers(t *testing.T) {
 	dw_printf("Example 1: AX.25 S-Frame...\n")
 
 	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
-	var header1 []C.uchar = []C.uchar{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var header [IL2P_HEADER_SIZE]C.uchar
+	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
 	var sresult [32]C.uchar
-	C.memset(unsafe.Pointer(&header[0]), 0, IL2P_HEADER_SIZE)
 	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
 	var alevel alevel_t
 
 	var pp = ax25_from_frame(example1, alevel)
 	assert.NotNil(t, pp)
-	var e = il2p_type_1_header(pp, 0, &header[0])
-	assert.Equal(t, C.int(0), e)
+	var header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 0, e)
 	ax25_delete(pp)
 
 	// dw_printf ("Example 1 header:\n");
@@ -327,9 +325,9 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), IL2P_HEADER_SIZE))
+	assert.Equal(t, header1, header)
 
-	var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	var scrambled = il2p_scramble_block(header)
 	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
@@ -350,7 +348,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1((*C.uchar)(C.CBytes(header)), 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -387,15 +385,14 @@ func test_example_headers(t *testing.T) {
 
 	// dw_printf ("---------- example 2 ------------\n");
 	var example2 = []byte{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
-	var header2 []C.uchar = []C.uchar{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
+	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(example2, alevel)
 	assert.NotNil(t, pp)
-	e = il2p_type_1_header(pp, 0, &header[0])
-	assert.Equal(t, C.int(0), e)
+	header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 0, e)
 	ax25_delete(pp)
 
 	// dw_printf ("Example 2 header:\n");
@@ -404,9 +401,9 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), C.ulong(len(header2))))
+	assert.Equal(t, header2, header)
 
-	scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	scrambled = il2p_scramble_block(header)
 	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
@@ -428,7 +425,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1((*C.uchar)(C.CBytes(header)), 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -467,16 +464,15 @@ func test_example_headers(t *testing.T) {
 
 	// dw_printf ("---------- example 3 ------------\n");
 	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
-	var header3 []C.uchar = []C.uchar{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
+	var header3 = []byte{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
 	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(example3, alevel)
 	assert.NotNil(t, pp)
-	e = il2p_type_1_header(pp, 0, &header[0])
-	assert.Equal(t, C.int(9), e)
+	header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 9, e)
 	ax25_delete(pp)
 
 	// dw_printf ("Example 3 header:\n");
@@ -485,9 +481,9 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header3[0]), C.ulong(len(header))))
+	assert.Equal(t, header3, header)
 
-	scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	scrambled = il2p_scramble_block(header)
 	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
@@ -512,7 +508,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1((*C.uchar)(C.CBytes(header)), 0)
 	assert.NotNil(t, pp)
 
 	/*

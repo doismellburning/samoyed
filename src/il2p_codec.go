@@ -52,14 +52,12 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 
 	// Can a type 1 header be used?
 
-	var hdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar
-
-	var e = il2p_type_1_header(pp, C.int(max_fec), &hdr[0])
+	var hdr, e = il2p_type_1_header(pp, max_fec)
 
 	if e >= 0 {
 		var outbuf = new(bytes.Buffer)
 
-		var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+		var scrambled = il2p_scramble_block(hdr)
 		outbuf.Write(scrambled)
 
 		var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
@@ -88,11 +86,11 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 		// Could not use type 1 header for some reason.
 		// e.g. More than 2 addresses, extended (mod 128) sequence numbers, etc.
 
-		e = il2p_type_0_header(pp, C.int(max_fec), &hdr[0])
+		hdr, e = il2p_type_0_header(pp, max_fec)
 		if e > 0 {
 			var outbuf = new(bytes.Buffer)
 
-			var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+			var scrambled = il2p_scramble_block(hdr)
 			outbuf.Write(scrambled)
 
 			var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
