@@ -119,34 +119,34 @@ func test_rs(t *testing.T) {
 
 	// See if we can go the other way.
 
-	var received [15]C.uchar
-	var corrected [15]C.uchar
-	var e C.int
+	var received = make([]byte, len(example_s))
+	var corrected []byte
+	var e int
 
-	e = il2p_decode_rs((*C.uchar)(C.CBytes(example_s)), 13, 2, &corrected[0])
+	corrected, e = il2p_decode_rs(example_s, 2)
 	assert.Zero(t, e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
+	assert.Equal(t, example_s[:13], corrected)
 
-	C.memcpy(unsafe.Pointer(&received[0]), unsafe.Pointer(&example_s[0]), 15)
+	copy(received, example_s)
 	received[0] = '?'
-	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
-	assert.Equal(t, C.int(1), e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
+	corrected, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, 1, e)
+	assert.Equal(t, example_s[:13], corrected)
 
-	e = il2p_decode_rs((*C.uchar)(C.CBytes(example_u)), 13, 2, &corrected[0])
+	corrected, e = il2p_decode_rs(example_u, 2)
 	assert.Zero(t, e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
+	assert.Equal(t, example_u[:13], corrected)
 
-	C.memcpy(unsafe.Pointer(&received[0]), unsafe.Pointer(&example_u[0]), 15)
+	copy(received, example_u)
 	received[12] = '?'
-	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
-	assert.Equal(t, C.int(1), e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
+	corrected, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, 1, e)
+	assert.Equal(t, example_u[:13], corrected)
 
 	received[1] = '?'
 	received[2] = '?'
-	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
-	assert.Equal(t, C.int(-1), e)
+	_, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, -1, e)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////

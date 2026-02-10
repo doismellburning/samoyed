@@ -128,10 +128,10 @@ func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
  *
  * Inputs:	rec_block	Received block composed of data and parity.
  *				Total size is sum of following two parameters.
- *		data_size	Number of data bytes in above.
+ *		rec_block	data_size + num_parity bytes.
  *		num_parity	Number of parity symbols (bytes) in above.
  *
- * Outputs:	out		Original with possible corrections applied.
+ * Returns:	out		Original with possible corrections applied.
  *				data_size bytes.
  *
  * Returns:	-1 for unrecoverable.
@@ -139,7 +139,9 @@ func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *C.uchar) C.int {
+func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
+
+	var data_size = len(rec_block) - num_parity
 
 	//  Use zero padding in front if data size is too small.
 
@@ -147,19 +149,19 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 
 	var rs_block [FX25_BLOCK_SIZE]C.uchar
 
-	C.memcpy(unsafe.Pointer(&rs_block[C.int(len(rs_block))-n]), unsafe.Pointer(rec_block), C.size_t(n))
+	C.memcpy(unsafe.Pointer(&rs_block[len(rs_block)-n]), C.CBytes(rec_block), C.size_t(n))
 
 	if il2p_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  ==============================\n")
-		dw_printf("%d filler zeros, %d data, %d parity\n", C.int(len(rs_block))-n, data_size, num_parity)
+		dw_printf("%d filler zeros, %d data, %d parity\n", len(rs_block)-n, data_size, num_parity)
 		fx_hex_dump(C.GoBytes(unsafe.Pointer(&rs_block[0]), C.int(len(rs_block))))
 	}
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
 
-	var derrors = decode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &derrlocs[0], 0)
-	C.memcpy(unsafe.Pointer(out), unsafe.Pointer(&rs_block[C.int(len(rs_block))-n]), C.size_t(data_size))
+	var derrors = decode_rs_char(il2p_find_rs(C.int(num_parity)), &rs_block[0], &derrlocs[0], 0)
+	var out = C.GoBytes(unsafe.Pointer(&rs_block[len(rs_block)-n]), C.int(data_size))
 
 	if il2p_get_debug() >= 3 {
 		if derrors == 0 {
@@ -178,7 +180,7 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 	// one of the padding bytes that should be 0.
 
 	for i := C.int(0); i < derrors; i++ {
-		if derrlocs[i] < C.int(len(rs_block))-n {
+		if derrlocs[i] < C.int(len(rs_block)-n) {
 			if il2p_get_debug() >= 3 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("RS DECODE ERROR!  Padding position %d should be 0 but it was set to %02x.\n", derrlocs[i], rs_block[derrlocs[i]])
@@ -192,5 +194,5 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  returns %d  ==============================\n", derrors)
 	}
-	return derrors
+	return out, int(derrors)
 }

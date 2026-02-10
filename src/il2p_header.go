@@ -675,11 +675,10 @@ func il2p_get_header_attributes(hdr *C.uchar, hdr_type *C.int, max_fec *C.int) C
  ***********************************************************************************/
 
 func il2p_clarify_header(rec_hdr *C.uchar, corrected_descrambled_hdr *C.uchar) C.int {
-	var corrected [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar
 
-	var e = il2p_decode_rs(rec_hdr, IL2P_HEADER_SIZE, IL2P_HEADER_PARITY, &corrected[0])
+	var corrected, e = il2p_decode_rs(C.GoBytes(unsafe.Pointer(rec_hdr), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY), IL2P_HEADER_PARITY)
 
-	il2p_descramble_block(&corrected[0], corrected_descrambled_hdr, IL2P_HEADER_SIZE)
+	il2p_descramble_block((*C.uchar)(C.CBytes(corrected)), corrected_descrambled_hdr, IL2P_HEADER_SIZE)
 
-	return (e)
+	return C.int(e)
 }
