@@ -24,9 +24,9 @@ import (
 // Convert ASCII to/from DEC SIXBIT as defined here:
 // https://en.wikipedia.org/wiki/Six-bit_character_code#DEC_six-bit_code
 
-func ascii_to_sixbit(a C.uchar) C.uchar {
+func ascii_to_sixbit(a rune) byte {
 	if a >= ' ' && a <= '_' {
-		return (a - ' ')
+		return byte(a - ' ')
 	}
 	return (31) // '?' for any invalid.
 }
@@ -241,7 +241,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 			// Shouldn't happen but follow the rule.
 			return nil, -1
 		}
-		hdr[i] = byte(ascii_to_sixbit(C.uchar(b)))
+		hdr[i] = ascii_to_sixbit(b)
 	}
 
 	for i, b := range src_addr {
@@ -249,7 +249,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 			// Shouldn't happen but follow the rule.
 			return nil, -1
 		}
-		hdr[6+i] = byte(ascii_to_sixbit(C.uchar(b)))
+		hdr[6+i] = ascii_to_sixbit(b)
 	}
 
 	// Byte 12 has DEST SSID in upper nybble and SRC SSID in lower nybble and
