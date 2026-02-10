@@ -347,7 +347,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1((*C.uchar)(C.CBytes(header)), 0)
+	pp = il2p_decode_header_type_1(header, 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -424,7 +424,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1((*C.uchar)(C.CBytes(header)), 0)
+	pp = il2p_decode_header_type_1(header, 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -507,7 +507,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1((*C.uchar)(C.CBytes(header)), 0)
+	pp = il2p_decode_header_type_1(header, 0)
 	assert.NotNil(t, pp)
 
 	/*

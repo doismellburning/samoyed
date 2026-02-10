@@ -31,8 +31,8 @@ func ascii_to_sixbit(a rune) byte {
 	return (31) // '?' for any invalid.
 }
 
-func sixbit_to_ascii(s C.uchar) C.uchar {
-	return (s + ' ')
+func sixbit_to_ascii(s byte) rune {
+	return rune(s + ' ')
 }
 
 // Functions for setting the various header fields.
@@ -77,14 +77,14 @@ func SET_PAYLOAD_BYTE_COUNT(hdr []byte, val int) {
 
 // Extracting the fields.
 
-func get_il2p_field(hdr *C.uchar, bit_num C.int, lsb_index C.int, width C.int) C.int {
-	var result C.int = 0
+func get_il2p_field(hdr []byte, bit_num int, lsb_index int, width int) int {
+	var result = 0
 	lsb_index -= width - 1
 	for width > 0 {
 		result <<= 1
 		Assert(lsb_index >= 0 && lsb_index <= 11)
-		var x = (*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), lsb_index))
-		if *x&(1<<bit_num) != 0 {
+		var x = hdr[lsb_index]
+		if x&(1<<bit_num) != 0 {
 			result |= 1
 		}
 		lsb_index++
@@ -93,27 +93,27 @@ func get_il2p_field(hdr *C.uchar, bit_num C.int, lsb_index C.int, width C.int) C
 	return (result)
 }
 
-func GET_UI(hdr *C.uchar) C.int {
+func GET_UI(hdr []byte) int {
 	return get_il2p_field(hdr, 6, 0, 1)
 }
 
-func GET_PID(hdr *C.uchar) C.int {
+func GET_PID(hdr []byte) int {
 	return get_il2p_field(hdr, 6, 4, 4)
 }
 
-func GET_CONTROL(hdr *C.uchar) C.int {
+func GET_CONTROL(hdr []byte) int {
 	return get_il2p_field(hdr, 6, 11, 7)
 }
 
-func GET_FEC_LEVEL(hdr *C.uchar) C.int {
+func GET_FEC_LEVEL(hdr []byte) int {
 	return get_il2p_field(hdr, 7, 0, 1)
 }
 
-func GET_HDR_TYPE(hdr *C.uchar) C.int {
+func GET_HDR_TYPE(hdr []byte) int {
 	return get_il2p_field(hdr, 7, 1, 1)
 }
 
-func GET_PAYLOAD_BYTE_COUNT(hdr *C.uchar) C.int {
+func GET_PAYLOAD_BYTE_COUNT(hdr []byte) int {
 	return get_il2p_field(hdr, 7, 11, 10)
 }
 
@@ -163,8 +163,8 @@ func encode_pid(pp *packet_t) int {
 
 // Convert IL2P 4 bit PID to AX.25 8 bit PID.
 
-func decode_pid(pid C.int) C.int {
-	var axpid = [16]C.int{
+func decode_pid(pid int) int {
+	var axpid = [16]int{
 		0xf0, // Should not happen. 0 is for 'S' frames.
 		0xf0, // Should not happen. 1 is for 'U' frames (but not UI).
 		0x20, // AX.25 Layer 3
@@ -421,7 +421,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
+func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 
 	if GET_HDR_TYPE(hdr) != 1 {
 		text_color_set(DW_COLOR_ERROR)
@@ -459,7 +459,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 
 	var byteBuf []byte
 	for i := 0; i <= 5; i++ {
-		byteBuf = append(byteBuf, byte(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i))&C.uchar(0x3f))))
+		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i]&0x3f)))
 	}
 	addrs[AX25_DESTINATION] = strings.TrimSpace(string(byteBuf))
 
@@ -475,12 +475,12 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 			return (nil)
 		}
 	}
-	var destSSID = int((*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12)) >> 4) & 0xf)
+	var destSSID = int((hdr[12] >> 4) & 0xf)
 	addrs[AX25_DESTINATION] += fmt.Sprintf("-%d", destSSID)
 
 	byteBuf = []byte{}
 	for i := 0; i <= 5; i++ {
-		byteBuf = append(byteBuf, byte(sixbit_to_ascii(*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), i+6))&C.uchar(0x3f))))
+		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i+6]&0x3f)))
 	}
 	addrs[AX25_SOURCE] = strings.TrimSpace(string(byteBuf))
 
@@ -496,7 +496,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 			return (nil)
 		}
 	}
-	var srcSSID = int((*(*C.uchar)(unsafe.Add(unsafe.Pointer(hdr), 12))) & 0xf)
+	var srcSSID = int(hdr[12] & 0xf)
 	addrs[AX25_SOURCE] += fmt.Sprintf("-%d", srcSSID)
 
 	// The PID field gives us the general type.
@@ -526,8 +526,8 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 			ftype = frame_type_S_SREJ
 		}
 		var modulo = modulo_8
-		var nr = int(control>>3) & 0x07
-		var pf = int(control>>6) & 0x01
+		var nr = (control >> 3) & 0x07
+		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for SREJ will be added later.
 		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo))
 	} else if pid == 1 {
@@ -559,7 +559,7 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		default:
 			ftype = frame_type_U_TEST
 		}
-		var pf = int(control>>6) & 0x01
+		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
 		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else if ui != 0 {
@@ -570,10 +570,10 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var ftype = frame_type_U_UI
-		var pf = int(control>>6) & 0x01
+		var pf = (control >> 6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
-		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, int(axpid), pinfo))
+		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else {
 
 		// 'I' frame.
@@ -581,13 +581,13 @@ func il2p_decode_header_type_1(hdr *C.uchar, num_sym_changed C.int) *packet_t {
 
 		var control = GET_CONTROL(hdr)
 		var cr = cr_cmd // Always command.
-		var pf = int(control>>6) & 0x01
-		var nr = int(control>>3) & 0x7
-		var ns = int(control & 0x7)
+		var pf = (control >> 6) & 0x01
+		var nr = (control >> 3) & 0x7
+		var ns = (control & 0x7)
 		var modulo = modulo_8
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
-		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, int(axpid), pinfo))
+		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo))
 	}
 } // end
 
@@ -650,10 +650,11 @@ func il2p_type_0_header(pp *packet_t, max_fec int) ([]byte, int) {
  *
  ***********************************************************************************/
 
-func il2p_get_header_attributes(hdr *C.uchar, hdr_type *C.int, max_fec *C.int) C.int {
-	*hdr_type = GET_HDR_TYPE(hdr)
-	*max_fec = GET_FEC_LEVEL(hdr)
-	return (GET_PAYLOAD_BYTE_COUNT(hdr))
+func il2p_get_header_attributes(_hdr *C.uchar, hdr_type *C.int, max_fec *C.int) C.int {
+	var hdr = C.GoBytes(unsafe.Pointer(_hdr), IL2P_HEADER_SIZE)
+	*hdr_type = C.int(GET_HDR_TYPE(hdr))
+	*max_fec = C.int(GET_FEC_LEVEL(hdr))
+	return C.int(GET_PAYLOAD_BYTE_COUNT(hdr))
 }
 
 /***********************************************************************************

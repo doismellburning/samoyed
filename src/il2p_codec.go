@@ -175,7 +175,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 
 		// Header type 1.  Any payload is the AX.25 Information part.
 
-		var pp = il2p_decode_header_type_1(uhdr, *symbols_corrected)
+		var pp = il2p_decode_header_type_1(C.GoBytes(unsafe.Pointer(uhdr), IL2P_HEADER_SIZE), int(*symbols_corrected))
 		if pp == nil {
 			// Failed for some reason.
 			return (nil)
