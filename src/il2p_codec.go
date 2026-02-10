@@ -7,6 +7,7 @@ package direwolf
 import "C"
 
 import (
+	"bytes"
 	"unsafe"
 )
 
@@ -47,82 +48,77 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
+func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 
 	// Can a type 1 header be used?
 
-	var hdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar
-	var out_len C.int
-
-	var e = il2p_type_1_header(pp, max_fec, &hdr[0])
+	var hdr, e = il2p_type_1_header(pp, max_fec)
 
 	if e >= 0 {
-		var _scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+		var outbuf = new(bytes.Buffer)
 
-		C.memcpy(unsafe.Pointer(iout), unsafe.Pointer(&_scrambled[0]), C.size_t(len(_scrambled)))
+		var scrambled = il2p_scramble_block(hdr)
+		outbuf.Write(scrambled)
 
-		var parity = il2p_encode_rs(_scrambled, IL2P_HEADER_PARITY)
-		C.memcpy(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE), C.CBytes(parity), C.size_t(len(parity)))
-
-		out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
+		var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+		outbuf.Write(parity)
 
 		if e == 0 {
 			// Success. No info part.
-			return (out_len)
+			return outbuf.Bytes(), outbuf.Len()
 		}
 
 		// Payload is AX.25 info part.
 		var pinfo = ax25_get_info(pp)
 
-		var encodedPayload, k = il2p_encode_payload(pinfo, int(max_fec))
+		var encodedPayload, k = il2p_encode_payload(pinfo, max_fec)
 		if k > 0 {
-			C.memcpy(unsafe.Add(unsafe.Pointer(iout), out_len), C.CBytes(encodedPayload), C.size_t(k))
-			out_len += C.int(k)
+			outbuf.Write(encodedPayload)
+
 			// Success. Info part was <= 1023 bytes.
-			return (out_len)
+			return outbuf.Bytes(), outbuf.Len()
 		}
 
 		// Something went wrong with the payload encoding.
-		return (-1)
+		return nil, -1
 	} else if e == -1 {
 
 		// Could not use type 1 header for some reason.
 		// e.g. More than 2 addresses, extended (mod 128) sequence numbers, etc.
 
-		e = il2p_type_0_header(pp, max_fec, &hdr[0])
+		hdr, e = il2p_type_0_header(pp, max_fec)
 		if e > 0 {
-			var _scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+			var outbuf = new(bytes.Buffer)
 
-			C.memcpy(unsafe.Pointer(iout), unsafe.Pointer(&_scrambled[0]), C.size_t(len(_scrambled)))
+			var scrambled = il2p_scramble_block(hdr)
+			outbuf.Write(scrambled)
 
-			var parity = il2p_encode_rs(_scrambled, IL2P_HEADER_PARITY)
-			C.memcpy(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE), C.CBytes(parity), C.size_t(len(parity)))
-
-			out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
+			var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+			outbuf.Write(parity)
 
 			// Payload is entire AX.25 frame.
 
 			var frame_data = ax25_get_frame_data(pp)
-			var encodedPayload, k = il2p_encode_payload(frame_data, int(max_fec))
+			var encodedPayload, k = il2p_encode_payload(frame_data, max_fec)
 			if k > 0 {
-				C.memcpy(unsafe.Add(unsafe.Pointer(iout), out_len), C.CBytes(encodedPayload), C.size_t(k))
-				out_len += C.int(k)
+				outbuf.Write(encodedPayload)
+
 				// Success. Entire AX.25 frame <= 1023 bytes.
-				return (out_len)
+				return outbuf.Bytes(), outbuf.Len()
 			}
 			// Something went wrong with the payload encoding.
-			return (-1)
+			return nil, -1
 		} else if e == 0 { //nolint:gocritic
 			// Impossible condition.  Type 0 header must have payload.
-			return (-1)
+			return nil, -1
 		} else {
 			// AX.25 frame is too large.
-			return (-1)
+			return nil, -1
 		}
 	}
 
 	// AX.25 Information part is too large.
-	return (-1)
+	return nil, -1
 }
 
 /*-------------------------------------------------------------
@@ -144,11 +140,19 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 
 func il2p_decode_frame(irec *C.uchar) *packet_t {
 	var uhdr [IL2P_HEADER_SIZE]C.uchar // After FEC and descrambling.
-	var e = il2p_clarify_header(irec, &uhdr[0])
+	var _e = il2p_clarify_header(irec, &uhdr[0])
 
 	// TODO?: for symmetry we might want to clarify the payload before combining.
 
-	return (il2p_decode_header_payload(&uhdr[0], (*C.uchar)(unsafe.Add(unsafe.Pointer(irec), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)), &e))
+	var _, max_fec, payload_len = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&uhdr[0]), IL2P_HEADER_SIZE))
+	var _, encoded_payload_len = il2p_payload_compute(C.int(payload_len), C.int(max_fec))
+
+	var e = int(_e)
+	return il2p_decode_header_payload(
+		C.GoBytes(unsafe.Pointer(&uhdr[0]), IL2P_HEADER_SIZE),
+		C.GoBytes(unsafe.Add(unsafe.Pointer(irec), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY), encoded_payload_len),
+		&e,
+	)
 }
 
 /*-------------------------------------------------------------
@@ -168,9 +172,8 @@ func il2p_decode_frame(irec *C.uchar) *packet_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_corrected *C.int) *packet_t {
-	var hdr_type, max_fec C.int
-	var payload_len = il2p_get_header_attributes(uhdr, &hdr_type, &max_fec)
+func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected *int) *packet_t {
+	var hdr_type, max_fec, payload_len = il2p_get_header_attributes(uhdr)
 
 	if hdr_type == 1 {
 
@@ -185,8 +188,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		if payload_len > 0 {
 			// This is the AX.25 Information part.
 
-			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-			var e = il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
+			var extracted, e = il2p_decode_payload(epayload, payload_len, max_fec, symbols_corrected)
 
 			// It would be possible to have a good header but too many errors in the payload.
 
@@ -200,15 +202,14 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
 			}
 
-			ax25_set_info(pp, C.GoBytes(unsafe.Pointer(&extracted[0]), payload_len))
+			ax25_set_info(pp, extracted)
 		}
 		return (pp)
 	} else {
 
 		// Header type 0.  The payload is the entire AX.25 frame.
 
-		var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-		var e = il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
+		var extracted, e = il2p_decode_payload(epayload, payload_len, max_fec, symbols_corrected)
 
 		if e <= 0 { // Payload was not received correctly.
 			return (nil)
@@ -225,7 +226,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&extracted[0]), payload_len), alevel)
+		var pp = ax25_from_frame(extracted, alevel)
 		return (pp)
 	}
 

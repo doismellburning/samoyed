@@ -16,6 +16,7 @@ import "C"
 
 import (
 	"math/bits"
+	"unsafe"
 )
 
 type IL2PState int
@@ -130,7 +131,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				if il2p_get_debug() >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
-					fx_hex_dump(&F.shdr[0], IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)
+					fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.shdr[0]), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY))
 				}
 
 				// Fix any errors and descramble.
@@ -139,15 +140,14 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
 					var plprop *il2p_payload_properties_t
-					var hdr_type, max_fec C.int
-					var length = il2p_get_header_attributes(&F.uhdr[0], &hdr_type, &max_fec)
+					var hdr_type, max_fec, length = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
 
-					plprop, F.eplen = il2p_payload_compute(length, max_fec)
+					plprop, F.eplen = il2p_payload_compute(C.int(length), C.int(max_fec))
 
 					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("IL2P header after correcting %d symbols and unscrambling [%d.%d.%d]:\n", F.corrected, channel, subchannel, slice)
-						fx_hex_dump(&F.uhdr[0], IL2P_HEADER_SIZE)
+						fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
 						dw_printf("Header type %d, max fec = %d\n", hdr_type, max_fec)
 						dw_printf("Need to collect %d encoded bytes for %d byte payload.\n", F.eplen, length)
 						dw_printf("%d small blocks of %d and %d large blocks of %d.  %d parity symbols per block\n",
@@ -207,7 +207,17 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		// TODO?:  for symmetry, we might decode the payload here and later build the frame.
 
 		{
-			var pp = il2p_decode_header_payload(&F.uhdr[0], &F.spayload[0], &(F.corrected))
+			// Compute encoded payload size (includes parity symbols).
+			var _, max_fec, payload_len = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
+			var _, encoded_payload_size = il2p_payload_compute(C.int(payload_len), C.int(max_fec))
+
+			var corrected = int(F.corrected)
+			var pp = il2p_decode_header_payload(
+				C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE),
+				C.GoBytes(unsafe.Pointer(&F.spayload[0]), encoded_payload_size),
+				&corrected,
+			)
+			F.corrected = C.int(corrected)
 
 			if il2p_get_debug() >= 1 {
 				if pp != nil {

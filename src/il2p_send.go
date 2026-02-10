@@ -1,16 +1,6 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
-import (
-	"unsafe"
-)
-
-var number_of_il2p_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "il2p_send_frame"
+var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "il2p_send_frame"
 
 /*-------------------------------------------------------------
  *
@@ -53,42 +43,43 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent
  *--------------------------------------------------------------*/
 
 func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
-	var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
 
-	encoded[0] = (IL2P_SYNC_WORD >> 16) & 0xff
-	encoded[1] = (IL2P_SYNC_WORD >> 8) & 0xff
-	encoded[2] = (IL2P_SYNC_WORD) & 0xff
+	var syncWordBytes = []byte{
+		(IL2P_SYNC_WORD >> 16) & 0xff,
+		(IL2P_SYNC_WORD >> 8) & 0xff,
+		(IL2P_SYNC_WORD) & 0xff,
+	}
 
-	var elen = il2p_encode_frame(pp, C.int(max_fec), &encoded[IL2P_SYNC_WORD_SIZE])
+	var encoded, elen = il2p_encode_frame(pp, max_fec)
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
 		return (-1)
 	}
 
-	elen += IL2P_SYNC_WORD_SIZE
+	var data = append(syncWordBytes, encoded...)
 
 	number_of_il2p_bits_sent[channel] = 0
 
 	if il2p_get_debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("IL2P frame, max_fec = %d, %d encoded bytes total\n", max_fec, elen)
-		fx_hex_dump(&encoded[0], elen)
+		dw_printf("IL2P frame, max_fec = %d, %d encoded bytes total\n", max_fec, len(data))
+		fx_hex_dump(data)
 	}
 
 	// Clobber some bytes for testing.
 	if polarity >= 2 {
-		for j := C.int(10); j < elen; j += 100 {
-			encoded[j] = ^encoded[j]
+		for j := 10; j < len(data); j += 100 {
+			data[j] = ^data[j]
 		}
 	}
 
 	// Send bits to modulator.
 
 	send_il2p_bytes(channel, []byte{IL2P_PREAMBLE}, polarity)
-	send_il2p_bytes(channel, C.GoBytes(unsafe.Pointer(&encoded[0]), elen), polarity)
+	send_il2p_bytes(channel, data, polarity)
 
-	return int(number_of_il2p_bits_sent[channel])
+	return number_of_il2p_bits_sent[channel]
 }
 
 func send_il2p_bytes(channel int, b []byte, polarity int) {

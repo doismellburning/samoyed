@@ -119,34 +119,34 @@ func test_rs(t *testing.T) {
 
 	// See if we can go the other way.
 
-	var received [15]C.uchar
-	var corrected [15]C.uchar
-	var e C.int
+	var received = make([]byte, len(example_s))
+	var corrected []byte
+	var e int
 
-	e = il2p_decode_rs((*C.uchar)(C.CBytes(example_s)), 13, 2, &corrected[0])
+	corrected, e = il2p_decode_rs(example_s, 2)
 	assert.Zero(t, e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
+	assert.Equal(t, example_s[:13], corrected)
 
-	C.memcpy(unsafe.Pointer(&received[0]), unsafe.Pointer(&example_s[0]), 15)
+	copy(received, example_s)
 	received[0] = '?'
-	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
-	assert.Equal(t, C.int(1), e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_s[0]), unsafe.Pointer(&corrected[0]), 13))
+	corrected, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, 1, e)
+	assert.Equal(t, example_s[:13], corrected)
 
-	e = il2p_decode_rs((*C.uchar)(C.CBytes(example_u)), 13, 2, &corrected[0])
+	corrected, e = il2p_decode_rs(example_u, 2)
 	assert.Zero(t, e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
+	assert.Equal(t, example_u[:13], corrected)
 
-	C.memcpy(unsafe.Pointer(&received[0]), unsafe.Pointer(&example_u[0]), 15)
+	copy(received, example_u)
 	received[12] = '?'
-	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
-	assert.Equal(t, C.int(1), e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&example_u[0]), unsafe.Pointer(&corrected[0]), 13))
+	corrected, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, 1, e)
+	assert.Equal(t, example_u[:13], corrected)
 
 	received[1] = '?'
 	received[2] = '?'
-	e = il2p_decode_rs(&received[0], 13, 2, &corrected[0])
-	assert.Equal(t, C.int(-1), e)
+	_, e = il2p_decode_rs(received, 2)
+	assert.Equal(t, -1, e)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -262,17 +262,16 @@ func test_payload(t *testing.T) {
 
 			// Now extract.
 
-			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-			var symbols_corrected C.int = 0
-			var e = il2p_decode_payload((*C.uchar)(C.CBytes(encoded)), payload_length, max_fec, &extracted[0], &symbols_corrected)
+			var symbols_corrected = 0
+			var extracted, e = il2p_decode_payload(encoded, int(payload_length), int(max_fec), &symbols_corrected)
 			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
-			assert.Equal(t, payload_length, e)
+			assert.Equal(t, payload_length, C.int(e))
 
 			// if (memcmp (original_payload, extracted, payload_length) != 0) {
 			//  dw_printf ("********** Received message not as expected. **********\n");
 			//  fx_hex_dump(extracted, payload_length);
 			// }
-			assert.Equal(t, C.GoBytes(unsafe.Pointer(&original_payload[0]), payload_length), C.GoBytes(unsafe.Pointer(&extracted[0]), payload_length))
+			assert.Equal(t, C.GoBytes(unsafe.Pointer(&original_payload[0]), payload_length), extracted)
 		}
 	}
 } // end test_payload
@@ -308,17 +307,15 @@ func test_example_headers(t *testing.T) {
 	dw_printf("Example 1: AX.25 S-Frame...\n")
 
 	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
-	var header1 []C.uchar = []C.uchar{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var header [IL2P_HEADER_SIZE]C.uchar
+	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
 	var sresult [32]C.uchar
-	C.memset(unsafe.Pointer(&header[0]), 0, IL2P_HEADER_SIZE)
 	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
 	var alevel alevel_t
 
 	var pp = ax25_from_frame(example1, alevel)
 	assert.NotNil(t, pp)
-	var e = il2p_type_1_header(pp, 0, &header[0])
-	assert.Equal(t, C.int(0), e)
+	var header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 0, e)
 	ax25_delete(pp)
 
 	// dw_printf ("Example 1 header:\n");
@@ -327,9 +324,9 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header1[0]), IL2P_HEADER_SIZE))
+	assert.Equal(t, header1, header)
 
-	var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	var scrambled = il2p_scramble_block(header)
 	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
@@ -350,7 +347,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1(header, 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -387,15 +384,14 @@ func test_example_headers(t *testing.T) {
 
 	// dw_printf ("---------- example 2 ------------\n");
 	var example2 = []byte{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
-	var header2 []C.uchar = []C.uchar{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
+	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(example2, alevel)
 	assert.NotNil(t, pp)
-	e = il2p_type_1_header(pp, 0, &header[0])
-	assert.Equal(t, C.int(0), e)
+	header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 0, e)
 	ax25_delete(pp)
 
 	// dw_printf ("Example 2 header:\n");
@@ -404,9 +400,9 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header2[0]), C.ulong(len(header2))))
+	assert.Equal(t, header2, header)
 
-	scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	scrambled = il2p_scramble_block(header)
 	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
@@ -428,7 +424,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1(header, 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -467,16 +463,15 @@ func test_example_headers(t *testing.T) {
 
 	// dw_printf ("---------- example 3 ------------\n");
 	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
-	var header3 []C.uchar = []C.uchar{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
-	var complete3 []C.uchar = []C.uchar{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
+	var header3 = []byte{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
+	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(example3, alevel)
 	assert.NotNil(t, pp)
-	e = il2p_type_1_header(pp, 0, &header[0])
-	assert.Equal(t, C.int(9), e)
+	header, e = il2p_type_1_header(pp, 0)
+	assert.Equal(t, 9, e)
 	ax25_delete(pp)
 
 	// dw_printf ("Example 3 header:\n");
@@ -485,9 +480,9 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&header[0]), unsafe.Pointer(&header3[0]), C.ulong(len(header))))
+	assert.Equal(t, header3, header)
 
-	scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&header[0]), 13))
+	scrambled = il2p_scramble_block(header)
 	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
@@ -512,7 +507,7 @@ func test_example_headers(t *testing.T) {
 
 	// Can we go from IL2P back to AX.25?
 
-	pp = il2p_decode_header_type_1(&header[0], 0)
+	pp = il2p_decode_header_type_1(header, 0)
 	assert.NotNil(t, pp)
 
 	/*
@@ -533,17 +528,16 @@ func test_example_headers(t *testing.T) {
 	pp = ax25_from_frame(example3, alevel)
 	assert.NotNil(t, pp)
 
-	var max_fec C.int = 0
-	var iout [IL2P_MAX_PACKET_SIZE]C.uchar
-	e = il2p_encode_frame(pp, max_fec, &iout[0])
+	var max_fec = 0
+	var iout, ioutLen = il2p_encode_frame(pp, max_fec)
 
 	// dw_printf ("expected for example 3:\n");
 	// fx_hex_dump(complete3, sizeof(complete3));
 	// dw_printf ("actual result for example 3:\n");
 	// fx_hex_dump(iout, e);
 	// Does it match the example in the protocol spec?
-	assert.Equal(t, C.int(len(complete3)), e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&iout[0]), unsafe.Pointer(&complete3[0]), C.ulong(len(complete3))))
+	assert.Equal(t, len(complete3), ioutLen)
+	assert.Equal(t, complete3, iout)
 	ax25_delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
@@ -560,12 +554,11 @@ func test_example_headers(t *testing.T) {
 func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 	t.Helper()
 
-	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
-		var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
-		var enc_len = il2p_encode_frame(pp1, max_fec, &encoded[0])
-		assert.GreaterOrEqual(t, enc_len, C.int(0))
+	for max_fec := 0; max_fec <= 1; max_fec++ {
+		var encoded, enc_len = il2p_encode_frame(pp1, max_fec)
+		assert.GreaterOrEqual(t, enc_len, 0)
 
-		var pp2 = il2p_decode_frame(&encoded[0])
+		var pp2 = il2p_decode_frame((*C.uchar)(C.CBytes(encoded)))
 		assert.NotNil(t, pp2)
 
 		// Is it the same after encoding to IL2P and then decoding?
@@ -581,7 +574,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 			ax25_hex_dump(pp1)
 
 			dw_printf("IL2P encoded as:\n")
-			fx_hex_dump(&encoded[0], enc_len)
+			fx_hex_dump(encoded)
 
 			dw_printf("Got turned into this:\n")
 			ax25_hex_dump(pp2)

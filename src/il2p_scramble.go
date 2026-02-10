@@ -6,23 +6,13 @@ package direwolf
  *
  *--------------------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
-import (
-	"unsafe"
-)
-
 // Scramble bits for il2p transmit.
 
 // Note that there is a delay of 5 until the first bit comes out.
 // So we need to need to ignore the first 5 out and stick in
 // an extra 5 filler bits to flush at the end.
 
-const INIT_TX_LFSR C.int = 0x00f
+const INIT_TX_LFSR int = 0x00f
 
 func scramble_bit(in int, state *int) int {
 	var out = ((*state >> 4) ^ *state) & 1
@@ -32,9 +22,9 @@ func scramble_bit(in int, state *int) int {
 
 // Undo data scrambling for il2p receive.
 
-const INIT_RX_LFSR C.int = 0x1f0
+const INIT_RX_LFSR int = 0x1f0
 
-func descramble_bit(in C.int, state *C.int) C.int {
+func descramble_bit(in int, state *int) int {
 	var out = (in ^ *state) & 1
 	*state = ((*state >> 1) | ((in & 1) << 8)) ^ ((in & 1) << 3)
 	return (out)
@@ -54,7 +44,7 @@ func descramble_bit(in C.int, state *C.int) C.int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_scramble_block(in []byte) []byte {
-	var tx_lfsr_state = int(INIT_TX_LFSR)
+	var tx_lfsr_state = INIT_TX_LFSR
 
 	Assert(len(in) >= 1)
 
@@ -109,27 +99,25 @@ func il2p_scramble_block(in []byte) []byte {
  *
  * Purpose:	Descramble a block after removing RS parity.
  *
- * Inputs:	in		Array of bytes.
- *		len		Number of bytes both in and out.
+ * Inputs:	in		Slice of bytes.
  *
- * Outputs:	out		Array of bytes.
+ * Returns:	out		Slice of bytes.
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_descramble_block(_in *C.uchar, _out *C.uchar, length C.int) {
+func il2p_descramble_block(in []byte) []byte {
 	var rx_lfsr_state = INIT_RX_LFSR
 
-	var in = unsafe.Slice(_in, length)
-	var out = make([]C.uchar, length)
+	var out = make([]byte, len(in))
 
-	for b := C.int(0); b < length; b++ {
-		for m := C.int(0x80); m != 0; m >>= 1 {
-			var d = descramble_bit(IfThenElse(((C.int(in[b])&m) != 0), C.int(1), C.int(0)), &rx_lfsr_state)
+	for b := 0; b < len(in); b++ {
+		for m := byte(0x80); m != 0; m >>= 1 {
+			var d = descramble_bit(IfThenElse(((in[b]&m) != 0), 1, 0), &rx_lfsr_state)
 			if d != 0 {
-				out[b] |= C.uchar(m)
+				out[b] |= m
 			}
 		}
 	}
 
-	C.memcpy(unsafe.Pointer(_out), unsafe.Pointer(&out[0]), C.size_t(length))
+	return out
 }

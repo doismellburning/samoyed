@@ -226,7 +226,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
-		fx_hex_dump(&F.block[0], FX25_BLOCK_SIZE)
+		fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), FX25_BLOCK_SIZE))
 	}
 	Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
@@ -262,7 +262,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				if fx25_get_debug() >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
-					fx_hex_dump(&frame_buf[0], frame_len)
+					fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
 				}
 
 				if FXTEST {
@@ -277,16 +277,16 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				// Most likely cause is defective sender software.
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Bad FCS for AX.25 frame.\n", channel, slice)
-				fx_hex_dump(&F.block[0], F.dlen)
-				fx_hex_dump(&frame_buf[0], frame_len)
+				fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), F.dlen))
+				fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
 			}
 		} else {
 			// Most likely cause is defective sender software.
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
-			fx_hex_dump(&F.block[0], F.dlen)
+			fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), F.dlen))
 			if frame_len > 0 {
-				fx_hex_dump(&frame_buf[0], frame_len)
+				fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
 			}
 		}
 	} else if fx25_get_debug() >= 2 {
@@ -334,7 +334,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 	if pin[0] != 0x7e {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d] error: Data section did not start with 0x7e.\n", channel, slice)
-		fx_hex_dump(&pin[0], C.int(ilen))
+		fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[0]), C.int(ilen)))
 		return nil
 	}
 
@@ -354,7 +354,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 			if pat_det == 0xfe {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.\n", channel, slice)
-				fx_hex_dump(&pin[i], C.int(ilen))
+				fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[i]), C.int(ilen)))
 				return nil
 			}
 
@@ -368,7 +368,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.\n", channel, slice)
-						fx_hex_dump(&pin[i], C.int(ilen))
+						fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[i]), C.int(ilen)))
 						return nil
 					}
 				} else if (pat_det >> 2) == 0x1f {
@@ -387,7 +387,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.\n", channel, slice)
-	fx_hex_dump(&pin[0], C.int(ilen))
+	fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[0]), C.int(ilen)))
 
 	return nil // Should never fall off the end.
 
