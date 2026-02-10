@@ -16,6 +16,7 @@ import "C"
 
 import (
 	"math/bits"
+	"unsafe"
 )
 
 type IL2PState int
@@ -130,7 +131,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				if il2p_get_debug() >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
-					fx_hex_dump(&F.shdr[0], IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)
+					fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.shdr[0]), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY))
 				}
 
 				// Fix any errors and descramble.
@@ -147,7 +148,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("IL2P header after correcting %d symbols and unscrambling [%d.%d.%d]:\n", F.corrected, channel, subchannel, slice)
-						fx_hex_dump(&F.uhdr[0], IL2P_HEADER_SIZE)
+						fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
 						dw_printf("Header type %d, max fec = %d\n", hdr_type, max_fec)
 						dw_printf("Need to collect %d encoded bytes for %d byte payload.\n", F.eplen, length)
 						dw_printf("%d small blocks of %d and %d large blocks of %d.  %d parity symbols per block\n",

@@ -236,7 +236,7 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled large payload block, %d bytes:\n", ipp.large_block_size)
-			fx_hex_dump(pout, ipp.large_block_size)
+			fx_hex_dump(C.GoBytes(unsafe.Pointer(pout), ipp.large_block_size))
 		}
 
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.large_block_size+ipp.parity_symbols_per_block))
@@ -262,7 +262,7 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled small payload block, %d bytes:\n", ipp.small_block_size)
-			fx_hex_dump(pout, ipp.small_block_size)
+			fx_hex_dump(C.GoBytes(unsafe.Pointer(pout), ipp.small_block_size))
 		}
 
 		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.small_block_size+ipp.parity_symbols_per_block))

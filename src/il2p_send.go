@@ -70,7 +70,7 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 	if il2p_get_debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("IL2P frame, max_fec = %d, %d encoded bytes total\n", max_fec, len(data))
-		fx_hex_dump((*C.uchar)(C.CBytes(data)), C.int(len(data)))
+		fx_hex_dump(data)
 	}
 
 	// Clobber some bytes for testing.

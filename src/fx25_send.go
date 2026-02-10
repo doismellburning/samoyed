@@ -24,8 +24,6 @@ var fx25BitsSent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "fx25_se
  *
  *		fbuf	- Frame buffer address.
  *
- *		flen	- Frame length, before bit-stuffing, not including the FCS.
- *
  *		fx_mode	- Normally, this would be 16, 32, or 64 for the desired number
  *			  of check bytes.  The shortest format, adequate for the
  *			  required data length will be picked automatically.
@@ -57,13 +55,11 @@ var fx25BitsSent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "fx25_se
 
 func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
 
-	var flen = C.int(len(fbuf)) // Convenient compatibility
-
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
-		fx_hex_dump((*C.uchar)(C.CBytes(fbuf)), flen)
+		fx_hex_dump(fbuf)
 	}
 
 	fx25BitsSent[channel] = 0
@@ -118,9 +114,9 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
-		fx_hex_dump(data, k_data_radio)
+		fx_hex_dump(C.GoBytes(unsafe.Pointer(data), k_data_radio))
 		dw_printf("FX.25[%d]: transmit %d check bytes:\n", channel, rs.nroots)
-		fx_hex_dump(&check[0], C.int(rs.nroots))
+		fx_hex_dump(C.GoBytes(unsafe.Pointer(&check[0]), C.int(rs.nroots)))
 		dw_printf("------\n")
 	}
 

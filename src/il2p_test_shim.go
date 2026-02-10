@@ -579,7 +579,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 			ax25_hex_dump(pp1)
 
 			dw_printf("IL2P encoded as:\n")
-			fx_hex_dump((*C.uchar)(C.CBytes(encoded)), C.int(enc_len))
+			fx_hex_dump(encoded)
 
 			dw_printf("Got turned into this:\n")
 			ax25_hex_dump(pp2)

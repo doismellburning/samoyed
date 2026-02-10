@@ -153,7 +153,7 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  ==============================\n")
 		dw_printf("%d filler zeros, %d data, %d parity\n", C.int(len(rs_block))-n, data_size, num_parity)
-		fx_hex_dump(&rs_block[0], C.int(len(rs_block)))
+		fx_hex_dump(C.GoBytes(unsafe.Pointer(&rs_block[0]), C.int(len(rs_block))))
 	}
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
@@ -169,7 +169,7 @@ func il2p_decode_rs(rec_block *C.uchar, data_size C.int, num_parity C.int, out *
 			for j := C.int(0); j < derrors; j++ {
 				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
 			}
-			fx_hex_dump(&rs_block[0], C.int(len(rs_block)))
+			fx_hex_dump(C.GoBytes(unsafe.Pointer(&rs_block[0]), C.int(len(rs_block))))
 		}
 	}
 
