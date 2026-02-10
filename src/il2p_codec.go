@@ -74,9 +74,10 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 		// Payload is AX.25 info part.
 		var pinfo = ax25_get_info(pp)
 
-		var k = il2p_encode_payload((*C.uchar)(C.CBytes(pinfo)), C.int(len(pinfo)), max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
+		var encodedPayload, k = il2p_encode_payload(pinfo, int(max_fec))
 		if k > 0 {
-			out_len += k
+			C.memcpy(unsafe.Add(unsafe.Pointer(iout), out_len), C.CBytes(encodedPayload), C.size_t(k))
+			out_len += C.int(k)
 			// Success. Info part was <= 1023 bytes.
 			return (out_len)
 		}
@@ -102,10 +103,10 @@ func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
 			// Payload is entire AX.25 frame.
 
 			var frame_data = ax25_get_frame_data(pp)
-			var frame_len = ax25_get_frame_len(pp)
-			var k = il2p_encode_payload((*C.uchar)(C.CBytes(frame_data)), C.int(frame_len), max_fec, (*C.uchar)(unsafe.Add(unsafe.Pointer(iout), out_len)))
+			var encodedPayload, k = il2p_encode_payload(frame_data, int(max_fec))
 			if k > 0 {
-				out_len += k
+				C.memcpy(unsafe.Add(unsafe.Pointer(iout), out_len), C.CBytes(encodedPayload), C.size_t(k))
+				out_len += C.int(k)
 				// Success. Entire AX.25 frame <= 1023 bytes.
 				return (out_len)
 			}

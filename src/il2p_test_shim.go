@@ -255,17 +255,16 @@ func test_payload(t *testing.T) {
 	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
 		for payload_length := C.int(1); payload_length <= IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
-			var encoded [IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar
-			var k = il2p_encode_payload(&original_payload[0], payload_length, max_fec, &encoded[0])
+			var encoded, k = il2p_encode_payload(C.GoBytes(unsafe.Pointer(&original_payload[0]), payload_length), int(max_fec))
 
 			// dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
-			assert.True(t, k > payload_length && k <= IL2P_MAX_ENCODED_PAYLOAD_SIZE)
+			assert.True(t, C.int(k) > payload_length && k <= IL2P_MAX_ENCODED_PAYLOAD_SIZE)
 
 			// Now extract.
 
 			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
 			var symbols_corrected C.int = 0
-			var e = il2p_decode_payload(&encoded[0], payload_length, max_fec, &extracted[0], &symbols_corrected)
+			var e = il2p_decode_payload((*C.uchar)(C.CBytes(encoded)), payload_length, max_fec, &extracted[0], &symbols_corrected)
 			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
 			assert.Equal(t, payload_length, e)
 
@@ -273,7 +272,7 @@ func test_payload(t *testing.T) {
 			//  dw_printf ("********** Received message not as expected. **********\n");
 			//  fx_hex_dump(extracted, payload_length);
 			// }
-			assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&original_payload[0]), unsafe.Pointer(&extracted[0]), C.ulong(payload_length)))
+			assert.Equal(t, C.GoBytes(unsafe.Pointer(&original_payload[0]), payload_length), C.GoBytes(unsafe.Pointer(&extracted[0]), payload_length))
 		}
 	}
 } // end test_payload
