@@ -6,10 +6,6 @@ package direwolf
 // #include <assert.h>
 import "C"
 
-import (
-	"unsafe"
-)
-
 /*--------------------------------------------------------------------------------
  *
  * Purpose:	Functions dealing with the payload.
@@ -189,10 +185,10 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
  *				Expected result size based on header.
  *		max_fec		true for 16 parity symbols, false for automatic.
  *
- * Outputs:	payload_out	Recovered payload.
- *
  * In/Out:	symbols_corrected	Number of symbols corrected.
  *
+ *
+ * Returns:	payload_out	Recovered payload.
  *
  * Returns:	Number of bytes extracted.  Should be same as payload_size going in.
  *		-3 for unexpected internal inconsistency.
@@ -205,82 +201,80 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, payload_out *C.uchar, symbols_corrected *C.int) C.int {
+func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int) ([]byte, int) {
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(payload_size, max_fec)
+	var ipp, e = il2p_payload_compute(C.int(payload_size), C.int(max_fec))
 	if e <= 0 {
-		return (e)
+		return nil, int(e)
 	}
 
 	var pin = received
-	var pout = payload_out
+	var pout []byte
 	var decoded_length C.int = 0
 	var failed = false
 
 	// First the large blocks.
 
 	for b := C.int(0); b < ipp.large_block_count; b++ {
-		var corrected_block, e = il2p_decode_rs(C.GoBytes(unsafe.Pointer(pin), ipp.large_block_size+ipp.parity_symbols_per_block), int(ipp.parity_symbols_per_block))
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], int(ipp.parity_symbols_per_block))
 
 		// dw_printf ("%s:%d: large block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
 		if e < 0 {
 			failed = true
 		}
-		*symbols_corrected += C.int(e)
+		*symbols_corrected += e
 
-		var _pout = il2p_descramble_block(corrected_block)
-		C.memcpy(unsafe.Pointer(pout), C.CBytes(_pout), C.size_t(ipp.large_block_size))
+		var descrambled = il2p_descramble_block(corrected_block)
+		pout = append(pout, descrambled...)
 
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled large payload block, %d bytes:\n", ipp.large_block_size)
-			fx_hex_dump(C.GoBytes(unsafe.Pointer(pout), ipp.large_block_size))
+			fx_hex_dump(descrambled)
 		}
 
-		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.large_block_size+ipp.parity_symbols_per_block))
-		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.large_block_size))
+		pin = pin[ipp.large_block_size+ipp.parity_symbols_per_block:]
 		decoded_length += ipp.large_block_size
 	}
 
 	// Then the small blocks.
 
 	for b := C.int(0); b < ipp.small_block_count; b++ {
-		var corrected_block, e = il2p_decode_rs(C.GoBytes(unsafe.Pointer(pin), ipp.small_block_size+ipp.parity_symbols_per_block), int(ipp.parity_symbols_per_block))
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], int(ipp.parity_symbols_per_block))
 
 		// dw_printf ("%s:%d: small block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
 		if e < 0 {
 			failed = true
 		}
-		*symbols_corrected += C.int(e)
+		*symbols_corrected += e
 
-		var _pout = il2p_descramble_block(corrected_block)
-		C.memcpy(unsafe.Pointer(pout), C.CBytes(_pout), C.size_t(ipp.small_block_size))
+		var descrambled = il2p_descramble_block(corrected_block)
+		pout = append(pout, descrambled...)
 
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Descrambled small payload block, %d bytes:\n", ipp.small_block_size)
-			fx_hex_dump(C.GoBytes(unsafe.Pointer(pout), ipp.small_block_size))
+			fx_hex_dump(descrambled)
 		}
 
-		pin = (*C.uchar)(unsafe.Add(unsafe.Pointer(pin), ipp.small_block_size+ipp.parity_symbols_per_block))
-		pout = (*C.uchar)(unsafe.Add(unsafe.Pointer(pout), ipp.small_block_size))
+		pin = pin[ipp.small_block_size+ipp.parity_symbols_per_block:]
 		decoded_length += ipp.small_block_size
 	}
 
 	if failed {
 		//dw_printf ("%s:%d: failed = %0x\n", __FILE__, __LINE__, failed);
-		return (-2)
+		return nil, -2
 	}
 
-	if decoded_length != payload_size {
+	if decoded_length != C.int(payload_size) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P Internal error: decoded_length = %d, payload_size = %d\n", decoded_length, payload_size)
-		return (-3)
+		return nil, -3
 	}
 
-	return (decoded_length)
+	return pout, int(decoded_length)
 
 } // end il2p_decode_payload

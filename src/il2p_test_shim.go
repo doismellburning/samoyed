@@ -262,17 +262,16 @@ func test_payload(t *testing.T) {
 
 			// Now extract.
 
-			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-			var symbols_corrected C.int = 0
-			var e = il2p_decode_payload((*C.uchar)(C.CBytes(encoded)), payload_length, max_fec, &extracted[0], &symbols_corrected)
+			var symbols_corrected = 0
+			var extracted, e = il2p_decode_payload(encoded, int(payload_length), int(max_fec), &symbols_corrected)
 			// dw_printf ("e = %d, payload_length = %d\n", e, payload_length);
-			assert.Equal(t, payload_length, e)
+			assert.Equal(t, payload_length, C.int(e))
 
 			// if (memcmp (original_payload, extracted, payload_length) != 0) {
 			//  dw_printf ("********** Received message not as expected. **********\n");
 			//  fx_hex_dump(extracted, payload_length);
 			// }
-			assert.Equal(t, C.GoBytes(unsafe.Pointer(&original_payload[0]), payload_length), C.GoBytes(unsafe.Pointer(&extracted[0]), payload_length))
+			assert.Equal(t, C.GoBytes(unsafe.Pointer(&original_payload[0]), payload_length), extracted)
 		}
 	}
 } // end test_payload

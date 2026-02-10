@@ -168,6 +168,9 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 	var hdr_type, max_fec C.int
 	var payload_len = il2p_get_header_attributes(uhdr, &hdr_type, &max_fec)
 
+	// Compute encoded payload size (includes parity symbols).
+	_, encoded_size := il2p_payload_compute(payload_len, max_fec)
+
 	if hdr_type == 1 {
 
 		// Header type 1.  Any payload is the AX.25 Information part.
@@ -181,8 +184,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		if payload_len > 0 {
 			// This is the AX.25 Information part.
 
-			var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-			var e = il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
+			var extracted, e = il2p_decode_payload(C.GoBytes(unsafe.Pointer(epayload), encoded_size), int(payload_len), int(max_fec), (*int)(unsafe.Pointer(symbols_corrected)))
 
 			// It would be possible to have a good header but too many errors in the payload.
 
@@ -191,26 +193,25 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 				return nil
 			}
 
-			if e != payload_len {
+			if C.int(e) != payload_len {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, max_fec=%d, payload_len=%d, e=%d.\n", hdr_type, max_fec, payload_len, e)
 			}
 
-			ax25_set_info(pp, C.GoBytes(unsafe.Pointer(&extracted[0]), payload_len))
+			ax25_set_info(pp, extracted)
 		}
 		return (pp)
 	} else {
 
 		// Header type 0.  The payload is the entire AX.25 frame.
 
-		var extracted [IL2P_MAX_PAYLOAD_SIZE]C.uchar
-		var e = il2p_decode_payload(epayload, payload_len, max_fec, &extracted[0], symbols_corrected)
+		var extracted, e = il2p_decode_payload(C.GoBytes(unsafe.Pointer(epayload), encoded_size), int(payload_len), int(max_fec), (*int)(unsafe.Pointer(symbols_corrected)))
 
 		if e <= 0 { // Payload was not received correctly.
 			return (nil)
 		}
 
-		if e != payload_len {
+		if C.int(e) != payload_len {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("IL2P Internal Error: il2p_decode_header_payload(): hdr_type=%d, e=%d, payload_len=%d\n", hdr_type, e, payload_len)
 			return (nil)
@@ -221,7 +222,7 @@ func il2p_decode_header_payload(uhdr *C.uchar, epayload *C.uchar, symbols_correc
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&extracted[0]), payload_len), alevel)
+		var pp = ax25_from_frame(extracted, alevel)
 		return (pp)
 	}
 
