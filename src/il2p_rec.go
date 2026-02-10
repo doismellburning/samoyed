@@ -207,7 +207,17 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		// TODO?:  for symmetry, we might decode the payload here and later build the frame.
 
 		{
-			var pp = il2p_decode_header_payload(&F.uhdr[0], &F.spayload[0], &(F.corrected))
+			// Compute encoded payload size (includes parity symbols).
+			var _, max_fec, payload_len = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
+			var _, encoded_payload_size = il2p_payload_compute(C.int(payload_len), C.int(max_fec))
+
+			var corrected = int(F.corrected)
+			var pp = il2p_decode_header_payload(
+				C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE),
+				C.GoBytes(unsafe.Pointer(&F.spayload[0]), encoded_payload_size),
+				&corrected,
+			)
+			F.corrected = C.int(corrected)
 
 			if il2p_get_debug() >= 1 {
 				if pp != nil {
