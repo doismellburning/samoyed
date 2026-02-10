@@ -7,6 +7,7 @@ package direwolf
 import "C"
 
 import (
+	"bytes"
 	"unsafe"
 )
 
@@ -47,82 +48,79 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *packet_t, max_fec C.int, iout *C.uchar) C.int {
+func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 
 	// Can a type 1 header be used?
 
 	var hdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar
-	var out_len C.int
 
-	var e = il2p_type_1_header(pp, max_fec, &hdr[0])
+	var e = il2p_type_1_header(pp, C.int(max_fec), &hdr[0])
 
 	if e >= 0 {
-		var _scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+		var outbuf = new(bytes.Buffer)
 
-		C.memcpy(unsafe.Pointer(iout), unsafe.Pointer(&_scrambled[0]), C.size_t(len(_scrambled)))
+		var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+		outbuf.Write(scrambled)
 
-		var parity = il2p_encode_rs(_scrambled, IL2P_HEADER_PARITY)
-		C.memcpy(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE), C.CBytes(parity), C.size_t(len(parity)))
-
-		out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
+		var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+		outbuf.Write(parity)
 
 		if e == 0 {
 			// Success. No info part.
-			return (out_len)
+			return outbuf.Bytes(), outbuf.Len()
 		}
 
 		// Payload is AX.25 info part.
 		var pinfo = ax25_get_info(pp)
 
-		var encodedPayload, k = il2p_encode_payload(pinfo, int(max_fec))
+		var encodedPayload, k = il2p_encode_payload(pinfo, max_fec)
 		if k > 0 {
-			C.memcpy(unsafe.Add(unsafe.Pointer(iout), out_len), C.CBytes(encodedPayload), C.size_t(k))
-			out_len += C.int(k)
+			outbuf.Write(encodedPayload)
+
 			// Success. Info part was <= 1023 bytes.
-			return (out_len)
+			return outbuf.Bytes(), outbuf.Len()
 		}
 
 		// Something went wrong with the payload encoding.
-		return (-1)
+		return nil, -1
 	} else if e == -1 {
 
 		// Could not use type 1 header for some reason.
 		// e.g. More than 2 addresses, extended (mod 128) sequence numbers, etc.
 
-		e = il2p_type_0_header(pp, max_fec, &hdr[0])
+		e = il2p_type_0_header(pp, C.int(max_fec), &hdr[0])
 		if e > 0 {
-			var _scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+			var outbuf = new(bytes.Buffer)
 
-			C.memcpy(unsafe.Pointer(iout), unsafe.Pointer(&_scrambled[0]), C.size_t(len(_scrambled)))
+			var scrambled = il2p_scramble_block(C.GoBytes(unsafe.Pointer(&hdr[0]), IL2P_HEADER_SIZE))
+			outbuf.Write(scrambled)
 
-			var parity = il2p_encode_rs(_scrambled, IL2P_HEADER_PARITY)
-			C.memcpy(unsafe.Add(unsafe.Pointer(iout), IL2P_HEADER_SIZE), C.CBytes(parity), C.size_t(len(parity)))
-
-			out_len = IL2P_HEADER_SIZE + IL2P_HEADER_PARITY
+			var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+			outbuf.Write(parity)
 
 			// Payload is entire AX.25 frame.
 
 			var frame_data = ax25_get_frame_data(pp)
-			var encodedPayload, k = il2p_encode_payload(frame_data, int(max_fec))
+			var encodedPayload, k = il2p_encode_payload(frame_data, max_fec)
 			if k > 0 {
-				C.memcpy(unsafe.Add(unsafe.Pointer(iout), out_len), C.CBytes(encodedPayload), C.size_t(k))
-				out_len += C.int(k)
+				outbuf.Write(encodedPayload)
+
 				// Success. Entire AX.25 frame <= 1023 bytes.
-				return (out_len)
+				return outbuf.Bytes(), outbuf.Len()
 			}
 			// Something went wrong with the payload encoding.
-			return (-1)
+			return nil, -1
 		} else if e == 0 { //nolint:gocritic
 			// Impossible condition.  Type 0 header must have payload.
-			return (-1)
+			return nil, -1
 		} else {
 			// AX.25 frame is too large.
-			return (-1)
+			return nil, -1
 		}
 	}
 
 	// AX.25 Information part is too large.
-	return (-1)
+	return nil, -1
 }
 
 /*-------------------------------------------------------------

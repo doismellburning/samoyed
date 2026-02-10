@@ -468,7 +468,7 @@ func test_example_headers(t *testing.T) {
 	// dw_printf ("---------- example 3 ------------\n");
 	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
 	var header3 []C.uchar = []C.uchar{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
-	var complete3 []C.uchar = []C.uchar{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
+	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
 	C.memset(unsafe.Pointer(&header[0]), 0, C.ulong(len(header)))
 	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
@@ -533,17 +533,16 @@ func test_example_headers(t *testing.T) {
 	pp = ax25_from_frame(example3, alevel)
 	assert.NotNil(t, pp)
 
-	var max_fec C.int = 0
-	var iout [IL2P_MAX_PACKET_SIZE]C.uchar
-	e = il2p_encode_frame(pp, max_fec, &iout[0])
+	var max_fec = 0
+	var iout, ioutLen = il2p_encode_frame(pp, max_fec)
 
 	// dw_printf ("expected for example 3:\n");
 	// fx_hex_dump(complete3, sizeof(complete3));
 	// dw_printf ("actual result for example 3:\n");
 	// fx_hex_dump(iout, e);
 	// Does it match the example in the protocol spec?
-	assert.Equal(t, C.int(len(complete3)), e)
-	assert.Equal(t, C.int(0), C.memcmp(unsafe.Pointer(&iout[0]), unsafe.Pointer(&complete3[0]), C.ulong(len(complete3))))
+	assert.Equal(t, len(complete3), ioutLen)
+	assert.Equal(t, complete3, iout)
 	ax25_delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
@@ -560,12 +559,11 @@ func test_example_headers(t *testing.T) {
 func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 	t.Helper()
 
-	for max_fec := C.int(0); max_fec <= 1; max_fec++ {
-		var encoded [IL2P_MAX_PACKET_SIZE]C.uchar
-		var enc_len = il2p_encode_frame(pp1, max_fec, &encoded[0])
-		assert.GreaterOrEqual(t, enc_len, C.int(0))
+	for max_fec := 0; max_fec <= 1; max_fec++ {
+		var encoded, enc_len = il2p_encode_frame(pp1, max_fec)
+		assert.GreaterOrEqual(t, enc_len, 0)
 
-		var pp2 = il2p_decode_frame(&encoded[0])
+		var pp2 = il2p_decode_frame((*C.uchar)(C.CBytes(encoded)))
 		assert.NotNil(t, pp2)
 
 		// Is it the same after encoding to IL2P and then decoding?
@@ -581,7 +579,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 			ax25_hex_dump(pp1)
 
 			dw_printf("IL2P encoded as:\n")
-			fx_hex_dump(&encoded[0], enc_len)
+			fx_hex_dump((*C.uchar)(C.CBytes(encoded)), C.int(enc_len))
 
 			dw_printf("Got turned into this:\n")
 			ax25_hex_dump(pp2)
