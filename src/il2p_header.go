@@ -678,7 +678,9 @@ func il2p_clarify_header(rec_hdr *C.uchar, corrected_descrambled_hdr *C.uchar) C
 
 	var corrected, e = il2p_decode_rs(C.GoBytes(unsafe.Pointer(rec_hdr), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY), IL2P_HEADER_PARITY)
 
-	il2p_descramble_block((*C.uchar)(C.CBytes(corrected)), corrected_descrambled_hdr, IL2P_HEADER_SIZE)
+	var _corrected_descrambled_hdr = il2p_descramble_block(corrected)
+
+	C.memcpy(unsafe.Pointer(corrected_descrambled_hdr), C.CBytes(_corrected_descrambled_hdr), IL2P_HEADER_SIZE)
 
 	return C.int(e)
 }

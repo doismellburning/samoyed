@@ -230,7 +230,8 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 		}
 		*symbols_corrected += C.int(e)
 
-		il2p_descramble_block((*C.uchar)(C.CBytes(corrected_block)), pout, ipp.large_block_size)
+		var _pout = il2p_descramble_block(corrected_block)
+		C.memcpy(unsafe.Pointer(pout), C.CBytes(_pout), C.size_t(ipp.large_block_size))
 
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -255,7 +256,8 @@ func il2p_decode_payload(received *C.uchar, payload_size C.int, max_fec C.int, p
 		}
 		*symbols_corrected += C.int(e)
 
-		il2p_descramble_block((*C.uchar)(C.CBytes(corrected_block)), pout, ipp.small_block_size)
+		var _pout = il2p_descramble_block(corrected_block)
+		C.memcpy(unsafe.Pointer(pout), C.CBytes(_pout), C.size_t(ipp.small_block_size))
 
 		if il2p_get_debug() >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
