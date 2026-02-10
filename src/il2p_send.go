@@ -1,12 +1,6 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
-var number_of_il2p_bits_sent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "il2p_send_frame"
+var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "il2p_send_frame"
 
 /*-------------------------------------------------------------
  *
@@ -85,7 +79,7 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 	send_il2p_bytes(channel, []byte{IL2P_PREAMBLE}, polarity)
 	send_il2p_bytes(channel, data, polarity)
 
-	return int(number_of_il2p_bits_sent[channel])
+	return number_of_il2p_bits_sent[channel]
 }
 
 func send_il2p_bytes(channel int, b []byte, polarity int) {
