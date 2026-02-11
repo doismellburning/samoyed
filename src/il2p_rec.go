@@ -29,14 +29,14 @@ type il2p_context_s struct {
 	polarity bool // True if opposite of expected polarity.
 
 	shdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]byte // Scrambled header as received over the radio.  Includes parity.
-	hc   int                                          // Number if bytes placed in above.
+	hc   int                                         // Number if bytes placed in above.
 
 	uhdr [IL2P_HEADER_SIZE]byte // Header after FEC and unscrambling.
 
 	eplen int // Encoded payload length.  This is not the number from the header but rather the number of encoded bytes to gather.
 
 	spayload [IL2P_MAX_ENCODED_PAYLOAD_SIZE]byte // Scrambled and encoded payload as received over the radio.
-	pc       int                                  // Number of bytes placed in above.
+	pc       int                                 // Number of bytes placed in above.
 
 	corrected int // Number of symbols corrected by RS FEC.
 }
@@ -81,7 +81,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
 
-	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff
+	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff //nolint:gosec
 
 	// State machine to look for sync word then gather appropriate number of header and payload bytes.
 
@@ -225,7 +225,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 			if pp != nil {
 				var alevel = demod_get_audio_level(channel, subchannel)
 				var retries = retry_t(F.corrected)
-				var fec_type fec_type_t = fec_type_il2p
+				var fec_type = fec_type_il2p
 
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
