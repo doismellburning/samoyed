@@ -45,7 +45,7 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 		return p, 0
 	}
 
-	if max_fec != 0 {
+	if true || max_fec != 0 {
 		p.payload_byte_count = payload_size
 		p.payload_block_count = (p.payload_byte_count + 238) / 239
 		p.small_block_size = p.payload_byte_count / p.payload_block_count

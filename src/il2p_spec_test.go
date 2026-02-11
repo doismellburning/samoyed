@@ -44,6 +44,11 @@ func TestIL2PSpec(t *testing.T) {
 			expectedAddrs: "KK4HEJ-15>CQ:",
 			ax25Data:      "86 A2 40 40 40 40 60 96 96 68 90 8A 94 FF 03 F0",
 		},
+		{
+			inputData:     "26 13 6D 02 8C FE FB E8 AA 94 2D 6A 34 43 35 3C 69 9F 0C 75 5A 38 A1 7F A5 DA D8 F6 EA 57 37 3D B1 2A B0 DE 44 A8 20 D0 1D 5A 2B 38",
+			expectedAddrs: "KK4HEJ-2>KA2DEW-2:",
+			ax25Data:      "96 82 64 88 8A AE E4 96 96 68 90 8A 94 65 B8 CF 30 31 32 33 34 35 36 37 38",
+		},
 	}
 
 	for _, testDatum := range testData {
