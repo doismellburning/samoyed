@@ -73,7 +73,7 @@ func il2p_set_debug(debug int) {
 
 // Find RS codec control block for specified number of parity symbols.
 
-func il2p_find_rs(nparity C.int) *rs_t {
+func il2p_find_rs(nparity int) *rs_t {
 	for n := 0; n < NTAB; n++ {
 		if Tab[n].nroots == C.uint(nparity) {
 			return Tab[n].rs
@@ -115,7 +115,7 @@ func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
 	C.memcpy(unsafe.Pointer(&rs_block[len(rs_block)-data_size-num_parity]), C.CBytes(tx_data), C.size_t(data_size))
 
 	var parity_out = make([]C.uchar, num_parity)
-	encode_rs_char(il2p_find_rs(C.int(num_parity)), &rs_block[0], &parity_out[0])
+	encode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &parity_out[0])
 
 	return C.GoBytes(unsafe.Pointer(&parity_out[0]), C.int(num_parity))
 }
@@ -160,7 +160,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
 
-	var derrors = decode_rs_char(il2p_find_rs(C.int(num_parity)), &rs_block[0], &derrlocs[0], 0)
+	var derrors = decode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &derrlocs[0], 0)
 	var out = C.GoBytes(unsafe.Pointer(&rs_block[len(rs_block)-n]), C.int(data_size))
 
 	if il2p_get_debug() >= 3 {
