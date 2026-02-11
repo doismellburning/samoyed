@@ -558,7 +558,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 		var encoded, enc_len = il2p_encode_frame(pp1, max_fec)
 		assert.GreaterOrEqual(t, enc_len, 0)
 
-		var pp2 = il2p_decode_frame((*C.uchar)(C.CBytes(encoded)))
+		var pp2 = il2p_decode_frame(encoded)
 		assert.NotNil(t, pp2)
 
 		// Is it the same after encoding to IL2P and then decoding?

@@ -1,14 +1,7 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
 import (
 	"bytes"
-	"unsafe"
 )
 
 /*-------------------------------------------------------------
@@ -138,19 +131,12 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec *C.uchar) *packet_t {
-	var uhdr, e = il2p_clarify_header(C.GoBytes(unsafe.Pointer(irec), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY))
+func il2p_decode_frame(irec []byte) *packet_t {
+	var uhdr, e = il2p_clarify_header(irec)
 
 	// TODO?: for symmetry we might want to clarify the payload before combining.
 
-	var _, max_fec, payload_len = il2p_get_header_attributes(uhdr)
-	var _, encoded_payload_len = il2p_payload_compute(C.int(payload_len), C.int(max_fec))
-
-	return il2p_decode_header_payload(
-		uhdr,
-		C.GoBytes(unsafe.Add(unsafe.Pointer(irec), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY), encoded_payload_len),
-		&e,
-	)
+	return il2p_decode_header_payload(uhdr, irec[IL2P_HEADER_SIZE+IL2P_HEADER_PARITY:], &e)
 }
 
 /*-------------------------------------------------------------
