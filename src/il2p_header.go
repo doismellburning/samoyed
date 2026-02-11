@@ -1,16 +1,9 @@
 package direwolf
 
-// #include <assert.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"fmt"
 	"strings"
 	"unicode"
-	"unsafe"
 )
 
 /*--------------------------------------------------------------------------------
@@ -663,7 +656,7 @@ func il2p_get_header_attributes(hdr []byte) (int, int, int) {
  *
  * Inputs:      rec_hdr	- Header as received over the radio.
  *
- * Outputs:     corrected_descrambled_hdr - After RS FEC and unscrambling.
+ * Returns:     corrected_descrambled_hdr - After RS FEC and unscrambling.
  *
  * Returns:	Number of symbols that were corrected:
  *		 0 = No errors
@@ -672,13 +665,11 @@ func il2p_get_header_attributes(hdr []byte) (int, int, int) {
  *
  ***********************************************************************************/
 
-func il2p_clarify_header(rec_hdr *C.uchar, corrected_descrambled_hdr *C.uchar) C.int {
+func il2p_clarify_header(rec_hdr []byte) ([]byte, int) {
 
-	var corrected, e = il2p_decode_rs(C.GoBytes(unsafe.Pointer(rec_hdr), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY), IL2P_HEADER_PARITY)
+	var corrected, e = il2p_decode_rs(rec_hdr, IL2P_HEADER_PARITY)
 
-	var _corrected_descrambled_hdr = il2p_descramble_block(corrected)
+	var corrected_descrambled_hdr = il2p_descramble_block(corrected)
 
-	C.memcpy(unsafe.Pointer(corrected_descrambled_hdr), C.CBytes(_corrected_descrambled_hdr), IL2P_HEADER_SIZE)
-
-	return C.int(e)
+	return corrected_descrambled_hdr, e
 }

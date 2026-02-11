@@ -8,15 +8,8 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"math/bits"
-	"unsafe"
 )
 
 type IL2PState int
@@ -31,21 +24,21 @@ type il2p_context_s struct {
 
 	acc uint // Accumulate most recent 24 bits for sync word matching. Lower 8 bits are also used for accumulating bytes for the header and payload.
 
-	bc C.int // Bit counter so we know when a complete byte has been accumulated.
+	bc int // Bit counter so we know when a complete byte has been accumulated.
 
 	polarity bool // True if opposite of expected polarity.
 
-	shdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]C.uchar // Scrambled header as received over the radio.  Includes parity.
-	hc   C.int                                          // Number if bytes placed in above.
+	shdr [IL2P_HEADER_SIZE + IL2P_HEADER_PARITY]byte // Scrambled header as received over the radio.  Includes parity.
+	hc   int                                         // Number if bytes placed in above.
 
-	uhdr [IL2P_HEADER_SIZE]C.uchar // Header after FEC and unscrambling.
+	uhdr [IL2P_HEADER_SIZE]byte // Header after FEC and unscrambling.
 
-	eplen C.int // Encoded payload length.  This is not the number from the header but rather the number of encoded bytes to gather.
+	eplen int // Encoded payload length.  This is not the number from the header but rather the number of encoded bytes to gather.
 
-	spayload [IL2P_MAX_ENCODED_PAYLOAD_SIZE]C.uchar // Scrambled and encoded payload as received over the radio.
-	pc       C.int                                  // Number of bytes placed in above.
+	spayload [IL2P_MAX_ENCODED_PAYLOAD_SIZE]byte // Scrambled and encoded payload as received over the radio.
+	pc       int                                 // Number of bytes placed in above.
 
-	corrected C.int // Number of symbols corrected by RS FEC.
+	corrected int // Number of symbols corrected by RS FEC.
 }
 
 var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
@@ -88,7 +81,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
 
-	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff
+	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff //nolint:gosec
 
 	// State machine to look for sync word then gather appropriate number of header and payload bytes.
 
@@ -120,10 +113,10 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		if F.bc == 8 { // full byte has been collected.
 			F.bc = 0
 			if !F.polarity {
-				F.shdr[F.hc] = C.uchar(F.acc & 0xff)
+				F.shdr[F.hc] = byte(F.acc & 0xff)
 				F.hc++
 			} else {
-				F.shdr[F.hc] = C.uchar(^F.acc) & 0xff
+				F.shdr[F.hc] = byte(^F.acc) & 0xff
 				F.hc++
 			}
 			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
@@ -131,23 +124,25 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				if il2p_get_debug() >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
-					fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.shdr[0]), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY))
+					fx_hex_dump(F.shdr[:])
 				}
 
 				// Fix any errors and descramble.
-				F.corrected = il2p_clarify_header(&F.shdr[0], &F.uhdr[0])
+				var uhdr, corrected = il2p_clarify_header(F.shdr[:])
+				F.corrected = corrected
+				copy(F.uhdr[:], uhdr)
 
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
-					var plprop *il2p_payload_properties_t
-					var hdr_type, max_fec, length = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
+					var hdr_type, max_fec, length = il2p_get_header_attributes(F.uhdr[:])
 
-					plprop, F.eplen = il2p_payload_compute(C.int(length), C.int(max_fec))
+					var plprop, eplen = il2p_payload_compute(length, max_fec)
+					F.eplen = eplen
 
 					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("IL2P header after correcting %d symbols and unscrambling [%d.%d.%d]:\n", F.corrected, channel, subchannel, slice)
-						fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
+						fx_hex_dump(F.uhdr[:])
 						dw_printf("Header type %d, max fec = %d\n", hdr_type, max_fec)
 						dw_printf("Need to collect %d encoded bytes for %d byte payload.\n", F.eplen, length)
 						dw_printf("%d small blocks of %d and %d large blocks of %d.  %d parity symbols per block\n",
@@ -183,10 +178,10 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		if F.bc == 8 { // full byte has been collected.
 			F.bc = 0
 			if !F.polarity {
-				F.spayload[F.pc] = C.uchar(F.acc & 0xff)
+				F.spayload[F.pc] = byte(F.acc & 0xff)
 				F.pc++
 			} else {
-				F.spayload[F.pc] = C.uchar(^F.acc) & 0xff
+				F.spayload[F.pc] = byte(^F.acc) & 0xff
 				F.pc++
 			}
 			if F.pc == F.eplen {
@@ -208,16 +203,14 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 		{
 			// Compute encoded payload size (includes parity symbols).
-			var _, max_fec, payload_len = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
-			var _, encoded_payload_size = il2p_payload_compute(C.int(payload_len), C.int(max_fec))
+			var _, max_fec, payload_len = il2p_get_header_attributes(F.uhdr[:])
+			var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
-			var corrected = int(F.corrected)
 			var pp = il2p_decode_header_payload(
-				C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE),
-				C.GoBytes(unsafe.Pointer(&F.spayload[0]), encoded_payload_size),
-				&corrected,
+				F.uhdr[:],
+				F.spayload[:encoded_payload_size],
+				&F.corrected,
 			)
-			F.corrected = C.int(corrected)
 
 			if il2p_get_debug() >= 1 {
 				if pp != nil {
@@ -232,7 +225,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 			if pp != nil {
 				var alevel = demod_get_audio_level(channel, subchannel)
 				var retries = retry_t(F.corrected)
-				var fec_type fec_type_t = fec_type_il2p
+				var fec_type = fec_type_il2p
 
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
 
