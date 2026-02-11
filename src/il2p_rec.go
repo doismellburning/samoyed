@@ -135,7 +135,9 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				}
 
 				// Fix any errors and descramble.
-				F.corrected = il2p_clarify_header(&F.shdr[0], &F.uhdr[0])
+				var uhdr, corrected = il2p_clarify_header(C.GoBytes(unsafe.Pointer(&F.shdr[0]), IL2P_HEADER_SIZE+IL2P_HEADER_PARITY))
+				F.corrected = C.int(corrected)
+				C.memcpy(unsafe.Pointer(&F.uhdr[0]), C.CBytes(uhdr), C.size_t(len(uhdr)))
 
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
