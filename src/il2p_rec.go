@@ -141,10 +141,10 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
-					var plprop *il2p_payload_properties_t
 					var hdr_type, max_fec, length = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
 
-					plprop, F.eplen = il2p_payload_compute(C.int(length), C.int(max_fec))
+					var plprop, eplen = il2p_payload_compute(length, max_fec)
+					F.eplen = C.int(eplen)
 
 					if il2p_get_debug() >= 1 {
 						text_color_set(DW_COLOR_DEBUG)
@@ -211,12 +211,12 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		{
 			// Compute encoded payload size (includes parity symbols).
 			var _, max_fec, payload_len = il2p_get_header_attributes(C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE))
-			var _, encoded_payload_size = il2p_payload_compute(C.int(payload_len), C.int(max_fec))
+			var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
 			var corrected = int(F.corrected)
 			var pp = il2p_decode_header_payload(
 				C.GoBytes(unsafe.Pointer(&F.uhdr[0]), IL2P_HEADER_SIZE),
-				C.GoBytes(unsafe.Pointer(&F.spayload[0]), encoded_payload_size),
+				C.GoBytes(unsafe.Pointer(&F.spayload[0]), C.int(encoded_payload_size)),
 				&corrected,
 			)
 			F.corrected = C.int(corrected)

@@ -1,11 +1,5 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
 /*--------------------------------------------------------------------------------
  *
  * Purpose:	Functions dealing with the payload.
@@ -13,13 +7,13 @@ import "C"
  *--------------------------------------------------------------------------------*/
 
 type il2p_payload_properties_t struct {
-	payload_byte_count       C.int // Total size, 0 thru 1023
-	payload_block_count      C.int
-	small_block_size         C.int
-	large_block_size         C.int
-	large_block_count        C.int
-	small_block_count        C.int
-	parity_symbols_per_block C.int // 2, 4, 6, 8, 16
+	payload_byte_count       int // Total size, 0 thru 1023
+	payload_block_count      int
+	small_block_size         int
+	large_block_size         int
+	large_block_count        int
+	small_block_count        int
+	parity_symbols_per_block int // 2, 4, 6, 8, 16
 }
 
 /*--------------------------------------------------------------------------------
@@ -40,7 +34,7 @@ type il2p_payload_properties_t struct {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_payload_compute(payload_size C.int, max_fec C.int) (*il2p_payload_properties_t, C.int) {
+func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properties_t, int) {
 
 	var p = new(il2p_payload_properties_t)
 
@@ -129,18 +123,18 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(C.int(payload_size), C.int(max_fec))
+	var ipp, e = il2p_payload_compute(payload_size, max_fec)
 	if e <= 0 {
-		return nil, int(e)
+		return nil, e
 	}
 
 	var pin = payload
 	var pout []byte
-	var encoded_length C.int = 0
+	var encoded_length = 0
 
 	// First the large blocks.
 
-	for b := C.int(0); b < ipp.large_block_count; b++ {
+	for b := 0; b < ipp.large_block_count; b++ {
 		var scram = il2p_scramble_block(pin[:ipp.large_block_size])
 		pout = append(pout, scram...)
 
@@ -148,7 +142,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 		encoded_length += ipp.large_block_size
 
-		var parity = il2p_encode_rs(scram, int(ipp.parity_symbols_per_block))
+		var parity = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
 		pout = append(pout, parity...)
 
 		encoded_length += ipp.parity_symbols_per_block
@@ -156,20 +150,20 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// Then the small blocks.
 
-	for b := C.int(0); b < ipp.small_block_count; b++ {
+	for b := 0; b < ipp.small_block_count; b++ {
 		var scram = il2p_scramble_block(pin[:ipp.small_block_size])
 		pout = append(pout, scram...)
 
 		pin = pin[ipp.small_block_size:]
 		encoded_length += ipp.small_block_size
 
-		var parity = il2p_encode_rs(scram, int(ipp.parity_symbols_per_block))
+		var parity = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
 		pout = append(pout, parity...)
 
 		encoded_length += ipp.parity_symbols_per_block
 	}
 
-	return pout, int(encoded_length)
+	return pout, encoded_length
 
 } // end il2p_encode_payload
 
@@ -204,20 +198,20 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int) ([]byte, int) {
 	// Determine number of blocks and sizes.
 
-	var ipp, e = il2p_payload_compute(C.int(payload_size), C.int(max_fec))
+	var ipp, e = il2p_payload_compute(payload_size, max_fec)
 	if e <= 0 {
-		return nil, int(e)
+		return nil, e
 	}
 
 	var pin = received
 	var pout []byte
-	var decoded_length C.int = 0
+	var decoded_length = 0
 	var failed = false
 
 	// First the large blocks.
 
-	for b := C.int(0); b < ipp.large_block_count; b++ {
-		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], int(ipp.parity_symbols_per_block))
+	for b := 0; b < ipp.large_block_count; b++ {
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
 
 		// dw_printf ("%s:%d: large block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -241,8 +235,8 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 
 	// Then the small blocks.
 
-	for b := C.int(0); b < ipp.small_block_count; b++ {
-		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], int(ipp.parity_symbols_per_block))
+	for b := 0; b < ipp.small_block_count; b++ {
+		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
 
 		// dw_printf ("%s:%d: small block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
 
@@ -269,12 +263,12 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		return nil, -2
 	}
 
-	if decoded_length != C.int(payload_size) {
+	if decoded_length != payload_size {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P Internal error: decoded_length = %d, payload_size = %d\n", decoded_length, payload_size)
 		return nil, -3
 	}
 
-	return pout, int(decoded_length)
+	return pout, decoded_length
 
 } // end il2p_decode_payload
