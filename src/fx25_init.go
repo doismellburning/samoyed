@@ -229,29 +229,29 @@ func fx25_init(debug_level int) {
 
 // Get properties of specified CTAG number.
 
-func fx25_get_rs(ctag_num C.int) *rs_t {
+func fx25_get_rs(ctag_num int) *rs_t {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
 	return fx25Tab[tags[ctag_num].itab].rs
 }
 
-func fx25_get_ctag_value(ctag_num C.int) C.uint64_t {
+func fx25_get_ctag_value(ctag_num int) uint64 {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.uint64_t(tags[ctag_num].value)
+	return tags[ctag_num].value
 }
 
-func fx25_get_k_data_radio(ctag_num C.int) C.int {
+func fx25_get_k_data_radio(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.int(tags[ctag_num].k_data_radio)
+	return tags[ctag_num].k_data_radio
 }
 
-func fx25_get_k_data_rs(ctag_num C.int) C.int {
+func fx25_get_k_data_rs(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.int(tags[ctag_num].k_data_rs)
+	return tags[ctag_num].k_data_rs
 }
 
-func fx25_get_nroots(ctag_num C.int) C.int {
+func fx25_get_nroots(ctag_num int) C.int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	return C.int(fx25Tab[tags[ctag_num].itab].nroots)
 }
@@ -285,7 +285,7 @@ func fx25_get_debug() int {
  *
  *--------------------------------------------------------------*/
 
-func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
+func fx25_pick_mode(fx_mode int, dlen int) int {
 	if fx_mode <= 0 {
 		return -1
 	}
@@ -306,8 +306,8 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 
 	if fx_mode == 16 || fx_mode == 32 || fx_mode == 64 {
 		for k := CTAG_MAX; k >= CTAG_MIN; k-- {
-			if fx_mode == fx25_get_nroots(C.int(k)) && dlen <= fx25_get_k_data_radio(C.int(k)) {
-				return C.int(k)
+			if C.int(fx_mode) == fx25_get_nroots(k) && dlen <= fx25_get_k_data_radio(k) {
+				return k
 			}
 		}
 		return -1
@@ -337,7 +337,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	// to be coordinated with other FX.25 developers so we maintain compatibility.
 	// See https://web.tapr.org/meetings/DCC_2020/JE1WAZ/DCC-2020-PRUG-FINAL.pptx
 
-	var prefer = [6]C.int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
+	var prefer = [6]int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
 	for k := 0; k < 6; k++ {
 		var m = prefer[k]
 		if dlen <= fx25_get_k_data_radio(m) {

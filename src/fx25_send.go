@@ -12,7 +12,7 @@ import (
 	"unsafe"
 )
 
-var fx25BitsSent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "fx25_send_frame" or "???"
+var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "fx25_send_frame" or "???"
 
 /*-------------------------------------------------------------
  *
@@ -72,12 +72,12 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
 	var stuffedBytes, meaningfulLen = bitStuff(fbuf, FX25_MAX_DATA)
-	var dlen = C.int(meaningfulLen) // Use meaningful length, not total buffer size
+	var dlen = meaningfulLen // Use meaningful length, not total buffer size
 
 	// Pick suitable correlation tag depending on
 	// user's preference, for number of check bytes,
 	// and the data size.
-	var ctag_num = fx25_pick_mode(C.int(fx_mode), dlen)
+	var ctag_num = fx25_pick_mode(fx_mode, dlen)
 
 	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
 		text_color_set(DW_COLOR_ERROR)
@@ -106,7 +106,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 	check[FX25_MAX_CHECK] = fence
 	var rs = fx25_get_rs(ctag_num)
 
-	Assert(k_data_rs+C.int(rs.nroots) == C.int(rs.nn))
+	Assert(k_data_rs+int(rs.nroots) == int(rs.nn))
 
 	encode_rs_char(rs, data, &check[0])
 	Assert(check[FX25_MAX_CHECK] == fence)
@@ -114,7 +114,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(data), k_data_radio))
+		fx_hex_dump(C.GoBytes(unsafe.Pointer(data), C.int(k_data_radio)))
 		dw_printf("FX.25[%d]: transmit %d check bytes:\n", channel, rs.nroots)
 		fx_hex_dump(C.GoBytes(unsafe.Pointer(&check[0]), C.int(rs.nroots)))
 		dw_printf("------\n")
@@ -140,7 +140,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 			*(*C.uchar)(unsafe.Pointer(uintptr(unsafe.Pointer(data)) + uintptr(j))) ^= 0xff
 		}
 
-		fp.Write(C.GoBytes(unsafe.Pointer(data), k_data_radio))
+		fp.Write(C.GoBytes(unsafe.Pointer(data), C.int(k_data_radio)))
 		fp.Write(C.GoBytes(unsafe.Pointer(&check[0]), C.int(rs.nroots)))
 		fp.Write(flags)
 	} else {
@@ -155,11 +155,11 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 			var b = C.uchar(ctag_value>>(k*8)) & 0xff
 			send_bytes(channel, &b, 1)
 		}
-		send_bytes(channel, data, int(k_data_radio))
+		send_bytes(channel, data, k_data_radio)
 		send_bytes(channel, &check[0], int(rs.nroots))
 	}
 
-	return int(fx25BitsSent[channel])
+	return fx25BitsSent[channel]
 }
 
 func send_bytes(channel int, _b *C.uchar, count int) {

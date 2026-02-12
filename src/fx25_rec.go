@@ -97,9 +97,9 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		if c >= CTAG_MIN && c <= CTAG_MAX {
 
 			F.ctag_num = c
-			F.k_data_radio = fx25_get_k_data_radio(F.ctag_num)
-			F.nroots = fx25_get_nroots(F.ctag_num)
-			F.coffs = fx25_get_k_data_rs(F.ctag_num)
+			F.k_data_radio = C.int(fx25_get_k_data_radio(int(F.ctag_num)))
+			F.nroots = fx25_get_nroots(int(F.ctag_num))
+			F.coffs = C.int(fx25_get_k_data_rs(int(F.ctag_num)))
 			Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
 
 			if fx25_get_debug() >= 2 {
@@ -107,7 +107,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				dw_printf("FX.25[%d.%d]: Matched correlation tag 0x%02x with %d bit errors.  Expecting %d data & %d check bytes.\n",
 					channel, slice, // ideally subchannel too only if applicable
 					c,
-					bits.OnesCount(uint(F.accum^fx25_get_ctag_value(c))),
+					bits.OnesCount(uint(F.accum^C.uint64_t(fx25_get_ctag_value(int(c))))),
 					F.k_data_radio, F.nroots)
 			}
 
@@ -231,7 +231,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 	Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
 	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
-	var rs = fx25_get_rs(F.ctag_num)
+	var rs = fx25_get_rs(int(F.ctag_num))
 
 	var derrors = decode_rs_char(rs, &F.block[0], &derrlocs[0], 0)
 
