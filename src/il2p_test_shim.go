@@ -1,16 +1,9 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"fmt"
 	"slices"
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -61,12 +54,6 @@ func il2p_test_main(t *testing.T) {
 	// Use same serialize / deserialize functions used on the air.
 
 	test_serdes(t)
-
-	// Decode bitstream from demodulator if data file is available.
-	// TODO:  Very large info parts.  Appropriate error if too long.
-	// TODO:  More than 2 addresses.
-
-	decode_bitstream(t)
 
 	IL2P_TEST = false
 }
@@ -248,14 +235,14 @@ func test_payload(t *testing.T) {
 	// Now let's try encoding payloads and extracting original again.
 	// This will also provide exercise for scrambling and Reed Solomon under more conditions.
 
-	var original_payload [IL2P_MAX_PAYLOAD_SIZE]C.uchar
+	var original_payload = make([]byte, IL2P_MAX_PAYLOAD_SIZE)
 	for n := 0; n < IL2P_MAX_PAYLOAD_SIZE; n++ {
-		original_payload[n] = C.uchar(C.uint(n) & 0xff)
+		original_payload[n] = byte(n & 0xff)
 	}
 	for max_fec := 0; max_fec <= 1; max_fec++ {
 		for payload_length := 1; payload_length <= IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
-			var encoded, k = il2p_encode_payload(C.GoBytes(unsafe.Pointer(&original_payload[0]), C.int(payload_length)), max_fec)
+			var encoded, k = il2p_encode_payload(original_payload[:payload_length], max_fec)
 
 			// dw_printf ("payload length %d %s -> %d\n", payload_length, max_fec ? "M" : "", k);
 			assert.True(t, k > payload_length && k <= IL2P_MAX_ENCODED_PAYLOAD_SIZE)
@@ -271,7 +258,7 @@ func test_payload(t *testing.T) {
 			//  dw_printf ("********** Received message not as expected. **********\n");
 			//  fx_hex_dump(extracted, payload_length);
 			// }
-			assert.Equal(t, C.GoBytes(unsafe.Pointer(&original_payload[0]), C.int(payload_length)), extracted)
+			assert.Equal(t, original_payload[:payload_length], extracted)
 		}
 	}
 } // end test_payload
@@ -308,8 +295,6 @@ func test_example_headers(t *testing.T) {
 
 	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
 	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var sresult [32]C.uchar
-	C.memset(unsafe.Pointer(&sresult[0]), 0, 32)
 	var alevel alevel_t
 
 	var pp = ax25_from_frame(example1, alevel)
@@ -327,15 +312,11 @@ func test_example_headers(t *testing.T) {
 	assert.Equal(t, header1, header)
 
 	var scrambled = il2p_scramble_block(header)
-	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
-
-	// dw_printf ("Expect scrambled  26 57 4d 57 f1 96 cc 85 42 e7 24 f7 2e\n");
-	// for (int i = 0 ; i < sizeof(sresult); i++) {
 	//    dw_printf (" %02x", sresult[i]);
 	// }
 	// dw_printf ("\n");
 
-	var check = il2p_encode_rs(C.GoBytes(unsafe.Pointer(&sresult[0]), 13), 2)
+	var check = il2p_encode_rs(scrambled, 2)
 
 	// dw_printf ("check = ");
 	// for (int i = 0 ; i < sizeof(check); i++) {
@@ -385,7 +366,6 @@ func test_example_headers(t *testing.T) {
 	// dw_printf ("---------- example 2 ------------\n");
 	var example2 = []byte{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
 	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(example2, alevel)
@@ -403,7 +383,6 @@ func test_example_headers(t *testing.T) {
 	assert.Equal(t, header2, header)
 
 	scrambled = il2p_scramble_block(header)
-	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  6a ea 9c c2 01 11 fc 14 1f da 6e f2 53\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
@@ -411,7 +390,7 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	check = il2p_encode_rs(C.GoBytes(unsafe.Pointer(&sresult[0]), 13), 2)
+	check = il2p_encode_rs(scrambled, 2)
 
 	// dw_printf ("expect checksum = 91 bd\n");
 	// dw_printf ("check = ");
@@ -465,7 +444,6 @@ func test_example_headers(t *testing.T) {
 	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
 	var header3 = []byte{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
 	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	C.memset(unsafe.Pointer(&sresult[0]), 0, C.ulong(len(sresult)))
 	alevel = alevel_t{} //nolint:exhaustruct
 
 	pp = ax25_from_frame(example3, alevel)
@@ -483,7 +461,6 @@ func test_example_headers(t *testing.T) {
 	assert.Equal(t, header3, header)
 
 	scrambled = il2p_scramble_block(header)
-	C.memcpy(unsafe.Pointer(&sresult[0]), C.CBytes(scrambled), C.size_t(len(scrambled)))
 
 	// dw_printf ("Expect scrambled  26 13 6d 02 8c fe fb e8 aa 94 2d 6a 34\n");
 	// for (int i = 0 ; i < sizeof(sresult); i++) {
@@ -491,7 +468,7 @@ func test_example_headers(t *testing.T) {
 	// }
 	// dw_printf ("\n");
 
-	check = il2p_encode_rs(C.GoBytes(unsafe.Pointer(&sresult[0]), 13), 2)
+	check = il2p_encode_rs(scrambled, 2)
 
 	// dw_printf ("expect checksum = 43 35\n");
 	// dw_printf ("check = ");
@@ -707,7 +684,7 @@ func all_frame_types(t *testing.T) {
 	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_128
 		var nr = 127
-		var cr cmdres_t = cr_res
+		var cr = cr_res
 
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
 
@@ -757,46 +734,6 @@ func all_frame_types(t *testing.T) {
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
-//	Test bitstream tapped off from demodulator.
-//
-//	5 frames were sent to Nino TNC and a recording was made.
-//	This was demodulated and the resulting bit stream saved to a file.
-//
-//	No automatic test here - must be done manually with audio recording.
-//
-/////////////////////////////////////////////////////////////////////////////////////////////
-
-var decoding_bitstream = 0
-
-func decode_bitstream(t *testing.T) {
-	t.Helper()
-
-	dw_printf("-----\nReading il2p-bitstream.txt if available...\n")
-
-	var fp = C.fopen(C.CString("il2p-bitstream.txt"), C.CString("r"))
-	if fp == nil {
-		dw_printf("Bitstream test file not available.\n")
-		return
-	}
-
-	decoding_bitstream = 1
-	var save_previous = il2p_get_debug()
-	il2p_set_debug(1)
-
-	var ch C.int
-	for ch != C.EOF {
-		ch = C.fgetc(fp)
-		if ch == '0' || ch == '1' {
-			il2p_rec_bit(0, 0, 0, int(ch-'0'))
-		}
-	}
-	C.fclose(fp)
-	il2p_set_debug(save_previous)
-	decoding_bitstream = 0
-} // end decode_bitstream
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-//
 //	Test serialize / deserialize.
 //
 //	This uses same functions used on the air.
@@ -818,7 +755,7 @@ Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I m
 `
 
 var rec_count = -1 // disable deserialized packet test.
-var polarity C.int = 0
+var polarity = 0
 
 func test_serdes(t *testing.T) {
 	t.Helper()
@@ -842,7 +779,7 @@ func test_serdes(t *testing.T) {
 
 		for max_fec := 0; max_fec <= 1; max_fec++ {
 			for polarity = 0; polarity <= 2; polarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, int(polarity))
+				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, polarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
