@@ -24,7 +24,7 @@ jobs:
         echo "Version: $SAMOYED_VERSION"
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT  # Output to be used by the release job
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV  # Env to be used by the make build
-    - run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev libasound2-dev libavahi-client-dev libbsd-dev libgpiod-dev libgps-dev"
+    - run: "sudo apt update && sudo apt install --yes universal-ctags libudev-dev libhamlib-dev libasound2-dev libavahi-client-dev libbsd-dev libgpiod-dev libgps-dev"
     - run: "sudo apt install --yes morse2ascii"  # For decoding the morse
     - run: "make stats"
     - run: "make cmds"

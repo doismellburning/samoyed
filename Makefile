@@ -9,7 +9,7 @@ COVERAGE_FILE = cover.out
 all: $(CMDS) test
 
 .PHONY: cmds
-cmds: $(CMDS)
+cmds: $(CMDS) tags
 
 # samoyed, ll2utm, etc. etc.
 .PHONY: $(CMDS)
@@ -23,7 +23,7 @@ $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 
 .PHONY: test
-test: gotest test-scripts
+test: tags gotest test-scripts
 
 .PHONY: gotest
 gotest:
@@ -43,7 +43,7 @@ coveragereport:
 	go tool cover -func=$(COVERAGE_FILE)
 
 .PHONY: check
-check: vet lint shellcheck reuse
+check: vet lint shellcheck reuse tags
 
 .PHONY: reuse
 reuse:
@@ -54,7 +54,7 @@ shellcheck:
 	shellcheck --external-sources test-scripts/* --exclude SC1091
 
 .PHONY: vet
-vet:
+vet: tags
 	go vet $(SRC_DIRS)
 
 ./bin/golangci-lint:
