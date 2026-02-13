@@ -174,7 +174,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
  *
  ***********************************************************************************/
 
-func fx25_rec_busy(channel C.int) C.int {
+func fx25_rec_busy(channel int) bool {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// This could be a little faster if we knew number of
@@ -184,12 +184,12 @@ func fx25_rec_busy(channel C.int) C.int {
 		for j := 0; j < MAX_SLICERS; j++ {
 			if fx_context[channel][i][j] != nil {
 				if fx_context[channel][i][j].state != FX_TAG {
-					return (1)
+					return true
 				}
 			}
 		}
 	}
-	return (0)
+	return false
 
 } // end fx25_rec_busy
 

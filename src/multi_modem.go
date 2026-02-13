@@ -231,7 +231,7 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 			if candidate[channel][subchan][slice].packet_p != nil {
 				candidate[channel][subchan][slice].age++
 				if candidate[channel][subchan][slice].age > process_age[channel] {
-					if fx25_rec_busy(C.int(channel)) > 0 {
+					if fx25_rec_busy(channel) {
 						candidate[channel][subchan][slice].age = 0
 					} else {
 						pick_best_candidate(channel)
@@ -318,7 +318,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 	 */
 	if save_audio_config_p.achan[channel].num_subchan == 1 &&
 		save_audio_config_p.achan[channel].num_slicers == 1 &&
-		fx25_rec_busy(C.int(channel)) == 0 {
+		!fx25_rec_busy(channel) {
 
 		var drop_it = false
 		if save_audio_config_p.recv_error_rate != 0 {
