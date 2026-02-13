@@ -99,7 +99,7 @@ func waypoint_init(mc *misc_config_s) {
 	 * If that fails, do own serial port open.
 	 */
 	if mc.waypoint_serial_port != "" {
-		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(C.CString(mc.waypoint_serial_port), 4800)
+		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
 
 		if s_waypoint_serial_port_fd == nil {
 			s_waypoint_serial_port_fd = serial_port_open(mc.waypoint_serial_port, 4800)
