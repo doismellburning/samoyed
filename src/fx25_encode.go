@@ -33,58 +33,41 @@ package direwolf
  *
  */
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <ctype.h>
-import "C"
-
-import (
-	"unsafe"
-)
-
-func encode_rs_char(rs *rs_t, data *C.uchar, bb *C.uchar) {
+func encode_rs_char(rs *rs_t, data []byte, bb []byte) {
 
 	var nroots = int(rs.nroots)
 	var nn = int(rs.nn)
 	var dataLen = nn - nroots
 
-	// Create Go slice views over C arrays for cleaner indexing
-	var dataSlice = unsafe.Slice((*byte)(data), dataLen)
-	var bbSlice = unsafe.Slice((*byte)(bb), nroots)
-	var indexOfSlice = unsafe.Slice((*byte)(rs.index_of), nn+1)
-	var alphaToSlice = unsafe.Slice((*byte)(rs.alpha_to), nn+1)
-	var genpolySlice = unsafe.Slice((*byte)(rs.genpoly), nroots+1)
-
 	// Clear out the FEC data area
-	for k := range bbSlice {
-		bbSlice[k] = 0
+	for k := range bb {
+		bb[k] = 0
 	}
 
 	for i := 0; i < dataLen; i++ {
 		// feedback = INDEX_OF[data[i] ^ bb[0]]
-		var feedback = C.uchar(indexOfSlice[dataSlice[i]^bbSlice[0]])
+		var feedback = rs.index_of[data[i]^bb[0]]
 
-		if C.uint(feedback) != rs.nn { // feedback term is non-zero
+		if uint(feedback) != rs.nn { // feedback term is non-zero
 			for j := 1; j < nroots; j++ {
 				// bb[j] ^= ALPHA_TO[modnn(feedback + GENPOLY[NROOTS-j])]
-				var genpolyVal = C.uchar(genpolySlice[nroots-j])
+				var genpolyVal = rs.genpoly[nroots-j]
 				var modnnResult = modnn(rs, int(feedback)+int(genpolyVal))
-				bbSlice[j] ^= alphaToSlice[modnnResult]
+				bb[j] ^= rs.alpha_to[modnnResult]
 			}
 		}
 
 		// Shift
-		copy(bbSlice, bbSlice[1:])
+		copy(bb, bb[1:])
 
 		// bb[NROOTS-1] = ...
-		if C.uint(feedback) != rs.nn {
+		if uint(feedback) != rs.nn {
 			// ALPHA_TO[modnn(feedback + GENPOLY[0])]
-			var genpolyVal = C.uchar(genpolySlice[0])
+			var genpolyVal = rs.genpoly[0]
 			var modnnResult = modnn(rs, int(feedback)+int(genpolyVal))
-			bbSlice[nroots-1] = alphaToSlice[modnnResult]
+			bb[nroots-1] = rs.alpha_to[modnnResult]
 		} else {
-			bbSlice[nroots-1] = 0
+			bb[nroots-1] = 0
 		}
 	}
 }

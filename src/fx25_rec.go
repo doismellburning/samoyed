@@ -6,16 +6,8 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stdint.h>
-// #include <stdlib.h>
-import "C"
-
 import (
 	"math/bits"
-	"unsafe"
 )
 
 type FX25RecState int
@@ -28,15 +20,15 @@ const (
 
 type fx_context_s struct {
 	state        FX25RecState
-	accum        C.uint64_t // Accumulate bits for matching to correlation tag.
-	ctag_num     C.int      // Correlation tag number, CTAG_MIN to CTAG_MAX if approx. match found.
-	k_data_radio C.int      // Expected size of "data" sent over radio.
-	coffs        C.int      // Starting offset of the check part.
-	nroots       C.int      // Expected number of check bytes.
-	dlen         C.int      // Accumulated length in "data" below.
-	clen         C.int      // Accumulated length in "check" below.
-	imask        C.uchar    // Mask for storing a bit.
-	block        [FX25_BLOCK_SIZE + 1]C.uchar
+	accum        uint64 // Accumulate bits for matching to correlation tag.
+	ctag_num     int    // Correlation tag number, CTAG_MIN to CTAG_MAX if approx. match found.
+	k_data_radio int    // Expected size of "data" sent over radio.
+	coffs        int    // Starting offset of the check part.
+	nroots       int    // Expected number of check bytes.
+	dlen         int    // Accumulated length in "data" below.
+	clen         int    // Accumulated length in "check" below.
+	imask        byte   // Mask for storing a bit.
+	block        [FX25_BLOCK_SIZE + 1]byte
 }
 
 var fx_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*fx_context_s
@@ -114,7 +106,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 			F.imask = 0x01
 			F.dlen = 0
 			F.clen = 0
-			F.block = [FX25_BLOCK_SIZE + 1]C.uchar{}
+			F.block = [FX25_BLOCK_SIZE + 1]byte{}
 			F.block[FX25_BLOCK_SIZE] = FENCE
 			F.state = FX_DATA
 		}
@@ -174,7 +166,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
  *
  ***********************************************************************************/
 
-func fx25_rec_busy(channel C.int) C.int {
+func fx25_rec_busy(channel int) bool {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// This could be a little faster if we knew number of
@@ -184,12 +176,12 @@ func fx25_rec_busy(channel C.int) C.int {
 		for j := 0; j < MAX_SLICERS; j++ {
 			if fx_context[channel][i][j] != nil {
 				if fx_context[channel][i][j].state != FX_TAG {
-					return (1)
+					return true
 				}
 			}
 		}
 	}
-	return (0)
+	return false
 
 } // end fx25_rec_busy
 
@@ -226,14 +218,14 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), FX25_BLOCK_SIZE))
+		fx_hex_dump(F.block[:FX25_BLOCK_SIZE])
 	}
 	Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
-	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
+	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
 	var rs = fx25_get_rs(F.ctag_num)
 
-	var derrors = decode_rs_char(rs, &F.block[0], &derrlocs[0], 0)
+	var derrors = decode_rs_char(rs, F.block[:FX25_BLOCK_SIZE], derrlocs[:], 0)
 
 	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
 
@@ -243,26 +235,26 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				dw_printf("FX.25[%d.%d]: FEC complete with no errors.\n", channel, slice)
 			} else {
 				dw_printf("FX.25[%d.%d]: FEC complete, fixed %2d errors in byte positions:", channel, slice, derrors)
-				for k := C.int(0); k < derrors; k++ {
+				for k := 0; k < derrors; k++ {
 					dw_printf(" %d", derrlocs[k])
 				}
 				dw_printf("\n")
 			}
 		}
 
-		var frame_buf = my_unstuff(channel, subchannel, slice, F.block[:], int(F.dlen))
-		var frame_len = C.int(len(frame_buf))
+		var frame_buf = my_unstuff(channel, subchannel, slice, F.block[:], F.dlen)
+		var frame_len = len(frame_buf)
 
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
 
 			var actual_fcs = uint16(frame_buf[frame_len-2]) | (uint16(frame_buf[frame_len-1]) << 8)
-			var expected_fcs = fcs_calc(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2))
+			var expected_fcs = fcs_calc(frame_buf[:frame_len-2])
 			if actual_fcs == expected_fcs {
 
 				if fx25_get_debug() >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
-					fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
+					fx_hex_dump(frame_buf[:frame_len])
 				}
 
 				if FXTEST {
@@ -270,23 +262,23 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 
-					multi_modem_process_rec_frame(channel, subchannel, slice, C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
+					multi_modem_process_rec_frame(channel, subchannel, slice, frame_buf[:frame_len-2], alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}
 
 			} else {
 				// Most likely cause is defective sender software.
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Bad FCS for AX.25 frame.\n", channel, slice)
-				fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), F.dlen))
-				fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
+				fx_hex_dump(F.block[:F.dlen])
+				fx_hex_dump(frame_buf[:frame_len])
 			}
 		} else {
 			// Most likely cause is defective sender software.
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
-			fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), F.dlen))
+			fx_hex_dump(F.block[:F.dlen])
 			if frame_len > 0 {
-				fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
+				fx_hex_dump(frame_buf[:frame_len])
 			}
 		}
 	} else if fx25_get_debug() >= 2 {
@@ -326,15 +318,15 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
  *
  ***********************************************************************************/
 
-func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int) []C.uchar {
-	var pat_det C.uchar = 0 // Pattern detector.
-	var oacc C.uchar = 0    // Accumulator for a byte out.
-	var olen C.int = 0      // Number of good bits in oacc.
+func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []byte { //nolint:unparam
+	var pat_det byte = 0 // Pattern detector.
+	var oacc byte = 0    // Accumulator for a byte out.
+	var olen = 0         // Number of good bits in oacc.
 
 	if pin[0] != 0x7e {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d] error: Data section did not start with 0x7e.\n", channel, slice)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[0]), C.int(ilen)))
+		fx_hex_dump(pin[:ilen])
 		return nil
 	}
 
@@ -343,10 +335,10 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 		pin = pin[1:] // Skip over leading flag byte(s).
 	}
 
-	var frame_buf []C.uchar
+	var frame_buf []byte
 	for i := 0; i < ilen; i++ {
-		for imask := C.uchar(0x01); imask != 0; imask <<= 1 {
-			var dbit C.uchar = C.uchar(IfThenElse((pin[i]&imask) != 0, 1, 0))
+		for imask := byte(0x01); imask != 0; imask <<= 1 {
+			var dbit = byte(IfThenElse((pin[i]&imask) != 0, 1, 0))
 
 			pat_det >>= 1 // Shift the most recent eight bits thru the pattern detector.
 			pat_det |= dbit << 7
@@ -354,7 +346,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 			if pat_det == 0xfe {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.\n", channel, slice)
-				fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[i]), C.int(ilen)))
+				fx_hex_dump(pin[i:ilen])
 				return nil
 			}
 
@@ -368,7 +360,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.\n", channel, slice)
-						fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[i]), C.int(ilen)))
+						fx_hex_dump(pin[i:ilen])
 						return nil
 					}
 				} else if (pat_det >> 2) == 0x1f {
@@ -387,7 +379,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []C.uchar, ilen int)
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.\n", channel, slice)
-	fx_hex_dump(C.GoBytes(unsafe.Pointer(&pin[0]), C.int(ilen)))
+	fx_hex_dump(pin[:ilen])
 
 	return nil // Should never fall off the end.
 

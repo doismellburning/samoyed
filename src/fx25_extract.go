@@ -49,18 +49,9 @@ package direwolf
  *
  */
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <string.h>
-import "C"
-
-import (
-	"unsafe"
-)
-
 // #define DEBUG 5
 
-func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.int {
+func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// Access rs struct members
 	var nn = int(rs.nn)
 	var nroots = int(rs.nroots)
@@ -68,11 +59,6 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 	var prim = int(rs.prim)
 	var iprim = int(rs.iprim)
 	var A0 = nn // A0 is defined as NN
-
-	// Create Go slice views over C arrays
-	var dataSlice = unsafe.Slice((*byte)(data), nn)
-	var alphaTo = unsafe.Slice((*byte)(rs.alpha_to), nn+1)
-	var indexOf = unsafe.Slice((*byte)(rs.index_of), nn+1)
 
 	var degLambda, el, degOmega int
 	var i, j, r, k int
@@ -93,15 +79,15 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 
 	// form the syndromes; i.e., evaluate data(x) at roots of g(x)
 	for i = 0; i < nroots; i++ {
-		s[i] = dataSlice[0]
+		s[i] = data[0]
 	}
 
 	for j = 1; j < nn; j++ {
 		for i = 0; i < nroots; i++ {
 			if s[i] == 0 {
-				s[i] = dataSlice[j]
+				s[i] = data[j]
 			} else {
-				s[i] = dataSlice[j] ^ alphaTo[modnn(rs, int(indexOf[s[i]])+(fcr+i)*prim)]
+				s[i] = data[j] ^ rs.alpha_to[modnn(rs, int(rs.index_of[s[i]])+(fcr+i)*prim)]
 			}
 		}
 	}
@@ -110,7 +96,7 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 	synError = 0
 	for i = 0; i < nroots; i++ {
 		synError |= int(s[i])
-		s[i] = indexOf[s[i]]
+		s[i] = rs.index_of[s[i]]
 	}
 
 	// fprintf(stderr,"syn_error = %4x\n",syn_error);
@@ -129,14 +115,13 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 
 	if no_eras > 0 {
 		// Init lambda to be the erasure locator polynomial
-		var erasPosSlice = unsafe.Slice(eras_pos, no_eras)
-		lambda[1] = alphaTo[modnn(rs, prim*(nn-1-int(erasPosSlice[0])))]
-		for i = 1; i < int(no_eras); i++ {
-			u = byte(modnn(rs, prim*(nn-1-int(erasPosSlice[i]))))
+		lambda[1] = rs.alpha_to[modnn(rs, prim*(nn-1-eras_pos[0]))]
+		for i = 1; i < no_eras; i++ {
+			u = byte(modnn(rs, prim*(nn-1-eras_pos[i])))
 			for j = i + 1; j > 0; j-- {
-				tmp = indexOf[lambda[j-1]]
+				tmp = rs.index_of[lambda[j-1]]
 				if int(tmp) != A0 {
-					lambda[j] ^= alphaTo[modnn(rs, int(u)+int(tmp))]
+					lambda[j] ^= rs.alpha_to[modnn(rs, int(u)+int(tmp))]
 				}
 			}
 		}
@@ -181,22 +166,22 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 	// for(i=0;i<NROOTS+1;i++)
 	//   b[i] = INDEX_OF[lambda[i]];
 	for i = 0; i < nroots+1; i++ {
-		b[i] = indexOf[lambda[i]]
+		b[i] = rs.index_of[lambda[i]]
 	}
 
 	// Begin Berlekamp-Massey algorithm to determine error+erasure
 	// locator polynomial
-	r = int(no_eras)
-	el = int(no_eras)
+	r = no_eras
+	el = no_eras
 	for r++; r <= nroots; r++ {
 		// Compute discrepancy at the r-th step in poly-form
 		discrR = 0
 		for i = 0; i < r; i++ {
 			if lambda[i] != 0 && int(s[r-i-1]) != A0 {
-				discrR ^= alphaTo[modnn(rs, int(indexOf[lambda[i]])+int(s[r-i-1]))]
+				discrR ^= rs.alpha_to[modnn(rs, int(rs.index_of[lambda[i]])+int(s[r-i-1]))]
 			}
 		}
-		discrR = indexOf[discrR] // Index form
+		discrR = rs.index_of[discrR] // Index form
 		if int(discrR) == A0 {
 			// 2 lines below: B(x) <-- x*B(x)
 			// memmove(&b[1],b,NROOTS*sizeof(b[0]));
@@ -207,19 +192,19 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 			t[0] = lambda[0]
 			for i = 0; i < nroots; i++ {
 				if int(b[i]) != A0 {
-					t[i+1] = lambda[i+1] ^ alphaTo[modnn(rs, int(discrR)+int(b[i]))]
+					t[i+1] = lambda[i+1] ^ rs.alpha_to[modnn(rs, int(discrR)+int(b[i]))]
 				} else {
 					t[i+1] = lambda[i+1]
 				}
 			}
-			if 2*el <= r+int(no_eras)-1 {
-				el = r + int(no_eras) - el
+			if 2*el <= r+no_eras-1 {
+				el = r + no_eras - el
 				// 2 lines below: B(x) <-- inv(discr_r) * lambda(x)
 				for i = 0; i <= nroots; i++ {
 					if lambda[i] == 0 {
 						b[i] = byte(A0)
 					} else {
-						b[i] = byte(modnn(rs, int(indexOf[lambda[i]])-int(discrR)+nn))
+						b[i] = byte(modnn(rs, int(rs.index_of[lambda[i]])-int(discrR)+nn))
 					}
 				}
 			} else {
@@ -236,7 +221,7 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 	// Convert lambda to index form and compute deg(lambda(x))
 	degLambda = 0
 	for i = 0; i < nroots+1; i++ {
-		lambda[i] = indexOf[lambda[i]]
+		lambda[i] = rs.index_of[lambda[i]]
 		if int(lambda[i]) != A0 {
 			degLambda = i
 		}
@@ -245,12 +230,12 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 	// memcpy(&reg[1],&lambda[1],NROOTS*sizeof(reg[0]));
 	copy(reg[1:nroots+1], lambda[1:nroots+1])
 	count = 0 // Number of roots of lambda(x)
-	for i, k = 1, iprim-1; i <= nn; i, k = i+1, int(modnn(rs, k+iprim)) {
+	for i, k = 1, iprim-1; i <= nn; i, k = i+1, modnn(rs, k+iprim) {
 		q = 1 // lambda[0] is always 0
 		for j = degLambda; j > 0; j-- {
 			if int(reg[j]) != A0 {
 				reg[j] = byte(modnn(rs, int(reg[j])+j))
-				q ^= alphaTo[reg[j]]
+				q ^= rs.alpha_to[reg[j]]
 			}
 		}
 		if q != 0 {
@@ -287,13 +272,13 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 		}
 		for ; j >= 0; j-- {
 			if int(s[i-j]) != A0 && int(lambda[j]) != A0 {
-				tmp ^= alphaTo[modnn(rs, int(s[i-j])+int(lambda[j]))]
+				tmp ^= rs.alpha_to[modnn(rs, int(s[i-j])+int(lambda[j]))]
 			}
 		}
 		if tmp != 0 {
 			degOmega = i
 		}
-		omega[i] = indexOf[tmp]
+		omega[i] = rs.index_of[tmp]
 	}
 	omega[nroots] = byte(A0)
 
@@ -303,10 +288,10 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 		num1 = 0
 		for i = degOmega; i >= 0; i-- {
 			if int(omega[i]) != A0 {
-				num1 ^= alphaTo[modnn(rs, int(omega[i])+i*int(root[j]))]
+				num1 ^= rs.alpha_to[modnn(rs, int(omega[i])+i*int(root[j]))]
 			}
 		}
-		num2 = alphaTo[modnn(rs, int(root[j])*(fcr-1)+nn)]
+		num2 = rs.alpha_to[modnn(rs, int(root[j])*(fcr-1)+nn)]
 		den = 0
 
 		// lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i]
@@ -318,7 +303,7 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 		}
 		for i = maxI & ^1; i >= 0; i -= 2 {
 			if int(lambda[i+1]) != A0 {
-				den ^= alphaTo[modnn(rs, int(lambda[i+1])+i*int(root[j]))]
+				den ^= rs.alpha_to[modnn(rs, int(lambda[i+1])+i*int(root[j]))]
 			}
 		}
 		if den == 0 {
@@ -330,17 +315,16 @@ func decode_rs_char(rs *rs_t, data *C.uchar, eras_pos *C.int, no_eras C.int) C.i
 		}
 		// Apply error to data
 		if num1 != 0 {
-			dataSlice[loc[j]] ^= alphaTo[modnn(rs, int(indexOf[num1])+int(indexOf[num2])+nn-int(indexOf[den]))]
+			data[loc[j]] ^= rs.alpha_to[modnn(rs, int(rs.index_of[num1])+int(rs.index_of[num2])+nn-int(rs.index_of[den]))]
 		}
 	}
 finish:
 	if eras_pos != nil {
-		var erasPosSlice = unsafe.Slice(eras_pos, max(count, 0)+int(no_eras))
 		for i = 0; i < count; i++ {
-			erasPosSlice[i] = C.int(loc[i])
+			eras_pos[i] = loc[i]
 		}
 	}
-	return C.int(count)
+	return count
 }
 
 // end fx25_extract.go

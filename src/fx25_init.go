@@ -36,17 +36,8 @@ package direwolf
  *
  */
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <stdint.h>
-// #include <inttypes.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"math/bits"
-	"unsafe"
 )
 
 const EXIT_FAILURE = 1
@@ -54,12 +45,12 @@ const EXIT_FAILURE = 1
 const FX25_NTAB = 3
 
 var fx25Tab = [FX25_NTAB]struct {
-	symsize C.uint // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly C.uint // Field generator polynomial coefficients.
-	fcs     C.uint // First root of RS code generator polynomial, index form.
-	prim    C.uint // Primitive element to generate polynomial roots.
-	nroots  C.uint // RS code generator polynomial degree (number of roots).
-	rs      *rs_t  // Pointer to RS codec control block.  Filled in at init time.
+	symsize uint  // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly uint  // Field generator polynomial coefficients.
+	fcs     uint  // First root of RS code generator polynomial, index form.
+	prim    uint  // Primitive element to generate polynomial roots.
+	nroots  uint  // RS code generator polynomial degree (number of roots).
+	rs      *rs_t // Pointer to RS codec control block.  Filled in at init time.
 }{
 	{8, 0x11d, 1, 1, 16, nil}, // RS(255,239)
 	{8, 0x11d, 1, 1, 32, nil}, // RS(255,223)
@@ -123,19 +114,13 @@ const CLOSE_ENOUGH = 8 // How many bits can be wrong in tag yet consider it a ma
 // Given a 64 bit correlation tag value, find acceptable match in table.
 // Return index into table or -1 for no match.
 
-func fx25_tag_find_match(t C.uint64_t) C.int {
+func fx25_tag_find_match(t uint64) int {
 	for c := CTAG_MIN; c <= CTAG_MAX; c++ {
-		if bits.OnesCount64(uint64(t)^tags[c].value) <= CLOSE_ENOUGH {
-			return C.int(c)
+		if bits.OnesCount64(t^tags[c].value) <= CLOSE_ENOUGH {
+			return c
 		}
 	}
 	return -1
-}
-
-func free_rs_char(rs *rs_t) {
-	C.free(unsafe.Pointer(rs.alpha_to))
-	C.free(unsafe.Pointer(rs.index_of))
-	C.free(unsafe.Pointer(rs.genpoly))
 }
 
 /*-------------------------------------------------------------
@@ -229,31 +214,31 @@ func fx25_init(debug_level int) {
 
 // Get properties of specified CTAG number.
 
-func fx25_get_rs(ctag_num C.int) *rs_t {
+func fx25_get_rs(ctag_num int) *rs_t {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
 	return fx25Tab[tags[ctag_num].itab].rs
 }
 
-func fx25_get_ctag_value(ctag_num C.int) C.uint64_t {
+func fx25_get_ctag_value(ctag_num int) uint64 {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.uint64_t(tags[ctag_num].value)
+	return tags[ctag_num].value
 }
 
-func fx25_get_k_data_radio(ctag_num C.int) C.int {
+func fx25_get_k_data_radio(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.int(tags[ctag_num].k_data_radio)
+	return tags[ctag_num].k_data_radio
 }
 
-func fx25_get_k_data_rs(ctag_num C.int) C.int {
+func fx25_get_k_data_rs(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.int(tags[ctag_num].k_data_rs)
+	return tags[ctag_num].k_data_rs
 }
 
-func fx25_get_nroots(ctag_num C.int) C.int {
+func fx25_get_nroots(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
-	return C.int(fx25Tab[tags[ctag_num].itab].nroots)
+	return int(fx25Tab[tags[ctag_num].itab].nroots)
 }
 
 func fx25_get_debug() int {
@@ -285,7 +270,7 @@ func fx25_get_debug() int {
  *
  *--------------------------------------------------------------*/
 
-func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
+func fx25_pick_mode(fx_mode int, dlen int) int {
 	if fx_mode <= 0 {
 		return -1
 	}
@@ -306,8 +291,8 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 
 	if fx_mode == 16 || fx_mode == 32 || fx_mode == 64 {
 		for k := CTAG_MAX; k >= CTAG_MIN; k-- {
-			if fx_mode == fx25_get_nroots(C.int(k)) && dlen <= fx25_get_k_data_radio(C.int(k)) {
-				return C.int(k)
+			if fx_mode == fx25_get_nroots(k) && dlen <= fx25_get_k_data_radio(k) {
+				return k
 			}
 		}
 		return -1
@@ -337,7 +322,7 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
 	// to be coordinated with other FX.25 developers so we maintain compatibility.
 	// See https://web.tapr.org/meetings/DCC_2020/JE1WAZ/DCC-2020-PRUG-FINAL.pptx
 
-	var prefer = [6]C.int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
+	var prefer = [6]int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
 	for k := 0; k < 6; k++ {
 		var m = prefer[k]
 		if dlen <= fx25_get_k_data_radio(m) {
@@ -357,8 +342,8 @@ func fx25_pick_mode(fx_mode C.int, dlen C.int) C.int {
  *   nroots = RS code generator polynomial degree (number of roots)
  */
 
-func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots C.uint) *rs_t {
-	if symsize > 8*C.sizeof_uchar {
+func init_rs_char(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) *rs_t {
+	if symsize > 8 {
 		return nil // Need version with ints rather than chars
 	}
 
@@ -375,31 +360,18 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 	var rs = new(rs_t)
 
 	rs.mm = symsize
-	rs.nn = C.uint((1 << symsize) - 1)
+	rs.nn = uint((1 << symsize) - 1)
 
-	rs.alpha_to = (*C.uchar)(C.calloc(C.size_t(rs.nn+1), C.sizeof_uchar))
-	if rs.alpha_to == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FATAL ERROR: Out of memory.\n")
-		exit(EXIT_FAILURE)
-	}
-	rs.index_of = (*C.uchar)(C.calloc(C.size_t(rs.nn+1), C.sizeof_uchar))
-	if rs.index_of == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FATAL ERROR: Out of memory.\n")
-		exit(EXIT_FAILURE)
-	}
+	rs.alpha_to = make([]byte, rs.nn+1)
+	rs.index_of = make([]byte, rs.nn+1)
 
 	// Generate Galois field lookup tables
-	var alpha_to = unsafe.Slice((*byte)(rs.alpha_to), rs.nn+1)
-	var index_of = unsafe.Slice((*byte)(rs.index_of), rs.nn+1)
-
-	index_of[0] = byte(rs.nn) // log(zero) = -inf (A0)
-	alpha_to[rs.nn] = 0       // alpha**-inf = 0
+	rs.index_of[0] = byte(rs.nn) // log(zero) = -inf (A0)
+	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
 	var sr = 1
 	for i := 0; i < int(rs.nn); i++ {
-		index_of[sr] = byte(i)
-		alpha_to[i] = byte(sr)
+		rs.index_of[sr] = byte(i)
+		rs.alpha_to[i] = byte(sr)
 		sr <<= 1
 		if sr&(1<<symsize) != 0 {
 			sr ^= int(gfpoly)
@@ -408,21 +380,13 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 	}
 	if sr != 1 {
 		// field generator polynomial is not primitive!
-		C.free(unsafe.Pointer(rs.alpha_to))
-		C.free(unsafe.Pointer(rs.index_of))
-		C.free(unsafe.Pointer(rs))
 		return nil
 	}
 
 	// Form RS code generator polynomial from its roots
-	rs.genpoly = (*C.uchar)(C.calloc(C.size_t(nroots+1), C.sizeof_uchar))
-	if rs.genpoly == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FATAL ERROR: Out of memory.\n")
-		exit(EXIT_FAILURE)
-	}
-	rs.fcr = C.uchar(fcr)
-	rs.prim = C.uchar(prim)
+	rs.genpoly = make([]byte, nroots+1)
+	rs.fcr = byte(fcr)
+	rs.prim = byte(prim)
 	rs.nroots = nroots
 
 	// Find prim-th root of 1, used in decoding
@@ -430,27 +394,26 @@ func init_rs_char(symsize C.uint, gfpoly C.uint, fcr C.uint, prim C.uint, nroots
 	for (iprim % int(prim)) != 0 {
 		iprim += int(rs.nn)
 	}
-	rs.iprim = C.uchar(iprim / int(prim))
+	rs.iprim = byte(iprim / int(prim))
 
-	var genpoly = unsafe.Slice((*byte)(rs.genpoly), nroots+1)
-	genpoly[0] = 1
+	rs.genpoly[0] = 1
 	for i, root := 0, int(fcr)*int(prim); i < int(nroots); i, root = i+1, root+int(prim) {
-		genpoly[i+1] = 1
+		rs.genpoly[i+1] = 1
 
 		// Multiply rs->genpoly[] by  @**(root + x)
 		for j := i; j > 0; j-- {
-			if genpoly[j] != 0 {
-				genpoly[j] = genpoly[j-1] ^ alpha_to[modnn(rs, int(index_of[genpoly[j]])+root)]
+			if rs.genpoly[j] != 0 {
+				rs.genpoly[j] = rs.genpoly[j-1] ^ rs.alpha_to[modnn(rs, int(rs.index_of[rs.genpoly[j]])+root)]
 			} else {
-				genpoly[j] = genpoly[j-1]
+				rs.genpoly[j] = rs.genpoly[j-1]
 			}
 		}
 		// rs->genpoly[0] can never be zero
-		genpoly[0] = alpha_to[modnn(rs, int(index_of[genpoly[0]])+root)]
+		rs.genpoly[0] = rs.alpha_to[modnn(rs, int(rs.index_of[rs.genpoly[0]])+root)]
 	}
 	// convert rs->genpoly[] to index form for quicker encoding
 	for i := 0; i <= int(nroots); i++ {
-		genpoly[i] = index_of[genpoly[i]]
+		rs.genpoly[i] = rs.index_of[rs.genpoly[i]]
 	}
 
 	return rs

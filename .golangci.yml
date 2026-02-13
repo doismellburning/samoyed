@@ -59,6 +59,7 @@ linters:
     gosec:
       excludes:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
+        - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
     nestif:
       min-complexity: 579  # There's lots of upstream complexity, so let's soft-disable this
     revive:

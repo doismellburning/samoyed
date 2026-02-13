@@ -1,18 +1,11 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
 import (
 	"fmt"
 	"os"
-	"unsafe"
 )
 
-var fx25BitsSent [MAX_RADIO_CHANS]C.int // Count number of bits sent by "fx25_send_frame" or "???"
+var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "fx25_send_frame" or "???"
 
 /*-------------------------------------------------------------
  *
@@ -72,12 +65,12 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
 	var stuffedBytes, meaningfulLen = bitStuff(fbuf, FX25_MAX_DATA)
-	var dlen = C.int(meaningfulLen) // Use meaningful length, not total buffer size
+	var dlen = meaningfulLen // Use meaningful length, not total buffer size
 
 	// Pick suitable correlation tag depending on
 	// user's preference, for number of check bytes,
 	// and the data size.
-	var ctag_num = fx25_pick_mode(C.int(fx_mode), dlen)
+	var ctag_num = fx25_pick_mode(fx_mode, dlen)
 
 	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
 		text_color_set(DW_COLOR_ERROR)
@@ -97,26 +90,27 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 		}
 	}
 
-	var data = (*C.uchar)(C.CBytes(stuffedBytes))
+	var data = stuffedBytes
 
 	// Compute the check bytes.
 
-	const fence C.uchar = 0xaa
-	var check [FX25_MAX_CHECK + 1]C.uchar
+	const fence byte = 0xaa
+	var check [FX25_MAX_CHECK + 1]byte
 	check[FX25_MAX_CHECK] = fence
 	var rs = fx25_get_rs(ctag_num)
+	var nroots = int(rs.nroots)
 
-	Assert(k_data_rs+C.int(rs.nroots) == C.int(rs.nn))
+	Assert(k_data_rs+nroots == int(rs.nn))
 
-	encode_rs_char(rs, data, &check[0])
+	encode_rs_char(rs, data, check[:nroots])
 	Assert(check[FX25_MAX_CHECK] == fence)
 
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d]: transmit %d data bytes, ctag number 0x%02x\n", channel, k_data_radio, ctag_num)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(data), k_data_radio))
-		dw_printf("FX.25[%d]: transmit %d check bytes:\n", channel, rs.nroots)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(&check[0]), C.int(rs.nroots)))
+		fx_hex_dump(data[:k_data_radio])
+		dw_printf("FX.25[%d]: transmit %d check bytes:\n", channel, nroots)
+		fx_hex_dump(check[:nroots])
 		dw_printf("------\n")
 	}
 
@@ -125,7 +119,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 		var flags = []byte{0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e}
 		var fname = fmt.Sprintf("fx%02x.dat", ctag_num)
-		var fp, err = os.Create(fname)
+		var fp, err = os.Create(fname) //nolint:gosec
 		if err != nil {
 			panic(err)
 		}
@@ -137,11 +131,11 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 		}
 
 		for j := 8; j < 16; j++ {
-			*(*C.uchar)(unsafe.Pointer(uintptr(unsafe.Pointer(data)) + uintptr(j))) ^= 0xff
+			data[j] ^= 0xff
 		}
 
-		fp.Write(C.GoBytes(unsafe.Pointer(data), k_data_radio))
-		fp.Write(C.GoBytes(unsafe.Pointer(&check[0]), C.int(rs.nroots)))
+		fp.Write(data[:k_data_radio])
+		fp.Write(check[:nroots])
 		fp.Write(flags)
 	} else {
 		// Normal usage.  Send bits to modulator.
@@ -152,22 +146,19 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 		//	}
 
 		for k := 0; k < 8; k++ {
-			var b = C.uchar(ctag_value>>(k*8)) & 0xff
-			send_bytes(C.int(channel), &b, 1)
+			send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
 		}
-		send_bytes(C.int(channel), data, k_data_radio)
-		send_bytes(C.int(channel), &check[0], C.int(rs.nroots))
+		send_bytes(channel, data[:k_data_radio])
+		send_bytes(channel, check[:nroots])
 	}
 
-	return int(fx25BitsSent[channel])
+	return fx25BitsSent[channel]
 }
 
-func send_bytes(channel C.int, _b *C.uchar, count C.int) {
-	var b = C.GoBytes(unsafe.Pointer(_b), count)
-	for j := C.int(0); j < count; j++ {
-		var x = b[j]
+func send_bytes(channel int, b []byte) {
+	for _, x := range b {
 		for k := 0; k < 8; k++ {
-			send_bit(channel, C.int(x&0x01))
+			send_bit(channel, int(x&0x01))
 			x >>= 1
 		}
 	}
@@ -180,11 +171,11 @@ func send_bytes(channel C.int, _b *C.uchar, count C.int) {
  */
 var sendBitOutput [MAX_RADIO_CHANS]int
 
-func send_bit(channel C.int, b C.int) {
+func send_bit(channel int, b int) {
 	if b == 0 {
 		sendBitOutput[channel] = 1 - sendBitOutput[channel]
 	}
-	tone_gen_put_bit(int(channel), sendBitOutput[channel])
+	tone_gen_put_bit(channel, sendBitOutput[channel])
 	fx25BitsSent[channel]++
 }
 
