@@ -123,10 +123,10 @@ const CLOSE_ENOUGH = 8 // How many bits can be wrong in tag yet consider it a ma
 // Given a 64 bit correlation tag value, find acceptable match in table.
 // Return index into table or -1 for no match.
 
-func fx25_tag_find_match(t C.uint64_t) C.int {
+func fx25_tag_find_match(t uint64) int {
 	for c := CTAG_MIN; c <= CTAG_MAX; c++ {
-		if bits.OnesCount64(uint64(t)^tags[c].value) <= CLOSE_ENOUGH {
-			return C.int(c)
+		if bits.OnesCount64(t^tags[c].value) <= CLOSE_ENOUGH {
+			return c
 		}
 	}
 	return -1
