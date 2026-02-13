@@ -6,16 +6,8 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stdint.h>
-// #include <stdlib.h>
-import "C"
-
 import (
 	"math/bits"
-	"unsafe"
 )
 
 type FX25RecState int
@@ -98,7 +90,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 			F.ctag_num = c
 			F.k_data_radio = fx25_get_k_data_radio(F.ctag_num)
-			F.nroots = int(fx25_get_nroots(F.ctag_num))
+			F.nroots = fx25_get_nroots(F.ctag_num)
 			F.coffs = fx25_get_k_data_rs(F.ctag_num)
 			Assert(F.coffs == FX25_BLOCK_SIZE-F.nroots)
 
@@ -226,16 +218,14 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(&F.block[0]), FX25_BLOCK_SIZE))
+		fx_hex_dump(F.block[:FX25_BLOCK_SIZE])
 	}
 	Assert(F.block[FX25_BLOCK_SIZE] == FENCE)
 
-	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
+	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
 	var rs = fx25_get_rs(F.ctag_num)
 
-	var tmp = (*C.uchar)(C.CBytes(F.block[:]))
-	var derrors = decode_rs_char(rs, tmp, &derrlocs[0], 0)
-	copy(F.block[:], C.GoBytes(unsafe.Pointer(tmp), C.int(len(F.block))))
+	var derrors = decode_rs_char(rs, F.block[:FX25_BLOCK_SIZE], derrlocs[:], 0)
 
 	if derrors >= 0 { // -1 for failure.  >= 0 for success, number of bytes corrected.
 
@@ -245,7 +235,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				dw_printf("FX.25[%d.%d]: FEC complete with no errors.\n", channel, slice)
 			} else {
 				dw_printf("FX.25[%d.%d]: FEC complete, fixed %2d errors in byte positions:", channel, slice, derrors)
-				for k := C.int(0); k < derrors; k++ {
+				for k := 0; k < derrors; k++ {
 					dw_printf(" %d", derrlocs[k])
 				}
 				dw_printf("\n")
@@ -253,18 +243,18 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 		}
 
 		var frame_buf = my_unstuff(channel, subchannel, slice, F.block[:], F.dlen)
-		var frame_len = C.int(len(frame_buf))
+		var frame_len = len(frame_buf)
 
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
 
 			var actual_fcs = uint16(frame_buf[frame_len-2]) | (uint16(frame_buf[frame_len-1]) << 8)
-			var expected_fcs = fcs_calc(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2))
+			var expected_fcs = fcs_calc(frame_buf[:frame_len-2])
 			if actual_fcs == expected_fcs {
 
 				if fx25_get_debug() >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("FX.25[%d.%d]: Extracted AX.25 frame:\n", channel, slice)
-					fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
+					fx_hex_dump(frame_buf[:frame_len])
 				}
 
 				if FXTEST {
@@ -272,7 +262,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 
-					multi_modem_process_rec_frame(channel, subchannel, slice, C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len-2), alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
+					multi_modem_process_rec_frame(channel, subchannel, slice, frame_buf[:frame_len-2], alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
 				}
 
 			} else {
@@ -280,7 +270,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("FX.25[%d.%d]: Bad FCS for AX.25 frame.\n", channel, slice)
 				fx_hex_dump(F.block[:F.dlen])
-				fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
+				fx_hex_dump(frame_buf[:frame_len])
 			}
 		} else {
 			// Most likely cause is defective sender software.
@@ -288,7 +278,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
 			fx_hex_dump(F.block[:F.dlen])
 			if frame_len > 0 {
-				fx_hex_dump(C.GoBytes(unsafe.Pointer(&frame_buf[0]), frame_len))
+				fx_hex_dump(frame_buf[:frame_len])
 			}
 		}
 	} else if fx25_get_debug() >= 2 {
@@ -328,10 +318,10 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
  *
  ***********************************************************************************/
 
-func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []byte {
+func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []byte { //nolint:unparam
 	var pat_det byte = 0 // Pattern detector.
 	var oacc byte = 0    // Accumulator for a byte out.
-	var olen int = 0     // Number of good bits in oacc.
+	var olen = 0         // Number of good bits in oacc.
 
 	if pin[0] != 0x7e {
 		text_color_set(DW_COLOR_ERROR)

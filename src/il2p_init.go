@@ -1,15 +1,5 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stdio.h>
-import "C"
-
-import (
-	"unsafe"
-)
-
 // Interesting related stuff:
 // https://www.kernel.org/doc/html/v4.15/core-api/librs.html
 // https://berthub.eu/articles/posts/reed-solomon-for-programmers/
@@ -19,12 +9,12 @@ const MAX_NROOTS = 16
 const NTAB = 5
 
 type TabType struct {
-	symsize C.uint // Symbol size, bits (1-8).  Always 8 for this application.
-	genpoly C.uint // Field generator polynomial coefficients.
-	fcs     C.uint // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
-	prim    C.uint // Primitive element to generate polynomial roots.
-	nroots  C.uint // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
-	rs      *rs_t  // Pointer to RS codec control block.  Filled in at init time.
+	symsize uint  // Symbol size, bits (1-8).  Always 8 for this application.
+	genpoly uint  // Field generator polynomial coefficients.
+	fcs     uint  // First root of RS code generator polynomial, index form. FX.25 uses 1 but IL2P uses 0.
+	prim    uint  // Primitive element to generate polynomial roots.
+	nroots  uint  // RS code generator polynomial degree (number of roots). Same as number of check bytes added.
+	rs      *rs_t // Pointer to RS codec control block.  Filled in at init time.
 }
 
 var Tab = [NTAB]TabType{
@@ -67,15 +57,11 @@ func il2p_get_debug() int {
 	return g_il2p_debug
 }
 
-func il2p_set_debug(debug int) {
-	g_il2p_debug = debug
-}
-
 // Find RS codec control block for specified number of parity symbols.
 
 func il2p_find_rs(nparity int) *rs_t {
 	for n := 0; n < NTAB; n++ {
-		if Tab[n].nroots == C.uint(nparity) {
+		if Tab[n].nroots == uint(nparity) {
 			return Tab[n].rs
 		}
 	}
@@ -111,13 +97,13 @@ func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
 	Assert(num_parity == 2 || num_parity == 4 || num_parity == 6 || num_parity == 8 || num_parity == 16)
 	Assert(data_size+num_parity <= 255)
 
-	var rs_block [FX25_BLOCK_SIZE]C.uchar
-	C.memcpy(unsafe.Pointer(&rs_block[len(rs_block)-data_size-num_parity]), C.CBytes(tx_data), C.size_t(data_size))
+	var rs_block [FX25_BLOCK_SIZE]byte
+	copy(rs_block[len(rs_block)-data_size-num_parity:], tx_data)
 
-	var parity_out = make([]C.uchar, num_parity)
-	encode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &parity_out[0])
+	var parity_out = make([]byte, num_parity)
+	encode_rs_char(il2p_find_rs(num_parity), rs_block[:], parity_out)
 
-	return C.GoBytes(unsafe.Pointer(&parity_out[0]), C.int(num_parity))
+	return parity_out
 }
 
 /*-------------------------------------------------------------
@@ -147,31 +133,32 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	var n = data_size + num_parity // total size in.
 
-	var rs_block [FX25_BLOCK_SIZE]C.uchar
+	var rs_block [FX25_BLOCK_SIZE]byte
 
-	C.memcpy(unsafe.Pointer(&rs_block[len(rs_block)-n]), C.CBytes(rec_block), C.size_t(n))
+	copy(rs_block[len(rs_block)-n:], rec_block)
 
 	if il2p_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  ==============================\n")
 		dw_printf("%d filler zeros, %d data, %d parity\n", len(rs_block)-n, data_size, num_parity)
-		fx_hex_dump(C.GoBytes(unsafe.Pointer(&rs_block[0]), C.int(len(rs_block))))
+		fx_hex_dump(rs_block[:])
 	}
 
-	var derrlocs [FX25_MAX_CHECK]C.int // Half would probably be OK.
+	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
 
-	var derrors = decode_rs_char(il2p_find_rs(num_parity), &rs_block[0], &derrlocs[0], 0)
-	var out = C.GoBytes(unsafe.Pointer(&rs_block[len(rs_block)-n]), C.int(data_size))
+	var derrors = decode_rs_char(il2p_find_rs(num_parity), rs_block[:], derrlocs[:], 0)
+	var out = make([]byte, data_size)
+	copy(out, rs_block[len(rs_block)-n:len(rs_block)-n+data_size])
 
 	if il2p_get_debug() >= 3 {
 		if derrors == 0 {
 			dw_printf("No errors reported for RS block.\n")
 		} else if derrors > 0 {
 			dw_printf("%d errors fixed in positions:\n", derrors)
-			for j := C.int(0); j < derrors; j++ {
+			for j := 0; j < derrors; j++ {
 				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
 			}
-			fx_hex_dump(C.GoBytes(unsafe.Pointer(&rs_block[0]), C.int(len(rs_block))))
+			fx_hex_dump(rs_block[:])
 		}
 	}
 
@@ -179,8 +166,8 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	// present but the algorithm could get a good code block by "fixing"
 	// one of the padding bytes that should be 0.
 
-	for i := C.int(0); i < derrors; i++ {
-		if derrlocs[i] < C.int(len(rs_block)-n) {
+	for i := 0; i < derrors; i++ {
+		if derrlocs[i] < len(rs_block)-n {
 			if il2p_get_debug() >= 3 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("RS DECODE ERROR!  Padding position %d should be 0 but it was set to %02x.\n", derrlocs[i], rs_block[derrlocs[i]])
@@ -194,5 +181,5 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  returns %d  ==============================\n", derrors)
 	}
-	return out, int(derrors)
+	return out, derrors
 }
