@@ -57,19 +57,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <fcntl.h>
-// #include <termios.h>
-// #include <sys/select.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <errno.h>
-import "C"
-
 import (
 	"os"
 
@@ -270,7 +257,7 @@ func kisspt_open_pt() {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen int, kps *kissport_status_s, client C.int) {
+func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kps *kissport_status_s, client int) {
 	if pt_master == nil {
 		return
 	}
@@ -443,6 +430,6 @@ func kisspt_listen_thread() {
 
 	for {
 		var ch = kisspt_get()
-		kiss_rec_byte(kisspt_kf, C.uchar(ch), C.int(kisspt_debug), nil, -1, kisspt_send_rec_packet)
+		kiss_rec_byte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
 	}
 }
