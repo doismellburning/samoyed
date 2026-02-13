@@ -1052,29 +1052,24 @@ func aprs_ll_pos_time(A *decode_aprs_t, info []byte) {
 
 func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
 
-	var g_lat C.double = G_UNKNOWN
-	var g_lon C.double = G_UNKNOWN
-
 	if bytes.HasPrefix(info, []byte("$GPRMC,")) ||
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
-		var g_course C.float = G_UNKNOWN
-		var speed_knots C.float = G_UNKNOWN
 
-		dwgpsnmea_gprmc(C.CString(string(info)), bool2Cint(A.g_quiet), &(g_lat), &(g_lon), &speed_knots, &(g_course))
-		A.g_lat = float64(g_lat)
-		A.g_lon = float64(g_lon)
-		A.g_course = float64(g_course)
-		A.g_speed_mph = DW_KNOTS_TO_MPH(float64(speed_knots))
+		var result = dwgpsnmea_gprmc(string(info), A.g_quiet)
+
+		A.g_lat = result.Lat
+		A.g_lon = result.Lon
+		A.g_course = result.Course
+		A.g_speed_mph = DW_KNOTS_TO_MPH(result.Knots)
 		A.g_data_type_desc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
-		var alt_meters C.float = G_UNKNOWN
-		var num_sat C.int = 0
 
-		dwgpsnmea_gpgga(C.CString(string(info)), bool2Cint(A.g_quiet), &(g_lat), &(g_lon), &alt_meters, &num_sat)
-		A.g_lat = float64(g_lat)
-		A.g_lon = float64(g_lon)
-		A.g_altitude_ft = DW_METERS_TO_FEET(float64(alt_meters))
+		var result = dwgpsnmea_gpgga(string(info), A.g_quiet)
+
+		A.g_lat = result.Lat
+		A.g_lon = result.Lon
+		A.g_altitude_ft = DW_METERS_TO_FEET(result.Alt)
 		A.g_data_type_desc = "Raw GPS data"
 	}
 

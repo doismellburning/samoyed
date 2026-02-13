@@ -23,16 +23,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <errno.h>
-// #include <time.h>
-// #include <stddef.h>
-import "C"
-
 import (
 	"errors"
 	"fmt"
@@ -88,7 +78,7 @@ var s_save_configp *misc_config_s
 
 var s_gpsnmea_port_fd *term.Term
 
-func dwgpsnmea_init(pconfig *misc_config_s, debug int) C.int {
+func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	//dwgps_info_t info;
 	//int e;
 
@@ -127,8 +117,8 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) C.int {
 
 /* Return fd to share if waypoint wants same device. */
 
-func dwgpsnmea_get_fd(wp_port_name *C.char, speed int) *term.Term {
-	if s_save_configp.gpsnmea_port == C.GoString(wp_port_name) && speed == s_save_configp.gpsnmea_speed {
+func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
+	if s_save_configp.gpsnmea_port == wp_port_name && speed == s_save_configp.gpsnmea_speed {
 		return (s_gpsnmea_port_fd)
 	}
 	return nil
@@ -222,63 +212,54 @@ func read_gpsnmea_thread(fd *term.Term) {
 					// Here we just tuck away the course and speed.
 					// Fix and location will be updated by GxGGA.
 
-					var ignore_dlat, ignore_dlon C.double
-					var speed_knots C.float = G_UNKNOWN
-					var track C.float = G_UNKNOWN
+					var f = dwgpsnmea_gprmc(gps_msg, false)
 
-					var f = dwgpsnmea_gprmc(C.CString(gps_msg), 0, &ignore_dlat, &ignore_dlon, &speed_knots, &track)
-
-					if f == DWFIX_ERROR {
+					if f.Fix == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
-						if speed_knots != G_UNKNOWN {
-							info.speed_knots = float64(speed_knots)
+						if f.Knots != G_UNKNOWN {
+							info.speed_knots = f.Knots
 						}
 
-						if track != G_UNKNOWN {
-							info.track = float64(track)
+						if f.Course != G_UNKNOWN {
+							info.track = f.Course
 						}
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
-					var nsat C.int
 
-					var dlat C.double = G_UNKNOWN
-					var dlon C.double = G_UNKNOWN
-					var altitude C.float = G_UNKNOWN
+					var f = dwgpsnmea_gpgga(gps_msg, false)
 
-					var f = dwgpsnmea_gpgga(C.CString(gps_msg), 0, &dlat, &dlon, &altitude, &nsat)
-
-					if f == DWFIX_ERROR {
+					if f.Fix == DWFIX_ERROR {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
-						if dlat != G_UNKNOWN {
-							info.dlat = float64(dlat)
+						if f.Lat != G_UNKNOWN {
+							info.dlat = f.Lat
 						}
-						if dlon != G_UNKNOWN {
-							info.dlon = float64(dlon)
+						if f.Lon != G_UNKNOWN {
+							info.dlon = f.Lon
 						}
-						if altitude != G_UNKNOWN {
-							info.altitude = float64(altitude)
+						if f.Alt != G_UNKNOWN {
+							info.altitude = f.Alt
 						}
 
-						if f != info.fix { // Print change in location fix.
+						if f.Fix != info.fix { // Print change in location fix.
 							text_color_set(DW_COLOR_INFO)
-							if f == DWFIX_NO_FIX {
+							switch f.Fix {
+							case DWFIX_NO_FIX:
 								dw_printf("GPSNMEA: Location fix has been lost.\n")
-							}
-							if f == DWFIX_2D {
+							case DWFIX_2D:
 								dw_printf("GPSNMEA: Location fix is now 2D.\n")
-							}
-							if f == DWFIX_3D {
+							case DWFIX_3D:
 								dw_printf("GPSNMEA: Location fix is now 3D.\n")
+							default:
 							}
-							info.fix = f
+							info.fix = f.Fix
 						}
 						info.timestamp = time.Now()
 						if s_debug >= 2 {
@@ -376,28 +357,41 @@ func remove_checksum(sent string, quiet bool) (string, error) {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.double, oknots *C.float, ocourse *C.float) dwfix_t {
+type GPRMCResult struct {
+	Lat    float64
+	Lon    float64
+	Knots  float64
+	Course float64
+	Fix    dwfix_t
+}
 
-	var quiet = _quiet != 0
+func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 
-	var stemp = C.GoString(sentence)
-
-	stemp, err := remove_checksum(stemp, quiet)
-
-	if err != nil {
-		return (DWFIX_ERROR)
+	var result = &GPRMCResult{
+		Lat:    G_UNKNOWN,
+		Lon:    G_UNKNOWN,
+		Knots:  G_UNKNOWN,
+		Course: G_UNKNOWN,
+		Fix:    DWFIX_NO_FIX, // TODO Default to Error, because that's what most returns are? On the other hand it's good to be explicit...
 	}
 
-	ptype, stemp, _ := strings.Cut(stemp, ",")   /* Should be $GPRMC */
-	ptime, stemp, _ := strings.Cut(stemp, ",")   /* Time, hhmmss[.sss] */
-	pstatus, stemp, _ := strings.Cut(stemp, ",") /* Status, A=Active (valid position), V=Void */
-	plat, stemp, _ := strings.Cut(stemp, ",")    /* Latitude */
-	pns, stemp, _ := strings.Cut(stemp, ",")     /* North/South */
-	plon, stemp, _ := strings.Cut(stemp, ",")    /* Longitude */
-	pew, stemp, _ := strings.Cut(stemp, ",")     /* East/West */
-	pknots, stemp, _ := strings.Cut(stemp, ",")  /* Speed over ground, knots. */
-	pcourse, stemp, _ := strings.Cut(stemp, ",") /* True course, degrees. */
-	pdate, stemp, _ := strings.Cut(stemp, ",")   /* Date, ddmmyy */
+	sentence, err := remove_checksum(sentence, quiet)
+
+	if err != nil {
+		result.Fix = DWFIX_ERROR
+		return result
+	}
+
+	ptype, sentence, _ := strings.Cut(sentence, ",")   /* Should be $GPRMC */
+	ptime, sentence, _ := strings.Cut(sentence, ",")   /* Time, hhmmss[.sss] */
+	pstatus, sentence, _ := strings.Cut(sentence, ",") /* Status, A=Active (valid position), V=Void */
+	plat, sentence, _ := strings.Cut(sentence, ",")    /* Latitude */
+	pns, sentence, _ := strings.Cut(sentence, ",")     /* North/South */
+	plon, sentence, _ := strings.Cut(sentence, ",")    /* Longitude */
+	pew, sentence, _ := strings.Cut(sentence, ",")     /* East/West */
+	pknots, sentence, _ := strings.Cut(sentence, ",")  /* Speed over ground, knots. */
+	pcourse, sentence, _ := strings.Cut(sentence, ",") /* True course, degrees. */
+	pdate, sentence, _ := strings.Cut(sentence, ",")   /* Date, ddmmyy */
 	/* Magnetic variation */
 	/* In version 3.00, mode is added: A D E N (see below) */
 	/* Checksum */
@@ -408,63 +402,70 @@ func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	_ = ptype
 	_ = ptime
 	_ = pdate
-	_ = stemp
+	_ = sentence
 
 	if pstatus != "" && len(pstatus) == 1 {
 		if pstatus != "A" {
-			return (DWFIX_NO_FIX) /* Not "Active." Don't parse. */
+			result.Fix = DWFIX_NO_FIX
+			return result /* Not "Active." Don't parse. */
 		}
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("No status in GPRMC sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		*odlat = C.double(latitude_from_nmea(plat, pns[0]))
+		result.Lat = latitude_from_nmea(plat, pns[0])
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get latitude from GPRMC sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		*odlon = C.double(longitude_from_nmea(plon, pew[0]))
+		result.Lon = longitude_from_nmea(plon, pew[0])
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get longitude from GPRMC sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
-	if len(pknots) > 0 {
-		var _oknots, _ = strconv.ParseFloat(pknots, 64)
-		*oknots = C.float(_oknots)
+	var knots, knotsErr = strconv.ParseFloat(pknots, 64)
+	if knotsErr == nil {
+		result.Knots = knots
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get speed from GPRMC sentence.\n")
+			dw_printf("Can't get speed from GPRMC sentence: %s\n", knotsErr)
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
-	if len(pcourse) > 0 {
-		var _ocourse, _ = strconv.ParseFloat(pcourse, 64)
-		*ocourse = C.float(_ocourse)
+	var course, courseErr = strconv.ParseFloat(pcourse, 64)
+	if courseErr == nil {
+		result.Course = course
 	} else {
 		/* When stationary, this field might be empty. */
-		*ocourse = G_UNKNOWN
+		result.Course = G_UNKNOWN
 	}
 
 	//text_color_set (DW_COLOR_INFO);
 	//dw_printf("%.6f %.6f %.1f %.0f\n", *odlat, *odlon, *oknots, *ocourse);
 
-	return (DWFIX_2D)
+	result.Fix = DWFIX_2D
+
+	return result
 
 } /* end dwgpsnmea_gprmc */
 
@@ -500,33 +501,46 @@ func dwgpsnmea_gprmc(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.double, oalt *C.float, onsat *C.int) dwfix_t {
+type GPGGAResult struct {
+	Lat float64
+	Lon float64
+	Alt float64
+	Sat int
+	Fix dwfix_t
+}
 
-	var quiet = _quiet != 0
+func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 
-	var stemp = C.GoString(sentence)
-
-	stemp, err := remove_checksum(stemp, quiet)
-
-	if err != nil {
-		return (DWFIX_ERROR)
+	var result = &GPGGAResult{
+		Lat: G_UNKNOWN,
+		Lon: G_UNKNOWN,
+		Alt: G_UNKNOWN,
+		Sat: G_UNKNOWN,
+		Fix: DWFIX_NO_FIX,
 	}
 
-	ptype, stemp, _ := strings.Cut(stemp, ",")                 /* Should be $GPGGA */
-	ptime, stemp, _ := strings.Cut(stemp, ",")                 /* Time, hhmmss[.sss] */
-	plat, stemp, _ := strings.Cut(stemp, ",")                  /* Latitude */
-	pns, stemp, _ := strings.Cut(stemp, ",")                   /* North/South */
-	plon, stemp, _ := strings.Cut(stemp, ",")                  /* Longitude */
-	pew, stemp, _ := strings.Cut(stemp, ",")                   /* East/West */
-	pfix, stemp, _ := strings.Cut(stemp, ",")                  /* 0=invalid, 1=GPS fix, 2=DGPS fix */
-	pnum_sat, stemp, _ := strings.Cut(stemp, ",")              /* Number of satellites */
-	phdop, stemp, _ := strings.Cut(stemp, ",")                 /* Horiz. Dilution of Precision */
-	paltitude, stemp, altitudeFound := strings.Cut(stemp, ",") /* Altitude, above mean sea level */
-	palt_u, stemp, _ := strings.Cut(stemp, ",")                /* Units for Altitude, typically M for meters. */
-	pheight, stemp, _ := strings.Cut(stemp, ",")               /* Height above ellipsoid */
-	pheight_u, stemp, _ := strings.Cut(stemp, ",")             /* Units for height, typically M for meters. */
-	psince, stemp, _ := strings.Cut(stemp, ",")                /* Time since last DGPS update. */
-	pdsta, stemp, _ := strings.Cut(stemp, ",")                 /* DGPS reference station id. */
+	sentence, err := remove_checksum(sentence, quiet)
+
+	if err != nil {
+		result.Fix = DWFIX_ERROR
+		return result
+	}
+
+	ptype, sentence, _ := strings.Cut(sentence, ",")                 /* Should be $GPGGA */
+	ptime, sentence, _ := strings.Cut(sentence, ",")                 /* Time, hhmmss[.sss] */
+	plat, sentence, _ := strings.Cut(sentence, ",")                  /* Latitude */
+	pns, sentence, _ := strings.Cut(sentence, ",")                   /* North/South */
+	plon, sentence, _ := strings.Cut(sentence, ",")                  /* Longitude */
+	pew, sentence, _ := strings.Cut(sentence, ",")                   /* East/West */
+	pfix, sentence, _ := strings.Cut(sentence, ",")                  /* 0=invalid, 1=GPS fix, 2=DGPS fix */
+	pnum_sat, sentence, _ := strings.Cut(sentence, ",")              /* Number of satellites */
+	phdop, sentence, _ := strings.Cut(sentence, ",")                 /* Horiz. Dilution of Precision */
+	paltitude, sentence, altitudeFound := strings.Cut(sentence, ",") /* Altitude, above mean sea level */
+	palt_u, sentence, _ := strings.Cut(sentence, ",")                /* Units for Altitude, typically M for meters. */
+	pheight, sentence, _ := strings.Cut(sentence, ",")               /* Height above ellipsoid */
+	pheight_u, sentence, _ := strings.Cut(sentence, ",")             /* Units for height, typically M for meters. */
+	psince, sentence, _ := strings.Cut(sentence, ",")                /* Time since last DGPS update. */
+	pdsta, sentence, _ := strings.Cut(sentence, ",")                 /* DGPS reference station id. */
 
 	/* Suppress the 'set but not used' warnings. */
 	/* Alternatively, we might use __attribute__((unused)) */
@@ -540,38 +554,42 @@ func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	_ = pheight_u
 	_ = psince
 	_ = pdsta
-	_ = stemp
+	_ = sentence
 
 	if len(pfix) == 1 {
 		if pfix == "0" {
-			return (DWFIX_NO_FIX) /* No Fix. Don't parse the rest. */
+			result.Fix = DWFIX_NO_FIX /* No Fix. Don't parse the rest. */
+			return result
 		}
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("No fix in GPGGA sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		*odlat = C.double(latitude_from_nmea(plat, pns[0]))
+		result.Lat = latitude_from_nmea(plat, pns[0])
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get latitude from GPGGA sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		*odlon = C.double(longitude_from_nmea(plon, pew[0]))
+		result.Lon = longitude_from_nmea(plon, pew[0])
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get longitude from GPGGA sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
 	// TODO: num sat...  Why would we care?
@@ -582,20 +600,30 @@ func dwgpsnmea_gpgga(sentence *C.char, _quiet C.int, odlat *C.double, odlon *C.d
 	 */
 
 	if altitudeFound {
-
 		if len(paltitude) > 0 {
-			var _oaltitude, _ = strconv.ParseFloat(paltitude, 64)
-			*oalt = C.float(_oaltitude)
-			return (DWFIX_3D)
+			var altitude, altitudeErr = strconv.ParseFloat(paltitude, 64)
+			if altitudeErr == nil {
+				result.Alt = altitude
+				result.Fix = DWFIX_3D
+			} else {
+				if !quiet {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Can't get altitude from GPGGA sentence: %s\n", altitudeErr)
+				}
+				result.Fix = DWFIX_ERROR
+				return result
+			}
 		} else {
-			return (DWFIX_2D)
+			result.Fix = DWFIX_2D
 		}
+		return result
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get altitude from GPGGA sentence.\n")
 		}
-		return (DWFIX_ERROR)
+		result.Fix = DWFIX_ERROR
+		return result
 	}
 
 } /* end dwgpsnmea_gpgga */
