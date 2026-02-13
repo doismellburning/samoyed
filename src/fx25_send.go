@@ -152,20 +152,17 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 		//	}
 
 		for k := 0; k < 8; k++ {
-			var b = C.uchar(ctag_value>>(k*8)) & 0xff
-			send_bytes(channel, &b, 1)
+			send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
 		}
-		send_bytes(channel, data, k_data_radio)
-		send_bytes(channel, &check[0], int(rs.nroots))
+		send_bytes(channel, C.GoBytes(unsafe.Pointer(data), C.int(k_data_radio)))
+		send_bytes(channel, C.GoBytes(unsafe.Pointer(&check[0]), C.int(rs.nroots)))
 	}
 
 	return fx25BitsSent[channel]
 }
 
-func send_bytes(channel int, _b *C.uchar, count int) {
-	var b = C.GoBytes(unsafe.Pointer(_b), C.int(count))
-	for j := 0; j < count; j++ {
-		var x = b[j]
+func send_bytes(channel int, b []byte) {
+	for _, x := range b {
 		for k := 0; k < 8; k++ {
 			send_bit(channel, int(x&0x01))
 			x >>= 1
