@@ -30,7 +30,9 @@ jobs:
     - run: "make cmds"
     - name: "Install Dire Wolf to test parsing"
       run: "sudo apt install --yes direwolf"
+    - run: "ls -lah cover.out || true"
     - run: "make test"
+    - run: "ls -lah cover.out || true"
     - run: "make coveragereport"
     - run: "pipx install reuse"  # For validating the licence config
     - run: "make check"
