@@ -186,8 +186,8 @@ func kissserial_init(mc *misc_config_s) {
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen int,
-	notused1 *kissport_status_s, notused2 C.int) {
+func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int,
+	notused1 *kissport_status_s, notused2 int) {
 	/*
 	 * Quietly discard if we don't have open connection.
 	 */
@@ -376,6 +376,6 @@ func kissserial_listen_thread() {
 		if err != nil {
 			return
 		} // Was pthread_exit
-		kiss_rec_byte(kf, C.uchar(ch), C.int(kissserial_debug), nil, -1, kissserial_send_rec_packet)
+		kiss_rec_byte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
 	}
 }

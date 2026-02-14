@@ -8,26 +8,10 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <errno.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-// #include <ctype.h>
-// #include <stddef.h>
-import "C"
-
 import (
 	"net"
 	"os"
 	"strconv"
-	"unsafe"
 )
 
 var s_kiss_debug = 0
@@ -232,7 +216,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 			/* Start of frame.  */
 
 			kf.kiss_len = 0
-			kf.kiss_msg[kf.kiss_len] = C.uchar(b)
+			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
 			kf.state = KS_COLLECTING
 			return
@@ -247,7 +231,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 
 			if kf.kiss_len == 0 {
 				/* Empty frame.  Starting a new one. */
-				kf.kiss_msg[kf.kiss_len] = C.uchar(b)
+				kf.kiss_msg[kf.kiss_len] = b
 				kf.kiss_len++
 				return
 			}
@@ -256,16 +240,16 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 				return
 			}
 
-			kf.kiss_msg[kf.kiss_len] = C.uchar(b)
+			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
 			if debug > 0 {
 				/* As received over the wire from network TNC. */
 				// May include escapted characters.  What about FEND?
 				// FIXME: make it say Network TNC.
-				kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
+				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[0:kf.kiss_len])
 			}
 
-			var unwrapped = kiss_unwrap(C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
+			var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
@@ -286,7 +270,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 			var pp = ax25_from_frame(unwrapped[1:], alevel)
 
 			if pp != nil {
-				var fec_type fec_type_t = fec_type_none
+				var fec_type = fec_type_none
 				var retries retry_t
 
 				var spectrum = "Network TNC"
@@ -301,7 +285,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 		}
 
 		if kf.kiss_len < MAX_KISS_LEN {
-			kf.kiss_msg[kf.kiss_len] = C.uchar(b)
+			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
 		} else {
 			text_color_set(DW_COLOR_ERROR)

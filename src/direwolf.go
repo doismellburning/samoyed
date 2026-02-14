@@ -1106,10 +1106,10 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	var fbuf = ax25_pack(pp)
 
-	server_send_rec_packet(channel, pp, fbuf)                                                 // AGW net protocol
-	kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)    // KISS TCP
-	kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
-	kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
+	server_send_rec_packet(channel, pp, fbuf)                                          // AGW net protocol
+	kissnet_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)    // KISS TCP
+	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
+	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
 		var ao_pp = ax25_from_text(C.GoString(&ais_obj_packet[0]), true)
@@ -1117,9 +1117,9 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			var ao_fbuf = ax25_pack(ao_pp)
 
 			server_send_rec_packet(channel, ao_pp, ao_fbuf)
-			kissnet_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			kissserial_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			kisspt_send_rec_packet(C.int(channel), KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissnet_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			ax25_delete(ao_pp)
 		}
 	}
