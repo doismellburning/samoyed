@@ -58,14 +58,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <ctype.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
 import (
 	"bytes"
 	"fmt"
@@ -137,7 +129,7 @@ var FROMTO_PREFIX = map[fromto_t]string{
 type kissport_status_s struct {
 	pnext *kissport_status_s // To next in list.
 
-	arg2 int // temp for passing second arg into
+	arg2 int //nolint:unused // temp for passing second arg into
 	// kissnet_listen_thread
 
 	tcp_port int // default 8001
@@ -841,7 +833,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
+func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) { //nolint:unparam
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {

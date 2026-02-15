@@ -61,14 +61,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #define DIGIPEATER_C		// Why?
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <unistd.h>
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -85,7 +77,7 @@ import (
 type candidate_t struct {
 	packet_p    *packet_t
 	alevel      alevel_t
-	speed_error float64
+	speed_error float64    //nolint:unused
 	fec_type    fec_type_t // Type of FEC: none(0), fx25, il2p
 	retries     retry_t    // For the old "fix bits" strategy, this is the
 	// number of bits that were modified to get a good CRC.
@@ -186,7 +178,7 @@ func multi_modem_init(pa *audio_s) {
 
 var dc_average [MAX_RADIO_CHANS]float64
 
-func multi_modem_get_dc_average(channel int) int {
+func multi_modem_get_dc_average(channel int) int { //nolint:unused
 	// Scale to +- 200 so it will like the deviation measurement.
 
 	return int(float64(dc_average[channel]) * (200.0 / 32767.0))
