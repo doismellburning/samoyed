@@ -17,14 +17,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <errno.h>
-import "C"
-
 import (
 	"sync"
 	"time"
@@ -442,7 +434,7 @@ func append_to_queue(pnew *dlq_item_t) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int) {
+func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int) { //nolint:unparam // pid is unused
 
 	/* TODO KG
 	#if DEBUG
