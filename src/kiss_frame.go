@@ -851,7 +851,7 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 				dw_printf("KISS Set Hardware TNC: Did not expect a parameter.\n")
 			}
 
-			var response = fmt.Sprintf("DIREWOLF %d.%d", C.MAJOR_VERSION, C.MINOR_VERSION)
+			var response = fmt.Sprintf("DIREWOLF %d.%d", MAJOR_VERSION, MINOR_VERSION)
 			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {

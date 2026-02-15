@@ -19,7 +19,7 @@ package direwolf
 // #include <netdb.h>
 // #include <hamlib/rig.h>
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod
-// #cgo CFLAGS: -I../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0 -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
+// #cgo CFLAGS: -I../external/geotranz -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm
 import "C"
 
@@ -1076,7 +1076,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 					0, 0, 0, A.g_comment) // freq, tone, offset
 
 				// TODO Bodge
-				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, ais_obj_info)
+				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
 				C.strcpy(&ais_obj_packet[0], C.CString(_ais_obj_packet))
 
 				dw_printf("[%d.AIS] %s\n", channel, _ais_obj_packet)

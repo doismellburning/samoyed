@@ -692,8 +692,8 @@ func xmit_object_report(i int, first_time bool) {
 	}
 	stemp += ">"
 	stemp += APP_TOCALL
-	stemp += string('0' + C.MAJOR_VERSION)
-	stemp += string('0' + C.MINOR_VERSION) // TODO KG This seems to assume some limits on version numbers...
+	stemp += string(rune('0' + MAJOR_VERSION))
+	stemp += string(rune('0' + MINOR_VERSION)) // TODO KG This seems to assume some limits on version numbers...
 
 	/*
 	 * Append via path, for transmission, if specified.

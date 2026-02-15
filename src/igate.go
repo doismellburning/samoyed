@@ -1462,7 +1462,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	if ig_to_tx_allow(pp3, to_chan) {
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
 			save_audio_config_p.mycall[to_chan],
-			APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION,
+			APP_TOCALL, MAJOR_VERSION, MINOR_VERSION,
 			save_igate_config_p.tx_via,
 			payload)
 

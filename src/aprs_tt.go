@@ -1619,7 +1619,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 	// message formats in later versions.
 
 	var src = "DTMF"
-	var dest = fmt.Sprintf("%s%d%d", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION)
+	var dest = fmt.Sprintf("%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
 	var raw_tt_msg = fmt.Sprintf("%s>%s:t%s", src, dest, msg)
 
 	var pp = ax25_from_text(raw_tt_msg, true)
