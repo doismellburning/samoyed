@@ -23,21 +23,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <netdb.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <sys/socket.h>
-// #include <arpa/inet.h>
-// #include <netinet/in.h>
-// #include <netinet/tcp.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-import "C"
-
 import (
 	"bytes"
 	"fmt"
@@ -160,31 +145,37 @@ var s_debug int
  * TODO: should have debug option to print these occasionally.
  */
 
-var stats_failed_connect int /* Number of times we tried to connect to */
+var stats_failed_connect int //nolint:unused
+/* Number of times we tried to connect to */
 /* a server and failed.  A small number is not */
 /* a bad thing.  Each name should have a bunch */
 /* of addresses for load balancing and */
 /* redundancy. */
 
-var stats_connects int /* Number of successful connects to a server. */
+var stats_connects int //nolint:unused
+/* Number of successful connects to a server. */
 /* Normally you'd expect this to be 1.  */
 /* Could be larger if one disappears and we */
 /* try again to find a different one. */
 
-var stats_connect_at time.Time /* Most recent time connection was established. */
+var stats_connect_at time.Time //nolint:unused
+/* Most recent time connection was established. */
 /* can be used to determine elapsed connect time. */
 
-var stats_rf_recv_packets int /* Number of candidate packets from the radio. */
+var stats_rf_recv_packets int //nolint:unused
+/* Number of candidate packets from the radio. */
 /* This is not the total number of AX.25 frames received */
 /* over the radio; only APRS packets get this far. */
 
 var stats_uplink_packets int /* Number of packets passed along to the IGate */
 /* server after filtering. */
 
-var stats_uplink_bytes int /* Total number of bytes sent to IGate server */
+var stats_uplink_bytes int //nolint:unused
+/* Total number of bytes sent to IGate server */
 /* including login, packets, and heartbeats. */
 
-var stats_downlink_bytes int /* Total number of bytes from IGate server including */
+var stats_downlink_bytes int //nolint:unused
+/* Total number of bytes from IGate server including */
 /* packets, heartbeats, other messages. */
 
 var stats_downlink_packets int /* Number of packets from IGate server for possible transmission. */
@@ -1072,7 +1063,7 @@ func igate_recv_thread() {
 					// See what happens with -2 and follow up on this.
 					// Do we need something else here?
 					var slice = 0
-					var fec_type fec_type_t = fec_type_none
+					var fec_type = fec_type_none
 					var spectrum = "APRS-IS"
 					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
 				} else {
@@ -1121,7 +1112,7 @@ func igate_recv_thread() {
  *
  *--------------------------------------------------------------------*/
 
-func satgate_delay_packet(pp *packet_t, channel int) {
+func satgate_delay_packet(pp *packet_t, channel int) { //nolint:unparam
 
 	//if (s_debug >= 1) {
 	text_color_set(DW_COLOR_INFO)
@@ -1462,7 +1453,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	if ig_to_tx_allow(pp3, to_chan) {
 		var radio = fmt.Sprintf("%s>%s%d%d%s:}%s",
 			save_audio_config_p.mycall[to_chan],
-			APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION,
+			APP_TOCALL, MAJOR_VERSION, MINOR_VERSION,
 			save_igate_config_p.tx_via,
 			payload)
 

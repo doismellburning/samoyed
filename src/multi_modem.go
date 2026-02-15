@@ -61,14 +61,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #define DIGIPEATER_C		// Why?
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <unistd.h>
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -85,7 +77,7 @@ import (
 type candidate_t struct {
 	packet_p    *packet_t
 	alevel      alevel_t
-	speed_error float64
+	speed_error float64    //nolint:unused
 	fec_type    fec_type_t // Type of FEC: none(0), fx25, il2p
 	retries     retry_t    // For the old "fix bits" strategy, this is the
 	// number of bits that were modified to get a good CRC.
@@ -186,7 +178,7 @@ func multi_modem_init(pa *audio_s) {
 
 var dc_average [MAX_RADIO_CHANS]float64
 
-func multi_modem_get_dc_average(channel int) int {
+func multi_modem_get_dc_average(channel int) int { //nolint:unused
 	// Scale to +- 200 so it will like the deviation measurement.
 
 	return int(float64(dc_average[channel]) * (200.0 / 32767.0))
@@ -286,12 +278,12 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 		// TODO: Use station callsign, rather than "AIS," so we know where it is coming from,
 		// if it happens to get onto RF somehow.
 
-		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
+		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
 		pp = ax25_from_text(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
-		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
+		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
 		pp = ax25_from_text(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.

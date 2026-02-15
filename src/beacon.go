@@ -8,15 +8,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <math.h>
-// #include <time.h>
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -654,7 +645,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	if bp.dest != "" {
 		beacon_text += bp.dest
 	} else {
-		var stemp = fmt.Sprintf("%s%1d%1d", APP_TOCALL, C.MAJOR_VERSION, C.MINOR_VERSION)
+		var stemp = fmt.Sprintf("%s%1d%1d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
 		beacon_text += stemp
 	}
 
@@ -717,13 +708,13 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
 
-			var my_alt_ft int = G_UNKNOWN
+			var my_alt_ft = G_UNKNOWN
 			if gpsinfo.fix >= 3 && gpsinfo.altitude != G_UNKNOWN && bp.alt_m > 0 {
 				my_alt_ft = int(math.Round(DW_METERS_TO_FEET(float64(gpsinfo.altitude))))
 			}
 
 			/* Round to nearest integer. retaining unknown state. */
-			var coarse int = G_UNKNOWN
+			var coarse = G_UNKNOWN
 			if gpsinfo.track != G_UNKNOWN {
 				coarse = int(math.Round(float64(gpsinfo.track)))
 			}

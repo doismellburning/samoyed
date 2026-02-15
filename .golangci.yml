@@ -60,6 +60,7 @@ linters:
       excludes:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
         - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
+        - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
     nestif:
       min-complexity: 579  # There's lots of upstream complexity, so let's soft-disable this
     revive:

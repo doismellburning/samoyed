@@ -15,15 +15,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <ctype.h>
-// #include <time.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"fmt"
 	"os"
@@ -692,8 +683,8 @@ func xmit_object_report(i int, first_time bool) {
 	}
 	stemp += ">"
 	stemp += APP_TOCALL
-	stemp += string('0' + C.MAJOR_VERSION)
-	stemp += string('0' + C.MINOR_VERSION) // TODO KG This seems to assume some limits on version numbers...
+	stemp += string(rune('0' + MAJOR_VERSION))
+	stemp += string(rune('0' + MINOR_VERSION)) // TODO KG This seems to assume some limits on version numbers...
 
 	/*
 	 * Append via path, for transmission, if specified.
