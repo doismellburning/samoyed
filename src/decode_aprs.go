@@ -15,17 +15,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <time.h>
-// #include <assert.h>
-// #include <stdlib.h>	/* for atof */
-// #include <string.h>	/* for strtok */
-// #include <math.h>	/* for pow */
-// #include <ctype.h>	/* for isdigit */
-// #include <fcntl.h>
-// #include "regex.h"
-import "C"
-
 import (
 	"bytes"
 	"encoding/binary"
@@ -173,7 +162,8 @@ type decode_aprs_t struct {
 	g_footprint_lon    float64 /* Set all to G_UNKNOWN if not used. */
 	g_footprint_radius float64 /* Radius in miles. */
 
-	g_query_callsign string /* Directed query may contain callsign.  */
+	g_query_callsign string //nolint:unused
+	/* Directed query may contain callsign.  */
 	/* e.g. tell me all objects from that callsign. */
 
 	g_weather string /* Weather */
@@ -2376,7 +2366,7 @@ Assuming query responding is enabled, the following broadcast queries should be 
 
 */
 
-func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) {
+func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:unparam
 
 	A.g_data_type_desc = "General Query"
 
@@ -2670,8 +2660,8 @@ func aprs_morse_code(A *decode_aprs_t, info []byte) {
 func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 
 	type aprs_positionless_weather_s struct {
-		dti        byte    /* _ */
-		time_stamp [8]byte /* MDHM format */
+		dti        byte    //nolint:unused // _
+		time_stamp [8]byte //nolint:unused // MDHM format
 		comment    [99]byte
 	}
 	var p aprs_positionless_weather_s
@@ -2759,7 +2749,7 @@ func getwdata(wpp []byte, id rune, dlen int) (float64, []byte, bool) {
 	return f, wpp[dlen+1:], true
 }
 
-func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) {
+func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:unparam
 
 	var wp = wdata
 	var found bool
@@ -3594,7 +3584,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
  *
  *------------------------------------------------------------------*/
 
-func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time {
+func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
 	type dhm_s struct {
 		Day     [2]byte
 		Hours   [2]byte
@@ -3701,7 +3691,7 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time {
  *
  *------------------------------------------------------------------*/
 
-func get_maidenhead(A *decode_aprs_t, p []byte) int {
+func get_maidenhead(A *decode_aprs_t, p []byte) int { //nolint:unparam
 
 	if unicode.ToUpper(rune(p[0])) >= 'A' && unicode.ToUpper(rune(p[0])) <= 'R' &&
 		unicode.ToUpper(rune(p[1])) >= 'A' && unicode.ToUpper(rune(p[1])) <= 'R' &&
@@ -3755,7 +3745,7 @@ func get_maidenhead(A *decode_aprs_t, p []byte) int {
 // TODO KG rename?
 var dir []string = []string{"omni", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
 
-func data_extension_comment(A *decode_aprs_t, pdext []byte) bool {
+func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unparam
 
 	if len(pdext) < 7 {
 		A.g_comment = string(pdext)
