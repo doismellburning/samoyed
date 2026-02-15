@@ -41,7 +41,10 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
+func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
+
+	var appendCRC = len(crc) > 0 && crc[0]
+
 	// Can a type 1 header be used?
 	var hdr, e = il2p_type_1_header(pp, max_fec)
 
@@ -56,6 +59,10 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 
 		if e == 0 {
 			// Success. No info part.
+			if appendCRC {
+				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
+				outbuf.Write(crcBytes[:])
+			}
 			return outbuf.Bytes(), outbuf.Len()
 		}
 
@@ -65,6 +72,11 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 		var encodedPayload, k = il2p_encode_payload(pinfo, max_fec)
 		if k > 0 {
 			outbuf.Write(encodedPayload)
+
+			if appendCRC {
+				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
+				outbuf.Write(crcBytes[:])
+			}
 
 			// Success. Info part was <= 1023 bytes.
 			return outbuf.Bytes(), outbuf.Len()
@@ -92,6 +104,11 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
 			var encodedPayload, k = il2p_encode_payload(frame_data, max_fec)
 			if k > 0 {
 				outbuf.Write(encodedPayload)
+
+				if appendCRC {
+					var crcBytes = il2p_crc_encode(il2p_crc_calc(frame_data))
+					outbuf.Write(crcBytes[:])
+				}
 
 				// Success. Entire AX.25 frame <= 1023 bytes.
 				return outbuf.Bytes(), outbuf.Len()
@@ -129,11 +146,39 @@ func il2p_encode_frame(pp *packet_t, max_fec int) ([]byte, int) {
  *--------------------------------------------------------------*/
 
 func il2p_decode_frame(irec []byte) *packet_t {
-	var uhdr, e = il2p_clarify_header(irec)
+	var uhdr, e = il2p_clarify_header(irec[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY])
 
 	// TODO?: for symmetry we might want to clarify the payload before combining.
 
-	return il2p_decode_header_payload(uhdr, irec[IL2P_HEADER_SIZE+IL2P_HEADER_PARITY:], &e)
+	var payload = irec[IL2P_HEADER_SIZE+IL2P_HEADER_PARITY:]
+
+	// Determine if trailing CRC is present by computing the encoded payload size
+	// and checking if there are extra bytes beyond it.
+	var _, max_fec, payload_len = il2p_get_header_attributes(uhdr)
+	var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
+
+	var crc_bytes []byte
+	if len(payload) >= encoded_payload_size+IL2P_CRC_ENCODED_SIZE {
+		crc_bytes = payload[encoded_payload_size : encoded_payload_size+IL2P_CRC_ENCODED_SIZE]
+		payload = payload[:encoded_payload_size]
+	}
+
+	var pp = il2p_decode_header_payload(uhdr, payload, &e)
+
+	// Validate CRC if present.
+	if pp != nil && crc_bytes != nil {
+		var frame_data = ax25_get_frame_data(pp)
+		if !il2p_crc_check(frame_data, crc_bytes) {
+			if il2p_get_debug() >= 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("IL2P trailing CRC mismatch.\n")
+			}
+			ax25_delete(pp)
+			return nil
+		}
+	}
+
+	return pp
 }
 
 /*-------------------------------------------------------------
