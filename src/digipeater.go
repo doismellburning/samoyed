@@ -33,15 +33,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>	/* for isdigit, isupper */
-// #include "regex.h"
-// #include <unistd.h>
-import "C"
-
 import (
 	"regexp"
 	"strings"
@@ -109,7 +100,7 @@ var save_digi_config_p *digi_config_s
 
 var digi_count [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 
-func digipeater_get_count(from_chan, to_chan int) int {
+func digipeater_get_count(from_chan, to_chan int) int { //nolint:unused
 	return (digi_count[from_chan][to_chan])
 }
 
