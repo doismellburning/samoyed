@@ -5,15 +5,6 @@ Can't use cgo directly in test code, *can* use go code that uses cgo though, so 
 https://github.com/golang/go/issues/4030
 */
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>
-// #include "regex.h"
-// #include <unistd.h>
-import "C"
-
 import (
 	"regexp"
 	"testing"
@@ -227,7 +218,7 @@ func digipeater_test_main(t *testing.T) bool {
 	/*
 	 * Allow same thing after adequate time.
 	 */
-	C.sleep(5)
+	time.Sleep(5 * time.Second)
 
 	digipeater_test(t, "W1XYZ>TEST,R3*,WIDE3-2:info1",
 		"W1XYZ>TEST,R3,WB2OSZ-9*,WIDE3-1:info1")

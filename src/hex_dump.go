@@ -1,8 +1,5 @@
 package direwolf
 
-// #include <ctype.h>
-import "C"
-
 func hex_dump(p []byte) {
 	var offset = 0
 	var length = len(p)
