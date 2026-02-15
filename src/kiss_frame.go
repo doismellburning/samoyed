@@ -71,7 +71,6 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"unsafe"
 )
 
 const KISS_CMD_DATA_FRAME = 0
@@ -110,13 +109,13 @@ const MAX_NOISE_LEN = 100
 type kiss_frame_t struct {
 	state kiss_state_e
 
-	kiss_msg [MAX_KISS_LEN]C.uchar
+	kiss_msg [MAX_KISS_LEN]byte
 	/* Leading FEND is optional. */
 	/* Contains escapes and ending FEND. */
-	kiss_len C.int
+	kiss_len int
 
-	noise     [MAX_NOISE_LEN]C.uchar
-	noise_len C.int
+	noise     [MAX_NOISE_LEN]byte
+	noise_len int
 }
 
 type fromto_t int
@@ -138,12 +137,12 @@ var FROMTO_PREFIX = map[fromto_t]string{
 type kissport_status_s struct {
 	pnext *kissport_status_s // To next in list.
 
-	arg2 C.int // temp for passing second arg into
+	arg2 int // temp for passing second arg into
 	// kissnet_listen_thread
 
-	tcp_port C.int // default 8001
+	tcp_port int // default 8001
 
-	channel C.int // Radio channel for this tcp port.
+	channel int // Radio channel for this tcp port.
 	// -1 for all.
 
 	client_sock [MAX_NET_CLIENTS]net.Conn
@@ -394,10 +393,10 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
  * Let's try to keep it happy by sending back a command prompt.
  */
 
-type kiss_sendfun func(C.int, C.int, []byte, int, *kissport_status_s, C.int)
+type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
-	kps *kissport_status_s, client C.int,
+func kiss_rec_byte(kf *kiss_frame_t, ch byte, debug int,
+	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
 
@@ -409,7 +408,7 @@ func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 
 			if kf.noise_len > 0 {
 				if debug > 0 {
-					kiss_debug_print(FROM_CLIENT, "Rejected Noise", C.GoBytes(unsafe.Pointer(&kf.noise[0]), kf.noise_len))
+					kiss_debug_print(FROM_CLIENT, "Rejected Noise", kf.noise[:kf.noise_len])
 				}
 				kf.noise_len = 0
 			}
@@ -428,13 +427,12 @@ func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 		}
 		if ch == '\r' {
 			if debug > 0 {
-				kiss_debug_print(FROM_CLIENT, "Rejected Noise", C.GoBytes(unsafe.Pointer(&kf.noise[0]), kf.noise_len))
-				kf.noise[kf.noise_len] = 0
+				kiss_debug_print(FROM_CLIENT, "Rejected Noise", kf.noise[:kf.noise_len])
 			}
 
 			/* Try to appease client app by sending something back. */
-			if strings.EqualFold("restart\r", C.GoString((*C.char)(unsafe.Pointer(&kf.noise[0])))) ||
-				strings.EqualFold("reset\r", C.GoString((*C.char)(unsafe.Pointer(&kf.noise[0])))) {
+			if strings.EqualFold("restart\r", string(kf.noise[:kf.noise_len])) ||
+				strings.EqualFold("reset\r", string(kf.noise[:kf.noise_len])) {
 				// first 2 parameters don't matter when length is -1 indicating text.
 				sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
 			} else {
@@ -463,11 +461,10 @@ func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 			kf.kiss_len++
 			if debug > 0 {
 				/* As received over the wire from client app. */
-				kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
+				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[:kf.kiss_len])
 			}
 
-			var unwrapped = kiss_unwrap(C.GoBytes(unsafe.Pointer(&kf.kiss_msg[0]), kf.kiss_len))
-			var ulen = len(unwrapped)
+			var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
@@ -479,7 +476,7 @@ func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 				hex_dump(unwrapped[1:])
 			}
 
-			kiss_process_msg((*C.uchar)(C.CBytes(unwrapped)), C.int(ulen), debug, kps, client, sendfun)
+			kiss_process_msg(unwrapped, debug, kps, client, sendfun)
 
 			kf.state = KS_SEARCHING
 			return
@@ -522,30 +519,28 @@ func kiss_rec_byte(kf *kiss_frame_t, ch C.uchar, debug C.int,
 
 // This is used only by the TNC side.
 
-func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissport_status_s, client C.int, sendfun kiss_sendfun) {
+func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// Temporary for now
 	if KISSUTIL {
-		kiss_process_msg_override(kiss_msg, kiss_len)
+		Kissutil_kiss_process_msg(kiss_msg)
 		return
 	}
-
-	var kiss_msg_bytes = C.GoBytes(unsafe.Pointer(kiss_msg), kiss_len)
 
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.
 
-	var channel C.int
+	var channel int
 	if kps != nil && kps.channel != -1 {
 		// Ignore channel from KISS and substitute radio channel for that KISS TCP port.
 		channel = kps.channel
 	} else {
 		// Normal case of getting radio channel from the KISS frame.
-		channel = C.int(kiss_msg_bytes[0]>>4) & 0xf
+		channel = int(kiss_msg[0]>>4) & 0xf
 	}
 
 	var alevel alevel_t
-	var cmd = kiss_msg_bytes[0] & 0xf
+	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
 	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
@@ -553,7 +548,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 		// kissnet_copy clobbers first byte but we don't care
 		// because we have already determined channel and command.
 
-		kissnet_copy(kiss_msg, kiss_len, channel, C.int(cmd), kps, client)
+		kissnet_copy(kiss_msg, channel, int(cmd), kps, client)
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */
@@ -617,13 +612,13 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 
 			dw_printf("\n")
 			text_color_set(DW_COLOR_DEBUG)
-			kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(kiss_msg), kiss_len))
+			kiss_debug_print(FROM_CLIENT, "", kiss_msg)
 			return
 		}
 
 		alevel = alevel_t{} //nolint:exhaustruct
 
-		var pp = ax25_from_frame(kiss_msg_bytes[1:kiss_len], alevel)
+		var pp = ax25_from_frame(kiss_msg[1:], alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
@@ -636,103 +631,103 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 
 			if ax25_get_num_repeaters(pp) >= 1 &&
 				ax25_get_h(pp, AX25_REPEATER_1) > 0 {
-				tq_append(int(channel), TQ_PRIO_0_HI, pp)
+				tq_append(channel, TQ_PRIO_0_HI, pp)
 			} else {
-				tq_append(int(channel), TQ_PRIO_1_LO, pp)
+				tq_append(channel, TQ_PRIO_1_LO, pp)
 			}
 		}
 
 	case KISS_CMD_TXDELAY: /* 1 = TXDELAY */
 
-		if kiss_len < 2 {
+		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for TXDELAY command.\n")
 			return
 		}
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set TXDELAY = %d (*10mS units = %d mS), channel %d\n", kiss_msg_bytes[1], kiss_msg_bytes[1]*10, channel)
-		if kiss_msg_bytes[1] < 10 || kiss_msg_bytes[1] >= 100 {
+		dw_printf("KISS protocol set TXDELAY = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
+		if kiss_msg[1] < 10 || kiss_msg[1] >= 100 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Are you sure you want such an extreme value for TXDELAY?\n")
 			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
 			dw_printf("section, to understand what this means.\n")
 		}
-		xmit_set_txdelay(int(channel), int(kiss_msg_bytes[1]))
+		xmit_set_txdelay(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_PERSISTENCE: /* 2 = Persistence */
 
-		if kiss_len < 2 {
+		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for PERSISTENCE command.\n")
 			return
 		}
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set Persistence = %d, channel %d\n", kiss_msg_bytes[1], channel)
-		if kiss_msg_bytes[1] < 5 || kiss_msg_bytes[1] > 250 {
+		dw_printf("KISS protocol set Persistence = %d, channel %d\n", kiss_msg[1], channel)
+		if kiss_msg[1] < 5 || kiss_msg[1] > 250 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Are you sure you want such an extreme value for PERSIST?\n")
 			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
 			dw_printf("section, to understand what this means.\n")
 		}
-		xmit_set_persist(int(channel), int(kiss_msg_bytes[1]))
+		xmit_set_persist(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_SLOTTIME: /* 3 = SlotTime */
 
-		if kiss_len < 2 {
+		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for SLOTTIME command.\n")
 			return
 		}
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set SlotTime = %d (*10mS units = %d mS), channel %d\n", kiss_msg_bytes[1], kiss_msg_bytes[1]*10, channel)
-		if kiss_msg_bytes[1] < 2 || kiss_msg_bytes[1] > 50 {
+		dw_printf("KISS protocol set SlotTime = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
+		if kiss_msg[1] < 2 || kiss_msg[1] > 50 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Are you sure you want such an extreme value for SLOTTIME?\n")
 			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
 			dw_printf("section, to understand what this means.\n")
 		}
-		xmit_set_slottime(int(channel), int(kiss_msg_bytes[1]))
+		xmit_set_slottime(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_TXTAIL: /* 4 = TXtail */
-		if kiss_len < 2 {
+		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for TXTAIL command.\n")
 			return
 		}
 
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set TXtail = %d (*10mS units = %d mS), channel %d\n", kiss_msg_bytes[1], kiss_msg_bytes[1]*10, channel)
+		dw_printf("KISS protocol set TXtail = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
 
-		if kiss_msg_bytes[1] < 5 {
+		if kiss_msg[1] < 5 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Setting TXTAIL so low is asking for trouble.  You probably don't want to do this.\n")
 			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmit_set_txtail(int(channel), int(kiss_msg_bytes[1]))
+		xmit_set_txtail(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
-		if kiss_len < 2 {
+		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for FULLDUPLEX command.\n")
 			return
 		}
-		var val = kiss_msg_bytes[1] != 0
+		var val = kiss_msg[1] != 0
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set FullDuplex = %t, channel %d\n", val, channel)
-		xmit_set_fulldup(int(channel), val)
+		xmit_set_fulldup(channel, val)
 
 	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 
-		if kiss_len < 2 {
+		if len(kiss_msg) < 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS ERROR: Missing value for SET HARDWARE command.\n")
 			return
 		}
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg_bytes[1:], channel)
-		kiss_set_hardware(channel, kiss_msg_bytes[1:], debug, kps, client, sendfun)
+		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
+		kiss_set_hardware(channel, kiss_msg[1:], debug, kps, client, sendfun)
 
 	case KISS_CMD_END_KISS: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
@@ -742,7 +737,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("KISS Invalid command %d\n", cmd)
-		kiss_debug_print(FROM_CLIENT, "", C.GoBytes(unsafe.Pointer(kiss_msg), kiss_len))
+		kiss_debug_print(FROM_CLIENT, "", kiss_msg)
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Troubleshooting tip:\n")
@@ -846,7 +841,7 @@ func kiss_process_msg(kiss_msg *C.uchar, kiss_len C.int, debug C.int, kps *kissp
  *
  *--------------------------------------------------------------------*/
 
-func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport_status_s, client C.int, sendfun kiss_sendfun) {
+func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	var cmd, value, found = bytes.Cut(command, []byte{':'})
 
 	if found {
@@ -864,7 +859,7 @@ func kiss_set_hardware(channel C.int, command []byte, debug C.int, kps *kissport
 				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
 			}
 
-			var n = tq_count(int(channel), -1, "", "", true)
+			var n = tq_count(channel, -1, "", "", true)
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else {

@@ -16,22 +16,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <errno.h>
-// #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <ctype.h>
-// #include <stddef.h>
-// #include <string.h>
-// #include <getopt.h>
-// #include <dirent.h>
-// #include <sys/stat.h>
-// #define DIR_CHAR "/"
-import "C"
-
 import (
 	"bufio"
 	"fmt"
@@ -42,7 +26,6 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unsafe"
 
 	"github.com/pkg/term"
 	"github.com/spf13/pflag"
@@ -105,10 +88,7 @@ func KissUtilMain() {
 	text_color_init(0) // Turn off text color.
 	// It could interfere with trying to pipe stdout to some other application.
 
-	C.setlinebuf(C.stdout)
-
 	KISSUTIL = true // Change behaviour of kiss_process_msg
-	KISS_PROCESS_MSG_OVERRIDE = Kissutil_kiss_process_msg
 
 	/*
 	 * Extract command line args.
@@ -201,7 +181,7 @@ func KissUtilMain() {
 			var fname = entry.Name()
 			fmt.Printf("Processing %s for transmit...\n", fname)
 
-			var data, err = os.ReadFile(fname)
+			var data, err = os.ReadFile(fname) //nolint:gosec
 			if err != nil {
 				panic(err)
 			}
@@ -445,11 +425,11 @@ func tnc_listen_net() {
 			// on the assumption it was being used in only one direction.
 			// Not worried enough about it to do anything at this time.
 
-			var _verbose = C.int(0)
+			var _verbose = 0
 			if verbose {
 				_verbose = 1
 			}
-			kiss_rec_byte(&kstate, C.uchar(data[j]), _verbose, nil, 0, nil)
+			kiss_rec_byte(&kstate, data[j], _verbose, nil, 0, nil)
 		}
 	}
 } /* end tnc_listen_net */
@@ -492,11 +472,11 @@ func tnc_listen_serial() {
 		// Feed in one byte at a time.
 		// kiss_process_msg is called when a complete frame has been accumulated.
 
-		var _verbose = C.int(0)
+		var _verbose = 0
 		if verbose {
 			_verbose = 1
 		}
-		kiss_rec_byte(&kstate, C.uchar(ch), _verbose, nil, 0, nil)
+		kiss_rec_byte(&kstate, ch, _verbose, nil, 0, nil)
 	}
 } /* end tnc_listen_serial */
 
@@ -515,19 +495,15 @@ func tnc_listen_serial() {
  *
  *-----------------------------------------------------------------*/
 
-func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
+func Kissutil_kiss_process_msg(kiss_msg []byte) {
 	var alevel alevel_t
-
-	// Hacks to work around the dodgy C/Go/callback bodges I had to do
-	var kiss_len = C.int(_kiss_len)
-	var kiss_msg = unsafe.Slice((*C.uchar)(_kiss_msg), kiss_len)
 
 	var channel = (kiss_msg[0] >> 4) & 0xf
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
 	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
-		var pp = ax25_from_frame(C.GoBytes(unsafe.Pointer(&kiss_msg[0]), kiss_len)[1:], alevel)
+		var pp = ax25_from_frame(kiss_msg[1:], alevel)
 		if pp == nil {
 			fmt.Printf("ERROR - Invalid KISS data frame from TNC.\n")
 		} else {
@@ -567,7 +543,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 				fmt.Printf("Save received frame to %s\n", fullpath)
 
 				var content = fmt.Sprintf("%s %s%s\n", prefix, addrs, string(pinfo))
-				var err = os.WriteFile(fullpath, []byte(content), 0644)
+				var err = os.WriteFile(fullpath, []byte(content), 0644) //nolint:gosec
 
 				if err != nil {
 					fmt.Printf("Unable to open for write: %s\n", fullpath)
@@ -580,7 +556,7 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 		// Display as "h ..." for in/out symmetry.
 		// Use safe print here?
-		fmt.Printf("[%d] h %s\n", channel, C.GoString((*C.char)(unsafe.Pointer(&kiss_msg[1]))))
+		fmt.Printf("[%d] h %s\n", channel, string(kiss_msg[1:]))
 	/*
 	 * The rest should only go TO the TNC and not come FROM it.
 	 */
@@ -588,27 +564,6 @@ func Kissutil_kiss_process_msg(_kiss_msg unsafe.Pointer, _kiss_len int) {
 		fmt.Printf("Unexpected KISS command %d, channel %d\n", cmd, channel)
 	}
 } /* end kiss_process_msg */
-
-func usage() {
-	fmt.Printf("\n")
-	fmt.Printf("kissutil  -  Utility for testing a KISS TNC.\n")
-	fmt.Printf("\n")
-	fmt.Printf("Convert between KISS format and usual text representation.\n")
-	fmt.Printf("The TNC can be attached by TCP or a serial port.\n")
-	fmt.Printf("\n")
-	fmt.Printf("Usage:	kissutil  [ options ]\n")
-	fmt.Printf("\n")
-	fmt.Printf("	-h	hostname of TCP KISS TNC, default localhost.\n")
-	fmt.Printf("	-p	port, default 8001.\n")
-	fmt.Printf("		If it does not start with a digit, it is\n")
-	fmt.Printf("		a serial port.  e.g.  /dev/ttyAMA0 or COM3.\n")
-	fmt.Printf("	-s	Serial port speed, default 9600.\n")
-	fmt.Printf("	-v	Verbose.  Show the KISS frame contents.\n")
-	fmt.Printf("	-f	Transmit files directory.  Process and delete files here.\n")
-	fmt.Printf("	-o	Receive output queue directory.  Store received frames here.\n")
-	fmt.Printf("	-T	Precede received frames with 'strftime' format time stamp.\n")
-	usage2()
-}
 
 // Used as both CLI help message and in-usage error reminder
 func usage2() {

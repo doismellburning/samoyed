@@ -144,24 +144,10 @@ same direwolf instance.
 
 */
 
-// #include <stdlib.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <errno.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stddef.h>
-import "C"
-
 import (
 	"fmt"
 	"net"
 	"syscall"
-	"unsafe"
 )
 
 var s_misc_config_p *misc_config_s
@@ -204,8 +190,8 @@ func kissnet_init(mc *misc_config_s) {
 		if mc.kiss_port[i] != 0 {
 			var kps = new(kissport_status_s)
 
-			kps.tcp_port = C.int(mc.kiss_port[i])
-			kps.channel = C.int(mc.kiss_chan[i])
+			kps.tcp_port = mc.kiss_port[i]
+			kps.channel = mc.kiss_chan[i]
 
 			kissnet_init_one(kps)
 
@@ -245,7 +231,7 @@ func kissnet_init_one(kps *kissport_status_s) {
 	 * Currently we start up a separate thread for each potential connection.
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
-	for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+	for client := 0; client < MAX_NET_CLIENTS; client++ {
 		go kissnet_listen_thread(kps, client)
 	}
 }
@@ -385,8 +371,8 @@ func connect_listen_thread(kps *kissport_status_s) {
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen int,
-	onlykps *kissport_status_s, onlyclient C.int) {
+func kissnet_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int,
+	onlykps *kissport_status_s, onlyclient int) {
 	// Something received over the radio would normally be sent to all attached clients.
 	// However, there are times we want to send a response only to a particular client.
 	// In the case of a serial port or pseudo terminal, there is only one potential client.
@@ -394,7 +380,7 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen in
 
 	for kps := all_ports; kps != nil; kps = kps.pnext {
 		if onlykps == nil || kps == onlykps {
-			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+			for client := 0; client < MAX_NET_CLIENTS; client++ {
 				if onlyclient == -1 || client == onlyclient {
 					if kps.client_sock[client] != nil {
 						var kiss_buff []byte
@@ -498,11 +484,15 @@ func kissnet_send_rec_packet(channel C.int, kiss_cmd C.int, fbuf []byte, flen in
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_copy(in_msg *C.uchar, in_len C.int, channel C.int, cmd C.int, from_kps *kissport_status_s, from_client C.int) {
-	var msg = C.GoBytes(unsafe.Pointer(in_msg), in_len)
+func kissnet_copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
+
+	// Copy before mutating
+	var msg = make([]byte, len(_msg))
+	copy(msg, _msg)
+
 	if s_misc_config_p.kiss_copy {
 		for kps := all_ports; kps != nil; kps = kps.pnext {
-			for client := C.int(0); client < MAX_NET_CLIENTS; client++ {
+			for client := 0; client < MAX_NET_CLIENTS; client++ {
 				// To all but origin.
 				if !(kps == from_kps && client == from_client) { //nolint:staticcheck
 					if kps.client_sock[client] != nil {
@@ -596,7 +586,7 @@ func kiss_get(kps *kissport_status_s, client int) byte {
 	}
 }
 
-func kissnet_listen_thread(kps *kissport_status_s, client C.int) {
+func kissnet_listen_thread(kps *kissport_status_s, client int) {
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	/* TODO KG
@@ -618,8 +608,8 @@ func kissnet_listen_thread(kps *kissport_status_s, client C.int) {
 	// "Simply KISS" as some call it.
 
 	for {
-		var ch = kiss_get(kps, int(client))
-		kiss_rec_byte(kps.kf[client], C.uchar(ch), C.int(kiss_debug), kps, client, kissnet_send_rec_packet)
+		var ch = kiss_get(kps, client)
+		kiss_rec_byte(kps.kf[client], ch, kiss_debug, kps, client, kissnet_send_rec_packet)
 	}
 } /* end kissnet_listen_thread */
 
