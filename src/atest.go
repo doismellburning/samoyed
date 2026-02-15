@@ -176,6 +176,7 @@ Higher values = Try modifying more bits to get a good CRC.`)
 x = FX.25
 o = DCD output control
 2 = IL2P`)
+	var il2pNoCRC = pflag.Bool("no-il2p-crc", false, "Disable trailing CRC for IL2P frame decoding.  Default is CRC enabled.")
 	var help = pflag.Bool("help", false, "Display help text.")
 
 	pflag.Usage = func() {
@@ -394,6 +395,11 @@ o = DCD output control
 	if *modemProfile != "" {
 		fmt.Printf("Demodulator profile set to \"%s\"\n", *modemProfile)
 		my_audio_config.achan[0].profiles = *modemProfile
+	}
+
+	// IL2P CRC is enabled by default.  Use --no-il2p-crc to disable (e.g. for recordings made without CRC).
+	if !*il2pNoCRC {
+		my_audio_config.achan[0].il2p_crc = true
 	}
 
 	my_audio_config.achan[1] = my_audio_config.achan[0]

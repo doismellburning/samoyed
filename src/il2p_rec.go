@@ -18,6 +18,7 @@ const IL2P_SEARCHING IL2PState = 0
 const IL2P_HEADER IL2PState = 1
 const IL2P_PAYLOAD IL2PState = 2
 const IL2P_DECODE IL2PState = 3
+const IL2P_CRC IL2PState = 4
 
 type il2p_context_s struct {
 	state IL2PState
@@ -37,6 +38,9 @@ type il2p_context_s struct {
 
 	spayload [IL2P_MAX_ENCODED_PAYLOAD_SIZE]byte // Scrambled and encoded payload as received over the radio.
 	pc       int                                 // Number of bytes placed in above.
+
+	scrc [IL2P_CRC_ENCODED_SIZE]byte // Received Hamming-encoded CRC.
+	cc   int                         // CRC byte counter.
 
 	corrected int // Number of symbols corrected by RS FEC.
 }
@@ -155,7 +159,12 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 						F.state = IL2P_PAYLOAD
 					} else if F.eplen == 0 { // No payload.
 						F.pc = 0
-						F.state = IL2P_DECODE
+						if il2p_crc_enabled(channel) {
+							F.cc = 0
+							F.state = IL2P_CRC
+						} else {
+							F.state = IL2P_DECODE
+						}
 					} else { // Error.
 
 						if il2p_get_debug() >= 1 {
@@ -188,6 +197,28 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 				// TODO?: for symmetry it seems like we should clarify the payload before combining.
 
+				if il2p_crc_enabled(channel) {
+					F.cc = 0
+					F.state = IL2P_CRC
+				} else {
+					F.state = IL2P_DECODE
+				}
+			}
+		}
+
+	case IL2P_CRC: // Gathering 4 trailing CRC bytes.
+
+		F.bc++
+		if F.bc == 8 { // full byte has been collected.
+			F.bc = 0
+			if !F.polarity {
+				F.scrc[F.cc] = byte(F.acc & 0xff)
+				F.cc++
+			} else {
+				F.scrc[F.cc] = byte(^F.acc) & 0xff
+				F.cc++
+			}
+			if F.cc == IL2P_CRC_ENCODED_SIZE {
 				F.state = IL2P_DECODE
 			}
 		}
@@ -219,6 +250,24 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 					// Most likely too many FEC errors.
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("FAILED to construct frame in il2p_rec_bit.\n")
+				}
+			}
+
+			// Validate trailing CRC if we collected one.
+			if pp != nil && il2p_crc_enabled(channel) {
+				var frame_data = ax25_get_frame_data(pp)
+				if !il2p_crc_check(frame_data, F.scrc[:]) {
+					if il2p_get_debug() >= 1 {
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("IL2P trailing CRC mismatch.\n")
+					}
+					ax25_delete(pp)
+					pp = nil
+
+					// Retry with single erasure hints if there is payload to retry against.
+					if F.eplen > 0 {
+						pp = il2p_crc_retry_decode(F.uhdr[:], F.spayload[:encoded_payload_size], F.scrc[:])
+					}
 				}
 			}
 
