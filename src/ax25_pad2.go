@@ -114,15 +114,8 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>
-import "C"
-
 import (
-	"unsafe"
+	"bytes"
 )
 
 /*------------------------------------------------------------------------------
@@ -178,7 +171,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		return (nil)
 	}
 
-	var ctrl C.int
+	var ctrl int
 	var t cmdres_t // 1 = must be cmd, 0 = must be response, 2 = can be either.
 	var i = false  // Is Info part allowed?
 	switch ftype {
@@ -232,9 +225,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		}
 	}
 
-	var p = (*C.uchar)(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len))
-	*p = C.uchar(ctrl)
-	p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+	this_p.frame_data[this_p.frame_len] = byte(ctrl)
 	this_p.frame_len++
 
 	if ftype == frame_type_U_UI {
@@ -247,8 +238,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 			dw_printf("Internal error in ax25_u_frame: U frame, Invalid pid value 0x%02x.\n", pid)
 			pid = AX25_PID_NO_LAYER_3
 		}
-		*p = C.uchar(pid)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(pid)
 		this_p.frame_len++
 	}
 
@@ -259,8 +249,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 				dw_printf("Internal error in ax25_u_frame: U frame, Invalid information field length %d.\n", len(info))
 				info = info[:AX25_MAX_INFO_LEN]
 			}
-			C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
-			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
+			copy(this_p.frame_data[this_p.frame_len:], info)
 			this_p.frame_len += len(info)
 		}
 	} else {
@@ -269,9 +258,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 			dw_printf("Internal error in ax25_u_frame: Info part not allowed for U frame type.\n")
 		}
 	}
-	*p = 0
 
-	// TODO KG Assert(p == this_p.frame_data+this_p.frame_len)
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -371,25 +358,20 @@ func ax25_s_frame(
 		return (nil)
 	}
 
-	var p = (*C.uchar)(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len))
-
 	if modulo == 8 {
 		if pf != 0 {
 			ctrl |= 0x10
 		}
 		ctrl |= nr << 5
-		*p = C.uchar(ctrl)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 	} else {
-		*p = C.uchar(ctrl)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 
 		ctrl = pf & 1
 		ctrl |= nr << 1
-		*p = C.uchar(ctrl)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 	}
 
@@ -400,8 +382,7 @@ func ax25_s_frame(
 				dw_printf("Internal error in ax25_s_frame: SREJ frame, Invalid information field length %d.\n", len(info))
 				info = info[:AX25_MAX_INFO_LEN]
 			}
-			C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
-			p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
+			copy(this_p.frame_data[this_p.frame_len:], info)
 			this_p.frame_len += len(info)
 		}
 	} else {
@@ -410,9 +391,7 @@ func ax25_s_frame(
 			dw_printf("Internal error in ax25_s_frame: Info part not allowed for RR, RNR, REJ frame.\n")
 		}
 	}
-	*p = 0
 
-	// TODO KG Assert(p == this_p.frame_data+this_p.frame_len)
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -495,29 +474,24 @@ func ax25_i_frame(
 		ns &= int(modulo - 1)
 	}
 
-	var p = (*C.uchar)(unsafe.Add(unsafe.Pointer(&this_p.frame_data[0]), this_p.frame_len))
-
 	var ctrl int
 	if modulo == 8 {
 		ctrl = (nr << 5) | (ns << 1)
 		if pf != 0 {
 			ctrl |= 0x10
 		}
-		*p = C.uchar(ctrl)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 	} else {
 		ctrl = ns << 1
-		*p = C.uchar(ctrl)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 
 		ctrl = nr << 1
 		if pf != 0 {
 			ctrl |= 0x01
 		}
-		*p = C.uchar(ctrl)
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 	}
 
@@ -529,8 +503,7 @@ func ax25_i_frame(
 		dw_printf("Warning: Client application provided invalid PID value, 0x%02x, for I frame.\n", pid)
 		pid = AX25_PID_NO_LAYER_3
 	}
-	*p = C.uchar(pid)
-	p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), 1))
+	this_p.frame_data[this_p.frame_len] = byte(pid)
 	this_p.frame_len++
 
 	if len(info) > 0 {
@@ -539,14 +512,10 @@ func ax25_i_frame(
 			dw_printf("Internal error in ax25_i_frame: I frame, Invalid information field length %d.\n", len(info))
 			info = info[:AX25_MAX_INFO_LEN]
 		}
-		C.memcpy(unsafe.Pointer(p), C.CBytes(info), C.size_t(len(info)))
-		p = (*C.uchar)(unsafe.Add(unsafe.Pointer(p), len(info)))
+		copy(this_p.frame_data[this_p.frame_len:], info)
 		this_p.frame_len += len(info)
 	}
 
-	*p = 0
-
-	// TODO KG Assert(p == this_p.frame_data+this_p.frame_len)
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -578,7 +547,7 @@ func ax25_i_frame(
  *
  *------------------------------------------------------------------------------*/
 
-func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t) C.int {
+func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t) int {
 
 	Assert(pp.frame_len == 0)
 	Assert(cr == cr_cmd || cr == cr_res)
@@ -591,7 +560,6 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 
 	for n := 0; n < num_addr; n++ {
 
-		var pa = (*C.uchar)(unsafe.Add(unsafe.Pointer(&pp.frame_data[0]), n*7))
 		var strictness = 1
 
 		var oaddr, ssid, _, ok = ax25_parse_addr(n, addrs[n], strictness)
@@ -602,28 +570,25 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 
 		// Fill in address.
 
-		C.memset(unsafe.Pointer(pa), ' '<<1, 6)
-		var pb = pa
-		for _, c := range oaddr {
-			*pb = C.uchar(c << 1)
-			pb = (*C.uchar)(unsafe.Add(unsafe.Pointer(pb), 1))
+		copy(pp.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
+		for i, c := range oaddr {
+			pp.frame_data[n*7+i] = byte(c << 1)
 		}
-		pa = (*C.uchar)(unsafe.Add(unsafe.Pointer(pa), 6))
 
 		// Fill in SSID.
 
-		*pa = C.uchar(0x60 | ((ssid & 0xf) << 1))
+		pp.frame_data[n*7+6] = byte(0x60 | ((ssid & 0xf) << 1))
 
 		// Command / response flag.
 
 		switch n {
 		case AX25_DESTINATION:
 			if cr == cr_cmd {
-				*pa |= 0x80
+				pp.frame_data[n*7+6] |= 0x80
 			}
 		case AX25_SOURCE:
 			if cr == cr_res {
-				*pa |= 0x80
+				pp.frame_data[n*7+6] |= 0x80
 			}
 		default:
 		}
@@ -631,7 +596,7 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 		// Is this the end of address field?
 
 		if n == num_addr-1 {
-			*pa |= 1
+			pp.frame_data[n*7+6] |= 1
 		}
 
 		pp.frame_len += 7
