@@ -12,6 +12,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/ecobee/goalsa v0.0.0-20230731174733-19b297509b2e // indirect
 	github.com/jkeiser/iter v0.0.0-20200628201005-c8aa0ae784d1 // indirect
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b // indirect
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
