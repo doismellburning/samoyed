@@ -30,16 +30,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <math.h>
-// #include <errno.h>
-// #include <stddef.h>
-import "C"
-
 import (
 	"math/rand"
 	"os"
@@ -726,7 +716,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	 * about 40 mS of elapsed real time.
 	 */
 
-	audio_wait(C.int(ACHAN2ADEV(channel)))
+	audio_wait(ACHAN2ADEV(channel))
 
 	/*
 	 * Ideally we should be here just about the time when the audio is ending.
@@ -1158,7 +1148,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 	 * We still need to wait if operating in stereo and the other audio
 	 * half is busy.
 	 */
-	var n C.int = 0
+	var n int = 0
 	if !fulldup {
 
 	start_over_again:

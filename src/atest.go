@@ -37,20 +37,6 @@ package direwolf
  *
  *--------------------------------------------------------------------*/
 
-// #define X 1
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-// #include <getopt.h>
-// #include <ctype.h>
-// #include <math.h>
-// int audio_get_real (int a);
-// int get_input_real (int it, int chan);
-import "C"
-
 import (
 	"encoding/binary"
 	"errors"
@@ -610,7 +596,7 @@ o = DCD output control
  * Simulate sample from the audio device.
  */
 
-func audio_get_fake(_ C.int) C.int {
+func audio_get_fake(_ int) int {
 
 	if wav_data.Datasize <= 0 {
 		e_o_f = true
@@ -629,10 +615,10 @@ func audio_get_fake(_ C.int) C.int {
 
 	// TODO KG Better error handling
 
-	return C.int(data[0])
+	return int(data[0])
 }
 
-func audio_get(a C.int) C.int {
+func audio_get(a int) int {
 	if ATEST_C {
 		return audio_get_fake(a)
 	} else {
@@ -678,9 +664,9 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 	/* Insert time stamp relative to start of file. */
 
-	var sec = C.double(sample_number) / C.double(my_audio_config.adev[0].samples_per_sec)
+	var sec = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 	var minutes = int(sec / 60.)
-	sec -= C.double(minutes * 60)
+	sec -= float64(minutes * 60)
 
 	dw_printf("%d:%06.3f ", minutes, sec)
 
@@ -777,13 +763,13 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 } /* end fake dlq_append */
 
-var dcd_start_time [MAX_RADIO_CHANS]C.double
+var dcd_start_time [MAX_RADIO_CHANS]float64
 
 func ptt_set_fake(ot int, channel int, ptt_signal int) {
 	// Should only get here for DCD output control.
 
 	if d_o_opt > 0 {
-		var t = C.double(sample_number) / C.double(my_audio_config.adev[0].samples_per_sec)
+		var t = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 
 		text_color_set(DW_COLOR_INFO)
 
@@ -799,11 +785,11 @@ func ptt_set_fake(ot int, channel int, ptt_signal int) {
 
 			var sec1 = dcd_start_time[channel]
 			var min1 = (int)(sec1 / 60.)
-			sec1 -= C.double(min1 * 60)
+			sec1 -= float64(min1 * 60)
 
 			var sec2 = t
 			var min2 = (int)(sec2 / 60.)
-			sec2 -= C.double(min2 * 60)
+			sec2 -= float64(min2 * 60)
 
 			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-dcd_start_time[channel])*1000.)
 		}

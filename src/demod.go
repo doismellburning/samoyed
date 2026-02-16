@@ -10,16 +10,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <math.h>
-// #include <unistd.h>
-// #include <sys/stat.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"strings"
 	"unicode"
@@ -795,7 +785,7 @@ func demod_get_sample(a int) int {
 
 	if save_audio_config_p.adev[a].bits_per_sample == 8 {
 
-		var x1 = audio_get(C.int(a))
+		var x1 = audio_get(a)
 		if x1 < 0 {
 			return (FSK_READ_ERR)
 		}
@@ -807,12 +797,12 @@ func demod_get_sample(a int) int {
 		sam = int16(x1-128) * 256
 
 	} else {
-		var x1 = audio_get(C.int(a)) /* lower byte first */
+		var x1 = audio_get(a) /* lower byte first */
 		if x1 < 0 {
 			return (FSK_READ_ERR)
 		}
 
-		var x2 = audio_get(C.int(a))
+		var x2 = audio_get(a)
 		if x2 < 0 {
 			return (FSK_READ_ERR)
 		}

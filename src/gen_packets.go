@@ -49,17 +49,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <getopt.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <math.h>
-// int audio_flush_real (int a);
-// int audio_put_real (int a, int c);
-// void dcd_change_real (int chan, int subchan, int slice, int state);
-import "C"
-
 import (
 	"bufio"
 	"encoding/binary"
@@ -911,7 +900,7 @@ func audio_put(a int, c uint8) int {
 	if GEN_PACKETS {
 		return audio_put_fake(a, c)
 	} else {
-		return int(audio_put_real(C.int(a), C.int(c)))
+		return audio_put_real(a, int(c))
 	}
 }
 
@@ -923,7 +912,7 @@ func audio_flush(a int) int {
 	if GEN_PACKETS {
 		return audio_flush_fake(a)
 	} else {
-		return int(audio_flush_real(C.int(a)))
+		return audio_flush_real(a)
 	}
 }
 
