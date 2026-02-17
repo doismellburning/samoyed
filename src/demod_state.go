@@ -111,8 +111,6 @@ type demodulator_state_s struct {
 	 * The rest are continuously updated.
 	 */
 
-	lo_phase uint /* Local oscillator for PSK. */
-
 	/*
 	 * Use half of the AGC code to get a measure of input audio amplitude.
 	 * These use "quick" attack and "sluggish" decay while the
