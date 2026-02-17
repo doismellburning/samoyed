@@ -1,21 +1,5 @@
 package direwolf
 
-// #define APRS_TT_C 1
-// #include <stdlib.h>
-// #include <math.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <errno.h>
-// #include <ctype.h>
-// #include <assert.h>
-// #include "utm.h"
-// #include "mgrs.h"
-// #include "usng.h"
-// #include "error_string.h"
-// // Expose some of the aprs_tt.c globals
-import "C"
-
 import (
 	"fmt"
 	"strconv"
