@@ -147,18 +147,9 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>
-// #include <math.h>
-import "C"
-
 import (
 	"runtime"
 	"time"
-	"unsafe"
 )
 
 // Limits and defaults for parameters.
@@ -724,7 +715,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 
 	// If it came from the radio, search for destination our registered callsign list.
 
-	var incoming_for_client int = -1 // which client app registered the callsign?
+	var incoming_for_client = -1 // which client app registered the callsign?
 
 	if client == -1 { // from the radio.
 
@@ -1245,7 +1236,7 @@ func dl_data_request(E *dlq_item_t) {
 		return
 	}
 
-	C.memcpy(unsafe.Pointer(&first_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
+	copy(first_segment.segdata[:], E.txdata.data[orig_offset:seglen])
 
 	var cdataData = []byte{first_segment.header, first_segment.original_pid}
 	cdataData = append(cdataData, first_segment.segdata[:seglen]...)
@@ -1278,7 +1269,7 @@ func dl_data_request(E *dlq_item_t) {
 			return
 		}
 
-		C.memcpy(unsafe.Pointer(&subsequent_segment.segdata[0]), unsafe.Pointer(&E.txdata.data[orig_offset]), C.ulong(seglen))
+		copy(subsequent_segment.segdata[:], E.txdata.data[orig_offset:seglen])
 
 		cdataData = []byte{subsequent_segment.header}
 		cdataData = append(cdataData, subsequent_segment.segdata[:seglen]...)
@@ -1543,12 +1534,12 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 	//						// Indexed by N(S) in case it gets lost and needs to be sent again.
 	//						// Cleared out when we get ACK for it.
 
-	var count1 int = 0
+	var count1 = 0
 	for incoming := S.i_frame_queue; incoming != nil; incoming = incoming.next {
 		count1++
 	}
 
-	var count2 int = 0
+	var count2 = 0
 	for k := 0; k < int(S.modulo); k++ {
 		if S.txdata_by_ns[k] != nil {
 			count2++
@@ -3010,7 +3001,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			nr = AX25MODULO(nr, S.modulo)
 		}
 
-		var _f int = 0
+		var _f = 0
 		if f { // C int bool hackery
 			_f = 1
 		}
@@ -3042,7 +3033,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 			nr = AX25MODULO(nr, S.modulo)
 		}
 
-		var _f int = 0
+		var _f = 0
 		if f { // C int bool hackery
 			_f = 1
 		}
@@ -3107,7 +3098,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 		if cr == cr_cmd {
 			var r = cr_res // DM response with F taken from P.
 			var f = pf
-			var nopid int = 0 // PID only for I and UI frames.
+			var nopid = 0 // PID only for I and UI frames.
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
@@ -3122,8 +3113,8 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 
 		if cr == cr_cmd && pf == 1 {
 			var r = cr_res // DM response with F = 1.
-			var f int = 1
-			var nopid int = 0 // PID applies only for I and UI frames.
+			var f = 1
+			var nopid = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3213,7 +3204,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			// RR/RNR response, F==0
 
 			if cr == cr_cmd && pf == 1 {
-				var f int = 1
+				var f = 1
 				enquiry_response(S, RR_OR_RNR(ready), f)
 			}
 
@@ -3351,7 +3342,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 		if cr == cr_cmd {
 			var r = cr_res // DM response with F taken from P.
 			var f = pf
-			var nopid int = 0 // PID is only for I and UI.
+			var nopid = 0 // PID is only for I and UI.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3364,8 +3355,8 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 
 		if cr == cr_cmd && pf == 1 {
 			var r = cr_res // DM response with F = 1.
-			var f int = 1
-			var nopid int = 0
+			var f = 1
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3449,7 +3440,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			}
 		} else {
 			if cr == cr_cmd && pf == 1 {
-				var f int = 1
+				var f = 1
 				enquiry_response(S, frame_type_S_REJ, f)
 			}
 
@@ -3584,7 +3575,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
  *
  *------------------------------------------------------------------------------*/
 
-func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) {
+func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nolint:unparam
 
 	switch S.state {
 
@@ -3770,8 +3761,8 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 	var cr = cr_cmd
 	var i_frame_nr = S.vr
 	var i_frame_ns = nr
-	var p int = 0
-	var num_resent int = 0
+	var p = 0
+	var num_resent = 0
 
 	// Resend I frame with N(S) equal to the N(R) in the SREJ.
 	// Additional sequence numbers can be in optional information part.
@@ -3890,7 +3881,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		var res = cr_res
 		var f = p // I don't understand the purpose of "P" in SABM/SABME
 		// but we dutifully copy it into "F" for the UA response.
-		var nopid int = 0 // PID is only for I and UI.
+		var nopid = 0 // PID is only for I and UI.
 
 		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3925,7 +3916,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		if extended { // SABME - respond with DM, enter state 5.
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3938,7 +3929,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3950,7 +3941,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		if extended { // SABME - respond with UA
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3958,7 +3949,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		} else { // SABM, respond with UA, enter state 1
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -3973,7 +3964,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		{
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
@@ -3985,7 +3976,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		{
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -4065,7 +4056,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 		{
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -4077,7 +4068,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 		{
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
@@ -4091,7 +4082,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 
 			var res = cr_res
 			var f = p
-			var nopid int = 0
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -4604,8 +4595,8 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
 
 		case state_0_disconnected, state_1_awaiting_connection, state_2_awaiting_release, state_5_awaiting_v22_connection:
 			{
-				var r = cr_res    // DM response with F taken from P.
-				var nopid int = 0 // PID applies only for I and UI frames.
+				var r = cr_res // DM response with F taken from P.
+				var nopid = 0  // PID applies only for I and UI frames.
 
 				var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, pf, nopid, nil)
 				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -4693,8 +4684,8 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 					var res = cr_res
 					var xinfo = xid_encode(param, res)
 
-					var nopid int = 0
-					var f int = -1
+					var nopid = 0
+					var f = -1
 					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, xinfo)
 					lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 				}
@@ -4790,7 +4781,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 	var res = cr_res
 	var f = pf
-	var nopid int = 0
+	var nopid = 0
 
 	if cr == cr_cmd {
 		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info)
@@ -4909,8 +4900,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			var cmd = cr_cmd
-			var p int = 1
-			var nopid int = 0
+			var p = 1
+			var nopid = 0
 
 			SET_RC(S, S.rc+1)
 			if S.rc > S.peak_rc_value {
@@ -4937,8 +4928,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			var cmd = cr_cmd
-			var p int = 1
-			var nopid int = 0
+			var p = 1
+			var nopid = 0
 
 			SET_RC(S, S.rc+1)
 			if S.rc > S.peak_rc_value {
@@ -4996,8 +4987,8 @@ func t1_expiry(S *ax25_dlsm_t) {
 			discard_i_queue(S)
 
 			var cr = cr_res // DM can only be response.
-			var f int = 0   // Erratum: Assuming F=0 because it is not response to P=1
-			var nopid int = 0
+			var f = 0       // Erratum: Assuming F=0 because it is not response to P=1
+			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, f, nopid, nil)
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
@@ -5084,8 +5075,8 @@ func t3_expiry(S *ax25_dlsm_t) {
 
 func tm201_expiry(S *ax25_dlsm_t) {
 	var cmd = cr_cmd
-	var p int = 1
-	var nopid int = 0
+	var p = 1
+	var nopid = 0
 
 	if s_debug_timers {
 		var now = time.Now()
@@ -5170,8 +5161,8 @@ func nr_error_recovery(S *ax25_dlsm_t) {
 
 func establish_data_link(S *ax25_dlsm_t) {
 	var cmd = cr_cmd
-	var p int = 1
-	var nopid int = 0
+	var p = 1
+	var nopid = 0
 
 	clear_exception_conditions(S)
 
@@ -5266,7 +5257,7 @@ func clear_exception_conditions(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func transmit_enquiry(S *ax25_dlsm_t) {
-	var p int = 1
+	var p = 1
 	var nr = S.vr
 	var cmd = cr_cmd
 
@@ -5607,7 +5598,7 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr int) {
 
 func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr cmdres_t, pf int) {
 	if cr == cr_cmd && pf == 1 {
-		var f int = 1
+		var f = 1
 		enquiry_response(S, frame_type, f)
 	} else if cr == cr_res && pf == 1 {
 		if s_debug_protocol_errors {
@@ -6093,8 +6084,8 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 		var cmd = cr_cmd
 		var xinfo = xid_encode(&param, cmd)
 
-		var p int = 1
-		var nopid int = 0
+		var p = 1
+		var nopid = 0
 		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
