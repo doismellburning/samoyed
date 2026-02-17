@@ -20,28 +20,6 @@ const (
 	BP_WINDOW_FLATTOP
 )
 
-// Experimental low pass filter to detect DC bias or low frequency changes.
-// IIR behaves like an analog R-C filter.
-// Intuitively, it seems like FIR would be better because it is based on a finite history.
-// However, it would require MANY taps and a LOT of computation for a low frequency.
-// We can use a little trick here to keep a running average.
-// This would be equivalent to convolving with an array of all 1 values.
-// That would eliminate the need to multiply.
-// We can also eliminate the need to add them all up each time by keeping a running total.
-// Add a sample to the total when putting it in our array of recent samples.
-// Subtract it from the total when it gets pushed off the end.
-// We can also eliminate the need to shift them all down by using a circular buffer.
-
-const CIC_LEN_MAX = 4000
-
-type cic_t struct {
-	len int // Number of elements used.
-	// Might want to dynamically allocate.
-	in    [CIC_LEN_MAX]int16 // Samples coming in.
-	sum   int                // Running sum.
-	inext int                // Next position to fill.
-}
-
 const MAX_FILTER_SIZE = 480 /* 401 is needed for profile A, 300 baud & 44100. Revisit someday. */
 // Size comes out to 417 for 1200 bps with 48000 sample rate
 // v1.7 - Was 404.  Bump up to 480.
@@ -341,23 +319,6 @@ type demodulator_state_s struct {
 			agc_3_slow_decay  float64
 			agc_3_peak        float64
 			agc_3_valley      float64
-
-			// CIC low pass filters to detect DC bias or low frequency changes.
-			// IIR behaves like an analog R-C filter.
-			// Intuitively, it seems like FIR would be better because it is based on a finite history.
-			// However, it would require MANY taps and a LOT of computation for a low frequency.
-			// We can use a little trick here to keep a running average.
-			// This would be equivalent to convolving with an array of all 1 values.
-			// That would eliminate the need to multiply.
-			// We can also eliminate the need to add them all up each time by keeping a running total.
-			// Add a sample to the total when putting it in our array of recent samples.
-			// Subtract it from the total when it gets pushed off the end.
-			// We can also eliminate the need to shift them all down by using a circular buffer.
-			// This only works with integers because float would have cumulated round off errors.
-
-			cic_center1 cic_t
-			cic_above   cic_t
-			cic_below   cic_t
 		}
 
 		//////////////////////////////////////////////////////////////////////////////////
