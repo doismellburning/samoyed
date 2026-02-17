@@ -6,15 +6,6 @@ package direwolf
  *
  *----------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <math.h>
-// #include <unistd.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"math"
 )
@@ -239,7 +230,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
  *
  *----------------------------------------------------------------*/
 
-func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_size int, wtype bp_window_t) {
+func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_size int, wtype bp_window_t) { //nolint:unused
 
 	var Gs float64 = 0
 	var Gc float64 = 0
