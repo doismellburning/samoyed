@@ -126,7 +126,7 @@ func recv_adev_thread(a int) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 
-	var first_chan = C.int(ADEVFIRSTCHAN(a))
+	var first_chan = ADEVFIRSTCHAN(a)
 	var num_chan = save_pa.adev[a].num_channels
 
 	/*
@@ -134,7 +134,7 @@ func recv_adev_thread(a int) {
 	 */
 	var eof = false
 	for !eof {
-		for c := C.int(0); c < C.int(num_chan); c++ {
+		for c := 0; c < num_chan; c++ {
 			var audio_sample = demod_get_sample(a)
 
 			if audio_sample >= 256*256 {
@@ -143,7 +143,7 @@ func recv_adev_thread(a int) {
 
 			// Future?  provide more flexible mapping.
 			// i.e. for each valid channel where audio_source[] is first_chan+c.
-			multi_modem_process_sample(int(first_chan+c), audio_sample)
+			multi_modem_process_sample(first_chan+c, audio_sample)
 
 			/* Originally, the DTMF decoder was always active. */
 			/* It took very little CPU time and the thinking was that an */
@@ -165,9 +165,9 @@ func recv_adev_thread(a int) {
 			/* sequences arriving at the same instant. */
 
 			if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
-				var tt = dtmf_sample(int(first_chan+c), float64(audio_sample)/16384.)
+				var tt = dtmf_sample(first_chan+c, float64(audio_sample)/16384.)
 				if tt != ' ' {
-					aprs_tt_button(int(first_chan+c), tt)
+					aprs_tt_button(first_chan+c, tt)
 				}
 			}
 		} // for c is just 0 or 0 then 1
