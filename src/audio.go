@@ -1752,7 +1752,7 @@ func audio_get_real(a int) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_put_real(a C.int, c C.int) C.int {
+func audio_put_real(a int, c uint8) int {
 	/* Should never be full at this point. */
 	Assert(adev[a].outbuf_len < adev[a].outbuf_size_in_bytes)
 
@@ -1761,7 +1761,7 @@ func audio_put_real(a C.int, c C.int) C.int {
 	adev[a].outbuf_len++
 
 	if adev[a].outbuf_len == adev[a].outbuf_size_in_bytes {
-		return C.int(audio_flush(int(a)))
+		return audio_flush(a)
 	}
 
 	return (0)
@@ -1782,7 +1782,7 @@ func audio_put_real(a C.int, c C.int) C.int {
  *
  *----------------------------------------------------------------*/
 
-func audio_flush_real(a C.int) C.int {
+func audio_flush_real(a int) int {
 	// TODO KG #if USE_ALSA
 
 	Assert(adev[a].audio_out_handle != nil)
