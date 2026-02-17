@@ -1,8 +1,5 @@
 package direwolf
 
-// #include <stdint.h>          // int64_t
-import "C"
-
 /*
  * Demodulator state.
  * Different copy is required for each channel & subchannel being processed concurrently.
