@@ -28,16 +28,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <assert.h>
-// #include <time.h>
-import "C"
-
 import (
 	"time"
 )
@@ -69,7 +59,7 @@ var audioStatsSampleCount [MAX_ADEVS]int
 var audioStatsErrorCount [MAX_ADEVS]int
 var audioStatsSuppressFirst [MAX_ADEVS]bool
 
-func audio_stats(adev C.int, nchan int, nsamp int, interval int) {
+func audio_stats(adev int, nchan int, nsamp int, interval int) {
 
 	/* Gather numbers for read from audio device. */
 
@@ -120,15 +110,15 @@ func audio_stats(adev C.int, nchan int, nsamp int, interval int) {
 				text_color_set(DW_COLOR_DEBUG)
 
 				if nchan > 1 {
-					var ch0 = ADEVFIRSTCHAN(int(adev))
+					var ch0 = ADEVFIRSTCHAN(adev)
 					var alevel0 = demod_get_audio_level(ch0, 0)
-					var ch1 = ADEVFIRSTCHAN(int(adev)) + 1
+					var ch1 = ADEVFIRSTCHAN(adev) + 1
 					var alevel1 = demod_get_audio_level(ch1, 0)
 
 					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio levels CH%d %d, CH%d %d\n\n",
 						adev, ave_rate, audioStatsErrorCount[adev], ch0, alevel0.rec, ch1, alevel1.rec)
 				} else {
-					var ch0 = ADEVFIRSTCHAN(int(adev))
+					var ch0 = ADEVFIRSTCHAN(adev)
 					var alevel0 = demod_get_audio_level(ch0, 0)
 
 					dw_printf("\nADEVICE%d: Sample rate approx. %.1f k, %d errors, receive audio level CH%d %d\n\n",

@@ -1455,7 +1455,7 @@ static int set_oss_params (int a, int fd, struct audio_s *pa)
  *
  *----------------------------------------------------------------*/
 
-func audio_get_real(a C.int) C.int {
+func audio_get_real(a int) int {
 
 	/* TODO KG
 	   #if STATISTICS
@@ -1708,10 +1708,10 @@ func audio_get_real(a C.int) C.int {
 		}
 	}
 
-	var n C.int
+	var n int
 
 	if adev[a].inbuf_next < adev[a].inbuf_len {
-		n = C.int(*(*C.uchar)(unsafe.Add(unsafe.Pointer(adev[a].inbuf_ptr), adev[a].inbuf_next)))
+		n = int(*(*C.uchar)(unsafe.Add(unsafe.Pointer(adev[a].inbuf_ptr), adev[a].inbuf_next)))
 		adev[a].inbuf_next++
 		//No data to read, avoid reading outside buffer
 	} else {
