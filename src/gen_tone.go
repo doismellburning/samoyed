@@ -8,14 +8,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <math.h>
-// #include <unistd.h>
-// #include <string.h>
-// #include <stdlib.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -107,9 +99,7 @@ var prev_dat [MAX_RADIO_CHANS]int // Previous data bit.  Used for G3RUH style.
  *
  *----------------------------------------------------------------*/
 
-var amp16bit int /* for 9600 baud */
-
-func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int {
+func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //nolint:unparam
 
 	/* TODO KG
 	#if DEBUG
@@ -124,8 +114,6 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int {
 	 */
 
 	save_audio_config_p = audio_config_p
-
-	amp16bit = ((32767 * amp) / 100)
 
 	for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
 
@@ -278,7 +266,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int {
 // 1 -> take new value.
 // in between some sort of weighted average.
 
-func interpol8(oldv float64, newv float64, bc float64) float64 {
+func interpol8(oldv float64, newv float64, bc float64) float64 { //nolint:unused
 	// Step function.
 	//return (newv);				// 78 on 11/7
 
