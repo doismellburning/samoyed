@@ -18,8 +18,8 @@ package direwolf
 // #include <netinet/in.h>
 // #include <netdb.h>
 // #include <hamlib/rig.h>
-// #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay libgpiod
-// #cgo CFLAGS: -I../external/geotranz -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
+// #cgo pkg-config: avahi-client hamlib libbsd-overlay libgpiod
+// #cgo CFLAGS: -I../external/geotranz -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB
 // #cgo LDFLAGS: -lm
 import "C"
 

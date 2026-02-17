@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/creack/pty v1.1.24
+	github.com/gen2brain/malgo v0.11.24
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
 	github.com/lestrrat-go/strftime v1.1.1
 	github.com/pkg/term v1.1.0
