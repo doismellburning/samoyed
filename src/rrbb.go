@@ -13,12 +13,6 @@ package direwolf
  *
  *******************************************************************************/
 
-// #include <stdio.h>
-// #include <assert.h>
-// #include <stdlib.h>
-// #include <string.h>
-import "C"
-
 var new_count = 0
 var delete_count = 0
 
@@ -272,7 +266,7 @@ func rrbb_delete(b *rrbb_t) {
  *
  ***********************************************************************************/
 
-func rrbb_set_nextp(b *rrbb_t, np *rrbb_t) {
+func rrbb_set_nextp(b *rrbb_t, np *rrbb_t) { //nolint:unused
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -290,7 +284,7 @@ func rrbb_set_nextp(b *rrbb_t, np *rrbb_t) {
  *
  ***********************************************************************************/
 
-func rrbb_get_nextp(b *rrbb_t) *rrbb_t {
+func rrbb_get_nextp(b *rrbb_t) *rrbb_t { //nolint:unused
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -426,7 +420,7 @@ func rrbb_set_speed_error(b *rrbb_t, speed_error float64) {
  *
  ***********************************************************************************/
 
-func rrbb_get_speed_error(b *rrbb_t) float64 {
+func rrbb_get_speed_error(b *rrbb_t) float64 { //nolint:unused
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)

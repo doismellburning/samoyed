@@ -19,16 +19,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <math.h>
-// #include <unistd.h>
-// #include <sys/stat.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"math"
 )

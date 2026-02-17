@@ -11,16 +11,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <math.h>
-// #include <unistd.h>
-// #include <sys/stat.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"math"
 )
@@ -46,7 +36,7 @@ func push_sample(val float64, buff []float64, size int) {
 /* FIR filter kernel. */
 
 func convolve(data, filter []float64, filter_size int) float64 {
-	var sum float64 = 0.0
+	var sum = 0.0
 
 	for j := range filter_size {
 		sum += filter[j] * data[j]
@@ -396,7 +386,7 @@ func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulato
 
 func process_filtered_sample(channel int, fsam float64, D *demodulator_state_s) {
 
-	var subchannel int = 0
+	var subchannel = 0
 
 	/*
 	 * Version 1.2: Capture the post-filtering amplitude for display.

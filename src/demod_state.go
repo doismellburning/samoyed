@@ -1,8 +1,5 @@
 package direwolf
 
-// #include <stdint.h>          // int64_t
-import "C"
-
 /*
  * Demodulator state.
  * Different copy is required for each channel & subchannel being processed concurrently.
@@ -19,28 +16,6 @@ const (
 	BP_WINDOW_BLACKMAN
 	BP_WINDOW_FLATTOP
 )
-
-// Experimental low pass filter to detect DC bias or low frequency changes.
-// IIR behaves like an analog R-C filter.
-// Intuitively, it seems like FIR would be better because it is based on a finite history.
-// However, it would require MANY taps and a LOT of computation for a low frequency.
-// We can use a little trick here to keep a running average.
-// This would be equivalent to convolving with an array of all 1 values.
-// That would eliminate the need to multiply.
-// We can also eliminate the need to add them all up each time by keeping a running total.
-// Add a sample to the total when putting it in our array of recent samples.
-// Subtract it from the total when it gets pushed off the end.
-// We can also eliminate the need to shift them all down by using a circular buffer.
-
-const CIC_LEN_MAX = 4000
-
-type cic_t struct {
-	len int // Number of elements used.
-	// Might want to dynamically allocate.
-	in    [CIC_LEN_MAX]int16 // Samples coming in.
-	sum   int                // Running sum.
-	inext int                // Next position to fill.
-}
 
 const MAX_FILTER_SIZE = 480 /* 401 is needed for profile A, 300 baud & 44100. Revisit someday. */
 // Size comes out to 417 for 1200 bps with 48000 sample rate
@@ -68,15 +43,6 @@ type demodulator_state_s struct {
 
 	lp_window bp_window_t
 
-	/*
-	 * Alternate Low pass filters.
-	 * First is arbitrary number for quick IIR.
-	 * Second is frequency as ratio to baud rate for FIR.
-	 */
-	lpf_use_fir int /* 0 for IIR, 1 for FIR. */
-
-	lpf_iir float64 /* Only if using IIR. */
-
 	lpf_baud float64 /* Cutoff frequency as fraction of baud. */
 	/* Intuitively we'd expect this to be somewhere */
 	/* in the range of 0.5 to 1. */
@@ -103,10 +69,6 @@ type demodulator_state_s struct {
 	quick_attack   float64
 	sluggish_decay float64
 
-	/*
-	 * Hysteresis before final demodulator 0 / 1 decision.
-	 */
-	hysteresis  float64
 	num_slicers int /* >1 for multiple slicers. */
 
 	/*
@@ -146,8 +108,6 @@ type demodulator_state_s struct {
 	 * The rest are continuously updated.
 	 */
 
-	lo_phase uint /* Local oscillator for PSK. */
-
 	/*
 	 * Use half of the AGC code to get a measure of input audio amplitude.
 	 * These use "quick" attack and "sluggish" decay while the
@@ -167,9 +127,8 @@ type demodulator_state_s struct {
 
 	lp_filter [MAX_FILTER_SIZE]float64
 
-	m_peak, s_peak         float64
-	m_valley, s_valley     float64
-	m_amp_prev, s_amp_prev float64
+	m_peak, s_peak     float64
+	m_valley, s_valley float64
 
 	/*
 	 * For the PLL and data bit timing.
@@ -341,23 +300,6 @@ type demodulator_state_s struct {
 			agc_3_slow_decay  float64
 			agc_3_peak        float64
 			agc_3_valley      float64
-
-			// CIC low pass filters to detect DC bias or low frequency changes.
-			// IIR behaves like an analog R-C filter.
-			// Intuitively, it seems like FIR would be better because it is based on a finite history.
-			// However, it would require MANY taps and a LOT of computation for a low frequency.
-			// We can use a little trick here to keep a running average.
-			// This would be equivalent to convolving with an array of all 1 values.
-			// That would eliminate the need to multiply.
-			// We can also eliminate the need to add them all up each time by keeping a running total.
-			// Add a sample to the total when putting it in our array of recent samples.
-			// Subtract it from the total when it gets pushed off the end.
-			// We can also eliminate the need to shift them all down by using a circular buffer.
-			// This only works with integers because float would have cumulated round off errors.
-
-			cic_center1 cic_t
-			cic_above   cic_t
-			cic_below   cic_t
 		}
 
 		//////////////////////////////////////////////////////////////////////////////////

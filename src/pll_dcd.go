@@ -1,7 +1,5 @@
 package direwolf
 
-import "C"
-
 import (
 	"math/bits"
 )

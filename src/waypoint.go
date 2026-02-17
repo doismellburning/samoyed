@@ -6,19 +6,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <ctype.h>
-// #include <errno.h>
-// #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <netdb.h>		// gethostbyname
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-import "C"
-
 import (
 	"fmt"
 	"net"

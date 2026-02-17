@@ -16,14 +16,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <unistd.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"fmt"
 	"strconv"
@@ -469,7 +461,7 @@ func parse_primary(pf *pfstate_t) int {
 func parse_filter_spec(pf *pfstate_t) int {
 
 	// Yes this is always assigned over, but that requires a fair bit of reading to be sure of, so let's have an explicit default
-	var result int = -1 //nolint:wastedassign
+	var result = -1 //nolint:ineffassign,wastedassign
 
 	if (!pf.is_aprs) && !strings.ContainsRune("01bdvu", rune(pf.token_str[0])) {
 		print_error(pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.")
@@ -685,7 +677,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 
 func filt_bodgu(pf *pfstate_t, arg string) int {
 
-	var result int = 0
+	var result = 0
 	var str = pf.token_str
 	var sep = str[1]
 	var cp = str[2:]
@@ -1207,7 +1199,7 @@ func filt_i(pf *pfstate_t) int {
 	// TODO: Should produce a warning if a user specified filter does not include "i".
 	// 3 hours * 60 min/hr = 180 minutes
 	// TODO KG: This was unused in the original C, but I think that was accidental given all the context here
-	var heardtime = 180                             //nolint:wastedassign
+	var heardtime = 180                             //nolint:ineffassign,wastedassign
 	var maxhops = save_igate_config_p.max_digi_hops // from IGTXVIA config.
 	var dlat float64 = G_UNKNOWN
 	var dlon float64 = G_UNKNOWN

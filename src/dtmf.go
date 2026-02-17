@@ -13,13 +13,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <math.h>
-// #include <assert.h>
-// #include <string.h>
-import "C"
-
 import (
 	"math"
 	"os"
@@ -488,6 +481,6 @@ func push_button(channel int, button rune, ms int) {
 	push_button_raw(channel, button, ms, false)
 }
 
-func push_button_test(channel int, button rune, ms int) {
+func push_button_test(channel int, button rune, ms int) { //nolint:unparam
 	push_button_raw(channel, button, ms, true)
 }

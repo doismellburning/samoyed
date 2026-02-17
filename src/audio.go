@@ -1989,9 +1989,9 @@ func audio_flush_real(a int) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_wait(a C.int) {
+func audio_wait(a int) {
 
-	audio_flush(int(a))
+	audio_flush(a)
 
 	// TODO KG #if USE_ALSA
 
@@ -2062,7 +2062,7 @@ func audio_close() C.int {
 		// TODO KG #if USE_ALSA
 		if adev[a].audio_in_handle != nil && adev[a].audio_out_handle != nil {
 
-			audio_wait(a)
+			audio_wait(int(a))
 
 			C.snd_pcm_close(adev[a].audio_in_handle)
 			C.snd_pcm_close(adev[a].audio_out_handle)
