@@ -1,13 +1,5 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <assert.h>
-// #include <stdarg.h>
-import "C"
-
 import (
 	"testing"
 
