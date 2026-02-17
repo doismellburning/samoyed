@@ -1,20 +1,5 @@
 package direwolf
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <locale.h>
-// #include <unistd.h>
-// #include <string.h>
-// #include <regex.h>
-// #include <libudev.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <sys/ioctl.h>			// ioctl, _IOR
-// #include <fcntl.h>
-// #include <errno.h>
-// #include <linux/hidraw.h>		// for HIDIOCGRAWINFO
-import "C"
-
 import (
 	"fmt"
 	"os"
@@ -137,7 +122,7 @@ func CM108Main() {
 	// Consider only the 'devnode' paths that end with "card" and a number.
 	// Replace the number with a question mark.
 	var iname = 0
-	var suggested_names []string = []string{"Fred", "Wilma", "Pebbles", "Dino", "Barney", "Betty", "Bamm_Bamm", "Chip", "Roxy"}
+	var suggested_names = []string{"Fred", "Wilma", "Pebbles", "Dino", "Barney", "Betty", "Bamm_Bamm", "Chip", "Roxy"}
 	// Drop any "/sys" at the beginning.
 	var r = regexp.MustCompile("(/devices/.+/card)[0-9]$") // TODO KG Was REG_EXTENDED - may need some fiddling/checking? Can't easily test...
 	for i := 0; i < len(things); i++ {
