@@ -15,14 +15,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <stdarg.h>
-// typedef const char const_char;
-import "C"
-
 import (
 	"fmt"
 	"strconv"
@@ -174,7 +166,7 @@ var grid = [10][10]string{
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_multipress(text string, quiet bool) (string, int) {
+func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unparam
 
 	var buttons = ""
 	var errors = 0
@@ -263,7 +255,7 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_two_key(text string, quiet bool) (string, int) {
+func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unparam
 
 	var buttons = ""
 	var errors = 0
@@ -594,7 +586,7 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_ascii2d(text string, quiet bool) (string, int) {
+func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unparam,unused
 
 	var errors = 0
 	var buttons = ""
