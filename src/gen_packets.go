@@ -49,17 +49,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <getopt.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <math.h>
-// int audio_flush_real (int a);
-// int audio_put_real (int a, int c);
-// void dcd_change_real (int chan, int subchan, int slice, int state);
-import "C"
-
 import (
 	"bufio"
 	"encoding/binary"
@@ -281,7 +270,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	var variable_speed_max_error float64 = 0 // both in percent
-	var variable_speed_increment float64 = 0.1
+	var variable_speed_increment = 0.1
 	if *variableSpeedStr != "" {
 		var maxError, increment, found = strings.Cut(*variableSpeedStr, ",")
 		variable_speed_max_error, _ = strconv.ParseFloat(maxError, 64)
@@ -512,7 +501,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			input_fp = os.Stdin
 		} else {
 			var err error
-			input_fp, err = os.Open(arg)
+			input_fp, err = os.Open(arg) //nolint:gosec // We expect to read from a user-supplied file from CLI
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Can't open %s for read: %s\n", arg, err)
@@ -651,7 +640,7 @@ func audio_file_open(fname string, pa *audio_s) int {
 	 * Write the file header.  Don't know length yet.
 	 */
 	var openErr error
-	out_fp, openErr = os.Create(fname)
+	out_fp, openErr = os.Create(fname) //nolint:gosec // We expect to write to a user-supplied file from CLI
 
 	if openErr != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -729,7 +718,7 @@ func audio_file_open(fname string, pa *audio_s) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_file_close() int {
+func audio_file_close() int { //nolint:unparam
 	/*
 	 * Go back and fix up lengths in header.
 	 */
@@ -864,7 +853,7 @@ func send_packet(str string) {
 
 var sample16 int16
 
-func audio_put_fake(a int, c uint8) int {
+func audio_put_fake(_ int, c uint8) int {
 
 	if g_add_noise {
 		if (byte_count & 1) == 0 {
@@ -907,11 +896,11 @@ func audio_put_fake(a int, c uint8) int {
 
 } /* end audio_put */
 
-func audio_put(a int, c uint8) int {
+func audio_put(a int, c uint8) int { //nolint:unparam
 	if GEN_PACKETS {
 		return audio_put_fake(a, c)
 	} else {
-		return int(audio_put_real(C.int(a), C.int(c)))
+		return audio_put_real(a, c)
 	}
 }
 
@@ -923,7 +912,7 @@ func audio_flush(a int) int {
 	if GEN_PACKETS {
 		return audio_flush_fake(a)
 	} else {
-		return int(audio_flush_real(C.int(a)))
+		return audio_flush_real(a)
 	}
 }
 
