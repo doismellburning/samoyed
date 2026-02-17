@@ -18,18 +18,6 @@ package direwolf
  *
  *------------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <time.h>
-// #include <assert.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <unistd.h>
-// #include <errno.h>
-import "C"
-
 import (
 	"encoding/csv"
 	"fmt"
@@ -102,7 +90,7 @@ func log_init(daily_names bool, path string) {
 			// Doesn't exist.  Try to create it.
 			// parent directory must exist.
 			// We don't create multiple levels like "mkdir -p"
-			var mkdirErr = os.Mkdir(path, 0755)
+			var mkdirErr = os.Mkdir(path, 0750)
 			if mkdirErr == nil {
 				// Success.
 				text_color_set(DW_COLOR_INFO)
@@ -182,7 +170,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Opening log file \"%s\".\n", fname)
 
-			var f, openErr = os.OpenFile(full_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+			var f, openErr = os.OpenFile(full_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
 
 			if openErr == nil {
 				g_log_fp = f
@@ -217,7 +205,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Opening log file \"%s\"\n", g_log_path)
 
-			var f, openErr = os.OpenFile(g_log_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
+			var f, openErr = os.OpenFile(g_log_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
 
 			if openErr == nil {
 				g_log_fp = f
@@ -277,7 +265,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			sname = A.g_name
 		}
 
-		var ssymbol string = string(rune(A.g_symbol_table)) + string(rune(A.g_symbol_code))
+		var ssymbol = string(rune(A.g_symbol_table)) + string(rune(A.g_symbol_code))
 
 		var smfr = A.g_mfr
 		var sstatus = A.g_mic_e_status
@@ -358,7 +346,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
  *
  *------------------------------------------------------------------*/
 
-func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic
+func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic,unused
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
 
