@@ -610,7 +610,7 @@ o = DCD output control
  * Simulate sample from the audio device.
  */
 
-func audio_get_fake(_ C.int) C.int {
+func audio_get_fake(_ int) int {
 
 	if wav_data.Datasize <= 0 {
 		e_o_f = true
@@ -629,10 +629,10 @@ func audio_get_fake(_ C.int) C.int {
 
 	// TODO KG Better error handling
 
-	return C.int(data[0])
+	return int(data[0])
 }
 
-func audio_get(a C.int) C.int {
+func audio_get(a int) int {
 	if ATEST_C {
 		return audio_get_fake(a)
 	} else {
