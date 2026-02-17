@@ -726,7 +726,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	 * about 40 mS of elapsed real time.
 	 */
 
-	audio_wait(C.int(ACHAN2ADEV(channel)))
+	audio_wait(ACHAN2ADEV(channel))
 
 	/*
 	 * Ideally we should be here just about the time when the audio is ending.
