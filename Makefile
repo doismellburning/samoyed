@@ -44,6 +44,7 @@ coveragereport:
 
 .PHONY: check
 check: vet lint shellcheck reuse
+	go mod tidy -diff
 
 .PHONY: reuse
 reuse:
@@ -69,6 +70,7 @@ lint: ./bin/golangci-lint
 .PHONY: fix
 fix: ./bin/golangci-lint
 	./bin/golangci-lint run --fix $(SRC_DIRS) || true  # golangci-lint will still run other non-fix linters, and fail if it didn't fix everything - I just want best-effort
+	go mod tidy
 
 
 .PHONY: stats
