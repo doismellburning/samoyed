@@ -37,20 +37,6 @@ package direwolf
  *
  *--------------------------------------------------------------------*/
 
-// #define X 1
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-// #include <getopt.h>
-// #include <ctype.h>
-// #include <math.h>
-// int audio_get_real (int a);
-// int get_input_real (int it, int chan);
-import "C"
-
 import (
 	"encoding/binary"
 	"errors"
@@ -102,9 +88,6 @@ var wav_data atest_wav_data_t
 var atestFP *os.File
 var e_o_f bool
 var packets_decoded_one = 0
-var packets_decoded_total = 0
-var decimate = 0 /* Reduce that sampling rate if set. 1 = normal, 2 = half, 3 = 1/3, etc. */
-var upsample = 0 /* Upsample for G3RUH decoder. Non-zero will override the default. */
 
 var my_audio_config *audio_s
 
@@ -429,7 +412,7 @@ o = DCD output control
 
 	for _, wavFileName := range pflag.Args() {
 		var err error
-		atestFP, err = os.Open(wavFileName)
+		atestFP, err = os.Open(wavFileName) //nolint:gosec // File path from CLI is expected for this tool
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Couldn't open file %s for read: %s\n", wavFileName, err)
@@ -779,7 +762,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 var dcd_start_seconds [MAX_RADIO_CHANS]float64
 
-func ptt_set_fake(ot int, channel int, ptt_signal int) {
+func ptt_set_fake(_ int, channel int, ptt_signal int) {
 	// Should only get here for DCD output control.
 
 	if d_o_opt > 0 {
