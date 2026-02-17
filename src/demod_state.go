@@ -46,15 +46,6 @@ type demodulator_state_s struct {
 
 	lp_window bp_window_t
 
-	/*
-	 * Alternate Low pass filters.
-	 * First is arbitrary number for quick IIR.
-	 * Second is frequency as ratio to baud rate for FIR.
-	 */
-	lpf_use_fir int /* 0 for IIR, 1 for FIR. */
-
-	lpf_iir float64 /* Only if using IIR. */
-
 	lpf_baud float64 /* Cutoff frequency as fraction of baud. */
 	/* Intuitively we'd expect this to be somewhere */
 	/* in the range of 0.5 to 1. */
