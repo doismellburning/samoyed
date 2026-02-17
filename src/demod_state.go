@@ -72,10 +72,6 @@ type demodulator_state_s struct {
 	quick_attack   float64
 	sluggish_decay float64
 
-	/*
-	 * Hysteresis before final demodulator 0 / 1 decision.
-	 */
-	hysteresis  float64
 	num_slicers int /* >1 for multiple slicers. */
 
 	/*
