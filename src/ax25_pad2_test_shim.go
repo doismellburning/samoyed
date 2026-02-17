@@ -1,12 +1,5 @@
 package direwolf
 
-// #include <stdlib.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <stdio.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"testing"
 
@@ -25,7 +18,7 @@ import (
 func ax25_pad2_test_main(t *testing.T) {
 	t.Helper()
 
-	var pid int = 0xf0
+	var pid = 0xf0
 	var info []byte
 
 	var addrs [AX25_MAX_ADDRS]string
@@ -127,11 +120,11 @@ func ax25_pad2_test_main(t *testing.T) {
 
 	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
-	var ftype ax25_frame_type_t = frame_type_S_SREJ
+	var ftype = frame_type_S_SREJ
 	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_128
 		var nr = 127
-		var cr cmdres_t = cr_res
+		var cr = cr_res
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("\nConstruct Multi-SREJ S frame, cmd=%d, ftype=%d, pid=0x%02x\n", cr, ftype, pid)
