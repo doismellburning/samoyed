@@ -30,16 +30,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <math.h>
-// #include <errno.h>
-// #include <stddef.h>
-import "C"
-
 import (
 	"math/rand"
 	"os"
@@ -961,7 +951,7 @@ func xmit_speech(c int, pp *packet_t) {
 
 func xmit_speak_it(script string, c int, msg string) error {
 
-	var cmd = exec.Command(script, strconv.Itoa(c), msg)
+	var cmd = exec.Command(script, strconv.Itoa(c), msg) //nolint:gosec // Trust the user-supplied config
 
 	var err = cmd.Run()
 
@@ -1158,7 +1148,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 	 * We still need to wait if operating in stereo and the other audio
 	 * half is busy.
 	 */
-	var n C.int = 0
+	var n = 0
 	if !fulldup {
 
 	start_over_again:
