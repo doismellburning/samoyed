@@ -1211,6 +1211,7 @@ func cleanup() {
 	log_term()
 	ptt_term()
 	dwgps_term()
+	waypoint_term()
 	SLEEP_SEC(1)
 	os.Exit(0)
 }
