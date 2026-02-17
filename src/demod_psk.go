@@ -57,16 +57,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdlib.h>
-// #include <stdio.h>
-// #include <math.h>
-// #include <unistd.h>
-// #include <sys/stat.h>
-// #include <string.h>
-// #include <assert.h>
-// #include <ctype.h>
-import "C"
-
 import (
 	"math"
 	"unicode"
@@ -547,7 +537,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 	Assert(f >= -0.001 && f <= 1.001)
 
 	// Interpolate between the ideal angles to get a level of certainty.
-	var result int = 0
+	var result = 0
 	for b := int(0); b < bits_per_symbol; b++ {
 		var demod float64
 		if bits_per_symbol == 2 {
@@ -619,7 +609,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
  *--------------------------------------------------------------------*/
 
 func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulator_state_s) {
-	var slice int = 0 // Would it make sense to have more than one?
+	var slice = 0 // Would it make sense to have more than one?
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
@@ -778,7 +768,7 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 
 		pll_dcd_signal_transition2(DCD_CONFIG_PSK, D, slice, int(D.slicer[slice].data_clock_pll))
 
-		var before int32 = (D.slicer[slice].data_clock_pll) // Treat as signed.
+		var before = (D.slicer[slice].data_clock_pll) // Treat as signed.
 		if D.slicer[slice].data_detect != 0 {
 			D.slicer[slice].data_clock_pll = int32(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_locked_inertia)))
 		} else {
