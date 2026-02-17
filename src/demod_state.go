@@ -130,9 +130,8 @@ type demodulator_state_s struct {
 
 	lp_filter [MAX_FILTER_SIZE]float64
 
-	m_peak, s_peak         float64
-	m_valley, s_valley     float64
-	m_amp_prev, s_amp_prev float64
+	m_peak, s_peak     float64
+	m_valley, s_valley float64
 
 	/*
 	 * For the PLL and data bit timing.
