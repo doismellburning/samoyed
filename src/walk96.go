@@ -7,14 +7,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <math.h>
-import "C"
-
 import (
 	"fmt"
 	"os"
@@ -85,10 +77,7 @@ var sequence = 0
 
 /* Should be called once per second. */
 
-func walk96(fix int, lat float64, lon float64, knots float64, course float64, alt float64) {
-	/*
-		char comment[50];
-	*/
+func walk96(fix int, lat float64, lon float64, knots float64, course float64, alt float64) { //nolint:unparam
 
 	sequence++
 	var comment = fmt.Sprintf("Sequence number %04d", sequence)
@@ -96,14 +85,6 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	/*
 	 * Construct the packet in normal monitoring format.
 	 */
-
-	/* FIXME KG
-	int messaging = 0;
-	int compressed = 0;
-
-	char info[AX25_MAX_INFO_LEN];
-	char position_report[AX25_MAX_PACKET_LEN];
-	*/
 
 	// TODO (high, bug):    Why do we see !4237.13N/07120.84W=PHG0000...   when all values set to unknown.
 
