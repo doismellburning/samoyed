@@ -678,9 +678,9 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 	/* Insert time stamp relative to start of file. */
 
-	var sec = C.double(sample_number) / C.double(my_audio_config.adev[0].samples_per_sec)
+	var sec = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 	var minutes = int(sec / 60.)
-	sec -= C.double(minutes * 60)
+	sec -= float64(minutes * 60)
 
 	dw_printf("%d:%06.3f ", minutes, sec)
 
@@ -777,13 +777,13 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 } /* end fake dlq_append */
 
-var dcd_start_time [MAX_RADIO_CHANS]C.double
+var dcd_start_seconds [MAX_RADIO_CHANS]float64
 
 func ptt_set_fake(ot int, channel int, ptt_signal int) {
 	// Should only get here for DCD output control.
 
 	if d_o_opt > 0 {
-		var t = C.double(sample_number) / C.double(my_audio_config.adev[0].samples_per_sec)
+		var t = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 
 		text_color_set(DW_COLOR_INFO)
 
@@ -793,19 +793,19 @@ func ptt_set_fake(ot int, channel int, ptt_signal int) {
 			//sec1 -= min1 * 60;
 			//dw_printf ("DCD[%d] = ON    %d:%06.3f\n",  channel, min1, sec1);
 			dcd_count++
-			dcd_start_time[channel] = t
+			dcd_start_seconds[channel] = t
 		} else {
-			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - dcd_start_time[channel]) * 1000.);
+			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - dcd_start_seconds[channel]) * 1000.);
 
-			var sec1 = dcd_start_time[channel]
+			var sec1 = dcd_start_seconds[channel]
 			var min1 = (int)(sec1 / 60.)
-			sec1 -= C.double(min1 * 60)
+			sec1 -= float64(min1 * 60)
 
 			var sec2 = t
 			var min2 = (int)(sec2 / 60.)
-			sec2 -= C.double(min2 * 60)
+			sec2 -= float64(min2 * 60)
 
-			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-dcd_start_time[channel])*1000.)
+			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-dcd_start_seconds[channel])*1000.)
 		}
 	}
 }
