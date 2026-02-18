@@ -38,6 +38,7 @@ package direwolf
  *--------------------------------------------------------------------*/
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -86,6 +87,7 @@ var format atest_format_t
 var wav_data atest_wav_data_t
 
 var atestFP *os.File
+var atestBuf *bufio.Reader
 var e_o_f bool
 var packets_decoded_one = 0
 
@@ -518,6 +520,8 @@ o = DCD output control
 		multi_modem_init(my_audio_config)
 		packets_decoded_one = 0
 
+		atestBuf = bufio.NewReader(atestFP)
+
 		e_o_f = false
 		for !e_o_f {
 			for c := 0; c < (my_audio_config.adev[0].num_channels); c++ {
@@ -600,8 +604,7 @@ func audio_get_fake(_ int) int {
 		return (-1)
 	}
 
-	var data = make([]byte, 1)
-	var _, err = atestFP.Read(data)
+	var data, err = atestBuf.ReadByte()
 	wav_data.Datasize--
 
 	if errors.Is(err, io.EOF) {
@@ -612,7 +615,7 @@ func audio_get_fake(_ int) int {
 
 	// TODO KG Better error handling
 
-	return int(data[0])
+	return int(data)
 }
 
 func audio_get(a int) int {
