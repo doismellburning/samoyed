@@ -700,7 +700,8 @@ func ptt_init(audio_config_p *audio_s) {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
-					var line, lineErr = gpiocdev.RequestLine(chip_name, line_number, gpiocdev.AsOutput(0))
+					var initialState = IfThenElse(audio_config_p.achan[ch].octrl[ot].ptt_invert, 1, 0) // Using "invert" as initial state means we always start "off"
+					var line, lineErr = gpiocdev.RequestLine(chip_name, line_number, gpiocdev.AsOutput(initialState))
 					if lineErr != nil {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Can't request GPIOD line %d on %s: %v\n", line_number, chip_name, lineErr)
