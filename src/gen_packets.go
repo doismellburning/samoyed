@@ -86,7 +86,10 @@ var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
 var g_noise_level float64 = 0
 
-var out_fp *os.File
+var genPacketsOutFile *os.File
+
+// Created in audio_file_open, used for audio_put_fake, flushed in audio_file_close
+var genPacketsOutBuf *bufio.Writer
 
 var byte_count int /* Number of data bytes written to file. Will be written to header when file is closed. */
 
@@ -640,7 +643,7 @@ func audio_file_open(fname string, pa *audio_s) int {
 	 * Write the file header.  Don't know length yet.
 	 */
 	var openErr error
-	out_fp, openErr = os.Create(fname) //nolint:gosec // We expect to write to a user-supplied file from CLI
+	genPacketsOutFile, openErr = os.Create(fname) //nolint:gosec // We expect to write to a user-supplied file from CLI
 
 	if openErr != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -685,13 +688,13 @@ func audio_file_open(fname string, pa *audio_s) int {
 		panic("assert(gen_header.nchannels == 1 || gen_header.nchannels == 2)")
 	}
 
-	var writeErr = binary.Write(out_fp, binary.LittleEndian, gen_header)
+	var writeErr = binary.Write(genPacketsOutFile, binary.LittleEndian, gen_header)
 
 	if writeErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Couldn't write header to %s: %s\n", fname, writeErr)
-		out_fp.Close()
-		out_fp = nil
+		genPacketsOutFile.Close()
+		genPacketsOutFile = nil
 		return (-1)
 	}
 
@@ -699,6 +702,8 @@ func audio_file_open(fname string, pa *audio_s) int {
 	 * Number of bytes written will be filled in later.
 	 */
 	byte_count = 0
+
+	genPacketsOutBuf = bufio.NewWriter(genPacketsOutFile)
 
 	return (0)
 } /* end audio_open */
@@ -725,31 +730,39 @@ func audio_file_close() int { //nolint:unparam
 	gen_header.filesize = int32(byte_count + binary.Size(new(wav_header)) - 8)
 	gen_header.datasize = int32(byte_count)
 
-	if out_fp == nil {
+	if genPacketsOutFile == nil {
 		return (-1)
 	}
 
-	var _, seekErr = out_fp.Seek(0, io.SeekStart)
+	var flushErr = genPacketsOutBuf.Flush()
+	if flushErr != nil {
+		return -1
+	}
+
+	var _, seekErr = genPacketsOutFile.Seek(0, io.SeekStart)
 	if seekErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Couldn't seek in audio file: %s\n", seekErr)
-		out_fp.Close()
-		out_fp = nil
+		genPacketsOutFile.Close()
+		genPacketsOutFile = nil
+		genPacketsOutBuf = nil
 		return (-1)
 	}
 
-	var writeErr = binary.Write(out_fp, binary.LittleEndian, gen_header)
+	var writeErr = binary.Write(genPacketsOutFile, binary.LittleEndian, gen_header)
 
 	if writeErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Couldn't write header to audio file: %s\n", writeErr)
-		out_fp.Close()
-		out_fp = nil
+		genPacketsOutFile.Close()
+		genPacketsOutFile = nil
+		genPacketsOutBuf = nil
 		return (-1)
 	}
 
-	out_fp.Close()
-	out_fp = nil
+	genPacketsOutFile.Close()
+	genPacketsOutFile = nil
+	genPacketsOutBuf = nil
 
 	return (0)
 } /* end audio_close */
@@ -879,7 +892,7 @@ func audio_put_fake(_ int, c uint8) int {
 				s = -32767
 			}
 
-			var n, writeErr = out_fp.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
+			var n, writeErr = genPacketsOutBuf.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
 			if writeErr != nil {
 				return -1
 			}
@@ -887,7 +900,7 @@ func audio_put_fake(_ int, c uint8) int {
 		}
 	} else {
 		byte_count++
-		var n, writeErr = out_fp.Write([]byte{c})
+		var n, writeErr = genPacketsOutBuf.Write([]byte{c})
 		if writeErr != nil {
 			return -1
 		}
