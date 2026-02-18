@@ -545,8 +545,15 @@ var ptt_fd [MAX_RADIO_CHANS][NUM_OCTYPES]*os.File
 /* if using both RTS and DTR. */
 var rig [MAX_RADIO_CHANS][NUM_OCTYPES]*C.RIG
 
+// gpiodOutputLine is the subset of gpiocdev.Line used for PTT output control.
+// The interface exists to allow dependency injection in tests.
+type gpiodOutputLine interface {
+	SetValue(value int) error
+	Close() error
+}
+
 /* GPIOD line handles, one per channel/output-type combination. */
-var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]*gpiocdev.Line
+var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
 
 var otnames [NUM_OCTYPES]string
 
