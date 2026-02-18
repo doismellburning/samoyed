@@ -133,7 +133,6 @@ package direwolf
 // #include <grp.h>
 // #include <dirent.h>
 // #include <hamlib/rig.h>
-// #include <gpiod.h>
 import "C"
 
 import (
@@ -143,6 +142,7 @@ import (
 	"strconv"
 	"strings"
 
+	gpiocdev "github.com/warthog618/go-gpiocdev"
 	"golang.org/x/sys/unix"
 )
 
@@ -491,32 +491,6 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 	get_access_to_gpio(gpio_value_path)
 }
 
-func gpiod_probe(chip_dev_path string, line_number C.int) C.int {
-	// chip_dev_path must be complete device path such as /dev/gpiochip3
-
-	var chip = C.gpiod_chip_open(C.CString(chip_dev_path))
-	if chip == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Can't open GPIOD chip %s.\n", chip_dev_path)
-		return -1
-	}
-
-	/* FIXME KG gpiod version compatibility issues :(
-	var line = C.gpiod_chip_get_line_info(chip, C.uint(line_number))
-	if line == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Can't get GPIOD line %d.\n", line_number)
-		return -1
-	}
-	if ptt_debug_level >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("GPIOD probe OK. Chip: %s line: %d\n", chip_dev_path, line_number)
-	}
-	*/
-
-	return 0
-}
-
 /*-------------------------------------------------------------------
  *
  * Name:        ptt_init
@@ -570,6 +544,9 @@ var ptt_fd [MAX_RADIO_CHANS][NUM_OCTYPES]*os.File
 /* Could be the same for two channels */
 /* if using both RTS and DTR. */
 var rig [MAX_RADIO_CHANS][NUM_OCTYPES]*C.RIG
+
+/* GPIOD line handles, one per channel/output-type combination. */
+var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]*gpiocdev.Line
 
 var otnames [NUM_OCTYPES]string
 
@@ -716,18 +693,20 @@ func ptt_init(audio_config_p *audio_s) {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
 					var line_number = audio_config_p.achan[ch].octrl[ot].out_gpio_num
-					var rc = gpiod_probe(chip_name, C.int(line_number))
-					if rc < 0 {
+					var line, lineErr = gpiocdev.RequestLine(chip_name, line_number, gpiocdev.AsOutput(0))
+					if lineErr != nil {
 						text_color_set(DW_COLOR_ERROR)
-						//No, people won't notice the error message and be confused.  Just terminate.
-						//dw_printf ("Disable PTT for channel %d\n", ch);
-						//audio_config_p.achan[ch].octrl[ot].ptt_method = PTT_METHOD_NONE;
+						dw_printf("Can't request GPIOD line %d on %s: %v\n", line_number, chip_name, lineErr)
 						dw_printf("Terminating due to failed PTT on channel %d\n", ch)
 						os.Exit(1)
-					} else {
-						// Set initial state off ptt_set will invert output signal if appropriate.
-						ptt_set(ot, ch, 0)
 					}
+					gpiod_line[ch][ot] = line
+					if ptt_debug_level >= 2 {
+						text_color_set(DW_COLOR_DEBUG)
+						dw_printf("GPIOD init OK. Chip: %s line: %d\n", chip_name, line_number)
+					}
+					// Set initial state off.  ptt_set will invert output signal if appropriate.
+					ptt_set(ot, ch, 0)
 				}
 			}
 		}
@@ -1134,18 +1113,19 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 		}
 	}
 
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIOD { //nolint: staticcheck
-		dw_printf("Gpiod support currently disabled due to mid-stage porting complexity.\n")
-
-		/* FIXME KG Can't find the gpiod function?
-		var chip = save_audio_config_p.achan[channel].octrl[ot].out_gpio_name
-		var line = save_audio_config_p.achan[channel].octrl[ot].out_gpio_num
-		var rc = C.gpiod_ctxless_set_value(chip, line, ptt, false, "direwolf", nil, nil)
-		if ptt_debug_level >= 1 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d  rc: %d\n", chip, line, ptt, rc)
+	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
+		if gpiod_line[channel][ot] != nil {
+			var err = gpiod_line[channel][ot].SetValue(ptt)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, otnames[ot], err)
+			} else if ptt_debug_level >= 1 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d\n",
+					save_audio_config_p.achan[channel].octrl[ot].out_gpio_name,
+					save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt)
+			}
 		}
-		*/
 	}
 
 	/*
@@ -1312,6 +1292,17 @@ func ptt_term() {
 				if ptt_fd[n][ot] != nil {
 					ptt_fd[n][ot].Close()
 					ptt_fd[n][ot] = nil
+				}
+			}
+		}
+	}
+
+	for n := 0; n < MAX_RADIO_CHANS; n++ {
+		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
+			for ot := 0; ot < NUM_OCTYPES; ot++ {
+				if gpiod_line[n][ot] != nil {
+					gpiod_line[n][ot].Close()
+					gpiod_line[n][ot] = nil
 				}
 			}
 		}
