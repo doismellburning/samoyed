@@ -1,19 +1,6 @@
 /* UTM to Latitude / Longitude conversion */
 package main
 
-// #cgo CFLAGS: -I../../src -I../../external/geotranz -DMAJOR_VERSION=0 -DMINOR_VERSION=0
-// #cgo LDFLAGS: -lm
-// #include <stdio.h>
-// #include <stdlib.h>
-// #include <math.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include "utm.h"
-// #include "mgrs.h"
-// #include "usng.h"
-// #include "error_string.h"
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -21,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
+	"github.com/tzneal/coordconv"
 )
 
 func R2D(radians float64) float64 {
@@ -32,69 +19,59 @@ func main() {
 	if len(os.Args) == 4 {
 		// 3 command line arguments for UTM
 
-		var szone [100]C.char
-		C.strncpy(&szone[0], C.CString(os.Args[1]), C.ulong(len(szone)))
-		var zletC *C.char
-		var lzone = C.strtoul(&szone[0], &zletC, 10)
-		var zlet = C.GoString(zletC)
+		var zlet rune
+		var zoneStr = os.Args[1] // e.g. "19T" or just "19"
+		if len(zoneStr) > 0 && zoneStr[len(zoneStr)-1] >= 'A' && zoneStr[len(zoneStr)-1] <= 'Z' {
+			zlet = rune(zoneStr[len(zoneStr)-1])
+			zoneStr = zoneStr[:len(zoneStr)-1]
+		}
+		var zone, _ = strconv.Atoi(zoneStr)
 
-		var hemi C.char
-		if zlet == "" {
-			hemi = 'N'
+		var hemisphere coordconv.Hemisphere
+		if zlet == 0 {
+			hemisphere = coordconv.HemisphereNorth
 		} else {
-			// FIXME KG uppercase first character of zlet
-			if !strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", rune(zlet[0])) {
+			// TODO KG uppercase zlet?
+			if !strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", zlet) {
 				fmt.Printf("Latitudinal band must be one of CDEFGHJKLMNPQRSTUVWX.")
 				usage()
 			}
-			if rune(zlet[0]) >= 'N' {
-				hemi = 'N'
+			if zlet >= 'N' {
+				hemisphere = coordconv.HemisphereNorth
 			} else {
-				hemi = 'S'
+				hemisphere = coordconv.HemisphereSouth
 			}
 		}
 
 		var easting, _ = strconv.ParseFloat(os.Args[2], 64)
 		var northing, _ = strconv.ParseFloat(os.Args[3], 64)
 
-		var lat C.double
-		var lon C.double
-		var err = C.Convert_UTM_To_Geodetic(C.long(lzone), hemi, C.double(easting), C.double(northing), &lat, &lon)
-		if err == 0 {
-			lat = C.double(R2D(float64(lat)))
-			lon = C.double(R2D(float64(lon)))
+		var utmCoord = coordconv.UTMCoord{
+			Zone:       zone,
+			Hemisphere: hemisphere,
+			Easting:    easting,
+			Northing:   northing,
+		}
+
+		var latlng, utmErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utmCoord)
+		if utmErr == nil {
+			var lat = R2D(float64(latlng.Lat))
+			var lon = R2D(float64(latlng.Lng))
 
 			fmt.Printf("from UTM, latitude = %.6f, longitude = %.6f\n", lat, lon)
 		} else {
-			var message *C.char
-			C.utm_error_string(err, message)
-			fmt.Printf("Conversion from UTM failed:\n%s\n\n", C.GoString(message))
+			fmt.Printf("Conversion from UTM failed:\n%s\n\n", utmErr)
 		}
 	} else if len(os.Args) == 2 {
-		// One command line argument, USNG or MGRS.
-		// TODO: continue here.
-		var lat C.double
-		var lon C.double
-		var err = C.Convert_USNG_To_Geodetic(C.CString(os.Args[1]), &lat, &lon)
-		if err == 0 {
-			lat = C.double(R2D(float64(lat)))
-			lon = C.double(R2D(float64(lon)))
-			fmt.Printf("from USNG, latitude = %.6f, longitude = %.6f\n", lat, lon)
-		} else {
-			var message *C.char
-			C.usng_error_string(err, message)
-			fmt.Printf("Conversion from USNG failed:\n%s\n\n", C.GoString(message))
-		}
+		// One command line argument, MGRS.
 
-		err = C.Convert_MGRS_To_Geodetic(C.CString(os.Args[1]), &lat, &lon)
-		if err == 0 {
-			lat = C.double(R2D(float64(lat)))
-			lon = C.double(R2D(float64(lon)))
+		var mgrsLatlng, mgrsErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(os.Args[1])
+		if mgrsErr == nil {
+			var lat = R2D(float64(mgrsLatlng.Lat))
+			var lon = R2D(float64(mgrsLatlng.Lng))
 			fmt.Printf("from MGRS, latitude = %.6f, longitude = %.6f\n", lat, lon)
 		} else {
-			var message *C.char
-			C.mgrs_error_string(err, message)
-			fmt.Printf("Conversion from MGRS failed:\n%s\n\n", C.GoString(message))
+			fmt.Printf("Conversion from MGRS failed:\n%s\n\n", mgrsErr)
 		}
 	} else {
 		usage()

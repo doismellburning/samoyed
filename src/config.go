@@ -27,10 +27,6 @@ package direwolf
 // #else
 // #define DEFAULT_GPSD_PORT "2947"
 // #endif
-// #include "utm.h"
-// #include "mgrs.h"
-// #include "usng.h"
-// #include "error_string.h"
 import "C"
 
 import (
@@ -44,6 +40,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/tzneal/coordconv"
 )
 
 /*
@@ -5836,22 +5834,25 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		if len(zone) > 0 && easting != G_UNKNOWN && northing != G_UNKNOWN {
 
 			var latband C.char
-			var hemi C.char
-			var lzone = parse_utm_zone(zone, &latband, &hemi)
+			var _hemi C.char
+			var lzone = parse_utm_zone(zone, &latband, &_hemi)
 
-			var dlat C.double
-			var dlon C.double
-			var lerr = C.Convert_UTM_To_Geodetic(lzone, hemi, easting, northing, &dlat, &dlon)
+			var hemi = HemisphereRuneToCoordconvHemisphere(rune(_hemi))
 
-			if lerr == 0 {
-				b.lat = R2D(float64(dlat))
-				b.lon = R2D(float64(dlon))
+			var utm = coordconv.UTMCoord{
+				Zone:       int(lzone),
+				Hemisphere: hemi,
+				Easting:    float64(easting),
+				Northing:   float64(northing),
+			}
+			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
+
+			if geoErr == nil {
+				b.lat = R2D(float64(geo.Lat))
+				b.lon = R2D(float64(geo.Lng))
 			} else {
-				var message [300]C.char
-
-				C.utm_error_string(lerr, &message[0])
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, C.GoString(&message[0]))
+				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, geoErr)
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)

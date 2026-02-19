@@ -19,7 +19,7 @@ package direwolf
 // #include <netdb.h>
 // #include <hamlib/rig.h>
 // #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay
-// #cgo CFLAGS: -I../external/geotranz -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
+// #cgo CFLAGS: -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm
 import "C"
 
@@ -33,7 +33,6 @@ import (
 	"time"
 	"unicode"
 
-	_ "github.com/doismellburning/samoyed/external/geotranz" // Pulls this in for cgo
 	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
 )

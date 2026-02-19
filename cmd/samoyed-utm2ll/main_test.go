@@ -21,6 +21,5 @@ func Example_main_2() {
 
 	main()
 	// Output:
-	// from USNG, latitude = 42.662049, longitude = -71.365550
 	// from MGRS, latitude = 42.662049, longitude = -71.365550
 }
