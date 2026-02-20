@@ -1236,11 +1236,24 @@ func get_input_real(it int, channel int) int {
 		}
 		fd.Close()
 
-		var v, _ = strconv.Atoi(string(vtemp))
-		if C.int(v) != bool2Cint(save_audio_config_p.achan[channel].ictrl[it].invert) {
-			return 1
+		var v, parseErr = strconv.Atoi(string(vtemp))
+		if parseErr != nil {
+			dw_printf("Error parsing return value (%s) from GPIO %d: %s\n", vtemp, save_audio_config_p.achan[channel].ictrl[it].in_gpio_num, parseErr)
+			return -1
+		}
+
+		if !save_audio_config_p.achan[channel].ictrl[it].invert {
+			if v == 0 {
+				return 0
+			} else {
+				return 1
+			}
 		} else {
-			return 0
+			if v == 0 {
+				return 1
+			} else {
+				return 0
+			}
 		}
 	}
 
