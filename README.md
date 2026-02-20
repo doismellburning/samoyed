@@ -1,285 +1,103 @@
-# samoyed
+# Samoyed
 
-Samoyed is a software "soundcard" modem/TNC and APRS encoder/decoder.
+Samoyed is a software "soundcard" modem/TNC and APRS encoder/decoder,
+ported to Go from [Dire Wolf](https://github.com/wb2osz/direwolf).
 
-It is based on [Dire Wolf](https://github.com/wb2osz/direwolf),
-ported to Go for increased tooling support,
-and with reduced platform scope to cut complexity and make it easier to extend.
+> **Status:** Active port in progress — pre-release, likely to contain bugs.
+> Linux x86_64 is the primary supported platform during porting.
+> Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems.
 
-## Initial Port Goals
+## Why Samoyed?
 
-* Near-straight port from C to Go with minimal changes except where necessary or practical
-* Improve testing and linting infrastructure to ensure consistency and benefit from tooling support
-* Lean on the Go stdlib to leverage existing tooling
-* Maintain broad-strokes compatibility with Dire Wolf to minimise switching costs
-* Reduce platform compatibility (drop win32 support, possibly Windows and Mac entirely, older versions of Linux etc) to reduce complexity of the initial porting effort. Specifically:
-    * [Pentium 3 support](https://github.com/wb2osz/direwolf/blob/041f396de0ab2111b9ccc07960f8f083a81f9ad0/src/direwolf.c#L384-L424) and [Windows XP support](https://github.com/wb2osz/direwolf/blob/a231971a652bfb574a4bae9a5d875fbce53d2267/src/direwolf.h#L15-L43) will go away completely
-    * During the port, nothing other than x86_64 Linux will be supported
-    * (Re)growing arm64 support will be a priority after that
-    * Windows and Mac support will depend on demand / testability / cost of support
-* Remove reliance on preprocessor defines for test infrastructure and tooling to reduce complexity
+Dire Wolf is a mature, capable piece of software written in C. Samoyed is (currently) a near-straight port to Go, motivated by:
 
-## Dire Wolf
+- **Better tooling** — Go's testing, linting, and static analysis ecosystem, as well as the stdlib
+- **Simpler builds** — no cmake, no preprocessor conditionals for test infrastructure
+- **Reduced platform scope** — dropping old Windows / old CPU complexity makes the codebase easier to extend
+- **Easier contribution** — idiomatic Go and improved test suites should make things more approachable for new contributors
 
-### Decoded Information from Radio Emissions for Windows Or Linux Fans ###
+Samoyed aims for broad-strokes compatibility with Dire Wolf to minimise switching costs.
 
-In the early days of Amateur Packet Radio, it was necessary to use an expensive "Terminal Node Controller" (TNC) with specialized hardware.  Those days are gone.  You can now get better results at lower cost by connecting your radio to the "soundcard" interface of a computer and using software to decode the signals.
+## Features
 
-Why waste $200 and settle for mediocre receive performance from a 1980's technology  TNC using an old modem chip?   Dire Wolf decodes over 1000 error-free frames from Track 2 of the [WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf), leaving all the hardware TNCs, and first generation "soundcard" modems, behind in the dust.
+Samoyed inherits Dire Wolf's feature set:
 
-![](tnc-test-cd-results.png)
+- **APRS** encoder/decoder — position, objects, messages, telemetry, weather, and more
+- **Modems** — 300 bps AFSK (HF), 1200 bps AFSK (VHF/UHF), 2400 & 4800 bps PSK, 9600 bps GMSK/G3RUH, AIS, EAS SAME
+- **FX.25** — Forward Error Correction fully compatible with existing AX.25 systems
+- **IL2P** — Improved Layer 2 Protocol with lower overhead FEC
+- **KISS interface** — TCP/IP, serial port, and Bluetooth
+- **AGW network interface** — TCP/IP, compatible with many third-party applications
+- **Digipeater** — APRS and traditional packet radio, with flexible cross-band and filtering options
+- **Internet Gateway (IGate)** — bridging disjoint radio networks via the internet
+- **GPS tracker beacons** — SmartBeaconing support
+- **APRStt gateway** — DTMF tone sequences into the APRS network
+- **AX.25 v2.2 connected mode** — automatic retransmission and in-order delivery
+- **DTMF** decoding and encoding
+- **Morse code** generator
+- **DNS Service Discovery** — network KISS TNC auto-discovery (Linux)
+- Concurrent operation with multiple soundcards and radio channels
 
-Dire Wolf includes [FX.25](https://en.wikipedia.org/wiki/FX.25_Forward_Error_Correction) which adds Forward Error Correction (FEC) in a way that is completely compatible with existing systems.  If both ends are capable of FX.25, your information will continue to get through under conditions where regular AX.25 is completely useless. This was originally developed for satellites and is now seeing widespread use on HF.
+## Building
 
-![](fx25.png)
+### Prerequisites
 
-Version 1.7 adds [IL2P](https://en.wikipedia.org/wiki/Improved_Layer_2_Protocol), a different method of FEC with less overhead but it is not compatible with AX.25.
+See .github/workflows/build-and-test.yml for package dependencies
 
+### Build
 
+```sh
+git clone https://github.com/doismellburning/samoyed
+cd samoyed
+make cmds        # build all binaries into dist/
+make test        # run the full test suite
+```
 
-### Dire Wolf is a modern software replacement for the old 1980's style TNC built with special hardware. ###
+## Development
 
-Without any additional software, it can perform as:
+See [AGENTS.md](./AGENTS.md) for general development notes and style guidelines.
 
- - APRS GPS Tracker
- - Digipeater
- - Internet Gateway (IGate)
-- [APRStt](http://www.aprs.org/aprstt.html) gateway
+Key `make` targets:
 
+| Target | Description |
+|--------|-------------|
+| `make all` | Build everything and run all tests — run before committing |
+| `make cmds` | Build all binaries |
+| `make test` | Run the full test suite |
+| `make check` | Run linters (`vet`, `golangci-lint`, `shellcheck`, `reuse`) |
+| `make fix` | Auto-fix linting issues where possible |
+| `make coveragereport` | Show test coverage breakdown |
+| `make stats` | Show lines-of-code breakdown (C vs Go) |
 
-It can also be used as a virtual TNC for other applications such as [APRSIS32](http://aprsisce.wikidot.com/), [Xastir](http://xastir.org/index.php/Main_Page), [APRS-TW](http://aprstw.blandranch.net/), [YAAC](http://www.ka2ddo.org/ka2ddo/YAAC.html), [PinPoint APRS](http://www.pinpointaprs.com/), [UI-View32](http://www.ui-view.net/),[UISS](http://users.belgacom.net/hamradio/uiss.htm), [Linux AX25](http://www.linux-ax25.org/wiki/Main_Page), [SARTrack](http://www.sartrack.co.nz/index.html), [Winlink Express (formerly known as RMS Express, formerly known as Winlink 2000 or WL2K)](http://www.winlink.org/RMSExpress), [BPQ32](http://www.cantab.net/users/john.wiseman/Documents/BPQ32.html), [Outpost PM](http://www.outpostpm.org/), [Ham Radio of Things](https://github.com/wb2osz/hrot), [Packet Compressed Sensing Imaging (PCSI)](https://maqifrnswa.github.io/PCSI/), and many others.
- 
- 
-## Features & Benefits ##
+## Contributing
 
-![](direwolf-block-diagram.png)
+Contributions are welcome! While the Go port is ongoing, new features are generally discouraged
+as they risk delaying the port's completion — but bug fixes, test improvements, and
+help porting remaining C modules are all very useful.
 
-### Dire Wolf includes: ###
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
+## Platform Support
 
+| Platform | Status |
+|----------|--------|
+| x86_64 Linux | Primary target |
+| arm64 Linux | Planned after initial port |
+| Windows | TBD (depends on demand / testability) |
+| macOS | TBD (depends on demand / testability) |
 
-- **Beaconing, Tracker, Telemetry Toolkit.**
+## About Dire Wolf
 
-     Send periodic beacons to provide information to others.  For tracking the location is provided by a GPS receiver.
-     Build your own telemetry applications with the toolkit.
+Samoyed is based on [Dire Wolf](https://github.com/wb2osz/direwolf) by John Langner WB2OSZ —
+a modern software replacement for hardware TNCs, with outstanding receive performance.
+Dire Wolf decodes over 1000 error-free frames from the
+[WA8LMF TNC Test CD](https://github.com/wb2osz/direwolf/tree/dev/doc/WA8LMF-TNC-Test-CD-Results.pdf),
+outperforming all hardware TNCs and first-generation soundcard modems.
 
+For Dire Wolf documentation, see the [Dire Wolf doc directory](https://github.com/wb2osz/direwolf/tree/master/doc).
 
-- **APRStt Gateway.**
+## License
 
-     Very few hams have portable equipment for APRS but nearly everyone has a handheld radio that can send DTMF tones.  APRStt allows a user, equipped with only DTMF (commonly known as Touch Tone) generation capability, to enter information into the global APRS data network.  Responses can be sent by Morse Code or synthesized speech.
+GPL-2.0-or-later. See [LICENSES/](./LICENSES/) and [REUSE.toml](./REUSE.toml) for full details.
 
-- **Digipeaters for APRS and traditional Packet Radio.**
-
-    Extend the range of other stations by re-transmitting their signals. Unmatched flexibility for cross band repeating and filtering to limit what is retransmitted.
-
-- **Internet Gateway (IGate).**
-
-    IGate stations allow communication between disjoint radio networks by allowing some content to flow between them over the Internet.
-
-- **Ham Radio of Things (HRoT).**
-
-    There have been occasional mentions of merging Ham Radio with the Internet of Things but only ad hoc incompatible narrowly focused applications. Here is a proposal for a standardized more flexible method so different systems can communicate with each other.
-
-    [Ham Radio of Things - IoT over Ham Radio](https://github.com/wb2osz/hrot)
-
-- **AX.25 v2.2 Link Layer.**
-
-    Traditional connected mode packet radio where the TNC automatically retries transmissions and delivers data in the right order.
-
-- **KISS Interface (TCP/IP, serial port, Bluetooth) & AGW network Interface (TCP/IP).**
-
-    Dire Wolf can be used as a virtual TNC for applications such as [APRSIS32](http://aprsisce.wikidot.com/), [Xastir](http://xastir.org/index.php/Main_Page), [APRS-TW](http://aprstw.blandranch.net/), [YAAC](http://www.ka2ddo.org/ka2ddo/YAAC.html), [PinPoint APRS](http://www.pinpointaprs.com/), [UI-View32](http://www.ui-view.net/),[UISS](http://users.belgacom.net/hamradio/uiss.htm), [Linux AX25](http://www.linux-ax25.org/wiki/Main_Page), [SARTrack](http://www.sartrack.co.nz/index.html), [Winlink Express (formerly known as RMS Express, formerly known as Winlink 2000 or WL2K)](http://www.winlink.org/RMSExpress), [BPQ32](http://www.cantab.net/users/john.wiseman/Documents/BPQ32.html), [Outpost PM](http://www.outpostpm.org/), [Ham Radio of Things](https://github.com/wb2osz/hrot), [Packet Compressed Sensing Imaging (PCSI)](https://maqifrnswa.github.io/PCSI/), and many others.
-
-### Radio Interfaces:   ###
-
-- **Uses computer's "soundcard" and digital signal processing.**
-
-    Lower cost and better performance than specialized hardware. 
-
-    Compatible interfaces include [DRAWS](http://nwdigitalradio.com/draws/), [UDRC](https://nw-digital-radio.groups.io/g/udrc/wiki/UDRC%E2%84%A2-and-Direwolf-Packet-Modem), [SignaLink USB](http://www.tigertronics.com/slusbmain.htm), [DMK URI](http://www.dmkeng.com/URI_Order_Page.htm), [RB-USB RIM](http://www.repeater-builder.com/products/usb-rim-lite.html), [RA-35](http://www.masterscommunications.com/products/radio-adapter/ra35.html), [DINAH](https://hamprojects.info/dinah/), [SHARI](https://hamprojects.info/shari/), and many others.
-
-
-
-- **Modems:**
-
-    300 bps AFSK for HF
-
-    1200 bps AFSK most common for VHF/UHF
-
-    2400 & 4800 bps PSK
-
-    9600 bps GMSK/G3RUH
-
-    AIS reception
-
-    EAS SAME reception
-
-
-
-- **DTMF ("Touch Tone") Decoding and Encoding.**
- 
-- **Speech Synthesizer interface & Morse code generator.**
-
-    Transmit human understandable messages.
-
-- **Compatible with Software Defined Radios such as gqrx, rtl_fm, and SDR#.**
-
-- **Concurrent operation with up to 3 soundcards and 6 radios.**
-
-### Portable & Open Source:   ###
-
-- **Runs on Windows, Linux (PC/laptop, Raspberry Pi, etc.), Mac OSX.**
-
-
-
-## Documentation ##
-
-
-[Stable Version](https://github.com/wb2osz/direwolf/tree/master/doc)
-
-[Latest Development Version ("dev" branch)](https://github.com/wb2osz/direwolf/tree/dev/doc)
-
-[Additional Topics](https://github.com/wb2osz/direwolf-doc)
-
-[Power Point presentations](https://github.com/wb2osz/direwolf-presentation)  -- Why not give a talk at a local club meeting?
-
-Youtube has many interesting and helpful videos.  Searching for [direwolf tnc](https://www.youtube.com/results?search_query=direwolf+tnc) or [direwolf aprs](https://www.youtube.com/results?search_query=direwolf+aprs)  will produce the most relevant results. 
-
-## Installation ##
-
-### Windows ###
-
-Go to the [**releases** page](https://github.com/wb2osz/direwolf/releases).   Download a zip file with "win" in its name, unzip it, and run direwolf.exe from a command window.
-
-You can also build it yourself from source.  For more details see the **User Guide** in the [**doc** directory](https://github.com/wb2osz/direwolf/tree/master/doc).
-
-
-
-
-### Linux - Using git clone (recommended) ###
-
-***Note that this has changed for version 1.6.  There are now a couple extra steps.***
-
-
-First you will need to install some software development packages using different commands depending on your flavor of Linux.
-In most cases, the first few  will already be there and the package installer will tell you that installation is not necessary.
-
-On Debian / Ubuntu / Raspbian / Raspberry Pi OS:
-
-    sudo apt-get install git
-    sudo apt-get install gcc
-    sudo apt-get install g++
-    sudo apt-get install make
-    sudo apt-get install cmake
-    sudo apt-get install libasound2-dev
-    sudo apt-get install libudev-dev
-    sudo apt-get install libavahi-client-dev
-
-Or on Red Hat / Fedora / CentOS:
-
-    sudo yum install git
-    sudo yum install gcc
-    sudo yum install gcc-c++
-    sudo yum install make
-    sudo yum install alsa-lib-devel
-    sudo yum install libudev-devel
-    sudo yum install avahi-devel
-
-CentOS 6 & 7 currently have cmake 2.8 but we need 3.1 or later.
-First you need to enable the EPEL repository.  Add a symlink if you don't already have the older version and want to type cmake rather than cmake3.
-
-    sudo yum install epel-release
-	sudo rpm -e cmake
-	sudo yum install cmake3
-	sudo ln -s /usr/bin/cmake3 /usr/bin/cmake
-
-Then on any flavor of Linux:
-
-	cd ~
-	git clone https://www.github.com/wb2osz/direwolf
-	cd direwolf
-    git checkout dev
-	mkdir build && cd build
-	cmake ..
-	make -j4
-	sudo make install
-	make install-conf
-
-This gives you the latest development version.  Leave out the "git checkout dev" to get the most recent stable release.
-
-For more details see the **User Guide** in the [**doc** directory](https://github.com/wb2osz/direwolf/tree/master/doc).  Special considerations for the Raspberry Pi are found in **Raspberry-Pi-APRS.pdf**
-
-
-### Linux - Using apt-get (Debian flavor operating systems) ###
-
-Results will vary depending on your hardware platform and operating system version because it depends on various volunteers who perform the packaging. Expect the version to lag significantly behind development.
-
-	sudo apt-get update
-	apt-cache showpkg direwolf
-	sudo apt-get install direwolf
-
-
-### Linux - Using yum (Red Hat flavor operating systems) ###
-
-Results will vary depending on your hardware platform and operating system version because it depends on various volunteers who perform the packaging.  Expect the version to lag significantly behind development.
-
-	sudo yum check-update
-	sudo yum list direwolf
-	sudo yum install direwolf
-
-
-### Macintosh macOS - Using Homebrew ###
-
-The following instructions have been verified on macOS Ventura 13.6 (M2) and macOS High Sierra 10.13.6 (Intel).
-
-First make sure that you have the following tools installed on your Mac:
-
-- [Xcode or Xcode Command Line Tools](https://developer.apple.com/xcode/resources/)
-- [Homebrew](https://brew.sh/)
-
-You will need to install the following packages using Homebrew:
-
-	brew install cmake
-	brew install portaudio
-	brew install hidapi
-
-Then follow the same instructions as above for the Linux `git clone` build:
-
-	cd ~
-	git clone https://www.github.com/wb2osz/direwolf
-	cd direwolf
-	git checkout dev
-	mkdir build && cd build
-	cmake ..
-	make -j4
-	sudo make install
-	make install-conf
-
-This gives you the latest development version.  Leave out the "git checkout dev" to get the most recent stable release.
-
-For more information, see the ***User Guide*** in the [**doc** directory](https://github.com/wb2osz/direwolf/tree/master/doc).
-
-If you have problems,  post them to the [Dire Wolf packet TNC](https://groups.io/g/direwolf) discussion group.
-
-
-### Macintosh macOS - Prebuilt version ###
-
-You can also install a pre-built version from MacPorts.  Keeping this up to date depends on volunteers who perform the packaging. This version could lag behind development.
-
-	sudo port install direwolf
-
-
-## Join the conversation  ##
- 
-Here are some good places to ask questions and share your experience:
-
-- [Dire Wolf Software TNC](https://groups.io/g/direwolf) 
-
-- [Raspberry Pi 4 Ham Radio](https://groups.io/g/RaspberryPi-4-HamRadio)
-
-- [linuxham](https://groups.io/g/linuxham)
-
-- [TAPR aprssig](http://www.tapr.org/pipermail/aprssig/)
- 
-
-The github "issues" section is for reporting software defects and enhancement requests.  It is NOT a place to ask questions or have general discussions.  Please use one of the locations above.
+Samoyed is a fork of Dire Wolf — see [AUTHORS.md](./AUTHORS.md) for authorship and attribution.
