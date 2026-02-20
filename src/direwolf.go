@@ -18,7 +18,7 @@ package direwolf
 // #include <netinet/in.h>
 // #include <netdb.h>
 // #include <hamlib/rig.h>
-// #cgo pkg-config: alsa avahi-client hamlib libbsd-overlay
+// #cgo pkg-config: alsa avahi-client hamlib
 // #cgo CFLAGS: -DUSE_CM108 -DUSE_AVAHI_CLIENT -DUSE_HAMLIB -DUSE_ALSA
 // #cgo LDFLAGS: -lm
 import "C"

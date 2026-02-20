@@ -25,16 +25,6 @@ package direwolf
 // Touch Tone sequence should be appropriate.
 // What do we call the parts separated by * key?  Field.
 
-// #include <stdlib.h>
-// #include <math.h>
-// #include <string.h>
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <errno.h>
-// #include <ctype.h>
-// #include <assert.h>
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -617,8 +607,7 @@ func expand_macro(e string) int {
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("Macro tone sequence: '%s'\n", e)
 
-	var xstr, ystr, zstr, _, _, _ipat = find_ttloc_match(e)
-	var ipat = C.int(_ipat)
+	var xstr, ystr, zstr, _, _, ipat = find_ttloc_match(e)
 
 	if ipat >= 0 {
 		// Why did we print b & d here?
@@ -1138,8 +1127,7 @@ func parse_location(e string) int {
 
 	Assert(e[0] == 'B')
 
-	var xstr, ystr, _, bstr, dstr, _ipat = find_ttloc_match(e)
-	var ipat = C.int(_ipat)
+	var xstr, ystr, _, bstr, dstr, ipat = find_ttloc_match(e)
 
 	if ipat >= 0 {
 		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);

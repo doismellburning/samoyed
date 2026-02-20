@@ -12,23 +12,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #define CONFIG_C 1		// influences behavior of aprs_tt.h
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <ctype.h>
-// #include <math.h>
-// #include <regex.h>
-// #include <limits.h>		// for PATH_MAX
-// #if ENABLE_GPSD
-// #include <gps.h>		/* for DEFAULT_GPSD_PORT  (2947) */
-// #else
-// #define DEFAULT_GPSD_PORT "2947"
-// #endif
-import "C"
-
 import (
 	"bufio"
 	"errors"
@@ -43,6 +26,8 @@ import (
 
 	"github.com/tzneal/coordconv"
 )
+
+const DEFAULT_GPSD_PORT = 2947 // Taken from gps.h
 
 /*
  * All the leftovers.
@@ -579,7 +564,7 @@ main ()
  *
  *----------------------------------------------------------------*/
 
-func parse_interval(str string, line int) int {
+func parse_interval(str string, line int) int { //nolint:unparam
 
 	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
 
@@ -1050,7 +1035,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		os.Exit(1)
 	}
 
-	var fp, fpErr = os.Open(absFilePath)
+	var fp, fpErr = os.Open(absFilePath) //nolint:gosec
 
 	if fpErr != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -1879,7 +1864,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: PTT can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
 				continue
 			}
-			var ot C.int
+			var ot int
 			var otname string
 
 			if strings.EqualFold(t, "PTT") {
@@ -2253,14 +2238,12 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: TXINH can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
 				continue
 			}
-			var itname [8]C.char
-
-			C.strcpy(&itname[0], C.CString("TXINH"))
+			var itname = "TXINH"
 
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: Missing input type name for %s command.\n", line, C.GoString(&itname[0]))
+				dw_printf("Config file line %d: Missing input type name for %s command.\n", line, itname)
 				continue
 			}
 
@@ -2275,7 +2258,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, C.GoString(&itname[0]))
+					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, itname)
 					continue
 				}
 
@@ -4970,7 +4953,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			dw_printf("Warning: GPSD support currently disabled pending a rewrite of the integration.\n")
 
 			p_misc_config.gpsd_host = "localhost"
-			p_misc_config.gpsd_port, _ = strconv.Atoi(C.DEFAULT_GPSD_PORT)
+			p_misc_config.gpsd_port = DEFAULT_GPSD_PORT
 
 			t = split("", false)
 			if t != "" {
@@ -4983,7 +4966,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 						p_misc_config.gpsd_port = n
 					} else {
-						p_misc_config.gpsd_port, _ = strconv.Atoi(C.DEFAULT_GPSD_PORT)
+						p_misc_config.gpsd_port = DEFAULT_GPSD_PORT
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Invalid port number for GPSD Socket Interface. Using default of %d.\n",
 							line, p_misc_config.gpsd_port)
@@ -5433,8 +5416,8 @@ func config_init(fname string, p_audio_config *audio_s,
 	 * Suggest that beaconing be enabled when digipeating.
 	 */
 
-	for i := C.int(0); i < MAX_TOTAL_CHANS; i++ {
-		for j := C.int(0); j < MAX_TOTAL_CHANS; j++ {
+	for i := 0; i < MAX_TOTAL_CHANS; i++ {
+		for j := 0; j < MAX_TOTAL_CHANS; j++ {
 
 			/* APRS digipeating. */
 
@@ -5454,7 +5437,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var b = 0
 				for k := 0; k < p_misc_config.num_beacons; k++ {
-					if C.int(p_misc_config.beacon[k].sendto_chan) == j {
+					if p_misc_config.beacon[k].sendto_chan == j {
 						b++
 					}
 				}
@@ -5485,7 +5468,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var b = 0
 				for k := 0; k < p_misc_config.num_beacons; k++ {
-					if C.int(p_misc_config.beacon[k].sendto_chan) == j {
+					if p_misc_config.beacon[k].sendto_chan == j {
 						b++
 					}
 				}
@@ -5546,7 +5529,7 @@ func config_init(fname string, p_audio_config *audio_s,
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) error {
+func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) error { //nolint:unparam
 
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
@@ -5569,8 +5552,8 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 	var zone string
 	var temp_symbol string
-	var easting C.double = G_UNKNOWN
-	var northing C.double = G_UNKNOWN
+	var easting float64 = G_UNKNOWN
+	var northing float64 = G_UNKNOWN
 
 	for {
 		var t = split("", false)
@@ -5762,10 +5745,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			zone = value
 		} else if strings.EqualFold(keyword, "EAST") || strings.EqualFold(keyword, "EASTING") {
 			var f, _ = strconv.ParseFloat(value, 64)
-			easting = C.double(f)
+			easting = f
 		} else if strings.EqualFold(keyword, "NORTH") || strings.EqualFold(keyword, "NORTHING") {
 			var f, _ = strconv.ParseFloat(value, 64)
-			northing = C.double(f)
+			northing = f
 		} else if strings.EqualFold(keyword, "SYMBOL") {
 			/* Defer processing in case overlay appears later. */
 			temp_symbol = value
