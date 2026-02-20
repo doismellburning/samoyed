@@ -117,11 +117,3 @@ func Assert(t bool) {
 		panic(fmt.Sprintf("Assertion failed at %s:%d", file, line))
 	}
 }
-
-func bool2Cint(t bool) C.int {
-	if t {
-		return 1
-	} else {
-		return 0
-	}
-}
