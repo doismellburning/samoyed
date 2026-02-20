@@ -4,11 +4,13 @@ go 1.25
 
 require (
 	github.com/creack/pty v1.1.24
+	github.com/golang/geo v0.0.0-20180826223333-635502111454
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
 	github.com/lestrrat-go/strftime v1.1.1
 	github.com/pkg/term v1.1.0
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+	github.com/tzneal/coordconv v0.1.2
 	github.com/warthog618/go-gpiocdev v0.9.1
 	golang.org/x/sys v0.18.0
 	gopkg.in/yaml.v3 v3.0.1

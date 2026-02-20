@@ -33,11 +33,6 @@ package direwolf
 // #include <errno.h>
 // #include <ctype.h>
 // #include <assert.h>
-// // geotranz
-// #include "utm.h"
-// #include "mgrs.h"
-// #include "usng.h"
-// #include "error_string.h"
 import "C"
 
 import (
@@ -47,6 +42,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/tzneal/coordconv"
 )
 
 /* Error codes for sending responses to user. */
@@ -1274,21 +1271,24 @@ func parse_location(e string) int {
 				m_loc_text = fmt.Sprintf("%d %.0f %.0f", aprs_tt_config.ttloc_ptr[ipat].utm.lzone, easting, northing)
 			}
 
-			var lat0, lon0 C.double
-			var lerr = C.Convert_UTM_To_Geodetic(C.long(aprs_tt_config.ttloc_ptr[ipat].utm.lzone),
-				C.char(aprs_tt_config.ttloc_ptr[ipat].utm.hemi), C.double(easting), C.double(northing), &lat0, &lon0)
+			var hemi = HemisphereRuneToCoordconvHemisphere(aprs_tt_config.ttloc_ptr[ipat].utm.hemi)
 
-			if lerr == 0 {
-				m_latitude = R2D(float64(lat0))
-				m_longitude = R2D(float64(lon0))
+			var utm = coordconv.UTMCoord{
+				Zone:       aprs_tt_config.ttloc_ptr[ipat].utm.lzone,
+				Hemisphere: hemi,
+				Easting:    easting,
+				Northing:   northing,
+			}
+			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
+
+			if geoErr == nil {
+				m_latitude = R2D(float64(geo.Lat))
+				m_longitude = R2D(float64(geo.Lng))
 
 				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
 			} else {
-				var message [300]C.char
-
 				text_color_set(DW_COLOR_ERROR)
-				C.utm_error_string(lerr, &message[0])
-				dw_printf("Conversion from UTM failed:\n%s\n\n", C.GoString(&message[0]))
+				dw_printf("Conversion from UTM failed:\n%s\n\n", geoErr)
 			}
 
 			m_dao[2] = e[0]
@@ -1317,25 +1317,17 @@ func parse_location(e string) int {
 
 			m_loc_text = loc
 
-			var lerr C.long
-			var lat0, lon0 C.double
-			if aprs_tt_config.ttloc_ptr[ipat].ttlocType == TTLOC_MGRS {
-				lerr = C.Convert_MGRS_To_Geodetic(C.CString(loc), &lat0, &lon0)
-			} else {
-				lerr = C.Convert_USNG_To_Geodetic(C.CString(loc), &lat0, &lon0)
-			}
+			// Apparently also does USNG!
+			var geo, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(loc)
 
-			if lerr == 0 {
-				m_latitude = R2D(float64(lat0))
-				m_longitude = R2D(float64(lon0))
+			if convertErr == nil {
+				m_latitude = R2D(float64(geo.Lat))
+				m_longitude = R2D(float64(geo.Lng))
 
 				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", m_latitude, m_longitude);
 			} else {
-				var message [300]C.char
-
 				text_color_set(DW_COLOR_ERROR)
-				C.mgrs_error_string(lerr, &message[0])
-				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", C.GoString(&message[0]))
+				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", convertErr)
 			}
 
 			m_dao[2] = e[0]
