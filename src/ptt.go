@@ -132,7 +132,6 @@ package direwolf
 // #include <errno.h>
 // #include <grp.h>
 // #include <dirent.h>
-// #include <hamlib/rig.h>
 import "C"
 
 import (
@@ -141,8 +140,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	gpiocdev "github.com/warthog618/go-gpiocdev"
+	goHamlib "github.com/xylo04/goHamlib"
 	"golang.org/x/sys/unix"
 )
 
@@ -543,7 +544,7 @@ var ptt_fd [MAX_RADIO_CHANS][NUM_OCTYPES]*os.File
 /* Serial port handle or fd.  */
 /* Could be the same for two channels */
 /* if using both RTS and DTR. */
-var rig [MAX_RADIO_CHANS][NUM_OCTYPES]*C.RIG
+var rig [MAX_RADIO_CHANS][NUM_OCTYPES]*goHamlib.Rig
 
 // gpiodOutputLine is the subset of gpiocdev.Line used for PTT output control.
 // The interface exists to allow dependency injection in tests.
@@ -813,104 +814,84 @@ func ptt_init(audio_config_p *audio_s) {
 		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := 0; ot < NUM_OCTYPES; ot++ {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
-					dw_printf("Hamlib support currently disabled due to mid-stage porting complexity.\n")
-
-					/* FIXME KG
 					if ot == OCTYPE_PTT {
-						var err C.int = -1
-						var tries = 0
-
-						// For "AUTO" model, try to guess what is out there.
-
 						if audio_config_p.achan[ch].octrl[ot].ptt_model == -1 {
-							var hport C.hamlib_port_t // http://hamlib.sourceforge.net/manuals/1.2.15/structhamlib__port__t.html
-
-							// FIXME KG memset(&hport, 0, C.sizeof_hport)
-							C.strcpy(&hport.pathname[0], &audio_config_p.achan[ch].octrl[ot].ptt_device[0])
-
-							if audio_config_p.achan[ch].octrl[ot].ptt_rate > 0 {
-								// Override the default serial port data rate.
-								hport.parm.serial.rate = audio_config_p.achan[ch].octrl[ot].ptt_rate
-								hport.parm.serial.data_bits = 8
-								hport.parm.serial.stop_bits = 1
-								hport.parm.serial.parity = C.RIG_PARITY_NONE
-								hport.parm.serial.handshake = C.RIG_HANDSHAKE_NONE
-							}
-
-							C.rig_load_all_backends()
-							audio_config_p.achan[ch].octrl[ot].ptt_model = C.int(C.rig_probe(hport))
-
-							if audio_config_p.achan[ch].octrl[ot].ptt_model == C.RIG_MODEL_NONE {
-								text_color_set(DW_COLOR_ERROR)
-								dw_printf("Hamlib Error: Couldn't guess rig model number for AUTO option.  Run \"rigctl --list\" for a list of model numbers.\n")
-								continue
-							}
-
-							text_color_set(DW_COLOR_INFO)
-							dw_printf("Hamlib AUTO option detected rig model %d.  Run \"rigctl --list\" for a list of model numbers.\n",
-								audio_config_p.achan[ch].octrl[ot].ptt_model)
-						}
-
-						rig[ch][ot] = C.rig_init(C.rig_model_t(audio_config_p.achan[ch].octrl[ot].ptt_model))
-						if rig[ch][ot] == nil {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Hamlib error: Unknown rig model %d.  Run \"rigctl --list\" for a list of model numbers.\n",
-								audio_config_p.achan[ch].octrl[ot].ptt_model)
+							dw_printf("Hamlib error: AUTO rig model detection is not supported. Specify the model number explicitly.\n")
+							dw_printf("Run \"rigctl --list\" for a list of model numbers.\n")
 							continue
 						}
 
-						C.strcpy(&rig[ch][ot].state.rigport.pathname[0], &audio_config_p.achan[ch].octrl[ot].ptt_device[0])
+						var r = &goHamlib.Rig{} //nolint:exhaustruct
+						var initErr = r.Init(goHamlib.RigModelID(audio_config_p.achan[ch].octrl[ot].ptt_model))
+						if initErr != nil {
+							text_color_set(DW_COLOR_ERROR)
+							dw_printf("Hamlib error: Unknown rig model %d. %s\n",
+								audio_config_p.achan[ch].octrl[ot].ptt_model, initErr)
+							dw_printf("Run \"rigctl --list\" for a list of model numbers.\n")
+							continue
+						}
+
+						var port = goHamlib.Port{ //nolint:exhaustruct
+							Portname:  audio_config_p.achan[ch].octrl[ot].ptt_device,
+							Databits:  8,
+							Stopbits:  1,
+							Parity:    goHamlib.ParityNone,
+							Handshake: goHamlib.HandshakeNone,
+						}
 
 						// Issue 290.
 						// We had a case where hamlib defaulted to 9600 baud for a particular
 						// radio model but 38400 was needed.  Add an option for the configuration
 						// file to override the hamlib default speed.
 
-						text_color_set(DW_COLOR_INFO)
-						if audio_config_p.achan[ch].octrl[ot].ptt_model != 2 { // 2 is network, not serial port.
-							dw_printf("Hamlib determined CAT control serial port rate of %d.\n", rig[ch][ot].state.rigport.parm.serial.rate)
-						}
-
-						// Config file can optionally override the rate that hamlib came up with.
-
-						if audio_config_p.achan[ch].octrl[ot].ptt_rate > 0 {
-							dw_printf("User configuration overriding hamlib CAT control speed to %d.\n", audio_config_p.achan[ch].octrl[ot].ptt_rate)
-							rig[ch][ot].state.rigport.parm.serial.rate = audio_config_p.achan[ch].octrl[ot].ptt_rate
-
-							// Do we want to explicitly set all of these or let it default?
-							rig[ch][ot].state.rigport.parm.serial.data_bits = 8
-							rig[ch][ot].state.rigport.parm.serial.stop_bits = 1
-							rig[ch][ot].state.rigport.parm.serial.parity = C.RIG_PARITY_NONE
-							rig[ch][ot].state.rigport.parm.serial.handshake = C.RIG_HANDSHAKE_NONE
-						}
-						tries = 0
-						for {
-							// Try up to 5 times, Hamlib can take a moment to finish init
-							err = C.rig_open(rig[ch][ot])
-							tries++
-							if tries > 5 {
-								break
-							} else if err != C.RIG_OK {
+						if audio_config_p.achan[ch].octrl[ot].ptt_model == 2 {
+							// Model 2 is rigctld network control, not a serial port.
+							port.RigPortType = goHamlib.RigPortNetwork
+						} else {
+							port.RigPortType = goHamlib.RigPortSerial
+							if audio_config_p.achan[ch].octrl[ot].ptt_rate > 0 {
 								text_color_set(DW_COLOR_INFO)
-								dw_printf("Retrying Hamlib Rig open...\n")
-								time.Sleep(5 * time.Second)
+								dw_printf("User configuration overriding hamlib CAT control speed to %d.\n",
+									audio_config_p.achan[ch].octrl[ot].ptt_rate)
+								port.Baudrate = audio_config_p.achan[ch].octrl[ot].ptt_rate
 							}
-							// FIXME KG while (err != C.RIG_OK);
 						}
-						if err != C.RIG_OK {
+
+						var portErr = r.SetPort(port)
+						if portErr != nil {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Hamlib Rig open error %d: %s\n", err, C.rigerror(err))
-							C.rig_cleanup(rig[ch][ot])
-							rig[ch][ot] = nil
+							dw_printf("Hamlib error setting port for channel %d: %s\n", ch, portErr)
+							r.Cleanup() //nolint:errcheck
+							continue
+						}
+
+						var openErr error
+						var tries = 0
+						for {
+							// Retry up to 5 times, Hamlib can take a moment to finish init
+							openErr = r.Open()
+							tries++
+							if openErr == nil || tries > 5 {
+								break
+							}
+							text_color_set(DW_COLOR_INFO)
+							dw_printf("Retrying Hamlib Rig open...\n")
+							time.Sleep(5 * time.Second)
+						}
+						if openErr != nil {
+							text_color_set(DW_COLOR_ERROR)
+							dw_printf("Hamlib Rig open error for channel %d: %s\n", ch, openErr)
+							r.Cleanup() //nolint:errcheck
 							os.Exit(1)
 						}
 
 						// Successful.  Later code should check for rig[ch][ot] not nil.
+						rig[ch][ot] = r
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("HAMLIB can only be used for PTT.  Not DCD or other output.\n")
 					}
-					*/
 				}
 			}
 		}
@@ -1176,27 +1157,21 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 	 */
 
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
-		dw_printf("Hamlib support currently disabled due to mid-stage porting complexity.\n")
-
-		/* FIXME KG
 		if rig[channel][ot] != nil {
-
-			var onoff = C.RIG_PTT_OFF
-			if ptt {
-				onoff = C.RIG_PTT_ON
+			var onoff = goHamlib.RIG_PTT_OFF
+			if ptt != 0 {
+				onoff = goHamlib.RIG_PTT_ON
 			}
-			var retcode = C.rig_set_ptt(rig[channel][ot], C.RIG_VFO_CURR, onoff)
-
-			if retcode != C.RIG_OK {
+			var retcode = rig[channel][ot].SetPtt(goHamlib.VFOCurrent, onoff)
+			if retcode != nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Hamlib Error: rig_set_ptt command for channel %d %s\n", channel, otnames[ot])
-				dw_printf("%s\n", C.rigerror(retcode))
+				dw_printf("Hamlib error: SetPtt command for channel %d %s\n", channel, otnames[ot])
+				dw_printf("%s\n", retcode)
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Hamlib: Can't use rig_set_ptt for channel %d %s because rig_open failed.\n", channel, otnames[ot])
+			dw_printf("Hamlib: Can't use SetPtt for channel %d %s because rig open failed.\n", channel, otnames[ot])
 		}
-		*/
 	}
 
 	/*
@@ -1320,9 +1295,8 @@ func ptt_term() {
 		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
 			for ot := 0; ot < NUM_OCTYPES; ot++ {
 				if rig[n][ot] != nil {
-
-					C.rig_close(rig[n][ot])
-					C.rig_cleanup(rig[n][ot])
+					rig[n][ot].Close()   //nolint:errcheck
+					rig[n][ot].Cleanup() //nolint:errcheck
 					rig[n][ot] = nil
 				}
 			}
