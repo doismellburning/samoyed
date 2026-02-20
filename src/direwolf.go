@@ -1023,7 +1023,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	 *
 	 * Suppress printed decoding if "-q d" option used.
 	 */
-	var ais_obj_packet [300]C.char
+	var ais_obj_packet string
 
 	if ax25_is_aprs(pp) {
 		// we still want to decode it for logging and other processing.
@@ -1075,10 +1075,9 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 					0, 0, 0, A.g_comment) // freq, tone, offset
 
 				// TODO Bodge
-				var _ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
-				C.strcpy(&ais_obj_packet[0], C.CString(_ais_obj_packet))
+				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
 
-				dw_printf("[%d.AIS] %s\n", channel, _ais_obj_packet)
+				dw_printf("[%d.AIS] %s\n", channel, ais_obj_packet)
 
 				// This will be sent to client apps after the User Defined Data representation.
 			}
@@ -1110,8 +1109,8 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
-	if A_opt_ais_to_obj && C.strlen(&ais_obj_packet[0]) != 0 {
-		var ao_pp = ax25_from_text(C.GoString(&ais_obj_packet[0]), true)
+	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
+		var ao_pp = ax25_from_text(ais_obj_packet, true)
 		if ao_pp != nil {
 			var ao_fbuf = ax25_pack(ao_pp)
 

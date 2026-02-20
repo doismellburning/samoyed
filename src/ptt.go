@@ -117,23 +117,6 @@ package direwolf
 	We'd be starting from scratch to figure out how to do it.
 */
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-// #include <sys/termios.h>
-// #include <sys/ioctl.h>
-// #include <fcntl.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <unistd.h>
-// #include <errno.h>
-// #include <grp.h>
-// #include <dirent.h>
-import "C"
-
 import (
 	"fmt"
 	"io"
@@ -288,7 +271,7 @@ func get_access_to_gpio(path string) {
  *
  *------------------------------------------------------------------*/
 
-func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
+func export_gpio(ch int, ot int, invert bool, direction int) {
 
 	// Raspberry Pi was easy.  GPIO 24 has the name gpio24.
 	// Others, such as the Cubieboard, take a little more effort.
@@ -455,7 +438,7 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 	var gpio_direction_path = fmt.Sprintf("/sys/class/gpio/%s/direction", gpio_name)
 	get_access_to_gpio(gpio_direction_path)
 
-	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0)
+	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0) //nolint:gosec
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Error opening %s\n", gpio_direction_path)
@@ -465,7 +448,7 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 
 	var gpio_val string
 	if direction != 0 {
-		if invert != 0 {
+		if invert {
 			gpio_val = "high"
 		} else {
 			gpio_val = "low"
@@ -725,19 +708,19 @@ func ptt_init(audio_config_p *audio_s) {
 	 * the pins we want to use.
 	 */
 
-	for ch := C.int(0); ch < MAX_RADIO_CHANS; ch++ {
+	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
 		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 
 			// output control type, PTT, DCD, CON, ...
-			for ot := C.int(0); ot < NUM_OCTYPES; ot++ {
+			for ot := 0; ot < NUM_OCTYPES; ot++ {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					export_gpio(ch, ot, bool2Cint(audio_config_p.achan[ch].octrl[ot].ptt_invert), 1)
+					export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
 				}
 			}
 			// input control type
-			for it := C.int(0); it < NUM_ICTYPES; it++ {
+			for it := 0; it < NUM_ICTYPES; it++ {
 				if audio_config_p.achan[ch].ictrl[it].method == PTT_METHOD_GPIO {
-					export_gpio(ch, it, bool2Cint(audio_config_p.achan[ch].ictrl[it].invert), 0)
+					export_gpio(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
 				}
 			}
 		}
@@ -1083,7 +1066,7 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 
 		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", save_audio_config_p.achan[channel].octrl[ot].out_gpio_name)
 
-		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0)
+		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, otnames[ot])
@@ -1217,7 +1200,7 @@ func get_input_real(it int, channel int) int {
 
 		get_access_to_gpio(gpio_value_path)
 
-		var fd, openErr = os.Open(gpio_value_path)
+		var fd, openErr = os.Open(gpio_value_path) //nolint:gosec
 		if openErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error opening %s to check input.\n", gpio_value_path)
@@ -1236,11 +1219,24 @@ func get_input_real(it int, channel int) int {
 		}
 		fd.Close()
 
-		var v, _ = strconv.Atoi(string(vtemp))
-		if C.int(v) != bool2Cint(save_audio_config_p.achan[channel].ictrl[it].invert) {
-			return 1
+		var v, parseErr = strconv.Atoi(string(vtemp))
+		if parseErr != nil {
+			dw_printf("Error parsing return value (%s) from GPIO %d: %s\n", vtemp, save_audio_config_p.achan[channel].ictrl[it].in_gpio_num, parseErr)
+			return -1
+		}
+
+		if !save_audio_config_p.achan[channel].ictrl[it].invert {
+			if v == 0 {
+				return 0
+			} else {
+				return 1
+			}
 		} else {
-			return 0
+			if v == 0 {
+				return 1
+			} else {
+				return 0
+			}
 		}
 	}
 
