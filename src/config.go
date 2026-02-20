@@ -460,12 +460,11 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
  *
  * Inputs:      szone	- String like [-]number[letter]
  *
- * Outputs:	latband	- Latitude band if specified, otherwise space or -.
+ * Returns:	latband	- Latitude band if specified, otherwise space or -.
  *
  *		hemi	- Hemisphere, always one of 'N' or 'S'.
  *
  * Returns:	Zone as number.
- *		Type is long because Convert_UTM_To_Geodetic expects that.
  *
  * Errors:	Prints message and return 0.
  *
@@ -482,10 +481,10 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
  *
  *----------------------------------------------------------------*/
 
-func parse_utm_zone(szone string, latband *C.char, hemi *C.char) C.long {
+func parse_utm_zone(szone string) (rune, rune, int) {
 
-	*latband = ' '
-	*hemi = 'N' /* default */
+	var latband = ' '
+	var hemi = 'N' /* default */
 
 	var lastRune = rune(szone[len(szone)-1])
 	if unicode.IsLetter(lastRune) {
@@ -501,21 +500,21 @@ func parse_utm_zone(szone string, latband *C.char, hemi *C.char) C.long {
 		/* Allow negative number to mean south. */
 
 		if lzone < 0 {
-			*latband = '-'
-			*hemi = 'S'
+			latband = '-'
+			hemi = 'S'
 			lzone = (-lzone)
 		}
 	} else {
 		lastRune = unicode.ToUpper(lastRune)
-		*latband = C.char(lastRune)
+		latband = lastRune
 		if strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", lastRune) {
 			if lastRune < 'N' {
-				*hemi = 'S'
+				hemi = 'S'
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Latitudinal band in \"%s\" must be one of CDEFGHJKLMNPQRSTUVWX.\n", szone)
-			*hemi = '?'
+			hemi = '?'
 		}
 	}
 
@@ -525,7 +524,7 @@ func parse_utm_zone(szone string, latband *C.char, hemi *C.char) C.long {
 
 	}
 
-	return C.long(lzone)
+	return latband, hemi, lzone
 } /* end parse_utm_zone */
 
 /*
@@ -5833,14 +5832,12 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 		if len(zone) > 0 && easting != G_UNKNOWN && northing != G_UNKNOWN {
 
-			var latband C.char
-			var _hemi C.char
-			var lzone = parse_utm_zone(zone, &latband, &_hemi)
+			var _, _hemi, lzone = parse_utm_zone(zone)
 
-			var hemi = HemisphereRuneToCoordconvHemisphere(rune(_hemi))
+			var hemi = HemisphereRuneToCoordconvHemisphere(_hemi)
 
 			var utm = coordconv.UTMCoord{
-				Zone:       int(lzone),
+				Zone:       lzone,
 				Hemisphere: hemi,
 				Easting:    float64(easting),
 				Northing:   float64(northing),
