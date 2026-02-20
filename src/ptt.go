@@ -288,7 +288,7 @@ func get_access_to_gpio(path string) {
  *
  *------------------------------------------------------------------*/
 
-func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
+func export_gpio(ch int, ot int, invert bool, direction int) {
 
 	// Raspberry Pi was easy.  GPIO 24 has the name gpio24.
 	// Others, such as the Cubieboard, take a little more effort.
@@ -465,7 +465,7 @@ func export_gpio(ch C.int, ot C.int, invert C.int, direction C.int) {
 
 	var gpio_val string
 	if direction != 0 {
-		if invert != 0 {
+		if invert {
 			gpio_val = "high"
 		} else {
 			gpio_val = "low"
@@ -725,19 +725,19 @@ func ptt_init(audio_config_p *audio_s) {
 	 * the pins we want to use.
 	 */
 
-	for ch := C.int(0); ch < MAX_RADIO_CHANS; ch++ {
+	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
 		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 
 			// output control type, PTT, DCD, CON, ...
-			for ot := C.int(0); ot < NUM_OCTYPES; ot++ {
+			for ot := 0; ot < NUM_OCTYPES; ot++ {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					export_gpio(ch, ot, bool2Cint(audio_config_p.achan[ch].octrl[ot].ptt_invert), 1)
+					export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
 				}
 			}
 			// input control type
-			for it := C.int(0); it < NUM_ICTYPES; it++ {
+			for it := 0; it < NUM_ICTYPES; it++ {
 				if audio_config_p.achan[ch].ictrl[it].method == PTT_METHOD_GPIO {
-					export_gpio(ch, it, bool2Cint(audio_config_p.achan[ch].ictrl[it].invert), 0)
+					export_gpio(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
 				}
 			}
 		}
