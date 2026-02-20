@@ -5,67 +5,38 @@ package direwolf
  * Purpose:   	Interface to audio device commonly called a "sound card" for
  *		historical reasons.
  *
- *		This version is for Linux and Cygwin.
+ *		This version uses PortAudio for cross-platform audio support.
  *
- *		Two different types of sound interfaces are supported:
- *
- *		* OSS - For Cygwin or Linux versions with /dev/dsp.
- *
- *		* ALSA - For Linux versions without /dev/dsp.
- *			In this case, define preprocessor symbol USE_ALSA.
- *
- * References:	Some tips on on using Linux sound devices.
- *
- *		http://www.oreilly.de/catalog/multilinux/excerpt/ch14-05.htm
- *		http://cygwin.com/ml/cygwin-patches/2004-q1/msg00116/devdsp.c
- *		http://manuals.opensound.com/developer/fulldup.c.html
- *
- *		"Introduction to Sound Programming with ALSA"
- *		http://www.linuxjournal.com/article/6735?page=0,1
- *
- *		http://www.alsa-project.org/main/index.php/Asoundrc
+ * References:	PortAudio documentation: http://www.portaudio.com/
+ *		Go bindings: https://github.com/gordonklaus/portaudio
  *
  * Credits:	Release 1.0: Fabrice FAURE contributed code for the SDR UDP interface.
  *
  *		Discussion here:  http://gqrx.dk/doc/streaming-audio-over-udp
  *
- *		Release 1.1:  Gabor Berczi provided fixes for the OSS code
- *		which had fallen into decay.
- *
  * Major Revisions:
  *
  *		1.2 - Add ability to use more than one audio device.
+ *		Go port - Replaced ALSA with PortAudio for cross-platform support.
  *
  *---------------------------------------------------------------*/
 
 // #include <stdio.h>
 // #include <unistd.h>
-// #include <stdlib.h>
-// #include <string.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <sys/ioctl.h>
-// #include <fcntl.h>
-// #include <assert.h>
-// #include <sys/socket.h>
-// #include <arpa/inet.h>
-// #include <netinet/in.h>
 // #include <errno.h>
-// #if USE_ALSA
-// #include <alsa/asoundlib.h>
-// #elif USE_SNDIO
-// #include <sndio.h>
-// #include <poll.h>
-// #else
-// #include <sys/soundcard.h>
-// #endif
 import "C"
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"strings"
-	"unsafe"
+	"sync"
+
+	"github.com/gordonklaus/portaudio"
 )
 
 /*
@@ -496,21 +467,7 @@ type audio_s struct {
 
 }
 
-/*
-#if __WIN32__
-#define DEFAULT_ADEVICE	""		// Windows: Empty string = default audio device.
-#elif __APPLE__
-#define DEFAULT_ADEVICE	""		// Mac OSX: Empty string = default audio device.
-#elif USE_ALSA
-*/
-const DEFAULT_ADEVICE = "default" // Use default device for ALSA.
-/*
-#elif USE_SNDIO
-#define DEFAULT_ADEVICE	"default"	// Use default device for sndio.
-#else
-#define DEFAULT_ADEVICE	"/dev/dsp"	// First audio device for OSS.  (FreeBSD)
-#endif
-*/
+const DEFAULT_ADEVICE = "default" // Use default device for PortAudio.
 
 /*
  * UDP audio receiving port.  Couldn't find any standard or usage precedent.
@@ -580,46 +537,187 @@ const DEFAULT_FULLDUP = false // false = half duplex
 
 /* Audio configuration. */
 
-// TODO KG var save_audio_config_p *audio_s
+// audioRingBuffer is a thread-safe ring buffer for audio data.
+// The PortAudio callback writes to this buffer, and the main
+// processing thread reads from it.
+type audioRingBuffer struct {
+	buf      []byte
+	size     int
+	readPos  int
+	writePos int
+	count    int // number of bytes available to read
+	mu       sync.Mutex
+	cond     *sync.Cond
+	overflow bool // set when data is dropped due to full buffer
+	closed   bool
+}
+
+func newAudioRingBuffer(size int) *audioRingBuffer {
+	var rb = &audioRingBuffer{ //nolint:exhaustruct
+		buf:  make([]byte, size),
+		size: size,
+	}
+	rb.cond = sync.NewCond(&rb.mu)
+	return rb
+}
+
+// write adds data to the ring buffer. Called from PortAudio callback.
+// Returns true if all data was written, false if some was dropped (overflow).
+// Uses chunk copies (at most two) to minimise time holding the mutex.
+func (rb *audioRingBuffer) write(data []byte) bool {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	if rb.closed {
+		return false
+	}
+
+	var n = len(data)
+	if n == 0 {
+		return true
+	}
+
+	var overflow = false
+
+	// If incoming data is larger than the whole buffer, keep only the most-recent rb.size bytes.
+	if n >= rb.size {
+		data = data[n-rb.size:]
+		n = rb.size
+		overflow = true
+		rb.readPos = 0
+		rb.writePos = 0
+		rb.count = 0
+	}
+
+	// Drop oldest bytes to make room if needed.
+	var free = rb.size - rb.count
+	if n > free {
+		var drop = n - free
+		rb.readPos = (rb.readPos + drop) % rb.size
+		rb.count -= drop
+		overflow = true
+	}
+
+	// Write in at most two contiguous chunks to handle the ring wrap.
+	var part1 = rb.size - rb.writePos
+	if part1 > n {
+		part1 = n
+	}
+	copy(rb.buf[rb.writePos:], data[:part1])
+	if n > part1 {
+		copy(rb.buf[0:], data[part1:])
+	}
+	rb.writePos = (rb.writePos + n) % rb.size
+	rb.count += n
+
+	if overflow {
+		rb.overflow = true
+	}
+
+	rb.cond.Signal()
+	return !overflow
+}
+
+// readChunk copies up to len(dst) bytes from the ring buffer into dst, blocking
+// until at least one byte is available. Returns the number of bytes copied and
+// true on success, or 0 and false if the buffer is closed and empty.
+// Uses at most two contiguous copies to minimise lock hold time.
+func (rb *audioRingBuffer) readChunk(dst []byte) (int, bool) {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	for rb.count == 0 && !rb.closed {
+		rb.cond.Wait()
+	}
+
+	if rb.closed && rb.count == 0 {
+		return 0, false
+	}
+
+	var n = len(dst)
+	if n > rb.count {
+		n = rb.count
+	}
+
+	var part1 = rb.size - rb.readPos
+	if part1 > n {
+		part1 = n
+	}
+	copy(dst[:part1], rb.buf[rb.readPos:])
+	if n > part1 {
+		copy(dst[part1:], rb.buf[0:n-part1])
+	}
+	rb.readPos = (rb.readPos + n) % rb.size
+	rb.count -= n
+	return n, true
+}
+
+// checkOverflow returns and clears the overflow flag.
+func (rb *audioRingBuffer) checkOverflow() bool {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+	var overflow = rb.overflow
+	rb.overflow = false
+	return overflow
+}
+
+// close signals that no more data will be written.
+func (rb *audioRingBuffer) close() {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+	rb.closed = true
+	rb.cond.Broadcast()
+}
 
 /* Current state for each of the audio devices. */
 
 type adev_s struct {
+	// PortAudio streams (replaces ALSA handles)
+	inputStream  *portaudio.Stream
+	outputStream *portaudio.Stream
 
-	// TODO KG #if USE_ALSA
-	audio_in_handle  *C.snd_pcm_t
-	audio_out_handle *C.snd_pcm_t
+	// Audio format
+	bytesPerFrame int
+	sampleRate    int
+	numChannels   int
+	bitsPerSample int
 
-	bytes_per_frame C.int /* number of bytes for a sample from all channels. */
-	/* e.g. 4 for stereo 16 bit. */
+	// Ring buffer for input audio (filled by callback)
+	inputRingBuf *audioRingBuffer
 
-	/* TODO KG
-	   #elif USE_SNDIO
-	   	struct sio_hdl *sndio_in_handle;
-	   	struct sio_hdl *sndio_out_handle;
+	// Output buffers for blocking writes
+	outputBuf16   []int16 // Output buffer for 16-bit blocking writes
+	outputBuf8    []uint8 // Output buffer for 8-bit blocking writes
+	outputStarted bool    // Whether output stream is currently started
 
-	   #else
-	   	int oss_audio_device_fd;	Single device, both directions.
+	// Byte-level buffers (maintains existing interface for non-soundcard input)
+	inbufSizeInBytes  int
+	inbuf             []byte
+	inbufLen          int
+	inbufNext         int
+	outbufSizeInBytes int
+	outbuf            []byte
+	outbufLen         int
 
-	   #endif
-	*/
+	// Frames per buffer for PortAudio
+	framesPerBuffer int
 
-	inbuf_size_in_bytes C.int /* number of bytes allocated */
-	inbuf_ptr           *C.uchar
-	inbuf_len           C.int /* number byte of actual data available. */
-	inbuf_next          C.int /* index of next to remove. */
+	// Pre-allocated scratch buffer for zero-allocation int16→byte conversion in the input callback.
+	inputScratchBuf []byte
 
-	outbuf_size_in_bytes C.int
-	outbuf_ptr           *C.uchar
-	outbuf_len           C.int
-
+	// Input type
 	g_audio_in_type audio_in_type_e
 
-	udp_sock *net.UDPConn /* UDP socket for receiving data */
-
+	// UDP socket for SDR input
+	udp_sock *net.UDPConn
 }
 
 var adev [MAX_ADEVS]*adev_s
+
+// portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
+// correctly paired even if audio_open/audio_close are called concurrently.
+var portaudioMu sync.Mutex
+var portaudioRefCount int
 
 // Originally 40.  Version 1.2, try 10 for lower latency.
 
@@ -632,19 +730,132 @@ func roundup1k(n int) int {
 func calcbufsize(rate int, chans int, bits int) int {
 	var size1 = (rate * chans * bits / 8 * ONE_BUF_TIME) / 1000
 	var size2 = roundup1k(size1)
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("audio_open: calcbufsize (rate=%d, chans=%d, bits=%d) calc size=%d, round up to %d\n",
-			rate, chans, bits, size1, size2);
-	#endif
-	*/
 	return (size2)
 }
 
-// KG Compatibility shim because ALSA #defines this and CGo doesn't like that
-func snd_pcm_status_alloca(ptr **C.snd_pcm_status_t) {
-	*ptr = (*C.snd_pcm_status_t)(C.malloc(C.snd_pcm_status_sizeof()))
+/*
+ * Find a PortAudio device by name.
+ * Supports:
+ *   - "default" or "" -> system default device
+ *   - "hw:X,Y" style ALSA names -> search by substring
+ *   - Direct device name matching
+ */
+// parseALSADeviceName parses ALSA device names like "hw:Card,Dev,Sub" or
+// "plughw:Card,Dev,Sub" and returns the card name and device number.
+// Returns ("", -1) if the name doesn't match the ALSA pattern.
+func parseALSADeviceName(name string) (cardName string, devNum int) {
+	// Strip prefix: hw:, plughw:, etc.
+	var lower = strings.ToLower(name)
+	var idx = strings.Index(lower, "hw:")
+	if idx < 0 {
+		return "", -1
+	}
+	var rest = name[idx+3:] // after "hw:"
+
+	// Split by comma: Card,Dev[,Sub]
+	var parts = strings.SplitN(rest, ",", 3)
+	if len(parts) < 2 {
+		return parts[0], -1
+	}
+
+	devNum = -1
+	fmt.Sscanf(parts[1], "%d", &devNum)
+	return parts[0], devNum
+}
+
+func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
+	// Handle default device
+	if name == "" || strings.ToLower(name) == "default" {
+		if forInput {
+			var dev, err = portaudio.DefaultInputDevice()
+			if err != nil {
+				return nil
+			}
+			return dev
+		} else {
+			var dev, err = portaudio.DefaultOutputDevice()
+			if err != nil {
+				return nil
+			}
+			return dev
+		}
+	}
+
+	// Search through all devices
+	var devices, err = portaudio.Devices()
+	if err != nil {
+		return nil
+	}
+
+	var devMatchesDirection = func(dev *portaudio.DeviceInfo) bool {
+		if forInput {
+			return dev.MaxInputChannels > 0
+		}
+		return dev.MaxOutputChannels > 0
+	}
+
+	// Try exact match first
+	for _, dev := range devices {
+		if dev.Name == name && devMatchesDirection(dev) {
+			return dev
+		}
+	}
+
+	// Try substring match (check both directions)
+	for _, dev := range devices {
+		if devMatchesDirection(dev) {
+			var nameLower = strings.ToLower(name)
+			var devLower = strings.ToLower(dev.Name)
+			if strings.Contains(devLower, nameLower) || strings.Contains(nameLower, devLower) {
+				return dev
+			}
+		}
+	}
+
+	// Try ALSA-style name matching.
+	// Config names like "plughw:Loopback,1,1" need to match PortAudio names
+	// like "Loopback: PCM (hw:0,1)".
+	// Extract card name and device number from the config, then match against
+	// the card name prefix and (hw:X,Dev) pattern in PortAudio device names.
+	var cardName, devNum = parseALSADeviceName(name)
+	if cardName != "" {
+		for _, dev := range devices {
+			if !devMatchesDirection(dev) {
+				continue
+			}
+			var devLower = strings.ToLower(dev.Name)
+			// Check card name appears in PortAudio device name
+			if !strings.Contains(devLower, strings.ToLower(cardName)) {
+				continue
+			}
+			// If we have a device number, match it against (hw:X,Dev) in the name
+			if devNum >= 0 {
+				var target = fmt.Sprintf(",%d)", devNum)
+				if strings.Contains(dev.Name, target) {
+					return dev
+				}
+			} else {
+				return dev
+			}
+		}
+	}
+
+	// Fall back to default
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Could not match audio device '%s' to any PortAudio device, falling back to default.\n", name)
+	if forInput {
+		var dev, err = portaudio.DefaultInputDevice()
+		if err != nil {
+			return nil
+		}
+		return dev
+	} else {
+		var dev, err = portaudio.DefaultOutputDevice()
+		if err != nil {
+			return nil
+		}
+		return dev
+	}
 }
 
 /*------------------------------------------------------------------
@@ -652,11 +863,6 @@ func snd_pcm_status_alloca(ptr **C.snd_pcm_status_t) {
  * Name:        audio_open
  *
  * Purpose:     Open the digital audio device.
- *		For "OSS", the device name is typically "/dev/dsp".
- *		For "ALSA", it's a lot more complicated.  See User Guide.
- *
- *		New in version 1.0, we recognize "udp:" optionally
- *		followed by a port number.
  *
  * Inputs:      pa		- Address of structure of type audio_s.
  *
@@ -670,53 +876,49 @@ func snd_pcm_status_alloca(ptr **C.snd_pcm_status_t) {
  *					bits_per_sample
  *				If zero, reasonable defaults will be provided.
  *
- *				The device names are in adevice_in and adevice_out.
- *				 - For "OSS", the device name is typically "/dev/dsp".
- *				 - For "ALSA", the device names are hw:c,d
- *				   where c is the "card" (for historical purposes)
- *				   and d is the "device" within the "card."
- *
- *
  * Outputs:	pa		- The ACTUAL values are returned here.
  *
- *				These might not be exactly the same as what was requested.
- *
- *				Example: ask for stereo, 16 bits, 22050 per second.
- *				An ordinary desktop/laptop PC should be able to handle this.
- *				However, some other sort of smaller device might be
- *				more restrictive in its capabilities.
- *				It might say, the best I can do is mono, 8 bit, 8000/sec.
- *
- *				The software modem must use this ACTUAL information
- *				that the device is supplying, that could be different
- *				than what the user specified.
- *
  * Returns:     0 for success, -1 for failure.
- *
  *
  *----------------------------------------------------------------*/
 
 func audio_open(pa *audio_s) C.int {
-	/* TODO KG
-	#if !USE_SNDIO
-		int err;
-	#endif
-	*/
 
 	save_audio_config_p = pa
 
+	// Initialize PortAudio, using a refcount so that multiple audio_open/
+	// audio_close cycles are correctly paired with Initialize/Terminate.
+	portaudioMu.Lock()
+	if portaudioRefCount == 0 {
+		var err = portaudio.Initialize()
+		if err != nil {
+			portaudioMu.Unlock()
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("PortAudio initialization failed: %v\n", err)
+			return -1
+		}
+	}
+	portaudioRefCount++
+	portaudioMu.Unlock()
+
+	// If audio_open fails after this point, roll back the refcount increment
+	// so it stays correctly paired with audio_close calls.
+	var openSucceeded = false
+	defer func() {
+		if !openSucceeded {
+			portaudioMu.Lock()
+			portaudioRefCount--
+			if portaudioRefCount == 0 {
+				portaudio.Terminate()
+			}
+			portaudioMu.Unlock()
+		}
+	}()
+
 	for a := 0; a < MAX_ADEVS; a++ {
 		adev[a] = new(adev_s)
-		// TODO KG #if USE_ALSA
-		adev[a].audio_in_handle = nil
-		adev[a].audio_out_handle = nil
-		/* TODO KG
-		#elif USE_SNDIO
-			  adev[a].sndio_in_handle = adev[a].sndio_out_handle = nil;
-		#else
-			  adev[a].oss_audio_device_fd = -1;
-		#endif
-		*/
+		adev[a].inputStream = nil
+		adev[a].outputStream = nil
 	}
 
 	/*
@@ -763,14 +965,20 @@ func audio_open(pa *audio_s) C.int {
 	for a := C.int(0); a < MAX_ADEVS; a++ {
 		if pa.adev[a].defined != 0 {
 
-			adev[a].inbuf_size_in_bytes = 0
-			adev[a].inbuf_ptr = nil
-			adev[a].inbuf_len = 0
-			adev[a].inbuf_next = 0
+			adev[a].inbufSizeInBytes = 0
+			adev[a].inbuf = nil
+			adev[a].inbufLen = 0
+			adev[a].inbufNext = 0
 
-			adev[a].outbuf_size_in_bytes = 0
-			adev[a].outbuf_ptr = nil
-			adev[a].outbuf_len = 0
+			adev[a].outbufSizeInBytes = 0
+			adev[a].outbuf = nil
+			adev[a].outbufLen = 0
+
+			// Store audio format
+			adev[a].sampleRate = pa.adev[a].samples_per_sec
+			adev[a].numChannels = pa.adev[a].num_channels
+			adev[a].bitsPerSample = pa.adev[a].bits_per_sample
+			adev[a].bytesPerFrame = pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
 
 			/*
 			 * Determine the type of audio input.
@@ -816,6 +1024,11 @@ func audio_open(pa *audio_s) C.int {
 				dw_printf("Audio out device for transmit: %s %s\n", audio_out_name, ctemp)
 			}
 
+			// Calculate buffer size
+			var bufSizeInBytes = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample)
+			var framesPerBuffer = bufSizeInBytes / adev[a].bytesPerFrame
+			adev[a].framesPerBuffer = framesPerBuffer
+
 			/*
 			 * Now attempt actual opens.
 			 */
@@ -827,64 +1040,87 @@ func audio_open(pa *audio_s) C.int {
 			switch adev[a].g_audio_in_type {
 
 			/*
-			 * Soundcard - ALSA.
+			 * Soundcard - PortAudio with callback mode.
+			 * Callback mode is more reliable than blocking read because the
+			 * callback runs on a dedicated audio thread with better timing
+			 * guarantees than Go goroutines.
 			 */
 			case AUDIO_IN_TYPE_SOUNDCARD:
-				// TODO KG #if USE_ALSA
-				var err = C.snd_pcm_open(&(adev[a].audio_in_handle), C.CString(audio_in_name), C.SND_PCM_STREAM_CAPTURE, 0)
-				if err < 0 {
+				var inputDev = findPortAudioDevice(audio_in_name, true)
+				if inputDev == nil {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not open audio device %s for input\n%s\n",
-						audio_in_name, C.GoString(C.snd_strerror(err)))
-					if err == -C.EBUSY {
-						dw_printf("This means that some other application is using that device.\n")
-						dw_printf("The solution is to identify that other application and stop it.\n")
-					}
-					return (-1)
+					dw_printf("Could not find audio input device: %s\n", audio_in_name)
+					return -1
 				}
 
-				adev[a].inbuf_size_in_bytes = set_alsa_params(a, adev[a].audio_in_handle, pa, C.CString(audio_in_name), C.CString("input"))
+				// Create ring buffer for audio data.
+				// Size it to hold ~1 second of audio for plenty of headroom.
+				// This accommodates Go scheduler delays and processing latency.
+				var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
+				adev[a].inputRingBuf = newAudioRingBuffer(ringBufSize)
 
-				/* TODO KG
-				#elif USE_SNDIO
-						adev[a].sndio_in_handle = sio_open (audio_in_name, SIO_REC, 0);
-						if (adev[a].sndio_in_handle == nil) {
-						  text_color_set(DW_COLOR_ERROR);
-						  dw_printf ("Could not open audio device %s for input\n",
-							audio_in_name);
-						  return (-1);
-						}
+				// Create input stream parameters
+				var inputParams = portaudio.StreamParameters{
+					Input: portaudio.StreamDeviceParameters{
+						Device:   inputDev,
+						Channels: pa.adev[a].num_channels,
+						Latency:  inputDev.DefaultHighInputLatency,
+					},
+					Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+					SampleRate:      float64(pa.adev[a].samples_per_sec),
+					FramesPerBuffer: framesPerBuffer,
+					Flags:           portaudio.NoFlag,
+				}
 
-						adev[a].inbuf_size_in_bytes = set_sndio_params (a, adev[a].sndio_in_handle, pa, audio_in_name, "input");
+				// Open input stream with callback.
+				// The callback receives audio data and writes it to the ring buffer.
+				// IMPORTANT: Capture the ring buffer pointer now, not in the closure,
+				// to avoid the classic Go closure-over-loop-variable bug.
+				var inRingBuf = adev[a].inputRingBuf
+				var err error
+				if pa.adev[a].bits_per_sample == 16 {
+					// Pre-allocate a scratch buffer sized for one full callback invocation
+					// so the callback performs zero heap allocations at runtime.
+					adev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
+					var inScratchBuf = adev[a].inputScratchBuf
+					adev[a].inputStream, err = portaudio.OpenStream(
+						inputParams,
+						func(in []int16) {
+							// Reuse the pre-allocated scratch buffer; slice to actual length.
+							var scratch = inScratchBuf[:len(in)*2]
+							for i, sample := range in {
+								binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
+							}
+							inRingBuf.write(scratch)
+						},
+					)
+				} else {
+					adev[a].inputStream, err = portaudio.OpenStream(
+						inputParams,
+						func(in []uint8) {
+							// Write uint8 samples directly to ring buffer
+							inRingBuf.write(in)
+						},
+					)
+				}
+				if err != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, err)
+					return -1
+				}
 
-						if (!sio_start (adev[a].sndio_in_handle)) {
-						  text_color_set(DW_COLOR_ERROR);
-						  dw_printf ("Could not start audio device %s for input\n",
-							audio_in_name);
-						  return (-1);
-						}
+				err = adev[a].inputStream.Start()
+				if err != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Could not start audio input stream: %v\n", err)
+					return -1
+				}
 
-				#else // OSS
-					        adev[a].oss_audio_device_fd = open (pa.adev[a].adevice_in, O_RDWR);
+				adev[a].inbufSizeInBytes = bufSizeInBytes
 
-					        if (adev[a].oss_audio_device_fd < 0) {
-					          text_color_set(DW_COLOR_ERROR);
-					          dw_printf ("%s:\n", pa.adev[a].adevice_in);
-				//	          snprintf (message, sizeof(message), "Could not open audio device %s", pa.adev[a].adevice_in);
-				//	          perror (message);
-					          return (-1);
-					        }
-
-					        adev[a].outbuf_size_in_bytes = adev[a].inbuf_size_in_bytes = set_oss_params (a, adev[a].oss_audio_device_fd, pa);
-
-					        if (adev[a].inbuf_size_in_bytes <= 0 || adev[a].outbuf_size_in_bytes <= 0) {
-					          return (-1);
-					        }
-				#endif
-				*/
-				/*
-				 * UDP.
-				 */
+			/*
+			 * UDP.
+			 */
 			case AUDIO_IN_TYPE_SDR_UDP:
 
 				var udpAddr, addrErr = net.ResolveUDPAddr("udp", audio_in_name[3:]) // Capture the colon onwards from "udp:$PORT"
@@ -902,7 +1138,7 @@ func audio_open(pa *audio_s) C.int {
 					dw_printf("Couldn't create listening socket: %s\n", udpErr)
 					return -1
 				}
-				adev[a].inbuf_size_in_bytes = SDR_UDP_BUF_MAXLEN
+				adev[a].inbufSizeInBytes = SDR_UDP_BUF_MAXLEN
 
 				/*
 				 * stdin.
@@ -911,7 +1147,7 @@ func audio_open(pa *audio_s) C.int {
 
 				/* Do we need to adjust any properties of stdin? */
 
-				adev[a].inbuf_size_in_bytes = 1024
+				adev[a].inbufSizeInBytes = 1024
 
 			default:
 
@@ -921,521 +1157,83 @@ func audio_open(pa *audio_s) C.int {
 			}
 
 			/*
-			 * Output device.  Only "soundcard" is supported at this time.
+			 * Output device - blocking write mode.
+			 * audio_flush_real fills the typed output buffer and calls Write() to
+			 * send it to PortAudio. The stream is started lazily on first write
+			 * and stopped in audio_wait to avoid underflows during idle periods.
 			 */
 
-			// TODO KG #if USE_ALSA
-			var err = C.snd_pcm_open(&(adev[a].audio_out_handle), C.CString(audio_out_name), C.SND_PCM_STREAM_PLAYBACK, 0)
-
-			if err < 0 {
+			var outputDev = findPortAudioDevice(audio_out_name, false)
+			if outputDev == nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Could not open audio device %s for output\n%s\n",
-					audio_out_name, C.GoString(C.snd_strerror(err)))
-				if err == -C.EBUSY {
-					dw_printf("This means that some other application is using that device.\n")
-					dw_printf("The solution is to identify that other application and stop it.\n")
-				}
-				return (-1)
+				dw_printf("Could not find audio output device: %s\n", audio_out_name)
+				return -1
 			}
 
-			adev[a].outbuf_size_in_bytes = set_alsa_params(a, adev[a].audio_out_handle, pa, C.CString(audio_out_name), C.CString("output"))
-
-			if adev[a].inbuf_size_in_bytes <= 0 || adev[a].outbuf_size_in_bytes <= 0 {
-				return (-1)
+			// Create output stream parameters
+			var outputParams = portaudio.StreamParameters{
+				Input: portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+				Output: portaudio.StreamDeviceParameters{
+					Device:   outputDev,
+					Channels: pa.adev[a].num_channels,
+					Latency:  outputDev.DefaultHighOutputLatency,
+				},
+				SampleRate:      float64(pa.adev[a].samples_per_sec),
+				FramesPerBuffer: framesPerBuffer,
+				Flags:           portaudio.NoFlag,
 			}
 
-			/* TODO KG
-			#elif USE_SNDIO
-				    adev[a].sndio_out_handle = sio_open (audio_out_name, SIO_PLAY, 0);
-				    if (adev[a].sndio_out_handle == nil) {
-				      text_color_set(DW_COLOR_ERROR);
-				      dw_printf ("Could not open audio device %s for output\n",
-						audio_out_name);
-				      return (-1);
-				    }
+			// Open output stream in blocking write mode.
+			// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
+			var err error
+			if pa.adev[a].bits_per_sample == 16 {
+				adev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
+				adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
+			} else {
+				adev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
+				adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
+			}
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
+				return -1
+			}
 
-				    adev[a].outbuf_size_in_bytes = set_sndio_params (a, adev[a].sndio_out_handle, pa, audio_out_name, "output");
+			// Output stream is opened but NOT started here.
+			// It will be started lazily on first write in audio_flush_real
+			// and stopped in audio_wait, to avoid underflows during idle periods.
 
-				    if (adev[a].inbuf_size_in_bytes <= 0 || adev[a].outbuf_size_in_bytes <= 0) {
-				      return (-1);
-				    }
+			adev[a].outbufSizeInBytes = bufSizeInBytes
 
-				    if (!sio_start (adev[a].sndio_out_handle)) {
-				      text_color_set(DW_COLOR_ERROR);
-				      dw_printf ("Could not start audio device %s for output\n",
-						audio_out_name);
-				      return (-1);
-				    }
-			#endif
-			*/
+			// Version 1.3 - after a report of this situation for Mac OSX version.
+			if adev[a].inbufSizeInBytes < 256 || adev[a].inbufSizeInBytes > 32768 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Audio buffer has unexpected extreme size of %d bytes.\n", adev[a].inbufSizeInBytes)
+				dw_printf("This might be caused by unusual audio device configuration values.\n")
+				adev[a].inbufSizeInBytes = 2048
+				dw_printf("Using %d to attempt recovery.\n", adev[a].inbufSizeInBytes)
+			}
 
 			/*
-			 * Finally allocate buffer for each direction.
+			 * Finally allocate byte-level buffers for each direction.
 			 */
-			adev[a].inbuf_ptr = (*C.uchar)(C.malloc(C.size_t(adev[a].inbuf_size_in_bytes)))
-			Assert(adev[a].inbuf_ptr != nil)
-			adev[a].inbuf_len = 0
-			adev[a].inbuf_next = 0
+			adev[a].inbuf = make([]byte, adev[a].inbufSizeInBytes)
+			Assert(adev[a].inbuf != nil)
+			adev[a].inbufLen = 0
+			adev[a].inbufNext = 0
 
-			adev[a].outbuf_ptr = (*C.uchar)(C.malloc(C.size_t(adev[a].outbuf_size_in_bytes)))
-			Assert(adev[a].outbuf_ptr != nil)
-			adev[a].outbuf_len = 0
+			adev[a].outbuf = make([]byte, adev[a].outbufSizeInBytes)
+			Assert(adev[a].outbuf != nil)
+			adev[a].outbufLen = 0
 
 		} /* end of audio device defined */
 
 	} /* end of for each audio device */
 
+	openSucceeded = true
 	return (0)
 
 } /* end audio_open */
-
-// TODO KG #if USE_ALSA
-
-/*
- * Set parameters for sound card.
- *
- * See  ??  for details.
- */
-/*
- * Terminology:
- *   Sample	- for one channel.		e.g. 2 bytes for 16 bit.
- *   Frame	- one sample for all channels.  e.g. 4 bytes for 16 bit stereo
- *   Period	- size of one transfer.
- */
-
-func set_alsa_params(a C.int, handle *C.snd_pcm_t, pa *audio_s, devname *C.char, inout *C.char) C.int {
-
-	var hw_params *C.snd_pcm_hw_params_t
-	var err = C.snd_pcm_hw_params_malloc(&hw_params)
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not alloc hw param structure.\n%s\n", C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	err = C.snd_pcm_hw_params_any(handle, hw_params)
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not init hw param structure.\n%s\n",
-			C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	/* Interleaved data: L, R, L, R, ... */
-
-	err = C.snd_pcm_hw_params_set_access(handle, hw_params, C.SND_PCM_ACCESS_RW_INTERLEAVED)
-
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not set interleaved mode.\n%s\n",
-			C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	/* Signed 16 bit little endian or unsigned 8 bit. */
-
-	err = C.snd_pcm_hw_params_set_format(handle, hw_params,
-		C.snd_pcm_format_t(IfThenElse(pa.adev[a].bits_per_sample == 8, C.SND_PCM_FORMAT_U8, C.SND_PCM_FORMAT_S16_LE)))
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not set bits per sample.\n%s\n",
-			C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	/* Number of audio channels. */
-
-	err = C.snd_pcm_hw_params_set_channels(handle, hw_params, C.uint(pa.adev[a].num_channels))
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not set number of audio channels.\n%s\n",
-			C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	/* Audio sample rate. */
-
-	var val = C.uint(pa.adev[a].samples_per_sec)
-
-	var dir C.int = 0
-
-	err = C.snd_pcm_hw_params_set_rate_near(handle, hw_params, &val, &dir)
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not set audio sample rate.\n%s\n", C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	if val != C.uint(pa.adev[a].samples_per_sec) {
-
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Asked for %d samples/sec but got %d.\n",
-
-			pa.adev[a].samples_per_sec, val)
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-
-		pa.adev[a].samples_per_sec = int(val)
-	}
-
-	/* Original: */
-	/* Guessed around 20 reads/sec might be good. */
-	/* Period too long = too much latency. */
-	/* Period too short = more overhead of many small transfers. */
-
-	/* fpp = pa.adev[a].samples_per_sec / 20; */
-
-	/* The suggested period size was 2205 frames.  */
-	/* I thought the later "...set_period_size_near" might adjust it to be */
-	/* some more optimal nearby value based hardware buffer sizes but */
-	/* that didn't happen.   We ended up with a buffer size of 4410 bytes. */
-
-	/* In version 1.2, let's take a different approach. */
-	/* Reduce the latency and round up to a multiple of 1 Kbyte. */
-
-	/* For the typical case of 44100 sample rate, 1 channel, 16 bits, we calculate */
-	/* a buffer size of 882 and round it up to 1k.  This results in 512 frames per period. */
-	/* A period comes out to be about 80 periods per second or about 12.5 mSec each. */
-
-	var buf_size_in_bytes = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample)
-
-	/* TODO KG
-	#if __arm__
-		// Ugly hack for RPi.
-		// Reducing buffer size is fine for input but not so good for output.
-
-		if (*inout == 'o') {
-		  buf_size_in_bytes = buf_size_in_bytes * 4;
-		}
-	#endif
-	*/
-
-	// Frames per period.
-	var fpp = C.snd_pcm_uframes_t(buf_size_in_bytes / (pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8))
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("suggest period size of %d frames\n", (int)fpp);
-	#endif
-	*/
-	dir = 0
-	err = C.snd_pcm_hw_params_set_period_size_near(handle, hw_params, &fpp, &dir)
-
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not set period size\n%s\n", C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	err = C.snd_pcm_hw_params(handle, hw_params)
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not set hw params\n%s\n", C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	/* Driver might not like our suggested period size */
-	/* and might have another idea. */
-
-	err = C.snd_pcm_hw_params_get_period_size(hw_params, &fpp, nil)
-	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not get audio period size.\n%s\n", C.GoString(C.snd_strerror(err)))
-		dw_printf("for %s %s.\n", C.GoString(devname), C.GoString(inout))
-		return (-1)
-	}
-
-	C.snd_pcm_hw_params_free(hw_params)
-
-	/* A "frame" is one sample for all channels. */
-
-	/* The read and write use units of frames, not bytes. */
-
-	adev[a].bytes_per_frame = C.int(C.snd_pcm_frames_to_bytes(handle, 1))
-
-	Assert(adev[a].bytes_per_frame == C.int(pa.adev[a].num_channels*pa.adev[a].bits_per_sample/8))
-
-	buf_size_in_bytes = int(fpp) * int(adev[a].bytes_per_frame)
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("audio buffer size = %d (bytes per frame) x %d (frames per period) = %d \n", adev[a].bytes_per_frame, (int)fpp, buf_size_in_bytes);
-	#endif
-	*/
-
-	/* Version 1.3 - after a report of this situation for Mac OSX version. */
-	if buf_size_in_bytes < 256 || buf_size_in_bytes > 32768 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio buffer has unexpected extreme size of %d bytes.\n", buf_size_in_bytes)
-		dw_printf("This might be caused by unusual audio device configuration values.\n")
-		buf_size_in_bytes = 2048
-		dw_printf("Using %d to attempt recovery.\n", buf_size_in_bytes)
-	}
-
-	return C.int(buf_size_in_bytes)
-
-} /* end alsa_set_params */
-
-// TODO KG #elif USE_SNDIO
-
-/*
- * Set parameters for sound card. (sndio)
- *
- * See  /usr/include/sndio.h  for details.
- */
-
-/* TODO KG
-static int set_sndio_params (int a, struct sio_hdl *handle, struct audio_s *pa, char *devname, char *inout)
-{
-
-	struct sio_par q, r;
-
-	// Signed 16 bit little endian or unsigned 8 bit.
-	sio_initpar (&q);
-	q.bits = pa.adev[a].bits_per_sample;
-	q.bps = (q.bits + 7) / 8;
-	q.sig = (q.bits == 8) ? 0 : 1;
-	q.le = 1; // always little endian
-	q.msb = 0; // LSB aligned
-	q.rchan = q.pchan = pa.adev[a].num_channels;
-	q.rate = pa.adev[a].samples_per_sec;
-	q.xrun = SIO_IGNORE;
-	q.appbufsz = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample);
-
-
-#if DEBUG
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("suggest buffer size %d bytes for %s %s.\n",
-		q.appbufsz, devname, inout);
-#endif
-
-	// challenge new setting
-	if (!sio_setpar (handle, &q)) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Could not set hardware parameter for %s %s.\n",
-		devname, inout);
-	  return (-1);
-	}
-
-	// get response
-	if (!sio_getpar (handle, &r)) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Could not obtain current hardware setting for %s %s.\n",
-		devname, inout);
-	  return (-1);
-	}
-
-#if DEBUG
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("audio buffer size %d bytes for %s %s.\n",
-		r.appbufsz, devname, inout);
-#endif
-	if (q.rate != r.rate) {
-	  text_color_set(DW_COLOR_INFO);
-	  dw_printf ("Asked for %d samples/sec but got %d for %s %s.",
-		     pa.adev[a].samples_per_sec, r.rate, devname, inout);
-	  pa.adev[a].samples_per_sec = r.rate;
-	}
-
-	// not supported
-	if (q.bits != r.bits || q.bps != r.bps || q.sig != r.sig ||
-	    (q.bits > 8 && q.le != r.le) ||
-	    (*inout == 'o' && q.pchan != r.pchan) ||
-	    (*inout == 'i' && q.rchan != r.rchan)) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Unsupported format for %s %s.\n", devname, inout);
-	  return (-1);
-	}
-
-	return r.appbufsz;
-
-}
-
-static int poll_sndio (struct sio_hdl *hdl, int events)
-{
-	struct pollfd *pfds;
-	int nfds, revents;
-
-	nfds = sio_nfds (hdl);
-	pfds = alloca (nfds * sizeof(struct pollfd));
-
-	do {
-	  nfds = sio_pollfd (hdl, pfds, events);
-	  if (nfds < 1) {
-	    // no need to wait
-	    return (0);
-	  }
-	  if (poll (pfds, nfds, -1) < 0) {
-	    text_color_set(DW_COLOR_ERROR);
-	    dw_printf ("poll %d\n", errno);
-	    return (-1);
-	  }
-	  revents = sio_revents (hdl, pfds);
-	} while (!(revents & (events | POLLHUP)));
-
-	// unrecoverable error occurred
-	if (revents & POLLHUP) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("waited for %s, POLLHUP received\n", (events & POLLIN) ? "POLLIN" : "POLLOUT");
-	  return (-1);
-	}
-
-	return (0);
-}
-
-#else
-*/
-
-/*
- * Set parameters for sound card.  (OSS only)
- *
- * See  /usr/include/sys/soundcard.h  for details.
- */
-
-/* TODO KG
-static int set_oss_params (int a, int fd, struct audio_s *pa)
-{
-	int err;
-	int devcaps;
-	int asked_for;
-	char message[100];
-	int ossbuf_size_in_bytes;
-
-
-	err = ioctl (fd, SNDCTL_DSP_CHANNELS, &(pa.adev[a].num_channels));
-   	if (err == -1) {
-	  text_color_set(DW_COLOR_ERROR);
-    	  perror("Not able to set audio device number of channels");
- 	  return (-1);
-	}
-
-        asked_for = pa.adev[a].samples_per_sec;
-
-	err = ioctl (fd, SNDCTL_DSP_SPEED, &(pa.adev[a].samples_per_sec));
-   	if (err == -1) {
-	  text_color_set(DW_COLOR_ERROR);
-    	  perror("Not able to set audio device sample rate");
- 	  return (-1);
-	}
-
-	if (pa.adev[a].samples_per_sec != asked_for) {
-	  text_color_set(DW_COLOR_INFO);
-          dw_printf ("Asked for %d samples/sec but actually using %d.\n",
-		asked_for, pa.adev[a].samples_per_sec);
-	}
-
-	// This is actually a bit mask but it happens that
-	// 0x8 is unsigned 8 bit samples and
-	// 0x10 is signed 16 bit little endian.
-
-	err = ioctl (fd, SNDCTL_DSP_SETFMT, &(pa.adev[a].bits_per_sample));
-   	if (err == -1) {
-	  text_color_set(DW_COLOR_ERROR);
-    	  perror("Not able to set audio device sample size");
- 	  return (-1);
-	}
-
-
- // Determine capabilities.
-
-	err = ioctl (fd, SNDCTL_DSP_GETCAPS, &devcaps);
-   	if (err == -1) {
-	  text_color_set(DW_COLOR_ERROR);
-    	  perror("Not able to get audio device capabilities");
- 	  // Is this fatal? //	return (-1);
-	}
-
-#if DEBUG
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("audio_open(): devcaps = %08x\n", devcaps);
-	if (devcaps & DSP_CAP_DUPLEX) dw_printf ("Full duplex record/playback.\n");
-	if (devcaps & DSP_CAP_BATCH) dw_printf ("Device has some kind of internal buffers which may cause delays.\n");
-	if (devcaps & ~ (DSP_CAP_DUPLEX | DSP_CAP_BATCH)) dw_printf ("Others...\n");
-#endif
-
-	if (!(devcaps & DSP_CAP_DUPLEX)) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Audio device does not support full duplex\n");
-    	  // Do we care? //	return (-1);
-	}
-
-	err = ioctl (fd, SNDCTL_DSP_SETDUPLEX, nil);
-   	if (err == -1) {
-	  // text_color_set(DW_COLOR_ERROR);
-    	  // perror("Not able to set audio full duplex mode");
- 	  // Unfortunate but not a disaster.
-	}
-
-/*
- * Get preferred block size.
- * Presumably this will provide the most efficient transfer.
- *
- * In my particular situation, this turned out to be
- *  	2816 for 11025 Hz 16 bit mono
- *	5568 for 11025 Hz 16 bit stereo
- *     11072 for 44100 Hz 16 bit mono
- *
- * This was long ago under different conditions.
- * Should study this again some day.
- *
- * Your mileage may vary.
-*/
-/* TODO KG
-	err = ioctl (fd, SNDCTL_DSP_GETBLKSIZE, &ossbuf_size_in_bytes);
-   	if (err == -1) {
-	  text_color_set(DW_COLOR_ERROR);
-    	  perror("Not able to get audio block size");
-	  ossbuf_size_in_bytes = 2048;	// pick something reasonable
-	}
-
-#if DEBUG
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("audio_open(): suggestd block size is %d\n", ossbuf_size_in_bytes);
-#endif
-
-// That's 1/8 of a second which seems rather long if we want to
-// respond quickly.
-
-
-	ossbuf_size_in_bytes = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample);
-
-#if DEBUG
-	text_color_set(DW_COLOR_DEBUG);
-	dw_printf ("audio_open(): using block size of %d\n", ossbuf_size_in_bytes);
-#endif
-
-#if 0
-	// Original - dies without good explanation.
-	Assert (ossbuf_size_in_bytes >= 256 && ossbuf_size_in_bytes <= 32768);
-#else
-	// Version 1.3 - after a report of this situation for Mac OSX version.
-	if (ossbuf_size_in_bytes < 256 || ossbuf_size_in_bytes > 32768) {
-	  text_color_set(DW_COLOR_ERROR);
-	  dw_printf ("Audio buffer has unexpected extreme size of %d bytes.\n", ossbuf_size_in_bytes);
-	  dw_printf ("Detected at %s, line %d.\n", __FILE__, __LINE__);
-	  dw_printf ("This might be caused by unusual audio device configuration values.\n");
-	  ossbuf_size_in_bytes = 2048;
-	  dw_printf ("Using %d to attempt recovery.\n", ossbuf_size_in_bytes);
-	}
-#endif
-	return (ossbuf_size_in_bytes);
-
-}
-
-
-#endif
-
-
 
 /*------------------------------------------------------------------
  *
@@ -1457,196 +1255,54 @@ static int set_oss_params (int a, int fd, struct audio_s *pa)
 
 func audio_get_real(a int) int {
 
-	/* TODO KG
-	   #if STATISTICS
-	   	// Gather numbers for read from audio device.
-
-	   #define duration 100			// report every 100 seconds.
-	   	static time_t last_time[MAX_ADEVS];
-	   	time_t this_time[MAX_ADEVS];
-	   	static int sample_count[MAX_ADEVS];
-	   	static int error_count[MAX_ADEVS];
-	   #endif
-
-	   /* TODO KG
-	   #if DEBUGx
-	   	text_color_set(DW_COLOR_DEBUG);
-
-	   	dw_printf ("audio_get():\n");
-
-	   #endif
-	*/
-
-	var retries = 0
-
-	Assert(adev[a].inbuf_size_in_bytes >= 100 && adev[a].inbuf_size_in_bytes <= 32768)
+	Assert(adev[a].inbufSizeInBytes >= 100 && adev[a].inbufSizeInBytes <= 32768)
 
 	switch adev[a].g_audio_in_type {
 
 	/*
-	 * Soundcard - ALSA
+	 * Soundcard - PortAudio callback mode.
+	 * Audio data is written to the ring buffer by the callback.
+	 * We just read one byte from it here.
 	 */
 	case AUDIO_IN_TYPE_SOUNDCARD:
+		Assert(adev[a].inputRingBuf != nil)
 
-		// TODO KG #if USE_ALSA
+		// Check for overflow (data was dropped in the callback)
+		if adev[a].inputRingBuf.checkOverflow() {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Audio input overflow on device %d - some samples lost\n", a)
+			dw_printf("If receiving is fine and strange things happen when transmitting, it is probably RF energy\n")
+			dw_printf("getting into your audio or digital wiring.\n")
 
-		for adev[a].inbuf_next >= adev[a].inbuf_len {
+			audio_stats(a,
+				save_audio_config_p.adev[a].num_channels,
+				0,
+				save_audio_config_p.statistics_interval)
+		}
 
-			Assert(adev[a].audio_in_handle != nil)
-			/* TODO KG
-			#if DEBUGx
-				      text_color_set(DW_COLOR_DEBUG);
-				      dw_printf ("audio_get(): readi asking for %d frames\n", adev[a].inbuf_size_in_bytes / adev[a].bytes_per_frame);
-			#endif
-			*/
-			var n = C.snd_pcm_readi(adev[a].audio_in_handle, unsafe.Pointer(adev[a].inbuf_ptr), C.snd_pcm_uframes_t(adev[a].inbuf_size_in_bytes/adev[a].bytes_per_frame))
-
-			/* TODO KG
-			#if DEBUGx
-				      text_color_set(DW_COLOR_DEBUG);
-				      dw_printf ("audio_get(): readi asked for %d and got %d frames\n",
-					adev[a].inbuf_size_in_bytes / adev[a].bytes_per_frame, n);
-			#endif
-			*/
-
+		// Drain the ring buffer into inbuf in a single bulk read when exhausted.
+		// This acquires the ring buffer mutex only once per inbuf-worth of data
+		// rather than once per byte.
+		for adev[a].inbufNext >= adev[a].inbufLen {
+			var n, ok = adev[a].inputRingBuf.readChunk(adev[a].inbuf)
+			if !ok {
+				// Ring buffer was closed - stream ended
+				return -1
+			}
 			if n > 0 {
-
-				/* Success */
-
-				adev[a].inbuf_len = C.int(n) * adev[a].bytes_per_frame /* convert to number of bytes */
-				adev[a].inbuf_next = 0
+				adev[a].inbufLen = n
+				adev[a].inbufNext = 0
 
 				audio_stats(a,
 					save_audio_config_p.adev[a].num_channels,
-					int(n),
+					n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 					save_audio_config_p.statistics_interval)
-
-			} else if n == 0 {
-
-				/* Didn't expect this, but it's not a problem. */
-				/* Wait a little while and try again. */
-
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Audio input got zero bytes: %s\n", C.GoString(C.snd_strerror(C.int(n))))
-				SLEEP_MS(10)
-
-				adev[a].inbuf_len = 0
-				adev[a].inbuf_next = 0
-			} else {
-				/* Error */
-				// TODO: Needs more study and testing.
-
-				// Only expected error conditions:
-				//    -EBADFD	PCM is not in the right state (SND_PCM_STATE_PREPARED or SND_PCM_STATE_RUNNING)
-				//    -EPIPE	an overrun occurred
-				//    -ESTRPIPE	a suspend event occurred (stream is suspended and waiting for an application recovery)
-
-				// Data overrun is displayed as "broken pipe" which seems a little misleading.
-				// Add our own message which says something about CPU being too slow.
-
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Audio input device %d error code %d: %s\n", a, n, C.GoString(C.snd_strerror(C.int(n))))
-
-				if n == (-C.EPIPE) {
-					dw_printf("If receiving is fine and strange things happen when transmitting, it is probably RF energy\n")
-					dw_printf("getting into your audio or digital wiring. This can cause USB to lock up or PTT to get stuck on.\n")
-					dw_printf("Move the radio, and especially the antenna, farther away from the computer.\n")
-					dw_printf("Use shielded cable and put ferrite beads on the cables to reduce RF going where it is not wanted.\n")
-					dw_printf("\n")
-					dw_printf("A less likely cause is the CPU being too slow to keep up with the audio stream.\n")
-					dw_printf("Use the \"top\" command, in another command window, to look at CPU usage.\n")
-					dw_printf("This might be a temporary condition so we will attempt to recover a few times before giving up.\n")
-					dw_printf("If using a very slow CPU, try reducing the CPU load by using -P- command\n")
-					dw_printf("line option for 9600 bps or -D3 for slower AFSK .\n")
-				}
-
-				audio_stats(a,
-					save_audio_config_p.adev[a].num_channels,
-					0,
-					save_audio_config_p.statistics_interval)
-
-				/* Try to recover a few times and eventually give up. */
-				retries++
-				if retries > 10 {
-					adev[a].inbuf_len = 0
-					adev[a].inbuf_next = 0
-					return (-1)
-				}
-
-				if n == -C.EPIPE {
-
-					/* EPIPE means overrun */
-
-					C.snd_pcm_recover(adev[a].audio_in_handle, C.int(n), 1)
-
-				} else {
-					/* Could be some temporary condition. */
-					/* Wait a little then try again. */
-					/* Sometimes I get "Resource temporarily available" */
-					/* when the Update Manager decides to run. */
-
-					SLEEP_MS(250)
-					C.snd_pcm_recover(adev[a].audio_in_handle, C.int(n), 1)
-				}
 			}
 		}
 
-		/* TODO KG
-		#elif USE_SNDIO
-
-			    while (adev[a].inbuf_next >= adev[a].inbuf_len) {
-
-			      Assert (adev[a].sndio_in_handle != nil);
-			      if (poll_sndio (adev[a].sndio_in_handle, POLLIN) < 0) {
-				adev[a].inbuf_len = 0;
-				adev[a].inbuf_next = 0;
-				return (-1);
-			      }
-
-			      n = sio_read (adev[a].sndio_in_handle, adev[a].inbuf_ptr, adev[a].inbuf_size_in_bytes);
-			      adev[a].inbuf_len = n;
-			      adev[a].inbuf_next = 0;
-
-			      audio_stats (a,
-					save_audio_config_p.adev[a].num_channels,
-					n / (save_audio_config_p.adev[a].num_channels * save_audio_config_p.adev[a].bits_per_sample / 8),
-					save_audio_config_p.statistics_interval);
-			    }
-
-		#else	// begin OSS
-
-			    // Fixed in 1.2.  This was formerly outside of the switch
-			    // so the OSS version did not process stdin or UDP.
-
-			    while (adev[a].g_audio_in_type == AUDIO_IN_TYPE_SOUNDCARD && adev[a].inbuf_next >= adev[a].inbuf_len) {
-			      Assert (adev[a].oss_audio_device_fd > 0);
-			      n = read (adev[a].oss_audio_device_fd, adev[a].inbuf_ptr, adev[a].inbuf_size_in_bytes);
-			      //text_color_set(DW_COLOR_DEBUG);
-			      // dw_printf ("audio_get(): read %d returns %d\n", adev[a].inbuf_size_in_bytes, n);
-			      if (n < 0) {
-			        text_color_set(DW_COLOR_ERROR);
-			        perror("Can't read from audio device");
-			        adev[a].inbuf_len = 0;
-			        adev[a].inbuf_next = 0;
-
-			        audio_stats (a,
-					save_audio_config_p.adev[a].num_channels,
-					0,
-					save_audio_config_p.statistics_interval);
-
-			        return (-1);
-			      }
-			      adev[a].inbuf_len = n;
-			      adev[a].inbuf_next = 0;
-
-			      audio_stats (a,
-					save_audio_config_p.adev[a].num_channels,
-					n / (save_audio_config_p.adev[a].num_channels * save_audio_config_p.adev[a].bits_per_sample / 8),
-					save_audio_config_p.statistics_interval);
-			    }
-
-		#endif
-		*/
+		var b = adev[a].inbuf[adev[a].inbufNext]
+		adev[a].inbufNext++
+		return int(b)
 
 		/*
 		 * UDP.
@@ -1654,17 +1310,16 @@ func audio_get_real(a int) int {
 
 	case AUDIO_IN_TYPE_SDR_UDP:
 
-		for adev[a].inbuf_next >= adev[a].inbuf_len {
+		for adev[a].inbufNext >= adev[a].inbufLen {
 
 			Assert(adev[a].udp_sock != nil)
-			var buf = make([]byte, adev[a].inbuf_size_in_bytes)
-			var n, _, readErr = adev[a].udp_sock.ReadFromUDP(buf)
+			var n, _, readErr = adev[a].udp_sock.ReadFromUDP(adev[a].inbuf)
 
 			if readErr != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Can't read from udp socket: %s", readErr)
-				adev[a].inbuf_len = 0
-				adev[a].inbuf_next = 0
+				adev[a].inbufLen = 0
+				adev[a].inbufNext = 0
 
 				audio_stats(a,
 					save_audio_config_p.adev[a].num_channels,
@@ -1674,9 +1329,8 @@ func audio_get_real(a int) int {
 				return (-1)
 			}
 
-			adev[a].inbuf_ptr = (*C.uchar)(C.CBytes(buf))
-			adev[a].inbuf_len = C.int(n)
-			adev[a].inbuf_next = 0
+			adev[a].inbufLen = n
+			adev[a].inbufNext = 0
 
 			audio_stats(a,
 				save_audio_config_p.adev[a].num_channels,
@@ -1690,42 +1344,38 @@ func audio_get_real(a int) int {
 		 */
 	case AUDIO_IN_TYPE_STDIN:
 
-		for adev[a].inbuf_next >= adev[a].inbuf_len {
-			var res = C.read(C.STDIN_FILENO, unsafe.Pointer(adev[a].inbuf_ptr), C.size_t(adev[a].inbuf_size_in_bytes))
-			if res <= 0 {
-				text_color_set(DW_COLOR_INFO)
-				dw_printf("\nEnd of file on stdin.  Exiting.\n")
-				exit(0)
+		for adev[a].inbufNext >= adev[a].inbufLen {
+			var n, err = os.Stdin.Read(adev[a].inbuf)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					text_color_set(DW_COLOR_INFO)
+					dw_printf("\nEnd of file on stdin.  Exiting.\n")
+					exit(0)
+				}
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Error reading from stdin: %v\n", err)
+				return -1
 			}
 
 			audio_stats(a,
 				save_audio_config_p.adev[a].num_channels,
-				int(res)/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
+				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 				save_audio_config_p.statistics_interval)
 
-			adev[a].inbuf_len = C.int(res)
-			adev[a].inbuf_next = 0
+			adev[a].inbufLen = n
+			adev[a].inbufNext = 0
 		}
 	}
 
 	var n int
 
-	if adev[a].inbuf_next < adev[a].inbuf_len {
-		n = int(*(*C.uchar)(unsafe.Add(unsafe.Pointer(adev[a].inbuf_ptr), adev[a].inbuf_next)))
-		adev[a].inbuf_next++
+	if adev[a].inbufNext < adev[a].inbufLen {
+		n = int(adev[a].inbuf[adev[a].inbufNext])
+		adev[a].inbufNext++
 		//No data to read, avoid reading outside buffer
 	} else {
 		n = 0
 	}
-
-	/* TODO KG
-	#if DEBUGx
-
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("audio_get(): returns %d\n", n);
-
-	#endif
-	*/
 
 	return (n)
 
@@ -1754,13 +1404,12 @@ func audio_get_real(a int) int {
 
 func audio_put_real(a int, c uint8) int {
 	/* Should never be full at this point. */
-	Assert(adev[a].outbuf_len < adev[a].outbuf_size_in_bytes)
+	Assert(adev[a].outbufLen < adev[a].outbufSizeInBytes)
 
-	var x = (*C.uchar)(unsafe.Add(unsafe.Pointer(adev[a].outbuf_ptr), adev[a].outbuf_len))
-	*x = C.uchar(c)
-	adev[a].outbuf_len++
+	adev[a].outbuf[adev[a].outbufLen] = c
+	adev[a].outbufLen++
 
-	if adev[a].outbuf_len == adev[a].outbuf_size_in_bytes {
+	if adev[a].outbufLen == adev[a].outbufSizeInBytes {
 		return audio_flush(a)
 	}
 
@@ -1783,173 +1432,58 @@ func audio_put_real(a int, c uint8) int {
  *----------------------------------------------------------------*/
 
 func audio_flush_real(a int) int {
-	// TODO KG #if USE_ALSA
 
-	Assert(adev[a].audio_out_handle != nil)
+	if adev[a].outbufLen == 0 {
+		return 0
+	}
+	if adev[a].outputStream == nil {
+		adev[a].outbufLen = 0
+		return -1
+	}
 
-	/*
-	 * Trying to set the automatic start threshold didn't have the desired
-	 * effect.  After the first transmitted packet, they are saved up
-	 * for a few minutes and then all come out together.
-	 *
-	 * "Prepare" it if not already in the running state.
-	 * We stop it at the end of each transmitted packet.
-	 */
+	if adev[a].outputBuf16 != nil {
+		var nSamples = adev[a].outbufLen / 2
+		for i := 0; i < nSamples; i++ {
+			var lo = adev[a].outbuf[i*2]
+			var hi = adev[a].outbuf[i*2+1]
+			adev[a].outputBuf16[i] = int16(uint16(lo) | uint16(hi)<<8)
+		}
+		for i := nSamples; i < len(adev[a].outputBuf16); i++ {
+			adev[a].outputBuf16[i] = 0
+		}
+	} else if adev[a].outputBuf8 != nil {
+		copy(adev[a].outputBuf8, adev[a].outbuf[:adev[a].outbufLen])
+		for i := adev[a].outbufLen; i < len(adev[a].outputBuf8); i++ {
+			adev[a].outputBuf8[i] = 128
+		}
+	}
 
-	var status *C.snd_pcm_status_t
-	snd_pcm_status_alloca(&status)
+	// Start the output stream lazily on first write.
+	if !adev[a].outputStarted {
+		var err = adev[a].outputStream.Start()
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Could not start audio output stream: %v\n", err)
+			return -1
+		}
+		adev[a].outputStarted = true
+	}
 
-	var k = C.snd_pcm_status(adev[a].audio_out_handle, status)
-	if k != 0 {
+	var err = adev[a].outputStream.Write()
+	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio output get status error.\n%s\n", C.GoString(C.snd_strerror(k)))
+		dw_printf("Audio output write error: %v\n", err)
+		var stopErr = adev[a].outputStream.Stop()
+		if stopErr != nil {
+			dw_printf("Audio output stream stop error: %v\n", stopErr)
+		}
+		adev[a].outputStarted = false
+		adev[a].outbufLen = 0
+		return -1
 	}
 
-	k = C.int(C.snd_pcm_status_get_state(status))
-	if k != C.SND_PCM_STATE_RUNNING {
-
-		//text_color_set(DW_COLOR_DEBUG);
-		//dw_printf ("Audio output state = %d.  Try to start.\n", k);
-
-		k = C.snd_pcm_prepare(adev[a].audio_out_handle)
-
-		if k != 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio output start error.\n%s\n", C.GoString(C.snd_strerror(k)))
-		}
-	}
-
-	var psound = adev[a].outbuf_ptr
-
-	var retries = 10
-	for retries > 0 {
-
-		k = C.int(C.snd_pcm_writei(adev[a].audio_out_handle, unsafe.Pointer(psound), C.snd_pcm_uframes_t(adev[a].outbuf_len/adev[a].bytes_per_frame)))
-		/* TODO KG
-		#if DEBUGx
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("audio_flush(): snd_pcm_writei %d frames returns %d\n",
-						adev[a].outbuf_len / adev[a].bytes_per_frame, k);
-			  fflush (stdout);
-		#endif
-		*/
-		if k == -C.EPIPE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio output data underrun.\n")
-
-			/* No problemo.  Recover and go around again. */
-
-			C.snd_pcm_recover(adev[a].audio_out_handle, k, 1)
-		} else if k == -C.ESTRPIPE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Driver suspended, recovering\n")
-			C.snd_pcm_recover(adev[a].audio_out_handle, k, 1)
-		} else if k == -C.EBADFD {
-			k = C.snd_pcm_prepare(adev[a].audio_out_handle)
-			if k < 0 {
-				dw_printf("Error preparing after bad state: %s\n", C.GoString(C.snd_strerror(k)))
-			}
-		} else if k < 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio write error: %s\n", C.GoString(C.snd_strerror(k)))
-
-			/* Some other error condition. */
-			/* Try again. What do we have to lose? */
-
-			k = C.snd_pcm_prepare(adev[a].audio_out_handle)
-			if k < 0 {
-				dw_printf("Error preparing after error: %s\n", C.GoString(C.snd_strerror(k)))
-			}
-		} else if k != adev[a].outbuf_len/adev[a].bytes_per_frame {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Audio write took %d frames rather than %d.\n",
-				k, adev[a].outbuf_len/adev[a].bytes_per_frame)
-
-			/* Go around again with the rest of it. */
-
-			psound = (*C.uchar)(unsafe.Add(unsafe.Pointer(psound), k*adev[a].bytes_per_frame))
-			adev[a].outbuf_len -= k * adev[a].bytes_per_frame
-		} else {
-			/* Success! */
-			adev[a].outbuf_len = 0
-			return (0)
-		}
-		retries--
-	}
-
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Audio write error retry count exceeded.\n")
-
-	adev[a].outbuf_len = 0
-	return (-1)
-
-	/* TODO KG
-	#elif USE_SNDIO
-
-		int k;
-		unsigned char *ptr;
-		int len;
-
-		ptr = adev[a].outbuf_ptr;
-		len = adev[a].outbuf_len;
-
-		while (len > 0) {
-		  Assert (adev[a].sndio_out_handle != nil);
-		  if (poll_sndio (adev[a].sndio_out_handle, POLLOUT) < 0) {
-		    text_color_set(DW_COLOR_ERROR);
-		    perror("Can't write to audio device");
-		    adev[a].outbuf_len = 0;
-		    return (-1);
-		  }
-
-		  k = sio_write (adev[a].sndio_out_handle, ptr, len);
-	#if DEBUGx
-		  text_color_set(DW_COLOR_DEBUG);
-		  dw_printf ("audio_flush(): write %d returns %d\n", len, k);
-		  fflush (stdout);
-	#endif
-		  ptr += k;
-		  len -= k;
-		}
-
-		adev[a].outbuf_len = 0;
-		return (0);
-
-	#else		// OSS
-
-		int k;
-		unsigned char *ptr;
-		int len;
-
-		ptr = adev[a].outbuf_ptr;
-		len = adev[a].outbuf_len;
-
-		while (len > 0) {
-		  Assert (adev[a].oss_audio_device_fd > 0);
-		  k = write (adev[a].oss_audio_device_fd, ptr, len);
-	#if DEBUGx
-		  text_color_set(DW_COLOR_DEBUG);
-		  dw_printf ("audio_flush(): write %d returns %d\n", len, k);
-		  fflush (stdout);
-	#endif
-		  if (k < 0) {
-		    text_color_set(DW_COLOR_ERROR);
-		    perror("Can't write to audio device");
-		    adev[a].outbuf_len = 0;
-		    return (-1);
-		  }
-		  if (k < len) {
-		    / presumably full but didn't block.
-		    usleep (10000);
-		  }
-		  ptr += k;
-		  len -= k;
-		}
-
-		adev[a].outbuf_len = 0;
-		return (0);
-	#endif
-	*/
+	adev[a].outbufLen = 0
+	return 0
 
 } /* end audio_flush */
 
@@ -1967,77 +1501,22 @@ func audio_flush_real(a int) int {
  *		Wait until all the queued up audio out has been played.
  *		Take any other necessary actions to stop audio output.
  *
- * In an ideal world:
- *
- *		We would like to ask the hardware when all the queued
- *		up sound has actually come out the speaker.
- *
- * In reality:
- *
- * 		This has been found to be less than reliable in practice.
- *
- *		Caller does the following:
- *
- *		(1) Make note of when PTT is turned on.
- *		(2) Calculate how long it will take to transmit the
- *			frame including TXDELAY, frame (including
- *			"flags", data, FCS and bit stuffing), and TXTAIL.
- *		(3) Call this function, which might or might not wait long enough.
- *		(4) Add (1) and (2) resulting in when PTT should be turned off.
- *		(5) Take difference between current time and desired PPT off time
- *			and wait for additional time if required.
- *
  *----------------------------------------------------------------*/
 
 func audio_wait(a int) {
 
 	audio_flush(a)
 
-	// TODO KG #if USE_ALSA
-
-	/* For playback, this should wait for all pending frames */
-	/* to be played and then stop. */
-
-	C.snd_pcm_drain(adev[a].audio_out_handle)
-
-	/*
-			 * When this was first implemented, I observed:
-		 	 *
-		 	 * 	"Experimentation reveals that snd_pcm_drain doesn't
-			 * 	 actually wait.  It returns immediately.
-			 * 	 However it does serve a useful purpose of stopping
-			 * 	 the playback after all the queued up data is used."
-		 	 *
-			 *
-			 * Now that I take a closer look at the transmit timing, for
-		 	 * version 1.2, it seems that snd_pcm_drain DOES wait until all
-			 * all pending frames have been played.
-			 * Either way, the caller will now compensate for it.
-	*/
-
-	/* TODO KG
-	#elif USE_SNDIO
-
-		poll_sndio (adev[a].sndio_out_handle, POLLOUT);
-
-	#else
-
-		Assert (adev[a].oss_audio_device_fd > 0);
-
-		// This caused a crash later on Cygwin.
-		// Haven't tried it on other (non-Linux) Unix yet.
-
-		// err = ioctl (adev[a].oss_audio_device_fd, SNDCTL_DSP_SYNC, nil);
-
-	#endif
-	*/
-
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("audio_wait(): after sync, status=%d\n", err);
-	   #endif
-	*/
+	// Stop the output stream — Pa_StopStream drains remaining buffers
+	// before returning. It will be restarted lazily on next write.
+	if adev[a].outputStream != nil && adev[a].outputStarted {
+		var err = adev[a].outputStream.Stop()
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("audio_wait: failed to stop output stream for device %d: %v\n", a, err)
+		}
+		adev[a].outputStarted = false
+	}
 
 } /* end audio_wait */
 
@@ -2059,56 +1538,63 @@ func audio_close() C.int {
 
 	for a := C.int(0); a < MAX_ADEVS; a++ {
 
-		// TODO KG #if USE_ALSA
-		if adev[a].audio_in_handle != nil && adev[a].audio_out_handle != nil {
+		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil) {
 
 			audio_wait(int(a))
 
-			C.snd_pcm_close(adev[a].audio_in_handle)
-			C.snd_pcm_close(adev[a].audio_out_handle)
+			if adev[a].inputStream != nil {
+				adev[a].inputStream.Stop()
+				adev[a].inputStream.Close()
+				adev[a].inputStream = nil
+			}
 
-			adev[a].audio_in_handle = nil
-			adev[a].audio_out_handle = nil
+			// Close output stream (already stopped by audio_wait above)
+			if adev[a].outputStream != nil {
+				if adev[a].outputStarted {
+					adev[a].outputStream.Stop()
+					adev[a].outputStarted = false
+				}
+				adev[a].outputStream.Close()
+				adev[a].outputStream = nil
+			}
 
-			/* TODO KG
-			#elif USE_SNDIO
+			// Then close ring buffers
+			if adev[a].inputRingBuf != nil {
+				adev[a].inputRingBuf.close()
+				adev[a].inputRingBuf = nil
+			}
 
-				  if (adev[a].sndio_in_handle != nil && adev[a].sndio_out_handle != nil) {
+			adev[a].outputBuf16 = nil
+			adev[a].outputBuf8 = nil
 
-				    audio_wait (a);
+			if adev[a].udp_sock != nil {
+				adev[a].udp_sock.Close()
+				adev[a].udp_sock = nil
+			}
 
-				    sio_stop (adev[a].sndio_in_handle);
-				    sio_stop (adev[a].sndio_out_handle);
-				    sio_close (adev[a].sndio_in_handle);
-				    sio_close (adev[a].sndio_out_handle);
+			adev[a].inbufSizeInBytes = 0
+			adev[a].inbuf = nil
+			adev[a].inbufLen = 0
+			adev[a].inbufNext = 0
 
-				    adev[a].sndio_in_handle = adev[a].sndio_out_handle = nil;
-
-			#else
-
-				  if  (adev[a].oss_audio_device_fd > 0) {
-
-				    audio_wait (a);
-
-				    close (adev[a].oss_audio_device_fd);
-
-				    adev[a].oss_audio_device_fd = -1;
-			#endif
-			*/
-
-			adev[a].inbuf_size_in_bytes = 0
-			adev[a].inbuf_ptr = nil
-			adev[a].inbuf_len = 0
-			adev[a].inbuf_next = 0
-
-			adev[a].outbuf_size_in_bytes = 0
-			adev[a].outbuf_ptr = nil
-			adev[a].outbuf_len = 0
+			adev[a].outbufSizeInBytes = 0
+			adev[a].outbuf = nil
+			adev[a].outbufLen = 0
 		}
 	}
+
+	// Terminate PortAudio when the last audio device is closed.
+	portaudioMu.Lock()
+	if portaudioRefCount > 0 {
+		portaudioRefCount--
+		if portaudioRefCount == 0 {
+			portaudio.Terminate()
+		}
+	}
+	portaudioMu.Unlock()
 
 	return (err)
 
 } /* end audio_close */
 
-/* end audio.c */
+/* end audio.go */
