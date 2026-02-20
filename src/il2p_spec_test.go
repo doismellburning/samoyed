@@ -58,5 +58,11 @@ func TestIL2PSpec(t *testing.T) {
 
 		// Does it match the AX.25 data in the spec?
 		assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), ax25_pack(pp))
+
+		// Verify the trailing CRC bytes are valid for the decoded frame.
+		var frameData = ax25_get_frame_data(pp)
+		var crcBytes = b[len(b)-IL2P_CRC_ENCODED_SIZE:]
+		assert.True(t, il2p_crc_check(frameData, crcBytes),
+			"Trailing CRC mismatch for %s", testDatum.expectedAddrs)
 	}
 }
