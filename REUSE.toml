@@ -38,8 +38,3 @@ SPDX-License-Identifier = "GPL-2.0-or-later"
 path = "debian/**"
 SPDX-FileCopyrightText = "(C) 2014 Iain R. Learmonth <irl@fsfe.org>"
 SPDX-License-Identifier = "GPL-2.0-or-later"
-
-[[annotations]]
-path = "external/geotranz/**"
-SPDX-FileCopyrightText = "National Geospatial-Intelligence Agency"
-SPDX-License-Identifier = "LicenseRef-GEOTRANS"
