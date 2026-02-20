@@ -17,9 +17,8 @@ package direwolf
 // #include <sys/socket.h>
 // #include <netinet/in.h>
 // #include <netdb.h>
-// #include <hamlib/rig.h>
-// #cgo pkg-config: alsa hamlib
-// #cgo CFLAGS: -DUSE_CM108 -DUSE_HAMLIB -DUSE_ALSA
+// #cgo pkg-config: alsa
+// #cgo CFLAGS: -DUSE_CM108 -DUSE_ALSA
 // #cgo LDFLAGS: -lm
 import "C"
 
@@ -35,6 +34,7 @@ import (
 
 	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
+	goHamlib "github.com/xylo04/goHamlib"
 )
 
 /*------------------------------------------------------------------
@@ -295,7 +295,7 @@ x = Silence FX.25 information.`)
 	 * Possibly override some by command line options.
 	 */
 
-	C.rig_set_debug(uint32(d_h_opt))
+	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
 	symbols_init()
 
