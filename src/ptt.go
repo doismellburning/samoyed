@@ -117,23 +117,6 @@ package direwolf
 	We'd be starting from scratch to figure out how to do it.
 */
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <stdlib.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <time.h>
-// #include <sys/termios.h>
-// #include <sys/ioctl.h>
-// #include <fcntl.h>
-// #include <sys/types.h>
-// #include <sys/stat.h>
-// #include <unistd.h>
-// #include <errno.h>
-// #include <grp.h>
-// #include <dirent.h>
-import "C"
-
 import (
 	"fmt"
 	"io"
@@ -455,7 +438,7 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 	var gpio_direction_path = fmt.Sprintf("/sys/class/gpio/%s/direction", gpio_name)
 	get_access_to_gpio(gpio_direction_path)
 
-	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0)
+	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0) //nolint:gosec
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Error opening %s\n", gpio_direction_path)
@@ -1083,7 +1066,7 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 
 		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", save_audio_config_p.achan[channel].octrl[ot].out_gpio_name)
 
-		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0)
+		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, otnames[ot])
@@ -1217,7 +1200,7 @@ func get_input_real(it int, channel int) int {
 
 		get_access_to_gpio(gpio_value_path)
 
-		var fd, openErr = os.Open(gpio_value_path)
+		var fd, openErr = os.Open(gpio_value_path) //nolint:gosec
 		if openErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error opening %s to check input.\n", gpio_value_path)
