@@ -348,7 +348,7 @@ func digipeat_match(
 
 	if repeater == mycall_rec {
 		var result = ax25_dup(pp)
-		// FIXME KG assert (result != nil);
+		Assert(result != nil)
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
@@ -403,7 +403,7 @@ func digipeat_match(
 
 	if alias.MatchString(repeater) {
 		var result = ax25_dup(pp)
-		// FIXME KG assert (result != nil);
+		Assert(result != nil)
 
 		ax25_set_addr(result, r, mycall_xmit)
 		ax25_set_h(result, r)
@@ -428,7 +428,7 @@ func digipeat_match(
 
 			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
 				var result = ax25_dup(pp)
-				// FIXME KG assert (result != nil);
+				Assert(result != nil)
 
 				ax25_set_addr(result, r2, mycall_xmit)
 				ax25_set_h(result, r2)
@@ -499,7 +499,7 @@ func digipeat_match(
 		if len(atgp) > 0 && strings.HasPrefix(strings.ToLower(repeater), strings.ToLower(atgp)) {
 			if ssid >= 1 && ssid <= 7 {
 				var result = ax25_dup(pp)
-				// FIXME KG assert (result != nil);
+				Assert(result != nil)
 
 				// First, remove any already used digipeaters.
 
@@ -534,7 +534,7 @@ func digipeat_match(
 
 		if ssid == 1 {
 			var result = ax25_dup(pp)
-			// FIXME KG assert (result != nil);
+			Assert(result != nil)
 
 			ax25_set_addr(result, r, mycall_xmit)
 			ax25_set_h(result, r)
@@ -543,7 +543,7 @@ func digipeat_match(
 
 		if ssid >= 2 && ssid <= 7 {
 			var result = ax25_dup(pp)
-			// FIXME KG assert (result != nil);
+			Assert(result != nil)
 
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
@@ -588,7 +588,7 @@ func digi_regen(from_chan int, pp *packet_t) {
 
 	// dw_printf ("digi_regen()\n");
 
-	// FIXME KG assert (from_chan >= 0 && from_chan < MAX_TOTAL_CHANS);
+	Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
 
 	for to_chan := range MAX_TOTAL_CHANS {
 		if save_digi_config_p.regen[from_chan][to_chan] {
