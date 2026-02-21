@@ -56,11 +56,6 @@ func beacon_tracker_set_debug(level int) {
  *--------------------------------------------------------------------*/
 
 func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) {
-	/*  FIXME KG
-	struct tm tm;
-	int j;
-	pthread_t beacon_tid;
-	*/
 
 	/*
 	 * Save parameters for later use.
@@ -204,7 +199,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 	for j := 0; j < g_misc_config_p.num_beacons; j++ {
 		var bp = &(g_misc_config_p.beacon[j])
-		/* FIXME KG
+		/* TODO KG
 		#if DEBUG
 
 			  text_color_set(DW_COLOR_DEBUG);

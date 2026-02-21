@@ -232,7 +232,7 @@ func recv_process() {
 
 				dlq_delete(pitem)
 			} else { //nolint:staticcheck
-				// FIXME KG DEBUG
+				// TODO KG DEBUG
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("recv_process: spurious wakeup. (Temp debugging message - not a problem if only occasional.)\n");
 			}
