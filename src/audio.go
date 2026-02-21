@@ -21,11 +21,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-// #include <stdio.h>
-// #include <unistd.h>
-// #include <errno.h>
-import "C"
-
 import (
 	"encoding/binary"
 	"errors"
@@ -564,7 +559,7 @@ func newAudioRingBuffer(size int) *audioRingBuffer {
 // write adds data to the ring buffer. Called from PortAudio callback.
 // Returns true if all data was written, false if some was dropped (overflow).
 // Uses chunk copies (at most two) to minimise time holding the mutex.
-func (rb *audioRingBuffer) write(data []byte) bool {
+func (rb *audioRingBuffer) write(data []byte) bool { //nolint:unparam
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
 
@@ -882,7 +877,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *
  *----------------------------------------------------------------*/
 
-func audio_open(pa *audio_s) C.int {
+func audio_open(pa *audio_s) int {
 
 	save_audio_config_p = pa
 
@@ -962,7 +957,7 @@ func audio_open(pa *audio_s) C.int {
 	 * Open audio device(s).
 	 */
 
-	for a := C.int(0); a < MAX_ADEVS; a++ {
+	for a := 0; a < MAX_ADEVS; a++ {
 		if pa.adev[a].defined != 0 {
 
 			adev[a].inbufSizeInBytes = 0
@@ -1010,9 +1005,9 @@ func audio_open(pa *audio_s) C.int {
 			var ctemp string
 
 			if pa.adev[a].num_channels == 2 {
-				ctemp = fmt.Sprintf(" (channels %d & %d)", ADEVFIRSTCHAN(int(a)), ADEVFIRSTCHAN(int(a))+1)
+				ctemp = fmt.Sprintf(" (channels %d & %d)", ADEVFIRSTCHAN(a), ADEVFIRSTCHAN(a)+1)
 			} else {
-				ctemp = fmt.Sprintf(" (channel %d)", ADEVFIRSTCHAN(int(a)))
+				ctemp = fmt.Sprintf(" (channel %d)", ADEVFIRSTCHAN(a))
 			}
 
 			text_color_set(DW_COLOR_INFO)
@@ -1532,15 +1527,15 @@ func audio_wait(a int) {
  *
  *----------------------------------------------------------------*/
 
-func audio_close() C.int {
+func audio_close() int { //nolint:unparam
 
-	var err C.int = 0
+	var err = 0
 
-	for a := C.int(0); a < MAX_ADEVS; a++ {
+	for a := 0; a < MAX_ADEVS; a++ {
 
 		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil) {
 
-			audio_wait(int(a))
+			audio_wait(a)
 
 			if adev[a].inputStream != nil {
 				adev[a].inputStream.Stop()
