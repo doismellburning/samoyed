@@ -53,6 +53,7 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
 	}
+
 	presult.SymTableId = symtab
 
 	copy(presult.Lon[:], longitude_to_str(dlong, ambiguity))
@@ -61,6 +62,7 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not in range of ! to ~\n")
 	}
+
 	presult.SymbolCode = symbol
 
 	return presult
@@ -109,7 +111,6 @@ func compressed_position_string(p *compressed_position_t) string {
 func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	power int, height int, gain int,
 	course int, speed int) *compressed_position_t {
-
 	var presult = new(compressed_position_t)
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
@@ -124,6 +125,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	if unicode.IsDigit(rune(symtab)) {
 		symtab = symtab - '0' + 'a'
 	}
+
 	presult.SymTableId = symtab
 
 	copy(presult.Y[:], latitude_to_comp_str(dlat))
@@ -133,6 +135,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not in range of ! to ~\n")
 	}
+
 	presult.SymbolCode = symbol
 
 	/*
@@ -163,12 +166,14 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 			if c < 0 {
 				c += 90
 			}
+
 			if c >= 90 {
 				c -= 90
 			}
 		} else {
 			c = 0
 		}
+
 		presult.C = byte(c + '!')
 
 		var s = math.Round(math.Log(float64(speed)+1.0) / math.Log(1.08))
@@ -181,9 +186,11 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		if power == 0 {
 			power = 10
 		}
+
 		if height == 0 {
 			height = 20
 		}
+
 		if gain == 0 {
 			gain = 3
 		}
@@ -195,6 +202,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		if s < 0 {
 			s = 0
 		}
+
 		if s > 93 {
 			s = 93
 		}
@@ -268,6 +276,7 @@ func phg_data_extension(power int, height int, gain int, dir string) string {
 	}
 
 	var d = '0'
+
 	if dir != "" {
 		if strings.EqualFold(dir, "NE") {
 			d = '1'
@@ -311,13 +320,13 @@ func phg_data_extension(power int, height int, gain int, dir string) string {
  *----------------------------------------------------------------*/
 
 func cse_spd_data_extension(course int, speed int) string {
-
 	var cse int
 	if course != G_UNKNOWN {
 		cse = course
 		for cse < 1 {
 			cse += 360
 		}
+
 		for cse > 360 {
 			cse -= 360
 		}
@@ -331,6 +340,7 @@ func cse_spd_data_extension(course int, speed int) string {
 	if spd < 0 {
 		spd = 0 // would include G_UNKNOWN
 	}
+
 	if spd > 999 {
 		spd = 999
 	}
@@ -373,7 +383,6 @@ func frequency_spec(freq float64, tone float64, offset float64) string {
 	if freq > 0 {
 		/* TODO: Should use letters for > 999.999. */
 		/* For now, just be sure we have proper field width. */
-
 		if freq > 999.999 {
 			freq = 999.999
 		}
@@ -473,7 +482,6 @@ func encode_position(messaging bool, compressed bool, lat float64, lon float64, 
 		// However, the resolution would be decreased and that could be important
 		// when hiking in hilly terrain.  It would also be confusing to
 		// flip back and forth between two different representations.
-
 		var dti = '!'
 		if messaging {
 			dti = '='
@@ -526,9 +534,11 @@ func encode_position(messaging bool, compressed bool, lat float64, lon float64, 
 		if alt_ft < -99999 {
 			alt_ft = -99999
 		}
+
 		if alt_ft > 999999 {
 			alt_ft = 999999
 		}
+
 		result += fmt.Sprintf("/A=%06d", alt_ft) // /A=123456 ot /A=-12345
 	}
 
@@ -596,7 +606,6 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 	power int, height int, gain int, dir string,
 	course int, speed int,
 	freq float64, tone float64, offset float64, comment string) string {
-
 	var dti = ';'
 	var liveKilled = '*'
 
@@ -624,7 +633,6 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 		} else if power > 0 || height > 0 || gain > 0 {
 			result += phg_data_extension(power, height, gain, dir)
 		}
-
 	}
 
 	/* Optional frequency spec. */

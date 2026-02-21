@@ -40,6 +40,7 @@ func dns_sd_announce(mc *misc_config_s) {
 	if svErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("DNS-SD: Failed to create service: %v\n", svErr)
+
 		return
 	}
 
@@ -47,6 +48,7 @@ func dns_sd_announce(mc *misc_config_s) {
 	if rpErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("DNS-SD: Failed to create responder: %v\n", rpErr)
+
 		return
 	}
 
@@ -54,6 +56,7 @@ func dns_sd_announce(mc *misc_config_s) {
 	if addErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("DNS-SD: Failed to add service: %v\n", addErr)
+
 		return
 	}
 

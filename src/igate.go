@@ -245,7 +245,6 @@ func igate_get_dnl_cnt() int {
  *--------------------------------------------------------------------*/
 
 func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level int) {
-
 	s_debug = debug_level
 	dp_queue_head = nil
 
@@ -311,7 +310,6 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 	if p_igate_config.satgate_delay > 0 {
 		go satgate_delay_thread()
 	}
-
 } /* end igate_init */
 
 /*-------------------------------------------------------------------
@@ -336,14 +334,12 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 const MAX_HOSTS = 50
 
 func connect_thread() {
-
 	/* TODO KG
 	#if DEBUGx
 		text_color_set(DW_COLOR_DEBUG);
 	        dw_printf ("DEBUG: igate connect_thread start, port = %d = '%s'\n", save_igate_config_p.t2_server_port, server_port_str);
 	#endif
 	*/
-
 	var server_name = save_igate_config_p.t2_server_name
 
 	/*
@@ -351,11 +347,9 @@ func connect_thread() {
 	 */
 
 	for {
-
 		/*
 		 * Connect to IGate server if not currently connected.
 		 */
-
 		if igate_sock == nil {
 			var conn, connErr = net.Dial("tcp", net.JoinHostPort(server_name, strconv.Itoa(save_igate_config_p.t2_server_port)))
 			stats_connects++
@@ -364,13 +358,13 @@ func connect_thread() {
 			if connErr != nil {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
+
 				stats_failed_connect++
 			} else {
-
 				/* Success. */
-
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("\nNow connected to IGate server %s\n", server_name)
+
 				if strings.Contains(server_name, ":") {
 					dw_printf("Check server status here http://[%s]:14501\n\n", server_name)
 				} else {
@@ -391,6 +385,7 @@ func connect_thread() {
 				 */
 
 				SLEEP_SEC(3)
+
 				var stemp = fmt.Sprintf("user %s pass %s vers Samoyed %s",
 					save_igate_config_p.t2_login, save_igate_config_p.t2_passcode,
 					SAMOYED_VERSION)
@@ -398,11 +393,13 @@ func connect_thread() {
 					stemp += " filter "
 					stemp += save_igate_config_p.t2_filter
 				}
+
 				send_msg_to_server(stemp)
 
 				/* Delay until it is ok to start sending packets. */
 
 				SLEEP_SEC(7)
+
 				ok_to_send = true
 			}
 		}
@@ -413,9 +410,11 @@ func connect_thread() {
 		if igate_sock != nil {
 			SLEEP_SEC(10)
 		}
+
 		if igate_sock != nil {
 			SLEEP_SEC(10)
 		}
+
 		if igate_sock != nil {
 			SLEEP_SEC(10)
 		}
@@ -457,7 +456,6 @@ const IGATE_MAX_MSG = 512 /* "All 'packets' sent to APRS-IS must be in the TNC2 
 /* including the CR/LF sequence." */
 
 func igate_send_rec_packet(channel int, recv_pp *packet_t) {
-
 	if igate_sock == nil {
 		return /* Silently discard if not connected. */
 	}
@@ -484,17 +482,15 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && // in radio channel range
 		save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS] != "" {
-
 		if pfilter(channel, MAX_TOTAL_CHANS, save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, true) != 1 {
-
 			// Is this useful troubleshooting information or just distracting noise?
 			// Originally this was always printed but there was a request to add a "quiet" option to suppress this.
 			// version 1.4: Instead, make the default off and activate it only with the debug igate option.
-
 			if s_debug >= 1 {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Packet from channel %d to IGate was rejected by filter: %s\n", channel, save_digi_config_p.filter_str[channel][MAX_TOTAL_CHANS])
 			}
+
 			return
 		}
 	}
@@ -510,7 +506,6 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	 * Third party frames require special handling to unwrap payload.
 	 */
 	for ax25_get_dti(pp) == '}' {
-
 		for n := 0; n < ax25_get_num_repeaters(pp); n++ {
 			/* includes ssid. Do we want to ignore it? */
 			var via = ax25_get_addr_with_ssid(pp, n+AX25_REPEATER_1)
@@ -519,13 +514,13 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 				via == "TCPXX" ||
 				via == "RFONLY" ||
 				via == "NOGATE" {
-
 				if s_debug >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 				}
 
 				ax25_delete(pp)
+
 				return
 			}
 		}
@@ -540,6 +535,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			ax25_delete(pp)
 			return
 		}
+
 		ax25_delete(pp)
 		pp = inner_pp
 	}
@@ -555,13 +551,13 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			via == "TCPXX" ||
 			via == "RFONLY" ||
 			via == "NOGATE" {
-
 			if s_debug >= 1 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 			}
 
 			ax25_delete(pp)
+
 			return
 		}
 	}
@@ -575,7 +571,9 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Do not relay generic query.\n")
 		}
+
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -599,12 +597,13 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	 * Someone around here occasionally sends a packet with no information part.
 	 */
 	if len(pinfo) == 0 {
-
 		if s_debug >= 1 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Information part length is zero.\n")
 		}
+
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -619,12 +618,10 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	if save_igate_config_p.satgate_delay > 0 &&
 		ax25_get_heard(pp) == AX25_SOURCE &&
 		ax25_get_num_repeaters(pp) > 0 {
-
 		satgate_delay_packet(pp, channel)
 	} else {
 		send_packet_to_server(pp, channel)
 	}
-
 } /* end igate_send_rec_packet */
 
 /*-------------------------------------------------------------------
@@ -645,7 +642,6 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
  *--------------------------------------------------------------------*/
 
 func send_packet_to_server(pp *packet_t, channel int) {
-
 	var pinfo = ax25_get_info(pp)
 
 	/*
@@ -663,7 +659,9 @@ func send_packet_to_server(pp *packet_t, channel int) {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Rx IGate: Drop duplicate of same packet seen recently.\n")
 		}
+
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -707,6 +705,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	if channel >= 0 {
 		mycall = save_audio_config_p.mycall[channel]
 	}
+
 	msg += mycall
 	msg += ":"
 
@@ -770,6 +769,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	// TODO KG Check against IGATE_MAX_MSG size?
 
 	send_msg_to_server(msg)
+
 	stats_uplink_packets++
 
 	/*
@@ -802,7 +802,6 @@ func send_packet_to_server(pp *packet_t, channel int) {
  *--------------------------------------------------------------------*/
 
 func send_msg_to_server(imsg string) {
-
 	if igate_sock == nil {
 		return /* Silently discard if not connected. */
 	}
@@ -828,7 +827,6 @@ func send_msg_to_server(imsg string) {
 	stats_uplink_bytes += len(imsg)
 
 	var _, err = igate_sock.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
-
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending to IGate server.  Closing connection.\n\n")
@@ -852,9 +850,7 @@ func send_msg_to_server(imsg string) {
  *--------------------------------------------------------------------*/
 
 func get1ch() byte {
-
 	for {
-
 		for igate_sock == nil {
 			SLEEP_SEC(5) /* Not connected.  Try again later. */
 		}
@@ -885,7 +881,6 @@ func get1ch() byte {
 		igate_sock.Close()
 		igate_sock = nil
 	}
-
 } /* end get1ch */
 
 /*-------------------------------------------------------------------
@@ -901,14 +896,12 @@ func get1ch() byte {
  *--------------------------------------------------------------------*/
 
 func igate_recv_thread() {
-
 	/* TODO KG
 	#if DEBUGx
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("igate_recv_thread ( socket = %d )\n", igate_sock);
 	#endif
 	*/
-
 	for {
 		var message []byte
 
@@ -972,7 +965,6 @@ func igate_recv_thread() {
 			 * That way we can see login confirmation but not
 			 * be bothered by the heart beat messages.
 			 */
-
 			if !ok_to_send {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
@@ -994,7 +986,6 @@ func igate_recv_thread() {
 
 			if bytes.Contains(message, []byte{0}) {
 				// Invalid.  Either drop it or pass it along as-is.  Don't change.
-
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("'nul' character found in packet from IS.  This should never happen.\n")
 				dw_printf("The source station is probably transmitting with defective software.\n")
@@ -1024,7 +1015,6 @@ func igate_recv_thread() {
 			 * New in 1.7:  If ICHANNEL was specified, send packet to client app as specified channel.
 			 */
 			if save_audio_config_p.igate_vchannel >= 0 {
-
 				var ichan = save_audio_config_p.igate_vchannel
 
 				// My original poorly thoughtout idea was to parse it into a packet object,
@@ -1054,7 +1044,6 @@ func igate_recv_thread() {
 
 				var pp3 = ax25_from_text(string(stemp), false)
 				if pp3 != nil {
-
 					var alevel alevel_t
 					alevel.mark = -2 // FIXME: Do we want some other special case?
 					alevel.space = -2
@@ -1113,7 +1102,6 @@ func igate_recv_thread() {
  *--------------------------------------------------------------------*/
 
 func satgate_delay_packet(pp *packet_t, channel int) { //nolint:unparam
-
 	//if (s_debug >= 1) {
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("Rx IGate: SATgate mode, delay packet heard directly.\n")
@@ -1125,6 +1113,7 @@ func satgate_delay_packet(pp *packet_t, channel int) { //nolint:unparam
 	dp_mutex.Lock()
 
 	var pnext, plast *packet_t
+
 	if dp_queue_head == nil {
 		dp_queue_head = pp
 	} else {
@@ -1134,8 +1123,10 @@ func satgate_delay_packet(pp *packet_t, channel int) { //nolint:unparam
 			if pnext == nil {
 				break
 			}
+
 			plast = pnext
 		}
+
 		ax25_set_nextp(plast, pp)
 	}
 
@@ -1167,7 +1158,6 @@ func satgate_delay_thread() {
 		/* Don't need critical region just to peek */
 
 		if dp_queue_head != nil {
-
 			var release_time = ax25_get_release_time(dp_queue_head)
 
 			if time.Now().After(release_time) {
@@ -1256,7 +1246,6 @@ func is_message_message(infop string) bool {
 }
 
 func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
-
 	Assert(to_chan >= 0 && to_chan < MAX_TOTAL_CHANS)
 
 	/*
@@ -1284,6 +1273,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
 		dw_printf("%s\n", message)
+
 		return
 	}
 
@@ -1307,13 +1297,13 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			via == "TCPXX" || // TCPXX deprecated.
 			via == "RFONLY" ||
 			via == "NOGATE" {
-
 			if s_debug >= 1 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Tx IGate: Do not transmit with %s in path.\n", via)
 			}
 
 			ax25_delete(pp3)
+
 			return
 		}
 	}
@@ -1355,11 +1345,9 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	var msp_special_case = false
 
 	if len(pinfo) >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") {
-
 		var n = mheard_get_msp(string(src))
 
 		if n > 0 {
-
 			msp_special_case = true
 
 			if s_debug >= 1 {
@@ -1372,14 +1360,10 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	}
 
 	if !msp_special_case {
-
 		if save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
-
 			if pfilter(MAX_TOTAL_CHANS, to_chan, save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true) != 1 {
-
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
-
 				ax25_delete(pp3)
 				return
 			}
@@ -1459,7 +1443,6 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 
 		var pradio = ax25_from_text(radio, true)
 		if pradio != nil {
-
 			/* TODO KG
 			#if ITEST
 				    text_color_set(DW_COLOR_XMIT);
@@ -1473,10 +1456,8 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			stats_rf_xmit_packets++ // Any type of packet.
 
 			if is_message_message(string(pinfo)) {
-
 				// We transmitted a "message."  Telemetry metadata is excluded.
 				// Remember to pass along address of the sender later.
-
 				stats_msg_cnt++ // Update statistics.
 
 				mheard_set_msp(string(src), save_igate_config_p.igmsp)
@@ -1490,11 +1471,9 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			dw_printf("Will not attempt to transmit third party packet.\n")
 			dw_printf("%s\n", radio)
 		}
-
 	}
 
 	ax25_delete(pp3)
-
 } /* end maybe_xmit_packet_from_igate */
 
 /*-------------------------------------------------------------------
@@ -1577,13 +1556,12 @@ func rx_to_ig_init() {
 		rx2ig_time_stamp[n] = time.Time{}
 		rx2ig_checksum[n] = 0
 	}
+
 	rx2ig_insert_next = 0
 }
 
 func rx_to_ig_remember(pp *packet_t) {
-
 	// No need to save the information if we are not doing duplicate checking.
-
 	if save_igate_config_p.rx2ig_dedupe_time == 0 {
 		return
 	}
@@ -1630,6 +1608,7 @@ func rx_to_ig_allow(pp *packet_t) bool {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("rx_to_ig_allow? YES, no dedupe checking\n")
 		}
+
 		return true
 	}
 
@@ -1642,6 +1621,7 @@ func rx_to_ig_allow(pp *packet_t) bool {
 				// could be multiple entries and this might not be the most recent.
 				dw_printf("rx_to_ig_allow? NO. Seen %d seconds ago.\n", int(time.Since(rx2ig_time_stamp[j]).Seconds()))
 			}
+
 			return false
 		}
 	}
@@ -1650,8 +1630,8 @@ func rx_to_ig_allow(pp *packet_t) bool {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_allow? YES\n")
 	}
-	return true
 
+	return true
 } /* end rx_to_ig_allow */
 
 /*-------------------------------------------------------------------
@@ -1864,6 +1844,7 @@ func ig_to_tx_init() {
 		ig2tx_chan[n] = 0xff
 		ig2tx_bydigi[n] = 0
 	}
+
 	ig2tx_insert_next = 0
 }
 
@@ -1913,24 +1894,18 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 
 	for j := 0; j < IG2TX_HISTORY_MAX; j++ {
 		if ig2tx_checksum[j] == int(crc) && ig2tx_chan[j] == channel && !ig2tx_time_stamp[j].Before(now.Add(-IG2TX_DEDUPE_TIME)) {
-
 			/* We have a duplicate within some time period. */
-
 			if is_message_message(string(pinfo)) {
-
 				/* I think I want to avoid the duplicate suppression for "messages." */
 				/* Suppose we transmit a message from station X and it doesn't get an ack back. */
 				/* Station X then sends exactly the same thing 20 seconds later.  */
 				/* We don't want to suppress the retry. */
-
 				if s_debug >= 2 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("ig_to_tx_allow? Yes for duplicate message sent %d seconds ago. bydigi=%d\n", int(time.Since(ig2tx_time_stamp[j]).Seconds()), ig2tx_bydigi[j])
 				}
 			} else {
-
 				/* Normal (non-message) case. */
-
 				if s_debug >= 2 {
 					text_color_set(DW_COLOR_DEBUG)
 					// could be multiple entries and this might not be the most recent.
@@ -1939,6 +1914,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Tx IGate: Drop duplicate packet transmitted recently.\n")
+
 				return false
 			}
 		}
@@ -1948,11 +1924,13 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 
 	var count_1 = 0
 	var count_5 = 0
+
 	for j := 0; j < IG2TX_HISTORY_MAX; j++ {
 		if ig2tx_chan[j] == channel && ig2tx_bydigi[j] == 0 {
 			if !ig2tx_time_stamp[j].Before(time.Now().Add(-60 * time.Second)) {
 				count_1++
 			}
+
 			if !ig2tx_time_stamp[j].Before(time.Now().Add(-300 * time.Second)) {
 				count_5++
 			}
@@ -1975,11 +1953,14 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	if count_1 >= save_igate_config_p.tx_limit_1*increase_limit {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Already transmitted maximum of %d packets in 1 minute.\n", save_igate_config_p.tx_limit_1)
+
 		return false
 	}
+
 	if count_5 >= save_igate_config_p.tx_limit_5*increase_limit {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Already transmitted maximum of %d packets in 5 minutes.\n", save_igate_config_p.tx_limit_5)
+
 		return false
 	}
 
@@ -1989,7 +1970,6 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	}
 
 	return true
-
 } /* end ig_to_tx_allow */
 
 /* end igate.c */

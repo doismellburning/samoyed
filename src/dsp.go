@@ -33,7 +33,6 @@ import (
  *----------------------------------------------------------------*/
 
 func window(windowType bp_window_t, _size int, _j int) float64 {
-
 	var size = float64(_size) // Save on a lot of casting later
 	var j = float64(_j)
 
@@ -41,7 +40,6 @@ func window(windowType bp_window_t, _size int, _j int) float64 {
 	var w float64
 
 	switch windowType {
-
 	case BP_WINDOW_COSINE:
 		w = math.Cos(float64(j-center) / size * math.Pi)
 		//w = math.Sin(j * math.Pi / (size - 1));
@@ -86,7 +84,6 @@ func window(windowType bp_window_t, _size int, _j int) float64 {
  *----------------------------------------------------------------*/
 
 func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_window_t) {
-
 	/*
 		#if DEBUG1
 			text_color_set(DW_COLOR_DEBUG);
@@ -95,7 +92,6 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
 			dw_printf ("   j     shape   sinc   final\n");
 		#endif
 	*/
-
 	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
 	for j := 0; j < filter_size; j++ {
@@ -126,6 +122,7 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
 	for j := 0; j < filter_size; j++ {
 		G += lp_filter[j]
 	}
+
 	for j := 0; j < filter_size; j++ {
 		lp_filter[j] /= G
 	}
@@ -154,7 +151,6 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
  *----------------------------------------------------------------*/
 
 func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, wtype bp_window_t) {
-
 	var center = 0.5 * float64(filter_size-1)
 
 	/*
@@ -195,6 +191,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 	 * See http://dsp.stackexchange.com/questions/4693/fir-filter-gain
 	 */
 	var w = 2 * math.Pi * (f1 + f2) / 2
+
 	var G float64 = 0
 	for j := 0; j < filter_size; j++ {
 		G += 2 * bp_filter[j] * math.Cos((float64(j)-center)*w) // is this correct?
@@ -208,7 +205,6 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 	for j := 0; j < filter_size; j++ {
 		bp_filter[j] /= G
 	}
-
 } /* end gen_bandpass */
 
 /*------------------------------------------------------------------
@@ -231,12 +227,10 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
  *----------------------------------------------------------------*/
 
 func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_size int, wtype bp_window_t) { //nolint:unused
-
 	var Gs float64 = 0
 	var Gc float64 = 0
 
 	for j := 0; j < filter_size; j++ {
-
 		var center = 0.5 * float64(filter_size-1)
 		var am = ((float64(j) - center) / (float64)(sps)) * (float64(fc)) * (2.0 * (math.Pi))
 
@@ -268,7 +262,6 @@ func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_si
 		sin_table[j] /= Gs
 		cos_table[j] /= Gc
 	}
-
 } /* end gen_ms */
 
 /*------------------------------------------------------------------
@@ -290,7 +283,6 @@ func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_si
  *----------------------------------------------------------------*/
 
 func rrc(t float64, a float64) float64 {
-
 	var sinc, window, result float64
 
 	if t > -0.001 && t < 0.001 {
@@ -345,6 +337,7 @@ func gen_rrc_lowpass(pfilter []float64, filter_taps int, rolloff float64, sample
 	for k := 0; k < filter_taps; k++ {
 		t += pfilter[k]
 	}
+
 	for k := 0; k < filter_taps; k++ {
 		pfilter[k] /= t
 	}

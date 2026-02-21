@@ -107,7 +107,6 @@ var afskSpaceGain [MAX_SUBCHANS]float64
 
 func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	space_freq int, profile rune, D *demodulator_state_s) {
-
 	var samples_per_sec = float64(_samples_per_sec)
 	var baud = float64(_baud)
 
@@ -128,11 +127,9 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	D.profile = profile
 
 	switch D.profile {
-
 	case 'A': // Official name
 		fallthrough
 	case 'E': // For compatibility during transition
-
 		D.profile = 'A'
 
 		/* New in version 1.7 */
@@ -190,7 +187,6 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	case 'B': // official name
 		fallthrough
 	case 'D': // backward compatibility
-
 		D.profile = 'B'
 
 		// Experiment for version 1.7.
@@ -251,7 +247,6 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		D.alevel_space_peak = -1
 
 	default:
-
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid AFSK demodulator profile = %c\n", profile)
 		exit(1)
@@ -293,7 +288,6 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	 */
 
 	if D.use_prefilter != 0 {
-
 		// odd number is a little better
 		D.pre_filter_taps = int((D.pre_filter_len_sym * float64(samples_per_sec) / float64(baud))) | 1
 
@@ -310,6 +304,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 			dw_printf("before demodulating.  This greatly decreases the CPU requirements with little\n")
 			dw_printf("impact on the decoding performance.  This is useful for a slow ARM processor,\n")
 			dw_printf("such as with a Raspberry Pi model 1.\n")
+
 			D.pre_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
@@ -335,7 +330,6 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	 * contents will be generated differently.  Later code does not care.
 	 */
 	if D.u.afsk.use_rrc != 0 {
-
 		Assert(D.u.afsk.rrc_width_sym >= 1 && D.u.afsk.rrc_width_sym <= 16)
 		Assert(D.u.afsk.rrc_rolloff >= 0. && D.u.afsk.rrc_rolloff <= 1.)
 
@@ -377,11 +371,11 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	 * try using multiple slicing points instead of the traditional AGC.
 	 */
 	afskSpaceGain[0] = MIN_G
+
 	var step = math.Pow(10.0, math.Log10(MAX_G/MIN_G)/(MAX_SUBCHANS-1))
 	for j := 1; j < MAX_SUBCHANS; j++ {
 		afskSpaceGain[j] = afskSpaceGain[j-1] * float64(step)
 	}
-
 } /* demod_afsk_init */
 
 /*-------------------------------------------------------------------
@@ -470,7 +464,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			static int seq = 0;			// for log file name
 		#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 
@@ -489,7 +482,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 	var fsam = float64(sam) / 16384.0
 
 	switch D.profile {
-
 	default:
 		fallthrough
 	case 'E':
@@ -499,7 +491,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			/* ========== New in Version 1.7 ========== */
 
 			//	Cleaner & simpler than earlier 'A' thru 'E'
-
 			if D.use_prefilter != 0 {
 				push_sample(fsam, D.raw_cb[:], D.pre_filter_taps)
 				fsam = convolve(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
@@ -539,7 +530,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			}
 
 			if D.num_slicers <= 1 {
-
 				// Which tone is stronger?  That's simple with an ideal signal.
 				// However, we don't see too many ideal signals.
 				// Due to mismatching pre-emphasis and de-emphasis, the two
@@ -549,7 +539,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 				// This is probably over complicated and could be combined with
 				// the signal amplitude measurement, above.
 				// It works so let's move along to other topics.
-
 				var m_norm, s_norm float64
 				D.m_peak, D.m_valley, m_norm = agc(m_amp, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 				D.s_peak, D.s_valley, s_norm = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
@@ -565,7 +554,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 				//printf ("JWL DEBUG demod A with agc = %6.2f\n", demod_out);
 
 				nudge_pll_afsk(channel, subchannel, 0, demod_out, D, 1.0)
-
 			} else {
 				// Multiple slice case.
 				// Rather than trying to find the best threshold location, use multiple
@@ -575,12 +563,12 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 
 				// We are not performing the AGC step here but still want the envelope
 				// for calculating the confidence level (or quality) of the sample.
-
 				D.m_peak, D.m_valley, _ = agc(m_amp, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 				D.s_peak, D.s_valley, _ = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
 
 				for slice := int(0); slice < D.num_slicers; slice++ {
 					var demod_out = m_amp - s_amp*afskSpaceGain[slice]
+
 					var amp = 0.5 * (D.m_peak - D.m_valley + (D.s_peak-D.s_valley)*afskSpaceGain[slice])
 					if amp < 0.0000001 {
 						amp = 1 // avoid divide by zero with no signal.
@@ -602,7 +590,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			/* ========== Version 1.7 Experiment ========== */
 
 			// New - Convert frequency to a value proportional to frequency.
-
 			if D.use_prefilter != 0 {
 				push_sample(fsam, D.raw_cb[:], D.pre_filter_taps)
 				fsam = convolve(D.raw_cb[:], D.pre_filter[:], D.pre_filter_taps)
@@ -616,6 +603,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			var c_Q = convolve(D.u.afsk.c_Q_raw[:], D.lp_filter[:], D.lp_filter_taps)
 
 			var phase = float64(math.Atan2(float64(c_Q), float64(c_I)))
+
 			var rate = phase - D.u.afsk.prev_phase
 			if rate > math.Pi {
 				rate -= 2 * math.Pi
@@ -633,15 +621,12 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 			// We really don't have mark and space amplitudes available in this case.
 
 			if D.num_slicers <= 1 {
-
 				var demod_out = norm_rate
 				// Tested and it looks good.  Range roughly -1 to +1.
 				//printf ("JWL DEBUG demod B single = %6.2f\n", demod_out);
 
 				nudge_pll_afsk(channel, subchannel, 0, demod_out, D, 1.0)
-
 			} else {
-
 				// This would be useful for HF SSB where a tuning error
 				// would shift the frequency.  Multiple slicing points would
 				// then compensate for differences in transmit/receive frequencies.
@@ -652,9 +637,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 				//
 				// Assuming a 300 Hz shift, this would put slicing thresholds up
 				// to +-75 Hz from the center.
-
 				for slice := int(0); slice < D.num_slicers; slice++ {
-
 					var offset = -0.5 + float64(slice)*(1./float64(D.num_slicers-1))
 					var demod_out = norm_rate + offset
 
@@ -698,7 +681,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 
 		#endif
 	*/
-
 } /* end demod_afsk_process_sample */
 
 /*
@@ -732,7 +714,6 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
  */
 
 func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D *demodulator_state_s, amplitude float64) {
-
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
@@ -742,11 +723,9 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 	// dw_printf ("prev = %lx, new data clock pll = %lx\n" D.prev_d_c_pll, D.data_clock_pll);
 
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll > 0 {
-
 		/* Overflow - this is where we sample. */
 		// Assign it a confidence level or quality, 0 to 100, based on the amplitude.
 		// Those very close to 0 are suspect.  We'll get back to this later.
-
 		var quality = int(math.Abs(float64(demod_out)) * 100.0 / float64(amplitude))
 		if quality > 100 {
 			quality = 100
@@ -789,7 +768,6 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 
 	var demod_data = demod_out > 0
 	if demod_data != (D.slicer[slice].prev_demod_data != 0) {
-
 		pll_dcd_signal_transition2(DCD_CONFIG_AFSK, D, slice, int(D.slicer[slice].data_clock_pll))
 
 		// TODO:	  signed int before = (signed int)(D.slicer[slice].data_clock_pll);	// Treat as signed.
@@ -805,5 +783,4 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 	 * Remember demodulator output so we can compare next time.
 	 */
 	D.slicer[slice].prev_demod_data = IfThenElse(demod_data, 1, 0)
-
 } /* end nudge_pll */

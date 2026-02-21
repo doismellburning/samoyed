@@ -56,7 +56,6 @@ func beacon_tracker_set_debug(level int) {
  *--------------------------------------------------------------------*/
 
 func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) {
-
 	/*
 	 * Save parameters for later use.
 	 */
@@ -82,6 +81,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 		if channel < 0 {
 			channel = 0 /* For IGate, use channel 0 call. */
 		}
+
 		if channel >= MAX_TOTAL_CHANS {
 			channel = 0 // For ICHANNEL, use channel 0 call.
 		}
@@ -91,26 +91,24 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 			if !IsNoCall(g_modem_config_p.mycall[channel]) {
 				switch g_misc_config_p.beacon[j].btype {
 				case BEACON_OBJECT:
-
 					/* Object name is required. */
-
 					if g_misc_config_p.beacon[j].objname == "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: OBJNAME is required for OBEACON.\n", g_misc_config_p.beacon[j].lineno)
 						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+
 						continue
 					}
 					/* Fall thru.  Ignore any warning about missing break. */
 					fallthrough
 
 				case BEACON_POSITION:
-
 					/* Location is required. */
-
 					if g_misc_config_p.beacon[j].lat == G_UNKNOWN || g_misc_config_p.beacon[j].lon == G_UNKNOWN {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: Latitude and longitude are required.\n", g_misc_config_p.beacon[j].lineno)
 						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+
 						continue
 					}
 
@@ -129,11 +127,13 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 				case BEACON_TRACKER:
 					{
 						var gpsinfo dwgps_info_t
+
 						var fix = dwgps_read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", g_misc_config_p.beacon[j].lineno)
 							g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+
 							dw_printf("You must specify the source of the GPS data in your configuration file.\n")
 							dw_printf("It can be either GPSD, meaning the gpsd daemon, or GPSNMEA for\n")
 							dw_printf("for a serial port connection with exclusive use.\n")
@@ -153,27 +153,26 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 					}
 
 				case BEACON_CUSTOM:
-
 					/* INFO or INFOCMD is required. */
-
 					if g_misc_config_p.beacon[j].custom_info == "" && g_misc_config_p.beacon[j].custom_infocmd == "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: INFO or INFOCMD is required for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
 						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+
 						continue
 					}
 
 				case BEACON_IGATE:
-
 					/* Doesn't make sense if IGate is not configured. */
-
 					if g_igate_config_p.t2_server_name == "" ||
 						g_igate_config_p.t2_login == "" ||
 						g_igate_config_p.t2_passcode == "" {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured.\n", g_misc_config_p.beacon[j].lineno)
 						dw_printf("IBEACON has been disabled.\n")
+
 						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+
 						continue
 					}
 
@@ -229,20 +228,24 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 						bp.every = 3600
 						break
 					}
+
 					if IS_GOOD(e) {
 						bp.every = e
 						break
 					}
+
 					e = bp.every - n
 					if e < 1 {
 						bp.every = 1 // Impose a larger minimum?
 						break
 					}
+
 					if IS_GOOD(e) {
 						bp.every = e
 						break
 					}
 				}
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Time between slotted beacons has been adjusted to %d seconds.\n", bp.lineno, bp.every)
 			}
@@ -253,6 +256,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 			for bp.delay > bp.every {
 				bp.delay -= bp.every
 			}
+
 			for bp.delay < 5 {
 				bp.delay += bp.every
 			}
@@ -266,6 +270,7 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 	 */
 
 	var count = 0
+
 	for j := 0; j < g_misc_config_p.num_beacons; j++ {
 		if g_misc_config_p.beacon[j].btype != BEACON_IGNORE {
 			count++
@@ -306,8 +311,8 @@ func beacon_thread() {
 	 * See if any tracker beacons are configured.
 	 * No need to obtain GPS data if none.
 	 */
-
 	var number_of_tbeacons = 0
+
 	for j := range g_misc_config_p.num_beacons {
 		if g_misc_config_p.beacon[j].btype == BEACON_TRACKER {
 			number_of_tbeacons++
@@ -323,8 +328,8 @@ func beacon_thread() {
 		 * Sleep until time for the earliest scheduled or
 		 * the soonest we could transmit due to corner pegging.
 		 */
-
 		var earliest = now.Add(time.Hour)
+
 		for j := range g_misc_config_p.num_beacons {
 			if g_misc_config_p.beacon[j].btype != BEACON_IGNORE {
 				var t = g_misc_config_p.beacon[j].next
@@ -339,6 +344,7 @@ func beacon_thread() {
 			if t.Before(earliest) {
 				earliest = t
 			}
+
 			t = now.Add(time.Duration(g_misc_config_p.sb_fast_rate) * time.Second)
 			if t.Before(earliest) {
 				earliest = t
@@ -369,6 +375,7 @@ func beacon_thread() {
 				var hms = now.Format("15:04:05")
 
 				text_color_set(DW_COLOR_DEBUG)
+
 				switch fix {
 				case DWFIX_3D:
 					dw_printf("%s  3D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0, %.1f m\n", hms, gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track, gpsinfo.altitude)
@@ -414,7 +421,6 @@ func beacon_thread() {
 
 			if !bp.next.After(now) {
 				/* Send the beacon. */
-
 				beacon_send(j, &gpsinfo)
 
 				/* Calculate when the next one should be sent. */
@@ -423,7 +429,6 @@ func beacon_thread() {
 				if bp.btype == BEACON_TRACKER {
 					if gpsinfo.fix < DWFIX_2D {
 						/* Fix not available so beacon was not sent. */
-
 						if g_misc_config_p.sb_configured {
 							/* Try again in a couple seconds. */
 							bp.next = now.Add(2 * time.Second)
@@ -435,7 +440,6 @@ func beacon_thread() {
 					} else if g_misc_config_p.sb_configured {
 						/* Remember most recent tracker beacon. */
 						/* Compute next time if not turning. */
-
 						sb_prev_time = now
 						sb_prev_course = float64(gpsinfo.track)
 
@@ -450,7 +454,6 @@ func beacon_thread() {
 					/* Non-tracker beacon, fixed spacing. */
 					/* Increment by 'every' so slotted times come out right. */
 					/* i.e. Don't take relative to now in case there was some delay. */
-
 					bp.next = bp.next.Add(time.Duration(bp.every) * time.Second)
 
 					// https://github.com/wb2osz/direwolf/pull/301
@@ -465,6 +468,7 @@ func beacon_thread() {
 					/* fixme: if NTP sets clock BACK an hour, this thread will sleep for that hour */
 					if bp.next.Before(now) {
 						bp.next = now.Add(time.Duration(bp.every) * time.Second)
+
 						text_color_set(DW_COLOR_INFO)
 						dw_printf("\nSystem clock appears to have jumped forward.  Beacon schedule updated.\n\n")
 					}
@@ -620,6 +624,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	if IsNoCall(mycall) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("MYCALL not set for beacon to chan %d in config file line %d.\n", bp.sendto_chan, bp.lineno)
+
 		return
 	}
 
@@ -635,6 +640,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	} else {
 		beacon_text = mycall
 	}
+
 	beacon_text += ">"
 
 	if bp.dest != "" {
@@ -647,6 +653,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	if bp.via != "" {
 		beacon_text += "," + bp.via
 	}
+
 	beacon_text += ":"
 
 	/*
@@ -664,7 +671,6 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	if bp.commentcmd != "" {
 		/* Run given command to get variable part of comment. */
 		var var_comment, k = dw_run_cmd(bp.commentcmd, 2)
-
 		if k == nil {
 			super_comment += string(var_comment)
 		} else {
@@ -678,7 +684,6 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	 */
 	switch bp.btype {
 	case BEACON_POSITION:
-
 		beacon_text += encode_position(bp.messaging, bp.compress,
 			bp.lat, bp.lon, bp.ambiguity,
 			int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
@@ -689,7 +694,6 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			super_comment)
 
 	case BEACON_OBJECT:
-
 		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), bp.lat, bp.lon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
@@ -697,12 +701,10 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			bp.freq, bp.tone, bp.offset, super_comment)
 
 	case BEACON_TRACKER:
-
 		if gpsinfo.fix >= DWFIX_2D {
 			/* Transmit altitude only if user asked for it. */
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
-
 			var my_alt_ft = G_UNKNOWN
 			if gpsinfo.fix >= 3 && gpsinfo.altitude != G_UNKNOWN && bp.alt_m > 0 {
 				my_alt_ft = int(math.Round(DW_METERS_TO_FEET(float64(gpsinfo.altitude))))
@@ -752,30 +754,28 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 		}
 
 	case BEACON_CUSTOM:
-
 		if bp.custom_info != "" {
 			/* Fixed handcrafted text. */
 			beacon_text += bp.custom_info
 		} else if bp.custom_infocmd != "" {
 			/* Run given command to obtain the info part for packet. */
-
 			var info_part, k = dw_run_cmd(bp.custom_infocmd, 2)
-
 			if k == nil {
 				beacon_text += string(info_part)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("CBEACON, config file line %d, INFOCMD failure: %s.\n", bp.lineno, k)
+
 				beacon_text = "" // abort!
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Internal error. custom_info is null.\n")
+
 			beacon_text = "" // abort!
 		}
 
 	case BEACON_IGATE:
-
 		{
 			var last_minutes = 30
 
@@ -805,7 +805,6 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 
 	if pp != nil {
 		/* Send to desired destination. */
-
 		switch bp.sendto_type {
 		case SENDTO_IGATE:
 			text_color_set(DW_COLOR_XMIT)
@@ -815,7 +814,6 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			ax25_delete(pp)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
-
 			var alevel alevel_t
 			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 		default:

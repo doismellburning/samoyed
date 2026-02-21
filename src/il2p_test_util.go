@@ -48,6 +48,7 @@ func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int,
 	Assert(text == string(pinfo))
 
 	dw_printf("Number of symbols corrected: %d\n", retries)
+
 	if polarity == 2 { // expecting errors corrected.
 		Assert(retries == 10)
 	} else { // should be no errors.

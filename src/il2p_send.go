@@ -43,7 +43,6 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent b
  *--------------------------------------------------------------*/
 
 func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
-
 	var syncWordBytes = []byte{
 		(IL2P_SYNC_WORD >> 16) & 0xff,
 		(IL2P_SYNC_WORD >> 8) & 0xff,
@@ -54,6 +53,7 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
+
 		return (-1)
 	}
 
@@ -89,7 +89,9 @@ func send_il2p_bytes(channel int, b []byte, polarity int) {
 			if (x & 0x80) != 0 {
 				bit = 1
 			}
+
 			send_il2p_bit(channel, bit, polarity)
+
 			x <<= 1
 		}
 	}

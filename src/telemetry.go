@@ -72,17 +72,14 @@ var md_list_head *t_metadata_s
  *--------------------------------------------------------------------*/
 
 func t_get_metadata(station string) *t_metadata_s {
-
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("t_get_metadata (station=%s)\n", station);
 	#endif
 	*/
-
 	for p := md_list_head; p != nil; p = p.pnext {
 		if station == p.station {
-
 			return (p)
 		}
 	}
@@ -94,6 +91,7 @@ func t_get_metadata(station string) *t_metadata_s {
 	for n := 0; n < T_NUM_ANALOG; n++ {
 		p.name[n] = fmt.Sprintf("A%d", n+1)
 	}
+
 	for n := 0; n < T_NUM_DIGITAL; n++ {
 		p.name[T_NUM_ANALOG+n] = fmt.Sprintf("D%d", n+1)
 	}
@@ -115,7 +113,6 @@ func t_get_metadata(station string) *t_metadata_s {
 	md_list_head = p
 
 	return (p)
-
 } /* end t_get_metadata */
 
 /*-------------------------------------------------------------------
@@ -137,7 +134,6 @@ func t_get_metadata(station string) *t_metadata_s {
  *--------------------------------------------------------------------*/
 
 func t_ndp(str string) int {
-
 	var p = strings.Index(str, ".")
 	if p == -1 {
 		return (0)
@@ -182,7 +178,6 @@ func t_ndp(str string) int {
  *--------------------------------------------------------------------*/
 
 func telemetry_data_original(station string, info string, quiet bool) (string, string) {
-
 	/* TODO KG
 	   #if DEBUG1
 	   	text_color_set(DW_COLOR_DEBUG);
@@ -190,10 +185,10 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
 	   	dw_printf ("\n%s\n\n", info);
 	   #endif
 	*/
-
 	var pm = t_get_metadata(station)
 
 	var araw [T_NUM_ANALOG]float64
+
 	var ndp [T_NUM_ANALOG]int
 	for n := 0; n < T_NUM_ANALOG; n++ {
 		araw[n] = G_UNKNOWN
@@ -210,6 +205,7 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error: Information part of telemetry packet must begin with \"T#\"\n")
 		}
+
 		return "", ""
 	}
 
@@ -228,11 +224,13 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Nothing after \"T#\" for telemetry data.\n")
 		}
+
 		return "", ""
 	}
 
 	var comment string
 	var seq, _ = strconv.Atoi(seqStr)
+
 	var parts = strings.SplitN(rest, ",", T_NUM_ANALOG+1)
 	for n, p := range parts {
 		if n < T_NUM_ANALOG {
@@ -262,6 +260,7 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
 					dw_printf("Expected to find 8 binary digits after \"%s\" for the digital values.\n", p)
 				}
 			}
+
 			if len(p) > 8 {
 				comment = p[8:]
 				p = p[:8]
@@ -328,7 +327,6 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
  *--------------------------------------------------------------------*/
 
 func telemetry_data_base91(station string, cdata string) string {
-
 	/* TODO KG
 	#if DEBUG2
 		text_color_set(DW_COLOR_DEBUG);
@@ -336,10 +334,10 @@ func telemetry_data_base91(station string, cdata string) string {
 		dw_printf ("\n%s\n\n", cdata);
 	#endif
 	*/
-
 	var pm = t_get_metadata(station)
 
 	var araw [T_NUM_ANALOG]float64
+
 	var ndp [T_NUM_ANALOG]int
 	for n := 0; n < T_NUM_ANALOG; n++ {
 		araw[n] = G_UNKNOWN
@@ -354,6 +352,7 @@ func telemetry_data_base91(station string, cdata string) string {
 	if len(cdata) < 4 || len(cdata) > 14 || (len(cdata)%2 == 1) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: Expected even number of 2 to 14 characters but got \"%s\"\n", cdata)
+
 		return ""
 	}
 
@@ -390,7 +389,6 @@ func telemetry_data_base91(station string, cdata string) string {
 	*/
 
 	return t_data_process(pm, seq, araw, ndp, draw)
-
 } /* end telemtry_data_base91 */
 
 /*-------------------------------------------------------------------
@@ -418,7 +416,6 @@ func telemetry_data_base91(station string, cdata string) string {
  *--------------------------------------------------------------------*/
 
 func telemetry_name_message(station string, msg string) {
-
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -426,7 +423,6 @@ func telemetry_name_message(station string, msg string) {
 		dw_printf ("\n%s\n\n", msg);
 	#endif
 	*/
-
 	msg = strings.TrimSpace(msg)
 
 	var pm = t_get_metadata(station)
@@ -450,7 +446,6 @@ func telemetry_name_message(station string, msg string) {
 		}
 	#endif
 	*/
-
 } /* end telemetry_name_message */
 
 /*-------------------------------------------------------------------
@@ -475,7 +470,6 @@ func telemetry_name_message(station string, msg string) {
  *--------------------------------------------------------------------*/
 
 func telemetry_unit_label_message(station string, msg string) {
-
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -488,7 +482,6 @@ func telemetry_unit_label_message(station string, msg string) {
 	 * Make a copy of the input string because this will alter it.
 	 * Remove any trailing CR LF.
 	 */
-
 	var stemp = strings.TrimSpace(msg)
 
 	var pm = t_get_metadata(station)
@@ -510,7 +503,6 @@ func telemetry_unit_label_message(station string, msg string) {
 		}
 	#endif
 	*/
-
 } /* end telemetry_unit_label_message */
 
 /*-------------------------------------------------------------------
@@ -536,7 +528,6 @@ func telemetry_unit_label_message(station string, msg string) {
  *--------------------------------------------------------------------*/
 
 func telemetry_coefficents_message(station string, msg string, quiet bool) {
-
 	/* TODO
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -549,7 +540,6 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
 	 * Make a copy of the input string because this will alter it.
 	 * Remove any trailing CR LF.
 	 */
-
 	var stemp = strings.TrimSpace(msg)
 
 	var pm = t_get_metadata(station)
@@ -569,6 +559,7 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
 				}
 			}
 		}
+
 		n++
 	}
 
@@ -593,7 +584,6 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
 	   	}
 	   #endif
 	*/
-
 } /* end telemetry_coefficents_message */
 
 /*-------------------------------------------------------------------
@@ -617,7 +607,6 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
  *--------------------------------------------------------------------*/
 
 func telemetry_bit_sense_message(station string, msg string, quiet bool) {
-
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -625,7 +614,6 @@ func telemetry_bit_sense_message(station string, msg string, quiet bool) {
 		dw_printf ("\n%s\n\n", msg);
 	#endif
 	*/
-
 	var pm = t_get_metadata(station)
 
 	if len(msg) < 8 {
@@ -684,7 +672,6 @@ func telemetry_bit_sense_message(station string, msg string, quiet bool) {
 			pm.project);
 	#endif
 	*/
-
 } /* end telemetry_bit_sense_message */
 
 /*-------------------------------------------------------------------
@@ -725,7 +712,6 @@ func ival_to_str(x int) string {
 }
 
 func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]int) string {
-
 	Assert(pm != nil)
 
 	var output string
@@ -737,9 +723,7 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 	output += "Seq=" + ival_to_str(seq)
 
 	for n := 0; n < T_NUM_ANALOG; n++ {
-
 		// Display all or only defined values?  Only defined for now.
-
 		if araw[n] != G_UNKNOWN {
 			var fval float64
 			var fndp int
@@ -756,18 +740,16 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 			fndp = max(z, max(pm.coeff_ndp[n][C_B]+ndp[n], pm.coeff_ndp[n][C_C]))
 
 			var val_str = fval_to_str(fval, fndp)
+
 			output += val_str
 			if len(pm.unit[n]) > 0 {
 				output += " " + pm.unit[n]
 			}
-
 		}
 	}
 
 	for n := 0; n < T_NUM_DIGITAL; n++ {
-
 		// Display all or only defined values?  Only defined for now.
-
 		if draw[n] != G_UNKNOWN {
 			var dval int
 
@@ -781,6 +763,7 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 			}
 
 			var val_str = ival_to_str(dval)
+
 			output += val_str
 			if len(pm.unit[T_NUM_ANALOG+n]) > 0 {
 				output += " " + pm.unit[T_NUM_ANALOG+n]
@@ -797,5 +780,4 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 		dw_printf ("%s\n", output);
 	#endif
 	*/
-
 } /* end t_data_process */

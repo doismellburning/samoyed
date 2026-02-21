@@ -155,7 +155,6 @@ import (
  *------------------------------------------------------------------------------*/
 
 func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype ax25_frame_type_t, pf int, pid int, info []byte) *packet_t {
-
 	var this_p = ax25_new()
 
 	if this_p == nil {
@@ -168,12 +167,14 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_u_frame: Could not set addresses for U frame.\n")
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
 	var ctrl int
 	var t cmdres_t // 1 = must be cmd, 0 = must be response, 2 = can be either.
 	var i = false  // Is Info part allowed?
+
 	switch ftype {
 	// 1 = cmd only, 0 = res only, 2 = either
 	case frame_type_U_SABME:
@@ -211,6 +212,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_u_frame: Invalid ftype %d for U frame.\n", ftype)
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -229,15 +231,14 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 	this_p.frame_len++
 
 	if ftype == frame_type_U_UI {
-
 		// Definitely don't want pid value of 0 (not in valid list)
 		// or 0xff (which means more bytes follow).
-
 		if pid < 0 || pid == 0 || pid == 0xff {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Internal error in ax25_u_frame: U frame, Invalid pid value 0x%02x.\n", pid)
 			pid = AX25_PID_NO_LAYER_3
 		}
+
 		this_p.frame_data[this_p.frame_len] = byte(pid)
 		this_p.frame_len++
 	}
@@ -249,6 +250,7 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 				dw_printf("Internal error in ax25_u_frame: U frame, Invalid information field length %d.\n", len(info))
 				info = info[:AX25_MAX_INFO_LEN]
 			}
+
 			copy(this_p.frame_data[this_p.frame_len:], info)
 			this_p.frame_len += len(info)
 		}
@@ -306,7 +308,6 @@ func ax25_s_frame(
 	pf int,
 	info []byte,
 ) *packet_t {
-
 	var this_p = ax25_new()
 
 	if this_p == nil {
@@ -317,6 +318,7 @@ func ax25_s_frame(
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Could not set addresses for S frame.\n")
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -325,6 +327,7 @@ func ax25_s_frame(
 		dw_printf("Internal error in ax25_s_frame: Invalid modulo %d for S frame.\n", modulo)
 		modulo = 8
 	}
+
 	this_p.modulo = modulo
 
 	if nr < 0 || nr >= int(modulo) {
@@ -342,6 +345,7 @@ func ax25_s_frame(
 	}
 
 	var ctrl int
+
 	switch ftype {
 	case frame_type_S_RR:
 		ctrl = 0x01
@@ -355,6 +359,7 @@ func ax25_s_frame(
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Invalid ftype %d for S frame.\n", ftype)
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -362,6 +367,7 @@ func ax25_s_frame(
 		if pf != 0 {
 			ctrl |= 0x10
 		}
+
 		ctrl |= nr << 5
 		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
@@ -382,6 +388,7 @@ func ax25_s_frame(
 				dw_printf("Internal error in ax25_s_frame: SREJ frame, Invalid information field length %d.\n", len(info))
 				info = info[:AX25_MAX_INFO_LEN]
 			}
+
 			copy(this_p.frame_data[this_p.frame_len:], info)
 			this_p.frame_len += len(info)
 		}
@@ -396,7 +403,6 @@ func ax25_s_frame(
 	Assert(this_p.magic2 == MAGIC)
 
 	return (this_p)
-
 } /* end ax25_s_frame */
 
 /*------------------------------------------------------------------------------
@@ -441,7 +447,6 @@ func ax25_i_frame(
 	pid int,
 	info []byte,
 ) *packet_t {
-
 	var this_p = ax25_new()
 
 	if this_p == nil {
@@ -452,6 +457,7 @@ func ax25_i_frame(
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Could not set addresses for I frame.\n")
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -460,6 +466,7 @@ func ax25_i_frame(
 		dw_printf("Internal error in ax25_i_frame: Invalid modulo %d for I frame.\n", modulo)
 		modulo = 8
 	}
+
 	this_p.modulo = modulo
 
 	if nr < 0 || nr >= int(modulo) {
@@ -480,6 +487,7 @@ func ax25_i_frame(
 		if pf != 0 {
 			ctrl |= 0x10
 		}
+
 		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 	} else {
@@ -491,6 +499,7 @@ func ax25_i_frame(
 		if pf != 0 {
 			ctrl |= 0x01
 		}
+
 		this_p.frame_data[this_p.frame_len] = byte(ctrl)
 		this_p.frame_len++
 	}
@@ -503,6 +512,7 @@ func ax25_i_frame(
 		dw_printf("Warning: Client application provided invalid PID value, 0x%02x, for I frame.\n", pid)
 		pid = AX25_PID_NO_LAYER_3
 	}
+
 	this_p.frame_data[this_p.frame_len] = byte(pid)
 	this_p.frame_len++
 
@@ -512,6 +522,7 @@ func ax25_i_frame(
 			dw_printf("Internal error in ax25_i_frame: I frame, Invalid information field length %d.\n", len(info))
 			info = info[:AX25_MAX_INFO_LEN]
 		}
+
 		copy(this_p.frame_data[this_p.frame_len:], info)
 		this_p.frame_len += len(info)
 	}
@@ -520,7 +531,6 @@ func ax25_i_frame(
 	Assert(this_p.magic2 == MAGIC)
 
 	return (this_p)
-
 } /* end ax25_i_frame */
 
 /*------------------------------------------------------------------------------
@@ -548,18 +558,17 @@ func ax25_i_frame(
  *------------------------------------------------------------------------------*/
 
 func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t) int {
-
 	Assert(pp.frame_len == 0)
 	Assert(cr == cr_cmd || cr == cr_res)
 
 	if num_addr < AX25_MIN_ADDRS || num_addr > AX25_MAX_ADDRS {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("INTERNAL ERROR: set_addrs, num_addr = %d\n", num_addr)
+
 		return (0)
 	}
 
 	for n := 0; n < num_addr; n++ {
-
 		var strictness = 1
 
 		var oaddr, ssid, _, ok = ax25_parse_addr(n, addrs[n], strictness)
@@ -571,6 +580,7 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 		// Fill in address.
 
 		copy(pp.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
+
 		for i, c := range oaddr {
 			pp.frame_data[n*7+i] = byte(c << 1)
 		}
@@ -603,5 +613,6 @@ func set_addrs(pp *packet_t, addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdr
 	}
 
 	pp.num_addr = num_addr
+
 	return (1)
 } /* end set_addrs */

@@ -63,6 +63,7 @@ func Walk96Main() {
 		} else {
 			fmt.Printf("GPS fix not available.\n")
 		}
+
 		SLEEP_SEC(1)
 	}
 
@@ -78,7 +79,6 @@ var sequence = 0
 /* Should be called once per second. */
 
 func walk96(fix int, lat float64, lon float64, knots float64, course float64, alt float64) { //nolint:unparam
-
 	sequence++
 	var comment = fmt.Sprintf("Sequence number %04d", sequence)
 

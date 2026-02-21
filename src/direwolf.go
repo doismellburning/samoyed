@@ -195,7 +195,6 @@ x = Silence FX.25 information.`)
 
 	if *debugStr != "" {
 		// New in 1.1.  Can combine multiple such as "-d pkk"
-
 		for _, p := range *debugStr {
 			switch p {
 			case 'a':
@@ -246,7 +245,6 @@ x = Silence FX.25 information.`)
 	if *quietStr != "" {
 		// New in 1.2.  Quiet option to suppress some types of printing.
 		// Can combine multiple such as "-q hd"
-
 		for _, p := range *quietStr {
 			switch p {
 			case 'h':
@@ -293,6 +291,7 @@ x = Silence FX.25 information.`)
 			fmt.Printf("-r option, audio samples/sec, is out of range.\n")
 			os.Exit(1)
 		}
+
 		audio_config.adev[0].samples_per_sec = *audioSampleRate
 	}
 
@@ -301,6 +300,7 @@ x = Silence FX.25 information.`)
 			fmt.Printf("-n option, number of audio channels, is out of range.\n")
 			os.Exit(1)
 		}
+
 		audio_config.adev[0].num_channels = *audioChannels
 		if *audioChannels == 2 {
 			audio_config.chan_medium[1] = MEDIUM_RADIO
@@ -345,6 +345,7 @@ x = Silence FX.25 information.`)
 		} else if audio_config.achan[0].baud < 3600 {
 			audio_config.achan[0].modem_type = MODEM_QPSK
 			audio_config.achan[0].mark_freq = 0
+
 			audio_config.achan[0].space_freq = 0
 			if audio_config.achan[0].baud != 2400 {
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", audio_config.achan[0].baud)
@@ -352,6 +353,7 @@ x = Silence FX.25 information.`)
 		} else if audio_config.achan[0].baud < 7200 {
 			audio_config.achan[0].modem_type = MODEM_8PSK
 			audio_config.achan[0].mark_freq = 0
+
 			audio_config.achan[0].space_freq = 0
 			if audio_config.achan[0].baud != 4800 {
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", audio_config.achan[0].baud)
@@ -378,7 +380,6 @@ x = Silence FX.25 information.`)
 	if *g3ruh {
 		// Force G3RUH mode, overriding default for speed.
 		//   Example:   -B 2400 -g
-
 		audio_config.achan[0].modem_type = MODEM_SCRAMBLE
 		audio_config.achan[0].mark_freq = 0
 		audio_config.achan[0].space_freq = 0
@@ -387,7 +388,6 @@ x = Silence FX.25 information.`)
 	if *direwolf15compat {
 		// V.26 compatible with earlier versions of direwolf.
 		//   Example:   -B 2400 -j    or simply   -j
-
 		audio_config.achan[0].v26_alternative = V26_A
 		audio_config.achan[0].modem_type = MODEM_QPSK
 		audio_config.achan[0].mark_freq = 0
@@ -398,7 +398,6 @@ x = Silence FX.25 information.`)
 	if *mfj2400compat {
 		// V.26 compatible with MFJ and maybe others.
 		//   Example:   -B 2400 -J     or simply   -J
-
 		audio_config.achan[0].v26_alternative = V26_B
 		audio_config.achan[0].modem_type = MODEM_QPSK
 		audio_config.achan[0].mark_freq = 0
@@ -410,6 +409,7 @@ x = Silence FX.25 information.`)
 		if *audioStatsInterval < 10 {
 			fmt.Printf("Setting such a small audio statistics interval (<10) will produce inaccurate sample rate display.\n")
 		}
+
 		audio_config.statistics_interval = *audioStatsInterval
 	}
 
@@ -450,15 +450,19 @@ x = Silence FX.25 information.`)
 			var E_rx_opt, _ = strconv.Atoi(e[1:])
 			if E_rx_opt < 1 || E_rx_opt > 99 {
 				fmt.Printf("-ER must be in range of 1 to 99.\n")
+
 				E_rx_opt = 10
 			}
+
 			audio_config.recv_error_rate = E_rx_opt
 		} else {
 			var E_tx_opt, _ = strconv.Atoi(e)
 			if E_tx_opt < 1 || E_tx_opt > 99 {
 				fmt.Printf("-E must be in range of 1 to 99.\n")
+
 				E_tx_opt = 10
 			}
+
 			audio_config.xmit_error_rate = E_tx_opt
 		}
 	}
@@ -491,6 +495,7 @@ x = Silence FX.25 information.`)
 			fmt.Printf("Can't mix -X with -I or -i.\n")
 			os.Exit(1)
 		}
+
 		audio_config.achan[0].fx25_strength = *fx25CheckBytes
 		audio_config.achan[0].layer2_xmit = LAYER2_FX25
 	}
@@ -505,9 +510,11 @@ x = Silence FX.25 information.`)
 		if *il2pNormal > 0 {
 			audio_config.achan[0].il2p_max_fec = 1
 		}
+
 		if audio_config.achan[0].il2p_max_fec == 0 {
 			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -I for best results.\n")
 		}
+
 		audio_config.achan[0].il2p_invert_polarity = 0 // normal
 	}
 
@@ -516,9 +523,11 @@ x = Silence FX.25 information.`)
 		if *il2pInverted > 0 {
 			audio_config.achan[0].il2p_max_fec = 1
 		}
+
 		if audio_config.achan[0].il2p_max_fec == 0 {
 			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -i for best results.\n")
 		}
+
 		audio_config.achan[0].il2p_invert_polarity = 1 // invert for transmit
 		if audio_config.achan[0].baud == 1200 {
 			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
@@ -589,9 +598,11 @@ x = Silence FX.25 information.`)
 	if !(audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16) { //nolint:staticcheck
 		panic("audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16")
 	}
+
 	if !(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2) { //nolint:staticcheck
 		panic("assert(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2)")
 	}
+
 	if !(audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
 		panic("assert(audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
 	}
@@ -615,10 +626,12 @@ x = Silence FX.25 information.`)
 	if *transmitCalibration != "" {
 		var transmitCalibrationType = ' '
 		var transmitCalibrationChannel int
+
 		for _, p := range *transmitCalibration {
 			switch p {
 			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 				transmitCalibrationChannel = transmitCalibrationChannel*10 + int(p-'0')
+
 				if transmitCalibrationType == ' ' {
 					transmitCalibrationType = 'a'
 				}
@@ -637,6 +650,7 @@ x = Silence FX.25 information.`)
 				os.Exit(1)
 			}
 		}
+
 		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= MAX_RADIO_CHANS {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
@@ -659,6 +673,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].mark_freq,
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
+
 					for n > 0 {
 						tone_gen_put_bit(transmitCalibrationChannel, n&1)
 						n--
@@ -666,15 +681,19 @@ x = Silence FX.25 information.`)
 				case 'm': // "Mark" tone: -x m
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
+
 					for n > 0 {
 						tone_gen_put_bit(transmitCalibrationChannel, 1)
+
 						n--
 					}
 				case 's': // "Space" tone: -x s
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
+
 					for n > 0 {
 						tone_gen_put_bit(transmitCalibrationChannel, 0)
+
 						n--
 					}
 				case 'p': // Silence - set PTT only: -x p
@@ -785,7 +804,6 @@ x = Silence FX.25 information.`)
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
 func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
-
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -819,6 +837,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	var h int
 	var heard string
+
 	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
@@ -953,6 +972,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		pinfo = ax25_get_info(pp)
 
 		dw_printf("(%s)", desc)
+
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
@@ -966,7 +986,6 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// more likely to have compressed data than UTF-8 text.
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
-
 		ax25_safe_print(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
@@ -975,6 +994,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	if d_u_opt {
 		var hasNonPrintable = false
+
 		for _, r := range pinfo {
 			if !unicode.IsPrint(rune(r)) {
 				hasNonPrintable = true
@@ -1009,12 +1029,10 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	if ax25_is_aprs(pp) {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
-
 		var A = decode_aprs(pp, q_d_opt, "")
 
 		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
-
 			decode_aprs_print(A)
 		}
 

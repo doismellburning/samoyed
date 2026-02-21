@@ -108,7 +108,6 @@ var s_gps_mutex sync.Mutex
  *--------------------------------------------------------------------*/
 
 func dwgps_init(pconfig *misc_config_s, debug int) {
-
 	dwgps_clear(s_dwgps_info) // Init the global
 
 	s_dwgps_debug = debug
@@ -122,7 +121,6 @@ func dwgps_init(pconfig *misc_config_s, debug int) {
 
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
-
 } /* end dwgps_init */
 
 /*-------------------------------------------------------------------
@@ -157,7 +155,6 @@ func dwgps_clear(gpsinfo *dwgps_info_t) {
  *--------------------------------------------------------------------*/
 
 func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
-
 	s_gps_mutex.Lock()
 
 	*gpsinfo = *s_dwgps_info
@@ -189,14 +186,12 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
  *--------------------------------------------------------------------*/
 
 func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
-
 	dw_printf("%stime=%s fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
 		msg,
 		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
 		gpsinfo.dlat, gpsinfo.dlon,
 		gpsinfo.track, gpsinfo.speed_knots,
 		gpsinfo.altitude)
-
 } /* end dwgps_set_data */
 
 /*-------------------------------------------------------------------
@@ -212,14 +207,12 @@ func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
  *--------------------------------------------------------------------*/
 
 func dwgps_term() {
-
 	dwgpsnmea_term()
 
 	/* TODO KG
 	#if ENABLE_GPSD
 	dwgpsd_term()
 	*/
-
 } /* end dwgps_term */
 
 /*-------------------------------------------------------------------
@@ -233,16 +226,13 @@ func dwgps_term() {
  *--------------------------------------------------------------------*/
 
 func dwgps_set_data(gpsinfo *dwgps_info_t) {
-
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
-
 	s_gps_mutex.Lock()
 
 	*s_dwgps_info = *gpsinfo
 
 	s_gps_mutex.Unlock()
-
 } /* end dwgps_set_data */
 
 /* end dwgps.c */

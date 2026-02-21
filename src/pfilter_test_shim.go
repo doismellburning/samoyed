@@ -15,6 +15,7 @@ func pf_test_main(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
 	pfilter_init(&p_igate_config, 0)
+
 	pftest_running = true // Change behaviour in pfilter.c to terminate early for test convenience
 
 	dw_printf("Quick test for packet filtering.\n")
@@ -233,6 +234,7 @@ func pf_test_main(t *testing.T) {
 		dw_printf("\nPacket Filtering Test - FAILED!     %d errors\n", pftest_error_count)
 		t.Fail()
 	}
+
 	text_color_set(DW_COLOR_REC)
 	dw_printf("\nPacket Filtering Test - SUCCESS!\n")
 }

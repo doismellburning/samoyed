@@ -84,6 +84,7 @@ func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel 
 	D.slicer[slice].score <<= 1
 	// 2 is to detect 'flag' patterns with 2 transitions per octet.
 	var goodBits = bits.OnesCount(uint(D.slicer[slice].good_hist))
+
 	var badBits = bits.OnesCount(uint(D.slicer[slice].bad_hist))
 	if goodBits-badBits >= 2 {
 		D.slicer[slice].score |= 1

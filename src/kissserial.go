@@ -118,7 +118,6 @@ func kissserial_init(mc *misc_config_s) {
 	if g_misc_config_p.kiss_serial_port != "" {
 		if g_misc_config_p.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
-
 			serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 			if serialport_fd != nil {
@@ -193,6 +192,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 		if kissserial_debug > 0 {
 			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 		}
+
 		kiss_buff = fbuf
 	} else {
 		var stemp []byte
@@ -202,6 +202,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 		if flen > AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
+
 			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
 
@@ -275,18 +276,17 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
  *--------------------------------------------------------------------*/
 
 func kissserial_get() (byte, error) {
-
 	if g_misc_config_p.kiss_serial_poll == 0 {
 		/*
 		 * Normal case, was opened at start up time.
 		 */
 		var ch, err = serial_port_get1(serialport_fd)
-
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
 			serial_port_close(serialport_fd)
 			serialport_fd = nil
+
 			return ch, err
 		}
 
@@ -305,9 +305,7 @@ func kissserial_get() (byte, error) {
 	for {
 		if serialport_fd != nil {
 			// Open, try to read.
-
 			var ch, err = serial_port_get1(serialport_fd)
-
 			if err == nil {
 				return ch, nil
 			}
@@ -321,10 +319,8 @@ func kissserial_get() (byte, error) {
 			SLEEP_SEC(g_misc_config_p.kiss_serial_poll)
 
 			var _, statErr = os.Stat(g_misc_config_p.kiss_serial_port)
-
 			if statErr == nil {
 				// It's there now.  Try to open.
-
 				serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 				if serialport_fd != nil {
@@ -362,12 +358,12 @@ func kissserial_listen_thread() {
 		dw_printf ("kissserial_listen_thread ( %d )\n", fd);
 	#endif
 	*/
-
 	for {
 		var ch, err = kissserial_get()
 		if err != nil {
 			return
 		} // Was pthread_exit
+
 		kiss_rec_byte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
 	}
 }

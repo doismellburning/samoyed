@@ -97,7 +97,6 @@ var mheard_debug = 0
  *------------------------------------------------------------------*/
 
 func mheard_init(debug int) {
-
 	mheard_db = make(map[string]*mheard_t)
 
 	mheard_debug = debug
@@ -114,7 +113,6 @@ func mheard_init(debug int) {
 /* convert some time in past to hours:minutes text format. */
 
 func mheard_age(now, t time.Time) string {
-
 	if t.IsZero() {
 		return "-  "
 	}
@@ -137,9 +135,7 @@ func mheard_latlon(dlat float64, dlon float64) string {
 const MAXDUMP = 1000
 
 func mheard_dump() {
-
 	/* Get linear array of node pointers so they can be sorted easily. */
-
 	var stations = slices.Collect(maps.Values(mheard_db))
 
 	/* Sort most recently heard to the top then print. */
@@ -176,7 +172,6 @@ func mheard_dump() {
 		dw_printf("%-9s %3d   %d   %d  %7s %7s  %s  %d\n",
 			mptr.callsign, mptr.count, mptr.channel, mptr.num_digi_hops, rf, is, position, mptr.msp)
 	}
-
 } /* end mheard_dump */
 
 /*------------------------------------------------------------------
@@ -203,7 +198,6 @@ func mheard_dump() {
  *------------------------------------------------------------------*/
 
 func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) { //nolint:unparam
-
 	var now = time.Now()
 
 	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
@@ -267,11 +261,9 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 
 	var mptr = mheard_db[source]
 	if mptr == nil {
-
 		/*
 		 * Not heard before.  Add it.
 		 */
-
 		if mheard_debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("mheard_save_rf: %s %d - added new\n", source, hops)
@@ -288,25 +280,23 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 		mptr.dlon = G_UNKNOWN
 
 		mheard_mutex.Lock()
+
 		mheard_db[source] = mptr
+
 		mheard_mutex.Unlock()
 	} else {
-
 		/*
 		 * Update existing entry.
 		 * The only tricky part here is that we might hear the same transmission
 		 * several times.  First direct, then thru various digipeater paths.
 		 * We are interested in the shortest path if heard very recently.
 		 */
-
 		if hops > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
-
 			if mheard_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("mheard_save_rf: %s %d - skip because hops was %d %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
 			}
 		} else {
-
 			if mheard_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("mheard_save_rf: %s %d - update time, was %d hops %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
@@ -333,6 +323,7 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 
 	if mheard_debug >= 2 {
 		var limit = 10 // normally 30 or 60.  more frequent when debugging.
+
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mheard_count(0, limit), mheard_count(2, limit), mheard_count(8, limit))
 	}
@@ -340,7 +331,6 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 	if mheard_debug > 0 {
 		mheard_dump()
 	}
-
 } /* end mheard_save_rf */
 
 /*------------------------------------------------------------------
@@ -375,7 +365,6 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
  *------------------------------------------------------------------*/
 
 func mheard_save_is(ptext string) {
-
 	var now = time.Now()
 
 	// It is possible that source won't adhere to the AX.25 restrictions.
@@ -408,7 +397,6 @@ func mheard_save_is(ptext string) {
 		 * Hmmmm.  I wonder why I did not store the location if available.
 		 * An earlier example has an APRSdroid station reporting location without using [ham] RF.
 		 */
-
 		if mheard_debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("mheard_save_is: %s - added new\n", source)
@@ -422,16 +410,17 @@ func mheard_save_is(ptext string) {
 		mptr.dlon = G_UNKNOWN
 
 		mheard_mutex.Lock()
+
 		mheard_db[source] = mptr
+
 		mheard_mutex.Unlock()
 	} else {
-
 		/* Already there.  Update last heard from IS time. */
-
 		if mheard_debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("mheard_save_is: %s - update time, was %d seconds ago.\n", source, int(now.Sub(mptr.last_heard_rf).Seconds()))
 		}
+
 		mptr.count++
 		mptr.last_heard_is = now
 	}
@@ -445,6 +434,7 @@ func mheard_save_is(ptext string) {
 
 	if mheard_debug >= 2 {
 		var limit = 10 // normally 30 or 60
+
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mheard_count(0, limit), mheard_count(2, limit), mheard_count(8, limit))
 	}
@@ -458,7 +448,6 @@ func mheard_save_is(ptext string) {
 			ax25_delete (pp);
 		#endif
 	*/
-
 } /* end mheard_save_is */
 
 /*------------------------------------------------------------------
@@ -519,7 +508,6 @@ func mheard_save_is(ptext string) {
  *------------------------------------------------------------------*/
 
 func mheard_count(max_hops int, time_limit int) int {
-
 	var limit = time.Duration(time_limit) * time.Minute
 	var since = time.Now().Add(-limit)
 
@@ -537,7 +525,6 @@ func mheard_count(max_hops int, time_limit int) int {
 	}
 
 	return (count)
-
 } /* end mheard_count */
 
 /*------------------------------------------------------------------
@@ -565,12 +552,11 @@ func mheard_count(max_hops int, time_limit int) int {
  *------------------------------------------------------------------*/
 
 func mheard_was_recently_nearby(role string, callsign string, _time_limit int, max_hops int, dlat float64, dlon float64, km float64) bool {
-
 	var time_limit = time.Duration(_time_limit) * time.Minute
 
 	if role != "" {
-
 		text_color_set(DW_COLOR_INFO)
+
 		if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN {
 			dw_printf(
 				"Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops, and within %.1f km of %.2f %.2f?\n",
@@ -590,11 +576,11 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
 	var mptr = mheard_db[callsign]
 
 	if mptr == nil || mptr.last_heard_rf.IsZero() {
-
 		if role != "" {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("No, we have not heard %s over the radio.\n", callsign)
 		}
+
 		return false
 	}
 
@@ -602,41 +588,41 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
 	var heard_ago = now.Sub(mptr.last_heard_rf)
 
 	if heard_ago > time_limit {
-
 		if role != "" {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("No, %s was last heard over the radio %d minutes ago with %d digipeater hops.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops)
 		}
+
 		return false
 	}
 
 	if mptr.num_digi_hops > max_hops {
-
 		if role != "" {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("No, %s was last heard over the radio with %d digipeater hops %d minutes ago.\n", callsign, mptr.num_digi_hops, int(heard_ago.Minutes()))
 		}
+
 		return false
 	}
 
 	// Apply physical distance check?
 
 	if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN && mptr.dlat != G_UNKNOWN && mptr.dlon != G_UNKNOWN {
-
 		var dist = ll_distance_km(float64(mptr.dlat), float64(mptr.dlon), float64(dlat), float64(dlon))
 
 		if dist > km {
-
 			if role != "" {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("No, %s was %.1f km away although it was %d digipeater hops %d minutes ago.\n", callsign, dist, mptr.num_digi_hops, int(heard_ago.Minutes()))
 			}
+
 			return false
 		} else {
 			if role != "" {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Yes, %s last heard over radio %d minutes ago, %d digipeater hops.  Last location %.1f km away.\n", callsign, int(heard_ago.Minutes()), mptr.num_digi_hops, dist)
 			}
+
 			return true
 		}
 	}
@@ -649,7 +635,6 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
 	}
 
 	return true
-
 } /* end mheard_was_recently_nearby */
 
 /*------------------------------------------------------------------
@@ -665,11 +650,9 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
  *------------------------------------------------------------------*/
 
 func mheard_set_msp(callsign string, num int) {
-
 	var mptr = mheard_db[callsign]
 
 	if mptr != nil {
-
 		mptr.msp = num
 
 		if mheard_debug > 0 {
@@ -680,7 +663,6 @@ func mheard_set_msp(callsign string, num int) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: Can't find %s to set MSP.\n", callsign)
 	}
-
 } /* end mheard_set_msp */
 
 /*------------------------------------------------------------------
@@ -697,20 +679,18 @@ func mheard_set_msp(callsign string, num int) {
  *------------------------------------------------------------------*/
 
 func mheard_get_msp(callsign string) int {
-
 	var mptr = mheard_db[callsign]
 
 	if mptr != nil {
-
 		if mheard_debug > 0 {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("MSP for %s is %d\n", callsign, mptr.msp)
 		}
+
 		return (mptr.msp) // Should we have a time limit?
 	}
 
 	return (0)
-
 } /* end mheard_get_msp */
 
 /* end mheard.c */

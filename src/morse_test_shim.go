@@ -13,6 +13,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 	modem.adev[0].defined = 1
 	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
 	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+
 	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 	for channel := range MAX_RADIO_CHANS {
 		modem.achan[channel].modem_type = MODEM_AFSK
@@ -20,6 +21,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ
 		modem.achan[channel].baud = DEFAULT_BAUD
 	}
+
 	modem.chan_medium[0] = MEDIUM_RADIO
 
 	GEN_PACKETS = true

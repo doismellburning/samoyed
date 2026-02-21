@@ -74,7 +74,6 @@ var s_amplitude int = 100 // range of 0 .. 100
  *----------------------------------------------------------------*/
 
 func dtmf_init(p_audio_config *audio_s, amp int) {
-
 	s_amplitude = amp
 
 	/*
@@ -89,7 +88,6 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 		D.sample_rate = p_audio_config.adev[a].samples_per_sec
 
 		if p_audio_config.achan[c].dtmf_decode != DTMF_DECODE_OFF {
-
 			/* TODO KG
 			#if DEBUG
 				    text_color_set(DW_COLOR_DEBUG);
@@ -104,12 +102,10 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 			#endif
 			*/
 			for j := 0; j < NUM_TONES; j++ {
-
 				// Why do some insist on rounding k to the nearest integer?
 				// That would move the filter center frequency away from ideal.
 				// What is to be gained?
 				// More consistent results for all the tones when k is not rounded off.
-
 				var k = float64(D.block_size) * float64(DTMF_TONES[j]) / float64(D.sample_rate)
 
 				D.coef[j] = float64(2.0 * math.Cos(2.0*math.Pi*float64(k)/float64(D.block_size)))
@@ -126,17 +122,18 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 
 	for c := 0; c < MAX_RADIO_CHANS; c++ {
 		var D = &(dd[c])
+
 		D.n = 0
 		for j := 0; j < NUM_TONES; j++ {
 			D.Q1[j] = 0
 			D.Q2[j] = 0
 		}
+
 		D.prev_dec = ' '
 		D.debounced = ' '
 		D.prev_debounced = ' '
 		D.timeout = 0
 	}
-
 }
 
 /*------------------------------------------------------------------
@@ -158,7 +155,6 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
  *----------------------------------------------------------------*/
 
 func dtmf_sample(c int, input float64) rune {
-
 	// Only applies to radio channels.  Should not be here.
 	if c >= MAX_RADIO_CHANS {
 		return ('$')
@@ -187,6 +183,7 @@ func dtmf_sample(c int, input float64) rune {
 			D.Q1[i] = 0
 			D.Q2[i] = 0
 		}
+
 		D.n = 0
 
 		/*
@@ -261,6 +258,7 @@ func dtmf_sample(c int, input float64) rune {
 			if decoded != ' ' {
 				_tmpIntBool = 1
 			}
+
 			dcd_change(c, MAX_SUBCHANS, 0, _tmpIntBool)
 
 			/* Reset timeout timer. */
@@ -268,17 +266,20 @@ func dtmf_sample(c int, input float64) rune {
 				D.timeout = ((DTMF_TIMEOUT_SEC) * D.sample_rate) / D.block_size
 			}
 		}
+
 		D.prev_dec = decoded
 
 		// Return only new button pushes.
 		// Also report timeout after period of inactivity.
 
 		var ret = '.'
+
 		if D.debounced != D.prev_debounced {
 			if D.debounced != ' ' {
 				ret = D.debounced
 			}
 		}
+
 		if ret == '.' {
 			if D.timeout > 0 {
 				D.timeout--
@@ -287,6 +288,7 @@ func dtmf_sample(c int, input float64) rune {
 				}
 			}
 		}
+
 		D.prev_debounced = D.debounced
 
 		/* TODO KG
@@ -323,7 +325,6 @@ func dtmf_sample(c int, input float64) rune {
  *--------------------------------------------------------------------*/
 
 func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int {
-
 	// Length of tone or gap between.
 	var len_ms = int((500.0 / float64(speed)) + 0.5)
 
@@ -341,7 +342,6 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
 	return (txdelay +
 		int(1000.0*float64(len(str))/float64(speed)+0.5) +
 		txtail)
-
 } /* end dtmf_send */
 
 /*------------------------------------------------------------------
@@ -366,8 +366,8 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
 var push_button_result string
 
 func push_button_raw(channel int, button rune, ms int, test_mode bool) {
-
 	var fa, fb int
+
 	switch button {
 	case '1':
 		fa = DTMF_TONES[0]
@@ -420,6 +420,7 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 
 	case '?': /* check result */
 		Assert(test_mode)
+
 		if push_button_result == "123A456B789C*0#D123$789$" { //nolint:staticcheck
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\nSuccess!\n")
@@ -442,12 +443,10 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 	var phasea, phaseb float64
 
 	for i := int(0); i < (ms*dd[channel].sample_rate)/1000; i++ {
-
 		// This could be more efficient with a precomputed sine wave table
 		// but I'm not that worried about it.
 		// With a Raspberry Pi, model 2, default 1200 receiving takes about 14% of one CPU core.
 		// When transmitting tones, it briefly shoots up to about 33%.
-
 		if fa > 0 && fb > 0 {
 			dtmf = float64(math.Sin(float64(phasea)) + math.Sin(float64(phaseb)))
 			phasea += 2.0 * float64(math.Pi) * float64(fa) / float64(dd[channel].sample_rate)
@@ -459,7 +458,6 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 		if test_mode {
 			/* Make sure it is insensitive to signal amplitude. */
 			/* (Uncomment each of below when testing.) */
-
 			var x = dtmf_sample(0, dtmf)
 			//x = dtmf_sample (0, dtmf * 1000);
 			//x = dtmf_sample (0, dtmf * 0.001);
@@ -470,7 +468,6 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 		} else {
 			// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
 			// Amplitude of 100 would use full +-32k range.
-
 			var sam = int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
 			gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
 		}

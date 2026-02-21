@@ -35,12 +35,12 @@ type il2p_payload_properties_t struct {
  *--------------------------------------------------------------------------------*/
 
 func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properties_t, int) {
-
 	var p = new(il2p_payload_properties_t)
 
 	if payload_size < 0 || payload_size > IL2P_MAX_PAYLOAD_SIZE {
 		return p, -1
 	}
+
 	if payload_size == 0 {
 		return p, 0
 	}
@@ -76,6 +76,7 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 			// Should not happen.  But just in case...
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("IL2P parity symbol per payload block error.  small_block_size = %d\n", p.small_block_size)
+
 			return p, -1
 		}
 	}
@@ -84,7 +85,6 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 
 	return p, (p.small_block_count*(p.small_block_size+p.parity_symbols_per_block) +
 		p.large_block_count*(p.large_block_size+p.parity_symbols_per_block))
-
 } // end il2p_payload_compute
 
 /*--------------------------------------------------------------------------------
@@ -111,12 +111,12 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
  *--------------------------------------------------------------------------------*/
 
 func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
-
 	var payload_size = len(payload)
 
 	if payload_size > IL2P_MAX_PAYLOAD_SIZE {
 		return nil, -1
 	}
+
 	if payload_size == 0 {
 		return nil, 0
 	}
@@ -164,7 +164,6 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 	}
 
 	return pout, encoded_length
-
 } // end il2p_encode_payload
 
 /*--------------------------------------------------------------------------------
@@ -197,7 +196,6 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols_corrected *int) ([]byte, int) {
 	// Determine number of blocks and sizes.
-
 	var ipp, e = il2p_payload_compute(payload_size, max_fec)
 	if e <= 0 {
 		return nil, e
@@ -218,6 +216,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		if e < 0 {
 			failed = true
 		}
+
 		*symbols_corrected += e
 
 		var descrambled = il2p_descramble_block(corrected_block)
@@ -243,6 +242,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 		if e < 0 {
 			failed = true
 		}
+
 		*symbols_corrected += e
 
 		var descrambled = il2p_descramble_block(corrected_block)
@@ -266,9 +266,9 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 	if decoded_length != payload_size {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P Internal error: decoded_length = %d, payload_size = %d\n", decoded_length, payload_size)
+
 		return nil, -3
 	}
 
 	return pout, decoded_length
-
 } // end il2p_decode_payload

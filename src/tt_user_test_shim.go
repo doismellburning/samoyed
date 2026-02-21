@@ -18,6 +18,7 @@ func tt_user_test_main(t *testing.T) {
 	t.Helper()
 
 	TT_TESTS_RUNNING = true
+
 	defer func() {
 		TT_TESTS_RUNNING = false
 	}()

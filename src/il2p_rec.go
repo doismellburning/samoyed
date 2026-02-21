@@ -65,14 +65,13 @@ var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
  ***********************************************************************************/
 
 func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
-
 	// Allocate context blocks only as needed.
-
 	var F = il2p_context[channel][subchannel][slice]
 	if F == nil {
 		Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 		Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 		Assert(slice >= 0 && slice < MAX_SLICERS)
+
 		F = new(il2p_context_s)
 		il2p_context[channel][subchannel][slice] = F
 
@@ -86,9 +85,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 	// State machine to look for sync word then gather appropriate number of header and payload bytes.
 
 	switch F.state {
-
 	case IL2P_SEARCHING: // Searching for the sync word.
-
 		if bits.OnesCount(F.acc^IL2P_SYNC_WORD) <= 1 { // allow single bit mismatch
 			//text_color_set (DW_COLOR_INFO);
 			//dw_printf ("IL2P header has normal polarity\n");
@@ -108,7 +105,6 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		}
 
 	case IL2P_HEADER: // Gathering the header.
-
 		F.bc++
 		if F.bc == 8 { // full byte has been collected.
 			F.bc = 0
@@ -119,8 +115,8 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				F.shdr[F.hc] = byte(^F.acc) & 0xff
 				F.hc++
 			}
-			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
 
+			if F.hc == IL2P_HEADER_SIZE+IL2P_HEADER_PARITY { // Have all of header
 				if il2p_get_debug() >= 1 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("IL2P header as received [%d.%d.%d]:\n", channel, subchannel, slice)
@@ -157,7 +153,6 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 						F.pc = 0
 						F.state = IL2P_DECODE
 					} else { // Error.
-
 						if il2p_get_debug() >= 1 {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("IL2P header INVALID.\n")
@@ -173,7 +168,6 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		} // full byte collected.
 
 	case IL2P_PAYLOAD: // Gathering the payload, if any.
-
 		F.bc++
 		if F.bc == 8 { // full byte has been collected.
 			F.bc = 0
@@ -184,10 +178,9 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				F.spayload[F.pc] = byte(^F.acc) & 0xff
 				F.pc++
 			}
+
 			if F.pc == F.eplen {
-
 				// TODO?: for symmetry it seems like we should clarify the payload before combining.
-
 				F.state = IL2P_DECODE
 			}
 		}
@@ -200,7 +193,6 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		// in uhdr[IL2P_HEADER_SIZE];  // Header after FEC and descrambling.
 
 		// TODO?:  for symmetry, we might decode the payload here and later build the frame.
-
 		{
 			// Compute encoded payload size (includes parity symbols).
 			var _, max_fec, payload_len = il2p_get_header_attributes(F.uhdr[:])
@@ -241,5 +233,4 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		F.state = IL2P_SEARCHING
 
 	} // end of switch
-
 } // end il2p_rec_bit

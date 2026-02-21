@@ -41,11 +41,13 @@ func Text2TT(args []string) {
 	var cs int
 
 	fmt.Printf("Push buttons for multi-press method:\n")
+
 	buttons, _ = tt_text_to_multipress(text, false)
 	cs = checksum(buttons)
 	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)
 
 	fmt.Printf("Push buttons for two-key method:\n")
+
 	buttons, _ = tt_text_to_two_key(text, false)
 	cs = checksum(buttons)
 	fmt.Printf("\"%s\"    checksum for call = %d\n", buttons, cs)

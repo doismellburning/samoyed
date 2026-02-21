@@ -111,6 +111,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	for i = 1; i <= nroots; i++ {
 		lambda[i] = 0
 	}
+
 	lambda[0] = 1
 
 	if no_eras > 0 {
@@ -173,14 +174,17 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// locator polynomial
 	r = no_eras
 	el = no_eras
+
 	for r++; r <= nroots; r++ {
 		// Compute discrepancy at the r-th step in poly-form
 		discrR = 0
+
 		for i = 0; i < r; i++ {
 			if lambda[i] != 0 && int(s[r-i-1]) != A0 {
 				discrR ^= rs.alpha_to[modnn(rs, int(rs.index_of[lambda[i]])+int(s[r-i-1]))]
 			}
 		}
+
 		discrR = rs.index_of[discrR] // Index form
 		if int(discrR) == A0 {
 			// 2 lines below: B(x) <-- x*B(x)
@@ -190,6 +194,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		} else {
 			// 7 lines below: T(x) <-- lambda(x) - discr_r*x*b(x)
 			t[0] = lambda[0]
+
 			for i = 0; i < nroots; i++ {
 				if int(b[i]) != A0 {
 					t[i+1] = lambda[i+1] ^ rs.alpha_to[modnn(rs, int(discrR)+int(b[i]))]
@@ -197,6 +202,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 					t[i+1] = lambda[i+1]
 				}
 			}
+
 			if 2*el <= r+no_eras-1 {
 				el = r + no_eras - el
 				// 2 lines below: B(x) <-- inv(discr_r) * lambda(x)
@@ -220,6 +226,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 	// Convert lambda to index form and compute deg(lambda(x))
 	degLambda = 0
+
 	for i = 0; i < nroots+1; i++ {
 		lambda[i] = rs.index_of[lambda[i]]
 		if int(lambda[i]) != A0 {
@@ -229,15 +236,19 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// Find roots of the error+erasure locator polynomial by Chien search
 	// memcpy(&reg[1],&lambda[1],NROOTS*sizeof(reg[0]));
 	copy(reg[1:nroots+1], lambda[1:nroots+1])
+
 	count = 0 // Number of roots of lambda(x)
+
 	for i, k = 1, iprim-1; i <= nn; i, k = i+1, modnn(rs, k+iprim) {
 		q = 1 // lambda[0] is always 0
+
 		for j = degLambda; j > 0; j-- {
 			if int(reg[j]) != A0 {
 				reg[j] = byte(modnn(rs, int(reg[j])+j))
 				q ^= rs.alpha_to[reg[j]]
 			}
 		}
+
 		if q != 0 {
 			continue // Not a root
 		}
@@ -254,6 +265,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			break
 		}
 	}
+
 	if degLambda != count {
 		// deg(lambda) unequal to number of roots => uncorrectable
 		// error detected
@@ -263,34 +275,42 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// Compute err+eras evaluator poly omega(x) = s(x)*lambda(x) (modulo
 	// x**NROOTS). in index form. Also find deg(omega).
 	degOmega = 0
+
 	for i = 0; i < nroots; i++ {
 		tmp = 0
+
 		if degLambda < i {
 			j = degLambda
 		} else {
 			j = i
 		}
+
 		for ; j >= 0; j-- {
 			if int(s[i-j]) != A0 && int(lambda[j]) != A0 {
 				tmp ^= rs.alpha_to[modnn(rs, int(s[i-j])+int(lambda[j]))]
 			}
 		}
+
 		if tmp != 0 {
 			degOmega = i
 		}
+
 		omega[i] = rs.index_of[tmp]
 	}
+
 	omega[nroots] = byte(A0)
 
 	// Compute error values in poly-form. num1 = omega(inv(X(l))), num2 =
 	// inv(X(l))**(FCR-1) and den = lambda_pr(inv(X(l))) all in poly-form
 	for j = count - 1; j >= 0; j-- {
 		num1 = 0
+
 		for i = degOmega; i >= 0; i-- {
 			if int(omega[i]) != A0 {
 				num1 ^= rs.alpha_to[modnn(rs, int(omega[i])+i*int(root[j]))]
 			}
 		}
+
 		num2 = rs.alpha_to[modnn(rs, int(root[j])*(fcr-1)+nn)]
 		den = 0
 
@@ -301,11 +321,13 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		} else {
 			maxI = nroots - 1
 		}
+
 		for i = maxI & ^1; i >= 0; i -= 2 {
 			if int(lambda[i+1]) != A0 {
 				den ^= rs.alpha_to[modnn(rs, int(lambda[i+1])+i*int(root[j]))]
 			}
 		}
+
 		if den == 0 {
 			// #if DEBUG >= 1
 			// fprintf(stderr,"\n ERROR: denominator = 0\n");
@@ -318,12 +340,14 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			data[loc[j]] ^= rs.alpha_to[modnn(rs, int(rs.index_of[num1])+int(rs.index_of[num2])+nn-int(rs.index_of[den]))]
 		}
 	}
+
 finish:
 	if eras_pos != nil {
 		for i = 0; i < count; i++ {
 			eras_pos[i] = loc[i]
 		}
 	}
+
 	return count
 }
 

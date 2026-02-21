@@ -19,7 +19,6 @@ func TT2TextMain() {
 }
 
 func TT2Text(buttons string) {
-
 	switch tt_guess_type(buttons) {
 	case TT_MULTIPRESS:
 		fmt.Printf("Looks like multi-press encoding.\n")
@@ -33,10 +32,12 @@ func TT2Text(buttons string) {
 	var errs int
 
 	fmt.Printf("Decoded text from multi-press method:\n")
+
 	text, _ = tt_multipress_to_text(buttons, false)
 	fmt.Printf("\"%s\"\n", text)
 
 	fmt.Printf("Decoded text from two-key method:\n")
+
 	text, _ = tt_two_key_to_text(buttons, false)
 	fmt.Printf("\"%s\"\n", text)
 

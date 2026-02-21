@@ -553,6 +553,7 @@ func newAudioRingBuffer(size int) *audioRingBuffer {
 		size: size,
 	}
 	rb.cond = sync.NewCond(&rb.mu)
+
 	return rb
 }
 
@@ -598,10 +599,13 @@ func (rb *audioRingBuffer) write(data []byte) bool { //nolint:unparam
 	if part1 > n {
 		part1 = n
 	}
+
 	copy(rb.buf[rb.writePos:], data[:part1])
+
 	if n > part1 {
 		copy(rb.buf[0:], data[part1:])
 	}
+
 	rb.writePos = (rb.writePos + n) % rb.size
 	rb.count += n
 
@@ -610,6 +614,7 @@ func (rb *audioRingBuffer) write(data []byte) bool { //nolint:unparam
 	}
 
 	rb.cond.Signal()
+
 	return !overflow
 }
 
@@ -638,12 +643,16 @@ func (rb *audioRingBuffer) readChunk(dst []byte) (int, bool) {
 	if part1 > n {
 		part1 = n
 	}
+
 	copy(dst[:part1], rb.buf[rb.readPos:])
+
 	if n > part1 {
 		copy(dst[part1:], rb.buf[0:n-part1])
 	}
+
 	rb.readPos = (rb.readPos + n) % rb.size
 	rb.count -= n
+
 	return n, true
 }
 
@@ -653,6 +662,7 @@ func (rb *audioRingBuffer) checkOverflow() bool {
 	defer rb.mu.Unlock()
 	var overflow = rb.overflow
 	rb.overflow = false
+
 	return overflow
 }
 
@@ -660,6 +670,7 @@ func (rb *audioRingBuffer) checkOverflow() bool {
 func (rb *audioRingBuffer) close() {
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
+
 	rb.closed = true
 	rb.cond.Broadcast()
 }
@@ -725,6 +736,7 @@ func roundup1k(n int) int {
 func calcbufsize(rate int, chans int, bits int) int {
 	var size1 = (rate * chans * bits / 8 * ONE_BUF_TIME) / 1000
 	var size2 = roundup1k(size1)
+
 	return (size2)
 }
 
@@ -741,6 +753,7 @@ func calcbufsize(rate int, chans int, bits int) int {
 func parseALSADeviceName(name string) (cardName string, devNum int) {
 	// Strip prefix: hw:, plughw:, etc.
 	var lower = strings.ToLower(name)
+
 	var idx = strings.Index(lower, "hw:")
 	if idx < 0 {
 		return "", -1
@@ -755,6 +768,7 @@ func parseALSADeviceName(name string) (cardName string, devNum int) {
 
 	devNum = -1
 	fmt.Sscanf(parts[1], "%d", &devNum)
+
 	return parts[0], devNum
 }
 
@@ -766,12 +780,14 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 			if err != nil {
 				return nil
 			}
+
 			return dev
 		} else {
 			var dev, err = portaudio.DefaultOutputDevice()
 			if err != nil {
 				return nil
 			}
+
 			return dev
 		}
 	}
@@ -786,6 +802,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 		if forInput {
 			return dev.MaxInputChannels > 0
 		}
+
 		return dev.MaxOutputChannels > 0
 	}
 
@@ -800,6 +817,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 	for _, dev := range devices {
 		if devMatchesDirection(dev) {
 			var nameLower = strings.ToLower(name)
+
 			var devLower = strings.ToLower(dev.Name)
 			if strings.Contains(devLower, nameLower) || strings.Contains(nameLower, devLower) {
 				return dev
@@ -838,17 +856,20 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 	// Fall back to default
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Could not match audio device '%s' to any PortAudio device, falling back to default.\n", name)
+
 	if forInput {
 		var dev, err = portaudio.DefaultInputDevice()
 		if err != nil {
 			return nil
 		}
+
 		return dev
 	} else {
 		var dev, err = portaudio.DefaultOutputDevice()
 		if err != nil {
 			return nil
 		}
+
 		return dev
 	}
 }
@@ -878,34 +899,40 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *----------------------------------------------------------------*/
 
 func audio_open(pa *audio_s) int {
-
 	save_audio_config_p = pa
 
 	// Initialize PortAudio, using a refcount so that multiple audio_open/
 	// audio_close cycles are correctly paired with Initialize/Terminate.
 	portaudioMu.Lock()
+
 	if portaudioRefCount == 0 {
 		var err = portaudio.Initialize()
 		if err != nil {
 			portaudioMu.Unlock()
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("PortAudio initialization failed: %v\n", err)
+
 			return -1
 		}
 	}
+
 	portaudioRefCount++
+
 	portaudioMu.Unlock()
 
 	// If audio_open fails after this point, roll back the refcount increment
 	// so it stays correctly paired with audio_close calls.
 	var openSucceeded = false
+
 	defer func() {
 		if !openSucceeded {
 			portaudioMu.Lock()
+
 			portaudioRefCount--
 			if portaudioRefCount == 0 {
 				portaudio.Terminate()
 			}
+
 			portaudioMu.Unlock()
 		}
 	}()
@@ -921,7 +948,6 @@ func audio_open(pa *audio_s) int {
 	 */
 
 	for a := 0; a < MAX_ADEVS; a++ {
-
 		if pa.adev[a].num_channels == 0 {
 			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
 		}
@@ -959,7 +985,6 @@ func audio_open(pa *audio_s) int {
 
 	for a := 0; a < MAX_ADEVS; a++ {
 		if pa.adev[a].defined != 0 {
-
 			adev[a].inbufSizeInBytes = 0
 			adev[a].inbuf = nil
 			adev[a].inbufLen = 0
@@ -986,6 +1011,7 @@ func audio_open(pa *audio_s) int {
 				/* Change "-" to stdin for readability. */
 				pa.adev[a].adevice_in = "stdin"
 			}
+
 			if strings.HasPrefix(strings.ToLower(pa.adev[a].adevice_in), "udp:") {
 				adev[a].g_audio_in_type = AUDIO_IN_TYPE_SDR_UDP
 				/* Supply default port if none specified. */
@@ -1033,7 +1059,6 @@ func audio_open(pa *audio_s) int {
 			 */
 
 			switch adev[a].g_audio_in_type {
-
 			/*
 			 * Soundcard - PortAudio with callback mode.
 			 * Callback mode is more reliable than blocking read because the
@@ -1045,6 +1070,7 @@ func audio_open(pa *audio_s) int {
 				if inputDev == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not find audio input device: %s\n", audio_in_name)
+
 					return -1
 				}
 
@@ -1073,6 +1099,7 @@ func audio_open(pa *audio_s) int {
 				// to avoid the classic Go closure-over-loop-variable bug.
 				var inRingBuf = adev[a].inputRingBuf
 				var err error
+
 				if pa.adev[a].bits_per_sample == 16 {
 					// Pre-allocate a scratch buffer sized for one full callback invocation
 					// so the callback performs zero heap allocations at runtime.
@@ -1086,6 +1113,7 @@ func audio_open(pa *audio_s) int {
 							for i, sample := range in {
 								binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
 							}
+
 							inRingBuf.write(scratch)
 						},
 					)
@@ -1098,9 +1126,11 @@ func audio_open(pa *audio_s) int {
 						},
 					)
 				}
+
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, err)
+
 					return -1
 				}
 
@@ -1108,6 +1138,7 @@ func audio_open(pa *audio_s) int {
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not start audio input stream: %v\n", err)
+
 					return -1
 				}
 
@@ -1117,37 +1148,37 @@ func audio_open(pa *audio_s) int {
 			 * UDP.
 			 */
 			case AUDIO_IN_TYPE_SDR_UDP:
-
 				var udpAddr, addrErr = net.ResolveUDPAddr("udp", audio_in_name[3:]) // Capture the colon onwards from "udp:$PORT"
 				if addrErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Error with UDP address: %s\n", addrErr)
+
 					return -1
 				}
 
 				var udpErr error
-				adev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
 
+				adev[a].udp_sock, udpErr = net.ListenUDP("udp", udpAddr) // Capture the colon onwards from `udp:$PORT`
 				if udpErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Couldn't create listening socket: %s\n", udpErr)
+
 					return -1
 				}
+
 				adev[a].inbufSizeInBytes = SDR_UDP_BUF_MAXLEN
 
 				/*
 				 * stdin.
 				 */
 			case AUDIO_IN_TYPE_STDIN:
-
 				/* Do we need to adjust any properties of stdin? */
-
 				adev[a].inbufSizeInBytes = 1024
 
 			default:
-
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Internal error, invalid audio_in_type\n")
+
 				return (-1)
 			}
 
@@ -1162,6 +1193,7 @@ func audio_open(pa *audio_s) int {
 			if outputDev == nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Could not find audio output device: %s\n", audio_out_name)
+
 				return -1
 			}
 
@@ -1181,6 +1213,7 @@ func audio_open(pa *audio_s) int {
 			// Open output stream in blocking write mode.
 			// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
 			var err error
+
 			if pa.adev[a].bits_per_sample == 16 {
 				adev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
 				adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
@@ -1188,9 +1221,11 @@ func audio_open(pa *audio_s) int {
 				adev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
 				adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
 			}
+
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
+
 				return -1
 			}
 
@@ -1205,6 +1240,7 @@ func audio_open(pa *audio_s) int {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Audio buffer has unexpected extreme size of %d bytes.\n", adev[a].inbufSizeInBytes)
 				dw_printf("This might be caused by unusual audio device configuration values.\n")
+
 				adev[a].inbufSizeInBytes = 2048
 				dw_printf("Using %d to attempt recovery.\n", adev[a].inbufSizeInBytes)
 			}
@@ -1220,14 +1256,12 @@ func audio_open(pa *audio_s) int {
 			adev[a].outbuf = make([]byte, adev[a].outbufSizeInBytes)
 			Assert(adev[a].outbuf != nil)
 			adev[a].outbufLen = 0
-
 		} /* end of audio device defined */
-
 	} /* end of for each audio device */
 
 	openSucceeded = true
-	return (0)
 
+	return (0)
 } /* end audio_open */
 
 /*------------------------------------------------------------------
@@ -1249,11 +1283,9 @@ func audio_open(pa *audio_s) int {
  *----------------------------------------------------------------*/
 
 func audio_get_real(a int) int {
-
 	Assert(adev[a].inbufSizeInBytes >= 100 && adev[a].inbufSizeInBytes <= 32768)
 
 	switch adev[a].g_audio_in_type {
-
 	/*
 	 * Soundcard - PortAudio callback mode.
 	 * Audio data is written to the ring buffer by the callback.
@@ -1284,6 +1316,7 @@ func audio_get_real(a int) int {
 				// Ring buffer was closed - stream ended
 				return -1
 			}
+
 			if n > 0 {
 				adev[a].inbufLen = n
 				adev[a].inbufNext = 0
@@ -1297,6 +1330,7 @@ func audio_get_real(a int) int {
 
 		var b = adev[a].inbuf[adev[a].inbufNext]
 		adev[a].inbufNext++
+
 		return int(b)
 
 		/*
@@ -1304,15 +1338,14 @@ func audio_get_real(a int) int {
 		 */
 
 	case AUDIO_IN_TYPE_SDR_UDP:
-
 		for adev[a].inbufNext >= adev[a].inbufLen {
-
 			Assert(adev[a].udp_sock != nil)
-			var n, _, readErr = adev[a].udp_sock.ReadFromUDP(adev[a].inbuf)
 
+			var n, _, readErr = adev[a].udp_sock.ReadFromUDP(adev[a].inbuf)
 			if readErr != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Can't read from udp socket: %s", readErr)
+
 				adev[a].inbufLen = 0
 				adev[a].inbufNext = 0
 
@@ -1331,14 +1364,12 @@ func audio_get_real(a int) int {
 				save_audio_config_p.adev[a].num_channels,
 				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 				save_audio_config_p.statistics_interval)
-
 		}
 
 		/*
 		 * stdin.
 		 */
 	case AUDIO_IN_TYPE_STDIN:
-
 		for adev[a].inbufNext >= adev[a].inbufLen {
 			var n, err = os.Stdin.Read(adev[a].inbuf)
 			if err != nil {
@@ -1347,8 +1378,10 @@ func audio_get_real(a int) int {
 					dw_printf("\nEnd of file on stdin.  Exiting.\n")
 					exit(0)
 				}
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Error reading from stdin: %v\n", err)
+
 				return -1
 			}
 
@@ -1373,7 +1406,6 @@ func audio_get_real(a int) int {
 	}
 
 	return (n)
-
 } /* end audio_get */
 
 /*------------------------------------------------------------------
@@ -1409,7 +1441,6 @@ func audio_put_real(a int, c uint8) int {
 	}
 
 	return (0)
-
 } /* end audio_put */
 
 /*------------------------------------------------------------------
@@ -1427,10 +1458,10 @@ func audio_put_real(a int, c uint8) int {
  *----------------------------------------------------------------*/
 
 func audio_flush_real(a int) int {
-
 	if adev[a].outbufLen == 0 {
 		return 0
 	}
+
 	if adev[a].outputStream == nil {
 		adev[a].outbufLen = 0
 		return -1
@@ -1443,11 +1474,13 @@ func audio_flush_real(a int) int {
 			var hi = adev[a].outbuf[i*2+1]
 			adev[a].outputBuf16[i] = int16(uint16(lo) | uint16(hi)<<8)
 		}
+
 		for i := nSamples; i < len(adev[a].outputBuf16); i++ {
 			adev[a].outputBuf16[i] = 0
 		}
 	} else if adev[a].outputBuf8 != nil {
 		copy(adev[a].outputBuf8, adev[a].outbuf[:adev[a].outbufLen])
+
 		for i := adev[a].outbufLen; i < len(adev[a].outputBuf8); i++ {
 			adev[a].outputBuf8[i] = 128
 		}
@@ -1459,8 +1492,10 @@ func audio_flush_real(a int) int {
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Could not start audio output stream: %v\n", err)
+
 			return -1
 		}
+
 		adev[a].outputStarted = true
 	}
 
@@ -1468,18 +1503,21 @@ func audio_flush_real(a int) int {
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Audio output write error: %v\n", err)
+
 		var stopErr = adev[a].outputStream.Stop()
 		if stopErr != nil {
 			dw_printf("Audio output stream stop error: %v\n", stopErr)
 		}
+
 		adev[a].outputStarted = false
 		adev[a].outbufLen = 0
+
 		return -1
 	}
 
 	adev[a].outbufLen = 0
-	return 0
 
+	return 0
 } /* end audio_flush */
 
 /*------------------------------------------------------------------
@@ -1499,7 +1537,6 @@ func audio_flush_real(a int) int {
  *----------------------------------------------------------------*/
 
 func audio_wait(a int) {
-
 	audio_flush(a)
 
 	// Stop the output stream — Pa_StopStream drains remaining buffers
@@ -1510,9 +1547,9 @@ func audio_wait(a int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("audio_wait: failed to stop output stream for device %d: %v\n", a, err)
 		}
+
 		adev[a].outputStarted = false
 	}
-
 } /* end audio_wait */
 
 /*------------------------------------------------------------------
@@ -1528,13 +1565,10 @@ func audio_wait(a int) {
  *----------------------------------------------------------------*/
 
 func audio_close() int { //nolint:unparam
-
 	var err = 0
 
 	for a := 0; a < MAX_ADEVS; a++ {
-
 		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil) {
-
 			audio_wait(a)
 
 			if adev[a].inputStream != nil {
@@ -1549,6 +1583,7 @@ func audio_close() int { //nolint:unparam
 					adev[a].outputStream.Stop()
 					adev[a].outputStarted = false
 				}
+
 				adev[a].outputStream.Close()
 				adev[a].outputStream = nil
 			}
@@ -1580,16 +1615,17 @@ func audio_close() int { //nolint:unparam
 
 	// Terminate PortAudio when the last audio device is closed.
 	portaudioMu.Lock()
+
 	if portaudioRefCount > 0 {
 		portaudioRefCount--
 		if portaudioRefCount == 0 {
 			portaudio.Terminate()
 		}
 	}
+
 	portaudioMu.Unlock()
 
 	return (err)
-
 } /* end audio_close */
 
 /* end audio.go */

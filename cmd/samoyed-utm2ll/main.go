@@ -18,8 +18,8 @@ func R2D(radians float64) float64 {
 func main() {
 	if len(os.Args) == 4 {
 		// 3 command line arguments for UTM
-
 		var zlet rune
+
 		var zoneStr = os.Args[1] // e.g. "19T" or just "19"
 		if len(zoneStr) > 0 && zoneStr[len(zoneStr)-1] >= 'A' && zoneStr[len(zoneStr)-1] <= 'Z' {
 			zlet = rune(zoneStr[len(zoneStr)-1])
@@ -36,6 +36,7 @@ func main() {
 				fmt.Printf("Latitudinal band must be one of CDEFGHJKLMNPQRSTUVWX.")
 				usage()
 			}
+
 			if zlet >= 'N' {
 				hemisphere = coordconv.HemisphereNorth
 			} else {
@@ -64,7 +65,6 @@ func main() {
 		}
 	} else if len(os.Args) == 2 {
 		// One command line argument, MGRS.
-
 		var mgrsLatlng, mgrsErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(os.Args[1])
 		if mgrsErr == nil {
 			var lat = R2D(float64(mgrsLatlng.Lat))

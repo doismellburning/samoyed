@@ -41,25 +41,31 @@ func CM108Main() {
 
 	if len(os.Args) >= 2 {
 		var path = os.Args[1]
+
 		var gpio = 3
 		if len(os.Args) >= 3 {
 			gpio, _ = strconv.Atoi(os.Args[2])
 		}
+
 		if gpio < 1 || gpio > 8 {
 			fmt.Printf("GPIO number must be in range of 1 - 8.\n")
 			cm108_usage()
 			os.Exit(1)
 		}
+
 		var state = 0
 		for {
 			fmt.Printf("%d", state)
+
 			var err = cm108_set_gpio_pin(path, gpio, state)
 			if err != 0 {
 				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO!\n")
 				cm108_usage()
 				os.Exit(1)
 			}
+
 			SLEEP_SEC(1)
+
 			state = 1 - state
 		}
 	}
@@ -88,11 +94,13 @@ func CM108Main() {
 		len(things[0].plughw)/5, "-------",
 		len(things[0].plughw2)/4, "-------",
 		17, "---------", len(things[0].devnode_usb), "---")
+
 	for i := 0; i < len(things); i++ {
 		var good = "  "
 		if GOOD_DEVICE(things[i].vid, things[i].pid) {
 			good = "**"
 		}
+
 		fmt.Printf("%2s  %04x %04x  %-*s %-*s %-*s %-*s %s %-*s\n",
 			good,
 			things[i].vid, things[i].pid,
@@ -103,6 +111,7 @@ func CM108Main() {
 			things[i].devnode_hidraw, len(things[i].devnode_usb), things[i].devnode_usb)
 		// fmt.Printf ("             %-*s\n", len(things[i].devpath), things[i].devpath);
 	}
+
 	fmt.Printf("\n")
 	fmt.Printf("** = Can use Audio Adapter GPIO for PTT.\n")
 	fmt.Printf("\n")
@@ -125,12 +134,14 @@ func CM108Main() {
 	var suggested_names = []string{"Fred", "Wilma", "Pebbles", "Dino", "Barney", "Betty", "Bamm_Bamm", "Chip", "Roxy"}
 	// Drop any "/sys" at the beginning.
 	var r = regexp.MustCompile("(/devices/.+/card)[0-9]$") // TODO KG Was REG_EXTENDED - may need some fiddling/checking? Can't easily test...
+
 	for i := 0; i < len(things); i++ {
 		if i == 0 || things[i].devpath != things[i-1].devpath {
 			var matches = r.FindStringSubmatch(things[i].devpath)
 			if len(matches) > 0 {
 				var without_number = matches[0]
 				fmt.Printf("DEVPATH==\"%s?\", ATTR{id}=\"%s\"\n", without_number, suggested_names[iname])
+
 				if iname < 6 {
 					iname++
 				}

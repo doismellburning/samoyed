@@ -163,7 +163,6 @@ func dlq_init() {
 		dw_printf ("dlq_init ( )\n");
 	#endif
 	*/
-
 	dlq_queue_head = nil
 
 	/* TODO KG
@@ -183,7 +182,6 @@ func dlq_init() {
 	recv_thread_is_waiting = false
 
 	was_init = true
-
 } /* end dlq_init */
 
 /*-------------------------------------------------------------------
@@ -227,19 +225,18 @@ func dlq_init() {
  *--------------------------------------------------------------------*/
 
 func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("dlq_rec_frame (chan=%d, pp=%p, ...)\n", channel, pp);
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR:  dlq_rec_frame nil packet pointer. Please report this!\n")
+
 		return
 	}
 
@@ -277,7 +274,6 @@ func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, al
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_rec_frame */
 
 func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
@@ -308,7 +304,6 @@ func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel 
  *--------------------------------------------------------------------*/
 
 func append_to_queue(pnew *dlq_item_t) {
-
 	if !was_init {
 		dlq_init()
 	}
@@ -325,16 +320,19 @@ func append_to_queue(pnew *dlq_item_t) {
 
 	var plast *dlq_item_t
 	var queue_length int
+
 	if dlq_queue_head == nil {
 		dlq_queue_head = pnew
 		queue_length = 1
 	} else {
 		queue_length = 2 /* head + new one */
+
 		plast = dlq_queue_head
 		for plast.nextp != nil {
 			plast = plast.nextp
 			queue_length++
 		}
+
 		plast.nextp = pnew
 	}
 
@@ -401,7 +399,6 @@ func append_to_queue(pnew *dlq_item_t) {
 	if recv_thread_is_waiting {
 		dlq_wake_up_chan <- struct{}{}
 	}
-
 } /* end append_to_queue */
 
 /*-------------------------------------------------------------------
@@ -433,14 +430,12 @@ func append_to_queue(pnew *dlq_item_t) {
  *--------------------------------------------------------------------*/
 
 func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int) { //nolint:unparam // pid is unused
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("dlq_connect_request (...)\n");
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	/* Allocate a new queue item. */
@@ -457,7 +452,6 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_connect_request */
 
 /*-------------------------------------------------------------------
@@ -491,7 +485,6 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel 
 		dw_printf ("dlq_disconnect_request (...)\n");
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	/* Allocate a new queue item. */
@@ -508,7 +501,6 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel 
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_disconnect_request */
 
 /*-------------------------------------------------------------------
@@ -547,7 +539,6 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, 
 		dw_printf ("dlq_outstanding_frames_request (...)\n");
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	/* Allocate a new queue item. */
@@ -564,7 +555,6 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, 
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_outstanding_frames_request */
 
 /*-------------------------------------------------------------------
@@ -600,14 +590,12 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, 
  *--------------------------------------------------------------------*/
 
 func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int, xdata []byte) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("dlq_xmit_data_request (...)\n");
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	/* Allocate a new queue item. */
@@ -628,7 +616,6 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel i
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_xmit_data_request */
 
 /*-------------------------------------------------------------------
@@ -658,14 +645,12 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel i
  *--------------------------------------------------------------------*/
 
 func dlq_register_callsign(addr string, channel int, client int) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("dlq_register_callsign (%s, chan=%d, client=%d)\n", addr, channel, client);
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	/* Allocate a new queue item. */
@@ -682,18 +667,15 @@ func dlq_register_callsign(addr string, channel int, client int) {
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_register_callsign */
 
 func dlq_unregister_callsign(addr string, channel int, client int) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("dlq_unregister_callsign (%s, chan=%d, client=%d)\n", addr, channel, client);
 	#endif
 	*/
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	/* Allocate a new queue item. */
@@ -710,7 +692,6 @@ func dlq_unregister_callsign(addr string, channel int, client int) {
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_unregister_callsign */
 
 /*-------------------------------------------------------------------
@@ -738,7 +719,6 @@ func dlq_unregister_callsign(addr string, channel int, client int) {
  *--------------------------------------------------------------------*/
 
 func dlq_channel_busy(channel int, activity int, status int) {
-
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
 		/* TODO KG
 		#if DEBUG
@@ -748,7 +728,6 @@ func dlq_channel_busy(channel int, activity int, status int) {
 		*/
 
 		/* Allocate a new queue item. */
-
 		var pnew = new(dlq_item_t)
 		s_new_count++
 
@@ -761,7 +740,6 @@ func dlq_channel_busy(channel int, activity int, status int) {
 
 		append_to_queue(pnew)
 	}
-
 } /* end dlq_channel_busy */
 
 /*-------------------------------------------------------------------
@@ -782,7 +760,6 @@ func dlq_channel_busy(channel int, activity int, status int) {
  *--------------------------------------------------------------------*/
 
 func dlq_seize_confirm(channel int) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -791,7 +768,6 @@ func dlq_seize_confirm(channel int) {
 	*/
 
 	/* Allocate a new queue item. */
-
 	var pnew = new(dlq_item_t)
 	s_new_count++
 
@@ -801,7 +777,6 @@ func dlq_seize_confirm(channel int) {
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_seize_confirm */
 
 /*-------------------------------------------------------------------
@@ -832,7 +807,6 @@ func dlq_client_cleanup(client int) {
 	// Assert (client >= 0 && client < MAX_NET_CLIENTS);
 
 	/* Allocate a new queue item. */
-
 	var pnew = new(dlq_item_t)
 	s_new_count++
 
@@ -844,7 +818,6 @@ func dlq_client_cleanup(client int) {
 	/* Put it into queue. */
 
 	append_to_queue(pnew)
-
 } /* end dlq_client_cleanup */
 
 /*-------------------------------------------------------------------
@@ -879,15 +852,14 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 	}
 
 	if dlq_queue_head == nil {
-
 		/* TODO KG
 		#if DEBUG
 			  text_color_set(DW_COLOR_DEBUG);
 			  dw_printf ("dlq_wait_while_empty (): prepare to SLEEP...\n");
 		#endif
 		*/
-
 		recv_thread_is_waiting = true
+
 		if !timeout.IsZero() {
 			var waitFor = time.Until(timeout)
 
@@ -901,6 +873,7 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 		} else {
 			<-dlq_wake_up_chan
 		}
+
 		recv_thread_is_waiting = false
 	}
 
@@ -911,7 +884,6 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 	#endif
 	*/
 	return (timed_out_result)
-
 } /* end dlq_wait_while_empty */
 
 /*-------------------------------------------------------------------
@@ -928,14 +900,12 @@ func dlq_wait_while_empty(timeout time.Time) bool {
  *--------------------------------------------------------------------*/
 
 func dlq_remove() *dlq_item_t {
-
 	/* TODO KG
 	#if DEBUG1
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("dlq_remove() enter critical section\n");
 	#endif
 	*/
-
 	if !was_init {
 		dlq_init()
 	}
@@ -989,6 +959,7 @@ func dlq_delete(pitem *dlq_item_t) {
 	if pitem == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: dlq_delete()  given nil pointer.\n")
+
 		return
 	}
 
@@ -1030,7 +1001,6 @@ func dlq_delete(pitem *dlq_item_t) {
  *--------------------------------------------------------------------*/
 
 func cdata_new(pid int, data []byte) *cdata_t {
-
 	s_cdata_new_count++
 
 	var cdata = new(cdata_t)
@@ -1044,8 +1014,8 @@ func cdata_new(pid int, data []byte) *cdata_t {
 		cdata.data = make([]byte, len(data))
 		copy(cdata.data, data)
 	}
-	return (cdata)
 
+	return (cdata)
 } /* end cdata_new */
 
 /*-------------------------------------------------------------------
@@ -1062,19 +1032,20 @@ func cdata_delete(cdata *cdata_t) {
 	if cdata == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: cdata_delete()  given nil pointer.\n")
+
 		return
 	}
 
 	if cdata.magic != TXDATA_MAGIC {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR: cdata_delete()  given corrupted data.\n")
+
 		return
 	}
 
 	s_cdata_delete_count++
 
 	cdata.magic = 0
-
 } /* end cdata_delete */
 
 /*-------------------------------------------------------------------
@@ -1092,7 +1063,6 @@ func cdata_check_leak() {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal Error, cdata_check_leak, new=%d, delete=%d\n", s_cdata_new_count, s_cdata_delete_count)
 	}
-
 } /* end cdata_check_leak */
 
 /* end dlq.c */

@@ -81,11 +81,13 @@ func digipeater_test(t *testing.T, in, out string) {
 	var result = digipeat_match(0, pp, digipeaterTestMyCall, digipeaterTestMyCall, digipeaterTestAliasRegexp, digipeaterTestWideRegexp, 0, preempt, digipeaterTestConfigATGP, "")
 
 	var xmit string
+
 	if result != nil {
 		dedupe_remember(result, 0)
 		xmit = ax25_format_addrs(result)
 		pinfo = ax25_get_info(result)
 		xmit += string(pinfo)
+
 		ax25_delete(result)
 	}
 
@@ -310,30 +312,36 @@ func digipeater_test_main(t *testing.T) bool {
 	// Examples given for desired result.
 
 	digipeaterTestMyCall = "CLNGMN-1"
+
 	digipeater_test(t, "W1ABC>TEST60,HOP7-7,HOP7-7:",
 		"W1ABC>TEST60,CLNGMN-1*,HOP7-6,HOP7-7:")
 	digipeater_test(t, "W1ABC>TEST61,ROAN-3*,HOP7-6,HOP7-7:",
 		"W1ABC>TEST61,CLNGMN-1*,HOP7-5,HOP7-7:")
 
 	digipeaterTestMyCall = "GDHILL-8"
+
 	digipeater_test(t, "W1ABC>TEST62,MDMTNS-7*,HOP7-1,HOP7-7:",
 		"W1ABC>TEST62,GDHILL-8,HOP7*,HOP7-7:")
 	digipeater_test(t, "W1ABC>TEST63,CAMLBK-9*,HOP7-1,HOP7-7:",
 		"W1ABC>TEST63,GDHILL-8,HOP7*,HOP7-7:")
 
 	digipeaterTestMyCall = "MDMTNS-7"
+
 	digipeater_test(t, "W1ABC>TEST64,GDHILL-8*,HOP7*,HOP7-7:",
 		"W1ABC>TEST64,MDMTNS-7*,HOP7-6:")
 
 	digipeaterTestMyCall = "CAMLBK-9"
+
 	digipeater_test(t, "W1ABC>TEST65,GDHILL-8,HOP7*,HOP7-7:",
 		"W1ABC>TEST65,CAMLBK-9*,HOP7-6:")
 
 	digipeaterTestMyCall = "KATHDN-15"
+
 	digipeater_test(t, "W1ABC>TEST66,MTWASH-14*,HOP7-1:",
 		"W1ABC>TEST66,KATHDN-15,HOP7*:")
 
 	digipeaterTestMyCall = "SPRNGR-1"
+
 	digipeater_test(t, "W1ABC>TEST67,CLNGMN-1*,HOP7-1:",
 		"W1ABC>TEST67,SPRNGR-1,HOP7*:")
 

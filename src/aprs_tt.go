@@ -313,6 +313,7 @@ func aprs_tt_button(channel int, button rune) {
 		if len(msg_str[channel]) < MAX_MSG_LEN {
 			msg_str[channel] += string(button)
 		}
+
 		if button == '#' {
 			/*
 			 * Put into the receive queue like any other packet.
@@ -330,11 +331,11 @@ func aprs_tt_button(channel int, button rune) {
 		 * one channel so do this only for the one specified
 		 * in the TTOBJ command.
 		 */
-
 		if channel == tt_config.obj_recv_chan {
 			poll_period++
 			if poll_period >= 39 {
 				poll_period = 0
+
 				tt_user_background()
 			}
 		}
@@ -406,7 +407,6 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * Discard empty message.
 	 * In case # is there as optional start.
 	 */
-
 	if msg[0] == '#' {
 		return
 	}
@@ -463,6 +463,7 @@ func aprs_tt_sequence(channel int, msg string) {
 	 * don't pass in the success / failure code to know the difference.
 	 */
 	var script_response string
+
 	if err == 0 && len(tt_config.ttcmd) > 0 {
 		var _script_response, _ = dw_run_cmd(tt_config.ttcmd, 1)
 		script_response = string(_script_response)
@@ -488,6 +489,7 @@ func aprs_tt_sequence(channel int, msg string) {
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error. Couldn't make frame from \"%s\"\n", audible_response)
+
 		return
 	}
 
@@ -530,7 +532,6 @@ func parse_fields(msg string) int {
 	for _, e := range fields {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("parse_fields () field = %s\n", e);
-
 		switch e[0] {
 		case 'A':
 			switch e[1] {
@@ -573,6 +574,7 @@ func parse_fields(msg string) int {
 		default:
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Field does not start with A, B, C, or digit: \"%s\"\n", e)
+
 			return (TT_ERROR_D_MSG)
 		}
 	}
@@ -658,12 +660,14 @@ func expand_macro(e string) int {
 		 */
 
 		dw_printf("After substitution:  '%s'\n", stemp)
+
 		return (parse_fields(stemp))
 	} else {
 		/* Send reject sound. */
 		/* Does not match any macro definitions. */
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tone sequence did not match any pattern\n")
+
 		return (TT_ERROR_MACRO_NOMATCH)
 	}
 }
@@ -720,6 +724,7 @@ func checksum_not_ok(str string, length int, found rune) int {
 	if expected != found {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
+
 		return (TT_ERROR_BAD_CHECKSUM)
 	}
 
@@ -742,10 +747,12 @@ func parse_callsign(e string) int {
 
 	if length == 4 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) {
 		m_callsign = e[1:]
+
 		if tt_debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Special case, 3 digit tactical call: \"%s\"\n", m_callsign)
 		}
+
 		return (0)
 	}
 
@@ -774,6 +781,7 @@ func parse_callsign(e string) int {
 
 			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(stemp[0])
+
 			if tt_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
@@ -782,12 +790,14 @@ func parse_callsign(e string) int {
 		} else {
 			m_symbol_code = APRSTT_DEFAULT_SYMBOL
 			m_symtab_or_overlay = rune(e[length-2])
+
 			if tt_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Three digit abbreviation2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
 					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
 			}
 		}
+
 		return (0)
 	}
 
@@ -831,11 +841,13 @@ func parse_callsign(e string) int {
 					m_callsign, m_symbol_code, m_symtab_or_overlay, e[length-1])
 			}
 		}
+
 		return (0)
 	}
 
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Touch tone callsign not valid: \"%s\"\n", e)
+
 	return (TT_ERROR_INVALID_CALL)
 }
 
@@ -883,6 +895,7 @@ func parse_object_name(e string) int {
 			if len(m_callsign) > 9 {
 				m_callsign = m_callsign[:9]
 			}
+
 			m_ssid = 0 /* No ssid for object name */
 
 			if tt_debug > 0 {
@@ -959,21 +972,25 @@ func parse_symbol(e string) int {
 		case '1':
 			m_symtab_or_overlay = '/'
 			m_symbol_code = rune(32 + nn)
+
 			if tt_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("symbol code '%c', primary symbol table '%c'\n",
 					m_symbol_code, m_symtab_or_overlay)
 			}
+
 			return (0)
 
 		case '2':
 			m_symtab_or_overlay = '\\'
 			m_symbol_code = rune(32 + nn)
+
 			if tt_debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("symbol code '%c', alternate symbol table '%c'\n",
 					m_symbol_code, m_symtab_or_overlay)
 			}
+
 			return (0)
 
 		case '0':
@@ -982,11 +999,13 @@ func parse_symbol(e string) int {
 				if errors == 0 {
 					m_symbol_code = rune(32 + nn)
 					m_symtab_or_overlay = rune(stemp[0])
+
 					if tt_debug > 0 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("symbol code '%c', alternate symbol table with overlay '%c'\n",
 							m_symbol_code, m_symtab_or_overlay)
 					}
+
 					return (0)
 				}
 			}
@@ -1059,6 +1078,7 @@ func parse_aprstt3_call(e string) int {
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
+
 					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
 				}
 			}
@@ -1131,11 +1151,9 @@ func parse_location(e string) int {
 
 	if ipat >= 0 {
 		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
-
 		var ttloc_type = aprs_tt_config.ttloc_ptr[ipat].ttlocType
 		switch ttloc_type {
 		case TTLOC_POINT:
-
 			m_latitude = float64(aprs_tt_config.ttloc_ptr[ipat].point.lat)
 			m_longitude = float64(aprs_tt_config.ttloc_ptr[ipat].point.lon)
 
@@ -1150,6 +1168,7 @@ func parse_location(e string) int {
 				m_dao[2] = e[2]
 				m_dao[3] = ' '
 			}
+
 			if len(e) == 4 { /* probably B9nn -->  !Tnn! */
 				m_dao[2] = e[2]
 				m_dao[3] = e[3]
@@ -1161,6 +1180,7 @@ func parse_location(e string) int {
 				dw_printf("Bearing \"%s\" should be 3 digits.\n", bstr)
 				// return error code?
 			}
+
 			if len(dstr) < 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Distance \"%s\" should 1 or more digits.\n", dstr)
@@ -1190,11 +1210,14 @@ func parse_location(e string) int {
 			if len(xstr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing X coordinate.\n")
+
 				xstr = "0"
 			}
+
 			if len(ystr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing Y coordinate.\n")
+
 				ystr = "0"
 			}
 
@@ -1238,6 +1261,7 @@ func parse_location(e string) int {
 				/* Avoid divide by zero later.  Put in middle of range. */
 				xstr = "5"
 			}
+
 			if len(ystr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Missing Y coordinate.\n")
@@ -1267,8 +1291,8 @@ func parse_location(e string) int {
 				Easting:    easting,
 				Northing:   northing,
 			}
-			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 
+			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
 				m_latitude = R2D(float64(geo.Lat))
 				m_longitude = R2D(float64(geo.Lng))
@@ -1289,6 +1313,7 @@ func parse_location(e string) int {
 				/* Should not be possible to get here. Fake it and carry on. */
 				xstr = "5"
 			}
+
 			if len(ystr) == 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("MGRS/USNG: Missing Y (northing) coordinate.\n")
@@ -1307,7 +1332,6 @@ func parse_location(e string) int {
 
 			// Apparently also does USNG!
 			var geo, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(loc)
-
 			if convertErr == nil {
 				m_latitude = R2D(float64(geo.Lat))
 				m_longitude = R2D(float64(geo.Lng))
@@ -1322,9 +1346,7 @@ func parse_location(e string) int {
 			m_dao[3] = e[1]
 
 		case TTLOC_MHEAD:
-
 			/* Combine prefix from configuration and digits from user. */
-
 			var stemp = aprs_tt_config.ttloc_ptr[ipat].mhead.prefix
 			stemp += xstr
 
@@ -1332,6 +1354,7 @@ func parse_location(e string) int {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
 					aprs_tt_config.ttloc_ptr[ipat].mhead.prefix, xstr)
+
 				return (TT_ERROR_INVALID_MHEAD)
 			}
 
@@ -1342,7 +1365,6 @@ func parse_location(e string) int {
 			if errs == 0 {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
-
 				m_loc_text = mh
 
 				var lat, lon, err = ll_from_grid_square(m_loc_text)
@@ -1356,10 +1378,10 @@ func parse_location(e string) int {
 			m_dao[3] = e[1]
 
 		case TTLOC_SATSQ:
-
 			if len(xstr) != 4 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected 4 digits for the Satellite Square.\n")
+
 				return (TT_ERROR_INVALID_SATSQ)
 			}
 
@@ -1380,10 +1402,10 @@ func parse_location(e string) int {
 			m_dao[3] = e[1]
 
 		case TTLOC_AMBIG:
-
 			if len(xstr) != 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected 1 digits for the position ambiguity.\n")
+
 				return (TT_ERROR_INVALID_LOC)
 			}
 
@@ -1392,6 +1414,7 @@ func parse_location(e string) int {
 		default:
 			panic(fmt.Sprintf("Unknown ttloc_ptr type: %d", ttloc_type))
 		}
+
 		return (0)
 	}
 
@@ -1497,6 +1520,7 @@ func find_ttloc_match(e string) (string, string, string, string, string, int) {
 			}
 		} /* if strlen */
 	}
+
 	return xstr, ystr, zstr, bstr, dstr, -1
 } /* end find_ttloc_match */
 
@@ -1597,7 +1621,6 @@ func raw_tt_data_to_app(channel int, msg string) {
 	// For lack of a better idea, make source "DTMF" to indicate where it came from.
 	// Application version might be useful in case we end up using different
 	// message formats in later versions.
-
 	var src = "DTMF"
 	var dest = fmt.Sprintf("%s%d%d", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION)
 	var raw_tt_msg = fmt.Sprintf("%s>%s:t%s", src, dest, msg)

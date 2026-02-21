@@ -156,11 +156,9 @@ func server_set_debug(n int) {
 }
 
 func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
-
 	var direction, datakind string
 
 	switch fromto {
-
 	case FROM_CLIENT:
 		direction = "from" /* from the client application */
 
@@ -284,7 +282,6 @@ func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
  *--------------------------------------------------------------------*/
 
 func server_init(audio_config_p *audio_s, mc *misc_config_s) {
-
 	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
 	/* TODO KG
@@ -305,6 +302,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	if server_port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled AGW network client port.\n")
+
 		return
 	}
 
@@ -349,11 +347,11 @@ func server_connect_listen_thread(server_port int) {
 	    	dw_printf("Binding to port %d ... \n", server_port);
 	#endif
 	*/
-
 	var listener, listenErr = net.Listen("tcp", fmt.Sprintf(":%d", server_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
+
 		return
 	}
 
@@ -366,6 +364,7 @@ func server_connect_listen_thread(server_port int) {
 		file, err := tcpListener.File()
 		if err == nil {
 			defer file.Close()
+
 			syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 		}
 	}
@@ -436,14 +435,11 @@ func server_connect_listen_thread(server_port int) {
  *--------------------------------------------------------------------*/
 
 func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
-
 	/*
 	 * RAW format
 	 */
 	for client := 0; client < MAX_NET_CLIENTS; client++ {
-
 		if enable_send_raw_to_client[client] && client_sock[client] != nil {
-
 			var agwpe_msg = new(AGWPEMessage)
 
 			agwpe_msg.Header.Portx = byte(channel)
@@ -470,7 +466,6 @@ func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
 			}
 
 			var _, err = agwpe_msg.Write(client_sock[client], binary.LittleEndian)
-
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application.  Closing connection.\n\n")
@@ -484,7 +479,6 @@ func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
 	// Application might want more human readable format.
 
 	server_send_monitored(channel, pp, 0)
-
 } /* end server_send_rec_packet */
 
 func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
@@ -495,7 +489,6 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 	 *
 	 *			'T' for own transmitted frames.
 	 */
-
 	for client := 0; client < MAX_NET_CLIENTS; client++ {
 		if enable_send_monitor_to_client[client] && client_sock[client] != nil {
 			var agwpe_msg = new(AGWPEMessage)
@@ -540,8 +533,10 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 				if agwpe_msg.Header.DataKind != 'U' {
 					break
 				}
+
 				agwpe_msg.Header.DataKind = 'T'
 			}
+
 			agwpe_msg.Data = append(agwpe_msg.Data, []byte(desc)...)
 
 			// Timestamp with [...]\r
@@ -560,6 +555,7 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 				// Use memcpy instead to preserve binary data, e.g. NET/ROM.
 				agwpe_msg.Data = append(agwpe_msg.Data, pinfo...)
 				msg_data_len += len(pinfo)
+
 				agwpe_msg.Data = append(agwpe_msg.Data, '\r')
 				msg_data_len++
 			}
@@ -573,7 +569,6 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 			}
 
 			var _, err = agwpe_msg.Write(client_sock[client], binary.LittleEndian)
-
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
@@ -583,7 +578,6 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 			}
 		}
 	}
-
 } /* server_send_monitored */
 
 // Next two are broken out in case they can be reused elsewhere.
@@ -599,7 +593,6 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 // rather than continuing to propagate historical inconsistencies.
 
 func mon_addrs(channel int, pp *packet_t) []byte {
-
 	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
 	var dst = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
@@ -625,8 +618,8 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 				// #endif
 				via += "*"
 			}
-
 		}
+
 		return []byte(fmt.Sprintf(" %d:Fm %s To %s Via %s ", channel+1, src, dst, via))
 	} else {
 		return []byte(fmt.Sprintf(" %d:Fm %s To %s ", channel+1, src, dst))
@@ -644,7 +637,6 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 //	'S' for supervisory and other unnumbered frames.
 
 func mon_desc(pp *packet_t) (byte, string) {
-
 	var cr, _, pf, nr, ns, ftype = ax25_frame_type(pp)
 	var pf_text string // P or F depending on whether command or response.
 
@@ -667,7 +659,6 @@ func mon_desc(pp *packet_t) (byte, string) {
 	var pinfo = ax25_get_info(pp)
 
 	switch ftype {
-
 	case frame_type_I:
 		return 'I', fmt.Sprintf("<I S%d R%d pid=%02X Len=%d %s=%d >", ns, nr, ax25_get_pid(pp), len(pinfo), pf_text, pf)
 
@@ -739,7 +730,6 @@ func mon_desc(pp *packet_t) (byte, string) {
  *--------------------------------------------------------------------*/
 
 func server_link_established(channel int, client int, remote_call string, own_call string, incoming bool) {
-
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -757,11 +747,11 @@ func server_link_established(channel int, client int, remote_call string, own_ca
 		// We started the connection.
 		reply.Data = []byte(fmt.Sprintf("*** CONNECTED With Station %s\r", remote_call))
 	}
+
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
 
 	send_to_client(client, reply)
-
 } /* end server_link_established */
 
 /*-------------------------------------------------------------------
@@ -789,7 +779,6 @@ func server_link_established(channel int, client int, remote_call string, own_ca
  *--------------------------------------------------------------------*/
 
 func server_link_terminated(channel int, client int, remote_call string, own_call string, timeout bool) {
-
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -802,11 +791,11 @@ func server_link_terminated(channel int, client int, remote_call string, own_cal
 	} else {
 		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED From Station %s\r", remote_call))
 	}
+
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
 
 	send_to_client(client, reply)
-
 } /* end server_link_terminated */
 
 /*-------------------------------------------------------------------
@@ -834,7 +823,6 @@ func server_link_terminated(channel int, client int, remote_call string, own_cal
  *--------------------------------------------------------------------*/
 
 func server_rec_conn_data(channel int, client int, remote_call string, own_call string, pid int, data []byte) {
-
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -855,7 +843,6 @@ func server_rec_conn_data(channel int, client int, remote_call string, own_call 
 	reply.Header.DataLen = uint32(len(data))
 
 	send_to_client(client, reply)
-
 } /* end server_rec_conn_data */
 
 /*-------------------------------------------------------------------
@@ -878,7 +865,6 @@ func server_rec_conn_data(channel int, client int, remote_call string, own_call 
  *--------------------------------------------------------------------*/
 
 func server_outstanding_frames_reply(channel int, client int, own_call string, remote_call string, count int) {
-
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -911,7 +897,6 @@ func server_outstanding_frames_reply(channel int, client int, own_call string, r
  *--------------------------------------------------------------------*/
 
 func send_to_client(client int, reply_p *AGWPEMessage) {
-
 	if client_sock[client] == nil {
 		return
 	}
@@ -932,11 +917,9 @@ func send_to_client(client int, reply_p *AGWPEMessage) {
 }
 
 func cmd_listen_thread(client int) {
-
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	for {
-
 		for client_sock[client] == nil {
 			SLEEP_SEC(1) /* Not connected.  Try again later. */
 		}
@@ -944,7 +927,6 @@ func cmd_listen_thread(client int) {
 		var cmd = new(AGWPEMessage)
 
 		var readErr = binary.Read(client_sock[client], binary.LittleEndian, cmd.Header)
-
 		if readErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
@@ -952,6 +934,7 @@ func cmd_listen_thread(client int) {
 			client_sock[client].Close()
 			client_sock[client] = nil
 			dlq_client_cleanup(client)
+
 			continue
 		}
 
@@ -974,7 +957,6 @@ func cmd_listen_thread(client int) {
 		cmd.Header.CallTo[len(cmd.Header.CallTo)-1] = 0
 
 		if cmd.Header.DataLen > 0 {
-
 			var b = make([]byte, cmd.Header.DataLen)
 			var n, readErr = client_sock[client].Read(b)
 
@@ -986,6 +968,7 @@ func cmd_listen_thread(client int) {
 				client_sock[client].Close()
 				client_sock[client] = nil
 				dlq_client_cleanup(client)
+
 				return
 			}
 
@@ -1005,7 +988,6 @@ func cmd_listen_thread(client int) {
 		}
 
 		switch cmd.Header.DataKind {
-
 		case 'R': /* Request for version number */
 			{
 				var reply = new(AGWPEMessage)
@@ -1041,6 +1023,7 @@ func cmd_listen_thread(client int) {
 				// No other place cares about total number.
 
 				var count = 0
+
 				for j := 0; j < MAX_TOTAL_CHANS; j++ {
 					if save_audio_config_p.chan_medium[j] == MEDIUM_RADIO ||
 						save_audio_config_p.chan_medium[j] == MEDIUM_IGATE ||
@@ -1052,9 +1035,7 @@ func cmd_listen_thread(client int) {
 				var info = fmt.Sprintf("%d;", count)
 
 				for j := 0; j < MAX_TOTAL_CHANS; j++ {
-
 					switch save_audio_config_p.chan_medium[j] {
-
 					case MEDIUM_RADIO:
 						// Misleading if using stdin or udp.
 						var a = ACHAN2ADEV(j)
@@ -1068,6 +1049,7 @@ func cmd_listen_thread(client int) {
 							if j&1 > 0 {
 								lr = "right"
 							}
+
 							info += fmt.Sprintf("Port%d %s soundcard %s;", j+1, names[a], lr)
 						}
 
@@ -1104,7 +1086,6 @@ func cmd_listen_thread(client int) {
 					  int how_many_bytes_NETLE;
 					} reply;
 			*/
-
 			var reply = new(AGWPEMessage)
 
 			reply.Header.Portx = cmd.Header.Portx /* Reply with same port number ! */
@@ -1129,11 +1110,9 @@ func cmd_listen_thread(client int) {
 			send_to_client(client, reply)
 
 		case 'H': /* Ask about recently heard stations on given port. */
-
 			/* This should send back 20 'H' frames for the most recently heard stations. */
 			/* If there are less available, empty frames are sent to make a total of 20. */
 			/* Each contains the first and last heard times. */
-
 			{
 				/*
 					#if 0						// Currently, this information is not being collected.
@@ -1163,15 +1142,11 @@ func cmd_listen_thread(client int) {
 			}
 
 		case 'k': /* Ask to start receiving RAW AX25 frames */
-
 			// Actually it is a toggle so we must be sure to clear it for a new connection.
-
 			enable_send_raw_to_client[client] = !enable_send_raw_to_client[client]
 
 		case 'm': /* Ask to start receiving Monitor frames */
-
 			// Actually it is a toggle so we must be sure to clear it for a new connection.
-
 			enable_send_monitor_to_client[client] = !enable_send_monitor_to_client[client]
 
 		case 'V': /* Transmit UI data frame (with digipeater path) */
@@ -1180,7 +1155,6 @@ func cmd_listen_thread(client int) {
 				//	1 byte for number of digipeaters.
 				//	10 bytes for each digipeater.
 				//	data part of message.
-
 				var pid = cmd.Header.PID
 				var stemp = ByteArrayToString(cmd.Header.CallFrom[:])
 				stemp += ">"
@@ -1209,6 +1183,7 @@ func cmd_listen_thread(client int) {
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Failed to create frame from AGW 'V' message.\n")
+
 					break
 				}
 
@@ -1256,7 +1231,6 @@ func cmd_listen_thread(client int) {
 				// - Continue to ignore port number at beginning of data?
 				// - Use second one instead?
 				// - Error message if a mismatch?
-
 				var alevel alevel_t
 				var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
@@ -1264,13 +1238,11 @@ func cmd_listen_thread(client int) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Failed to create frame from AGW 'K' message.\n")
 				} else {
-
 					/* How can we determine if it is an original or repeated message? */
 					/* If there is at least one digipeater in the frame, AND */
 					/* that digipeater has been used, it should go out quickly thru */
 					/* the high priority queue. */
 					/* Otherwise, it is an original for the low priority queue. */
-
 					if ax25_get_num_repeaters(pp) >= 1 &&
 						ax25_get_h(pp, AX25_REPEATER_1) > 0 {
 						tq_append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
@@ -1285,7 +1257,6 @@ func cmd_listen_thread(client int) {
 			// Silently ignore it.
 
 		case 'X': /* Register CallSign  */
-
 			{
 				/*
 					struct {
@@ -1293,7 +1264,6 @@ func cmd_listen_thread(client int) {
 					  char data;			// 1 = success, 0 = failure
 					} reply;
 				*/
-
 				var ok byte
 
 				// The protocol spec says it is an error to register the same one more than once.
@@ -1305,10 +1275,12 @@ func cmd_listen_thread(client int) {
 
 				if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 					ok = 1
+
 					dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
+
 					ok = 0
 				}
 
@@ -1346,7 +1318,6 @@ func cmd_listen_thread(client int) {
 						  char dcall[7][10];
 					        }
 				*/
-
 				var callsigns [AX25_MAX_ADDRS]string
 				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
@@ -1367,7 +1338,6 @@ func cmd_listen_thread(client int) {
 					binary.Decode(cmd.Data, binary.LittleEndian, v) // TODO KG Explicitly check err?
 
 					if v.num_digi >= 1 && v.num_digi <= 7 {
-
 						if cmd.Header.DataLen != uint32(v.num_digi)*10+1 && cmd.Header.DataLen != uint32(v.num_digi)*10+2 {
 							// I'm getting 1 more than expected from AGWterminal.
 							text_color_set(DW_COLOR_ERROR)
@@ -1389,7 +1359,6 @@ func cmd_listen_thread(client int) {
 			}
 
 		case 'D': /* Send Connected Data */
-
 			{
 				var callsigns [AX25_MAX_ADDRS]string
 				const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
@@ -1401,7 +1370,6 @@ func cmd_listen_thread(client int) {
 			}
 
 		case 'd': /* Disconnect, Terminate an AX.25 Connection */
-
 			{
 				var callsigns [AX25_MAX_ADDRS]string
 				const num_calls = 2 // only first 2 used.
@@ -1410,11 +1378,9 @@ func cmd_listen_thread(client int) {
 				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
 				dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
-
 			}
 
 		case 'M': /* Send UNPROTO Information (no digipeater path) */
-
 			/*
 						Added in version 1.3.
 						This is the same as 'V' except there is no provision for digipeaters.
@@ -1445,7 +1411,6 @@ func cmd_listen_thread(client int) {
 						  000:  21 22 3c 43 2e 74 71 6c 48 72 71 21 21 5f        !"<C.tqlHrq!!_
 			*/
 			{
-
 				var pid = cmd.Header.PID
 				var stemp = ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + ByteArrayToString(cmd.Header.CallTo[:]) + ": "
 
@@ -1472,7 +1437,6 @@ func cmd_listen_thread(client int) {
 			}
 
 		case 'y': /* Ask Outstanding frames waiting on a Port  */
-
 			/* Number of frames sitting in transmit queue for specified channel. */
 			{
 				/*
@@ -1481,7 +1445,6 @@ func cmd_listen_thread(client int) {
 					  int data_NETLE;			// Little endian order.
 					} reply;
 				*/
-
 				var reply = new(AGWPEMessage)
 
 				reply.Header.Portx = cmd.Header.Portx /* Reply with same port number */
@@ -1501,7 +1464,6 @@ func cmd_listen_thread(client int) {
 			}
 
 		case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
-
 			// This is different than the above 'y' because this refers to a specific
 			// link in connected mode.
 
@@ -1537,9 +1499,7 @@ func cmd_listen_thread(client int) {
 			// The only way to get this information is from inside the data link state machine.
 			// We will send a request to it and the result coming out will be used to
 			// send the reply back to the client application.
-
 			{
-
 				var callsigns [AX25_MAX_ADDRS]string
 				const num_calls = 2 // only first 2 used.
 
@@ -1550,7 +1510,6 @@ func cmd_listen_thread(client int) {
 			}
 
 		default:
-
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("--- Unexpected Command from application %d using AGW protocol:\n", client)
 			debug_print(FROM_CLIENT, client, cmd)

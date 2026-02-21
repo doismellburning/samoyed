@@ -133,7 +133,6 @@ func KissUtilMain() {
 	 */
 	if len(receive_output) > 0 {
 		var s, err = os.Stat(receive_output)
-
 		if err != nil {
 			fmt.Printf("Error with receive queue location %s: %s\n", receive_output, err)
 			os.Exit(1)
@@ -171,7 +170,6 @@ func KissUtilMain() {
 		 * This doesn't take them in any particular order.
 		 * A future enhancement might sort by name or timestamp.
 		 */
-
 		var entries, err = os.ReadDir(transmit_from)
 		if err != nil {
 			panic(err)
@@ -197,7 +195,6 @@ func KissUtilMain() {
 		/*
 		 * Using stdin.
 		 */
-
 		var scanner = bufio.NewScanner(os.Stdin)
 
 		for scanner.Scan() {
@@ -250,21 +247,25 @@ func process_input(stuff string) {
 	 * Optional prefix, like "[9]" or "[99]" to specify channel.
 	 */
 	var channel int
+
 	if stuff[0] == '[' {
 		var before, after, _ = strings.Cut(stuff, "]") // Could check found, but should be fine
 		before = strings.TrimPrefix(before, "[")
 
 		var err error
-		channel, err = strconv.Atoi(before)
 
+		channel, err = strconv.Atoi(before)
 		if err != nil {
 			fmt.Printf("ERROR! Channel number and ] was expected after [ at beginning of line.\n")
 			usage2()
+
 			return
 		}
+
 		if channel < 0 || channel > 15 {
 			fmt.Printf("ERROR! KISS channel number must be in range of 0 thru 15.\n")
 			usage2()
+
 			return
 		}
 
@@ -336,6 +337,7 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 		fmt.Printf("ERROR - Invalid channel %d - must be in range 0 to 15.\n", channel)
 		channel = 0
 	}
+
 	if cmd < 0 || cmd > 15 {
 		fmt.Printf("ERROR - Invalid command %d - must be in range 0 to 15.\n", cmd)
 		cmd = 0
@@ -389,9 +391,7 @@ func tnc_listen_net() {
 
 	// For the IGate we would loop around and try to reconnect if the TNC
 	// goes away.  We should probably do the same here.
-
 	var conn, connErr = net.Dial("tcp", net.JoinHostPort(hostname, port))
-
 	if connErr != nil {
 		fmt.Printf("Unable to connect to %s on port %s: %s\n", hostname, port, connErr)
 		os.Exit(1)
@@ -403,10 +403,11 @@ func tnc_listen_net() {
 	 * Print what we get from TNC.
 	 */
 	var kstate kiss_frame_t
+
 	for {
 		var data = make([]byte, 4096)
-		var length, err = server_sock.Read(data)
 
+		var length, err = server_sock.Read(data)
 		if err != nil {
 			fmt.Printf("Read error from TCP KISS TNC (%s).  Terminating.\n", err)
 			os.Exit(1)
@@ -424,11 +425,11 @@ func tnc_listen_net() {
 			// It says "from KISS client application" because it was written
 			// on the assumption it was being used in only one direction.
 			// Not worried enough about it to do anything at this time.
-
 			var _verbose = 0
 			if verbose {
 				_verbose = 1
 			}
+
 			kiss_rec_byte(&kstate, data[j], _verbose, nil, 0, nil)
 		}
 	}
@@ -461,9 +462,9 @@ func tnc_listen_serial() {
 	 * Read and print.
 	 */
 	var kstate kiss_frame_t
+
 	for {
 		var ch, err = serial_port_get1(serial_fd)
-
 		if err != nil {
 			fmt.Printf("Read error from serial port KISS TNC: %s.\n", err)
 			os.Exit(1)
@@ -476,6 +477,7 @@ func tnc_listen_serial() {
 		if verbose {
 			_verbose = 1
 		}
+
 		kiss_rec_byte(&kstate, ch, _verbose, nil, 0, nil)
 	}
 } /* end tnc_listen_serial */
@@ -543,8 +545,8 @@ func Kissutil_kiss_process_msg(kiss_msg []byte) {
 				fmt.Printf("Save received frame to %s\n", fullpath)
 
 				var content = fmt.Sprintf("%s %s%s\n", prefix, addrs, string(pinfo))
-				var err = os.WriteFile(fullpath, []byte(content), 0644) //nolint:gosec
 
+				var err = os.WriteFile(fullpath, []byte(content), 0644) //nolint:gosec
 				if err != nil {
 					fmt.Printf("Unable to open for write: %s\n", fullpath)
 				}

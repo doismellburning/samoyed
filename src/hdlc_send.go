@@ -39,22 +39,23 @@ var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hd
  *--------------------------------------------------------------*/
 
 func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *audio_s) int {
-
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-
 		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}
+
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
 		var fbuf = ax25_pack(pp)
+
 		var n = fx25_send_frame(channel, fbuf, audio_config_p.achan[channel].fx25_strength, false)
 		if n > 0 {
 			return n
 		}
+
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send FX.25.  Falling back to regular AX.25.\n")
 		// Definitely need to fall back to AX.25 here because
@@ -62,11 +63,11 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 	}
 
 	var fbuf = ax25_pack(pp)
+
 	return (ax25_only_hdlc_send_frame(channel, fbuf, bad_fcs))
 }
 
 func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
-
 	number_of_bits_sent[channel] = 0
 
 	/* TODO KG
@@ -130,7 +131,6 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
  *--------------------------------------------------------------*/
 
 func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_config_p *audio_s) int {
-
 	number_of_bits_sent[channel] = 0
 
 	/* TODO KG
@@ -167,13 +167,14 @@ func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_confi
 // MSB first, opposite of AX.25.
 
 func send_byte_msb_first(channel int, x int, polarity int) {
-
 	for i := 0; i < 8; i++ {
 		var dbit = 0
 		if (x & 0x80) != 0 {
 			dbit = 1
 		}
+
 		tone_gen_put_bit(channel, (dbit^polarity)&1)
+
 		x <<= 1
 		number_of_bits_sent[channel]++
 	}
@@ -189,7 +190,6 @@ var stuff [MAX_RADIO_CHANS]int // Count number of "1" bits to keep track of when
 // on multiple channels at the same time.
 
 func send_control_nrzi(channel int, x byte) {
-
 	for i := 0; i < 8; i++ {
 		send_bit_nrzi(channel, x&1 != 0)
 		x >>= 1
@@ -199,9 +199,9 @@ func send_control_nrzi(channel int, x byte) {
 }
 
 func send_data_nrzi(channel int, x byte) {
-
 	for i := 0; i < 8; i++ {
 		send_bit_nrzi(channel, x&1 != 0)
+
 		if x&1 > 0 {
 			stuff[channel]++
 			if stuff[channel] == 5 {
@@ -211,6 +211,7 @@ func send_data_nrzi(channel int, x byte) {
 		} else {
 			stuff[channel] = 0
 		}
+
 		x >>= 1
 	}
 }
@@ -224,7 +225,6 @@ func send_data_nrzi(channel int, x byte) {
 var nrziBitOutput [MAX_RADIO_CHANS]int
 
 func send_bit_nrzi(channel int, b bool) {
-
 	if !b {
 		nrziBitOutput[channel] = 1 - nrziBitOutput[channel]
 	}
@@ -279,16 +279,19 @@ func eas_send(channel int, str []byte, repeat int, txdelay int, txtail int) int 
 	for r := 0; r < repeat; r++ {
 		for j := 0; j < 16; j++ {
 			eas_put_byte(channel, 0xAB)
+
 			bytes_sent++
 		}
 
 		for _, p := range str {
 			eas_put_byte(channel, p)
+
 			bytes_sent++
 		}
 
 		if r < repeat-1 {
 			gen_tone_put_quiet_ms(channel, gap)
+
 			gaps_sent++
 		}
 	}
@@ -302,7 +305,6 @@ func eas_send(channel int, str []byte, repeat int, txdelay int, txtail int) int 
 	// dw_printf ("DEBUG:  EAS total time = %d ms\n", elapsed);
 
 	return (elapsed)
-
 } /* end eas_send */
 
 /* end hdlc_send.c */

@@ -138,11 +138,11 @@ func kisspt_open_pt() {
 		dw_printf ("kisspt_open_pt (  )\n");
 	#endif
 	*/
-
 	var ptmx, pts, err = pty.Open()
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Could not create pseudo terminal for KISS TNC: %s.\n", err)
+
 		return
 	}
 
@@ -265,10 +265,12 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
 	}
 
 	var kiss_buff []byte
+
 	if flen < 0 {
 		if kisspt_debug > 0 {
 			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 		}
+
 		kiss_buff = fbuf
 	} else {
 		var stemp []byte
@@ -276,6 +278,7 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
 		if flen > AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
+
 			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
 
@@ -389,9 +392,9 @@ func kisspt_get() byte {
 
 		// TODO KG Check rc == -1
 		*/
-
 		ch = make([]byte, 1)
 		var err error
+
 		n, err = pt_master.Read(ch)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -400,6 +403,7 @@ func kisspt_get() byte {
 			pt_master.Close()
 
 			pt_master = nil
+
 			os.Remove(TMP_KISSTNC_SYMLINK)
 			// FIXME KG pthread_exit(NULL)
 			return 0 // TODO KG
@@ -429,7 +433,6 @@ func kisspt_listen_thread() {
 		dw_printf ("kisspt_listen_thread ( %d )\n", fd);
 	#endif
 	*/
-
 	for {
 		var ch = kisspt_get()
 		kiss_rec_byte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)

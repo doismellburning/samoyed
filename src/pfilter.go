@@ -153,13 +153,13 @@ func bool2text(val int) string {
  *--------------------------------------------------------------------*/
 
 func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) int {
-
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("INTERNAL ERROR in pfilter: nil packet pointer. Please report this!\n")
+
 		return (-1)
 	}
 
@@ -200,14 +200,15 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 		if pfstate.token_type != TOKEN_AND &&
 			pfstate.token_type != TOKEN_OR &&
 			pfstate.token_type != TOKEN_EOL {
-
 			print_error(&pfstate, "Expected logical operator or end of line here.")
+
 			result = -1
 		}
 	}
 
 	if pfilter_debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
+
 		if from_chan == MAX_TOTAL_CHANS {
 			dw_printf(" Packet filter from IGate to radio channel %d returns %s\n", to_chan, bool2text(result))
 		} else if to_chan == MAX_TOTAL_CHANS {
@@ -220,7 +221,6 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 	}
 
 	return (result)
-
 } /* end pfilter */
 
 /*-------------------------------------------------------------------
@@ -272,6 +272,7 @@ func next_token(pf *pfstate_t) {
 	if len(pf.toBeParsed) == 0 {
 		pf.token_type = TOKEN_EOL
 		pf.token_str = "end-of-line"
+
 		return
 	}
 
@@ -307,10 +308,10 @@ func next_token(pf *pfstate_t) {
 				break
 			}
 		}
+
 		pf.token_type = TOKEN_FILTER_SPEC
 		pf.token_str = s
 	}
-
 } /* end next_token */
 
 /*-------------------------------------------------------------------
@@ -332,21 +333,18 @@ func next_token(pf *pfstate_t) {
  *--------------------------------------------------------------------*/
 
 func parse_expr(pf *pfstate_t) int {
-
 	return parse_or_expr(pf)
 }
 
 /* or_expr::	and_expr [ | and_expr ] ... */
 
 func parse_or_expr(pf *pfstate_t) int {
-
 	var result = parse_and_expr(pf)
 	if result < 0 {
 		return (-1)
 	}
 
 	for pf.token_type == TOKEN_OR {
-
 		next_token(pf)
 		var e = parse_and_expr(pf)
 
@@ -358,6 +356,7 @@ func parse_or_expr(pf *pfstate_t) int {
 		if e < 0 {
 			return (-1)
 		}
+
 		result |= e
 	}
 
@@ -367,14 +366,12 @@ func parse_or_expr(pf *pfstate_t) int {
 /* and_expr::	primary [ & primary ] ... */
 
 func parse_and_expr(pf *pfstate_t) int {
-
 	var result = parse_primary(pf)
 	if result < 0 {
 		return (-1)
 	}
 
 	for pf.token_type == TOKEN_AND {
-
 		next_token(pf)
 		var e = parse_primary(pf)
 
@@ -386,6 +383,7 @@ func parse_and_expr(pf *pfstate_t) int {
 		if e < 0 {
 			return (-1)
 		}
+
 		result &= e
 	}
 
@@ -397,11 +395,9 @@ func parse_and_expr(pf *pfstate_t) int {
 /*		filter_spec	*/
 
 func parse_primary(pf *pfstate_t) int {
-
 	var result int
 
 	if pf.token_type == TOKEN_LPAREN { //nolint:staticcheck
-
 		next_token(pf)
 		result = parse_expr(pf)
 
@@ -409,10 +405,10 @@ func parse_primary(pf *pfstate_t) int {
 			next_token(pf)
 		} else {
 			print_error(pf, "Expected \")\" here.\n")
+
 			result = -1
 		}
 	} else if pf.token_type == TOKEN_NOT {
-
 		next_token(pf)
 		var e = parse_primary(pf)
 
@@ -430,6 +426,7 @@ func parse_primary(pf *pfstate_t) int {
 		result = parse_filter_spec(pf)
 	} else {
 		print_error(pf, "Expected filter specification, (, or ! here.")
+
 		result = -1
 	}
 
@@ -459,14 +456,16 @@ func parse_primary(pf *pfstate_t) int {
  *--------------------------------------------------------------------*/
 
 func parse_filter_spec(pf *pfstate_t) int {
-
 	// Yes this is always assigned over, but that requires a fair bit of reading to be sure of, so let's have an explicit default
 	var result = -1 //nolint:ineffassign,wastedassign
 
 	if (!pf.is_aprs) && !strings.ContainsRune("01bdvu", rune(pf.token_str[0])) {
 		print_error(pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.")
+
 		result = -1
+
 		next_token(pf)
+
 		return (result)
 	}
 
@@ -477,7 +476,6 @@ func parse_filter_spec(pf *pfstate_t) int {
 	} else if pf.token_str == "1" {
 		result = 1
 	} else if pf.token_str[0] == 'b' && unicode.IsPunct(rune(pf.token_str[1])) {
-
 		/* simple string matching */
 
 		/* b - budlist */
@@ -516,6 +514,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 			if len(path) == 0 {
 				path = "no digipeater path"
 			}
+
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
 		}
@@ -538,6 +537,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 			if len(path) == 0 {
 				path = "no digipeater path"
 			}
+
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), path)
 		}
@@ -557,6 +557,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 			}
 		} else {
 			result = 0
+
 			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "not a message")
@@ -566,7 +567,6 @@ func parse_filter_spec(pf *pfstate_t) int {
 		/* u - unproto (AX.25 destination) */
 		/* Probably want to exclude mic-e types */
 		/* because destination is used for part of location. */
-
 		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
 			var addr = ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION)
 			result = filt_bodgu(pf, addr)
@@ -577,6 +577,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 			}
 		} else {
 			result = 0
+
 			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("   %s returns %s for %s\n", pf.token_str, bool2text(result), "MIC-E packet type")
@@ -584,7 +585,6 @@ func parse_filter_spec(pf *pfstate_t) int {
 		}
 	} else if pf.token_str[0] == 't' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* t - packet type: position, weather, telemetry, etc. */
-
 		result = filt_t(pf)
 
 		if pfilter_debug >= 2 {
@@ -614,6 +614,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
+
 			if pf.decoded.g_symbol_table == '/' { //nolint:staticcheck
 				dw_printf("   %s returns %s for symbol %c in primary table\n", pf.token_str, bool2text(result), pf.decoded.g_symbol_code)
 			} else if pf.decoded.g_symbol_table == '\\' {
@@ -629,6 +630,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
+
 			if pf.decoded.g_packet_type == packet_type_message {
 				dw_printf("   %s returns %s for message to %s\n", pf.token_str, bool2text(result), pf.decoded.g_addressee)
 			} else {
@@ -638,6 +640,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 	} else {
 		/* unrecognized filter type */
 		print_error(pf, fmt.Sprintf("Unrecognized filter type '%c'", pf.token_str[0]))
+
 		result = -1
 	}
 
@@ -676,7 +679,6 @@ func parse_filter_spec(pf *pfstate_t) int {
  *------------------------------------------------------------------------------*/
 
 func filt_bodgu(pf *pfstate_t, arg string) int {
-
 	var result = 0
 	var str = pf.token_str
 	var sep = str[1]
@@ -687,11 +689,11 @@ func filt_bodgu(pf *pfstate_t, arg string) int {
 		var idx = strings.Index(part, "*")
 		if idx != -1 {
 			/* Wildcarding.  Should have single * on end. */
-
 			if idx != (len(part) - 1) {
 				print_error(pf, "Any wildcard * must be at the end of pattern.\n")
 				return (-1)
 			}
+
 			if strings.HasPrefix(arg, part[:idx]) {
 				result = 1
 			}
@@ -730,16 +732,13 @@ func filt_bodgu(pf *pfstate_t, arg string) int {
  *------------------------------------------------------------------------------*/
 
 func filt_t(pf *pfstate_t) int {
-
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
-
 	var infop = ax25_get_info(pf.pp)
 
 	Assert(len(infop) > 0)
 
 	for _, f := range pf.token_str[2:] {
 		switch f {
-
 		case 'p': /* Position */
 			if pf.decoded.g_packet_type == packet_type_position {
 				return (1)
@@ -792,7 +791,6 @@ func filt_t(pf *pfstate_t) int {
 			}
 
 		case 'w': /* Weather */
-
 			if pf.decoded.g_packet_type == packet_type_weather {
 				return (1)
 			}
@@ -816,8 +814,8 @@ func filt_t(pf *pfstate_t) int {
 			return (-1)
 		}
 	}
-	return (0) /* Didn't match anything.  Reject */
 
+	return (0) /* Didn't match anything.  Reject */
 } /* end filt_t */
 
 /*------------------------------------------------------------------------------
@@ -847,7 +845,6 @@ func filt_t(pf *pfstate_t) int {
  *------------------------------------------------------------------------------*/
 
 func filt_r(pf *pfstate_t) (int, string) {
-
 	if pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN {
 		return 0, ""
 	}
@@ -957,7 +954,6 @@ func filt_r(pf *pfstate_t) (int, string) {
  *------------------------------------------------------------------------------*/
 
 func filt_s(pf *pfstate_t) int {
-
 	var str = pf.token_str
 	var sep = string(str[1])
 	var cp = str[2:]
@@ -972,7 +968,6 @@ func filt_s(pf *pfstate_t) int {
 	var parts = strings.Split(cp, sep)
 
 	if len(parts) > 0 {
-
 		pri = parts[0]
 
 		// Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
@@ -983,7 +978,6 @@ func filt_s(pf *pfstate_t) int {
 		}
 
 		if len(parts) > 1 {
-
 			alt = parts[1]
 
 			// Zero length after second / would be pointless.
@@ -999,7 +993,6 @@ func filt_s(pf *pfstate_t) int {
 			}
 
 			if len(parts) > 2 {
-
 				over = parts[2]
 
 				// Zero length is acceptable and is not the same as missing.
@@ -1056,27 +1049,20 @@ func filt_s(pf *pfstate_t) int {
 	// Look for Alternate symbols.
 
 	if strings.Contains(alt, string(rune(pf.decoded.g_symbol_code))) {
-
 		// We have a match but that might not be enough.
 		// We must see if there was an overlay part specified.
-
 		if len(parts) > 2 {
-
 			if len(over) > 0 {
-
 				// Non-zero length overlay part was specified.
 				// Need to match one of them.
-
 				if strings.Contains(over, string(rune(pf.decoded.g_symbol_table))) {
 					return 1
 				} else {
 					return 0
 				}
 			} else {
-
 				// Zero length overlay part was specified.
 				// We must have no overlay, i.e.  table is \.
-
 				if pf.decoded.g_symbol_table == '\\' {
 					return 1
 				} else {
@@ -1085,7 +1071,6 @@ func filt_s(pf *pfstate_t) int {
 			}
 		} else {
 			// No check of overlay part.  Just make sure it is not primary table.
-
 			if pf.decoded.g_symbol_table != '/' {
 				return 1
 			} else {
@@ -1095,7 +1080,6 @@ func filt_s(pf *pfstate_t) int {
 	}
 
 	return (0)
-
 } /* end filt_s */
 
 /*------------------------------------------------------------------------------
@@ -1190,7 +1174,6 @@ func filt_s(pf *pfstate_t) int {
  *------------------------------------------------------------------------------*/
 
 func filt_i(pf *pfstate_t) int {
-
 	// http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2020-July/048656.html
 	// Default of 3 hours should be good.
 	// One might question why to have a time limit at all.  Messages are very rare
@@ -1321,7 +1304,6 @@ func filt_i(pf *pfstate_t) int {
 	return (1)
 
 	// #endif
-
 } /* end filt_i */
 
 /*-------------------------------------------------------------------
@@ -1337,7 +1319,6 @@ func filt_i(pf *pfstate_t) int {
  *--------------------------------------------------------------------*/
 
 func print_error(pf *pfstate_t, msg string) {
-
 	var intro string
 
 	if pf.from_chan == MAX_TOTAL_CHANS {

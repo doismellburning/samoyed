@@ -201,6 +201,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if *amplitude > 0 {
 		fmt.Printf("Amplitude set to %d%%.\n", *amplitude)
+
 		if *amplitude < 0 || *amplitude > 200 {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Amplitude must be in range of 0 to 200, not %d.\n", *amplitude)
@@ -222,8 +223,10 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if *audioSampleRate != DEFAULT_SAMPLES_PER_SEC {
 		modem.adev[0].samples_per_sec = *audioSampleRate
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Audio sample rate set to %d samples / second.\n", modem.adev[0].samples_per_sec)
+
 		if modem.adev[0].samples_per_sec < MIN_SAMPLES_PER_SEC || modem.adev[0].samples_per_sec > MAX_SAMPLES_PER_SEC {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable audio sample rate in range of %d - %d, not %d.\n",
@@ -248,6 +251,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if *eightBitsPerSample {
 		modem.adev[0].bits_per_sample = 8
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("8 bits per audio sample rather than 16.\n")
 	}
@@ -255,6 +259,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if *twoSoundChannels {
 		modem.adev[0].num_channels = 2
 		modem.chan_medium[1] = MEDIUM_RADIO
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("2 channels of sound rather than 1.\n")
 	}
@@ -263,8 +268,10 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		//TODO: document this.
 		// Why not base it on the destination field instead?
 		g_morse_wpm = *morseWPM
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Morse code speed set to %d WPM.\n", g_morse_wpm)
+
 		if g_morse_wpm < 5 || g_morse_wpm > 50 {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Morse code speed must be in range of 5 to 50 WPM, not %d.\n", g_morse_wpm)
@@ -274,8 +281,10 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	var variable_speed_max_error float64 = 0 // both in percent
 	var variable_speed_increment = 0.1
+
 	if *variableSpeedStr != "" {
 		var maxError, increment, found = strings.Cut(*variableSpeedStr, ",")
+
 		variable_speed_max_error, _ = strconv.ParseFloat(maxError, 64)
 		if found {
 			variable_speed_increment, _ = strconv.ParseFloat(increment, 64)
@@ -289,6 +298,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		} else {
 			bitrate, _ = strconv.Atoi(*bitrateStr)
 		}
+
 		modem.achan[0].baud = bitrate
 		fmt.Printf("Data rate set to %d bits / second.\n", modem.achan[0].baud)
 
@@ -317,7 +327,9 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			modem.achan[0].modem_type = MODEM_QPSK
 			modem.achan[0].mark_freq = 0
 			modem.achan[0].space_freq = 0
+
 			fmt.Printf("Using V.26 QPSK rather than AFSK.\n")
+
 			if modem.achan[0].baud != 2400 {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", modem.achan[0].baud)
@@ -326,16 +338,20 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			modem.achan[0].modem_type = MODEM_8PSK
 			modem.achan[0].mark_freq = 0
 			modem.achan[0].space_freq = 0
+
 			fmt.Printf("Using V.27 8PSK rather than AFSK.\n")
+
 			if modem.achan[0].baud != 4800 {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", modem.achan[0].baud)
 			}
 		} else {
 			modem.achan[0].modem_type = MODEM_SCRAMBLE
+
 			text_color_set(DW_COLOR_INFO)
 			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
 		}
+
 		if modem.achan[0].baud != 100 && (modem.achan[0].baud < MIN_BAUD || modem.achan[0].baud > MAX_BAUD) {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
@@ -347,6 +363,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if *markFrequency > 0 {
 		modem.achan[0].mark_freq = *markFrequency
 		fmt.Printf("Mark frequency set to %d Hz.\n", modem.achan[0].mark_freq)
+
 		if modem.achan[0].mark_freq < 300 || modem.achan[0].mark_freq > 3000 {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable value in range of 300 - 3000, not %d.\n", *markFrequency)
@@ -356,8 +373,10 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if *spaceFrequency > 0 {
 		modem.achan[0].space_freq = *spaceFrequency
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Space frequency set to %d Hz.\n", modem.achan[0].space_freq)
+
 		if modem.achan[0].space_freq < 300 || modem.achan[0].space_freq > 3000 {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable value in range of 300 - 3000, not %d.\n", *spaceFrequency)
@@ -372,12 +391,14 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			pflag.Usage()
 			os.Exit(1)
 		}
+
 		modem.achan[0].baud = bitrateOverride
 		fmt.Printf("Data rate set to %d bits / second.\n", modem.achan[0].baud)
 	}
 
 	if *g3ruh { /* -g for g3ruh scrambling */
 		modem.achan[0].modem_type = MODEM_SCRAMBLE
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using G3RUH mode regardless of bit rate.\n")
 	}
@@ -411,6 +432,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			fmt.Printf("Can't mix -X with -I or -i.\n")
 			os.Exit(1)
 		}
+
 		modem.achan[0].fx25_strength = *fx25CheckBytes
 		modem.achan[0].layer2_xmit = LAYER2_FX25
 	}
@@ -424,20 +446,24 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if *il2pNormal >= 0 {
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using IL2P normal polarity.\n")
+
 		modem.achan[0].layer2_xmit = LAYER2_IL2P
 		if *il2pNormal > 0 {
 			modem.achan[0].il2p_max_fec = 1
 		}
+
 		modem.achan[0].il2p_invert_polarity = 0 // normal
 	}
 
 	if *il2pInverted >= 0 {
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using IL2P inverted polarity.\n")
+
 		modem.achan[0].layer2_xmit = LAYER2_IL2P
 		if *il2pInverted > 0 {
 			modem.achan[0].il2p_max_fec = 1
 		}
+
 		modem.achan[0].il2p_invert_polarity = 1 // invert for transmit
 		if modem.achan[0].baud == 1200 {
 			text_color_set(DW_COLOR_ERROR)
@@ -477,9 +503,11 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	if !(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16) { //nolint:staticcheck
 		panic("assert(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16)")
 	}
+
 	if !(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2) { //nolint:staticcheck
 		panic("assert(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2)")
 	}
+
 	if !(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
 		panic("assert(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
 	}
@@ -501,9 +529,11 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		if arg == "-" {
 			text_color_set(DW_COLOR_INFO)
 			fmt.Printf("Reading from stdin ...\n")
+
 			input_fp = os.Stdin
 		} else {
 			var err error
+
 			input_fp, err = os.Open(arg) //nolint:gosec // We expect to read from a user-supplied file from CLI
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -511,6 +541,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 				os.Exit(1)
 			}
 			defer input_fp.Close()
+
 			text_color_set(DW_COLOR_INFO)
 			fmt.Printf("Reading from %s ...\n", arg)
 		}
@@ -518,12 +549,14 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		var scanner = bufio.NewScanner(input_fp)
 		for scanner.Scan() {
 			var str = scanner.Text()
+
 			text_color_set(DW_COLOR_REC)
 			fmt.Printf("%s", str)
 			send_packet(str)
 		}
 
 		audio_file_close()
+
 		return
 	}
 
@@ -584,7 +617,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	} else {
 		// This should send a total of 6.
 		// Note that sticking in the user defined type {DE is optional.
-
 		if modem.achan[0].modem_type == MODEM_EAS {
 			send_packet("X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
 			send_packet("X>X-2:{DENNNN")
@@ -643,11 +675,12 @@ func audio_file_open(fname string, pa *audio_s) int {
 	 * Write the file header.  Don't know length yet.
 	 */
 	var openErr error
-	genPacketsOutFile, openErr = os.Create(fname) //nolint:gosec // We expect to write to a user-supplied file from CLI
 
+	genPacketsOutFile, openErr = os.Create(fname) //nolint:gosec // We expect to write to a user-supplied file from CLI
 	if openErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Couldn't open %s for write: %s\n", fname, openErr)
+
 		return (-1)
 	}
 
@@ -689,12 +722,12 @@ func audio_file_open(fname string, pa *audio_s) int {
 	}
 
 	var writeErr = binary.Write(genPacketsOutFile, binary.LittleEndian, gen_header)
-
 	if writeErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Couldn't write header to %s: %s\n", fname, writeErr)
 		genPacketsOutFile.Close()
 		genPacketsOutFile = nil
+
 		return (-1)
 	}
 
@@ -746,17 +779,18 @@ func audio_file_close() int { //nolint:unparam
 		genPacketsOutFile.Close()
 		genPacketsOutFile = nil
 		genPacketsOutBuf = nil
+
 		return (-1)
 	}
 
 	var writeErr = binary.Write(genPacketsOutFile, binary.LittleEndian, gen_header)
-
 	if writeErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Couldn't write header to audio file: %s\n", writeErr)
 		genPacketsOutFile.Close()
 		genPacketsOutFile = nil
 		genPacketsOutBuf = nil
+
 		return (-1)
 	}
 
@@ -771,7 +805,6 @@ func send_packet(str string) {
 	if g_morse_wpm > 0 {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
-
 		morse_send(0, str, g_morse_wpm, 100, 100)
 	} else if modem.achan[0].modem_type == MODEM_EAS {
 		// Generate EAS SAME signal FOR RESEARCH AND TESTING ONLY!!!
@@ -786,11 +819,11 @@ func send_packet(str string) {
 		// Examples:
 		//	X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-
 		//	X>X:NNNN
-
 		var pp = ax25_from_text(str, true)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
+
 			return
 		}
 
@@ -811,6 +844,7 @@ func send_packet(str string) {
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
+
 			return
 		}
 
@@ -844,6 +878,7 @@ func send_packet(str string) {
 			layer2_send_frame(c, pp, false, &modem)
 			layer2_preamble_postamble(c, 2, true, &modem)
 		}
+
 		ax25_delete(pp)
 	}
 }
@@ -867,11 +902,11 @@ func send_packet(str string) {
 var sample16 int16
 
 func audio_put_fake(_ int, c uint8) int {
-
 	if g_add_noise {
 		if (byte_count & 1) == 0 {
 			sample16 = int16(c) /* save lower byte. */
 			byte_count++
+
 			return int(c)
 		} else {
 			sample16 |= int16(c) << 8 /* insert upper byte. */
@@ -888,6 +923,7 @@ func audio_put_fake(_ int, c uint8) int {
 			if s > 32767 {
 				s = 32767
 			}
+
 			if s < -32767 {
 				s = -32767
 			}
@@ -896,17 +932,19 @@ func audio_put_fake(_ int, c uint8) int {
 			if writeErr != nil {
 				return -1
 			}
+
 			return n
 		}
 	} else {
 		byte_count++
+
 		var n, writeErr = genPacketsOutBuf.Write([]byte{c})
 		if writeErr != nil {
 			return -1
 		}
+
 		return n
 	}
-
 } /* end audio_put */
 
 func audio_put(a int, c uint8) int { //nolint:unparam

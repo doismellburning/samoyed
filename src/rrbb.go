@@ -70,7 +70,6 @@ type rrbb_t struct {
  ***********************************************************************************/
 
 func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram_state int, prev_descram int) *rrbb_t {
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -143,10 +142,10 @@ func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram in
  ***********************************************************************************/
 
 func rrbb_append_bit(b *rrbb_t, val byte) {
-
 	if b.length >= MAX_NUM_BITS {
 		return /* Silently discard if full. */
 	}
+
 	b.fdata[b.length] = val
 	b.length++
 }
@@ -164,7 +163,6 @@ func rrbb_append_bit(b *rrbb_t, val byte) {
  ***********************************************************************************/
 
 func rrbb_chop8(b *rrbb_t) {
-
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)

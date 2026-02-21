@@ -29,7 +29,6 @@ import (
  *---------------------------------------------------------------*/
 
 func serial_port_open(devicename string, baud int) *term.Term {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -57,10 +56,10 @@ func serial_port_open(devicename string, baud int) *term.Term {
 	var linuxname = devicename
 
 	var fd, err = term.Open(linuxname, term.RawMode)
-
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Could not open serial port %s: %s.\n", linuxname, err)
+
 		return nil
 	}
 
@@ -105,7 +104,6 @@ func serial_port_open(devicename string, baud int) *term.Term {
  *---------------------------------------------------------------*/
 
 func serial_port_write(fd *term.Term, data []byte) int {
-
 	if fd == nil {
 		return (-1)
 	}
@@ -135,7 +133,6 @@ func serial_port_write(fd *term.Term, data []byte) int {
  *--------------------------------------------------------------------*/
 
 func serial_port_get1(fd *term.Term) (byte, error) {
-
 	var bytes = make([]byte, 1)
 	var n, err = fd.Read(bytes)
 
@@ -176,6 +173,7 @@ func serial_port_close(fd *term.Term) {
 	if fd == nil {
 		return
 	}
+
 	fd.Close()
 }
 

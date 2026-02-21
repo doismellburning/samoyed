@@ -86,7 +86,6 @@ func DecodeAPRSMain() {
 
 func DecodeAPRSLine(line string) {
 	/* Try to process it. */
-
 	fmt.Printf("\n")
 	ax25_safe_print([]byte(line), false)
 	fmt.Printf("\n")
@@ -101,10 +100,9 @@ func DecodeAPRSLine(line string) {
 		// Documented input format is "DE AD BE EF"
 		// Go's hex.DecodeString will decode "DEADBEEF"
 		// So, let's just strip spaces and use that!
-
 		var spacelessLine = strings.ReplaceAll(line, " ", "")
-		var bytes, err = hex.DecodeString(spacelessLine)
 
+		var bytes, err = hex.DecodeString(spacelessLine)
 		if err != nil {
 			panic(err)
 		}
@@ -119,9 +117,11 @@ func DecodeAPRSLine(line string) {
 
 			if bytes[len(bytes)-1] == FEND {
 				fmt.Printf("Removing KISS FEND characters at beginning and end.\n")
+
 				bytes = bytes[1 : len(bytes)-1]
 			} else {
 				fmt.Printf("Removing KISS FEND character at beginning.  Was expecting another at end.\n")
+
 				bytes = bytes[1:]
 			}
 		}
@@ -175,7 +175,6 @@ func DecodeAPRSLine(line string) {
 		}
 	} else {
 		// Normal monitoring format.
-
 		var pp = ax25_from_text(line, true)
 		if pp != nil {
 			var A = decode_aprs(pp, false, "") // Extract information into structure.

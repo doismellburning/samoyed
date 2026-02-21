@@ -97,6 +97,7 @@ func get_field(base []byte, start uint, length uint) int {
 			result |= 1
 		}
 	}
+
 	return (result)
 }
 
@@ -111,6 +112,7 @@ func get_field_signed(base []byte, start uint, length uint) int32 {
 	// Sign extend.
 	result <<= (32 - length)
 	result >>= (32 - length)
+
 	return (result)
 }
 
@@ -118,7 +120,6 @@ func get_field_lat(base []byte, start uint, length uint) float64 {
 	// Latitude of 0x3412140 (91 deg) means not available.
 	// Message type 27 uses lower resolution, 17 bits rather than 27.
 	// It encodes minutes/10 rather than normal minutes/10000.
-
 	var n = get_field_signed(base, start, length)
 	if length == 17 {
 		if n == 91*600 {
@@ -139,7 +140,6 @@ func get_field_lon(base []byte, start uint, length uint) float64 {
 	// Longitude of 0x6791AC0 (181 deg) means not available.
 	// Message type 27 uses lower resolution, 18 bits rather than 28.
 	// It encodes minutes/10 rather than normal minutes/10000.
-
 	var n = get_field_signed(base, start, length)
 	if length == 18 {
 		if n == 181*600 {
@@ -163,7 +163,6 @@ func get_field_speed(base []byte, start uint, length uint) float64 {
 
 	// Message type 27 uses lower resolution, 6 bits rather than 10.
 	// It encodes minutes/10 rather than normal minutes/10000.
-
 	var n = get_field(base, start, length)
 	if length == 6 {
 		if n == 63 {
@@ -185,7 +184,6 @@ func get_field_course(base []byte, start uint, length uint) float64 {
 	// Multiply by 0.1 to get degrees
 	// Message type 27 uses lower resolution, 9 bits rather than 12.
 	// It encodes degrees rather than normal degrees/10.
-
 	var n = get_field(base, start, length)
 	if length == 9 {
 		if n == 360 {
@@ -204,10 +202,12 @@ func get_field_course(base []byte, start uint, length uint) float64 {
 
 func get_field_ascii(base []byte, start uint, length uint) int {
 	Assert(length == 6)
+
 	var ch = get_field(base, start, length)
 	if ch < 32 {
 		ch += 64
 	}
+
 	return (ch)
 }
 
@@ -244,6 +244,7 @@ func char_to_sextet(ch byte) int {
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid character \"%c\" found in AIS NMEA sentence payload.\n", ch)
+
 		return (0)
 	}
 }
@@ -260,6 +261,7 @@ func sextet_to_char(val int) byte {
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid 6 bit value %d from AIS HDLC payload.\n", val)
+
 		return '0'
 	}
 }
@@ -274,7 +276,6 @@ func sextet_to_char(val int) byte {
  *--------------------------------------------------------------------*/
 
 func ais_to_nmea(ais []byte) []byte {
-
 	var payload []byte
 	// Number of resulting characters for payload.
 	var ns = uint(len(ais)*8+5) / 6 //nolint:gosec // G115 integer overflow
@@ -340,7 +341,6 @@ type AISData struct {
 }
 
 func ais_parse(sentence string, quiet bool) (*AISData, int) {
-
 	var aisData = new(AISData)
 	aisData.mssi = "?"
 	aisData.lat = G_UNKNOWN
@@ -359,6 +359,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		if p == '*' {
 			break
 		}
+
 		calculatedChecksum ^= byte(p)
 	}
 
@@ -369,6 +370,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Missing AIS sentence checksum.\n")
 		}
+
 		return aisData, -1
 	}
 
@@ -380,6 +382,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("AIS sentence checksum error. Expected %02x but found %s.\n", calculatedChecksum, checksumStr)
 		}
+
 		return aisData, -1
 	}
 
@@ -407,6 +410,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Payload is missing from AIS sentence.\n")
 		}
+
 		return aisData, -1
 	}
 
@@ -442,9 +446,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	}
 
 	switch aisType {
-
 	case 1, 2, 3: // Position Report Class A
-
 		aisData.description = fmt.Sprintf("AIS %d: Position Report Class A", aisType)
 		aisData.symtab = '/'
 		aisData.symbol = 's' // Power boat (ship) side view
@@ -455,7 +457,6 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 4: // Base Station Report
-
 		aisData.description = fmt.Sprintf("AIS %d: Base Station Report", aisType)
 		aisData.symtab = '\\'
 		aisData.symbol = 'L' // Lighthouse
@@ -471,7 +472,6 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 5: // Static and Voyage Related Data
-
 		aisData.description = fmt.Sprintf("AIS %d: Static and Voyage Related Data", aisType)
 		aisData.symtab = '/'
 		aisData.symbol = 's' // Power boat (ship) side view
@@ -484,23 +484,23 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		}
 
 	case 9: // Standard SAR Aircraft Position Report
-
 		aisData.description = fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)
 		aisData.symtab = '/'
 		aisData.symbol = '\''                           // Small AIRCRAFT
 		aisData.alt_m = float64(get_field(ais, 38, 12)) // meters, 4095 means not available
 		aisData.lon = get_field_lon(ais, 61, 28)
 		aisData.lat = get_field_lat(ais, 89, 27)
+
 		aisData.knots = get_field_speed(ais, 50, 10) // plane is knots, not knots/10
 		if aisData.knots != G_UNKNOWN {
 			aisData.knots *= 10.0
 		}
+
 		aisData.course = get_field_course(ais, 116, 12)
 		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 18: // Standard Class B CS Position Report
 		// As an oversimplification, Class A is commercial, B is recreational.
-
 		aisData.description = fmt.Sprintf("AIS %d: Standard Class B CS Position Report", aisType)
 		aisData.symtab = '/'
 		aisData.symbol = 'Y' // YACHT (sail)
@@ -509,7 +509,6 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 19: // Extended Class B CS Position Report
-
 		aisData.description = fmt.Sprintf("AIS %d: Extended Class B CS Position Report", aisType)
 		aisData.symtab = '/'
 		aisData.symbol = 'Y' // YACHT (sail)
@@ -518,7 +517,6 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		aisData.comment = get_ship_data(aisData.mssi)
 
 	case 27: // Long Range AIS Broadcast message
-
 		aisData.description = fmt.Sprintf("AIS %d: Long Range AIS Broadcast message", aisType)
 		aisData.symtab = '\\'
 		aisData.symbol = 's'                     // OVERLAY SHIP/boat (top view)
@@ -533,7 +531,6 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	}
 
 	return aisData, 0
-
 } /* end ais_parse */
 
 /*-------------------------------------------------------------------
@@ -568,7 +565,6 @@ func ais_check_length(aisType int, length int) int {
 		//dw_printf("AIS ERROR: message type %d is invalid.\n", aisType);
 		return (-1) // Invalid type.
 	}
-
 } // end ais_check_length
 
 /*-------------------------------------------------------------------
@@ -607,6 +603,7 @@ func save_ship_data(mssi string, shipname string, callsign string, destination s
 		if mssi == p.mssi {
 			break
 		}
+
 		p = p.pnext
 	}
 
@@ -639,8 +636,10 @@ func get_ship_data(mssi string) string {
 		if mssi == p.mssi {
 			break
 		}
+
 		p = p.pnext
 	}
+
 	if p != nil {
 		if len(p.destination) > 0 {
 			return fmt.Sprintf("%s, %s, dest. %s", p.shipname, p.callsign, p.destination)

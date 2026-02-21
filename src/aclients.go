@@ -82,7 +82,6 @@ func AClientsMain() {
 
 	for j := range num_clients {
 		/* Each command line argument should be of the form "port=description." */
-
 		var arg = os.Args[j+1]
 		var _port, _description, descriptionFound = strings.Cut(arg, "=")
 
@@ -130,6 +129,7 @@ func AClientsMain() {
 		SLEEP_MS(100)
 
 		var something = false
+
 		var results = make([]string, len(packetChans))
 		for i, ch := range packetChans {
 			select {
@@ -144,6 +144,7 @@ func AClientsMain() {
 			for _, result := range results {
 				fmt.Printf("%*s", column_width, result)
 			}
+
 			fmt.Printf("\n")
 		}
 
@@ -156,6 +157,7 @@ func AClientsMain() {
 			for j := range num_clients {
 				fmt.Printf(", %s %d", description[j], packet_count[j])
 			}
+
 			fmt.Printf("\n\n")
 		}
 	}
@@ -175,7 +177,6 @@ func AClientsMain() {
 
 func client_thread_net(my_index int, hostname string, port string, description string, packetChan chan<- string) {
 	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port))
-
 	if connErr != nil {
 		fmt.Printf("Client %d unable to connect to %s on %s, port %s\n",
 			my_index, description, hostname, port)
@@ -203,13 +204,14 @@ func client_thread_net(my_index int, hostname string, port string, description s
 	 */
 
 	var use_chan = -1
+
 	for {
 		var readErr = binary.Read(conn, binary.LittleEndian, mon_cmd)
-
 		if readErr != nil {
 			if readErr == io.EOF {
 				continue
 			}
+
 			fmt.Printf("Read error, client %d got %s.\n", my_index, readErr)
 			os.Exit(1)
 		}
@@ -233,7 +235,6 @@ func client_thread_net(my_index int, hostname string, port string, description s
 
 		if mon_cmd.DataKind == 'K' && (use_chan == -1 || byte(use_chan) == mon_cmd.Portx) {
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
-
 			use_chan = int(mon_cmd.Portx)
 			var alevel alevel_t
 			var pp = ax25_from_frame(data[1:mon_cmd.DataLen], alevel)
@@ -242,7 +243,9 @@ func client_thread_net(my_index int, hostname string, port string, description s
 
 			var fullResult = result + string(info)
 			packetChan <- fullResult
+
 			ax25_delete(pp)
+
 			packet_count[my_index]++
 		}
 	}
@@ -283,9 +286,9 @@ func client_thread_serial(my_index int, port string, description string, packetC
 	for {
 		var done = false
 		var buffer []byte
+
 		for !done {
 			var b, err = serial_port_get1(fd)
-
 			if err != nil {
 				fmt.Printf("Client %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)
@@ -309,12 +312,16 @@ func client_thread_serial(my_index int, port string, description string, packetC
 				if len(buffer) >= 10 && buffer[len(buffer)-2] == '>' && buffer[len(buffer)-1] == ':' {
 					continue
 				}
+
 				done = true
+
 				continue
 			}
+
 			if b == '\n' {
 				continue
 			}
+
 			buffer = append(buffer, b)
 		}
 

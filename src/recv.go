@@ -116,7 +116,6 @@ func recv_init(pa *audio_s) {
 func recv_adev_thread(a int) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
-
 	var first_chan = ADEVFIRSTCHAN(a)
 	var num_chan = save_pa.adev[a].num_channels
 
@@ -203,7 +202,6 @@ func recv_process() {
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-
 					app_process_rec_packet(pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
 
 					/*

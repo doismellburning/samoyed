@@ -113,11 +113,9 @@ var process_age [MAX_RADIO_CHANS]int
  *------------------------------------------------------------------------------*/
 
 func multi_modem_init(pa *audio_s) {
-
 	/*
 	 * Save audio configuration for later use.
 	 */
-
 	save_audio_config_p = pa
 
 	demod_init(save_audio_config_p)
@@ -130,10 +128,12 @@ func multi_modem_init(pa *audio_s) {
 				dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
 				save_audio_config_p.achan[channel].baud = DEFAULT_BAUD
 			}
+
 			var real_baud = save_audio_config_p.achan[channel].baud
 			if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
 				real_baud = save_audio_config_p.achan[channel].baud / 2
 			}
+
 			if save_audio_config_p.achan[channel].modem_type == MODEM_8PSK {
 				real_baud = save_audio_config_p.achan[channel].baud / 3
 			}
@@ -142,7 +142,6 @@ func multi_modem_init(pa *audio_s) {
 			//crc_queue_of_last_to_app[channel] = nil;
 		}
 	}
-
 }
 
 /*------------------------------------------------------------------------------
@@ -180,15 +179,12 @@ var dc_average [MAX_RADIO_CHANS]float64
 
 func multi_modem_get_dc_average(channel int) int { //nolint:unused
 	// Scale to +- 200 so it will like the deviation measurement.
-
 	return int(float64(dc_average[channel]) * (200.0 / 32767.0))
 }
 
 func multi_modem_process_sample(channel int, audio_sample int) {
-
 	// Accumulate an average DC bias level.
 	// Shouldn't happen with a soundcard but could with mistuned SDR.
-
 	dc_average[channel] = dc_average[channel]*0.999 + float64(audio_sample)*0.001
 
 	// Issue 128.  Someone ran into this.
@@ -198,7 +194,6 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 
 	if save_audio_config_p.achan[channel].num_subchan <= 0 || save_audio_config_p.achan[channel].num_subchan > MAX_SUBCHANS ||
 		save_audio_config_p.achan[channel].num_slicers <= 0 || save_audio_config_p.achan[channel].num_slicers > MAX_SLICERS {
-
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR!  Something is seriously wrong in multi_modem_process_sample\n")
 		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
@@ -217,9 +212,7 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 	}
 
 	for subchan := 0; subchan < save_audio_config_p.achan[channel].num_subchan; subchan++ {
-
 		for slice := 0; slice < save_audio_config_p.achan[channel].num_slicers; slice++ {
-
 			if candidate[channel][subchan][slice].packet_p != nil {
 				candidate[channel][subchan][slice].age++
 				if candidate[channel][subchan][slice].age > process_age[channel] {
@@ -258,7 +251,6 @@ func multi_modem_process_sample(channel int, audio_sample int) {
  *--------------------------------------------------------------------*/
 
 func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -297,10 +289,10 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 // TODO: Eliminate function above and move code elsewhere?
 
 func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, retries retry_t, fec_type fec_type_t) {
-
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected internal problem in multi_modem_process_rec_packet_real\n")
+
 		return /* oops!  why would it fail? */
 	}
 
@@ -311,8 +303,8 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 	if save_audio_config_p.achan[channel].num_subchan == 1 &&
 		save_audio_config_p.achan[channel].num_slicers == 1 &&
 		!fx25_rec_busy(channel) {
-
 		var drop_it = false
+
 		if save_audio_config_p.recv_error_rate != 0 {
 			var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
@@ -321,6 +313,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 
 			if float64(save_audio_config_p.recv_error_rate)/100.0 > r {
 				drop_it = true
+
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", save_audio_config_p.recv_error_rate)
 			}
@@ -331,6 +324,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 		} else {
 			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
+
 		return
 	}
 
@@ -384,7 +378,6 @@ func slice_from_n(channel int, x int) int {
 }
 
 func pick_best_candidate(channel int) {
-
 	if save_audio_config_p.achan[channel].num_slicers < 1 {
 		save_audio_config_p.achan[channel].num_slicers = 1
 	}
@@ -427,7 +420,6 @@ func pick_best_candidate(channel int) {
 				/* This didn't work so well when looking for the best score. */
 				/* Around 1.3 dev H, we add an extra 1 in here so the minimum */
 				/* score should now be 1 for anything received.  */
-
 				candidate[channel][j][k].score = int(RETRY_MAX)*1000 - int(candidate[channel][j][k].retries*1000) + 1
 			}
 		}
@@ -442,9 +434,7 @@ func pick_best_candidate(channel int) {
 		var k = slice_from_n(channel, n)
 
 		if candidate[channel][j][k].packet_p != nil {
-
 			for m := 0; m < num_bars; m++ {
-
 				var mj = subchan_from_n(channel, m)
 				var mk = slice_from_n(channel, m)
 
@@ -511,6 +501,7 @@ func pick_best_candidate(channel int) {
 
 	for n := 0; n < num_bars; n++ {
 		var j = subchan_from_n(channel, n)
+
 		var k = slice_from_n(channel, n)
 		if n != best_n && candidate[channel][j][k].packet_p != nil {
 			ax25_delete(candidate[channel][j][k].packet_p)
@@ -524,6 +515,7 @@ func pick_best_candidate(channel int) {
 	var k = slice_from_n(channel, best_n)
 
 	var drop_it = false
+
 	if save_audio_config_p.recv_error_rate != 0 {
 		var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
@@ -532,6 +524,7 @@ func pick_best_candidate(channel int) {
 
 		if float64(save_audio_config_p.recv_error_rate)/100.0 > r {
 			drop_it = true
+
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Intentionally dropping incoming frame.  Recv Error rate = %d per cent.\n", save_audio_config_p.recv_error_rate)
 		}
@@ -556,7 +549,6 @@ func pick_best_candidate(channel int) {
 	/* Clear in preparation for next time. */
 
 	candidate[channel] = [MAX_SUBCHANS][MAX_SLICERS]candidate_t{} // TODO KG Gotta be a nicer way to do this
-
 } /* end pick_best_candidate */
 
 /* end multi_modem.c */
