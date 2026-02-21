@@ -1,25 +1,5 @@
-// Package direwolf is a cgo wrapper for the Dire Wolf C source, eventually leading to a full port.
+// Package direwolf is a Go port of the Dire Wolf C source.
 package direwolf
-
-// #define DIREWOLF_C 1
-// #include <stdio.h>
-// #include <math.h>
-// #include <stdlib.h>
-// #include <getopt.h>
-// #include <assert.h>
-// #include <string.h>
-// #include <signal.h>
-// #include <ctype.h>
-// #include <unistd.h>
-// #include <fcntl.h>
-// #include <sys/types.h>
-// #include <sys/ioctl.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <netdb.h>
-// #cgo CFLAGS: -DUSE_CM108
-// #cgo LDFLAGS: -lm
-import "C"
 
 import (
 	"fmt"
