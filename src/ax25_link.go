@@ -2351,7 +2351,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			} else { // N(R) not in expected range.
 
 				nr_error_recovery(S)
-				enter_new_state(S, TODO_SABME_SABM(S))
+				enter_new_state(S, SABME_or_SABM(S))
 			}
 		} else { // Bad information length.
 			// Wouldn't even get to CRC check if not octet aligned.
@@ -2362,7 +2362,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			establish_data_link(S)
 			S.layer_3_initiated = false
 
-			enter_new_state(S, TODO_SABME_SABM(S))
+			enter_new_state(S, SABME_or_SABM(S))
 		}
 	}
 
@@ -2372,7 +2372,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 // I was thinking, why not use v2.2 instead of we were already connected with v2.2?
 // My version of establish_data_link combined the two original functions and
 // already uses SABME or SABM based on S.modulo.
-func TODO_SABME_SABM(S *ax25_dlsm_t) dlsm_state_e { // FIXME KG TERRIBLE NAME - "Which next awaiting state?"
+func SABME_or_SABM(S *ax25_dlsm_t) dlsm_state_e {
 	var _s = state_1_awaiting_connection
 	if S.modulo == 128 {
 		_s = state_5_awaiting_v22_connection
@@ -3150,7 +3150,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			}
 
 			nr_error_recovery(S)
-			enter_new_state(S, TODO_SABME_SABM(S))
+			enter_new_state(S, SABME_or_SABM(S))
 		}
 
 	case state_4_timer_recovery:
@@ -3196,7 +3196,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 				// The flow charts go into state 1 after nr_error_recovery.
 				// I use state 5 instead if we were oprating in extended (modulo 128) mode.
 
-				enter_new_state(S, TODO_SABME_SABM(S))
+				enter_new_state(S, SABME_or_SABM(S))
 			}
 		} else {
 
@@ -3233,7 +3233,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 				}
 			} else {
 				nr_error_recovery(S)
-				enter_new_state(S, TODO_SABME_SABM(S))
+				enter_new_state(S, SABME_or_SABM(S))
 			}
 		}
 	}
@@ -3405,7 +3405,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			S.acknowledge_pending = false
 		} else {
 			nr_error_recovery(S)
-			enter_new_state(S, TODO_SABME_SABM(S))
+			enter_new_state(S, SABME_or_SABM(S))
 		}
 
 	case state_4_timer_recovery:
@@ -3436,7 +3436,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 				}
 			} else {
 				nr_error_recovery(S)
-				enter_new_state(S, TODO_SABME_SABM(S))
+				enter_new_state(S, SABME_or_SABM(S))
 			}
 		} else {
 			if cr == cr_cmd && pf == 1 {
@@ -3462,7 +3462,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 
 			} else {
 				nr_error_recovery(S)
-				enter_new_state(S, TODO_SABME_SABM(S))
+				enter_new_state(S, SABME_or_SABM(S))
 			}
 		}
 	}
@@ -3646,7 +3646,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 		} else {
 			nr_error_recovery(S)
 			// Erratum?  Flow chart shows state 1 but that would not be appropriate if modulo is 128.
-			enter_new_state(S, TODO_SABME_SABM(S))
+			enter_new_state(S, SABME_or_SABM(S))
 		}
 
 	case state_4_timer_recovery:
@@ -3734,7 +3734,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 			}
 		} else {
 			nr_error_recovery(S)
-			enter_new_state(S, TODO_SABME_SABM(S))
+			enter_new_state(S, SABME_or_SABM(S))
 		}
 	}
 
@@ -4452,7 +4452,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		S.layer_3_initiated = false
 
 		// Erratum? Flow chart goes to state 1.  Wouldn't we want this to be state 5 if modulo is 128?
-		enter_new_state(S, TODO_SABME_SABM(S))
+		enter_new_state(S, SABME_or_SABM(S))
 	}
 
 } /* end ua_frame */
