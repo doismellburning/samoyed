@@ -782,12 +782,11 @@ x = Silence FX.25 information.`)
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
 func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
-	/* FIXME KG
-	assert (chan >= 0 && chan < MAX_TOTAL_CHANS);		// TOTAL for virtual channels
-	assert (subchan >= -3 && subchan < MAX_SUBCHANS);
-	assert (slice >= 0 && slice < MAX_SLICERS);
-	assert (pp != NULL);	// 1.1J+
-	*/
+
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
+	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
+	Assert(slice >= 0 && slice < MAX_SLICERS)
+	Assert(pp != nil) // 1.1J+
 
 	// Extra stuff before slice indicators.
 	// Can indicate FX.25/IL2P or fix_bits.
@@ -801,7 +800,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	default:
 		// Possible fix_bits indication.
 		if audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall {
-			// FIXME KG assert(retries >= RETRY_NONE && retries <= RETRY_MAX)
+			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX)
 			display_retries = fmt.Sprintf(" [%s] ", retry_text[int(retries)])
 		}
 	}

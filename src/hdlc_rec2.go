@@ -548,13 +548,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  ***********************************************************************************/
 
 func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t, retry_conf *retry_conf_t, passall bool) bool {
-	// FIXME KG int i;
 
-	/* TODO KG
-	#if DEBUGx
-		int crc_failed = 1;
-	#endif
-	*/
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
@@ -787,7 +781,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 			goto failure
 		}
 	} else {
-		/* FIXME KG
+		/* TODO KG
 		#if DEBUGx
 		              crc_failed = 0;
 		#endif
@@ -795,7 +789,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 		goto failure
 	}
 failure:
-	/* FIXME KG
+	/* TODO KG
 	   #if DEBUGx
 	           if (retry_conf.type == RETRY_TYPE_NONE ) {
 	                 int j;

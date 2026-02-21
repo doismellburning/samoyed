@@ -38,8 +38,6 @@ type cdata_t struct {
 	data []byte /* Variable length data. */
 }
 
-// FIXME KG cdata_t.data?
-
 /* Types of things that can be in queue. */
 
 type dlq_type_t int

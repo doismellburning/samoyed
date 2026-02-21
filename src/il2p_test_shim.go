@@ -790,6 +790,6 @@ func test_serdes(t *testing.T) {
 	}
 
 	dw_printf("Serdes receive count = %d\n", rec_count)
-	// FIXME KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, rec_count == 12)
+	// TODO KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, rec_count == 12)
 	rec_count = -1 // disable deserialized packet test.
 }
