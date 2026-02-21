@@ -2,7 +2,6 @@ version: "2"
 linters:
   default: all
   disable:
-    - "cyclop"  # One day
     - "dupl"  # One day
     - "dupword"  # One day
     - "err113"  # Eventually
@@ -32,7 +31,7 @@ linters:
     - "wsl_v5"  # This seems to do some odd things around variable declarations that I'm not going to deal with right now
   settings:
     cyclop:
-      max-complexity: 60  # I sure wish this could be lower
+      max-complexity: 566  # I sure wish this could be lower
     depguard:
       rules:
         main:
