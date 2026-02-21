@@ -1095,7 +1095,7 @@ func dl_data_request(E *dlq_item_t) {
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_data_request (\"")
-		// FIXME KG ax25_safe_print(&E.txdata.data, E.txdata.len, 1) // FIXME KG data is a char[] which I can't figure out how to turn into a char* from cgo
+		ax25_safe_print(E.txdata.data[:E.txdata.len], true)
 		dw_printf("\") state=%d\n", S.state)
 	}
 
