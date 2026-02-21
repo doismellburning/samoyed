@@ -149,15 +149,17 @@ func kisspt_open_pt() {
 	pt_master = ptmx
 	pt_slave = pts
 
+	// TODO KG Figure out the right serial settings?
+
 	// TODO KG grantpt?
 	// TODO KG unlockpt?
 	// TODO KG ptsname?
 	// TODO KG cfmakeraw?
 
-	// FIXME KG ts.c_cc[C.VMIN] = 1  /* wait for at least one character */
-	// FIXME KG ts.c_cc[C.VTIME] = 0 /* no fancy timing. */
+	// TODO KG ts.c_cc[C.VMIN] = 1  /* wait for at least one character */
+	// TODO KG ts.c_cc[C.VTIME] = 0 /* no fancy timing. */
 
-	// FIXME KG tcsetattr TCSANOW?
+	// TODO KG tcsetattr TCSANOW?
 
 	/*
 	 * We had a problem here since the beginning.
@@ -175,7 +177,7 @@ func kisspt_open_pt() {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf("Debug: Try using non-blocking mode for pseudo terminal.\n");
 
-	/* FIXME KG
+	/* TODO KG
 	var flags = C.fcntl(fd, C.F_GETFL, 0)
 	e = C.fcntl(fd, C.F_SETFL, flags|C.O_NONBLOCK)
 	if e != 0 {
@@ -194,7 +196,7 @@ func kisspt_open_pt() {
 	// is also based on Debian.
 	// Need to revisit this.
 
-	/* FIXME KG
+	/* TODO KG
 	var pt_slave_fd = C.open(pt_slave_name, C.O_RDWR|C.O_NOCTTY)
 
 	if pt_slave_fd < 0 {
