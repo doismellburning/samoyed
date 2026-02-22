@@ -1466,9 +1466,7 @@ func cmd_listen_thread(client int) {
 		case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
 			// This is different than the above 'y' because this refers to a specific
 			// link in connected mode.
-
 			// This would be useful for a couple different purposes.
-
 			// When sending bulk data, we want to keep a fair amount queued up to take
 			// advantage of large window sizes (MAXFRAME, EMAXFRAME).  On the other
 			// hand we don't want to get TOO far ahead when transferring a large file.

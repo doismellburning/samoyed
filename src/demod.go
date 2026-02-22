@@ -559,7 +559,50 @@ func demod_init(pa *audio_s) int {
 					D.sluggish_decay = 0.00012 * 0.2
 				}
 
-				//TODO: how about MODEM_OFF case?
+			case MODEM_BPSK:
+				if save_audio_config_p.achan[channel].profiles == "" {
+					save_audio_config_p.achan[channel].profiles = "LMNO"
+				}
+
+				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
+
+				save_audio_config_p.achan[channel].decimate = 1
+
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
+					channel, save_audio_config_p.achan[channel].baud,
+					save_audio_config_p.achan[channel].profiles,
+					save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec)
+
+				if save_audio_config_p.achan[channel].decimate != 1 {
+					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
+				}
+
+				dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
+
+				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
+					dw_printf(", DTMF decoder enabled")
+				}
+
+				dw_printf(".\n")
+
+				for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+					Assert(d >= 0 && d < MAX_SUBCHANS)
+					var D = &demodulator_state[channel][d]
+					var profile = save_audio_config_p.achan[channel].profiles[d]
+
+					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
+						V26_UNSPECIFIED,
+						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec/save_audio_config_p.achan[channel].decimate,
+						save_audio_config_p.achan[channel].baud,
+						rune(profile),
+						D)
+
+					D.quick_attack = 0.080 * 0.2
+					D.sluggish_decay = 0.00012 * 0.2
+				}
+
+			//TODO: how about MODEM_OFF case?
 
 			default: /* Not AFSK */
 				/*
@@ -900,7 +943,7 @@ func demod_process_sample(channel int, subchan int, sam int) {
 			demod_afsk_process_sample(channel, subchan, sam, D)
 		}
 
-	case MODEM_QPSK, MODEM_8PSK:
+	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
 		if save_audio_config_p.achan[channel].decimate > 1 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid combination of options.  Exiting.\n")
@@ -950,7 +993,7 @@ func demod_get_audio_level_real(channel int, subchan int) alevel_t {
 		/* For AFSK, we have mark and space amplitudes. */
 		alevel.mark = (int)((D.alevel_mark_peak)*100.0 + 0.5)
 		alevel.space = (int)((D.alevel_space_peak)*100.0 + 0.5)
-	case MODEM_QPSK, MODEM_8PSK:
+	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
 		alevel.mark = -1
 		alevel.space = -1
 	default:

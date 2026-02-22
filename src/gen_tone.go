@@ -139,6 +139,18 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 			// ticks_per_bit should be ticks_per_symbol.
 
 			switch save_audio_config_p.achan[channel].modem_type {
+			case MODEM_BPSK:
+				audio_config_p.achan[channel].mark_freq = 1800
+				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
+
+				// 1 bit per symbol, so symbol time equals bit time
+				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
+				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
+				f2_change_per_sample[channel] = f1_change_per_sample[channel] // Not used.
+				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
+
+				tone_phase[channel] = PHASE_SHIFT_45
+
 			case MODEM_QPSK:
 				audio_config_p.achan[channel].mark_freq = 1800
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
@@ -320,6 +332,16 @@ func tone_gen_put_bit_real(channel int, dat int) {
 
 	// TODO: change to switch instead of if if if
 
+	if save_audio_config_p.achan[channel].modem_type == MODEM_BPSK {
+		dat &= 1 // Keep only LSB to be extra safe.
+
+		// For BPSK, each bit is one symbol.
+		// Bit 1 shifts phase by 180 degrees; bit 0 leaves phase unchanged.
+		if dat == 1 {
+			tone_phase[channel] += PHASE_SHIFT_180
+		}
+	}
+
 	if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
 		dat &= 1 // Keep only LSB to be extra safe.
 
@@ -427,6 +449,11 @@ func tone_gen_put_bit_real(channel int, dat int) {
 			}
 
 			tone_phase[channel] += change
+			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
+			gen_tone_put_sample(channel, a, sam)
+
+		case MODEM_BPSK:
+			tone_phase[channel] += f1_change_per_sample[channel]
 			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 

@@ -156,6 +156,7 @@ func AtestMain() {
 AIS for ship Automatic Identification System.
 EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var g3ruh = pflag.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
+	var bpsk = pflag.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
 	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
 	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
 	var modemProfile = pflag.StringP("modem-profile", "P", "", "Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
@@ -375,6 +376,13 @@ o = DCD output control
 		my_audio_config.achan[0].mark_freq = 0
 		my_audio_config.achan[0].space_freq = 0
 		my_audio_config.achan[0].profiles = " " // avoid getting default later.
+	}
+
+	if *bpsk {
+		my_audio_config.achan[0].modem_type = MODEM_BPSK
+		my_audio_config.achan[0].mark_freq = 0
+		my_audio_config.achan[0].space_freq = 0
+		my_audio_config.achan[0].profiles = ""
 	}
 
 	/*
