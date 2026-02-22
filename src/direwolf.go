@@ -46,6 +46,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
+var waypointSender *WaypointSender
 
 /*-------------------------------------------------------------------
  *
@@ -181,6 +182,7 @@ x = Silence FX.25 information.`)
 	var d_n_opt = 0      /* "-d n" option for Network KISS.  Can be repeated for more detail. */
 	var d_t_opt = 0      /* "-d t" option for Tracker.  Can be repeated for more detail. */
 	var d_g_opt = 0      /* "-d g" option for GPS. Can be repeated for more detail. */
+	var d_w_opt = 0      /* "-d w" option for waypoints.  Not documented yet. */
 	var d_o_opt = 0      /* "-d o" option for output control such as PTT and DCD. */
 	var d_i_opt = 0      /* "-d i" option for IGate.  Repeat for more detail */
 	var d_m_opt = 0      /* "-d m" option for mheard list. */
@@ -211,7 +213,7 @@ x = Silence FX.25 information.`)
 			case 'g':
 				d_g_opt++
 			case 'w':
-				waypoint_set_debug(1) // not documented yet.
+				d_w_opt = 1 // not documented yet.
 			case 't':
 				d_t_opt++
 				beacon_tracker_set_debug(d_t_opt)
@@ -730,7 +732,8 @@ x = Silence FX.25 information.`)
 	 */
 	dwgps_init(misc_config, d_g_opt)
 
-	waypoint_init(misc_config)
+	waypointSender = NewWaypointSender(misc_config)
+	waypointSender.SetDebug(d_w_opt)
 
 	/*
 	 * Enable beaconing.
@@ -1040,7 +1043,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		var user_def_da = "{" + string(USER_DEF_USER_ID) + string(USER_DEF_TYPE_AIS)
 
 		if strings.HasPrefix(string(pinfo), user_def_da) {
-			waypoint_send_ais(pinfo[3:])
+			waypointSender.SendAIS(pinfo[3:])
 
 			if A_opt_ais_to_obj && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
 				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
@@ -1069,7 +1072,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 				nameIn = A.g_name
 			}
 
-			waypoint_send_sentence(nameIn,
+			waypointSender.SendSentence(nameIn,
 				float64(A.g_lat), float64(A.g_lon), rune(A.g_symbol_table), A.g_symbol_code,
 				DW_FEET_TO_METERS(float64(A.g_altitude_ft)), float64(A.g_course), DW_MPH_TO_KNOTS(float64(A.g_speed_mph)),
 				A.g_comment)
@@ -1187,7 +1190,11 @@ func cleanup() {
 	log_term()
 	ptt_term()
 	dwgps_term()
-	waypoint_term()
+
+	if waypointSender != nil {
+		waypointSender.Close()
+	}
+
 	SLEEP_SEC(1)
 	os.Exit(0)
 }
