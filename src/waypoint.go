@@ -16,20 +16,18 @@ import (
 	"github.com/pkg/term"
 )
 
-var s_waypoint_serial_port_fd *term.Term
-var s_waypoint_udp_sock net.Conn
-var s_waypoint_formats = 0 // which formats should we generate?
-var s_waypoint_debug = 0   // Print information flowing to attached device.
-
-func waypoint_set_debug(n int) {
-	s_waypoint_debug = n
+type WaypointSender struct {
+	serialPortFd *term.Term
+	udpSock      net.Conn
+	formats      int // which formats should we generate?
+	debug        int // Print information flowing to attached device.
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:	waypoint_init
+ * Name:	NewWaypointSender
  *
- * Purpose:	Initialization for waypoint output port.
+ * Purpose:	Initialise and return a new WaypointSender.
  *
  * Inputs:	mc			- Pointer to configuration options.
  *
@@ -45,9 +43,6 @@ func waypoint_set_debug(n int) {
  *		  ->waypoint_formats	- Set of formats enabled.
  *					  If none set, default to generic & Kenwood here.
  *
- * Global output: s_waypoint_serial_port_fd
- *		  s_waypoint_udp_sock
- *
  * Description:	First to see if this is shared with GPS input.
  *		If not, open serial port.
  *		In version 1.6 UDP is added.  It is possible to use both.
@@ -57,7 +52,7 @@ func waypoint_set_debug(n int) {
  *
  *---------------------------------------------------------------*/
 
-func waypoint_init(mc *misc_config_s) {
+func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 	/* TODO KG
 	#if DEBUG
 		text_color_set (DW_COLOR_DEBUG);
@@ -66,7 +61,8 @@ func waypoint_init(mc *misc_config_s) {
 	#endif
 	*/
 
-	s_waypoint_udp_sock = nil
+	var ws = &WaypointSender{} //nolint:exhaustruct
+
 	if mc.waypoint_udp_portnum > 0 {
 		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))
 		var conn, err = net.Dial("udp", addr)
@@ -75,7 +71,7 @@ func waypoint_init(mc *misc_config_s) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Couldn't create socket for waypoint send to %s: %s\n", addr, err)
 		} else {
-			s_waypoint_udp_sock = conn
+			ws.udpSock = conn
 		}
 	}
 
@@ -86,16 +82,16 @@ func waypoint_init(mc *misc_config_s) {
 	 * If that fails, do own serial port open.
 	 */
 	if mc.waypoint_serial_port != "" {
-		s_waypoint_serial_port_fd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
+		ws.serialPortFd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
 
-		if s_waypoint_serial_port_fd == nil {
-			s_waypoint_serial_port_fd = serial_port_open(mc.waypoint_serial_port, 4800)
+		if ws.serialPortFd == nil {
+			ws.serialPortFd = serial_port_open(mc.waypoint_serial_port, 4800)
 		} else {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Note: Sharing same port for GPS input and waypoint output.\n")
 		}
 
-		if s_waypoint_serial_port_fd == nil {
+		if ws.serialPortFd == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Unable to open serial port %s for waypoint output.\n", mc.waypoint_serial_port)
 		}
@@ -103,26 +99,24 @@ func waypoint_init(mc *misc_config_s) {
 
 	// Set default formats if user did not specify any.
 
-	s_waypoint_formats = mc.waypoint_formats
-	if s_waypoint_formats == 0 {
-		s_waypoint_formats = WPL_FORMAT_NMEA_GENERIC | WPL_FORMAT_KENWOOD
+	ws.formats = mc.waypoint_formats
+	if ws.formats == 0 {
+		ws.formats = WPL_FORMAT_NMEA_GENERIC | WPL_FORMAT_KENWOOD
 	}
-	if s_waypoint_formats&WPL_FORMAT_GARMIN > 0 {
-		s_waypoint_formats |= WPL_FORMAT_NMEA_GENERIC /* See explanation below. */
+	if ws.formats&WPL_FORMAT_GARMIN > 0 {
+		ws.formats |= WPL_FORMAT_NMEA_GENERIC /* See explanation below. */
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set (DW_COLOR_DEBUG);
-		dw_printf ("end of waypoint_init: s_waypoint_serial_port_fd = %d\n", s_waypoint_serial_port_fd);
-		dw_printf ("end of waypoint_init: s_waypoint_udp_sock_fd = %d\n", s_waypoint_udp_sock_fd);
-	#endif
-	*/
+	return ws
+}
+
+func (ws *WaypointSender) SetDebug(n int) {
+	ws.debug = n
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        append_checksum
+ * Name:        appendChecksum
  *
  * Purpose:     Append checksum to the sentence.
  *
@@ -135,7 +129,7 @@ func waypoint_init(mc *misc_config_s) {
  *
  *--------------------------------------------------------------------*/
 
-func append_checksum(sentence []byte) []byte {
+func appendChecksum(sentence []byte) []byte {
 	Assert(sentence[0] == '$')
 
 	var cs = 0
@@ -146,11 +140,11 @@ func append_checksum(sentence []byte) []byte {
 	var checksum = fmt.Sprintf("*%02X", cs&0xff)
 
 	return append(sentence, checksum...)
-} /* end append_checksum */
+} /* end appendChecksum */
 
 /*-------------------------------------------------------------------
  *
- * Name:        nema_send_waypoint
+ * Name:        SendSentence
  *
  * Purpose:     Convert APRS position or object into NMEA waypoint sentence
  *		for use by a GPS display or other mapping application.
@@ -189,7 +183,7 @@ func append_checksum(sentence []byte) []byte {
  *
  *--------------------------------------------------------------------*/
 
-func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab rune, symbol byte,
+func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float64, symtab rune, symbol byte,
 	alt float64, course float64, speed float64, comment_in string) {
 	/* TODO KG
 	#if DEBUG
@@ -200,7 +194,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 
 	// Don't waste time if no destinations specified.
 
-	if s_waypoint_serial_port_fd == nil && s_waypoint_udp_sock == nil {
+	if ws.serialPortFd == nil && ws.udpSock == nil {
 		return
 	}
 
@@ -262,10 +256,10 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 *		*99		is checksum
 	 */
 
-	if s_waypoint_formats&WPL_FORMAT_NMEA_GENERIC > 0 {
+	if ws.formats&WPL_FORMAT_NMEA_GENERIC > 0 {
 		var sentence = fmt.Sprintf("$GPWPL,%s,%s,%s,%s,%s", slat, slat_ns, slong, slong_ew, wname)
-		var full_sentence = append_checksum([]byte(sentence))
-		send_sentence(full_sentence)
+		var full_sentence = appendChecksum([]byte(sentence))
+		ws.send(full_sentence)
 	}
 
 	/*
@@ -290,7 +284,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 *		*99		is checksum
 	 */
 
-	if s_waypoint_formats&WPL_FORMAT_GARMIN > 0 {
+	if ws.formats&WPL_FORMAT_GARMIN > 0 {
 		var i = int(symbol - ' ')
 		var grm_sym int /* Garmin symbol code. */
 
@@ -305,8 +299,8 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 		}
 
 		var sentence = fmt.Sprintf("$PGRMW,%s,%s,%04X,%s", wname, salt, grm_sym, wcomment)
-		var full_sentence = append_checksum([]byte(sentence))
-		send_sentence(full_sentence)
+		var full_sentence = appendChecksum([]byte(sentence))
+		ws.send(full_sentence)
 	}
 
 	/*
@@ -335,7 +329,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 * to delete that specific waypoint.
 	 */
 
-	if s_waypoint_formats&WPL_FORMAT_MAGELLAN > 0 {
+	if ws.formats&WPL_FORMAT_MAGELLAN > 0 {
 		var i = int(symbol - ' ')
 		var sicon string /* Magellan icon string.  Currently 1 or 2 characters. */
 
@@ -350,8 +344,8 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 		}
 
 		var sentence = fmt.Sprintf("$PMGNWPL,%s,%s,%s,%s,%s,M,%s,%s,%s", slat, slat_ns, slong, slong_ew, salt, wname, wcomment, sicon)
-		var full_sentence = append_checksum([]byte(sentence))
-		send_sentence(full_sentence)
+		var full_sentence = appendChecksum([]byte(sentence))
+		ws.send(full_sentence)
 	}
 
 	/*
@@ -440,7 +434,7 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 *	Oddly, there is no place for comment.
 	 */
 
-	if s_waypoint_formats&WPL_FORMAT_KENWOOD > 0 {
+	if ws.formats&WPL_FORMAT_KENWOOD > 0 {
 		var now = time.Now()
 		var stime = now.Format("150405") // "%H%M%S"
 		var sdate = now.Format("020106") // "%d%m%y"
@@ -470,8 +464,8 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 		var sentence = fmt.Sprintf("$PKWDWPL,%s,V,%s,%s,%s,%s,%s,%s,%s,%s,%s,%c%c",
 			stime, slat, slat_ns, slong, slong_ew,
 			sspeed, scourse, sdate, salt, wname, symtab, ken_sym)
-		var full_sentence = append_checksum([]byte(sentence))
-		send_sentence(full_sentence)
+		var full_sentence = appendChecksum([]byte(sentence))
+		ws.send(full_sentence)
 	}
 
 	/*
@@ -500,11 +494,11 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
 	 *		*99		is checksum
 	 *
 	 */
-} /* end waypoint_send_sentence */
+} /* end SendSentence */
 
 /*-------------------------------------------------------------------
  *
- * Name:        nema_send_ais
+ * Name:        SendAIS
  *
  * Purpose:     Send NMEA AIS sentence to GPS display or other mapping application.
  *
@@ -514,13 +508,24 @@ func waypoint_send_sentence(name_in string, dlat float64, dlong float64, symtab 
  *
  *--------------------------------------------------------------------*/
 
-func waypoint_send_ais(sentence []byte) {
-	if s_waypoint_serial_port_fd == nil && s_waypoint_udp_sock == nil {
+func (ws *WaypointSender) SendAIS(sentence []byte) {
+	if ws.serialPortFd == nil && ws.udpSock == nil {
 		return
 	}
 
-	if s_waypoint_formats&WPL_FORMAT_AIS > 0 {
-		send_sentence(sentence)
+	if ws.formats&WPL_FORMAT_AIS > 0 {
+		ws.send(sentence)
+	}
+}
+
+func (ws *WaypointSender) Close() {
+	if ws.serialPortFd != nil {
+		serial_port_close(ws.serialPortFd)
+		ws.serialPortFd = nil
+	}
+	if ws.udpSock != nil {
+		ws.udpSock.Close()
+		ws.udpSock = nil
 	}
 }
 
@@ -528,8 +533,8 @@ func waypoint_send_ais(sentence []byte) {
  * Append CR LF and send it.
  */
 
-func send_sentence(sentence []byte) {
-	if s_waypoint_debug > 0 {
+func (ws *WaypointSender) send(sentence []byte) {
+	if ws.debug > 0 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("waypoint send sentence: \"%s\"\n", sentence)
 	}
@@ -540,26 +545,15 @@ func send_sentence(sentence []byte) {
 
 	var final_len = len(final)
 
-	if s_waypoint_serial_port_fd != nil {
-		serial_port_write(s_waypoint_serial_port_fd, final)
+	if ws.serialPortFd != nil {
+		serial_port_write(ws.serialPortFd, final)
 	}
 
-	if s_waypoint_udp_sock != nil {
-		var n, err = s_waypoint_udp_sock.Write(final)
+	if ws.udpSock != nil {
+		var n, err = ws.udpSock.Write(final)
 		if n != final_len {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to send waypoint via UDP, err=%s\n", err)
 		}
 	}
-} /* send_sentence */
-
-func waypoint_term() {
-	if s_waypoint_serial_port_fd != nil {
-		serial_port_close(s_waypoint_serial_port_fd)
-		s_waypoint_serial_port_fd = nil
-	}
-	if s_waypoint_udp_sock != nil {
-		s_waypoint_udp_sock.Close()
-		s_waypoint_udp_sock = nil
-	}
-}
+} /* send */

@@ -55,7 +55,7 @@ func TestAppendChecksumBasic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result = append_checksum([]byte(tt.input))
+			var result = appendChecksum([]byte(tt.input))
 			assert.Equal(t, tt.expected, string(result))
 		})
 	}
@@ -71,7 +71,7 @@ func TestAppendChecksumFormat(t *testing.T) {
 
 	for _, input := range inputs {
 		t.Run(input[:8], func(t *testing.T) {
-			var result = string(append_checksum([]byte(input)))
+			var result = string(appendChecksum([]byte(input)))
 
 			// Must preserve original sentence.
 			assert.True(t, strings.HasPrefix(result, input),
@@ -104,7 +104,7 @@ func TestAppendChecksumCorrectness(t *testing.T) {
 
 	for _, input := range inputs {
 		t.Run(input[:8], func(t *testing.T) {
-			var result = string(append_checksum([]byte(input)))
+			var result = string(appendChecksum([]byte(input)))
 			var expected = computeChecksum(input)
 			var actual = 0
 			_, err := fmt.Sscanf(result[len(result)-2:], "%X", &actual)
@@ -118,7 +118,7 @@ func TestAppendChecksumCorrectness(t *testing.T) {
 func TestAppendChecksumIdempotentInput(t *testing.T) {
 	var input = []byte("$GPWPL,test")
 	var original = string(input)
-	var result = append_checksum(input)
+	var result = appendChecksum(input)
 	assert.Equal(t, original, string(input), "original slice content must not change")
 	assert.True(t, strings.HasPrefix(string(result), original),
 		"result must start with original content")
@@ -143,9 +143,9 @@ func receiveUDP(t *testing.T, conn net.PacketConn) string {
 	return string(buf[:n])
 }
 
-// setupUDPWaypoint starts a UDP listener and initialises the waypoint subsystem
-// to send to it.  It returns a cleanup function that must be deferred.
-func setupUDPWaypoint(t *testing.T, formats int) net.PacketConn {
+// setupUDPWaypoint starts a UDP listener and initialises a WaypointSender to send to it.
+// It returns the sender and the listener.
+func setupUDPWaypoint(t *testing.T, formats int) (*WaypointSender, net.PacketConn) {
 	t.Helper()
 
 	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
@@ -156,21 +156,21 @@ func setupUDPWaypoint(t *testing.T, formats int) net.PacketConn {
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      formats,
 	}
-	waypoint_init(&mc)
+	var ws = NewWaypointSender(&mc)
 
 	t.Cleanup(func() {
-		waypoint_term()
+		ws.Close()
 		listener.Close() //nolint:gosec,errcheck
 	})
 
-	return listener
+	return ws, listener
 }
 
 // TestWaypointSendSentenceNMEAGeneric verifies $GPWPL output over UDP.
 func TestWaypointSendSentenceNMEAGeneric(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	waypoint_send_sentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
 
 	var got = receiveUDP(t, listener)
 	// Should contain exactly one CRLF-terminated NMEA sentence.
@@ -194,9 +194,9 @@ func TestWaypointSendSentenceNMEAGeneric(t *testing.T) {
 
 // TestWaypointSendSentenceKenwood verifies $PKWDWPL output over UDP.
 func TestWaypointSendSentenceKenwood(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_KENWOOD)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_KENWOOD)
 
-	waypoint_send_sentence("W1AW", 41.7147, -72.7272, '/', '-', 100.0, 270.0, 10.0, "")
+	ws.SendSentence("W1AW", 41.7147, -72.7272, '/', '-', 100.0, 270.0, 10.0, "")
 
 	var got = receiveUDP(t, listener)
 	assert.True(t, strings.HasPrefix(got, "$PKWDWPL,"), "should be a PKWDWPL sentence")
@@ -206,9 +206,9 @@ func TestWaypointSendSentenceKenwood(t *testing.T) {
 
 // TestWaypointSendSentenceMagellan verifies $PMGNWPL output over UDP.
 func TestWaypointSendSentenceMagellan(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_MAGELLAN)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_MAGELLAN)
 
-	waypoint_send_sentence("MAGSTN", 34.0, -118.0, '/', '-', 50.0, G_UNKNOWN, G_UNKNOWN, "a comment")
+	ws.SendSentence("MAGSTN", 34.0, -118.0, '/', '-', 50.0, G_UNKNOWN, G_UNKNOWN, "a comment")
 
 	var got = receiveUDP(t, listener)
 	assert.True(t, strings.HasPrefix(got, "$PMGNWPL,"), "should be a PMGNWPL sentence")
@@ -218,19 +218,17 @@ func TestWaypointSendSentenceMagellan(t *testing.T) {
 
 // TestWaypointSendSentenceNoDest verifies early return when no destination is configured.
 func TestWaypointSendSentenceNoDest(t *testing.T) {
-	// Ensure clean state: no serial port, no UDP socket.
-	s_waypoint_serial_port_fd = nil
-	s_waypoint_udp_sock = nil
+	var ws = &WaypointSender{} //nolint:exhaustruct
 
 	// Should not panic.
-	waypoint_send_sentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
 }
 
 // TestWaypointSendSentenceCommaInName verifies comma substitution.
 func TestWaypointSendSentenceCommaInName(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	waypoint_send_sentence("MY,OBJ", 42.0, -71.0, '/', '-', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("MY,OBJ", 42.0, -71.0, '/', '-', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
 
 	var got = receiveUDP(t, listener)
 	assert.NotContains(t, got[:strings.LastIndex(got, "*")], ",MY,OBJ,",
@@ -240,9 +238,9 @@ func TestWaypointSendSentenceCommaInName(t *testing.T) {
 
 // TestWaypointSendSentenceAsteriskInName verifies asterisk substitution.
 func TestWaypointSendSentenceAsteriskInName(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	waypoint_send_sentence("MY*OBJ", 42.0, -71.0, '/', '-', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("MY*OBJ", 42.0, -71.0, '/', '-', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
 
 	var got = receiveUDP(t, listener)
 	assert.Contains(t, got, "MY~OBJ", "asterisk in name should become tilde character")
@@ -250,10 +248,10 @@ func TestWaypointSendSentenceAsteriskInName(t *testing.T) {
 
 // TestWaypointSendSentenceKenwoodSymbolComma verifies Kenwood comma-symbol substitution.
 func TestWaypointSendSentenceKenwoodSymbolComma(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_KENWOOD)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_KENWOOD)
 
 	// Symbol ',' (Boy Scouts) should be substituted to '|'.
-	waypoint_send_sentence("BSCOUT", 42.0, -71.0, '/', ',', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("BSCOUT", 42.0, -71.0, '/', ',', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
 
 	var got = receiveUDP(t, listener)
 	// The Kenwood sentence ends with two-char symbol (table + code).
@@ -266,19 +264,18 @@ func TestWaypointSendSentenceKenwoodSymbolComma(t *testing.T) {
 
 // TestWaypointSendAisNoDest verifies AIS early return when no destination configured.
 func TestWaypointSendAisNoDest(t *testing.T) {
-	s_waypoint_serial_port_fd = nil
-	s_waypoint_udp_sock = nil
+	var ws = &WaypointSender{} //nolint:exhaustruct
 
 	// Should not panic.
-	waypoint_send_ais([]byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B"))
+	ws.SendAIS([]byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B"))
 }
 
 // TestWaypointSendAisUDP verifies AIS sentences are forwarded over UDP.
 func TestWaypointSendAisUDP(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_AIS)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_AIS)
 
 	var aisMsg = []byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B")
-	waypoint_send_ais(aisMsg)
+	ws.SendAIS(aisMsg)
 
 	var got = receiveUDP(t, listener)
 	assert.True(t, strings.HasPrefix(got, "!AIVDM,"), "AIS sentence should be forwarded unchanged")
@@ -288,9 +285,9 @@ func TestWaypointSendAisUDP(t *testing.T) {
 
 // TestWaypointSendAisWrongFormat verifies AIS not sent when format flag not set.
 func TestWaypointSendAisWrongFormat(t *testing.T) {
-	var listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
+	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	waypoint_send_ais([]byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B"))
+	ws.SendAIS([]byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B"))
 
 	// Listener should receive nothing; set a short deadline and expect a timeout.
 	err := listener.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
@@ -300,23 +297,23 @@ func TestWaypointSendAisWrongFormat(t *testing.T) {
 	assert.Error(t, readErr, "should timeout because AIS flag is not set")
 }
 
-// TestWaypointDefaultFormats verifies that init sets defaults when formats==0.
+// TestWaypointDefaultFormats verifies that NewWaypointSender sets defaults when formats==0.
 func TestWaypointDefaultFormats(t *testing.T) {
 	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		waypoint_term()
-		listener.Close() //nolint:gosec,errcheck
-	})
 
 	var mc = misc_config_s{ //nolint: exhaustruct
 		waypoint_udp_hostname: "127.0.0.1",
 		waypoint_udp_portnum:  udpPort(t, listener),
-		waypoint_formats:      0, // let init pick defaults
+		waypoint_formats:      0, // let NewWaypointSender pick defaults
 	}
-	waypoint_init(&mc)
+	var ws = NewWaypointSender(&mc)
+	t.Cleanup(func() {
+		ws.Close()
+		listener.Close() //nolint:gosec,errcheck
+	})
 
-	assert.Equal(t, WPL_FORMAT_NMEA_GENERIC|WPL_FORMAT_KENWOOD, s_waypoint_formats,
+	assert.Equal(t, WPL_FORMAT_NMEA_GENERIC|WPL_FORMAT_KENWOOD, ws.formats,
 		"default formats should be NMEA generic + Kenwood")
 }
 
@@ -324,23 +321,23 @@ func TestWaypointDefaultFormats(t *testing.T) {
 func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		waypoint_term()
-		listener.Close() //nolint:gosec,errcheck
-	})
 
 	var mc = misc_config_s{ //nolint: exhaustruct
 		waypoint_udp_hostname: "127.0.0.1",
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      WPL_FORMAT_GARMIN,
 	}
-	waypoint_init(&mc)
+	var ws = NewWaypointSender(&mc)
+	t.Cleanup(func() {
+		ws.Close()
+		listener.Close() //nolint:gosec,errcheck
+	})
 
-	assert.NotZero(t, s_waypoint_formats&WPL_FORMAT_NMEA_GENERIC,
+	assert.NotZero(t, ws.formats&WPL_FORMAT_NMEA_GENERIC,
 		"Garmin format should imply NMEA generic")
 }
 
-// TestWaypointTermClearsState verifies that waypoint_term resets the globals.
+// TestWaypointTermClearsState verifies that Close resets the struct fields.
 func TestWaypointTermClearsState(t *testing.T) {
 	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -353,10 +350,10 @@ func TestWaypointTermClearsState(t *testing.T) {
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      WPL_FORMAT_KENWOOD,
 	}
-	waypoint_init(&mc)
-	require.NotNil(t, s_waypoint_udp_sock, "socket should be open after init")
+	var ws = NewWaypointSender(&mc)
+	require.NotNil(t, ws.udpSock, "socket should be open after NewWaypointSender")
 
-	waypoint_term()
-	assert.Nil(t, s_waypoint_udp_sock, "socket should be nil after term")
-	assert.Nil(t, s_waypoint_serial_port_fd, "serial port fd should be nil after term")
+	ws.Close()
+	assert.Nil(t, ws.udpSock, "socket should be nil after Close")
+	assert.Nil(t, ws.serialPortFd, "serial port fd should be nil after Close")
 }
