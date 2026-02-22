@@ -1,0 +1,9 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+$GEN_PACKETS -B1200 -k -n 100 -o test12-bpsk.wav
+$ATEST -B1200 -k -F0 -L85 -G89 test12-bpsk.wav
+$ATEST -B1200 -k -F1 -L91 -G95 test12-bpsk.wav

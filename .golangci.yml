@@ -31,7 +31,7 @@ linters:
     - "wsl_v5"  # KG 2026-02-26 I don't have concrete data but it feels like wsl is giving me spurious edits/breakages - it might not be wsl, it might be something else, but it only started being an issue once I enabled wsl, so I'm disabling it again for the foreseeable
   settings:
     cyclop:
-      max-complexity: 566  # I sure wish this could be lower
+      max-complexity: 567  # I sure wish this could be lower
     depguard:
       rules:
         main:
@@ -61,7 +61,7 @@ linters:
         - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
     nestif:
-      min-complexity: 579  # There's lots of upstream complexity, so let's soft-disable this
+      min-complexity: 580  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"

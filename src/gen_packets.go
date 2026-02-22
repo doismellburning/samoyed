@@ -139,6 +139,7 @@ AIS for ship Automatic Identification System.
 EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var bitrateOverrideStr = pflag.StringP("bitrate-override", "b", "", "Bits / second for data.")
 	var g3ruh = pflag.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
+	var bpsk = pflag.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
 	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
 	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
 	var markFrequency = pflag.IntP("mark", "m", 0, "Mark frequency.")
@@ -401,6 +402,12 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using G3RUH mode regardless of bit rate.\n")
+	}
+
+	if *bpsk { /* -k for BPSK */
+		modem.achan[0].modem_type = MODEM_BPSK
+		modem.achan[0].mark_freq = 0
+		modem.achan[0].space_freq = 0
 	}
 
 	if *direwolf15compat { /* -j V.26 compatible with earlier direwolf. */
@@ -860,6 +867,8 @@ func send_packet(str string) {
 				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 2)
 			case MODEM_8PSK:
 				samples_per_symbol = modem.adev[0].samples_per_sec / (modem.achan[c].baud / 3)
+			case MODEM_BPSK:
+				samples_per_symbol = modem.adev[0].samples_per_sec / modem.achan[c].baud
 			default:
 				samples_per_symbol = modem.adev[0].samples_per_sec / modem.achan[c].baud
 			}
