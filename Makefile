@@ -4,6 +4,7 @@ GO_FILES = $(shell find * -name \*.go)
 SRC_DIRS = ./cmd/... ./src/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
+GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 
 .PHONY: all
 all: $(CMDS) test
@@ -27,7 +28,7 @@ test: gotest test-scripts
 
 .PHONY: gotest
 gotest:
-	go test -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) -v $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
+	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
 # TODO Better output name, non-PHONY target, docs, etc.
 .PHONY: gotest-bin
