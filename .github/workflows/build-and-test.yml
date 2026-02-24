@@ -20,7 +20,7 @@ jobs:
     - name: "Generate Version"
       id: "version"
       run: |
-        export SAMOYED_VERSION=$(date --utc +%Y.%m.%d.%s)-$(git rev-parse --short HEAD)
+        export SAMOYED_VERSION=$(./version.sh)
         echo "Version: $SAMOYED_VERSION"
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT  # Output to be used by the release job
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV  # Env to be used by the make build
