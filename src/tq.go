@@ -81,7 +81,6 @@ func tq_init(audio_config_p *audio_s) {
 		dw_printf ("tq_init (  )\n");
 	#endif
 	*/
-
 	save_audio_config_p = audio_config_p
 
 	for c := 0; c < MAX_RADIO_CHANS; c++ {
@@ -96,14 +95,12 @@ func tq_init(audio_config_p *audio_s) {
 	 */
 
 	for c := 0; c < MAX_RADIO_CHANS; c++ {
-
 		xmit_thread_is_waiting[c] = false
 
 		if audio_config_p.chan_medium[c] == MEDIUM_RADIO {
 			wake_up_cond[c] = sync.NewCond(&wake_up_mutex[c])
 		}
 	}
-
 } /* end tq_init */
 
 /*-------------------------------------------------------------------
@@ -144,7 +141,6 @@ func tq_init(audio_config_p *audio_s) {
  *--------------------------------------------------------------------*/
 
 func tq_append(channel int, prio int, pp *packet_t) {
-
 	/* TODO KG
 	#if DEBUG
 		unsigned char *pinfo;
@@ -154,12 +150,12 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		dw_printf ("tq_append (channel=%d, prio=%d, pp=%p) \"%*s\"\n", channel, prio, pp, info_len, (char*)pinfo);
 	#endif
 	*/
-
 	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("INTERNAL ERROR:  tq_append nil packet pointer. Please report this!\n")
+
 		return
 	}
 
@@ -179,7 +175,6 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 	if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE ||
 		save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
-
 		var ts string // optional time stamp.
 
 		if save_audio_config_p.timestamp_format != "" {
@@ -190,10 +185,10 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		// Formated addresses.
 		var stemp = ax25_format_addrs(pp)
 		var pinfo = ax25_get_info(pp)
+
 		text_color_set(DW_COLOR_XMIT)
 
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
-
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
@@ -207,10 +202,10 @@ func tq_append(channel int, prio int, pp *packet_t) {
 			dw_printf("\n")
 
 			nettnc_send_packet(channel, pp)
-
 		}
 
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -227,6 +222,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
 		dw_printf("\n")
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -258,6 +254,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -274,14 +271,17 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		queue_head[channel][prio] = pp
 	} else {
 		var pnext *packet_t
+
 		var plast = queue_head[channel][prio]
 		for {
 			pnext = ax25_get_nextp(plast)
 			if pnext == nil {
 				break
 			}
+
 			plast = pnext
 		}
+
 		ax25_set_nextp(plast, pp)
 	}
 
@@ -377,7 +377,6 @@ func tq_append(channel int, prio int, pp *packet_t) {
 // TODO: FIXME:  this is a copy of tq_append.  Need to fine tune and explain why.
 
 func lm_data_request(channel int, prio int, pp *packet_t) {
-
 	/* TODO KG
 	#if DEBUG
 		unsigned char *pinfo;
@@ -387,12 +386,12 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		dw_printf ("lm_data_request (channel=%d, prio=%d, pp=%p) \"%*s\"\n", channel, prio, pp, info_len, (char*)pinfo);
 	#endif
 	*/
-
 	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("INTERNAL ERROR:  lm_data_request nil packet pointer. Please report this!\n")
+
 		return
 	}
 
@@ -414,6 +413,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		dw_printf("Why aren't external KISS modems allowed?  See\n")
 		dw_printf("Why-is-9600-only-twice-as-fast-as-1200.pdf for explanation.\n")
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -445,8 +445,10 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 			if pnext == nil {
 				break
 			}
+
 			plast = pnext
 		}
+
 		ax25_set_nextp(plast, pp)
 	}
 
@@ -479,7 +481,6 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		wake_up_mutex[channel].Unlock()
 	}
 	//NO!	}
-
 } /* end lm_data_request */
 
 /*-------------------------------------------------------------------
@@ -536,7 +537,6 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
  *--------------------------------------------------------------------*/
 
 func lm_seize_request(channel int) {
-
 	var prio = TQ_PRIO_1_LO
 
 	/* TODO KG
@@ -554,6 +554,7 @@ func lm_seize_request(channel int) {
 		dw_printf("Connected packet mode is allowed only with internal modems.\n")
 		dw_printf("Why aren't external KISS modems allowed?  See\n")
 		dw_printf("Why-is-9600-only-twice-as-fast-as-1200.pdf for explanation.\n")
+
 		return
 	}
 
@@ -587,8 +588,10 @@ func lm_seize_request(channel int) {
 			if pnext == nil {
 				break
 			}
+
 			plast = pnext
 		}
+
 		ax25_set_nextp(plast, pp)
 	}
 
@@ -629,7 +632,6 @@ func lm_seize_request(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_wait_while_empty(channel int) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -671,7 +673,6 @@ func tq_wait_while_empty(channel int) {
 			  dw_printf ("tq_wait_while_empty (%d): SLEEP - about to call cond wait\n", channel);
 		#endif
 		*/
-
 		wake_up_mutex[channel].Lock()
 		xmit_thread_is_waiting[channel] = true
 		wake_up_cond[channel].Wait()
@@ -693,7 +694,6 @@ func tq_wait_while_empty(channel int) {
 		dw_printf ("tq_wait_while_empty (%d) returns\n", channel);
 	#endif
 	*/
-
 }
 
 /*-------------------------------------------------------------------
@@ -712,14 +712,12 @@ func tq_wait_while_empty(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_remove(channel int, prio int) *packet_t {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("tq_remove(%d,%d) enter critical section\n", channel, prio);
 	#endif
 	*/
-
 	tq_mutex.Lock()
 
 	var result_p *packet_t
@@ -751,7 +749,6 @@ func tq_remove(channel int, prio int) *packet_t {
 	   #endif
 	*/
 	return (result_p)
-
 } /* end tq_remove */
 
 /*-------------------------------------------------------------------
@@ -771,7 +768,6 @@ func tq_remove(channel int, prio int) *packet_t {
  *--------------------------------------------------------------------*/
 
 func tq_peek(channel int, prio int) *packet_t {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -781,7 +777,6 @@ func tq_peek(channel int, prio int) *packet_t {
 
 	// I don't think we need critical region here.
 	//dw_mutex_lock (&tq_mutex);
-
 	var result_p = queue_head[channel][prio]
 	// Just take a peek at the head.  Don't remove it.
 
@@ -804,7 +799,6 @@ func tq_peek(channel int, prio int) *packet_t {
 	   #endif
 	*/
 	return (result_p)
-
 } /* end tq_peek */
 
 /*-------------------------------------------------------------------
@@ -820,11 +814,9 @@ func tq_peek(channel int, prio int) *packet_t {
  *--------------------------------------------------------------------*/
 
 func tq_is_empty(channel int) bool {
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	for p := 0; p < TQ_NUM_PRIO; p++ {
-
 		Assert(p >= 0 && p < TQ_NUM_PRIO)
 
 		if queue_head[channel][p] != nil {
@@ -833,7 +825,6 @@ func tq_is_empty(channel int) bool {
 	}
 
 	return true
-
 } /* end tq_is_empty */
 
 /*-------------------------------------------------------------------
@@ -861,14 +852,12 @@ func tq_is_empty(channel int) bool {
 //#define DEBUG2 1
 
 func tq_count(channel int, prio int, source string, dest string, bytes bool) int {
-
 	/* TODO KG
 	#if DEBUG2
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("tq_count(channel=%d, prio=%d, source=\"%s\", dest=\"%s\", bytes=%d)\n", channel, prio, source, dest, bytes);
 	#endif
 	*/
-
 	if prio == -1 {
 		return (tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes))
 	}
@@ -878,6 +867,7 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("INTERNAL ERROR - tq_count(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
+
 		return (0)
 	}
 
@@ -901,7 +891,6 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 	for pp != nil {
 		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
 			// Consider only real packets.
-
 			var count_it = 1
 
 			if source != "" {
@@ -917,6 +906,7 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 					count_it = 0
 				}
 			}
+
 			if count_it > 0 && dest != "" {
 				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 				/* TODO KG
@@ -939,6 +929,7 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 				}
 			}
 		}
+
 		pp = ax25_get_nextp(pp)
 	}
 

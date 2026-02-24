@@ -352,14 +352,12 @@ func isxdigit(b byte) bool {
  *------------------------------------------------------------------------------*/
 
 func ax25_new() *packet_t {
-
 	/* TODO KG
 	#if DEBUG
 	        text_color_set(DW_COLOR_DEBUG);
 	        dw_printf ("ax25_new(): before alloc, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
 	#endif
 	*/
-
 	last_seq_num++
 	ax25_new_count++
 
@@ -371,7 +369,6 @@ func ax25_new() *packet_t {
 
 	//if (ax25_new_count > ax25_delete_count + 100) {
 	if ax25_new_count > ax25_delete_count+256 {
-
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Report to WB2OSZ - Memory leak for packet objects.  new=%d, delete=%d\n", ax25_new_count, ax25_delete_count)
 	}
@@ -403,10 +400,10 @@ func ax25_delete(this_p *packet_t) {
 	        dw_printf ("ax25_delete(): before free, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
 	#endif
 	*/
-
 	if this_p == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - nil pointer passed to ax25_delete.\n")
+
 		return
 	}
 
@@ -469,7 +466,6 @@ func ax25_delete(this_p *packet_t) {
  *------------------------------------------------------------------------------*/
 
 func ax25_from_text(monitor string, strict bool) *packet_t {
-
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
 	 */
@@ -477,7 +473,6 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("DEBUG: ax25_from_text ('%s', %d)\n", monitor, strict);
 	// fflush(stdout); sleep(1);
-
 	var this_p = ax25_new()
 
 	/* Is it possible to have a nul character (zero byte) in the */
@@ -535,6 +530,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  No source address\n")
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -544,6 +540,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad source address\n")
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -564,6 +561,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad destination address\n")
 		ax25_delete(this_p)
+
 		return (nil)
 	}
 
@@ -604,11 +602,13 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		}
 
 		var heardTemp bool
+
 		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), IfThenElse(strict, 1, 0))
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
 			ax25_delete(this_p)
+
 			return (nil)
 		}
 
@@ -656,6 +656,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
 			ax25_delete(this_p)
+
 			return (nil)
 		}
 
@@ -666,7 +667,6 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 			isxdigit(pinfo[3]) &&
 			isxdigit(pinfo[4]) &&
 			pinfo[5] == '>' {
-
 			var hexVal, _ = strconv.ParseInt(string(pinfo[3:5]), 16, 64)
 			info_part = append(info_part, byte(hexVal))
 			pinfo = pinfo[6:]
@@ -713,7 +713,6 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
-
 	/*
 	 * First make sure we have an acceptable length:
 	 *
@@ -730,11 +729,11 @@ func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
 	 * is 7+7 for addresses plus 1 for control.
 	 *
 	 */
-
 	var flen = len(data)
 	if flen < AX25_MIN_PACKET_LEN || flen > AX25_MAX_PACKET_LEN {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Frame length %d not in allowable range of %d to %d.\n", flen, AX25_MIN_PACKET_LEN, AX25_MAX_PACKET_LEN)
+
 		return (nil)
 	}
 
@@ -768,7 +767,6 @@ func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
  *------------------------------------------------------------------------------*/
 
 func ax25_dup(copy_from *packet_t) *packet_t {
-
 	var this_p = ax25_new()
 	Assert(this_p != nil)
 
@@ -779,7 +777,6 @@ func ax25_dup(copy_from *packet_t) *packet_t {
 	this_p.seq = save_seq
 
 	return (this_p)
-
 }
 
 /*------------------------------------------------------------------------------
@@ -824,7 +821,6 @@ var position_name = [1 + AX25_MAX_ADDRS]string{
 	"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
 
 func ax25_parse_addr(position int, in_addr string, strictness int) (string, int, bool, bool) {
-
 	var out_addr string
 	var ssid int
 	var heard bool
@@ -834,14 +830,17 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 	if position < -1 {
 		position = -1
 	}
+
 	if position > AX25_REPEATER_8 {
 		position = AX25_REPEATER_8
 	}
+
 	position++ /* Adjust for position_name above. */
 
 	if len(in_addr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%sAddress \"%s\" is empty.\n", position_name[position], in_addr)
+
 		return out_addr, ssid, heard, false
 	}
 
@@ -854,6 +853,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
 
 	var maxlen = IfThenElse(strictness > 0, 6, (AX25_MAX_ADDR_LEN - 1))
+
 	for i, p := range in_addr {
 		if p == '-' || p == '*' {
 			break
@@ -862,12 +862,14 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 		if i >= maxlen {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sAddress is too long. \"%s\" has more than %d characters.\n", position_name[position], in_addr, maxlen)
+
 			return out_addr, ssid, heard, false
 		}
 
 		if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sAddress, \"%s\" contains character other than letter or digit in character position %d.\n", position_name[position], in_addr, i)
+
 			return out_addr, ssid, heard, false
 		}
 
@@ -876,7 +878,6 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 		if DECODE_APRS_UTIL {
 			// Hack when running in decode_aprs utility
 			// Exempt the "qA..." case because it was already mentioned.
-
 			if strictness > 0 && unicode.IsLower(p) && !strings.HasPrefix(in_addr, "qA") {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
@@ -885,6 +886,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 			if strictness > 0 && unicode.IsLower(p) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
+
 				return out_addr, ssid, heard, false
 			}
 		}
@@ -894,35 +896,45 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 	in_addr = in_addr[len(out_addr):]
 
 	var sstr string
+
 	if len(in_addr) > 0 && in_addr[0] == '-' {
 		in_addr = in_addr[1:]
 		for i, p := range in_addr {
 			if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
 				break
 			}
+
 			if i >= 2 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sSSID is too long. SSID part of \"%s\" has more than 2 characters.\n", position_name[position], in_addr)
+
 				return out_addr, ssid, heard, false
 			}
+
 			sstr += string(p)
 			if strictness > 0 && !unicode.IsDigit(p) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sSSID must be digits. \"%s\" has letters in SSID.\n", position_name[position], in_addr)
+
 				return out_addr, ssid, heard, false
 			}
 		}
+
 		var k, kErr = strconv.Atoi(sstr)
 		if kErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sMalformed SSID: \"%s\" could not be parsed.\n", position_name[position], in_addr)
+
 			return out_addr, ssid, heard, false
 		}
+
 		if k < 0 || k > 15 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sSSID out of range. SSID of \"%s\" not in range of 0 to 15.\n", position_name[position], in_addr)
+
 			return out_addr, ssid, heard, false
 		}
+
 		ssid = k
 
 		// Chomp
@@ -931,24 +943,27 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 
 	if len(in_addr) > 0 && in_addr[0] == '*' {
 		heard = true
+
 		if strictness == 2 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\"*\" is not allowed at end of address \"%s\" here.\n", in_addr)
+
 			return out_addr, ssid, heard, false
 		}
+
 		in_addr = in_addr[1:]
 	}
 
 	if len(in_addr) != 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid character \"%c\" found in %saddress \"%s\".\n", in_addr[0], position_name[position], in_addr)
+
 		return out_addr, ssid, heard, false
 	}
 
 	// dw_printf ("ax25_parse_addr out: '%s' %d %d\n", out_addr, *out_ssid, *out_heard);
 
 	return out_addr, ssid, heard, true
-
 } /* end ax25_parse_addr */
 
 /*-------------------------------------------------------------------
@@ -995,8 +1010,8 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *--------------------------------------------------------------------*/
 
 func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
-
 	var all_ok = true
+
 	for n := 0; n < ax25_get_num_addr(pp); n++ {
 		var addr = ax25_get_addr_with_ssid(pp, n)
 
@@ -1031,10 +1046,10 @@ func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
  *------------------------------------------------------------------------------*/
 
 func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
-
 	if ax25_get_dti(from_pp) != '}' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_unwrap_third_party: wrong data type.\n")
+
 		return (nil)
 	}
 
@@ -1071,7 +1086,6 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_addr(this_p *packet_t, n int, ad string) {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < AX25_MAX_ADDRS)
@@ -1084,7 +1098,6 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 	}
 
 	if n >= 0 && n < this_p.num_addr {
-
 		//dw_printf ("ax25_set_addr , existing case\n");
 		/*
 		 * Set existing address position.
@@ -1093,7 +1106,6 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		// Why aren't we setting 'strict' here?
 		// Messages from IGate have q-constructs.
 		// We use this to parse it and later remove unwanted parts.
-
 		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
 
 		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
@@ -1102,16 +1114,16 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 			if i >= 6 {
 				break
 			}
+
 			this_p.frame_data[n*7+i] = byte(c << 1)
 		}
+
 		ax25_set_ssid(this_p, n, ssidTemp)
 	} else if n == this_p.num_addr {
-
 		//dw_printf ("ax25_set_addr , appending case\n");
 		/*
 		 * One beyond last position, process as insert.
 		 */
-
 		ax25_insert_addr(this_p, n, ad)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
@@ -1152,7 +1164,6 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *------------------------------------------------------------------------------*/
 
 func ax25_insert_addr(this_p *packet_t, n int, ad string) {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
@@ -1188,10 +1199,12 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 
 	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
 	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
+
 	for i, c := range addrTemp {
 		if i >= 6 {
 			break
 		}
+
 		this_p.frame_data[n*7+i] = byte(c << 1)
 	}
 
@@ -1200,6 +1213,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	// Sanity check after messing with number of addresses.
 
 	var expect = this_p.num_addr
+
 	this_p.num_addr = (-1)
 	if expect != ax25_get_num_addr(this_p) {
 		text_color_set(DW_COLOR_ERROR)
@@ -1227,7 +1241,6 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *------------------------------------------------------------------------------*/
 
 func ax25_remove_addr(this_p *packet_t, n int) {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
@@ -1245,12 +1258,12 @@ func ax25_remove_addr(this_p *packet_t, n int) {
 	// Sanity check after messing with number of addresses.
 
 	var expect = this_p.num_addr
+
 	this_p.num_addr = (-1)
 	if expect != ax25_get_num_addr(this_p) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
-
 }
 
 /*------------------------------------------------------------------------------
@@ -1269,7 +1282,6 @@ func ax25_remove_addr(this_p *packet_t, n int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_num_addr(this_p *packet_t) int {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1348,7 +1360,6 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1356,6 +1367,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
 		dw_printf("Address index, %d, is less than zero.\n", n)
+
 		return "??????"
 	}
 
@@ -1363,6 +1375,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
 		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
+
 		return "??????"
 	}
 
@@ -1421,7 +1434,6 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1429,6 +1441,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_no_ssid.\n")
 		dw_printf("Address index, %d, is less than zero.\n", n)
+
 		return "??????"
 	}
 
@@ -1436,6 +1449,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_no_with_ssid.\n")
 		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
+
 		return "??????"
 	}
 
@@ -1476,7 +1490,6 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_ssid(this_p *packet_t, n int) int {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1485,6 +1498,7 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_get_ssid(%d), num_addr=%d\n", n, this_p.num_addr)
+
 		return (0)
 	}
 }
@@ -1507,7 +1521,6 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1538,7 +1551,6 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_h(this_p *packet_t, n int) int {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < this_p.num_addr)
@@ -1548,6 +1560,7 @@ func ax25_get_h(this_p *packet_t, n int) int {
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_get_h(%d), num_addr=%d\n", n, this_p.num_addr)
+
 		return (0)
 	}
 }
@@ -1570,7 +1583,6 @@ func ax25_get_h(this_p *packet_t, n int) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_h(this_p *packet_t, n int) {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1599,18 +1611,17 @@ func ax25_set_h(this_p *packet_t, n int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_heard(this_p *packet_t) int {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	var result = AX25_SOURCE
 
 	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
-
 		if ax25_get_h(this_p, i) != 0 {
 			result = i
 		}
 	}
+
 	return result
 }
 
@@ -1631,16 +1642,15 @@ func ax25_get_heard(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_first_not_repeated(this_p *packet_t) int {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
-
 		if ax25_get_h(this_p, i) == 0 {
 			return i
 		}
 	}
+
 	return (-1)
 }
 
@@ -1660,7 +1670,6 @@ func ax25_get_first_not_repeated(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_rr(this_p *packet_t, n int) int { //nolint:unused
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < this_p.num_addr)
@@ -1670,6 +1679,7 @@ func ax25_get_rr(this_p *packet_t, n int) int { //nolint:unused
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: ax25_get_rr(%d), num_addr=%d\n", n, this_p.num_addr)
+
 		return (0)
 	}
 }
@@ -1691,24 +1701,19 @@ func ax25_get_rr(this_p *packet_t, n int) int { //nolint:unused
  *------------------------------------------------------------------------------*/
 
 func ax25_get_info(this_p *packet_t) []byte {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	if this_p.num_addr >= 2 {
-
 		/* AX.25 */
-
 		return this_p.frame_data[ax25_get_info_offset(this_p):this_p.frame_len]
 	} else {
-
 		/* Not AX.25.  Treat Whole packet as info. */
 		return ax25_get_frame_data(this_p)
 	}
 } /* end ax25_get_info */
 
 func ax25_set_info(this_p *packet_t, new_info []byte) {
-
 	var old_info = ax25_get_info(this_p)
 	this_p.frame_len -= len(old_info)
 
@@ -1742,19 +1747,17 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
  *------------------------------------------------------------------------------*/
 
 func ax25_cut_at_crlf(this_p *packet_t) int {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
 	var info = ax25_get_info(this_p)
 
 	for j, b := range info {
-
 		if b == '\r' || b == '\n' {
-
 			var chop = len(info) - j
 
 			this_p.frame_len -= chop
+
 			return (chop)
 		}
 	}
@@ -1783,6 +1786,7 @@ func ax25_get_dti(this_p *packet_t) byte {
 	if this_p.num_addr >= 2 {
 		return this_p.frame_data[ax25_get_info_offset(this_p)]
 	}
+
 	return (' ')
 }
 
@@ -1924,7 +1928,6 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 // TODO: max len for result.  buffer overflow?
 
 func ax25_format_addrs(this_p *packet_t) string {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1986,7 +1989,6 @@ func ax25_format_addrs(this_p *packet_t) string {
  *------------------------------------------------------------------*/
 
 func ax25_format_via_path(this_p *packet_t) string {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2004,6 +2006,7 @@ func ax25_format_via_path(this_p *packet_t) string {
 		if i > AX25_REPEATER_1 {
 			result += ","
 		}
+
 		result += ax25_get_addr_with_ssid(this_p, i)
 		if i == heard {
 			result += "*"
@@ -2026,7 +2029,6 @@ func ax25_format_via_path(this_p *packet_t) string {
  *------------------------------------------------------------------*/
 
 func ax25_pack(this_p *packet_t) []byte {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2075,7 +2077,6 @@ func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
 }
 
 func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int, ns int, frameType ax25_frame_type_t) {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2090,6 +2091,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 	if c < 0 {
 		desc = "Not AX.25"
 		frameType = frame_not_AX25
+
 		return
 	}
 
@@ -2158,9 +2160,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 	}
 
 	if (c & 1) == 0 {
-
 		// Information 			rrr p sss 0		or	sssssss 0  rrrrrrr p
-
 		if this_p.modulo == modulo_128 {
 			ns = (c >> 1) & 0x7f
 			pf = c2 & 1
@@ -2174,11 +2174,10 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 		//snprintf (desc, DESC_SIZ, "I %s, n(s)=%d, n(r)=%d, %s=%d", cr_text, *ns, nr, pf_text, pf);
 		desc = fmt.Sprintf("I %s, n(s)=%d, n(r)=%d, %s=%d, pid=0x%02x", cr_text, ns, nr, pf_text, pf, ax25_get_pid(this_p))
 		frameType = frame_type_I
+
 		return
 	} else if (c & 2) == 0 {
-
 		// Supervisory			rrr p/f ss 0 1		or	0000 ss 0 1  rrrrrrr p/f
-
 		if this_p.modulo == modulo_128 {
 			pf = c2 & 1
 			nr = (c2 >> 1) & 0x7f
@@ -2192,67 +2191,78 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 		case 0:
 			desc = fmt.Sprintf("RR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
 			frameType = (frame_type_S_RR)
+
 			return
 		case 1:
 			desc = fmt.Sprintf("RNR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
 			frameType = (frame_type_S_RNR)
+
 			return
 		case 2:
 			desc = fmt.Sprintf("REJ %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
 			frameType = (frame_type_S_REJ)
+
 			return
 		case 3:
 			desc = fmt.Sprintf("SREJ %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
 			frameType = (frame_type_S_SREJ)
+
 			return
 		}
 	} else {
-
 		// Unnumbered			mmm p/f mm 1 1
-
 		pf = (c >> 4) & 1
 
 		switch c & 0xef {
-
 		case 0x6f:
 			desc = fmt.Sprintf("SABME %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_SABME)
+
 			return
 		case 0x2f:
 			desc = fmt.Sprintf("SABM %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_SABM)
+
 			return
 		case 0x43:
 			desc = fmt.Sprintf("DISC %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_DISC)
+
 			return
 		case 0x0f:
 			desc = fmt.Sprintf("DM %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_DM)
+
 			return
 		case 0x63:
 			desc = fmt.Sprintf("UA %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_UA)
+
 			return
 		case 0x87:
 			desc = fmt.Sprintf("FRMR %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_FRMR)
+
 			return
 		case 0x03:
 			desc = fmt.Sprintf("UI %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_UI)
+
 			return
 		case 0xaf:
 			desc = fmt.Sprintf("XID %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_XID)
+
 			return
 		case 0xe3:
 			desc = fmt.Sprintf("TEST %s, %s=%d", cr_text, pf_text, pf)
 			frameType = (frame_type_U_TEST)
+
 			return
 		default:
 			desc = "U other???"
 			frameType = (frame_type_U)
+
 			return
 		}
 	}
@@ -2261,8 +2271,8 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 	// Here only to suppress "warning: control reaches end of non-void function"
 
 	frameType = (frame_not_AX25)
-	return
 
+	return
 } /* end ax25_frame_type */
 
 /*------------------------------------------------------------------
@@ -2319,7 +2329,6 @@ func ctrl_to_text(c int) string {
 /* Text description of protocol id octet. */
 
 func pid_to_text(p int) string {
-
 	if (p & 0x30) == 0x10 {
 		return "AX.25 layer 3 implemented."
 	} else if (p & 0x30) == 0x20 {
@@ -2361,7 +2370,6 @@ func ax25_hex_dump(this_p *packet_t) {
 	var fptr = this_p.frame_data
 
 	if this_p.num_addr >= AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
-
 		var c = fptr[this_p.num_addr*7]
 		var p = fptr[this_p.num_addr*7+1]
 
@@ -2369,7 +2377,6 @@ func ax25_hex_dump(this_p *packet_t) {
 
 		if (c&0x01) == 0 || /* I   xxxx xxx0 */
 			c == 0x03 || c == 0x13 { /* UI  000x 0011 */
-
 			var pid_text = pid_to_text(int(p))
 
 			cp_text += ", " + pid_text
@@ -2411,7 +2418,6 @@ func ax25_hex_dump(this_p *packet_t) {
 		fptr[13]&SSID_LAST_MASK)
 
 	for n := 2; n < this_p.num_addr; n++ {
-
 		dw_printf(" digi %d  %c%c%c%c%c%c %2d   h=%d res=%d last=%d\n",
 			n-1,
 			IfThenElse(unicode.IsPrint(rune(fptr[n*7+0]>>1)), fptr[n*7+0]>>1, '.'),
@@ -2424,11 +2430,9 @@ func ax25_hex_dump(this_p *packet_t) {
 			(fptr[n*7+6]&SSID_H_MASK)>>SSID_H_SHIFT,
 			(fptr[n*7+6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
 			fptr[n*7+6]&SSID_LAST_MASK)
-
 	}
 
 	hex_dump(fptr[:this_p.frame_len])
-
 } /* end ax25_hex_dump */
 
 /*------------------------------------------------------------------
@@ -2453,7 +2457,6 @@ func ax25_hex_dump(this_p *packet_t) {
  *------------------------------------------------------------------*/
 
 func ax25_is_aprs(this_p *packet_t) bool {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2486,7 +2489,6 @@ func ax25_is_aprs(this_p *packet_t) bool {
  *------------------------------------------------------------------*/
 
 func ax25_is_null_frame(this_p *packet_t) bool {
-
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2520,6 +2522,7 @@ func ax25_get_control(this_p *packet_t) int {
 	if this_p.num_addr >= 2 {
 		return int(this_p.frame_data[ax25_get_control_offset(this_p)])
 	}
+
 	return (-1)
 }
 
@@ -2540,6 +2543,7 @@ func ax25_get_c2(this_p *packet_t) int {
 			return (-1) /* attempt to go beyond the end of frame. */
 		}
 	}
+
 	return (-1) /* not AX.25 */
 }
 
@@ -2581,6 +2585,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
 	if frame_type != frame_type_I && frame_type != frame_type_U_UI {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ax25_set_pid(0x%2x): Packet type is not I or UI.\n", pid)
+
 		return
 	}
 
@@ -2621,6 +2626,7 @@ func ax25_get_pid(this_p *packet_t) int {
 	if this_p.num_addr >= 2 {
 		return int(this_p.frame_data[ax25_get_pid_offset(this_p)])
 	}
+
 	return (-1)
 }
 
@@ -2644,7 +2650,6 @@ func ax25_get_frame_len(this_p *packet_t) int {
 	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
 	return (this_p.frame_len)
-
 } /* end ax25_get_frame_len */
 
 func ax25_get_frame_data(this_p *packet_t) []byte {
@@ -2652,7 +2657,6 @@ func ax25_get_frame_data(this_p *packet_t) []byte {
 	Assert(this_p.magic2 == MAGIC)
 
 	return this_p.frame_data[:this_p.frame_len]
-
 } /* end ax25_get_frame_data_ptr */
 
 /*------------------------------------------------------------------------------
@@ -2705,7 +2709,6 @@ func ax25_get_frame_data(this_p *packet_t) []byte {
  *------------------------------------------------------------------------------*/
 
 func ax25_dedupe_crc(pp *packet_t) uint16 {
-
 	var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 
 	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
@@ -2715,14 +2718,12 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 	for len(info) >= 1 && (info[len(info)-1] == '\r' ||
 		info[len(info)-1] == '\n' ||
 		info[len(info)-1] == ' ') {
-
 		// Temporary for debugging!
 
 		//  if (pinfo[info_len-1] == ' ') {
 		//    text_color_set(DW_COLOR_ERROR);
 		//    dw_printf ("DEBUG:  ax25_dedupe_crc ignoring trailing space.\n");
 		//  }
-
 		info = info[:len(info)-1]
 	}
 
@@ -2757,7 +2758,6 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
  *------------------------------------------------------------------------------*/
 
 func ax25_m_m_crc(pp *packet_t) uint16 {
-
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
 	var fbuf = ax25_pack(pp)
 
@@ -2812,7 +2812,6 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 const MAXSAFE = AX25_MAX_INFO_LEN
 
 func ax25_safe_print(info []byte, ascii_only bool) {
-
 	if len(info) > MAXSAFE {
 		info = info[:MAXSAFE]
 	}
@@ -2825,17 +2824,14 @@ func ax25_safe_print(info []byte, ascii_only bool) {
 			safe_str += fmt.Sprintf("<0x%02x>", ch)
 		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||
 			(ascii_only && ch >= 0x80) {
-
 			/* Control codes and delete. */
 			/* UTF-8 does not use fe and ff except in a possible */
 			/* "Byte Order Mark" (BOM) at the beginning. */
-
 			safe_str += fmt.Sprintf("<0x%02x>", ch)
 		} else {
 			/* Let everything else thru so we can handle UTF-8 */
 			/* Maybe we should have an option to display 0x80 */
 			/* and above as hexadecimal. */
-
 			safe_str += string(ch)
 		}
 	}
@@ -2876,7 +2872,6 @@ func ax25_safe_print(info []byte, ascii_only bool) {
  *------------------------------------------------------------------*/
 
 func ax25_alevel_to_text(alevel alevel_t) string {
-
 	if alevel.rec < 0 {
 		return ""
 	}
@@ -2891,13 +2886,10 @@ func ax25_alevel_to_text(alevel alevel_t) string {
 	} else if (alevel.mark == -1 && alevel.space == -1) || /* PSK */
 		(alevel.mark == -99 && alevel.space == -99) { /* v. 1.7 "B" FM demodulator. */
 		// ?? Where does -99 come from?
-
 		return strconv.Itoa(alevel.rec)
 	} else if alevel.mark == -2 && alevel.space == -2 { /* DTMF - single number. */
-
 		return strconv.Itoa(alevel.rec)
 	} else { /* AFSK */
-
 		//snprintf (text, AX25_ALEVEL_TO_TEXT_SIZE, "%d:%d(%d/%d=%05.3f=)", alevel.original, alevel.rec, alevel.mark, alevel.space, alevel.ms_ratio);
 		return fmt.Sprintf("%d(%d/%d)", alevel.rec, alevel.mark, alevel.space)
 	}
@@ -2916,7 +2908,6 @@ func ax25_get_control_offset(this_p *packet_t) int {
 }
 
 func ax25_get_num_control(this_p *packet_t) int {
-
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
 	if (c & 0x01) == 0 { /* I   xxxx xxx0 */
@@ -2964,14 +2955,12 @@ func ax25_get_pid_offset(this_p *packet_t) int {
 }
 
 func ax25_get_num_pid(this_p *packet_t) int {
-
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
 	var pid int
 
 	if (c&0x01) == 0 || /* I   xxxx xxx0 */
 		c == 0x03 || c == 0x13 { /* UI  000x 0011 */
-
 		pid = int(this_p.frame_data[ax25_get_pid_offset(this_p)])
 		/*
 			#if DEBUGX
@@ -2981,6 +2970,7 @@ func ax25_get_num_pid(this_p *packet_t) int {
 		if pid == AX25_PID_ESCAPE_CHARACTER {
 			return (2) /* pid 1111 1111 means another follows. */
 		}
+
 		return (1)
 	}
 
@@ -3016,9 +3006,7 @@ func ax25_get_info_offset(this_p *packet_t) int {
 }
 
 func ax25_get_num_info(this_p *packet_t) int { //nolint:unused
-
 	/* assuming AX.25 frame. */
-
 	var length = this_p.frame_len - this_p.num_addr*7 - ax25_get_num_control(this_p) - ax25_get_num_pid(this_p)
 	if length < 0 {
 		length = 0 /* print error? */

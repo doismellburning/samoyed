@@ -357,13 +357,13 @@ const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
 func parse_ll(str string, which parse_ll_which_e, line int) float64 {
-
 	var stemp = str
 
 	/*
 	 * Remove any negative sign.
 	 */
 	var sign = 1
+
 	if stemp[0] == '-' {
 		stemp = stemp[1:]
 		sign = -1
@@ -401,6 +401,7 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 
 	var degreesStr = stemp
 	var minutesStr string
+
 	var minutesFound = false
 	if strings.Contains(degreesStr, "^") {
 		degreesStr, minutesStr, minutesFound = strings.Cut(stemp, "^")
@@ -418,10 +419,12 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 		if minutesErr != nil {
 			dw_printf("Line %d: Could not parse minutes string '%s': %s\n", line, minutesStr, minutesErr)
 		}
+
 		if minutes >= 60.0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: Number of minutes in \"%s\" is >= 60.\n", line, minutesStr)
 		}
+
 		degrees += minutes / 60
 	}
 
@@ -467,7 +470,6 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
  *----------------------------------------------------------------*/
 
 func parse_utm_zone(szone string) (rune, rune, int) {
-
 	var latband = ' '
 	var hemi = 'N' /* default */
 
@@ -483,7 +485,6 @@ func parse_utm_zone(szone string) (rune, rune, int) {
 	if lastRune == 0 {
 		/* Number is not followed by letter something else.  */
 		/* Allow negative number to mean south. */
-
 		if lzone < 0 {
 			latband = '-'
 			hemi = 'S'
@@ -491,6 +492,7 @@ func parse_utm_zone(szone string) (rune, rune, int) {
 		}
 	} else {
 		lastRune = unicode.ToUpper(lastRune)
+
 		latband = lastRune
 		if strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", lastRune) {
 			if lastRune < 'N' {
@@ -499,6 +501,7 @@ func parse_utm_zone(szone string) (rune, rune, int) {
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Latitudinal band in \"%s\" must be one of CDEFGHJKLMNPQRSTUVWX.\n", szone)
+
 			hemi = '?'
 		}
 	}
@@ -506,7 +509,6 @@ func parse_utm_zone(szone string) (rune, rune, int) {
 	if lzone < 1 || lzone > 60 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("UTM Zone number %d must be in range of 1 to 60.\n", lzone)
-
 	}
 
 	return latband, hemi, lzone
@@ -565,7 +567,6 @@ main ()
  *----------------------------------------------------------------*/
 
 func parse_interval(str string, line int) int { //nolint:unparam
-
 	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
 
 	var minutes, _ = strconv.Atoi(minutesStr)
@@ -624,17 +625,16 @@ func parse_interval(str string, line int) int { //nolint:unparam
 //#define DEBUG8 1
 
 func check_via_path(via_path string) int {
-
 	/* TODO KG
 	#if DEBUG8
 		text_color_set(DW_COLOR_DEBUG);
 	        dw_printf ("check_via_path %s\n", via_path);
 	#endif
 	*/
-
 	var parts = strings.Split(via_path, ",")
 	var num_digi = 0
 	var max_digi_hops = 0
+
 	for _, part := range parts {
 		num_digi++
 
@@ -664,6 +664,7 @@ func check_via_path(via_path string) int {
 	if num_digi > AX25_MAX_REPEATERS {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Maximum of 8 digipeaters has been exceeded.\n")
+
 		return (-1)
 	}
 
@@ -675,7 +676,6 @@ func check_via_path(via_path string) int {
 	*/
 
 	return (max_digi_hops)
-
 } /* end check_via_path */
 
 /*-------------------------------------------------------------------
@@ -707,7 +707,6 @@ const MAXCMDLEN = 1200
 var splitCmd string
 
 func split(str string, rest_of_line bool) string {
-
 	/*
 	 * If string is provided, make a copy.
 	 * Drop any CRLF at the end.
@@ -715,6 +714,7 @@ func split(str string, rest_of_line bool) string {
 	 */
 	if str != "" {
 		splitCmd = ""
+
 		for _, c := range str {
 			switch c {
 			case '\t':
@@ -736,7 +736,9 @@ func split(str string, rest_of_line bool) string {
 
 	var token string
 	var in_quotes = false
+
 	var parsedLen int
+
 outerLoop:
 	for parsedLen = 0; parsedLen < len(splitCmd); parsedLen++ {
 		var c = splitCmd[parsedLen]
@@ -762,6 +764,7 @@ outerLoop:
 			token += string(c)
 		}
 	}
+
 	splitCmd = splitCmd[parsedLen:]
 
 	// dw_printf("split out: '%s'\n", token);
@@ -817,7 +820,6 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s) {
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -828,14 +830,12 @@ func config_init(fname string, p_audio_config *audio_s,
 	/*
 	 * First apply defaults.
 	 */
-
 	p_audio_config.igate_vchannel = -1 // none.
 
 	/* First audio device is always available with defaults. */
 	/* Others must be explicitly defined before use. */
 
 	for adevice := 0; adevice < MAX_ADEVS; adevice++ {
-
 		p_audio_config.adev[adevice].adevice_in = DEFAULT_ADEVICE
 		p_audio_config.adev[adevice].adevice_out = DEFAULT_ADEVICE
 
@@ -944,6 +944,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		p_tt_config.response[m].method = "MORSE"
 		p_tt_config.response[m].mtext = "?"
 	}
+
 	p_tt_config.response[TT_ERROR_OK].mtext = "R"
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
@@ -952,6 +953,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		p_misc_config.kiss_port[i] = 0 // entry not used.
 		p_misc_config.kiss_chan[i] = -1
 	}
+
 	p_misc_config.kiss_port[0] = DEFAULT_KISS_PORT
 	p_misc_config.kiss_chan[0] = -1 // all channels.
 
@@ -1036,7 +1038,6 @@ func config_init(fname string, p_audio_config *audio_s,
 	}
 
 	var fp, fpErr = os.Open(absFilePath) //nolint:gosec
-
 	if fpErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Could not open configuration file %s: %s\n", absFilePath, fpErr)
@@ -1053,6 +1054,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	dw_printf("\nReading config file %s\n", absFilePath)
 
 	var line = 0
+
 	var scanner = bufio.NewScanner(fp)
 	for scanner.Scan() {
 		var text = scanner.Text()
@@ -1090,9 +1092,9 @@ func config_init(fname string, p_audio_config *audio_s,
 		if strings.HasPrefix(strings.ToUpper(t), "ADEVICE") {
 			/* "ADEVICE" is equivalent to "ADEVICE0". */
 			adevice = 0
+
 			if len(t) >= 8 {
 				var i, iErr = strconv.Atoi(string(t[7]))
-
 				if iErr != nil {
 					dw_printf("Config file: Could not parse ADEVICE number on line %d: %s.\n", line, iErr)
 					continue
@@ -1102,7 +1104,9 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Device number %d out of range for ADEVICE command on line %d.\n", adevice, line)
 					dw_printf("If you really need more than %d audio devices, increase MAX_ADEVS and recompile.\n", MAX_ADEVS)
+
 					adevice = 0
+
 					continue
 				}
 
@@ -1124,6 +1128,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if p_audio_config.adev[adevice].defined == 1 { // 1 means defined by user.
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: ADEVICE%d can't be defined more than once. Line %d.\n", adevice, line)
+
 				continue
 			}
 
@@ -1137,7 +1142,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				/////////  to be continued....  FIXME
-
 			} else {
 				/* First channel of device is valid. */
 				// This might be changed to UDP or STDIN when the device name is examined.
@@ -1153,7 +1157,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 			}
 		} else if strings.EqualFold(t, "PAIDEVICE") {
-
 			/*
 			 * PAIDEVICE[n]  input-device
 			 * PAODEVICE[n]  output-device
@@ -1173,7 +1176,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *		We now have a general quoting scheme so the original ADEVICE can handle this.
 			 *		These options will probably be removed before general 1.3 release.
 			 */
-
 			adevice = 0
 			if unicode.IsDigit(rune(t[9])) {
 				adevice = int(t[9] - '0')
@@ -1183,6 +1185,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Device number %d out of range for PADEVICE command on line %d.\n", adevice, line)
 				adevice = 0
+
 				continue
 			}
 
@@ -1190,6 +1193,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing name of audio device for PADEVICE command on line %d.\n", line)
+
 				continue
 			}
 
@@ -1209,6 +1213,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Device number %d out of range for PADEVICE command on line %d.\n", adevice, line)
 				adevice = 0
+
 				continue
 			}
 
@@ -1216,6 +1221,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing name of audio device for PADEVICE command on line %d.\n", line)
+
 				continue
 			}
 
@@ -1226,17 +1232,17 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			p_audio_config.adev[adevice].adevice_out = t
 		} else if strings.EqualFold(t, "ARATE") {
-
 			/*
 			 * ARATE 		- Audio samples per second, 11025, 22050, 44100, etc.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing audio sample rate for ARATE command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= MIN_SAMPLES_PER_SEC && n <= MAX_SAMPLES_PER_SEC {
 				p_audio_config.adev[adevice].samples_per_sec = n
@@ -1246,17 +1252,17 @@ func config_init(fname string, p_audio_config *audio_s,
 					line, MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC)
 			}
 		} else if strings.EqualFold(t, "ACHANNELS") {
-
 			/*
 			 * ACHANNELS 		- Number of audio channels for current device: 1 or 2
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing number of audio channels for ACHANNELS command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n == 1 || n == 2 {
 				p_audio_config.adev[adevice].num_channels = n
@@ -1272,7 +1278,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Number of audio channels must be 1 or 2.\n", line)
 			}
 		} else if strings.EqualFold(t, "CHANNEL") {
-
 			/*
 			 * ==================== Radio channel parameters ====================
 			 */
@@ -1283,20 +1288,19 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			// TODO: allow full range so mycall can be set for network channels.
 			// Watch out for achan[] out of bounds.
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing channel number for CHANNEL command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < MAX_RADIO_CHANS {
-
 				channel = n
 
 				if p_audio_config.chan_medium[n] != MEDIUM_RADIO {
-
 					if p_audio_config.adev[ACHAN2ADEV(n)].defined == 0 {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Channel number %d is not valid because audio device %d is not defined.\n",
@@ -1312,7 +1316,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Channel number must in range of 0 to %d.\n", line, MAX_RADIO_CHANS-1)
 			}
 		} else if strings.EqualFold(t, "ICHANNEL") {
-
 			/*
 			 * ICHANNEL n			- Define IGate virtual channel.
 			 *
@@ -1321,18 +1324,17 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *	In the future there might be other typs of virtual channels.
 			 *	This does not change the current channel number used by MODEM, PTT, etc.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing virtual channel number for ICHANNEL command.\n", line)
+
 				continue
 			}
+
 			var ichan, _ = strconv.Atoi(t)
 			if ichan >= MAX_RADIO_CHANS && ichan < MAX_TOTAL_CHANS {
-
 				if p_audio_config.chan_medium[ichan] == MEDIUM_NONE {
-
 					p_audio_config.chan_medium[ichan] = MEDIUM_IGATE
 
 					// This is redundant but saves the time of searching through all
@@ -1347,7 +1349,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: ICHANNEL number must in range of %d to %d.\n", line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 			}
 		} else if strings.EqualFold(t, "NCHANNEL") {
-
 			/*
 			 * NCHANNEL chan addr port			- Define Network TNC virtual channel.
 			 *
@@ -1364,18 +1365,17 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * FIXME: Can't set mycall for nchannel.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing virtual channel number for NCHANNEL command.\n", line)
+
 				continue
 			}
+
 			var nchan, _ = strconv.Atoi(t)
 			if nchan >= MAX_RADIO_CHANS && nchan < MAX_TOTAL_CHANS {
-
 				if p_audio_config.chan_medium[nchan] == MEDIUM_NONE {
-
 					p_audio_config.chan_medium[nchan] = MEDIUM_NETTNC
 				} else {
 					text_color_set(DW_COLOR_ERROR)
@@ -1390,20 +1390,22 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing network TNC address for NCHANNEL command.\n", line)
+
 				continue
 			}
+
 			p_audio_config.nettnc_addr[nchan] = t
 
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing network TNC TCP port for NCHANNEL command.\n", line)
+
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
 			p_audio_config.nettnc_port[nchan] = n
 		} else if strings.EqualFold(t, "mycall") {
-
 			/*
 			 * MYCALL station
 			 */
@@ -1411,6 +1413,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing value for MYCALL command on line %d.\n", line)
+
 				continue
 			} else {
 				var strictness = 2
@@ -1424,6 +1427,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if !ok {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Invalid value for MYCALL command on line %d.\n", line)
+
 					continue
 				}
 
@@ -1431,14 +1435,12 @@ func config_init(fname string, p_audio_config *audio_s,
 				// Set for other channels which have not been set yet.
 
 				for c := 0; c < MAX_TOTAL_CHANS; c++ {
-
 					if c == channel || IsNoCall(p_audio_config.mycall[c]) {
 						p_audio_config.mycall[c] = t
 					}
 				}
 			}
 		} else if strings.EqualFold(t, "MODEM") {
-
 			/*
 			 * MODEM	- Set modem properties for current channel.
 			 *
@@ -1458,18 +1460,21 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *	g3ruh		- This modem type regardless of default for speed.
 			 *	v26a or v26b	- V.26 alternative.  a=original, b=MFJ compatible
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: MODEM can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing data transmission speed for MODEM command.\n", line)
+
 				continue
 			}
+
 			var n int
 			if strings.EqualFold(t, "AIS") {
 				n = MAX_BAUD - 1 // Hack - See special case later.
@@ -1478,6 +1483,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			} else {
 				n, _ = strconv.Atoi(t)
 			}
+
 			if n >= MIN_BAUD && n <= MAX_BAUD {
 				p_audio_config.achan[channel].baud = n
 				if n != 300 && n != 1200 && n != 2400 && n != 4800 && n != 9600 && n != 19200 && n != MAX_BAUD-1 && n != MAX_BAUD-2 {
@@ -1486,6 +1492,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 			} else {
 				p_audio_config.achan[channel].baud = DEFAULT_BAUD
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unreasonable data rate. Using %d bits per second.\n",
 					line, p_audio_config.achan[channel].baud)
@@ -1539,9 +1546,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 
 			if alldigits(t) {
-
 				/* old style */
-
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Old style (pre version 1.2) format will no longer be supported in next version.\n", line)
 
@@ -1555,6 +1560,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_audio_config.achan[channel].mark_freq = n
 				} else {
 					p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unreasonable mark tone frequency. Using %d.\n",
 						line, p_audio_config.achan[channel].mark_freq)
@@ -1566,13 +1572,16 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Missing tone frequency for space.\n", line)
+
 					continue
 				}
+
 				n, _ = strconv.Atoi(t)
 				if n >= 300 && n <= 5000 {
 					p_audio_config.achan[channel].space_freq = n
 				} else {
 					p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unreasonable space tone frequency. Using %d.\n",
 						line, p_audio_config.achan[channel].space_freq)
@@ -1583,14 +1592,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				if p_audio_config.achan[channel].baud == 1200 &&
 					p_audio_config.achan[channel].mark_freq == 1200 &&
 					p_audio_config.achan[channel].space_freq == 2200 {
-
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200.\n", line)
 				}
+
 				if p_audio_config.achan[channel].baud == 300 &&
 					p_audio_config.achan[channel].mark_freq == 1600 &&
 					p_audio_config.achan[channel].space_freq == 1800 {
-
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800.\n", line)
 				}
@@ -1599,13 +1607,10 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				t = split("", false)
 				if t != "" {
-
 					/* Look for some combination of letter(s) and + */
-
 					if unicode.IsLetter(rune(t[0])) || t[0] == '+' {
 						/* Here we only catch something other than letters and + mixed in. */
 						/* Later, we check for valid letters and no more than one letter if + specified. */
-
 						if strings.ContainsFunc(t, func(r rune) bool {
 							return !(unicode.IsLetter(r) || r == '+' || r == '-')
 						}) {
@@ -1614,10 +1619,12 @@ func config_init(fname string, p_audio_config *audio_s,
 						}
 
 						p_audio_config.achan[channel].profiles = t
+
 						t = split("", false)
 						if len(p_audio_config.achan[channel].profiles) > 1 && t != "" {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Can't combine multiple demodulator types and multiple frequencies.\n", line)
+
 							continue
 						}
 					}
@@ -1630,8 +1637,10 @@ func config_init(fname string, p_audio_config *audio_s,
 					if n < 1 || n > MAX_SUBCHANS {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Number of demodulators is out of range. Using 3.\n", line)
+
 						n = 3
 					}
+
 					p_audio_config.achan[channel].num_freq = n
 
 					t = split("", false)
@@ -1640,8 +1649,10 @@ func config_init(fname string, p_audio_config *audio_s,
 						if n < 5 || n > int(math.Abs(float64(p_audio_config.achan[channel].mark_freq-p_audio_config.achan[channel].space_freq))/2) {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Unreasonable value for offset between modems.  Using 50 Hz.\n", line)
+
 							n = 50
 						}
+
 						p_audio_config.achan[channel].offset = n
 
 						text_color_set(DW_COLOR_ERROR)
@@ -1650,13 +1661,12 @@ func config_init(fname string, p_audio_config *audio_s,
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Missing frequency offset between modems.  Using 50 Hz.\n", line)
+
 						p_audio_config.achan[channel].offset = 50
 					}
 				}
 			} else {
-
 				/* New style in version 1.2. */
-
 				for t != "" {
 					if strings.Contains(t, ":") { /* mark:space */
 						var markStr, spaceStr, _ = strings.Cut(t, ":")
@@ -1673,12 +1683,15 @@ func config_init(fname string, p_audio_config *audio_s,
 
 							if p_audio_config.achan[channel].mark_freq < 300 || p_audio_config.achan[channel].mark_freq > 5000 {
 								p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+
 								text_color_set(DW_COLOR_ERROR)
 								dw_printf("Line %d: Unreasonable mark tone frequency. Using %d instead.\n",
 									line, p_audio_config.achan[channel].mark_freq)
 							}
+
 							if p_audio_config.achan[channel].space_freq < 300 || p_audio_config.achan[channel].space_freq > 5000 {
 								p_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+
 								text_color_set(DW_COLOR_ERROR)
 								dw_printf("Line %d: Unreasonable space tone frequency. Using %d instead.\n",
 									line, p_audio_config.achan[channel].space_freq)
@@ -1695,6 +1708,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						if p_audio_config.achan[channel].num_freq < 1 || p_audio_config.achan[channel].num_freq > MAX_SUBCHANS {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Number of demodulators is out of range. Using 3.\n", line)
+
 							p_audio_config.achan[channel].num_freq = 3
 						}
 
@@ -1702,10 +1716,10 @@ func config_init(fname string, p_audio_config *audio_s,
 							float64(p_audio_config.achan[channel].offset) > math.Abs(float64(p_audio_config.achan[channel].mark_freq-p_audio_config.achan[channel].space_freq))/2 {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Offset between demodulators is unreasonable. Using 50 Hz.\n", line)
+
 							p_audio_config.achan[channel].offset = 50
 						}
 					} else if alllettersorpm(t) { /* profile of letter(s) + - */
-
 						// Will be validated later.
 						p_audio_config.achan[channel].profiles = t
 					} else if t[0] == '/' { /* /div */
@@ -1727,20 +1741,19 @@ func config_init(fname string, p_audio_config *audio_s,
 							dw_printf("Line %d: Ignoring unreasonable upsample ratio of %d.\n", line, n)
 						}
 					} else if strings.EqualFold(t, "G3RUH") { /* Force G3RUH modem regardless of default for speed. New in 1.6. */
-
 						p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE
 						p_audio_config.achan[channel].mark_freq = 0
 						p_audio_config.achan[channel].space_freq = 0
 					} else if strings.EqualFold(t, "V26A") || /* Compatible with direwolf versions <= 1.5.  New in 1.6. */
 						strings.EqualFold(t, "V26B") { /* Compatible with MFJ-2400.  New in 1.6. */
-
 						if p_audio_config.achan[channel].modem_type != MODEM_QPSK ||
 							p_audio_config.achan[channel].baud != 2400 {
-
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: %s option can only be used with 2400 bps PSK.\n", line, t)
+
 							continue
 						}
+
 						p_audio_config.achan[channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
 					} else {
 						text_color_set(DW_COLOR_ERROR)
@@ -1754,10 +1767,8 @@ func config_init(fname string, p_audio_config *audio_s,
 				/* A later place sets /n for 300 baud if not specified by user. */
 
 				//dw_printf ("debug: div = %d\n", p_audio_config.achan[channel].decimate);
-
 			}
 		} else if strings.EqualFold(t, "DTMF") {
-
 			/*
 			 * DTMF  		- Enable DTMF decoder.
 			 *
@@ -1765,17 +1776,15 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *	Option to determine if it goes to APRStt gateway and/or application.
 			 *	Disable normal demodulator to reduce CPU requirements.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: DTMF can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
 
 			p_audio_config.achan[channel].dtmf_decode = DTMF_DECODE_ON
-
 		} else if strings.EqualFold(t, "FIX_BITS") {
-
 			/*
 			 * FIX_BITS  n  [ APRS | AX25 | NONE ] [ PASSALL ]
 			 *
@@ -1783,23 +1792,27 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *	- n is maximum number of bits to attempt fixing.
 			 *	- Optional sanity check & allow everything even with bad FCS.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: FIX_BITS can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for FIX_BITS command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if retry_t(n) >= RETRY_NONE && retry_t(n) < RETRY_MAX { // MAX is actually last valid +1
 				p_audio_config.achan[channel].fix_bits = retry_t(n)
 			} else {
 				p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid value %d for FIX_BITS. Using default of %d.\n",
 					line, n, p_audio_config.achan[channel].fix_bits)
@@ -1816,9 +1829,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			t = split("", false)
 			for t != "" {
-
 				// If more than one sanity test, we silently take the last one.
-
 				if strings.EqualFold(t, "APRS") {
 					p_audio_config.achan[channel].sanity_test = SANITY_APRS
 				} else if strings.EqualFold(t, "AX25") || strings.EqualFold(t, "AX.25") {
@@ -1827,6 +1838,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_audio_config.achan[channel].sanity_test = SANITY_NONE
 				} else if strings.EqualFold(t, "PASSALL") {
 					p_audio_config.achan[channel].passall = true
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: There is an old saying, \"Be careful what you ask for because you might get it.\"\n", line)
 					dw_printf("The PASSALL option means allow all frames even when they are invalid.\n")
@@ -1836,10 +1848,10 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Invalid option '%s' for FIX_BITS.\n", line, t)
 				}
+
 				t = split("", false)
 			}
 		} else if strings.EqualFold(t, "PTT") || strings.EqualFold(t, "DCD") || strings.EqualFold(t, "CON") {
-
 			/*
 			 * PTT 		- Push To Talk signal line.
 			 * DCD		- Data Carrier Detect indicator.
@@ -1858,10 +1870,10 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * Applies to most recent CHANNEL command.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: PTT can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
 			var ot int
@@ -1883,11 +1895,11 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Missing output control device for %s command.\n",
 					line, otname)
+
 				continue
 			}
 
 			if strings.EqualFold(t, "GPIO") {
-
 				/* GPIO case, Linux only. */
 
 				/* TODO KG
@@ -1900,6 +1912,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, otname)
+
 					continue
 				}
 
@@ -1911,6 +1924,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_audio_config.achan[channel].octrl[ot].out_gpio_num = gpio
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				}
+
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIO
 				// #endif
 			} else if strings.EqualFold(t, "GPIOD") {
@@ -1926,6 +1940,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing GPIO chip name for %s.\n", line, otname)
 					dw_printf("Use the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines.\n")
+
 					continue
 				}
 
@@ -1948,6 +1963,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, otname)
+
 					continue
 				}
 
@@ -1959,6 +1975,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_audio_config.achan[channel].octrl[ot].out_gpio_num = gpio
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				}
+
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD
 				/* TODO KG
 				#else
@@ -1969,15 +1986,14 @@ func config_init(fname string, p_audio_config *audio_s,
 				*/
 				//#endif /* __WIN32__ */
 			} else if strings.EqualFold(t, "LPT") {
-
 				/* Parallel printer case, x86 Linux only. */
 
 				//#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
-
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing LPT bit number for %s.\n", line, otname)
+
 					continue
 				}
 
@@ -1989,6 +2005,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = lpt
 					p_audio_config.achan[channel].octrl[ot].ptt_invert = false
 				}
+
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_LPT
 				/*
 					#else
@@ -1997,15 +2014,15 @@ func config_init(fname string, p_audio_config *audio_s,
 					#endif
 				*/
 			} else if strings.EqualFold(t, "RIG") {
-
 				// TODO KG #ifdef USE_HAMLIB
-
 				t = split("", false)
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing model number for hamlib.\n", line)
+
 					continue
 				}
+
 				if strings.EqualFold(t, "AUTO") {
 					p_audio_config.achan[channel].octrl[ot].ptt_model = -1
 				} else {
@@ -2014,14 +2031,18 @@ func config_init(fname string, p_audio_config *audio_s,
 						dw_printf("Config file line %d: A rig number, not a name, is required here.\n", line)
 						dw_printf("For example, if you have a Yaesu FT-847, specify 101.\n")
 						dw_printf("See https://github.com/Hamlib/Hamlib/wiki/Supported-Radios for more details.\n")
+
 						continue
 					}
+
 					var n, _ = strconv.Atoi(t)
 					if n < 1 || n > 9999 {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file line %d: Unreasonable model number %d for hamlib.\n", line, n)
+
 						continue
 					}
+
 					p_audio_config.achan[channel].octrl[ot].ptt_model = n
 				}
 
@@ -2029,8 +2050,10 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing port for hamlib.\n", line)
+
 					continue
 				}
+
 				p_audio_config.achan[channel].octrl[ot].ptt_device = t
 
 				// Optional serial port rate for CAT control PTT.
@@ -2040,6 +2063,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					if !alldigits(t) {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file line %d: An optional number is required here for CAT serial port speed: %s\n", line, t)
+
 						continue
 					}
 					var n, _ = strconv.Atoi(t)
@@ -2070,20 +2094,18 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				//#endif
 			} else if strings.EqualFold(t, "CM108") {
-
 				/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
 
 				// TODO KG #if USE_CM108
-
 				if ot != OCTYPE_PTT {
 					// Future project:  Allow DCD and CON via the same device.
 					// This gets more complicated because we can't selectively change a single GPIO bit.
 					// We would need to keep track of what is currently there, change one bit, in our local
 					// copy of the status and then write out the byte for all of the pins.
 					// Let's keep it simple with just PTT for the first stab at this.
-
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: PTT CM108 option is only valid for PTT, not %s.\n", line, otname)
+
 					continue
 				}
 
@@ -2104,6 +2126,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					if t == "" {
 						break
 					}
+
 					if t[0] == '-' {
 						var gpio, _ = strconv.Atoi(t[1:])
 						p_audio_config.achan[channel].octrl[ot].out_gpio_num = -1 * gpio
@@ -2117,15 +2140,19 @@ func config_init(fname string, p_audio_config *audio_s,
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1.\n", line, t)
+
 						continue
 					}
 				}
+
 				if p_audio_config.achan[channel].octrl[ot].out_gpio_num < 1 || p_audio_config.achan[channel].octrl[ot].out_gpio_num > 8 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: CM108 GPIO number %d is not in range of 1 thru 8.\n", line,
 						p_audio_config.achan[channel].octrl[ot].out_gpio_num)
+
 					continue
 				}
+
 				if p_audio_config.achan[channel].octrl[ot].ptt_device == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", line,
@@ -2138,8 +2165,10 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("You must explicitly mention a device name such as /dev/hidraw1.\n")
 					dw_printf("Run \"cm108\" utility to get a list.\n")
 					dw_printf("See Interface Guide for details.\n")
+
 					continue
 				}
+
 				p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_CM108
 
 				/* TODO KG
@@ -2153,9 +2182,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				#endif
 				*/
 			} else {
-
 				/* serial port case. */
-
 				p_audio_config.achan[channel].octrl[ot].ptt_device = t
 
 				t = split("", false)
@@ -2163,6 +2190,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing RTS or DTR after %s device name.\n",
 						line, otname)
+
 					continue
 				}
 
@@ -2182,6 +2210,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
 						line, otname)
+
 					continue
 				}
 
@@ -2193,7 +2222,6 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				t = split("", false)
 				if t != "" {
-
 					if strings.EqualFold(t, "rts") {
 						p_audio_config.achan[channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
 						p_audio_config.achan[channel].octrl[ot].ptt_invert2 = false
@@ -2210,6 +2238,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file line %d: Expected RTS or DTR after first RTS or DTR.\n",
 							line)
+
 						continue
 					}
 
@@ -2219,12 +2248,10 @@ func config_init(fname string, p_audio_config *audio_s,
 						dw_printf("Config file line %d: Doesn't make sense to specify the some control line twice.\n",
 							line)
 					}
-
 				} /* end of second serial port control line. */
 			} /* end of serial port case. */
 			/* end of PTT, DCD, CON */
 		} else if strings.EqualFold(t, "TXINH") {
-
 			/*
 			 * INPUTS
 			 *
@@ -2232,10 +2259,10 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * TXINH GPIO [-]gpio-num (only type supported so far)
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TXINH can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
 			var itname = "TXINH"
@@ -2244,11 +2271,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Missing input type name for %s command.\n", line, itname)
+
 				continue
 			}
 
 			if strings.EqualFold(t, "GPIO") {
-
 				/* TODO KG
 				#if __WIN32__
 					      text_color_set(DW_COLOR_ERROR);
@@ -2259,6 +2286,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file line %d: Missing GPIO number for %s.\n", line, itname)
+
 					continue
 				}
 
@@ -2270,55 +2298,61 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].in_gpio_num = gpio
 					p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].invert = false
 				}
+
 				p_audio_config.achan[channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 				// #endif
 			}
 		} else if strings.EqualFold(t, "DWAIT") {
-
 			/*
 			 * DWAIT n		- Extra delay for receiver squelch. n = 10 mS units.
 			 *
 			 * Why did I do this?  Just add more to TXDELAY.
 			 * Now undocumented in User Guide.  Might disappear someday.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: DWAIT can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing delay time for DWAIT command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n <= 255 {
 				p_audio_config.achan[channel].dwait = n
 			} else {
 				p_audio_config.achan[channel].dwait = DEFAULT_DWAIT
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid delay time for DWAIT. Using %d.\n",
 					line, p_audio_config.achan[channel].dwait)
 			}
 		} else if strings.EqualFold(t, "SLOTTIME") {
-
 			/*
 			 * SLOTTIME n		- For non-digipeat transmit delay timing. n = 10 mS units.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: SLOTTIME can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing delay time for SLOTTIME command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 5 && n < 50 {
 				// 0 = User has no clue.  This would be no delay.
@@ -2327,6 +2361,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_audio_config.achan[channel].slottime = n
 			} else {
 				p_audio_config.achan[channel].slottime = DEFAULT_SLOTTIME
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid delay time for persist algorithm. Using default %d.\n",
 					line, p_audio_config.achan[channel].slottime)
@@ -2335,27 +2370,30 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Why don't you just use the default?\n")
 			}
 		} else if strings.EqualFold(t, "PERSIST") {
-
 			/*
 			 * PERSIST 		- For non-digipeat transmit delay timing.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: PERSIST can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing probability for PERSIST command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 5 && n <= 250 {
 				p_audio_config.achan[channel].persist = n
 			} else {
 				p_audio_config.achan[channel].persist = DEFAULT_PERSIST
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid probability for persist algorithm. Using default %d.\n",
 					line, p_audio_config.achan[channel].persist)
@@ -2364,25 +2402,28 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Why don't you just use the default?\n")
 			}
 		} else if strings.EqualFold(t, "TXDELAY") {
-
 			/*
 			 * TXDELAY n		- For transmit delay timing. n = 10 mS units.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TXDELAY can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing time for TXDELAY command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n <= 255 {
 				text_color_set(DW_COLOR_ERROR)
+
 				if n < 10 {
 					dw_printf("Line %d: Setting TXDELAY this small is a REALLY BAD idea if you want other stations to hear you.\n",
 						line)
@@ -2398,30 +2439,34 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("section, to understand what this means.\n")
 					dw_printf("Why don't you just use the default?\n")
 				}
+
 				p_audio_config.achan[channel].txdelay = n
 			} else {
 				p_audio_config.achan[channel].txdelay = DEFAULT_TXDELAY
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid time for transmit delay. Using %d.\n",
 					line, p_audio_config.achan[channel].txdelay)
 			}
 		} else if strings.EqualFold(t, "TXTAIL") {
-
 			/*
 			 * TXTAIL n		- For transmit timing. n = 10 mS units.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TXTAIL can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing time for TXTAIL command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n <= 255 {
 				if n < 5 {
@@ -2439,36 +2484,41 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("section, to understand what this means.\n")
 					dw_printf("Why don't you just use the default?\n")
 				}
+
 				p_audio_config.achan[channel].txtail = n
 			} else {
 				p_audio_config.achan[channel].txtail = DEFAULT_TXTAIL
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid time for transmit timing. Using %d.\n",
 					line, p_audio_config.achan[channel].txtail)
 			}
 		} else if strings.EqualFold(t, "FULLDUP") {
-
 			/*
 			 * FULLDUP  {on|off} 		- Full Duplex
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: FULLDUP can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing parameter for FULLDUP command.  Expecting ON or OFF.\n", line)
+
 				continue
 			}
+
 			if strings.EqualFold(t, "ON") {
 				p_audio_config.achan[channel].fulldup = true
 			} else if strings.EqualFold(t, "OFF") {
 				p_audio_config.achan[channel].fulldup = false
 			} else {
 				p_audio_config.achan[channel].fulldup = false
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Expected ON or OFF for FULLDUP.\n", line)
 			}
@@ -2478,16 +2528,18 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * Specify script for text-to-speech function.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: SPEECH can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing script for Text-to-Speech function.\n", line)
+
 				continue
 			}
 
@@ -2506,7 +2558,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			   }
 			*/
 		} else if strings.EqualFold(t, "FX25TX") {
-
 			/*
 			 * FX25TX n		- Enable FX.25 transmission.  Default off.
 			 *				0 = off, 1 = auto mode, others are suggestions for testing
@@ -2514,18 +2565,21 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *				Also set by "-X n" command line option.
 			 *				V1.7 changed from global to per-channel setting.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: FX25TX can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing FEC mode for FX25TX command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 200 {
 				p_audio_config.achan[channel].fx25_strength = n
@@ -2533,12 +2587,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			} else {
 				p_audio_config.achan[channel].fx25_strength = 1
 				p_audio_config.achan[channel].layer2_xmit = LAYER2_FX25
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unreasonable value for FX.25 transmission mode. Using %d.\n",
 					line, p_audio_config.achan[channel].fx25_strength)
 			}
 		} else if strings.EqualFold(t, "FX25AUTO") {
-
 			/*
 			 * FX25AUTO n		- Enable Automatic use of FX.25 for connected mode.  *** Not Implemented ***
 			 *				Automatically enable, for that session only, when an identical
@@ -2547,29 +2601,32 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *				0 to disable feature.
 			 *				Current a global setting.  Could be per channel someday.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: FX25AUTO can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing count for FX25AUTO command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 20 {
 				p_audio_config.fx25_auto_enable = n
 			} else {
 				p_audio_config.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unreasonable count for connected mode automatic FX.25. Using %d.\n",
 					line, p_audio_config.fx25_auto_enable)
 			}
 		} else if strings.EqualFold(t, "IL2PTX") {
-
 			/*
 			 * IL2PTX  [ + - ] [ 0 1 ]	- Enable IL2P transmission.  Default off.
 			 *				"+" means normal polarity. Redundant since it is the default.
@@ -2579,12 +2636,13 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *				"0" means weak FEC.  Not recommended.
 			 *				"1" means stronger FEC.  "Max FEC."  Default if not specified.
 			 */
-
 			if channel < 0 || channel >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: IL2PTX can only be used with radio channel 0 - %d.\n", line, MAX_RADIO_CHANS-1)
+
 				continue
 			}
+
 			p_audio_config.achan[channel].layer2_xmit = LAYER2_IL2P
 			p_audio_config.achan[channel].il2p_max_fec = 1
 			p_audio_config.achan[channel].il2p_invert_polarity = 0
@@ -2594,6 +2652,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				if t == "" {
 					break
 				}
+
 				for _, c := range t {
 					switch c {
 					case '+':
@@ -2607,12 +2666,12 @@ func config_init(fname string, p_audio_config *audio_s,
 					default:
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Invalid parameter '%c' for IL2PTX command.\n", line, c)
+
 						continue
 					}
 				}
 			}
 		} else if strings.EqualFold(t, "DIGIPEAT") || strings.EqualFold(t, "DIGIPEATER") {
-
 			/*
 			 * ==================== APRS Digipeater parameters ====================
 			 */
@@ -2623,24 +2682,28 @@ func config_init(fname string, p_audio_config *audio_s,
 			 * ATGP is an ugly hack for the specific need of ATGP which needs more that 8 digipeaters.
 			 * DO NOT put this in the User Guide.  On a need to know basis.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing FROM-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number.\n",
 					line, t)
+
 				continue
 			}
+
 			var from_chan, _ = strconv.Atoi(t)
 			if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
 					MAX_TOTAL_CHANS-1, line)
+
 				continue
 			}
 
@@ -2651,6 +2714,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 					line, from_chan)
+
 				continue
 			}
 
@@ -2658,19 +2722,24 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing TO-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: '%s' is not allowed for TO-channel.  It must be a number.\n",
 					line, t)
+
 				continue
 			}
+
 			var to_chan, _ = strconv.Atoi(t)
 			if to_chan < 0 || to_chan >= MAX_TOTAL_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
 					MAX_TOTAL_CHANS-1, line)
+
 				continue
 			}
 
@@ -2679,6 +2748,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 					line, to_chan)
+
 				continue
 			}
 
@@ -2686,20 +2756,25 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing alias pattern on line %d.\n", line)
+
 				continue
 			}
+
 			var r, err = regexp.Compile(t)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n", line, err)
+
 				continue
 			}
+
 			p_digi_config.alias[from_chan][to_chan] = r
 
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing wide pattern on line %d.\n", line)
+
 				continue
 			}
 
@@ -2707,8 +2782,10 @@ func config_init(fname string, p_audio_config *audio_s,
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Invalid wide matching pattern on line %d:\n%s\n", line, err)
+
 				continue
 			}
+
 			p_digi_config.wide[from_chan][to_chan] = r
 
 			p_digi_config.enabled[from_chan][to_chan] = true
@@ -2724,6 +2801,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("Config file, line %d: Preemptive digipeating DROP option is discouraged.\n", line)
 					dw_printf("It can create a via path which is misleading about the actual path taken.\n")
 					dw_printf("PREEMPT is the best choice for this feature.\n")
+
 					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_DROP
 					t = split("", false)
 				} else if strings.EqualFold(t, "MARK") {
@@ -2731,6 +2809,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("Config file, line %d: Preemptive digipeating MARK option is discouraged.\n", line)
 					dw_printf("It can create a via path which is misleading about the actual path taken.\n")
 					dw_printf("PREEMPT is the best choice for this feature.\n")
+
 					p_digi_config.preempt[from_chan][to_chan] = PREEMPT_MARK
 					t = split("", false)
 				} else if (strings.EqualFold(t, "TRACE")) || (strings.HasPrefix(strings.ToUpper(t), "PREEMPT")) {
@@ -2747,49 +2826,53 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file, line %d: Found \"%s\" where end of line was expected.\n", line, t)
 			}
 		} else if strings.EqualFold(t, "DEDUPE") {
-
 			/*
 			 * DEDUPE 		- Time to suppress digipeating of duplicate APRS packets.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing time for DEDUPE command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n < 600 {
 				p_digi_config.dedupe_time = n
 			} else {
 				p_digi_config.dedupe_time = DEFAULT_DEDUPE
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unreasonable value for dedupe time. Using %d.\n",
 					line, p_digi_config.dedupe_time)
 			}
 		} else if strings.EqualFold(t, "regen") {
-
 			/*
 			 * REGEN 		- Signal regeneration.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing FROM-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number.\n",
 					line, t)
+
 				continue
 			}
+
 			var from_chan, _ = strconv.Atoi(t)
 			if from_chan < 0 || from_chan >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
 					MAX_RADIO_CHANS-1, line)
+
 				continue
 			}
 
@@ -2799,6 +2882,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 					line, from_chan)
+
 				continue
 			}
 
@@ -2806,32 +2890,37 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing TO-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: '%s' is not allowed for TO-channel.  It must be a number.\n",
 					line, t)
+
 				continue
 			}
+
 			var to_chan, _ = strconv.Atoi(t)
 			if to_chan < 0 || to_chan >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
 					MAX_RADIO_CHANS-1, line)
+
 				continue
 			}
+
 			if p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 					line, to_chan)
+
 				continue
 			}
 
 			p_digi_config.regen[from_chan][to_chan] = true
-
 		} else if strings.EqualFold(t, "CDIGIPEAT") || strings.EqualFold(t, "CDIGIPEATER") {
-
 			/*
 			 * ==================== Connected Digipeater parameters ====================
 			 */
@@ -2839,24 +2928,28 @@ func config_init(fname string, p_audio_config *audio_s,
 			/*
 			 * CDIGIPEAT  from-chan  to-chan [ alias-pattern ]
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing FROM-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number.\n",
 					line, t)
+
 				continue
 			}
+
 			var from_chan, _ = strconv.Atoi(t)
 			if from_chan < 0 || from_chan >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
 					MAX_RADIO_CHANS-1, line)
+
 				continue
 			}
 
@@ -2870,6 +2963,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 					line, from_chan)
 				dw_printf("Only internal modems can be used for connected mode packet.\n")
+
 				continue
 			}
 
@@ -2877,26 +2971,33 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing TO-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: '%s' is not allowed for TO-channel.  It must be a number.\n",
 					line, t)
+
 				continue
 			}
+
 			var to_chan, _ = strconv.Atoi(t)
 			if to_chan < 0 || to_chan >= MAX_RADIO_CHANS {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
 					MAX_RADIO_CHANS-1, line)
+
 				continue
 			}
+
 			if p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 					line, to_chan)
 				dw_printf("Only internal modems can be used for connected mode packet.\n")
+
 				continue
 			}
 
@@ -2909,8 +3010,10 @@ func config_init(fname string, p_audio_config *audio_s,
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n", line, err)
+
 					continue
 				}
+
 				t = split("", false)
 			}
 
@@ -2921,7 +3024,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Config file, line %d: Found \"%s\" where end of line was expected.\n", line, t)
 			}
 		} else if strings.EqualFold(t, "FILTER") {
-
 			/*
 			 * ==================== Packet Filtering for APRS digipeater or IGate ====================
 			 */
@@ -2957,7 +3059,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *			  Maybe it should be called subscribe or something like that
 			 *			  because the subscriptions are cumulative.
 			 */
-
 			var from_chan int
 			var to_chan int
 
@@ -2965,10 +3066,13 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing FROM-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if t[0] == 'i' || t[0] == 'I' {
 				from_chan = MAX_TOTAL_CHANS
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: FILTER IG ... on line %d.\n", line)
 				dw_printf("Warning! Don't mess with IS>RF filtering unless you are an expert and have an unusual situation.\n")
@@ -2977,11 +3081,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Warning! If you insist, be sure to add \" | i/180 \" so you don't break messaging.\n")
 			} else {
 				var fromChanErr error
+
 				from_chan, fromChanErr = strconv.Atoi(t)
 				if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS || fromChanErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Filter FROM-channel must be in range of 0 to %d or \"IG\" on line %d.\n",
 						MAX_TOTAL_CHANS-1, line)
+
 					continue
 				}
 
@@ -2990,12 +3096,15 @@ func config_init(fname string, p_audio_config *audio_s,
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 						line, from_chan)
+
 					continue
 				}
+
 				if p_audio_config.chan_medium[from_chan] == MEDIUM_IGATE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Use 'IG' rather than %d for FROM-channel.\n",
 						line, from_chan)
+
 					continue
 				}
 			}
@@ -3004,10 +3113,13 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing TO-channel on line %d.\n", line)
+
 				continue
 			}
+
 			if t[0] == 'i' || t[0] == 'I' {
 				to_chan = MAX_TOTAL_CHANS
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: FILTER ... IG ... on line %d.\n", line)
 				dw_printf("Warning! Don't mess with RF>IS filtering unless you are an expert and have an unusual situation.\n")
@@ -3016,24 +3128,30 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .\n")
 			} else {
 				var toChanErr error
+
 				to_chan, toChanErr = strconv.Atoi(t)
 				if to_chan < 0 || to_chan >= MAX_TOTAL_CHANS || toChanErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Filter TO-channel must be in range of 0 to %d or \"IG\" on line %d.\n",
 						MAX_TOTAL_CHANS-1, line)
+
 					continue
 				}
+
 				if p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO &&
 					p_audio_config.chan_medium[to_chan] != MEDIUM_NETTNC {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 						line, to_chan)
+
 					continue
 				}
+
 				if p_audio_config.chan_medium[to_chan] == MEDIUM_IGATE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Use 'IG' rather than %d for TO-channel.\n",
 						line, to_chan)
+
 					continue
 				}
 			}
@@ -3053,9 +3171,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			p_digi_config.filter_str[from_chan][to_chan] = t
 
 			//TODO:  Do a test run to see errors now instead of waiting.
-
 		} else if strings.EqualFold(t, "CFILTER") {
-
 			/*
 			 * ==================== Packet Filtering for connected digipeater ====================
 			 */
@@ -3066,11 +3182,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			 * Why did I put this here?
 			 * What would be a useful use case?  Perhaps block by source or destination?
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing FROM-channel on line %d.\n", line)
+
 				continue
 			}
 
@@ -3079,6 +3195,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Filter FROM-channel must be in range of 0 to %d on line %d.\n",
 					MAX_RADIO_CHANS-1, line)
+
 				continue
 			}
 
@@ -3089,6 +3206,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 					line, from_chan)
+
 				continue
 			}
 
@@ -3096,6 +3214,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing TO-channel on line %d.\n", line)
+
 				continue
 			}
 
@@ -3104,12 +3223,15 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Filter TO-channel must be in range of 0 to %d on line %d.\n",
 					MAX_RADIO_CHANS-1, line)
+
 				continue
 			}
+
 			if p_audio_config.chan_medium[to_chan] != MEDIUM_RADIO {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 					line, to_chan)
+
 				continue
 			}
 
@@ -3122,9 +3244,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			p_cdigi_config.cfilter_str[from_chan][to_chan] = t
 
 			//TODO1.2:  Do a test run to see errors now instead of waiting.
-
 		} else if strings.EqualFold(t, "TTCORRAL") {
-
 			/*
 			 * ==================== APRStt gateway ====================
 			 */
@@ -3134,7 +3254,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * TTCORRAL  latitude  longitude  offset-or-ambiguity
 			 */
-
 			dw_printf("TTCORRAL support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3172,13 +3291,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			//	p_tt_config.corral_lon, p_tt_config.corral_offset, p_tt_config.corral_ambiguity);
 			*/
 		} else if strings.EqualFold(t, "TTPOINT") {
-
 			/*
 			 * TTPOINT 		- Define a point represented by touch tone sequence.
 			 *
 			 * TTPOINT   pattern  latitude  longitude
 			 */
-
 			dw_printf("TTPOINT support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3242,15 +3359,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			tl.point.lon = parse_ll(t, LON, line)
 			*/
-
 		} else if strings.EqualFold(t, "TTVECTOR") {
-
 			/*
 			 * TTVECTOR 		- Touch tone location with bearing and distance.
 			 *
 			 * TTVECTOR   pattern  latitude  longitude  scale  unit
 			 */
-
 			dw_printf("TTVECTOR support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3351,15 +3465,12 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			//dw_printf ("ttvector: %f meters\n", tl.vector.scale);
 			*/
-
 		} else if strings.EqualFold(t, "TTGRID") {
-
 			/*
 			 * TTGRID 		- Define a grid for touch tone locations.
 			 *
 			 * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
 			 */
-
 			dw_printf("TTGRID support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3443,15 +3554,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			tl.grid.lon9 = parse_ll(t, LON, line)
 			*/
-
 		} else if strings.EqualFold(t, "TTUTM") {
-
 			/*
 			 * TTUTM 		- Specify UTM zone for touch tone locations.
 			 *
 			 * TTUTM   pattern  zone [ scale [ x-offset y-offset ] ]
 			 */
-
 			dw_printf("TTUTM support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3558,14 +3666,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			*/
 		} else if strings.EqualFold(t, "TTUSNG") || strings.EqualFold(t, "TTMGRS") {
-
 			/*
 			 * TTUSNG, TTMGRS 		- Specify zone/square for touch tone locations.
 			 *
 			 * TTUSNG   pattern  zone_square
 			 * TTMGRS   pattern  zone_square
 			 */
-
 			dw_printf("TTUSNG/TTMGRS support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3673,7 +3779,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 			*/
 		} else if strings.EqualFold(t, "TTMHEAD") {
-
 			/*
 			 * TTMHEAD 		- Define pattern to be used for Maidenhead Locator.
 			 *
@@ -3686,7 +3791,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 */
 
 			// TODO1.3:  TTMHEAD needs testing.
-
 			dw_printf("TTMHEAD support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3786,9 +3890,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			*/
-
 		} else if strings.EqualFold(t, "TTSATSQ") {
-
 			/*
 			 * TTSATSQ 		- Define pattern to be used for Satellite square.
 			 *
@@ -3800,7 +3902,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 */
 
 			// TODO1.2:  TTSATSQ To be continued...
-
 			dw_printf("TTSATSQ support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3869,7 +3970,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 */
 
 			// TODO1.3:  TTAMBIG To be continued...
-
 			dw_printf("TTAMBIG support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -3924,7 +4024,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			*/
 		} else if strings.EqualFold(t, "TTMACRO") {
-
 			/*
 			 * TTMACRO 		- Define compact message format with full expansion
 			 *
@@ -3948,7 +4047,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *		These provide automatic conversion from plain text to the TT encoding.
 			 *
 			 */
-
 			dw_printf("TTMACRO support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -4208,7 +4306,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			*/
 		} else if strings.EqualFold(t, "TTOBJ") {
-
 			/*
 			 * TTOBJ 		- TT Object Report options.
 			 *
@@ -4216,7 +4313,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 *	whereto is any combination of transmit channel, APP, IG.
 			 */
-
 			dw_printf("TTOBJ support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -4312,13 +4408,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			*/
 		} else if strings.EqualFold(t, "TTERR") {
-
 			/*
 			 * TTERR 		- TT responses for success or errors.
 			 *
 			 * TTERR  msg_id  method  text...
 			 */
-
 			dw_printf("TTERR support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -4391,15 +4485,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			C.strcpy(&p_tt_config.response[msg_num].mtext[0], C.CString(t))
 			p_tt_config.response[msg_num].mtext[TT_MTEXT_LEN-1] = 0
 			*/
-
 		} else if strings.EqualFold(t, "TTSTATUS") {
-
 			/*
 			 * TTSTATUS 		- TT custom status messages.
 			 *
 			 * TTSTATUS  status_id  text...
 			 */
-
 			dw_printf("TTSTATUS support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -4435,14 +4526,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			C.strcpy(&p_tt_config.status[status_num][0], C.CString(t))
 			*/
 		} else if strings.EqualFold(t, "TTCMD") {
-
 			/*
 			 * TTCMD 		- Command to run when valid sequence is received.
 			 *			  Any text generated will be sent back to user.
 			 *
 			 * TTCMD ...
 			 */
-
 			dw_printf("TTCMD support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG APRStt
@@ -4456,7 +4545,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			C.strcpy(&p_tt_config.ttcmd[0], C.CString(t))
 			*/
 		} else if strings.EqualFold(t, "IGSERVER") {
-
 			/*
 			 * ==================== Internet gateway ====================
 			 */
@@ -4468,13 +4556,14 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * IGSERVER  hostname:port				-- more in line with usual conventions.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing IGate server name for IGSERVER command.\n", line)
+
 				continue
 			}
+
 			p_igate_config.t2_server_name = t
 
 			/* If there is a : in the name, split it out as the port number. */
@@ -4482,11 +4571,13 @@ func config_init(fname string, p_audio_config *audio_s,
 			if strings.Contains(t, ":") {
 				var hostname, portStr, _ = strings.Cut(t, ":")
 				p_igate_config.t2_server_name = hostname
+
 				var port, portErr = strconv.Atoi(portStr)
 				if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
 					p_igate_config.t2_server_port = port
 				} else {
 					p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
 						line, p_igate_config.t2_server_port)
@@ -4502,6 +4593,7 @@ func config_init(fname string, p_audio_config *audio_s,
 					p_igate_config.t2_server_port = n
 				} else {
 					p_igate_config.t2_server_port = DEFAULT_IGATE_PORT
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
 						line, p_igate_config.t2_server_port)
@@ -4515,11 +4607,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * IGLOGIN  callsign  passcode
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing login callsign for IGLOGIN command.\n", line)
+
 				continue
 			}
 			// TODO: Wouldn't hurt to do validity checking of format.
@@ -4529,21 +4621,22 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing passcode for IGLOGIN command.\n", line)
+
 				continue
 			}
+
 			p_igate_config.t2_passcode = t
 		} else if strings.EqualFold(t, "IGTXVIA") {
-
 			/*
 			 * IGTXVIA 		- Transmit channel and VIA path for messages from IGate server
 			 *
 			 * IGTXVIA  channel  [ path ]
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing transmit channel for IGTXVIA command.\n", line)
+
 				continue
 			}
 
@@ -4552,15 +4645,15 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n",
 					MAX_TOTAL_CHANS-1, line)
+
 				continue
 			}
+
 			p_igate_config.tx_chan = n
 
 			t = split("", false)
 			if t != "" {
-
 				// TODO KG#if 1	// proper checking
-
 				n = check_via_path(t)
 				if n >= 0 {
 					p_igate_config.max_digi_hops = n
@@ -4584,7 +4677,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				*/
 			}
 		} else if strings.EqualFold(t, "IGFILTER") {
-
 			/*
 			 * IGFILTER 		- IGate Server side filters.
 			 *			  Is this name too confusing.  Too similar to FILTER IG 0 ...
@@ -4593,12 +4685,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * IGFILTER  filter-spec ...
 			 */
-
 			t = split("", true) /* Take rest of line as one string. */
 
 			if p_igate_config.t2_filter != "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Warning - IGFILTER already configured (%s), this one (%s) will be ignored.\n", line, p_igate_config.t2_filter, t)
+
 				continue
 			}
 
@@ -4613,17 +4705,16 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Please read \"Successful-APRS-IGate-Operation.pdf\".\n")
 			}
 		} else if strings.EqualFold(t, "IGTXLIMIT") {
-
 			/*
 			 * IGTXLIMIT 		- Limit transmissions during 1 and 5 minute intervals.
 			 *
 			 * IGTXLIMIT  one-minute-limit  five-minute-limit
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing one minute limit for IGTXLIMIT command.\n", line)
+
 				continue
 			}
 
@@ -4634,6 +4725,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_igate_config.tx_limit_1 = n
 			} else {
 				p_igate_config.tx_limit_1 = IGATE_TX_LIMIT_1_MAX
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: One minute transmit limit has been reduced to %d.\n",
 					line, p_igate_config.tx_limit_1)
@@ -4644,6 +4736,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing five minute limit for IGTXLIMIT command.\n", line)
+
 				continue
 			}
 
@@ -4654,54 +4747,52 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_igate_config.tx_limit_5 = n
 			} else {
 				p_igate_config.tx_limit_5 = IGATE_TX_LIMIT_5_MAX
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Five minute transmit limit has been reduced to %d.\n",
 					line, p_igate_config.tx_limit_5)
 				dw_printf("You won't make friends by setting a limit this high.\n")
 			}
 		} else if strings.EqualFold(t, "IGMSP") {
-
 			/*
 			 * IGMSP 		- Number of times to send position of message sender.
 			 *
 			 * IGMSP  n
 			 */
-
 			t = split("", false)
 			if t != "" {
-
 				var n, _ = strconv.Atoi(t)
 				if n >= 0 && n <= 10 {
 					p_igate_config.igmsp = n
 				} else {
 					p_igate_config.igmsp = 1
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unreasonable number of times for message sender position.  Using default 1.\n", line)
 				}
 			} else {
 				p_igate_config.igmsp = 1
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing number of times for message sender position.  Using default 1.\n", line)
 			}
 		} else if strings.EqualFold(t, "SATGATE") {
-
 			/*
 			 * SATGATE 		- Special SATgate mode to delay packets heard directly.
 			 *
 			 * SATGATE [ n ]
 			 */
-
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Line %d: SATGATE is pretty useless and will be removed in a future version.\n", line)
 
 			t = split("", false)
 			if t != "" {
-
 				var n, _ = strconv.Atoi(t)
 				if n >= MIN_SATGATE_DELAY && n <= MAX_SATGATE_DELAY {
 					p_igate_config.satgate_delay = n
 				} else {
 					p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY
+
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unreasonable SATgate delay.  Using default.\n", line)
 				}
@@ -4709,7 +4800,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_igate_config.satgate_delay = DEFAULT_SATGATE_DELAY
 			}
 		} else if strings.EqualFold(t, "AGWPORT") {
-
 			/*
 			 * ==================== All the left overs ====================
 			 */
@@ -4719,31 +4809,34 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * In version 1.2 we allow 0 to disable listening.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing port number for AGWPORT command.\n", line)
+
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
+
 			t = split("", false)
 			if t != "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Unexpected \"%s\" after the port number.\n", line, t)
 				dw_printf("Perhaps you were trying to use feature available only with KISSPORT.\n")
+
 				continue
 			}
+
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 				p_misc_config.agwpe_port = n
 			} else {
 				p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n",
 					line, p_misc_config.agwpe_port)
 			}
 		} else if strings.EqualFold(t, "KISSPORT") {
-
 			/*
 			 * KISSPORT port [ chan ]		- Port number for KISS over IP.
 			 */
@@ -4763,14 +4856,15 @@ func config_init(fname string, p_audio_config *audio_s,
 			//
 			//	KISSPORT 7001 1		# Only radio channel 1 for receive.  KISS channel set to 0.
 			//				# Transmit to radio channel 1, ignoring KISS channel.
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing TCP port number for KISSPORT command.\n", line)
+
 				continue
 			}
 			var n, _ = strconv.Atoi(t)
+
 			var tcp_port int
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 				tcp_port = n
@@ -4778,17 +4872,21 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\n", line)
 				dw_printf("Use something in the range of %d to %d.\n", MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
+
 				continue
 			}
 
 			t = split("", false)
 			var channel = -1 // optional.  default to all if not specified.
+
 			if t != "" {
 				var channelErr error
+
 				channel, channelErr = strconv.Atoi(t)
 				if channel < 0 || channel >= MAX_TOTAL_CHANS || channelErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d.\n", line, channel, MAX_TOTAL_CHANS-1)
+
 					continue
 				}
 			}
@@ -4798,10 +4896,8 @@ func config_init(fname string, p_audio_config *audio_s,
 			if tcp_port == 0 {
 				p_misc_config.kiss_port[0] = 0 // Should all be wiped out?
 			} else {
-
 				// Try to find an empty slot.
 				// A duplicate TCP port number will overwrite the previous value.
-
 				var slot = -1
 				for i := 0; i < MAX_KISS_TCP_PORTS && slot == -1; i++ {
 					if p_misc_config.kiss_port[i] == tcp_port { //nolint:staticcheck
@@ -4814,6 +4910,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						slot = i
 					}
 				}
+
 				if slot >= 0 {
 					p_misc_config.kiss_port[slot] = tcp_port
 					p_misc_config.kiss_chan[slot] = channel
@@ -4823,7 +4920,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 			}
 		} else if strings.EqualFold(t, "NULLMODEM") || strings.EqualFold(t, "SERIALKISS") {
-
 			/*
 			 * NULLMODEM name [ speed ]	- Device name for serial port or our end of the virtual "null modem"
 			 * SERIALKISS name  [ speed ]
@@ -4833,17 +4929,18 @@ func config_init(fname string, p_audio_config *audio_s,
 			 * null modem cable on Windows only.  Now it is also available for Linux.
 			 * TODO1.5: In retrospect, this doesn't seem like such a good name.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing serial port name on line %d.\n", line)
+
 				continue
 			} else {
 				if p_misc_config.kiss_serial_port != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", line)
 				}
+
 				p_misc_config.kiss_serial_port = t
 				p_misc_config.kiss_serial_speed = 0
 				p_misc_config.kiss_serial_poll = 0
@@ -4854,52 +4951,51 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_misc_config.kiss_serial_speed, _ = strconv.Atoi(t)
 			}
 		} else if strings.EqualFold(t, "SERIALKISSPOLL") {
-
 			/*
 			 * SERIALKISSPOLL name		- Poll for serial port name that might come and go.
 			 *			  	  e.g. /dev/rfcomm0 for bluetooth.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing serial port name on line %d.\n", line)
+
 				continue
 			} else {
 				if p_misc_config.kiss_serial_port != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", line)
 				}
+
 				p_misc_config.kiss_serial_port = t
 				p_misc_config.kiss_serial_speed = 0
 				p_misc_config.kiss_serial_poll = 1 // set polling.
 			}
 		} else if strings.EqualFold(t, "KISSCOPY") {
-
 			/*
 			 * KISSCOPY 		- Data from network KISS client is copied to all others.
 			 *			  This does not apply to pseudo terminal KISS.
 			 */
-
 			p_misc_config.kiss_copy = true
 		} else if strings.EqualFold(t, "DNSSD") {
-
 			/*
 			 * DNSSD 		- Enable or disable (1/0) dns-sd, DNS Service Discovery announcements
 			 * DNSSDNAME            - Set DNS-SD service name, defaults to "Dire Wolf on <hostname>"
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing integer value for DNSSD command.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n == 0 || n == 1 {
 				p_misc_config.dns_sd_enabled = n != 0
 			} else {
 				p_misc_config.dns_sd_enabled = false
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", line)
 			}
@@ -4908,12 +5004,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing service name for DNSSDNAME.\n", line)
+
 				continue
 			} else {
 				p_misc_config.dns_sd_name = t
 			}
 		} else if strings.EqualFold(t, "gpsnmea") {
-
 			/*
 			 * GPSNMEA  serial-device  [ speed ]		- Direct connection to GPS receiver.
 			 */
@@ -4921,8 +5017,10 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Missing serial port name for GPS receiver.\n", line)
+
 				continue
 			}
+
 			p_misc_config.gpsnmea_port = t
 
 			t = split("", false)
@@ -4933,7 +5031,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				p_misc_config.gpsnmea_speed = 4800 // The standard at one time.
 			}
 		} else if strings.EqualFold(t, "gpsd") {
-
 			/*
 			 * GPSD		- Use GPSD server.
 			 *
@@ -4949,7 +5046,6 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			   #elif ENABLE_GPSD
 			*/
-
 			dw_printf("Warning: GPSD support currently disabled pending a rewrite of the integration.\n")
 
 			p_misc_config.gpsd_host = "localhost"
@@ -4961,12 +5057,12 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				t = split("", false)
 				if t != "" {
-
 					var n, _ = strconv.Atoi(t)
 					if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 						p_misc_config.gpsd_port = n
 					} else {
 						p_misc_config.gpsd_port = DEFAULT_GPSD_PORT
+
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Invalid port number for GPSD Socket Interface. Using default of %d.\n",
 							line, p_misc_config.gpsd_port)
@@ -4981,9 +5077,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				    continue;
 			#endif
 			*/
-
 		} else if strings.EqualFold(t, "waypoint") {
-
 			/*
 			 * WAYPOINT		- Generate WPL and AIS NMEA sentences for display on map.
 			 *
@@ -4991,11 +5085,11 @@ func config_init(fname string, p_audio_config *audio_s,
 			 * WAYPOINT  host:udpport [ formats ]
 			 *
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing output device for WAYPOINT on line %d.\n", line)
+
 				continue
 			}
 
@@ -5004,12 +5098,14 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if strings.Contains(t, ":") {
 				var hostname, portStr, _ = strings.Cut(t, ":")
+
 				var port, _ = strconv.Atoi(portStr)
 				if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER {
 					p_misc_config.waypoint_udp_hostname = hostname
 					if p_misc_config.waypoint_udp_hostname == "" {
 						p_misc_config.waypoint_udp_hostname = "localhost"
 					}
+
 					p_misc_config.waypoint_udp_portnum = port
 				} else {
 					text_color_set(DW_COLOR_ERROR)
@@ -5041,7 +5137,6 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 			}
 		} else if strings.EqualFold(t, "logdir") {
-
 			/*
 			 * LOGDIR	- Directory name for automatically named daily log files.  Use "." for current working directory.
 			 */
@@ -5049,22 +5144,24 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing directory name for LOGDIR on line %d.\n", line)
+
 				continue
 			} else {
 				if p_misc_config.log_path != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: LOGDIR on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line)
 				}
+
 				p_misc_config.log_daily_names = true
 				p_misc_config.log_path = t
 			}
+
 			t = split("", false)
 			if t != "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: LOGDIR on line %d should have directory path and nothing more.\n", line)
 			}
 		} else if strings.EqualFold(t, "logfile") {
-
 			/*
 			 * LOGFILE	- Log file name, including any directory part.
 			 */
@@ -5072,38 +5169,37 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing file name for LOGFILE on line %d.\n", line)
+
 				continue
 			} else {
 				if p_misc_config.log_path != "" {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: LOGFILE on line %d is replacing an earlier LOGDIR or LOGFILE.\n", line)
 				}
+
 				p_misc_config.log_daily_names = false
 				p_misc_config.log_path = t
 			}
+
 			t = split("", false)
 			if t != "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: LOGFILE on line %d should have file name and nothing more.\n", line)
 			}
 		} else if strings.EqualFold(t, "BEACON") {
-
 			/*
 			 * BEACON channel delay every message
 			 *
 			 * Original handcrafted style.  Removed in version 1.0.
 			 */
-
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Old style 'BEACON' has been replaced with new commands.\n", line)
 			dw_printf("Use PBEACON, OBEACON, TBEACON, or CBEACON instead.\n")
-
 		} else if strings.EqualFold(t, "PBEACON") ||
 			strings.EqualFold(t, "OBEACON") ||
 			strings.EqualFold(t, "TBEACON") ||
 			strings.EqualFold(t, "CBEACON") ||
 			strings.EqualFold(t, "IBEACON") {
-
 			/*
 			 * PBEACON keyword=value ...
 			 * OBEACON keyword=value ...
@@ -5116,9 +5212,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			// TODO: maybe add proportional pathing so multiple beacon timing does not need to be manually constructed?
 			// http://www.aprs.org/newN/ProportionalPathing.txt
-
 			if p_misc_config.num_beacons < MAX_BEACONS {
-
 				if strings.EqualFold(t, "PBEACON") {
 					p_misc_config.beacon[p_misc_config.num_beacons].btype = BEACON_POSITION
 				} else if strings.EqualFold(t, "OBEACON") {
@@ -5140,16 +5234,15 @@ func config_init(fname string, p_audio_config *audio_s,
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Maximum number of beacons exceeded on line %d.\n", line)
+
 				continue
 			}
 		} else if strings.EqualFold(t, "SMARTBEACON") || strings.EqualFold(t, "SMARTBEACONING") {
-
 			/*
 			 * SMARTBEACONING [ fast_speed fast_rate slow_speed slow_rate turn_time turn_angle turn_slope ]
 			 *
 			 * Parameters must be all or nothing.
 			 */
-
 			dw_printf("SMARTBEACONING support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
 			/* TODO KG
@@ -5210,9 +5303,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			/* If I was ambitious, I might allow optional */
 			/* unit at end for miles or km / hour. */
-
 		} else if strings.EqualFold(t, "FRACK") {
-
 			/*
 			 * ==================== AX.25 connected mode ====================
 			 */
@@ -5220,13 +5311,14 @@ func config_init(fname string, p_audio_config *audio_s,
 			/*
 			 * FRACK  n 		- Number of seconds to wait for ack to transmission.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for FRACK.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_T1V_FRACK_MIN && n <= AX25_T1V_FRACK_MAX {
 				p_misc_config.frack = n
@@ -5235,17 +5327,17 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Invalid FRACK time. Using default %d.\n", line, p_misc_config.frack)
 			}
 		} else if strings.EqualFold(t, "RETRY") {
-
 			/*
 			 * RETRY  n 		- Number of times to retry before giving up.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for RETRY.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_N2_RETRY_MIN && n <= AX25_N2_RETRY_MAX {
 				p_misc_config.retry = n
@@ -5254,17 +5346,17 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Invalid RETRY number. Using default %d.\n", line, p_misc_config.retry)
 			}
 		} else if strings.EqualFold(t, "PACLEN") {
-
 			/*
 			 * PACLEN  n 		- Maximum number of bytes in information part.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for PACLEN.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_N1_PACLEN_MIN && n <= AX25_N1_PACLEN_MAX {
 				p_misc_config.paclen = n
@@ -5273,45 +5365,47 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Invalid PACLEN value. Using default %d.\n", line, p_misc_config.paclen)
 			}
 		} else if strings.EqualFold(t, "MAXFRAME") {
-
 			/*
 			 * MAXFRAME  n 		- Max frames to send before ACK.  mod 8 "Window" size.
 			 *
 			 * Window size would make more sense but everyone else calls it MAXFRAME.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for MAXFRAME.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_K_MAXFRAME_BASIC_MIN && n <= AX25_K_MAXFRAME_BASIC_MAX {
 				p_misc_config.maxframe_basic = n
 			} else {
 				p_misc_config.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d.\n",
 					line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, p_misc_config.maxframe_basic)
 			}
 		} else if strings.EqualFold(t, "EMAXFRAME") {
-
 			/*
 			 * EMAXFRAME  n 		- Max frames to send before ACK.  mod 128 "Window" size.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for EMAXFRAME.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= AX25_K_MAXFRAME_EXTENDED_MIN && n <= AX25_K_MAXFRAME_EXTENDED_MAX {
 				p_misc_config.maxframe_extended = n
 			} else {
 				p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d.\n",
 					line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, p_misc_config.maxframe_extended)
@@ -5320,13 +5414,14 @@ func config_init(fname string, p_audio_config *audio_s,
 			/*
 			 * MAXV22  n 		- Max number of SABME sent before trying SABM.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing value for MAXV22.\n", line)
+
 				continue
 			}
+
 			var n, _ = strconv.Atoi(t)
 			if n >= 0 && n <= AX25_N2_RETRY_MAX {
 				p_misc_config.maxv22 = n
@@ -5335,17 +5430,16 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Invalid MAXV22 number. Will use half of RETRY.\n", line)
 			}
 		} else if strings.EqualFold(t, "V20") {
-
 			/*
 			 * V20  address [ address ... ] 	- Stations known to support only AX.25 v2.0.
 			 *					  When connecting to these, skip SABME and go right to SABM.
 			 *					  Possible to have multiple and they are cumulative.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing address(es) for V20.\n", line)
+
 				continue
 			}
 
@@ -5362,21 +5456,21 @@ func config_init(fname string, p_audio_config *audio_s,
 
 					// continue processing any others following.
 				}
+
 				t = split("", false)
 			}
 		} else if strings.EqualFold(t, "NOXID") {
-
 			/*
 			 * NOXID  address [ address ... ] 	- Stations known not to understand XID.
 			 *					  After connecting to these (with v2.2 obviously), don't try using XID command.
 			 *					  AX.25 for Linux is the one known case so far.
 			 *					  Possible to have multiple and they are cumulative.
 			 */
-
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing address(es) for NOXID.\n", line)
+
 				continue
 			}
 
@@ -5393,17 +5487,16 @@ func config_init(fname string, p_audio_config *audio_s,
 
 					// continue processing any others following.
 				}
+
 				t = split("", false)
 			}
 		} else {
-
 			/*
 			 * Invalid command.
 			 */
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file: Unrecognized command '%s' on line %d.\n", t, line)
 		}
-
 	}
 
 	/*
@@ -5418,11 +5511,8 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	for i := 0; i < MAX_TOTAL_CHANS; i++ {
 		for j := 0; j < MAX_TOTAL_CHANS; j++ {
-
 			/* APRS digipeating. */
-
 			if p_digi_config.enabled[i][j] {
-
 				if IsNoCall(p_audio_config.mycall[i]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
@@ -5436,11 +5526,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				var b = 0
+
 				for k := 0; k < p_misc_config.num_beacons; k++ {
 					if p_misc_config.beacon[k].sendto_chan == j {
 						b++
 					}
 				}
+
 				if b == 0 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Beaconing should be configured for channel %d when digipeating is enabled.\n", j)
@@ -5453,7 +5545,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			/* Connected mode digipeating. */
 
 			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && p_cdigi_config.enabled[i][j] {
-
 				if IsNoCall(p_audio_config.mycall[i]) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
@@ -5467,11 +5558,13 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				var b = 0
+
 				for k := 0; k < p_misc_config.num_beacons; k++ {
 					if p_misc_config.beacon[k].sendto_chan == j {
 						b++
 					}
 				}
+
 				if b == 0 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Beaconing should be configured for channel %d when digipeating is enabled.\n", j)
@@ -5484,10 +5577,10 @@ func config_init(fname string, p_audio_config *audio_s,
 
 		if len(p_igate_config.t2_login) > 0 &&
 			(p_audio_config.chan_medium[i] == MEDIUM_RADIO || p_audio_config.chan_medium[i] == MEDIUM_NETTNC) {
-
 			if IsNoCall(p_audio_config.mycall[i]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for receive channel %d before Rx IGate is allowed.\n", i)
+
 				p_igate_config.t2_login = ""
 			}
 			// Currently we can have only one transmit channel.
@@ -5495,6 +5588,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			if p_igate_config.tx_chan >= 0 && IsNoCall(p_audio_config.mycall[p_igate_config.tx_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for transmit channel %d before Tx IGate is allowed.\n", i)
+
 				p_igate_config.tx_chan = -1
 			}
 		}
@@ -5518,7 +5612,6 @@ func config_init(fname string, p_audio_config *audio_s,
 	if p_misc_config.maxv22 < 0 {
 		p_misc_config.maxv22 = p_misc_config.retry / 3
 	}
-
 } /* end config_init */
 
 /*
@@ -5530,7 +5623,6 @@ func config_init(fname string, p_audio_config *audio_s,
 // Just ignores overlay, symbol, lat, long, and comment.
 
 func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) error { //nolint:unparam
-
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
@@ -5565,6 +5657,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		if !found {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file: No = found in, %s, on line %d.\n", t, line)
+
 			return errors.New("TODO")
 		}
 
@@ -5615,8 +5708,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			if n < 1 || n > 3600 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds.\n", line, n)
+
 				continue
 			}
+
 			b.slot = n
 		} else if strings.EqualFold(keyword, "EVERY") {
 			b.every = parse_interval(value, line)
@@ -5629,8 +5724,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
+
 					continue
 				}
+
 				b.sendto_type = SENDTO_RECV
 				b.sendto_chan = n
 			} else if value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X' {
@@ -5638,6 +5735,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+
 					continue
 				}
 
@@ -5648,8 +5746,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+
 					continue
 				}
+
 				b.sendto_type = SENDTO_XMIT
 				b.sendto_chan = n
 			}
@@ -5668,9 +5768,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			}
 			*/
 		} else if strings.EqualFold(keyword, "VIA") {
-
 			// #if 1	// proper checking
-
 			if check_via_path(value) >= 0 {
 				b.via = value
 			} else {
@@ -5719,6 +5817,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				value = strings.TrimSpace(value)
 
 				var meters float64 = 0
+
 				for _, u := range units {
 					if strings.EqualFold(u.name, unit) {
 						meters = u.meters
@@ -5793,6 +5892,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Invalid option keyword, %s.\n", line, keyword)
+
 			return errors.New("TODO")
 		}
 	}
@@ -5805,6 +5905,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	if b.compress && b.ambiguity != 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Position ambiguity can't be used with compressed location format.\n", line)
+
 		b.ambiguity = 0
 	}
 
@@ -5812,9 +5913,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	 * Convert UTM coordinates to lat / long.
 	 */
 	if len(zone) > 0 || easting != G_UNKNOWN || northing != G_UNKNOWN {
-
 		if len(zone) > 0 && easting != G_UNKNOWN && northing != G_UNKNOWN {
-
 			var _, _hemi, lzone = parse_utm_zone(zone)
 
 			var hemi = HemisphereRuneToCoordconvHemisphere(_hemi)
@@ -5825,8 +5924,8 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				Easting:    float64(easting),
 				Northing:   float64(northing),
 			}
-			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 
+			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
 				b.lat = R2D(float64(geo.Lat))
 				b.lon = R2D(float64(geo.Lng))
@@ -5848,13 +5947,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	 * We should complain if overlay used with symtab other than \.
 	 */
 	if len(temp_symbol) > 0 {
-
 		if len(temp_symbol) == 2 &&
 			(temp_symbol[0] == '/' || temp_symbol[0] == '\\' || unicode.IsUpper(rune(temp_symbol[0])) || unicode.IsDigit(rune(temp_symbol[0]))) &&
 			temp_symbol[1] >= '!' && temp_symbol[1] <= '~' {
-
 			/* Explicit table and symbol. */
-
 			if unicode.IsUpper(rune(b.symtab)) || unicode.IsDigit(rune(b.symtab)) {
 				b.symbol = temp_symbol[1]
 			} else {
@@ -5862,7 +5958,6 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.symbol = temp_symbol[1]
 			}
 		} else {
-
 			/* Try to look up by description. */
 			var symtab, symbol, ok = symbols_code_from_description(b.symtab, temp_symbol)
 			if ok {
@@ -5878,10 +5973,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/* Check is here because could be using default channel when SENDTO= is not specified. */
 
 	if b.sendto_type == SENDTO_XMIT {
-
 		if (b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE) && p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
+
 			return errors.New("TODO")
 		}
 
@@ -5890,12 +5985,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			if IsNoCall(p_audio_config.mycall[0]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0)
+
 				return errors.New("TODO")
 			}
 		} else {
 			if IsNoCall(p_audio_config.mycall[b.sendto_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan)
+
 				return errors.New("TODO")
 			}
 		}

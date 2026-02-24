@@ -279,6 +279,7 @@ func find_avail() int {
 	}
 
 	clear_user(i_oldest)
+
 	return (i_oldest)
 } /* end find_avail */
 
@@ -302,6 +303,7 @@ func corral_slot() int {
 				used = true
 			}
 		}
+
 		if !used {
 			return (slot)
 		}
@@ -377,6 +379,7 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 	if callsign == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("APRStt tone sequence did not include callsign / object name.\n")
+
 		return (TT_ERROR_NO_CALL)
 	}
 
@@ -523,7 +526,6 @@ func tt_user_background() {
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("tt_user_background()  now = %d\n", (int)now);
 				// tt_user_dump ();
-
 				xmit_object_report(i, false)
 
 				/* Increase count of number times this one was sent. */
@@ -545,7 +547,6 @@ func tt_user_background() {
 		if tt_user[i].callsign != "" {
 			if tt_user[i].last_heard.Add(time.Duration(save_tt_config_p.retain_time) * time.Second).Before(now) {
 				// dw_printf ("debug: purging expired user %d\n", i);
-
 				clear_user(i)
 			}
 		}
@@ -589,7 +590,6 @@ func xmit_object_report(i int, first_time bool) {
 	// text_color_set(DW_COLOR_DEBUG);
 	// printf ("xmit_object_report (index = %d, first_time = %d) rx = %d, tx = %d\n", i, first_time,
 	//			save_tt_config_p.obj_recv_chan, save_tt_config_p.obj_xmit_chan);
-
 	Assert(i >= 0 && i < MAX_TT_USERS)
 
 	/*
@@ -604,12 +604,14 @@ func xmit_object_report(i int, first_time bool) {
 
 	var olat, olong float64
 	var oambig int
+
 	if tt_user[i].corral_slot == 0 {
 		/*
 		 * Known location.
 		 */
 		olat = tt_user[i].latitude
 		olong = tt_user[i].longitude
+
 		oambig = tt_user[i].ambiguity
 		if oambig == G_UNKNOWN {
 			oambig = 0
@@ -644,6 +646,7 @@ func xmit_object_report(i int, first_time bool) {
 		if info_comment != "" {
 			info_comment += " "
 		}
+
 		info_comment += "["
 		info_comment += tt_user[i].loc_text
 		info_comment += "]"
@@ -658,6 +661,7 @@ func xmit_object_report(i int, first_time bool) {
 		if !strings.HasPrefix(save_tt_config_p.status[tt_user[i].mic_e-'0'], "/") {
 			info_comment += "/"
 		}
+
 		info_comment += save_tt_config_p.status[tt_user[i].mic_e-'0']
 	}
 
@@ -665,6 +669,7 @@ func xmit_object_report(i int, first_time bool) {
 		if len(info_comment) > 0 {
 			info_comment += " "
 		}
+
 		info_comment += tt_user[i].dao
 	}
 
@@ -681,6 +686,7 @@ func xmit_object_report(i int, first_time bool) {
 	} else {
 		stemp = save_audio_config_p.mycall[save_tt_config_p.obj_recv_chan]
 	}
+
 	stemp += ">"
 	stemp += APP_TOCALL
 	stemp += string(rune('0' + MAJOR_VERSION))
@@ -734,6 +740,7 @@ func xmit_object_report(i int, first_time bool) {
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\"%s\"\n", stemp)
+
 		return
 	}
 
@@ -752,7 +759,6 @@ func xmit_object_report(i int, first_time bool) {
 	if first_time && save_tt_config_p.obj_send_to_app > 0 {
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.
-
 		var fbuf = ax25_pack(pp)
 
 		server_send_rec_packet(save_tt_config_p.obj_recv_chan, pp, fbuf)
@@ -764,13 +770,11 @@ func xmit_object_report(i int, first_time bool) {
 	if first_time && save_tt_config_p.obj_send_to_ig > 0 {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
-
 		igate_send_rec_packet(save_tt_config_p.obj_recv_chan, pp)
 	}
 
 	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {
 		/* Remember it so we don't digipeat our own. */
-
 		dedupe_remember(pp, save_tt_config_p.obj_xmit_chan)
 
 		tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
@@ -842,6 +846,7 @@ func tt_setenv(i int) {
 	os.Setenv("TTCALLSP", strings.Join(strings.Split(tt_user[i].callsign, ""), " "))
 
 	var phonetics []string
+
 	for _, p := range tt_user[i].callsign {
 		if unicode.IsUpper(p) {
 			phonetics = append(phonetics, letters[p-'A'])
@@ -853,6 +858,7 @@ func tt_setenv(i int) {
 			phonetics = append(phonetics, string(p))
 		}
 	}
+
 	os.Setenv("TTCALLPH", strings.Join(phonetics, " "))
 
 	os.Setenv("TTSSID", strconv.Itoa(tt_user[i].ssid))
@@ -903,6 +909,7 @@ func tt_user_dump() {
 	var now = time.Now()
 
 	dw_printf("call   ov suf lsthrd xmit nxt cor  lat    long freq     ctcss m comment\n")
+
 	for i := range MAX_TT_USERS {
 		if tt_user[i].callsign != "" {
 			dw_printf("%-6s %c%c %-3s %6d %d %+6d %d %6.2f %7.2f %-10s %-3s %c %s\n",

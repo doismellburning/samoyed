@@ -21,6 +21,7 @@ func ascii_to_sixbit(a rune) byte {
 	if a >= ' ' && a <= '_' {
 		return byte(a - ' ')
 	}
+
 	return (31) // '?' for any invalid.
 }
 
@@ -34,13 +35,16 @@ func sixbit_to_ascii(s byte) rune {
 func set_il2p_field(hdr []byte, bit_num int, lsb_index int, width int, value int) {
 	for width > 0 && value != 0 {
 		Assert(lsb_index >= 0 && lsb_index <= 11)
+
 		if value&1 != 0 {
 			hdr[lsb_index] |= byte(1 << bit_num)
 		}
+
 		value >>= 1
 		lsb_index--
 		width--
 	}
+
 	Assert(value == 0)
 }
 
@@ -72,17 +76,22 @@ func SET_PAYLOAD_BYTE_COUNT(hdr []byte, val int) {
 
 func get_il2p_field(hdr []byte, bit_num int, lsb_index int, width int) int {
 	var result = 0
+
 	lsb_index -= width - 1
 	for width > 0 {
 		result <<= 1
+
 		Assert(lsb_index >= 0 && lsb_index <= 11)
+
 		var x = hdr[lsb_index]
 		if x&(1<<bit_num) != 0 {
 			result |= 1
 		}
+
 		lsb_index++
 		width--
 	}
+
 	return (result)
 }
 
@@ -121,36 +130,47 @@ func encode_pid(pp *packet_t) int {
 	if (pid & 0x30) == 0x20 {
 		return (0x2) // AX.25 Layer 3
 	}
+
 	if (pid & 0x30) == 0x10 {
 		return (0x2) // AX.25 Layer 3
 	}
+
 	if pid == 0x01 {
 		return (0x3) // ISO 8208 / CCIT X.25 PLP
 	}
+
 	if pid == 0x06 {
 		return (0x4) // Compressed TCP/IP
 	}
+
 	if pid == 0x07 {
 		return (0x5) // Uncompressed TCP/IP
 	}
+
 	if pid == 0x08 {
 		return (0x6) // Segmentation fragmen
 	}
+
 	if pid == 0xcc {
 		return (0xb) // ARPA Internet Protocol
 	}
+
 	if pid == 0xcd {
 		return (0xc) // ARPA Address Resolution
 	}
+
 	if pid == 0xce {
 		return (0xd) // FlexNet
 	}
+
 	if pid == 0xcf {
 		return (0xe) // TheNET
 	}
+
 	if pid == 0xf0 {
 		return (0xf) // No L3
 	}
+
 	return (-1)
 }
 
@@ -207,7 +227,6 @@ func decode_pid(pid int) int {
  *--------------------------------------------------------------------------------*/
 
 func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
-
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
 	if ax25_get_num_addr(pp) != 2 {
@@ -234,6 +253,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 			// Shouldn't happen but follow the rule.
 			return nil, -1
 		}
+
 		hdr[i] = ascii_to_sixbit(b)
 	}
 
@@ -242,6 +262,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 			// Shouldn't happen but follow the rule.
 			return nil, -1
 		}
+
 		hdr[6+i] = ascii_to_sixbit(b)
 	}
 
@@ -253,20 +274,17 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 	//dw_printf ("%s(): %s-%d>%s-%d: %s\n", __func__, src_addr, src_ssid, dst_addr, dst_ssid, description);
 
 	switch frame_type {
-
 	case frame_type_S_RR, frame_type_S_RNR, frame_type_S_REJ, frame_type_S_SREJ:
 		// Receive Ready - System Ready To Receive
 		// Receive Not Ready - TNC Buffer Full
 		// Reject Frame - Out of Sequence or Duplicate
 		// Selective Reject - Request single frame repeat
-
 		// S frames (RR, RNR, REJ, SREJ), mod 8, have control N(R) P/F S S 0 1
 		// These are mapped into    P/F N(R) C S S
 		// Bit 6 is not mentioned in documentation but it is used for P/F for the other frame types.
 		// C is copied from the C bit in the destination addr.
 		// C from source is not used here.  Reception assumes it is the opposite.
 		// PID is set to 0, meaning none, for S frames.
-
 		SET_UI(hdr, 0)
 		SET_PID(hdr, 0)
 		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((IfThenElse((cr == cr_cmd), 1, 0))|(IfThenElse((cr == cr_11), 1, 0)))<<2))
@@ -293,13 +311,11 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 		// Unnumbered Information
 		// Exchange Identification
 		// Test
-
 		// The encoding allows only 3 bits for frame type and SABME got left out.
 		// Control format:  P/F opcode[3] C n/a n/a
 		// The grayed out n/a bits are observed as 00 in the example.
 		// The header UI field must also be set for UI frames.
 		// PID is set to 1 for all U frames other than UI.
-
 		if frame_type == frame_type_U_UI {
 			SET_UI(hdr, 1) // I guess this is how we distinguish 'I' and 'UI'
 			// on the receiving end.
@@ -307,6 +323,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 			if pid < 0 {
 				return nil, -1
 			}
+
 			SET_PID(hdr, pid)
 		} else {
 			SET_PID(hdr, 1) // 1 for 'U' other than 'UI'.
@@ -355,16 +372,15 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 		}
 
 	case frame_type_I: // Information
-
 		// I frames (mod 8 only)
 		// encoded control: P/F N(R) N(S)
-
 		SET_UI(hdr, 0)
 
 		var pid2 = encode_pid(pp)
 		if pid2 < 0 {
 			return nil, -1
 		}
+
 		SET_PID(hdr, pid2)
 
 		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|ns)
@@ -391,6 +407,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 	}
 
 	SET_PAYLOAD_BYTE_COUNT(hdr, len(pinfo))
+
 	return hdr, len(pinfo)
 }
 
@@ -415,10 +432,10 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
  *--------------------------------------------------------------------------------*/
 
 func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
-
 	if GET_HDR_TYPE(hdr) != 1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P Internal error.  Should not be here: il2p_decode_header_type_1, when header type is 0.\n")
+
 		return (nil)
 	}
 
@@ -454,6 +471,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 	for i := 0; i <= 5; i++ {
 		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i]&0x3f)))
 	}
+
 	addrs[AX25_DESTINATION] = strings.TrimSpace(string(byteBuf))
 
 	for _, c := range addrs[AX25_DESTINATION] {
@@ -465,6 +483,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("IL2P: Invalid character '%c' in destination address '%s'\n", addrs[AX25_DESTINATION][i], addrs[AX25_DESTINATION]);
 			}
+
 			return (nil)
 		}
 	}
@@ -475,6 +494,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 	for i := 0; i <= 5; i++ {
 		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i+6]&0x3f)))
 	}
+
 	addrs[AX25_SOURCE] = strings.TrimSpace(string(byteBuf))
 
 	for _, c := range addrs[AX25_SOURCE] {
@@ -486,6 +506,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("IL2P: Invalid character '%c' in source address '%s'\n", addrs[AX25_SOURCE][i], addrs[AX25_SOURCE]);
 			}
+
 			return (nil)
 		}
 	}
@@ -501,13 +522,12 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 	var ui = GET_UI(hdr)
 
 	if pid == 0 {
-
 		// 'S' frame.
 		// The control field contains: P/F N(R) C S S
-
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var ftype ax25_frame_type_t
+
 		switch control & 0x03 {
 		case 0:
 			ftype = frame_type_S_RR
@@ -522,16 +542,16 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var nr = (control >> 3) & 0x07
 		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for SREJ will be added later.
+
 		return (ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, pinfo))
 	} else if pid == 1 {
-
 		// 'U' frame other than 'UI'.
 		// The control field contains: P/F OPCODE{3) C x x
-
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var axpid = 0 // unused for U other than UI.
 		var ftype ax25_frame_type_t
+
 		switch (control >> 3) & 0x7 {
 		case 0:
 			ftype = frame_type_U_SABM
@@ -554,24 +574,22 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		}
 		var pf = (control >> 6) & 0x01
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
+
 		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else if ui != 0 {
-
 		// 'UI' frame.
 		// The control field contains: P/F OPCODE{3) C x x
-
 		var control = GET_CONTROL(hdr)
 		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
 		var ftype = frame_type_U_UI
 		var pf = (control >> 6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
+
 		return (ax25_u_frame(addrs, num_addr, cr, ftype, pf, axpid, pinfo))
 	} else {
-
 		// 'I' frame.
 		// The control field contains: P/F N(R) N(S)
-
 		var control = GET_CONTROL(hdr)
 		var cr = cr_cmd // Always command.
 		var pf = (control >> 6) & 0x01
@@ -580,6 +598,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		var modulo = modulo_8
 		var axpid = decode_pid(GET_PID(hdr))
 		var pinfo []byte // Any info for UI, XID, TEST will be added later.
+
 		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo))
 	}
 } // end
@@ -608,7 +627,6 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
  *--------------------------------------------------------------------------------*/
 
 func il2p_type_0_header(pp *packet_t, max_fec int) ([]byte, int) {
-
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]
@@ -666,7 +684,6 @@ func il2p_get_header_attributes(hdr []byte) (int, int, int) {
  ***********************************************************************************/
 
 func il2p_clarify_header(rec_hdr []byte) ([]byte, int) {
-
 	var corrected, e = il2p_decode_rs(rec_hdr, IL2P_HEADER_PARITY)
 
 	var corrected_descrambled_hdr = il2p_descramble_block(corrected)

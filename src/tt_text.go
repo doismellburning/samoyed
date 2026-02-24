@@ -167,27 +167,26 @@ var grid = [10][10]string{
  *----------------------------------------------------------------*/
 
 func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unparam
-
 	var buttons = ""
 	var errors = 0
 
 	for _, c := range text {
-
 		if unicode.IsDigit(c) {
-
 			/* Count number of other characters assigned to this button. */
 			/* Press that number plus one more. */
-
 			var n = 1
+
 			var row = c - '0'
 			for col := 0; col < 4; col++ {
 				if translate[row][col] != 0 {
 					n++
 				}
 			}
+
 			if len(buttons) > 0 && rune(buttons[len(buttons)-1]) == row+'0' {
 				buttons += "A"
 			}
+
 			for ; n > 0; n-- {
 				buttons += string(row + '0')
 			}
@@ -198,10 +197,12 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 				c = unicode.ToUpper(c)
 			} else if c != ' ' {
 				errors++
+
 				if !quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Text to multi-press: Only letters, digits, and space allowed.\n")
 				}
+
 				c = ' '
 			}
 
@@ -213,11 +214,11 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 			for row := 0; row < 10 && !found; row++ {
 				for col := 0; col < 4 && !found; col++ {
 					if c == translate[row][col] {
-
 						/* Stick in 'A' if previous character used same button. */
 						if len(buttons) > 0 && rune(buttons[len(buttons)-1]) == rune(row+'0') {
 							buttons += "A"
 						}
+
 						for n := col + 1; n > 0; n-- {
 							buttons += string(rune(row + '0'))
 							found = true
@@ -225,8 +226,10 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 					}
 				}
 			}
+
 			if !found {
 				errors++
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Text to multi-press: INTERNAL ERROR.  Should not be here.\n")
 			}
@@ -234,7 +237,6 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 	}
 
 	return buttons, errors
-
 } /* end tt_text_to_multipress */
 
 /*------------------------------------------------------------------
@@ -256,15 +258,12 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
  *----------------------------------------------------------------*/
 
 func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unparam
-
 	var buttons = ""
 	var errors = 0
 
 	for _, c := range text {
 		if unicode.IsDigit(c) {
-
 			/* Digit is single key press. */
-
 			buttons += string(c)
 		} else {
 			if unicode.IsUpper(c) {
@@ -273,10 +272,12 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 				c = unicode.ToUpper(c)
 			} else if c != ' ' {
 				errors++
+
 				if !quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Text to two key: Only letters, digits, and space allowed.\n")
 				}
+
 				c = ' '
 			}
 
@@ -293,8 +294,10 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 					}
 				}
 			}
+
 			if !found {
 				errors++
+
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Text to two-key: INTERNAL ERROR.  Should not be here.\n")
 			}
@@ -302,7 +305,6 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 	}
 
 	return buttons, errors
-
 } /* end tt_text_to_two_key */
 
 /*------------------------------------------------------------------
@@ -328,7 +330,6 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 // TODO:  need to test this.
 
 func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
-
 	var errors = 0
 
 	var buttons string
@@ -339,10 +340,12 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 
 	if !unicode.IsUpper(c) {
 		errors++
+
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Letter to two digits: \"%c\" found where a letter is required.\n", c)
 		}
+
 		return "00", errors
 	}
 
@@ -358,15 +361,17 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 			}
 		}
 	}
+
 	if !found {
 		errors++
+
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Letter to two digits: INTERNAL ERROR.  Should not be here.\n")
+
 		return "00", errors
 	}
 
 	return buttons, errors
-
 } /* end tt_letter_to_two_digits */
 
 /*------------------------------------------------------------------
@@ -388,18 +393,18 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_text_to_call10(text string, quiet bool) (string, int) {
-
 	var errors = 0
 
 	/* Quick validity check. */
 
 	if len(text) < 1 || len(text) > 6 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Text to callsign 6+4: Callsign \"%s\" not between 1 and 6 characters.\n", text)
 		}
+
 		errors++
+
 		return "", errors
 	}
 
@@ -409,7 +414,9 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Text to callsign 6+4: Callsign \"%s\" can contain only letters and digits.\n", text)
 			}
+
 			errors++
+
 			return "", errors
 		}
 	}
@@ -446,6 +453,7 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 		if !found {
 			/* Earlier check should have caught any character not in translation table. */
 			errors++
+
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Text to callsign 6+4: INTERNAL ERROR 0x%02x.  Should not be here.\n", c)
 		}
@@ -456,7 +464,6 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 	buttons += fmt.Sprintf("%04d", packed)
 
 	return buttons, errors
-
 } /* end tt_text_to_call10 */
 
 /*------------------------------------------------------------------
@@ -481,18 +488,18 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_text_to_satsq(text string, quiet bool) (string, int) {
-
 	var errors = 0
 
 	/* Quick validity check. */
 
 	if len(text) != 4 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Satellite Gridsquare to DTMF: Gridsquare \"%s\" must be 4 characters.\n", text)
 		}
+
 		errors++
+
 		return "", errors
 	}
 
@@ -501,22 +508,24 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
 	var uc = strings.ToUpper(text[0:2])
 
 	if uc[0] < 'A' || uc[0] > 'R' || uc[1] < 'A' || uc[1] > 'R' {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Satellite Gridsquare to DTMF: First two characters \"%s\" must be letters in range of A to R.\n", text)
 		}
+
 		errors++
+
 		return "", errors
 	}
 
 	if !unicode.IsDigit(rune(text[2])) || !unicode.IsDigit(rune(text[3])) {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Satellite Gridsquare to DTMF: Last two characters \"%s\" must be digits.\n", text)
 		}
+
 		errors++
+
 		return "", errors
 	}
 
@@ -528,7 +537,6 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
 	for row := 0; row < 10 && !found; row++ {
 		for col := 0; col < 10 && !found; col++ {
 			if uc == grid[row][col] {
-
 				buttons = string([]byte{
 					byte(row + '0'),
 					byte(col + '0'),
@@ -544,6 +552,7 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
 	if !found {
 		/* Sorry, Greenland, and half of Africa, and ... */
 		errors++
+
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Satellite Gridsquare to DTMF: Sorry, your location can't be converted to DTMF.\n")
@@ -551,7 +560,6 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-
 } /* end tt_text_to_satsq */
 
 /*------------------------------------------------------------------
@@ -587,14 +595,11 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unparam,unused
-
 	var errors = 0
 	var buttons = ""
 
 	for _, c := range text {
-
 		/* "isprint()" might depend on locale so use brute force. */
-
 		if c < ' ' || c > '~' {
 			c = '?'
 		}
@@ -606,7 +611,6 @@ func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unpara
 	}
 
 	return buttons, errors
-
 } /* end tt_text_to_ascii2d */
 
 /*------------------------------------------------------------------
@@ -627,18 +631,16 @@ func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unpara
  *----------------------------------------------------------------*/
 
 func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
-
 	var text string
 	var errors = 0
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
 		if unicode.IsDigit(c) {
-
 			/* Determine max that can occur in a row. */
 			/* = number of other characters assigned to this button + 1. */
-
 			var maxspan = 1
+
 			var row = c - '0'
 			for col := 0; col < 4; col++ {
 				if translate[row][col] != 0 {
@@ -649,10 +651,12 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 			/* Count number of consecutive same digits. */
 
 			var n = 1
+
 			for j := i + 1; j < len(buttons); j++ {
 				if rune(buttons[j]) != c {
 					break
 				}
+
 				n++
 				i = j // Update the main index
 			}
@@ -663,6 +667,7 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 				text += string(c)
 			} else {
 				errors++
+
 				if !quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Multi-press to text: Maximum of %d \"%c\" can occur in a row.\n", maxspan, c)
@@ -671,21 +676,19 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 				text += string(c)
 			}
 		} else if c == 'A' || c == 'a' {
-
 			/* Separator should occur only if digit before and after are the same. */
-
 			if i == 0 || i == len(buttons)-1 || buttons[i-1] != buttons[i+1] {
 				errors++
+
 				if !quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Multi-press to text: \"A\" can occur only between two same digits.\n")
 				}
 			}
 		} else {
-
 			/* Completely unexpected character. */
-
 			errors++
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Multi-press to text: \"%c\" not allowed.\n", c)
@@ -714,16 +717,13 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
-
 	var errors = 0
 	var text string
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
 		if unicode.IsDigit(c) {
-
 			/* Letter (or space) if followed by ABCD. */
-
 			var row = c - '0'
 			var col = -1
 
@@ -741,29 +741,29 @@ func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 					text += string(translate[row][col])
 				} else {
 					errors++
+
 					if !quiet {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Two key to text: Invalid combination \"%c%c\".\n", c, col+'A')
 					}
 				}
+
 				i++ // Skip the next character since we consumed it
 			} else {
 				text += string(c)
 			}
 		} else if (c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd') {
-
 			/* ABCD not expected here. */
-
 			errors++
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Two-key to text: A, B, C, or D in unexpected location.\n")
 			}
 		} else {
-
 			/* Completely unexpected character. */
-
 			errors++
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Two-key to text: Invalid character \"%c\".\n", c)
@@ -772,7 +772,6 @@ func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 	}
 
 	return text, errors
-
 } /* end tt_two_key_to_text */
 
 /*------------------------------------------------------------------
@@ -796,7 +795,6 @@ func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
-
 	var text string
 	var errors = 0
 
@@ -804,18 +802,16 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 	var c2 = buttons[1]
 
 	if c1 >= '2' && c1 <= '9' {
-
 		if c2 >= '1' && c2 <= '4' {
-
 			var row = c1 - '0'
 			var col = c2 - '1'
 
 			if translate[row][col] != 0 {
-
 				text += string(translate[row][col])
 			} else {
 				errors++
 				text = ""
+
 				if !quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Two digits to letter: Invalid combination \"%c%c\".\n", c1, c2)
@@ -824,6 +820,7 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 		} else {
 			errors++
 			text = ""
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Two digits to letter: Second character \"%c\" must be in range of 1 through 4.\n", c2)
@@ -832,6 +829,7 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 	} else {
 		errors++
 		text = ""
+
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Two digits to letter: First character \"%c\" must be in range of 2 through 9.\n", c1)
@@ -839,7 +837,6 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 	}
 
 	return text, errors
-
 } /* end tt_two_digits_to_letter */
 
 /*------------------------------------------------------------------
@@ -860,19 +857,19 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_call10_to_text(buttons string, quiet bool) (string, int) {
-
 	var text string
 	var errors = 0
 
 	/* Validity check. */
 
 	if len(buttons) != 10 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Callsign 6+4 to text: Encoded Callsign \"%s\" must be exactly 10 digits.\n", buttons)
 		}
+
 		errors++
+
 		return text, errors
 	}
 
@@ -882,7 +879,9 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Callsign 6+4 to text: Encoded Callsign \"%s\" can contain only digits.\n", buttons)
 			}
+
 			errors++
+
 			return text, errors
 		}
 	}
@@ -898,6 +897,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 		if row < 0 || row > 9 || col < 0 || col > 3 { //nolint:staticcheck
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Callsign 6+4 to text: INTERNAL ERROR %d %d.  Should not be here.\n", row, col)
+
 			errors++
 			row = 0
 			col = 1
@@ -907,6 +907,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 			text += string(call10encoding[row][col])
 		} else {
 			errors++
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Callsign 6+4 to text: Invalid combination: button %d, position %d.\n", row, col)
@@ -919,7 +920,6 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 	text = strings.TrimSpace(text)
 
 	return text, errors
-
 } /* end tt_call10_to_text */
 
 /*------------------------------------------------------------------
@@ -941,19 +941,19 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
-
 	var text string
 	var errors = 0
 
 	/* Validity check. */
 
 	if len(buttons) != 5 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Callsign 3+2 suffix to text: Encoded Callsign \"%s\" must be exactly 5 digits.\n", buttons)
 		}
+
 		errors++
+
 		return text, errors
 	}
 
@@ -963,7 +963,9 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Callsign 3+2 suffix to text: Encoded Callsign \"%s\" can contain only digits.\n", buttons)
 			}
+
 			errors++
+
 			return text, errors
 		}
 	}
@@ -979,6 +981,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 		if row < 0 || row > 9 || col < 0 || col > 3 { //nolint:staticcheck
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Callsign 3+2 suffix to text: INTERNAL ERROR %d %d.  Should not be here.\n", row, col)
+
 			errors++
 			row = 0
 			col = 1
@@ -988,6 +991,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 			text += string(call10encoding[row][col])
 		} else {
 			errors++
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Callsign 3+2 suffix to text: Invalid combination: button %d, position %d.\n", row, col)
@@ -1000,7 +1004,6 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 	}
 
 	return text, errors
-
 } /* end tt_call5_suffix_to_text */
 
 /*------------------------------------------------------------------
@@ -1041,7 +1044,6 @@ var mhpair = [MAXMHPAIRS]mhpairType{
 }
 
 func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
-
 	var text string
 	var errors = 0
 
@@ -1050,12 +1052,13 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 	if len(buttons) != 4 && len(buttons) != 6 &&
 		len(buttons) != 10 && len(buttons) != 12 &&
 		len(buttons) != 16 && len(buttons) != 18 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("DTMF to Maidenhead Gridsquare Locator: Input \"%s\" must be exactly 4, 6, 10, or 12 digits.\n", buttons)
 		}
+
 		errors++
+
 		return text, errors
 	}
 
@@ -1065,7 +1068,9 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("DTMF to Maidenhead Gridsquare Locator: Input \"%s\" can contain only digits.\n", buttons)
 			}
+
 			errors++
+
 			return text, errors
 		}
 	}
@@ -1102,7 +1107,6 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 	}
 
 	return text, errors
-
 } /* end tt_mhead_to_text */
 
 /*------------------------------------------------------------------
@@ -1127,34 +1131,34 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_text_to_mhead(text string, quiet bool) (string, int) {
-
 	var errors = 0
 	var buttons string
 
 	var np = len(text) / 2
 
 	if (len(text) % 2) != 0 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Maidenhead Gridsquare Locator to DTMF: Input \"%s\" must be even number of characters.\n", text)
 		}
+
 		errors++
+
 		return buttons, errors
 	}
 
 	if np < 1 || np > MAXMHPAIRS {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Maidenhead Gridsquare Locator to DTMF: Input \"%s\" must be 1 to %d pairs of characters.\n", text, np)
 		}
+
 		errors++
+
 		return buttons, errors
 	}
 
 	for i := 0; i < np; i++ {
-
 		var t0 = rune(text[i*2])
 		var t1 = rune(text[i*2+1])
 
@@ -1165,13 +1169,14 @@ func tt_text_to_mhead(text string, quiet bool) (string, int) {
 				dw_printf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
 					mhpair[i].position, text, mhpair[i].min_ch, mhpair[i].max_ch)
 			}
+
 			buttons = ""
 			errors++
+
 			return buttons, errors
 		}
 
 		if mhpair[i].min_ch == 'A' { /* Should be letters */
-
 			var b3, _errors = tt_letter_to_two_digits(t0, quiet)
 			errors += _errors
 			buttons += b3
@@ -1180,7 +1185,6 @@ func tt_text_to_mhead(text string, quiet bool) (string, int) {
 			errors += _errors
 			buttons += b3
 		} else { /* Should be digits */
-
 			buttons += string(t0) + string(t1)
 		}
 	}
@@ -1190,7 +1194,6 @@ func tt_text_to_mhead(text string, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-
 } /* tt_text_to_mhead */
 
 /*------------------------------------------------------------------
@@ -1211,18 +1214,18 @@ func tt_text_to_mhead(text string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_satsq_to_text(buttons string, quiet bool) (string, int) {
-
 	var errors = 0
 
 	/* Validity check. */
 
 	if len(buttons) != 4 {
-
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("DTMF to Satellite Gridsquare: Input \"%s\" must be exactly 4 digits.\n", buttons)
 		}
+
 		errors++
+
 		return "", errors
 	}
 
@@ -1232,7 +1235,9 @@ func tt_satsq_to_text(buttons string, quiet bool) (string, int) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("DTMF to Satellite Gridsquare: Input \"%s\" can contain only digits.\n", buttons)
 			}
+
 			errors++
+
 			return "", errors
 		}
 	}
@@ -1243,7 +1248,6 @@ func tt_satsq_to_text(buttons string, quiet bool) (string, int) {
 	var text = grid[row][col] + buttons[2:]
 
 	return text, errors
-
 } /* end tt_satsq_to_text */
 
 /*------------------------------------------------------------------
@@ -1264,7 +1268,6 @@ func tt_satsq_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
-
 	var text string
 	var errors = 0
 
@@ -1283,16 +1286,16 @@ func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
 			text += string(n + 32)
 		} else {
 			// Unexpected character.
-
 			errors++
+
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("ASCII2D to text: Invalid character pair \"%c%c\".\n", c1, c2)
 			}
 		}
 	}
-	return text, errors
 
+	return text, errors
 } /* end tt_ascii2d_to_text */
 
 /*------------------------------------------------------------------
@@ -1311,9 +1314,7 @@ func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_guess_type(buttons string) tt_enc_t {
-
 	/* If it contains B, C, or D, it can't be multipress. */
-
 	if strings.ContainsAny(buttons, "BCDbcd") {
 		return (TT_TWO_KEY)
 	}
@@ -1332,5 +1333,4 @@ func tt_guess_type(buttons string) tt_enc_t {
 	/* Could be either one. */
 
 	return (TT_EITHER)
-
 } /* end tt_guess_type */

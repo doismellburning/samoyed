@@ -121,6 +121,7 @@ func ax25_pad2_test_main(t *testing.T) {
 	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
 	var ftype = frame_type_S_SREJ
+
 	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_128
 		var nr = 127

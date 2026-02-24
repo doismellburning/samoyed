@@ -35,19 +35,17 @@ var s_kiss_debug = 0
  *--------------------------------------------------------------------*/
 
 func nettnc_init(pa *audio_s) {
-
 	for i := 0; i < MAX_TOTAL_CHANS; i++ {
-
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
+
 			var e = nettnc_attach(i, pa.nettnc_addr[i], pa.nettnc_port[i])
 			if e < 0 {
 				os.Exit(1)
 			}
 		}
 	}
-
 } // end nettnc_init
 
 /*-------------------------------------------------------------------
@@ -83,7 +81,6 @@ var s_tnc_port [MAX_TOTAL_CHANS]int
 var s_tnc_sock [MAX_TOTAL_CHANS]net.Conn // Socket handle or file descriptor. -1 for invalid.
 
 func nettnc_attach(channel int, host string, port int) int {
-
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	s_tnc_host[channel] = host
@@ -91,7 +88,6 @@ func nettnc_attach(channel int, host string, port int) int {
 	s_tnc_sock[channel] = nil
 
 	var conn, connErr = net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
-
 	if connErr == nil {
 		s_tnc_sock[channel] = conn
 	} else {
@@ -113,7 +109,6 @@ func nettnc_attach(channel int, host string, port int) int {
 	//	}
 
 	return (0)
-
 } // end nettnc_attach
 
 /*-------------------------------------------------------------------
@@ -133,7 +128,6 @@ func nettnc_attach(channel int, host string, port int) int {
  *--------------------------------------------------------------------*/
 
 func nettnc_listen_thread(channel int) {
-
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var kstate kiss_frame_t // State machine to gather a KISS frame.
@@ -143,29 +137,30 @@ func nettnc_listen_thread(channel int) {
 		 * Re-attach to TNC if not currently attached.
 		 */
 		if s_tnc_sock[channel] == nil {
-
 			text_color_set(DW_COLOR_ERROR)
 			// I'm using the term "attach" here, in an attempt to
 			// avoid confusion with the AX.25 connect.
 			dw_printf("Attempting to reattach to network TNC...\n")
 
 			var conn, connErr = net.Dial("tcp", net.JoinHostPort(s_tnc_host[channel], strconv.Itoa(s_tnc_port[channel])))
-
 			if connErr == nil {
 				s_tnc_sock[channel] = conn
+
 				dw_printf("Successfully reattached to network TNC.\n")
 			}
 		} else {
 			const NETTNCBUFSIZ = 2048
 			var buf = make([]byte, NETTNCBUFSIZ)
-			var n, readErr = s_tnc_sock[channel].Read(buf)
 
+			var n, readErr = s_tnc_sock[channel].Read(buf)
 			if readErr != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
 				s_tnc_sock[channel].Close()
 				s_tnc_sock[channel] = nil
+
 				SLEEP_SEC(5)
+
 				continue
 			}
 
@@ -203,44 +198,40 @@ func nettnc_listen_thread(channel int) {
  *-----------------------------------------------------------------*/
 
 func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int) {
-
 	//dw_printf ("my_kiss_rec_byte ( %c %02x ) \n", b, b);
-
 	switch kf.state {
-
 	/* Searching for starting FEND. */
 	default: // Includes KS_SEARCHING
-
 		if b == FEND {
-
 			/* Start of frame.  */
-
 			kf.kiss_len = 0
 			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
 			kf.state = KS_COLLECTING
+
 			return
 		}
+
 		return
 
 	case KS_COLLECTING: /* Frame collection in progress. */
-
 		if b == FEND {
-
 			/* End of frame. */
-
 			if kf.kiss_len == 0 {
 				/* Empty frame.  Starting a new one. */
 				kf.kiss_msg[kf.kiss_len] = b
 				kf.kiss_len++
+
 				return
 			}
+
 			if kf.kiss_len == 1 && kf.kiss_msg[0] == FEND {
 				/* Empty frame.  Just go on collecting. */
 				return
 			}
 
 			kf.kiss_msg[kf.kiss_len] = b
+
 			kf.kiss_len++
 			if debug > 0 {
 				/* As received over the wire from network TNC. */
@@ -281,6 +272,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 			}
 
 			kf.state = KS_SEARCHING
+
 			return
 		}
 
@@ -291,6 +283,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("KISS frame from network TNC exceeded maximum length.\n")
 		}
+
 		return
 	}
 } /* end my_kiss_rec_byte */
@@ -314,10 +307,8 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
  *-----------------------------------------------------------------*/
 
 func nettnc_send_packet(channel int, pp *packet_t) {
-
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
-
 	var fbuf = ax25_get_frame_data(pp)
 
 	var frame_buff = []byte{0} // For now, set channel to 0.
@@ -336,5 +327,4 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 	}
 
 	// Do not free packet object;  caller will take care of it.
-
 } /* end nettnc_send_packet */

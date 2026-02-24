@@ -276,7 +276,6 @@ type new_sym_t struct {
 var new_sym_ptr []*new_sym_t
 
 func symbols_init() {
-
 	/*
 	 * We only care about lines with this format:
 	 *
@@ -287,7 +286,6 @@ func symbols_init() {
 	 *  Column 5 - space
 	 *  Column 6 - Start of description.
 	 */
-
 	const COL1_OVERLAY = 0
 	const COL2_SYMBOL = 1
 	const COL3_SP = 2
@@ -337,6 +335,7 @@ func symbols_init() {
 
 	for _, l := range SymbolsSearchLocations {
 		var openErr error
+
 		fp, openErr = os.Open(l) //nolint:gosec // We're supplying the locations, we can trust them
 		if openErr == nil {
 			break
@@ -377,7 +376,6 @@ func symbols_init() {
 			}
 		#endif
 	*/
-
 } /* end symbols_init */
 
 /*------------------------------------------------------------------
@@ -391,7 +389,6 @@ func symbols_init() {
  *------------------------------------------------------------------*/
 
 func symbols_list() {
-
 	dw_printf("\n")
 
 	dw_printf("\tPRIMARY SYMBOL TABLE\n")
@@ -431,6 +428,7 @@ func symbols_list() {
 				// TODO KG Warn somehow?
 				continue
 			}
+
 			dw_printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
 				primary_symtab[index].xy, ' ',
 				index, tones,
@@ -440,6 +438,7 @@ func symbols_list() {
 				// TODO KG Warn somehow?
 				continue
 			}
+
 			dw_printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
 				alternate_symtab[index].xy, overlay,
 				tones,
@@ -449,15 +448,16 @@ func symbols_list() {
 				// TODO KG Warn somehow?
 				continue
 			}
+
 			dw_printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
 				alternate_symtab[index].xy, ' ',
 				symbol-' ', tones,
 				s.description)
 		}
 	}
+
 	dw_printf("\n")
 	dw_printf("More information here: http://www.aprs.org/symbols.html\n")
-
 } /* end symbols_list */
 
 /*------------------------------------------------------------------
@@ -517,17 +517,14 @@ var ssid_to_sym = [16]byte{
 }
 
 func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bool) {
-
 	/*
 	 * This part does not apply to MIC-E format because the destination
 	 * is used to encode latitude and other information.
 	 */
 	if dti != '\'' && dti != '`' {
-
 		/*
 		 * For GPSCnn, nn is the index into the primary symbol table.
 		 */
-
 		if strings.HasPrefix(dest, "GPSC") {
 			var nn, _ = strconv.Atoi(dest[4:])
 			if nn >= 1 && nn <= 94 {
@@ -572,7 +569,6 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
 		if (strings.HasPrefix(dest, "GPS") ||
 			strings.HasPrefix(dest, "SPC") ||
 			strings.HasPrefix(dest, "SYM")) && len(dest) >= 5 {
-
 			var xy = string(dest[3]) + string(dest[4])
 
 			var z byte
@@ -586,6 +582,7 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
 					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
 						symtab = z
 					}
+
 					return symtab, byte(' ' + nn), true
 				}
 			}
@@ -644,17 +641,13 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
  *------------------------------------------------------------------*/
 
 func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
-
 	if symbol >= '!' && symbol <= '~' && symtab == '/' {
-
 		/* Primary Symbol table. */
 		return fmt.Sprintf("GPSC%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && symtab == '\\' {
-
 		/* Alternate Symbol table. */
 		return fmt.Sprintf("GPSE%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
-
 		/* Alternate Symbol table with overlay. */
 		return fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab), true
 	}
@@ -688,7 +681,6 @@ func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
  *------------------------------------------------------------------*/
 
 func symbols_get_description(symtab byte, symbol byte) string {
-
 	symbols_init()
 
 	// The symbol table identifier should be
@@ -709,6 +701,7 @@ func symbols_get_description(symtab byte, symbol byte) string {
 		/* We do the latter. */
 
 		symbol = ' '
+
 		return primary_symtab[symbol-' '].description
 	}
 
@@ -717,6 +710,7 @@ func symbols_get_description(symtab byte, symbol byte) string {
 	if symbol < ' ' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Symbol code is not a printable character.\n")
+
 		symbol = ' ' /* Avoid subscript out of bounds. */
 	}
 
@@ -738,6 +732,7 @@ func symbols_get_description(symtab byte, symbol byte) string {
 			description += " w/overlay "
 			description += string(rune(symtab))
 		}
+
 		return description
 	}
 } /* end symbols_get_description */
@@ -759,7 +754,6 @@ func symbols_get_description(symtab byte, symbol byte) string {
  *------------------------------------------------------------------*/
 
 func symbols_code_from_description(overlay byte, description string) (byte, byte, bool) {
-
 	symbols_init()
 
 	/*
@@ -835,11 +829,9 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
  *------------------------------------------------------------------*/
 
 func symbols_to_tones(symtab byte, symbol byte) string {
-
 	if symtab == '/' {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
-
 		var tt, _ = tt_text_to_two_key(string(symtab), false)
 
 		return fmt.Sprintf("AB0%02d%s", symbol-' ', tt)

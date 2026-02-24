@@ -12,6 +12,7 @@ func kiss_test_main(t *testing.T) {
 	t.Helper()
 
 	var din = make([]byte, 512)
+
 	for k := range 512 {
 		if k < 256 {
 			din[k] = byte(k)

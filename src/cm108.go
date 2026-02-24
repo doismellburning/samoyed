@@ -213,7 +213,6 @@ const MAXX_THINGS = 60
  *------------------------------------------------------------------*/
 
 func cm108_inventory(max_things int) ([]*thing_s, error) {
-
 	var things []*thing_s
 
 	/*
@@ -223,11 +222,13 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 	var u = udev.Udev{}
 	var e = u.NewEnumerate()
 	e.AddMatchSubsystem("sound")
+
 	var devices, devicesErr = e.Devices()
 	if devicesErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		var msg = "INTERNAL ERROR: Can't enumerate udev devices"
 		dw_printf("%s: %v.\n", msg, devicesErr)
+
 		return things, errors.New(msg)
 	}
 
@@ -285,11 +286,13 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 	 */
 	var e2 = u.NewEnumerate()
 	e2.AddMatchSubsystem("hidraw")
+
 	var hidDevices, hidDevicesErr = e2.Devices()
 	if hidDevicesErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		var msg = "INTERNAL ERROR: Can't enumerate udev hidraw devices"
 		dw_printf("%s: %v.\n", msg, hidDevicesErr)
+
 		return nil, errors.New(msg)
 	}
 
@@ -306,6 +309,7 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 					var vid64, _ = strconv.ParseInt(p, 16, 0)
 					vid = int(vid64)
 				}
+
 				p = parentdev.SysattrValue("idProduct")
 				if p != "" {
 					var pid64, _ = strconv.ParseInt(p, 16, 0)
@@ -316,6 +320,7 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 
 				// Add hidraw name to any matching existing.
 				var matched = false
+
 				for _, thing := range things {
 					if thing.vid == vid && thing.pid == pid && usb != "" && thing.devnode_usb == usb {
 						matched = true
@@ -362,7 +367,6 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 	}
 
 	return things, nil
-
 } /* end cm108_inventory */
 
 /*-------------------------------------------------------------------
@@ -386,9 +390,7 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
  *------------------------------------------------------------------*/
 
 func cm108_find_ptt(output_audio_device string) string {
-
 	//dw_printf ("DEBUG: cm108_find_ptt('%s')\n", output_audio_device);
-
 	var ptt_device = ""
 
 	// Possible improvement: Skip if inventory already taken.
@@ -408,6 +410,7 @@ func cm108_find_ptt(output_audio_device string) string {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not extract card number or name from %s\n", output_audio_device)
 		dw_printf("Can't automatically find matching HID for PTT.\n")
+
 		return ptt_device
 	}
 
@@ -421,6 +424,7 @@ func cm108_find_ptt(output_audio_device string) string {
 				dw_printf("Warning: USB audio card %s (%s) is not a device known to work with GPIO PTT.\n",
 					thing.card_number, thing.card_name)
 			}
+
 			return ptt_device
 		}
 	}
@@ -456,21 +460,23 @@ func cm108_find_ptt(output_audio_device string) string {
  *------------------------------------------------------------------*/
 
 func cm108_set_gpio_pin(name string, num int, state int) int {
-
 	if num < 1 || num > 8 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%s CM108 GPIO number %d must be in range of 1 thru 8.\n", name, num)
+
 		return (-1)
 	}
 
 	if state != 0 && state != 1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%s CM108 GPIO state %d must be 0 or 1.\n", name, state)
+
 		return (-1)
 	}
 
 	var iomask = 1 << (num - 1)     // 0=input, 1=output
 	var iodata = state << (num - 1) // 0=low, 1=high
+
 	return cm108_write(name, iomask, iodata)
 } /* end cm108_set_gpio_pin */
 
@@ -498,7 +504,6 @@ func cm108_set_gpio_pin(name string, num int, state int) int {
  *------------------------------------------------------------------*/
 
 func cm108_write(name string, iomask int, iodata int) int {
-
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("TEMP DEBUG cm108_write:  %s %d %d\n", name, iomask, iodata);
 
@@ -534,7 +539,6 @@ func cm108_write(name string, iomask int, iodata int) int {
 	 * I figure "audio" makes more sense than "gpio" because we need to be part of
 	 * audio group to use the USB Audio adapter for sound.
 	 */
-
 	var fd, err = os.OpenFile(name, os.O_RDWR, 0000) //nolint:gosec // This comes from user-supplied config, all we can really do is trust it
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -578,7 +582,6 @@ func cm108_write(name string, iomask int, iodata int) int {
 		//  Errors observed during development.
 		//  as pi		EACCES          13      /* Permission denied */
 		//  as root		EPIPE           32      /* Broken pipe - Happens if we send 4 bytes */
-
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Write to %s failed, n=%d, err=%v\n", name, n, writeErr)
 

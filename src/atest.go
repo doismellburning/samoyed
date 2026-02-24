@@ -209,6 +209,7 @@ o = DCD output control
 
 	var d_x_opt = 0
 	var d_2_opt = 0
+
 	for _, debugFlag := range *debugFlags {
 		switch debugFlag {
 		case "x":
@@ -229,6 +230,7 @@ o = DCD output control
 		pflag.Usage()
 		os.Exit(1)
 	}
+
 	my_audio_config.achan[0].decimate = *decimate
 
 	if *upsample != 0 {
@@ -237,6 +239,7 @@ o = DCD output control
 			pflag.Usage()
 			os.Exit(1)
 		}
+
 		my_audio_config.achan[0].upsample = *upsample
 	}
 
@@ -245,26 +248,32 @@ o = DCD output control
 		pflag.Usage()
 		os.Exit(1)
 	}
+
 	my_audio_config.achan[0].fix_bits = retry_t(*fixBits)
 
 	var channelFlagCount int
+
 	for _, b := range []bool{*channel0, *channel1, *channel2} {
 		if b {
 			channelFlagCount++
 		}
 	}
+
 	if channelFlagCount != 1 {
 		fmt.Fprintf(os.Stderr, "Exactly one of left/right/both channels must be selected.\n")
 		pflag.Usage()
 		os.Exit(1)
 	}
+
 	var decode_only = 0 /* Set to 0 or 1 to decode only one channel.  2 for both.  */
 	if *channel0 {
 		decode_only = 0
 	}
+
 	if *channel1 {
 		decode_only = 1
 	}
+
 	if *channel2 {
 		decode_only = 2
 	}
@@ -370,7 +379,6 @@ o = DCD output control
 	if *direwolf15compat {
 		// V.26 compatible with earlier versions of direwolf.
 		//   Example:   -B 2400 -j    or simply   -j
-
 		my_audio_config.achan[0].v26_alternative = V26_A
 		my_audio_config.achan[0].modem_type = MODEM_QPSK
 		my_audio_config.achan[0].mark_freq = 0
@@ -378,10 +386,10 @@ o = DCD output control
 		my_audio_config.achan[0].baud = 2400
 		my_audio_config.achan[0].profiles = ""
 	}
+
 	if *mfj2400compat {
 		// V.26 compatible with MFJ and maybe others.
 		//   Example:   -B 2400 -J     or simply   -J
-
 		my_audio_config.achan[0].v26_alternative = V26_B
 		my_audio_config.achan[0].modem_type = MODEM_QPSK
 		my_audio_config.achan[0].mark_freq = 0
@@ -414,6 +422,7 @@ o = DCD output control
 
 	for _, wavFileName := range pflag.Args() {
 		var err error
+
 		atestFP, err = os.Open(wavFileName) //nolint:gosec // File path from CLI is expected for this tool
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -518,6 +527,7 @@ o = DCD output control
 		 * Needs to be done for each file because they could have different sample rates.
 		 */
 		multi_modem_init(my_audio_config)
+
 		packets_decoded_one = 0
 
 		atestBuf = bufio.NewReader(atestFP)
@@ -527,7 +537,6 @@ o = DCD output control
 			for c := 0; c < (my_audio_config.adev[0].num_channels); c++ {
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
-
 				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
 
 				if audio_sample >= 256*256 {
@@ -542,6 +551,7 @@ o = DCD output control
 				if decode_only == 0 && c != 0 {
 					continue
 				}
+
 				if decode_only == 1 && c != 1 {
 					continue
 				}
@@ -552,6 +562,7 @@ o = DCD output control
 			/* When a complete frame is accumulated, */
 			/* process_rec_frame, below, is called. */
 		}
+
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("\n\n")
 
@@ -561,6 +572,7 @@ o = DCD output control
 				fmt.Printf("%+.1f dB, %d\n", db, count[j])
 			}
 		}
+
 		if EXPERIMENT_H {
 			for j := range MAX_SUBCHANS {
 				fmt.Printf("%d\n", count[j])
@@ -576,6 +588,7 @@ o = DCD output control
 	var elapsed = time.Since(start_time)
 
 	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/float64(elapsed.Seconds()))
+
 	if d_o_opt > 0 {
 		fmt.Printf("DCD count = %d\n", dcd_count)
 		fmt.Printf("DCD missing errors = %d\n", dcd_missing_errors)
@@ -586,6 +599,7 @@ o = DCD output control
 		fmt.Printf("\n * * * TEST FAILED: number decoded is less than %d * * * \n", *errorIfLessThan)
 		os.Exit(1)
 	}
+
 	if *errorIfGreaterThan != -1 && packets_decoded_total > *errorIfGreaterThan {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("\n * * * TEST FAILED: number decoded is greater than %d * * * \n", *errorIfGreaterThan)
@@ -598,7 +612,6 @@ o = DCD output control
  */
 
 func audio_get_fake(_ int) int {
-
 	if wav_data.Datasize <= 0 {
 		e_o_f = true
 		return (-1)
@@ -610,6 +623,7 @@ func audio_get_fake(_ int) int {
 	if errors.Is(err, io.EOF) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected end of file.\n")
+
 		e_o_f = true
 	}
 
@@ -631,8 +645,8 @@ func audio_get(a int) int {
  */
 
 func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
-
 	packets_decoded_one++
+
 	if hdlc_rec_data_detect_any(channel) == 0 {
 		dcd_missing_errors++
 	}
@@ -650,6 +664,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 	var h int
 	var heard string
+
 	if ax25_get_num_addr(pp) == 0 {
 		/* Not AX.25. No station to display below. */
 		h = -1
@@ -684,7 +699,6 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 		strings.HasPrefix(heard, "WIDE") &&
 		unicode.IsDigit(rune(heard[4])) &&
 		len(heard) == 5 {
-
 		var probably_really = ax25_get_addr_with_ssid(pp, h-1)
 
 		heard += " (probably " + probably_really + ")"
@@ -760,14 +774,12 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 	*/
 
 	ax25_delete(pp)
-
 } /* end fake dlq_append */
 
 var dcd_start_seconds [MAX_RADIO_CHANS]float64
 
 func ptt_set_fake(_ int, channel int, ptt_signal int) {
 	// Should only get here for DCD output control.
-
 	if d_o_opt > 0 {
 		var t = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 
@@ -782,7 +794,6 @@ func ptt_set_fake(_ int, channel int, ptt_signal int) {
 			dcd_start_seconds[channel] = t
 		} else {
 			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - dcd_start_seconds[channel]) * 1000.);
-
 			var sec1 = dcd_start_seconds[channel]
 			var min1 = (int)(sec1 / 60.)
 			sec1 -= float64(min1 * 60)

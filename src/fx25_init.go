@@ -120,6 +120,7 @@ func fx25_tag_find_match(t uint64) int {
 			return c
 		}
 	}
+
 	return -1
 }
 
@@ -218,6 +219,7 @@ func fx25_get_rs(ctag_num int) *rs_t {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
 	Assert(tags[ctag_num].itab >= 0 && tags[ctag_num].itab < FX25_NTAB)
 	Assert(fx25Tab[tags[ctag_num].itab].rs != nil)
+
 	return fx25Tab[tags[ctag_num].itab].rs
 }
 
@@ -295,6 +297,7 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 				return k
 			}
 		}
+
 		return -1
 	}
 
@@ -329,6 +332,7 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 			return m
 		}
 	}
+
 	return -1
 
 	// TODO: revisit error messages, produced by caller, when this returns -1.
@@ -350,9 +354,11 @@ func init_rs_char(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) *
 	if fcr >= (1 << symsize) {
 		return nil
 	}
+
 	if prim == 0 || prim >= (1<<symsize) {
 		return nil
 	}
+
 	if nroots >= (1 << symsize) {
 		return nil // Can't have more roots than symbol values!
 	}
@@ -368,16 +374,20 @@ func init_rs_char(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) *
 	// Generate Galois field lookup tables
 	rs.index_of[0] = byte(rs.nn) // log(zero) = -inf (A0)
 	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
+
 	var sr = 1
 	for i := 0; i < int(rs.nn); i++ {
 		rs.index_of[sr] = byte(i)
 		rs.alpha_to[i] = byte(sr)
+
 		sr <<= 1
 		if sr&(1<<symsize) != 0 {
 			sr ^= int(gfpoly)
 		}
+
 		sr &= int(rs.nn)
 	}
+
 	if sr != 1 {
 		// field generator polynomial is not primitive!
 		return nil
@@ -394,6 +404,7 @@ func init_rs_char(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) *
 	for (iprim % int(prim)) != 0 {
 		iprim += int(rs.nn)
 	}
+
 	rs.iprim = byte(iprim / int(prim))
 
 	rs.genpoly[0] = 1
@@ -431,13 +442,17 @@ func fx_hex_dump(p []byte) {
 		var n = min(length, 16)
 
 		dw_printf("  %03x: ", offset)
+
 		for i := 0; i < n; i++ {
 			dw_printf(" %02x", p[i])
 		}
+
 		for i := n; i < 16; i++ {
 			dw_printf("   ")
 		}
+
 		dw_printf("  ")
+
 		for i := 0; i < n; i++ {
 			if p[i] >= 0x20 && p[i] <= 0x7E {
 				dw_printf("%c", p[i])
@@ -445,7 +460,9 @@ func fx_hex_dump(p []byte) {
 				dw_printf(".")
 			}
 		}
+
 		dw_printf("\n")
+
 		p = p[n:]
 		offset += n
 		length -= n

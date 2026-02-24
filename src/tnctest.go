@@ -148,6 +148,7 @@ func TNCTestMain() {
 			fmt.Printf("Internal error 1\n")
 			os.Exit(1)
 		}
+
 		hostname[j] = "localhost"
 		port[j] = parts[0]
 		description[j] = parts[1]
@@ -165,7 +166,6 @@ func TNCTestMain() {
 	for j := range num_tnc {
 		/* If port begins with digit, consider it to be TCP. */
 		/* Otherwise, treat as serial port name. */
-
 		tnctest_using_tcp[j] = unicode.IsDigit(rune(port[j][0]))
 
 		/* Addresses to use in the AX.25 frames. */
@@ -189,7 +189,9 @@ func TNCTestMain() {
 
 	for ready := false; !ready; {
 		SLEEP_MS(100)
+
 		ready = true
+
 		for j := range num_tnc {
 			if is_connected[j] < 0 {
 				ready = false
@@ -211,8 +213,10 @@ func TNCTestMain() {
 	var timeout = 600
 	for ready := false; !ready && timeout > 0; {
 		SLEEP_MS(100)
+
 		timeout--
 		ready = true
+
 		for j := range num_tnc {
 			if is_connected[j] <= 0 {
 				ready = false
@@ -238,6 +242,7 @@ func TNCTestMain() {
 	fmt.Printf("Send data...\n")
 
 	var send_count int
+
 	var burst_size = 1
 	for send_count < max_count {
 		for n := 1; n <= burst_size && send_count < max_count; n++ {
@@ -265,12 +270,14 @@ func TNCTestMain() {
 
 	for last_rec_seq[0] != max_count && no_activity < INACTIVE_TIMEOUT {
 		SLEEP_MS(1000)
+
 		no_activity++
 
 		if last_rec_seq[0] > last0 {
 			last0 = last_rec_seq[0]
 			no_activity = 0
 		}
+
 		if last_rec_seq[1] > last1 {
 			last1 = last_rec_seq[1]
 			no_activity = 0
@@ -283,6 +290,7 @@ func TNCTestMain() {
 		fmt.Printf("Got last expected reply.\n")
 	} else {
 		fmt.Printf("ERROR: Timeout - No incoming activity for %d seconds.\n", no_activity)
+
 		errors++
 	}
 
@@ -291,6 +299,7 @@ func TNCTestMain() {
 	 */
 	if last_rec_seq[0] != max_count {
 		fmt.Printf("ERROR: Last received reply was %d when we were expecting %d.\n", last_rec_seq[0], max_count)
+
 		errors++
 	}
 
@@ -303,8 +312,10 @@ func TNCTestMain() {
 	timeout = 200 // 20 sec should be generous.
 	for ready := false; !ready && timeout > 0; {
 		SLEEP_MS(100)
+
 		timeout--
 		ready = true
+
 		for j := range num_tnc {
 			if is_connected[j] != 0 {
 				ready = false
@@ -316,6 +327,7 @@ func TNCTestMain() {
 		fmt.Printf("ERROR: Gave up waiting for disconnect!\n")
 		tnc_reset(1, 0) // Don't leave TNC in bad state for next time.
 		SLEEP_MS(10000)
+
 		errors++
 	}
 
@@ -323,6 +335,7 @@ func TNCTestMain() {
 		fmt.Printf("TEST FAILED!\n")
 		os.Exit(1)
 	}
+
 	fmt.Printf("Success!\n")
 	os.Exit(0)
 }
@@ -369,6 +382,7 @@ func process_rec_data(my_index int, data string) {
 	} else if strings.HasPrefix(after, "reply") {
 		if my_index == 0 {
 			last_rec_seq[my_index]++
+
 			var n, _ = strconv.Atoi(before)
 			if n != last_rec_seq[my_index] {
 				fmt.Printf("%*s%s: Received %d when %d was expected.\n", my_index*column_width, "", tnc_address[my_index], n, last_rec_seq[my_index])
@@ -412,9 +426,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	/*
 	 * Connect to TNC server.
 	 */
-
 	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port))
-
 	if connErr != nil {
 		fmt.Printf("TNC %d unable to connect to %s on %s, port %s: %s\n",
 			my_index, description, hostname, port, connErr)
@@ -461,11 +473,11 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 
 	for {
 		var readErr = binary.Read(conn, binary.LittleEndian, mon_cmd)
-
 		if readErr != nil {
 			if readErr == io.EOF {
 				continue
 			}
+
 			fmt.Printf("Read error, TNC %d got %s.\n", my_index, readErr)
 			os.Exit(1)
 		}
@@ -547,7 +559,6 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
  *--------------------------------------------------------------------*/
 
 func tnc_thread_serial(my_index int, port string, description string, tnc_address string) {
-
 	tnctest_serial_fd[my_index] = serial_port_open(port, 9600)
 
 	if tnctest_serial_fd[my_index] == nil {
@@ -598,7 +609,6 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 		var done = false
 		for !done {
 			var b, err = serial_port_get1(tnctest_serial_fd[my_index])
-
 			if err != nil {
 				fmt.Printf("TNC %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)
@@ -724,7 +734,6 @@ func tnc_disconnect(from int, to int) {
 }
 
 func tnc_reset(from int, to int) {
-
 	_ = to // Upstream doesn't use it, it's not clear to me why / what it might have been for /KG
 
 	fmt.Printf("%*s[T %.3f] *** Send reset ***\n", from*column_width, "", time.Since(start_time).Seconds())
@@ -763,6 +772,7 @@ func tnc_send_data(from int, to int, data string) {
 		if len(data) > math.MaxUint32 {
 			panic("len(data) exceeds uint32 maximum!")
 		}
+
 		header.DataLen = uint32(len(data)) //nolint:gosec
 
 		binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
@@ -771,12 +781,13 @@ func tnc_send_data(from int, to int, data string) {
 	} else {
 		// The assumption is that we are in CONVERSE mode.
 		// The data should be terminated by carriage return.
-
 		var timeout = 600 // 60 sec.  I've seen it take more than 20.
 		for timeout > 0 && busy[from] {
 			SLEEP_MS(100)
+
 			timeout--
 		}
+
 		if timeout == 0 {
 			fmt.Printf("ERROR: Gave up waiting while TNC busy.\n")
 			tnc_disconnect(0, 1)

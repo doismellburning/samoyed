@@ -109,12 +109,12 @@ func cdigipeater_init(p_audio_config *audio_s, p_cdigi_config *cdigi_config_s) {
 func cdigipeater(from_chan int, pp *packet_t) {
 	// Connected mode is allowed only for channels with internal modem.
 	// It probably wouldn't matter for digipeating but let's keep that rule simple and consistent.
-
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
 		(save_audio_config_p.chan_medium[from_chan] != MEDIUM_RADIO &&
 			save_audio_config_p.chan_medium[from_chan] != MEDIUM_NETTNC) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("cdigipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+
 		return
 	}
 
@@ -220,7 +220,6 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 	 * Logically this should come later, after an address/alias match.
 	 * But here we only have to do it once.
 	 */
-
 	if cfilter_str != "" {
 		if pfilter(from_chan, to_chan, cfilter_str, pp, false) != 1 {
 			return (nil)
@@ -255,6 +254,7 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 
 		ax25_set_addr(result, r, mycall_xmit)
 		ax25_set_h(result, r)
+
 		return (result)
 	}
 
@@ -270,6 +270,7 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 
 			ax25_set_addr(result, r, mycall_xmit)
 			ax25_set_h(result, r)
+
 			return (result)
 		}
 	}

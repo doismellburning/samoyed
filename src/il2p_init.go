@@ -43,6 +43,7 @@ func il2p_init(il2p_debug int) {
 
 	for i := 0; i < NTAB; i++ {
 		Assert(Tab[i].nroots <= MAX_NROOTS)
+
 		Tab[i].rs = init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
 		if Tab[i].rs == nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -50,7 +51,6 @@ func il2p_init(il2p_debug int) {
 			exit(1)
 		}
 	}
-
 } // end il2p_init
 
 func il2p_get_debug() int {
@@ -65,8 +65,10 @@ func il2p_find_rs(nparity int) *rs_t {
 			return Tab[n].rs
 		}
 	}
+
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("IL2P INTERNAL ERROR: il2p_find_rs: control block not found for nparity = %d.\n", nparity)
+
 	return Tab[0].rs
 }
 
@@ -89,7 +91,6 @@ func il2p_find_rs(nparity int) *rs_t {
  *--------------------------------------------------------------*/
 
 func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
-
 	var data_size = len(tx_data)
 
 	Assert(data_size >= 1)
@@ -126,7 +127,6 @@ func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
  *--------------------------------------------------------------*/
 
 func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
-
 	var data_size = len(rec_block) - num_parity
 
 	//  Use zero padding in front if data size is too small.
@@ -155,9 +155,11 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 			dw_printf("No errors reported for RS block.\n")
 		} else if derrors > 0 {
 			dw_printf("%d errors fixed in positions:\n", derrors)
+
 			for j := 0; j < derrors; j++ {
 				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
 			}
+
 			fx_hex_dump(rs_block[:])
 		}
 	}
@@ -172,7 +174,9 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("RS DECODE ERROR!  Padding position %d should be 0 but it was set to %02x.\n", derrlocs[i], rs_block[derrlocs[i]])
 			}
+
 			derrors = -1
+
 			break
 		}
 	}
@@ -181,5 +185,6 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("==============================  il2p_decode_rs  returns %d  ==============================\n", derrors)
 	}
+
 	return out, derrors
 }

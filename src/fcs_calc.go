@@ -84,7 +84,6 @@ func crc16(data []byte, seed uint16) uint16 {
 	var crc = seed
 
 	for _, b := range data {
-
 		crc = (crc >> 8) ^ ccitt_table[(crc^uint16(b))&0xff]
 	}
 

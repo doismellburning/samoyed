@@ -59,7 +59,6 @@ func convolve(data, filter []float64, filter_size int) float64 {
 // Result should settle down to 1 unit peak to peak.  i.e. -0.5 to +0.5
 
 func agc(in, fast_attack, slow_decay float64, inPeak, inValley float64) (float64, float64, float64) {
-
 	var outPeak float64
 	var outValley float64
 
@@ -106,10 +105,10 @@ func agc(in, fast_attack, slow_decay float64, inPeak, inValley float64) (float64
  *----------------------------------------------------------------*/
 
 func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int, baud int, D *demodulator_state_s) {
-
 	if upsample < 1 {
 		upsample = 1
 	}
+
 	if upsample > 4 {
 		upsample = 4
 	}
@@ -261,12 +260,15 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 	var k = 0
 	for i := 0; i < D.lp_filter_taps; i++ {
 		D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k]
+
 		k++
 		if upsample >= 2 {
 			D.u.bb.lp_polyphase_2[i] = D.u.bb.lp_filter[k]
+
 			k++
 			if upsample >= 3 {
 				D.u.bb.lp_polyphase_3[i] = D.u.bb.lp_filter[k]
+
 				k++
 				if upsample >= 4 {
 					D.u.bb.lp_polyphase_4[i] = D.u.bb.lp_filter[k]
@@ -283,7 +285,6 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 		slice_point[j] = 0.02 * float64(j-0.5*(MAX_SUBCHANS-1))
 		//dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
 	}
-
 } /* end fsk_demod_init */
 
 /*-------------------------------------------------------------------
@@ -344,14 +345,12 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
  *--------------------------------------------------------------------*/
 
 func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulator_state_s) {
-
 	/* TODO KG
 	#if DEBUG4
 		static FILE *demod_log_fp = NULL;
 		static int log_file_seq = 0;		// Part of log file name
 	#endif
 	*/
-
 	var subchan = 0
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
@@ -370,12 +369,15 @@ func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulato
 
 	fsam = convolve(D.u.bb.audio_in[:], D.u.bb.lp_polyphase_1[:], D.lp_filter_taps)
 	process_filtered_sample(channel, fsam, D)
+
 	if upsample >= 2 {
 		fsam = convolve(D.u.bb.audio_in[:], D.u.bb.lp_polyphase_2[:], D.lp_filter_taps)
 		process_filtered_sample(channel, fsam, D)
+
 		if upsample >= 3 {
 			fsam = convolve(D.u.bb.audio_in[:], D.u.bb.lp_polyphase_3[:], D.lp_filter_taps)
 			process_filtered_sample(channel, fsam, D)
+
 			if upsample >= 4 {
 				fsam = convolve(D.u.bb.audio_in[:], D.u.bb.lp_polyphase_4[:], D.lp_filter_taps)
 				process_filtered_sample(channel, fsam, D)
@@ -385,7 +387,6 @@ func demod_9600_process_sample(channel int, sam int, upsample int, D *demodulato
 }
 
 func process_filtered_sample(channel int, fsam float64, D *demodulator_state_s) {
-
 	var subchannel = 0
 
 	/*
@@ -429,16 +430,13 @@ func process_filtered_sample(channel int, fsam float64, D *demodulator_state_s) 
 	//dw_printf ("peak=%.2f valley=%.2f fsam=%.2f norm=%.2f\n", D.m_peak, D.m_valley, fsam, norm);
 
 	if D.num_slicers <= 1 {
-
 		/* Normal case of one demodulator to one HDLC decoder. */
 		/* Demodulator output is difference between response from two filters. */
 		/* AGC should generally keep this around -1 to +1 range. */
-
 		demod_data = demod_out > 0
 		nudge_pll_9600(channel, subchannel, 0, demod_out, D)
 	} else {
 		/* Multiple slicers each feeding its own HDLC decoder. */
-
 		for slice := int(0); slice < D.num_slicers; slice++ {
 			demod_data = demod_out-slice_point[slice] > 0
 			nudge_pll_9600(channel, subchannel, slice, demod_out-slice_point[slice], D)
@@ -490,7 +488,6 @@ func process_filtered_sample(channel int, fsam float64, D *demodulator_state_s) 
 		}
 	#endif
 	*/
-
 } /* end demod_9600_process_sample */
 
 /*-------------------------------------------------------------------
@@ -557,9 +554,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
 
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
-
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
-
 		hdlc_rec_bit_new(channel, subchannel, slice, IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
@@ -572,9 +567,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 	 */
 	if (D.slicer[slice].prev_demod_out_f < 0 && demod_out_f > 0) ||
 		(D.slicer[slice].prev_demod_out_f > 0 && demod_out_f < 0) {
-
 		// Note:  Test for this demodulator, not overall for channel.
-
 		pll_dcd_signal_transition2(DCD_CONFIG_9600, D, slice, int(D.slicer[slice].data_clock_pll))
 
 		var target = float64(D.pll_step_per_sample) * demod_out_f / (demod_out_f - D.slicer[slice].prev_demod_out_f)
@@ -585,6 +578,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 		} else {
 			D.slicer[slice].data_clock_pll = int32(float64(D.slicer[slice].data_clock_pll)*D.pll_searching_inertia + target*(1.0-D.pll_searching_inertia))
 		}
+
 		D.slicer[slice].pll_nudge_total += int64(D.slicer[slice].data_clock_pll) - int64(before)
 	}
 
@@ -635,7 +629,6 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 	 * for the DPLL sync.
 	 */
 	D.slicer[slice].prev_demod_out_f = demod_out_f
-
 } /* end nudge_pll */
 
 /* end demod_9600.c */

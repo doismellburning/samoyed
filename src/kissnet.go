@@ -209,7 +209,6 @@ func kissnet_init_one(kps *kissport_status_s) {
 		dw_printf ("kissnet_init ( tcp port %d, radio chan = %d )\n", kps.tcp_port, kps.chan);
 	#endif
 	*/
-
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
 		kps.kf[client] = new(kiss_frame_t)
@@ -218,6 +217,7 @@ func kissnet_init_one(kps *kissport_status_s) {
 	if kps.tcp_port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled KISS network client port.\n")
+
 		return
 	}
 
@@ -260,11 +260,11 @@ func connect_listen_thread(kps *kissport_status_s) {
 		dw_printf("Binding to port %d ... \n", kps.tcp_port);
 	#endif
 	*/
-
 	var listener, listenErr = net.Listen("tcp", fmt.Sprintf(":%d", kps.tcp_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
+
 		return
 	}
 
@@ -279,6 +279,7 @@ func connect_listen_thread(kps *kissport_status_s) {
 		file, err := tcpListener.File()
 		if err == nil {
 			defer file.Close()
+
 			syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
 		}
 	}
@@ -300,6 +301,7 @@ func connect_listen_thread(kps *kissport_status_s) {
 
 		if client >= 0 {
 			text_color_set(DW_COLOR_INFO)
+
 			if kps.channel == -1 {
 				dw_printf("Ready to accept KISS TCP client application %d on port %d ...\n", client, kps.tcp_port)
 			} else {
@@ -315,6 +317,7 @@ func connect_listen_thread(kps *kissport_status_s) {
 			kps.client_sock[client] = conn
 
 			text_color_set(DW_COLOR_INFO)
+
 			if kps.channel == -1 {
 				dw_printf("\nAttached to KISS TCP client application %d on port %d ...\n\n", client, kps.tcp_port)
 			} else {
@@ -377,18 +380,17 @@ func kissnet_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int,
 	// However, there are times we want to send a response only to a particular client.
 	// In the case of a serial port or pseudo terminal, there is only one potential client.
 	// so the response would be sent to only one place.  A new parameter has been added for this.
-
 	for kps := all_ports; kps != nil; kps = kps.pnext {
 		if onlykps == nil || kps == onlykps {
 			for client := 0; client < MAX_NET_CLIENTS; client++ {
 				if onlyclient == -1 || client == onlyclient {
 					if kps.client_sock[client] != nil {
 						var kiss_buff []byte
+
 						if flen < 0 {
 							// A client app might think it is attached to a traditional TNC.
 							// It might try sending commands over and over again trying to get the TNC into KISS mode.
 							// We recognize this attempt and send it something to keep it happy.
-
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("KISS TCP: Something unexpected from client application.\n")
 							dw_printf("Is client app treating this like an old TNC with command mode?\n")
@@ -400,6 +402,7 @@ func kissnet_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int,
 							if kiss_debug > 0 {
 								kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
 							}
+
 							kiss_buff = fbuf
 						} else {
 							var stemp []byte
@@ -485,7 +488,6 @@ func kissnet_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int,
  *--------------------------------------------------------------------*/
 
 func kissnet_copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
-
 	// Copy before mutating
 	var msg = make([]byte, len(_msg))
 	copy(msg, _msg)
@@ -500,7 +502,6 @@ func kissnet_copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s
 							// Two different cases here:
 							//  - The TCP port allows all channels, or
 							//  - The TCP port allows only one channel.  In this case set KISS channel to 0.
-
 							if kps.channel == -1 {
 								msg[0] = byte((channel << 4) | cmd)
 							} else {
@@ -582,6 +583,7 @@ func kiss_get(kps *kissport_status_s, client int) byte {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
 		c.Close()
+
 		kps.client_sock[client] = nil
 	}
 }

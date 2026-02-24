@@ -239,6 +239,7 @@ func test_payload(t *testing.T) {
 	for n := 0; n < IL2P_MAX_PAYLOAD_SIZE; n++ {
 		original_payload[n] = byte(n & 0xff)
 	}
+
 	for max_fec := 0; max_fec <= 1; max_fec++ {
 		for payload_length := 1; payload_length <= IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
@@ -681,6 +682,7 @@ func all_frame_types(t *testing.T) {
 	var srej_info = []byte{1 << 1, 2 << 1, 3 << 1, 4 << 1}
 
 	var ftype = frame_type_S_SREJ
+
 	for pf := 0; pf <= 1; pf++ {
 		var modulo = modulo_128
 		var nr = 127
@@ -761,6 +763,7 @@ func test_serdes(t *testing.T) {
 	t.Helper()
 
 	dw_printf("\nTest serialize / deserialize...\n")
+
 	rec_count = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
@@ -786,6 +789,7 @@ func test_serdes(t *testing.T) {
 				il2p_rec_bit(0, 0, 0, 0)
 			}
 		}
+
 		ax25_delete(pp)
 	}
 

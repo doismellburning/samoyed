@@ -119,7 +119,6 @@ func morse_init(audio_config_p *audio_s, amp int) {
 	/*
 	 * Save away modem parameters for later use.
 	 */
-
 	save_audio_config_p = audio_config_p
 
 	for j := 0; j < len(SineTable); j++ {
@@ -157,7 +156,6 @@ func morse_init(audio_config_p *audio_s, amp int) {
  *--------------------------------------------------------------------*/
 
 func morse_send(channel int, str string, wpm int, txdelay int, txtail int) int {
-
 	var time_units = 0
 
 	morse_quiet_ms(channel, txdelay)
@@ -169,23 +167,29 @@ func morse_send(channel int, str string, wpm int, txdelay int, txtail int) int {
 			for encIdx, e := range enc {
 				if e == '.' {
 					morse_tone(channel, 1, wpm)
+
 					time_units++
 				} else {
 					morse_tone(channel, 3, wpm)
+
 					time_units += 3
 				}
+
 				if encIdx != len(enc)-1 { // Intersperse quiet
 					morse_quiet(channel, 1, wpm)
+
 					time_units++
 				}
 			}
 		} else {
 			morse_quiet(channel, 1, wpm)
+
 			time_units++
 		}
 
 		if strIdx != len(str)-1 { // Intersperse quiet
 			morse_quiet(channel, 3, wpm)
+
 			time_units += 3
 		}
 	}
@@ -199,7 +203,6 @@ func morse_send(channel int, str string, wpm int, txdelay int, txtail int) int {
 	audio_flush(ACHAN2ADEV(channel))
 
 	return (txdelay + int(TIME_UNITS_TO_MS(time_units, wpm)+0.5) + txtail)
-
 } /* end morse_send */
 
 /*-------------------------------------------------------------------
@@ -215,7 +218,6 @@ func morse_send(channel int, str string, wpm int, txdelay int, txtail int) int {
  *--------------------------------------------------------------------*/
 
 func morse_tone(channel int, tu int, wpm int) {
-
 	/* TODO KG
 	#if MTEST1
 		int n;
@@ -224,12 +226,12 @@ func morse_tone(channel int, tu int, wpm int) {
 		}
 	#else
 	*/
-
 	var a = ACHAN2ADEV(channel) /* device for channel. */
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+
 		return
 	}
 
@@ -243,14 +245,12 @@ func morse_tone(channel int, tu int, wpm int) {
 	var nsamples = (int)((TIME_UNITS_TO_MS(tu, wpm) * float64(save_audio_config_p.adev[a].samples_per_sec/1000.)) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-
 		tone_phase += f1_change_per_sample
 		var sam = SineTable[(tone_phase>>24)&0xff]
 		gen_tone_put_sample(channel, a, sam)
 	}
 
 	// TODO KG #endif
-
 } /* end morse_tone */
 
 /*-------------------------------------------------------------------
@@ -266,7 +266,6 @@ func morse_tone(channel int, tu int, wpm int) {
  *--------------------------------------------------------------------*/
 
 func morse_quiet(channel int, tu int, wpm int) {
-
 	/* TODO KG
 	#if MTEST1
 		int n;
@@ -281,18 +280,16 @@ func morse_quiet(channel int, tu int, wpm int) {
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+
 		return
 	}
 
 	var nsamples = int((TIME_UNITS_TO_MS(tu, wpm) * float64(save_audio_config_p.adev[a].samples_per_sec) / 1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-
 		gen_tone_put_sample(channel, a, sam)
-
 	}
 	// TODO KG #endif
-
 } /* end morse_quiet */
 
 /*-------------------------------------------------------------------
@@ -308,7 +305,6 @@ func morse_quiet(channel int, tu int, wpm int) {
  *--------------------------------------------------------------------*/
 
 func morse_quiet_ms(channel int, ms int) {
-
 	/* TODO KG
 	#if MTEST1
 	#else
@@ -319,6 +315,7 @@ func morse_quiet_ms(channel int, ms int) {
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+
 		return
 	}
 
@@ -329,7 +326,6 @@ func morse_quiet_ms(channel int, ms int) {
 	}
 
 	// TODO KG #endif
-
 } /* end morse_quiet_ms */
 
 /*-------------------------------------------------------------------
@@ -348,7 +344,6 @@ func morse_quiet_ms(channel int, ms int) {
  *--------------------------------------------------------------------*/
 
 func morse_lookup(ch rune) int {
-
 	if unicode.IsLower(ch) {
 		ch = unicode.ToUpper(ch)
 	}
@@ -382,7 +377,6 @@ func morse_lookup(ch rune) int {
  *--------------------------------------------------------------------*/
 
 func morse_units_ch(ch rune) int {
-
 	var i = morse_lookup(ch)
 
 	if i < 0 {
@@ -423,7 +417,6 @@ func morse_units_ch(ch rune) int {
  *--------------------------------------------------------------------*/
 
 func morse_units_str(str string) int {
-
 	var units = (len(str) - 1) * 3
 
 	for _, k := range str {

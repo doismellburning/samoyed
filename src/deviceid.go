@@ -81,12 +81,12 @@ var search_locations = []string{
 }
 
 func deviceid_init() {
-
 	var fp *os.File
+
 	for _, location := range search_locations {
 		var err error
-		fp, err = os.Open(location) //nolint:gosec // G304: location comes from hardcoded search_locations (allowlisted search paths), not user input
 
+		fp, err = os.Open(location) //nolint:gosec // G304: location comes from hardcoded search_locations (allowlisted search paths), not user input
 		if err == nil {
 			defer fp.Close()
 			break
@@ -96,10 +96,13 @@ func deviceid_init() {
 	if fp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not open any of these file locations:\n")
+
 		for _, location := range search_locations {
 			dw_printf("    %s\n", location)
 		}
+
 		dw_printf("It won't be possible to extract device identifiers from packets.\n")
+
 		return
 	}
 
@@ -212,12 +215,12 @@ func deviceid_decode_dest(dest string) string {
 	if len(ptocalls) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("deviceid_decode_dest called without any deviceid data.\n")
+
 		return device
 	}
 
 	for _, t := range ptocalls {
 		if strings.HasPrefix(dest, t.tocall) {
-
 			if t.vendor != "" {
 				device = t.vendor
 			}
@@ -240,7 +243,6 @@ func deviceid_decode_dest(dest string) string {
 
 	// Not found in table.
 	return "UNKNOWN vendor/model"
-
 } // end deviceid_decode_dest
 
 /*------------------------------------------------------------------
@@ -294,6 +296,7 @@ func deviceid_decode_mice(comment string) (string, string) {
 	if len(ptocalls) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("deviceid_decode_mice called without any deviceid data.\n")
+
 		return trimmed, device
 	}
 
@@ -308,7 +311,6 @@ func deviceid_decode_mice(comment string) (string, string) {
 			(len(m.prefix) == 0 && // Later
 				(comment[0] == '`' || comment[0] == '\'') && // prefix ` or '
 				strings.HasSuffix(comment, m.suffix)) { // suffix
-
 			if m.vendor != "" {
 				device = m.vendor
 			}

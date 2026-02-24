@@ -34,7 +34,6 @@ package direwolf
  */
 
 func encode_rs_char(rs *rs_t, data []byte, bb []byte) {
-
 	var nroots = int(rs.nroots)
 	var nn = int(rs.nn)
 	var dataLen = nn - nroots

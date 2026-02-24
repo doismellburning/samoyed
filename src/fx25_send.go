@@ -47,7 +47,6 @@ var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "fx25_send
  *--------------------------------------------------------------*/
 
 func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
-
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
@@ -75,6 +74,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.\n", channel, fx_mode, dlen)
+
 		return (-1)
 	}
 
@@ -116,15 +116,17 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 	if test_mode {
 		// Standalone text application.
-
 		var flags = []byte{0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e}
 		var fname = fmt.Sprintf("fx%02x.dat", ctag_num)
+
 		var fp, err = os.Create(fname) //nolint:gosec
 		if err != nil {
 			panic(err)
 		}
 		defer fp.Close()
+
 		fp.Write(flags)
+
 		for k := 0; k < 8; k++ {
 			var b = byte(ctag_value>>(k*8)) & 0xff // Should be portable to big endian too.
 			fp.Write([]byte{b})
@@ -144,10 +146,10 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 		//	for (int j = 0; j < 16; j++) {
 		//	  data[j] = ~ data[j];
 		//	}
-
 		for k := 0; k < 8; k++ {
 			send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
 		}
+
 		send_bytes(channel, data[:k_data_radio])
 		send_bytes(channel, check[:nroots])
 	}
@@ -175,6 +177,7 @@ func send_bit(channel int, b int) {
 	if b == 0 {
 		sendBitOutput[channel] = 1 - sendBitOutput[channel]
 	}
+
 	tone_gen_put_bit(channel, sendBitOutput[channel])
 	fx25BitsSent[channel]++
 }
@@ -216,6 +219,7 @@ func bitStuff(in []byte, maxBytes int) ([]byte, int) {
 	// In data
 
 	var ones = 0
+
 	for _, b := range in {
 		for i := range 8 {
 			var v = b&(1<<i) > 0
@@ -249,6 +253,7 @@ func bitStuff(in []byte, maxBytes int) ([]byte, int) {
 	// Fill remainder with flag patterns (rotating through flag bits)
 	if maxBytes > 0 {
 		maxBits := maxBytes * 8
+
 		bitPos := 0 // Which bit position of flag to use (0-7)
 		for len(outBits) < maxBits {
 			v := flag&(1<<bitPos) > 0
@@ -263,6 +268,7 @@ func bitStuff(in []byte, maxBytes int) ([]byte, int) {
 
 	for len(outBits) >= 8 {
 		var b byte
+
 		for bitIdx := range 8 {
 			if outBits[bitIdx] {
 				b |= 1 << bitIdx
@@ -277,14 +283,17 @@ func bitStuff(in []byte, maxBytes int) ([]byte, int) {
 
 	if len(outBits) > 0 {
 		var b byte
+
 		for bitIdx := 0; bitIdx < 8 && bitIdx < len(outBits); bitIdx++ {
 			if outBits[bitIdx] {
 				b |= 1 << bitIdx
 			}
 		}
+
 		outBytes = append(outBytes, b)
 	}
 
 	var meaningfulLen = (meaningfulBits + 7) / 8 // Round up to bytes
+
 	return outBytes, meaningfulLen
 }

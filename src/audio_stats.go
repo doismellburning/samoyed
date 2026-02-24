@@ -60,9 +60,7 @@ var audioStatsErrorCount [MAX_ADEVS]int
 var audioStatsSuppressFirst [MAX_ADEVS]bool
 
 func audio_stats(adev int, nchan int, nsamp int, interval int) {
-
 	/* Gather numbers for read from audio device. */
-
 	if interval <= 0 {
 		return
 	}
@@ -93,16 +91,14 @@ func audio_stats(adev int, nchan int, nsamp int, interval int) {
 		} else {
 			audioStatsErrorCount[adev]++
 		}
+
 		var this_time = time.Now()
 		if !this_time.Before(audioStatsLastTime[adev].Add(time.Duration(interval) * time.Second)) {
-
 			if audioStatsSuppressFirst[adev] {
-
 				/* The issue we had is that the first time the rate */
 				/* would be off considerably because we didn't start */
 				/* on a second boundary.  So we will suppress printing */
 				/* of the first one.  */
-
 				audioStatsSuppressFirst[adev] = false
 			} else {
 				var ave_rate = (float64(audioStatsSampleCount[adev]) / 1000.0) / float64(interval)
@@ -125,6 +121,7 @@ func audio_stats(adev int, nchan int, nsamp int, interval int) {
 						adev, ave_rate, audioStatsErrorCount[adev], ch0, alevel0.rec)
 				}
 			}
+
 			audioStatsLastTime[adev] = this_time
 			audioStatsSampleCount[adev] = 0
 			audioStatsErrorCount[adev] = 0

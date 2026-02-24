@@ -81,7 +81,6 @@ var s_gpsnmea_port_fd *term.Term
 func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	//dwgps_info_t info;
 	//int e;
-
 	s_debug = debug
 	s_save_configp = pconfig
 
@@ -91,7 +90,6 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	}
 
 	if pconfig.gpsnmea_port == "" {
-
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return (0)
 	}
@@ -107,6 +105,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
+
 		return (-1)
 	}
 
@@ -121,6 +120,7 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
 	if s_save_configp.gpsnmea_port == wp_port_name && speed == s_save_configp.gpsnmea_speed {
 		return (s_gpsnmea_port_fd)
 	}
+
 	return nil
 }
 
@@ -143,7 +143,6 @@ const TIMEOUT = 5
 func read_gpsnmea_thread(fd *term.Term) {
 	// Maximum length of message from GPS receiver is 82 according to some people.
 	// Make buffer considerably larger to be safe.
-
 	const NMEA_MAX_LEN = 160
 
 	if s_debug >= 2 {
@@ -154,33 +153,34 @@ func read_gpsnmea_thread(fd *term.Term) {
 	var info = new(dwgps_info_t)
 	dwgps_clear(info)
 	info.fix = DWFIX_NOT_SEEN /* clear not init state. */
+
 	if s_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSNMEA: ", info)
 	}
+
 	dwgps_set_data(info)
 
 	var gps_msg string
 
 	for {
 		var ch, err = serial_port_get1(fd)
-
 		if err != nil {
-
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */
 			/* a normal serial port. */
-
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("----------------------------------------------\n")
 			dw_printf("GPSNMEA: Lost communication with GPS receiver.\n")
 			dw_printf("----------------------------------------------\n")
 
 			info.fix = DWFIX_ERROR
+
 			if s_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dwgps_print("GPSNMEA: ", info)
 			}
+
 			dwgps_set_data(info)
 
 			serial_port_close(s_gpsnmea_port_fd)
@@ -198,7 +198,6 @@ func read_gpsnmea_thread(fd *term.Term) {
 			gps_msg = string(ch)
 		case '\r', '\n':
 			if len(gps_msg) >= 6 && gps_msg[0] == '$' {
-
 				if s_debug >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("%s\n", gps_msg)
@@ -208,10 +207,8 @@ func read_gpsnmea_thread(fd *term.Term) {
 				// TODO: More general: Ignore the second letter rather than recognizing only GP... and GN...
 
 				if strings.HasPrefix(gps_msg, "$GPRMC") || strings.HasPrefix(gps_msg, "$GNRMC") {
-
 					// Here we just tuck away the course and speed.
 					// Fix and location will be updated by GxGGA.
-
 					var f = dwgpsnmea_gprmc(gps_msg, false)
 
 					if f.Fix == DWFIX_ERROR {
@@ -229,7 +226,6 @@ func read_gpsnmea_thread(fd *term.Term) {
 						}
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
-
 					var f = dwgpsnmea_gpgga(gps_msg, false)
 
 					if f.Fix == DWFIX_ERROR {
@@ -241,15 +237,18 @@ func read_gpsnmea_thread(fd *term.Term) {
 						if f.Lat != G_UNKNOWN {
 							info.dlat = f.Lat
 						}
+
 						if f.Lon != G_UNKNOWN {
 							info.dlon = f.Lon
 						}
+
 						if f.Alt != G_UNKNOWN {
 							info.altitude = f.Alt
 						}
 
 						if f.Fix != info.fix { // Print change in location fix.
 							text_color_set(DW_COLOR_INFO)
+
 							switch f.Fix {
 							case DWFIX_NO_FIX:
 								dw_printf("GPSNMEA: Location fix has been lost.\n")
@@ -259,13 +258,17 @@ func read_gpsnmea_thread(fd *term.Term) {
 								dw_printf("GPSNMEA: Location fix is now 3D.\n")
 							default:
 							}
+
 							info.fix = f.Fix
 						}
+
 						info.timestamp = time.Now()
+
 						if s_debug >= 2 {
 							text_color_set(DW_COLOR_DEBUG)
 							dwgps_print("GPSNMEA: ", info)
 						}
+
 						dwgps_set_data(info)
 					}
 				}
@@ -297,14 +300,15 @@ func read_gpsnmea_thread(fd *term.Term) {
  *--------------------------------------------------------------------*/
 
 func remove_checksum(sent string, quiet bool) (string, error) {
-
 	var msg, checksumStr, found = strings.Cut(sent, "*")
 	if !found {
 		var errorMsg = "Missing GPS checksum"
+
 		if !quiet {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("%s.\n", errorMsg)
 		}
+
 		return "", errors.New(errorMsg)
 	}
 
@@ -317,10 +321,12 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 
 	if calculatedChecksum != checksum {
 		var errorMsg = fmt.Sprintf("GPS checksum error. Expected %02x but found %s", calculatedChecksum, checksumStr)
+
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%s.\n", errorMsg)
 		}
+
 		return "", errors.New(errorMsg)
 	}
 
@@ -366,7 +372,6 @@ type GPRMCResult struct {
 }
 
 func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
-
 	var result = &GPRMCResult{
 		Lat:    G_UNKNOWN,
 		Lon:    G_UNKNOWN,
@@ -376,7 +381,6 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	sentence, err := remove_checksum(sentence, quiet)
-
 	if err != nil {
 		result.Fix = DWFIX_ERROR
 		return result
@@ -414,7 +418,9 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("No status in GPRMC sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -425,7 +431,9 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get latitude from GPRMC sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -436,7 +444,9 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get longitude from GPRMC sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -448,7 +458,9 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get speed from GPRMC sentence: %s\n", knotsErr)
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -466,7 +478,6 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	result.Fix = DWFIX_2D
 
 	return result
-
 } /* end dwgpsnmea_gprmc */
 
 /*-------------------------------------------------------------------
@@ -510,7 +521,6 @@ type GPGGAResult struct {
 }
 
 func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
-
 	var result = &GPGGAResult{
 		Lat: G_UNKNOWN,
 		Lon: G_UNKNOWN,
@@ -520,7 +530,6 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	sentence, err := remove_checksum(sentence, quiet)
-
 	if err != nil {
 		result.Fix = DWFIX_ERROR
 		return result
@@ -566,7 +575,9 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("No fix in GPGGA sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -577,7 +588,9 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get latitude from GPGGA sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -588,7 +601,9 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get longitude from GPGGA sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -610,22 +625,26 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Can't get altitude from GPGGA sentence: %s\n", altitudeErr)
 				}
+
 				result.Fix = DWFIX_ERROR
+
 				return result
 			}
 		} else {
 			result.Fix = DWFIX_2D
 		}
+
 		return result
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Can't get altitude from GPGGA sentence.\n")
 		}
+
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
-
 } /* end dwgpsnmea_gpgga */
 
 /*-------------------------------------------------------------------

@@ -23,7 +23,6 @@ type rs_t struct {
 }
 
 func modnn(rs *rs_t, _x int) int {
-
 	var x = uint(_x)
 
 	for x >= rs.nn {

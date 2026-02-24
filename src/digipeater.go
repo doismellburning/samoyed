@@ -144,7 +144,6 @@ func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
 
 func digipeater(from_chan int, pp *packet_t) {
 	// Network TNC is OK for UI frames where we don't care about timing.
-
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
 		(digipeater_audio_config.chan_medium[from_chan] != MEDIUM_RADIO &&
 			digipeater_audio_config.chan_medium[from_chan] != MEDIUM_NETTNC) {
@@ -354,6 +353,7 @@ func digipeat_match(
 		/* could have different calls. */
 		ax25_set_addr(result, r, mycall_xmit)
 		ax25_set_h(result, r)
+
 		return (result)
 	}
 
@@ -386,7 +386,6 @@ func digipeat_match(
 		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */
-
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Digipeater: Drop redundant packet to channel %d.\n", to_chan)
 		//#endif
@@ -407,6 +406,7 @@ func digipeat_match(
 
 		ax25_set_addr(result, r, mycall_xmit)
 		ax25_set_h(result, r)
+
 		return (result)
 	}
 
@@ -436,7 +436,6 @@ func digipeat_match(
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
 					// TODO: deprecate this option.  Result is misleading.
-
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
@@ -445,7 +444,6 @@ func digipeat_match(
 						r2--
 					}
 				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
-
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
@@ -495,7 +493,6 @@ func digipeat_match(
 		// so the via path does not continue to grow and exceed the 8 available positions.
 		// The strange thing about this is that the used up digipeater is left there but
 		// removed by the next digipeater.
-
 		if len(atgp) > 0 && strings.HasPrefix(strings.ToLower(repeater), strings.ToLower(atgp)) {
 			if ssid >= 1 && ssid <= 7 {
 				var result = ax25_dup(pp)
@@ -505,11 +502,13 @@ func digipeat_match(
 
 				for ax25_get_num_addr(result) >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
 					ax25_remove_addr(result, AX25_REPEATER_1)
+
 					r--
 				}
 
 				ssid--
 				ax25_set_ssid(result, r, ssid) // could be zero.
+
 				if ssid == 0 {
 					ax25_set_h(result, r)
 				}
@@ -518,6 +517,7 @@ func digipeat_match(
 
 				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
 				ax25_set_h(result, AX25_REPEATER_1)
+
 				return (result)
 			}
 		}
@@ -538,6 +538,7 @@ func digipeat_match(
 
 			ax25_set_addr(result, r, mycall_xmit)
 			ax25_set_h(result, r)
+
 			return (result)
 		}
 
@@ -551,6 +552,7 @@ func digipeat_match(
 				ax25_insert_addr(result, r, mycall_xmit)
 				ax25_set_h(result, r)
 			}
+
 			return (result)
 		}
 	}
@@ -587,7 +589,6 @@ func digi_regen(from_chan int, pp *packet_t) {
 	*/
 
 	// dw_printf ("digi_regen()\n");
-
 	Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
 
 	for to_chan := range MAX_TOTAL_CHANS {

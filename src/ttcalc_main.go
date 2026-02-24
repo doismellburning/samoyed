@@ -41,7 +41,6 @@ func TTCalcMain() {
 	 */
 
 	var server_sock, err = connect_to_server(hostname, port)
-
 	if err != nil {
 		os.Exit(1)
 	}
@@ -63,11 +62,11 @@ func TTCalcMain() {
 
 	for {
 		var readErr = binary.Read(server_sock, binary.LittleEndian, &mon_cmd)
-
 		if readErr != nil {
 			if readErr == io.EOF {
 				continue
 			}
+
 			fmt.Printf("Read error, received %d.\n", readErr)
 			os.Exit(1)
 		}
@@ -75,7 +74,6 @@ func TTCalcMain() {
 		var data = make([]byte, mon_cmd.DataLen)
 		if mon_cmd.DataLen > 0 {
 			_, readErr = io.ReadFull(server_sock, data)
-
 			if readErr != nil {
 				fmt.Printf("Read error, client received %s when reading %d data bytes. Terminating.\n", readErr, mon_cmd.DataLen)
 				os.Exit(1)
@@ -192,6 +190,7 @@ func do_lastop(lastop, result, num int) int {
 	case DIV:
 		result /= num
 	}
+
 	return result
 }
 
@@ -235,7 +234,6 @@ func calculator(str string) int {
 
 func connect_to_server(hostname string, port string) (net.Conn, error) {
 	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port))
-
 	if connErr != nil {
 		return conn, connErr
 	}

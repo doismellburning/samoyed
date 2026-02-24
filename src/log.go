@@ -74,7 +74,6 @@ func log_init(daily_names bool, path string) {
 	if g_daily_names {
 		// Original strategy.  Automatic daily file names.
 		var stat, statErr = os.Stat(path)
-
 		if statErr == nil {
 			// Exists, but is it a directory?
 			if stat.IsDir() {
@@ -84,6 +83,7 @@ func log_init(daily_names bool, path string) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Log file location \"%s\" is not a directory.\n", path)
 				dw_printf("Using current working directory \".\" instead.\n")
+
 				g_log_path = "."
 			}
 		} else {
@@ -101,13 +101,13 @@ func log_init(daily_names bool, path string) {
 				dw_printf("Failed to create log file location \"%s\".\n", path)
 				dw_printf("%s\n", mkdirErr)
 				dw_printf("Using current working directory \".\" instead.\n")
+
 				g_log_path = "."
 			}
 		}
 	} else {
 		// Added in version 1.5.  Single file.
 		// Typically logrotate would be used to keep size under control.
-
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Log file is \"%s\"\n", path)
 		g_log_path = path
@@ -147,7 +147,6 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 		// It's been there a few years and no on complained so leave it alone for now.
 
 		// Microsoft doesn't recognize %F as equivalent to %Y-%m-%d
-
 		var fname = now.Format("2006-01-02.log")
 
 		// Close current file if name has changed
@@ -171,7 +170,6 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			dw_printf("Opening log file \"%s\".\n", fname)
 
 			var f, openErr = os.OpenFile(full_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
-
 			if openErr == nil {
 				g_log_fp = f
 				g_open_fname = fname
@@ -179,7 +177,9 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Can't open log file \"%s\" for write.\n", full_path)
 				dw_printf("%s\n", openErr)
+
 				g_open_fname = ""
+
 				return
 			}
 
@@ -194,11 +194,9 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 		// Added in version 1.5.  Single file.
 
 		// Open for append if not already open.
-
 		if g_log_fp == nil {
 			// See if file already exists and not empty.
 			// This is used later to write a header if it did not exist already.
-
 			var _, statErr = os.Stat(g_log_path)
 			var already_there = statErr == nil
 
@@ -206,14 +204,15 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			dw_printf("Opening log file \"%s\"\n", g_log_path)
 
 			var f, openErr = os.OpenFile(g_log_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
-
 			if openErr == nil {
 				g_log_fp = f
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Can't open log file \"%s\" for write.\n", g_log_path)
 				dw_printf("%s\n", openErr)
+
 				g_log_path = ""
+
 				return
 			}
 
@@ -236,6 +235,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 
 		var heard = ""
 		var h int
+
 		if pp != nil {
 			if ax25_get_num_addr(pp) == 0 {
 				/* Not AX.25. No station to display below. */
@@ -311,6 +311,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 		if A.g_tone != G_UNKNOWN {
 			stone = fmt.Sprintf("%.1f", A.g_tone)
 		}
+
 		if A.g_dcs != G_UNKNOWN {
 			stone = fmt.Sprintf("D%03o", A.g_dcs)
 		}
@@ -349,7 +350,6 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic,unused
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
-
 		var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
 
 		/* Who are we hearing?   Original station or digipeater? */

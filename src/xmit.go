@@ -122,7 +122,6 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
 		dw_printf ("xmit_init ( ... )\n");
 	#endif
 	*/
-
 	save_audio_config_p = p_modem
 
 	g_debug_xmit_packet = debug_xmit_packet
@@ -282,10 +281,8 @@ const (
 )
 
 func frame_flavor(pp *packet_t) flavor_t {
-
 	if ax25_is_aprs(pp) { // UI frame, PID 0xF0.
 		// It's unfortunate APRS did not use its own special PID.
-
 		var dest = ax25_get_addr_no_ssid(pp, AX25_DESTINATION)
 
 		if dest == "SPEECH" {
@@ -311,7 +308,6 @@ func frame_flavor(pp *packet_t) flavor_t {
 	}
 
 	return (FLAVOR_OTHER)
-
 } /* end frame_flavor */
 
 /*-------------------------------------------------------------------
@@ -361,7 +357,6 @@ func frame_flavor(pp *packet_t) flavor_t {
  *--------------------------------------------------------------------*/
 
 func xmit_thread(channel int) {
-
 	for {
 		tq_wait_while_empty(channel)
 		/* TODO KG
@@ -373,7 +368,6 @@ func xmit_thread(channel int) {
 
 		// Does this extra loop offer any benefit?
 		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
-
 			/*
 			 * Wait for the channel to be clear.
 			 * If there is something in the high priority queue, begin transmitting immediately.
@@ -382,6 +376,7 @@ func xmit_thread(channel int) {
 			var ok = wait_for_clear_channel(channel, xmit_slottime[channel], xmit_persist[channel], xmit_fulldup[channel])
 
 			var prio = TQ_PRIO_1_LO
+
 			var pp = tq_remove(channel, TQ_PRIO_0_HI)
 			if pp != nil {
 				prio = TQ_PRIO_0_HI
@@ -406,14 +401,13 @@ func xmit_thread(channel int) {
 					 * If destination is "MORSE" send as morse code.
 					 * If destination is "DTMF" send as Touch Tones.
 					 */
-
 					switch frame_flavor(pp) {
-
 					case FLAVOR_SPEECH:
 						xmit_speech(channel, pp)
 
 					case FLAVOR_MORSE:
 						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
+
 						var wpm = MORSE_DEFAULT_WPM
 						if ssid > 0 {
 							wpm = ssid * 2
@@ -429,6 +423,7 @@ func xmit_thread(channel int) {
 							//dw_printf ("APRStt morse xmit delay hack...\n");
 							SLEEP_MS(700)
 						}
+
 						xmit_morse(channel, pp, wpm)
 
 					case FLAVOR_DTMF:
@@ -436,6 +431,7 @@ func xmit_thread(channel int) {
 						if speed == 0 {
 							speed = 5 // default half of maximum
 						}
+
 						if speed > 10 {
 							speed = 10
 						}
@@ -646,12 +642,12 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 
 	var done = false
 	for numframe < max_bundle && !done {
-
 		/*
 		 * Peek at what is available.
 		 * Don't remove from queue yet because it might not be eligible.
 		 */
 		prio = TQ_PRIO_1_LO
+
 		pp = tq_peek(channel, TQ_PRIO_0_HI)
 		if pp != nil {
 			prio = TQ_PRIO_0_HI
@@ -660,14 +656,11 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 		}
 
 		if pp != nil {
-
 			switch frame_flavor(pp) {
-
 			default:
 				done = true // not eligible for bundling.
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
-
 				pp = tq_remove(channel, prio)
 				/* TODO KG
 				#if DEBUG
@@ -745,7 +738,6 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	if wait_more > 0 {
 		SLEEP_MS(int(wait_more.Milliseconds()))
 	} else if wait_more < -100*time.Millisecond {
-
 		/* If we run over by 10 mSec or so, it's nothing to worry about. */
 		/* However, if PTT is still on about 1/10 sec after audio */
 		/* should be done, something is wrong. */
@@ -791,9 +783,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
  *--------------------------------------------------------------------*/
 
 func send_one_frame(c int, p int, pp *packet_t) int {
-
 	if ax25_is_null_frame(pp) {
-
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
 		// Application wants to send a frame.
@@ -802,7 +792,6 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 		// I think the solution is to send back a seize confirm here.
 		// It shouldn't hurt if we send it redundantly.
 		// Added for 1.5 beta test 4.
-
 		dlq_seize_confirm(c) // C4.2.  "This primitive indicates, to the Data-link State
 		// machine, that the transmission opportunity has arrived."
 
@@ -857,7 +846,6 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 	/* Optional hex dump of packet. */
 
 	if g_debug_xmit_packet {
-
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		ax25_hex_dump(pp)
@@ -876,6 +864,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 
 		if float64(save_audio_config_p.xmit_error_rate)/100.0 > r {
 			send_invalid_fcs2 = true
+
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", save_audio_config_p.xmit_error_rate)
 		}
@@ -913,7 +902,6 @@ func xmit_speech(c int, pp *packet_t) {
 	/*
 	 * Print spoken packet.  Prefix by channel.
 	 */
-
 	var ts = timestampPrefix()
 
 	var pinfo = ax25_get_info(pp)
@@ -925,6 +913,7 @@ func xmit_speech(c int, pp *packet_t) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
 		ax25_delete(pp)
+
 		return
 	}
 
@@ -950,11 +939,9 @@ func xmit_speech(c int, pp *packet_t) {
 /* Broken out into separate function so configuration can validate it. */
 
 func xmit_speak_it(script string, c int, msg string) error {
-
 	var cmd = exec.Command(script, strconv.Itoa(c), msg) //nolint:gosec // Trust the user-supplied config
 
 	var err = cmd.Run()
-
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to run text-to-speech script, %s\n", script)
@@ -1000,10 +987,10 @@ func timestampPrefix() string {
  *--------------------------------------------------------------------*/
 
 func xmit_morse(c int, pp *packet_t, wpm int) {
-
 	var ts = timestampPrefix()
 
 	var pinfo = ax25_get_info(pp)
+
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
 
@@ -1051,10 +1038,10 @@ func xmit_morse(c int, pp *packet_t, wpm int) {
  *--------------------------------------------------------------------*/
 
 func xmit_dtmf(c int, pp *packet_t, speed int) {
-
 	var ts = timestampPrefix()
 
 	var pinfo = ax25_get_info(pp)
+
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
 
@@ -1142,19 +1129,19 @@ const WAIT_TIMEOUT_MS = 60 * 1000
 const WAIT_CHECK_EVERY_MS = 10
 
 func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool) bool {
-
 	/*
 	 * For full duplex we skip the channel busy check and random wait.
 	 * We still need to wait if operating in stereo and the other audio
 	 * half is busy.
 	 */
 	var n = 0
-	if !fulldup {
 
+	if !fulldup {
 	start_over_again:
 
 		for hdlc_rec_data_detect_any(channel) > 0 {
 			SLEEP_MS(WAIT_CHECK_EVERY_MS)
+
 			n++
 			if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
 				return false
@@ -1207,6 +1194,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 
 	for !audio_out_dev_mutex[ACHAN2ADEV(channel)].TryLock() {
 		SLEEP_MS(WAIT_CHECK_EVERY_MS)
+
 		n++
 		if n > (WAIT_TIMEOUT_MS / WAIT_CHECK_EVERY_MS) {
 			return false
@@ -1214,7 +1202,6 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 	}
 
 	return true
-
 } /* end wait_for_clear_channel */
 
 /* end xmit.c */

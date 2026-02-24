@@ -17,6 +17,7 @@ const INIT_TX_LFSR int = 0x00f
 func scramble_bit(in int, state *int) int {
 	var out = ((*state >> 4) ^ *state) & 1
 	*state = ((((in ^ *state) & 1) << 9) | (*state ^ ((*state & 1) << 4))) >> 1
+
 	return (out)
 }
 
@@ -27,6 +28,7 @@ const INIT_RX_LFSR int = 0x1f0
 func descramble_bit(in int, state *int) int {
 	var out = (in ^ *state) & 1
 	*state = ((*state >> 1) | ((in & 1) << 8)) ^ ((in & 1) << 3)
+
 	return (out)
 }
 
@@ -52,17 +54,20 @@ func il2p_scramble_block(in []byte) []byte {
 
 	var skipping = true // Discard the first 5 out.
 	var ob = 0          // Index to output byte.
-	var om byte = 0x80  // Output bit mask;
+
+	var om byte = 0x80 // Output bit mask;
 	for ib := 0; ib < len(in); ib++ {
 		for im := byte(0x80); im != 0; im >>= 1 {
 			var s = scramble_bit(IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
 			if ib == 0 && im == 0x04 {
 				skipping = false
 			}
+
 			if !skipping {
 				if s != 0 {
 					out[ob] |= (om)
 				}
+
 				om >>= 1
 				if om == 0 {
 					om = 0x80
@@ -83,6 +88,7 @@ func il2p_scramble_block(in []byte) []byte {
 		if s != 0 {
 			out[ob] |= (om)
 		}
+
 		om >>= 1
 		if om == 0 {
 			om = 0x80

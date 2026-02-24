@@ -46,12 +46,13 @@ func main() {
 	var _, mgrsErr = coordconv.DefaultMGRSConverter.ConvertFromGeodetic(latlng, 5)
 	if mgrsErr == nil {
 		// OK, hope changing precision doesn't make a difference.
-
 		fmt.Printf("MGRS =")
+
 		for precision := 1; precision <= 5; precision++ {
 			var mgrsCoord, _ = coordconv.DefaultMGRSConverter.ConvertFromGeodetic(latlng, precision)
 			fmt.Printf("  %s", mgrsCoord)
 		}
+
 		fmt.Printf("\n")
 	} else {
 		fmt.Printf("Conversion to MGRS failed:\n%s\n", mgrsErr)

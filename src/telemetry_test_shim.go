@@ -203,6 +203,7 @@ func telemetry_test_main(t *testing.T) {
 		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 306\n")
 	}
+
 	assert.Equal(t, "N0QBF's Big Balloon", pm.project, "test 306")
 
 	// Too few and invalid digits.
@@ -213,6 +214,7 @@ func telemetry_test_main(t *testing.T) {
 		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 307\n")
 	}
+
 	assert.Empty(t, pm.project, "test 307")
 
 	telemetry_bit_sense_message("N0QBF-11", "10110008", false)
@@ -222,6 +224,7 @@ func telemetry_test_main(t *testing.T) {
 		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 308\n")
 	}
+
 	assert.Empty(t, pm.project, "test 308")
 
 	dw_printf("part 4\n")

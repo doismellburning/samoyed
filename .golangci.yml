@@ -28,7 +28,6 @@ linters:
     - "whitespace"  # I do not have the energy to deal with extraneous leading/trailing newlines right now
     - "wrapcheck"  # Error wrapping is the least of my concerns
     - "wsl"  # Avoid deprecation warning from enabling all
-    - "wsl_v5"  # This seems to do some odd things around variable declarations that I'm not going to deal with right now
   settings:
     cyclop:
       max-complexity: 566  # I sure wish this could be lower
@@ -77,6 +76,9 @@ linters:
         - '-ST1021' # Default
         - '-ST1022' # Default
         - '-S1007' # Raw strings are good but I want to copy the pattern verbatim from upstream
+    wsl_v5:
+      disable:
+        - "decl"
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

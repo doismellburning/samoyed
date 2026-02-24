@@ -60,13 +60,12 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 		dw_printf ("waypoint_init() destination hostname=%s UDP port=%d\n", mc.waypoint_udp_hostname, mc.waypoint_udp_portnum);
 	#endif
 	*/
-
 	var ws = &WaypointSender{} //nolint:exhaustruct
 
 	if mc.waypoint_udp_portnum > 0 {
 		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))
-		var conn, err = net.Dial("udp", addr)
 
+		var conn, err = net.Dial("udp", addr)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Couldn't create socket for waypoint send to %s: %s\n", addr, err)
@@ -103,6 +102,7 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 	if ws.formats == 0 {
 		ws.formats = WPL_FORMAT_NMEA_GENERIC | WPL_FORMAT_KENWOOD
 	}
+
 	if ws.formats&WPL_FORMAT_GARMIN > 0 {
 		ws.formats |= WPL_FORMAT_NMEA_GENERIC /* See explanation below. */
 	}
@@ -193,7 +193,6 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	*/
 
 	// Don't waste time if no destinations specified.
-
 	if ws.serialPortFd == nil && ws.udpSock == nil {
 		return
 	}
@@ -452,6 +451,7 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 		// used for the symbol code.
 
 		var ken_sym byte /* APRS symbol with , or * substituted. */
+
 		switch symbol {
 		case ',':
 			ken_sym = '|'
@@ -523,6 +523,7 @@ func (ws *WaypointSender) Close() {
 		serial_port_close(ws.serialPortFd)
 		ws.serialPortFd = nil
 	}
+
 	if ws.udpSock != nil {
 		ws.udpSock.Close()
 		ws.udpSock = nil

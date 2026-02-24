@@ -21,6 +21,7 @@ func computeChecksum(sentence string) int {
 	for _, c := range sentence[1:] {
 		cs ^= int(c)
 	}
+
 	return cs & 0xff
 }
 
@@ -85,6 +86,7 @@ func TestAppendChecksumFormat(t *testing.T) {
 
 			var hexPart = result[len(input)+1:]
 			assert.Len(t, hexPart, 2, "checksum must be exactly two hex digits")
+
 			for _, c := range hexPart {
 				assert.True(t, (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'),
 					"checksum digits must be uppercase hex")
@@ -127,19 +129,23 @@ func TestAppendChecksumIdempotentInput(t *testing.T) {
 // udpPort returns the port number from a PacketConn bound to a UDP address.
 func udpPort(t *testing.T, conn net.PacketConn) int {
 	t.Helper()
+
 	addr, ok := conn.LocalAddr().(*net.UDPAddr)
 	require.True(t, ok, "listener must be bound to a UDP address")
+
 	return addr.Port
 }
 
 // receiveUDP reads one datagram from conn with a 2-second deadline.
 func receiveUDP(t *testing.T, conn net.PacketConn) string {
 	t.Helper()
+
 	err := conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	require.NoError(t, err)
 	var buf = make([]byte, 4096)
 	var n, _, readErr = conn.ReadFrom(buf)
 	require.NoError(t, readErr, "should receive a UDP datagram")
+
 	return string(buf[:n])
 }
 
@@ -308,6 +314,7 @@ func TestWaypointDefaultFormats(t *testing.T) {
 		waypoint_formats:      0, // let NewWaypointSender pick defaults
 	}
 	var ws = NewWaypointSender(&mc)
+
 	t.Cleanup(func() {
 		ws.Close()
 		listener.Close() //nolint:gosec,errcheck
@@ -328,6 +335,7 @@ func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 		waypoint_formats:      WPL_FORMAT_GARMIN,
 	}
 	var ws = NewWaypointSender(&mc)
+
 	t.Cleanup(func() {
 		ws.Close()
 		listener.Close() //nolint:gosec,errcheck

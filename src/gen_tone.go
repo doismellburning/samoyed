@@ -100,7 +100,6 @@ var prev_dat [MAX_RADIO_CHANS]int // Previous data bit.  Used for G3RUH style.
  *----------------------------------------------------------------*/
 
 func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //nolint:unparam
-
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -112,13 +111,10 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 	/*
 	 * Save away modem parameters for later use.
 	 */
-
 	save_audio_config_p = audio_config_p
 
 	for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
-
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-
 			var a = ACHAN2ADEV(channel)
 
 			/* TODO KG
@@ -143,9 +139,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 			// ticks_per_bit should be ticks_per_symbol.
 
 			switch save_audio_config_p.achan[channel].modem_type {
-
 			case MODEM_QPSK:
-
 				audio_config_p.achan[channel].mark_freq = 1800
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
 
@@ -160,7 +154,6 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 				// from one symbol to the next.
 
 			case MODEM_8PSK:
-
 				audio_config_p.achan[channel].mark_freq = 1800
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
 
@@ -171,23 +164,19 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 				samples_per_symbol[channel] = 3. * float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
 
 			case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
-
 				// Tone is half baud.
 				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
 				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].baud) * 0.5 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
 				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
 
 			case MODEM_EAS: //  EAS.
-
 				// TODO: Proper fix would be to use float for baud, mark, space.
-
 				ticks_per_bit[channel] = (int)(math.Floor((TICKS_PER_CYCLE / 520.833333333333) + 0.5))
 				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec)/520.83333 + 0.5
 				f1_change_per_sample[channel] = (uint)((2083.33333333333 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
 				f2_change_per_sample[channel] = (uint)((1562.5000000 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
 
 			default: // AFSK
-
 				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
 				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
 				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
@@ -197,7 +186,6 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 	}
 
 	for j := 0; j < 256; j++ {
-
 		var a = (float64(j) / 256.0) * (2.0 * math.Pi)
 		var s = int(math.Sin(a) * 32767 * float64(amp) / 100.0)
 
@@ -206,17 +194,19 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 		if s < -32768 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+
 			s = -32768
 		} else if s > 32767 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+
 			s = 32767
 		}
+
 		sine_table[j] = int16(s)
 	}
 
 	return (0)
-
 } /* end gen_tone_init */
 
 /*-------------------------------------------------------------------
@@ -269,13 +259,13 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 func interpol8(oldv float64, newv float64, bc float64) float64 { //nolint:unused
 	// Step function.
 	//return (newv);				// 78 on 11/7
-
 	Assert(bc >= 0)
 	Assert(bc <= 1.1)
 
 	if bc < 0 {
 		return (oldv)
 	}
+
 	if bc > 1 {
 		return (newv)
 	}
@@ -311,7 +301,6 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 */
 
 func tone_gen_put_bit_real(channel int, dat int) {
-
 	var a = ACHAN2ADEV(channel) /* device for channel. */
 
 	Assert(save_audio_config_p != nil)
@@ -319,6 +308,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for tone generation.\n", channel)
+
 		return
 	}
 
@@ -331,12 +321,12 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	// TODO: change to switch instead of if if if
 
 	if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
-
 		dat &= 1 // Keep only LSB to be extra safe.
 
 		if (bit_count[channel] & 1) == 0 {
 			save_bit[channel] = dat
 			bit_count[channel]++
+
 			return
 		}
 
@@ -370,12 +360,12 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	}
 
 	if save_audio_config_p.achan[channel].modem_type == MODEM_8PSK {
-
 		dat &= 1 // Keep only LSB to be extra safe.
 
 		if bit_count[channel] < 2 {
 			save_bit[channel] = (save_bit[channel] << 1) | dat
 			bit_count[channel]++
+
 			return
 		}
 
@@ -405,13 +395,10 @@ func tone_gen_put_bit_real(channel int, dat int) {
 		#endif
 	*/
 	for { /* until enough audio samples for this symbol. */
-
 		var sam int
 
 		switch save_audio_config_p.achan[channel].modem_type {
-
 		case MODEM_AFSK:
-
 			/* TODO KG
 			#if DEBUG2
 				      text_color_set(DW_COLOR_DEBUG);
@@ -424,27 +411,26 @@ func tone_gen_put_bit_real(channel int, dat int) {
 			// It never really mattered before because we were using NRZI.
 			// With the addition of IL2P, we need to be more careful.
 			// A data '1' should be the mark tone.
-
 			var change = f2_change_per_sample[channel]
 			if dat > 0 {
 				change = f1_change_per_sample[channel]
 			}
+
 			tone_phase[channel] += change
 			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
 		case MODEM_EAS:
-
 			var change = f2_change_per_sample[channel]
 			if dat > 0 {
 				change = f1_change_per_sample[channel]
 			}
+
 			tone_phase[channel] += change
 			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
 		case MODEM_QPSK:
-
 			/* TODO KG
 			#if DEBUG2
 				      text_color_set(DW_COLOR_DEBUG);
@@ -501,7 +487,6 @@ func tone_gen_put_bit_real(channel int, dat int) {
 			gen_tone_put_sample(channel, a, sam)
 
 		case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
-
 			if dat != prev_dat[channel] {
 				tone_phase[channel] += f1_change_per_sample[channel]
 			} else {
@@ -511,6 +496,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 					tone_phase[channel] = 0x40000000 // 90 degrees.
 				}
 			}
+
 			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
 			gen_tone_put_sample(channel, a, sam)
 
@@ -533,15 +519,12 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	bit_len_acc[channel] -= ticks_per_bit[channel]
 
 	prev_dat[channel] = dat // Only needed for G3RUH baseband/scrambled.
-
 } /* end tone_gen_put_bit */
 
 func gen_tone_put_sample(channel int, a int, sam int) {
-
 	/* Ship out an audio sample. */
 	/* 16 bit is signed, little endian, range -32768 .. +32767 */
 	/* 8 bit is unsigned, range 0 .. 255 */
-
 	Assert(save_audio_config_p != nil)
 
 	Assert(save_audio_config_p.adev[a].num_channels == 1 || save_audio_config_p.adev[a].num_channels == 2)
@@ -564,9 +547,7 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 	}
 
 	if save_audio_config_p.adev[a].num_channels == 1 {
-
 		/* Mono */
-
 		if save_audio_config_p.adev[a].bits_per_sample == 8 {
 			audio_put(a, uint8(((sam+32768)>>8)&0xff))
 		} else {
@@ -574,11 +555,8 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 			audio_put(a, uint8((sam>>8)&0xff))
 		}
 	} else {
-
 		if channel == ADEVFIRSTCHAN(a) {
-
 			/* Stereo, left channel. */
-
 			if save_audio_config_p.adev[a].bits_per_sample == 8 {
 				audio_put(a, uint8(((sam+32768)>>8)&0xff))
 				audio_put(a, 0)
@@ -590,9 +568,7 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 				audio_put(a, 0)
 			}
 		} else {
-
 			/* Stereo, right channel. */
-
 			if save_audio_config_p.adev[a].bits_per_sample == 8 {
 				audio_put(a, 0)
 				audio_put(a, uint8(((sam+32768)>>8)&0xff))
@@ -608,7 +584,6 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 }
 
 func gen_tone_put_quiet_ms(channel int, time_ms int) {
-
 	var a = ACHAN2ADEV(channel) /* device for channel. */
 	var sam = 0
 

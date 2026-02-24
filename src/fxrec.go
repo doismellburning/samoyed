@@ -14,6 +14,7 @@ func FxrecMain() {
 
 	for i := CTAG_MIN; i <= CTAG_MAX; i++ {
 		var fname = fmt.Sprintf("fx%02x.dat", i)
+
 		var fp, err = os.Open(fname) //nolint:gosec
 		if err != nil {
 			fmt.Printf("****** Could not open %s: %s ******\n", fname, err)
@@ -29,6 +30,7 @@ func FxrecMain() {
 				break
 			}
 			var ch = buf[0]
+
 			var imask byte
 			for imask = 0x01; imask != 0; imask <<= 1 {
 				fx25_rec_bit(0, 0, 0, int(ch&imask))
@@ -46,6 +48,7 @@ func FxrecMain() {
 		fmt.Printf("***** FX25 unit test Success - all tests passed. *****\n")
 		return
 	}
+
 	fmt.Printf("***** FX25 unit test FAILED.  Only %d/11 tests passed. *****\n", fx25_test_count)
 	os.Exit(1)
 }

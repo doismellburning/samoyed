@@ -262,7 +262,6 @@ func hdlc_rec2_block(block *rrbb_t) {
 	}
 
 	rrbb_delete(block)
-
 } /* end hdlc_rec2_block */
 
 /***********************************************************************************
@@ -303,7 +302,6 @@ func hdlc_rec2_block(block *rrbb_t) {
  ***********************************************************************************/
 
 func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool {
-
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	//int passall = save_audio_config_p.achan[channel].passall;
 
@@ -318,9 +316,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	 * Try inverting one bit.
 	 */
 	if fix_bits < RETRY_INVERT_SINGLE {
-
 		/* Stop before single bit fix up. */
-
 		return false /* failure. */
 	}
 	/* Try to swap one bit */
@@ -331,6 +327,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	for i := 0; i < length; i++ {
 		/* Set the index of the bit to swap */
 		retry_cfg.contig.bit_idx = i
+
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			/* TODO KG
@@ -355,6 +352,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 	for i := 0; i < length-1; i++ {
 		retry_cfg.contig.bit_idx = i
+
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			/* TODO KG
@@ -379,6 +377,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 	for i := 0; i < length-2; i++ {
 		retry_cfg.contig.bit_idx = i
+
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
 			/* TODO KG
@@ -417,14 +416,16 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 		retry_cfg.sep.bit_idx_a = i
 
 		var ok = false
+
 		for j := i + 2; j < length; j++ {
 			retry_cfg.sep.bit_idx_b = j
+
 			ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 			if ok {
 				break
 			}
-
 		}
+
 		if ok {
 			/* TODO KG
 			#if DEBUG
@@ -548,7 +549,6 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  ***********************************************************************************/
 
 func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t, retry_conf *retry_conf_t, passall bool) bool {
-
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry
@@ -596,7 +596,6 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 			}
 		} else if retry_conf_mode == RETRY_MODE_CONTIGUOUS {
 			/* Else handle all the others contiguous modes */
-
 			if retry_conf_type == RETRY_TYPE_SWAP {
 				/* If this is the bit to swap */
 				if is_contig_bit_modified(i, retry_conf) {
@@ -620,7 +619,6 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 		var dbit bool
 
 		if H2.is_scrambled {
-
 			var _raw = 0
 			if raw {
 				_raw = 1
@@ -631,13 +629,11 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 			H2.prev_descram = descram
 			H2.prev_raw = raw
 		} else {
-
 			dbit = (raw == H2.prev_raw)
 			H2.prev_raw = raw
 		}
 
 		if dbit {
-
 			H2.pat_det |= 0x80
 			/* Valid data will never have 7 one bits in a row: exit. */
 			if H2.pat_det == 0xfe {
@@ -649,10 +645,10 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 				*/
 				return false
 			}
+
 			H2.oacc >>= 1
 			H2.oacc |= 0x80
 		} else {
-
 			/* The special pattern 01111110 indicates beginning and ending of a frame: exit. */
 			if H2.pat_det == 0x7e {
 				/* TODO KG
@@ -670,10 +666,10 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 				 * the current '0' bit should be discarded because it was added for
 				 * "bit stuffing."
 				 */
-
 			} else if (H2.pat_det >> 2) == 0x1f {
 				continue
 			}
+
 			H2.oacc >>= 1
 		}
 
@@ -690,7 +686,6 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 			if H2.frame_len < MAX_FRAME_LEN {
 				H2.frame_buf[H2.frame_len] = H2.oacc
 				H2.frame_len++
-
 			}
 		}
 	} /* end of loop on all bits in block */
@@ -706,7 +701,6 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 	*/
 
 	if H2.olen == 0 && H2.frame_len >= MIN_FRAME_LEN {
-
 		/* TODO KG
 		#if DEBUGx
 		        if (retry_conf.type == RETRY_TYPE_NONE) {
@@ -729,13 +723,11 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 		/* accumulated along the way as the octets are received. */
 		/* I think making a second pass over it and comparing is */
 		/* easier to understand. */
-
 		var actual_fcs = uint16(H2.frame_buf[H2.frame_len-2]) | (uint16(H2.frame_buf[H2.frame_len-1]) << 8)
 
 		var expected_fcs = fcs_calc(H2.frame_buf[:H2.frame_len-2])
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
-
 			// Sanity check for AIS.
 			if ais_check_length(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
 				multi_modem_process_rec_frame(
@@ -747,28 +739,25 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 					retry_conf.retry,
 					0,
 				) /* len-2 to remove FCS. */
+
 				return true
 			} else {
 				return false /* did not pass sanity check */
 			}
 		} else if actual_fcs == expected_fcs &&
 			sanity_check(H2.frame_buf[:H2.frame_len-2], retry_conf.retry, save_audio_config_p.achan[channel].sanity_test) {
-
 			// TODO: Shouldn't be necessary to pass chan, subchan, alevel into
 			// try_decode because we can obtain them from block.
 			// Let's make sure that assumption is good...
-
 			Assert(rrbb_get_chan(block) == channel)
 			Assert(rrbb_get_subchan(block) == subchan)
 			multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, retry_conf.retry, 0) /* len-2 to remove FCS. */
-			return true                                                                                                        /* success */
 
+			return true /* success */
 		} else if passall {
 			if retry_conf_retry == RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
-
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
-
 				multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, RETRY_MAX, 0) /* len-2 to remove FCS. */
 				return true                                                                                                 /* success */
 			} else {
@@ -777,7 +766,6 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 					passall, retry_conf_retry, retry_conf_type)
 			}
 		} else {
-
 			goto failure
 		}
 	} else {
@@ -788,6 +776,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 		*/
 		goto failure
 	}
+
 failure:
 	/* TODO KG
 	   #if DEBUGx
@@ -821,8 +810,8 @@ failure:
 	   end:
 	   #endif
 	*/
-	return false /* failure. */
 
+	return false /* failure. */
 } /* end try_decode */
 
 /***********************************************************************************
@@ -856,7 +845,6 @@ failure:
  ***********************************************************************************/
 
 func sanity_check(buf []byte, bits_flipped retry_t, sanity_test sanity_t) bool {
-
 	/*
 	 * No sanity check if we didn't try fixing the data.
 	 * Should we have different levels of checking depending on
@@ -914,7 +902,6 @@ func sanity_check(buf []byte, bits_flipped retry_t, sanity_test sanity_t) bool {
 	 */
 
 	for j := 0; j < alen; j += 7 {
-
 		var addr [7]rune
 
 		addr[0] = rune(buf[j+0] >> 1)

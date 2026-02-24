@@ -1635,6 +1635,7 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 
 	// Establish second connection (different callsigns)
 	initiateConnect(t, "STA1", "STA3", CHANNEL)
+
 	addrs[OWNCALL] = "STA3"
 	addrs[PEERCALL] = "STA1"
 	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
@@ -1673,6 +1674,7 @@ func TestAX25LinkIsolation(t *testing.T) {
 
 	// Establish second connection
 	initiateConnect(t, "STA1", "STA3", CHANNEL)
+
 	addrs[OWNCALL] = "STA3"
 	addrs[PEERCALL] = "STA1"
 	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
@@ -1743,6 +1745,7 @@ func TestAX25LinkFrameTypeParsing(t *testing.T) {
 		if ftype == frame_type_U_DM || ftype == frame_type_U_UA {
 			cr = cr_res
 		}
+
 		pid := 0
 		if ftype == frame_type_U_UI {
 			pid = AX25_PID_NO_LAYER_3

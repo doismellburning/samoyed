@@ -122,7 +122,6 @@ var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
  *----------------------------------------------------------------*/
 
 func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps int, profile rune, D *demodulator_state_s) {
-
 	var samples_per_sec = float64(_samples_per_sec)
 
 	*D = demodulator_state_s{} //nolint:exhaustruct
@@ -141,7 +140,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	var carrier_freq int
 
 	if modem_type == MODEM_QPSK {
-
 		Assert(D.u.psk.v26_alt != V26_UNSPECIFIED)
 
 		correct_baud = bps / 2
@@ -155,9 +153,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		*/
 
 		switch unicode.ToUpper(profile) {
-
 		case 'P': /* Self correlation technique. */
-
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
 
 			D.u.psk.lpf_baud = 0.60
@@ -168,7 +164,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		case 'Q': /* Self correlation technique. */
-
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 1.3
 			D.u.psk.pre_filter_width_sym = 1.497 // 55. * 1200. / 44100.;
@@ -184,10 +179,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		default: //nolint: gocritic
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid demodulator profile %c for v.26 QPSK.  Valid choices are P, Q, R, S.  Using default.\n", profile)
+
 			fallthrough
 
 		case 'R': /* Mix with local oscillator. */
-
 			D.u.psk.psk_use_lo = 1
 
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
@@ -200,7 +195,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		case 'S': /* Mix with local oscillator. */
-
 			D.u.psk.psk_use_lo = 1
 
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
@@ -232,7 +226,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		D.u.psk.soffs = int(math.Round((13.0 / 12.0) * samples_per_sec / float64(correct_baud)))
 		// #endif
 	} else {
-
 		correct_baud = bps / 3
 		carrier_freq = 1800
 
@@ -244,9 +237,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		*/
 
 		switch unicode.ToUpper(profile) {
-
 		case 'T': /* Self correlation technique. */
-
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
 
 			D.u.psk.lpf_baud = 1.15
@@ -257,7 +248,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		case 'U': /* Self correlation technique. */
-
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
 			D.u.psk.prefilter_baud = 0.9
 			D.u.psk.pre_filter_width_sym = 0.571 // 21. * 1200. / 44100.;
@@ -273,10 +263,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		default: //nolint: gocritic
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid demodulator profile %c for v.27 8PSK.  Valid choices are T, U, V, W.  Using default.\n", profile)
+
 			fallthrough
 
 		case 'V': /* Mix with local oscillator. */
-
 			D.u.psk.psk_use_lo = 1
 
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
@@ -289,7 +279,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		case 'W': /* Mix with local oscillator. */
-
 			D.u.psk.psk_use_lo = 1
 
 			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
@@ -525,9 +514,11 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 	for a >= float64(N) {
 		a -= float64(N)
 	}
+
 	for a < 0.0 {
 		a += float64(N)
 	}
+
 	var i = int(a)
 	if i == N {
 		i = N - 1 // Should be < N. Watch out for possible roundoff errors.
@@ -538,6 +529,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 
 	// Interpolate between the ideal angles to get a level of certainty.
 	var result = 0
+
 	for b := int(0); b < bits_per_symbol; b++ {
 		var demod float64
 		if bits_per_symbol == 2 {
@@ -549,10 +541,11 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 		if demod >= 0.5 {
 			result |= 1 << b
 		}
+
 		bit_quality[b] = int(math.Round(100.0 * 2.0 * math.Abs(float64(demod)-0.5)))
 	}
-	return (result)
 
+	return (result)
 } // end phase_shift_to_symbol
 
 /*-------------------------------------------------------------------
@@ -633,7 +626,6 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		 * The absolute phase doesn't matter.
 		 * We are just concerned with the change since the previous symbol.
 		 */
-
 		var sam_x_cos = fsam * D.u.psk.sin_table256[((D.u.psk.lo_phase>>24)+64)&0xff]
 		push_sample(sam_x_cos, D.u.psk.I_raw[:], D.u.psk.lp_filter_taps)
 		var I = convolve(D.u.psk.I_raw[:], D.u.psk.lp_filter[:], D.u.psk.lp_filter_taps)
@@ -651,6 +643,7 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 
 		var gray int
 		var bit_quality [3]int
+
 		if D.modem_type == MODEM_QPSK {
 			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2, bit_quality[:]) // MFJ compatible
@@ -660,6 +653,7 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		} else {
 			gray = phase_shift_to_symbol(delta, 3, bit_quality[:]) // 8-PSK
 		}
+
 		nudge_pll_psk(channel, subchannel, slice, gray, D, bit_quality[:])
 
 		D.u.psk.lo_phase += D.u.psk.lo_step
@@ -690,13 +684,12 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		} else {
 			gray = phase_shift_to_symbol(delta+(3*math.Pi/2), 3, bit_quality[:])
 		}
+
 		nudge_pll_psk(channel, subchannel, slice, gray, D, bit_quality[:])
 	}
-
 } /* end demod_psk_process_sample */
 
 func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *demodulator_state_s, bit_quality []int) {
-
 	/*
 	 * Finally, a PLL is used to sample near the centers of the data bits.
 	 *
@@ -722,19 +715,15 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 	 * phase when searching for a signal.
 	 * Don't change it as much when locked on to a signal.
 	 */
-
 	D.slicer[slice].prev_d_c_pll = D.slicer[slice].data_clock_pll
 
 	// Perform the add as unsigned to avoid signed overflow error.
 	D.slicer[slice].data_clock_pll = (int32)((uint32)(D.slicer[slice].data_clock_pll) + (uint32)(D.pll_step_per_sample))
 
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll >= 0 {
-
 		/* Overflow of PLL counter. */
 		/* This is where we sample the data. */
-
 		if D.modem_type == MODEM_QPSK {
-
 			var gray = demod_bits
 
 			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
@@ -751,6 +740,7 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
+
 		D.slicer[slice].pll_symbol_count++
 		pll_dcd_each_symbol2(DCD_CONFIG_PSK, D, channel, subchannel, slice)
 	}
@@ -765,7 +755,6 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 	// TODO: demod_9600 has an improved technique.  Would it help us here?
 
 	if demod_bits != D.slicer[slice].prev_demod_data {
-
 		pll_dcd_signal_transition2(DCD_CONFIG_PSK, D, slice, int(D.slicer[slice].data_clock_pll))
 
 		var before = (D.slicer[slice].data_clock_pll) // Treat as signed.
@@ -774,6 +763,7 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		} else {
 			D.slicer[slice].data_clock_pll = int32(math.Floor(float64(D.slicer[slice].data_clock_pll) * float64(D.pll_searching_inertia)))
 		}
+
 		D.slicer[slice].pll_nudge_total += (int64)(D.slicer[slice].data_clock_pll) - int64(before)
 	}
 
@@ -781,7 +771,6 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 	 * Remember demodulator output so we can compare next time.
 	 */
 	D.slicer[slice].prev_demod_data = demod_bits
-
 } /* end nudge_pll */
 
 /* end demod_psk.c */
