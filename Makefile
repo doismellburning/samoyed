@@ -53,7 +53,7 @@ reuse:
 
 .PHONY: shellcheck
 shellcheck:
-	shellcheck --external-sources test-scripts/* --exclude SC1091
+	shellcheck --external-sources version.sh test-scripts/* --exclude SC1091
 
 .PHONY: vet
 vet:
