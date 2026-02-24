@@ -1,0 +1,17 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+# IL2P at 1200 bps with maximum FEC and trailing CRC (the default when -I is used).
+$GEN_PACKETS -B1200 -I1 -n 100 -o test12il2p.wav
+$ATEST -B1200 -F0 -L82 -G90 test12il2p.wav
+
+# Same, but with CRC disabled on both sides (--no-il2p-crc).
+$GEN_PACKETS -B1200 -I1 --no-il2p-crc -n 100 -o test12il2p_nocrc.wav
+$ATEST -B1200 -F0 --no-il2p-crc -L84 -G92 test12il2p_nocrc.wav
+
+# IL2P at 9600 bps with maximum FEC and trailing CRC.
+$GEN_PACKETS -B9600 -I1 -n 100 -o test96il2p.wav
+$ATEST -B9600 -F0 -L69 -G77 test96il2p.wav

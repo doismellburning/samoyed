@@ -155,6 +155,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var fx25CheckBytes = pflag.IntP("fx25-check-bytes", "X", 0, "1 to enable FX.25 transmit.  16, 32, 64 for specific number of check bytes.")
 	var il2pNormal = pflag.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 uses weaker FEC.")
 	var il2pInverted = pflag.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 uses weaker FEC.")
+	var il2pNoCRC = pflag.Bool("no-il2p-crc", false, "Disable trailing CRC for IL2P frames.  Default is CRC enabled.")
 	var variableSpeedStr = pflag.StringP("variable-speed", "v", "", "max[,incr] Variable speed with specified maximum error and increment.")
 	var help = pflag.BoolP("help", "h", false, "Display help text.")
 
@@ -442,6 +443,12 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		if modem.achan[0].baud == 1200 {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
+		}
+	}
+
+	if *il2pNormal >= 0 || *il2pInverted >= 0 {
+		if !*il2pNoCRC {
+			modem.achan[0].il2p_crc = true
 		}
 	}
 

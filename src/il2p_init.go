@@ -183,3 +183,45 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 	}
 	return out, derrors
 }
+
+/*-------------------------------------------------------------
+ *
+ * Name:	il2p_decode_rs_with_erasure
+ *
+ * Purpose:	Like il2p_decode_rs but provides a single erasure hint
+ *		to the RS decoder at a given byte position within rec_block.
+ *		This allows recovery of one additional error beyond the
+ *		normal error-correction capacity.
+ *
+ * Inputs:	rec_block	data_size + num_parity bytes.
+ *		num_parity	Number of parity symbols in above.
+ *		erasure_pos	0-indexed position within rec_block to mark
+ *				as an erasure.
+ *
+ * Returns:	out		Corrected data bytes (data_size bytes).
+ *		derrors		Number of symbols corrected, or -1 on failure.
+ *
+ *--------------------------------------------------------------*/
+
+func il2p_decode_rs_with_erasure(rec_block []byte, num_parity int, erasure_pos int) ([]byte, int) {
+	var data_size = len(rec_block) - num_parity
+	var n = data_size + num_parity
+	var rs_block [FX25_BLOCK_SIZE]byte
+	copy(rs_block[len(rs_block)-n:], rec_block)
+
+	var derrlocs [FX25_MAX_CHECK]int
+	// Translate from rec_block space to padded rs_block space.
+	derrlocs[0] = (FX25_BLOCK_SIZE - n) + erasure_pos
+
+	var derrors = decode_rs_char(il2p_find_rs(num_parity), rs_block[:], derrlocs[:], 1)
+	var out = make([]byte, data_size)
+	copy(out, rs_block[len(rs_block)-n:len(rs_block)-n+data_size])
+
+	for i := 0; i < derrors; i++ {
+		if derrlocs[i] < len(rs_block)-n {
+			derrors = -1
+			break
+		}
+	}
+	return out, derrors
+}

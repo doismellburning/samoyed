@@ -220,6 +220,8 @@ type achan_param_s struct {
 
 	il2p_invert_polarity int // 1 means invert on transmit.  Receive handles either automatically.
 
+	il2p_crc bool // Append trailing CRC after IL2P frame.  Default true.
+
 	v26_alternative v26_e
 
 	// Original implementation used alternative A for 2400 bbps PSK.

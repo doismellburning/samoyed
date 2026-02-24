@@ -50,7 +50,8 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 		(IL2P_SYNC_WORD) & 0xff,
 	}
 
-	var encoded, elen = il2p_encode_frame(pp, max_fec)
+	var crc_enabled = save_audio_config_p != nil && save_audio_config_p.achan[channel].il2p_crc
+	var encoded, elen = il2p_encode_frame(pp, max_fec, crc_enabled)
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
