@@ -436,7 +436,12 @@ o = DCD output control
 		 * Doesn't handle all possible cases but good enough for our purposes.
 		 */
 
-		binary.Read(atestFP, binary.LittleEndian, &header)
+		err = binary.Read(atestFP, binary.LittleEndian, &header)
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			fmt.Printf("WAV file error: Could not read file header: %s\n", err)
+			os.Exit(1)
+		}
 
 		if string(header.RIFF[:]) != "RIFF" || string(header.WAVE[:]) != "WAVE" {
 			text_color_set(DW_COLOR_ERROR)
@@ -444,17 +449,33 @@ o = DCD output control
 			os.Exit(1)
 		}
 
-		binary.Read(atestFP, binary.LittleEndian, &chunk)
-
-		if string(chunk.Id[:]) == "LIST" {
-			atestFP.Seek(int64(chunk.Datasize), io.SeekCurrent)
-			binary.Read(atestFP, binary.LittleEndian, &chunk)
+		err = binary.Read(atestFP, binary.LittleEndian, &chunk)
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			fmt.Printf("WAV file error: Could not read chunk header: %s\n", err)
+			os.Exit(1)
 		}
 
-		if string(chunk.Id[:]) != "fmt " {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("WAV file error: Found \"%4.4s\" where \"fmt \" was expected.\n", string(chunk.Id[:]))
-			os.Exit(1)
+		for string(chunk.Id[:]) != "fmt " {
+			if chunk.Datasize < 0 {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Invalid chunk datasize %d.\n", chunk.Datasize)
+				os.Exit(1)
+			}
+
+			_, err = atestFP.Seek(int64(chunk.Datasize)+int64(chunk.Datasize%2), io.SeekCurrent)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Could not Seek: %s.\n", err)
+				os.Exit(1)
+			}
+
+			err = binary.Read(atestFP, binary.LittleEndian, &chunk)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Could not find \"fmt \" chunk.\n")
+				os.Exit(1)
+			}
 		}
 
 		if chunk.Datasize != 16 && chunk.Datasize != 18 {
@@ -469,15 +490,42 @@ o = DCD output control
 		var formatSize = int32(unsafe.Sizeof(format))
 		if chunk.Datasize > formatSize {
 			var extra = chunk.Datasize - formatSize
-			atestFP.Seek(int64(extra), io.SeekCurrent)
+
+			_, err = atestFP.Seek(int64(extra), io.SeekCurrent)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Could not Seek: %s.\n", err)
+				os.Exit(1)
+			}
 		}
 
-		binary.Read(atestFP, binary.LittleEndian, &wav_data)
-
-		if string(wav_data.Data[:]) != "data" {
+		err = binary.Read(atestFP, binary.LittleEndian, &wav_data)
+		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("WAV file error: Found \"%4.4s\" where \"data\" was expected.\n", string(wav_data.Data[:]))
+			fmt.Printf("WAV file error: Could not read data chunk header: %s\n", err)
 			os.Exit(1)
+		}
+
+		for string(wav_data.Data[:]) != "data" {
+			if wav_data.Datasize < 0 {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Invalid chunk datasize %d.\n", wav_data.Datasize)
+				os.Exit(1)
+			}
+
+			_, err = atestFP.Seek(int64(wav_data.Datasize)+int64(wav_data.Datasize%2), io.SeekCurrent)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Could not Seek: %s.\n", err)
+				os.Exit(1)
+			}
+
+			err = binary.Read(atestFP, binary.LittleEndian, &wav_data)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				fmt.Printf("WAV file error: Could not find \"data\" chunk.\n")
+				os.Exit(1)
+			}
 		}
 
 		if format.Wformattag != 1 {
