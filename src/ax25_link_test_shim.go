@@ -98,6 +98,7 @@ func ax25_link_test_main(t *testing.T) {
 	// Segmenter/Reassembler Tests
 	TestAX25LinkReassemblerInitialState(t)
 	TestAX25LinkFirstSegmentFlag(t)
+	TestAX25LinkV22SegmentationDataContent(t)
 
 	// Link Multiplexer Tests
 	TestAX25LinkMultipleConcurrentLinks(t)
@@ -1607,6 +1608,75 @@ func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 	// Reassembler should now have a buffer allocated
 	assert.NotNil(t, S.ra_buff, "Reassembler buffer should be allocated after first segment")
 	assert.Equal(t, 2, S.ra_following, "Should have 2 segments remaining")
+}
+
+func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
+	t.Helper()
+
+	var MY_CALL = "TEST1"
+	var THEIR_CALL = "TEST2"
+	const CHANNEL = 0
+
+	setupTestEnvV22(t)
+
+	// Establish a v2.2 (modulo 128) connection via SABME/UA exchange.
+	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
+	assert.NotNil(t, list_head)
+	assert.Equal(t, state_5_awaiting_v22_connection, list_head.state)
+
+	var addrs [AX25_MAX_ADDRS]string
+	addrs[OWNCALL] = THEIR_CALL
+	addrs[PEERCALL] = MY_CALL
+	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
+	receiveFrame(t, pp, CHANNEL)
+
+	var S = list_head
+	assert.Equal(t, state_3_connected, S.state)
+	assert.Equal(t, ax25_modulo_t(128), S.modulo)
+
+	// Use a small n1_paclen to force segmentation with short data.
+	// With n1_paclen=4:
+	//   First segment holds 2 data bytes (n1_paclen - 2 for header + orig_pid).
+	//   Subsequent segments hold 3 data bytes each (n1_paclen - 1 for header).
+	//
+	// For "ABCDEF" (6 bytes), nseg_to_follow = ceil(7/3) = 3:
+	//   seg 1 (first):  [0x82, 0xF0, 'A', 'B']
+	//   seg 2:          [0x01, 'C', 'D', 'E']
+	//   seg 3 (last):   [0x00, 'F']
+	S.n1_paclen = 4
+
+	var txdata = cdata_new(0xF0, []byte{'A', 'B', 'C', 'D', 'E', 'F'})
+	var E = new(dlq_item_t)
+	E._type = DLQ_XMIT_DATA_REQUEST
+	E._chan = CHANNEL
+	E.addrs[OWNCALL] = MY_CALL
+	E.addrs[PEERCALL] = THEIR_CALL
+	E.num_addr = 2
+	E.txdata = txdata
+
+	dl_data_request(E)
+
+	// Collect the queued segment frames.
+	var frames []*cdata_t
+	for f := S.i_frame_queue; f != nil; f = f.next {
+		frames = append(frames, f)
+	}
+
+	if !assert.Len(t, frames, 3, "Expected 3 segments") {
+		return
+	}
+
+	// seg 1: first-segment header (0x80 | 2 following = 0x82), original pid, data[0:2]
+	assert.Equal(t, AX25_PID_SEGMENTATION_FRAGMENT, frames[0].pid)
+	assert.Equal(t, []byte{0x82, 0xF0, 'A', 'B'}, frames[0].data[:frames[0].len])
+
+	// seg 2: header (1 more following), data[2:5]
+	assert.Equal(t, AX25_PID_SEGMENTATION_FRAGMENT, frames[1].pid)
+	assert.Equal(t, []byte{0x01, 'C', 'D', 'E'}, frames[1].data[:frames[1].len])
+
+	// seg 3: header (0 more = last), data[5:6]
+	assert.Equal(t, AX25_PID_SEGMENTATION_FRAGMENT, frames[2].pid)
+	assert.Equal(t, []byte{0x00, 'F'}, frames[2].data[:frames[2].len])
 }
 
 // ============================================================================

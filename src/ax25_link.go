@@ -1225,7 +1225,7 @@ func dl_data_request(E *dlq_item_t) {
 		return
 	}
 
-	copy(first_segment.segdata[:], E.txdata.data[orig_offset:seglen])
+	copy(first_segment.segdata[:], E.txdata.data[orig_offset:orig_offset+seglen])
 
 	var cdataData = []byte{first_segment.header, first_segment.original_pid}
 	cdataData = append(cdataData, first_segment.segdata[:seglen]...)
@@ -1259,7 +1259,7 @@ func dl_data_request(E *dlq_item_t) {
 			return
 		}
 
-		copy(subsequent_segment.segdata[:], E.txdata.data[orig_offset:seglen])
+		copy(subsequent_segment.segdata[:], E.txdata.data[orig_offset:orig_offset+seglen])
 
 		cdataData = []byte{subsequent_segment.header}
 		cdataData = append(cdataData, subsequent_segment.segdata[:seglen]...)
