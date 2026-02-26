@@ -1,4 +1,5 @@
 DIST_DIR = dist
+DEB_STAGING = .deb-staging
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SRC_DIRS = ./cmd/... ./src/...
@@ -22,6 +23,21 @@ $(DIST_DIR)/%: $(DIST_DIR) $(C_FILES) $(GO_FILES) ./cmd/%
 
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
+
+.PHONY: deb
+deb: cmds
+	test -n "$(SAMOYED_VERSION)" || (echo "ERROR: SAMOYED_VERSION is not set" >&2; exit 1)
+	rm -rf $(DEB_STAGING)
+	mkdir -p $(DEB_STAGING)/DEBIAN $(DEB_STAGING)/usr/bin $(DEB_STAGING)/usr/share/man/man1
+	strip $(DIST_DIR)/*
+	cp $(DIST_DIR)/samoyed-* $(DEB_STAGING)/usr/bin/
+	cp man/*.1 $(DEB_STAGING)/usr/share/man/man1/
+	grep -v '^#' packaging/debian/control.in \
+		| sed -e 's/@@VERSION@@/$(SAMOYED_VERSION)/g' \
+		      -e "s/@@ARCH@@/$$(dpkg --print-architecture)/g" \
+		> $(DEB_STAGING)/DEBIAN/control
+	dpkg-deb --build --root-owner-group $(DEB_STAGING) samoyed-binary_$(SAMOYED_VERSION)_$$(dpkg --print-architecture).deb
+	rm -rf $(DEB_STAGING)
 
 .PHONY: test
 test: gotest test-scripts

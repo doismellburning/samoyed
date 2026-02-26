@@ -3,6 +3,8 @@
 
 /tags
 
+*.deb
+
 # Custom
 *.docx
 z*

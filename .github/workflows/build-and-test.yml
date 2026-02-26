@@ -46,6 +46,16 @@ jobs:
         path: "${{ env.TARBALL_NAME }}"
         if-no-files-found: "error"
         compression-level: 0
+    - name: "Build Debian package"
+      run: "make deb"
+    - name: "Set deb filename"
+      run: 'echo "DEB_NAME=samoyed-binary_${{ env.SAMOYED_VERSION }}_$(dpkg --print-architecture).deb" >> $GITHUB_ENV'
+    - uses: "actions/upload-artifact@v6"
+      with:
+        name: "${{ env.DEB_NAME }}"
+        path: "${{ env.DEB_NAME }}"
+        if-no-files-found: "error"
+        compression-level: 0
 
   release:
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
@@ -69,7 +79,9 @@ jobs:
 
           This is a mid-port pre-release and likely contains bugs. Please file issues at https://github.com/doismellburning/samoyed/issues
         generate_release_notes: true
-        files: "*.tgz"
+        files: |
+          *.tgz
+          *.deb
         fail_on_unmatched_files: true
         draft: true  # TODO Fix
         prerelease: true
