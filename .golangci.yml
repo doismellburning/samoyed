@@ -28,6 +28,7 @@ linters:
     - "whitespace"  # I do not have the energy to deal with extraneous leading/trailing newlines right now
     - "wrapcheck"  # Error wrapping is the least of my concerns
     - "wsl"  # Avoid deprecation warning from enabling all
+    - "wsl_v5"  # KG 2026-02-26 I don't have concrete data but it feels like wsl is giving me spurious edits/breakages - it might not be wsl, it might be something else, but it only started being an issue once I enabled wsl, so I'm disabling it again for the foreseeable
   settings:
     cyclop:
       max-complexity: 566  # I sure wish this could be lower
