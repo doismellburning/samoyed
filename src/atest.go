@@ -167,7 +167,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 Higher values = Try modifying more bits to get a good CRC.`)
 	var errorIfLessThan = pflag.IntP("error-if-less-than", "L", -1, "Error if less than this number decoded.")
 	var errorIfGreaterThan = pflag.IntP("error-if-greater-than", "G", -1, "Error if greater than this number decoded.")
-	var channel0 = pflag.BoolP("channel-0", "0", true, "Use channel 0 (left) of stereo audio.")
+	var channel0 = pflag.BoolP("channel-0", "0", false, "Use channel 0 (left) of stereo audio (default).")
 	var channel1 = pflag.BoolP("channel-1", "1", false, "Use channel 1 (right) of stereo audio.")
 	var channel2 = pflag.BoolP("channel-2", "2", false, "Use both channels of stereo audio.")
 	var hexDisplay = pflag.BoolP("hex-display", "h", false, "Print frame contents as hexadecimal bytes.")
@@ -259,7 +259,11 @@ o = DCD output control
 		}
 	}
 
-	if channelFlagCount != 1 {
+	if channelFlagCount == 0 {
+		*channel0 = true
+	}
+
+	if channelFlagCount > 1 {
 		fmt.Fprintf(os.Stderr, "Exactly one of left/right/both channels must be selected.\n")
 		pflag.Usage()
 		os.Exit(1)
