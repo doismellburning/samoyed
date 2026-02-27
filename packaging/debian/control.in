@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Samoyed Authors
+# SPDX-License-Identifier: GPL-2.0-or-later
+Package: samoyed-binary
+Version: @@VERSION@@
+Architecture: @@ARCH@@
+Maintainer: The Samoyed Authors
+Description: Samoyed AX.25 digital radio software binaries
+ Pre-built binary package for Samoyed, a Go port of Dire Wolf.
+ Includes: aclients, appserver, atest, cm108, decode_aprs, direwolf,
+ dwgpsnmea, fxrec, fxsend, gen_packets, gen_tone, kissutil, ll2utm,
+ log2gpx, text2tt, tnctest, tt2text, ttcalc, utm2ll, walk96.
+Depends: libhamlib4, libportaudio2, libavahi-client3, libbsd0, libudev1
