@@ -4096,7 +4096,6 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 		// Experimentation, with KPC-3+, revealed that we get DM instead.
 		// One part of the the 2.0 spec sort of indicates this might be intentional.
 		// But another part more clearly states it should be FRMR.
-
 		// At first I thought it was an error in the protocol spec.
 		// Later, I tend to believe it was just implemented wrong in the KPC-3+.
 		if f == 1 {

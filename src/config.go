@@ -1744,6 +1744,10 @@ func config_init(fname string, p_audio_config *audio_s,
 						p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE
 						p_audio_config.achan[channel].mark_freq = 0
 						p_audio_config.achan[channel].space_freq = 0
+					} else if strings.EqualFold(t, "BPSK") { /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
+						p_audio_config.achan[channel].modem_type = MODEM_BPSK
+						p_audio_config.achan[channel].mark_freq = 0
+						p_audio_config.achan[channel].space_freq = 0
 					} else if strings.EqualFold(t, "V26A") || /* Compatible with direwolf versions <= 1.5.  New in 1.6. */
 						strings.EqualFold(t, "V26B") { /* Compatible with MFJ-2400.  New in 1.6. */
 						if p_audio_config.achan[channel].modem_type != MODEM_QPSK ||

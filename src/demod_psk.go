@@ -78,6 +78,7 @@ var DCD_CONFIG_PSK = &DCDConfig{
 	} }
 */
 
+var phase_to_gray_bpsk = [2]int{0, 1}
 var phase_to_gray_v26 = [4]int{0, 1, 3, 2}
 var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
 
@@ -90,7 +91,7 @@ var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
  * Purpose:     Initialization for a PSK demodulator.
  *		Select appropriate parameters and set up filters.
  *
- * Inputs:   	modem_type	- MODEM_QPSK or MODEM_8PSK.
+ * Inputs:   	modem_type	- MODEM_QPSK or MODEM_8PSK or MODEM_BPSK.
  *
  *		v26_alt		- V26_A (classic) or V26_B (MFJ compatible)
  *
@@ -109,6 +110,10 @@ var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
  *				  For 8-PSK:
  *
  *					T, U, V, W  same as above.
+ *
+ *                For BPSK:
+ *
+ *					L, M, N, O  same as above.
  *
  *		D		- Pointer to demodulator state for given channel.
  *
@@ -139,7 +144,74 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	var correct_baud int // baud is not same as bits/sec here!
 	var carrier_freq int
 
-	if modem_type == MODEM_QPSK {
+	if modem_type == MODEM_BPSK {
+		correct_baud = bps // 1 bit per symbol
+		carrier_freq = 1800
+
+		switch unicode.ToUpper(profile) {
+		case 'L': /* Self correlation technique. */
+			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
+
+			D.u.psk.lpf_baud = 0.60
+			D.u.psk.lp_filter_width_sym = 1.061
+			D.u.psk.lp_window = BP_WINDOW_COSINE
+
+			D.pll_locked_inertia = 0.95
+			D.pll_searching_inertia = 0.50
+
+		case 'M': /* Self correlation technique. */
+			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
+			D.u.psk.prefilter_baud = 1.3
+			D.u.psk.pre_filter_width_sym = 1.497
+			D.u.psk.pre_window = BP_WINDOW_COSINE
+
+			D.u.psk.lpf_baud = 0.60
+			D.u.psk.lp_filter_width_sym = 1.061
+			D.u.psk.lp_window = BP_WINDOW_COSINE
+
+			D.pll_locked_inertia = 0.87
+			D.pll_searching_inertia = 0.50
+
+		default: //nolint: gocritic
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Invalid demodulator profile %c for BPSK.  Valid choices are L, M, N, O.  Using default.\n", profile)
+
+			fallthrough
+
+		case 'N': /* Mix with local oscillator. */
+			D.u.psk.psk_use_lo = 1
+
+			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
+
+			D.u.psk.lpf_baud = 0.70
+			D.u.psk.lp_filter_width_sym = 1.007
+			D.u.psk.lp_window = BP_WINDOW_TRUNCATED
+
+			D.pll_locked_inertia = 0.925
+			D.pll_searching_inertia = 0.50
+
+		case 'O': /* Mix with local oscillator. */
+			D.u.psk.psk_use_lo = 1
+
+			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
+			D.u.psk.prefilter_baud = 0.55
+			D.u.psk.pre_filter_width_sym = 2.014
+			D.u.psk.pre_window = BP_WINDOW_FLATTOP
+
+			D.u.psk.lpf_baud = 0.60
+			D.u.psk.lp_filter_width_sym = 1.061
+			D.u.psk.lp_window = BP_WINDOW_COSINE
+
+			D.pll_locked_inertia = 0.925
+			D.pll_searching_inertia = 0.50
+		}
+
+		D.u.psk.delay_line_width_sym = 1.25
+
+		D.u.psk.coffs = int(math.Round((11.0 / 12.0) * samples_per_sec / float64(correct_baud)))
+		D.u.psk.boffs = int(math.Round(samples_per_sec / float64(correct_baud)))
+		D.u.psk.soffs = int(math.Round((13.0 / 12.0) * samples_per_sec / float64(correct_baud)))
+	} else if modem_type == MODEM_QPSK {
 		Assert(D.u.psk.v26_alt != V26_UNSPECIFIED)
 
 		correct_baud = bps / 2
@@ -505,9 +577,9 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality []int) int {
 	// Number of different symbol states.
-	Assert(bits_per_symbol == 2 || bits_per_symbol == 3)
+	Assert(bits_per_symbol == 1 || bits_per_symbol == 2 || bits_per_symbol == 3)
 	var N = 1 << bits_per_symbol
-	Assert(N == 4 || N == 8)
+	Assert(N == 2 || N == 4 || N == 8)
 
 	// Scale angle to 1 per symbol then separate into integer and fractional parts.
 	var a = phase_shift * float64(N) / (math.Pi * 2.0)
@@ -532,9 +604,13 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 
 	for b := int(0); b < bits_per_symbol; b++ {
 		var demod float64
-		if bits_per_symbol == 2 {
+
+		switch bits_per_symbol {
+		case 1:
+			demod = float64((phase_to_gray_bpsk[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_bpsk[(i+1)&1]>>b)&1)*f
+		case 2:
 			demod = float64((phase_to_gray_v26[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_v26[(i+1)&3]>>b)&1)*f
-		} else {
+		default:
 			demod = float64((phase_to_gray_v27[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_v27[(i+1)&7]>>b)&1)*f
 		}
 		// Slice to get boolean value and quality measurement.
@@ -644,13 +720,16 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		var gray int
 		var bit_quality [3]int
 
-		if D.modem_type == MODEM_QPSK {
+		switch D.modem_type {
+		case MODEM_BPSK:
+			gray = phase_shift_to_symbol(delta, 1, bit_quality[:]) // BPSK
+		case MODEM_QPSK:
 			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+(-math.Pi/4), 2, bit_quality[:]) // MFJ compatible
 			} else {
 				gray = phase_shift_to_symbol(delta, 2, bit_quality[:]) // Classic
 			}
-		} else {
+		default:
 			gray = phase_shift_to_symbol(delta, 3, bit_quality[:]) // 8-PSK
 		}
 
@@ -675,13 +754,16 @@ func demod_psk_process_sample(channel int, subchannel int, sam int, D *demodulat
 		var bit_quality [3]int
 		var delta = float64(math.Atan2(float64(I), float64(Q)))
 
-		if D.modem_type == MODEM_QPSK {
+		switch D.modem_type {
+		case MODEM_BPSK:
+			gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 1, bit_quality[:]) // BPSK
+		case MODEM_QPSK:
 			if D.u.psk.v26_alt == V26_B {
 				gray = phase_shift_to_symbol(delta+float64(math.Pi/2), 2, bit_quality[:]) // MFJ compatible
 			} else {
 				gray = phase_shift_to_symbol(delta+float64(3*math.Pi/4), 2, bit_quality[:]) // Classic
 			}
-		} else {
+		default:
 			gray = phase_shift_to_symbol(delta+(3*math.Pi/2), 3, bit_quality[:])
 		}
 
@@ -723,14 +805,20 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 	if D.slicer[slice].data_clock_pll < 0 && D.slicer[slice].prev_d_c_pll >= 0 {
 		/* Overflow of PLL counter. */
 		/* This is where we sample the data. */
-		if D.modem_type == MODEM_QPSK {
+		switch D.modem_type {
+		case MODEM_BPSK:
+			var gray = demod_bits
+
+			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
+				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
+		case MODEM_QPSK:
 			var gray = demod_bits
 
 			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-		} else {
+		default:
 			var gray = demod_bits
 
 			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>2)&1, false, bit_quality[2],
