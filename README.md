@@ -1,7 +1,8 @@
 # Samoyed
 
-Samoyed is a software "soundcard" modem/TNC and APRS encoder/decoder,
-ported to Go from [Dire Wolf](https://github.com/wb2osz/direwolf).
+Samoyed is a fully-featured software modem/TNC for packet radio.
+It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
+Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 
 > **Status:** Active port in progress — pre-release, likely to contain bugs.
 > Linux x86_64 is the primary supported platform during porting.
