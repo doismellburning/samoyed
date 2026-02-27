@@ -75,9 +75,9 @@ jobs:
         body: |
           Automated release for commit ${{ github.sha }}.
 
-          You will need to fetch your own dependencies for now - see https://github.com/doismellburning/samoyed/blob/main/.github/workflows/build-and-test.yml for an example for Debian. 
+          You will need to fetch your own dependencies to build this for now - see https://github.com/doismellburning/samoyed/blob/main/.github/workflows/build-and-test.yml for an example for Debian.
 
-          This is a mid-port pre-release and likely contains bugs. Please file issues at https://github.com/doismellburning/samoyed/issues
+          This is an alpha release and likely contains bugs. Please file issues at https://github.com/doismellburning/samoyed/issues
         generate_release_notes: true
         files: |
           *.tgz
