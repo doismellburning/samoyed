@@ -15,6 +15,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	goHamlib "github.com/xylo04/goHamlib"
 )
@@ -81,6 +82,13 @@ const audio_amplitude = 100 /* % of audio sample range. */
 /* Currently no option to change this. */
 
 func DirewolfMain() {
+	// logrus writes to stderr by default, while everything still going through
+	// dw_printf writes to stdout. Until the conversion is finished the two are
+	// halves of one console stream - a "Packet" entry on stderr whose packet
+	// text went to stdout is no use to anyone, and anything reading our stdout
+	// would lose the converted lines altogether - so put logrus on stdout too.
+	logrus.SetOutput(os.Stdout)
+
 	var audioStatsInterval = pflag.IntP("audio-stats-interval", "a", 0, "Audio statistics interval in seconds.  0 to disable.")
 	var configFileName = pflag.StringP("config-file", "c", "direwolf.conf", "Configuration file name.")
 	var enablePseudoTerminal = pflag.BoolP("enable-ptty", "p", false, "Enable pseudo terminal for KISS protocol.")
@@ -207,6 +215,10 @@ x = Silence FX.25 information.`)
 	var aprstt_debug = 0 /* "-d d" option for APRStt (think Dtmf) debug. */
 
 	if *debugStr != "" {
+		// A -d option of any sort is a request for debug output, and logrus
+		// defaults to Info, so the entries the options gate would be dropped.
+		logrus.SetLevel(logrus.DebugLevel)
+
 		// New in 1.1.  Can combine multiple such as "-d pkk"
 		for _, p := range *debugStr {
 			switch p {
@@ -910,15 +922,16 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	}
 
 	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("\n")
 
 	// The HEARD line.
 
 	if !q_h_opt && alevel.rec >= 0 { /* suppress if "-q h" option */
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
 		if channel != audio_config.igate_vchannel { // suppress if from ICHANNEL
+			var logEntry = logrus.WithField("heard", heard)
+
 			if h != -1 && h != AX25_SOURCE {
-				dw_printf("Digipeater ")
+				logEntry = logEntry.WithField("digipeater", true)
 			}
 
 			var alevel_text = ax25_alevel_to_text(alevel)
@@ -941,23 +954,29 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 				strings.EqualFold(heard[:4], "WIDE") &&
 				unicode.IsDigit(rune(heard[4])) {
 				var probably_really = ax25_get_addr_with_ssid(pp, h-1)
+				logEntry = logEntry.WithField("probably_really", probably_really)
 
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, alevel_text, display_retries, spectrum)
-				} else {
-					dw_printf("%s (probably %s)\n", heard, probably_really)
+					logEntry = logEntry.WithFields(logrus.Fields{
+						"audio_level": alevel_text,
+						"retries":     display_retries,
+						"spectrum":    spectrum,
+					})
 				}
 			} else if heard == "DTMF" {
-				dw_printf("%s audio level = %s  tt\n", heard, alevel_text)
+				logEntry = logEntry.WithField("audio_level", alevel_text)
 			} else {
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s audio level = %s  %s  %s\n", heard, alevel_text, display_retries, spectrum)
-				} else {
-					dw_printf("%s\n", heard)
+					logEntry = logEntry.WithFields(logrus.Fields{
+						"audio_level": alevel_text,
+						"retries":     display_retries,
+						"spectrum":    spectrum,
+					})
 				}
 			}
+			logEntry.Info("Heard")
 		}
 	}
 
@@ -968,14 +987,13 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	// i.e. we have no control over the situation when using SDR.
 
 	if alevel.rec > 110 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio input level is too high. This may cause distortion and reduced decode performance.\n")
-		dw_printf("Solution is to decrease the audio input level.\n")
-		dw_printf("Setting audio input level so most stations are around 50 will provide good dyanmic range.\n")
+		logrus.WithField("alevel", alevel.rec).
+			Warn("Audio input level is too high. This may cause distortion and reduced decode performance. " +
+				"Solution is to decrease the audio input level. " +
+				"Setting audio input level so most stations are around 50 will provide good dynamic range.")
 	} else if alevel.rec < 5 && channel != audio_config.igate_vchannel && subchan != -3 {
 		// FIXME: rather than checking for ichannel, how about checking medium==radio
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio input level is too low.  Increase so most stations are around 50.\n")
+		logrus.WithField("alevel", alevel.rec).Warn("Audio input level is too low.  Increase so most stations are around 50.")
 	}
 
 	// Display non-APRS packets in a different color.
@@ -984,42 +1002,36 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	// -1 for APRStt DTMF decoder.
 
-	var ts string // optional time stamp
+	var logEntry = logrus.WithField("channel", channel)
 
 	if len(audio_config.timestamp_format) > 0 {
 		var formattedTime, _ = strftime.Format(audio_config.timestamp_format, time.Now())
-		ts = " " + formattedTime // space after channel.
+		logEntry = logEntry.WithField("ts", formattedTime)
 	}
 
 	switch subchan {
 	case -1: // dtmf
-		text_color_set(DW_COLOR_REC)
-		dw_printf("[%d.dtmf%s] ", channel, ts)
+		logEntry = logEntry.WithField("subchan", "dtmf")
 	case -2: // APRS-IS
-		text_color_set(DW_COLOR_REC)
-		dw_printf("[%d.is%s] ", channel, ts)
+		logEntry = logEntry.WithField("subchan", "is")
 	case -3: // nettnc
-		text_color_set(DW_COLOR_REC)
-		dw_printf("[%d%s] ", channel, ts)
+		logEntry = logEntry.WithField("subchan", "nettnc")
 	default:
+		if audio_config.achan[channel].num_subchan > 1 {
+			logEntry = logEntry.WithField("subchan", subchan)
+		}
+		if audio_config.achan[channel].num_slicers > 1 {
+			logEntry = logEntry.WithField("slice", slice)
+		}
+
 		if ax25_is_aprs(pp) {
 			text_color_set(DW_COLOR_REC)
 		} else {
 			text_color_set(DW_COLOR_DECODED)
 		}
-
-		if audio_config.achan[channel].num_subchan > 1 && audio_config.achan[channel].num_slicers == 1 {
-			dw_printf("[%d.%d%s] ", channel, subchan, ts)
-		} else if audio_config.achan[channel].num_subchan == 1 && audio_config.achan[channel].num_slicers > 1 {
-			dw_printf("[%d.%d%s] ", channel, slice, ts)
-		} else if audio_config.achan[channel].num_subchan > 1 && audio_config.achan[channel].num_slicers > 1 {
-			dw_printf("[%d.%d.%d%s] ", channel, subchan, slice, ts)
-		} else {
-			dw_printf("[%d%s] ", channel, ts)
-		}
 	}
 
-	dw_printf("%s", stemp) /* stations followed by : */
+	logEntry = logEntry.WithField("addrs", stemp) /* stations followed by : */
 
 	/* Demystify non-APRS.  Use same format for transmitted frames in xmit.c. */
 
@@ -1034,12 +1046,13 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
 		pinfo = AX25GetInfo(pp)
 
-		dw_printf("(%s)", desc)
+		logEntry = logEntry.WithField("desc", desc)
 
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(pinfo)
-			dw_printf(" %s\n", info2text)
+			logEntry.WithField("info", info2text).Info("Packet")
 		} else {
+			logEntry.Info("Packet ax25_safe_print below:")
 			AX25SafePrint(pinfo, asciiOnly)
 			dw_printf("\n")
 		}
@@ -1049,6 +1062,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// more likely to have compressed data than UTF-8 text.
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
+		logEntry.Info("Packet ax25_safe_print below:")
 		AX25SafePrint(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
@@ -1067,7 +1081,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		}
 
 		if hasNonPrintable {
-			text_color_set(DW_COLOR_DEBUG)
+			logrus.Debug("--debug u hexdump below:")
 			AX25SafePrint(pinfo, true)
 			dw_printf("\n")
 		}
@@ -1076,10 +1090,8 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	/* Optional hex dump of packet. */
 
 	if d_p_opt {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("------\n")
+		logrus.Debug("--debug p hexdump below:")
 		ax25_hex_dump(pp)
-		dw_printf("------\n")
 	}
 
 	/*
@@ -1144,7 +1156,10 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 				// TODO Bodge
 				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)
 
-				dw_printf("[%d.AIS] %s\n", channel, ais_obj_packet)
+				logrus.WithFields(logrus.Fields{
+					"channel":        channel,
+					"ais_obj_packet": ais_obj_packet,
+				}).Info("AIS")
 
 				// This will be sent to client apps after the User Defined Data representation.
 			}
@@ -1273,7 +1288,7 @@ func setup_sigint_handler() {
 
 func cleanup() {
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("\nQRT\n")
+	logrus.Info("QRT")
 	if packetLogger != nil {
 		packetLogger.Close()
 	}
