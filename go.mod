@@ -10,6 +10,7 @@ require (
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
 	github.com/lestrrat-go/strftime v1.1.1
 	github.com/pkg/term v1.1.0
+	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/tzneal/coordconv v0.1.2
