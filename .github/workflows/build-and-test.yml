@@ -9,7 +9,12 @@ on:
 
 jobs:
   build_and_test:
-    runs-on: "ubuntu-latest"
+    strategy:
+      matrix:
+        runner:
+          - "ubuntu-latest"
+          - "ubuntu-24.04-arm"
+    runs-on: "${{ matrix.runner }}"
     outputs:
       SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
     steps:
