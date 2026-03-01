@@ -40,7 +40,7 @@ jobs:
       run: 'echo "TARBALL_NAME=samoyed-${{env.SAMOYED_VERSION }}-${{ runner.os }}-${{ runner.arch }}.tgz" >> $GITHUB_ENV'
     - name: "Build tarball"
       run: "tar czvf \"$TARBALL_NAME\" dist/"
-    - uses: "actions/upload-artifact@v6"
+    - uses: "actions/upload-artifact@v7"
       with:
         name: "${{ env.TARBALL_NAME }}"
         path: "${{ env.TARBALL_NAME }}"
@@ -50,7 +50,7 @@ jobs:
       run: "make deb"
     - name: "Set deb filename"
       run: 'echo "DEB_NAME=samoyed-binary_${{ env.SAMOYED_VERSION }}_$(dpkg --print-architecture).deb" >> $GITHUB_ENV'
-    - uses: "actions/upload-artifact@v6"
+    - uses: "actions/upload-artifact@v7"
       with:
         name: "${{ env.DEB_NAME }}"
         path: "${{ env.DEB_NAME }}"
