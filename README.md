@@ -5,7 +5,7 @@ It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), di
 Samoyed is a Go port of [Dire Wolf](https://github.com/wb2osz/direwolf).
 
 > **Status:** Active port in progress — pre-release, likely to contain bugs.
-> Linux x86_64 is the primary supported platform during porting.
+> Linux x86_64 and arm64 are the primary supported platforms during porting.
 > Please [file issues](https://github.com/doismellburning/samoyed/issues) if you encounter problems.
 
 ## Why Samoyed?
@@ -83,7 +83,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 | Platform | Status |
 |----------|--------|
 | x86_64 Linux | Primary target |
-| arm64 Linux | Planned after initial port |
+| arm64 Linux | Supported |
 | Windows | TBD (depends on demand / testability) |
 | macOS | TBD (depends on demand / testability) |
 
