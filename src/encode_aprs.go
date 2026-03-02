@@ -594,7 +594,7 @@ type aprs_object_t struct {
 		live_killed rune // * for live or _ for killed
 		time_stamp  [7]rune
 	}
-	u struct { // TODO KG Was union
+	u union {
 		pos  position_t            // Up to 43 char comment.  First 7 bytes could be data extension.
 		cpos compressed_position_t // Up to 40 char comment.  No PHG data extension in this case.
 	}
