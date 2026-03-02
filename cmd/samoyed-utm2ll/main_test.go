@@ -23,3 +23,10 @@ func Example_main_2() {
 	// Output:
 	// from MGRS, latitude = 42.662049, longitude = -71.365550
 }
+
+func Example_main_3() {
+	os.Args = []string{"utm2ll", "19t", "306130", "4726010"} // Handle lowercase letter
+
+	main()
+	// Output: from UTM, latitude = 42.662139, longitude = -71.365553
+}
