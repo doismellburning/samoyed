@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/tzneal/coordconv"
 )
@@ -21,17 +22,21 @@ func main() {
 		var zlet rune
 
 		var zoneStr = os.Args[1] // e.g. "19T" or just "19"
-		if len(zoneStr) > 0 && zoneStr[len(zoneStr)-1] >= 'A' && zoneStr[len(zoneStr)-1] <= 'Z' {
-			zlet = rune(zoneStr[len(zoneStr)-1])
-			zoneStr = zoneStr[:len(zoneStr)-1]
+		if len(zoneStr) > 0 {
+			var last = zoneStr[len(zoneStr)-1]
+			if (last >= 'A' && last <= 'Z') || (last >= 'a' && last <= 'z') {
+				zlet = rune(last)
+				zoneStr = zoneStr[:len(zoneStr)-1]
+			}
 		}
+		zlet = unicode.ToUpper(zlet)
+
 		var zone, _ = strconv.Atoi(zoneStr)
 
 		var hemisphere coordconv.Hemisphere
 		if zlet == 0 {
 			hemisphere = coordconv.HemisphereNorth
 		} else {
-			// TODO KG uppercase zlet?
 			if !strings.ContainsRune("CDEFGHJKLMNPQRSTUVWX", zlet) {
 				fmt.Printf("Latitudinal band must be one of CDEFGHJKLMNPQRSTUVWX.")
 				usage()
