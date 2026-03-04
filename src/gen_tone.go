@@ -140,7 +140,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 
 			switch save_audio_config_p.achan[channel].modem_type {
 			case MODEM_BPSK:
-				audio_config_p.achan[channel].mark_freq = 1800
+				audio_config_p.achan[channel].mark_freq = 1500
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
 
 				// 1 bit per symbol, so symbol time equals bit time
@@ -336,8 +336,8 @@ func tone_gen_put_bit_real(channel int, dat int) {
 		dat &= 1 // Keep only LSB to be extra safe.
 
 		// For BPSK, each bit is one symbol.
-		// Bit 1 shifts phase by 180 degrees; bit 0 leaves phase unchanged.
-		if dat == 1 {
+		// Per IL2P spec: bit 0 causes a 180 degree phase reversal; bit 1 leaves phase unchanged.
+		if dat == 0 {
 			tone_phase[channel] += PHASE_SHIFT_180
 		}
 	}
