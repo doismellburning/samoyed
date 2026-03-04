@@ -1203,7 +1203,7 @@ func cmd_listen_thread(client int) {
 				/* xastir when using the AGW interface.  */
 				/* The current version uses only the 'V' message, not 'K' for transmitting. */
 
-				tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+				xmitSvc.TQ.tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 			}
 
 		case 'K': /* Transmit raw AX.25 frame */
@@ -1246,9 +1246,9 @@ func cmd_listen_thread(client int) {
 					/* Otherwise, it is an original for the low priority queue. */
 					if ax25_get_num_repeaters(pp) >= 1 &&
 						ax25_get_h(pp, AX25_REPEATER_1) > 0 {
-						tq_append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
+						xmitSvc.TQ.tq_append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 					} else {
-						tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+						xmitSvc.TQ.tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 					}
 				}
 			}
@@ -1434,7 +1434,7 @@ func cmd_listen_thread(client int) {
 				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
 				ax25_set_pid(pp, pid)
 
-				tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+				xmitSvc.TQ.tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 			}
 
 		case 'y': /* Ask Outstanding frames waiting on a Port  */
@@ -1455,7 +1455,7 @@ func cmd_listen_thread(client int) {
 				var n = 0
 				if cmd.Header.Portx < MAX_RADIO_CHANS {
 					// Count both normal and expedited in transmit queue for given channel.
-					n = tq_count(int(cmd.Header.Portx), -1, "", "", false)
+					n = xmitSvc.TQ.tq_count(int(cmd.Header.Portx), -1, "", "", false)
 				}
 
 				reply.Data = make([]byte, 4)

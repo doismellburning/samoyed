@@ -631,9 +631,9 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			/* Otherwise, it is an original for the low priority queue. */
 			if ax25_get_num_repeaters(pp) >= 1 &&
 				ax25_get_h(pp, AX25_REPEATER_1) > 0 {
-				tq_append(channel, TQ_PRIO_0_HI, pp)
+				xmitSvc.TQ.tq_append(channel, TQ_PRIO_0_HI, pp)
 			} else {
-				tq_append(channel, TQ_PRIO_1_LO, pp)
+				xmitSvc.TQ.tq_append(channel, TQ_PRIO_1_LO, pp)
 			}
 		}
 
@@ -872,7 +872,7 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
 			}
 
-			var n = tq_count(channel, -1, "", "", true)
+			var n = xmitSvc.TQ.tq_count(channel, -1, "", "", true)
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else {

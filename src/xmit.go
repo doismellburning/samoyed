@@ -85,6 +85,8 @@ type XmitService struct {
 	audioOutDevMutex [MAX_ADEVS]sync.Mutex
 
 	p_modem *audio_s
+
+	TQ *TransmitQueue
 }
 
 /*-------------------------------------------------------------------
@@ -109,7 +111,7 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
+func NewXmitService(p_modem *audio_s, debug_xmit_packet bool, tq *TransmitQueue) *XmitService {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -153,13 +155,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 		xs.fulldup[j] = p_modem.achan[j].fulldup
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init: about to call tq_init \n");
-	#endif
-	*/
-	tq_init(p_modem)
+	xs.TQ = tq
 
 	/* TODO KG
 	#if DEBUG
@@ -355,7 +351,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 
 func (xs *XmitService) xmit_thread(channel int) {
 	for {
-		tq_wait_while_empty(channel)
+		xs.TQ.tq_wait_while_empty(channel)
 		/* TODO KG
 		#if DEBUG
 			  text_color_set(DW_COLOR_DEBUG);
@@ -364,7 +360,7 @@ func (xs *XmitService) xmit_thread(channel int) {
 		*/
 
 		// Does this extra loop offer any benefit?
-		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
+		for xs.TQ.tq_peek(channel, TQ_PRIO_0_HI) != nil || xs.TQ.tq_peek(channel, TQ_PRIO_1_LO) != nil {
 			/*
 			 * Wait for the channel to be clear.
 			 * If there is something in the high priority queue, begin transmitting immediately.
@@ -374,11 +370,11 @@ func (xs *XmitService) xmit_thread(channel int) {
 
 			var prio = TQ_PRIO_1_LO
 
-			var pp = tq_remove(channel, TQ_PRIO_0_HI)
+			var pp = xs.TQ.tq_remove(channel, TQ_PRIO_0_HI)
 			if pp != nil {
 				prio = TQ_PRIO_0_HI
 			} else {
-				pp = tq_remove(channel, TQ_PRIO_1_LO)
+				pp = xs.TQ.tq_remove(channel, TQ_PRIO_1_LO)
 			}
 
 			/* TODO KG
@@ -645,11 +641,11 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		 */
 		prio = TQ_PRIO_1_LO
 
-		pp = tq_peek(channel, TQ_PRIO_0_HI)
+		pp = xs.TQ.tq_peek(channel, TQ_PRIO_0_HI)
 		if pp != nil {
 			prio = TQ_PRIO_0_HI
 		} else {
-			pp = tq_peek(channel, TQ_PRIO_1_LO)
+			pp = xs.TQ.tq_peek(channel, TQ_PRIO_1_LO)
 		}
 
 		if pp != nil {
@@ -658,7 +654,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 				done = true // not eligible for bundling.
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
-				pp = tq_remove(channel, prio)
+				pp = xs.TQ.tq_remove(channel, prio)
 				/* TODO KG
 				#if DEBUG
 					        text_color_set(DW_COLOR_DEBUG);
@@ -1164,7 +1160,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		 * Wait random time.
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
-		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
+		for xs.TQ.tq_peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(slottime * 10)
 
 			if hdlc_rec_data_detect_any(channel) > 0 {
