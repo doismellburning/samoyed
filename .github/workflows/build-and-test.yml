@@ -62,9 +62,23 @@ jobs:
         if-no-files-found: "error"
         compression-level: 0
 
+  should_release:
+    runs-on: "ubuntu-latest"
+    outputs:
+      result: "${{ steps.check.outputs.result }}"
+    steps:
+    - uses: "actions/checkout@v6"
+      with:
+        fetch-depth: 2
+    - name: "Check if release is warranted"
+      id: "check"
+      run: echo "result=$(./should-release.sh)" >> $GITHUB_OUTPUT
+
   release:
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    needs: build_and_test
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/main' && needs.should_release.outputs.result == 'true')
+    needs: [build_and_test, should_release]
     runs-on: "ubuntu-latest"
     permissions:
       contents: "write"
