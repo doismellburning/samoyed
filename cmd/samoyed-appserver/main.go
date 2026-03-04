@@ -154,7 +154,7 @@ func poll_timing_test() {
 		} else if session[s].tt_next <= session[s].tt_count {
 			var rem = session[s].tt_count - session[s].tt_next + 1 // remaining to send.
 
-			agwlib_Y_outstanding_frames_for_station(session[s].channel, mycall, session[s].client_addr) //nolint:gosec
+			agwlib_Y_outstanding_frames_for_station(session[s].channel, mycall, session[s].client_addr)
 			direwolf.SLEEP_MS(10)
 
 			if session[s].tx_queue_len > 128 {
@@ -187,14 +187,14 @@ func poll_timing_test() {
 				}
 
 				stuff += "\r"
-				agwlib_D_send_connected_data(session[s].channel, 0xF0, mycall, session[s].client_addr, []byte(stuff)) //nolint:gosec
+				agwlib_D_send_connected_data(session[s].channel, 0xF0, mycall, session[s].client_addr, []byte(stuff))
 
 				session[s].tt_next++
 			}
 		} else {
 			// All done queuing up the packets.
 			// Wait until they have all been sent and ack'ed by other end.
-			agwlib_Y_outstanding_frames_for_station(session[s].channel, mycall, session[s].client_addr) //nolint:gosec
+			agwlib_Y_outstanding_frames_for_station(session[s].channel, mycall, session[s].client_addr)
 			direwolf.SLEEP_MS(10)
 
 			if session[s].tx_queue_len > 0 {
@@ -213,8 +213,8 @@ func poll_timing_test() {
 				int(float64(byte_count)*8*100/elapsed.Seconds()/1200),
 				int(float64(byte_count)*8*100/elapsed.Seconds()/9600))
 
-			agwlib_D_send_connected_data(session[s].channel, 0xF0, mycall, session[s].client_addr, []byte(summary)) //nolint:gosec
-			session[s].tt_count = 0                                                                                 // all done.
+			agwlib_D_send_connected_data(session[s].channel, 0xF0, mycall, session[s].client_addr, []byte(summary))
+			session[s].tt_count = 0 // all done.
 		}
 	}
 } // end poll_timing_test
@@ -290,19 +290,19 @@ func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign
 
 		var greeting = "Welcome!  Type ? for list of commands or HELP <command> for details.\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 	} else {
 		fmt.Printf("Too many users already: %s\n", data)
 
 		// Sorry, too many users already.
 		var greeting = "Sorry, maximum number of users has been exceeded.  Try again later.\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 
 		// FIXME: Ideally we'd want to wait until nothing in the outgoing queue
 		// to that station so we know the rejection message was received.
 		direwolf.SLEEP_SEC(10)
-		agwlib_d_disconnect(channel, call_to, call_from) //nolint:gosec
+		agwlib_d_disconnect(channel, call_to, call_from)
 	}
 } /* end agw_cb_C_connection_received */
 
@@ -383,7 +383,7 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 	if pcmd == "" {
 		var greeting = "Type ? for list of commands or HELP <command> for details.\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 
 		return
 	}
@@ -392,13 +392,13 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		// who - list people currently logged in.
 		var greeting = "Session Channel User   Since\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 
 		for n := range session {
 			if session[n].client_addr[0] != 0 {
 				var greeting = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, session[n].channel, session[n].client_addr)
 
-				agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+				agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 			}
 		}
 	} else if strings.EqualFold(pcmd, "test") {
@@ -435,21 +435,21 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		// bye - disconnect.
 		var greeting = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 		// Ideally we'd want to wait until nothing in the outgoing queue
 		// to that station so we know the message was received.
 		direwolf.SLEEP_SEC(10)
-		agwlib_d_disconnect(channel, call_to, call_from) //nolint:gosec
+		agwlib_d_disconnect(channel, call_to, call_from)
 	} else if strings.EqualFold(pcmd, "help") || strings.EqualFold(pcmd, "?") {
 		// help.
 		var greeting = "Help not yet available.\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 	} else {
 		// command not recognized.
 		var greeting = "Invalid command. Type ? for list of commands or HELP <command> for details.\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting)) //nolint:gosec
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 	}
 } /* end agw_cb_D_connected_data */
 
@@ -494,7 +494,7 @@ func agw_cb_G_port_information(num_chan_avail int, chan_descriptions []string) {
 				 * Send command to register my callsign for incoming connect requests.
 				 */
 
-				agwlib_X_register_callsign(channel, mycall) //nolint:gosec
+				agwlib_X_register_callsign(channel, mycall)
 			} else {
 				fmt.Printf("Radio channel number is out of bounds: %s\n", p)
 			}

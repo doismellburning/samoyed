@@ -26,7 +26,7 @@ func AssertOutputContains(t *testing.T, command func(), expectedOutputContains s
 
 	command()
 
-	w.Close() //nolint:gosec
+	w.Close()
 
 	os.Stdout = oldStdout
 

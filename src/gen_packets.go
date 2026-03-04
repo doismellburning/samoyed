@@ -500,15 +500,15 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	fx25_init(1)
 	il2p_init(0) // There are no "-d" options so far but it could be handy here.
 
-	if !(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16) { //nolint:staticcheck
+	if !(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16) {
 		panic("assert(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16)")
 	}
 
-	if !(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2) { //nolint:staticcheck
+	if !(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2) {
 		panic("assert(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2)")
 	}
 
-	if !(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC) { //nolint:staticcheck
+	if !(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC) {
 		panic("assert(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
 	}
 
@@ -717,7 +717,7 @@ func audio_file_open(fname string, pa *audio_s) int {
 	gen_header.data[3] = 'a'
 	gen_header.datasize = 0
 
-	if !(gen_header.nchannels == 1 || gen_header.nchannels == 2) { //nolint:staticcheck
+	if !(gen_header.nchannels == 1 || gen_header.nchannels == 2) {
 		panic("assert(gen_header.nchannels == 1 || gen_header.nchannels == 2)")
 	}
 

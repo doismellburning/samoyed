@@ -974,7 +974,7 @@ func sanity_check(buf []byte, bits_flipped retry_t, sanity_test sanity_t) bool {
 	for j := alen + 2; j < len(buf); j++ {
 		var ch = buf[j]
 
-		if !((ch >= 0x1c && ch <= 0x7f) || ch == 0x0a || ch == 0x0d || ch == 0x80 || ch == 0x9f || ch == 0xc2 || ch == 0xb0 || ch == 0xf8) { //nolint:staticcheck
+		if !((ch >= 0x1c && ch <= 0x7f) || ch == 0x0a || ch == 0x0d || ch == 0x80 || ch == 0x9f || ch == 0xc2 || ch == 0xb0 || ch == 0xf8) {
 			/* TODO KG
 			#if DEBUGx
 				    text_color_set(DW_COLOR_ERROR);

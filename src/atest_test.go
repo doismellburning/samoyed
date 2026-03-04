@@ -44,7 +44,7 @@ func Test_atest_basic_1(t *testing.T) {
 	// Run
 	AtestMain()
 
-	w.Close() //nolint:gosec
+	w.Close()
 
 	os.Stdout = oldStdout
 
@@ -138,7 +138,7 @@ func Test_atest_extraChunks(t *testing.T) {
 
 	AtestMain()
 
-	w.Close() //nolint:gosec
+	w.Close()
 
 	os.Stdout = oldStdout
 

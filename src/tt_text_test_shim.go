@@ -14,19 +14,19 @@ func test_text2tt(t *testing.T, text string, _expect_mp string, _expect_2k strin
 	var buttons string
 
 	buttons, _ = tt_text_to_multipress(text, false)
-	assert.Equal(t, _expect_mp, buttons, "Unexpected multi-press value for text %s", text) //nolint:testifylint
+	assert.Equal(t, _expect_mp, buttons, "Unexpected multi-press value for text %s", text)
 
 	buttons, _ = tt_text_to_two_key(text, false)
-	assert.Equal(t, _expect_2k, buttons, "Unexpected two-key value for text %s", text) //nolint:testifylint
+	assert.Equal(t, _expect_2k, buttons, "Unexpected two-key value for text %s", text)
 
 	buttons, _ = tt_text_to_call10(text, false)
-	assert.Equal(t, _expect_c10, buttons, "Unexpected call10 value for text %s", text) //nolint:testifylint
+	assert.Equal(t, _expect_c10, buttons, "Unexpected call10 value for text %s", text)
 
 	buttons, _ = tt_text_to_mhead(text, false)
-	assert.Equal(t, _expect_loc, buttons, "Unexpected Maidenhead value for text %s", text) //nolint:testifylint
+	assert.Equal(t, _expect_loc, buttons, "Unexpected Maidenhead value for text %s", text)
 
 	buttons, _ = tt_text_to_satsq(text, false)
-	assert.Equal(t, _expect_sat, buttons, "Unexpected SatSq value for text %s", text) //nolint:testifylint
+	assert.Equal(t, _expect_sat, buttons, "Unexpected SatSq value for text %s", text)
 }
 
 func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k string, _expect_c10 string, _expect_loc string, _expect_sat string) {
@@ -37,19 +37,19 @@ func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k st
 	var text string
 
 	text, _ = tt_multipress_to_text(buttons, false)
-	assert.Equal(t, _expect_mp, text, "Unexpected multi-press value for buttons %s", buttons) //nolint:testifylint
+	assert.Equal(t, _expect_mp, text, "Unexpected multi-press value for buttons %s", buttons)
 
 	text, _ = tt_two_key_to_text(buttons, false)
-	assert.Equal(t, _expect_2k, text, "Unexpected two-key value for buttons %s", buttons) //nolint:testifylint
+	assert.Equal(t, _expect_2k, text, "Unexpected two-key value for buttons %s", buttons)
 
 	text, _ = tt_call10_to_text(buttons, false)
-	assert.Equal(t, _expect_c10, text, "Unexpected call10 value for buttons %s", buttons) //nolint:testifylint
+	assert.Equal(t, _expect_c10, text, "Unexpected call10 value for buttons %s", buttons)
 
 	text, _ = tt_mhead_to_text(buttons, false)
-	assert.Equal(t, _expect_loc, text, "Unexpected Maidenhead value for buttons %s", buttons) //nolint:testifylint
+	assert.Equal(t, _expect_loc, text, "Unexpected Maidenhead value for buttons %s", buttons)
 
 	text, _ = tt_satsq_to_text(buttons, false)
-	assert.Equal(t, _expect_sat, text, "Unexpected SatSq value for buttons %s", buttons) //nolint:testifylint
+	assert.Equal(t, _expect_sat, text, "Unexpected SatSq value for buttons %s", buttons)
 }
 
 func tt_text_test_main(t *testing.T) {

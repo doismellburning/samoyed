@@ -20,7 +20,6 @@ linters:
     - "noctx"  # One day I will learn what a Context is, but that is not today
     - "nonamedreturns"  # Named returns seem a useful tradeoff for now - several functions that return ("output") many things, and names help
     - "nlreturn"  # Lots of false positives on C code that isn't a return
-    - "nolintlint"  # Doesn't play nicely with Cgo
     - "paralleltest"  # One day, but let's have *working* tests first
     - "prealloc"  # One day, but not now
     - "testpackage"  # Noble intent, but right now we're doing all sorts of juggling with packages, so let's save this for later

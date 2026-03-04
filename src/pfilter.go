@@ -998,7 +998,7 @@ func filt_s(pf *pfstate_t) int {
 				// Zero length is acceptable and is not the same as missing.
 
 				if strings.ContainsFunc(over, func(r rune) bool {
-					return !(unicode.IsUpper(r) || unicode.IsDigit(r) || r == '\\') //nolint:staticcheck
+					return !(unicode.IsUpper(r) || unicode.IsDigit(r) || r == '\\')
 				}) {
 					print_error(pf, "Symbol filter, overlay must be upper case letter, digit, or \\.")
 					return (-1)

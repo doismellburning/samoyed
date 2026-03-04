@@ -108,7 +108,7 @@ func set_field(base []byte, start uint, length uint, val int) { // TODO KG int32
 }
 
 func get_field_signed(base []byte, start uint, length uint) int32 {
-	var result = int32(get_field(base, start, length)) //nolint:gosec // G115 integer overflow
+	var result = int32(get_field(base, start, length))
 	// Sign extend.
 	result <<= (32 - length)
 	result >>= (32 - length)
@@ -278,7 +278,7 @@ func sextet_to_char(val int) byte {
 func ais_to_nmea(ais []byte) []byte {
 	var payload []byte
 	// Number of resulting characters for payload.
-	var ns = uint(len(ais)*8+5) / 6 //nolint:gosec // G115 integer overflow
+	var ns = uint(len(ais)*8+5) / 6
 	for k := uint(0); k < ns; k++ {
 		payload = append(payload, sextet_to_char(get_field(ais, k*6, 6)))
 	}
@@ -292,7 +292,7 @@ func ais_to_nmea(ais []byte) []byte {
 	// decoding application can drop this number of bits from the end.
 	// At least, I think that is the way it should work.
 	// The examples all have 0.
-	var pad_bytes = fmt.Sprintf(",%d", int(ns)*6-len(ais)*8) //nolint:gosec // G115 integer overflow
+	var pad_bytes = fmt.Sprintf(",%d", int(ns)*6-len(ais)*8)
 	nmea = append(nmea, []byte(pad_bytes)...)
 
 	// Finally the NMEA style checksum.
@@ -419,7 +419,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	var ais = make([]byte, 256)
 
 	for i, b := range payload {
-		set_field(ais, uint(i)*6, 6, char_to_sextet(byte(b))) //nolint:gosec // G115 integer overflow
+		set_field(ais, uint(i)*6, 6, char_to_sextet(byte(b)))
 	}
 
 	// Verify number of filler bits.
