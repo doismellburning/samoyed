@@ -654,7 +654,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmit_set_txdelay(channel, int(kiss_msg[1]))
+		xmitSvc.SetTxdelay(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_PERSISTENCE: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
@@ -674,7 +674,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmit_set_persist(channel, int(kiss_msg[1]))
+		xmitSvc.SetPersist(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_SLOTTIME: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
@@ -694,7 +694,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmit_set_slottime(channel, int(kiss_msg[1]))
+		xmitSvc.SetSlottime(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_TXTAIL: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
@@ -714,7 +714,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			dw_printf("section, to understand what this means.\n")
 		}
 
-		xmit_set_txtail(channel, int(kiss_msg[1]))
+		xmitSvc.SetTxtail(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
@@ -727,7 +727,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS protocol set FullDuplex = %t, channel %d\n", val, channel)
-		xmit_set_fulldup(channel, val)
+		xmitSvc.SetFulldup(channel, val)
 
 	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
