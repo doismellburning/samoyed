@@ -47,6 +47,7 @@ var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var waypointSender *WaypointSender
+var xmitSvc *XmitService
 
 /*-------------------------------------------------------------------
  *
@@ -611,7 +612,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmit_init(audio_config, d_p_opt)
+	xmitSvc = NewXmitService(audio_config, d_p_opt)
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter

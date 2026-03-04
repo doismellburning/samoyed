@@ -12,7 +12,7 @@ package direwolf
  *		packets from the queue and transmits them.
  *
  *
- * Usage:	(1) The main application calls xmit_init.
+ * Usage:	(1) The main application calls NewXmitService.
  *
  *			This will initialize the transmit packet queue
  *			and create a thread to empty the queue when
@@ -44,65 +44,59 @@ import (
 const MORSE_DEFAULT_WPM = 10
 
 /*
- * Parameters for transmission.
+ * XmitService holds all transmit state.
  * Each channel can have different timing values.
  *
  * These are initialized once at application startup time
  * and some can be changed later by commands from connected applications.
  */
 
-var xmit_slottime [MAX_RADIO_CHANS]int /* Slot time in 10 mS units for persistence algorithm. */
+type XmitService struct {
+	slottime [MAX_RADIO_CHANS]int /* Slot time in 10 mS units for persistence algorithm. */
 
-var xmit_persist [MAX_RADIO_CHANS]int /* Sets probability for transmitting after each */
-/* slot time delay.  Transmit if a random number */
-/* in range of 0 - 255 <= persist value.  */
-/* Otherwise wait another slot time and try again. */
+	persist [MAX_RADIO_CHANS]int /* Sets probability for transmitting after each */
+	/* slot time delay.  Transmit if a random number */
+	/* in range of 0 - 255 <= persist value.  */
+	/* Otherwise wait another slot time and try again. */
 
-var xmit_txdelay [MAX_RADIO_CHANS]int /* After turning on the transmitter, */
-/* send "flags" for txdelay * 10 mS. */
+	txdelay [MAX_RADIO_CHANS]int /* After turning on the transmitter, */
+	/* send "flags" for txdelay * 10 mS. */
 
-var xmit_txtail [MAX_RADIO_CHANS]int /* Amount of time to keep transmitting after we */
-/* are done sending the data.  This is to avoid */
-/* dropping PTT too soon and chopping off the end */
-/* of the frame.  Again 10 mS units. */
+	txtail [MAX_RADIO_CHANS]int /* Amount of time to keep transmitting after we */
+	/* are done sending the data.  This is to avoid */
+	/* dropping PTT too soon and chopping off the end */
+	/* of the frame.  Again 10 mS units. */
 
-var xmit_fulldup [MAX_RADIO_CHANS]bool /* Full duplex if true. */
+	fulldup [MAX_RADIO_CHANS]bool /* Full duplex if true. */
 
-var xmit_bits_per_sec [MAX_RADIO_CHANS]int /* Data transmission rate. */
-/* Often called baud rate which is equivalent for */
-/* 1200 & 9600 cases but could be different with other */
-/* modulation techniques. */
+	bits_per_sec [MAX_RADIO_CHANS]int /* Data transmission rate. */
+	/* Often called baud rate which is equivalent for */
+	/* 1200 & 9600 cases but could be different with other */
+	/* modulation techniques. */
 
-var g_debug_xmit_packet bool /* print packet in hexadecimal form for debugging. */
+	debugXmitPacket bool /* print packet in hexadecimal form for debugging. */
 
-// #define BITS_TO_MS(b,ch) (((b)*1000)/xmit_bits_per_sec[(ch)])
-func BITS_TO_MS(b int, ch int) int {
-	return b * 1000 / xmit_bits_per_sec[ch]
+	/*
+	 * When an audio device is in stereo mode, we can have two
+	 * different channels that want to transmit at the same time.
+	 * We are not clever enough to multiplex them so use this
+	 * so only one is active at the same time.
+	 */
+	audioOutDevMutex [MAX_ADEVS]sync.Mutex
+
+	p_modem *audio_s
 }
-
-// #define MS_TO_BITS(ms,ch) (((ms)*xmit_bits_per_sec[(ch)])/1000)
-func MS_TO_BITS(ms int, ch int) int {
-	return ms * xmit_bits_per_sec[ch] / 1000
-}
-
-/*
- * When an audio device is in stereo mode, we can have two
- * different channels that want to transmit at the same time.
- * We are not clever enough to multiplex them so use this
- * so only one is activte at the same time.
- */
-var audio_out_dev_mutex [MAX_ADEVS]sync.Mutex
 
 /*-------------------------------------------------------------------
  *
- * Name:        xmit_init
+ * Name:        NewXmitService
  *
  * Purpose:     Initialize the transmit process.
  *
- * Inputs:	modem		- Structure with modem and timing parameters.
+ * Inputs:	p_modem		- Structure with modem and timing parameters.
  *
  *
- * Outputs:	Remember required information for future use.
+ * Outputs:	Returns a new XmitService with required information set up.
  *
  * Description:	Initialize the queue to be empty and set up other
  *		mechanisms for sharing it between different threads.
@@ -115,16 +109,17 @@ var audio_out_dev_mutex [MAX_ADEVS]sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
+func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("xmit_init ( ... )\n");
 	#endif
 	*/
-	save_audio_config_p = p_modem
+	var xs = &XmitService{} //nolint:exhaustruct
+	xs.p_modem = p_modem
 
-	g_debug_xmit_packet = debug_xmit_packet
+	xs.debugXmitPacket = debug_xmit_packet
 
 	/*
 	 * Push to Talk (PTT) control.
@@ -150,12 +145,12 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
 	 */
 
 	for j := 0; j < MAX_RADIO_CHANS; j++ {
-		xmit_bits_per_sec[j] = p_modem.achan[j].baud
-		xmit_slottime[j] = p_modem.achan[j].slottime
-		xmit_persist[j] = p_modem.achan[j].persist
-		xmit_txdelay[j] = p_modem.achan[j].txdelay
-		xmit_txtail[j] = p_modem.achan[j].txtail
-		xmit_fulldup[j] = p_modem.achan[j].fulldup
+		xs.bits_per_sec[j] = p_modem.achan[j].baud
+		xs.slottime[j] = p_modem.achan[j].slottime
+		xs.persist[j] = p_modem.achan[j].persist
+		xs.txdelay[j] = p_modem.achan[j].txdelay
+		xs.txtail[j] = p_modem.achan[j].txtail
+		xs.fulldup[j] = p_modem.achan[j].fulldup
 	}
 
 	/* TODO KG
@@ -178,7 +173,7 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
 
 	for j := 0; j < MAX_RADIO_CHANS; j++ {
 		if p_modem.chan_medium[j] == MEDIUM_RADIO {
-			go xmit_thread(j)
+			go xs.xmit_thread(j)
 		}
 	}
 
@@ -188,15 +183,17 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
 		dw_printf ("xmit_init: finished \n");
 	#endif
 	*/
+
+	return xs
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        xmit_set_txdelay
- *		xmit_set_persist
- *		xmit_set_slottime
- *		xmit_set_txtail
- *		xmit_set_fulldup
+ * Name:        SetTxdelay
+ *		SetPersist
+ *		SetSlottime
+ *		SetTxtail
+ *		SetFulldup
  *
  *
  * Purpose:     The KISS protocol, and maybe others, can specify
@@ -218,33 +215,33 @@ func xmit_init(p_modem *audio_s, debug_xmit_packet bool) {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_set_txdelay(channel int, value int) {
+func (xs *XmitService) SetTxdelay(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xmit_txdelay[channel] = value
+		xs.txdelay[channel] = value
 	}
 }
 
-func xmit_set_persist(channel int, value int) {
+func (xs *XmitService) SetPersist(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xmit_persist[channel] = value
+		xs.persist[channel] = value
 	}
 }
 
-func xmit_set_slottime(channel int, value int) {
+func (xs *XmitService) SetSlottime(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xmit_slottime[channel] = value
+		xs.slottime[channel] = value
 	}
 }
 
-func xmit_set_txtail(channel int, value int) {
+func (xs *XmitService) SetTxtail(channel, value int) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xmit_txtail[channel] = value
+		xs.txtail[channel] = value
 	}
 }
 
-func xmit_set_fulldup(channel int, value bool) {
+func (xs *XmitService) SetFulldup(channel int, value bool) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
-		xmit_fulldup[channel] = value
+		xs.fulldup[channel] = value
 	}
 }
 
@@ -356,7 +353,7 @@ func frame_flavor(pp *packet_t) flavor_t {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_thread(channel int) {
+func (xs *XmitService) xmit_thread(channel int) {
 	for {
 		tq_wait_while_empty(channel)
 		/* TODO KG
@@ -373,7 +370,7 @@ func xmit_thread(channel int) {
 			 * If there is something in the high priority queue, begin transmitting immediately.
 			 * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
 			 */
-			var ok = wait_for_clear_channel(channel, xmit_slottime[channel], xmit_persist[channel], xmit_fulldup[channel])
+			var ok = xs.wait_for_clear_channel(channel, xs.slottime[channel], xs.persist[channel], xs.fulldup[channel])
 
 			var prio = TQ_PRIO_1_LO
 
@@ -403,7 +400,7 @@ func xmit_thread(channel int) {
 					 */
 					switch frame_flavor(pp) {
 					case FLAVOR_SPEECH:
-						xmit_speech(channel, pp)
+						xs.xmit_speech(channel, pp)
 
 					case FLAVOR_MORSE:
 						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
@@ -424,7 +421,7 @@ func xmit_thread(channel int) {
 							SLEEP_MS(700)
 						}
 
-						xmit_morse(channel, pp, wpm)
+						xs.xmit_morse(channel, pp, wpm)
 
 					case FLAVOR_DTMF:
 						var speed = ax25_get_ssid(pp, AX25_DESTINATION)
@@ -436,10 +433,10 @@ func xmit_thread(channel int) {
 							speed = 10
 						}
 
-						xmit_dtmf(channel, pp, speed)
+						xs.xmit_dtmf(channel, pp, speed)
 
 					case FLAVOR_APRS_DIGI:
-						xmit_ax25_frames(channel, prio, pp, 1) /* 1 means don't bundle */
+						xs.xmit_ax25_frames(channel, prio, pp, 1) /* 1 means don't bundle */
 						// I don't know if this in some official specification
 						// somewhere, but it is generally agreed that APRS digipeaters
 						// should send only one frame at a time rather than
@@ -447,12 +444,12 @@ func xmit_thread(channel int) {
 						// Discussion here:  http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2021-September/049034.html
 
 					default:
-						xmit_ax25_frames(channel, prio, pp, 256)
+						xs.xmit_ax25_frames(channel, prio, pp, 256)
 					}
 
 					// Corresponding lock is in wait_for_clear_channel.
 
-					audio_out_dev_mutex[ACHAN2ADEV(channel)].Unlock()
+					xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
 				} else {
 					/*
 					 * Timeout waiting for clear channel.
@@ -557,7 +554,7 @@ func priorityToRune(prio int) rune {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
+func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	/*
 	 * These are for timing of a transmission.
 	 * All are in usual unix time (seconds since 1/1/1970) but higher resolution
@@ -575,7 +572,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	/* TODO KG
 	   #if DEBUG
 	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("xmit_thread: t=%.3f, Turn on PTT now for channel %d. speed = %d\n", dtime_now()-time_ptt, chan, xmit_bits_per_sec[chan]);
+	   	dw_printf ("xmit_thread: t=%.3f, Turn on PTT now for channel %d. speed = %d\n", dtime_now()-time_ptt, chan, xs.bits_per_sec[chan]);
 	   #endif
 	*/
 	ptt_set(OCTYPE_PTT, channel, 1)
@@ -585,15 +582,15 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
 	// machine, that the transmission opportunity has arrived."
 
-	var pre_flags = MS_TO_BITS(xmit_txdelay[channel]*10, channel) / 8
+	var pre_flags = xs.msToBits(xs.txdelay[channel]*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
-	var num_bits = layer2_preamble_postamble(channel, pre_flags, false, save_audio_config_p)
+	var num_bits = layer2_preamble_postamble(channel, pre_flags, false, xs.p_modem)
 
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_thread: t=%.3f, txdelay=%d [*10], pre_flags=%d, num_bits=%d\n", dtime_now()-time_ptt, xmit_txdelay[channel], pre_flags, num_bits);
+		dw_printf ("xmit_thread: t=%.3f, txdelay=%d [*10], pre_flags=%d, num_bits=%d\n", dtime_now()-time_ptt, xs.txdelay[channel], pre_flags, num_bits);
 		double presleep = dtime_now();
 	#endif
 	*/
@@ -622,7 +619,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	 * Transmit the frame.
 	 */
 
-	var nb = send_one_frame(channel, prio, pp)
+	var nb = xs.send_one_frame(channel, prio, pp)
 
 	num_bits += nb
 	if nb > 0 {
@@ -669,7 +666,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 				#endif
 				*/
 
-				nb = send_one_frame(channel, prio, pp)
+				nb = xs.send_one_frame(channel, prio, pp)
 
 				num_bits += nb
 				if nb > 0 {
@@ -692,13 +689,13 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	 * Need TXTAIL because we don't know exactly when the sound is done.
 	 */
 
-	var post_flags = MS_TO_BITS(xmit_txtail[channel]*10, channel) / 8
-	nb = layer2_preamble_postamble(channel, post_flags, true, save_audio_config_p)
+	var post_flags = xs.msToBits(xs.txtail[channel]*10, channel) / 8
+	nb = layer2_preamble_postamble(channel, post_flags, true, xs.p_modem)
 	num_bits += nb
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_thread: t=%.3f, txtail=%d [*10], post_flags=%d, nb=%d, num_bits=%d\n", dtime_now()-time_ptt, xmit_txtail[channel], post_flags, nb, num_bits);
+		dw_printf ("xmit_thread: t=%.3f, txtail=%d [*10], post_flags=%d, nb=%d, num_bits=%d\n", dtime_now()-time_ptt, xs.txtail[channel], post_flags, nb, num_bits);
 	#endif
 	*/
 
@@ -718,7 +715,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
 	 * Calculate how long the frame(s) should take in milliseconds.
 	 */
 
-	var durationMS = BITS_TO_MS(num_bits, channel)
+	var durationMS = xs.bitsToMS(num_bits, channel)
 
 	/*
 	 * See how long it has been since PTT was turned on.
@@ -782,7 +779,7 @@ func xmit_ax25_frames(channel int, prio int, pp *packet_t, max_bundle int) {
  *
  *--------------------------------------------------------------------*/
 
-func send_one_frame(c int, p int, pp *packet_t) int {
+func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 	if ax25_is_null_frame(pp) {
 		// Issue 132 - We could end up in a situation where:
 		// Transmitter is already on.
@@ -803,7 +800,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 		return (0)
 	}
 
-	var ts = timestampPrefix()
+	var ts = xs.timestampPrefix()
 
 	var stemp = ax25_format_addrs(pp)
 
@@ -814,7 +811,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 		#if 0						// FIXME - enable this?
 			dw_printf ("[%d%c%s%s] ", c,
 					p==TQ_PRIO_0_HI ? 'H' : 'L',
-					save_audio_config_p.achan[c].fx25_strength ? "F" : "",
+					xs.p_modem.achan[c].fx25_strength ? "F" : "",
 					ts);
 		#else
 	*/
@@ -845,7 +842,7 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 
 	/* Optional hex dump of packet. */
 
-	if g_debug_xmit_packet {
+	if xs.debugXmitPacket {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		ax25_hex_dump(pp)
@@ -857,20 +854,20 @@ func send_one_frame(c int, p int, pp *packet_t) int {
 	 */
 	var send_invalid_fcs2 = false
 
-	if save_audio_config_p.xmit_error_rate != 0 {
+	if xs.p_modem.xmit_error_rate != 0 {
 		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.0:src/math/rand/rand.go;l=189
 		// rand.Float64 excludes 1.0 so let's just use the internal implementation
 		var r = float64(rand.Int63n(1<<53)) / (1 << 53) // Random, 0.0 to 1.0
 
-		if float64(save_audio_config_p.xmit_error_rate)/100.0 > r {
+		if float64(xs.p_modem.xmit_error_rate)/100.0 > r {
 			send_invalid_fcs2 = true
 
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", save_audio_config_p.xmit_error_rate)
+			dw_printf("Intentionally sending invalid CRC for frame above.  Xmit Error rate = %d per cent.\n", xs.p_modem.xmit_error_rate)
 		}
 	}
 
-	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, save_audio_config_p)
+	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, xs.p_modem)
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
@@ -898,18 +895,18 @@ func send_one_frame(c int, p int, pp *packet_t) int {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_speech(c int, pp *packet_t) {
+func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	/*
 	 * Print spoken packet.  Prefix by channel.
 	 */
-	var ts = timestampPrefix()
+	var ts = xs.timestampPrefix()
 
 	var pinfo = ax25_get_info(pp)
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
 
-	if save_audio_config_p.tts_script == "" {
+	if xs.p_modem.tts_script == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
 		ax25_delete(pp)
@@ -926,7 +923,7 @@ func xmit_speech(c int, pp *packet_t) {
 	 * Invoke the speech-to-text script.
 	 */
 
-	xmit_speak_it(save_audio_config_p.tts_script, c, string(pinfo))
+	xmit_speak_it(xs.p_modem.tts_script, c, string(pinfo))
 
 	/*
 	 * Turn off transmitter.
@@ -955,9 +952,9 @@ func xmit_speak_it(script string, c int, msg string) error {
 	return (err)
 }
 
-func timestampPrefix() string {
-	if save_audio_config_p.timestamp_format != "" {
-		var formattedTime, _ = strftime.Format(save_audio_config_p.timestamp_format, time.Now())
+func (xs *XmitService) timestampPrefix() string {
+	if xs.p_modem.timestamp_format != "" {
+		var formattedTime, _ = strftime.Format(xs.p_modem.timestamp_format, time.Now())
 		return " " + formattedTime // space after channel.
 	}
 
@@ -986,8 +983,8 @@ func timestampPrefix() string {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_morse(c int, pp *packet_t, wpm int) {
-	var ts = timestampPrefix()
+func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
+	var ts = xs.timestampPrefix()
 
 	var pinfo = ax25_get_info(pp)
 
@@ -999,7 +996,7 @@ func xmit_morse(c int, pp *packet_t, wpm int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = morse_send(c, string(pinfo), wpm, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
+	var _length_ms = morse_send(c, string(pinfo), wpm, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
@@ -1037,8 +1034,8 @@ func xmit_morse(c int, pp *packet_t, wpm int) {
  *
  *--------------------------------------------------------------------*/
 
-func xmit_dtmf(c int, pp *packet_t, speed int) {
-	var ts = timestampPrefix()
+func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
+	var ts = xs.timestampPrefix()
 
 	var pinfo = ax25_get_info(pp)
 
@@ -1050,7 +1047,7 @@ func xmit_dtmf(c int, pp *packet_t, speed int) {
 
 	// make txdelay at least 300 and txtail at least 250 ms.
 
-	var _length_ms = dtmf_send(c, string(pinfo), speed, max(xmit_txdelay[c]*10, 300), max(xmit_txtail[c]*10, 250))
+	var _length_ms = dtmf_send(c, string(pinfo), speed, max(xs.txdelay[c]*10, 300), max(xs.txtail[c]*10, 250))
 	var waitDuration = time.Duration(_length_ms) * time.Millisecond
 
 	// there is probably still sound queued up in the output buffers.
@@ -1128,7 +1125,7 @@ func xmit_dtmf(c int, pp *packet_t, speed int) {
 const WAIT_TIMEOUT_MS = 60 * 1000
 const WAIT_CHECK_EVERY_MS = 10
 
-func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool) bool {
+func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool) bool {
 	/*
 	 * For full duplex we skip the channel busy check and random wait.
 	 * We still need to wait if operating in stereo and the other audio
@@ -1155,8 +1152,8 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 		 * turn around fast enough when using squelch and VOX.
 		 */
 
-		if save_audio_config_p.achan[channel].dwait > 0 {
-			SLEEP_MS(save_audio_config_p.achan[channel].dwait * 10)
+		if xs.p_modem.achan[channel].dwait > 0 {
+			SLEEP_MS(xs.p_modem.achan[channel].dwait * 10)
 		}
 
 		if hdlc_rec_data_detect_any(channel) > 0 {
@@ -1192,7 +1189,7 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 
 	// TODO: review this.
 
-	for !audio_out_dev_mutex[ACHAN2ADEV(channel)].TryLock() {
+	for !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
 		SLEEP_MS(WAIT_CHECK_EVERY_MS)
 
 		n++
@@ -1203,5 +1200,13 @@ func wait_for_clear_channel(channel int, slottime int, persist int, fulldup bool
 
 	return true
 } /* end wait_for_clear_channel */
+
+func (xs *XmitService) bitsToMS(b, ch int) int {
+	return b * 1000 / xs.bits_per_sec[ch]
+}
+
+func (xs *XmitService) msToBits(ms, ch int) int {
+	return ms * xs.bits_per_sec[ch] / 1000
+}
 
 /* end xmit.c */
