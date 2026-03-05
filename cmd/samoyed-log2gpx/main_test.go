@@ -37,7 +37,7 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 	go func() {
 		defer w.Close()
 
-		w.WriteString(input) //nolint:gosec
+		w.WriteString(input)
 	}()
 
 	// Capture stdout
@@ -51,7 +51,7 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 	var done = make(chan bool)
 
 	go func() {
-		io.Copy(&output, rOut) //nolint:gosec
+		io.Copy(&output, rOut)
 
 		done <- true
 	}()
@@ -62,7 +62,7 @@ chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,s
 	main()
 
 	// Close stdout and wait for capture to finish
-	wOut.Close() //nolint:gosec
+	wOut.Close()
 	<-done
 
 	// Check output

@@ -2071,7 +2071,7 @@ func ax25_pack(this_p *packet_t) []byte {
 const DESC_SIZ = 56
 
 func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
-	var _, _, _, _, _, frameType = ax25_frame_type(this_p) //nolint:dogsled
+	var _, _, _, _, _, frameType = ax25_frame_type(this_p)
 
 	return frameType
 }
@@ -2187,7 +2187,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 		}
 
 		// The exhaustive linter is wrong about exhaustiveness(!)
-		switch (c >> 2) & 3 { //nolint:exhaustive
+		switch (c >> 2) & 3 {
 		case 0:
 			desc = fmt.Sprintf("RR %s, n(r)=%d, %s=%d", cr_text, nr, pf_text, pf)
 			frameType = (frame_type_S_RR)

@@ -324,7 +324,7 @@ func aprs_tt_button(channel int, button rune) {
 
 			msg_str[channel] = ""
 		}
-	} else { //nolint:gocritic
+	} else {
 		/*
 		 * Idle time. Poll occasionally for processing.
 		 * Timing would be off we we are listening to more than

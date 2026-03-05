@@ -94,7 +94,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("Xmit\t%s\n", xmit)
 
-	if !assert.Equal(t, out, xmit) { //nolint:testifylint
+	if !assert.Equal(t, out, xmit) {
 		digipeaterTestFailed++
 	}
 

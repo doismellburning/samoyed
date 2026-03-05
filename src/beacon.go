@@ -598,7 +598,7 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
 func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	var bp = &(g_misc_config_p.beacon[j])
 
-	if !(bp.sendto_chan >= 0) { //nolint:staticcheck
+	if !(bp.sendto_chan >= 0) {
 		panic("assert(bp.sendto_chan >= 0)")
 	}
 

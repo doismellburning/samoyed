@@ -80,7 +80,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
 
-	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff //nolint:gosec
+	F.acc = ((F.acc << 1) | uint(dbit&1)) & 0x00ffffff
 
 	// State machine to look for sync word then gather appropriate number of header and payload bytes.
 

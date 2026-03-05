@@ -166,7 +166,7 @@ func setupUDPWaypoint(t *testing.T, formats int) (*WaypointSender, net.PacketCon
 
 	t.Cleanup(func() {
 		ws.Close()
-		listener.Close() //nolint:gosec,errcheck
+		listener.Close() //nolint:errcheck
 	})
 
 	return ws, listener
@@ -224,7 +224,7 @@ func TestWaypointSendSentenceMagellan(t *testing.T) {
 
 // TestWaypointSendSentenceNoDest verifies early return when no destination is configured.
 func TestWaypointSendSentenceNoDest(t *testing.T) {
-	var ws = &WaypointSender{} //nolint:exhaustruct
+	var ws = new(WaypointSender)
 
 	// Should not panic.
 	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
@@ -270,7 +270,7 @@ func TestWaypointSendSentenceKenwoodSymbolComma(t *testing.T) {
 
 // TestWaypointSendAisNoDest verifies AIS early return when no destination configured.
 func TestWaypointSendAisNoDest(t *testing.T) {
-	var ws = &WaypointSender{} //nolint:exhaustruct
+	var ws = new(WaypointSender)
 
 	// Should not panic.
 	ws.SendAIS([]byte("!AIVDM,1,1,,A,35NO=dPOiAJriVDH@94E84AJ0000,0*4B"))
@@ -317,7 +317,7 @@ func TestWaypointDefaultFormats(t *testing.T) {
 
 	t.Cleanup(func() {
 		ws.Close()
-		listener.Close() //nolint:gosec,errcheck
+		listener.Close() //nolint:errcheck
 	})
 
 	assert.Equal(t, WPL_FORMAT_NMEA_GENERIC|WPL_FORMAT_KENWOOD, ws.formats,
@@ -338,7 +338,7 @@ func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 
 	t.Cleanup(func() {
 		ws.Close()
-		listener.Close() //nolint:gosec,errcheck
+		listener.Close() //nolint:errcheck
 	})
 
 	assert.NotZero(t, ws.formats&WPL_FORMAT_NMEA_GENERIC,
@@ -350,7 +350,7 @@ func TestWaypointTermClearsState(t *testing.T) {
 	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		listener.Close() //nolint:gosec,errcheck
+		listener.Close() //nolint:errcheck
 	})
 
 	var mc = misc_config_s{ //nolint: exhaustruct

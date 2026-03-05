@@ -2601,7 +2601,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 					ask_resend_count++
 
 					x = AX25MODULO(x+1, S.modulo)
-					if !(x != AX25MODULO(last+1, S.modulo)) { //nolint:staticcheck
+					if !(x != AX25MODULO(last+1, S.modulo)) {
 						break
 					}
 				}
@@ -6133,7 +6133,7 @@ func PAUSE_T1(S *ax25_dlsm_t) {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Paused T1 with %.3f still remaining, [now=%.3f] from %s %d\n", S.t1_exp.Sub(now).Seconds(), now.Sub(S.start_time).Seconds(), from_func, from_line)
 		}
-	} else { //nolint:gocritic
+	} else {
 		if s_debug_timers {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("T1 error: Didn't expect pause when already paused.\n")
@@ -6251,7 +6251,7 @@ func PAUSE_TM201(S *ax25_dlsm_t) {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Paused TM201 with %.3f still remaining, [now=%.3f] from %s %d\n", S.tm201_exp.Sub(now).Seconds(), now.Sub(S.start_time).Seconds(), from_func, from_line)
 		}
-	} else { //nolint:gocritic
+	} else {
 		if s_debug_timers {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("TM201 error: Didn't expect pause when already paused.\n")

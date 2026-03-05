@@ -184,7 +184,7 @@ func tnc_listen_thread() {
 				// For example, a server would register its callsigns.
 
 				if s_tnc_init_func != nil {
-					s_tnc_init_func() //nolint:gosec
+					s_tnc_init_func()
 				}
 			}
 
@@ -195,7 +195,7 @@ func tnc_listen_thread() {
 			var readErr = binary.Read(s_tnc_sock, binary.LittleEndian, header)
 			if readErr != nil {
 				fmt.Printf("Error communicating with network TNC. Will try to reattach: %s\n", readErr)
-				s_tnc_sock.Close() //nolint:gosec
+				s_tnc_sock.Close()
 				s_tnc_sock = nil
 
 				continue
@@ -221,11 +221,11 @@ func tnc_listen_thread() {
 				var data = make([]byte, header.DataLen)
 
 				var n, err = io.ReadFull(s_tnc_sock, data)
-				if uint32(n) != header.DataLen || err != nil { //nolint:gosec
+				if uint32(n) != header.DataLen || err != nil {
 					fmt.Printf("Error getting message data from network TNC: %s\n", err)
 					fmt.Printf("Tried to read %d bytes but got only %d.\n", header.DataLen, n)
 					fmt.Printf("Closing socket to network TNC.\n\n")
-					s_tnc_sock.Close() //nolint:gosec
+					s_tnc_sock.Close()
 					s_tnc_sock = nil
 
 					continue
@@ -448,7 +448,7 @@ func agwlib_D_send_connected_data(channel byte, pid byte, call_from Callsign, ca
 	h.PID = pid // Normally 0xF0 but other special cases are possible.
 	h.CallFrom = call_from
 	h.CallTo = call_to
-	h.DataLen = uint32(len(data)) //nolint:gosec
+	h.DataLen = uint32(len(data))
 
 	var headerErr = binary.Write(s_tnc_sock, binary.LittleEndian, h)
 	if headerErr != nil {

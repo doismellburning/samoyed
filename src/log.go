@@ -132,7 +132,7 @@ func log_init(daily_names bool, path string) {
  *
  *------------------------------------------------------------------*/
 
-func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) { //nolint:gocritic
+func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) {
 	if len(g_log_path) == 0 {
 		return
 	}
@@ -190,7 +190,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 				fmt.Fprintf(g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n")
 			}
 		}
-	} else { //nolint:gocritic
+	} else {
 		// Added in version 1.5.  Single file.
 
 		// Open for append if not already open.
@@ -347,7 +347,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
  *
  *------------------------------------------------------------------*/
 
-func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:gocritic,unused
+func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:unused
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
 		var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")

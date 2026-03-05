@@ -496,7 +496,7 @@ func kissnet_copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s
 		for kps := all_ports; kps != nil; kps = kps.pnext {
 			for client := 0; client < MAX_NET_CLIENTS; client++ {
 				// To all but origin.
-				if !(kps == from_kps && client == from_client) { //nolint:staticcheck
+				if !(kps == from_kps && client == from_client) {
 					if kps.client_sock[client] != nil {
 						if kps.channel == -1 || kps.channel == channel {
 							// Two different cases here:

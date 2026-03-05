@@ -132,7 +132,7 @@ var hdlcRecRandSeed int32 = 1
 var hdlcRecRandMax int32 = 0x7fffffff
 
 func hdlcRecRand() int32 {
-	hdlcRecRandSeed = int32((uint32(hdlcRecRandSeed)*1103515245)+12345) & hdlcRecRandMax //nolint:gosec
+	hdlcRecRandSeed = int32((uint32(hdlcRecRandSeed)*1103515245)+12345) & hdlcRecRandMax
 	return hdlcRecRandSeed
 }
 
