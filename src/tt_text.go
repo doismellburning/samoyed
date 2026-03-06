@@ -594,7 +594,7 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unparam,unused
+func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unparam
 	var errors = 0
 	var buttons = ""
 
