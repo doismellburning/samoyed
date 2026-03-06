@@ -909,10 +909,6 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_digi_config.dedupe_time = DEFAULT_DEDUPE
 
 	p_tt_config.gateway_enabled = 0
-	p_tt_config.ttloc_size = 2 /* Start with at least 2.  */
-	/* When full, it will be increased by 50 %. */
-	// TODO KG p_tt_config.ttloc_ptr = malloc (sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-	p_tt_config.ttloc_len = 0
 
 	/* Retention time and decay algorithm from 13 Feb 13 version of */
 	/* http://www.aprs.org/aprstt/aprstt-coding24.txt */

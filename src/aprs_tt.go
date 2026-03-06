@@ -191,9 +191,7 @@ type tt_config_s struct {
 	/* e.g.  3 seconds before first transmission then */
 	/* delays of 16, 32, seconds etc. in between repeats. */
 
-	ttloc_ptr  []*ttloc_s /* Variable length array of above. */
-	ttloc_size int        /* Number of elements allocated. */
-	ttloc_len  int        /* Number of elements actually used. */
+	ttlocs []*ttloc_s
 
 	corral_lat       float64 /* The "corral" for unknown locations. */
 	corral_lon       float64
@@ -253,11 +251,8 @@ func aprs_tt_init(p *tt_config_s, debug int) {
 
 	if p == nil {
 		/* For unit testing. */
-		var NUM_TEST_CONFIG = 10 // TODO KG Hardcoded because cross-language sizing is fiddly
 		var config tt_config_s
-		config.ttloc_size = NUM_TEST_CONFIG
-		config.ttloc_ptr = aprs_tt_test_config
-		config.ttloc_len = NUM_TEST_CONFIG
+		config.ttlocs = aprs_tt_test_config
 		/* Don't care about xmit timing or corral here. */
 
 		tt_config = &config
@@ -616,12 +611,12 @@ func expand_macro(e string) int {
 		// Documentation says only x, y, z can be used with macros.
 		// Only those 3 are processed below.
 
-		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, aprs_tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
-		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, aprs_tt_config.ttloc_ptr[ipat].pattern, xstr, ystr, zstr)
+		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, aprs_tt_config.ttlocs[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
+		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, aprs_tt_config.ttlocs[ipat].pattern, xstr, ystr, zstr)
 
-		dw_printf("Replace with:        '%s'\n", aprs_tt_config.ttloc_ptr[ipat].macro.definition)
+		dw_printf("Replace with:        '%s'\n", aprs_tt_config.ttlocs[ipat].macro.definition)
 
-		if aprs_tt_config.ttloc_ptr[ipat].ttlocType != TTLOC_MACRO {
+		if aprs_tt_config.ttlocs[ipat].ttlocType != TTLOC_MACRO {
 			/* Found match to a different type.  Really shouldn't be here. */
 			/* Print internal error message... */
 			dw_printf("expand_macro: type != TTLOC_MACRO\n")
@@ -635,7 +630,7 @@ func expand_macro(e string) int {
 
 		var stemp string
 
-		var definition = aprs_tt_config.ttloc_ptr[ipat].macro.definition
+		var definition = aprs_tt_config.ttlocs[ipat].macro.definition
 		for i, d := range definition {
 			if i != len(definition)-1 {
 				if (d == 'x' || d == 'y' || d == 'z') && d == rune(definition[i+1]) {
@@ -1151,11 +1146,11 @@ func parse_location(e string) int {
 
 	if ipat >= 0 {
 		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
-		var ttloc_type = aprs_tt_config.ttloc_ptr[ipat].ttlocType
+		var ttloc_type = aprs_tt_config.ttlocs[ipat].ttlocType
 		switch ttloc_type {
 		case TTLOC_POINT:
-			m_latitude = float64(aprs_tt_config.ttloc_ptr[ipat].point.lat)
-			m_longitude = float64(aprs_tt_config.ttloc_ptr[ipat].point.lon)
+			m_latitude = float64(aprs_tt_config.ttlocs[ipat].point.lat)
+			m_longitude = float64(aprs_tt_config.ttlocs[ipat].point.lon)
 
 			/* Is it one of ten or a hundred positions? */
 			/* It's not hardwired to always be B0n or B9nn.  */
@@ -1187,10 +1182,10 @@ func parse_location(e string) int {
 				// return error code?
 			}
 
-			var lat0 = D2R(float64(aprs_tt_config.ttloc_ptr[ipat].vector.lat))
-			var lon0 = D2R(float64(aprs_tt_config.ttloc_ptr[ipat].vector.lon))
+			var lat0 = D2R(float64(aprs_tt_config.ttlocs[ipat].vector.lat))
+			var lon0 = D2R(float64(aprs_tt_config.ttlocs[ipat].vector.lon))
 			var d, _ = strconv.ParseFloat(dstr, 64)
-			var dist = d * float64(aprs_tt_config.ttloc_ptr[ipat].vector.scale)
+			var dist = d * float64(aprs_tt_config.ttlocs[ipat].vector.scale)
 			var b, _ = strconv.ParseFloat(bstr, 64)
 			var bearing = D2R(b)
 
@@ -1221,8 +1216,8 @@ func parse_location(e string) int {
 				ystr = "0"
 			}
 
-			var lat0 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lat0)
-			var lat9 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lat9)
+			var lat0 = float64(aprs_tt_config.ttlocs[ipat].grid.lat0)
+			var lat9 = float64(aprs_tt_config.ttlocs[ipat].grid.lat9)
 			var yrange = lat9 - lat0
 			var y, _ = strconv.ParseFloat(ystr, 64)
 			var user_y_max = math.Round(math.Pow(10., float64(len(ystr))) - 1.) // e.g. 999 for 3 digits
@@ -1236,8 +1231,8 @@ func parse_location(e string) int {
 			#endif
 			*/
 
-			var lon0 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lon0)
-			var lon9 = float64(aprs_tt_config.ttloc_ptr[ipat].grid.lon9)
+			var lon0 = float64(aprs_tt_config.ttlocs[ipat].grid.lon0)
+			var lon9 = float64(aprs_tt_config.ttlocs[ipat].grid.lon9)
 			var xrange = lon9 - lon0
 			var x, _ = strconv.ParseFloat(xstr, 64)
 			var user_x_max = math.Round(math.Pow(10., float64(len(xstr))) - 1.)
@@ -1270,23 +1265,23 @@ func parse_location(e string) int {
 			}
 
 			var x, _ = strconv.ParseFloat(xstr, 64)
-			var easting = x*float64(aprs_tt_config.ttloc_ptr[ipat].utm.scale) + float64(aprs_tt_config.ttloc_ptr[ipat].utm.x_offset)
+			var easting = x*float64(aprs_tt_config.ttlocs[ipat].utm.scale) + float64(aprs_tt_config.ttlocs[ipat].utm.x_offset)
 
 			var y, _ = strconv.ParseFloat(ystr, 64)
-			var northing = y*float64(aprs_tt_config.ttloc_ptr[ipat].utm.scale) + float64(aprs_tt_config.ttloc_ptr[ipat].utm.y_offset)
+			var northing = y*float64(aprs_tt_config.ttlocs[ipat].utm.scale) + float64(aprs_tt_config.ttlocs[ipat].utm.y_offset)
 
-			if unicode.IsLetter(aprs_tt_config.ttloc_ptr[ipat].utm.latband) {
-				m_loc_text = fmt.Sprintf("%d%c %.0f %.0f", aprs_tt_config.ttloc_ptr[ipat].utm.lzone, aprs_tt_config.ttloc_ptr[ipat].utm.latband, easting, northing)
-			} else if aprs_tt_config.ttloc_ptr[ipat].utm.latband == '-' {
-				m_loc_text = fmt.Sprintf("%d %.0f %.0f", -aprs_tt_config.ttloc_ptr[ipat].utm.lzone, easting, northing)
+			if unicode.IsLetter(aprs_tt_config.ttlocs[ipat].utm.latband) {
+				m_loc_text = fmt.Sprintf("%d%c %.0f %.0f", aprs_tt_config.ttlocs[ipat].utm.lzone, aprs_tt_config.ttlocs[ipat].utm.latband, easting, northing)
+			} else if aprs_tt_config.ttlocs[ipat].utm.latband == '-' {
+				m_loc_text = fmt.Sprintf("%d %.0f %.0f", -aprs_tt_config.ttlocs[ipat].utm.lzone, easting, northing)
 			} else {
-				m_loc_text = fmt.Sprintf("%d %.0f %.0f", aprs_tt_config.ttloc_ptr[ipat].utm.lzone, easting, northing)
+				m_loc_text = fmt.Sprintf("%d %.0f %.0f", aprs_tt_config.ttlocs[ipat].utm.lzone, easting, northing)
 			}
 
-			var hemi = HemisphereRuneToCoordconvHemisphere(aprs_tt_config.ttloc_ptr[ipat].utm.hemi)
+			var hemi = HemisphereRuneToCoordconvHemisphere(aprs_tt_config.ttlocs[ipat].utm.hemi)
 
 			var utm = coordconv.UTMCoord{
-				Zone:       aprs_tt_config.ttloc_ptr[ipat].utm.lzone,
+				Zone:       aprs_tt_config.ttlocs[ipat].utm.lzone,
 				Hemisphere: hemi,
 				Easting:    easting,
 				Northing:   northing,
@@ -1321,7 +1316,7 @@ func parse_location(e string) int {
 				ystr = "5"
 			}
 
-			var loc = aprs_tt_config.ttloc_ptr[ipat].mgrs.zone
+			var loc = aprs_tt_config.ttlocs[ipat].mgrs.zone
 			loc += xstr
 			loc += ystr
 
@@ -1347,13 +1342,13 @@ func parse_location(e string) int {
 
 		case TTLOC_MHEAD:
 			/* Combine prefix from configuration and digits from user. */
-			var stemp = aprs_tt_config.ttloc_ptr[ipat].mhead.prefix
+			var stemp = aprs_tt_config.ttlocs[ipat].mhead.prefix
 			stemp += xstr
 
 			if len(stemp) != 4 && len(stemp) != 6 && len(stemp) != 10 && len(stemp) != 12 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
-					aprs_tt_config.ttloc_ptr[ipat].mhead.prefix, xstr)
+					aprs_tt_config.ttlocs[ipat].mhead.prefix, xstr)
 
 				return (TT_ERROR_INVALID_MHEAD)
 			}
@@ -1412,7 +1407,7 @@ func parse_location(e string) int {
 			m_ambiguity, _ = strconv.Atoi(xstr)
 
 		default:
-			panic(fmt.Sprintf("Unknown ttloc_ptr type: %d", ttloc_type))
+			panic(fmt.Sprintf("Unknown ttloc type: %d", ttloc_type))
 		}
 
 		return (0)
@@ -1458,8 +1453,8 @@ func find_ttloc_match(e string) (string, string, string, string, string, int) {
 	// debug dw_printf ("find_ttloc_match: e=%s\n", e);
 	var xstr, ystr, zstr, bstr, dstr string
 
-	for ipat := 0; ipat < tt_config.ttloc_len; ipat++ {
-		var pattern = aprs_tt_config.ttloc_ptr[ipat].pattern
+	for ipat := 0; ipat < len(tt_config.ttlocs); ipat++ {
+		var pattern = aprs_tt_config.ttlocs[ipat].pattern
 		var length = len(pattern) /* Length of pattern we are trying to match. */
 
 		if len(e) == length {
