@@ -53,6 +53,39 @@ const TT_ERROR_INVALID_SATSQ = 11  /* Satellite square must be 4 digits. */
 const TT_ERROR_SUFFIX_NO_CALL = 12 /* No known callsign for suffix. */
 const TT_ERROR_MAXP1 = 13          /* Number of items above.  i.e. Last number plus 1. */
 
+func ttErrorString(errCode int) string { // TODO Fix the type
+	switch errCode {
+	case TT_ERROR_OK:
+		return "OK"
+	case TT_ERROR_D_MSG:
+		return "D_MSG"
+	case TT_ERROR_INTERNAL:
+		return "INTERNAL"
+	case TT_ERROR_MACRO_NOMATCH:
+		return "MACRO_NOMATCH"
+	case TT_ERROR_BAD_CHECKSUM:
+		return "BAD_CHECKSUM"
+	case TT_ERROR_INVALID_CALL:
+		return "INVALID_CALL"
+	case TT_ERROR_INVALID_OBJNAME:
+		return "INVALID_OBJNAME"
+	case TT_ERROR_INVALID_SYMBOL:
+		return "INVALID_SYMBOL"
+	case TT_ERROR_INVALID_LOC:
+		return "INVALID_LOC"
+	case TT_ERROR_NO_CALL:
+		return "NO_CALL"
+	case TT_ERROR_INVALID_MHEAD:
+		return "INVALID_MHEAD"
+	case TT_ERROR_INVALID_SATSQ:
+		return "INVALID_SATSQ"
+	case TT_ERROR_SUFFIX_NO_CALL:
+		return "SUFFIX_NO_CALL"
+	default:
+		panic(fmt.Sprintf("Unknown errCode: %d", errCode))
+	}
+}
+
 /*
  * Configuration options for APRStt.
  */

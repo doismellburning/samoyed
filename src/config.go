@@ -3250,9 +3250,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * TTCORRAL  latitude  longitude  offset-or-ambiguity
 			 */
-			dw_printf("TTCORRAL support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
@@ -3279,39 +3277,21 @@ func config_init(fname string, p_audio_config *audio_s,
 			if p_tt_config.corral_offset == 1 ||
 				p_tt_config.corral_offset == 2 ||
 				p_tt_config.corral_offset == 3 {
-				p_tt_config.corral_ambiguity = C.int(p_tt_config.corral_offset)
+				p_tt_config.corral_ambiguity = int(p_tt_config.corral_offset)
 				p_tt_config.corral_offset = 0
 			}
 
 			//dw_printf ("DEBUG: corral %f %f %f %d\n", p_tt_config.corral_lat,
 			//	p_tt_config.corral_lon, p_tt_config.corral_offset, p_tt_config.corral_ambiguity);
-			*/
 		} else if strings.EqualFold(t, "TTPOINT") {
 			/*
 			 * TTPOINT 		- Define a point represented by touch tone sequence.
 			 *
 			 * TTPOINT   pattern  latitude  longitude
 			 */
-			dw_printf("TTPOINT support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Should make this a function/macro instead of repeating code.
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = (**C.char)(C.realloc(unsafe.Pointer(p_tt_config.ttloc_ptr), C.size_t(C.int(unsafe.Sizeof(C.struct_ttloc_s)) * (p_tt_config.ttloc_size))))
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			var tl = (*C.struct_ttloc_s)(unsafe.Add(unsafe.Pointer(p_tt_config.ttloc_ptr), p_tt_config.ttloc_len-1))
-			tl._type = C.TTLOC_POINT
-			C.strcpy(&tl.pattern[0], C.CString(""))
-			tl.point.lat = 0
-			tl.point.lon = 0
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_POINT
 
 			// Pattern: B and digits
 
@@ -3321,7 +3301,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing pattern for TTPOINT command.\n", line)
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
@@ -3354,30 +3334,18 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			tl.point.lon = parse_ll(t, LON, line)
-			*/
+
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTVECTOR") {
 			/*
 			 * TTVECTOR 		- Touch tone location with bearing and distance.
 			 *
 			 * TTVECTOR   pattern  latitude  longitude  scale  unit
 			 */
-			dw_printf("TTVECTOR support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			var tl = (*C.struct_ttloc_s)(unsafe.Add(unsafe.Pointer(p_tt_config.ttloc_ptr), p_tt_config.ttloc_len-1))
-			tl._type = TTLOC_VECTOR
-			C.strcpy(&tl.pattern[0], C.CString(""))
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_VECTOR
+			tl.pattern = ""
 			tl.vector.lat = 0
 			tl.vector.lon = 0
 			tl.vector.scale = 1
@@ -3390,18 +3358,18 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing pattern for TTVECTOR command.\n", line)
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTVECTOR pattern must begin with upper case 'B'.\n", line)
 			}
-			if strncmp(t+1, "5bbb", 4) != 0 {
+			if !strings.HasPrefix(t[1:], "5bbb") {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTVECTOR pattern would normally contain \"5bbb\".\n", line)
 			}
-			for j := 1; j < (C.int)(strlen(t)); j++ {
-				if !isdigit(t[j]) && t[j] != 'b' && t[j] != 'd' {
+			for j := 1; j < len(t); j++ {
+				if !unicode.IsDigit(rune(t[j])) && t[j] != 'b' && t[j] != 'd' {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTVECTOR pattern must contain only B, digits, b, and d.\n", line)
 				}
@@ -3435,7 +3403,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing scale for TTVECTOR command.\n", line)
 				continue
 			}
-			var scale = atof(t)
+			var scale, _ = strconv.ParseFloat(t, 64)
 
 			// Unit.
 
@@ -3446,9 +3414,9 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 
-			var meters = 0
-			for j := 0; j < NUM_UNITS && meters == 0; j++ {
-				if strcasecmp(units[j].name, t) == 0 {
+			var meters float64
+			for j := 0; j < len(units) && meters == 0; j++ {
+				if strings.EqualFold(units[j].name, t) {
 					meters = units[j].meters
 				}
 			}
@@ -3459,35 +3427,16 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 			tl.vector.scale = scale * meters
 
-			//dw_printf ("ttvector: %f meters\n", tl.vector.scale);
-			*/
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTGRID") {
 			/*
 			 * TTGRID 		- Define a grid for touch tone locations.
 			 *
 			 * TTGRID   pattern  min-latitude  min-longitude  max-latitude  max-longitude
 			 */
-			dw_printf("TTGRID support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			var tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
-			tl._type = TTLOC_GRID
-			C.strcpy(&tl.pattern[0], C.CString(""))
-			tl.grid.lat0 = 0
-			tl.grid.lon0 = 0
-			tl.grid.lat9 = 0
-			tl.grid.lon9 = 0
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_GRID
 
 			// Pattern: B [digit] x... y...
 
@@ -3497,14 +3446,14 @@ func config_init(fname string, p_audio_config *audio_s,
 				dw_printf("Line %d: Missing pattern for TTGRID command.\n", line)
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTGRID pattern must begin with upper case 'B'.\n", line)
 			}
-			for j := C.int(1); j < C.int(strlen(t)); j++ {
-				if !isdigit(t[j]) && t[j] != 'x' && t[j] != 'y' {
+			for j := 1; j < len(t); j++ {
+				if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTGRID pattern must be B, optional digit, xxx, yyy.\n", line)
 				}
@@ -3549,39 +3498,18 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 			tl.grid.lon9 = parse_ll(t, LON, line)
-			*/
+
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTUTM") {
 			/*
 			 * TTUTM 		- Specify UTM zone for touch tone locations.
 			 *
 			 * TTUTM   pattern  zone [ scale [ x-offset y-offset ] ]
 			 */
-			dw_printf("TTUTM support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-
-			struct ttloc_s *tl;
-			double dlat, dlon;
-			long lerr;
-
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
-			tl._type = TTLOC_UTM
-			C.strcpy(&tl.pattern[0], C.CString(""))
-			tl.utm.lzone = 0
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_UTM
 			tl.utm.scale = 1
-			tl.utm.x_offset = 0
-			tl.utm.y_offset = 0
 
 			// Pattern: B [digit] x... y...
 
@@ -3589,19 +3517,17 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing pattern for TTUTM command.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTUTM pattern must begin with upper case 'B'.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			for j := 1; j < C.int(strlen(t)); j++ {
-				if !isdigit(t[j]) && t[j] != 'x' && t[j] != 'y' {
+			for j := 1; j < len(t); j++ {
+				if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTUTM pattern must be B, optional digit, xxx, yyy.\n", line)
 					// Bail out somehow.  continue would match inner for.
@@ -3614,53 +3540,52 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing zone for TTUTM command.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
 
-			tl.utm.lzone = parse_utm_zone(t, &(tl.utm.latband), &(tl.utm.hemi))
+			tl.utm.latband, tl.utm.hemi, tl.utm.lzone = parse_utm_zone(t)
 
 			// Optional scale.
 
 			t = split("", false)
 			if t != "" {
 
-				tl.utm.scale = atof(t)
+				tl.utm.scale, _ = strconv.ParseFloat(t, 64)
 
 				// Optional x offset.
 
 				t = split("", false)
 				if t != "" {
 
-					tl.utm.x_offset = atof(t)
+					tl.utm.x_offset, _ = strconv.ParseFloat(t, 64)
 
 					// Optional y offset.
 
 					t = split("", false)
 					if t != "" {
 
-						tl.utm.y_offset = atof(t)
+						tl.utm.y_offset, _ = strconv.ParseFloat(t, 64)
 					}
 				}
 			}
 
 			// Practice run to see if conversion might fail later with actual location.
 
-			lerr = Convert_UTM_To_Geodetic(tl.utm.lzone, tl.utm.hemi,
-				tl.utm.x_offset+5*tl.utm.scale,
-				tl.utm.y_offset+5*tl.utm.scale,
-				&dlat, &dlon)
+			var utm = coordconv.UTMCoord{
+				Zone:       tl.utm.lzone,
+				Hemisphere: HemisphereRuneToCoordconvHemisphere(tl.utm.hemi),
+				Easting:    tl.utm.x_offset + 5*tl.utm.scale,
+				Northing:   tl.utm.y_offset + 5*tl.utm.scale,
+			}
+			var _, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 
-			if lerr != 0 {
-				var message [300]C.char
-
-				utm_error_string(lerr, message)
+			if geoErr != nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, message)
-				p_tt_config.ttloc_len--
+				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, geoErr)
 				continue
 			}
-			*/
+
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTUSNG") || strings.EqualFold(t, "TTMGRS") {
 			/*
 			 * TTUSNG, TTMGRS 		- Specify zone/square for touch tone locations.
@@ -3668,112 +3593,80 @@ func config_init(fname string, p_audio_config *audio_s,
 			 * TTUSNG   pattern  zone_square
 			 * TTMGRS   pattern  zone_square
 			 */
-			dw_printf("TTUSNG/TTMGRS support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-				struct ttloc_s *tl;
-			   int j;
-			   int num_x, num_y;
-			   double lat, lon;
-			   long lerr;
-			   char message[300];
+			var tl = new(ttloc_s)
 
-				Assert(p_tt_config.ttloc_size >= 2)
-				Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			// TODO1.2: in progress...
+			if strings.EqualFold(t, "TTMGRS") {
+				tl.ttlocType = TTLOC_MGRS
+			} else {
+				tl.ttlocType = TTLOC_USNG
+			}
 
-				// Allocate new space, but first, if already full, make larger.
-				if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-					p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-					p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-				}
-				p_tt_config.ttloc_len++
-				Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
+			// Pattern: B [digit] x... y...
 
-				tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
+			t = split("", false)
+			if t == "" {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Missing pattern for TTUSNG/TTMGRS command.\n", line)
+				continue
+			}
+			tl.pattern = t
 
-				// TODO1.2: in progress...
-				if strings.EqualFold(t, "TTMGRS") {
-					tl._type = TTLOC_MGRS
-				} else {
-					tl._type = TTLOC_USNG
-				}
-				C.strcpy(&tl.pattern[0], C.CString(""))
-				C.strcpy(&tl.mgrs.zone[0], C.CString(""))
-
-				// Pattern: B [digit] x... y...
-
-				t = split("", false)
-				if t == "" {
+			if t[0] != 'B' {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'.\n", line)
+				continue
+			}
+			var num_x = 0
+			var num_y = 0
+			for j := 1; j < len(t); j++ {
+				if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Missing pattern for TTUSNG/TTMGRS command.\n", line)
-					p_tt_config.ttloc_len--
-					continue
+					dw_printf("Line %d: TTUSNG/TTMGRS pattern must be B, optional digit, xxx, yyy.\n", line)
+					// Bail out somehow.  continue would match inner for.
 				}
-				C.strcpy(&tl.pattern[0], C.CString(t))
-
-				if t[0] != 'B' {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'.\n", line)
-					p_tt_config.ttloc_len--
-					continue
+				if t[j] == 'x' {
+					num_x++
 				}
-				num_x = 0
-				num_y = 0
-				for j = 1; j < C.int(strlen(t)); j++ {
-					if !isdigit(t[j]) && t[j] != 'x' && t[j] != 'y' {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Line %d: TTUSNG/TTMGRS pattern must be B, optional digit, xxx, yyy.\n", line)
-						// Bail out somehow.  continue would match inner for.
-					}
-					if t[j] == 'x' {
-						num_x++
-					}
-					if t[j] == 'y' {
-						num_y++
-					}
+				if t[j] == 'y' {
+					num_y++
 				}
-				if num_x < 1 || num_x > 5 || num_x != num_y {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y.\n", line)
-					p_tt_config.ttloc_len--
-					continue
-				}
+			}
+			if num_x < 1 || num_x > 5 || num_x != num_y {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y.\n", line)
+				continue
+			}
 
-				// Zone 1 - 60 and optional latitudinal letter.
+			// Zone 1 - 60 and optional latitudinal letter.
 
-				t = split("", false)
-				if t == "" {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Missing zone & square for TTUSNG/TTMGRS command.\n", line)
-					p_tt_config.ttloc_len--
-					continue
-				}
-				C.strcpy(&tl.mgrs.zone[0], C.CString(t))
+			t = split("", false)
+			if t == "" {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Missing zone & square for TTUSNG/TTMGRS command.\n", line)
+				continue
+			}
+			tl.mgrs.zone = t
 
-				// Try converting it rather do our own error checking.
+			// Try converting it rather do our own error checking.
 
-				if tl._type == TTLOC_MGRS {
-					lerr = Convert_MGRS_To_Geodetic(tl.mgrs.zone, &lat, &lon)
-				} else {
-					lerr = Convert_USNG_To_Geodetic(tl.mgrs.zone, &lat, &lon)
-				}
-				if lerr != 0 {
+			var _, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(tl.mgrs.zone)
+			if convertErr != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", line, tl.mgrs.zone, convertErr)
+				continue
+			}
 
-					mgrs_error_string(lerr, message)
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", line, tl.mgrs.zone, message)
-					p_tt_config.ttloc_len--
-					continue
-				}
+			// Should be the end.
 
-				// Should be the end.
+			t = split("", false)
+			if t != "" {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Unexpected stuff at end ignored:  %s\n", line, t)
+			}
 
-				t = split("", false)
-				if t != "" {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Unexpected stuff at end ignored:  %s\n", line, t)
-				}
-			*/
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTMHEAD") {
 			/*
 			 * TTMHEAD 		- Define pattern to be used for Maidenhead Locator.
@@ -3787,30 +3680,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			 */
 
 			// TODO1.3:  TTMHEAD needs testing.
-			dw_printf("TTMHEAD support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-			struct ttloc_s *tl;
-			   int j;
-			   int k;
-			   int count_x;
-			   int count_other;
-
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
-			tl._type = TTLOC_MHEAD
-			C.strcpy(&tl.pattern[0], C.CString(""))
-			C.strcpy(&tl.mhead.prefix[0], C.CString(""))
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_MHEAD
 
 			// Pattern: B, optional additional button, some number of xxxx... for matching
 
@@ -3818,29 +3690,28 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing pattern for TTMHEAD command.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTMHEAD pattern must begin with upper case 'B'.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
 
 			// Optionally one of 0-9ABCD
 
-			if strchr("ABCD", t[1]) != nil || isdigit(t[1]) {
+			var j int
+			if len(t) > 1 && (strings.ContainsRune("ABCD", rune(t[1])) || unicode.IsDigit(rune(t[1]))) {
 				j = 2
 			} else {
 				j = 1
 			}
 
-			count_x = 0
-			count_other = 0
-			for k := j; k < C.int(strlen(t)); k++ {
+			var count_x = 0
+			var count_other = 0
+			for k := j; k < len(t); k++ {
 				if t[k] == 'x' {
 					count_x++
 				} else {
@@ -3851,7 +3722,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			if count_other != 0 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTMHEAD must have only lower case x to match received data.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
 
@@ -3859,33 +3729,31 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			t = split("", false)
 			if t != "" {
-				var mh [30]C.char
+				tl.mhead.prefix = t
 
-				C.strcpy(&tl.mhead.prefix[0], C.CString(t))
-
-				if !alldigits(t) || (strlen(t) != 4 && strlen(t) != 6 && strlen(t) != 10) {
+				if !alldigits(t) || (len(t) != 4 && len(t) != 6 && len(t) != 10) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTMHEAD prefix must be 4, 6, or 10 digits.\n", line)
-					p_tt_config.ttloc_len--
 					continue
 				}
-				if tt_mhead_to_text(t, 0, mh, sizeof(mh)) != 0 {
+
+				var _, mhErrors = tt_mhead_to_text(t, false)
+				if mhErrors != 0 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTMHEAD prefix not a valid DTMF sequence.\n", line)
-					p_tt_config.ttloc_len--
 					continue
 				}
 			}
 
-			k = strlen(tl.mhead.prefix) + count_x
+			var k = len(tl.mhead.prefix) + count_x
 
 			if k != 4 && k != 6 && k != 10 && k != 12 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTMHEAD prefix and user data must have a total of 4, 6, 10, or 12 digits.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			*/
+
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTSATSQ") {
 			/*
 			 * TTSATSQ 		- Define pattern to be used for Satellite square.
@@ -3898,26 +3766,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			 */
 
 			// TODO1.2:  TTSATSQ To be continued...
-			dw_printf("TTSATSQ support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			var tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
-			tl._type = TTLOC_SATSQ
-			C.strcpy(&tl.pattern[0], C.CString(""))
-			tl.point.lat = 0
-			tl.point.lon = 0
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_SATSQ
 
 			// Pattern: B, optional additional button, exactly xxxx for matching
 
@@ -3925,35 +3776,32 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing pattern for TTSATSQ command.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTSATSQ pattern must begin with upper case 'B'.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
 
 			// Optionally one of 0-9ABCD
 
-			var j C.int
-			if strchr("ABCD", t[1]) != nil || isdigit(t[1]) {
+			var j int
+			if len(t) > 1 && (strings.ContainsRune("ABCD", rune(t[1])) || unicode.IsDigit(rune(t[1]))) {
 				j = 2
 			} else {
 				j = 1
 			}
 
-			if strcmp(t+j, "xxxx") != 0 {
+			if t[j:] != "xxxx" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTSATSQ pattern must end with exactly xxxx in lower case.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
 
-			*/
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTAMBIG") {
 			/*
 			 * TTAMBIG 		- Define pattern to be used for Object Location Ambiguity.
@@ -3966,24 +3814,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			 */
 
 			// TODO1.3:  TTAMBIG To be continued...
-			dw_printf("TTAMBIG support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len > 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			var tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
-			tl._type = TTLOC_AMBIG
-			C.strcpy(&tl.pattern[0], C.CString(""))
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_AMBIG
 
 			// Pattern: B, optional additional button, exactly x for matching
 
@@ -3991,34 +3824,32 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing pattern for TTAMBIG command.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
 			if t[0] != 'B' {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTAMBIG pattern must begin with upper case 'B'.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
 
 			// Optionally one of 0-9ABCD
 
-			var j C.int
-			if strchr("ABCD", t[1]) != nil || isdigit(t[1]) {
+			var j int
+			if len(t) > 1 && (strings.ContainsRune("ABCD", rune(t[1])) || unicode.IsDigit(rune(t[1]))) {
 				j = 2
 			} else {
 				j = 1
 			}
 
-			if strcmp(t+j, "x") != 0 {
+			if t[j:] != "x" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: TTAMBIG pattern must end with exactly one x in lower case.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			*/
+
+			p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
 		} else if strings.EqualFold(t, "TTMACRO") {
 			/*
 			 * TTMACRO 		- Define compact message format with full expansion
@@ -4043,28 +3874,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *		These provide automatic conversion from plain text to the TT encoding.
 			 *
 			 */
-			dw_printf("TTMACRO support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-
-			   int j;
-			   int p_count[3], d_count[3];
-			   int tt_error = 0;
-
-			Assert(p_tt_config.ttloc_size >= 2)
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			// Allocate new space, but first, if already full, make larger.
-			if p_tt_config.ttloc_len == p_tt_config.ttloc_size {
-				p_tt_config.ttloc_size += p_tt_config.ttloc_size / 2
-				p_tt_config.ttloc_ptr = realloc (p_tt_config.ttloc_ptr, sizeof(struct ttloc_s) * p_tt_config.ttloc_size);
-			}
-			p_tt_config.ttloc_len++
-			Assert(p_tt_config.ttloc_len >= 0 && p_tt_config.ttloc_len <= p_tt_config.ttloc_size)
-
-			tl = &(p_tt_config.ttloc_ptr[p_tt_config.ttloc_len-1])
-			tl._type = TTLOC_MACRO
-			C.strcpy(&tl.pattern[0], C.CString(""))
+			var tl = new(ttloc_s)
+			tl.ttlocType = TTLOC_MACRO
 
 			// Pattern: Any combination of digits, x, y, and z.
 			// Also make note of which letters are used in pattern and definition.
@@ -4074,21 +3886,19 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing pattern for TTMACRO command.\n", line)
-				p_tt_config.ttloc_len--
 				continue
 			}
-			C.strcpy(&tl.pattern[0], C.CString(t))
+			tl.pattern = t
 
-			p_count[0] = 0
-			p_count[1] = 0
-			p_count[2] = 0
+			var p_count [3]int
+			var tt_error = 0
 
-			for j := 0; j < C.int(strlen(t)); j++ {
-				if strchr("0123456789ABCDxyz", t[j]) == nil {
+			for j := 0; j < len(t); j++ {
+				if !strings.ContainsRune("0123456789ABCDxyz", rune(t[j])) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z.\n", line)
-					p_tt_config.ttloc_len--
-					continue
+					tt_error++
+					break
 				}
 				// Count how many x, y, z in the pattern.
 				if t[j] >= 'x' && t[j] <= 'z' {
@@ -4107,109 +3917,92 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Missing definition for TTMACRO command.\n", line)
 				tl.macro.definition = "" // Don't die on null pointer later.
-				p_tt_config.ttloc_len--
 				continue
 			}
 
 			// Make a pass over the definition, looking for the xx{...} substitutions.
 			// These are done just once when reading the configuration file.
 
-			char *pi;
-			char *ps;
-			char stemp[100];  // text inside of xx{...}
-			char ttemp[300];  // Converted to tone sequences.
-			char otemp[1000]; // Result after any substitutions.
-			char t2[2];
+			var tmp = t      // Chomp through this
+			var otemp string // Result after any substitution
 
-			C.strcpy(&otemp[0], C.CString(""))
-			t2[1] = 0
-			pi = t
-			for *pi == ' ' || *pi == '\t' {
-				pi++
-			}
-			for ; *pi != 0; pi++ {
+			tmp = strings.TrimSpace(tmp)
 
-				if strncmp(pi, "AC{", 3) == 0 {
+			for len(tmp) != 0 {
 
+				if strings.HasPrefix(tmp, "AC{") {
 					// Convert to fixed length 10 digit callsign.
-
-					pi += 3
-					ps = stemp
-					for *pi != '}' && *pi != '*' && *pi != 0 {
-						*ps = *pi
-						ps++
-						pi++
+					tmp = tmp[3:]
+					var stemp string
+					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
+						stemp += string(tmp[0])
+						tmp = tmp[1:]
 					}
-					if *pi == '}' {
-						*ps = 0
-						if tt_text_to_call10(stemp, 0, ttemp) == 0 {
+					if len(tmp) > 0 && tmp[0] == '}' {
+						var ttemp, errs = tt_text_to_call10(stemp, false)
+						if errs == 0 {
 							//text_color_set(DW_COLOR_DEBUG);
 							//dw_printf ("DEBUG Line %d: AC{%s} -> AC%s\n", line, stemp, ttemp);
-							strlcat(otemp, "AC", sizeof(otemp))
-							strlcat(otemp, ttemp, sizeof(otemp))
+							otemp += "AC" + ttemp
 						} else {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: AC{%s} could not be converted to tones for callsign.\n", line, stemp)
 							tt_error++
 						}
+						tmp = tmp[1:]
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: AC{... is missing matching } in TTMACRO definition.\n", line)
 						tt_error++
 					}
-				} else if strncmp(pi, "AA{", 3) == 0 {
+				} else if strings.HasPrefix(tmp, "AA{") {
 
 					// Convert to object name.
 
-					pi += 3
-					ps = stemp
-					for *pi != '}' && *pi != '*' && *pi != 0 {
-						*ps = *pi
-						ps++
-						pi++
+					tmp = tmp[3:]
+					var stemp string
+					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
+						stemp += string(tmp[0])
+						tmp = tmp[1:]
 					}
-					if *pi == '}' {
-						*ps = 0
-						if strlen(stemp) > 9 {
+					if len(tmp) > 0 && tmp[0] == '}' {
+						if len(stemp) > 9 {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Object name %s has been truncated to 9 characters.\n", line, stemp)
-							stemp[9] = 0
+							stemp = stemp[:9]
 						}
-						if tt_text_to_two_key(stemp, 0, ttemp) == 0 {
+						var ttemp, errs = tt_text_to_two_key(stemp, false)
+						if errs == 0 {
 							//text_color_set(DW_COLOR_DEBUG);
 							//dw_printf ("DEBUG Line %d: AA{%s} -> AA%s\n", line, stemp, ttemp);
-							strlcat(otemp, "AA", sizeof(otemp))
-							strlcat(otemp, ttemp, sizeof(otemp))
+							otemp += "AA" + ttemp
 						} else {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: AA{%s} could not be converted to tones for object name.\n", line, stemp)
 							tt_error++
 						}
+						tmp = tmp[1:]
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: AA{... is missing matching } in TTMACRO definition.\n", line)
 						tt_error++
 					}
-				} else if strncmp(pi, "AB{", 3) == 0 {
+				} else if strings.HasPrefix(tmp, "AB{") {
 
 					// Attempt conversion from description to symbol code.
 
-					pi += 3
-					ps = stemp
-					for *pi != '}' && *pi != '*' && *pi != 0 {
-						*ps = *pi
-						ps++
-						pi++
+					tmp = tmp[3:]
+					var stemp string
+					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
+						stemp += string(tmp[0])
+						tmp = tmp[1:]
 					}
-					if *pi == '}' {
-						var symtab C.char
-						var symbol C.char
-
-						*ps = 0
-
+					if len(tmp) > 0 && tmp[0] == '}' {
 						// First try to find something matching the description.
 
-						if symbols_code_from_description(' ', stemp, &symtab, &symbol) == 0 {
+						var symtab, symbol, ok = symbols_code_from_description(' ', stemp)
+
+						if !ok {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default.\n", line, stemp)
 							symtab = '\\' // Alternate
@@ -4218,62 +4011,61 @@ func config_init(fname string, p_audio_config *audio_s,
 
 						// Convert symtab(overlay) & symbol to tone sequence.
 
-						symbols_to_tones(symtab, symbol, ttemp, sizeof(ttemp))
+						var ttemp = symbols_to_tones(symtab, symbol)
 
 						//text_color_set(DW_COLOR_DEBUG);
 						//dw_printf ("DEBUG config file Line %d: AB{%s} -> %s\n", line, stemp, ttemp);
 
-						strlcat(otemp, ttemp, sizeof(otemp))
+						otemp += ttemp
+						tmp = tmp[1:]
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: AB{... is missing matching } in TTMACRO definition.\n", line)
 						tt_error++
 					}
-				} else if strncmp(pi, "CA{", 3) == 0 {
+				} else if strings.HasPrefix(tmp, "CA{") {
 
 					// Convert to enhanced comment that can contain any ASCII character.
 
-					pi += 3
-					ps = stemp
-					for *pi != '}' && *pi != '*' && *pi != 0 {
-						*ps = *pi
-						ps++
-						pi++
+					tmp = tmp[3:]
+					var stemp string
+					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
+						stemp += string(tmp[0])
+						tmp = tmp[1:]
 					}
-					if *pi == '}' {
-						*ps = 0
-						if tt_text_to_ascii2d(stemp, 0, ttemp) == 0 {
+					if len(tmp) > 0 && tmp[0] == '}' {
+						var ttemp, errs = tt_text_to_ascii2d(stemp, false)
+						if errs == 0 {
 							//text_color_set(DW_COLOR_DEBUG);
 							//dw_printf ("DEBUG Line %d: CA{%s} -> CA%s\n", line, stemp, ttemp);
-							strlcat(otemp, "CA", sizeof(otemp))
-							strlcat(otemp, ttemp, sizeof(otemp))
+							otemp += "CA" + ttemp
 						} else {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: CA{%s} could not be converted to tones for enhanced comment.\n", line, stemp)
 							tt_error++
 						}
+						tmp = tmp[1:]
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: CA{... is missing matching } in TTMACRO definition.\n", line)
 						tt_error++
 					}
-				} else if strchr("0123456789ABCD*#xyz", *pi) != nil {
-					t2[0] = *pi
-					strlcat(otemp, t2, sizeof(otemp))
+				} else if strings.ContainsRune("0123456789ABCD*#xyz", rune(tmp[0])) {
+					otemp += string(tmp[0])
+					tmp = tmp[1:]
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: TTMACRO definition can contain only 0-9, A, B, C, D, *, #, x, y, z.\n", line)
 					tt_error++
+					tmp = tmp[1:]
 				}
 			}
 
 			// Make sure that number of x, y, z, in pattern and definition match.
 
-			d_count[0] = 0
-			d_count[1] = 0
-			d_count[2] = 0
+			var d_count [3]int
 
-			for j := 0; j < C.int(strlen(otemp)); j++ {
+			for j := 0; j < len(otemp); j++ {
 				if otemp[j] >= 'x' && otemp[j] <= 'z' {
 					d_count[otemp[j]-'x']++
 				}
@@ -4296,11 +4088,14 @@ func config_init(fname string, p_audio_config *audio_s,
 			//dw_printf ("DEBUG Config Line %d: %s -> %s\n", line, t, otemp);
 
 			if tt_error == 0 {
-				tl.macro.definition = strdup(otemp)
-			} else {
-				p_tt_config.ttloc_len--
+				tl.macro.definition = otemp
 			}
-			*/
+
+			if tt_error == 0 {
+				p_tt_config.ttlocs = append(p_tt_config.ttlocs, tl)
+			} else {
+				dw_printf("Line %d: Errors found in TTMACRO, skipping.\n", line)
+			}
 		} else if strings.EqualFold(t, "TTOBJ") {
 			/*
 			 * TTOBJ 		- TT Object Report options.
@@ -4309,13 +4104,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 *	whereto is any combination of transmit channel, APP, IG.
 			 */
-			dw_printf("TTOBJ support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
-
-			/* TODO KG APRStt
-
-			   int r, x = -1;
-			   int app = 0;
-			   int ig = 0;
 
 			t = split("", false)
 			if t == "" {
@@ -4352,10 +4140,13 @@ func config_init(fname string, p_audio_config *audio_s,
 			// Can have any combination of number, APP, IG.
 			// Would it be easier with strtok?
 
-			for p := t; *p != 0; p++ {
+			var x = -1
+			var app = 0
+			var ig = 0
 
-				if isdigit(*p) {
-					x = *p - '0'
+			for _, p := range t {
+				if unicode.IsDigit(p) {
+					x = int(p - '0')
 					if x < 0 || x > MAX_TOTAL_CHANS-1 {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, line)
@@ -4366,12 +4157,12 @@ func config_init(fname string, p_audio_config *audio_s,
 						dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", line, x)
 						x = -1
 					}
-				} else if *p == 'a' || *p == 'A' {
+				} else if p == 'a' || p == 'A' {
 					app = 1
-				} else if *p == 'i' || *p == 'I' {
+				} else if p == 'i' || p == 'I' {
 					ig = 1
-				} else if strchr("pPgG,", *p) != nil {
-
+				} else if strings.ContainsRune("pPgG,", p) {
+					// Skip?
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", line)
@@ -4396,28 +4187,19 @@ func config_init(fname string, p_audio_config *audio_s,
 			if t != "" {
 
 				if check_via_path(t) >= 0 {
-					C.strcpy(&p_tt_config.obj_xmit_via[0], C.CString(t))
+					p_tt_config.obj_xmit_via = t
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: invalid via path.\n", line)
 				}
 			}
-			*/
 		} else if strings.EqualFold(t, "TTERR") {
 			/*
 			 * TTERR 		- TT responses for success or errors.
 			 *
 			 * TTERR  msg_id  method  text...
 			 */
-			dw_printf("TTERR support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
-
-			   int n, msg_num;
-			   char *p;
-			   char method[AX25_MAX_ADDR_LEN];
-			   int ssid;
-			   int heard;
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
@@ -4425,9 +4207,9 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 
-			msg_num = -1
+			var msg_num = -1
 			for n := 0; n < TT_ERROR_MAXP1; n++ {
-				if strcasecmp(t, tt_msg_id[n]) == 0 {
+				if strings.EqualFold(t, ttErrorString(n)) {
 					msg_num = n
 					break
 				}
@@ -4446,17 +4228,14 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 
-			for p := t; *p != 0; p++ {
-				if islower(*p) {
-					*p = toupper(*p)
-				}
-			}
+			t = strings.ToUpper(t)
 
-			if !ax25_parse_addr(-1, t, 1, method, &ssid, &heard) {
+			var method, _, _, ok = ax25_parse_addr(-1, t, 1)
+			if !ok {
 				continue // function above prints any error message
 			}
 
-			if strcmp(method, "MORSE") != 0 && strcmp(method, "SPEECH") != 0 {
+			if method != "MORSE" && method != "SPEECH" {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Response method of %s must be SPEECH or MORSE for TTERR command.\n", line, method)
 				continue
@@ -4474,22 +4253,18 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			Assert(msg_num >= 0 && msg_num < TT_ERROR_MAXP1)
 
-			strlcpy(p_tt_config.response[msg_num].method, method, sizeof(p_tt_config.response[msg_num].method))
+			p_tt_config.response[msg_num].method = method
 
 			// TODO1.3: Need SSID too!
 
-			C.strcpy(&p_tt_config.response[msg_num].mtext[0], C.CString(t))
-			p_tt_config.response[msg_num].mtext[TT_MTEXT_LEN-1] = 0
-			*/
+			p_tt_config.response[msg_num].mtext = t
 		} else if strings.EqualFold(t, "TTSTATUS") {
 			/*
 			 * TTSTATUS 		- TT custom status messages.
 			 *
 			 * TTSTATUS  status_id  text...
 			 */
-			dw_printf("TTSTATUS support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
 
-			/* TODO KG APRStt
 			t = split("", false)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
@@ -4497,7 +4272,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 
-			var status_num = atoi(t)
+			var status_num, _ = strconv.Atoi(t)
 
 			if status_num < 1 || status_num > 9 {
 				text_color_set(DW_COLOR_ERROR)
@@ -4515,12 +4290,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Line %d: TTSTATUS debug %d \"%s\"\n", line, status_num, t);
 
-			for *t == ' ' || *t == '\t' {
-				t++ // remove leading white space.
-			}
+			t = strings.TrimSpace(t)
 
-			C.strcpy(&p_tt_config.status[status_num][0], C.CString(t))
-			*/
+			p_tt_config.status[status_num] = t
 		} else if strings.EqualFold(t, "TTCMD") {
 			/*
 			 * TTCMD 		- Command to run when valid sequence is received.
@@ -4528,9 +4300,6 @@ func config_init(fname string, p_audio_config *audio_s,
 			 *
 			 * TTCMD ...
 			 */
-			dw_printf("TTCMD support currently disabled due to mid-stage porting complexity - line %d skipped.\n", line)
-
-			/* TODO KG APRStt
 			t = split("", true)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
@@ -4538,8 +4307,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				continue
 			}
 
-			C.strcpy(&p_tt_config.ttcmd[0], C.CString(t))
-			*/
+			p_tt_config.ttcmd = t
 		} else if strings.EqualFold(t, "IGSERVER") {
 			/*
 			 * ==================== Internet gateway ====================
