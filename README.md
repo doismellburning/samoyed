@@ -49,6 +49,16 @@ The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Ra
 sudo apt install ./samoyed-binary_*.deb
 ```
 
+## Usage
+
+The primary binary is `samoyed-direwolf`. Run it with `--help` for a full list of options:
+
+```sh
+samoyed-direwolf --help
+```
+
+For more detail on configuration and features, see the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) — Samoyed aims for broad compatibility with Dire Wolf.
+
 ## Building
 
 ### Prerequisites
