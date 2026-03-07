@@ -365,7 +365,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 		/* Already there.  Update last heard from IS time. */
 		if mdb.debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard SaveIS: %s - update time, was %d seconds ago.\n", source, int(now.Sub(mptr.last_heard_rf).Seconds()))
+			dw_printf("mheard SaveIS: %s - update time, was %d seconds ago.\n", source, int(now.Sub(mptr.last_heard_is).Seconds()))
 		}
 
 		mptr.count++
