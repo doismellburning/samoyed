@@ -39,6 +39,16 @@ Samoyed inherits Dire Wolf's feature set:
 - **DNS Service Discovery** — network KISS TNC auto-discovery (Linux)
 - Concurrent operation with multiple soundcards and radio channels
 
+## Installation
+
+Pre-built binaries are available on the [GitHub Releases page](https://github.com/doismellburning/samoyed/releases), including tarballs and `.deb` packages.
+
+The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Raspberry Pi OS, etc.) and can be installed with:
+
+```sh
+sudo apt install ./samoyed-binary_*.deb
+```
+
 ## Building
 
 ### Prerequisites
