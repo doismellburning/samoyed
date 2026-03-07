@@ -998,7 +998,7 @@ func igate_recv_thread() {
 			/*
 			 * Record that we heard from the source address.
 			 */
-			mheard_save_is(string(message))
+			mheardDB.SaveIS(string(message))
 
 			stats_downlink_packets++
 
@@ -1345,7 +1345,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	var msp_special_case = false
 
 	if len(pinfo) >= 1 && bytes.ContainsAny(pinfo[0:1], "!=/@'`") {
-		var n = mheard_get_msp(string(src))
+		var n = mheardDB.GetMSP(string(src))
 
 		if n > 0 {
 			msp_special_case = true
@@ -1355,7 +1355,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 				dw_printf("Special case, allow position from message sender %s, %d remaining.\n", src, n-1)
 			}
 
-			mheard_set_msp(string(src), n-1)
+			mheardDB.SetMSP(string(src), n-1)
 		}
 	}
 
@@ -1460,7 +1460,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 				// Remember to pass along address of the sender later.
 				stats_msg_cnt++ // Update statistics.
 
-				mheard_set_msp(string(src), save_igate_config_p.igmsp)
+				mheardDB.SetMSP(string(src), save_igate_config_p.igmsp)
 			}
 
 			ig_to_tx_remember(pp3, save_igate_config_p.tx_chan, 0) // correct. version before encapsulating it.

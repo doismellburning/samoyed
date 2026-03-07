@@ -1272,7 +1272,7 @@ func filt_i(pf *pfstate_t) int {
 	 *	 period (range defined as digi hops, distance, or both)."
 	 */
 
-	var was_heard = mheard_was_recently_nearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
+	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
 
 	if was_heard {
 		return (0)
@@ -1295,7 +1295,7 @@ func filt_i(pf *pfstate_t) int {
 	 * the past minute, rather than the usual 180 minutes for the addressee.
 	 */
 
-	was_heard = mheard_was_recently_nearby("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
+	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
 
 	if was_heard {
 		return (0)
