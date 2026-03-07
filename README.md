@@ -92,11 +92,7 @@ Key `make` targets:
 
 ## Contributing
 
-Contributions are welcome! While the Go port is ongoing, new features are generally discouraged
-as they risk delaying the port's completion — but bug fixes, test improvements, and
-help porting remaining C modules are all very useful.
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Platform Support
 
