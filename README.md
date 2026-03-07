@@ -39,6 +39,26 @@ Samoyed inherits Dire Wolf's feature set:
 - **DNS Service Discovery** — network KISS TNC auto-discovery (Linux)
 - Concurrent operation with multiple soundcards and radio channels
 
+## Installation
+
+Pre-built binaries are available on the [GitHub Releases page](https://github.com/doismellburning/samoyed/releases), including tarballs and `.deb` packages.
+
+The `.deb` packages are recommended for Debian-based systems (Debian, Ubuntu, Raspberry Pi OS, etc.) and can be installed with:
+
+```sh
+sudo apt install ./samoyed-binary_*.deb
+```
+
+## Usage
+
+The primary binary is `samoyed-direwolf`. Run it with `--help` for a full list of options:
+
+```sh
+samoyed-direwolf --help
+```
+
+For more detail on configuration and features, see the [Dire Wolf documentation](https://github.com/wb2osz/direwolf/tree/master/doc) — Samoyed aims for broad compatibility with Dire Wolf.
+
 ## Building
 
 ### Prerequisites
@@ -72,11 +92,7 @@ Key `make` targets:
 
 ## Contributing
 
-Contributions are welcome! While the Go port is ongoing, new features are generally discouraged
-as they risk delaying the port's completion — but bug fixes, test improvements, and
-help porting remaining C modules are all very useful.
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Platform Support
 
