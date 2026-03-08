@@ -32,22 +32,6 @@ import (
 	"unicode"
 )
 
-// This is getting updated from two different threads so we need a critical region
-// for adding new nodes.
-
-var mheard_mutex sync.Mutex
-
-// I think we can get away without a critical region for reading if we follow these
-// rules:
-//
-// (1) When adding a new node, make sure it is complete, including next ptr,
-//	before adding it to the list.
-// (2) Update the start of list pointer last.
-// (2) Nothing gets deleted.
-
-// If we ever decide to start cleaning out very old data, all access would then
-// need to use the mutex.
-
 /*
  * Information for each station heard over the radio or from Internet Server.
  */
@@ -79,32 +63,37 @@ type mheard_t struct {
 	// first heard in addition to last heard.
 }
 
-var mheard_db map[string]*mheard_t
-
-var mheard_debug = 0
+// MHeardDB maintains a list of all stations heard over the radio or from an
+// Internet Server.  It is getting updated from two different threads so we
+// need a critical region for adding new nodes.
+type MHeardDB struct {
+	mu    sync.RWMutex
+	db    map[string]*mheard_t
+	debug int
+}
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_init
+ * Function:	NewMHeardDB
  *
  * Purpose:	Initialization at start of application.
  *
  * Inputs:	debug		- Debug level.
  *
- * Description:	Clear pointer table.
- *		Save debug level for later use.
- *
  *------------------------------------------------------------------*/
 
-func mheard_init(debug int) {
-	mheard_db = make(map[string]*mheard_t)
+func NewMHeardDB(debug int) *MHeardDB {
+	var mdb = new(MHeardDB)
 
-	mheard_debug = debug
-} /* end mheard_init */
+	mdb.db = make(map[string]*mheard_t)
+	mdb.debug = debug
+
+	return mdb
+} /* end NewMHeardDB */
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_dump
+ * Function:	dump
  *
  * Purpose:	Print list of stations heard for debugging.
  *
@@ -132,51 +121,9 @@ func mheard_latlon(dlat float64, dlon float64) string {
 	}
 }
 
-const MAXDUMP = 1000
-
-func mheard_dump() {
-	/* Get linear array of node pointers so they can be sorted easily. */
-	var stations = slices.Collect(maps.Values(mheard_db))
-
-	/* Sort most recently heard to the top then print. */
-	slices.SortFunc(stations, func(ma, mb *mheard_t) int {
-		var ta = ma.last_heard_rf
-		if ma.last_heard_is.After(ta) {
-			ta = ma.last_heard_is
-		}
-
-		var tb = mb.last_heard_rf
-		if mb.last_heard_is.After(tb) {
-			tb = mb.last_heard_is
-		}
-
-		if ta.Before(tb) {
-			return -1
-		} else if ta.After(tb) {
-			return 1
-		} else {
-			return 0
-		}
-	})
-
-	text_color_set(DW_COLOR_DEBUG)
-
-	dw_printf("callsign  cnt chan hops    RF      IS    lat     long  msp\n")
-
-	for _, mptr := range stations {
-		var now = time.Now()
-		var rf = mheard_age(now, mptr.last_heard_rf)
-		var is = mheard_age(now, mptr.last_heard_is)
-		var position = mheard_latlon(mptr.dlat, mptr.dlon)
-
-		dw_printf("%-9s %3d   %d   %d  %7s %7s  %s  %d\n",
-			mptr.callsign, mptr.count, mptr.channel, mptr.num_digi_hops, rf, is, position, mptr.msp)
-	}
-} /* end mheard_dump */
-
 /*------------------------------------------------------------------
  *
- * Function:	mheard_save_rf
+ * Function:	SaveRF
  *
  * Purpose:	Save information about station heard over the radio.
  *
@@ -197,7 +144,7 @@ func mheard_dump() {
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) { //nolint:unparam
+func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) {
 	var now = time.Now()
 
 	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
@@ -259,14 +206,15 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 		}
 	}
 
-	var mptr = mheard_db[source]
+	mdb.mu.Lock()
+	var mptr = mdb.db[source]
 	if mptr == nil {
 		/*
 		 * Not heard before.  Add it.
 		 */
-		if mheard_debug > 0 {
+		if mdb.debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard_save_rf: %s %d - added new\n", source, hops)
+			dw_printf("mheard SaveRF: %s %d - added new\n", source, hops)
 		}
 
 		mptr = new(mheard_t)
@@ -279,11 +227,7 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 		mptr.dlat = G_UNKNOWN
 		mptr.dlon = G_UNKNOWN
 
-		mheard_mutex.Lock()
-
-		mheard_db[source] = mptr
-
-		mheard_mutex.Unlock()
+		mdb.db[source] = mptr
 	} else {
 		/*
 		 * Update existing entry.
@@ -292,14 +236,14 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 		 * We are interested in the shortest path if heard very recently.
 		 */
 		if hops > mptr.num_digi_hops && now.Sub(mptr.last_heard_rf).Seconds() < 15 {
-			if mheard_debug > 0 {
+			if mdb.debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("mheard_save_rf: %s %d - skip because hops was %d %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
+				dw_printf("mheard SaveRF: %s %d - skip because hops was %d %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
 			}
 		} else {
-			if mheard_debug > 0 {
+			if mdb.debug > 0 {
 				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("mheard_save_rf: %s %d - update time, was %d hops %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
+				dw_printf("mheard SaveRF: %s %d - update time, was %d hops %d seconds ago.\n", source, hops, mptr.num_digi_hops, int(now.Sub(mptr.last_heard_rf).Seconds()))
 			}
 
 			mptr.count++
@@ -321,50 +265,52 @@ func mheard_save_rf(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t
 		}
 	}
 
-	if mheard_debug >= 2 {
+	mdb.mu.Unlock()
+
+	if mdb.debug >= 2 {
 		var limit = 10 // normally 30 or 60.  more frequent when debugging.
 
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mheard_count(0, limit), mheard_count(2, limit), mheard_count(8, limit))
+		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mdb.Count(0, limit), mdb.Count(2, limit), mdb.Count(8, limit))
 	}
 
-	if mheard_debug > 0 {
-		mheard_dump()
+	if mdb.debug > 0 {
+		mdb.dump()
 	}
-} /* end mheard_save_rf */
+} /* end SaveRF */
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_save_is
+ * Function:	SaveIS
  *
  * Purpose:	Save information about station heard via Internet Server.
  *
  * Inputs:	ptext	- Packet in monitoring text form as sent by the Internet server.
  *
- *				  Any trailing CRLF should have been removed.
- *				  Typical examples:
+ *			  Any trailing CRLF should have been removed.
+ *			  Typical examples:
  *
- *				KA1BTK-5>APDR13,TCPIP*,qAC,T2IRELAND:=4237.62N/07040.68W$/A=-00054 http://aprsdroid.org/
- *				N1HKO-10>APJI40,TCPIP*,qAC,N1HKO-JS:<IGATE,MSG_CNT=0,LOC_CNT=0
- *				K1RI-2>APWW10,WIDE1-1,WIDE2-1,qAS,K1RI:/221700h/9AmA<Ct3_ sT010/002g005t045r000p023P020h97b10148
- *				KC1BOS-2>T3PQ3S,WIDE1-1,WIDE2-1,qAR,W1TG-1:`c)@qh\>/"50}TinyTrak4 Mobile
- *				WHO-IS>APJIW4,TCPIP*,qAC,AE5PL-JF::WB2OSZ   :C/Billerica Amateur Radio Society/MA/United States{XF}WO
+ *			KA1BTK-5>APDR13,TCPIP*,qAC,T2IRELAND:=4237.62N/07040.68W$/A=-00054 http://aprsdroid.org/
+ *			N1HKO-10>APJI40,TCPIP*,qAC,N1HKO-JS:<IGATE,MSG_CNT=0,LOC_CNT=0
+ *			K1RI-2>APWW10,WIDE1-1,WIDE2-1,qAS,K1RI:/221700h/9AmA<Ct3_ sT010/002g005t045r000p023P020h97b10148
+ *			KC1BOS-2>T3PQ3S,WIDE1-1,WIDE2-1,qAR,W1TG-1:`c)@qh\>/\"50}TinyTrak4 Mobile
+ *			WHO-IS>APJIW4,TCPIP*,qAC,AE5PL-JF::WB2OSZ   :C/Billerica Amateur Radio Society/MA/United States{XF}WO
  *
- *				  Notice how the final address in the header might not
- *				  be a valid AX.25 address.  We see a 9 character address
- *				  (with no ssid) and an ssid of two letters.
+ *			  Notice how the final address in the header might not
+ *			  be a valid AX.25 address.  We see a 9 character address
+ *			  (with no ssid) and an ssid of two letters.
  *
- *				  The "q construct"  ( http://www.aprs-is.net/q.aspx ) provides
- *				  a clue about the journey taken but I don't think we care here.
+ *			  The "q construct"  ( http://www.aprs-is.net/q.aspx ) provides
+ *			  a clue about the journey taken but I don't think we care here.
  *
- *				  All we should care about here is the the source address.
- *				  Note that the source address might not adhere to the AX.25 format.
+ *			  All we should care about here is the the source address.
+ *			  Note that the source address might not adhere to the AX.25 format.
  *
  * Description:
  *
  *------------------------------------------------------------------*/
 
-func mheard_save_is(ptext string) {
+func (mdb *MHeardDB) SaveIS(ptext string) {
 	var now = time.Now()
 
 	// It is possible that source won't adhere to the AX.25 restrictions.
@@ -380,7 +326,7 @@ func mheard_save_is(ptext string) {
 	   	if (pp == nil) {
 	   	  if (mheard_debug) {
 	   	    text_color_set(DW_COLOR_ERROR);
-	   	    dw_printf ("mheard_save_is: Could not parse message from server.\n");
+	   	    dw_printf ("mheard SaveIS: Could not parse message from server.\n");
 	   	    dw_printf ("%s\n", ptext);
 	   	  }
 	   	  return;
@@ -389,7 +335,8 @@ func mheard_save_is(ptext string) {
 	   	//////ax25_get_addr_with_ssid (pp, AX25_SOURCE, source);
 	*/
 
-	var mptr = mheard_db[source]
+	mdb.mu.Lock()
+	var mptr = mdb.db[source]
 	if mptr == nil {
 		/*
 		 * Not heard before.  Add it.
@@ -397,9 +344,9 @@ func mheard_save_is(ptext string) {
 		 * Hmmmm.  I wonder why I did not store the location if available.
 		 * An earlier example has an APRSdroid station reporting location without using [ham] RF.
 		 */
-		if mheard_debug > 0 {
+		if mdb.debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard_save_is: %s - added new\n", source)
+			dw_printf("mheard SaveIS: %s - added new\n", source)
 		}
 
 		mptr = new(mheard_t)
@@ -409,21 +356,19 @@ func mheard_save_is(ptext string) {
 		mptr.dlat = G_UNKNOWN
 		mptr.dlon = G_UNKNOWN
 
-		mheard_mutex.Lock()
-
-		mheard_db[source] = mptr
-
-		mheard_mutex.Unlock()
+		mdb.db[source] = mptr
 	} else {
 		/* Already there.  Update last heard from IS time. */
-		if mheard_debug > 0 {
+		if mdb.debug > 0 {
 			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("mheard_save_is: %s - update time, was %d seconds ago.\n", source, int(now.Sub(mptr.last_heard_rf).Seconds()))
+			dw_printf("mheard SaveIS: %s - update time, was %d seconds ago.\n", source, int(now.Sub(mptr.last_heard_is).Seconds()))
 		}
 
 		mptr.count++
 		mptr.last_heard_is = now
 	}
+
+	mdb.mu.Unlock()
 
 	// Is is desirable to save any location in this case?
 	// I don't think it would help.
@@ -432,15 +377,15 @@ func mheard_save_is(ptext string) {
 	// On the other hand, I don't think it would hurt.
 	// The filter always includes a time since last heard over the radio.
 
-	if mheard_debug >= 2 {
+	if mdb.debug >= 2 {
 		var limit = 10 // normally 30 or 60
 
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mheard_count(0, limit), mheard_count(2, limit), mheard_count(8, limit))
+		dw_printf("mheard debug, %d min, DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d\n", limit, mdb.Count(0, limit), mdb.Count(2, limit), mdb.Count(8, limit))
 	}
 
-	if mheard_debug > 0 {
-		mheard_dump()
+	if mdb.debug > 0 {
+		mdb.dump()
 	}
 
 	/*
@@ -448,11 +393,11 @@ func mheard_save_is(ptext string) {
 			ax25_delete (pp);
 		#endif
 	*/
-} /* end mheard_save_is */
+} /* end SaveIS */
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_count
+ * Function:	Count
  *
  * Purpose:	Count local stations for IGate statistics report like this:
  *
@@ -507,29 +452,31 @@ func mheard_save_is(ptext string) {
  *
  *------------------------------------------------------------------*/
 
-func mheard_count(max_hops int, time_limit int) int {
+func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
 	var limit = time.Duration(time_limit) * time.Minute
 	var since = time.Now().Add(-limit)
 
 	var count = 0
 
-	for _, p := range mheard_db {
+	mdb.mu.RLock()
+	for _, p := range mdb.db {
 		if !p.last_heard_rf.Before(since) && p.num_digi_hops <= max_hops {
 			count++
 		}
 	}
+	mdb.mu.RUnlock()
 
-	if mheard_debug == 1 {
+	if mdb.debug == 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("mheard_count(<= %d digi hops, last %d minutes) returns %d\n", max_hops, int(limit.Minutes()), count)
+		dw_printf("mheard Count(<= %d digi hops, last %d minutes) returns %d\n", max_hops, int(limit.Minutes()), count)
 	}
 
 	return (count)
-} /* end mheard_count */
+} /* end Count */
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_was_recently_nearby
+ * Function:	WasRecentlyNearby
  *
  * Purpose:	Determine whether given station was heard recently on the radio.
  *
@@ -551,8 +498,11 @@ func mheard_count(max_hops int, time_limit int) int {
  *
  *------------------------------------------------------------------*/
 
-func mheard_was_recently_nearby(role string, callsign string, _time_limit int, max_hops int, dlat float64, dlon float64, km float64) bool {
+func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit int, max_hops int, dlat float64, dlon float64, km float64) bool {
 	var time_limit = time.Duration(_time_limit) * time.Minute
+
+	mdb.mu.RLock()
+	defer mdb.mu.RUnlock()
 
 	if role != "" {
 		text_color_set(DW_COLOR_INFO)
@@ -573,7 +523,7 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
 		}
 	}
 
-	var mptr = mheard_db[callsign]
+	var mptr = mdb.db[callsign]
 
 	if mptr == nil || mptr.last_heard_rf.IsZero() {
 		if role != "" {
@@ -635,11 +585,11 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
 	}
 
 	return true
-} /* end mheard_was_recently_nearby */
+} /* end WasRecentlyNearby */
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_set_msp
+ * Function:	SetMSP
  *
  * Purpose:	Set the "message sender position" count for specified station.
  *
@@ -649,13 +599,16 @@ func mheard_was_recently_nearby(role string, callsign string, _time_limit int, m
  *
  *------------------------------------------------------------------*/
 
-func mheard_set_msp(callsign string, num int) {
-	var mptr = mheard_db[callsign]
+func (mdb *MHeardDB) SetMSP(callsign string, num int) {
+	mdb.mu.Lock()
+	defer mdb.mu.Unlock()
+
+	var mptr = mdb.db[callsign]
 
 	if mptr != nil {
 		mptr.msp = num
 
-		if mheard_debug > 0 {
+		if mdb.debug > 0 {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("MSP for %s set to %d\n", callsign, num)
 		}
@@ -663,11 +616,11 @@ func mheard_set_msp(callsign string, num int) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error: Can't find %s to set MSP.\n", callsign)
 	}
-} /* end mheard_set_msp */
+} /* end SetMSP */
 
 /*------------------------------------------------------------------
  *
- * Function:	mheard_get_msp
+ * Function:	GetMSP
  *
  * Purpose:	Get the "message sender position" count for specified station.
  *
@@ -678,11 +631,14 @@ func mheard_set_msp(callsign string, num int) {
  *
  *------------------------------------------------------------------*/
 
-func mheard_get_msp(callsign string) int {
-	var mptr = mheard_db[callsign]
+func (mdb *MHeardDB) GetMSP(callsign string) int {
+	mdb.mu.RLock()
+	defer mdb.mu.RUnlock()
+
+	var mptr = mdb.db[callsign]
 
 	if mptr != nil {
-		if mheard_debug > 0 {
+		if mdb.debug > 0 {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("MSP for %s is %d\n", callsign, mptr.msp)
 		}
@@ -691,6 +647,49 @@ func mheard_get_msp(callsign string) int {
 	}
 
 	return (0)
-} /* end mheard_get_msp */
+} /* end GetMSP */
 
-/* end mheard.c */
+func (mdb *MHeardDB) dump() {
+	mdb.mu.RLock()
+	defer mdb.mu.RUnlock()
+
+	/* Get linear array of node pointers so they can be sorted easily. */
+	var stations = slices.Collect(maps.Values(mdb.db))
+
+	/* Sort most recently heard to the top then print. */
+	slices.SortFunc(stations, func(ma, mb *mheard_t) int {
+		var ta = ma.last_heard_rf
+		if ma.last_heard_is.After(ta) {
+			ta = ma.last_heard_is
+		}
+
+		var tb = mb.last_heard_rf
+		if mb.last_heard_is.After(tb) {
+			tb = mb.last_heard_is
+		}
+
+		if ta.Before(tb) {
+			return 1
+		} else if ta.After(tb) {
+			return -1
+		} else {
+			return 0
+		}
+	})
+
+	text_color_set(DW_COLOR_DEBUG)
+
+	dw_printf("callsign  cnt chan hops    RF      IS    lat     long  msp\n")
+
+	for _, mptr := range stations {
+		var now = time.Now()
+		var rf = mheard_age(now, mptr.last_heard_rf)
+		var is = mheard_age(now, mptr.last_heard_is)
+		var position = mheard_latlon(mptr.dlat, mptr.dlon)
+
+		dw_printf("%-9s %3d   %d   %d  %7s %7s  %s  %d\n",
+			mptr.callsign, mptr.count, mptr.channel, mptr.num_digi_hops, rf, is, position, mptr.msp)
+	}
+} /* end dump */
+
+/* end mheard.go */
