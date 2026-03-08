@@ -109,4 +109,4 @@ stats:
 	@find * -name CMakeLists.txt -exec wc -l {} + | tail -n 1 | sed -e "s/^ *//"
 
 tags: $(C_FILES) $(GO_FILES)
-	ctags --recurse --languages=C,Go --c-kinds=+p --fields=+iaS --extras=+q cmd/ src/ external/
+	ctags --recurse --languages=C,Go --c-kinds=+p --fields=+iaS --extras=+q cmd/ src/
