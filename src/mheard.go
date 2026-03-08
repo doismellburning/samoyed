@@ -67,7 +67,7 @@ type mheard_t struct {
 // Internet Server.  It is getting updated from two different threads so we
 // need a critical region for adding new nodes.
 type MHeardDB struct {
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	db    map[string]*mheard_t
 	debug int
 }
@@ -206,6 +206,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 		}
 	}
 
+	mdb.mu.Lock()
 	var mptr = mdb.db[source]
 	if mptr == nil {
 		/*
@@ -226,11 +227,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 		mptr.dlat = G_UNKNOWN
 		mptr.dlon = G_UNKNOWN
 
-		mdb.mu.Lock()
-
 		mdb.db[source] = mptr
-
-		mdb.mu.Unlock()
 	} else {
 		/*
 		 * Update existing entry.
@@ -267,6 +264,8 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 			mptr.dlon = A.g_lon
 		}
 	}
+
+	mdb.mu.Unlock()
 
 	if mdb.debug >= 2 {
 		var limit = 10 // normally 30 or 60.  more frequent when debugging.
@@ -336,6 +335,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 	   	//////ax25_get_addr_with_ssid (pp, AX25_SOURCE, source);
 	*/
 
+	mdb.mu.Lock()
 	var mptr = mdb.db[source]
 	if mptr == nil {
 		/*
@@ -356,11 +356,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 		mptr.dlat = G_UNKNOWN
 		mptr.dlon = G_UNKNOWN
 
-		mdb.mu.Lock()
-
 		mdb.db[source] = mptr
-
-		mdb.mu.Unlock()
 	} else {
 		/* Already there.  Update last heard from IS time. */
 		if mdb.debug > 0 {
@@ -371,6 +367,8 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 		mptr.count++
 		mptr.last_heard_is = now
 	}
+
+	mdb.mu.Unlock()
 
 	// Is is desirable to save any location in this case?
 	// I don't think it would help.
@@ -460,11 +458,13 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
 
 	var count = 0
 
+	mdb.mu.RLock()
 	for _, p := range mdb.db {
 		if !p.last_heard_rf.Before(since) && p.num_digi_hops <= max_hops {
 			count++
 		}
 	}
+	mdb.mu.RUnlock()
 
 	if mdb.debug == 1 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -500,6 +500,9 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
 
 func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit int, max_hops int, dlat float64, dlon float64, km float64) bool {
 	var time_limit = time.Duration(_time_limit) * time.Minute
+
+	mdb.mu.RLock()
+	defer mdb.mu.RUnlock()
 
 	if role != "" {
 		text_color_set(DW_COLOR_INFO)
@@ -597,6 +600,9 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
  *------------------------------------------------------------------*/
 
 func (mdb *MHeardDB) SetMSP(callsign string, num int) {
+	mdb.mu.Lock()
+	defer mdb.mu.Unlock()
+
 	var mptr = mdb.db[callsign]
 
 	if mptr != nil {
@@ -626,6 +632,9 @@ func (mdb *MHeardDB) SetMSP(callsign string, num int) {
  *------------------------------------------------------------------*/
 
 func (mdb *MHeardDB) GetMSP(callsign string) int {
+	mdb.mu.RLock()
+	defer mdb.mu.RUnlock()
+
 	var mptr = mdb.db[callsign]
 
 	if mptr != nil {
@@ -641,6 +650,9 @@ func (mdb *MHeardDB) GetMSP(callsign string) int {
 } /* end GetMSP */
 
 func (mdb *MHeardDB) dump() {
+	mdb.mu.RLock()
+	defer mdb.mu.RUnlock()
+
 	/* Get linear array of node pointers so they can be sorted easily. */
 	var stations = slices.Collect(maps.Values(mdb.db))
 
