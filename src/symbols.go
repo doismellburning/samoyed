@@ -31,220 +31,217 @@ type SymbolEntry struct {
 	description string
 }
 
-var primary_symtab = []SymbolEntry{
+func primarySymtab() []SymbolEntry {
+	return []SymbolEntry{
 
-	/*     00  */ {"~~", "--no-symbol--"},
-	/*  !  01  */ {"BB", "Police, Sheriff"},
-	/*  "  02  */ {"BC", "reserved  (was rain)"},
-	/*  #  03  */ {"BD", "DIGI (white center)"},
-	/*  $  04  */ {"BE", "PHONE"},
-	/*  %  05  */ {"BF", "DX CLUSTER"},
-	/*  &  06  */ {"BG", "HF GATEway"},
-	/*  '  07  */ {"BH", "Small AIRCRAFT"},
-	/*  (  08  */ {"BI", "Mobile Satellite Station"},
-	/*  )  09  */ {"BJ", "Wheelchair (handicapped)"},
-	/*  *  10  */ {"BK", "SnowMobile"},
-	/*  +  11  */ {"BL", "Red Cross"},
-	/*  ,  12  */ {"BM", "Boy Scouts"},
-	/*  -  13  */ {"BN", "House QTH (VHF)"},
-	/*  .  14  */ {"BO", "X"},
-	/*  /  15  */ {"BP", "Red Dot"},
-	/*  0  16  */ {"P0", "# circle (obsolete)"},
-	/*  1  17  */ {"P1", "TBD"},
-	/*  2  18  */ {"P2", "TBD"},
-	/*  3  19  */ {"P3", "TBD"},
-	/*  4  20  */ {"P4", "TBD"},
-	/*  5  21  */ {"P5", "TBD"},
-	/*  6  22  */ {"P6", "TBD"},
-	/*  7  23  */ {"P7", "TBD"},
-	/*  8  24  */ {"P8", "TBD"},
-	/*  9  25  */ {"P9", "TBD"},
-	/*  :  26  */ {"MR", "FIRE"},
-	/*  ;  27  */ {"MS", "Campground (Portable ops)"},
-	/*  <  28  */ {"MT", "Motorcycle"},
-	/*  =  29  */ {"MU", "RAILROAD ENGINE"},
-	/*  >  30  */ {"MV", "CAR"},
-	/*  ?  31  */ {"MW", "SERVER for Files"},
-	/*  @  32  */ {"MX", "HC FUTURE predict (dot)"},
-	/*  A  33  */ {"PA", "Aid Station"},
-	/*  B  34  */ {"PB", "BBS or PBBS"},
-	/*  C  35  */ {"PC", "Canoe"},
-	/*  D  36  */ {"PD", ""},
-	/*  E  37  */ {"PE", "EYEBALL (Eye catcher!)"},
-	/*  F  38  */ {"PF", "Farm Vehicle (tractor)"},
-	/*  G  39  */ {"PG", "Grid Square (6 digit)"},
-	/*  H  40  */ {"PH", "HOTEL (blue bed symbol)"},
-	/*  I  41  */ {"PI", "TcpIp on air network stn"},
-	/*  J  42  */ {"PJ", ""},
-	/*  K  43  */ {"PK", "School"},
-	/*  L  44  */ {"PL", "PC user"},
-	/*  M  45  */ {"PM", "MacAPRS"},
-	/*  N  46  */ {"PN", "NTS Station"},
-	/*  O  47  */ {"PO", "BALLOON"},
-	/*  P  48  */ {"PP", "Police"},
-	/*  Q  49  */ {"PQ", "TBD"},
-	/*  R  50  */ {"PR", "REC. VEHICLE"},
-	/*  S  51  */ {"PS", "SHUTTLE"},
-	/*  T  52  */ {"PT", "SSTV"},
-	/*  U  53  */ {"PU", "BUS"},
-	/*  V  54  */ {"PV", "ATV"},
-	/*  W  55  */ {"PW", "National WX Service Site"},
-	/*  X  56  */ {"PX", "HELO"},
-	/*  Y  57  */ {"PY", "YACHT (sail)"},
-	/*  Z  58  */ {"PZ", "WinAPRS"},
-	/*  [  59  */ {"HS", "Human/Person (HT)"},
-	/*  \  60  */ {"HT", "TRIANGLE(DF station)"},
-	/*  ]  61  */ {"HU", "MAIL/PostOffice(was PBBS)"},
-	/*  ^  62  */ {"HV", "LARGE AIRCRAFT"},
-	/*  _  63  */ {"HW", "WEATHER Station (blue)"},
-	/*  `  64  */ {"HX", "Dish Antenna"},
-	/*  a  65  */ {"LA", "AMBULANCE"},
-	/*  b  66  */ {"LB", "BIKE"},
-	/*  c  67  */ {"LC", "Incident Command Post"},
-	/*  d  68  */ {"LD", "Fire dept"},
-	/*  e  69  */ {"LE", "HORSE (equestrian)"},
-	/*  f  70  */ {"LF", "FIRE TRUCK"},
-	/*  g  71  */ {"LG", "Glider"},
-	/*  h  72  */ {"LH", "HOSPITAL"},
-	/*  i  73  */ {"LI", "IOTA (islands on the air)"},
-	/*  j  74  */ {"LJ", "JEEP"},
-	/*  k  75  */ {"LK", "TRUCK"},
-	/*  l  76  */ {"LL", "Laptop"},
-	/*  m  77  */ {"LM", "Mic-E Repeater"},
-	/*  n  78  */ {"LN", "Node (black bulls-eye)"},
-	/*  o  79  */ {"LO", "EOC"},
-	/*  p  80  */ {"LP", "ROVER (puppy, or dog)"},
-	/*  q  81  */ {"LQ", "GRID SQ shown above 128 m"},
-	/*  r  82  */ {"LR", "Repeater"},
-	/*  s  83  */ {"LS", "SHIP (pwr boat)"},
-	/*  t  84  */ {"LT", "TRUCK STOP"},
-	/*  u  85  */ {"LU", "TRUCK (18 wheeler)"},
-	/*  v  86  */ {"LV", "VAN"},
-	/*  w  87  */ {"LW", "WATER station"},
-	/*  x  88  */ {"LX", "xAPRS (Unix)"},
-	/*  y  89  */ {"LY", "YAGI @ QTH"},
-	/*  z  90  */ {"LZ", "TBD"},
-	/*  {  91  */ {"J1", ""},
-	/*  |  92  */ {"J2", "TNC Stream Switch"},
-	/*  }  93  */ {"J3", ""},
-	/*  ~  94  */ {"J3", "TNC Stream Switch"},
+		/*     00  */ {"~~", "--no-symbol--"},
+		/*  !  01  */ {"BB", "Police, Sheriff"},
+		/*  "  02  */ {"BC", "reserved  (was rain)"},
+		/*  #  03  */ {"BD", "DIGI (white center)"},
+		/*  $  04  */ {"BE", "PHONE"},
+		/*  %  05  */ {"BF", "DX CLUSTER"},
+		/*  &  06  */ {"BG", "HF GATEway"},
+		/*  '  07  */ {"BH", "Small AIRCRAFT"},
+		/*  (  08  */ {"BI", "Mobile Satellite Station"},
+		/*  )  09  */ {"BJ", "Wheelchair (handicapped)"},
+		/*  *  10  */ {"BK", "SnowMobile"},
+		/*  +  11  */ {"BL", "Red Cross"},
+		/*  ,  12  */ {"BM", "Boy Scouts"},
+		/*  -  13  */ {"BN", "House QTH (VHF)"},
+		/*  .  14  */ {"BO", "X"},
+		/*  /  15  */ {"BP", "Red Dot"},
+		/*  0  16  */ {"P0", "# circle (obsolete)"},
+		/*  1  17  */ {"P1", "TBD"},
+		/*  2  18  */ {"P2", "TBD"},
+		/*  3  19  */ {"P3", "TBD"},
+		/*  4  20  */ {"P4", "TBD"},
+		/*  5  21  */ {"P5", "TBD"},
+		/*  6  22  */ {"P6", "TBD"},
+		/*  7  23  */ {"P7", "TBD"},
+		/*  8  24  */ {"P8", "TBD"},
+		/*  9  25  */ {"P9", "TBD"},
+		/*  :  26  */ {"MR", "FIRE"},
+		/*  ;  27  */ {"MS", "Campground (Portable ops)"},
+		/*  <  28  */ {"MT", "Motorcycle"},
+		/*  =  29  */ {"MU", "RAILROAD ENGINE"},
+		/*  >  30  */ {"MV", "CAR"},
+		/*  ?  31  */ {"MW", "SERVER for Files"},
+		/*  @  32  */ {"MX", "HC FUTURE predict (dot)"},
+		/*  A  33  */ {"PA", "Aid Station"},
+		/*  B  34  */ {"PB", "BBS or PBBS"},
+		/*  C  35  */ {"PC", "Canoe"},
+		/*  D  36  */ {"PD", ""},
+		/*  E  37  */ {"PE", "EYEBALL (Eye catcher!)"},
+		/*  F  38  */ {"PF", "Farm Vehicle (tractor)"},
+		/*  G  39  */ {"PG", "Grid Square (6 digit)"},
+		/*  H  40  */ {"PH", "HOTEL (blue bed symbol)"},
+		/*  I  41  */ {"PI", "TcpIp on air network stn"},
+		/*  J  42  */ {"PJ", ""},
+		/*  K  43  */ {"PK", "School"},
+		/*  L  44  */ {"PL", "PC user"},
+		/*  M  45  */ {"PM", "MacAPRS"},
+		/*  N  46  */ {"PN", "NTS Station"},
+		/*  O  47  */ {"PO", "BALLOON"},
+		/*  P  48  */ {"PP", "Police"},
+		/*  Q  49  */ {"PQ", "TBD"},
+		/*  R  50  */ {"PR", "REC. VEHICLE"},
+		/*  S  51  */ {"PS", "SHUTTLE"},
+		/*  T  52  */ {"PT", "SSTV"},
+		/*  U  53  */ {"PU", "BUS"},
+		/*  V  54  */ {"PV", "ATV"},
+		/*  W  55  */ {"PW", "National WX Service Site"},
+		/*  X  56  */ {"PX", "HELO"},
+		/*  Y  57  */ {"PY", "YACHT (sail)"},
+		/*  Z  58  */ {"PZ", "WinAPRS"},
+		/*  [  59  */ {"HS", "Human/Person (HT)"},
+		/*  \  60  */ {"HT", "TRIANGLE(DF station)"},
+		/*  ]  61  */ {"HU", "MAIL/PostOffice(was PBBS)"},
+		/*  ^  62  */ {"HV", "LARGE AIRCRAFT"},
+		/*  _  63  */ {"HW", "WEATHER Station (blue)"},
+		/*  `  64  */ {"HX", "Dish Antenna"},
+		/*  a  65  */ {"LA", "AMBULANCE"},
+		/*  b  66  */ {"LB", "BIKE"},
+		/*  c  67  */ {"LC", "Incident Command Post"},
+		/*  d  68  */ {"LD", "Fire dept"},
+		/*  e  69  */ {"LE", "HORSE (equestrian)"},
+		/*  f  70  */ {"LF", "FIRE TRUCK"},
+		/*  g  71  */ {"LG", "Glider"},
+		/*  h  72  */ {"LH", "HOSPITAL"},
+		/*  i  73  */ {"LI", "IOTA (islands on the air)"},
+		/*  j  74  */ {"LJ", "JEEP"},
+		/*  k  75  */ {"LK", "TRUCK"},
+		/*  l  76  */ {"LL", "Laptop"},
+		/*  m  77  */ {"LM", "Mic-E Repeater"},
+		/*  n  78  */ {"LN", "Node (black bulls-eye)"},
+		/*  o  79  */ {"LO", "EOC"},
+		/*  p  80  */ {"LP", "ROVER (puppy, or dog)"},
+		/*  q  81  */ {"LQ", "GRID SQ shown above 128 m"},
+		/*  r  82  */ {"LR", "Repeater"},
+		/*  s  83  */ {"LS", "SHIP (pwr boat)"},
+		/*  t  84  */ {"LT", "TRUCK STOP"},
+		/*  u  85  */ {"LU", "TRUCK (18 wheeler)"},
+		/*  v  86  */ {"LV", "VAN"},
+		/*  w  87  */ {"LW", "WATER station"},
+		/*  x  88  */ {"LX", "xAPRS (Unix)"},
+		/*  y  89  */ {"LY", "YAGI @ QTH"},
+		/*  z  90  */ {"LZ", "TBD"},
+		/*  {  91  */ {"J1", ""},
+		/*  |  92  */ {"J2", "TNC Stream Switch"},
+		/*  }  93  */ {"J3", ""},
+		/*  ~  94  */ {"J3", "TNC Stream Switch"},
+	}
 }
 
 /*
  * Alternate symbol table.
  */
 
-var alternate_symtab = []SymbolEntry{
+func alternateSymtab() []SymbolEntry {
+	return []SymbolEntry{
 
-	/*     00  */ {"~~", "--no-symbol--"},
-	/*  !  01  */ {"OB", "EMERGENCY (!)"},
-	/*  "  02  */ {"OC", "reserved"},
-	/*  #  03  */ {"OD", "OVERLAY DIGI (green star)"},
-	/*  $  04  */ {"OE", "Bank or ATM  (green box)"},
-	/*  %  05  */ {"OF", "Power Plant with overlay"},
-	/*  &  06  */ {"OG", "I=Igte IGate R=RX T=1hopTX 2=2hopTX"},
-	/*  '  07  */ {"OH", "Crash (& now Incident sites)"},
-	/*  (  08  */ {"OI", "CLOUDY (other clouds w ovrly)"},
-	/*  )  09  */ {"OJ", "Firenet MEO, MODIS Earth Obs."},
-	/*  *  10  */ {"OK", "SNOW (& future ovrly codes)"},
-	/*  +  11  */ {"OL", "Church"},
-	/*  ,  12  */ {"OM", "Girl Scouts"},
-	/*  -  13  */ {"ON", "House (H=HF) (O = Op Present)"},
-	/*  .  14  */ {"OO", "Ambiguous (Big Question mark)"},
-	/*  /  15  */ {"OP", "Waypoint Destination"},
-	/*  0  16  */ {"A0", "CIRCLE (E/I/W=IRLP/Echolink/WIRES)"},
-	/*  1  17  */ {"A1", ""},
-	/*  2  18  */ {"A2", ""},
-	/*  3  19  */ {"A3", ""},
-	/*  4  20  */ {"A4", ""},
-	/*  5  21  */ {"A5", ""},
-	/*  6  22  */ {"A6", ""},
-	/*  7  23  */ {"A7", ""},
-	/*  8  24  */ {"A8", "802.11 or other network node"},
-	/*  9  25  */ {"A9", "Gas Station (blue pump)"},
-	/*  :  26  */ {"NR", "Hail (& future ovrly codes)"},
-	/*  ;  27  */ {"NS", "Park/Picnic area"},
-	/*  <  28  */ {"NT", "ADVISORY (one WX flag)"},
-	/*  =  29  */ {"NU", "APRStt Touchtone (DTMF users)"},
-	/*  >  30  */ {"NV", "OVERLAID CAR"},
-	/*  ?  31  */ {"NW", "INFO Kiosk  (Blue box with ?)"},
-	/*  @  32  */ {"NX", "HURRICANE/Trop-Storm"},
-	/*  A  33  */ {"AA", "overlayBOX DTMF & RFID & XO"},
-	/*  B  34  */ {"AB", "Blwng Snow (& future codes)"},
-	/*  C  35  */ {"AC", "Coast Guard"},
-	/*  D  36  */ {"AD", "Drizzle (proposed APRStt)"},
-	/*  E  37  */ {"AE", "Smoke (& other vis codes)"},
-	/*  F  38  */ {"AF", "Freezng rain (&future codes)"},
-	/*  G  39  */ {"AG", "Snow Shwr (& future ovrlys)"},
-	/*  H  40  */ {"AH", "Haze (& Overlay Hazards)"},
-	/*  I  41  */ {"AI", "Rain Shower"},
-	/*  J  42  */ {"AJ", "Lightning (& future ovrlys)"},
-	/*  K  43  */ {"AK", "Kenwood HT (W)"},
-	/*  L  44  */ {"AL", "Lighthouse"},
-	/*  M  45  */ {"AM", "MARS (A=Army,N=Navy,F=AF)"},
-	/*  N  46  */ {"AN", "Navigation Buoy"},
-	/*  O  47  */ {"AO", "Rocket"},
-	/*  P  48  */ {"AP", "Parking"},
-	/*  Q  49  */ {"AQ", "QUAKE"},
-	/*  R  50  */ {"AR", "Restaurant"},
-	/*  S  51  */ {"AS", "Satellite/Pacsat"},
-	/*  T  52  */ {"AT", "Thunderstorm"},
-	/*  U  53  */ {"AU", "SUNNY"},
-	/*  V  54  */ {"AV", "VORTAC Nav Aid"},
-	/*  W  55  */ {"AW", "# NWS site (NWS options)"},
-	/*  X  56  */ {"AX", "Pharmacy Rx (Apothicary)"},
-	/*  Y  57  */ {"AY", "Radios and devices"},
-	/*  Z  58  */ {"AZ", ""},
-	/*  [  59  */ {"DS", "W.Cloud (& humans w Ovrly)"},
-	/*  \  60  */ {"DT", "New overlayable GPS symbol"},
-	/*  ]  61  */ {"DU", ""},
-	/*  ^  62  */ {"DV", "# Aircraft (shows heading)"},
-	/*  _  63  */ {"DW", "# WX site (green digi)"},
-	/*  `  64  */ {"DX", "Rain (all types w ovrly)"},
-	/*  a  65  */ {"SA", "ARRL, ARES, WinLINK"},
-	/*  b  66  */ {"SB", "Blwng Dst/Snd (& others)"},
-	/*  c  67  */ {"SC", "CD triangle RACES/SATERN/etc"},
-	/*  d  68  */ {"SD", "DX spot by callsign"},
-	/*  e  69  */ {"SE", "Sleet (& future ovrly codes)"},
-	/*  f  70  */ {"SF", "Funnel Cloud"},
-	/*  g  71  */ {"SG", "Gale Flags"},
-	/*  h  72  */ {"SH", "Store. or HAMFST Hh=HAM store"},
-	/*  i  73  */ {"SI", "BOX or points of Interest"},
-	/*  j  74  */ {"SJ", "WorkZone (Steam Shovel)"},
-	/*  k  75  */ {"SK", "Special Vehicle SUV,ATV,4x4"},
-	/*  l  76  */ {"SL", "Areas      (box,circles,etc)"},
-	/*  m  77  */ {"SM", "Value Sign (3 digit display)"},
-	/*  n  78  */ {"SN", "OVERLAY TRIANGLE"},
-	/*  o  79  */ {"SO", "small circle"},
-	/*  p  80  */ {"SP", "Prtly Cldy (& future ovrlys)"},
-	/*  q  81  */ {"SQ", ""},
-	/*  r  82  */ {"SR", "Restrooms"},
-	/*  s  83  */ {"SS", "OVERLAY SHIP/boat (top view)"},
-	/*  t  84  */ {"ST", "Tornado"},
-	/*  u  85  */ {"SU", "OVERLAID TRUCK"},
-	/*  v  86  */ {"SV", "OVERLAID Van"},
-	/*  w  87  */ {"SW", "Flooding"},
-	/*  x  88  */ {"SX", "Wreck or Obstruction ->X<-"},
-	/*  y  89  */ {"SY", "Skywarn"},
-	/*  z  90  */ {"SZ", "OVERLAID Shelter"},
-	/*  {  91  */ {"Q1", "Fog (& future ovrly codes)"},
-	/*  |  92  */ {"Q2", "TNC Stream Switch"},
-	/*  }  93  */ {"Q3", ""},
-	/*  ~  94  */ {"Q4", "TNC Stream Switch"},
+		/*     00  */ {"~~", "--no-symbol--"},
+		/*  !  01  */ {"OB", "EMERGENCY (!)"},
+		/*  "  02  */ {"OC", "reserved"},
+		/*  #  03  */ {"OD", "OVERLAY DIGI (green star)"},
+		/*  $  04  */ {"OE", "Bank or ATM  (green box)"},
+		/*  %  05  */ {"OF", "Power Plant with overlay"},
+		/*  &  06  */ {"OG", "I=Igte IGate R=RX T=1hopTX 2=2hopTX"},
+		/*  '  07  */ {"OH", "Crash (& now Incident sites)"},
+		/*  (  08  */ {"OI", "CLOUDY (other clouds w ovrly)"},
+		/*  )  09  */ {"OJ", "Firenet MEO, MODIS Earth Obs."},
+		/*  *  10  */ {"OK", "SNOW (& future ovrly codes)"},
+		/*  +  11  */ {"OL", "Church"},
+		/*  ,  12  */ {"OM", "Girl Scouts"},
+		/*  -  13  */ {"ON", "House (H=HF) (O = Op Present)"},
+		/*  .  14  */ {"OO", "Ambiguous (Big Question mark)"},
+		/*  /  15  */ {"OP", "Waypoint Destination"},
+		/*  0  16  */ {"A0", "CIRCLE (E/I/W=IRLP/Echolink/WIRES)"},
+		/*  1  17  */ {"A1", ""},
+		/*  2  18  */ {"A2", ""},
+		/*  3  19  */ {"A3", ""},
+		/*  4  20  */ {"A4", ""},
+		/*  5  21  */ {"A5", ""},
+		/*  6  22  */ {"A6", ""},
+		/*  7  23  */ {"A7", ""},
+		/*  8  24  */ {"A8", "802.11 or other network node"},
+		/*  9  25  */ {"A9", "Gas Station (blue pump)"},
+		/*  :  26  */ {"NR", "Hail (& future ovrly codes)"},
+		/*  ;  27  */ {"NS", "Park/Picnic area"},
+		/*  <  28  */ {"NT", "ADVISORY (one WX flag)"},
+		/*  =  29  */ {"NU", "APRStt Touchtone (DTMF users)"},
+		/*  >  30  */ {"NV", "OVERLAID CAR"},
+		/*  ?  31  */ {"NW", "INFO Kiosk  (Blue box with ?)"},
+		/*  @  32  */ {"NX", "HURRICANE/Trop-Storm"},
+		/*  A  33  */ {"AA", "overlayBOX DTMF & RFID & XO"},
+		/*  B  34  */ {"AB", "Blwng Snow (& future codes)"},
+		/*  C  35  */ {"AC", "Coast Guard"},
+		/*  D  36  */ {"AD", "Drizzle (proposed APRStt)"},
+		/*  E  37  */ {"AE", "Smoke (& other vis codes)"},
+		/*  F  38  */ {"AF", "Freezng rain (&future codes)"},
+		/*  G  39  */ {"AG", "Snow Shwr (& future ovrlys)"},
+		/*  H  40  */ {"AH", "Haze (& Overlay Hazards)"},
+		/*  I  41  */ {"AI", "Rain Shower"},
+		/*  J  42  */ {"AJ", "Lightning (& future ovrlys)"},
+		/*  K  43  */ {"AK", "Kenwood HT (W)"},
+		/*  L  44  */ {"AL", "Lighthouse"},
+		/*  M  45  */ {"AM", "MARS (A=Army,N=Navy,F=AF)"},
+		/*  N  46  */ {"AN", "Navigation Buoy"},
+		/*  O  47  */ {"AO", "Rocket"},
+		/*  P  48  */ {"AP", "Parking"},
+		/*  Q  49  */ {"AQ", "QUAKE"},
+		/*  R  50  */ {"AR", "Restaurant"},
+		/*  S  51  */ {"AS", "Satellite/Pacsat"},
+		/*  T  52  */ {"AT", "Thunderstorm"},
+		/*  U  53  */ {"AU", "SUNNY"},
+		/*  V  54  */ {"AV", "VORTAC Nav Aid"},
+		/*  W  55  */ {"AW", "# NWS site (NWS options)"},
+		/*  X  56  */ {"AX", "Pharmacy Rx (Apothicary)"},
+		/*  Y  57  */ {"AY", "Radios and devices"},
+		/*  Z  58  */ {"AZ", ""},
+		/*  [  59  */ {"DS", "W.Cloud (& humans w Ovrly)"},
+		/*  \  60  */ {"DT", "New overlayable GPS symbol"},
+		/*  ]  61  */ {"DU", ""},
+		/*  ^  62  */ {"DV", "# Aircraft (shows heading)"},
+		/*  _  63  */ {"DW", "# WX site (green digi)"},
+		/*  `  64  */ {"DX", "Rain (all types w ovrly)"},
+		/*  a  65  */ {"SA", "ARRL, ARES, WinLINK"},
+		/*  b  66  */ {"SB", "Blwng Dst/Snd (& others)"},
+		/*  c  67  */ {"SC", "CD triangle RACES/SATERN/etc"},
+		/*  d  68  */ {"SD", "DX spot by callsign"},
+		/*  e  69  */ {"SE", "Sleet (& future ovrly codes)"},
+		/*  f  70  */ {"SF", "Funnel Cloud"},
+		/*  g  71  */ {"SG", "Gale Flags"},
+		/*  h  72  */ {"SH", "Store. or HAMFST Hh=HAM store"},
+		/*  i  73  */ {"SI", "BOX or points of Interest"},
+		/*  j  74  */ {"SJ", "WorkZone (Steam Shovel)"},
+		/*  k  75  */ {"SK", "Special Vehicle SUV,ATV,4x4"},
+		/*  l  76  */ {"SL", "Areas      (box,circles,etc)"},
+		/*  m  77  */ {"SM", "Value Sign (3 digit display)"},
+		/*  n  78  */ {"SN", "OVERLAY TRIANGLE"},
+		/*  o  79  */ {"SO", "small circle"},
+		/*  p  80  */ {"SP", "Prtly Cldy (& future ovrlys)"},
+		/*  q  81  */ {"SQ", ""},
+		/*  r  82  */ {"SR", "Restrooms"},
+		/*  s  83  */ {"SS", "OVERLAY SHIP/boat (top view)"},
+		/*  t  84  */ {"ST", "Tornado"},
+		/*  u  85  */ {"SU", "OVERLAID TRUCK"},
+		/*  v  86  */ {"SV", "OVERLAID Van"},
+		/*  w  87  */ {"SW", "Flooding"},
+		/*  x  88  */ {"SX", "Wreck or Obstruction ->X<-"},
+		/*  y  89  */ {"SY", "Skywarn"},
+		/*  z  90  */ {"SZ", "OVERLAID Shelter"},
+		/*  {  91  */ {"Q1", "Fog (& future ovrly codes)"},
+		/*  |  92  */ {"Q2", "TNC Stream Switch"},
+		/*  }  93  */ {"Q3", ""},
+		/*  ~  94  */ {"Q4", "TNC Stream Switch"},
+	}
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	symbols_init
+ * Function:	NewAPRSSymbolData
  *
- * Purpose:	Initialization for functions related to symbols.
- *
- * Inputs:
- *
- * Global output:
- *		new_sym_ptr
- *		new_sym_size
- *		new_sym_len
+ * Purpose:	Initialise and return a new APRSSymbolData.
  *
  * Description:	The primary and alternate symbol tables are constant
  *		so they are hardcoded.
@@ -273,9 +270,11 @@ type new_sym_t struct {
 	description string
 }
 
-var new_sym_ptr []*new_sym_t
+type APRSSymbolData struct {
+	newSymbols []*new_sym_t
+}
 
-func symbols_init() {
+func NewAPRSSymbolData() *APRSSymbolData {
 	/*
 	 * We only care about lines with this format:
 	 *
@@ -312,9 +311,7 @@ func symbols_init() {
 			x[COL6_DESC] != ' ')
 	}
 
-	if len(new_sym_ptr) > 0 {
-		return /* was called already. */
-	}
+	var sd = new(APRSSymbolData)
 
 	// If search strategy changes, be sure to keep decode_tocall in sync.
 
@@ -347,7 +344,7 @@ func symbols_init() {
 		dw_printf("Warning: Could not open 'symbols-new.txt'.\n")
 		dw_printf("The \"new\" OVERLAID character information will not be available.\n")
 
-		return
+		return sd
 	}
 
 	defer fp.Close()
@@ -365,7 +362,7 @@ func symbols_init() {
 		newSymbol.symbol = line[COL2_SYMBOL]
 		newSymbol.description = strings.TrimSpace(line[COL6_DESC:])
 
-		new_sym_ptr = append(new_sym_ptr, newSymbol)
+		sd.newSymbols = append(sd.newSymbols, newSymbol)
 	}
 
 	/*
@@ -376,7 +373,8 @@ func symbols_init() {
 			}
 		#endif
 	*/
-} /* end symbols_init */
+	return sd
+} /* end NewAPRSSymbolData */
 
 /*------------------------------------------------------------------
  *
@@ -388,15 +386,18 @@ func symbols_init() {
  *
  *------------------------------------------------------------------*/
 
-func symbols_list() {
+func (sd *APRSSymbolData) symbols_list() {
 	dw_printf("\n")
+
+	var pt = primarySymtab()
+	var at = alternateSymtab()
 
 	dw_printf("\tPRIMARY SYMBOL TABLE\n")
 	dw_printf("\n")
 	dw_printf("sym  GPSxy  GPSCnn  APRStt  Icon\n")
 	dw_printf("---  -----  ------  ------  ----\n")
 
-	for n, s := range primary_symtab {
+	for n, s := range pt {
 		dw_printf(" /%c     %s      %02d  AB1%02d   %s\n", n+' ', s.xy, n, n, s.description)
 	}
 
@@ -406,7 +407,7 @@ func symbols_list() {
 	dw_printf("sym  GPSxy  GPSEnn  APRStt  Icon\n")
 	dw_printf("---  -----  ------  ------  ----\n")
 
-	for n, s := range alternate_symtab {
+	for n, s := range at {
 		dw_printf(" \\%c     %s      %02d  AB2%02d   %s\n", n+' ', s.xy, n, n, s.description)
 	}
 
@@ -416,41 +417,41 @@ func symbols_list() {
 	dw_printf("sym  GPSxyz  GPSxnn  APRStt   Icon\n")
 	dw_printf("---  ------  ------  ------   ----\n")
 
-	for _, s := range new_sym_ptr {
+	for _, s := range sd.newSymbols {
 		var overlay = s.overlay
 		var symbol = s.symbol
 		var index = int(symbol - ' ')
 
-		var tones = symbols_to_tones(overlay, symbol)
+		var tones = sd.symbols_to_tones(overlay, symbol)
 
 		if overlay == '/' {
-			if index >= len(primary_symtab) {
+			if index >= len(pt) {
 				// TODO KG Warn somehow?
 				continue
 			}
 
 			dw_printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
-				primary_symtab[index].xy, ' ',
+				pt[index].xy, ' ',
 				index, tones,
 				s.description)
 		} else if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
-			if index >= len(alternate_symtab) {
+			if index >= len(at) {
 				// TODO KG Warn somehow?
 				continue
 			}
 
 			dw_printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
-				alternate_symtab[index].xy, overlay,
+				at[index].xy, overlay,
 				tones,
 				s.description)
 		} else {
-			if index >= len(alternate_symtab) {
+			if index >= len(at) {
 				// TODO KG Warn somehow?
 				continue
 			}
 
 			dw_printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
-				alternate_symtab[index].xy, ' ',
+				at[index].xy, ' ',
 				symbol-' ', tones,
 				s.description)
 		}
@@ -497,26 +498,28 @@ func symbols_list() {
  *
  *------------------------------------------------------------------*/
 
-var ssid_to_sym = [16]byte{
-	' ',  /* 0 - No icon. */
-	'a',  /* 1 - Ambulance */
-	'U',  /* 2 - Bus */
-	'f',  /* 3 - Fire Truck */
-	'b',  /* 4 - Bicycle */
-	'Y',  /* 5 - Yacht */
-	'X',  /* 6 - Helicopter */
-	'\'', /* 7 - Small Aircraft */
-	's',  /* 8 - Ship */
-	'>',  /* 9 - Car */
-	'<',  /* 10 - Motorcycle */
-	'O',  /* 11 - Ballon */
-	'j',  /* 12 - Jeep */
-	'R',  /* 13 - Recreational Vehicle */
-	'k',  /* 14 - Truck */
-	'v',  /* 15 - Van */
+func ssidToSym() [16]byte {
+	return [16]byte{
+		' ',  /* 0 - No icon. */
+		'a',  /* 1 - Ambulance */
+		'U',  /* 2 - Bus */
+		'f',  /* 3 - Fire Truck */
+		'b',  /* 4 - Bicycle */
+		'Y',  /* 5 - Yacht */
+		'X',  /* 6 - Helicopter */
+		'\'', /* 7 - Small Aircraft */
+		's',  /* 8 - Ship */
+		'>',  /* 9 - Car */
+		'<',  /* 10 - Motorcycle */
+		'O',  /* 11 - Ballon */
+		'j',  /* 12 - Jeep */
+		'R',  /* 13 - Recreational Vehicle */
+		'k',  /* 14 - Truck */
+		'v',  /* 15 - Van */
+	}
 }
 
-func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bool) {
+func (sd *APRSSymbolData) symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bool) {
 	/*
 	 * This part does not apply to MIC-E format because the destination
 	 * is used to encode latitude and other information.
@@ -553,8 +556,9 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
 			strings.HasPrefix(dest, "SYM")) && len(dest) >= 5 {
 			var xy = string(dest[3]) + string(dest[4])
 
+			var pt = primarySymtab()
 			for nn := 1; nn <= 94; nn++ {
-				if xy == primary_symtab[nn].xy {
+				if xy == pt[nn].xy {
 					return '/', byte(' ' + nn), true // Primary
 				}
 			}
@@ -576,8 +580,9 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
 				z = dest[5]
 			}
 
+			var at = alternateSymtab()
 			for nn := 1; nn <= 94; nn++ {
-				if xy == alternate_symtab[nn].xy {
+				if xy == at[nn].xy {
 					var symtab byte = '\\' // Alternate
 					if unicode.IsUpper(rune(z)) || unicode.IsDigit(rune(z)) {
 						symtab = z
@@ -614,7 +619,8 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
 		if found {
 			var ssid, _ = strconv.Atoi(ssidStr)
 			if ssid >= 1 && ssid <= 15 {
-				return '/', ssid_to_sym[ssid], true // All in Primary table
+				var sts = ssidToSym()
+				return '/', sts[ssid], true // All in Primary table
 			}
 		}
 	}
@@ -632,15 +638,15 @@ func symbols_from_dest_or_src(dti byte, src string, dest string) (byte, byte, bo
  *		symbol		any printable character ! to ~
  *
  * Returns:	dest		6 character "destination" of the forms
- *					GPSCnn  - primary table.
- *					GPSEnn  - alternate table.
- *					GPSxyz  - alternate with overlay.
+ *				GPSCnn  - primary table.
+ *				GPSEnn  - alternate table.
+ *				GPSxyz  - alternate with overlay.
  *
  *          ok	true for success, false for error.
  *
  *------------------------------------------------------------------*/
 
-func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
+func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, bool) {
 	if symbol >= '!' && symbol <= '~' && symtab == '/' {
 		/* Primary Symbol table. */
 		return fmt.Sprintf("GPSC%02d", symbol-' '), true
@@ -649,7 +655,8 @@ func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
 		return fmt.Sprintf("GPSE%02d", symbol-' '), true
 	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
 		/* Alternate Symbol table with overlay. */
-		return fmt.Sprintf("GPS%s%c", alternate_symtab[symbol-' '].xy, symtab), true
+		var at = alternateSymtab()
+		return fmt.Sprintf("GPS%s%c", at[symbol-' '].xy, symtab), true
 	}
 
 	text_color_set(DW_COLOR_ERROR)
@@ -680,9 +687,7 @@ func symbols_into_dest(symtab byte, symbol byte) (string, bool) {
  *
  *------------------------------------------------------------------*/
 
-func symbols_get_description(symtab byte, symbol byte) string {
-	symbols_init()
-
+func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) string {
 	// The symbol table identifier should be
 	//	/	for symbol from primary table
 	//	\	for symbol from alternate table
@@ -702,7 +707,8 @@ func symbols_get_description(symtab byte, symbol byte) string {
 
 		symbol = ' '
 
-		return primary_symtab[symbol-' '].description
+		var pt = primarySymtab()
+		return pt[symbol-' '].description
 	}
 
 	// Bounds check before using symbol as index into table.
@@ -716,7 +722,7 @@ func symbols_get_description(symtab byte, symbol byte) string {
 
 	// First try to match with the "new" symbols.
 
-	for _, s := range new_sym_ptr {
+	for _, s := range sd.newSymbols {
 		if symtab == s.overlay && symbol == s.symbol {
 			return s.description
 		}
@@ -724,10 +730,12 @@ func symbols_get_description(symtab byte, symbol byte) string {
 
 	// Otherwise use the original symbol tables.
 
+	var pt = primarySymtab()
 	if symtab == '/' {
-		return primary_symtab[symbol-' '].description
+		return pt[symbol-' '].description
 	} else {
-		var description = alternate_symtab[symbol-' '].description
+		var at = alternateSymtab()
+		var description = at[symbol-' '].description
 		if symtab != '\\' {
 			description += " w/overlay "
 			description += string(rune(symtab))
@@ -745,7 +753,7 @@ func symbols_get_description(symtab byte, symbol byte) string {
  *
  * Inputs:	overlay		Explicit overlay or space.
  *		description	Substring of one of the descriptions.
- *				Example: dog
+ *			Example: dog
  *
  * Outputs:	symtab		/, \, 0-9, A-Z
  *		symbol		any printable character ! to ~
@@ -753,17 +761,17 @@ func symbols_get_description(symtab byte, symbol byte) string {
  *
  *------------------------------------------------------------------*/
 
-func symbols_code_from_description(overlay byte, description string) (byte, byte, bool) {
-	symbols_init()
-
+func (sd *APRSSymbolData) symbols_code_from_description(overlay byte, description string) (byte, byte, bool) {
 	/*
 	 * If user specified a particular overlay (i.e. for config file BEACON),
 	 * first try the alternate symbol table.
 	 * If that fails should we give up or ignore the overlay and keep trying?
 	 */
 
+	var at = alternateSymtab()
+
 	if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
-		for j, s := range alternate_symtab {
+		for j, s := range at {
 			if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
 				return overlay, byte(j + ' '), true
 			}
@@ -774,7 +782,8 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
 	/*
 	 * Search primary table.
 	 */
-	for j, s := range primary_symtab {
+	var pt = primarySymtab()
+	for j, s := range pt {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
 			return '/', byte(j + ' '), true
 		}
@@ -783,7 +792,7 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
 	/*
 	 * Search alternate table.
 	 */
-	for j, s := range alternate_symtab {
+	for j, s := range at {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
 			return '\\', byte(j + ' '), true
 		}
@@ -794,7 +803,7 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
 	 * Probably want this last so get get the most standard and
 	 * generic for queries such as "house" or ...
 	 */
-	for _, s := range new_sym_ptr {
+	for _, s := range sd.newSymbols {
 		if strings.Contains(strings.ToLower(s.description), strings.ToLower(description)) {
 			return s.overlay, s.symbol, true
 		}
@@ -824,11 +833,11 @@ func symbols_code_from_description(overlay byte, description string) (byte, byte
  *		Primary: 	AB1nn		nn = same number as GPSCnn
  *		Alternate:	AB2nn 		nn = same number as GPSEnn
  *		with overlay:	AB0nntt   	nn = same as with alternate
- *						tt = one or two tones from two key method.
+ *				tt = one or two tones from two key method.
  *
  *------------------------------------------------------------------*/
 
-func symbols_to_tones(symtab byte, symbol byte) string {
+func (sd *APRSSymbolData) symbols_to_tones(symtab byte, symbol byte) string {
 	if symtab == '/' {
 		return fmt.Sprintf("AB1%02d", symbol-' ')
 	} else if unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab)) {
