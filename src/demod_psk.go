@@ -451,6 +451,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		exit(1)
 	}
 
+	if D.u.psk.pre_filter_taps < 3 {
+		D.u.psk.pre_filter_taps = 3
+	}
+
 	if D.u.psk.delay_line_taps > MAX_FILTER_SIZE {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Calculated delay line size of %d is too large.\n", D.u.psk.delay_line_taps)
@@ -467,6 +471,10 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
 			MAX_FILTER_SIZE)
 		exit(1)
+	}
+
+	if D.u.psk.lp_filter_taps < 3 {
+		D.u.psk.lp_filter_taps = 3
 	}
 
 	/*
