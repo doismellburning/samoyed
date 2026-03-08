@@ -490,7 +490,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		os.Exit(1)
 	}
 
-	gen_tone_init(&modem, *amplitude/2, true)
+	genTone = NewGenToneService(&modem, *amplitude/2, true)
 	morse_init(&modem, *amplitude/2)
 	dtmf_init(&modem, *amplitude/2)
 
@@ -580,7 +580,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		for speed_error := -variable_speed_max_error; speed_error <= variable_speed_max_error+0.001; speed_error += variable_speed_increment {
 			// Baud is int so we get some roundoff.  Make it real?
 			modem.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
-			gen_tone_init(&modem, *amplitude/2, true)
+			genTone = NewGenToneService(&modem, *amplitude/2, true)
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error)
 			send_packet(stemp)
@@ -871,7 +871,7 @@ func send_packet(str string) {
 			var n = int(float64(samples_per_symbol) * (32 + float64(genPacketsRand())/float64(MY_RAND_MAX)))
 
 			for range n {
-				gen_tone_put_sample(c, 0, 0)
+				genTone.PutSample(c, 0, 0)
 			}
 
 			layer2_preamble_postamble(c, 32, false, &modem)

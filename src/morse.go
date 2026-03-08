@@ -247,7 +247,7 @@ func morse_tone(channel int, tu int, wpm int) {
 	for j := 0; j < nsamples; j++ {
 		tone_phase += f1_change_per_sample
 		var sam = SineTable[(tone_phase>>24)&0xff]
-		gen_tone_put_sample(channel, a, sam)
+		genTone.PutSample(channel, a, sam)
 	}
 
 	// TODO KG #endif
@@ -287,7 +287,7 @@ func morse_quiet(channel int, tu int, wpm int) {
 	var nsamples = int((TIME_UNITS_TO_MS(tu, wpm) * float64(save_audio_config_p.adev[a].samples_per_sec) / 1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-		gen_tone_put_sample(channel, a, sam)
+		genTone.PutSample(channel, a, sam)
 	}
 	// TODO KG #endif
 } /* end morse_quiet */
@@ -322,7 +322,7 @@ func morse_quiet_ms(channel int, ms int) {
 	var nsamples = int(float64(ms*save_audio_config_p.adev[a].samples_per_sec/1000.) + 0.5)
 
 	for j := 0; j < nsamples; j++ {
-		gen_tone_put_sample(channel, a, sam)
+		genTone.PutSample(channel, a, sam)
 	}
 
 	// TODO KG #endif

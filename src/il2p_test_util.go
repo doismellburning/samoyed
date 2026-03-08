@@ -28,7 +28,7 @@ func tone_gen_put_bit(channel int, data int) {
 	if IL2P_TEST {
 		tone_gen_put_bit_fake(channel, data)
 	} else {
-		tone_gen_put_bit_real(channel, data)
+		genTone.PutBit(channel, data)
 	}
 }
 
