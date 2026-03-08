@@ -669,9 +669,9 @@ func (mdb *MHeardDB) dump() {
 		}
 
 		if ta.Before(tb) {
-			return -1
-		} else if ta.After(tb) {
 			return 1
+		} else if ta.After(tb) {
+			return -1
 		} else {
 			return 0
 		}
