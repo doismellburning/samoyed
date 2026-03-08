@@ -723,6 +723,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Initialize the digipeater and IGate functions.
 	 */
+	mheardDB = NewMHeardDB(d_m_opt)
 	digipeater_init(audio_config, &digi_config)
 	igate_init(audio_config, &igate_config, &digi_config, d_i_opt)
 	cdigipeater_init(audio_config, &cdigi_config)
@@ -763,7 +764,6 @@ x = Silence FX.25 information.`)
 	 */
 
 	log_init(misc_config.log_daily_names, misc_config.log_path)
-	mheardDB = NewMHeardDB(d_m_opt)
 	beacon_init(audio_config, misc_config, &igate_config)
 
 	/*
