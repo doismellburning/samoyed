@@ -50,6 +50,7 @@ var waypointSender *WaypointSender
 var kissNetSvc *KissNetService
 var mheardDB *MHeardDB
 var xmitSvc *XmitService
+var ttGateway *TTGateway
 
 /*-------------------------------------------------------------------
  *
@@ -587,7 +588,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the touch tone decoder & APRStt gateway.
 	 */
 	dtmf_init(audio_config, audio_amplitude)
-	aprs_tt_init(&dw_tt_config, aprstt_debug)
+	ttGateway = NewTTGateway(&dw_tt_config, aprstt_debug)
 	tt_user_init(audio_config, &dw_tt_config)
 
 	/*
@@ -1145,13 +1146,13 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	if subchan == -1 { // from DTMF decoder
 		if dw_tt_config.gateway_enabled > 0 && len(pinfo) >= 2 {
-			aprs_tt_sequence(channel, string(pinfo[1:]))
+			ttGateway.Sequence(channel, string(pinfo[1:]))
 		}
 	} else if len(pinfo) >= 2 && pinfo[0] == 't' && dw_tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		aprs_tt_sequence(channel, string(pinfo[1:]))
+		ttGateway.Sequence(channel, string(pinfo[1:]))
 	} else {
 		/*
 		 * Send to the IGate processing.
