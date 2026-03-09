@@ -47,6 +47,7 @@ var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var waypointSender *WaypointSender
+var kissNetSvc *KissNetService
 var mheardDB *MHeardDB
 var xmitSvc *XmitService
 
@@ -207,7 +208,7 @@ x = Silence FX.25 information.`)
 				kisspt_set_debug(d_k_opt)
 			case 'n':
 				d_n_opt++
-				kiss_net_set_debug(d_n_opt)
+				// kiss_net_set_debug called after NewKissNetService below
 			case 'u':
 				d_u_opt = true
 				// separate out gps & waypoints.
@@ -734,7 +735,8 @@ x = Silence FX.25 information.`)
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
 	server_init(audio_config, misc_config)
-	kissnet_init(misc_config)
+	kissNetSvc = NewKissNetService(misc_config)
+	kissNetSvc.SetDebug(d_n_opt)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
@@ -1106,7 +1108,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	var fbuf = ax25_pack(pp)
 
 	server_send_rec_packet(channel, pp, fbuf)                                          // AGW net protocol
-	kissnet_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)    // KISS TCP
+	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)   // KISS TCP
 	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
@@ -1116,7 +1118,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			var ao_fbuf = ax25_pack(ao_pp)
 
 			server_send_rec_packet(channel, ao_pp, ao_fbuf)
-			kissnet_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			ax25_delete(ao_pp)
