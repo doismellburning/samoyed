@@ -189,11 +189,11 @@ func NewKissNetService(mc *misc_config_s) *KissNetService {
 			kps.tcp_port = mc.kiss_port[i]
 			kps.channel = mc.kiss_chan[i]
 
-			kns.initOne(kps)
-
 			// Add to list.
 			kps.pnext = kns.allPorts
 			kns.allPorts = kps
+
+			kns.initOne(kps)
 		}
 	}
 
