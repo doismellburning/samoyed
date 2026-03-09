@@ -38,8 +38,8 @@ package direwolf
  *			_3 	SlotTime	"	"
  *
  *			_4	TXtail		"	"
- *						Spec says it is obsolete but Xastir
- *						sends it and we respect it.
+ *					Spec says it is obsolete but Xastir
+ *					sends it and we respect it.
  *
  *			_5	FullDuplex	Ignored.
  *
@@ -150,29 +150,24 @@ import (
 	"syscall"
 )
 
-var s_misc_config_p *misc_config_s
-
-// Each TCP port has its own status block.
-// There is a variable number so use a linked list.
-
-var all_ports *kissport_status_s
-
-var kiss_debug = 0 /* Print information flowing from and to client. */
-
-func kiss_net_set_debug(n int) {
-	kiss_debug = n
+// KissNetService manages KISS protocol TCP socket connections.
+// Each TCP port has its own status block in a linked list.
+type KissNetService struct {
+	miscConfigP *misc_config_s
+	allPorts    *kissport_status_s
+	debug       int /* Print information flowing from and to client. */
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        kissnet_init
+ * Name:        NewKissNetService
  *
  * Purpose:     Set up a server to listen for connection requests from
  *		an application such as Xastir or APRSIS32.
  *		This is called once from the main program.
  *
  * Inputs:	mc.kiss_port	- TCP port for server.
- *				0 means disable.  New in version 1.2.
+ *				  0 means disable.  New in version 1.2.
  *
  * Outputs:
  *
@@ -183,8 +178,9 @@ func kiss_net_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kissnet_init(mc *misc_config_s) {
-	s_misc_config_p = mc
+func NewKissNetService(mc *misc_config_s) *KissNetService {
+	var kns = new(KissNetService)
+	kns.miscConfigP = mc
 
 	for i := range MAX_KISS_TCP_PORTS {
 		if mc.kiss_port[i] != 0 {
@@ -193,16 +189,303 @@ func kissnet_init(mc *misc_config_s) {
 			kps.tcp_port = mc.kiss_port[i]
 			kps.channel = mc.kiss_chan[i]
 
-			kissnet_init_one(kps)
-
 			// Add to list.
-			kps.pnext = all_ports
-			all_ports = kps
+			kps.pnext = kns.allPorts
+			kns.allPorts = kps
+
+			kns.initOne(kps)
 		}
+	}
+
+	return kns
+}
+
+func (kns *KissNetService) SetDebug(n int) {
+	kns.debug = n
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        SendRecPacket
+ *
+ * Purpose:     Send a packet, received over the radio, to the client app.
+ *
+ * Inputs:	chan		- Channel number where packet was received.
+ *			  0 = first, 1 = second if any.
+ *
+// TODO: add kiss_cmd
+ *
+ *		fbuf		- Raw received frame buffer
+ *
+ *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
+ *				  KISS_CMD_SET_HARDWARE when responding to a query.
+ *
+ *		flen		- Number of bytes for AX.25 frame.
+ *				  When called from kiss_rec_byte, flen will be -1
+ *				  indicating a text string rather than frame content.
+ *				  This is used to fake out an application that thinks
+ *				  it is using a traditional TNC and tries to put it
+ *				  into KISS mode.
+ *
+ *		onlykps		- KISS TCP status block pointer or NULL.
+ *
+ *		onlyclient	- It is possible to have more than client attached
+ *				  at the same time with TCP KISS.
+ *				  Starting with version 1.7 we can have multiple TCP ports.
+ *				  When a frame is received from the radio we normally want it
+ *				  to go to all of the clients.
+ *				  In this case specify NULL for onlykps and -1 tcp client.
+ *				  When responding to a command from the client, we want
+ *				  to send only to that one client app.  In this case
+ *				  a non NULL kps and onlyclient >= 0.
+ *
+ * Description:	Send message to client(s) if connected.
+ *		Disconnect from client, and notify user, if any error.
+ *
+ *--------------------------------------------------------------------*/
+
+func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int,
+	onlykps *kissport_status_s, onlyclient int) {
+	// Something received over the radio would normally be sent to all attached clients.
+	// However, there are times we want to send a response only to a particular client.
+	// In the case of a serial port or pseudo terminal, there is only one potential client.
+	// so the response would be sent to only one place.  A new parameter has been added for this.
+	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+		if onlykps == nil || kps == onlykps {
+			for client := 0; client < MAX_NET_CLIENTS; client++ {
+				if onlyclient == -1 || client == onlyclient {
+					if kps.client_sock[client] != nil {
+						var kiss_buff []byte
+
+						if flen < 0 {
+							// A client app might think it is attached to a traditional TNC.
+							// It might try sending commands over and over again trying to get the TNC into KISS mode.
+							// We recognize this attempt and send it something to keep it happy.
+							text_color_set(DW_COLOR_ERROR)
+							dw_printf("KISS TCP: Something unexpected from client application.\n")
+							dw_printf("Is client app treating this like an old TNC with command mode?\n")
+							dw_printf("This can be caused by the application sending commands to put a\n")
+							dw_printf("traditional TNC into KISS mode.  It is usually a harmless warning.\n")
+							dw_printf("For best results, configure for a KISS-only TNC to avoid this.\n")
+							dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
+
+							if kns.debug > 0 {
+								kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
+							}
+
+							kiss_buff = fbuf
+						} else {
+							var stemp []byte
+
+							// New in 1.7.
+							// Previously all channels were sent to everyone.
+							// We now have tcp ports which carry only a single radio channel.
+							// The application will see KISS channel 0 regardless of the radio channel.
+
+							if kps.channel == -1 { //nolint:staticcheck
+								// Normal case, all channels.
+								stemp = []byte{byte((channel << 4) | kiss_cmd)}
+							} else if kps.channel == channel {
+								// Single radio channel for this port.  Application sees 0.
+								stemp = []byte{byte((0 << 4) | kiss_cmd)}
+							} else {
+								// Skip it.
+								continue
+							}
+
+							stemp = append(stemp, fbuf...)
+
+							if kns.debug >= 2 {
+								/* AX.25 frame with the CRC removed. */
+								text_color_set(DW_COLOR_DEBUG)
+								dw_printf("\n")
+								dw_printf("Packet content before adding KISS framing and any escapes:\n")
+								hex_dump(fbuf)
+							}
+
+							kiss_buff = kiss_encapsulate(stemp)
+
+							/* This has the escapes and the surrounding FENDs. */
+
+							if kns.debug > 0 {
+								kiss_debug_print(TO_CLIENT, "", kiss_buff)
+							}
+						}
+
+						var _, err = kps.client_sock[client].Write(kiss_buff)
+						if err != nil {
+							text_color_set(DW_COLOR_ERROR)
+							dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
+							kps.client_sock[client].Close()
+							kps.client_sock[client] = nil
+						}
+					} // frame length >= 0
+				} // if all clients or the one specifie
+			} // for each client on the tcp port
+		} // if all ports or the one specified
+	} // for each tcp port
+} /* end SendRecPacket */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Copy
+ *
+ * Purpose:     Send data from one network KISS client to all others.
+ *
+ * Inputs:	in_msg		- KISS frame data without the framing or escapes.
+ *			  The first byte is channel and command (should be data).
+ *
+ *		in_len 		- Number of bytes in above.
+ *
+ *		chan		- Channel.  Use this instead of first byte of in_msg.
+ *
+ *		cmd		- KISS command nybble.
+ *				  Should be 0 because I'm expecting this only for data.
+ *
+ *		from_client	- Number of network (TCP) client instance.
+ *				  Should be 0, 1, 2, ...
+ *
+ *
+ * Global In:	kiss_copy	- From misc. configuration.
+ *				  This enables the feature.
+ *
+ *
+ * Description:	Send message to any attached network KISS clients, other than the one where it came from.
+ *		Enable this by putting KISSCOPY in the configuration file.
+ *		Note that this applies only to network (TCP) KISS clients, not serial port, or pseudo terminal.
+ *
+ *
+ *--------------------------------------------------------------------*/
+
+func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
+	// Copy before mutating
+	var msg = make([]byte, len(_msg))
+	copy(msg, _msg)
+
+	if kns.miscConfigP.kiss_copy {
+		for kps := kns.allPorts; kps != nil; kps = kps.pnext {
+			for client := 0; client < MAX_NET_CLIENTS; client++ {
+				// To all but origin.
+				if !(kps == from_kps && client == from_client) {
+					if kps.client_sock[client] != nil {
+						if kps.channel == -1 || kps.channel == channel {
+							// Two different cases here:
+							//  - The TCP port allows all channels, or
+							//  - The TCP port allows only one channel.  In this case set KISS channel to 0.
+							if kps.channel == -1 {
+								msg[0] = byte((channel << 4) | cmd)
+							} else {
+								msg[0] = byte(0 | cmd) // set channel to zero.
+							}
+
+							var kiss_buff = kiss_encapsulate(msg)
+
+							/* This has the escapes and the surrounding FENDs. */
+
+							if kns.debug > 0 {
+								kiss_debug_print(TO_CLIENT, "", kiss_buff)
+							}
+
+							var _, err = kps.client_sock[client].Write(kiss_buff)
+							if err != nil {
+								text_color_set(DW_COLOR_ERROR)
+								dw_printf("\nError %s copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", err, kps.tcp_port, client)
+								kps.client_sock[client].Close()
+								kps.client_sock[client] = nil
+							}
+						} // Channel is allowed on this port.
+					} // socket is open
+				} // if origin and destination different.
+			} // loop over all KISS network clients for one port.
+		} // loop over all KISS TCP ports
+	} // Feature enabled.
+} /* end Copy */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        listenThread
+ *
+ * Purpose:     Wait for KISS messages from an application.
+ *
+ * Inputs:	arg		- client number, 0 .. MAX_NET_CLIENTS-1
+ *
+ * Outputs:	client_sock[n]	- File descriptor for communicating with client app.
+ *
+ * Description:	Process messages from the client application.
+ *		Note that the client can go away and come back again and
+ *		re-establish communication without restarting this application.
+ *
+ *--------------------------------------------------------------------*/
+
+/* Return one byte (value 0 - 255) */
+
+func (kns *KissNetService) get(kps *kissport_status_s, client int) byte {
+	for {
+		for kps.client_sock[client] == nil {
+			SLEEP_SEC(1) /* Not connected.  Try again later. */
+		}
+
+		/* Just get one byte at a time. */
+
+		var c = kps.client_sock[client]
+		var ch = make([]byte, 1)
+		var n, _ = c.Read(ch)
+
+		if n == 1 {
+			/* TODO KG
+			#if DEBUG9
+				    dw_printf (log_fp, "%02x %c %c", ch,
+					    isprint(ch) ? ch : '.' ,
+					    (isupper(ch>>1) || isdigit(ch>>1) || (ch>>1) == ' ') ? (ch>>1) : '.');
+				    if (ch == FEND) fprintf (log_fp, "  FEND");
+				    if (ch == FESC) fprintf (log_fp, "  FESC");
+				    if (ch == TFEND) fprintf (log_fp, "  TFEND");
+				    if (ch == TFESC) fprintf (log_fp, "  TFESC");
+				    if (ch == '\r') fprintf (log_fp, "  CR");
+				    if (ch == '\n') fprintf (log_fp, "  LF");
+				    fprintf (log_fp, "\n");
+				    if (ch == FEND) fflush (log_fp);
+			#endif
+			*/
+			return (ch[0])
+		}
+
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
+		c.Close()
+
+		kps.client_sock[client] = nil
 	}
 }
 
-func kissnet_init_one(kps *kissport_status_s) {
+func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
+	Assert(client >= 0 && client < MAX_NET_CLIENTS)
+
+	/* TODO KG
+	#if DEBUG
+		text_color_set(DW_COLOR_DEBUG);
+		dw_printf ("kissnet_listen_thread ( tcp_port = %d, client = %d, socket fd = %d )\n", kps.tcp_port, client, kps.client_sock[client]);
+	#endif
+	*/
+
+	// So why is SendRecPacket mentioned here for incoming from the client app?
+	// The logic exists for the serial port case where the client might think it is
+	// attached to a traditional TNC.  It might try sending commands over and over again
+	// trying to get the TNC into KISS mode.  To keep it happy, we recognize this attempt
+	// and send it something to keep it happy.
+	// In the case of a serial port or pseudo terminal, there is only one potential client
+	// so the response would be sent to only one place.
+	// Starting in version 1.5, this now can have multiple attached clients.  We wouldn't
+	// want to send the response to all of them.   Actually, we should be providing only
+	// "Simply KISS" as some call it.
+
+	for {
+		var ch = kns.get(kps, client)
+		kiss_rec_byte(kps.kf[client], ch, kns.debug, kps, client, kns.SendRecPacket)
+	}
+} /* end listenThread */
+
+func (kns *KissNetService) initOne(kps *kissport_status_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -224,7 +507,7 @@ func kissnet_init_one(kps *kissport_status_s) {
 	/*
 	 * This waits for a client to connect and sets client_sock[n].
 	 */
-	go connect_listen_thread(kps)
+	go kns.connectListenThread(kps)
 
 	/*
 	 * These read messages from client when client_sock[n] is valid.
@@ -232,13 +515,13 @@ func kissnet_init_one(kps *kissport_status_s) {
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
 	for client := 0; client < MAX_NET_CLIENTS; client++ {
-		go kissnet_listen_thread(kps, client)
+		go kns.listenThread(kps, client)
 	}
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        connect_listen_thread
+ * Name:        connectListenThread
  *
  * Purpose:     Wait for a connection request from an application.
  *
@@ -253,7 +536,7 @@ func kissnet_init_one(kps *kissport_status_s) {
  *
  *--------------------------------------------------------------------*/
 
-func connect_listen_thread(kps *kissport_status_s) {
+func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -263,7 +546,7 @@ func connect_listen_thread(kps *kissport_status_s) {
 	var listener, listenErr = net.Listen("tcp", fmt.Sprintf(":%d", kps.tcp_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
+		dw_printf("connectListenThread: Listen failed: %s", listenErr)
 
 		return
 	}
@@ -334,285 +617,4 @@ func connect_listen_thread(kps *kissport_status_s) {
 	}
 }
 
-/*-------------------------------------------------------------------
- *
- * Name:        kissnet_send_rec_packet
- *
- * Purpose:     Send a packet, received over the radio, to the client app.
- *
- * Inputs:	chan		- Channel number where packet was received.
- *				  0 = first, 1 = second if any.
- *
-// TODO: add kiss_cmd
- *
- *		fbuf		- Raw received frame buffer
- *
- *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
- *				  KISS_CMD_SET_HARDWARE when responding to a query.
- *
- *		flen		- Number of bytes for AX.25 frame.
- *				  When called from kiss_rec_byte, flen will be -1
- *				  indicating a text string rather than frame content.
- *				  This is used to fake out an application that thinks
- *				  it is using a traditional TNC and tries to put it
- *				  into KISS mode.
- *
- *		onlykps		- KISS TCP status block pointer or NULL.
- *
- *		onlyclient	- It is possible to have more than client attached
- *				  at the same time with TCP KISS.
- *				  Starting with version 1.7 we can have multiple TCP ports.
- *				  When a frame is received from the radio we normally want it
- *				  to go to all of the clients.
- *				  In this case specify NULL for onlykps and -1 tcp client.
- *				  When responding to a command from the client, we want
- *				  to send only to that one client app.  In this case
- *				  a non NULL kps and onlyclient >= 0.
- *
- * Description:	Send message to client(s) if connected.
- *		Disconnect from client, and notify user, if any error.
- *
- *--------------------------------------------------------------------*/
-
-func kissnet_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int,
-	onlykps *kissport_status_s, onlyclient int) {
-	// Something received over the radio would normally be sent to all attached clients.
-	// However, there are times we want to send a response only to a particular client.
-	// In the case of a serial port or pseudo terminal, there is only one potential client.
-	// so the response would be sent to only one place.  A new parameter has been added for this.
-	for kps := all_ports; kps != nil; kps = kps.pnext {
-		if onlykps == nil || kps == onlykps {
-			for client := 0; client < MAX_NET_CLIENTS; client++ {
-				if onlyclient == -1 || client == onlyclient {
-					if kps.client_sock[client] != nil {
-						var kiss_buff []byte
-
-						if flen < 0 {
-							// A client app might think it is attached to a traditional TNC.
-							// It might try sending commands over and over again trying to get the TNC into KISS mode.
-							// We recognize this attempt and send it something to keep it happy.
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("KISS TCP: Something unexpected from client application.\n")
-							dw_printf("Is client app treating this like an old TNC with command mode?\n")
-							dw_printf("This can be caused by the application sending commands to put a\n")
-							dw_printf("traditional TNC into KISS mode.  It is usually a harmless warning.\n")
-							dw_printf("For best results, configure for a KISS-only TNC to avoid this.\n")
-							dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
-
-							if kiss_debug > 0 {
-								kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
-							}
-
-							kiss_buff = fbuf
-						} else {
-							var stemp []byte
-
-							// New in 1.7.
-							// Previously all channels were sent to everyone.
-							// We now have tcp ports which carry only a single radio channel.
-							// The application will see KISS channel 0 regardless of the radio channel.
-
-							if kps.channel == -1 { //nolint:staticcheck
-								// Normal case, all channels.
-								stemp = []byte{byte((channel << 4) | kiss_cmd)}
-							} else if kps.channel == channel {
-								// Single radio channel for this port.  Application sees 0.
-								stemp = []byte{byte((0 << 4) | kiss_cmd)}
-							} else {
-								// Skip it.
-								continue
-							}
-
-							stemp = append(stemp, fbuf...)
-
-							if kiss_debug >= 2 {
-								/* AX.25 frame with the CRC removed. */
-								text_color_set(DW_COLOR_DEBUG)
-								dw_printf("\n")
-								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								hex_dump(fbuf)
-							}
-
-							kiss_buff = kiss_encapsulate(stemp)
-
-							/* This has the escapes and the surrounding FENDs. */
-
-							if kiss_debug > 0 {
-								kiss_debug_print(TO_CLIENT, "", kiss_buff)
-							}
-						}
-
-						var _, err = kps.client_sock[client].Write(kiss_buff)
-						if err != nil {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
-							kps.client_sock[client].Close()
-							kps.client_sock[client] = nil
-						}
-					} // frame length >= 0
-				} // if all clients or the one specifie
-			} // for each client on the tcp port
-		} // if all ports or the one specified
-	} // for each tcp port
-} /* end kissnet_send_rec_packet */
-
-/*-------------------------------------------------------------------
- *
- * Name:        kissnet_copy
- *
- * Purpose:     Send data from one network KISS client to all others.
- *
- * Inputs:	in_msg		- KISS frame data without the framing or escapes.
- *				  The first byte is channel and command (should be data).
- *
- *		in_len 		- Number of bytes in above.
- *
- *		chan		- Channel.  Use this instead of first byte of in_msg.
- *
- *		cmd		- KISS command nybble.
- *				  Should be 0 because I'm expecting this only for data.
- *
- *		from_client	- Number of network (TCP) client instance.
- *				  Should be 0, 1, 2, ...
- *
- *
- * Global In:	kiss_copy	- From misc. configuration.
- *				  This enables the feature.
- *
- *
- * Description:	Send message to any attached network KISS clients, other than the one where it came from.
- *		Enable this by putting KISSCOPY in the configuration file.
- *		Note that this applies only to network (TCP) KISS clients, not serial port, or pseudo terminal.
- *
- *
- *--------------------------------------------------------------------*/
-
-func kissnet_copy(_msg []byte, channel int, cmd int, from_kps *kissport_status_s, from_client int) {
-	// Copy before mutating
-	var msg = make([]byte, len(_msg))
-	copy(msg, _msg)
-
-	if s_misc_config_p.kiss_copy {
-		for kps := all_ports; kps != nil; kps = kps.pnext {
-			for client := 0; client < MAX_NET_CLIENTS; client++ {
-				// To all but origin.
-				if !(kps == from_kps && client == from_client) {
-					if kps.client_sock[client] != nil {
-						if kps.channel == -1 || kps.channel == channel {
-							// Two different cases here:
-							//  - The TCP port allows all channels, or
-							//  - The TCP port allows only one channel.  In this case set KISS channel to 0.
-							if kps.channel == -1 {
-								msg[0] = byte((channel << 4) | cmd)
-							} else {
-								msg[0] = byte(0 | cmd) // set channel to zero.
-							}
-
-							var kiss_buff = kiss_encapsulate(msg)
-
-							/* This has the escapes and the surrounding FENDs. */
-
-							if kiss_debug > 0 {
-								kiss_debug_print(TO_CLIENT, "", kiss_buff)
-							}
-
-							var _, err = kps.client_sock[client].Write(kiss_buff)
-							if err != nil {
-								text_color_set(DW_COLOR_ERROR)
-								dw_printf("\nError %s copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", err, kps.tcp_port, client)
-								kps.client_sock[client].Close()
-								kps.client_sock[client] = nil
-							}
-						} // Channel is allowed on this port.
-					} // socket is open
-				} // if origin and destination different.
-			} // loop over all KISS network clients for one port.
-		} // loop over all KISS TCP ports
-	} // Feature enabled.
-} /* end kissnet_copy */
-
-/*-------------------------------------------------------------------
- *
- * Name:        kissnet_listen_thread
- *
- * Purpose:     Wait for KISS messages from an application.
- *
- * Inputs:	arg		- client number, 0 .. MAX_NET_CLIENTS-1
- *
- * Outputs:	client_sock[n]	- File descriptor for communicating with client app.
- *
- * Description:	Process messages from the client application.
- *		Note that the client can go away and come back again and
- *		re-establish communication without restarting this application.
- *
- *--------------------------------------------------------------------*/
-
-/* Return one byte (value 0 - 255) */
-
-func kiss_get(kps *kissport_status_s, client int) byte {
-	for {
-		for kps.client_sock[client] == nil {
-			SLEEP_SEC(1) /* Not connected.  Try again later. */
-		}
-
-		/* Just get one byte at a time. */
-
-		var c = kps.client_sock[client]
-		var ch = make([]byte, 1)
-		var n, _ = c.Read(ch)
-
-		if n == 1 {
-			/* TODO KG
-			#if DEBUG9
-				    dw_printf (log_fp, "%02x %c %c", ch,
-						isprint(ch) ? ch : '.' ,
-						(isupper(ch>>1) || isdigit(ch>>1) || (ch>>1) == ' ') ? (ch>>1) : '.');
-				    if (ch == FEND) fprintf (log_fp, "  FEND");
-				    if (ch == FESC) fprintf (log_fp, "  FESC");
-				    if (ch == TFEND) fprintf (log_fp, "  TFEND");
-				    if (ch == TFESC) fprintf (log_fp, "  TFESC");
-				    if (ch == '\r') fprintf (log_fp, "  CR");
-				    if (ch == '\n') fprintf (log_fp, "  LF");
-				    fprintf (log_fp, "\n");
-				    if (ch == FEND) fflush (log_fp);
-			#endif
-			*/
-			return (ch[0])
-		}
-
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
-		c.Close()
-
-		kps.client_sock[client] = nil
-	}
-}
-
-func kissnet_listen_thread(kps *kissport_status_s, client int) {
-	Assert(client >= 0 && client < MAX_NET_CLIENTS)
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("kissnet_listen_thread ( tcp_port = %d, client = %d, socket fd = %d )\n", kps.tcp_port, client, kps.client_sock[client]);
-	#endif
-	*/
-
-	// So why is kissnet_send_rec_packet mentioned here for incoming from the client app?
-	// The logic exists for the serial port case where the client might think it is
-	// attached to a traditional TNC.  It might try sending commands over and over again
-	// trying to get the TNC into KISS mode.  To keep it happy, we recognize this attempt
-	// and send it something to keep it happy.
-	// In the case of a serial port or pseudo terminal, there is only one potential client
-	// so the response would be sent to only one place.
-	// Starting in version 1.5, this now can have multiple attached clients.  We wouldn't
-	// want to send the response to all of them.   Actually, we should be providing only
-	// "Simply KISS" as some call it.
-
-	for {
-		var ch = kiss_get(kps, client)
-		kiss_rec_byte(kps.kf[client], ch, kiss_debug, kps, client, kissnet_send_rec_packet)
-	}
-} /* end kissnet_listen_thread */
-
-/* end kissnet.c */
+/* end kissnet.go */

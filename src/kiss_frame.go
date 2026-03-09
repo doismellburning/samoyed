@@ -547,7 +547,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 	case KISS_CMD_DATA_FRAME: /* 0 = Data Frame */
 		// kissnet_copy clobbers first byte but we don't care
 		// because we have already determined channel and command.
-		kissnet_copy(kiss_msg, channel, int(cmd), kps, client)
+		kissNetSvc.Copy(kiss_msg, channel, int(cmd), kps, client)
 
 		/* Note July 2017: There is a variant of of KISS, called SMACK, that assumes */
 		/* a TNC can never have more than 8 channels.  http://symek.de/g/smack.html */

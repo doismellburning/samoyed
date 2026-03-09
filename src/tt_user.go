@@ -762,7 +762,7 @@ func xmit_object_report(i int, first_time bool) {
 		var fbuf = ax25_pack(pp)
 
 		server_send_rec_packet(save_tt_config_p.obj_recv_chan, pp, fbuf)
-		kissnet_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissNetSvc.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
 		kissserial_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
 		kisspt_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
 	}
