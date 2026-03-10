@@ -157,7 +157,7 @@ func recv_adev_thread(a int) {
 			if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
 				var tt = dtmf_sample(first_chan+c, float64(audio_sample)/16384.)
 				if tt != ' ' {
-					aprs_tt_button(first_chan+c, tt)
+					ttGateway.Button(first_chan+c, tt)
 				}
 			}
 		} // for c is just 0 or 0 then 1

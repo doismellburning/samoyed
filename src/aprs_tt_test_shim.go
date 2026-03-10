@@ -91,42 +91,43 @@ var ttTestCases = []ttTestCase{
 	{"18199242771558", "WB4APR", "12", "\\A", "", "", "39.5000", "-77.0000", "!TBA!"},
 }
 
+var gateway *TTGateway
+
 func check_result(t *testing.T, testCase ttTestCase) {
 	t.Helper()
 
-	assert.Equal(t, testCase.callsign, m_callsign, testCase.toneseq)
+	var state = gateway.lastParseState
 
-	assert.Equal(t, testCase.ssid, strconv.Itoa(m_ssid), testCase.toneseq)
+	assert.Equal(t, testCase.callsign, state.callsign, testCase.toneseq)
 
-	var stemp = fmt.Sprintf("%c%c", m_symtab_or_overlay, m_symbol_code)
+	assert.Equal(t, testCase.ssid, strconv.Itoa(state.ssid), testCase.toneseq)
+
+	var stemp = fmt.Sprintf("%c%c", state.symtabOrOverlay, state.symbolCode)
 	assert.Equal(t, testCase.symbol, stemp, testCase.toneseq)
 
-	assert.Equal(t, testCase.freq, m_freq, testCase.toneseq)
+	assert.Equal(t, testCase.freq, state.freq, testCase.toneseq)
 
-	assert.Equal(t, testCase.comment, m_comment, testCase.toneseq)
+	assert.Equal(t, testCase.comment, state.comment, testCase.toneseq)
 
-	var latTmp = fmt.Sprintf("%.4f", m_latitude)
+	var latTmp = fmt.Sprintf("%.4f", state.latitude)
 	assert.Equal(t, testCase.latitude, latTmp, testCase.toneseq)
 
-	var lonTmp = fmt.Sprintf("%.4f", m_longitude)
+	var lonTmp = fmt.Sprintf("%.4f", state.longitude)
 	assert.Equal(t, testCase.longitude, lonTmp, testCase.toneseq)
 
-	assert.Equal(t, testCase.dao, string(m_dao[:]), testCase.toneseq)
+	assert.Equal(t, testCase.dao, string(state.dao[:]), testCase.toneseq)
 }
 
 func aprs_tt_test_main(t *testing.T) {
 	t.Helper()
 
-	running_TT_MAIN_tests = true
-
-	aprs_tt_init(nil, 0)
+	gateway = NewTTGateway(nil, 0)
+	gateway.runningTests = true
 
 	for testNum, testCase := range ttTestCases {
 		dw_printf("\nTest case %d: %s\n", testNum, testCase.toneseq)
 
-		aprs_tt_sequence(0, testCase.toneseq)
+		gateway.Sequence(0, testCase.toneseq)
 		check_result(t, testCase)
 	}
-
-	running_TT_MAIN_tests = false
 }
