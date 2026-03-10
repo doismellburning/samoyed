@@ -14,6 +14,7 @@ jobs:
         runner:
           - "ubuntu-latest"
           - "ubuntu-24.04-arm"
+          - "macos-latest"
     runs-on: "${{ matrix.runner }}"
     outputs:
       SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
@@ -29,12 +30,23 @@ jobs:
         echo "Version: $SAMOYED_VERSION"
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT  # Output to be used by the release job
         echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV  # Env to be used by the make build
-    - run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev portaudio19-dev libavahi-client-dev libbsd-dev libgps-dev"
-    - run: "sudo apt install --yes morse2ascii"  # For decoding the morse
+    - name: "Install dependencies (Linux)"
+      if: "runner.os == 'Linux'"
+      run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev portaudio19-dev libavahi-client-dev libbsd-dev libgps-dev"
+    - name: "Install dependencies (macOS)"
+      if: "runner.os == 'macOS'"
+      run: "brew install shellcheck hamlib portaudio"
+    - name: "Install morse2ascii"
+      if: "runner.os == 'Linux'"
+      run: "sudo apt install --yes morse2ascii"  # For decoding morse for tests; not available on macOS
     - run: "make stats"
     - run: "make cmds"
-    - name: "Install Dire Wolf to test parsing"
+    - name: "Install Dire Wolf to test parsing (Linux)"
+      if: "runner.os == 'Linux'"
       run: "sudo apt install --yes direwolf"
+    - name: "Install Dire Wolf to test parsing (macOS)"
+      if: "runner.os == 'macOS'"
+      run: "brew install direwolf"
 
     # 2026-03-11 KG
     # In https://github.com/doismellburning/samoyed/pull/426 and other cases, cover.out ended up created with references to files that weren't present in the source tree.
@@ -61,10 +73,14 @@ jobs:
         if-no-files-found: "error"
         compression-level: 0
     - name: "Build Debian package"
+      if: "runner.os == 'Linux'"
       run: "make deb"
     - name: "Set deb filename"
+      if: "runner.os == 'Linux'"
       run: 'echo "DEB_NAME=samoyed-binary_${{ env.SAMOYED_VERSION }}_$(dpkg --print-architecture).deb" >> $GITHUB_ENV'
-    - uses: "actions/upload-artifact@v7"
+    - name: "Upload Debian package"
+      if: "runner.os == 'Linux'"
+      uses: "actions/upload-artifact@v7"
       with:
         name: "${{ env.DEB_NAME }}"
         path: "${{ env.DEB_NAME }}"

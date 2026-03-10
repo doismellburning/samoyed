@@ -100,8 +100,8 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 |----------|--------|
 | x86_64 Linux | Primary target |
 | arm64 Linux | Supported |
+| macOS | Supported |
 | Windows | TBD (depends on demand / testability) |
-| macOS | TBD (depends on demand / testability) |
 
 ## About Dire Wolf
 
