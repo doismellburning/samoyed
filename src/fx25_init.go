@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals
 package direwolf
 
 // SPDX-FileCopyrightText: 2002 Phil Karn, KA9Q

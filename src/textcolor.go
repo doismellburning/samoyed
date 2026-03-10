@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals
 package direwolf
 
 // A lightweight reimplementation of Dire Wolf's textcolor.c

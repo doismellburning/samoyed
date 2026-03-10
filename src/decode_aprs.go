@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals
 package direwolf
 
 // TODO:  Better error messages for examples here: http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2023-July/date.html
