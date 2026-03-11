@@ -35,6 +35,14 @@ jobs:
     - run: "make cmds"
     - name: "Install Dire Wolf to test parsing"
       run: "sudo apt install --yes direwolf"
+
+    # 2026-03-11 KG
+    # In https://github.com/doismellburning/samoyed/pull/426 and other cases, cover.out ended up created with references to files that weren't present in the source tree.
+    # My best theory is that this comes from excessive GitHub Actions caching.
+    # https://github.com/actions/setup-go/blob/main/docs/advanced-usage.md#caching suggests I might be able to do something sophisticated with dependency paths, but just blatting the testcache should do the job solidly at not-too-high a cost.
+    - name: "Clean the testcache to work around some sort of caching bug"
+      run: "go clean -testcache"
+
     - run: "make test"
     - run: "make coveragereport"
     - run: "pipx install reuse"  # For validating the licence config
