@@ -39,9 +39,10 @@ jobs:
     # 2026-03-11 KG
     # In https://github.com/doismellburning/samoyed/pull/426 and other cases, cover.out ended up created with references to files that weren't present in the source tree.
     # My best theory is that this comes from excessive GitHub Actions caching.
-    # https://github.com/actions/setup-go/blob/main/docs/advanced-usage.md#caching suggests I might be able to do something sophisticated with dependency paths, but just blatting the testcache should do the job solidly at not-too-high a cost.
-    - name: "Clean the testcache to work around some sort of caching bug"
-      run: "go clean -testcache"
+    # https://github.com/actions/setup-go/blob/main/docs/advanced-usage.md#caching suggests I might be able to do something sophisticated with dependency paths, but just blatting the build cache should do the job solidly at not-too-high a cost.
+    # (This should be slightly lighter than simply turning off caching in GHA - we'll still benefit from module cache)
+    - name: "Clean the build cache to work around some sort of caching bug"
+      run: "go clean -cache"
 
     - run: "make test"
     - run: "make coveragereport"
