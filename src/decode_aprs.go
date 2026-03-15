@@ -530,12 +530,14 @@ func decode_aprs_print(A *decode_aprs_t) {
 	//dw_printf ("DEBUG decode_aprs_print symbol_code=%c=0x%02x\n", A.g_symbol_code, A.g_symbol_code);
 
 	if A.g_symbol_code != ' ' {
-		var symbol_description = aprsSymbolData.symbols_get_description(A.g_symbol_table, A.g_symbol_code)
+		if aprsSymbolData != nil {
+			var symbol_description = aprsSymbolData.symbols_get_description(A.g_symbol_table, A.g_symbol_code)
 
-		//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
+			//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 
-		stemp += ", "
-		stemp += symbol_description
+			stemp += ", "
+			stemp += symbol_description
+		} // TODO KG Else warn?
 	}
 
 	//dw_printf ("DEBUG decode_aprs_print stemp3=%s mfr=%s\n", stemp, A.g_mfr);
