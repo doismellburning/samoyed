@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 import (
@@ -7,14 +6,13 @@ import (
 	"strconv"
 )
 
-// Set at build time via `-ldflags "-X 'direwolf.SAMOYED_VERSION=X'"`
-var SAMOYED_VERSION string
+var SAMOYED_VERSION string //nolint:gochecknoglobals // Set at build time via `-ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=X'"`
 
 // A bunch of things, both Dire Wolf and APRS, seem to expect two-part single-digit versions.
 // This obviously doesn't interact well with my choice of CalVer...
 // TODO Figure out what to do with MAJOR_VERSION etc.
-var MAJOR_VERSION = 0
-var MINOR_VERSION = 0
+const MAJOR_VERSION = 0
+const MINOR_VERSION = 0
 
 // Put in APRS destination field to identify the equipment used.
 // Dire Wolf used APDW - "Assigned by WB4APR in tocalls.txt".
