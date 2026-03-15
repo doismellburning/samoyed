@@ -490,10 +490,12 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 
 		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 		if pinfo[0] != ':' && pinfo[0] != '}' {
-			var symtab, symbol, ok = aprsSymbolData.symbols_from_dest_or_src(pinfo[0], A.g_src, A.g_dest)
-			if ok {
-				A.g_symbol_table = symtab
-				A.g_symbol_code = symbol
+			if aprsSymbolData != nil { // TODO KG Consider some sort of debug message on an else?
+				var symtab, symbol, ok = aprsSymbolData.symbols_from_dest_or_src(pinfo[0], A.g_src, A.g_dest)
+				if ok {
+					A.g_symbol_table = symtab
+					A.g_symbol_code = symbol
+				}
 			}
 		}
 
