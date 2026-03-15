@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+//nolint:gochecknoglobals
 package direwolf
 
 //#define DEBUG1 1		/* Parsing of original human readable format. */

@@ -1,4 +1,5 @@
 /* Test AX.25 connected mode between two TNCs */
+//nolint:gochecknoglobals
 package direwolf
 
 import (

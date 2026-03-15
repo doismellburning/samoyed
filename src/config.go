@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals
 package direwolf
 
 //#define DEBUG 1

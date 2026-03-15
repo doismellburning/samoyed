@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals
 package direwolf
 
 var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "il2p_send_frame"

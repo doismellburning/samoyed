@@ -1,3 +1,4 @@
+//nolint:gochecknoglobals
 package direwolf
 
 var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hdlc_send_frame" or "hdlc_send_flags"

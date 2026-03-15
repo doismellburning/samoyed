@@ -10,6 +10,7 @@
  *		It processes commands from other radio stations and responds.
  *
  *---------------------------------------------------------------*/
+//nolint:gochecknoglobals
 package main
 
 import (

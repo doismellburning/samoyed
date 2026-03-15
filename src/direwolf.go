@@ -1,4 +1,6 @@
 // Package direwolf is a Go port of the Dire Wolf C source.
+//
+//nolint:gochecknoglobals
 package direwolf
 
 import (
