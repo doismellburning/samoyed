@@ -46,6 +46,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
+var aprsSymbolData *APRSSymbolData
 var waypointSender *WaypointSender
 var kissNetSvc *KissNetService
 var mheardDB *MHeardDB
@@ -173,8 +174,8 @@ x = Silence FX.25 information.`)
 	}
 
 	if *symbolDump {
-		symbols_init()
-		symbols_list()
+		aprsSymbolData = NewAPRSSymbolData()
+		aprsSymbolData.symbols_list()
 		os.Exit(0)
 	}
 
@@ -280,7 +281,7 @@ x = Silence FX.25 information.`)
 
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
-	symbols_init()
+	aprsSymbolData = NewAPRSSymbolData()
 
 	audio_config = new(audio_s)
 	misc_config = new(misc_config_s)

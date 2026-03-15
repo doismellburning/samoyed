@@ -70,6 +70,7 @@ func DecodeAPRSMain() {
 	text_color_init(0)
 	text_color_set(DW_COLOR_INFO)
 	deviceid_init()
+	aprsSymbolData = NewAPRSSymbolData()
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
