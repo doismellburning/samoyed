@@ -267,7 +267,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 
-					multi_modem_process_rec_frame(channel, subchannel, slice, frame_buf[:frame_len-2], alevel, retry_t(derrors), 1) /* len-2 to remove FCS. */
+					multi_modem_process_rec_frame(channel, subchannel, slice, frame_buf[:frame_len-2], alevel, BitFixLevel(derrors), 1) /* len-2 to remove FCS. */
 				}
 			} else {
 				// Most likely cause is defective sender software.

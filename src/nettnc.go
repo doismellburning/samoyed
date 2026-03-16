@@ -263,7 +263,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 
 			if pp != nil {
 				var fec_type = fec_type_none
-				var retries retry_t
+				var retries BitFixLevel
 
 				var spectrum = "Network TNC"
 				dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)

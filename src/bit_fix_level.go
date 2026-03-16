@@ -18,9 +18,6 @@ const (
 	BitFixLevelMax BitFixLevel = 5
 )
 
-// retry_t is a legacy alias for BitFixLevel; callers should migrate to BitFixLevel.
-type retry_t = BitFixLevel
-
 // Legacy names kept for compatibility while callers are updated.
 const (
 	RETRY_NONE           = BitFixNone

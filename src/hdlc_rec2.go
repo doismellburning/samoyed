@@ -88,7 +88,7 @@ const RETRY_TYPE_NONE = 0
 const RETRY_TYPE_SWAP = 1
 
 type retry_conf_t struct {
-	retry retry_t
+	retry BitFixLevel
 	mode  retry_mode_t
 	_type retry_type_t
 
@@ -444,7 +444,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool { //nolint:unused
 	//int len;
-	//retry_t fix_bits = save_audio_config_p.achan[channel].fix_bits;
+	//BitFixLevel fix_bits = save_audio_config_p.achan[channel].fix_bits;
 	var passall = save_audio_config_p.achan[channel].passall
 	/* TODO KG
 	#if DEBUG_LATER
@@ -844,7 +844,7 @@ failure:
  *
  ***********************************************************************************/
 
-func sanity_check(buf []byte, bits_flipped retry_t, sanity_test sanity_t) bool {
+func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bool {
 	/*
 	 * No sanity check if we didn't try fixing the data.
 	 * Should we have different levels of checking depending on

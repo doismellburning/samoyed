@@ -244,13 +244,13 @@ o = DCD output control
 		my_audio_config.achan[0].upsample = *upsample
 	}
 
-	if retry_t(*fixBits) < RETRY_NONE || retry_t(*fixBits) > RETRY_MAX {
+	if BitFixLevel(*fixBits) < RETRY_NONE || BitFixLevel(*fixBits) > RETRY_MAX {
 		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", RETRY_NONE, RETRY_MAX, *fixBits)
 		pflag.Usage()
 		os.Exit(1)
 	}
 
-	my_audio_config.achan[0].fix_bits = retry_t(*fixBits)
+	my_audio_config.achan[0].fix_bits = BitFixLevel(*fixBits)
 
 	var channelFlagCount int
 
@@ -697,7 +697,7 @@ func audio_get(a int) int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
+func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	packets_decoded_one++
 
 	if hdlc_rec_data_detect_any(channel) == 0 {
