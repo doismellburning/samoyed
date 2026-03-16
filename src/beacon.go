@@ -255,10 +255,25 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 		bs.miscConfig.beacon[j].next = now.Add(time.Duration(bs.miscConfig.beacon[j].delay) * time.Second)
 	}
 
-	/*
-	 * Start up thread for processing only if at least one is valid.
-	 */
+	return bs
+} /* end NewBeaconService */
 
+func (bs *BeaconService) SetDebug(level int) {
+	bs.trackerDebugLevel = level
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Start
+ *
+ * Purpose:     Start the beacon thread.
+ *
+ * Description:	Call after all configuration (e.g. SetDebug) is done.
+ *		Starts the goroutine only if at least one beacon is valid.
+ *
+ *--------------------------------------------------------------------*/
+
+func (bs *BeaconService) Start() {
 	var count = 0
 
 	for j := 0; j < bs.miscConfig.num_beacons; j++ {
@@ -270,12 +285,6 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 	if count >= 1 {
 		go bs.thread()
 	}
-
-	return bs
-} /* end NewBeaconService */
-
-func (bs *BeaconService) SetDebug(level int) {
-	bs.trackerDebugLevel = level
 }
 
 func IS_GOOD(x int) bool {

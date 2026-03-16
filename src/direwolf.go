@@ -772,6 +772,7 @@ x = Silence FX.25 information.`)
 	log_init(misc_config.log_daily_names, misc_config.log_path)
 	beaconService = NewBeaconService(audio_config, misc_config, &igate_config)
 	beaconService.SetDebug(d_t_opt)
+	beaconService.Start()
 
 	/*
 	 * Get sound samples and decode them.
