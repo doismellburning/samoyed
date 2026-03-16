@@ -50,6 +50,7 @@ var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var aprsSymbolData *APRSSymbolData
 var waypointSender *WaypointSender
+var beaconService *BeaconService
 var kissNetSvc *KissNetService
 var mheardDB *MHeardDB
 var xmitSvc *XmitService
@@ -222,7 +223,6 @@ x = Silence FX.25 information.`)
 				d_w_opt = 1 // not documented yet.
 			case 't':
 				d_t_opt++
-				beacon_tracker_set_debug(d_t_opt)
 			case 'p':
 				d_p_opt = true // TODO: packet dump for xmit side.
 			case 'o':
@@ -770,7 +770,9 @@ x = Silence FX.25 information.`)
 	 */
 
 	log_init(misc_config.log_daily_names, misc_config.log_path)
-	beacon_init(audio_config, misc_config, &igate_config)
+	beaconService = NewBeaconService(audio_config, misc_config, &igate_config)
+	beaconService.SetDebug(d_t_opt)
+	beaconService.Start()
 
 	/*
 	 * Get sound samples and decode them.

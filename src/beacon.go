@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -15,36 +14,27 @@ import (
 	"time"
 )
 
-/*
- * Save pointers to configuration settings.
- */
-
-var g_modem_config_p *audio_s
-var g_misc_config_p *misc_config_s
-var g_igate_config_p *igate_config_s
-
-var g_tracker_debug_level = 0 // 1 for data from gps.
-// 2 + Smart Beaconing logic.
-// 3 + Send transmissions to log file.
-
-func beacon_tracker_set_debug(level int) {
-	g_tracker_debug_level = level
+type BeaconService struct {
+	modemConfig       *audio_s
+	miscConfig        *misc_config_s
+	igateConfig       *igate_config_s
+	trackerDebugLevel int
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        beacon_init
+ * Name:        NewBeaconService
  *
  * Purpose:     Initialize the beacon process.
  *
  * Inputs:	pmodem		- Audio device and modem configuration.
- *				  Used only to find valid channels.
+ *			  Used only to find valid channels.
  *
  *		pconfig		- misc. configuration from config file.
- *				  Beacon stuff ended up here.
+ *			  Beacon stuff ended up here.
  *
  *		pigate		- IGate configuration.
- *				  Need this for calculating IGate statistics.
+ *			  Need this for calculating IGate statistics.
  *
  *
  * Outputs:	Remember required information for future use.
@@ -56,13 +46,12 @@ func beacon_tracker_set_debug(level int) {
  *
  *--------------------------------------------------------------------*/
 
-func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) {
-	/*
-	 * Save parameters for later use.
-	 */
-	g_modem_config_p = pmodem
-	g_misc_config_p = pconfig
-	g_igate_config_p = pigate
+func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) *BeaconService {
+	var bs = &BeaconService{ //nolint:exhaustruct
+		modemConfig: pmodem,
+		miscConfig:  pconfig,
+		igateConfig: pigate,
+	}
 
 	/*
 	 * Precompute the packet contents so any errors are
@@ -76,8 +65,8 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 	// optional, or not allowed for each beacon type.  Options which
 	// are not applicable are often silently ignored, causing confusion.
 
-	for j := 0; j < g_misc_config_p.num_beacons; j++ {
-		var channel = g_misc_config_p.beacon[j].sendto_chan
+	for j := 0; j < bs.miscConfig.num_beacons; j++ {
+		var channel = bs.miscConfig.beacon[j].sendto_chan
 
 		if channel < 0 {
 			channel = 0 /* For IGate, use channel 0 call. */
@@ -87,16 +76,16 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 			channel = 0 // For ICHANNEL, use channel 0 call.
 		}
 
-		if g_modem_config_p.chan_medium[channel] == MEDIUM_RADIO ||
-			g_modem_config_p.chan_medium[channel] == MEDIUM_NETTNC {
-			if !IsNoCall(g_modem_config_p.mycall[channel]) {
-				switch g_misc_config_p.beacon[j].btype {
+		if bs.modemConfig.chan_medium[channel] == MEDIUM_RADIO ||
+			bs.modemConfig.chan_medium[channel] == MEDIUM_NETTNC {
+			if !IsNoCall(bs.modemConfig.mycall[channel]) {
+				switch bs.miscConfig.beacon[j].btype {
 				case BEACON_OBJECT:
 					/* Object name is required. */
-					if g_misc_config_p.beacon[j].objname == "" {
+					if bs.miscConfig.beacon[j].objname == "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: OBJNAME is required for OBEACON.\n", g_misc_config_p.beacon[j].lineno)
-						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+						dw_printf("Config file, line %d: OBJNAME is required for OBEACON.\n", bs.miscConfig.beacon[j].lineno)
+						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
 					}
@@ -105,23 +94,23 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 				case BEACON_POSITION:
 					/* Location is required. */
-					if g_misc_config_p.beacon[j].lat == G_UNKNOWN || g_misc_config_p.beacon[j].lon == G_UNKNOWN {
+					if bs.miscConfig.beacon[j].lat == G_UNKNOWN || bs.miscConfig.beacon[j].lon == G_UNKNOWN {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: Latitude and longitude are required.\n", g_misc_config_p.beacon[j].lineno)
-						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+						dw_printf("Config file, line %d: Latitude and longitude are required.\n", bs.miscConfig.beacon[j].lineno)
+						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
 					}
 
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
-					if g_misc_config_p.beacon[j].custom_info != "" || g_misc_config_p.beacon[j].custom_infocmd != "" {
+					if bs.miscConfig.beacon[j].custom_info != "" || bs.miscConfig.beacon[j].custom_infocmd != "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
+						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
 						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
 						dw_printf("so it would not make sense to use these with other beacon types which construct\n")
 						dw_printf("the Information field. Perhaps you want to use COMMENT or COMMENTCMD option.\n")
-						// g_misc_config_p.beacon[j].btype = BEACON_IGNORE;
+						// bs.miscConfig.beacon[j].btype = BEACON_IGNORE;
 						continue
 					}
 
@@ -132,8 +121,8 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 						var fix = dwgps_read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", g_misc_config_p.beacon[j].lineno)
-							g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
+							bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 							dw_printf("You must specify the source of the GPS data in your configuration file.\n")
 							dw_printf("It can be either GPSD, meaning the gpsd daemon, or GPSNMEA for\n")
@@ -143,36 +132,36 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
-					if g_misc_config_p.beacon[j].custom_info != "" || g_misc_config_p.beacon[j].custom_infocmd != "" {
+					if bs.miscConfig.beacon[j].custom_info != "" || bs.miscConfig.beacon[j].custom_infocmd != "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
+						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
 						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
 						dw_printf("so it would not make sense to use these with other beacon types which construct\n")
 						dw_printf("the Information field. Perhaps you want to use COMMENT or COMMENTCMD option.\n")
-						// g_misc_config_p.beacon[j].btype = BEACON_IGNORE;
+						// bs.miscConfig.beacon[j].btype = BEACON_IGNORE;
 						continue
 					}
 
 				case BEACON_CUSTOM:
 					/* INFO or INFOCMD is required. */
-					if g_misc_config_p.beacon[j].custom_info == "" && g_misc_config_p.beacon[j].custom_infocmd == "" {
+					if bs.miscConfig.beacon[j].custom_info == "" && bs.miscConfig.beacon[j].custom_infocmd == "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD is required for custom beacon.\n", g_misc_config_p.beacon[j].lineno)
-						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+						dw_printf("Config file, line %d: INFO or INFOCMD is required for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
+						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
 					}
 
 				case BEACON_IGATE:
 					/* Doesn't make sense if IGate is not configured. */
-					if g_igate_config_p.t2_server_name == "" ||
-						g_igate_config_p.t2_login == "" ||
-						g_igate_config_p.t2_passcode == "" {
+					if bs.igateConfig.t2_server_name == "" ||
+						bs.igateConfig.t2_login == "" ||
+						bs.igateConfig.t2_passcode == "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured.\n", g_misc_config_p.beacon[j].lineno)
+						dw_printf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured.\n", bs.miscConfig.beacon[j].lineno)
 						dw_printf("IBEACON has been disabled.\n")
 
-						g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
 					}
@@ -181,13 +170,13 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: MYCALL must be set for beacon on channel %d. \n", g_misc_config_p.beacon[j].lineno, channel)
-				g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+				dw_printf("Config file, line %d: MYCALL must be set for beacon on channel %d. \n", bs.miscConfig.beacon[j].lineno, channel)
+				bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Invalid channel number %d for beacon. \n", g_misc_config_p.beacon[j].lineno, channel)
-			g_misc_config_p.beacon[j].btype = BEACON_IGNORE
+			dw_printf("Config file, line %d: Invalid channel number %d for beacon. \n", bs.miscConfig.beacon[j].lineno, channel)
+			bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 		}
 	}
 
@@ -197,8 +186,8 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 
 	var now = time.Now()
 
-	for j := 0; j < g_misc_config_p.num_beacons; j++ {
-		var bp = &(g_misc_config_p.beacon[j])
+	for j := 0; j < bs.miscConfig.num_beacons; j++ {
+		var bp = &(bs.miscConfig.beacon[j])
 		/* TODO KG
 		#if DEBUG
 
@@ -263,25 +252,40 @@ func beacon_init(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s
 			}
 		}
 
-		g_misc_config_p.beacon[j].next = now.Add(time.Duration(g_misc_config_p.beacon[j].delay) * time.Second)
+		bs.miscConfig.beacon[j].next = now.Add(time.Duration(bs.miscConfig.beacon[j].delay) * time.Second)
 	}
 
-	/*
-	 * Start up thread for processing only if at least one is valid.
-	 */
+	return bs
+} /* end NewBeaconService */
 
+func (bs *BeaconService) SetDebug(level int) {
+	bs.trackerDebugLevel = level
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Start
+ *
+ * Purpose:     Start the beacon thread.
+ *
+ * Description:	Call after all configuration (e.g. SetDebug) is done.
+ *		Starts the goroutine only if at least one beacon is valid.
+ *
+ *--------------------------------------------------------------------*/
+
+func (bs *BeaconService) Start() {
 	var count = 0
 
-	for j := 0; j < g_misc_config_p.num_beacons; j++ {
-		if g_misc_config_p.beacon[j].btype != BEACON_IGNORE {
+	for j := 0; j < bs.miscConfig.num_beacons; j++ {
+		if bs.miscConfig.beacon[j].btype != BEACON_IGNORE {
 			count++
 		}
 	}
 
 	if count >= 1 {
-		go beacon_thread()
+		go bs.thread()
 	}
-} /* end beacon_init */
+}
 
 func IS_GOOD(x int) bool {
 	return (3600/(x))*(x) == 3600
@@ -289,13 +293,13 @@ func IS_GOOD(x int) bool {
 
 /*-------------------------------------------------------------------
  *
- * Name:        beacon_thread
+ * Name:        thread
  *
  * Purpose:     Transmit beacons when it is time.
  *
- * Inputs:	g_misc_config_p.beacon
+ * Inputs:	bs.miscConfig.beacon
  *
- * Outputs:	g_misc_config_p.beacon[].next_time
+ * Outputs:	bs.miscConfig.beacon[].next_time
  *
  * Description:	Go to sleep until it is time for the next beacon.
  *		Transmit any beacons scheduled for now.
@@ -303,7 +307,7 @@ func IS_GOOD(x int) bool {
  *
  *--------------------------------------------------------------------*/
 
-func beacon_thread() {
+func (bs *BeaconService) thread() {
 	/*
 	 * SmartBeaconing state.
 	 */
@@ -314,8 +318,8 @@ func beacon_thread() {
 	 */
 	var number_of_tbeacons = 0
 
-	for j := range g_misc_config_p.num_beacons {
-		if g_misc_config_p.beacon[j].btype == BEACON_TRACKER {
+	for j := range bs.miscConfig.num_beacons {
+		if bs.miscConfig.beacon[j].btype == BEACON_TRACKER {
 			number_of_tbeacons++
 		}
 	}
@@ -331,22 +335,22 @@ func beacon_thread() {
 		 */
 		var earliest = now.Add(time.Hour)
 
-		for j := range g_misc_config_p.num_beacons {
-			if g_misc_config_p.beacon[j].btype != BEACON_IGNORE {
-				var t = g_misc_config_p.beacon[j].next
+		for j := range bs.miscConfig.num_beacons {
+			if bs.miscConfig.beacon[j].btype != BEACON_IGNORE {
+				var t = bs.miscConfig.beacon[j].next
 				if t.Before(earliest) {
 					earliest = t
 				}
 			}
 		}
 
-		if g_misc_config_p.sb_configured && number_of_tbeacons > 0 {
-			var t = now.Add(time.Duration(g_misc_config_p.sb_turn_time) * time.Second)
+		if bs.miscConfig.sb_configured && number_of_tbeacons > 0 {
+			var t = now.Add(time.Duration(bs.miscConfig.sb_turn_time) * time.Second)
 			if t.Before(earliest) {
 				earliest = t
 			}
 
-			t = now.Add(time.Duration(g_misc_config_p.sb_fast_rate) * time.Second)
+			t = now.Add(time.Duration(bs.miscConfig.sb_fast_rate) * time.Second)
 			if t.Before(earliest) {
 				earliest = t
 			}
@@ -372,7 +376,7 @@ func beacon_thread() {
 			var fix = dwgps_read(&gpsinfo)
 			var my_speed_mph = DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))
 
-			if g_tracker_debug_level >= 1 {
+			if bs.trackerDebugLevel >= 1 {
 				var hms = now.Format("15:04:05")
 
 				text_color_set(DW_COLOR_DEBUG)
@@ -393,17 +397,17 @@ func beacon_thread() {
 			/*
 			 * Run SmartBeaconing calculation if configured and GPS data available.
 			 */
-			if g_misc_config_p.sb_configured && fix >= DWFIX_2D {
-				var tnext = sb_calculate_next_time(now,
+			if bs.miscConfig.sb_configured && fix >= DWFIX_2D {
+				var tnext = bs.sbCalculateNextTime(now,
 					DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots)), float64(gpsinfo.track),
 					sb_prev_time, sb_prev_course)
 
-				for j := range g_misc_config_p.num_beacons {
-					if g_misc_config_p.beacon[j].btype == BEACON_TRACKER {
+				for j := range bs.miscConfig.num_beacons {
+					if bs.miscConfig.beacon[j].btype == BEACON_TRACKER {
 						/* Haven't thought about the consequences of SmartBeaconing */
 						/* and having more than one tbeacon configured. */
-						if tnext.Before(g_misc_config_p.beacon[j].next) {
-							g_misc_config_p.beacon[j].next = tnext
+						if tnext.Before(bs.miscConfig.beacon[j].next) {
+							bs.miscConfig.beacon[j].next = tnext
 						}
 					}
 				} /* Update next time if sooner. */
@@ -413,8 +417,8 @@ func beacon_thread() {
 		/*
 		 * Send if the time has arrived.
 		 */
-		for j := range g_misc_config_p.num_beacons {
-			var bp = &(g_misc_config_p.beacon[j])
+		for j := range bs.miscConfig.num_beacons {
+			var bp = &(bs.miscConfig.beacon[j])
 
 			if bp.btype == BEACON_IGNORE {
 				continue
@@ -422,7 +426,7 @@ func beacon_thread() {
 
 			if !bp.next.After(now) {
 				/* Send the beacon. */
-				beacon_send(j, &gpsinfo)
+				bs.send(j, &gpsinfo)
 
 				/* Calculate when the next one should be sent. */
 				/* Easy for fixed interval.  SmartBeaconing takes more effort. */
@@ -430,7 +434,7 @@ func beacon_thread() {
 				if bp.btype == BEACON_TRACKER {
 					if gpsinfo.fix < DWFIX_2D {
 						/* Fix not available so beacon was not sent. */
-						if g_misc_config_p.sb_configured {
+						if bs.miscConfig.sb_configured {
 							/* Try again in a couple seconds. */
 							bp.next = now.Add(2 * time.Second)
 						} else {
@@ -438,13 +442,13 @@ func beacon_thread() {
 							/* Important for slotted.  Might reconsider otherwise. */
 							bp.next = bp.next.Add(time.Duration(bp.every) * time.Second)
 						}
-					} else if g_misc_config_p.sb_configured {
+					} else if bs.miscConfig.sb_configured {
 						/* Remember most recent tracker beacon. */
 						/* Compute next time if not turning. */
 						sb_prev_time = now
 						sb_prev_course = float64(gpsinfo.track)
 
-						bp.next = sb_calculate_next_time(now,
+						bp.next = bs.sbCalculateNextTime(now,
 							float64(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))), float64(gpsinfo.track),
 							sb_prev_time, sb_prev_course)
 					} else {
@@ -477,27 +481,27 @@ func beacon_thread() {
 			} /* if time to send it */
 		} /* for each configured beacon */
 	} /* do forever */
-} /* end beacon_thread */
+} /* end thread */
 
 /*-------------------------------------------------------------------
  *
- * Name:        sb_calculate_next_time
+ * Name:        sbCalculateNextTime
  *
  * Purpose:     Calculate next transmission time using the SmartBeaconing algorithm.
  *
  * Inputs:	now			- Current time.
  *
  *		current_speed_mph	- Current speed from GPS.
- *				  	  Not expecting G_UNKNOWN but should check for it.
+ *			  	  Not expecting G_UNKNOWN but should check for it.
  *
  *		current_course		- Current direction of travel.
- *				  	  Could be G_UNKNOWN if stationary.
+ *			  	  Could be G_UNKNOWN if stationary.
  *
  *		last_xmit_time		- Time of most recent transmission.
  *
  *		last_xmit_course	- Direction included in most recent transmission.
  *
- * Global In:	g_misc_config_p.
+ * Global In:	bs.miscConfig.
  *			sb_configured	TRUE if SmartBeaconing is configured.
  *			sb_fast_speed	MPH
  *			sb_fast_rate	seconds
@@ -527,7 +531,7 @@ func heading_change(a, b float64) float64 {
 	}
 }
 
-func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_course float64, last_xmit_time time.Time, last_xmit_course float64) time.Time {
+func (bs *BeaconService) sbCalculateNextTime(now time.Time, current_speed_mph float64, current_course float64, last_xmit_time time.Time, last_xmit_course float64) time.Time {
 	var beacon_rate int
 
 	/*
@@ -535,17 +539,17 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
 	 */
 
 	if current_speed_mph == G_UNKNOWN {
-		beacon_rate = int(math.Round(float64(g_misc_config_p.sb_fast_rate+g_misc_config_p.sb_slow_rate) / 2.))
-	} else if current_speed_mph > float64(g_misc_config_p.sb_fast_speed) {
-		beacon_rate = g_misc_config_p.sb_fast_rate
-	} else if current_speed_mph < float64(g_misc_config_p.sb_slow_speed) {
-		beacon_rate = g_misc_config_p.sb_slow_rate
+		beacon_rate = int(math.Round(float64(bs.miscConfig.sb_fast_rate+bs.miscConfig.sb_slow_rate) / 2.))
+	} else if current_speed_mph > float64(bs.miscConfig.sb_fast_speed) {
+		beacon_rate = bs.miscConfig.sb_fast_rate
+	} else if current_speed_mph < float64(bs.miscConfig.sb_slow_speed) {
+		beacon_rate = bs.miscConfig.sb_slow_rate
 	} else {
 		/* Can't divide by 0 assuming sb_slow_speed > 0. */
-		beacon_rate = int(math.Round(float64(g_misc_config_p.sb_fast_rate*g_misc_config_p.sb_fast_speed) / current_speed_mph))
+		beacon_rate = int(math.Round(float64(bs.miscConfig.sb_fast_rate*bs.miscConfig.sb_fast_speed) / current_speed_mph))
 	}
 
-	if g_tracker_debug_level >= 2 {
+	if bs.trackerDebugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %.1f MPH\n", beacon_rate, current_speed_mph)
 	}
@@ -558,10 +562,10 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
 	if current_speed_mph != G_UNKNOWN && current_speed_mph >= 1.0 &&
 		current_course != G_UNKNOWN && last_xmit_course != G_UNKNOWN {
 		var change = heading_change(current_course, last_xmit_course)
-		var turn_threshold = float64(g_misc_config_p.sb_turn_angle) + float64(g_misc_config_p.sb_turn_slope)/current_speed_mph
+		var turn_threshold = float64(bs.miscConfig.sb_turn_angle) + float64(bs.miscConfig.sb_turn_slope)/current_speed_mph
 
-		if change > turn_threshold && !now.Before(last_xmit_time.Add(time.Duration(g_misc_config_p.sb_turn_time)*time.Second)) {
-			if g_tracker_debug_level >= 2 {
+		if change > turn_threshold && !now.Before(last_xmit_time.Add(time.Duration(bs.miscConfig.sb_turn_time)*time.Second)) {
+			if bs.trackerDebugLevel >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("SmartBeaconing: Send now for heading change of %.0f\n", change)
 			}
@@ -571,11 +575,11 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
 	}
 
 	return (next_time)
-} /* end sb_calculate_next_time */
+} /* end sbCalculateNextTime */
 
 /*-------------------------------------------------------------------
  *
- * Name:        beacon_send
+ * Name:        send
  *
  * Purpose:     Transmit one beacon after it was determined to be time.
  *
@@ -583,7 +587,7 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
  *
  *		gpsinfo			Information from GPS.  Used only for TBEACON.
  *
- * Global In:	g_misc_config_p.beacon		Array of beacon configurations.
+ * Global In:	bs.miscConfig.beacon		Array of beacon configurations.
  *
  * Outputs:	Destination(s) specified:
  *		 - Transmit queue.
@@ -596,8 +600,8 @@ func sb_calculate_next_time(now time.Time, current_speed_mph float64, current_co
  *
  *--------------------------------------------------------------------*/
 
-func beacon_send(j int, gpsinfo *dwgps_info_t) {
-	var bp = &(g_misc_config_p.beacon[j])
+func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
+	var bp = &(bs.miscConfig.beacon[j])
 
 	if !(bp.sendto_chan >= 0) {
 		panic("assert(bp.sendto_chan >= 0)")
@@ -615,11 +619,11 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 	 */
 	var mycall string
 
-	if g_modem_config_p.chan_medium[bp.sendto_chan] == MEDIUM_IGATE { // ICHANNEL uses chan 0 mycall.
+	if bs.modemConfig.chan_medium[bp.sendto_chan] == MEDIUM_IGATE { // ICHANNEL uses chan 0 mycall.
 		// TODO: Maybe it should be allowed to have own.
-		mycall = g_modem_config_p.mycall[0]
+		mycall = bs.modemConfig.mycall[0]
 	} else {
-		mycall = g_modem_config_p.mycall[bp.sendto_chan]
+		mycall = bs.modemConfig.mycall[bp.sendto_chan]
 	}
 
 	if IsNoCall(mycall) {
@@ -730,7 +734,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 			/* actually transmitting and relying on someone else to receive */
 			/* the signals. */
 
-			if g_tracker_debug_level >= 3 {
+			if bs.trackerDebugLevel >= 3 {
 				var A decode_aprs_t
 				A.g_freq = G_UNKNOWN
 				A.g_offset = G_UNKNOWN
@@ -784,7 +788,7 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 				igate_get_msg_cnt(),
 				igate_get_pkt_cnt(),
 				mheardDB.Count(0, last_minutes),
-				mheardDB.Count(g_igate_config_p.max_digi_hops, last_minutes),
+				mheardDB.Count(bs.igateConfig.max_digi_hops, last_minutes),
 				mheardDB.Count(8, last_minutes),
 				igate_get_upl_cnt(),
 				igate_get_dnl_cnt())
@@ -825,4 +829,4 @@ func beacon_send(j int, gpsinfo *dwgps_info_t) {
 		dw_printf("Config file: Failed to parse packet constructed from line %d.\n", bp.lineno)
 		dw_printf("%s\n", beacon_text)
 	}
-} /* end beacon_send */
+} /* end send */
