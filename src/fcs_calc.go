@@ -1,11 +1,10 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*
  * Calculate the FCS for an AX.25 frame.
  */
 
-var ccitt_table = [256]uint16{
+var ccitt_table = [256]uint16{ //nolint:gochecknoglobals // I yearn for const arrays
 
 	// from http://www.ietf.org/rfc/rfc1549.txt
 
