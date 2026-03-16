@@ -78,6 +78,8 @@ import (
  * Save Configuration for later use.
  */
 
+var g_misc_config_p *misc_config_s
+
 /*
  * Accumulated KISS frame and state of decoder.
  */
