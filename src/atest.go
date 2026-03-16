@@ -769,7 +769,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
 			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
-			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retry_text[int(retries)], spectrum)
+			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
 		}
 	}
 
