@@ -87,15 +87,13 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Construct the packet in normal monitoring format.
 	 */
 
-	// TODO (high, bug):    Why do we see !4237.13N/07120.84W=PHG0000...   when all values set to unknown.
-
 	var messaging = false
 	var compressed = false
 
 	var info = encode_position(messaging, compressed,
 		lat, lon, 0, int(DW_METERS_TO_FEET(alt)),
 		'/', '=',
-		G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "", // PHGd
+		0, 0, 0, "", // PHGd: 0 means not specified; encode_position emits PHG only when values > 0
 		int(course), int(knots),
 		445.925, 0, 0,
 		comment)
