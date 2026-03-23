@@ -94,6 +94,7 @@ type digi_config_s struct {
 
 var digipeater_audio_config *audio_s
 var save_digi_config_p *digi_config_s
+var dedupeService *DedupeService
 
 /*
  * Maintain count of packets digipeated for each combination of from/to channel.
@@ -125,7 +126,7 @@ func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
 	digipeater_audio_config = p_audio_config
 	save_digi_config_p = p_digi_config
 
-	dedupe_init(time.Duration(p_digi_config.dedupe_time) * time.Second)
+	dedupeService = NewDedupeService(time.Duration(p_digi_config.dedupe_time) * time.Second)
 }
 
 /*------------------------------------------------------------------------------
@@ -195,7 +196,7 @@ func digipeater(from_chan int, pp *packet_t) {
 					save_digi_config_p.atgp[from_chan][to_chan],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
-					dedupe_remember(pp, to_chan)
+					dedupeService.Remember(pp, to_chan)
 					tq_append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
 					digi_count[from_chan][to_chan]++
 				}
@@ -219,7 +220,7 @@ func digipeater(from_chan int, pp *packet_t) {
 					save_digi_config_p.atgp[from_chan][to_chan],
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
-					dedupe_remember(pp, to_chan)
+					dedupeService.Remember(pp, to_chan)
 					tq_append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
 					digi_count[from_chan][to_chan]++
 				}
@@ -383,7 +384,7 @@ func digipeat_match(
 	 *
 	 */
 
-	if dedupe_check(pp, to_chan) {
+	if dedupeService.Check(pp, to_chan) {
 		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */

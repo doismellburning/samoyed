@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -79,33 +78,10 @@ import (
 	"time"
 )
 
-/*------------------------------------------------------------------------------
- *
- * Name:	dedupe_init
- *
- * Purpose:	Initialize the duplicate detection subsystem.
- *
- * Input:	ttl	- Number of seconds to retain information
- *			  about recent transmissions.
- *
- *
- * Returns:	None
- *
- * Description:	This should be called at application startup.
- *
- *
- *------------------------------------------------------------------------------*/
-
-var history_time = 30 * time.Second /* Number of seconds to keep information */
-/* about recent transmissions. */
-
 const HISTORY_MAX = 25 /* Maximum number of transmission */
 /* records to keep.  If we run out of */
 /* room the oldest ones are overwritten */
 /* before they expire. */
-
-var insert_next int /* Index, in array below, where next */
-/* item should be stored. */
 
 type historyEntry struct {
 	time_stamp time.Time /* When the packet was transmitted. */
@@ -118,11 +94,33 @@ type historyEntry struct {
 
 }
 
-var history [HISTORY_MAX]historyEntry
+type DedupeService struct {
+	historyTime time.Duration /* Number of seconds to keep information */
+	insertNext  int           /* Index, in array below, where next item should be stored. */
+	history     [HISTORY_MAX]historyEntry
+}
 
-func dedupe_init(ttl time.Duration) {
-	history_time = ttl
-	insert_next = 0
+/*------------------------------------------------------------------------------
+ *
+ * Name:	NewDedupeService
+ *
+ * Purpose:	Initialize the duplicate detection subsystem.
+ *
+ * Input:	ttl	- Number of seconds to retain information
+ *			  about recent transmissions.
+ *
+ *
+ * Returns:	New DedupeService
+ *
+ * Description:	This should be called at application startup.
+ *
+ *
+ *------------------------------------------------------------------------------*/
+
+func NewDedupeService(ttl time.Duration) *DedupeService {
+	var ds = new(DedupeService)
+	ds.historyTime = ttl
+	return ds
 }
 
 /*------------------------------------------------------------------------------
@@ -161,14 +159,14 @@ func dedupe_init(ttl time.Duration) {
  *
  *------------------------------------------------------------------------------*/
 
-func dedupe_remember(pp *packet_t, channel int) {
-	history[insert_next].time_stamp = time.Now()
-	history[insert_next].checksum = ax25_dedupe_crc(pp)
-	history[insert_next].xmit_channel = channel
+func (ds *DedupeService) Remember(pp *packet_t, channel int) {
+	ds.history[ds.insertNext].time_stamp = time.Now()
+	ds.history[ds.insertNext].checksum = ax25_dedupe_crc(pp)
+	ds.history[ds.insertNext].xmit_channel = channel
 
-	insert_next++
-	if insert_next >= HISTORY_MAX {
-		insert_next = 0
+	ds.insertNext++
+	if ds.insertNext >= HISTORY_MAX {
+		ds.insertNext = 0
 	}
 
 	/* If we send something by digipeater, we don't */
@@ -193,11 +191,11 @@ func dedupe_remember(pp *packet_t, channel int) {
  *
  *------------------------------------------------------------------------------*/
 
-func dedupe_check(pp *packet_t, channel int) bool {
+func (ds *DedupeService) Check(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
-	for _, h := range history {
+	for _, h := range ds.history {
 		if h.checksum != crc {
 			continue
 		}
@@ -206,7 +204,7 @@ func dedupe_check(pp *packet_t, channel int) bool {
 			continue
 		}
 
-		var expiry = h.time_stamp.Add(history_time)
+		var expiry = h.time_stamp.Add(ds.historyTime)
 		if now.After(expiry) {
 			continue
 		}
