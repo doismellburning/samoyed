@@ -84,7 +84,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	var xmit string
 
 	if result != nil {
-		dedupe_remember(result, 0)
+		dedupeService.Remember(result, 0)
 		xmit = ax25_format_addrs(result)
 		pinfo = ax25_get_info(result)
 		xmit += string(pinfo)
@@ -107,7 +107,7 @@ func digipeater_test_main(t *testing.T) bool {
 
 	digipeaterTestMyCall = "WB2OSZ-9"
 
-	dedupe_init(4 * time.Second)
+	dedupeService = NewDedupeService(4 * time.Second)
 
 	/*
 	 * Compile the patterns.
