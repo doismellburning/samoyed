@@ -2,6 +2,7 @@ DIST_DIR = dist
 DEB_STAGING = .deb-staging
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
+SHELL_FILES = $(shell grep -rl '^\#!.*sh' *)
 SRC_DIRS = ./cmd/... ./src/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
@@ -69,7 +70,7 @@ reuse:
 
 .PHONY: shellcheck
 shellcheck:
-	shellcheck --external-sources version.sh test-scripts/* --exclude SC1091
+	shellcheck --external-sources --exclude SC1091 $(SHELL_FILES)
 
 .PHONY: vet
 vet:
