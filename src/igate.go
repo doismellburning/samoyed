@@ -1772,7 +1772,16 @@ Send it now and remember that fact.
 	rx_to_ig_remember [21] = 1447683040 57185 "N1ZKO-7>T2TS7X:`c6wl!i[/>"4]}[scanning]="
 
 Digipeat it.  Notice how it has a trailing CR.
-TODO:  Why is the CRC different?  Content looks the same.
+
+The CRC differs because igate_send_rec_packet makes a private copy of the packet and
+calls ax25_cut_at_crlf on the copy before rx_to_ig_remember computes the checksum,
+so that path sees info without the CR.  The digipeater receives the original packet
+(CR still present) and dedupe_remember -> ig_to_tx_remember -> ax25_dedupe_crc sees
+the CR.  At the time this log was captured, ax25_dedupe_crc did not strip trailing
+CR/LF/space, so the two paths produced different checksums for what looks like the
+same content.  ax25_dedupe_crc now strips trailing CR, LF, and space before hashing,
+so the checksums agree and cross-suppression between the Rx IGate and the digipeater
+works correctly.
 
 	ig_to_tx_remember [38] = ch0 d1 1447683040 27598 "N1ZKO-7>T2TS7X:`c6wl!i[/>"4]}[scanning]="
 	[0H] N1ZKO-7>T2TS7X,WB2OSZ-14*,WIDE2-1:`c6wl!i[/>"4]}[scanning]=<0x0d>
