@@ -10,14 +10,17 @@
 ## Style
 
 * Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary e.g. with a `for` loop variable
-* As this is still an incremental port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet, and that's often somewhat intentional
+* As this started as a port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet - new things should be, but we don't need to change existing things if not necessary
+* Prefer to use `new(Foo)` over `&Foo{}` - the latter makes the exhaustruct linter grumble
+
+### Test File Naming
+
+* Per Go convention, generally tests for `foo.go` live in `foo_test.go` but we also do the following:
+    * Tests ported from Dire Wolf are often in `foo_test_shim.go` because `go test` doesn't support cgo in _test.go files so that was a place to put the test code while the port was ongoing. Now we don't (directly) use cgo, this is obsolete, and they should live in `foo_direwolf_test.go` - kept separately to make it easier to track upstream
+    * Tests where an LLM has just generated a test suite for complex functionality live in `foo_impl_test.go` - this signifies that they don't necessarily reflect intended/specified behaviour, they just test an implementation as-is, so failing tests may not necessarily signify a bug
 
 ## Licensing
 
 * `make reuse` checks [REUSE](https://reuse.software/) compliance and must always pass
 * New files should have copyright assigned to "The Samoyed Authors" and be GPL-2.0-or-later, as per REUSE.toml
 * New individual files should declare this via SPDX headers where possible - if adding new entire directories, then adding an annotation path to REUSE.toml is acceptable
-
-## Review notes
-
-* Memory leaks via cgo conversion functions (`C.CString`, `C.CBytes`, etc.) are not a concern while porting - when the port is finished, all the cgo will be gone
