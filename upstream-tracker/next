@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+QUEUE="$SCRIPT_DIR/queue"
+
+NEXT=$(grep " pending " "$QUEUE" | head -1)
+
+if [ -z "$NEXT" ]; then
+    echo "No pending commits."
+    exit 0
+fi
+
+SHA=$(echo "$NEXT" | cut -d' ' -f1)
+SUMMARY=$(echo "$NEXT" | cut -d' ' -f3-)
+
+echo "=== $SHA — $SUMMARY ==="
+echo ""
+git show "$SHA"
+echo ""
+printf 'Mark as: [a]pplied / [s]kipped / [q]uit? '
+read -r CHOICE
+
+case "$CHOICE" in
+    a|applied)
+        sed -i "s|^$SHA pending |$SHA applied |" "$QUEUE"
+        echo "Marked as applied."
+        ;;
+    s|skipped)
+        sed -i "s|^$SHA pending |$SHA skipped |" "$QUEUE"
+        echo "Marked as skipped."
+        ;;
+    *)
+        echo "No change."
+        ;;
+esac

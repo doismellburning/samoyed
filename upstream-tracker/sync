@@ -1,0 +1,48 @@
+#!/bin/sh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/config"
+
+QUEUE="$SCRIPT_DIR/queue"
+LAST_SEEN_FILE="$SCRIPT_DIR/last-seen"
+
+# Ensure remote exists and points to the right URL
+if git remote get-url "$UPSTREAM_REMOTE" >/dev/null 2>&1; then
+    git remote set-url "$UPSTREAM_REMOTE" "$UPSTREAM_URL"
+else
+    git remote add "$UPSTREAM_REMOTE" "$UPSTREAM_URL"
+fi
+
+git fetch "$UPSTREAM_REMOTE" "$UPSTREAM_BRANCH"
+
+LAST_SEEN=$(grep -v '^#' "$LAST_SEEN_FILE" | head -1 | tr -d '[:space:]')
+
+if [ -z "$LAST_SEEN" ]; then
+    echo "upstream-tracker/last-seen is not set. Add the upstream SHA to start tracking from." >&2
+    exit 1
+fi
+
+NEW=$(git log "${LAST_SEEN}..${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}" --format="%H %s" --reverse)
+
+if [ -z "$NEW" ]; then
+    echo "No new commits."
+    exit 0
+fi
+
+COUNT=0
+while IFS= read -r line; do
+    SHA=$(echo "$line" | cut -d' ' -f1)
+    SUMMARY=$(echo "$line" | cut -d' ' -f2-)
+    if ! grep -q "^$SHA " "$QUEUE" 2>/dev/null; then
+        printf '%s pending %s\n' "$SHA" "$SUMMARY" >> "$QUEUE"
+        COUNT=$((COUNT + 1))
+    fi
+done <<EOF
+$NEW
+EOF
+
+LATEST=$(git log "${UPSTREAM_REMOTE}/${UPSTREAM_BRANCH}" --format="%H" -1)
+echo "$LATEST" > "$LAST_SEEN_FILE"
+
+echo "Added $COUNT new commit(s) to queue."
