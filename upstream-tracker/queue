@@ -1,0 +1,74 @@
+54c29c1b717884f198b1c11f4dd9f97990264686 pending gpiod v2 support
+752c000c3674f40bf75c6b7f846580911a5fb951 pending Fix initialization location
+1f2e04d40e02d2d02c5d58b334446e5f33e5fa14 pending CMake version bump
+3cce46f42977ced2c751c3f27ba1ff33ee857a9f pending misc
+93e3ed53348c89e8757b1606d029d2dd748d8e7e pending rge branch 'github-ci' of https://github.com/ra1nb0w/direwolf into ra1nb0w-github-ci f it merges an updated upstream into a topic branch.
+c202286288574fc850b1a1400ba2336f83504950 pending Issue 590 - Supoort both v1 and v2 of libgpiod.
+dce46d4446764de96a4823d13f2acfbca2c5fd87 pending Merge branch 'leventelist-gpiod_support2' into dev
+7ed28d5f2ac15ad863ded460a4de8e22ed52249b pending Merge pull request #594 from leventelist/cmake_version_bump
+f4d3c004d4872148cf157181a5e8810203b32c2f pending Fix compiler warnings.
+8e52348f543a2381049bb8d08c9111a80ee987f3 pending Fix compiler warnings.
+95e9b40a4b5d2dc67f30d23025e3f41c00fb1e82 pending Fix compiler warnings.
+94755b01c37c0558f0e821549b7672b32f99d19a pending Change version to 1.8 beta test 1.
+bed5c9c39aa949d805e022eeefe0e37a63ad5b6b pending Allow gcc 15 to find another error.
+6c3fd9d970c6a31653f1f989110ad4d8da5b221d pending catch up to latest tocalls.
+d0cf040e2e404b9ad87012494e2eda7a49d80d0f pending Add sample configuration at end.
+55129c0b84078ce8ef09e616d2cb3bddbb8a6e2c pending Always try home directory if current directory fails
+a9d2e7b7b90cc11726467d93111d34acc649287a pending Enhanced IGate.
+6cdb5883be5b13e26e065f7f7f2f6649da67a1d5 pending Merge pull request #599 from mfncooper/fix_598
+b309dac59d54853814ab9eb3057d9136c63ab410 pending Issue 580 - clean out old cruft.
+23022d025adead3ad61c33654ff8d2af85fc04a4 pending Merge remote-tracking branch 'refs/remotes/origin/dev' into dev
+c317511f7a5159b2611dfc0fc6a7b883a7c83338 pending Clean up AGWPE connection data upon termination
+fa3c231a5d520c55795e7370923bf2b6d17c6a88 pending Merge pull request #600 from mfncooper/fix_agwpe_cleanup
+fdc09de953bf9d4749532758ad9dcb9f6e1bb5c2 pending Don't announce via DNS-SD if KISS port not configured
+1f5e605e940dc682a43ba28074cf9efa385f563d pending Add new CMake option to build without DNS-SD
+03f9a48063fef3fd96a34a1eb08e9b4d525dde19 pending Merge pull request #602 from mfncooper/fix_451
+cc97a64d24d0bdf61c6d7e7fc1b1e3ab895c241b pending Disable broken Windows 32 bit CI build for now.
+7e689cfe780020664797c9853fd600907f071e0d pending Merge pull request #601 from mfncooper/fix_386
+c99e842ba4367ffcb8505ce3353fcda049a700b1 pending Merge branch 'github-ci' of https://github.com/ra1nb0w/direwolf into ra1nb0w-github-ci f it merges an updated upstream into a topic branch.
+2e337171c36932c6e6c303714d3ad606d214af42 pending Issue 569 - MODEM AIS doesn't work as -B AIS.
+e60040d6aa2f3445e0c08e4518a7eadbd412a310 pending Updated comments only.
+150d7ca33a2b393c409e42abba7e049732146419 pending Issue 557 - Better handling of vendor/model.
+9cfcf4960ba354d3e55ba396b4066b4351b5538b pending GPIOD for bookworm and trixie.
+6a57823ef39c25a5c0aff1839421ba7ab6ce7dd5 pending Get ready for 1.8.
+d2927d6d7da7c6665737209e30dc2e39263cbdc7 pending Fix graph.
+81ed8d0669633d395d5d463b92ec868a06ec2368 pending More debug info, better error message.
+0b34cb1f5ebb39e4b33e559e9dfededfc321c1cd pending Clean up sample direwolf.conf file.
+551d95ce5cd4e662b7caf511ee1b76a670e973c0 pending Fix copy/paste error in assertion in multi_modem_process_rec_frame
+11c4bdf70a8b8d204042c19bb27e1a085cee838a pending Merge pull request #605 from doismellburning/fix/multi_modem-assert
+f95c4e37dc08989465c32db86cdd7c5736dedd6e pending New SCHANNEL feature, like NCHANNEL but for serial TNCs
+df993f6859900e15a4f33444e896f7f5c2c5f63a pending More error checking and messages.
+ae1394debfef9f027a4f783f1cc69d019df03391 pending Fix x86_64 / i686 package name.
+aa476298b644766606e4dfc30e1f299023275fc6 pending Better error message.
+1ab1b05312c71926d30fc3f121791404e0717eb0 pending Better SATgate.
+5285fec721c770013258622416bfafbb20f4d9f7 pending Most recent tocalls.yaml
+0d7448147cfb10d09f554126ea058b168a65b537 pending Change beta test to release.
+e494c948ad59f0362a939b569f88c7e94cd22c93 pending Update User Guide for release 1.8
+6c3deb2d40c53e840c936d4ef882a23c01f62970 pending Merge pull request #606 from mfncooper/schannel_support
+9fa31fdfde36240a2b1d22a9538bda38eddacf80 pending dev branch now for 1.9
+0c3a7bb32d221882e161446158b09de1f3abac00 pending Merge remote-tracking branch 'refs/remotes/origin/dev' into dev
+3658a878920803bbb69a4567579dcc4d6cb80a92 pending Issue 618 - Crash on hand crafted packet.
+56b27074c0158d0f5b8a505bf39ec1f6ef75f5eb pending Fix crash when AGWPE connection attempt times out
+fde612f474525dee2d788f032e38840cfcbefe51 pending Merge pull request #622 from mfncooper/fix_621
+88042431b5ba5278b3a04b790dadee5f214bfe8f pending Recognize info field beginning with DX.
+8be2dd2c3cf18927ab58c0da720a00f1e7bd4eea pending notes for future
+3acf4debd05f00da9687bb870075201ea49472f7 pending Add delay so any messages can be seen before window disappears.
+610fbc0a95c6963d735db7d8c8637149175c20b8 pending Investigate Issue 620.
+694c95485b21c1c22bc4682703771dec4d7a374b pending Issue 617 - Buffer Overflow in KISS code.
+4bf4fe3b3e12931634e08808b6713b714d901729 pending Add text color options with black background.
+297be70046ad992519a0a735aed6ecc3e77ba7ee pending Issue 627 - Just add a comment for possible future use.
+cfabdfb62a5036d34f8904a3ad4b1e0ff6646df0 pending New text background options.
+f97d5b202e0681699b255c4c238b54b8145aa763 pending Add delay before retrying serial TNC.
+c8319fcc7b7d8311ed7b42537ec82650ec48275b pending Add new build config for Direwolf with Hamlib on Windows (#626)
+591a897161f9d3ebfa8d0e162236029464f13582 pending Improved generation of SREJ frames for more efficient AX.25 v2.2 connected mode.
+1924999dbd24ce155aff69fec76cee35ad478bdd pending Linux compile error.
+01c31145716fd57e2e53844718bdc769dcce16dd pending Minor symbol table correction & tweaks.
+485ccbf1cd08ef12a222cf7295d8321327e5c8da pending Don't use my call for example.
+9aba4b386f841e5c9c9068a2259f7f5058a5dee5 pending AX.25 v2.2 improvements
+041f396de0ab2111b9ccc07960f8f083a81f9ad0 pending Issue 633 - better error message.
+d0eb822fcf6be52e00fee3b0a2fd33ac77c7f7d0 pending Issue 635 - Multiple kiss pty and channel mapping.
+3b20d8210a1d6f77073fd3452bbe87a21ee35a79 pending Fix Ubuntu compiler warning & error.
+ee4d3e451084eb2273ce00036f6ff0f7332c5013 pending More weather fields.
+146f3d83ec13996901a1cc491a8d99affd6c624e pending Add support for Heard Stations via AGWPE (#615)
+0663670550073c9d89917d5ac78df65e551d237a pending Merge remote-tracking branch 'refs/remotes/origin/dev' into dev
+78d6559c67b94568b2f093fc9b4d4965749387ae pending Cleanup kiss pty for client apps.
