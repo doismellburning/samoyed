@@ -14,6 +14,11 @@ else
     git remote add "$UPSTREAM_REMOTE" "$UPSTREAM_URL"
 fi
 
+if [ ! -r "$LAST_SEEN_FILE" ]; then
+    echo "upstream-tracker/last-seen does not exist or is not readable. Add the upstream SHA to start tracking from." >&2
+    exit 1
+fi
+
 git fetch "$UPSTREAM_REMOTE" "$UPSTREAM_BRANCH"
 
 LAST_SEEN=$(grep -v '^#' "$LAST_SEEN_FILE" | head -1 | tr -d '[:space:]')
@@ -32,8 +37,8 @@ fi
 
 COUNT=0
 while IFS= read -r line; do
-    SHA=$(echo "$line" | cut -d' ' -f1)
-    SUMMARY=$(echo "$line" | cut -d' ' -f2-)
+    SHA=${line%% *}
+    SUMMARY=${line#"$SHA "}
     if ! grep -q "^$SHA " "$QUEUE" 2>/dev/null; then
         printf '%s pending %s\n' "$SHA" "$SUMMARY" >> "$QUEUE"
         COUNT=$((COUNT + 1))

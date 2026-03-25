@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 QUEUE="$SCRIPT_DIR/queue"
 
-NEXT=$(grep " pending " "$QUEUE" | head -1)
+NEXT=$(grep -E '^[0-9a-fA-F]{40} pending ' "$QUEUE" | head -1)
 
 if [ -z "$NEXT" ]; then
     echo "No pending commits."
@@ -23,11 +23,11 @@ read -r CHOICE
 
 case "$CHOICE" in
     a|applied)
-        sed -i "s|^$SHA pending |$SHA applied |" "$QUEUE"
+        sed "s|^$SHA pending |$SHA applied |" "$QUEUE" > "$QUEUE.tmp.$$" && mv "$QUEUE.tmp.$$" "$QUEUE"
         echo "Marked as applied."
         ;;
     s|skipped)
-        sed -i "s|^$SHA pending |$SHA skipped |" "$QUEUE"
+        sed "s|^$SHA pending |$SHA skipped |" "$QUEUE" > "$QUEUE.tmp.$$" && mv "$QUEUE.tmp.$$" "$QUEUE"
         echo "Marked as skipped."
         ;;
     *)
