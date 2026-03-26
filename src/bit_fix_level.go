@@ -10,12 +10,12 @@ import (
 type BitFixLevel int
 
 const (
-	BitFixNone     BitFixLevel = 0
-	BitFixSingle   BitFixLevel = 1 // invert one bit
-	BitFixDouble   BitFixLevel = 2 // invert two adjacent bits
-	BitFixTriple   BitFixLevel = 3 // invert three adjacent bits
-	BitFixTwoSep   BitFixLevel = 4 // invert two separate bits
-	BitFixLevelMax BitFixLevel = 5
+	BitFixNone    BitFixLevel = 0
+	BitFixSingle  BitFixLevel = 1 // invert one bit
+	BitFixDouble  BitFixLevel = 2 // invert two adjacent bits
+	BitFixTriple  BitFixLevel = 3 // invert three adjacent bits
+	BitFixTwoSep  BitFixLevel = 4 // invert two separate bits
+	BitFixPassAll BitFixLevel = 5 // pass frame regardless of CRC (no correction attempted)
 )
 
 // Legacy names kept for compatibility while callers are updated.
@@ -25,7 +25,7 @@ const (
 	RETRY_INVERT_DOUBLE  = BitFixDouble
 	RETRY_INVERT_TRIPLE  = BitFixTriple
 	RETRY_INVERT_TWO_SEP = BitFixTwoSep
-	RETRY_MAX            = BitFixLevelMax
+	RETRY_MAX            = BitFixPassAll
 )
 
 func (bfl BitFixLevel) String() string {
@@ -40,7 +40,7 @@ func (bfl BitFixLevel) String() string {
 		return "TRIPLE"
 	case BitFixTwoSep:
 		return "TWO_SEP"
-	case BitFixLevelMax:
+	case BitFixPassAll:
 		return "PASSALL"
 	}
 

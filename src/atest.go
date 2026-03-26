@@ -244,8 +244,8 @@ o = DCD output control
 		my_audio_config.achan[0].upsample = *upsample
 	}
 
-	if BitFixLevel(*fixBits) < RETRY_NONE || BitFixLevel(*fixBits) > RETRY_MAX {
-		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", RETRY_NONE, RETRY_MAX, *fixBits)
+	if BitFixLevel(*fixBits) < BitFixNone || BitFixLevel(*fixBits) >= BitFixPassAll {
+		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", BitFixNone, BitFixTwoSep, *fixBits)
 		pflag.Usage()
 		os.Exit(1)
 	}

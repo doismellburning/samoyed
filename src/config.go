@@ -1805,7 +1805,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 
 			var n, _ = strconv.Atoi(t)
-			if BitFixLevel(n) >= RETRY_NONE && BitFixLevel(n) < RETRY_MAX { // MAX is actually last valid +1
+			if BitFixLevel(n) >= BitFixNone && BitFixLevel(n) < BitFixPassAll {
 				p_audio_config.achan[channel].fix_bits = BitFixLevel(n)
 			} else {
 				p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
