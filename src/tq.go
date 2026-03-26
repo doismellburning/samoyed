@@ -17,7 +17,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lestrrat-go/strftime"
@@ -28,20 +28,35 @@ const TQ_NUM_PRIO = 2 /* Number of priorities. */
 const TQ_PRIO_0_HI = 0
 const TQ_PRIO_1_LO = 1
 
-var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
+// tqChanBuf is the buffer capacity of each per-priority Go channel queue.
+// It is intentionally larger than the soft limits (100 APRS, 250 connected)
+// so that sends in normal operation never block.
+const tqChanBuf = 1024
 
-var tq_mutex sync.Mutex /* Critical section for updating queues. */
-/* Just one for all queues. */
+type TransmitQueue struct {
+	saveAudioConfigP *audio_s
 
-var wake_up_cond [MAX_RADIO_CHANS]*sync.Cond /* Notify transmit thread when queue not empty. */
+	// queueHead is the actual transmit queue: one buffered channel per
+	// (radio channel, priority) pair.  Sending to a channel enqueues a
+	// packet; receiving dequeues it.  Go channels provide the necessary
+	// thread-safety without an explicit mutex.
+	queueHead [MAX_RADIO_CHANS][TQ_NUM_PRIO]chan *packet_t
 
-var wake_up_mutex [MAX_RADIO_CHANS]sync.Mutex /* Required by cond_wait. */
+	// peeked holds a packet that has been taken from queueHead but not yet
+	// handed to the transmitter.  It is read and written only by the single
+	// xmit goroutine that owns the channel, so no additional synchronisation
+	// is required.
+	peeked [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t
 
-var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
+	// byteCount tracks the total frame bytes currently held in each queue,
+	// including any peeked packet.  Updated atomically so that
+	// tq_count(bytes=true) can be answered without draining the channel.
+	byteCount [MAX_RADIO_CHANS][TQ_NUM_PRIO]atomic.Int64
+}
 
 /*-------------------------------------------------------------------
  *
- * Name:        tq_init
+ * Name:        NewTransmitQueue
  *
  * Purpose:     Initialize the transmit queue.
  *
@@ -73,36 +88,24 @@ var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
  *
  *--------------------------------------------------------------------*/
 
-// TODO KG static struct audio_s *save_audio_config_p;
-
-func tq_init(audio_config_p *audio_s) {
+func NewTransmitQueue(audio_config_p *audio_s) *TransmitQueue {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("tq_init (  )\n");
 	#endif
 	*/
-	save_audio_config_p = audio_config_p
+	var tq = new(TransmitQueue)
+	tq.saveAudioConfigP = audio_config_p
 
 	for c := 0; c < MAX_RADIO_CHANS; c++ {
 		for p := 0; p < TQ_NUM_PRIO; p++ {
-			queue_head[c][p] = nil
+			tq.queueHead[c][p] = make(chan *packet_t, tqChanBuf)
 		}
 	}
 
-	/*
-	 * Windows and Linux have different wake up methods.
-	 * Put a wrapper around this someday to hide the details.
-	 */
-
-	for c := 0; c < MAX_RADIO_CHANS; c++ {
-		xmit_thread_is_waiting[c] = false
-
-		if audio_config_p.chan_medium[c] == MEDIUM_RADIO {
-			wake_up_cond[c] = sync.NewCond(&wake_up_mutex[c])
-		}
-	}
-} /* end tq_init */
+	return tq
+} /* end NewTransmitQueue */
 
 /*-------------------------------------------------------------------
  *
@@ -114,11 +117,11 @@ func tq_init(audio_config_p *audio_s) {
  *
  * Inputs:	channel	- Channel, 0 is first.
  *
- *				New in 1.7:
- *				Channel can be assigned to IGate rather than a radio.
+ *			New in 1.7:
+ *			Channel can be assigned to IGate rather than a radio.
  *
- *				New in 1.8:
- *				Channel can be assigned to a network TNC.
+ *			New in 1.8:
+ *			Channel can be assigned to a network TNC.
  *
  *		prio	- Priority, use TQ_PRIO_0_HI for digipeated or
  *				TQ_PRIO_1_LO for normal.
@@ -130,7 +133,7 @@ func tq_init(audio_config_p *audio_s) {
  *
  * Outputs:
  *
- * Description:	Add packet to end of linked list.
+ * Description:	Add packet to end of queue.
  *		Signal the transmit thread if the queue was formerly empty.
  *
  *		Note that we have a transmit thread each audio channel.
@@ -141,7 +144,7 @@ func tq_init(audio_config_p *audio_s) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_append(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) tq_append(channel int, prio int, pp *packet_t) {
 	/* TODO KG
 	#if DEBUG
 		unsigned char *pinfo;
@@ -174,12 +177,12 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	// New in 1.8: Assign a channel to external network TNC.
 	// Send somewhere else, rather than the transmit queue.
 
-	if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE ||
-		save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+	if tq.saveAudioConfigP.chan_medium[channel] == MEDIUM_IGATE ||
+		tq.saveAudioConfigP.chan_medium[channel] == MEDIUM_NETTNC {
 		var ts string // optional time stamp.
 
-		if save_audio_config_p.timestamp_format != "" {
-			var formattedTime, _ = strftime.Format(save_audio_config_p.timestamp_format, time.Now())
+		if tq.saveAudioConfigP.timestamp_format != "" {
+			var formattedTime, _ = strftime.Format(tq.saveAudioConfigP.timestamp_format, time.Now())
 			ts = " " + formattedTime // space after channel.
 		}
 
@@ -189,7 +192,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 		text_color_set(DW_COLOR_XMIT)
 
-		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
+		if tq.saveAudioConfigP.chan_medium[channel] == MEDIUM_IGATE {
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
@@ -213,7 +216,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	// Normal case - put in queue for radio transmission.
 	// Error if trying to transmit to a radio channel which was not configured.
 
-	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.saveAudioConfigP.chan_medium[channel] == MEDIUM_NONE {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
 		dw_printf("This is probably a client application error, not a problem with direwolf.\n")
@@ -250,7 +253,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if ax25_is_aprs(pp) && tq_count(channel, prio, "", "", false) > 100 {
+	if ax25_is_aprs(pp) && tq.tq_count(channel, prio, "", "", false) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
@@ -259,48 +262,8 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		return
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_append: enter critical section\n");
-	#endif
-	*/
-
-	tq_mutex.Lock()
-
-	if queue_head[channel][prio] == nil {
-		queue_head[channel][prio] = pp
-	} else {
-		var pnext *packet_t
-
-		var plast = queue_head[channel][prio]
-		for {
-			pnext = ax25_get_nextp(plast)
-			if pnext == nil {
-				break
-			}
-
-			plast = pnext
-		}
-
-		ax25_set_nextp(plast, pp)
-	}
-
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_append: left critical section\n");
-		dw_printf ("tq_append (): about to wake up xmit thread.\n");
-	#endif
-	*/
-
-	if xmit_thread_is_waiting[channel] {
-		wake_up_mutex[channel].Lock()
-		wake_up_cond[channel].Signal()
-		wake_up_mutex[channel].Unlock()
-	}
+	tq.byteCount[channel][prio].Add(int64(ax25_get_frame_len(pp)))
+	tq.queueHead[channel][prio] <- pp
 } /* end tq_append */
 
 /*-------------------------------------------------------------------
@@ -364,7 +327,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
  *		Machine to pass expedited data to the link multiplexer.
  *
  *
- * Implementation: Add packet to end of linked list.
+ * Implementation: Add packet to end of queue.
  *		Signal the transmit thread if the queue was formerly empty.
  *
  *		Note that we have a transmit thread each audio channel.
@@ -375,9 +338,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-// TODO: FIXME:  this is a copy of tq_append.  Need to fine tune and explain why.
-
-func lm_data_request(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) lm_data_request(channel int, prio int, pp *packet_t) {
 	/* TODO KG
 	#if DEBUG
 		unsigned char *pinfo;
@@ -406,7 +367,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	#endif
 	*/
 
-	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.saveAudioConfigP.chan_medium[channel] != MEDIUM_RADIO {
 		// Connected mode is allowed only with internal modems.
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
@@ -422,45 +383,11 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	 * Is transmit queue out of control?
 	 */
 
-	if tq_count(channel, prio, "", "", false) > 250 {
+	if tq.tq_count(channel, prio, "", "", false) > 250 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Warning: Transmit packet queue for channel %d is extremely long.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
 	}
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_data_request: enter critical section\n");
-	#endif
-	*/
-
-	tq_mutex.Lock()
-
-	if queue_head[channel][prio] == nil {
-		queue_head[channel][prio] = pp
-	} else {
-		var plast = queue_head[channel][prio]
-		for {
-			var pnext = ax25_get_nextp(plast)
-			if pnext == nil {
-				break
-			}
-
-			plast = pnext
-		}
-
-		ax25_set_nextp(plast, pp)
-	}
-
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_data_request: left critical section\n");
-	#endif
-	*/
 
 	// Appendix C2a, from the Ax.25 protocol spec, says that a priority frame
 	// will start transmission.  If not already transmitting, normal frames
@@ -471,16 +398,9 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	//NO!	if (prio == TQ_PRIO_0_HI) {
 
-	/* TODO KG
-	   #if DEBUG
-	   	  dw_printf ("lm_data_request (): about to wake up xmit thread.\n");
-	   #endif
-	*/
-	if xmit_thread_is_waiting[channel] {
-		wake_up_mutex[channel].Lock()
-		wake_up_cond[channel].Signal()
-		wake_up_mutex[channel].Unlock()
-	}
+	tq.byteCount[channel][prio].Add(int64(ax25_get_frame_len(pp)))
+	tq.queueHead[channel][prio] <- pp
+
 	//NO!	}
 } /* end lm_data_request */
 
@@ -537,7 +457,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func lm_seize_request(channel int) {
+func (tq *TransmitQueue) lm_seize_request(channel int) {
 	var prio = TQ_PRIO_1_LO
 
 	/* TODO KG
@@ -548,7 +468,7 @@ func lm_seize_request(channel int) {
 	#endif
 	*/
 
-	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.saveAudioConfigP.chan_medium[channel] != MEDIUM_RADIO {
 		// Connected mode is allowed only with internal modems.
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
@@ -571,51 +491,8 @@ func lm_seize_request(channel int) {
 	#endif
 	*/
 
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("lm_seize_request: enter critical section\n");
-	   #endif
-	*/
-
-	tq_mutex.Lock()
-
-	if queue_head[channel][prio] == nil {
-		queue_head[channel][prio] = pp
-	} else {
-		var plast = queue_head[channel][prio]
-		for {
-			var pnext = ax25_get_nextp(plast)
-			if pnext == nil {
-				break
-			}
-
-			plast = pnext
-		}
-
-		ax25_set_nextp(plast, pp)
-	}
-
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_seize_request: left critical section\n");
-	#endif
-	*/
-
-	/* TODO KG
-	   #if DEBUG
-	   	dw_printf ("lm_seize_request (): about to wake up xmit thread.\n");
-	   #endif
-	*/
-
-	if xmit_thread_is_waiting[channel] {
-		wake_up_mutex[channel].Lock()
-		wake_up_cond[channel].Signal()
-		wake_up_mutex[channel].Unlock()
-	}
+	tq.byteCount[channel][prio].Add(int64(ax25_get_frame_len(pp)))
+	tq.queueHead[channel][prio] <- pp
 } /* end lm_seize_request */
 
 /*-------------------------------------------------------------------
@@ -632,69 +509,24 @@ func lm_seize_request(channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_wait_while_empty(channel int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_wait_while_empty (%d) : enter critical section\n", channel);
-	#endif
-	*/
+func (tq *TransmitQueue) tq_wait_while_empty(channel int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	tq_mutex.Lock()
-
-	/* TODO KG
-	#if DEBUG
-		//text_color_set(DW_COLOR_DEBUG);
-		//dw_printf ("tq_wait_while_empty (%d): after pthread_mutex_lock\n", channel);
-	#endif
-	*/
-	var is_empty = tq_is_empty(channel)
-
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_wait_while_empty (%d) : left critical section\n", channel);
-	#endif
-	*/
-
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("tq_wait_while_empty (%d): is_empty = %d\n", channel, is_empty);
-	   #endif
-	*/
-
-	if is_empty {
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("tq_wait_while_empty (%d): SLEEP - about to call cond wait\n", channel);
-		#endif
-		*/
-		wake_up_mutex[channel].Lock()
-		xmit_thread_is_waiting[channel] = true
-		wake_up_cond[channel].Wait()
-		xmit_thread_is_waiting[channel] = false
-
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("tq_wait_while_empty (%d): WOKE UP - returned from cond wait, err = %d\n", channel, err);
-		#endif
-		*/
-
-		wake_up_mutex[channel].Unlock()
+	// Return immediately if there is already a peeked packet or data in any queue.
+	for p := 0; p < TQ_NUM_PRIO; p++ {
+		if tq.peeked[channel][p] != nil || len(tq.queueHead[channel][p]) > 0 {
+			return
+		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_wait_while_empty (%d) returns\n", channel);
-	#endif
-	*/
+	// All queues are empty; block until a packet arrives in any of them.
+	// The received packet is stored in the peeked slot so it is not lost.
+	select {
+	case pp := <-tq.queueHead[channel][TQ_PRIO_0_HI]:
+		tq.peeked[channel][TQ_PRIO_0_HI] = pp
+	case pp := <-tq.queueHead[channel][TQ_PRIO_1_LO]:
+		tq.peeked[channel][TQ_PRIO_1_LO] = pp
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -712,33 +544,22 @@ func tq_wait_while_empty(channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_remove(channel int, prio int) *packet_t {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_remove(%d,%d) enter critical section\n", channel, prio);
-	#endif
-	*/
-	tq_mutex.Lock()
-
+func (tq *TransmitQueue) tq_remove(channel int, prio int) *packet_t {
 	var result_p *packet_t
 
-	if queue_head[channel][prio] == nil {
-		result_p = nil
+	if tq.peeked[channel][prio] != nil {
+		result_p = tq.peeked[channel][prio]
+		tq.peeked[channel][prio] = nil
 	} else {
-		result_p = queue_head[channel][prio]
-		queue_head[channel][prio] = ax25_get_nextp(result_p)
-		ax25_set_nextp(result_p, nil)
+		select {
+		case result_p = <-tq.queueHead[channel][prio]:
+		default:
+		}
 	}
 
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_remove(%d,%d) leave critical section, returns %p\n", channel, prio, result_p);
-	#endif
-	*/
+	if result_p != nil {
+		tq.byteCount[channel][prio].Add(-int64(ax25_get_frame_len(result_p)))
+	}
 
 	/* TODO KG
 	   #if AX25MEMDEBUG
@@ -749,7 +570,7 @@ func tq_remove(channel int, prio int) *packet_t {
 	   	}
 	   #endif
 	*/
-	return (result_p)
+	return result_p
 } /* end tq_remove */
 
 /*-------------------------------------------------------------------
@@ -768,38 +589,20 @@ func tq_remove(channel int, prio int) *packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func tq_peek(channel int, prio int) *packet_t {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_peek(%d,%d) enter critical section\n", channel, prio);
-	#endif
-	*/
+func (tq *TransmitQueue) tq_peek(channel int, prio int) *packet_t {
+	if tq.peeked[channel][prio] != nil {
+		return tq.peeked[channel][prio]
+	}
 
-	// I don't think we need critical region here.
-	//dw_mutex_lock (&tq_mutex);
-	var result_p = queue_head[channel][prio]
-	// Just take a peek at the head.  Don't remove it.
-
-	//dw_mutex_unlock (&tq_mutex);
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_remove(%d,%d) leave critical section, returns %p\n", channel, prio, result_p);
-	#endif
-	*/
-
-	/* TODO KG
-	   #if AX25MEMDEBUG
-
-	   	if (ax25memdebug_get() && result_p != nil) {
-	   	  text_color_set(DW_COLOR_DEBUG);
-	   	  dw_printf ("tq_remove (channel=%d, prio=%d)  seq=%d\n", channel, prio, ax25memdebug_seq(result_p));
-	   	}
-	   #endif
-	*/
-	return (result_p)
+	// Non-blocking receive: move the head packet into the peeked slot so
+	// subsequent peek and remove calls see it without touching the channel again.
+	select {
+	case pp := <-tq.queueHead[channel][prio]:
+		tq.peeked[channel][prio] = pp
+		return pp
+	default:
+		return nil
+	}
 } /* end tq_peek */
 
 /*-------------------------------------------------------------------
@@ -814,13 +617,11 @@ func tq_peek(channel int, prio int) *packet_t {
  *
  *--------------------------------------------------------------------*/
 
-func tq_is_empty(channel int) bool {
+func (tq *TransmitQueue) tq_is_empty(channel int) bool {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	for p := 0; p < TQ_NUM_PRIO; p++ {
-		Assert(p >= 0 && p < TQ_NUM_PRIO)
-
-		if queue_head[channel][p] != nil {
+		if tq.peeked[channel][p] != nil || len(tq.queueHead[channel][p]) > 0 {
 			return false
 		}
 	}
@@ -840,9 +641,9 @@ func tq_is_empty(channel int) bool {
  *		prio	- Priority, use TQ_PRIO_0_HI or TQ_PRIO_1_LO.
  *			  Specify -1 for total of both.
  *
- *		source - If specified, count only those with this source address.
+ *		source - Reserved for future use; pass "".
  *
- *		dest	- If specified, count only those with this destination address.
+ *		dest	- Reserved for future use; pass "".
  *
  *		bytes	- If true, return number of bytes rather than packets.
  *
@@ -850,100 +651,26 @@ func tq_is_empty(channel int) bool {
  *
  *--------------------------------------------------------------------*/
 
-//#define DEBUG2 1
-
-func tq_count(channel int, prio int, source string, dest string, bytes bool) int {
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_count(channel=%d, prio=%d, source=\"%s\", dest=\"%s\", bytes=%d)\n", channel, prio, source, dest, bytes);
-	#endif
-	*/
+func (tq *TransmitQueue) tq_count(channel int, prio int, source string, dest string, bytes bool) int {
 	if prio == -1 {
-		return (tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes))
+		return tq.tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq.tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes)
 	}
-
-	// Array bounds check.  FIXME: TODO:  should have internal error instead of dying.
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("INTERNAL ERROR - tq_count(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
 
-		return (0)
+		return 0
 	}
 
-	if queue_head[channel][prio] == nil {
-		/* TODO KG
-		#if DEBUG2
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("tq_count: queue channel %d, prio %d is empty, returning 0.\n", channel, prio);
-		#endif
-		*/
-		return (0)
+	if bytes {
+		return int(tq.byteCount[channel][prio].Load())
 	}
-
-	// Don't want lists being rearranged while we are traversing them.
-
-	tq_mutex.Lock()
-
-	var n = 0 // Result.  Number of bytes or packets.
-	var pp = queue_head[channel][prio]
-
-	for pp != nil {
-		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
-			// Consider only real packets.
-			var count_it = 1
-
-			if source != "" {
-				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-				/* TODO KG
-				#if DEBUG2
-					// I'm cringing at the thought of printing while in a critical region.  But it's only for temp debug.  :-(
-					    text_color_set(DW_COLOR_DEBUG);
-					    dw_printf ("tq_count: compare to frame source %s\n", frame_source);
-				#endif
-				*/
-				if source != frame_source {
-					count_it = 0
-				}
-			}
-
-			if count_it > 0 && dest != "" {
-				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-				/* TODO KG
-				#if DEBUG2
-					// I'm cringing at the thought of printing while in a critical region.  But it's only for debug debug.  :-(
-					    text_color_set(DW_COLOR_DEBUG);
-					    dw_printf ("tq_count: compare to frame destination %s\n", frame_dest);
-				#endif
-				*/
-				if dest != frame_dest {
-					count_it = 0
-				}
-			}
-
-			if count_it > 0 {
-				if bytes {
-					n += ax25_get_frame_len(pp)
-				} else {
-					n++
-				}
-			}
-		}
-
-		pp = ax25_get_nextp(pp)
+	var count = len(tq.queueHead[channel][prio])
+	if tq.peeked[channel][prio] != nil {
+		count++
 	}
-
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_count(%d, %d, \"%s\", \"%s\", %d) returns %d\n", channel, prio, source, dest, bytes, n);
-	#endif
-	*/
-
-	return (n)
+	return count
 } /* end tq_count */
 
 /* end tq.c */

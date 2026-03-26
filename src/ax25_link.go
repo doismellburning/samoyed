@@ -406,7 +406,7 @@ type ax25_dlsm_t struct {
 
 	// Count how many frames of each type we received.
 	// This is easy to do because they all come in thru lm_data_indication.
-	// Counting outgoing could probably be done in lm_data_request so
+	// Counting outgoing could probably be done in xmitSvc.TQ.lm_data_request so
 	// it would not have to be scattered all over the place.  TBD
 
 	count_recv_frame_type [frame_not_AX25 + 1]int
@@ -829,9 +829,9 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 //
 //		To the transmitter:
 //
-//			lm_data_request			- Queue up a frame for transmission.
+//			xmitSvc.TQ.lm_data_request			- Queue up a frame for transmission.
 //
-//			lm_seize_request		- Start transmitter when possible.
+//			xmitSvc.TQ.lm_seize_request		- Start transmitter when possible.
 //							  lm_seize_confirm will be called when it has.
 //
 //
@@ -969,7 +969,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		var p1 = 1
 		var nopid0 = 0
 		var pp15 = ax25_u_frame(S.addrs, S.num_addr, cr_cmd, frame_type_U_DISC, p1, nopid0, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp15)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp15)
 
 		STOP_T1(S) // started in establish_data_link.
 		STOP_T3(S) // probably don't need.
@@ -992,7 +992,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 			var nopid = 0 // PID applies only to I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, p, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // HI means expedited.
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // HI means expedited.
 
 			// Erratum: Shouldn't we inform the user when going to disconnected state?
 			// Notifying the application, here, is my own enhancement.
@@ -1014,7 +1014,7 @@ func dl_disconnect_request(E *dlq_item_t) {
 		var nopid = 0
 
 		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		STOP_T3(S)
 		START_T1(S)
@@ -1341,7 +1341,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
 		if (!S.peer_receiver_busy) &&
 			WITHIN_WINDOW_SIZE(S) {
 			S.acknowledge_pending = true
-			lm_seize_request(S.channel)
+			xmitSvc.TQ.lm_seize_request(S.channel)
 		}
 
 	default:
@@ -2105,7 +2105,7 @@ func lm_data_indication(E *dlq_item_t) {
 		(!S.peer_receiver_busy) &&
 		WITHIN_WINDOW_SIZE(S) {
 		//S.acknowledge_pending = 1;
-		lm_seize_request(S.channel)
+		xmitSvc.TQ.lm_seize_request(S.channel)
 	}
 } /* end lm_data_indication */
 
@@ -2182,7 +2182,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			var nopid = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -2197,7 +2197,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			var nopid = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
 	case state_3_connected, state_4_timer_recovery:
@@ -2270,14 +2270,14 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 							#if 0 // Erratum: Original - state 4 has expedited.
 
 								            if (S.state == state_4_timer_recovery) {
-								              lm_data_request (C.int(S.channel), TQ_PRIO_0_HI, pp);		// "expedited"
+								              xmitSvc.TQ.lm_data_request (C.int(S.channel), TQ_PRIO_0_HI, pp);		// "expedited"
 								            } else {
-								              lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
+								              xmitSvc.TQ.lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
 								            }
 							#else // 2006 version - states 3 & 4 the same.
 						*/
 
-						lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+						xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 						// #endif
 						S.acknowledge_pending = false
@@ -2462,7 +2462,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			var cr = cr_res // response with F set to 1.
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		} else if !S.acknowledge_pending {
 			S.acknowledge_pending = true // Probably want to set this before the LM-SEIZE Request
@@ -2474,7 +2474,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			// When that event arrives, we check acknowledge_pending and send something
 			// to be determined later.
 
-			lm_seize_request(S.channel)
+			xmitSvc.TQ.lm_seize_request(S.channel)
 		}
 	} else if S.reject_exception {
 		// This is not the sequence we were expecting.
@@ -2487,7 +2487,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			var cr = cr_res // response with F set to 1.
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			S.acknowledge_pending = false
 		}
 	} else if S.srej_enable == srej_none {
@@ -2510,7 +2510,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
 	} else {
@@ -2553,7 +2553,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 				var nr = S.vr
 
 				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
-				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+				xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			} else if S.rxdata_by_ns[AX25MODULO(ns-1, S.modulo)] == nil {
 				// Ask for missing frames when we don't have N(S)-1 in the receive buffer.
 
@@ -2925,7 +2925,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, info)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		return
 	}
@@ -2957,7 +2957,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_SREJ, S.modulo, nr, _f, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 	}
 } /* end send_srej_frames */
 
@@ -3013,7 +3013,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			var f = pf
 			var nopid = 0 // PID only for I and UI frames.
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -3028,7 +3028,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			var nopid = 0 // PID applies only for I and UI frames.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
 		// Erratum: We have a disagreement here between original and 2006 version.
@@ -3242,7 +3242,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			var nopid = 0 // PID is only for I and UI.
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -3255,7 +3255,7 @@ func rej_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, nr int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 
 		// Erratum: We have a disagreement here between original and 2006 version.
@@ -3648,8 +3648,8 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 	if txdata != nil {
 		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
-		// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		// dw_printf ("calling xmitSvc.TQ.lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		num_resent++
 	} else {
@@ -3679,7 +3679,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 		txdata = S.txdata_by_ns[i_frame_ns]
 		if txdata != nil {
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			num_resent++
 		} else {
@@ -3757,7 +3757,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 		var nopid = 0 // PID is only for I and UI.
 
 		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		clear_exception_conditions(S)
 
@@ -3792,7 +3792,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			enter_new_state(S, state_5_awaiting_v22_connection)
 		} else { // SABM - respond with UA.
 			// Erratum!  2006 version shows SAMBE twice for state 1.
@@ -3803,7 +3803,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			// stay in state 1.
 		}
 
@@ -3814,7 +3814,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			// stay in state 5
 		} else { // SABM, respond with UA, enter state 1
 			var res = cr_res
@@ -3822,7 +3822,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			enter_new_state(S, state_1_awaiting_connection)
 		}
 
@@ -3835,7 +3835,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
 			// stay in state 2.
 		}
 
@@ -3846,7 +3846,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			// State 3 & 4 handling are the same except for this one difference.
 			if S.state == state_4_timer_recovery {
@@ -3926,7 +3926,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 		}
 		// keep current state, 0, 1, or 5.
 
@@ -3937,7 +3937,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_0_HI, pp) // expedited
 		}
 		// keep current state, 2.
 
@@ -3950,7 +3950,7 @@ func disc_frame(S *ax25_dlsm_t, p int) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_UA, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			// dl disconnect *indication*
 			text_color_set(DW_COLOR_INFO)
@@ -4441,7 +4441,7 @@ func ui_frame(S *ax25_dlsm_t, cr cmdres_t, pf int) {
 				var nopid = 0  // PID applies only for I and UI frames.
 
 				var pp = ax25_u_frame(S.addrs, S.num_addr, r, frame_type_U_DM, pf, nopid, nil)
-				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+				xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			}
 
 		case state_3_connected, state_4_timer_recovery:
@@ -4521,7 +4521,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 					var nopid = 0
 					var f = -1
 					var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_XID, f, nopid, xinfo)
-					lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+					xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 				}
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -4558,7 +4558,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 				   	          packet_t pp;
 
 				   	          pp = ax25_u_frame (S.addrs, S.num_addr, cmd, frame_type_U_TEST, p, nopid, (unsigned char *)info, (int)strlen(info));
-				   	          lm_data_request (S.channel, TQ_PRIO_1_LO, pp);
+				   	          xmitSvc.TQ.lm_data_request (S.channel, TQ_PRIO_1_LO, pp);
 				   	        }
 				   #endif
 				*/
@@ -4614,7 +4614,7 @@ func test_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 
 	if cr == cr_cmd {
 		var pp = ax25_u_frame(S.addrs, S.num_addr, res, frame_type_U_TEST, f, nopid, info)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 	}
 } /* end test_frame */
 
@@ -4738,7 +4738,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 				_s = frame_type_U_SABME
 			}
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, _s, p, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			select_t1_value(S)
 			START_T1(S)
 			// Keep same state.
@@ -4762,7 +4762,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			}
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_DISC, p, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			select_t1_value(S)
 			START_T1(S)
 			// stay in same state
@@ -4809,7 +4809,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			var nopid = 0
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cr, frame_type_U_DM, f, nopid, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			enter_new_state(S, state_0_disconnected)
 		} else {
@@ -4917,7 +4917,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 			var xinfo = xid_encode(&param, cmd)
 
 			var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			START_TM201(S)
 		}
@@ -4988,7 +4988,7 @@ func establish_data_link(S *ax25_dlsm_t) {
 	}
 
 	var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frameType, p, nopid, nil)
-	lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+	xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 	STOP_T3(S)
 	START_T1(S)
@@ -5085,7 +5085,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
 	}
 	var pp = ax25_s_frame(S.addrs, S.num_addr, cmd, ft, S.modulo, nr, p, nil)
 
-	lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+	xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 	S.acknowledge_pending = false
 	START_T1(S)
@@ -5149,7 +5149,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 		if S.own_receiver_busy {
 			// I'm busy.
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RNR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false // because we sent N(R) from V(R).
 		} else if S.srej_enable == srej_single || S.srej_enable == srej_multi {
@@ -5193,7 +5193,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			} else {
 				// Not waiting for fill in of missing frames.		X.25 2.4.6.11 c)
 				var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-				lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+				xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 				S.acknowledge_pending = false
 			}
@@ -5209,7 +5209,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			}
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			S.acknowledge_pending = false
 		}
@@ -5221,7 +5221,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			_r = frame_type_S_RNR
 		}
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, _r, S.modulo, nr, f, nil)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.acknowledge_pending = false
 	}
@@ -5234,7 +5234,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 		// Erratum:  Flow chart says RR/RNR command but I'm confident it should be response.
 
 			pp = ax25_s_frame (S.addrs, S.num_addr, cr, S.own_receiver_busy ? frame_type_S_RNR : frame_type_S_RR, S.modulo, nr, f, nil, 0);
-			lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
+			xmitSvc.TQ.lm_data_request (C.int(S.channel), TQ_PRIO_1_LO, pp);
 
 			S.acknowledge_pending = 0;
 
@@ -5304,7 +5304,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p,
 				S.txdata_by_ns[ns].pid, S.txdata_by_ns[ns].data[:S.txdata_by_ns[ns].len])
 
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 			// Keep it around in case we need to send again.
 
 			sent_count++
@@ -5732,10 +5732,10 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 
 			if s_debug_misc { //nolint:staticcheck
 				// text_color_set(DW_COLOR_DEBUG);
-				// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
+				// dw_printf ("calling xmitSvc.TQ.lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
 			}
 
-			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 			// Stash in sent array in case it gets lost and needs to be sent again.
 
@@ -5861,7 +5861,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 		var p = 1
 		var nopid = 0
 		var pp = ax25_u_frame(S.addrs, S.num_addr, cmd, frame_type_U_XID, p, nopid, xinfo)
-		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
+		xmitSvc.TQ.lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		S.mdl_rc = 0
 		START_TM201(S)

@@ -510,7 +510,7 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 		return
 	}
 
-	tq_append(channel, TQ_PRIO_0_HI, pp)
+	xmitSvc.TQ.tq_append(channel, TQ_PRIO_0_HI, pp)
 } /* end Sequence */
 
 /*------------------------------------------------------------------
