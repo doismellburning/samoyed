@@ -133,7 +133,7 @@ func log_init(daily_names bool, path string) {
  *
  *------------------------------------------------------------------*/
 
-func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries retry_t) {
+func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries BitFixLevel) {
 	if len(g_log_path) == 0 {
 		return
 	}

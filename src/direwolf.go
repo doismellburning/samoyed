@@ -813,7 +813,7 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
-func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
+func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -832,7 +832,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// Possible fix_bits indication.
 		if audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall {
 			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX)
-			display_retries = fmt.Sprintf(" [%s] ", retry_text[int(retries)])
+			display_retries = fmt.Sprintf(" [%s] ", retries.String())
 		}
 	}
 

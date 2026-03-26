@@ -67,19 +67,6 @@ const (
 	AUDIO_IN_TYPE_STDIN
 )
 
-/* For option to try fixing frames with bad CRC. */
-
-type retry_t int
-
-const (
-	RETRY_NONE           retry_t = 0
-	RETRY_INVERT_SINGLE  retry_t = 1
-	RETRY_INVERT_DOUBLE  retry_t = 2
-	RETRY_INVERT_TRIPLE  retry_t = 3
-	RETRY_INVERT_TWO_SEP retry_t = 4
-	RETRY_MAX            retry_t = 5
-)
-
 // Type of communication medium associated with the channel.
 
 type medium_e int
@@ -270,7 +257,7 @@ type achan_param_s struct {
 
 	/* These are for dealing with imperfect frames. */
 
-	fix_bits retry_t /* Level of effort to recover from */
+	fix_bits BitFixLevel /* Level of effort to recover from */
 	/* a bad FCS on the frame. */
 	/* 0 = no effort */
 	/* 1 = try fixing a single bit */
@@ -493,7 +480,7 @@ const MAX_SAMPLES_PER_SEC = 192000 /* The cheap USB-audio adapters (e.g. CM108) 
 
 const DEFAULT_BITS_PER_SAMPLE = 16
 
-const DEFAULT_FIX_BITS = RETRY_NONE // Interesting research project but even a single bit fix up
+const DEFAULT_FIX_BITS = BitFixNone // Interesting research project but even a single bit fix up
 // will occasionally let corrupted packets through.
 
 /*

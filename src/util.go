@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 import (
@@ -117,15 +116,6 @@ func DW_KM_TO_MILES(x float64) float64 {
 	}
 
 	return x * 0.621371192
-}
-
-var retry_text = []string{
-	"NONE",
-	"SINGLE",
-	"DOUBLE",
-	"TRIPLE",
-	"TWO_SEP",
-	"PASSALL",
 }
 
 func D2R(d float64) float64 {

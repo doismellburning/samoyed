@@ -95,7 +95,7 @@ type dlq_item_t struct {
 
 	fec_type fec_type_t // Type of FEC for received signal: none, FX.25, or IL2P.
 
-	retries retry_t /* Effort expended to get a valid CRC. */
+	retries BitFixLevel /* Effort expended to get a valid CRC. */
 	/* Bits changed for regular AX.25. */
 	/* Number of bytes fixed for FX.25. */
 
@@ -225,7 +225,7 @@ func dlq_init() {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
+func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -277,7 +277,7 @@ func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, al
 	append_to_queue(pnew)
 } /* end dlq_rec_frame */
 
-func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries retry_t, spectrum string) {
+func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	if ATEST_C {
 		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
 	} else {

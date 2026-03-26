@@ -217,7 +217,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 			if pp != nil {
 				var alevel = demod_get_audio_level(channel, subchannel)
-				var retries = retry_t(F.corrected)
+				var retries = BitFixLevel(F.corrected)
 				var fec_type = fec_type_il2p
 
 				// TODO: Could we put last 3 arguments in packet object rather than passing around separately?
