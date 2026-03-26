@@ -618,7 +618,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(audio_config, d_p_opt)
+	xmitSvc = NewXmitService(audio_config, d_p_opt, NewTransmitQueue(audio_config))
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter

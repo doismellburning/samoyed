@@ -822,7 +822,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			var alevel alevel_t
 			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 		default:
-			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
+			xmitSvc.TQ.tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
