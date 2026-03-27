@@ -66,7 +66,7 @@ import (
 var DCD_CONFIG_PSK = &DCDConfig{
 	DCD_THRESH_ON:  30, // Hysteresis: Can miss 2 out of 32 for detecting lock.
 	DCD_THRESH_OFF: 6,  // Might want a little more fine tuning.
-	DCD_GOOD_WIDTH: 512,
+	DCD_GOOD_WIDTH: 1024,
 }
 
 /* TODO KG
@@ -184,7 +184,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.u.psk.use_prefilter = 0 /* No bandpass filter. */
 
-			D.u.psk.lpf_baud = 0.70
+			D.u.psk.lpf_baud = 0.55 // tightened from 0.70; BPSK signal bandwidth is baud/2, 0.55 gives modest margin with less noise
 			D.u.psk.lp_filter_width_sym = 1.007
 			D.u.psk.lp_window = BP_WINDOW_TRUNCATED
 
@@ -194,8 +194,8 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		case 'O': /* Mix with local oscillator. */
 			D.u.psk.psk_use_lo = 1
 
-			D.u.psk.use_prefilter = 1 /* Add a bandpass filter. */
-			D.u.psk.prefilter_baud = 0.55
+			D.u.psk.use_prefilter = 1    /* Add a bandpass filter. */
+			D.u.psk.prefilter_baud = 1.0 // was 0.55 (copied from QPSK S profile where correct_baud=bps/2); BPSK main lobe spans ±baud, so ±0.55*baud caused ISI at 300 baud
 			D.u.psk.pre_filter_width_sym = 2.014
 			D.u.psk.pre_window = BP_WINDOW_FLATTOP
 
