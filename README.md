@@ -61,6 +61,12 @@ For more detail on configuration and features, see the [Dire Wolf documentation]
 
 ## Building
 
+### Devcontainer
+
+A devcontainer configuration is included — use the `devcontainer` CLI to get a fully configured environment with all dependencies pre-installed.
+
+If `http_proxy`/`https_proxy` are set in your host environment, they will be passed through to the container and used during setup.
+
 ### Prerequisites
 
 See .github/workflows/build-and-test.yml for package dependencies

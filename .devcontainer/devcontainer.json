@@ -1,0 +1,12 @@
+{
+    "name": "Samoyed",
+    "image": "mcr.microsoft.com/devcontainers/go:2.1-1.25-bookworm",
+    "postCreateCommand": "sudo -E apt-get update && sudo -E apt-get install -y --no-install-recommends libudev-dev libhamlib-dev portaudio19-dev libavahi-client-dev libbsd-dev libgps-dev morse2ascii direwolf shellcheck pipx nodejs npm && pipx install reuse && sudo -E npm install -g @anthropic-ai/claude-code",
+    "remoteEnv": {
+        "http_proxy": "${localEnv:http_proxy}",
+        "https_proxy": "${localEnv:https_proxy}"
+    },
+    "mounts": [
+        "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind",
+    ]
+}
