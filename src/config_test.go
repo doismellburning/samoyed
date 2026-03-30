@@ -190,6 +190,175 @@ func Test_IsNoCall(t *testing.T) {
 	}
 }
 
+// --- config_init helpers ---
+
+// configFromString writes content to a temp config file, runs config_init, and
+// returns the resulting audio and misc config structs.
+func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+	t.Helper()
+
+	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
+	require.NoError(t, err)
+	_, err = tmpFile.WriteString(content)
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+
+	var audioConfig = new(audio_s)
+	var digiConfig digi_config_s
+	var cdigiConfig cdigi_config_s
+	var ttConfig tt_config_s
+	var igateConfig igate_config_s
+	var miscConfig misc_config_s
+
+	config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
+		&ttConfig, &igateConfig, &miscConfig)
+
+	return audioConfig, &miscConfig
+}
+
+// --- config_init MYCALL directive ---
+
+func Test_config_init_mycall(t *testing.T) {
+	t.Run("basic callsign stored on channel 0", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MYCALL Q1TEST\n")
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+	})
+
+	t.Run("lowercase input is silently uppercased", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MYCALL q1test\n")
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+	})
+
+	t.Run("callsign with SSID", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MYCALL Q1TEST-9\n")
+		assert.Equal(t, "Q1TEST-9", cfg.mycall[0])
+	})
+
+	t.Run("invalid callsign leaves all channels as NOCALL", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MYCALL !INVALID!\n")
+		assert.True(t, IsNoCall(cfg.mycall[0]))
+	})
+
+	t.Run("MYCALL propagates to all unset channels", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MYCALL Q1TEST\n")
+		// Channel 0 and all other channels that were not explicitly set should share it.
+		for c := range MAX_TOTAL_CHANS {
+			assert.Equal(t, "Q1TEST", cfg.mycall[c],
+				"expected Q1TEST on channel %d", c)
+		}
+	})
+
+	t.Run("per-channel MYCALL does not overwrite explicitly set channel", func(t *testing.T) {
+		// MYCALL Q1TEST sets all channels; then CHANNEL 1 + MYCALL Q2TEST
+		// should overwrite channel 1 but leave channel 0 as Q1TEST.
+		var cfg, _ = configFromString(t,
+			"ADEVICE hw:0,0\n"+
+				"ARATE 44100\n"+
+				"MYCALL Q1TEST\n"+
+				"CHANNEL 1\n"+
+				"MYCALL Q2TEST\n",
+		)
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+		assert.Equal(t, "Q2TEST", cfg.mycall[1])
+	})
+}
+
+// --- config_init case-insensitive keyword dispatch ---
+
+func Test_config_init_keyword_case_insensitive(t *testing.T) {
+	t.Run("lowercase directive name works", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "mycall Q1TEST\n")
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+	})
+
+	t.Run("mixed-case directive name works", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MyCall Q1TEST\n")
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+	})
+}
+
+// --- config_init TXDELAY directive ---
+
+func Test_config_init_txdelay(t *testing.T) {
+	t.Run("valid value stored", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "TXDELAY 50\n")
+		assert.Equal(t, 50, cfg.achan[0].txdelay)
+	})
+
+	t.Run("out-of-range value falls back to default", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "TXDELAY 999\n")
+		assert.Equal(t, DEFAULT_TXDELAY, cfg.achan[0].txdelay)
+	})
+}
+
+// --- config_init SLOTTIME directive ---
+
+func Test_config_init_slottime(t *testing.T) {
+	t.Run("valid value stored", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "SLOTTIME 20\n")
+		assert.Equal(t, 20, cfg.achan[0].slottime)
+	})
+
+	t.Run("out-of-range value falls back to default", func(t *testing.T) {
+		// 0 is outside the accepted range 5..49
+		var cfg, _ = configFromString(t, "SLOTTIME 0\n")
+		assert.Equal(t, DEFAULT_SLOTTIME, cfg.achan[0].slottime)
+	})
+}
+
+// --- config_init FRACK directive ---
+
+func Test_config_init_frack(t *testing.T) {
+	t.Run("valid value stored", func(t *testing.T) {
+		var _, misc = configFromString(t, "FRACK 5\n")
+		assert.Equal(t, 5, misc.frack)
+	})
+
+	t.Run("out-of-range value keeps default", func(t *testing.T) {
+		var _, misc = configFromString(t, "FRACK 999\n")
+		assert.Equal(t, AX25_T1V_FRACK_DEFAULT, misc.frack)
+	})
+}
+
+// --- config_init ADEVICE directive ---
+
+func Test_config_init_adevice(t *testing.T) {
+	t.Run("single arg sets both in and out to same device", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "ADEVICE hw:0,0\n")
+		assert.Equal(t, "hw:0,0", cfg.adev[0].adevice_in)
+		assert.Equal(t, "hw:0,0", cfg.adev[0].adevice_out)
+	})
+
+	t.Run("two args set in and out independently", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "ADEVICE hw:0,0 hw:1,0\n")
+		assert.Equal(t, "hw:0,0", cfg.adev[0].adevice_in)
+		assert.Equal(t, "hw:1,0", cfg.adev[0].adevice_out)
+	})
+
+	t.Run("ADEVICE1 numeric suffix sets device 1", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "ADEVICE hw:0,0\nADEVICE1 hw:1,0\n")
+		assert.Equal(t, "hw:1,0", cfg.adev[1].adevice_in)
+		assert.Equal(t, "hw:1,0", cfg.adev[1].adevice_out)
+	})
+}
+
+// --- config_init CHANNEL directive ---
+
+func Test_config_init_channel(t *testing.T) {
+	t.Run("CHANNEL 1 routes subsequent TXDELAY to channel 1", func(t *testing.T) {
+		// Need stereo ADEVICE so channel 1 is valid.
+		var cfg, _ = configFromString(t,
+			"ADEVICE hw:0,0\n"+
+				"ARATE 44100\n"+
+				"CHANNEL 1\n"+
+				"TXDELAY 42\n",
+		)
+		// Channel 0 should have the default; channel 1 should have 42.
+		assert.Equal(t, DEFAULT_TXDELAY, cfg.achan[0].txdelay)
+		assert.Equal(t, 42, cfg.achan[1].txdelay)
+	})
+}
+
 // --- config_init MODEM directive ---
 
 func Test_config_init_modem_directive(t *testing.T) {
