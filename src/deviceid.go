@@ -222,7 +222,7 @@ func NewDeviceIDData() *DeviceIDData {
 func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
-	if len(d.ptocalls) == 0 {
+	if d == nil || len(d.ptocalls) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("deviceid_decode_dest called without any deviceid data.\n")
 
@@ -303,7 +303,7 @@ func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
 		return trimmed, device
 	}
 
-	if len(d.ptocalls) == 0 {
+	if d == nil || len(d.ptocalls) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("deviceid_decode_mice called without any deviceid data.\n")
 
