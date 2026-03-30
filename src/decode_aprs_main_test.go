@@ -5,7 +5,7 @@ import (
 )
 
 func Test_DecodeAPRSLine1(t *testing.T) {
-	deviceid_init()
+	deviceIDData = NewDeviceIDData()
 
 	DECODE_APRS_UTIL = true
 
@@ -17,7 +17,7 @@ func Test_DecodeAPRSLine1(t *testing.T) {
 }
 
 func Test_DecodeAPRSLine2(t *testing.T) {
-	deviceid_init()
+	deviceIDData = NewDeviceIDData()
 
 	DECODE_APRS_UTIL = true
 
@@ -29,7 +29,7 @@ func Test_DecodeAPRSLine2(t *testing.T) {
 }
 
 func Test_DecodeAPRSLine3(t *testing.T) {
-	deviceid_init()
+	deviceIDData = NewDeviceIDData()
 
 	DECODE_APRS_UTIL = true
 
@@ -45,7 +45,7 @@ func Test_DecodeAPRSLine3(t *testing.T) {
 }
 
 func Test_DecodeAPRSLine3NoSpaces(t *testing.T) {
-	deviceid_init()
+	deviceIDData = NewDeviceIDData()
 
 	DECODE_APRS_UTIL = true
 
