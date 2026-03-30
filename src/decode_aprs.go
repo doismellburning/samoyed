@@ -356,7 +356,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	case '`': /* Current Mic-E Data */
 
 	default:
-		A.g_mfr = deviceid_decode_dest(A.g_dest)
+		A.g_mfr = deviceIDData.deviceid_decode_dest(A.g_dest)
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -1531,7 +1531,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	/* The telemetry field, in the original spec, is no longer used. */
 
 	// Comment with vendor/model removed.
-	var trimmed, device = deviceid_decode_mice(string(mcomment))
+	var trimmed, device = deviceIDData.deviceid_decode_mice(string(mcomment))
 	A.g_mfr = device
 
 	// Possible altitude at beginning of remaining comment.

@@ -46,19 +46,24 @@ type tocalls struct {
 	model  string
 }
 
-var pmice []*mice
-var ptocalls []*tocalls
+// DeviceIDData holds the loaded device identification tables.
+type DeviceIDData struct {
+	pmice    []*mice
+	ptocalls []*tocalls
+}
+
+var deviceIDData *DeviceIDData
 
 /*------------------------------------------------------------------
  *
- * Function:	deviceid_init
+ * Function:	NewDeviceIDData
  *
  * Purpose:	Called once at startup to read the tocalls.yaml file which was obtained from
  *		https://github.com/aprsorg/aprs-deviceid .
  *
  * Inputs:	tocalls.yaml with OS specific directory search list.
  *
- * Outputs:	static variables listed above.
+ * Returns:	Populated DeviceIDData, or empty struct if file not found.
  *
  * Description:	For maximum flexibility, we will read the
  *		data file at run time rather than compiling it in.
@@ -81,7 +86,9 @@ var search_locations = []string{
 	"/opt/local/share/direwolf/tocalls.yaml",
 }
 
-func deviceid_init() {
+func NewDeviceIDData() *DeviceIDData {
+	var d = new(DeviceIDData)
+
 	var fp *os.File
 
 	for _, location := range search_locations {
@@ -104,13 +111,13 @@ func deviceid_init() {
 
 		dw_printf("It won't be possible to extract device identifiers from packets.\n")
 
-		return
+		return d
 	}
 
 	var data, readErr = io.ReadAll(fp)
 	if readErr != nil {
 		dw_printf("Error reading deviceid file %s: %s\n", fp.Name(), readErr)
-		return
+		return d
 	}
 
 	// Some shenanigans to map this all to the right data types...
@@ -121,7 +128,7 @@ func deviceid_init() {
 	var unmarshallErr = yaml.Unmarshal(data, &deviceidConfig)
 	if unmarshallErr != nil {
 		dw_printf("Error parsing deviceid file %s: %s\n", fp.Name(), unmarshallErr)
-		return
+		return d
 	}
 
 	var miceSection, _ = deviceidConfig["mice"].([]interface{})
@@ -133,7 +140,7 @@ func deviceid_init() {
 		m.vendor, _ = entry["vendor"].(string)
 		m.model, _ = entry["model"].(string)
 
-		pmice = append(pmice, m)
+		d.pmice = append(d.pmice, m)
 	}
 
 	var micelegacySection, _ = deviceidConfig["micelegacy"].([]interface{})
@@ -146,7 +153,7 @@ func deviceid_init() {
 		m.vendor, _ = entry["vendor"].(string)
 		m.model, _ = entry["model"].(string)
 
-		pmice = append(pmice, m)
+		d.pmice = append(d.pmice, m)
 	}
 
 	var tocallsSection, _ = deviceidConfig["tocalls"].([]interface{})
@@ -161,12 +168,12 @@ func deviceid_init() {
 		// Remove trailing wildcard characters
 		t.tocall = strings.TrimRight(t.tocall, "?*n")
 
-		ptocalls = append(ptocalls, t)
+		d.ptocalls = append(d.ptocalls, t)
 	}
 
 	// MIC-E Legacy needs to be sorted so those with suffix come first.
 
-	slices.SortFunc(pmice, func(a, b *mice) int {
+	slices.SortFunc(d.pmice, func(a, b *mice) int {
 		// Used to sort the suffixes by length.
 		// Longer at the top.
 		// Example check for  >xxx^ before >xxx .
@@ -176,7 +183,7 @@ func deviceid_init() {
 	// Sort tocalls by decreasing length so the search will go from most specific to least specific.
 	// Example:  APY350 or APY008 would match those specific models before getting to the more generic APY.
 
-	slices.SortFunc(ptocalls, func(a, b *tocalls) int {
+	slices.SortFunc(d.ptocalls, func(a, b *tocalls) int {
 		// Used to sort the tocalls by length.
 		// When length is equal, alphabetically.
 		var c = cmp.Compare(len(b.tocall), len(a.tocall))
@@ -186,7 +193,9 @@ func deviceid_init() {
 
 		return strings.Compare(a.tocall, b.tocall)
 	})
-} // end deviceid_init
+
+	return d
+} // end NewDeviceIDData
 
 /*------------------------------------------------------------------
  *
@@ -210,17 +219,17 @@ func deviceid_init() {
  *
  *------------------------------------------------------------------*/
 
-func deviceid_decode_dest(dest string) string {
+func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
-	if len(ptocalls) == 0 {
+	if len(d.ptocalls) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("deviceid_decode_dest called without any deviceid data.\n")
 
 		return device
 	}
 
-	for _, t := range ptocalls {
+	for _, t := range d.ptocalls {
 		if strings.HasPrefix(dest, t.tocall) {
 			if t.vendor != "" {
 				device = t.vendor
@@ -286,7 +295,7 @@ func deviceid_decode_dest(dest string) string {
  *			Understanding APRS Packets
  *------------------------------------------------------------------*/
 
-func deviceid_decode_mice(comment string) (string, string) {
+func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
 	var device = "UNKNOWN vendor/model"
 	var trimmed = comment
 
@@ -294,7 +303,7 @@ func deviceid_decode_mice(comment string) (string, string) {
 		return trimmed, device
 	}
 
-	if len(ptocalls) == 0 {
+	if len(d.ptocalls) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("deviceid_decode_mice called without any deviceid data.\n")
 
@@ -304,7 +313,7 @@ func deviceid_decode_mice(comment string) (string, string) {
 	// The Legacy format has an explicit prefix in the table.
 	// For others, it must be ` or ' to indicate whether messaging capable.
 
-	for _, m := range pmice {
+	for _, m := range d.pmice {
 		if (len(m.prefix) != 0 && // Legacy
 			strings.HasPrefix(comment, m.prefix) && // prefix from table
 			strings.HasSuffix(comment, m.suffix)) || // possible suffix
