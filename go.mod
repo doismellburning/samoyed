@@ -1,6 +1,6 @@
 module github.com/doismellburning/samoyed
 
-go 1.25
+go 1.25.0
 
 require (
 	github.com/brutella/dnssd v1.2.14
@@ -15,7 +15,7 @@ require (
 	github.com/tzneal/coordconv v0.1.2
 	github.com/warthog618/go-gpiocdev v0.9.1
 	github.com/xylo04/goHamlib v0.0.0-20240309005711-30dd4ae13b38
-	golang.org/x/sys v0.41.0
+	golang.org/x/sys v0.42.0
 	gopkg.in/yaml.v3 v3.0.1
 	pgregory.net/rapid v1.2.0
 )
