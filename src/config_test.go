@@ -139,6 +139,29 @@ func Test_parse_ll(t *testing.T) {
 	}
 }
 
+// --- split ---
+
+func Test_split(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		restOfLine bool
+		want       string
+	}{
+		{"simple token", "hello world", false, "hello"},
+		{"quoted token", `"hello world"`, false, "hello world"},
+		{"quoted token at end of string", `"hello"`, false, "hello"},
+		{"doubled quote inside quotes", `"say ""hi"""`, false, `say "hi"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result = split(tt.input, tt.restOfLine)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
 // --- IsNoCall ---
 
 func Test_IsNoCall(t *testing.T) {
