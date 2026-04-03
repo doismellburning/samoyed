@@ -746,7 +746,7 @@ outerLoop:
 		switch c {
 		case '"':
 			if in_quotes {
-				if splitCmd[parsedLen+1] == '"' {
+				if parsedLen+1 < len(splitCmd) && splitCmd[parsedLen+1] == '"' {
 					token += string(c)
 					parsedLen++
 				} else {
