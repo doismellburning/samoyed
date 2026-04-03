@@ -112,6 +112,10 @@ outperforming all hardware TNCs and first-generation soundcard modems.
 
 For Dire Wolf documentation, see the [Dire Wolf doc directory](https://github.com/wb2osz/direwolf/tree/master/doc).
 
+## Further Reading
+
+- [Samoyed - An Amateur Radio Software Modem](https://radio.doismellburning.co.uk/projects/samoyed-an-amateur-radio-software-modem/) — project background
+
 ## License
 
 GPL-2.0-or-later. See [LICENSES/](./LICENSES/) and [REUSE.toml](./REUSE.toml) for full details.
