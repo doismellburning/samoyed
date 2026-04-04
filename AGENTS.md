@@ -13,6 +13,11 @@
 * As this started as a port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet - new things should be, but we don't need to change existing things if not necessary
 * Prefer to use `new(Foo)` over `&Foo{}` - the latter makes the exhaustruct linter grumble
 
+### Test Callsigns
+
+* Use `Q1TEST`, `Q2TEST`, etc. as synthetic callsigns in tests - the `Q` prefix is ITU-reserved for Q-codes and never assigned to amateur radio operators, so these can't be real callsigns
+* Avoid `N0CALL` as a test callsign - Dire Wolf uses it as a sentinel value
+
 ### Test File Naming
 
 * Per Go convention, generally tests for `foo.go` live in `foo_test.go` but we also do the following:

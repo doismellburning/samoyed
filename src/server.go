@@ -927,7 +927,7 @@ func cmd_listen_thread(client int) {
 
 		var cmd = new(AGWPEMessage)
 
-		var readErr = binary.Read(client_sock[client], binary.LittleEndian, cmd.Header)
+		var readErr = binary.Read(client_sock[client], binary.LittleEndian, &cmd.Header)
 		if readErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
