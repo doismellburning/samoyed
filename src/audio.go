@@ -915,29 +915,12 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 	}
 
 	var dev = matchPortAudioDeviceByName(name, forInput, devices)
-	if dev != nil {
-		return dev
+	if dev == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Could not match audio device '%s' to any PortAudio device.\n", name)
 	}
 
-	// Fall back to default
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Could not match audio device '%s' to any PortAudio device, falling back to default.\n", name)
-
-	if forInput {
-		var defaultDev, defaultErr = portaudio.DefaultInputDevice()
-		if defaultErr != nil {
-			return nil
-		}
-
-		return defaultDev
-	} else {
-		var defaultDev, defaultErr = portaudio.DefaultOutputDevice()
-		if defaultErr != nil {
-			return nil
-		}
-
-		return defaultDev
-	}
+	return dev
 }
 
 /*------------------------------------------------------------------
