@@ -178,7 +178,7 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 			var n = 1
 
 			var row = c - '0'
-			for col := 0; col < 4; col++ {
+			for col := range 4 {
 				if translate[row][col] != 0 {
 					n++
 				}
@@ -259,13 +259,13 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
  *----------------------------------------------------------------*/
 
 func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unparam
-	var buttons = ""
+	var buttons strings.Builder
 	var errors = 0
 
 	for _, c := range text {
 		if unicode.IsDigit(c) {
 			/* Digit is single key press. */
-			buttons += string(c)
+			buttons.WriteRune(c)
 		} else {
 			if unicode.IsUpper(c) {
 
@@ -289,8 +289,8 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 			for row := 0; row < 10 && !found; row++ {
 				for col := 0; col < 4 && !found; col++ {
 					if c == translate[row][col] {
-						buttons += string(rune(row + '0'))
-						buttons += string(rune(col + 'A'))
+						buttons.WriteRune(rune(row + '0'))
+						buttons.WriteRune(rune(col + 'A'))
 						found = true
 					}
 				}
@@ -305,7 +305,7 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 		}
 	}
 
-	return buttons, errors
+	return buttons.String(), errors
 } /* end tt_text_to_two_key */
 
 /*------------------------------------------------------------------
@@ -430,7 +430,7 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 	}
 
 	var packed = 0 // two bits per character
-	var buttons string
+	var buttons strings.Builder
 
 	for _, c := range padded {
 		if unicode.IsLower(c) {
@@ -444,7 +444,7 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 		for row := 0; row < 10 && !found; row++ {
 			for col := 0; col < 4 && !found; col++ {
 				if c == call10encoding[row][col] {
-					buttons += string(rune('0' + row))
+					buttons.WriteRune(rune('0' + row))
 					packed = packed*4 + col /* base 4 to binary */
 					found = true
 				}
@@ -462,9 +462,9 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 
 	/* Binary to decimal for the columns. */
 
-	buttons += fmt.Sprintf("%04d", packed)
+	fmt.Fprintf(&buttons, "%04d", packed)
 
-	return buttons, errors
+	return buttons.String(), errors
 } /* end tt_text_to_call10 */
 
 /*------------------------------------------------------------------
@@ -597,7 +597,7 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
 
 func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unparam
 	var errors = 0
-	var buttons = ""
+	var buttons strings.Builder
 
 	for _, c := range text {
 		/* "isprint()" might depend on locale so use brute force. */
@@ -607,11 +607,11 @@ func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unpara
 
 		var n = c - 32
 
-		buttons += string((n / 10) + '0')
-		buttons += string((n % 10) + '0')
+		buttons.WriteRune((n / 10) + '0')
+		buttons.WriteRune((n % 10) + '0')
 	}
 
-	return buttons, errors
+	return buttons.String(), errors
 } /* end tt_text_to_ascii2d */
 
 /*------------------------------------------------------------------
@@ -632,7 +632,7 @@ func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unpara
  *----------------------------------------------------------------*/
 
 func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
-	var text string
+	var text strings.Builder
 	var errors = 0
 
 	for i := 0; i < len(buttons); i++ {
@@ -643,7 +643,7 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 			var maxspan = 1
 
 			var row = c - '0'
-			for col := 0; col < 4; col++ {
+			for col := range 4 {
 				if translate[row][col] != 0 {
 					maxspan++
 				}
@@ -663,9 +663,9 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 			}
 
 			if n < maxspan {
-				text += string(translate[row][n-1])
+				text.WriteRune(translate[row][n-1])
 			} else if n == maxspan {
-				text += string(c)
+				text.WriteRune(c)
 			} else {
 				errors++
 
@@ -674,7 +674,7 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 					dw_printf("Multi-press to text: Maximum of %d \"%c\" can occur in a row.\n", maxspan, c)
 				}
 				/* Treat like the maximum length. */
-				text += string(c)
+				text.WriteRune(c)
 			}
 		} else if c == 'A' || c == 'a' {
 			/* Separator should occur only if digit before and after are the same. */
@@ -697,7 +697,7 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 		}
 	}
 
-	return text, errors
+	return text.String(), errors
 } /* end tt_multipress_to_text */
 
 /*------------------------------------------------------------------
@@ -719,7 +719,7 @@ func tt_multipress_to_text(buttons string, quiet bool) (string, int) {
 
 func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 	var errors = 0
-	var text string
+	var text strings.Builder
 
 	for i := 0; i < len(buttons); i++ {
 		var c = rune(buttons[i])
@@ -739,7 +739,7 @@ func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 
 			if col >= 0 {
 				if translate[row][col] != 0 {
-					text += string(translate[row][col])
+					text.WriteRune(translate[row][col])
 				} else {
 					errors++
 
@@ -751,7 +751,7 @@ func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 
 				i++ // Skip the next character since we consumed it
 			} else {
-				text += string(c)
+				text.WriteRune(c)
 			}
 		} else if (c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd') {
 			/* ABCD not expected here. */
@@ -772,7 +772,7 @@ func tt_two_key_to_text(buttons string, quiet bool) (string, int) {
 		}
 	}
 
-	return text, errors
+	return text.String(), errors
 } /* end tt_two_key_to_text */
 
 /*------------------------------------------------------------------
@@ -889,7 +889,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 
 	var packed, _ = strconv.Atoi(buttons[6:])
 
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		var c = buttons[k]
 
 		var row = c - '0'
@@ -973,7 +973,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 
 	var packed, _ = strconv.Atoi(buttons[3:])
 
-	for k := 0; k < 3; k++ {
+	for k := range 3 {
 		var c = buttons[k]
 
 		var row = c - '0'
@@ -1159,7 +1159,7 @@ func tt_text_to_mhead(text string, quiet bool) (string, int) {
 		return buttons, errors
 	}
 
-	for i := 0; i < np; i++ {
+	for i := range np {
 		var t0 = rune(text[i*2])
 		var t1 = rune(text[i*2+1])
 

@@ -42,7 +42,7 @@ var g_il2p_debug = 0
 func il2p_init(il2p_debug int) {
 	g_il2p_debug = il2p_debug
 
-	for i := 0; i < NTAB; i++ {
+	for i := range NTAB {
 		Assert(Tab[i].nroots <= MAX_NROOTS)
 
 		Tab[i].rs = init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
@@ -61,7 +61,7 @@ func il2p_get_debug() int {
 // Find RS codec control block for specified number of parity symbols.
 
 func il2p_find_rs(nparity int) *rs_t {
-	for n := 0; n < NTAB; n++ {
+	for n := range NTAB {
 		if Tab[n].nroots == uint(nparity) {
 			return Tab[n].rs
 		}

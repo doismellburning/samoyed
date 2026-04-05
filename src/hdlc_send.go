@@ -81,7 +81,7 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 
 	send_control_nrzi(channel, 0x7e) /* Start frame */
 
-	for j := 0; j < len(fbuf); j++ {
+	for j := range fbuf {
 		send_data_nrzi(channel, fbuf[j])
 	}
 
@@ -147,7 +147,7 @@ func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_confi
 	// For AX.25, it is the 01111110 "flag" pattern with NRZI and no bit stuffing.
 	// For IL2P, it is 01010101 without NRZI.
 
-	for j := 0; j < nbytes; j++ {
+	for range nbytes {
 		if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P {
 			send_byte_msb_first(channel, IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
 		} else {
@@ -168,7 +168,7 @@ func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_confi
 // MSB first, opposite of AX.25.
 
 func send_byte_msb_first(channel int, x int, polarity int) {
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		var dbit = 0
 		if (x & 0x80) != 0 {
 			dbit = 1
@@ -191,7 +191,7 @@ var stuff [MAX_RADIO_CHANS]int // Count number of "1" bits to keep track of when
 // on multiple channels at the same time.
 
 func send_control_nrzi(channel int, x byte) {
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		send_bit_nrzi(channel, x&1 != 0)
 		x >>= 1
 	}
@@ -200,7 +200,7 @@ func send_control_nrzi(channel int, x byte) {
 }
 
 func send_data_nrzi(channel int, x byte) {
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		send_bit_nrzi(channel, x&1 != 0)
 
 		if x&1 > 0 {
@@ -264,7 +264,7 @@ func send_bit_nrzi(channel int, b bool) {
  *--------------------------------------------------------------------*/
 
 func eas_put_byte(channel int, b byte) {
-	for n := 0; n < 8; n++ {
+	for range 8 {
 		tone_gen_put_bit(channel, int(b&1))
 		b >>= 1
 	}
@@ -277,8 +277,8 @@ func eas_send(channel int, str []byte, repeat int, txdelay int, txtail int) int 
 
 	gen_tone_put_quiet_ms(channel, txdelay)
 
-	for r := 0; r < repeat; r++ {
-		for j := 0; j < 16; j++ {
+	for r := range repeat {
+		for range 16 {
 			eas_put_byte(channel, 0xAB)
 
 			bytes_sent++

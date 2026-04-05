@@ -98,14 +98,14 @@ func hdlc_rec_init(pa *audio_s) {
 	Assert(pa != nil)
 	g_audio_p = pa
 
-	for ch := 0; ch < MAX_RADIO_CHANS; ch++ {
+	for ch := range MAX_RADIO_CHANS {
 		if pa.chan_medium[ch] == MEDIUM_RADIO {
 			num_subchannel[ch] = pa.achan[ch].num_subchan
 
 			Assert(num_subchannel[ch] >= 1 && num_subchannel[ch] <= MAX_SUBCHANS)
 
 			for sub := 0; sub < num_subchannel[ch]; sub++ {
-				for slice := 0; slice < MAX_SLICERS; slice++ {
+				for slice := range MAX_SLICERS {
 					var H = new(hdlc_state_s)
 					hdlc_state[ch][sub][slice] = H
 

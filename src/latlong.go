@@ -99,7 +99,7 @@ func latitude_to_str(dlat float64, ambiguity int) string {
 	// Assumes slat can hold 8 characters + nul.
 	// Degrees must be exactly 2 digits, with leading zero, if needed.
 
-	var slat = []byte(fmt.Sprintf("%02d%s%c", ideg, smin, hemi))
+	var slat = fmt.Appendf(nil, "%02d%s%c", ideg, smin, hemi)
 
 	if ambiguity >= 1 {
 		slat[6] = ' '
@@ -174,7 +174,7 @@ func longitude_to_str(dlong float64, ambiguity int) string {
 	// Assumes slong can hold 9 characters + nul.
 	// Degrees must be exactly 3 digits, with leading zero, if needed.
 
-	var slong = []byte(fmt.Sprintf("%03d%s%c", ideg, smin, hemi))
+	var slong = fmt.Appendf(nil, "%03d%s%c", ideg, smin, hemi)
 
 	/*
 	 * The spec says position ambiguity in latitude also
@@ -708,7 +708,7 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 
 	var ilat, ilon int
 
-	for n := 0; n < np; n++ {
+	for n := range np {
 		if mh[2*n] < MHPairs[n].min_ch || mh[2*n] > MHPairs[n].max_ch ||
 			mh[2*n+1] < MHPairs[n].min_ch || mh[2*n+1] > MHPairs[n].max_ch {
 			text_color_set(DW_COLOR_ERROR)

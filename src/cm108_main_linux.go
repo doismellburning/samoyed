@@ -95,7 +95,7 @@ func CM108Main() {
 		len(things[0].plughw2)/4, "-------",
 		17, "---------", len(things[0].devnode_usb), "---")
 
-	for i := 0; i < len(things); i++ {
+	for i := range things {
 		var good = "  "
 		if GOOD_DEVICE(things[i].vid, things[i].pid) {
 			good = "**"
@@ -135,7 +135,7 @@ func CM108Main() {
 	// Drop any "/sys" at the beginning.
 	var r = regexp.MustCompile("(/devices/.+/card)[0-9]$") // TODO KG Was REG_EXTENDED - may need some fiddling/checking? Can't easily test...
 
-	for i := 0; i < len(things); i++ {
+	for i := range things {
 		if i == 0 || things[i].devpath != things[i-1].devpath {
 			var matches = r.FindStringSubmatch(things[i].devpath)
 			if len(matches) > 0 {

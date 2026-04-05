@@ -1553,7 +1553,7 @@ var rx2ig_time_stamp [RX2IG_HISTORY_MAX]time.Time
 var rx2ig_checksum [RX2IG_HISTORY_MAX]int
 
 func rx_to_ig_init() {
-	for n := 0; n < RX2IG_HISTORY_MAX; n++ {
+	for n := range RX2IG_HISTORY_MAX {
 		rx2ig_time_stamp[n] = time.Time{}
 		rx2ig_checksum[n] = 0
 	}
@@ -1615,7 +1615,7 @@ func rx_to_ig_allow(pp *packet_t) bool {
 
 	// Yes, check for duplicates within certain time.
 
-	for j := 0; j < RX2IG_HISTORY_MAX; j++ {
+	for j := range RX2IG_HISTORY_MAX {
 		if rx2ig_checksum[j] == int(crc) && !rx2ig_time_stamp[j].Before(now.Add(-time.Duration(save_igate_config_p.rx2ig_dedupe_time)*time.Second)) {
 			if s_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -1848,7 +1848,7 @@ var ig2tx_chan [IG2TX_HISTORY_MAX]int
 var ig2tx_bydigi [IG2TX_HISTORY_MAX]int
 
 func ig_to_tx_init() {
-	for n := 0; n < IG2TX_HISTORY_MAX; n++ {
+	for n := range IG2TX_HISTORY_MAX {
 		ig2tx_time_stamp[n] = time.Time{}
 		ig2tx_checksum[n] = 0
 		ig2tx_chan[n] = 0xff
@@ -1902,7 +1902,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 
 	/* Consider transmissions on this channel only by either digi or IGate. */
 
-	for j := 0; j < IG2TX_HISTORY_MAX; j++ {
+	for j := range IG2TX_HISTORY_MAX {
 		if ig2tx_checksum[j] == int(crc) && ig2tx_chan[j] == channel && !ig2tx_time_stamp[j].Before(now.Add(-IG2TX_DEDUPE_TIME)) {
 			/* We have a duplicate within some time period. */
 			if is_message_message(string(pinfo)) {
@@ -1935,7 +1935,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	var count_1 = 0
 	var count_5 = 0
 
-	for j := 0; j < IG2TX_HISTORY_MAX; j++ {
+	for j := range IG2TX_HISTORY_MAX {
 		if ig2tx_chan[j] == channel && ig2tx_bydigi[j] == 0 {
 			if !ig2tx_time_stamp[j].Before(time.Now().Add(-60 * time.Second)) {
 				count_1++

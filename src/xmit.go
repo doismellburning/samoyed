@@ -144,7 +144,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	 * TODO1.2:  Any reason to use global config rather than making a copy?
 	 */
 
-	for j := 0; j < MAX_RADIO_CHANS; j++ {
+	for j := range MAX_RADIO_CHANS {
 		xs.bits_per_sec[j] = p_modem.achan[j].baud
 		xs.slottime[j] = p_modem.achan[j].slottime
 		xs.persist[j] = p_modem.achan[j].persist
@@ -171,7 +171,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	//TODO:  xmit thread should be higher priority to avoid
 	// underrun on the audio output device.
 
-	for j := 0; j < MAX_RADIO_CHANS; j++ {
+	for j := range MAX_RADIO_CHANS {
 		if p_modem.chan_medium[j] == MEDIUM_RADIO {
 			go xs.xmit_thread(j)
 		}

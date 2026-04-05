@@ -114,7 +114,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 	 */
 	save_audio_config_p = audio_config_p
 
-	for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
+	for channel := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			var a = ACHAN2ADEV(channel)
 
@@ -186,7 +186,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 		}
 	}
 
-	for j := 0; j < 256; j++ {
+	for j := range 256 {
 		var a = (float64(j) / 256.0) * (2.0 * math.Pi)
 		var s = int(math.Sin(a) * 32767 * float64(amp) / 100.0)
 
@@ -590,7 +590,7 @@ func gen_tone_put_quiet_ms(channel int, time_ms int) {
 
 	var nsamples = int((float64(time_ms) * float64(save_audio_config_p.adev[a].samples_per_sec) / 1000.) + 0.5)
 
-	for j := 0; j < nsamples; j++ {
+	for range nsamples {
 		gen_tone_put_sample(channel, a, sam)
 	}
 

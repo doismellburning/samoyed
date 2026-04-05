@@ -89,15 +89,15 @@ func t_get_metadata(station string) *t_metadata_s {
 
 	p.station = station
 
-	for n := 0; n < T_NUM_ANALOG; n++ {
+	for n := range T_NUM_ANALOG {
 		p.name[n] = fmt.Sprintf("A%d", n+1)
 	}
 
-	for n := 0; n < T_NUM_DIGITAL; n++ {
+	for n := range T_NUM_DIGITAL {
 		p.name[T_NUM_ANALOG+n] = fmt.Sprintf("D%d", n+1)
 	}
 
-	for n := 0; n < T_NUM_ANALOG; n++ {
+	for n := range T_NUM_ANALOG {
 		p.coeff[n][C_A] = 0.
 		p.coeff[n][C_B] = 1.
 		p.coeff[n][C_C] = 0.
@@ -106,7 +106,7 @@ func t_get_metadata(station string) *t_metadata_s {
 		p.coeff_ndp[n][C_C] = 0
 	}
 
-	for n := 0; n < T_NUM_DIGITAL; n++ {
+	for n := range T_NUM_DIGITAL {
 		p.sense[n] = true
 	}
 
@@ -191,13 +191,13 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
 	var araw [T_NUM_ANALOG]float64
 
 	var ndp [T_NUM_ANALOG]int
-	for n := 0; n < T_NUM_ANALOG; n++ {
+	for n := range T_NUM_ANALOG {
 		araw[n] = G_UNKNOWN
 		ndp[n] = 0
 	}
 
 	var draw [T_NUM_DIGITAL]int
-	for n := 0; n < T_NUM_DIGITAL; n++ {
+	for n := range T_NUM_DIGITAL {
 		draw[n] = G_UNKNOWN
 	}
 
@@ -340,13 +340,13 @@ func telemetry_data_base91(station string, cdata string) string {
 	var araw [T_NUM_ANALOG]float64
 
 	var ndp [T_NUM_ANALOG]int
-	for n := 0; n < T_NUM_ANALOG; n++ {
+	for n := range T_NUM_ANALOG {
 		araw[n] = G_UNKNOWN
 		ndp[n] = 0
 	}
 
 	var draw [T_NUM_DIGITAL]int
-	for n := 0; n < T_NUM_DIGITAL; n++ {
+	for n := range T_NUM_DIGITAL {
 		draw[n] = G_UNKNOWN
 	}
 
@@ -365,7 +365,7 @@ func telemetry_data_base91(station string, cdata string) string {
 			araw[n] = float64(two_base91_to_i(cdata[2*n], cdata[2*n+1]))
 		} else {
 			var b = two_base91_to_i(cdata[2*n], cdata[2*n+1])
-			for k := 0; k < T_NUM_DIGITAL; k++ {
+			for k := range T_NUM_DIGITAL {
 				draw[k] = b & 1
 				b >>= 1
 			}
@@ -546,7 +546,7 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
 	var pm = t_get_metadata(station)
 
 	var n = 0
-	for _, p := range strings.Split(stemp, ",") {
+	for p := range strings.SplitSeq(stemp, ",") {
 		if n < T_NUM_ANALOG*3 {
 			// Keep default (or earlier value) for an empty field.
 			if len(p) > 0 {
@@ -723,7 +723,7 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 
 	output += "Seq=" + ival_to_str(seq)
 
-	for n := 0; n < T_NUM_ANALOG; n++ {
+	for n := range T_NUM_ANALOG {
 		// Display all or only defined values?  Only defined for now.
 		if araw[n] != G_UNKNOWN {
 			var fval float64
@@ -749,7 +749,7 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 		}
 	}
 
-	for n := 0; n < T_NUM_DIGITAL; n++ {
+	for n := range T_NUM_DIGITAL {
 		// Display all or only defined values?  Only defined for now.
 		if draw[n] != G_UNKNOWN {
 			var dval int

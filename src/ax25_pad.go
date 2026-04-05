@@ -896,7 +896,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 	// Chomp
 	in_addr = in_addr[len(out_addr):]
 
-	var sstr string
+	var sstr strings.Builder
 
 	if len(in_addr) > 0 && in_addr[0] == '-' {
 		in_addr = in_addr[1:]
@@ -912,7 +912,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 				return out_addr, ssid, heard, false
 			}
 
-			sstr += string(p)
+			sstr.WriteRune(p)
 			if strictness > 0 && !unicode.IsDigit(p) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sSSID must be digits. \"%s\" has letters in SSID.\n", position_name[position], in_addr)
@@ -921,7 +921,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 			}
 		}
 
-		var k, kErr = strconv.Atoi(sstr)
+		var k, kErr = strconv.Atoi(sstr.String())
 		if kErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%sMalformed SSID: \"%s\" could not be parsed.\n", position_name[position], in_addr)
@@ -939,7 +939,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 		ssid = k
 
 		// Chomp
-		in_addr = in_addr[len(sstr):]
+		in_addr = in_addr[len(sstr.String()):]
 	}
 
 	if len(in_addr) > 0 && in_addr[0] == '*' {
@@ -1387,7 +1387,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 	// This will provide better information for troubleshooting.
 
 	var station string
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		station += string((this_p.frame_data[n*7+i] >> 1) & 0x7f)
 	}
 
@@ -1461,7 +1461,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 	// This will provide better information for troubleshooting.
 
 	var station string
-	for i := 0; i < 6; i++ {
+	for i := range 6 {
 		station += string((this_p.frame_data[n*7+i] >> 1) & 0x7f)
 	}
 
@@ -1940,26 +1940,27 @@ func ax25_format_addrs(this_p *packet_t) string {
 		return ""
 	}
 
-	var result = ax25_get_addr_with_ssid(this_p, AX25_SOURCE)
+	var result strings.Builder
+	result.WriteString(ax25_get_addr_with_ssid(this_p, AX25_SOURCE))
 
-	result += ">"
+	result.WriteString(">")
 
-	result += ax25_get_addr_with_ssid(this_p, AX25_DESTINATION)
+	result.WriteString(ax25_get_addr_with_ssid(this_p, AX25_DESTINATION))
 
 	var heard = ax25_get_heard(this_p)
 
 	for i := AX25_REPEATER_1; i < this_p.num_addr; i++ {
-		result += ","
-		result += ax25_get_addr_with_ssid(this_p, i)
+		result.WriteString(",")
+		result.WriteString(ax25_get_addr_with_ssid(this_p, i))
 
 		if i == heard {
-			result += "*"
+			result.WriteString("*")
 		}
 	}
 
-	result += ":"
+	result.WriteString(":")
 
-	return result
+	return result.String()
 
 	// dw_printf ("DEBUG ax25_format_addrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
 }
@@ -2001,20 +2002,20 @@ func ax25_format_via_path(this_p *packet_t) string {
 	}
 
 	var heard = ax25_get_heard(this_p)
-	var result string
+	var result strings.Builder
 
 	for i := AX25_REPEATER_1; i < this_p.num_addr; i++ {
 		if i > AX25_REPEATER_1 {
-			result += ","
+			result.WriteString(",")
 		}
 
-		result += ax25_get_addr_with_ssid(this_p, i)
+		result.WriteString(ax25_get_addr_with_ssid(this_p, i))
 		if i == heard {
-			result += "*"
+			result.WriteString("*")
 		}
 	}
 
-	return result
+	return result.String()
 } /* end ax25_format_via_path */
 
 /*------------------------------------------------------------------
@@ -2817,29 +2818,29 @@ func ax25_safe_print(info []byte, ascii_only bool) {
 		info = info[:MAXSAFE]
 	}
 
-	var safe_str string
+	var safe_str strings.Builder
 	var pstr = string(info)
 
 	for i, ch := range pstr {
 		if ch == ' ' && i == len(pstr)-1 {
-			safe_str += fmt.Sprintf("<0x%02x>", ch)
+			fmt.Fprintf(&safe_str, "<0x%02x>", ch)
 		} else if ch < ' ' || ch == 0x7f || ch == 0xfe || ch == 0xff ||
 			(ascii_only && ch >= 0x80) {
 			/* Control codes and delete. */
 			/* UTF-8 does not use fe and ff except in a possible */
 			/* "Byte Order Mark" (BOM) at the beginning. */
-			safe_str += fmt.Sprintf("<0x%02x>", ch)
+			fmt.Fprintf(&safe_str, "<0x%02x>", ch)
 		} else {
 			/* Let everything else thru so we can handle UTF-8 */
 			/* Maybe we should have an option to display 0x80 */
 			/* and above as hexadecimal. */
-			safe_str += string(ch)
+			safe_str.WriteRune(ch)
 		}
 	}
 
 	// TODO1.2: should return string rather printing to remove a race condition.
 
-	dw_printf("%s", safe_str)
+	dw_printf("%s", safe_str.String())
 } /* end ax25_safe_print */
 
 /*------------------------------------------------------------------

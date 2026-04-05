@@ -300,9 +300,9 @@ func next_token(pf *pfstate_t) {
 		pf.token_str = "\")\""
 	default:
 		// At this point, toBeParsed isn't empty and doesn't start with a space
-		var s = ""
+		var s strings.Builder
 		for {
-			s += string(rune(pf.toBeParsed[0]))
+			s.WriteRune(rune(pf.toBeParsed[0]))
 			pf.toBeParsed = pf.toBeParsed[1:]
 
 			if len(pf.toBeParsed) == 0 || pf.toBeParsed[0] == ' ' {
@@ -311,7 +311,7 @@ func next_token(pf *pfstate_t) {
 		}
 
 		pf.token_type = TOKEN_FILTER_SPEC
-		pf.token_str = s
+		pf.token_str = s.String()
 	}
 } /* end next_token */
 

@@ -92,7 +92,7 @@ func set_bit(base []byte, offset uint, val bool) {
 
 func get_field(base []byte, start uint, length uint) int {
 	var result = 0
-	for k := uint(0); k < length; k++ {
+	for k := range length {
 		result <<= 1
 		if get_bit(base, start+k) {
 			result |= 1
@@ -103,7 +103,7 @@ func get_field(base []byte, start uint, length uint) int {
 }
 
 func set_field(base []byte, start uint, length uint, val int) { // TODO KG int32?
-	for k := uint(0); k < length; k++ {
+	for k := range length {
 		set_bit(base, start+k, (val>>(length-1-k))&1 != 0)
 	}
 }
@@ -218,7 +218,7 @@ func get_field_string(base []byte, start uint, length uint) string {
 	var nc = length / 6 // Number of characters.
 	// Caller better provide space for at least this +1.
 	// No bounds checking here.
-	for i := uint(0); i < nc; i++ {
+	for i := range nc {
 		result += string(rune(get_field_ascii(base, start+i*6, 6)))
 	}
 	// Officially it should be terminated/padded with @ but we also see trailing spaces.
@@ -280,7 +280,7 @@ func ais_to_nmea(ais []byte) []byte {
 	var payload []byte
 	// Number of resulting characters for payload.
 	var ns = uint(len(ais)*8+5) / 6
-	for k := uint(0); k < ns; k++ {
+	for k := range ns {
 		payload = append(payload, sextet_to_char(get_field(ais, k*6, 6)))
 	}
 

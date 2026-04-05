@@ -764,7 +764,7 @@ func parseALSADeviceName(name string) (cardName string, devNum int) {
 // map from ALSA card ID (e.g. "FTDX10") to card number.
 func parseALSACardsProc(content string) map[string]int {
 	var result = make(map[string]int)
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		var trimmed = strings.TrimSpace(line)
 		var bracketStart = strings.Index(trimmed, "[")
 		if bracketStart < 0 {
@@ -986,7 +986,7 @@ func audio_open(pa *audio_s) int {
 		}
 	}()
 
-	for a := 0; a < MAX_ADEVS; a++ {
+	for a := range MAX_ADEVS {
 		adev[a] = new(adev_s)
 		adev[a].inputStream = nil
 		adev[a].outputStream = nil
@@ -996,7 +996,7 @@ func audio_open(pa *audio_s) int {
 	 * Fill in defaults for any missing values.
 	 */
 
-	for a := 0; a < MAX_ADEVS; a++ {
+	for a := range MAX_ADEVS {
 		if pa.adev[a].num_channels == 0 {
 			pa.adev[a].num_channels = DEFAULT_NUM_CHANNELS
 		}
@@ -1009,7 +1009,7 @@ func audio_open(pa *audio_s) int {
 			pa.adev[a].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 		}
 
-		for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
+		for channel := range MAX_RADIO_CHANS {
 			if pa.achan[channel].mark_freq == 0 {
 				pa.achan[channel].mark_freq = DEFAULT_MARK_FREQ
 			}
@@ -1032,7 +1032,7 @@ func audio_open(pa *audio_s) int {
 	 * Open audio device(s).
 	 */
 
-	for a := 0; a < MAX_ADEVS; a++ {
+	for a := range MAX_ADEVS {
 		if pa.adev[a].defined != 0 {
 			adev[a].inbufSizeInBytes = 0
 			adev[a].inbuf = nil
@@ -1518,7 +1518,7 @@ func audio_flush_real(a int) int {
 
 	if adev[a].outputBuf16 != nil {
 		var nSamples = adev[a].outbufLen / 2
-		for i := 0; i < nSamples; i++ {
+		for i := range nSamples {
 			var lo = adev[a].outbuf[i*2]
 			var hi = adev[a].outbuf[i*2+1]
 			adev[a].outputBuf16[i] = int16(uint16(lo) | uint16(hi)<<8)
@@ -1616,7 +1616,7 @@ func audio_wait(a int) {
 func audio_close() int { //nolint:unparam
 	var err = 0
 
-	for a := 0; a < MAX_ADEVS; a++ {
+	for a := range MAX_ADEVS {
 		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil) {
 			audio_wait(a)
 

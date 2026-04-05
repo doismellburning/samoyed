@@ -252,7 +252,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 	// so the response would be sent to only one place.  A new parameter has been added for this.
 	for kps := kns.allPorts; kps != nil; kps = kps.pnext {
 		if onlykps == nil || kps == onlykps {
-			for client := 0; client < MAX_NET_CLIENTS; client++ {
+			for client := range MAX_NET_CLIENTS {
 				if onlyclient == -1 || client == onlyclient {
 					if kps.client_sock[client] != nil {
 						var kiss_buff []byte
@@ -364,7 +364,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 
 	if kns.miscConfigP.kiss_copy {
 		for kps := kns.allPorts; kps != nil; kps = kps.pnext {
-			for client := 0; client < MAX_NET_CLIENTS; client++ {
+			for client := range MAX_NET_CLIENTS {
 				// To all but origin.
 				if !(kps == from_kps && client == from_client) {
 					if kps.client_sock[client] != nil {
@@ -514,7 +514,7 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
 	 * Currently we start up a separate thread for each potential connection.
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := range MAX_NET_CLIENTS {
 		go kns.listenThread(kps, client)
 	}
 }

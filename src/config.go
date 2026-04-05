@@ -735,7 +735,7 @@ func split(str string, rest_of_line bool) string {
 
 	splitCmd = strings.TrimSpace(splitCmd)
 
-	var token string
+	var token strings.Builder
 	var in_quotes = false
 
 	var parsedLen int
@@ -747,7 +747,7 @@ outerLoop:
 		case '"':
 			if in_quotes {
 				if parsedLen+1 < len(splitCmd) && splitCmd[parsedLen+1] == '"' {
-					token += string(c)
+					token.WriteString(string(c))
 					parsedLen++
 				} else {
 					in_quotes = false
@@ -757,12 +757,12 @@ outerLoop:
 			}
 		case ' ':
 			if in_quotes || rest_of_line {
-				token += string(c)
+				token.WriteString(string(c))
 			} else {
 				break outerLoop
 			}
 		default:
-			token += string(c)
+			token.WriteString(string(c))
 		}
 	}
 
@@ -770,7 +770,7 @@ outerLoop:
 
 	// dw_printf("split out: '%s'\n", token);
 
-	return token
+	return token.String()
 } /* end split */
 
 /*-------------------------------------------------------------------
@@ -836,7 +836,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	/* First audio device is always available with defaults. */
 	/* Others must be explicitly defined before use. */
 
-	for adevice := 0; adevice < MAX_ADEVS; adevice++ {
+	for adevice := range MAX_ADEVS {
 		p_audio_config.adev[adevice].adevice_in = DEFAULT_ADEVICE
 		p_audio_config.adev[adevice].adevice_out = DEFAULT_ADEVICE
 
@@ -850,7 +850,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_audio_config.adev[0].defined = 2 // 2 means it was done by default and not the user's config file.
 
 	// MAX_TOTAL_CHANS
-	for channel := 0; channel < MAX_TOTAL_CHANS; channel++ {
+	for channel := range MAX_TOTAL_CHANS {
 		p_audio_config.chan_medium[channel] = MEDIUM_NONE /* One or both channels will be */
 		/* set to radio when corresponding */
 		/* audio device is defined. */
@@ -858,7 +858,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	// MAX_RADIO_CHANS for achan[]
 	// Maybe achan should be renamed to radiochan to make it clearer.
-	for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
+	for channel := range MAX_RADIO_CHANS {
 		p_audio_config.achan[channel].modem_type = MODEM_AFSK
 		p_audio_config.achan[channel].v26_alternative = V26_UNSPECIFIED
 		p_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
@@ -878,7 +878,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
 		p_audio_config.achan[channel].sanity_test = SANITY_APRS
 
-		for ot := 0; ot < NUM_OCTYPES; ot++ {
+		for ot := range NUM_OCTYPES {
 			p_audio_config.achan[channel].octrl[ot].ptt_method = PTT_METHOD_NONE
 			p_audio_config.achan[channel].octrl[ot].ptt_device = ""
 			p_audio_config.achan[channel].octrl[ot].ptt_line = PTT_LINE_NONE
@@ -887,7 +887,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			p_audio_config.achan[channel].octrl[ot].ptt_lpt_bit = 0
 		}
 
-		for it := 0; it < NUM_ICTYPES; it++ {
+		for it := range NUM_ICTYPES {
 			p_audio_config.achan[channel].ictrl[it].method = PTT_METHOD_NONE
 			p_audio_config.achan[channel].ictrl[it].in_gpio_num = 0
 		}
@@ -937,7 +937,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_tt_config.status[8] = "/emergency"
 	p_tt_config.status[9] = "/custom 1"
 
-	for m := 0; m < TT_ERROR_MAXP1; m++ {
+	for m := range TT_ERROR_MAXP1 {
 		p_tt_config.response[m].method = "MORSE"
 		p_tt_config.response[m].mtext = "?"
 	}
@@ -946,7 +946,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
 
-	for i := 0; i < MAX_KISS_TCP_PORTS; i++ {
+	for i := range MAX_KISS_TCP_PORTS {
 		p_misc_config.kiss_port[i] = 0 // entry not used.
 		p_misc_config.kiss_chan[i] = -1
 	}
@@ -1431,7 +1431,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				// Definitely set for current channel.
 				// Set for other channels which have not been set yet.
 
-				for c := 0; c < MAX_TOTAL_CHANS; c++ {
+				for c := range MAX_TOTAL_CHANS {
 					if c == channel || IsNoCall(p_audio_config.mycall[c]) {
 						p_audio_config.mycall[c] = t
 					}
@@ -3924,8 +3924,8 @@ func config_init(fname string, p_audio_config *audio_s,
 			// Make a pass over the definition, looking for the xx{...} substitutions.
 			// These are done just once when reading the configuration file.
 
-			var tmp = t      // Chomp through this
-			var otemp string // Result after any substitution
+			var tmp = t               // Chomp through this
+			var otemp strings.Builder // Result after any substitution
 
 			tmp = strings.TrimSpace(tmp)
 
@@ -3934,20 +3934,20 @@ func config_init(fname string, p_audio_config *audio_s,
 				if strings.HasPrefix(tmp, "AC{") {
 					// Convert to fixed length 10 digit callsign.
 					tmp = tmp[3:]
-					var stemp string
+					var stemp strings.Builder
 					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
-						stemp += string(tmp[0])
+						stemp.WriteString(string(tmp[0]))
 						tmp = tmp[1:]
 					}
 					if len(tmp) > 0 && tmp[0] == '}' {
-						var ttemp, errs = tt_text_to_call10(stemp, false)
+						var ttemp, errs = tt_text_to_call10(stemp.String(), false)
 						if errs == 0 {
 							//text_color_set(DW_COLOR_DEBUG);
 							//dw_printf ("DEBUG Line %d: AC{%s} -> AC%s\n", line, stemp, ttemp);
-							otemp += "AC" + ttemp
+							otemp.WriteString("AC" + ttemp)
 						} else {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Line %d: AC{%s} could not be converted to tones for callsign.\n", line, stemp)
+							dw_printf("Line %d: AC{%s} could not be converted to tones for callsign.\n", line, stemp.String())
 							tt_error++
 						}
 						tmp = tmp[1:]
@@ -3976,7 +3976,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						if errs == 0 {
 							//text_color_set(DW_COLOR_DEBUG);
 							//dw_printf ("DEBUG Line %d: AA{%s} -> AA%s\n", line, stemp, ttemp);
-							otemp += "AA" + ttemp
+							otemp.WriteString("AA" + ttemp)
 						} else {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: AA{%s} could not be converted to tones for object name.\n", line, stemp)
@@ -3993,19 +3993,19 @@ func config_init(fname string, p_audio_config *audio_s,
 					// Attempt conversion from description to symbol code.
 
 					tmp = tmp[3:]
-					var stemp string
+					var stemp strings.Builder
 					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
-						stemp += string(tmp[0])
+						stemp.WriteString(string(tmp[0]))
 						tmp = tmp[1:]
 					}
 					if len(tmp) > 0 && tmp[0] == '}' {
 						// First try to find something matching the description.
 
-						var symtab, symbol, ok = aprsSymbolData.symbols_code_from_description(' ', stemp)
+						var symtab, symbol, ok = aprsSymbolData.symbols_code_from_description(' ', stemp.String())
 
 						if !ok {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default.\n", line, stemp)
+							dw_printf("Line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default.\n", line, stemp.String())
 							symtab = '\\' // Alternate
 							symbol = 'A'  // Box
 						}
@@ -4017,7 +4017,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						//text_color_set(DW_COLOR_DEBUG);
 						//dw_printf ("DEBUG config file Line %d: AB{%s} -> %s\n", line, stemp, ttemp);
 
-						otemp += ttemp
+						otemp.WriteString(ttemp)
 						tmp = tmp[1:]
 					} else {
 						text_color_set(DW_COLOR_ERROR)
@@ -4029,20 +4029,20 @@ func config_init(fname string, p_audio_config *audio_s,
 					// Convert to enhanced comment that can contain any ASCII character.
 
 					tmp = tmp[3:]
-					var stemp string
+					var stemp strings.Builder
 					for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
-						stemp += string(tmp[0])
+						stemp.WriteString(string(tmp[0]))
 						tmp = tmp[1:]
 					}
 					if len(tmp) > 0 && tmp[0] == '}' {
-						var ttemp, errs = tt_text_to_ascii2d(stemp, false)
+						var ttemp, errs = tt_text_to_ascii2d(stemp.String(), false)
 						if errs == 0 {
 							//text_color_set(DW_COLOR_DEBUG);
 							//dw_printf ("DEBUG Line %d: CA{%s} -> CA%s\n", line, stemp, ttemp);
-							otemp += "CA" + ttemp
+							otemp.WriteString("CA" + ttemp)
 						} else {
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Line %d: CA{%s} could not be converted to tones for enhanced comment.\n", line, stemp)
+							dw_printf("Line %d: CA{%s} could not be converted to tones for enhanced comment.\n", line, stemp.String())
 							tt_error++
 						}
 						tmp = tmp[1:]
@@ -4052,7 +4052,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						tt_error++
 					}
 				} else if strings.ContainsRune("0123456789ABCD*#xyz", rune(tmp[0])) {
-					otemp += string(tmp[0])
+					otemp.WriteString(string(tmp[0]))
 					tmp = tmp[1:]
 				} else {
 					text_color_set(DW_COLOR_ERROR)
@@ -4066,15 +4066,15 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			var d_count [3]int
 
-			for j := 0; j < len(otemp); j++ {
-				if otemp[j] >= 'x' && otemp[j] <= 'z' {
-					d_count[otemp[j]-'x']++
+			for j := 0; j < len(otemp.String()); j++ {
+				if otemp.String()[j] >= 'x' && otemp.String()[j] <= 'z' {
+					d_count[otemp.String()[j]-'x']++
 				}
 			}
 
 			// A little validity checking.
 
-			for j := 0; j < 3; j++ {
+			for j := range 3 {
 				if p_count[j] > 0 && d_count[j] == 0 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: '%c' is in TTMACRO pattern but is not used in definition.\n", line, 'x'+j)
@@ -4089,7 +4089,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			//dw_printf ("DEBUG Config Line %d: %s -> %s\n", line, t, otemp);
 
 			if tt_error == 0 {
-				tl.macro.definition = otemp
+				tl.macro.definition = otemp.String()
 			}
 
 			if tt_error == 0 {
@@ -4209,7 +4209,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			}
 
 			var msg_num = -1
-			for n := 0; n < TT_ERROR_MAXP1; n++ {
+			for n := range TT_ERROR_MAXP1 {
 				if strings.EqualFold(t, ttErrorString(n)) {
 					msg_num = n
 					break
@@ -5274,8 +5274,8 @@ func config_init(fname string, p_audio_config *audio_s,
 	 * Suggest that beaconing be enabled when digipeating.
 	 */
 
-	for i := 0; i < MAX_TOTAL_CHANS; i++ {
-		for j := 0; j < MAX_TOTAL_CHANS; j++ {
+	for i := range MAX_TOTAL_CHANS {
+		for j := range MAX_TOTAL_CHANS {
 			/* APRS digipeating. */
 			if p_digi_config.enabled[i][j] {
 				if IsNoCall(p_audio_config.mycall[i]) {
@@ -5363,7 +5363,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	// This will handle eventual case of multiple transmit channels.
 
 	if len(p_igate_config.t2_login) > 0 {
-		for j := 0; j < MAX_TOTAL_CHANS; j++ {
+		for j := range MAX_TOTAL_CHANS {
 			if p_audio_config.chan_medium[j] == MEDIUM_RADIO || p_audio_config.chan_medium[j] == MEDIUM_NETTNC {
 				if p_digi_config.filter_str[MAX_TOTAL_CHANS][j] == "" {
 					p_digi_config.filter_str[MAX_TOTAL_CHANS][j] = "i/180"

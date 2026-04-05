@@ -122,7 +122,7 @@ func morse_init(audio_config_p *audio_s, amp int) {
 	 */
 	save_audio_config_p = audio_config_p
 
-	for j := 0; j < len(SineTable); j++ {
+	for j := range len(SineTable) {
 		var a = (float64(j) / 256.0) * (2 * math.Pi)
 		var s = int(math.Sin(a) * 32767.0 * float64(amp) / 100.0)
 
@@ -245,7 +245,7 @@ func morse_tone(channel int, tu int, wpm int) {
 
 	var nsamples = (int)((TIME_UNITS_TO_MS(tu, wpm) * float64(save_audio_config_p.adev[a].samples_per_sec/1000.)) + 0.5)
 
-	for j := 0; j < nsamples; j++ {
+	for range nsamples {
 		tone_phase += f1_change_per_sample
 		var sam = SineTable[(tone_phase>>24)&0xff]
 		gen_tone_put_sample(channel, a, sam)
@@ -287,7 +287,7 @@ func morse_quiet(channel int, tu int, wpm int) {
 
 	var nsamples = int((TIME_UNITS_TO_MS(tu, wpm) * float64(save_audio_config_p.adev[a].samples_per_sec) / 1000.) + 0.5)
 
-	for j := 0; j < nsamples; j++ {
+	for range nsamples {
 		gen_tone_put_sample(channel, a, sam)
 	}
 	// TODO KG #endif
@@ -322,7 +322,7 @@ func morse_quiet_ms(channel int, ms int) {
 
 	var nsamples = int(float64(ms*save_audio_config_p.adev[a].samples_per_sec/1000.) + 0.5)
 
-	for j := 0; j < nsamples; j++ {
+	for range nsamples {
 		gen_tone_put_sample(channel, a, sam)
 	}
 

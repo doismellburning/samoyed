@@ -128,7 +128,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 		fp.Write(flags)
 
-		for k := 0; k < 8; k++ {
+		for k := range 8 {
 			var b = byte(ctag_value>>(k*8)) & 0xff // Should be portable to big endian too.
 			fp.Write([]byte{b})
 		}
@@ -147,7 +147,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 		//	for (int j = 0; j < 16; j++) {
 		//	  data[j] = ~ data[j];
 		//	}
-		for k := 0; k < 8; k++ {
+		for k := range 8 {
 			send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
 		}
 
@@ -160,7 +160,7 @@ func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int 
 
 func send_bytes(channel int, b []byte) {
 	for _, x := range b {
-		for k := 0; k < 8; k++ {
+		for range 8 {
 			send_bit(channel, int(x&0x01))
 			x >>= 1
 		}
