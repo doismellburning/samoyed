@@ -177,7 +177,7 @@ func AClientsMain() {
  *--------------------------------------------------------------------*/
 
 func client_thread_net(my_index int, hostname string, port string, description string, packetChan chan<- string) {
-	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port))
+	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port)) //nolint:gosec // G704: hostport should be provided by user-supplied config
 	if connErr != nil {
 		fmt.Printf("Client %d unable to connect to %s on %s, port %s\n",
 			my_index, description, hostname, port)
