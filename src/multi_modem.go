@@ -122,7 +122,7 @@ func multi_modem_init(pa *audio_s) {
 	demod_init(save_audio_config_p)
 	hdlc_rec_init(save_audio_config_p)
 
-	for channel := 0; channel < MAX_RADIO_CHANS; channel++ {
+	for channel := range MAX_RADIO_CHANS {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			if save_audio_config_p.achan[channel].baud <= 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -386,7 +386,7 @@ func pick_best_candidate(channel int) {
 
 	var spectrum [MAX_SUBCHANS*MAX_SLICERS + 1]byte
 
-	for n := 0; n < num_bars; n++ {
+	for n := range num_bars {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 
@@ -430,12 +430,12 @@ func pick_best_candidate(channel int) {
 
 	/* Bump it up slightly if others nearby have the same CRC. */
 
-	for n := 0; n < num_bars; n++ {
+	for n := range num_bars {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 
 		if candidate[channel][j][k].packet_p != nil {
-			for m := 0; m < num_bars; m++ {
+			for m := range num_bars {
 				var mj = subchan_from_n(channel, m)
 				var mk = slice_from_n(channel, m)
 
@@ -451,7 +451,7 @@ func pick_best_candidate(channel int) {
 	var best_n = 0
 	var best_score = 0
 
-	for n := 0; n < num_bars; n++ {
+	for n := range num_bars {
 		var j = subchan_from_n(channel, n)
 		var k = slice_from_n(channel, n)
 
@@ -500,7 +500,7 @@ func pick_best_candidate(channel int) {
 
 	/* Delete those not chosen. */
 
-	for n := 0; n < num_bars; n++ {
+	for n := range num_bars {
 		var j = subchan_from_n(channel, n)
 
 		var k = slice_from_n(channel, n)

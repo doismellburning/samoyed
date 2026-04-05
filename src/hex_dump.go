@@ -9,7 +9,7 @@ func hex_dump(p []byte) {
 
 		dw_printf("  %03x: ", offset)
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			dw_printf(" %02x", p[i])
 		}
 
@@ -19,7 +19,7 @@ func hex_dump(p []byte) {
 
 		dw_printf("  ")
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			if p[i] >= 0x20 && p[i] <= 0x7E {
 				dw_printf("%c", p[i])
 			} else {

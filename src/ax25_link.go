@@ -150,6 +150,7 @@ package direwolf
 
 import (
 	"runtime"
+	"slices"
 	"time"
 )
 
@@ -1601,14 +1602,14 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 			discard_i_queue(S)
 
-			for n := 0; n < 128; n++ {
+			for n := range 128 {
 				if S.txdata_by_ns[n] != nil {
 					cdata_delete(S.txdata_by_ns[n])
 					S.txdata_by_ns[n] = nil
 				}
 			}
 
-			for n := 0; n < 128; n++ {
+			for n := range 128 {
 				if S.rxdata_by_ns[n] != nil {
 					cdata_delete(S.rxdata_by_ns[n])
 					S.rxdata_by_ns[n] = nil
@@ -2832,7 +2833,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 		dw_printf("resend[]=")
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			dw_printf(" %d", resend[i])
 		}
 
@@ -2840,7 +2841,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 		dw_printf("rxdata_by_ns[]=")
 
-		for i := 0; i < 128; i++ {
+		for i := range 128 {
 			if S.rxdata_by_ns[i] != nil {
 				dw_printf(" %d", i)
 			}
@@ -2858,7 +2859,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 		dw_printf("resend[]=")
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			dw_printf(" %d", resend[i])
 		}
 
@@ -2866,7 +2867,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 		dw_printf("rxdata_by_ns[]=")
 
-		for i := 0; i < 128; i++ {
+		for i := range 128 {
 			if S.rxdata_by_ns[i] != nil {
 				dw_printf(" %d", i)
 			}
@@ -2932,7 +2933,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 	// Multi-SREJ not enabled.  Send separate SREJ for each desired sequence number.
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		var nr = resend[i]
 		var f = allow_f1 && (nr == S.vr)
 		// Possibly set if we are asking for the next after
@@ -3659,7 +3660,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 	// Multi-SREJ if there is an information part.
 
-	for j := 0; j < len(info); j++ {
+	for j := range info {
 		// We can have a single sequence number like this:
 		//    	xxx00000	(mod 8)
 		//	xxxxxxx0	(mod 128)
@@ -5008,7 +5009,7 @@ func clear_exception_conditions(S *ax25_dlsm_t) {
 
 	// My enhancement.  If we are establishing a new connection, we should discard any saved out of sequence incoming I frames.
 
-	for n := 0; n < 128; n++ {
+	for n := range 128 {
 		if S.rxdata_by_ns[n] != nil {
 			cdata_delete(S.rxdata_by_ns[n])
 			S.rxdata_by_ns[n] = nil
@@ -5844,10 +5845,8 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 	// Rather than wasting time, sending XID repeatedly until giving up, we have a workaround.
 	// The configuration file can contain a list of stations known not to respond to XID.
 	// Obviously this applies only to v2.2 because XID was not part of v2.0.
-	for _, addr := range g_misc_config_p.noxid_addrs {
-		if S.addrs[PEERCALL] == addr {
-			return
-		}
+	if slices.Contains(g_misc_config_p.noxid_addrs, S.addrs[PEERCALL]) {
+		return
 	}
 
 	switch S.mdl_state {
@@ -6082,10 +6081,7 @@ func STOP_T1(S *ax25_dlsm_t) {
 	if S.t1_exp.IsZero() {
 		// Was already stopped.
 	} else {
-		S.t1_remaining_when_last_stopped = S.t1_exp.Sub(now)
-		if S.t1_remaining_when_last_stopped < 0 {
-			S.t1_remaining_when_last_stopped = 0
-		}
+		S.t1_remaining_when_last_stopped = max(S.t1_exp.Sub(now), 0)
 	}
 
 	// Normally this would be at the top but we don't know time remaining at that point.

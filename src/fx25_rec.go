@@ -175,8 +175,8 @@ func fx25_rec_busy(channel int) bool {
 	// This could be a little faster if we knew number of
 	// subchannels and slicers but it is probably insignificant.
 
-	for i := 0; i < MAX_SUBCHANS; i++ {
-		for j := 0; j < MAX_SLICERS; j++ {
+	for i := range MAX_SUBCHANS {
+		for j := range MAX_SLICERS {
 			if fx_context[channel][i][j] != nil {
 				if fx_context[channel][i][j].state != FX_TAG {
 					return true
@@ -240,7 +240,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 			} else {
 				dw_printf("FX.25[%d.%d]: FEC complete, fixed %2d errors in byte positions:", channel, slice, derrors)
 
-				for k := 0; k < derrors; k++ {
+				for k := range derrors {
 					dw_printf(" %d", derrlocs[k])
 				}
 

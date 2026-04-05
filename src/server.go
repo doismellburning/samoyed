@@ -116,6 +116,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -295,7 +296,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 
 	save_audio_config_p = audio_config_p
 
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := range MAX_NET_CLIENTS {
 		enable_send_raw_to_client[client] = false
 		enable_send_monitor_to_client[client] = false
 	}
@@ -317,7 +318,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	 * Currently we start up a separate thread for each potential connection.
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := range MAX_NET_CLIENTS {
 		go cmd_listen_thread(client)
 	}
 }
@@ -439,7 +440,7 @@ func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
 	/*
 	 * RAW format
 	 */
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := range MAX_NET_CLIENTS {
 		if enable_send_raw_to_client[client] && client_sock[client] != nil {
 			var agwpe_msg = new(AGWPEMessage)
 
@@ -490,7 +491,7 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 	 *
 	 *			'T' for own transmitted frames.
 	 */
-	for client := 0; client < MAX_NET_CLIENTS; client++ {
+	for client := range MAX_NET_CLIENTS {
 		if enable_send_monitor_to_client[client] && client_sock[client] != nil {
 			var agwpe_msg = new(AGWPEMessage)
 
@@ -601,15 +602,15 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 	var num_digi = ax25_get_num_repeaters(pp)
 
 	if num_digi > 0 {
-		var via string // complete via path
+		var via strings.Builder // complete via path
 
-		for j := 0; j < num_digi; j++ {
+		for j := range num_digi {
 			if j != 0 {
-				via += "," // comma if not first address
+				via.WriteString(",") // comma if not first address
 			}
 
 			var digiaddr = ax25_get_addr_with_ssid(pp, AX25_REPEATER_1+j)
-			via += digiaddr
+			via.WriteString(digiaddr)
 			/*
 				#if 0  // Mark each used with * as seen in UZ7HO SoundModem.
 					    if (ax25_get_h(pp, AX25_REPEATER_1 + j)) {
@@ -617,13 +618,13 @@ func mon_addrs(channel int, pp *packet_t) []byte {
 			// Mark only last used (i.e. the heard station) with * as in TNC-2 Monitoring format.
 			if AX25_REPEATER_1+j == ax25_get_heard(pp) {
 				// #endif
-				via += "*"
+				via.WriteString("*")
 			}
 		}
 
-		return []byte(fmt.Sprintf(" %d:Fm %s To %s Via %s ", channel+1, src, dst, via))
+		return fmt.Appendf(nil, " %d:Fm %s To %s Via %s ", channel+1, src, dst, via.String())
 	} else {
-		return []byte(fmt.Sprintf(" %d:Fm %s To %s ", channel+1, src, dst))
+		return fmt.Appendf(nil, " %d:Fm %s To %s ", channel+1, src, dst)
 	}
 }
 
@@ -743,10 +744,10 @@ func server_link_established(channel int, client int, remote_call string, own_ca
 
 	if incoming {
 		// Other end initiated the connection.
-		reply.Data = []byte(fmt.Sprintf("*** CONNECTED To Station %s\r", remote_call))
+		reply.Data = fmt.Appendf(nil, "*** CONNECTED To Station %s\r", remote_call)
 	} else {
 		// We started the connection.
-		reply.Data = []byte(fmt.Sprintf("*** CONNECTED With Station %s\r", remote_call))
+		reply.Data = fmt.Appendf(nil, "*** CONNECTED With Station %s\r", remote_call)
 	}
 
 	reply.Data = append(reply.Data, 0)
@@ -788,9 +789,9 @@ func server_link_terminated(channel int, client int, remote_call string, own_cal
 	copy(reply.Header.CallTo[:], []byte(own_call))
 
 	if timeout {
-		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED RETRYOUT With %s\r", remote_call))
+		reply.Data = fmt.Appendf(nil, "*** DISCONNECTED RETRYOUT With %s\r", remote_call)
 	} else {
-		reply.Data = []byte(fmt.Sprintf("*** DISCONNECTED From Station %s\r", remote_call))
+		reply.Data = fmt.Appendf(nil, "*** DISCONNECTED From Station %s\r", remote_call)
 	}
 
 	reply.Data = append(reply.Data, 0)
@@ -1025,7 +1026,7 @@ func cmd_listen_thread(client int) {
 
 				var count = 0
 
-				for j := 0; j < MAX_TOTAL_CHANS; j++ {
+				for j := range MAX_TOTAL_CHANS {
 					if save_audio_config_p.chan_medium[j] == MEDIUM_RADIO ||
 						save_audio_config_p.chan_medium[j] == MEDIUM_IGATE ||
 						save_audio_config_p.chan_medium[j] == MEDIUM_NETTNC {
@@ -1033,9 +1034,10 @@ func cmd_listen_thread(client int) {
 					}
 				}
 
-				var info = fmt.Sprintf("%d;", count)
+				var info strings.Builder
+				fmt.Fprintf(&info, "%d;", count)
 
-				for j := 0; j < MAX_TOTAL_CHANS; j++ {
+				for j := range MAX_TOTAL_CHANS {
 					switch save_audio_config_p.chan_medium[j] {
 					case MEDIUM_RADIO:
 						// Misleading if using stdin or udp.
@@ -1044,29 +1046,29 @@ func cmd_listen_thread(client int) {
 						var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
 
 						if save_audio_config_p.adev[a].num_channels == 1 {
-							info += fmt.Sprintf("Port%d %s soundcard mono;", j+1, names[a])
+							fmt.Fprintf(&info, "Port%d %s soundcard mono;", j+1, names[a])
 						} else {
 							var lr = "left"
 							if j&1 > 0 {
 								lr = "right"
 							}
 
-							info += fmt.Sprintf("Port%d %s soundcard %s;", j+1, names[a], lr)
+							fmt.Fprintf(&info, "Port%d %s soundcard %s;", j+1, names[a], lr)
 						}
 
 					case MEDIUM_IGATE:
-						info += fmt.Sprintf("Port%d Internet Gateway;", j+1)
+						fmt.Fprintf(&info, "Port%d Internet Gateway;", j+1)
 
 					case MEDIUM_NETTNC:
 						// could elaborate with hostname, etc.
-						info += fmt.Sprintf("Port%d Network TNC;", j+1)
+						fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
 
 					default:
 						// Only list valid channels.
 					} // switch
 				} // for each channel
 
-				reply.Data = []byte(info)
+				reply.Data = []byte(info.String())
 				reply.Header.DataLen = uint32(len(reply.Data))
 
 				send_to_client(client, reply)
@@ -1157,15 +1159,16 @@ func cmd_listen_thread(client int) {
 				//	10 bytes for each digipeater.
 				//	data part of message.
 				var pid = cmd.Header.PID
-				var stemp = ByteArrayToString(cmd.Header.CallFrom[:])
-				stemp += ">"
-				stemp += ByteArrayToString(cmd.Header.CallTo[:])
+				var stemp strings.Builder
+				stemp.WriteString(ByteArrayToString(cmd.Header.CallFrom[:]))
+				stemp.WriteString(">")
+				stemp.WriteString(ByteArrayToString(cmd.Header.CallTo[:]))
 
 				var ndigi = int(cmd.Data[0])
 
-				for k := 0; k < ndigi; k++ {
+				for k := range ndigi {
 					var offset = 1 + 10*k
-					stemp += "," + string(cmd.Data[offset:offset+10])
+					stemp.WriteString("," + string(cmd.Data[offset:offset+10]))
 				}
 				// At this point, p now points to info part after digipeaters.
 
@@ -1174,12 +1177,12 @@ func cmd_listen_thread(client int) {
 				// That was fine until NET/ROM, with binary data, came along.
 				// Now we set the information field after creating the packet object.
 
-				stemp += ": "
+				stemp.WriteString(": ")
 
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("Transmit '%s'\n", stemp);
 
-				var pp = ax25_from_text(stemp, true)
+				var pp = ax25_from_text(stemp.String(), true)
 
 				if pp == nil {
 					text_color_set(DW_COLOR_ERROR)

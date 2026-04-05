@@ -237,7 +237,7 @@ func test_payload(t *testing.T) {
 	// This will also provide exercise for scrambling and Reed Solomon under more conditions.
 
 	var original_payload = make([]byte, IL2P_MAX_PAYLOAD_SIZE)
-	for n := 0; n < IL2P_MAX_PAYLOAD_SIZE; n++ {
+	for n := range IL2P_MAX_PAYLOAD_SIZE {
 		original_payload[n] = byte(n & 0xff)
 	}
 

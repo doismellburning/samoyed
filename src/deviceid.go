@@ -123,7 +123,7 @@ func NewDeviceIDData() *DeviceIDData {
 	// Some shenanigans to map this all to the right data types...
 	// Could probably do something with fancy struct tagging etc. but this is at least better than parsing with strcmp
 
-	var deviceidConfig map[string]interface{}
+	var deviceidConfig map[string]any
 
 	var unmarshallErr = yaml.Unmarshal(data, &deviceidConfig)
 	if unmarshallErr != nil {
@@ -131,9 +131,9 @@ func NewDeviceIDData() *DeviceIDData {
 		return d
 	}
 
-	var miceSection, _ = deviceidConfig["mice"].([]interface{})
+	var miceSection, _ = deviceidConfig["mice"].([]any)
 	for _, _entry := range miceSection {
-		var entry, _ = _entry.(map[string]interface{})
+		var entry, _ = _entry.(map[string]any)
 		var m = new(mice)
 
 		m.suffix, _ = entry["suffix"].(string)
@@ -143,9 +143,9 @@ func NewDeviceIDData() *DeviceIDData {
 		d.pmice = append(d.pmice, m)
 	}
 
-	var micelegacySection, _ = deviceidConfig["micelegacy"].([]interface{})
+	var micelegacySection, _ = deviceidConfig["micelegacy"].([]any)
 	for _, _entry := range micelegacySection {
-		var entry, _ = _entry.(map[string]interface{})
+		var entry, _ = _entry.(map[string]any)
 		var m = new(mice)
 
 		m.prefix, _ = entry["prefix"].(string)
@@ -156,9 +156,9 @@ func NewDeviceIDData() *DeviceIDData {
 		d.pmice = append(d.pmice, m)
 	}
 
-	var tocallsSection, _ = deviceidConfig["tocalls"].([]interface{})
+	var tocallsSection, _ = deviceidConfig["tocalls"].([]any)
 	for _, _entry := range tocallsSection {
-		var entry, _ = _entry.(map[string]interface{})
+		var entry, _ = _entry.(map[string]any)
 		var t = new(tocalls)
 
 		t.tocall, _ = entry["tocall"].(string)

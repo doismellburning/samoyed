@@ -149,7 +149,7 @@ var g_debug_level int
 func fx25_init(debug_level int) {
 	g_debug_level = debug_level
 
-	for i := 0; i < FX25_NTAB; i++ {
+	for i := range FX25_NTAB {
 		fx25Tab[i].rs = init_rs_char(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
 		if fx25Tab[i].rs == nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -161,8 +161,8 @@ func fx25_init(debug_level int) {
 	// Verify integrity of tables and assumptions.
 	// This also does a quick check for the popcount function.
 
-	for j := 0; j < 16; j++ {
-		for k := 0; k < 16; k++ {
+	for j := range 16 {
+		for k := range 16 {
 			if j == k {
 				Assert(bits.OnesCount64(tags[j].value^tags[k].value) == 0)
 			} else {
@@ -327,7 +327,7 @@ func fx25_pick_mode(fx_mode int, dlen int) int {
 	// See https://web.tapr.org/meetings/DCC_2020/JE1WAZ/DCC-2020-PRUG-FINAL.pptx
 
 	var prefer = [6]int{0x04, 0x03, 0x06, 0x09, 0x05, 0x01}
-	for k := 0; k < 6; k++ {
+	for k := range 6 {
 		var m = prefer[k]
 		if dlen <= fx25_get_k_data_radio(m) {
 			return m
@@ -444,7 +444,7 @@ func fx_hex_dump(p []byte) {
 
 		dw_printf("  %03x: ", offset)
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			dw_printf(" %02x", p[i])
 		}
 
@@ -454,7 +454,7 @@ func fx_hex_dump(p []byte) {
 
 		dw_printf("  ")
 
-		for i := 0; i < n; i++ {
+		for i := range n {
 			if p[i] >= 0x20 && p[i] <= 0x7E {
 				dw_printf("%c", p[i])
 			} else {

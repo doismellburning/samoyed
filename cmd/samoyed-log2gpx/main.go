@@ -302,24 +302,24 @@ func read_csv(fp *os.File) {
  */
 
 func xml_text(in string) string {
-	var out string
+	var out strings.Builder
 
 	for _, p := range in {
 		switch p {
 		case '"':
-			out += "&quot;"
+			out.WriteString("&quot;")
 		case '\'':
-			out += "&apos;"
+			out.WriteString("&apos;")
 		case '<':
-			out += "&lt;"
+			out.WriteString("&lt;")
 		case '>':
-			out += "&gt;"
+			out.WriteString("&gt;")
 		default:
-			out += string(p)
+			out.WriteRune(p)
 		}
 	}
 
-	return out
+	return out.String()
 }
 
 /*

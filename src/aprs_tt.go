@@ -652,7 +652,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		 * Substitute values in to the definition.
 		 */
 
-		var stemp string
+		var stemp strings.Builder
 
 		var definition = g.config.ttlocs[ipat].macro.definition
 		for i, d := range definition {
@@ -665,22 +665,22 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 
 			switch d {
 			case 'x':
-				stemp += xstr
+				stemp.WriteString(xstr)
 			case 'y':
-				stemp += ystr
+				stemp.WriteString(ystr)
 			case 'z':
-				stemp += zstr
+				stemp.WriteString(zstr)
 			default:
-				stemp += fmt.Sprintf("%c", d)
+				fmt.Fprintf(&stemp, "%c", d)
 			}
 		}
 		/*
 		 * Process as if we heard this over the air.
 		 */
 
-		dw_printf("After substitution:  '%s'\n", stemp)
+		dw_printf("After substitution:  '%s'\n", stemp.String())
 
-		return (g.parseFields(state, stemp))
+		return (g.parseFields(state, stemp.String()))
 	} else {
 		/* Send reject sound. */
 		/* Does not match any macro definitions. */

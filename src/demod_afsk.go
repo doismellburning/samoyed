@@ -111,7 +111,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	var samples_per_sec = float64(_samples_per_sec)
 	var baud = float64(_baud)
 
-	for j := 0; j < 256; j++ {
+	for j := range 256 {
 		fcos256_table[j] = float64(math.Cos(float64(j) * 2.0 * math.Pi / 256.0))
 	}
 

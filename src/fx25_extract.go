@@ -83,7 +83,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	}
 
 	for j = 1; j < nn; j++ {
-		for i = 0; i < nroots; i++ {
+		for i = range nroots {
 			if s[i] == 0 {
 				s[i] = data[j]
 			} else {
@@ -279,11 +279,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	for i = 0; i < nroots; i++ {
 		tmp = 0
 
-		if degLambda < i {
-			j = degLambda
-		} else {
-			j = i
-		}
+		j = min(degLambda, i)
 
 		for ; j >= 0; j-- {
 			if int(s[i-j]) != A0 && int(lambda[j]) != A0 {
@@ -315,12 +311,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		den = 0
 
 		// lambda[i+1] for i even is the formal derivative lambda_pr of lambda[i]
-		var maxI int
-		if degLambda < nroots-1 {
-			maxI = degLambda
-		} else {
-			maxI = nroots - 1
-		}
+		var maxI = min(degLambda, nroots-1)
 
 		for i = maxI & ^1; i >= 0; i -= 2 {
 			if int(lambda[i+1]) != A0 {

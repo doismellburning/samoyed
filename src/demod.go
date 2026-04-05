@@ -52,7 +52,7 @@ func demod_init(pa *audio_s) int {
 	 */
 	save_audio_config_p = pa
 
-	for channel := int(0); channel < MAX_RADIO_CHANS; channel++ {
+	for channel := range MAX_RADIO_CHANS {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			/*
 			 * These are derived from config file parameters.

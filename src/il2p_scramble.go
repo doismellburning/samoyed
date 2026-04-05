@@ -56,7 +56,7 @@ func il2p_scramble_block(in []byte) []byte {
 	var ob = 0          // Index to output byte.
 
 	var om byte = 0x80 // Output bit mask;
-	for ib := 0; ib < len(in); ib++ {
+	for ib := range in {
 		for im := byte(0x80); im != 0; im >>= 1 {
 			var s = scramble_bit(IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
 			if ib == 0 && im == 0x04 {
@@ -83,7 +83,7 @@ func il2p_scramble_block(in []byte) []byte {
 	// Preserve the LFSR state from before flushing.
 	// This might be needed as the initial state for later payload blocks.
 	var x = tx_lfsr_state
-	for n := 0; n < 5; n++ {
+	for range 5 {
 		var s = scramble_bit(0, &x)
 		if s != 0 {
 			out[ob] |= (om)
@@ -116,7 +116,7 @@ func il2p_descramble_block(in []byte) []byte {
 
 	var out = make([]byte, len(in))
 
-	for b := 0; b < len(in); b++ {
+	for b := range in {
 		for m := byte(0x80); m != 0; m >>= 1 {
 			var d = descramble_bit(IfThenElse(((in[b]&m) != 0), 1, 0), &rx_lfsr_state)
 			if d != 0 {

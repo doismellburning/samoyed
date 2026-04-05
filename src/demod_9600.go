@@ -282,7 +282,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 	/* Version 1.2: Experiment with different slicing levels. */
 	// Really didn't help that much because we should have a symmetrical signal.
 
-	for j := 0; j < MAX_SUBCHANS; j++ {
+	for j := range MAX_SUBCHANS {
 		slice_point[j] = 0.02 * float64(j-0.5*(MAX_SUBCHANS-1))
 		//dw_printf ("slice_point[%d] = %+5.2f\n", j, slice_point[j]);
 	}

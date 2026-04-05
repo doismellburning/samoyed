@@ -125,7 +125,7 @@ func recv_adev_thread(a int) {
 	 */
 	var eof = false
 	for !eof {
-		for c := 0; c < num_chan; c++ {
+		for c := range num_chan {
 			var audio_sample = demod_get_sample(a)
 
 			if audio_sample >= 256*256 {

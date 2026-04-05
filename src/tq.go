@@ -84,8 +84,8 @@ func tq_init(audio_config_p *audio_s) {
 	*/
 	save_audio_config_p = audio_config_p
 
-	for c := 0; c < MAX_RADIO_CHANS; c++ {
-		for p := 0; p < TQ_NUM_PRIO; p++ {
+	for c := range MAX_RADIO_CHANS {
+		for p := range TQ_NUM_PRIO {
 			queue_head[c][p] = nil
 		}
 	}
@@ -95,7 +95,7 @@ func tq_init(audio_config_p *audio_s) {
 	 * Put a wrapper around this someday to hide the details.
 	 */
 
-	for c := 0; c < MAX_RADIO_CHANS; c++ {
+	for c := range MAX_RADIO_CHANS {
 		xmit_thread_is_waiting[c] = false
 
 		if audio_config_p.chan_medium[c] == MEDIUM_RADIO {
@@ -817,7 +817,7 @@ func tq_peek(channel int, prio int) *packet_t {
 func tq_is_empty(channel int) bool {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	for p := 0; p < TQ_NUM_PRIO; p++ {
+	for p := range TQ_NUM_PRIO {
 		Assert(p >= 0 && p < TQ_NUM_PRIO)
 
 		if queue_head[channel][p] != nil {

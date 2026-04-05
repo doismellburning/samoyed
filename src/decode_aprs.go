@@ -780,7 +780,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 
 		if !A.g_quiet {
 			var n = len(A.g_comment)
-			for j := 0; j < n; j++ {
+			for j := range n {
 				if A.g_comment[j] == 0xb0 && (j == 0 || (A.g_comment[j-1])&0x80 == 0) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Character code 0xb0 is probably an attempt at a degree symbol.\n")
@@ -788,7 +788,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 				}
 			}
 
-			for j := 0; j < n; j++ {
+			for j := range n {
 				if A.g_comment[j] == 0xf8 && (j == n-1 || (A.g_comment[j+1]&0xc0) != 0xc0) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Character code 0xf8 is probably an attempt at a degree symbol.\n")
@@ -4094,7 +4094,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			// Try to convert from integer to proper value.
 
 			var f, _ = strconv.Atoi(string(sttemp[1:]))
-			for i := 0; i < NUM_CTCSS; i++ {
+			for i := range NUM_CTCSS {
 				if f == i_ctcss[i] {
 					A.g_tone = f_ctcss[i]
 					break
@@ -4342,7 +4342,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		//N 42 40.8500, W 071 33.9900
 		//, "PHG72604/ Pepperell, MA-> WX. 442.9+ PL100"
 
-		for i := 0; i < NUM_CTCSS; i++ {
+		for i := range NUM_CTCSS {
 			if s_ctcss[i] == bad2 {
 				if !A.g_quiet {
 					var good = fmt.Sprintf("T%03d", i_ctcss[i])

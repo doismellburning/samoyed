@@ -85,7 +85,7 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 
 func send_il2p_bytes(channel int, b []byte, polarity int) {
 	for _, x := range b {
-		for k := 0; k < 8; k++ {
+		for range 8 {
 			var bit = 0
 			if (x & 0x80) != 0 {
 				bit = 1

@@ -307,7 +307,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 		// Our own sin table for speed later.
 
-		for j := 0; j < 256; j++ {
+		for j := range 256 {
 			D.u.psk.sin_table256[j] = float64(math.Sin(2.0 * math.Pi * float64(j) / 256.0))
 		}
 	}
@@ -531,7 +531,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 	// Interpolate between the ideal angles to get a level of certainty.
 	var result = 0
 
-	for b := int(0); b < bits_per_symbol; b++ {
+	for b := range bits_per_symbol {
 		var demod float64
 		if bits_per_symbol == 2 {
 			demod = float64((phase_to_gray_v26[i]>>b)&1)*(1.0-f) + float64((phase_to_gray_v26[(i+1)&3]>>b)&1)*f

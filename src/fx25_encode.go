@@ -43,7 +43,7 @@ func encode_rs_char(rs *rs_t, data []byte, bb []byte) {
 		bb[k] = 0
 	}
 
-	for i := 0; i < dataLen; i++ {
+	for i := range dataLen {
 		// feedback = INDEX_OF[data[i] ^ bb[0]]
 		var feedback = rs.index_of[data[i]^bb[0]]
 

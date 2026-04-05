@@ -637,7 +637,7 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// Receive I-frames 0, 1, 2 in sequence
-	for ns := 0; ns < 3; ns++ {
+	for ns := range 3 {
 		var info = []byte("Frame " + string(rune('0'+ns)))
 		var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, ns, 0, AX25_PID_NO_LAYER_3, info)
 		assert.NotNil(t, pp)
@@ -2184,7 +2184,7 @@ func TestAX25LinkFrameCountStats(t *testing.T) {
 	addrs[AX25_SOURCE] = THEIR_CALL
 
 	// Receive some I-frames
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var pp = ax25_i_frame(addrs, 2, cr_cmd, 8, 0, i, 0, AX25_PID_NO_LAYER_3, []byte("data"))
 		receiveFrame(t, pp, CHANNEL)
 	}

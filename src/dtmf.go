@@ -82,7 +82,7 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 	 * Larger = narrower bandwidth, slower response.
 	 */
 
-	for c := int(0); c < MAX_RADIO_CHANS; c++ {
+	for c := range MAX_RADIO_CHANS {
 		var D = &(dd[c])
 		var a = ACHAN2ADEV(c)
 
@@ -102,7 +102,7 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 				    dw_printf ("    freq      k     coef    \n");
 			#endif
 			*/
-			for j := 0; j < NUM_TONES; j++ {
+			for j := range NUM_TONES {
 				// Why do some insist on rounding k to the nearest integer?
 				// That would move the filter center frequency away from ideal.
 				// What is to be gained?
@@ -121,11 +121,11 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 		}
 	}
 
-	for c := 0; c < MAX_RADIO_CHANS; c++ {
+	for c := range MAX_RADIO_CHANS {
 		var D = &(dd[c])
 
 		D.n = 0
-		for j := 0; j < NUM_TONES; j++ {
+		for j := range NUM_TONES {
 			D.Q1[j] = 0
 			D.Q2[j] = 0
 		}
@@ -164,7 +164,7 @@ func dtmf_sample(c int, input float64) rune {
 	var D = &(dd[c])
 	var Q0 float64
 
-	for i := 0; i < NUM_TONES; i++ {
+	for i := range NUM_TONES {
 		Q0 = input + D.Q1[i]*D.coef[i] - D.Q2[i]
 		D.Q2[i] = D.Q1[i]
 		D.Q1[i] = Q0
@@ -179,7 +179,7 @@ func dtmf_sample(c int, input float64) rune {
 		var decoded rune
 		var row, col int
 
-		for i := 0; i < NUM_TONES; i++ {
+		for i := range NUM_TONES {
 			output[i] = float64(math.Sqrt(float64(D.Q1[i]*D.Q1[i] + D.Q2[i]*D.Q2[i] - D.Q1[i]*D.Q2[i]*D.coef[i])))
 			D.Q1[i] = 0
 			D.Q2[i] = 0

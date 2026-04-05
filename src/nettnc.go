@@ -36,7 +36,7 @@ var s_kiss_debug = 0
  *--------------------------------------------------------------------*/
 
 func nettnc_init(pa *audio_s) {
-	for i := 0; i < MAX_TOTAL_CHANS; i++ {
+	for i := range MAX_TOTAL_CHANS {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
@@ -165,7 +165,7 @@ func nettnc_listen_thread(channel int) {
 				continue
 			}
 
-			for j := 0; j < n; j++ {
+			for j := range n {
 				// Separate the byte stream into KISS frame(s) and make it
 				// look like this came from a radio channel.
 				my_kiss_rec_byte(&kstate, buf[j], s_kiss_debug, channel)

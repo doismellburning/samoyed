@@ -202,7 +202,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 		}
 
 		var pval = 0
-		for j := byte(0); j < plen; j++ {
+		for range plen {
 			pval = (pval << 8) + int(info[i])
 			i++
 		}

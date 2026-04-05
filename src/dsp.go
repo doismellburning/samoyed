@@ -94,7 +94,7 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
 	*/
 	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		var sinc float64
 
 		var center = 0.5 * float64(filter_size-1)
@@ -119,11 +119,11 @@ func gen_lowpass(fc float64, lp_filter []float64, filter_size int, wtype bp_wind
 	 * Normalize lowpass for unity gain at DC.
 	 */
 	var G float64 = 0
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		G += lp_filter[j]
 	}
 
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		lp_filter[j] /= G
 	}
 } /* end gen_lowpass */
@@ -164,7 +164,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 
 	Assert(filter_size >= 3 && filter_size <= MAX_FILTER_SIZE)
 
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		var sinc float64
 
 		if float64(j)-center == 0 {
@@ -193,7 +193,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 	var w = 2 * math.Pi * (f1 + f2) / 2
 
 	var G float64 = 0
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		G += 2 * bp_filter[j] * math.Cos((float64(j)-center)*w) // is this correct?
 	}
 
@@ -202,7 +202,7 @@ func gen_bandpass(f1 float64, f2 float64, bp_filter []float64, filter_size int, 
 			dw_printf ("Before normalizing, G=%.3f\n", G);
 		#endif
 	*/
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		bp_filter[j] /= G
 	}
 } /* end gen_bandpass */
@@ -230,7 +230,7 @@ func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_si
 	var Gs float64 = 0
 	var Gc float64 = 0
 
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		var center = 0.5 * float64(filter_size-1)
 		var am = ((float64(j) - center) / (float64)(sps)) * (float64(fc)) * (2.0 * (math.Pi))
 
@@ -258,7 +258,7 @@ func gen_ms(fc int, sps int, sin_table []float64, cos_table []float64, filter_si
 
 	   #endif
 	*/
-	for j := 0; j < filter_size; j++ {
+	for j := range filter_size {
 		sin_table[j] /= Gs
 		cos_table[j] /= Gc
 	}
@@ -326,7 +326,7 @@ func rrc(t float64, a float64) float64 {
 func gen_rrc_lowpass(pfilter []float64, filter_taps int, rolloff float64, samples_per_symbol float64) {
 	var t float64
 
-	for k := 0; k < filter_taps; k++ {
+	for k := range filter_taps {
 		t = (float64(k) - ((float64(filter_taps) - 1.0) / 2.0)) / samples_per_symbol
 		pfilter[k] = rrc(t, rolloff)
 	}
@@ -334,11 +334,11 @@ func gen_rrc_lowpass(pfilter []float64, filter_taps int, rolloff float64, sample
 	// Scale it for unity gain.
 
 	t = 0
-	for k := 0; k < filter_taps; k++ {
+	for k := range filter_taps {
 		t += pfilter[k]
 	}
 
-	for k := 0; k < filter_taps; k++ {
+	for k := range filter_taps {
 		pfilter[k] /= t
 	}
 }
