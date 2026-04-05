@@ -61,7 +61,6 @@ linters:
         - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
         - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
-        - "G704"  # "SSRF via taint analysis" - I do not believe these are actual SSRF issues
     nestif:
       min-complexity: 750  # There's lots of upstream complexity, so let's soft-disable this
     revive:
