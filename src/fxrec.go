@@ -26,7 +26,7 @@ func FxrecMain() {
 		for {
 			var _, readErr = fp.Read(buf)
 			if readErr != nil && !errors.Is(readErr, io.EOF) {
-				fmt.Printf("Error reading %s: %s.\n", fname, err)
+				fmt.Printf("Error reading %s: %s.\n", fname, readErr)
 				break
 			}
 			var ch = buf[0]
