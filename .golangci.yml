@@ -9,17 +9,20 @@ linters:
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines
     - "gocyclo"  # One day
+    - "godoclint"  # There's lots to be done with documentation formatting, but not right now
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
     - "intrange" # Another thing that I like in theory, but am not prioritising right now
     - "lll"  # We have inherited lots of long lines
     - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
+    - "modernize"  # Good stuff here, but not yet
     - "nakedret"  # Naked returns in long functions are kinda an ok tradeoff right now
     - "noctx"  # One day I will learn what a Context is, but that is not today
     - "nonamedreturns"  # Named returns seem a useful tradeoff for now - several functions that return ("output") many things, and names help
     - "nlreturn"  # Lots of false positives on C code that isn't a return
     - "paralleltest"  # One day, but let's have *working* tests first
+    - "perfsprint"  # Performance optimisations, worth looking at, but not right now
     - "prealloc"  # One day, but not now
     - "testpackage"  # Noble intent, but right now we're doing all sorts of juggling with packages, so let's save this for later
     - "varnamelen"  # Noble intent, but we're inheriting lots of short variable names, and I'd like to stay close to upstream at first
@@ -58,6 +61,8 @@ linters:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
         - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
+        - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
+        - "G704"  # "SSRF via taint analysis" - I do not believe these are actual SSRF issues
     nestif:
       min-complexity: 750  # There's lots of upstream complexity, so let's soft-disable this
     revive:
