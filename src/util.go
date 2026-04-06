@@ -26,7 +26,7 @@ func IfThenElse[T any](x bool, a T, b T) T { //nolint:ireturn
 	}
 }
 
-// Used for both KISS and AGWPE
+// MAX_NET_CLIENTS is used for both KISS and AGWPE
 const MAX_NET_CLIENTS = 3
 
 // There are several places where we deal with fixed-width byte arrays containing a string.

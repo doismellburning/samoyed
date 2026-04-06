@@ -326,7 +326,7 @@ var ax25_new_count = 0
 var ax25_delete_count = 0
 var last_seq_num int = 0
 
-// Runtime replacement for DECAMAIN define
+// DECODE_APRS_UTIL is a runtime replacement for DECAMAIN define
 var DECODE_APRS_UTIL = false
 
 func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {
@@ -2068,10 +2068,6 @@ func ax25_pack(this_p *packet_t) []byte {
  *
  *------------------------------------------------------------------*/
 
-// TODO: need someway to ensure caller allocated enough space.
-// Should pass in as parameter.
-const DESC_SIZ = 56
-
 func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
 	var _, _, _, _, _, frameType = ax25_frame_type(this_p)
 
@@ -2810,7 +2806,6 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
  *
  *------------------------------------------------------------------*/
 
-// #define MAXSAFE 500
 const MAXSAFE = AX25_MAX_INFO_LEN
 
 func ax25_safe_print(info []byte, ascii_only bool) {

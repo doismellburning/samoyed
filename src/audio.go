@@ -504,7 +504,6 @@ const DEFAULT_BAUD = 1200
 
 const MIN_BAUD = 100
 
-// const MAX_BAUD	 =	10000
 const MAX_BAUD = 40000 // Anyone want to try 38.4 k baud?
 
 /*
