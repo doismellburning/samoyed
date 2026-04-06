@@ -324,10 +324,6 @@ func ais_to_nmea(ais []byte) []byte {
  *
  *--------------------------------------------------------------------*/
 
-// Maximum NMEA sentence length is 82, including CR/LF.
-// Make buffer considerably larger to be safe.
-const NMEA_MAX_LEN = 240
-
 type AISData struct {
 	description string //Description of AIS message type.
 	mssi        string //9 digit identifier.

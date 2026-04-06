@@ -46,6 +46,7 @@ import (
  * The configuration file reader fills in this information
  * and it is passed to digipeater_init at application start up time.
  */
+
 const DEFAULT_DEDUPE = 30
 
 type preempt_e int

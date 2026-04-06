@@ -54,7 +54,6 @@ const LINE_WIDTH = 120
 var column_width int
 var packet_count [MAX_CLIENTS]int
 
-// #define PRINT_MINUTES 2
 const PRINT_MINUTES = 30
 
 func AClientsMain() {
