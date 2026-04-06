@@ -989,541 +989,545 @@ func cmd_listen_thread(client int) {
 			debug_print(FROM_CLIENT, client, cmd)
 		}
 
-		switch cmd.Header.DataKind {
-		case 'R': /* Request for version number */
-			{
-				var reply = new(AGWPEMessage)
+		handleClientCommand(client, cmd)
+	}
+} /* end cmd_listen_thread */
 
-				reply.Header.DataKind = 'R'
-				reply.Header.DataLen = 8
-				reply.Data = make([]byte, 8)
-
-				// Xastir only prints this and doesn't care otherwise.
-				// APRSIS32 doesn't seem to care.
-				// UI-View32 wants on 2000.15 or later.
-
-				binary.LittleEndian.PutUint32(reply.Data[0:4], 2005) // Major version
-				binary.LittleEndian.PutUint32(reply.Data[4:8], 127)  // Minor version
-
-				send_to_client(client, reply)
-			}
-
-		case 'G': /* Ask about radio ports */
-			{
-				var reply = new(AGWPEMessage)
-
-				reply.Header.DataKind = 'G'
-
-				// Xastir only prints this and doesn't care otherwise.
-				// YAAC uses this to identify available channels.
-
-				// The interface manual wants the first to be "Port1"
-				// so channel 0 corresponds to "Port1."
-				// We can have gaps in the numbering.
-				// I wonder what applications will think about that.
-
-				// No other place cares about total number.
-
-				var count = 0
-
-				for j := range MAX_TOTAL_CHANS {
-					if save_audio_config_p.chan_medium[j] == MEDIUM_RADIO ||
-						save_audio_config_p.chan_medium[j] == MEDIUM_IGATE ||
-						save_audio_config_p.chan_medium[j] == MEDIUM_NETTNC {
-						count++
-					}
-				}
-
-				var info strings.Builder
-				fmt.Fprintf(&info, "%d;", count)
-
-				for j := range MAX_TOTAL_CHANS {
-					switch save_audio_config_p.chan_medium[j] {
-					case MEDIUM_RADIO:
-						// Misleading if using stdin or udp.
-						var a = ACHAN2ADEV(j)
-						// If I was really ambitious, some description could be provided.
-						var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
-
-						if save_audio_config_p.adev[a].num_channels == 1 {
-							fmt.Fprintf(&info, "Port%d %s soundcard mono;", j+1, names[a])
-						} else {
-							var lr = "left"
-							if j&1 > 0 {
-								lr = "right"
-							}
-
-							fmt.Fprintf(&info, "Port%d %s soundcard %s;", j+1, names[a], lr)
-						}
-
-					case MEDIUM_IGATE:
-						fmt.Fprintf(&info, "Port%d Internet Gateway;", j+1)
-
-					case MEDIUM_NETTNC:
-						// could elaborate with hostname, etc.
-						fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
-
-					default:
-						// Only list valid channels.
-					} // switch
-				} // for each channel
-
-				reply.Data = []byte(info.String())
-				reply.Header.DataLen = uint32(len(reply.Data))
-
-				send_to_client(client, reply)
-			}
-
-		case 'g': /* Ask about capabilities of a port. */
-			/*
-					struct {
-					  struct agwpe_s Header;
-				 	  unsigned char on_air_baud_rate; 	// 0=1200, 1=2400, 2=4800, 3=9600, ...
-					  unsigned char traffic_level;		// 0xff if not in autoupdate mode
-					  unsigned char tx_delay;
-					  unsigned char tx_tail;
-					  unsigned char persist;
-					  unsigned char slottime;
-					  unsigned char maxframe;
-					  unsigned char active_connections;
-					  int how_many_bytes_NETLE;
-					} reply;
-			*/
+func handleClientCommand(client int, cmd *AGWPEMessage) {
+	switch cmd.Header.DataKind {
+	case 'R': /* Request for version number */
+		{
 			var reply = new(AGWPEMessage)
 
-			reply.Header.Portx = cmd.Header.Portx /* Reply with same port number ! */
-			reply.Header.DataKind = 'g'
-			reply.Header.DataLen = 12
+			reply.Header.DataKind = 'R'
+			reply.Header.DataLen = 8
+			reply.Data = make([]byte, 8)
 
-			// YAAC asks for this.
-			// Fake it to keep application happy.
-			// TODO:  Supply real values instead of just faking it.
+			// Xastir only prints this and doesn't care otherwise.
+			// APRSIS32 doesn't seem to care.
+			// UI-View32 wants on 2000.15 or later.
 
-			reply.Data = make([]byte, 12)
-			reply.Data[0] = 0                                  // on_air_baud_rate
-			reply.Data[1] = 1                                  // traffic_level
-			reply.Data[2] = 0x19                               // tx_delay
-			reply.Data[3] = 4                                  // tx_tail
-			reply.Data[4] = 0xc8                               // persist
-			reply.Data[5] = 4                                  // slottime
-			reply.Data[6] = 7                                  // maxframe
-			reply.Data[7] = 0                                  // active_connections
-			binary.LittleEndian.PutUint32(reply.Data[8:12], 1) // how_many_bytes
+			binary.LittleEndian.PutUint32(reply.Data[0:4], 2005) // Major version
+			binary.LittleEndian.PutUint32(reply.Data[4:8], 127)  // Minor version
 
 			send_to_client(client, reply)
+		}
 
-		case 'H': /* Ask about recently heard stations on given port. */
-			/* This should send back 20 'H' frames for the most recently heard stations. */
-			/* If there are less available, empty frames are sent to make a total of 20. */
-			/* Each contains the first and last heard times. */
-			{
-				/*
-					#if 0						// Currently, this information is not being collected.
-							struct {
-							  struct agwpe_s Header;
-						 	  char info[100];
-							} reply;
+	case 'G': /* Ask about radio ports */
+		{
+			var reply = new(AGWPEMessage)
 
+			reply.Header.DataKind = 'G'
 
-						        memset (&reply.Header, 0, sizeof(reply.Header));
-						        reply.Header.DataKind = 'H';
+			// Xastir only prints this and doesn't care otherwise.
+			// YAAC uses this to identify available channels.
 
-							// TODO:  Implement properly.
+			// The interface manual wants the first to be "Port1"
+			// so channel 0 corresponds to "Port1."
+			// We can have gaps in the numbering.
+			// I wonder what applications will think about that.
 
-						        reply.Header.Portx = cmd.Header.Portx
+			// No other place cares about total number.
 
-						        strlcpy (reply.Header.call_from, "WB2OSZ-15 Mon,01Jan2000 01:02:03  Tue,31Dec2099 23:45:56", sizeof(reply.Header.call_from));
-							// or                                                  00:00:00                00:00:00
+			var count = 0
 
-						        strlcpy (agwpe_msg.data, ..., sizeof(agwpe_msg.data));
-
-						        reply.Header.data_len_NETLE = host2netle(strlen(reply.info));
-
-						        send_to_client (client, &reply);
-					#endif
-				*/
+			for j := range MAX_TOTAL_CHANS {
+				if save_audio_config_p.chan_medium[j] == MEDIUM_RADIO ||
+					save_audio_config_p.chan_medium[j] == MEDIUM_IGATE ||
+					save_audio_config_p.chan_medium[j] == MEDIUM_NETTNC {
+					count++
+				}
 			}
 
-		case 'k': /* Ask to start receiving RAW AX25 frames */
-			// Actually it is a toggle so we must be sure to clear it for a new connection.
-			enable_send_raw_to_client[client] = !enable_send_raw_to_client[client]
+			var info strings.Builder
+			fmt.Fprintf(&info, "%d;", count)
 
-		case 'm': /* Ask to start receiving Monitor frames */
-			// Actually it is a toggle so we must be sure to clear it for a new connection.
-			enable_send_monitor_to_client[client] = !enable_send_monitor_to_client[client]
+			for j := range MAX_TOTAL_CHANS {
+				switch save_audio_config_p.chan_medium[j] {
+				case MEDIUM_RADIO:
+					// Misleading if using stdin or udp.
+					var a = ACHAN2ADEV(j)
+					// If I was really ambitious, some description could be provided.
+					var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
 
-		case 'V': /* Transmit UI data frame (with digipeater path) */
-			{
-				// Data format is:
-				//	1 byte for number of digipeaters.
-				//	10 bytes for each digipeater.
-				//	data part of message.
-				var pid = cmd.Header.PID
-				var stemp strings.Builder
-				stemp.WriteString(ByteArrayToString(cmd.Header.CallFrom[:]))
-				stemp.WriteString(">")
-				stemp.WriteString(ByteArrayToString(cmd.Header.CallTo[:]))
-
-				var ndigi = int(cmd.Data[0])
-
-				for k := range ndigi {
-					var offset = 1 + 10*k
-					stemp.WriteString("," + string(cmd.Data[offset:offset+10]))
-				}
-				// At this point, p now points to info part after digipeaters.
-
-				// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
-				// Originally, I just appended the information part.
-				// That was fine until NET/ROM, with binary data, came along.
-				// Now we set the information field after creating the packet object.
-
-				stemp.WriteString(": ")
-
-				//text_color_set(DW_COLOR_DEBUG);
-				//dw_printf ("Transmit '%s'\n", stemp);
-
-				var pp = ax25_from_text(stemp.String(), true)
-
-				if pp == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Failed to create frame from AGW 'V' message.\n")
-
-					break
-				}
-
-				var data = cmd.Data[1+10*ndigi:]
-				ax25_set_info(pp, data)
-
-				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-				ax25_set_pid(pp, pid)
-
-				/* This goes into the low priority queue because it is an original. */
-
-				/* Note that the protocol has no way to set the "has been used" */
-				/* bits in the digipeater fields. */
-
-				/* This explains why the digipeating option is grayed out in */
-				/* xastir when using the AGW interface.  */
-				/* The current version uses only the 'V' message, not 'K' for transmitting. */
-
-				tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
-			}
-
-		case 'K': /* Transmit raw AX.25 frame */
-			{
-				// Message contains:
-				//	port number for transmission.
-				//	data length
-				//	data which is raw ax.25 frame.
-				//
-
-				// Bug fix in version 1.1:
-				//
-				// The first byte of data is described as:
-				//
-				// 		the "TNC" to use
-				//		00=Port 1
-				//		16=Port 2
-				//
-				// The seems to be redundant; we already a port number in the header.
-				// Anyhow, the original code here added one to cmd.data to get the
-				// first byte of the frame.  Unfortunately, it did not subtract one from
-				// cmd.Header.data_len so we ended up sending an extra byte.
-
-				// TODO: Right now I just use the port (channel) number in the header.
-				// What if the second one is inconsistent?
-				// - Continue to ignore port number at beginning of data?
-				// - Use second one instead?
-				// - Error message if a mismatch?
-				var alevel alevel_t
-				var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
-
-				if pp == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Failed to create frame from AGW 'K' message.\n")
-				} else {
-					/* How can we determine if it is an original or repeated message? */
-					/* If there is at least one digipeater in the frame, AND */
-					/* that digipeater has been used, it should go out quickly thru */
-					/* the high priority queue. */
-					/* Otherwise, it is an original for the low priority queue. */
-					if ax25_get_num_repeaters(pp) >= 1 &&
-						ax25_get_h(pp, AX25_REPEATER_1) > 0 {
-						tq_append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
+					if save_audio_config_p.adev[a].num_channels == 1 {
+						fmt.Fprintf(&info, "Port%d %s soundcard mono;", j+1, names[a])
 					} else {
-						tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+						var lr = "left"
+						if j&1 > 0 {
+							lr = "right"
+						}
+
+						fmt.Fprintf(&info, "Port%d %s soundcard %s;", j+1, names[a], lr)
 					}
-				}
+
+				case MEDIUM_IGATE:
+					fmt.Fprintf(&info, "Port%d Internet Gateway;", j+1)
+
+				case MEDIUM_NETTNC:
+					// could elaborate with hostname, etc.
+					fmt.Fprintf(&info, "Port%d Network TNC;", j+1)
+
+				default:
+					// Only list valid channels.
+				} // switch
+			} // for each channel
+
+			reply.Data = []byte(info.String())
+			reply.Header.DataLen = uint32(len(reply.Data))
+
+			send_to_client(client, reply)
+		}
+
+	case 'g': /* Ask about capabilities of a port. */
+		/*
+				struct {
+				  struct agwpe_s Header;
+			 	  unsigned char on_air_baud_rate; 	// 0=1200, 1=2400, 2=4800, 3=9600, ...
+				  unsigned char traffic_level;		// 0xff if not in autoupdate mode
+				  unsigned char tx_delay;
+				  unsigned char tx_tail;
+				  unsigned char persist;
+				  unsigned char slottime;
+				  unsigned char maxframe;
+				  unsigned char active_connections;
+				  int how_many_bytes_NETLE;
+				} reply;
+		*/
+		var reply = new(AGWPEMessage)
+
+		reply.Header.Portx = cmd.Header.Portx /* Reply with same port number ! */
+		reply.Header.DataKind = 'g'
+		reply.Header.DataLen = 12
+
+		// YAAC asks for this.
+		// Fake it to keep application happy.
+		// TODO:  Supply real values instead of just faking it.
+
+		reply.Data = make([]byte, 12)
+		reply.Data[0] = 0                                  // on_air_baud_rate
+		reply.Data[1] = 1                                  // traffic_level
+		reply.Data[2] = 0x19                               // tx_delay
+		reply.Data[3] = 4                                  // tx_tail
+		reply.Data[4] = 0xc8                               // persist
+		reply.Data[5] = 4                                  // slottime
+		reply.Data[6] = 7                                  // maxframe
+		reply.Data[7] = 0                                  // active_connections
+		binary.LittleEndian.PutUint32(reply.Data[8:12], 1) // how_many_bytes
+
+		send_to_client(client, reply)
+
+	case 'H': /* Ask about recently heard stations on given port. */
+		/* This should send back 20 'H' frames for the most recently heard stations. */
+		/* If there are less available, empty frames are sent to make a total of 20. */
+		/* Each contains the first and last heard times. */
+		{
+			/*
+				#if 0						// Currently, this information is not being collected.
+						struct {
+						  struct agwpe_s Header;
+					 	  char info[100];
+						} reply;
+
+
+					        memset (&reply.Header, 0, sizeof(reply.Header));
+					        reply.Header.DataKind = 'H';
+
+						// TODO:  Implement properly.
+
+					        reply.Header.Portx = cmd.Header.Portx
+
+					        strlcpy (reply.Header.call_from, "WB2OSZ-15 Mon,01Jan2000 01:02:03  Tue,31Dec2099 23:45:56", sizeof(reply.Header.call_from));
+						// or                                                  00:00:00                00:00:00
+
+					        strlcpy (agwpe_msg.data, ..., sizeof(agwpe_msg.data));
+
+					        reply.Header.data_len_NETLE = host2netle(strlen(reply.info));
+
+					        send_to_client (client, &reply);
+				#endif
+			*/
+		}
+
+	case 'k': /* Ask to start receiving RAW AX25 frames */
+		// Actually it is a toggle so we must be sure to clear it for a new connection.
+		enable_send_raw_to_client[client] = !enable_send_raw_to_client[client]
+
+	case 'm': /* Ask to start receiving Monitor frames */
+		// Actually it is a toggle so we must be sure to clear it for a new connection.
+		enable_send_monitor_to_client[client] = !enable_send_monitor_to_client[client]
+
+	case 'V': /* Transmit UI data frame (with digipeater path) */
+		{
+			// Data format is:
+			//	1 byte for number of digipeaters.
+			//	10 bytes for each digipeater.
+			//	data part of message.
+			var pid = cmd.Header.PID
+			var stemp strings.Builder
+			stemp.WriteString(ByteArrayToString(cmd.Header.CallFrom[:]))
+			stemp.WriteString(">")
+			stemp.WriteString(ByteArrayToString(cmd.Header.CallTo[:]))
+
+			var ndigi = int(cmd.Data[0])
+
+			for k := range ndigi {
+				var offset = 1 + 10*k
+				stemp.WriteString("," + string(cmd.Data[offset:offset+10]))
+			}
+			// At this point, p now points to info part after digipeaters.
+
+			// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
+			// Originally, I just appended the information part.
+			// That was fine until NET/ROM, with binary data, came along.
+			// Now we set the information field after creating the packet object.
+
+			stemp.WriteString(": ")
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("Transmit '%s'\n", stemp);
+
+			var pp = ax25_from_text(stemp.String(), true)
+
+			if pp == nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Failed to create frame from AGW 'V' message.\n")
+
+				break
 			}
 
-		case 'P': /* Application Login  */
+			var data = cmd.Data[1+10*ndigi:]
+			ax25_set_info(pp, data)
 
-			// Silently ignore it.
+			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
+			ax25_set_pid(pp, pid)
 
-		case 'X': /* Register CallSign  */
-			{
-				/*
-					struct {
-					  struct agwpe_s Header;
-					  char data;			// 1 = success, 0 = failure
-					} reply;
-				*/
-				var ok byte
+			/* This goes into the low priority queue because it is an original. */
 
-				// The protocol spec says it is an error to register the same one more than once.
-				// Too much trouble.  Report success if the channel is valid.
+			/* Note that the protocol has no way to set the "has been used" */
+			/* bits in the digipeater fields. */
 
-				var channel = int(cmd.Header.Portx)
+			/* This explains why the digipeating option is grayed out in */
+			/* xastir when using the AGW interface.  */
+			/* The current version uses only the 'V' message, not 'K' for transmitting. */
 
-				// Connected mode can only be used with internal modems.
+			tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+		}
 
-				if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-					ok = 1
+	case 'K': /* Transmit raw AX.25 frame */
+		{
+			// Message contains:
+			//	port number for transmission.
+			//	data length
+			//	data which is raw ax.25 frame.
+			//
 
-					dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+			// Bug fix in version 1.1:
+			//
+			// The first byte of data is described as:
+			//
+			// 		the "TNC" to use
+			//		00=Port 1
+			//		16=Port 2
+			//
+			// The seems to be redundant; we already a port number in the header.
+			// Anyhow, the original code here added one to cmd.data to get the
+			// first byte of the frame.  Unfortunately, it did not subtract one from
+			// cmd.Header.data_len so we ended up sending an extra byte.
+
+			// TODO: Right now I just use the port (channel) number in the header.
+			// What if the second one is inconsistent?
+			// - Continue to ignore port number at beginning of data?
+			// - Use second one instead?
+			// - Error message if a mismatch?
+			var alevel alevel_t
+			var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
+
+			if pp == nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Failed to create frame from AGW 'K' message.\n")
+			} else {
+				/* How can we determine if it is an original or repeated message? */
+				/* If there is at least one digipeater in the frame, AND */
+				/* that digipeater has been used, it should go out quickly thru */
+				/* the high priority queue. */
+				/* Otherwise, it is an original for the low priority queue. */
+				if ax25_get_num_repeaters(pp) >= 1 &&
+					ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+					tq_append(int(cmd.Header.Portx), TQ_PRIO_0_HI, pp)
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
-
-					ok = 0
+					tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
 				}
-
-				var reply = new(AGWPEMessage)
-				reply.Header.DataKind = 'X'
-				reply.Header.Portx = cmd.Header.Portx
-				copy(reply.Header.CallFrom[:], cmd.Header.CallFrom[:])
-				reply.Header.DataLen = 1
-				reply.Data = []byte{ok}
-
-				send_to_client(client, reply)
 			}
+		}
 
-		case 'x': /* Unregister CallSign  */
+	case 'P': /* Application Login  */
+
+		// Silently ignore it.
+
+	case 'X': /* Register CallSign  */
+		{
+			/*
+				struct {
+				  struct agwpe_s Header;
+				  char data;			// 1 = success, 0 = failure
+				} reply;
+			*/
+			var ok byte
+
+			// The protocol spec says it is an error to register the same one more than once.
+			// Too much trouble.  Report success if the channel is valid.
+
 			var channel = int(cmd.Header.Portx)
 
 			// Connected mode can only be used with internal modems.
 
 			if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-				dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+				ok = 1
+
+				dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
-			}
-		/* No response is expected. */
+				dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
 
-		case 'C', 'v', 'c':
-			/* C: Connect, Start an AX.25 Connection  */
-			/* v: Connect VIA, Start an AX.25 circuit thru digipeaters */
-			/* c: Connection with non-standard PID */
-			{
-				/*
-					        struct via_info {
-					          unsigned char num_digi;	// Expect to be in range 1 to 7.  Why not up to 8?
-						  char dcall[7][10];
-					        }
-				*/
-				var callsigns [AX25_MAX_ADDRS]string
-				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
-
-				var pid byte = 0xf0 /* normal for AX.25 I frames. */
-				if cmd.Header.DataKind == 'c' {
-					pid = cmd.Header.PID /* non standard for NETROM, TCP/IP, etc. */
-				}
-
-				var num_calls = 2 /* 2 plus any digipeaters. */
-
-				if cmd.Header.DataKind == 'v' {
-					var v struct {
-						NumDigi byte
-						Dcall   [7][10]byte
-					}
-
-					_, err := binary.Decode(cmd.Data, binary.LittleEndian, &v)
-					if err != nil {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("\n")
-						dw_printf("AGW client, connect via, has invalid payload: %v\n", err)
-						break
-					}
-
-					if v.NumDigi >= 1 && v.NumDigi <= 7 {
-						if cmd.Header.DataLen != uint32(v.NumDigi)*10+1 && cmd.Header.DataLen != uint32(v.NumDigi)*10+2 {
-							// I'm getting 1 more than expected from AGWterminal.
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, v.NumDigi*10+1)
-						}
-
-						for j := byte(0); j < v.NumDigi; j++ {
-							callsigns[AX25_REPEATER_1+j] = ByteArrayToString(v.Dcall[j][:])
-							num_calls++
-						}
-					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("\n")
-						dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", v.NumDigi)
-					}
-				}
-
-				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+				ok = 0
 			}
 
-		case 'D': /* Send Connected Data */
-			{
-				var callsigns [AX25_MAX_ADDRS]string
-				const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
+			var reply = new(AGWPEMessage)
+			reply.Header.DataKind = 'X'
+			reply.Header.Portx = cmd.Header.Portx
+			copy(reply.Header.CallFrom[:], cmd.Header.CallFrom[:])
+			reply.Header.DataLen = 1
+			reply.Data = []byte{ok}
 
-				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
-
-				dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data)
-			}
-
-		case 'd': /* Disconnect, Terminate an AX.25 Connection */
-			{
-				var callsigns [AX25_MAX_ADDRS]string
-				const num_calls = 2 // only first 2 used.
-
-				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
-
-				dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
-			}
-
-		case 'M': /* Send UNPROTO Information (no digipeater path) */
-			/*
-						Added in version 1.3.
-						This is the same as 'V' except there is no provision for digipeaters.
-						TODO: combine 'V' and 'M' into one case.
-						AGWterminal sends this for beacon or ask QRA.
-
-						<<< Send UNPROTO Information from AGWPE client application 0, total length = 253
-						        portx = 0, datakind = 'M', pid = 0x00
-						        call_from = "WB2OSZ-15", call_to = "BEACON"
-						        data_len = 217, user_reserved = 556, data =
-						  000:  54 68 69 73 20 76 65 72 73 69 6f 6e 20 75 73 65  This version use
-						   ...
-
-						<<< Send UNPROTO Information from AGWPE client application 0, total length = 37
-						        portx = 0, datakind = 'M', pid = 0x00
-						        call_from = "WB2OSZ-15", call_to = "QRA"
-						        data_len = 1, user_reserved = 31759424, data =
-						  000:  0d                                               .
-				                                          .
-
-						There is also a report of it coming from UISS.
-
-						<<< Send UNPROTO Information from AGWPE client application 0, total length = 50
-							portx = 0, port_hi_reserved = 0
-							datakind = 77 = 'M', kind_hi = 0
-							call_from = "JH4XSY", call_to = "APRS"
-							data_len = 14, user_reserved = 0, data =
-						  000:  21 22 3c 43 2e 74 71 6c 48 72 71 21 21 5f        !"<C.tqlHrq!!_
-			*/
-			{
-				var pid = cmd.Header.PID
-				var stemp = ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + ByteArrayToString(cmd.Header.CallTo[:]) + ": "
-
-				// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
-				// Originally, I just appended the information part as a text string.
-				// That was fine until NET/ROM, with binary data, came along.
-				// Now we set the information field after creating the packet object.
-
-				//text_color_set(DW_COLOR_DEBUG);
-				//dw_printf ("Transmit '%s'\n", stemp);
-
-				var pp = ax25_from_text(stemp, true)
-
-				if pp == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Failed to create frame from AGW 'M' message.\n")
-				}
-
-				ax25_set_info(pp, cmd.Data)
-				// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
-				ax25_set_pid(pp, pid)
-
-				tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
-			}
-
-		case 'y': /* Ask Outstanding frames waiting on a Port  */
-			/* Number of frames sitting in transmit queue for specified channel. */
-			{
-				/*
-					struct {
-					  struct agwpe_s Header;
-					  int data_NETLE;			// Little endian order.
-					} reply;
-				*/
-				var reply = new(AGWPEMessage)
-
-				reply.Header.Portx = cmd.Header.Portx /* Reply with same port number */
-				reply.Header.DataKind = 'y'
-				reply.Header.DataLen = 4
-
-				var n = 0
-				if cmd.Header.Portx < MAX_RADIO_CHANS {
-					// Count both normal and expedited in transmit queue for given channel.
-					n = tq_count(int(cmd.Header.Portx), -1, "", "", false)
-				}
-
-				reply.Data = make([]byte, 4)
-				binary.LittleEndian.PutUint32(reply.Data, uint32(n))
-
-				send_to_client(client, reply)
-			}
-
-		case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
-			// This is different than the above 'y' because this refers to a specific
-			// link in connected mode.
-
-			// This would be useful for a couple different purposes.
-
-			// When sending bulk data, we want to keep a fair amount queued up to take
-			// advantage of large window sizes (MAXFRAME, EMAXFRAME).  On the other
-			// hand we don't want to get TOO far ahead when transferring a large file.
-
-			// Before disconnecting from another station, it would be good to know
-			// that it actually received the last message we sent.  For this reason,
-			// I think it would be good for this to include information frames that were
-			// transmitted but not yet acknowledged.
-			// You could say that a particular frame is still waiting to be sent even
-			// if was already sent because it could be sent again if lost previously.
-
-			// The documentation is inconsistent about the address order.
-			// One place says "callfrom" is my callsign and "callto" is the other guy.
-			// That would make sense.  We are asking about frames going to the other guy.
-
-			// But another place says it depends on who initiated the connection.
-			//
-			//	"If we started the connection CallFrom=US and CallTo=THEM
-			//	If the other end started the connection CallFrom=THEM and CallTo=US"
-			//
-			// The response description says nothing about the order; it just mentions two addresses.
-			// If you are writing a client or server application, the order would
-			// be clear but right here it could be either case.
-			//
-			// Another version of the documentation mentioned the source address being optional.
-			//
-
-			// The only way to get this information is from inside the data link state machine.
-			// We will send a request to it and the result coming out will be used to
-			// send the reply back to the client application.
-			{
-				var callsigns [AX25_MAX_ADDRS]string
-				const num_calls = 2 // only first 2 used.
-
-				callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
-				callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
-
-				dlq_outstanding_frames_request(callsigns, num_calls, int(cmd.Header.Portx), client)
-			}
-
-		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("--- Unexpected Command from application %d using AGW protocol:\n", client)
-			debug_print(FROM_CLIENT, client, cmd)
-
+			send_to_client(client, reply)
 		}
+
+	case 'x': /* Unregister CallSign  */
+		var channel = int(cmd.Header.Portx)
+
+		// Connected mode can only be used with internal modems.
+
+		if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
+			dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+		} else {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
+		}
+	/* No response is expected. */
+
+	case 'C', 'v', 'c':
+		/* C: Connect, Start an AX.25 Connection  */
+		/* v: Connect VIA, Start an AX.25 circuit thru digipeaters */
+		/* c: Connection with non-standard PID */
+		{
+			/*
+				        struct via_info {
+				          unsigned char num_digi;	// Expect to be in range 1 to 7.  Why not up to 8?
+					  char dcall[7][10];
+				        }
+			*/
+			var callsigns [AX25_MAX_ADDRS]string
+			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			var pid byte = 0xf0 /* normal for AX.25 I frames. */
+			if cmd.Header.DataKind == 'c' {
+				pid = cmd.Header.PID /* non standard for NETROM, TCP/IP, etc. */
+			}
+
+			var num_calls = 2 /* 2 plus any digipeaters. */
+
+			if cmd.Header.DataKind == 'v' {
+				var v struct {
+					NumDigi byte
+					Dcall   [7][10]byte
+				}
+
+				_, err := binary.Decode(cmd.Data, binary.LittleEndian, &v)
+				if err != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("\n")
+					dw_printf("AGW client, connect via, has invalid payload: %v\n", err)
+					break
+				}
+
+				if v.NumDigi >= 1 && v.NumDigi <= 7 {
+					if cmd.Header.DataLen != uint32(v.NumDigi)*10+1 && cmd.Header.DataLen != uint32(v.NumDigi)*10+2 {
+						// I'm getting 1 more than expected from AGWterminal.
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, v.NumDigi*10+1)
+					}
+
+					for j := byte(0); j < v.NumDigi; j++ {
+						callsigns[AX25_REPEATER_1+j] = ByteArrayToString(v.Dcall[j][:])
+						num_calls++
+					}
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("\n")
+					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", v.NumDigi)
+				}
+			}
+
+			dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+		}
+
+	case 'D': /* Send Connected Data */
+		{
+			var callsigns [AX25_MAX_ADDRS]string
+			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
+
+			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data)
+		}
+
+	case 'd': /* Disconnect, Terminate an AX.25 Connection */
+		{
+			var callsigns [AX25_MAX_ADDRS]string
+			const num_calls = 2 // only first 2 used.
+
+			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
+		}
+
+	case 'M': /* Send UNPROTO Information (no digipeater path) */
+		/*
+					Added in version 1.3.
+					This is the same as 'V' except there is no provision for digipeaters.
+					TODO: combine 'V' and 'M' into one case.
+					AGWterminal sends this for beacon or ask QRA.
+
+					<<< Send UNPROTO Information from AGWPE client application 0, total length = 253
+					        portx = 0, datakind = 'M', pid = 0x00
+					        call_from = "WB2OSZ-15", call_to = "BEACON"
+					        data_len = 217, user_reserved = 556, data =
+					  000:  54 68 69 73 20 76 65 72 73 69 6f 6e 20 75 73 65  This version use
+					   ...
+
+					<<< Send UNPROTO Information from AGWPE client application 0, total length = 37
+					        portx = 0, datakind = 'M', pid = 0x00
+					        call_from = "WB2OSZ-15", call_to = "QRA"
+					        data_len = 1, user_reserved = 31759424, data =
+					  000:  0d                                               .
+			                                          .
+
+					There is also a report of it coming from UISS.
+
+					<<< Send UNPROTO Information from AGWPE client application 0, total length = 50
+						portx = 0, port_hi_reserved = 0
+						datakind = 77 = 'M', kind_hi = 0
+						call_from = "JH4XSY", call_to = "APRS"
+						data_len = 14, user_reserved = 0, data =
+					  000:  21 22 3c 43 2e 74 71 6c 48 72 71 21 21 5f        !"<C.tqlHrq!!_
+		*/
+		{
+			var pid = cmd.Header.PID
+			var stemp = ByteArrayToString(cmd.Header.CallFrom[:]) + ">" + ByteArrayToString(cmd.Header.CallTo[:]) + ": "
+
+			// Issue 527: NET/ROM routing broadcasts are binary info so we can't treat as string.
+			// Originally, I just appended the information part as a text string.
+			// That was fine until NET/ROM, with binary data, came along.
+			// Now we set the information field after creating the packet object.
+
+			//text_color_set(DW_COLOR_DEBUG);
+			//dw_printf ("Transmit '%s'\n", stemp);
+
+			var pp = ax25_from_text(stemp, true)
+
+			if pp == nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Failed to create frame from AGW 'M' message.\n")
+			}
+
+			ax25_set_info(pp, cmd.Data)
+			// Issue 527: NET/ROM routing broadcasts use PID 0xCF which was not preserved here.
+			ax25_set_pid(pp, pid)
+
+			tq_append(int(cmd.Header.Portx), TQ_PRIO_1_LO, pp)
+		}
+
+	case 'y': /* Ask Outstanding frames waiting on a Port  */
+		/* Number of frames sitting in transmit queue for specified channel. */
+		{
+			/*
+				struct {
+				  struct agwpe_s Header;
+				  int data_NETLE;			// Little endian order.
+				} reply;
+			*/
+			var reply = new(AGWPEMessage)
+
+			reply.Header.Portx = cmd.Header.Portx /* Reply with same port number */
+			reply.Header.DataKind = 'y'
+			reply.Header.DataLen = 4
+
+			var n = 0
+			if cmd.Header.Portx < MAX_RADIO_CHANS {
+				// Count both normal and expedited in transmit queue for given channel.
+				n = tq_count(int(cmd.Header.Portx), -1, "", "", false)
+			}
+
+			reply.Data = make([]byte, 4)
+			binary.LittleEndian.PutUint32(reply.Data, uint32(n))
+
+			send_to_client(client, reply)
+		}
+
+	case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
+		// This is different than the above 'y' because this refers to a specific
+		// link in connected mode.
+
+		// This would be useful for a couple different purposes.
+
+		// When sending bulk data, we want to keep a fair amount queued up to take
+		// advantage of large window sizes (MAXFRAME, EMAXFRAME).  On the other
+		// hand we don't want to get TOO far ahead when transferring a large file.
+
+		// Before disconnecting from another station, it would be good to know
+		// that it actually received the last message we sent.  For this reason,
+		// I think it would be good for this to include information frames that were
+		// transmitted but not yet acknowledged.
+		// You could say that a particular frame is still waiting to be sent even
+		// if was already sent because it could be sent again if lost previously.
+
+		// The documentation is inconsistent about the address order.
+		// One place says "callfrom" is my callsign and "callto" is the other guy.
+		// That would make sense.  We are asking about frames going to the other guy.
+
+		// But another place says it depends on who initiated the connection.
+		//
+		//	"If we started the connection CallFrom=US and CallTo=THEM
+		//	If the other end started the connection CallFrom=THEM and CallTo=US"
+		//
+		// The response description says nothing about the order; it just mentions two addresses.
+		// If you are writing a client or server application, the order would
+		// be clear but right here it could be either case.
+		//
+		// Another version of the documentation mentioned the source address being optional.
+		//
+
+		// The only way to get this information is from inside the data link state machine.
+		// We will send a request to it and the result coming out will be used to
+		// send the reply back to the client application.
+		{
+			var callsigns [AX25_MAX_ADDRS]string
+			const num_calls = 2 // only first 2 used.
+
+			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
+			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			dlq_outstanding_frames_request(callsigns, num_calls, int(cmd.Header.Portx), client)
+		}
+
+	default:
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("--- Unexpected Command from application %d using AGW protocol:\n", client)
+		debug_print(FROM_CLIENT, client, cmd)
+
 	}
-} /* end send_to_client */
+} /* end handleClientCommand */
