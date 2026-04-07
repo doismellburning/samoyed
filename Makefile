@@ -60,6 +60,11 @@ test-scripts: $(CMDS)
 coveragereport:
 	go tool cover -func=$(COVERAGE_FILE)
 
+.PHONY: perfilecoverage
+perfilecoverage:
+	$(MAKE) coveragereport | awk -F'\t' '/^github/ { split($$1, a, ":"); file = a[1]; sub(".*samoyed/", "", file); pct = $$NF; sub(/%/, "", pct); totals[file] += pct; counts[file]++ } END { for (f in totals) { printf "%.1f%%\t%s\n", totals[f]/counts[f], f } }' | sort -k2
+
+
 .PHONY: check
 check: vet lint shellcheck reuse
 	go mod tidy -diff
