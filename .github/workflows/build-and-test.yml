@@ -8,7 +8,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  generate_version:
+    runs-on: "ubuntu-latest"
+    outputs:
+      SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
+    steps:
+    - uses: "actions/checkout@v6"
+    - name: "Generate Version"
+      id: "version"
+      run: |
+        export SAMOYED_VERSION=$(./version.sh)
+        echo "Version: $SAMOYED_VERSION"
+        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT
+
   build_and_test:
+    needs: [generate_version]
     strategy:
       matrix:
         runner:
@@ -16,20 +30,15 @@ jobs:
           - "ubuntu-24.04-arm"
           - "macos-latest"
     runs-on: "${{ matrix.runner }}"
-    outputs:
-      SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
     steps:
     - uses: "actions/checkout@v6"
     - uses: "actions/setup-go@v6"
       with:
         go-version: "1.25"
-    - name: "Generate Version"
-      id: "version"
-      run: |
-        export SAMOYED_VERSION=$(./version.sh)
-        echo "Version: $SAMOYED_VERSION"
-        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_OUTPUT  # Output to be used by the release job
-        echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV  # Env to be used by the make build
+    - name: "Set Version"
+      env:
+        SAMOYED_VERSION: "${{ needs.generate_version.outputs.SAMOYED_VERSION }}"
+      run: echo "SAMOYED_VERSION=$SAMOYED_VERSION" >> $GITHUB_ENV
     - name: "Install dependencies (Linux)"
       if: "runner.os == 'Linux'"
       run: "sudo apt update && sudo apt install --yes libudev-dev libhamlib-dev portaudio19-dev libavahi-client-dev libbsd-dev libgps-dev"
@@ -103,7 +112,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.ref == 'refs/heads/main' && needs.should_release.outputs.result == 'true')
-    needs: [build_and_test, should_release]
+    needs: [generate_version, build_and_test, should_release]
     runs-on: "ubuntu-latest"
     permissions:
       contents: "write"
@@ -114,8 +123,8 @@ jobs:
     - name: "Create Release"
       uses: "softprops/action-gh-release@v2"
       with:
-        tag_name: "${{ needs.build_and_test.outputs.SAMOYED_VERSION }}"
-        name: "Release ${{ needs.build_and_test.outputs.SAMOYED_VERSION }}"
+        tag_name: "${{ needs.generate_version.outputs.SAMOYED_VERSION }}"
+        name: "Release ${{ needs.generate_version.outputs.SAMOYED_VERSION }}"
         body: |
           Automated release for commit ${{ github.sha }}.
 
