@@ -44,8 +44,8 @@ package direwolf
  *
  *			_6	SetHardware	TNC specific.
  *
- *			_C	XKISS extension - not supported.
- *			_E	XKISS extension - not supported.
+ *			_C	ACKMODE data frame (ACK required, with 2-byte sequence number).
+ *			_E	ACKMODE ACK (TNC to client, after frame transmitted over radio).
  *
  *			FF	Return		Exit KISS mode.  Ignored.
  *
@@ -73,8 +73,8 @@ const KISS_CMD_SLOTTIME = 3
 const KISS_CMD_TXTAIL = 4
 const KISS_CMD_FULLDUPLEX = 5
 const KISS_CMD_SET_HARDWARE = 6
-const XKISS_CMD_DATA = 12 // Not supported. http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf
-const XKISS_CMD_POLL = 14 // Not supported.
+const XKISS_CMD_DATA = 12 // ACKMODE: ACK-required data frame. http://he.fi/pub/oh7lzb/bpq/multi-kiss.pdf
+const XKISS_CMD_POLL = 14 // ACKMODE: ACK from TNC to client after transmission.
 const KISS_CMD_END_KISS = 15
 
 /*
@@ -315,7 +315,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 		"Data frame", "TXDELAY", "P", "SlotTime",
 		"TXtail", "FullDuplex", "SetHardware", "Invalid 7",
 		"Invalid 8", "Invalid 9", "Invalid 10", "Invalid 11",
-		"Invalid 12", "Invalid 13", "Invalid 14", "Return"}
+		"ACKMODE Data", "Invalid 13", "ACKMODE ACK", "Return"}
 
 	text_color_set(DW_COLOR_DEBUG)
 
@@ -742,6 +742,41 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("KISS protocol set hardware \"%s\", channel %d\n", kiss_msg[1:], channel)
 		kiss_set_hardware(channel, kiss_msg[1:], debug, kps, client, sendfun)
 
+	case XKISS_CMD_DATA: /* 12 = ACKMODE data frame with 2-byte sequence number */
+		if len(kiss_msg) < 4 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("KISS ACKMODE frame too short (need type + 2 seq bytes + data).\n")
+
+			return
+		}
+
+		kissNetSvc.Copy(kiss_msg, channel, int(cmd), kps, client)
+
+		if (channel < 0 || channel >= MAX_TOTAL_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE) && save_audio_config_p.chan_medium[channel] != MEDIUM_IGATE {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Invalid transmit channel %d from KISS client app.\n", channel)
+
+			return
+		}
+
+		var seqno = (uint16(kiss_msg[1]) << 8) | uint16(kiss_msg[2])
+
+		alevel = alevel_t{} //nolint:exhaustruct
+
+		var pp = ax25_from_frame(kiss_msg[3:], alevel)
+		if pp == nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("ERROR - Invalid KISS ACKMODE data frame from client app.\n")
+		} else {
+			if ax25_get_num_repeaters(pp) >= 1 &&
+				ax25_get_h(pp, AX25_REPEATER_1) > 0 {
+				tq_append(channel, TQ_PRIO_0_HI, pp)
+			} else {
+				tq_append(channel, TQ_PRIO_1_LO, pp)
+			}
+			ackmode_register(pp, seqno, channel, sendfun, kps, client)
+		}
+
 	case KISS_CMD_END_KISS: /* 15 = End KISS mode, channel should be 15. */
 		/* Ignore it. */
 		text_color_set(DW_COLOR_INFO)
@@ -756,16 +791,6 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("Troubleshooting tip:\n")
 		dw_printf("Use \"-d kn\" option on direwolf command line to observe\n")
 		dw_printf("all communication with the client application.\n")
-
-		if cmd == XKISS_CMD_DATA || cmd == XKISS_CMD_POLL {
-			dw_printf("\n")
-			dw_printf("It looks like you are trying to use the \"XKISS\" protocol which is not supported.\n")
-			dw_printf("Change your application settings to use standard \"KISS\" rather than some other variant.\n")
-			dw_printf("If you are using Winlink Express, configure like this:\n")
-			dw_printf("    Packet TNC Type:  KISS\n")
-			dw_printf("    Packet TNC Model:  NORMAL      -- Using ACKMODE will cause this error.\n")
-			dw_printf("\n")
-		}
 	}
 } /* end kiss_process_msg */
 
