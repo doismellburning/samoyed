@@ -1335,27 +1335,33 @@ func cmd_listen_thread(client int) {
 
 				if cmd.Header.DataKind == 'v' {
 					var v struct {
-						num_digi byte
-						dcall    [7][10]byte
+						NumDigi byte
+						Dcall   [7][10]byte
 					}
 
-					binary.Decode(cmd.Data, binary.LittleEndian, v) // TODO KG Explicitly check err?
+					_, err := binary.Decode(cmd.Data, binary.LittleEndian, &v)
+					if err != nil {
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("\n")
+						dw_printf("AGW client, connect via, has invalid payload: %v\n", err)
+						break
+					}
 
-					if v.num_digi >= 1 && v.num_digi <= 7 {
-						if cmd.Header.DataLen != uint32(v.num_digi)*10+1 && cmd.Header.DataLen != uint32(v.num_digi)*10+2 {
+					if v.NumDigi >= 1 && v.NumDigi <= 7 {
+						if cmd.Header.DataLen != uint32(v.NumDigi)*10+1 && cmd.Header.DataLen != uint32(v.NumDigi)*10+2 {
 							// I'm getting 1 more than expected from AGWterminal.
 							text_color_set(DW_COLOR_ERROR)
-							dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, v.num_digi*10+1)
+							dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, v.NumDigi*10+1)
 						}
 
-						for j := byte(0); j < v.num_digi; j++ {
-							callsigns[AX25_REPEATER_1+j] = ByteArrayToString(v.dcall[j][:])
+						for j := byte(0); j < v.NumDigi; j++ {
+							callsigns[AX25_REPEATER_1+j] = ByteArrayToString(v.Dcall[j][:])
 							num_calls++
 						}
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("\n")
-						dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", v.num_digi)
+						dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", v.NumDigi)
 					}
 				}
 
