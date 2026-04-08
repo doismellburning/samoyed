@@ -1442,6 +1442,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Failed to create frame from AGW 'M' message.\n")
+				break
 			}
 
 			ax25_set_info(pp, cmd.Data)
