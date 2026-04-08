@@ -31,7 +31,7 @@ linters:
     - "wsl_v5"  # KG 2026-02-26 I don't have concrete data but it feels like wsl is giving me spurious edits/breakages - it might not be wsl, it might be something else, but it only started being an issue once I enabled wsl, so I'm disabling it again for the foreseeable
   settings:
     cyclop:
-      max-complexity: 750  # I sure wish this could be lower
+      max-complexity: 150  # I sure wish this could be lower
     depguard:
       rules:
         main:
@@ -42,7 +42,7 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
     gocognit:
-      min-complexity: 1792  # I sure wish this could be lower
+      min-complexity: 300  # I sure wish this could be lower
     goconst:
       min-occurrences: 10
     gocritic:
@@ -62,7 +62,7 @@ linters:
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
         - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
     nestif:
-      min-complexity: 750  # There's lots of upstream complexity, so let's soft-disable this
+      min-complexity: 100  # There's lots of upstream complexity, so let's soft-disable this
     revive:
       rules:
         - name: "var-naming"
