@@ -1169,7 +1169,19 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			stemp.WriteString(">")
 			stemp.WriteString(ByteArrayToString(cmd.Header.CallTo[:]))
 
+			if len(cmd.Data) < 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'V' message too short to contain digipeater count.\n")
+				break
+			}
+
 			var ndigi = int(cmd.Data[0])
+
+			if len(cmd.Data) < 1+10*ndigi {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'V' message too short for %d digipeaters.\n", ndigi)
+				break
+			}
 
 			for k := range ndigi {
 				var offset = 1 + 10*k
