@@ -874,6 +874,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25
 		p_audio_config.achan[channel].il2p_max_fec = 1
 		p_audio_config.achan[channel].il2p_invert_polarity = 0
+		p_audio_config.achan[channel].il2p_crc = 1
 
 		p_audio_config.achan[channel].fix_bits = DEFAULT_FIX_BITS
 		p_audio_config.achan[channel].sanity_test = SANITY_APRS
@@ -2643,6 +2644,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			p_audio_config.achan[channel].layer2_xmit = LAYER2_IL2P
 			p_audio_config.achan[channel].il2p_max_fec = 1
 			p_audio_config.achan[channel].il2p_invert_polarity = 0
+			p_audio_config.achan[channel].il2p_crc = 1
 
 			for {
 				t = split("", false)
@@ -2660,6 +2662,10 @@ func config_init(fname string, p_audio_config *audio_s,
 						p_audio_config.achan[channel].il2p_max_fec = 0
 					case '1':
 						p_audio_config.achan[channel].il2p_max_fec = 1
+					case 'C':
+						p_audio_config.achan[channel].il2p_crc = 1
+					case 'c':
+						p_audio_config.achan[channel].il2p_crc = 0
 					default:
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Invalid parameter '%c' for IL2PTX command.\n", line, c)
