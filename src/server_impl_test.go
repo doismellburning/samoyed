@@ -266,8 +266,8 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	cmd.Header.Portx = 0
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
-	cmd.Data = buf.Bytes()
 	cmd.Header.DataLen = uint32(via.NumDigi)*10 + 1 // expected size per protocol
+	cmd.Data = buf.Bytes()[:int(cmd.Header.DataLen)]
 
 	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
 

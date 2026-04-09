@@ -1351,34 +1351,38 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			var num_calls = 2 /* 2 plus any digipeaters. */
 
 			if cmd.Header.DataKind == 'v' {
-				var v struct {
-					NumDigi byte
-					Dcall   [7][10]byte
-				}
-
-				_, err := binary.Decode(cmd.Data, binary.LittleEndian, &v)
-				if err != nil {
+				if len(cmd.Data) < 1 {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("\n")
-					dw_printf("AGW client, connect via, has invalid payload: %v\n", err)
+					dw_printf("AGW client, connect via, has invalid payload: too short\n")
 					break
 				}
 
-				if v.NumDigi >= 1 && v.NumDigi <= 7 {
-					if cmd.Header.DataLen != uint32(v.NumDigi)*10+1 && cmd.Header.DataLen != uint32(v.NumDigi)*10+2 {
+				var numDigi = int(cmd.Data[0])
+
+				if numDigi >= 1 && numDigi <= 7 {
+					var expectedLen = uint32(numDigi)*10 + 1
+					if cmd.Header.DataLen != expectedLen && cmd.Header.DataLen != expectedLen+1 {
 						// I'm getting 1 more than expected from AGWterminal.
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, v.NumDigi*10+1)
+						dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, expectedLen)
 					}
 
-					for j := byte(0); j < v.NumDigi; j++ {
-						callsigns[AX25_REPEATER_1+j] = ByteArrayToString(v.Dcall[j][:])
+					if len(cmd.Data) < 1+10*numDigi {
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("\n")
+						dw_printf("AGW client, connect via, payload too short for %d digipeaters.\n", numDigi)
+						break
+					}
+
+					for j := range numDigi {
+						callsigns[AX25_REPEATER_1+j] = ByteArrayToString(cmd.Data[1+10*j : 1+10*j+10])
 						num_calls++
 					}
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("\n")
-					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", v.NumDigi)
+					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", numDigi)
 				}
 			}
 
