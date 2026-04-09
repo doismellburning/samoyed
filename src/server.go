@@ -1415,7 +1415,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
-			dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data)
+			dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
 		}
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
