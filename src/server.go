@@ -1389,6 +1389,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("\n")
 					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", numDigi)
+					break
 				}
 			}
 
