@@ -202,7 +202,7 @@ Time stamp format for sent and received frames.
 Receive Bit Error Rate (BER), e.g. 1e-5
 
 .SH EXAMPLES
-gqrx (2.3 and later) has the ability to send streaming audio through a UDP socket to another application for further processing. 
+gqrx (2.3 and later) has the ability to send streaming audio through a UDP socket to another application for further processing.
 direwolf can listen over a UDP port with options like this:
 .RS
 .P
@@ -213,6 +213,12 @@ Other SDR applications might produce audio on stdout so it is convenient to pipe
 .RS
 .P
 rtl_fm \-f 144.39M \-o 4 \- | direwolf \-n 1 \-r 24000 \-b 16 \-
+.RE
+.P
+Audio output can also be sent to another host via UDP by setting ADEVICE_OUT (or the second argument to ADEVICE) to \fBudp:host:port\fR in the configuration file.  For example, to stream encoded audio to a local port:
+.RS
+.P
+ADEVICE default udp:localhost:7355
 .RE
 
 

@@ -1074,9 +1074,10 @@ func config_init(fname string, p_audio_config *audio_s,
 		/*
 		 * ADEVICE[n] 		- Name of input sound device, and optionally output, if different.
 		 *
-		 *			ADEVICE    plughw:1,0			-- same for in and out.
-		 *			ADEVICE	   plughw:2,0  plughw:3,0	-- different in/out for a channel or channel pair.
-		 *			ADEVICE1   udp:7355  default		-- from Software defined radio (SDR) via UDP.
+		 *			ADEVICE    plughw:1,0				-- same for in and out.
+		 *			ADEVICE	   plughw:2,0  plughw:3,0		-- different in/out for a channel or channel pair.
+		 *			ADEVICE1   udp:7355  default			-- input from SDR via UDP; output to soundcard.
+		 *			ADEVICE    default   udp:localhost:7355		-- input from soundcard; output via UDP.
 		 *
 		 *	New in 1.8: Ability to map to another audio device.
 		 *	This allows multiple modems (i.e. data speeds) on the same audio interface.

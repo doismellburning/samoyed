@@ -102,7 +102,7 @@ type adev_param_s struct {
 
 	adevice_in string /* Name of the audio input device (or file?). Can be udp:nnn for UDP or "-" to read from stdin. */
 
-	adevice_out string /* Name of the audio output device (or file?). */
+	adevice_out string /* Name of the audio output device. Can be udp:host:port to send audio via UDP. */
 
 	num_channels    int /* Should be 1 for mono or 2 for stereo. */
 	samples_per_sec int /* Audio sampling rate.  Typically 11025, 22050, 44100, or 48000. */
@@ -460,9 +460,15 @@ const DEFAULT_ADEVICE = "default" // Use default device for PortAudio.
 
 const DEFAULT_UDP_AUDIO_PORT = 7355
 
-// Maximum size of the UDP buffer (for allowing IP routing, udp packets are often limited to 1472 bytes)
+// Maximum size of the UDP receive buffer. Generous to handle any sender.
 
 const SDR_UDP_BUF_MAXLEN = 2000
+
+// Maximum UDP audio output packet payload. Sized to fit within a standard
+// Ethernet MTU (1500 bytes) after IP (20) and UDP (8) headers, so packets
+// are not fragmented on typical LAN/loopback paths.
+
+const UDP_AUDIO_OUT_BUF_MAXLEN = 1472
 
 const DEFAULT_NUM_CHANNELS = 1
 const DEFAULT_SAMPLES_PER_SEC = 44100 /* Very early observations.  Might no longer be valid. */
@@ -703,6 +709,9 @@ type adev_s struct {
 
 	// UDP socket for SDR input
 	udp_sock *net.UDPConn
+
+	// UDP connection for audio output
+	udp_out_sock net.Conn
 }
 
 var adev [MAX_ADEVS]*adev_s
@@ -1231,57 +1240,78 @@ func audio_open(pa *audio_s) int {
 			}
 
 			/*
-			 * Output device - blocking write mode.
-			 * audio_flush_real fills the typed output buffer and calls Write() to
-			 * send it to PortAudio. The stream is started lazily on first write
-			 * and stopped in audio_wait to avoid underflows during idle periods.
+			 * Output device.
 			 */
 
-			var outputDev = findPortAudioDevice(audio_out_name, false)
-			if outputDev == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Could not find audio output device: %s\n", audio_out_name)
+			if strings.HasPrefix(strings.ToLower(audio_out_name), "udp:") {
+				/*
+				 * UDP output - dial to the specified host:port and send audio packets.
+				 */
+				var outAddr = audio_out_name[4:] // skip "udp:"
+				var udpOutConn, dialErr = net.Dial("udp", outAddr)
+				if dialErr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)
 
-				return -1
-			}
+					return -1
+				}
 
-			// Create output stream parameters
-			var outputParams = portaudio.StreamParameters{
-				Input: portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
-				Output: portaudio.StreamDeviceParameters{
-					Device:   outputDev,
-					Channels: pa.adev[a].num_channels,
-					Latency:  outputDev.DefaultHighOutputLatency,
-				},
-				SampleRate:      float64(pa.adev[a].samples_per_sec),
-				FramesPerBuffer: framesPerBuffer,
-				Flags:           portaudio.NoFlag,
-			}
-
-			// Open output stream in blocking write mode.
-			// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
-			var err error
-
-			if pa.adev[a].bits_per_sample == 16 {
-				adev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
-				adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
+				adev[a].udp_out_sock = udpOutConn
+				adev[a].outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
 			} else {
-				adev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
-				adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
+				/*
+				 * Soundcard - blocking write mode.
+				 * audio_flush_real fills the typed output buffer and calls Write() to
+				 * send it to PortAudio. The stream is started lazily on first write
+				 * and stopped in audio_wait to avoid underflows during idle periods.
+				 */
+
+				var outputDev = findPortAudioDevice(audio_out_name, false)
+				if outputDev == nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Could not find audio output device: %s\n", audio_out_name)
+
+					return -1
+				}
+
+				// Create output stream parameters
+				var outputParams = portaudio.StreamParameters{
+					Input: portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+					Output: portaudio.StreamDeviceParameters{
+						Device:   outputDev,
+						Channels: pa.adev[a].num_channels,
+						Latency:  outputDev.DefaultHighOutputLatency,
+					},
+					SampleRate:      float64(pa.adev[a].samples_per_sec),
+					FramesPerBuffer: framesPerBuffer,
+					Flags:           portaudio.NoFlag,
+				}
+
+				// Open output stream in blocking write mode.
+				// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
+				var err error
+
+				if pa.adev[a].bits_per_sample == 16 {
+					adev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
+					adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
+				} else {
+					adev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
+					adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
+				}
+
+				if err != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
+
+					return -1
+				}
+
+				// Output stream is opened but NOT started here.
+				// It will be started lazily on first write in audio_flush_real
+				// and stopped in audio_wait, to avoid underflows during idle periods.
+
+				adev[a].outbufSizeInBytes = bufSizeInBytes
 			}
-
-			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
-
-				return -1
-			}
-
-			// Output stream is opened but NOT started here.
-			// It will be started lazily on first write in audio_flush_real
-			// and stopped in audio_wait, to avoid underflows during idle periods.
-
-			adev[a].outbufSizeInBytes = bufSizeInBytes
 
 			// Version 1.3 - after a report of this situation for Mac OSX version.
 			if adev[a].inbufSizeInBytes < 256 || adev[a].inbufSizeInBytes > 32768 {
@@ -1510,6 +1540,28 @@ func audio_flush_real(a int) int {
 		return 0
 	}
 
+	if adev[a].udp_out_sock != nil {
+		var toWrite = adev[a].outbufLen
+		var n, err = adev[a].udp_out_sock.Write(adev[a].outbuf[:toWrite])
+		adev[a].outbufLen = 0
+
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Audio UDP output write error: %v\n", err)
+
+			return -1
+		}
+
+		if n != toWrite {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Audio UDP output short write: wrote %d of %d bytes\n", n, toWrite)
+
+			return -1
+		}
+
+		return 0
+	}
+
 	if adev[a].outputStream == nil {
 		adev[a].outbufLen = 0
 		return -1
@@ -1587,6 +1639,11 @@ func audio_flush_real(a int) int {
 func audio_wait(a int) {
 	audio_flush(a)
 
+	// For UDP output, packets are sent immediately on flush — nothing more to do.
+	if adev[a].udp_out_sock != nil {
+		return
+	}
+
 	// Stop the output stream — Pa_StopStream drains remaining buffers
 	// before returning. It will be restarted lazily on next write.
 	if adev[a].outputStream != nil && adev[a].outputStarted {
@@ -1616,7 +1673,7 @@ func audio_close() int { //nolint:unparam
 	var err = 0
 
 	for a := range MAX_ADEVS {
-		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil) {
+		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil || adev[a].udp_sock != nil || adev[a].udp_out_sock != nil) {
 			audio_wait(a)
 
 			if adev[a].inputStream != nil {
@@ -1648,6 +1705,11 @@ func audio_close() int { //nolint:unparam
 			if adev[a].udp_sock != nil {
 				adev[a].udp_sock.Close()
 				adev[a].udp_sock = nil
+			}
+
+			if adev[a].udp_out_sock != nil {
+				adev[a].udp_out_sock.Close()
+				adev[a].udp_out_sock = nil
 			}
 
 			adev[a].inbufSizeInBytes = 0
