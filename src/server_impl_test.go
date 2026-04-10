@@ -225,25 +225,19 @@ func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 	assert.Equal(t, byte(1), reply.Data[0]) // success
 }
 
-// dlqAppended notes the current DLQ tail, calls f, then returns the item
-// appended to the queue during f (or nil if nothing was appended).
+// dlqAppended clears the DLQ, calls f, returns the first item appended
+// during f (or nil if nothing was appended), then restores the original queue.
 func dlqAppended(f func()) *dlq_item_t {
 	dlq_mutex.Lock()
-	var tail *dlq_item_t
-	for p := dlq_queue_head; p != nil; p = p.nextp {
-		tail = p
-	}
+	var savedHead = dlq_queue_head
+	dlq_queue_head = nil
 	dlq_mutex.Unlock()
 
 	f()
 
 	dlq_mutex.Lock()
-	var newItem *dlq_item_t
-	if tail == nil {
-		newItem = dlq_queue_head
-	} else {
-		newItem = tail.nextp
-	}
+	var newItem = dlq_queue_head
+	dlq_queue_head = savedHead
 	dlq_mutex.Unlock()
 	return newItem
 }
