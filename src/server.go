@@ -1339,6 +1339,11 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		/* v: Connect VIA, Start an AX.25 circuit thru digipeaters */
 		/* c: Connection with non-standard PID */
 		{
+			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW connect command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				break
+			}
 			/*
 				        struct via_info {
 				          unsigned char num_digi;	// Expect to be in range 1 to 7.  Why not up to 8?
@@ -1398,6 +1403,12 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'D': /* Send Connected Data */
 		{
+			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'D' command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				break
+			}
+
 			var callsigns [AX25_MAX_ADDRS]string
 			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
 
@@ -1409,6 +1420,12 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
 		{
+			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'd' command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				break
+			}
+
 			var callsigns [AX25_MAX_ADDRS]string
 			const num_calls = 2 // only first 2 used.
 
@@ -1539,6 +1556,12 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		// We will send a request to it and the result coming out will be used to
 		// send the reply back to the client application.
 		{
+			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'Y' command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				break
+			}
+
 			var callsigns [AX25_MAX_ADDRS]string
 			const num_calls = 2 // only first 2 used.
 
