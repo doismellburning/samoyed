@@ -1252,6 +1252,12 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			// - Continue to ignore port number at beginning of data?
 			// - Use second one instead?
 			// - Error message if a mismatch?
+			if cmd.Header.DataLen < 1 || int(cmd.Header.DataLen) > len(cmd.Data) {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'K' message has invalid data length %d.\n", cmd.Header.DataLen)
+				break
+			}
+
 			var alevel alevel_t
 			var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
