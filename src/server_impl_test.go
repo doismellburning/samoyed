@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"pgregory.net/rapid"
 )
 
 // readReplyFrom reads one AGWPEMessage (header + data) from conn.
@@ -240,6 +241,92 @@ func dlqAppended(f func()) *dlq_item_t {
 	dlq_queue_head = savedHead
 	dlq_mutex.Unlock()
 	return newItem
+}
+
+// Property: 'V' handler tolerates any cmd.Data without panicking.
+// Before the bounds-check fix, data[0] could be read on an empty slice,
+// and the digipeater slice could go out of bounds.
+func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
+	var cfg audio_s
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	rapid.Check(t, func(t *rapid.T) {
+		var cmd = new(AGWPEMessage)
+		cmd.Header.DataKind = 'V'
+		copy(cmd.Header.CallFrom[:], "Q1TEST")
+		copy(cmd.Header.CallTo[:], "Q2TEST")
+		cmd.Data = rapid.SliceOf(rapid.Byte()).Draw(t, "data")
+		cmd.Header.DataLen = uint32(len(cmd.Data))
+		handleClientCommand(0, cmd)
+	})
+}
+
+// Property: 'K' handler tolerates any combination of DataLen and Data without panicking.
+// Before the bounds-check fix, cmd.Data[1:cmd.Header.DataLen] would panic
+// when DataLen==0 or DataLen exceeded len(cmd.Data).
+func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
+	var cfg audio_s
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	rapid.Check(t, func(t *rapid.T) {
+		var cmd = new(AGWPEMessage)
+		cmd.Header.DataKind = 'K'
+		cmd.Data = rapid.SliceOf(rapid.Byte()).Draw(t, "data")
+		cmd.Header.DataLen = rapid.Uint32().Draw(t, "dataLen")
+		handleClientCommand(0, cmd)
+	})
+}
+
+// Property: 'v' handler with numDigi outside [1,7] must not enqueue a connect request.
+// Before the fix, the invalid-numDigi else branch fell through to dlq_connect_request,
+// silently treating the malformed frame as a direct connect.
+func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		var numDigi = rapid.OneOf(
+			rapid.Just(byte(0)),
+			rapid.ByteRange(8, 255),
+		).Draw(t, "numDigi")
+
+		// Provide enough data to reach the numDigi validation, not the len check.
+		var data = make([]byte, 1+10*7+1)
+		data[0] = numDigi
+
+		var cmd = new(AGWPEMessage)
+		cmd.Header.DataKind = 'v'
+		cmd.Header.Portx = 0 // valid radio port
+		copy(cmd.Header.CallFrom[:], "Q1TEST")
+		copy(cmd.Header.CallTo[:], "Q2TEST")
+		cmd.Data = data
+		cmd.Header.DataLen = uint32(len(data))
+
+		var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+		if item != nil {
+			t.Errorf("expected no DLQ append for out-of-range numDigi %d, got %+v", numDigi, item)
+		}
+	})
+}
+
+// Property: connected-mode handlers ('C','v','c','D','d','Y') must not enqueue
+// anything when Portx is not a radio channel.  Before the fix, the DLQ functions
+// would Assert-panic on channel >= MAX_RADIO_CHANS.
+func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		var dataKind = rapid.SampledFrom([]byte{'C', 'v', 'c', 'D', 'd', 'Y'}).Draw(t, "dataKind")
+		var portx = rapid.ByteRange(MAX_RADIO_CHANS, 255).Draw(t, "portx")
+
+		var cmd = new(AGWPEMessage)
+		cmd.Header.DataKind = dataKind
+		cmd.Header.Portx = portx
+		copy(cmd.Header.CallFrom[:], "Q1TEST")
+		copy(cmd.Header.CallTo[:], "Q2TEST")
+
+		var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+		if item != nil {
+			t.Errorf("expected no DLQ append for non-radio Portx %d with command '%c'", portx, dataKind)
+		}
+	})
 }
 
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
