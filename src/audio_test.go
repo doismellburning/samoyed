@@ -4,9 +4,11 @@
 package direwolf
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gordonklaus/portaudio"
 	"github.com/stretchr/testify/assert"
@@ -185,4 +187,67 @@ func Test_matchPortAudioDeviceByName_directionFilter(t *testing.T) {
 	// Output search should not return an input-only device.
 	dev = matchPortAudioDeviceByName("plughw:MYCARD,1", false, devices)
 	assert.Nil(t, dev)
+}
+
+// --- UDP audio output ---
+
+// setupAdev0 installs a fresh adev_s at index 0 and restores the original on
+// test cleanup.  Using index 0 is safe because audio tests are sequential.
+func setupAdev0(t *testing.T) *adev_s {
+	t.Helper()
+
+	var prev = adev[0]
+	t.Cleanup(func() { adev[0] = prev })
+
+	adev[0] = new(adev_s)
+
+	return adev[0]
+}
+
+func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
+	// Start a UDP listener to receive the audio output.
+	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer listener.Close()
+
+	// Dial from the "transmitter" side.
+	var conn net.Conn
+	conn, err = net.Dial("udp", listener.LocalAddr().String())
+	require.NoError(t, err)
+
+	defer conn.Close()
+
+	var dev = setupAdev0(t)
+	dev.udp_out_sock = conn
+	dev.outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
+	dev.outbuf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
+
+	var testData = []byte{0xDE, 0xAD, 0xBE, 0xEF}
+	copy(dev.outbuf, testData)
+	dev.outbufLen = len(testData)
+
+	var result = audio_flush_real(0)
+	assert.Equal(t, 0, result)
+	assert.Equal(t, 0, dev.outbufLen, "output buffer should be cleared after flush")
+
+	// Receive and verify the packet contents.
+	var buf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
+	require.NoError(t, listener.SetReadDeadline(time.Now().Add(time.Second)))
+
+	var n int
+	n, _, err = listener.ReadFrom(buf)
+	require.NoError(t, err)
+	assert.Equal(t, testData, buf[:n])
+}
+
+func Test_audioFlushReal_UDP_emptyBuffer_isNoop(t *testing.T) {
+	var dev = setupAdev0(t)
+	dev.udp_out_sock = &net.UDPConn{} // non-nil socket; must not be written to
+	dev.outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
+	dev.outbuf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN)
+	dev.outbufLen = 0
+
+	// Should return 0 without attempting a write.
+	assert.Equal(t, 0, audio_flush_real(0))
 }
