@@ -1409,6 +1409,12 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
+			if int(cmd.Header.DataLen) > len(cmd.Data) {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("AGW 'D' message has invalid data length %d.\n", cmd.Header.DataLen)
+				break
+			}
+
 			var callsigns [AX25_MAX_ADDRS]string
 			const num_calls = 2 // only first 2 used.  Digipeater path must be remembered from connect request.
 

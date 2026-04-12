@@ -360,6 +360,25 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 	assert.Equal(t, payload, got.txdata.data[:got.txdata.len])
 }
 
+// TestHandleClientCommand_D_OversizedDataLenNoDLQAppend verifies that a 'D'
+// command whose DataLen exceeds len(Data) is rejected without panicking or
+// enqueueing anything.
+func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'D'
+	cmd.Header.Portx = 0
+	cmd.Header.PID = 0xF0
+	cmd.Data = []byte("hi")
+	cmd.Header.DataLen = uint32(len(cmd.Data)) + 1
+	copy(cmd.Header.CallFrom[:], "Q1TEST")
+	copy(cmd.Header.CallTo[:], "Q2TEST")
+
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item != nil {
+		t.Errorf("expected no DLQ append for oversized DataLen, got %+v", item)
+	}
+}
+
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	// Encode the via_info payload: num_digi + 7 x 10-byte callsign slots.
 	var via struct {
