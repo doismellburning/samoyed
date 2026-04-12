@@ -147,7 +147,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 	if modem_type == MODEM_BPSK {
 		correct_baud = bps // 1 bit per symbol
-		carrier_freq = 1800
+		carrier_freq = 1500
 
 		switch unicode.ToUpper(profile) {
 		case 'L': /* Self correlation technique. */
