@@ -329,6 +329,56 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 	})
 }
 
+// TestAGWPEConnectedDataNoTrailingNull is a regression test for a bug where the
+// debug null byte appended to cmd.Data was included in the data passed to
+// dlq_xmit_data_request, causing the remote station to receive an extra 0x00 byte
+// at the end of each transmitted packet. This null byte sat in the remote's input
+// buffer and appeared as a 0x00 prefix on the next received command.
+func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
+	var payload = []byte("CMD1\r")
+
+	// The read path appends a null byte for debug printing, while DataLen
+	// reflects only the real payload.
+	var data = make([]byte, len(payload)+1)
+	copy(data, payload)
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'D'
+	cmd.Header.Portx = 0
+	cmd.Header.PID = 0xF0
+	cmd.Header.DataLen = uint32(len(payload))
+	copy(cmd.Header.CallFrom[:], "Q1TEST")
+	copy(cmd.Header.CallTo[:], "Q2TEST")
+	cmd.Data = data
+
+	var got = dlqAppended(func() { handleClientCommand(0, cmd) })
+
+	require.NotNil(t, got, "DLQ_XMIT_DATA_REQUEST item never appeared")
+	require.Equal(t, DLQ_XMIT_DATA_REQUEST, got._type)
+
+	// The transmitted data must be exactly the payload — no trailing null byte.
+	assert.Equal(t, len(payload), got.txdata.len)
+	assert.Equal(t, payload, got.txdata.data[:got.txdata.len])
+}
+
+// TestHandleClientCommand_D_OversizedDataLenNoDLQAppend verifies that a 'D'
+// command whose DataLen exceeds len(Data) is rejected without panicking or
+// enqueueing anything.
+func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'D'
+	cmd.Header.Portx = 0
+	cmd.Header.PID = 0xF0
+	cmd.Data = []byte("hi")
+	cmd.Header.DataLen = uint32(len(cmd.Data)) + 1
+	copy(cmd.Header.CallFrom[:], "Q1TEST")
+	copy(cmd.Header.CallTo[:], "Q2TEST")
+
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item != nil {
+		t.Errorf("expected no DLQ append for oversized DataLen, got %+v", item)
+	}
+}
+
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	// Encode the via_info payload: num_digi + 7 x 10-byte callsign slots.
 	var via struct {
