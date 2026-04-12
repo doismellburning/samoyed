@@ -141,7 +141,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 
 			switch save_audio_config_p.achan[channel].modem_type {
 			case MODEM_BPSK:
-				audio_config_p.achan[channel].mark_freq = 1800
+				audio_config_p.achan[channel].mark_freq = 1500
 				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
 
 				// 1 bit per symbol, so symbol time equals bit time

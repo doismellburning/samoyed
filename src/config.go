@@ -1742,7 +1742,7 @@ func config_init(fname string, p_audio_config *audio_s,
 						p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE
 						p_audio_config.achan[channel].mark_freq = 0
 						p_audio_config.achan[channel].space_freq = 0
-					} else if strings.EqualFold(t, "BPSK") { /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
+					} else if strings.EqualFold(t, "BPSK") { /* Force BPSK modem (1 bit/symbol, carrier 1500 Hz). */
 						p_audio_config.achan[channel].modem_type = MODEM_BPSK
 						p_audio_config.achan[channel].mark_freq = 0
 						p_audio_config.achan[channel].space_freq = 0
