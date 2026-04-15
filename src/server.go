@@ -975,10 +975,6 @@ func cmd_listen_thread(client int) {
 			}
 
 			cmd.Data = b
-
-			if n >= 0 {
-				cmd.Data = append(cmd.Data, 0) // Tidy if we print for debug.
-			}
 		}
 
 		/*
