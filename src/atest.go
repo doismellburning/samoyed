@@ -765,19 +765,21 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 		heard += " (probably " + probably_really + ")"
 	}
 
+	var display_modem = fmt.Sprintf(" %s ", my_audio_config.achan[channel].modem_type.String())
+
 	switch fec_type {
 	case fec_type_fx25:
-		dw_printf("%s audio level = %s   FX.25  %s\n", heard, alevel_text, spectrum)
+		dw_printf("%s audio level = %s  %s  FX.25  %s\n", heard, alevel_text, display_modem, spectrum)
 	case fec_type_il2p:
-		dw_printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, spectrum)
+		dw_printf("%s audio level = %s  %s  IL2P  %s\n", heard, alevel_text, display_modem, spectrum)
 	default:
 		//case fec_type_none:
 		if my_audio_config.achan[channel].fix_bits == RETRY_NONE && !my_audio_config.achan[channel].passall {
 			// No fix_bits or passall specified.
-			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
+			dw_printf("%s audio level = %s  %s  %s\n", heard, alevel_text, display_modem, spectrum)
 		} else {
 			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
-			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
+			dw_printf("%s audio level = %s  %s  [%s]  %s\n", heard, alevel_text, display_modem, retries.String(), spectrum)
 		}
 	}
 
