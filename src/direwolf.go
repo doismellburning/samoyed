@@ -836,6 +836,11 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		}
 	}
 
+	var display_modem string
+	if subchan >= 0 {
+		display_modem = fmt.Sprintf(" %s ", audio_config.achan[channel].modem_type.String())
+	}
+
 	var stemp = ax25_format_addrs(pp)
 
 	var pinfo = ax25_get_info(pp)
@@ -891,7 +896,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s (probably %s) audio level = %s  %s  %s\n", heard, probably_really, alevel_text, display_retries, spectrum)
+					dw_printf("%s (probably %s) audio level = %s  %s  %s  %s\n", heard, probably_really, alevel_text, display_modem, display_retries, spectrum)
 				} else {
 					dw_printf("%s (probably %s)\n", heard, probably_really)
 				}
@@ -900,7 +905,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			} else {
 				// audio level applies only for internal modem channels.
 				if subchan >= 0 {
-					dw_printf("%s audio level = %s  %s  %s\n", heard, alevel_text, display_retries, spectrum)
+					dw_printf("%s audio level = %s  %s  %s  %s\n", heard, alevel_text, display_modem, display_retries, spectrum)
 				} else {
 					dw_printf("%s\n", heard)
 				}

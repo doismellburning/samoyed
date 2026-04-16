@@ -126,6 +126,33 @@ const (
 	MODEM_BPSK
 )
 
+func (m modem_t) String() string {
+	switch m {
+	case MODEM_AFSK:
+		return "AFSK"
+	case MODEM_BPSK:
+		return "BPSK"
+	case MODEM_QPSK:
+		return "QPSK"
+	case MODEM_8PSK:
+		return "8PSK"
+	case MODEM_BASEBAND:
+		return "BASEBAND"
+	case MODEM_SCRAMBLE:
+		return "SCRAMBLE"
+	case MODEM_AIS:
+		return "AIS"
+	case MODEM_EAS:
+		return "EAS"
+	case MODEM_16_QAM:
+		return "16QAM"
+	case MODEM_64_QAM:
+		return "64QAM"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 type layer2_t int
 
 const (
