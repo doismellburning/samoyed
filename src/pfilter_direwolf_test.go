@@ -9,9 +9,7 @@ import (
 
 var pftest_error_count int
 
-func pf_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_pfilter(t *testing.T) {
 	// Setup
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
