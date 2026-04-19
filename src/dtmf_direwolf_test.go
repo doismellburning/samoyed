@@ -2,9 +2,7 @@ package direwolf
 
 import "testing"
 
-func dtmf_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_dtmf(t *testing.T) {
 	var c = 0 // radio channel.
 	var my_audio_config audio_s
 
