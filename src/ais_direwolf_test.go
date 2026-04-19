@@ -6,9 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func ais_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_AIS(t *testing.T) {
 	test_sextet(t)
 	test_basic_parse(t)
 }
