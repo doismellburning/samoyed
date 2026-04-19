@@ -324,7 +324,8 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
  *
  * Global In:	pt_master_fd
  *
- * Returns:	one byte (value 0 - 255) or terminate thread on error.
+ * Returns:	(byte, nil) on success, or (0, error) on failure.
+ *		The caller should stop processing and return on a non-nil error.
  *
  * Description:	There is room for improvement here.  Reading one byte
  *		at a time is inefficient.  We could read a large block
@@ -334,11 +335,8 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_get() byte {
-	var ch []byte
-	var n int
-
-	for n == 0 {
+func kisspt_get() (byte, error) {
+	for {
 		/*
 		 * Since the beginning we've always had a couple annoying problems with
 		 * the pseudo terminal KISS interface.
@@ -393,10 +391,11 @@ func kisspt_get() byte {
 
 		// TODO KG Check rc == -1
 		*/
-		ch = make([]byte, 1)
-		var err error
-
-		n, err = pt_master.Read(ch)
+		var ch = make([]byte, 1)
+		var n, err = pt_master.Read(ch)
+		if n > 0 {
+			return ch[0], nil
+		}
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", pt_slave.Name(), err)
@@ -406,12 +405,9 @@ func kisspt_get() byte {
 			pt_master = nil
 
 			os.Remove(TMP_KISSTNC_SYMLINK)
-			// FIXME KG pthread_exit(NULL)
-			return 0 // TODO KG
+			return 0, err
 		}
 	}
-
-	return ch[0]
 }
 
 /*-------------------------------------------------------------------
@@ -435,7 +431,10 @@ func kisspt_listen_thread() {
 	#endif
 	*/
 	for {
-		var ch = kisspt_get()
+		var ch, err = kisspt_get()
+		if err != nil {
+			return
+		}
 		kiss_rec_byte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
 	}
 }

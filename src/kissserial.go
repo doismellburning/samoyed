@@ -365,7 +365,7 @@ func kissserial_listen_thread() {
 		var ch, err = kissserial_get()
 		if err != nil {
 			return
-		} // Was pthread_exit
+		}
 
 		kiss_rec_byte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
 	}
