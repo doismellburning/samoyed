@@ -102,9 +102,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	dw_printf("\n")
 }
 
-func digipeater_test_main(t *testing.T) bool {
-	t.Helper()
-
+func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
 	dedupeService = NewDedupeService(4 * time.Second)
@@ -354,5 +352,4 @@ func digipeater_test_main(t *testing.T) bool {
 		t.Fail()
 	}
 
-	return (digipeaterTestFailed != 0)
 } /* end main */
