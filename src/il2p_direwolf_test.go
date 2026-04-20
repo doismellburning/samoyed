@@ -749,16 +749,16 @@ func test_serdes(t *testing.T) {
 
 	dw_printf("\nTest serialize / deserialize...\n")
 
-	rec_count = 0
+	il2pSerdesRecCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
 
 	for hdr_type := range 1 {
 		var packet string
 		if hdr_type == 1 {
-			packet = fmt.Sprintf("%s:%s", addrs2, text)
+			packet = fmt.Sprintf("%s:%s", addrs2, il2pTestText)
 		} else {
-			packet = fmt.Sprintf("%s:%s", addrs3, text)
+			packet = fmt.Sprintf("%s:%s", addrs3, il2pTestText)
 		}
 		var pp = ax25_from_text(packet, true)
 		assert.NotNil(t, pp)
@@ -766,8 +766,8 @@ func test_serdes(t *testing.T) {
 		var channel = 0
 
 		for max_fec := 0; max_fec <= 1; max_fec++ {
-			for polarity = 0; polarity <= 2; polarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, polarity)
+			for il2pSerdesPolarity = 0; il2pSerdesPolarity <= 2; il2pSerdesPolarity++ { // 2 means throw in some errors.
+				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, il2pSerdesPolarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
@@ -778,7 +778,7 @@ func test_serdes(t *testing.T) {
 		ax25_delete(pp)
 	}
 
-	dw_printf("Serdes receive count = %d\n", rec_count)
-	// TODO KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, rec_count == 12)
-	rec_count = -1 // disable deserialized packet test.
+	dw_printf("Serdes receive count = %d\n", il2pSerdesRecCount)
+	// TODO KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, il2pSerdesRecCount == 12)
+	il2pSerdesRecCount = -1 // disable deserialized packet test.
 }
