@@ -20,9 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func ax25_link_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_AX25_Link(t *testing.T) {
 	// Link Establishment and Termination
 	TestAX25LinkConnectedBasic(t)
 	TestAX25LinkSABMEConnection(t)

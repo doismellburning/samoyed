@@ -52,9 +52,7 @@ var xid_example = []byte{
 	/* PV */ 0x03, /* Parameter Variable - 3 retries */
 }
 
-func xid_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_XID(t *testing.T) {
 	/*
 		struct xid_param_s param;
 		struct xid_param_s param2;

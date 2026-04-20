@@ -7,9 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func encode_aprs_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_encode_aprs(t *testing.T) {
 	var result string
 
 	/***********  Position  ***********/

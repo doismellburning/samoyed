@@ -14,9 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func tt_user_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_TTUser(t *testing.T) {
 	TT_TESTS_RUNNING = true
 
 	defer func() {

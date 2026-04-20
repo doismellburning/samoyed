@@ -15,9 +15,7 @@ import (
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_pad2_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_AX25_PAD2(t *testing.T) {
 	var pid = 0xf0
 	var info []byte
 

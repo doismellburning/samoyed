@@ -8,9 +8,7 @@ import (
 
 /* Quick unit test for encapsulate & unwrap */
 
-func kiss_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_KISS(t *testing.T) {
 	var din = make([]byte, 512)
 
 	for k := range 512 {

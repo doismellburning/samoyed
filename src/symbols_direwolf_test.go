@@ -8,9 +8,7 @@ import (
 
 /* Quick, incomplete, unit test. */
 
-func symbols_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_Symbols(t *testing.T) {
 	var sd = NewAPRSSymbolData()
 
 	var symtab, symbol byte

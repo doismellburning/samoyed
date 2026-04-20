@@ -19,6 +19,20 @@ package direwolf
 
 var IL2P_TEST = false
 
+const il2pTestText = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
+'Certainly,' said Alice.
+'And only one for birthday presents, you know. There's glory for you!'
+'I don't know what you mean by \"glory\",' Alice said.
+Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I meant \"there's a nice knock-down argument for you!\"'
+'But \"glory\" doesn't mean \"a nice knock-down argument\",' Alice objected.
+'When I use a word,' Humpty Dumpty said, in rather a scornful tone, 'it means just what I choose it to mean - neither more nor less.'
+'The question is,' said Alice, 'whether you can make words mean so many different things.'
+'The question is,' said Humpty Dumpty, 'which is to be master - that's all.'
+`
+
+var il2pSerdesRecCount = -1 // disable deserialized packet test.
+var il2pSerdesPolarity = 0
+
 // Serializing calls this which then simulates the demodulator output.
 
 func tone_gen_put_bit_fake(channel int, data int) {
@@ -36,21 +50,21 @@ func tone_gen_put_bit(channel int, data int) {
 // This is called when a complete frame has been deserialized.
 
 func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) { //nolint:unparam
-	if rec_count < 0 {
+	if il2pSerdesRecCount < 0 {
 		return // Skip check before serdes test.
 	}
 
-	rec_count++
+	il2pSerdesRecCount++
 
 	// Does it have the the expected content?
 
 	var pinfo = ax25_get_info(pp)
-	Assert(len(text) == len(pinfo))
-	Assert(text == string(pinfo))
+	Assert(len(il2pTestText) == len(pinfo))
+	Assert(il2pTestText == string(pinfo))
 
 	dw_printf("Number of symbols corrected: %d\n", retries)
 
-	if polarity == 2 { // expecting errors corrected.
+	if il2pSerdesPolarity == 2 { // expecting errors corrected.
 		Assert(retries == 10)
 	} else { // should be no errors.
 		Assert(retries == 0)

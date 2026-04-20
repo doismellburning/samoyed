@@ -14,9 +14,7 @@ import (
  *
  *------------------------------------------------------------------*/
 
-func deviceid_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_DeviceID(t *testing.T) {
 	var device, comment_out string
 
 	var d = NewDeviceIDData()

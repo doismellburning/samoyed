@@ -17,9 +17,7 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_IL2P(t *testing.T) {
 	IL2P_TEST = true
 
 	var enable_color = 1
@@ -746,35 +744,21 @@ func all_frame_types(t *testing.T) {
 var addrs2 = "AA1AAA-1>ZZ9ZZZ-9"
 var addrs3 = "AA1AAA-1>ZZ9ZZZ-9,DIGI*"
 
-var text = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
-'Certainly,' said Alice.
-'And only one for birthday presents, you know. There's glory for you!'
-'I don't know what you mean by \"glory\",' Alice said.
-Humpty Dumpty smiled contemptuously. 'Of course you don't - till I tell you. I meant \"there's a nice knock-down argument for you!\"'
-'But \"glory\" doesn't mean \"a nice knock-down argument\",' Alice objected.
-'When I use a word,' Humpty Dumpty said, in rather a scornful tone, 'it means just what I choose it to mean - neither more nor less.'
-'The question is,' said Alice, 'whether you can make words mean so many different things.'
-'The question is,' said Humpty Dumpty, 'which is to be master - that's all.'
-`
-
-var rec_count = -1 // disable deserialized packet test.
-var polarity = 0
-
 func test_serdes(t *testing.T) {
 	t.Helper()
 
 	dw_printf("\nTest serialize / deserialize...\n")
 
-	rec_count = 0
+	il2pSerdesRecCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
 
 	for hdr_type := range 1 {
 		var packet string
 		if hdr_type == 1 {
-			packet = fmt.Sprintf("%s:%s", addrs2, text)
+			packet = fmt.Sprintf("%s:%s", addrs2, il2pTestText)
 		} else {
-			packet = fmt.Sprintf("%s:%s", addrs3, text)
+			packet = fmt.Sprintf("%s:%s", addrs3, il2pTestText)
 		}
 		var pp = ax25_from_text(packet, true)
 		assert.NotNil(t, pp)
@@ -782,8 +766,8 @@ func test_serdes(t *testing.T) {
 		var channel = 0
 
 		for max_fec := 0; max_fec <= 1; max_fec++ {
-			for polarity = 0; polarity <= 2; polarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, polarity)
+			for il2pSerdesPolarity = 0; il2pSerdesPolarity <= 2; il2pSerdesPolarity++ { // 2 means throw in some errors.
+				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, il2pSerdesPolarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
@@ -794,7 +778,7 @@ func test_serdes(t *testing.T) {
 		ax25_delete(pp)
 	}
 
-	dw_printf("Serdes receive count = %d\n", rec_count)
-	// TODO KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, rec_count == 12)
-	rec_count = -1 // disable deserialized packet test.
+	dw_printf("Serdes receive count = %d\n", il2pSerdesRecCount)
+	// TODO KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, il2pSerdesRecCount == 12)
+	il2pSerdesRecCount = -1 // disable deserialized packet test.
 }

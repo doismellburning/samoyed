@@ -119,9 +119,7 @@ func check_result(t *testing.T, testCase ttTestCase) {
 	assert.Equal(t, testCase.dao, string(state.dao[:]), testCase.toneseq)
 }
 
-func aprs_tt_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_APRS_TT(t *testing.T) {
 	gateway = NewTTGateway(nil, 0)
 	gateway.runningTests = true
 

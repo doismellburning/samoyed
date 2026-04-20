@@ -52,9 +52,7 @@ func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k st
 	assert.Equal(t, _expect_sat, text, "Unexpected SatSq value for buttons %s", buttons)
 }
 
-func tt_text_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_TTText(t *testing.T) {
 	dw_printf("Test conversions between normal text and DTMF representation.\n")
 	dw_printf("Some error messages are normal.  Just look for number of errors at end.\n")
 

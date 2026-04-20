@@ -6,9 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func telemetry_test_main(t *testing.T) {
-	t.Helper()
-
+func Test_telemetry(t *testing.T) {
 	var result string
 	var comment string
 
