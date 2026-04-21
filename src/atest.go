@@ -96,6 +96,8 @@ var my_audio_config *audio_s
 
 var space_gain [MAX_SUBCHANS]float64
 
+const numMegaChannels = 6
+
 var sample_number = -1 /* Sample number from the file. */
 /* Incremented only for channel 0. */
 /* Use to print timestamp, relative to beginning */
@@ -171,6 +173,7 @@ Higher values = Try modifying more bits to get a good CRC.`)
 	var channel0 = pflag.BoolP("channel-0", "0", false, "Use channel 0 (left) of stereo audio (default).")
 	var channel1 = pflag.BoolP("channel-1", "1", false, "Use channel 1 (right) of stereo audio.")
 	var channel2 = pflag.BoolP("channel-2", "2", false, "Use both channels of stereo audio.")
+	var megaDecode = pflag.BoolP("mega", "M", false, "Decode all common modulations in parallel (AFSK 1200, AFSK 300, BPSK 1200, BPSK 300, QPSK 2400, G3RUH 9600).")
 	var hexDisplay = pflag.BoolP("hex-display", "h", false, "Print frame contents as hexadecimal bytes.")
 	var bitErrorRate = pflag.Float64P("bit-error-rate", "e", 0.0, "Receive Bit Error Rate (BER).")
 	var debugFlags = pflag.StringSliceP("debug", "d", []string{}, `Debug (repeat for increased verbosity).
@@ -555,9 +558,14 @@ o = DCD output control
 		my_audio_config.adev[0].bits_per_sample = int(format.Wbitspersample)
 		my_audio_config.adev[0].num_channels = int(format.Nchannels)
 
-		my_audio_config.chan_medium[0] = MEDIUM_RADIO
-		if format.Nchannels == 2 {
-			my_audio_config.chan_medium[1] = MEDIUM_RADIO
+		if *megaDecode {
+			my_audio_config.adev[0].num_channels = 1
+			setupMegaChannels()
+		} else {
+			my_audio_config.chan_medium[0] = MEDIUM_RADIO
+			if format.Nchannels == 2 {
+				my_audio_config.chan_medium[1] = MEDIUM_RADIO
+			}
 		}
 
 		text_color_set(DW_COLOR_INFO)
@@ -575,6 +583,10 @@ o = DCD output control
 			one_filetime)
 		fmt.Printf("Fix Bits level = %d\n", my_audio_config.achan[0].fix_bits)
 
+		if *megaDecode {
+			fmt.Printf("Mega decode: AFSK 1200, AFSK 300, BPSK 1200, BPSK 300, QPSK 2400, G3RUH 9600\n")
+		}
+
 		/*
 		 * Initialize the AFSK demodulator and HDLC decoder.
 		 * Needs to be done for each file because they could have different sample rates.
@@ -587,29 +599,46 @@ o = DCD output control
 
 		e_o_f = false
 		for !e_o_f {
-			for c := 0; c < (my_audio_config.adev[0].num_channels); c++ {
-				/* This reads either 1 or 2 bytes depending on */
-				/* bits per sample.  */
-				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
-
+			if *megaDecode {
+				/* Read one sample (left/mono channel) and feed it to all modulation channels. */
+				var audio_sample = demod_get_sample(0)
 				if audio_sample >= 256*256 {
 					e_o_f = true
 					continue
 				}
-
-				if c == 0 {
-					sample_number++
+				/* For stereo files, discard the right-channel sample so we stay on the left channel. */
+				if format.Nchannels == 2 {
+					demod_get_sample(0)
 				}
-
-				if decode_only == 0 && c != 0 {
-					continue
+				sample_number++
+				for c := range numMegaChannels {
+					multi_modem_process_sample(c, audio_sample)
 				}
+			} else {
+				for c := 0; c < (my_audio_config.adev[0].num_channels); c++ {
+					/* This reads either 1 or 2 bytes depending on */
+					/* bits per sample.  */
+					var audio_sample = demod_get_sample(ACHAN2ADEV(c))
 
-				if decode_only == 1 && c != 1 {
-					continue
+					if audio_sample >= 256*256 {
+						e_o_f = true
+						continue
+					}
+
+					if c == 0 {
+						sample_number++
+					}
+
+					if decode_only == 0 && c != 0 {
+						continue
+					}
+
+					if decode_only == 1 && c != 1 {
+						continue
+					}
+
+					multi_modem_process_sample(c, audio_sample)
 				}
-
-				multi_modem_process_sample(c, audio_sample)
 			}
 
 			/* When a complete frame is accumulated, */
@@ -690,6 +719,41 @@ func audio_get(a int) int {
 		return audio_get_fake(a)
 	} else {
 		return audio_get_real(a)
+	}
+}
+
+func setupMegaChannels() {
+	my_audio_config.adev[1] = my_audio_config.adev[0]
+	my_audio_config.adev[2] = my_audio_config.adev[0]
+
+	type megaChanCfg struct {
+		modemType modem_t
+		baud      int
+		markFreq  int
+		spaceFreq int
+		profiles  string
+	}
+	var cfgs = [numMegaChannels]megaChanCfg{
+		{MODEM_AFSK, 1200, 1200, 2200, "A"},
+		{MODEM_AFSK, 300, 1600, 1800, "A"},
+		{MODEM_BPSK, 1200, 0, 0, ""},
+		{MODEM_QPSK, 2400, 0, 0, ""},
+		{MODEM_SCRAMBLE, 9600, 0, 0, ""},
+		{MODEM_BPSK, 300, 0, 0, ""},
+	}
+	for c, cfg := range cfgs {
+		my_audio_config.chan_medium[c] = MEDIUM_RADIO
+		my_audio_config.achan[c].modem_type = cfg.modemType
+		my_audio_config.achan[c].baud = cfg.baud
+		my_audio_config.achan[c].mark_freq = cfg.markFreq
+		my_audio_config.achan[c].space_freq = cfg.spaceFreq
+		my_audio_config.achan[c].profiles = cfg.profiles
+		my_audio_config.achan[c].num_freq = 1
+		my_audio_config.achan[c].fix_bits = RETRY_NONE
+		my_audio_config.achan[c].sanity_test = SANITY_NONE
+		if cfg.modemType == MODEM_QPSK {
+			my_audio_config.achan[c].v26_alternative = V26_DEFAULT
+		}
 	}
 }
 
