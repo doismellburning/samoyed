@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -683,14 +682,16 @@ type mhPair struct {
 	value    int
 }
 
-var MHPairs = []*mhPair{
-	{"first", 'A', 'R', 10 * 24 * 10 * 24 * 10 * 2},
-	{"second", '0', '9', 24 * 10 * 24 * 10 * 2},
-	{"third", 'A', 'X', 10 * 24 * 10 * 2},
-	{"fourth", '0', '9', 24 * 10 * 2},
-	{"fifth", 'A', 'X', 10 * 2},
-	{"sixth", '0', '9', 2},
-} // Even so we can get center of square.
+func mhPairs() []*mhPair {
+	return []*mhPair{
+		{"first", 'A', 'R', 10 * 24 * 10 * 24 * 10 * 2},
+		{"second", '0', '9', 24 * 10 * 24 * 10 * 2},
+		{"third", 'A', 'X', 10 * 24 * 10 * 2},
+		{"fourth", '0', '9', 24 * 10 * 2},
+		{"fifth", 'A', 'X', 10 * 2},
+		{"sixth", '0', '9', 2},
+	} // Even so we can get center of square.
+}
 
 func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	var np = len(maidenhead) / 2 /* Number of pairs of characters. */
@@ -706,26 +707,28 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 
 	var mh = strings.ToUpper(maidenhead)
 
+	var pairs = mhPairs()
+
 	var ilat, ilon int
 
 	for n := range np {
-		if mh[2*n] < MHPairs[n].min_ch || mh[2*n] > MHPairs[n].max_ch ||
-			mh[2*n+1] < MHPairs[n].min_ch || mh[2*n+1] > MHPairs[n].max_ch {
+		if mh[2*n] < pairs[n].min_ch || mh[2*n] > pairs[n].max_ch ||
+			mh[2*n+1] < pairs[n].min_ch || mh[2*n+1] > pairs[n].max_ch {
 			text_color_set(DW_COLOR_ERROR)
 
 			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
-				MHPairs[n].position, maidenhead, MHPairs[n].min_ch, MHPairs[n].max_ch)
+				pairs[n].position, maidenhead, pairs[n].min_ch, pairs[n].max_ch)
 			dw_printf("%s", s)
 
 			return 0, 0, errors.New(s)
 		}
 
-		ilon += int(mh[2*n]-MHPairs[n].min_ch) * MHPairs[n].value
-		ilat += int(mh[2*n+1]-MHPairs[n].min_ch) * MHPairs[n].value
+		ilon += int(mh[2*n]-pairs[n].min_ch) * pairs[n].value
+		ilat += int(mh[2*n+1]-pairs[n].min_ch) * pairs[n].value
 
 		if n == np-1 { // If last pair, take center of square.
-			ilon += MHPairs[n].value / 2
-			ilat += MHPairs[n].value / 2
+			ilon += pairs[n].value / 2
+			ilat += pairs[n].value / 2
 		}
 	}
 
