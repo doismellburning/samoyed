@@ -10,54 +10,56 @@ func Test_telemetry(t *testing.T) {
 	var result string
 	var comment string
 
+	var ts = NewTelemetryState()
+
 	dw_printf("Unit test for telemetry decoding functions...\n")
 
 	dw_printf("part 1\n")
 
 	// From protocol spec.
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 101")
 	assert.Empty(t, comment, "test 101")
 
 	// Try adding a comment.
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001Comment,with,commas", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101001Comment,with,commas", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 102")
 	assert.Equal(t, "Comment,with,commas", comment, "test 102")
 
 	// Error handling - Try shortening or omitting parts.
 
-	result, comment = telemetry_data_original("WB2OSZ", "T005,199,000,255,073,123,0110", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T005,199,000,255,073,123,0110", false)
 
 	assert.Empty(t, result, "test 103")
 	assert.Empty(t, comment, "test 103")
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,0110", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,0110", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0", result, "test 104")
 	assert.Empty(t, comment, "test 104")
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123", result, "test 105")
 	assert.Empty(t, comment, "test 105")
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,,123,01101001", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,,123,01101001", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0, D8=1", result, "test 106")
 	assert.Empty(t, comment, "test 106")
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101009", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#005,199,000,255,073,123,01101009", false)
 
 	assert.Equal(t, "Seq=5, A1=199, A2=0, A3=255, A4=73, A5=123, D1=0, D2=1, D3=1, D4=0, D5=1, D6=0, D7=0", result, "test 107")
 	assert.Empty(t, comment, "test 107")
 
 	// Local observation.
 
-	result, comment = telemetry_data_original("WB2OSZ", "T#491,4.9,0.3,25.0,0.0,1.0,00000000", false)
+	result, comment = ts.telemetry_data_original("WB2OSZ", "T#491,4.9,0.3,25.0,0.0,1.0,00000000", false)
 
 	assert.Equal(t, "Seq=491, A1=4.9, A2=0.3, A3=25.0, A4=0.0, A5=1.0, D1=0, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 108")
 	assert.Empty(t, comment, "test 108")
@@ -66,38 +68,38 @@ func Test_telemetry(t *testing.T) {
 
 	// From protocol spec.
 
-	result = telemetry_data_base91("WB2OSZ", "ss11")
+	result = ts.telemetry_data_base91("WB2OSZ", "ss11")
 
 	assert.Equal(t, "Seq=7544, A1=1472", result, "test 201")
 
-	result = telemetry_data_base91("WB2OSZ", "ss11223344{{!\"")
+	result = ts.telemetry_data_base91("WB2OSZ", "ss11223344{{!\"")
 
 	assert.Equal(t, "Seq=7544, A1=1472, A2=1564, A3=1656, A4=1748, A5=8280, D1=1, D2=0, D3=0, D4=0, D5=0, D6=0, D7=0, D8=0", result, "test 202")
 
 	// Error cases.  Should not happen in practice because function
 	// should be called only with valid data that matches the pattern.
 
-	result = telemetry_data_base91("WB2OSZ", "ss11223344{{!\"x")
+	result = ts.telemetry_data_base91("WB2OSZ", "ss11223344{{!\"x")
 
 	assert.Empty(t, result, "test 203")
 
-	result = telemetry_data_base91("WB2OSZ", "ss1")
+	result = ts.telemetry_data_base91("WB2OSZ", "ss1")
 
 	assert.Empty(t, result, "test 204")
 
-	result = telemetry_data_base91("WB2OSZ", "ss11223344{{!")
+	result = ts.telemetry_data_base91("WB2OSZ", "ss11223344{{!")
 
 	assert.Empty(t, result, "test 205")
 
-	result = telemetry_data_base91("WB2OSZ", "s |1")
+	result = ts.telemetry_data_base91("WB2OSZ", "s |1")
 
 	assert.Equal(t, "Seq=?", result, "test 206")
 
 	dw_printf("part 3\n")
 
-	telemetry_name_message("N0QBF-11", "Battery,Btemp,ATemp,Pres,Alt,Camra,Chut,Sun,10m,ATV")
+	ts.telemetry_name_message("N0QBF-11", "Battery,Btemp,ATemp,Pres,Alt,Camra,Chut,Sun,10m,ATV")
 
-	var pm = t_get_metadata("N0QBF-11")
+	var pm = ts.t_get_metadata("N0QBF-11")
 
 	assert.Equal(t, "Battery", pm.name[0], "test 301")
 	assert.Equal(t, "Btemp", pm.name[1], "test 301")
@@ -113,9 +115,9 @@ func Test_telemetry(t *testing.T) {
 	assert.Equal(t, "D7", pm.name[11], "test 301")
 	assert.Equal(t, "D8", pm.name[12], "test 301")
 
-	telemetry_unit_label_message("N0QBF-11", "v/100,deg.F,deg.F,Mbar,Kft,Click,OPEN,on,on,hi")
+	ts.telemetry_unit_label_message("N0QBF-11", "v/100,deg.F,deg.F,Mbar,Kft,Click,OPEN,on,on,hi")
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 
 	assert.Equal(t, "v/100", pm.unit[0], "test 302")
 	assert.Equal(t, "deg.F", pm.unit[1], "test 302")
@@ -131,9 +133,9 @@ func Test_telemetry(t *testing.T) {
 	assert.Empty(t, pm.unit[11], "test 302")
 	assert.Empty(t, pm.unit[12], "test 302")
 
-	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", false)
+	ts.telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2,3", false)
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 
 	if pm.coeff[0][0] != 0 || pm.coeff[0][1] < 5.1999 || pm.coeff[0][1] > 5.2001 || pm.coeff[0][2] != 0 ||
 		pm.coeff[1][0] != 0 || pm.coeff[1][1] < .52999 || pm.coeff[1][1] > .53001 || pm.coeff[1][2] != -32 ||
@@ -154,9 +156,9 @@ func Test_telemetry(t *testing.T) {
 	// Error if less than 15 or empty field.
 	// Notice that we keep the previous value in this case.
 
-	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", false)
+	ts.telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,2", false)
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 
 	if pm.coeff[0][0] != 0 || pm.coeff[0][1] < 5.1999 || pm.coeff[0][1] > 5.2001 || pm.coeff[0][2] != 0 ||
 		pm.coeff[1][0] != 0 || pm.coeff[1][1] < .52999 || pm.coeff[1][1] > .53001 || pm.coeff[1][2] != -32 ||
@@ -174,9 +176,9 @@ func Test_telemetry(t *testing.T) {
 		assert.Fail(t, "Wrong result, test 304n\n")
 	}
 
-	telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", false)
+	ts.telemetry_coefficents_message("N0QBF-11", "0,5.2,0,0,.53,-32,3,4.39,49,-32,3,18,1,,3", false)
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 
 	if pm.coeff[0][0] != 0 || pm.coeff[0][1] < 5.1999 || pm.coeff[0][1] > 5.2001 || pm.coeff[0][2] != 0 ||
 		pm.coeff[1][0] != 0 || pm.coeff[1][1] < .52999 || pm.coeff[1][1] > .53001 || pm.coeff[1][2] != -32 ||
@@ -194,9 +196,9 @@ func Test_telemetry(t *testing.T) {
 		assert.Fail(t, "Wrong result, test 305n\n")
 	}
 
-	telemetry_bit_sense_message("N0QBF-11", "10110000,N0QBF's Big Balloon", false)
+	ts.telemetry_bit_sense_message("N0QBF-11", "10110000,N0QBF's Big Balloon", false)
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
 		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 306\n")
@@ -205,9 +207,9 @@ func Test_telemetry(t *testing.T) {
 	assert.Equal(t, "N0QBF's Big Balloon", pm.project, "test 306")
 
 	// Too few and invalid digits.
-	telemetry_bit_sense_message("N0QBF-11", "1011000", false)
+	ts.telemetry_bit_sense_message("N0QBF-11", "1011000", false)
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
 		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 307\n")
@@ -215,9 +217,9 @@ func Test_telemetry(t *testing.T) {
 
 	assert.Empty(t, pm.project, "test 307")
 
-	telemetry_bit_sense_message("N0QBF-11", "10110008", false)
+	ts.telemetry_bit_sense_message("N0QBF-11", "10110008", false)
 
-	pm = t_get_metadata("N0QBF-11")
+	pm = ts.t_get_metadata("N0QBF-11")
 	if !pm.sense[0] || pm.sense[1] || !pm.sense[2] || !pm.sense[3] ||
 		pm.sense[4] || pm.sense[5] || pm.sense[6] || pm.sense[7] {
 		assert.Fail(t, "Wrong result, test 308\n")
@@ -227,27 +229,27 @@ func Test_telemetry(t *testing.T) {
 
 	dw_printf("part 4\n")
 
-	telemetry_coefficents_message("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", false)
-	telemetry_bit_sense_message("M0XER-3", "11111111,10mW research balloon", false)
-	telemetry_name_message("M0XER-3", "Vbat,Vsolar,Temp,Sat")
-	telemetry_unit_label_message("M0XER-3", "V,V,C,,m")
+	ts.telemetry_coefficents_message("M0XER-3", "0,0.001,0,0,0.001,0,0,0.1,-273.2,0,1,0,0,1,0", false)
+	ts.telemetry_bit_sense_message("M0XER-3", "11111111,10mW research balloon", false)
+	ts.telemetry_name_message("M0XER-3", "Vbat,Vsolar,Temp,Sat")
+	ts.telemetry_unit_label_message("M0XER-3", "V,V,C,,m")
 
-	result = telemetry_data_base91("M0XER-3", "DyR.&^<A!.")
+	result = ts.telemetry_data_base91("M0XER-3", "DyR.&^<A!.")
 
 	assert.Equal(t, "10mW research balloon: Seq=3273, Vbat=4.472 V, Vsolar=0.516 V, Temp=-24.3 C, Sat=13", result, "test 401")
 	assert.Empty(t, comment, "test 401")
 
-	result = telemetry_data_base91("M0XER-3", "cNOv'C?=!-")
+	result = ts.telemetry_data_base91("M0XER-3", "cNOv'C?=!-")
 
 	assert.Equal(t, "10mW research balloon: Seq=6051, Vbat=4.271 V, Vsolar=0.580 V, Temp=2.6 C, Sat=12", result, "test 402")
 	assert.Empty(t, comment, "test 402")
 
-	result = telemetry_data_base91("M0XER-3", "n0RS(:>b!+")
+	result = ts.telemetry_data_base91("M0XER-3", "n0RS(:>b!+")
 
 	assert.Equal(t, "10mW research balloon: Seq=7022, Vbat=4.509 V, Vsolar=0.662 V, Temp=-2.8 C, Sat=10", result, "test 403")
 	assert.Empty(t, comment, "test 403")
 
-	result = telemetry_data_base91("M0XER-3", "x&G=!(8s!,")
+	result = ts.telemetry_data_base91("M0XER-3", "x&G=!(8s!,")
 
 	assert.Equal(t, "10mW research balloon: Seq=7922, Vbat=3.486 V, Vsolar=0.007 V, Temp=-55.7 C, Sat=11", result, "test 404")
 	assert.Empty(t, comment, "test 404")

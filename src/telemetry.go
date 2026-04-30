@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2025 The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-//nolint:gochecknoglobals
 package direwolf
 
 //#define DEBUG1 1		/* Parsing of original human readable format. */
@@ -57,7 +56,13 @@ const C_A = 0 /* Scaling coefficient positions. */
 const C_B = 1
 const C_C = 2
 
-var md_list_head *t_metadata_s
+type TelemetryState struct {
+	mdListHead *t_metadata_s
+}
+
+func NewTelemetryState() *TelemetryState {
+	return new(TelemetryState)
+}
 
 /*-------------------------------------------------------------------
  *
@@ -72,14 +77,14 @@ var md_list_head *t_metadata_s
  *
  *--------------------------------------------------------------------*/
 
-func t_get_metadata(station string) *t_metadata_s {
+func (ts *TelemetryState) t_get_metadata(station string) *t_metadata_s {
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("t_get_metadata (station=%s)\n", station);
 	#endif
 	*/
-	for p := md_list_head; p != nil; p = p.pnext {
+	for p := ts.mdListHead; p != nil; p = p.pnext {
 		if station == p.station {
 			return (p)
 		}
@@ -110,8 +115,8 @@ func t_get_metadata(station string) *t_metadata_s {
 		p.sense[n] = true
 	}
 
-	p.pnext = md_list_head
-	md_list_head = p
+	p.pnext = ts.mdListHead
+	ts.mdListHead = p
 
 	return (p)
 } /* end t_get_metadata */
@@ -178,7 +183,7 @@ func t_ndp(str string) int {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_data_original(station string, info string, quiet bool) (string, string) {
+func (ts *TelemetryState) telemetry_data_original(station string, info string, quiet bool) (string, string) {
 	/* TODO KG
 	   #if DEBUG1
 	   	text_color_set(DW_COLOR_DEBUG);
@@ -186,7 +191,7 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
 	   	dw_printf ("\n%s\n\n", info);
 	   #endif
 	*/
-	var pm = t_get_metadata(station)
+	var pm = ts.t_get_metadata(station)
 
 	var araw [T_NUM_ANALOG]float64
 
@@ -327,7 +332,7 @@ func telemetry_data_original(station string, info string, quiet bool) (string, s
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_data_base91(station string, cdata string) string {
+func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) string {
 	/* TODO KG
 	#if DEBUG2
 		text_color_set(DW_COLOR_DEBUG);
@@ -335,7 +340,7 @@ func telemetry_data_base91(station string, cdata string) string {
 		dw_printf ("\n%s\n\n", cdata);
 	#endif
 	*/
-	var pm = t_get_metadata(station)
+	var pm = ts.t_get_metadata(station)
 
 	var araw [T_NUM_ANALOG]float64
 
@@ -416,7 +421,7 @@ func telemetry_data_base91(station string, cdata string) string {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_name_message(station string, msg string) {
+func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -426,7 +431,7 @@ func telemetry_name_message(station string, msg string) {
 	*/
 	msg = strings.TrimSpace(msg)
 
-	var pm = t_get_metadata(station)
+	var pm = ts.t_get_metadata(station)
 
 	var parts = strings.Split(msg, ",")
 	for n, p := range parts {
@@ -470,7 +475,7 @@ func telemetry_name_message(station string, msg string) {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_unit_label_message(station string, msg string) {
+func (ts *TelemetryState) telemetry_unit_label_message(station string, msg string) {
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -485,7 +490,7 @@ func telemetry_unit_label_message(station string, msg string) {
 	 */
 	var stemp = strings.TrimSpace(msg)
 
-	var pm = t_get_metadata(station)
+	var pm = ts.t_get_metadata(station)
 
 	var parts = strings.Split(stemp, ",")
 	for n, p := range parts {
@@ -528,7 +533,7 @@ func telemetry_unit_label_message(station string, msg string) {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_coefficents_message(station string, msg string, quiet bool) {
+func (ts *TelemetryState) telemetry_coefficents_message(station string, msg string, quiet bool) {
 	/* TODO
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -543,7 +548,7 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
 	 */
 	var stemp = strings.TrimSpace(msg)
 
-	var pm = t_get_metadata(station)
+	var pm = ts.t_get_metadata(station)
 
 	var n = 0
 	for p := range strings.SplitSeq(stemp, ",") {
@@ -607,7 +612,7 @@ func telemetry_coefficents_message(station string, msg string, quiet bool) {
  *
  *--------------------------------------------------------------------*/
 
-func telemetry_bit_sense_message(station string, msg string, quiet bool) {
+func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string, quiet bool) {
 	/* TODO KG
 	#if DEBUG3
 		text_color_set(DW_COLOR_DEBUG);
@@ -615,7 +620,7 @@ func telemetry_bit_sense_message(station string, msg string, quiet bool) {
 		dw_printf ("\n%s\n\n", msg);
 	#endif
 	*/
-	var pm = t_get_metadata(station)
+	var pm = ts.t_get_metadata(station)
 
 	if len(msg) < 8 {
 		if !quiet {

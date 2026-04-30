@@ -50,6 +50,7 @@ var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var aprsSymbolData *APRSSymbolData
 var waypointSender *WaypointSender
+var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
 var kissNetSvc *KissNetService
 var mheardDB *MHeardDB
