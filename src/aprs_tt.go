@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -178,28 +177,6 @@ type ttloc_s struct {
 	macro  macroTTLoc
 }
 
-var aprs_tt_test_config = []*ttloc_s{
-	{ttlocType: TTLOC_POINT, pattern: "B01", point: pointTTLoc{lat: 12.25, lon: 56.25}},
-	{ttlocType: TTLOC_POINT, pattern: "B988", point: pointTTLoc{lat: 12.50, lon: 56.50}},
-
-	{ttlocType: TTLOC_VECTOR, pattern: "B5bbbdddd", vector: vectorTTLoc{lat: 53., lon: -1., scale: 1000.}}, // km units
-
-	// Hilltop Tower http://www.aprs.org/aprs-jamboree-2013.html
-	{ttlocType: TTLOC_VECTOR, pattern: "B5bbbddd", vector: vectorTTLoc{lat: 37 + 55.37/60., lon: -(81 + 7.86/60.), scale: 16.09344}}, // .01 mile units
-
-	{ttlocType: TTLOC_GRID, pattern: "B2xxyy", grid: gridTTLoc{lat0: 12.00, lon0: 56.00,
-		lat9: 12.99, lon9: 56.99}},
-	{ttlocType: TTLOC_GRID, pattern: "Byyyxxx", grid: gridTTLoc{lat0: 37 + 50./60.0, lon0: 81,
-		lat9: 37 + 59.99/60.0, lon9: 81 + 9.99/60.0}},
-
-	{ttlocType: TTLOC_MHEAD, pattern: "BAxxxxxx", mhead: mheadTTLoc{prefix: "326129"}},
-
-	{ttlocType: TTLOC_SATSQ, pattern: "BAxxxx"},
-
-	{ttlocType: TTLOC_MACRO, pattern: "xxyyy", macro: macroTTLoc{definition: "B9xx*AB166*AA2B4C5B3B0Ayyy"}},
-	{ttlocType: TTLOC_MACRO, pattern: "xxxxzzzzzzzzzz", macro: macroTTLoc{definition: "BAxxxx*ACzzzzzzzzzz"}},
-}
-
 type tt_config_s struct {
 	gateway_enabled int /* Send DTMF sequences to APRStt gateway. */
 
@@ -308,15 +285,7 @@ type TTGateway struct {
 func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
 	var g = &TTGateway{debug: debug} //nolint:exhaustruct
 
-	if p == nil {
-		/* For unit testing. */
-		var config tt_config_s
-		config.ttlocs = aprs_tt_test_config
-		/* Don't care about xmit timing or corral here. */
-		g.config = &config
-	} else {
-		g.config = p
-	}
+	g.config = p
 
 	return g
 }
