@@ -134,6 +134,7 @@ type beacon_s struct {
 
 type misc_config_s struct {
 	agwpe_port int /* TCP Port number for the "AGW TCPIP Socket Interface" */
+	rhp_port   int /* TCP Port number for the "Remote Host Protocol" interface. 0 = disabled. */
 
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
@@ -249,6 +250,7 @@ const MAX_IP_PORT_NUMBER = 49151
 
 const DEFAULT_AGWPE_PORT = 8000 /* Like everyone else. */
 const DEFAULT_KISS_PORT = 8001  /* Above plus 1. */
+const DEFAULT_RHP_PORT = 9000   /* Remote Host Protocol. */
 
 const DEFAULT_NULLMODEM = "COM3" /* should be equiv. to /dev/ttyS2 on Cygwin */
 
@@ -4687,6 +4689,25 @@ func config_init(fname string, p_audio_config *audio_s,
 					dw_printf("Line %d: Too many KISSPORT commands.\n", line)
 				}
 			}
+		} else if strings.EqualFold(t, "RHPPORT") {
+			/*
+			 * RHPPORT n		- TCP port number for the Remote Host Protocol (RHP2) interface.
+			 *			  0 to disable.
+			 */
+			t = split("", false)
+			if t == "" {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file: Missing port number on line %d.\n", line)
+			} else {
+				var n, _ = strconv.Atoi(t)
+				if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
+					p_misc_config.rhp_port = n
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file: Invalid port number for RHPPORT on line %d.\n", line)
+				}
+			}
+
 		} else if strings.EqualFold(t, "NULLMODEM") || strings.EqualFold(t, "SERIALKISS") {
 			/*
 			 * NULLMODEM name [ speed ]	- Device name for serial port or our end of the virtual "null modem"

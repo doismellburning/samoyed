@@ -747,6 +747,11 @@ func mon_desc(pp *packet_t) (byte, string) {
  *--------------------------------------------------------------------*/
 
 func server_link_established(channel int, client int, remote_call string, own_call string, incoming bool) {
+	if client >= MAX_NET_CLIENTS {
+		rhpSvc.LinkEstablished(channel, client-MAX_NET_CLIENTS, remote_call, own_call, incoming)
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -796,6 +801,11 @@ func server_link_established(channel int, client int, remote_call string, own_ca
  *--------------------------------------------------------------------*/
 
 func server_link_terminated(channel int, client int, remote_call string, own_call string, timeout bool) {
+	if client >= MAX_NET_CLIENTS {
+		rhpSvc.LinkTerminated(channel, client-MAX_NET_CLIENTS, remote_call, own_call, timeout)
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -840,6 +850,11 @@ func server_link_terminated(channel int, client int, remote_call string, own_cal
  *--------------------------------------------------------------------*/
 
 func server_rec_conn_data(channel int, client int, remote_call string, own_call string, pid int, data []byte) {
+	if client >= MAX_NET_CLIENTS {
+		rhpSvc.RecConnData(channel, client-MAX_NET_CLIENTS, remote_call, own_call, pid, data)
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
