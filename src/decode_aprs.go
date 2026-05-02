@@ -1742,22 +1742,22 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Parameter Name for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_parm
 
-		telemetry_name_message(string(addressee), string(message[5:]))
+		telemetryState.telemetry_name_message(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("UNIT.")) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Unit/Label for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_unit
 
-		telemetry_unit_label_message(string(addressee), string(message[5:]))
+		telemetryState.telemetry_unit_label_message(string(addressee), string(message[5:]))
 	} else if bytes.HasPrefix(message, []byte("EQNS.")) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Equation Coefficients for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_eqns
 
-		telemetry_coefficents_message(string(addressee), string(message[5:]), quiet)
+		telemetryState.telemetry_coefficents_message(string(addressee), string(message[5:]), quiet)
 	} else if bytes.HasPrefix(message, []byte("BITS.")) {
 		A.g_data_type_desc = fmt.Sprintf("Telemetry Bit Sense/Project Name for \"%s\"", addressee)
 		A.g_message_subtype = message_subtype_telem_bits
 
-		telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
+		telemetryState.telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
 	} else if message[0] == '?' {
 		/*
 		 * If first character of message is "?" it is a query directed toward a specific station.
@@ -2509,7 +2509,7 @@ func aprs_directed_station_query(A *decode_aprs_t, addressee []byte, query []byt
 func aprs_telemetry(A *decode_aprs_t, info []byte, quiet bool) {
 	A.g_data_type_desc = "Telemetry"
 
-	var telemetry, comment = telemetry_data_original(A.g_src, string(info), quiet)
+	var telemetry, comment = telemetryState.telemetry_data_original(A.g_src, string(info), quiet)
 	A.g_telemetry = telemetry
 	A.g_comment = comment
 } /* end aprs_telemetry */
@@ -4161,7 +4161,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		//dw_printf("compressed telemetry data = \"%s\"\n", tdata);
 
-		var telemetry = telemetry_data_base91(A.g_src, string(tdata))
+		var telemetry = telemetryState.telemetry_data_base91(A.g_src, string(tdata))
 		A.g_telemetry = telemetry
 
 		commentData = cutBytes(commentData, match[0], match[1])
