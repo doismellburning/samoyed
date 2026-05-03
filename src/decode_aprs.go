@@ -3719,8 +3719,13 @@ func get_maidenhead(A *decode_aprs_t, p []byte) int { //nolint:unparam
  *
  *------------------------------------------------------------------*/
 
-// TODO KG rename?
-var dir []string = []string{"omni", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
+func directivityString(d int) (string, error) {
+	var dirs = []string{"omni", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
+	if d < 0 || d >= len(dirs) {
+		return "", fmt.Errorf("directivity index %d out of range [0,%d]", d, len(dirs)-1)
+	}
+	return dirs[d], nil
+}
 
 func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unparam
 	if len(pdext) < 7 {
@@ -3774,7 +3779,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		A.g_gain = int(pdext[5] - '0')
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			A.g_directivity = dir[pdext[6]-'0']
+			A.g_directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
 
 		// TODO: look for another 0-9 A-Z followed by a /
@@ -3808,7 +3813,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		A.g_gain = int(pdext[5] - '0')
 		if pdext[6] >= '0' && pdext[6] <= '8' {
-			A.g_directivity = dir[pdext[6]-'0']
+			A.g_directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
 
 		process_comment(A, pdext[7:])
