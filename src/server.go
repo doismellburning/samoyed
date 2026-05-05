@@ -283,6 +283,21 @@ func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
  *
  *--------------------------------------------------------------------*/
 
+// agwConnectedModeAllowed reports whether AX.25 connected mode is allowed on portx.
+// Connected mode is supported for MEDIUM_RADIO channels and MEDIUM_NETTNC channels.
+// When save_audio_config_p is nil (e.g. in unit tests), only channels < MAX_RADIO_CHANS
+// are permitted, preserving the previous behaviour.
+func agwConnectedModeAllowed(portx byte) bool {
+	if int(portx) >= MAX_TOTAL_CHANS {
+		return false
+	}
+	if save_audio_config_p == nil {
+		return int(portx) < MAX_RADIO_CHANS
+	}
+	var m = save_audio_config_p.chan_medium[portx]
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
+}
+
 func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
@@ -1294,9 +1309,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			var channel = int(cmd.Header.Portx)
 
-			// Connected mode can only be used with internal modems.
-
-			if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
+			if agwConnectedModeAllowed(cmd.Header.Portx) {
 				ok = 1
 
 				dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
@@ -1320,9 +1333,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 	case 'x': /* Unregister CallSign  */
 		var channel = int(cmd.Header.Portx)
 
-		// Connected mode can only be used with internal modems.
-
-		if channel < MAX_RADIO_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
+		if agwConnectedModeAllowed(cmd.Header.Portx) {
 			dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
@@ -1335,9 +1346,9 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		/* v: Connect VIA, Start an AX.25 circuit thru digipeaters */
 		/* c: Connection with non-standard PID */
 		{
-			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW connect command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				dw_printf("AGW connect command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 				break
 			}
 			/*
@@ -1399,9 +1410,9 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'D': /* Send Connected Data */
 		{
-			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'D' command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				dw_printf("AGW 'D' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 				break
 			}
 
@@ -1422,9 +1433,9 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
 		{
-			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'd' command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				dw_printf("AGW 'd' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 				break
 			}
 
@@ -1558,9 +1569,9 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		// We will send a request to it and the result coming out will be used to
 		// send the reply back to the client application.
 		{
-			if int(cmd.Header.Portx) >= MAX_RADIO_CHANS {
+			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'Y' command on non-radio channel %d ignored.\n", cmd.Header.Portx)
+				dw_printf("AGW 'Y' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 				break
 			}
 

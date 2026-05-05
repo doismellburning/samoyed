@@ -437,7 +437,7 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int
 		dw_printf ("dlq_connect_request (...)\n");
 	#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -486,7 +486,7 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel 
 		dw_printf ("dlq_disconnect_request (...)\n");
 	#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -540,7 +540,7 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, 
 		dw_printf ("dlq_outstanding_frames_request (...)\n");
 	#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -597,7 +597,7 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel i
 		dw_printf ("dlq_xmit_data_request (...)\n");
 	#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -652,7 +652,7 @@ func dlq_register_callsign(addr string, channel int, client int) {
 		dw_printf ("dlq_register_callsign (%s, chan=%d, client=%d)\n", addr, channel, client);
 	#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
@@ -677,7 +677,7 @@ func dlq_unregister_callsign(addr string, channel int, client int) {
 		dw_printf ("dlq_unregister_callsign (%s, chan=%d, client=%d)\n", addr, channel, client);
 	#endif
 	*/
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
 
