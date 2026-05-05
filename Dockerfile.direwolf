@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: The Samoyed Authors
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+FROM golang:1.25-bookworm AS builder
+
+WORKDIR /src
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libudev-dev \
+    libhamlib-dev \
+    portaudio19-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN go build -o /out/samoyed-direwolf ./cmd/samoyed-direwolf/...
+
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libportaudio2 \
+    libhamlib4 \
+    libudev1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /out/samoyed-direwolf /usr/local/bin/samoyed-direwolf
+
+# Wrapper that retries samoyed-direwolf until it stays up. This handles the
+# race where the peer container's DNS alias is not yet registered when the
+# UDP output address is resolved at startup.
+RUN printf '#!/bin/sh\nwhile true; do\n    /usr/local/bin/samoyed-direwolf "$@"\n    echo "samoyed-direwolf exited, retrying in 500ms..." >&2\n    sleep 0.5\ndone\n' \
+    > /usr/local/bin/start-direwolf.sh && \
+    chmod 755 /usr/local/bin/start-direwolf.sh
+
+ENTRYPOINT ["/usr/local/bin/start-direwolf.sh"]
