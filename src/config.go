@@ -1721,9 +1721,21 @@ func config_init(fname string, p_audio_config *audio_s,
 						p_audio_config.achan[channel].modem_type = MODEM_BPSK
 						p_audio_config.achan[channel].mark_freq = 0
 						p_audio_config.achan[channel].space_freq = 0
-					} else if alllettersorpm(t) { /* profile of letter(s) + - */
-						// Will be validated later.
-						p_audio_config.achan[channel].profiles = t
+					} else if strings.EqualFold(t, "G3RUH") { /* Force G3RUH modem regardless of default for speed. New in 1.6. */
+						p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE
+						p_audio_config.achan[channel].mark_freq = 0
+						p_audio_config.achan[channel].space_freq = 0
+					} else if strings.EqualFold(t, "V26A") || /* Compatible with direwolf versions <= 1.5.  New in 1.6. */
+						strings.EqualFold(t, "V26B") { /* Compatible with MFJ-2400.  New in 1.6. */
+						if p_audio_config.achan[channel].modem_type != MODEM_QPSK ||
+							p_audio_config.achan[channel].baud != 2400 {
+							text_color_set(DW_COLOR_ERROR)
+							dw_printf("Line %d: %s option can only be used with 2400 bps PSK.\n", line, t)
+
+							continue
+						}
+
+						p_audio_config.achan[channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
 					} else if t[0] == '/' { /* /div */
 						var n, _ = strconv.Atoi(t[1:])
 
@@ -1742,21 +1754,9 @@ func config_init(fname string, p_audio_config *audio_s,
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Line %d: Ignoring unreasonable upsample ratio of %d.\n", line, n)
 						}
-					} else if strings.EqualFold(t, "G3RUH") { /* Force G3RUH modem regardless of default for speed. New in 1.6. */
-						p_audio_config.achan[channel].modem_type = MODEM_SCRAMBLE
-						p_audio_config.achan[channel].mark_freq = 0
-						p_audio_config.achan[channel].space_freq = 0
-					} else if strings.EqualFold(t, "V26A") || /* Compatible with direwolf versions <= 1.5.  New in 1.6. */
-						strings.EqualFold(t, "V26B") { /* Compatible with MFJ-2400.  New in 1.6. */
-						if p_audio_config.achan[channel].modem_type != MODEM_QPSK ||
-							p_audio_config.achan[channel].baud != 2400 {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Line %d: %s option can only be used with 2400 bps PSK.\n", line, t)
-
-							continue
-						}
-
-						p_audio_config.achan[channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
+					} else if alllettersorpm(t) { /* profile of letter(s) + - */
+						// Will be validated later.
+						p_audio_config.achan[channel].profiles = t
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Line %d: Unrecognized option for MODEM: %s\n", line, t)
