@@ -968,14 +968,18 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 	var ptt2 = ptt_signal
 
 	Assert(ot >= 0 && ot < NUM_OCTYPES)
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+
+	if channel >= MAX_RADIO_CHANS {
+		return // NCHANNEL: no physical PTT hardware to drive
+	}
 
 	if ptt_debug_level >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("%s %d = %d\n", otnames[ot], channel, ptt_signal)
 	}
 
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)

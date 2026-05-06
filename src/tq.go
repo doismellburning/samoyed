@@ -406,13 +406,16 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	#endif
 	*/
 
+	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+		// For NETTNC channels, just yeet out the packet and let the external TNC handle it - we don't have enough info to do much else
+		tq_append(channel, prio, pp)
+		return
+	}
+
 	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		// Connected mode is allowed only with internal modems.
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
-		dw_printf("Connected packet mode is allowed only with internal modems.\n")
-		dw_printf("Why aren't external KISS modems allowed?  See\n")
-		dw_printf("Why-is-9600-only-twice-as-fast-as-1200.pdf for explanation.\n")
+		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
+		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
 		ax25_delete(pp)
 
 		return
@@ -548,13 +551,17 @@ func lm_seize_request(channel int) {
 	#endif
 	*/
 
+	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
+		// See lm_data_request for the rationale for allowing MEDIUM_NETTNC.
+		dlq_seize_confirm(channel)
+		return
+	}
+
 	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		// Connected mode is allowed only with internal modems.
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
-		dw_printf("Connected packet mode is allowed only with internal modems.\n")
-		dw_printf("Why aren't external KISS modems allowed?  See\n")
-		dw_printf("Why-is-9600-only-twice-as-fast-as-1200.pdf for explanation.\n")
+		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
+		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
 
 		return
 	}

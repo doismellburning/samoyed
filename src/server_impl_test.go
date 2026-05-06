@@ -410,3 +410,83 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	assert.Equal(t, "Q3TEST", item.addrs[AX25_REPEATER_1])
 	assert.Equal(t, "Q4TEST", item.addrs[AX25_REPEATER_1+1])
 }
+
+func TestAgwConnectedModeAllowed_OutOfRange(t *testing.T) {
+	var cfg audio_s
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	assert.False(t, agwConnectedModeAllowed(MAX_TOTAL_CHANS))
+	assert.False(t, agwConnectedModeAllowed(255))
+}
+
+func TestAgwConnectedModeAllowed_NilConfig_RadioRange(t *testing.T) {
+	save_audio_config_p = nil
+
+	assert.True(t, agwConnectedModeAllowed(0))
+	assert.True(t, agwConnectedModeAllowed(MAX_RADIO_CHANS-1))
+}
+
+func TestAgwConnectedModeAllowed_NilConfig_NCHANNELRange(t *testing.T) {
+	save_audio_config_p = nil
+
+	assert.False(t, agwConnectedModeAllowed(MAX_RADIO_CHANS))
+}
+
+func TestAgwConnectedModeAllowed_MediumRadio(t *testing.T) {
+	var cfg audio_s
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	assert.True(t, agwConnectedModeAllowed(0))
+}
+
+func TestAgwConnectedModeAllowed_MediumNETTNC(t *testing.T) {
+	var cfg audio_s
+	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	assert.True(t, agwConnectedModeAllowed(MAX_RADIO_CHANS))
+}
+
+func TestAgwConnectedModeAllowed_MediumIGate(t *testing.T) {
+	var cfg audio_s
+	cfg.chan_medium[0] = MEDIUM_IGATE
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	assert.False(t, agwConnectedModeAllowed(0))
+}
+
+func TestAgwConnectedModeAllowed_MediumNone(t *testing.T) {
+	var cfg audio_s
+	// chan_medium[0] defaults to MEDIUM_NONE
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	assert.False(t, agwConnectedModeAllowed(0))
+}
+
+func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
+	var cfg audio_s
+	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
+	save_audio_config_p = &cfg
+	t.Cleanup(func() { save_audio_config_p = nil })
+
+	var client = setupClientPipe(t)
+	var replyCh = asyncReply(client)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'X'
+	cmd.Header.Portx = MAX_RADIO_CHANS
+	copy(cmd.Header.CallFrom[:], "Q1TEST")
+	handleClientCommand(0, cmd)
+
+	var reply = <-replyCh
+	require.NotNil(t, reply)
+	assert.Equal(t, byte('X'), reply.Header.DataKind)
+	require.Len(t, reply.Data, 1)
+	assert.Equal(t, byte(1), reply.Data[0]) // success
+}

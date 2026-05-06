@@ -1775,11 +1775,11 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
  *
  *------------------------------------------------------------------------------*/
 
-var dcd_status [MAX_RADIO_CHANS]int
-var ptt_status [MAX_RADIO_CHANS]int
+var dcd_status [MAX_TOTAL_CHANS]int
+var ptt_status [MAX_TOTAL_CHANS]int
 
 func lm_channel_busy(E *dlq_item_t) {
-	Assert(E._chan >= 0 && E._chan < MAX_RADIO_CHANS)
+	Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
 	Assert(E.activity == OCTYPE_PTT || E.activity == OCTYPE_DCD)
 	Assert(E.status == 1 || E.status == 0)
 
@@ -1847,7 +1847,7 @@ func lm_channel_busy(E *dlq_item_t) {
  *------------------------------------------------------------------------------*/
 
 func lm_seize_confirm(E *dlq_item_t) {
-	Assert(E._chan >= 0 && E._chan < MAX_RADIO_CHANS)
+	Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
 
 	for S := list_head; S != nil; S = S.next {
 		if E._chan == S.channel {
