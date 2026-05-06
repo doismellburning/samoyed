@@ -212,12 +212,6 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 
 	A.g_quiet = quiet
 
-	if unicode.IsPrint(rune(pinfo[0])) {
-		A.g_data_type_desc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])
-	} else {
-		A.g_data_type_desc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])
-	}
-
 	A.g_symbol_table = '/' /* Default to primary table. */
 	A.g_symbol_code = ' '  /* What should we have for default symbol? */
 
@@ -241,6 +235,28 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	A.g_footprint_lat = G_UNKNOWN
 	A.g_footprint_lon = G_UNKNOWN
 	A.g_footprint_radius = G_UNKNOWN
+
+	/*
+	 * Extract source and destination including the SSID.
+	 */
+	if third_party_src != "" {
+		A.g_src = third_party_src
+	} else {
+		A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
+	}
+
+	A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
+
+	if len(pinfo) == 0 {
+		A.g_data_type_desc = "AX.25 UI frame with empty information field"
+		return A
+	}
+
+	if unicode.IsPrint(rune(pinfo[0])) {
+		A.g_data_type_desc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator \"%c\"", pinfo[0])
+	} else {
+		A.g_data_type_desc = fmt.Sprintf("ERROR!!!  Unknown APRS Data Type Indicator: unprintable 0x%02x", pinfo[0])
+	}
 
 	// Check for RFONLY or NOGATE in the destination field.
 	// Actual cases observed.
@@ -300,21 +316,8 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 			return A
 		} else {
 			A.g_data_type_desc = "Third Party Header: Unable to parse payload."
-			A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-			A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 		}
 	}
-
-	/*
-	 * Extract source and destination including the SSID.
-	 */
-	if third_party_src != "" {
-		A.g_src = third_party_src
-	} else {
-		A.g_src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-	}
-
-	A.g_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
 	//dw_printf ("DEBUG decode_aprs source=%s, dest=%s\n", A.g_src, A.g_dest);
 
