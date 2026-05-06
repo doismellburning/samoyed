@@ -325,7 +325,7 @@ x = Silence FX.25 information.`)
 		audio_config.adev[0].bits_per_sample = *bitsPerSample
 	}
 
-	if *bitrateStr != "" {
+	if pflag.Lookup("bitrate").Changed {
 		var bitrate, bitrateParseErr = strconv.Atoi(*bitrateStr)
 		if *bitrateStr == "AIS" {
 			bitrate = 0xA15A15
