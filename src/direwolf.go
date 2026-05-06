@@ -90,6 +90,7 @@ func DirewolfMain() {
 AIS for ship Automatic Identification System.
 EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var g3ruh = pflag.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
+	var bpsk = pflag.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
 	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
 	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
 	var modemProfile = pflag.StringP("modem-profile", "P", "", "Select the modem type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
@@ -389,6 +390,14 @@ x = Silence FX.25 information.`)
 		// Force G3RUH mode, overriding default for speed.
 		//   Example:   -B 2400 -g
 		audio_config.achan[0].modem_type = MODEM_SCRAMBLE
+		audio_config.achan[0].mark_freq = 0
+		audio_config.achan[0].space_freq = 0
+	}
+
+	if *bpsk {
+		// Force BPSK mode, overriding default for speed.
+		//   Example:   -B 300 -k
+		audio_config.achan[0].modem_type = MODEM_BPSK
 		audio_config.achan[0].mark_freq = 0
 		audio_config.achan[0].space_freq = 0
 	}

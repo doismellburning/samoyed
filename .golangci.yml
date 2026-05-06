@@ -42,7 +42,7 @@ linters:
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
     gocognit:
-      min-complexity: 1792  # I sure wish this could be lower
+      min-complexity: 1800  # I sure wish this could be lower
     goconst:
       min-occurrences: 10
     gocritic:

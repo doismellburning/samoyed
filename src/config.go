@@ -1717,6 +1717,10 @@ func config_init(fname string, p_audio_config *audio_s,
 
 							p_audio_config.achan[channel].offset = 50
 						}
+					} else if strings.EqualFold(t, "BPSK") { /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
+						p_audio_config.achan[channel].modem_type = MODEM_BPSK
+						p_audio_config.achan[channel].mark_freq = 0
+						p_audio_config.achan[channel].space_freq = 0
 					} else if alllettersorpm(t) { /* profile of letter(s) + - */
 						// Will be validated later.
 						p_audio_config.achan[channel].profiles = t
