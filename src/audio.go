@@ -123,6 +123,7 @@ const (
 	MODEM_64_QAM
 	MODEM_AIS
 	MODEM_EAS
+	MODEM_BPSK
 )
 
 type layer2_t int
