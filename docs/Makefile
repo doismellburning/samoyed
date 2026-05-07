@@ -34,9 +34,7 @@ clean:
 
 .PHONY: test
 test:
-	uv run coverage run --source $(SRCDIR) --module pytest test
-	uv run coverage report
-	uv run coverage html
+	uv run pytest test
 
 # Sphinx
 
