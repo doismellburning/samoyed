@@ -722,6 +722,34 @@ var adev [MAX_ADEVS]*adev_s
 var portaudioMu sync.Mutex
 var portaudioRefCount int
 
+// anyDeviceRequiresPortAudio reports whether any configured audio device needs
+// PortAudio (i.e. is a soundcard rather than stdin or UDP).  Used to skip
+// portaudio.Initialize() when all devices are stdin/UDP, so that samoyed can
+// run on systems with no working PortAudio host backend (issue #501).
+func anyDeviceRequiresPortAudio(pa *audio_s) bool {
+	for a := range MAX_ADEVS {
+		if pa.adev[a].defined == 0 {
+			continue
+		}
+
+		var inName = pa.adev[a].adevice_in
+		var inIsStdinOrDash = strings.EqualFold(inName, "stdin") || inName == "-"
+		var inIsUDP = strings.HasPrefix(strings.ToLower(inName), "udp:")
+
+		if !inIsStdinOrDash && !inIsUDP {
+			return true
+		}
+
+		var outIsUDP = strings.HasPrefix(strings.ToLower(pa.adev[a].adevice_out), "udp:")
+
+		if !outIsUDP {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Originally 40.  Version 1.2, try 10 for lower latency.
 
 const ONE_BUF_TIME = 10
@@ -959,31 +987,37 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 func audio_open(pa *audio_s) int {
 	save_audio_config_p = pa
 
-	// Initialize PortAudio, using a refcount so that multiple audio_open/
-	// audio_close cycles are correctly paired with Initialize/Terminate.
-	portaudioMu.Lock()
+	// Initialize PortAudio only if at least one configured device needs a
+	// soundcard.  Pure stdin/UDP configurations must work on systems with no
+	// working PortAudio host backend (issue #501).
+	var portaudioAcquired = false
 
-	if portaudioRefCount == 0 {
-		var err = portaudio.Initialize()
-		if err != nil {
-			portaudioMu.Unlock()
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("PortAudio initialization failed: %v\n", err)
+	if anyDeviceRequiresPortAudio(pa) {
+		portaudioMu.Lock()
 
-			return -1
+		if portaudioRefCount == 0 {
+			var err = portaudio.Initialize()
+			if err != nil {
+				portaudioMu.Unlock()
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("PortAudio initialization failed: %v\n", err)
+
+				return -1
+			}
 		}
+
+		portaudioRefCount++
+		portaudioAcquired = true
+
+		portaudioMu.Unlock()
 	}
-
-	portaudioRefCount++
-
-	portaudioMu.Unlock()
 
 	// If audio_open fails after this point, roll back the refcount increment
 	// so it stays correctly paired with audio_close calls.
 	var openSucceeded = false
 
 	defer func() {
-		if !openSucceeded {
+		if portaudioAcquired && !openSucceeded {
 			portaudioMu.Lock()
 
 			portaudioRefCount--

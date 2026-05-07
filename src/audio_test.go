@@ -241,6 +241,67 @@ func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 	assert.Equal(t, testData, buf[:n])
 }
 
+// --- anyDeviceRequiresPortAudio ---
+
+func makeAudioConfig(inName, outName string) *audio_s {
+	var pa = new(audio_s)
+	pa.adev[0].defined = 1
+	pa.adev[0].adevice_in = inName
+	pa.adev[0].adevice_out = outName
+
+	return pa
+}
+
+func Test_anyDeviceRequiresPortAudio(t *testing.T) {
+	tests := []struct {
+		name string
+		pa   *audio_s
+		want bool
+	}{
+		{
+			name: "no devices defined",
+			pa:   new(audio_s),
+			want: false,
+		},
+		{
+			name: "stdin in, udp out",
+			pa:   makeAudioConfig("stdin", "udp:127.0.0.1:1234"),
+			want: false,
+		},
+		{
+			name: "dash in, udp out",
+			pa:   makeAudioConfig("-", "udp:127.0.0.1:1234"),
+			want: false,
+		},
+		{
+			name: "udp in (uppercase), udp out",
+			pa:   makeAudioConfig("UDP:7355", "udp:127.0.0.1:1234"),
+			want: false,
+		},
+		{
+			name: "stdin in, soundcard out",
+			pa:   makeAudioConfig("stdin", "default"),
+			want: true,
+		},
+		{
+			name: "soundcard in, udp out",
+			pa:   makeAudioConfig("default", "udp:127.0.0.1:1234"),
+			want: true,
+		},
+		{
+			name: "soundcard in, soundcard out",
+			pa:   makeAudioConfig("default", "default"),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, anyDeviceRequiresPortAudio(tt.pa))
+		})
+	}
+}
+
 func Test_audioFlushReal_UDP_emptyBuffer_isNoop(t *testing.T) {
 	var dev = setupAdev0(t)
 	dev.udp_out_sock = &net.UDPConn{} // non-nil socket; must not be written to
