@@ -1,0 +1,56 @@
+[project]
+name = "samoyed-docs"
+version = "0"
+readme = "README.md"
+description = "Documentation site for Samoyed"
+requires-python = ">=3.14"
+dependencies = [
+    "sphinx>=9.1.0",
+    "sphinx-autobuild>=2025.8.25",
+    "structlog",
+]
+
+[tool.coverage.run]
+branch = true
+dynamic_context = "test_function"
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+
+[tool.coverage.html]
+show_contexts = true
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+ignore = [
+	"INP001",  # flake8-no-pep420: part of namespace package
+]
+select = [
+	"F",  # pyflakes
+	"E", "W",  # pycodestyle
+	"C90",  # mccabe
+	"I",  # isort
+	"N",  # pep8-naming
+	"UP",  # pyupgrade
+	"B",  # flake8-bugbear
+	"INP",  # flake8-no-pep420
+	"PLC0415",
+	"TID253",
+	"RUF",  # Ruff-specific rules
+	"PT",  # flake8-pytest-style
+	"SIM",  # flake8-simplify
+	"PERF",  # Perflint
+	"LOG",  # flake8-logging
+]
+
+[dependency-groups]
+dev = [
+    "coverage",
+    "pytest",
+    "ruff",
+    "ty",
+]
