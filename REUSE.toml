@@ -21,6 +21,7 @@ SPDX-License-Identifier = "GPL-2.0-or-later"
 [[annotations]]
 path = [
 	"*.md",
+	".claude/**",
 	".git*",
 	".github/**",
 	".golangci.yml",
