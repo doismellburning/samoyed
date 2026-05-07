@@ -157,3 +157,20 @@ jobs:
       - run: make bootstrap
       - run: make check
       - run: make dirhtml
+        id: docs-build
+      - uses: actions/upload-pages-artifact@v4
+        id: docs-upload-artifact
+        with:
+          path: docs/build/dirhtml/
+
+  docs-deploy:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+    runs-on: ubuntu-latest
+    needs: docs
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/deploy-pages@v4
