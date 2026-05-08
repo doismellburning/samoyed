@@ -2,18 +2,9 @@ version = 1
 
 [[annotations]]
 path = [
-	"*png",
-	"CMakeLists.txt",
-	"audio_win.txt",
 	"conf/**",
 	"data/**",
-	"doc/**",
 	"man/**",
-	"rpm/**",
-	"scripts/**",
-	"src/*.c",
-	"src/*.h",
-	"systemd/**",
 ]
 SPDX-FileCopyrightText = "The Dire Wolf Authors"
 SPDX-License-Identifier = "GPL-2.0-or-later"
