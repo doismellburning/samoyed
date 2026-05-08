@@ -138,3 +138,40 @@ jobs:
         fail_on_unmatched_files: true
         draft: true  # TODO Fix
         prerelease: true
+
+  docs:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: "docs"
+
+    env:
+      UV_LOCKED: 1  # Ensure lockfile is up to date at test time
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: make bootstrap
+      - run: make check
+      - run: make dirhtml
+        id: docs-build
+      - run: make test
+      - uses: actions/upload-pages-artifact@v4
+        id: docs-upload-artifact
+        with:
+          path: docs/build/dirhtml/
+
+  docs-deploy:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+    runs-on: ubuntu-latest
+    needs: docs
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/deploy-pages@v4

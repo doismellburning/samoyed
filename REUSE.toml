@@ -27,6 +27,7 @@ path = [
 	".golangci.yml",
 	"Makefile",
 	"cmd/**",
+	"docs/**",
 	"go.mod",
 	"go.sum",
 	"src/*.go",
