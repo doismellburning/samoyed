@@ -1,17 +1,16 @@
-.. Samoyed documentation master file, created by
-   sphinx-quickstart on Thu May  7 22:14:38 2026.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Welcome to Samoyed's documentation!
+===================================
 
-Samoyed documentation
-=====================
+..
+    Taken from ../README.md
 
-Add your content using ``reStructuredText`` syntax. See the
-`reStructuredText <https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_
-documentation for details.
+`Samoyed <https://github.com/doismellburning/samoyed>`__ is a fully-featured software modem/TNC for packet radio.
+It supports AX.25 v2.2, FX.25, IL2P, APRS, multi-speed modems (300-9600 bps), digipeating, IGates, and more.
+Samoyed is a Go port of `Dire Wolf <https://github.com/wb2osz/direwolf>`__.
 
+Samoyed builds on top of Dire Wolf and aims to be compatible.
+As such, `the Dire Wolf documentation <https://github.com/wb2osz/direwolf/tree/master/doc>`__ should provide a useful baseline.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-
