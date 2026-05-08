@@ -19,6 +19,8 @@ extensions = [
     "sphinx.ext.extlinks",
 ]
 
+pygments_style = "default"
+
 templates_path = ["_templates"]
 exclude_patterns = []
 
