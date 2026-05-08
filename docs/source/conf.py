@@ -15,6 +15,7 @@ author = "The Samoyed Authors"
 
 extensions = [
     "sphinx.ext.autosectionlabel",
+    "sphinx.ext.extlinks",
 ]
 
 templates_path = ["_templates"]
