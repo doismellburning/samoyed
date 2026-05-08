@@ -7,6 +7,10 @@
 * `make check` runs assorted linters and should always pass
 * `make fix` will attempt assorted auto-fixes and also do a partial lint run and is worth running after every change
 
+## Documentation
+
+* Update documentation in `docs/source` where appropriate
+
 ## Style
 
 * Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary e.g. with a `for` loop variable
