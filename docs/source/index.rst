@@ -14,3 +14,6 @@ As such, `the Dire Wolf documentation <https://github.com/wb2osz/direwolf/tree/m
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   :glob:
+
+   *
