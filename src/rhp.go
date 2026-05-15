@@ -435,13 +435,19 @@ func (svc *RHPService) removeClient(c *rhpClient) {
 // handleClient is the receive loop for one TCP connection.
 func (svc *RHPService) handleClient(c *rhpClient) {
 	defer func() {
-		// Clean up all open sockets.
+		// Copy sockets under lock, then release before cleanup to avoid
+		// deadlock: cleanupSocket must NOT be called with c.mu held.
 		c.mu.Lock()
+		var socksToClear = make([]*rhpSocket, 0, len(c.sockets))
 		for _, sock := range c.sockets {
-			svc.cleanupSocket(sock)
+			socksToClear = append(socksToClear, sock)
 		}
 		c.sockets = make(map[int]*rhpSocket)
 		c.mu.Unlock()
+
+		for _, sock := range socksToClear {
+			svc.cleanupSocket(sock)
+		}
 
 		c.conn.Close()
 		svc.removeClient(c)
