@@ -394,11 +394,6 @@ func (svc *RHPService) SendRecFrame(channel int, pp *packet_t, fbuf []byte) {
 	}
 }
 
-// incSeqno returns the next global sequence number.
-func (svc *RHPService) incSeqno() int {
-	return int(svc.seqno.Add(1))
-}
-
 // Close shuts down the RHP2 server by closing the TCP listener.
 // It is a no-op if the service is disabled or already closed.
 func (svc *RHPService) Close() error {
@@ -409,6 +404,11 @@ func (svc *RHPService) Close() error {
 		return nil
 	}
 	return ln.Close()
+}
+
+// incSeqno returns the next global sequence number.
+func (svc *RHPService) incSeqno() int {
+	return int(svc.seqno.Add(1))
 }
 
 // listen accepts incoming TCP connections.
