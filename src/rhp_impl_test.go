@@ -44,12 +44,14 @@ func freePort(t *testing.T) int {
 }
 
 // startRHP starts an RHPService on a free port and returns the service and port.
+// The service is automatically shut down when the test finishes.
 func startRHP(t *testing.T) (*RHPService, int) {
 	t.Helper()
 	var port = freePort(t)
 	var mc = new(misc_config_s)
 	mc.rhp_port = port
 	var svc = NewRHPService(mc)
+	t.Cleanup(func() { svc.Close() }) //nolint:errcheck
 	return svc, port
 }
 

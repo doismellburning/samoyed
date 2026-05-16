@@ -183,10 +183,11 @@ type rhpClient struct {
 
 // RHPService is the top-level RHP2 server.
 type RHPService struct {
-	port  int
-	mu    sync.Mutex
-	cs    []*rhpClient
-	seqno atomic.Int32
+	port     int
+	mu       sync.Mutex
+	cs       []*rhpClient
+	seqno    atomic.Int32
+	listener net.Listener
 }
 
 // NewRHPService creates a new RHP service.  If the configured port is 0
@@ -398,6 +399,18 @@ func (svc *RHPService) incSeqno() int {
 	return int(svc.seqno.Add(1))
 }
 
+// Close shuts down the RHP2 server by closing the TCP listener.
+// It is a no-op if the service is disabled or already closed.
+func (svc *RHPService) Close() error {
+	svc.mu.Lock()
+	var ln = svc.listener
+	svc.mu.Unlock()
+	if ln == nil {
+		return nil
+	}
+	return ln.Close()
+}
+
 // listen accepts incoming TCP connections.
 func (svc *RHPService) listen() {
 	var ln, err = net.Listen("tcp", fmt.Sprintf(":%d", svc.port))
@@ -406,6 +419,9 @@ func (svc *RHPService) listen() {
 		dw_printf("RHP2: Failed to listen on port %d: %v\n", svc.port, err)
 		return
 	}
+	svc.mu.Lock()
+	svc.listener = ln
+	svc.mu.Unlock()
 	defer ln.Close()
 
 	for {
