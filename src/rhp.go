@@ -123,10 +123,10 @@ type rhpCloseMsg struct {
 
 // rhpRecvMsg is the server-initiated RECV notification for connected-mode data.
 type rhpRecvMsg struct {
-	Type   string `json:"type"`
-	SeqNo  int    `json:"seqno"`
-	Handle int    `json:"handle"`
-	Data   string `json:"data"`
+	Type   string          `json:"type"`
+	SeqNo  int             `json:"seqno"`
+	Handle int             `json:"handle"`
+	Data   json.RawMessage `json:"data"`
 }
 
 // rhpTraceRecv is the server-initiated RECV notification for trace-mode frames.
@@ -154,11 +154,11 @@ type rhpRawRecv struct {
 
 // rhpDgramRecv is the server-initiated RECV notification for dgram-mode frames.
 type rhpDgramRecv struct {
-	Type   string `json:"type"`
-	SeqNo  int    `json:"seqno"`
-	Handle int    `json:"handle"`
-	Port   string `json:"port"`
-	Data   string `json:"data"`
+	Type   string          `json:"type"`
+	SeqNo  int             `json:"seqno"`
+	Handle int             `json:"handle"`
+	Port   string          `json:"port"`
+	Data   json.RawMessage `json:"data"`
 }
 
 // rhpSocket represents one virtual socket held by an RHP client.
@@ -295,7 +295,7 @@ func (svc *RHPService) RecConnData(_ int, rhpHandle int, _ string, _ string, _ i
 		Type:   "recv",
 		SeqNo:  svc.incSeqno(),
 		Handle: sock.handle,
-		Data:   string(data),
+		Data:   rhpEncodeData(data),
 	}
 	writeRHPMsg(c, msg) //nolint:errcheck
 }
@@ -386,7 +386,7 @@ func (svc *RHPService) SendRecFrame(channel int, pp *packet_t, fbuf []byte) {
 					SeqNo:  svc.incSeqno(),
 					Handle: sock.handle,
 					Port:   fmt.Sprintf("%d", channel),
-					Data:   string(info),
+					Data:   rhpEncodeData(info),
 				}
 				writeRHPMsg(c, msg) //nolint:errcheck
 			}
@@ -783,7 +783,7 @@ func (svc *RHPService) handleSend(c *rhpClient, env map[string]json.RawMessage) 
 		return
 	}
 
-	var payload = []byte(data)
+	var payload = rhpDecodeData(data)
 
 	switch sockMode {
 	case "dgram":
@@ -908,4 +908,61 @@ func optRHPStr(env map[string]json.RawMessage, key string) string {
 // sockPort == -1 means "all channels".
 func channelMatches(sockPort, channel int) bool {
 	return sockPort == -1 || sockPort == channel
+}
+
+// --- RHP2 binary-to-string encoding ----------------------------------------
+//
+// RHP2 carries arbitrary byte payloads in JSON string fields using a
+// non-standard encoding:
+//   - Bytes 0x08–0x0D, 0x22, 0x5C → standard JSON two-character escapes
+//   - Bytes 0x20–0x7E (printable ASCII, except " and \) → literal
+//   - All other bytes → \uXXXX, where XXXX is the byte value in hex
+//
+// This is NOT valid UTF-8 / Unicode.  \uXXXX escapes encode raw byte
+// values, not code points; decoding reverses this by taking the low byte
+// of each rune.
+
+// rhpEncodeData encodes b to a JSON string literal (including surrounding
+// quotes) using the RHP2 binary encoding.  The returned value is ready to
+// embed as a json.RawMessage.
+func rhpEncodeData(b []byte) json.RawMessage {
+	var buf strings.Builder
+	buf.WriteByte('"')
+	for _, c := range b {
+		switch c {
+		case '\b':
+			buf.WriteString(`\b`)
+		case '\t':
+			buf.WriteString(`\t`)
+		case '\n':
+			buf.WriteString(`\n`)
+		case '\f':
+			buf.WriteString(`\f`)
+		case '\r':
+			buf.WriteString(`\r`)
+		case '"':
+			buf.WriteString(`\"`)
+		case '\\':
+			buf.WriteString(`\\`)
+		default:
+			if c >= 0x20 && c <= 0x7E {
+				buf.WriteByte(c)
+			} else {
+				fmt.Fprintf(&buf, `\u%04x`, c)
+			}
+		}
+	}
+	buf.WriteByte('"')
+	return json.RawMessage(buf.String())
+}
+
+// rhpDecodeData decodes an RHP2 data string that has already been
+// JSON-decoded into a Go string.  Each rune's low byte is the decoded byte;
+// this correctly reverses the \uXXXX encoding used by RHP2.
+func rhpDecodeData(s string) []byte {
+	var result = make([]byte, 0, len(s))
+	for _, r := range s {
+		result = append(result, byte(r))
+	}
+	return result
 }

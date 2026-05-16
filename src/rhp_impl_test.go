@@ -644,7 +644,9 @@ func TestRHP_RecConnData_SendsRecv(t *testing.T) {
 	var msg = rhpRecvAs[rhpRecvMsg](t, conn)
 	assert.Equal(t, "recv", msg.Type)
 	assert.Equal(t, handle, msg.Handle)
-	assert.Equal(t, "connected data", msg.Data)
+	var msgData string
+	require.NoError(t, json.Unmarshal(msg.Data, &msgData))
+	assert.Equal(t, "connected data", msgData)
 }
 
 // ---------------------------------------------------------------------------
