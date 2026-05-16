@@ -4699,8 +4699,11 @@ func config_init(fname string, p_audio_config *audio_s,
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: Missing port number on line %d.\n", line)
 			} else {
-				var n, _ = strconv.Atoi(t)
-				if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
+				var n, nerr = strconv.Atoi(t)
+				if nerr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file: Invalid (non-numeric) port number for RHPPORT on line %d.\n", line)
+				} else if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 					p_misc_config.rhp_port = n
 				} else {
 					text_color_set(DW_COLOR_ERROR)
