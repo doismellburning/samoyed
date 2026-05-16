@@ -820,7 +820,8 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
-	p_misc_config *misc_config_s) {
+	p_misc_config *misc_config_s,
+	p_netrom_config *netrom_config_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -5260,6 +5261,10 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				t = split("", false)
 			}
+		} else if strings.EqualFold(t, "NETROM") {
+			if p_netrom_config != nil {
+				parseNetromConfig(line, split, p_netrom_config)
+			}
 		} else {
 			/*
 			 * Invalid command.
@@ -5383,6 +5388,86 @@ func config_init(fname string, p_audio_config *audio_s,
 		p_misc_config.maxv22 = p_misc_config.retry / 3
 	}
 } /* end config_init */
+
+// parseNetromConfig parses a NETROM config line into config.
+// Format: NETROM <channel> <callsign> <alias> [TTL <n>] [NODES <seconds>] [QUALITY <n>]
+// split is the token-scanner closure from config_init.
+func parseNetromConfig(line int, split func(string, bool) string, config *netrom_config_s) {
+	var t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Missing channel number for NETROM.\n", line)
+		return
+	}
+	var nrChan, nrChanErr = strconv.Atoi(t)
+	if nrChanErr != nil || nrChan < 0 || nrChan >= MAX_RADIO_CHANS {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Invalid channel %s for NETROM.\n", line, t)
+		return
+	}
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Missing callsign for NETROM.\n", line)
+		return
+	}
+	var nrCall = strings.ToUpper(t)
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Missing alias for NETROM.\n", line)
+		return
+	}
+	var nrAlias = strings.ToUpper(t)
+	if len(nrAlias) > netromAliasLen {
+		nrAlias = nrAlias[:netromAliasLen]
+	}
+
+	config.enabled = true
+	config.channel = nrChan
+	config.callsign = nrCall
+	config.alias = nrAlias
+
+	// Parse optional keyword=value pairs.
+	t = split("", false)
+	for t != "" {
+		switch strings.ToUpper(t) {
+		case "TTL":
+			t = split("", false)
+			var n, _ = strconv.Atoi(t)
+			if n > 0 && n <= 255 {
+				config.ttl = byte(n)
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Invalid TTL value %s for NETROM.\n", line, t)
+			}
+		case "NODES":
+			t = split("", false)
+			var n, _ = strconv.Atoi(t)
+			if n > 0 {
+				config.nodesInterval = n
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Invalid NODES interval %s for NETROM.\n", line, t)
+			}
+		case "QUALITY":
+			t = split("", false)
+			var n, _ = strconv.Atoi(t)
+			if n >= 0 && n <= 255 {
+				config.quality = byte(n)
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Invalid QUALITY value %s for NETROM.\n", line, t)
+			}
+		default:
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file, line %d: Unexpected NETROM option '%s'.\n", line, t)
+		}
+		t = split("", false)
+	}
+}
 
 /*
  * Parse the PBEACON or OBEACON options.
