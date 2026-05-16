@@ -251,15 +251,25 @@ func (svc *RHPService) LinkTerminated(_ int, rhpHandle int, _ string, _ string, 
 	if svc.port == 0 {
 		return
 	}
-	var c, sock = svc.findClientByRHPHandle(rhpHandle)
+	var c, _ = svc.findClientByRHPHandle(rhpHandle)
 	if c == nil {
 		return
 	}
 
 	// Remove the socket from the client's map since the link is gone.
 	c.mu.Lock()
-	delete(c.sockets, rhpHandle)
+	var sock, ok = c.sockets[rhpHandle]
+	if ok {
+		delete(c.sockets, rhpHandle)
+	}
 	c.mu.Unlock()
+
+	if !ok {
+		return
+	}
+
+	// Clean up dlq resources while NOT holding c.mu.
+	svc.cleanupSocket(sock)
 
 	var msg = rhpCloseMsg{
 		Type:   "close",
