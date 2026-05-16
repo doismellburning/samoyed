@@ -293,8 +293,9 @@ x = Silence FX.25 information.`)
 	var digi_config digi_config_s
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s
+	var netrom_config netrom_config_s
 
-	config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+	config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config, &netrom_config)
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < MIN_SAMPLES_PER_SEC || *audioSampleRate > MAX_SAMPLES_PER_SEC {
@@ -745,6 +746,7 @@ x = Silence FX.25 information.`)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(misc_config, d_c_opt)
+	netrom_init(&netrom_config)
 
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
@@ -1208,6 +1210,13 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
 				cdigipeater(channel, pp)
+			}
+		}
+
+		// NET/ROM transport: handle frames with PID 0xCF.
+		if ax25_get_pid(pp) == AX25_PID_NETROM {
+			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
+				netrom_rx(channel, pp)
 			}
 		}
 	}

@@ -1405,7 +1405,11 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				}
 			}
 
-			dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+			if pid == AX25_PID_NETROM && saveNetromConfig != nil && saveNetromConfig.enabled {
+				gNetromLinkMgr.connectRequest(int(cmd.Header.Portx), client, callsigns[AX25_DESTINATION], gNetromRouter)
+			} else {
+				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+			}
 		}
 
 	case 'D': /* Send Connected Data */
@@ -1428,7 +1432,18 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
-			dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+			if cmd.Header.PID == AX25_PID_NETROM && saveNetromConfig != nil && saveNetromConfig.enabled {
+				var nrCircuit = gNetromLinkMgr.findByCallsigns(
+					int(cmd.Header.Portx),
+					callsigns[AX25_SOURCE],
+					callsigns[AX25_DESTINATION],
+				)
+				if nrCircuit != nil {
+					gNetromLinkMgr.dataRequest(nrCircuit.localIdx, nrCircuit.localID, cmd.Data[:cmd.Header.DataLen])
+				}
+			} else {
+				dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+			}
 		}
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
@@ -1444,6 +1459,14 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			if saveNetromConfig != nil && saveNetromConfig.enabled {
+				var nrCircuit = gNetromLinkMgr.findByCallsigns(int(cmd.Header.Portx), callsigns[AX25_SOURCE], callsigns[AX25_DESTINATION])
+				if nrCircuit != nil {
+					gNetromLinkMgr.disconnectRequest(nrCircuit.localIdx, nrCircuit.localID)
+					break
+				}
+			}
 
 			dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}

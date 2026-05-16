@@ -209,9 +209,10 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 	var ttConfig tt_config_s
 	var igateConfig igate_config_s
 	var miscConfig misc_config_s
+	var netromConfig netrom_config_s
 
 	config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-		&ttConfig, &igateConfig, &miscConfig)
+		&ttConfig, &igateConfig, &miscConfig, &netromConfig)
 
 	return audioConfig, &miscConfig
 }
@@ -418,8 +419,9 @@ func Test_config_init_modem_directive(t *testing.T) {
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
+			var netromConfig netrom_config_s
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, &netromConfig)
 
 			assert.Equal(t, tt.wantBaud, audioConfig.achan[0].baud)
 			assert.Equal(t, tt.wantModemType, audioConfig.achan[0].modem_type)
