@@ -64,8 +64,8 @@ const (
 type rhpAuthReply struct {
 	Type    string `json:"type"`
 	ID      int    `json:"id,omitempty"`
-	ErrCode int    `json:"errCode"`
-	ErrText string `json:"errText"`
+	ErrCode int    `json:"errcode"`
+	ErrText string `json:"errtext"`
 }
 
 // rhpOpenReply is the server response to an OPEN message.
