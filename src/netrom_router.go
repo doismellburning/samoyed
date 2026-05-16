@@ -70,9 +70,10 @@ func (r *netromRouter) update(b *netromRoutingBroadcast, fromNeighbor string, lo
 		}
 	}
 
-	// Increment obsCount for routes not seen in this broadcast.
+	// Age only routes via fromNeighbor that were absent from this broadcast.
+	// Routes learned from other neighbors are unaffected by a single neighbor's omission.
 	for dst, entry := range r.routes {
-		if !seen[dst] {
+		if !seen[dst] && entry.neighbor == fromNeighbor {
 			entry.obsCount++
 		}
 	}
