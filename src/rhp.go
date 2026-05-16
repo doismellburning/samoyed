@@ -609,9 +609,11 @@ func (svc *RHPService) handleOpen(c *rhpClient, env map[string]json.RawMessage) 
 	if portStr != "" && portStr != "-1" {
 		var n int
 		var _, serr = fmt.Sscanf(portStr, "%d", &n)
-		if serr == nil {
-			channel = n
+		if serr != nil {
+			sendReply(0, rhpErrBadParam, fmt.Sprintf("invalid port %q", portStr))
+			return
 		}
+		channel = n
 	}
 
 	// Allocate a handle for this socket.
