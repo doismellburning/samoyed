@@ -765,8 +765,18 @@ func (svc *RHPService) handleSend(c *rhpClient, env map[string]json.RawMessage) 
 		return
 	}
 
+	// Copy the fields we need from the socket while holding c.mu to avoid
+	// a data race: LinkEstablished can mutate sock.remote concurrently.
 	c.mu.Lock()
 	var sock, ok = c.sockets[handle]
+	var sockMode, sockLocal, sockRemote string
+	var sockPort int
+	if ok {
+		sockMode = sock.mode
+		sockLocal = sock.local
+		sockRemote = sock.remote
+		sockPort = sock.port
+	}
 	c.mu.Unlock()
 	if !ok {
 		sendReply_(handle, rhpErrInvalidHandle, 0, "invalid handle")
@@ -775,11 +785,11 @@ func (svc *RHPService) handleSend(c *rhpClient, env map[string]json.RawMessage) 
 
 	var payload = []byte(data)
 
-	switch sock.mode {
+	switch sockMode {
 	case "dgram":
 		// Determine source and destination callsigns.
-		var src = sock.local
-		var dst = sock.remote
+		var src = sockLocal
+		var dst = sockRemote
 		// Allow per-send override of remote from the SEND message fields.
 		var remoteOverride = strings.ToUpper(optRHPStr(env, "remote"))
 		if remoteOverride != "" {
@@ -789,7 +799,7 @@ func (svc *RHPService) handleSend(c *rhpClient, env map[string]json.RawMessage) 
 			sendReply_(handle, rhpErrBadParam, 0, "dgram send requires local and remote callsigns")
 			return
 		}
-		var channel = sock.port
+		var channel = sockPort
 		if channel < 0 {
 			channel = 0 // default to channel 0 if "all channels"
 		}
@@ -805,17 +815,17 @@ func (svc *RHPService) handleSend(c *rhpClient, env map[string]json.RawMessage) 
 		sendReply_(handle, rhpErrOk, 0, "Ok")
 
 	case "stream":
-		if sock.local == "" || sock.remote == "" {
+		if sockLocal == "" || sockRemote == "" {
 			sendReply_(handle, rhpErrBadParam, 0, "stream send requires established connection")
 			return
 		}
-		var channel = sock.port
+		var channel = sockPort
 		if channel < 0 {
 			channel = 0
 		}
 		var addrs [AX25_MAX_ADDRS]string
-		addrs[AX25_SOURCE] = sock.local
-		addrs[AX25_DESTINATION] = sock.remote
+		addrs[AX25_SOURCE] = sockLocal
+		addrs[AX25_DESTINATION] = sockRemote
 		dlq_xmit_data_request(addrs, 2, channel, MAX_NET_CLIENTS+handle, AX25_PID_NO_LAYER_3, payload)
 		sendReply_(handle, rhpErrOk, rhpFlagConnected, "Ok")
 
