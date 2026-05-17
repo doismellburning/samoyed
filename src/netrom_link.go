@@ -150,6 +150,7 @@ func (m *netromLinkManager) connectRequest(channel, client int, dstNode string, 
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("NET/ROM: no route to %s\n", dstNode)
+		server_link_terminated(channel, client, dstNode, m.nodeCall, false)
 		return
 	}
 
