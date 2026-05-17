@@ -429,7 +429,15 @@ func (m *netromLinkManager) rxInfoAck(f *netromTransportFrame) {
 		c.stopT1()
 	}
 
-	c.trySend()
+	// NAK: fast-retransmit the oldest unacknowledged frame.
+	if f.flags&netromFlagNAK != 0 && c.outstanding[c.va] != nil {
+		netromTx(c.channel, c.remoteNode, c.outstanding[c.va])
+	}
+
+	// CHOKE: remote is busy; do not send more data now.
+	if f.flags&netromFlagChoke == 0 {
+		c.trySend()
+	}
 }
 
 // trySend transmits queued frames while the window allows. Must be called with c.mu held.
