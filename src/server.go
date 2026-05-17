@@ -1440,6 +1440,10 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				)
 				if nrCircuit != nil {
 					gNetromLinkMgr.dataRequest(nrCircuit.localIdx, nrCircuit.localID, cmd.Data[:cmd.Header.DataLen])
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("NET/ROM: AGW 'D': no circuit for %s→%s on port %d; data dropped.\n",
+						callsigns[AX25_SOURCE], callsigns[AX25_DESTINATION], cmd.Header.Portx)
 				}
 			} else {
 				dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
