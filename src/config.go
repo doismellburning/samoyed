@@ -5291,7 +5291,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
+					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", j)
 					p_digi_config.enabled[i][j] = false
 				}
 
