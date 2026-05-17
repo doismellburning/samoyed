@@ -112,6 +112,15 @@ func netrom_rx(fromChan int, pp *packet_t) {
 	gNetromLinkMgr.rxFrame(fromChan, f)
 }
 
+// netromConfigTTL returns the TTL to use for outbound frames, falling back to
+// NETROM_TTL_DEFAULT if the subsystem has not been initialised yet.
+func netromConfigTTL() byte {
+	if saveNetromConfig != nil && saveNetromConfig.ttl > 0 {
+		return saveNetromConfig.ttl
+	}
+	return NETROM_TTL_DEFAULT
+}
+
 // netromTx transmits a NET/ROM payload as an AX.25 UI frame to a neighbor.
 func netromTx(channel int, neighbor string, payload []byte) {
 	if saveNetromConfig == nil {

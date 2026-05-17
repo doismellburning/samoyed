@@ -166,7 +166,7 @@ func (m *netromLinkManager) connectRequest(channel, client int, dstNode string, 
 	c.mu.Unlock()
 
 	var payload = netromBuildConnect(
-		dstNode, m.nodeCall, NETROM_TTL_DEFAULT,
+		dstNode, m.nodeCall, netromConfigTTL(),
 		0, 0, // remote ckt fields – 0 because remote doesn't have a circuit yet.
 		c.localIdx, c.localID,
 		m.nodeCall, m.nodeAlias,
@@ -259,7 +259,7 @@ func (m *netromLinkManager) rxConnect(fromChan int, f *netromTransportFrame) {
 
 	// Send CONNECT ACK.
 	var payload = netromBuildConnAck(
-		f.net.src, m.nodeCall, NETROM_TTL_DEFAULT,
+		f.net.src, m.nodeCall, netromConfigTTL(),
 		f.origIdx, f.origID,
 		c.localIdx, c.localID,
 		c.window,
@@ -319,7 +319,7 @@ func (m *netromLinkManager) rxDisconnect(f *netromTransportFrame) {
 	c.stopT1()
 
 	var discAck = netromBuildDiscAck(
-		c.remoteNode, c.localNode, NETROM_TTL_DEFAULT,
+		c.remoteNode, c.localNode, netromConfigTTL(),
 		c.remoteIdx, c.remoteID,
 	)
 	netromTx(c.channel, c.remoteNode, discAck)
@@ -363,7 +363,7 @@ func (m *netromLinkManager) rxInfo(f *netromTransportFrame) {
 	// Validate sequence.
 	if f.txSeq != c.vr {
 		// Out-of-sequence: send NAK INFO ACK.
-		var ack = netromBuildInfoAck(c.remoteNode, c.localNode, NETROM_TTL_DEFAULT, c.remoteIdx, c.remoteID, c.vr, false, true)
+		var ack = netromBuildInfoAck(c.remoteNode, c.localNode, netromConfigTTL(), c.remoteIdx, c.remoteID, c.vr, false, true)
 		netromTx(c.channel, c.remoteNode, ack)
 		return
 	}
@@ -375,7 +375,7 @@ func (m *netromLinkManager) rxInfo(f *netromTransportFrame) {
 	if f.flags&netromFlagMore != 0 {
 		c.recvBuf = append(c.recvBuf, data...)
 		// Send INFO ACK for the fragment.
-		var ack = netromBuildInfoAck(c.remoteNode, c.localNode, NETROM_TTL_DEFAULT, c.remoteIdx, c.remoteID, c.vr, false, false)
+		var ack = netromBuildInfoAck(c.remoteNode, c.localNode, netromConfigTTL(), c.remoteIdx, c.remoteID, c.vr, false, false)
 		netromTx(c.channel, c.remoteNode, ack)
 		return
 	}
@@ -392,7 +392,7 @@ func (m *netromLinkManager) rxInfo(f *netromTransportFrame) {
 	}
 
 	// Send INFO ACK.
-	var ack = netromBuildInfoAck(c.remoteNode, c.localNode, NETROM_TTL_DEFAULT, c.remoteIdx, c.remoteID, c.vr, false, false)
+	var ack = netromBuildInfoAck(c.remoteNode, c.localNode, netromConfigTTL(), c.remoteIdx, c.remoteID, c.vr, false, false)
 	netromTx(c.channel, c.remoteNode, ack)
 }
 
@@ -430,7 +430,7 @@ func (c *netromCircuit) trySend() {
 		c.sendQueue = c.sendQueue[1:]
 
 		var payload = netromBuildInfo(
-			c.remoteNode, c.localNode, NETROM_TTL_DEFAULT,
+			c.remoteNode, c.localNode, netromConfigTTL(),
 			c.remoteIdx, c.remoteID,
 			c.vs, c.vr,
 			false, false, false,
@@ -457,7 +457,7 @@ func (c *netromCircuit) windowOpen() bool {
 
 // sendDisconnect transmits a DISCONNECT REQUEST. Must be called with c.mu held.
 func (c *netromCircuit) sendDisconnect() {
-	var payload = netromBuildDisconnect(c.remoteNode, c.localNode, NETROM_TTL_DEFAULT, c.remoteIdx, c.remoteID, c.vr)
+	var payload = netromBuildDisconnect(c.remoteNode, c.localNode, netromConfigTTL(), c.remoteIdx, c.remoteID, c.vr)
 	netromTx(c.channel, c.remoteNode, payload)
 }
 
@@ -496,7 +496,7 @@ func (c *netromCircuit) t1Expired() {
 	case nrStateAwaitingConnection:
 		// Retransmit CONNECT REQUEST.
 		var payload = netromBuildConnect(
-			c.remoteNode, c.localNode, NETROM_TTL_DEFAULT,
+			c.remoteNode, c.localNode, netromConfigTTL(),
 			0, 0,
 			c.localIdx, c.localID,
 			c.localNode, c.mgr.nodeAlias,
