@@ -1135,11 +1135,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			// New case for release 1.8.
 
 			if t == "=" {
-				t = split("", false)
-				if t != "" { //nolint:staticcheck
-				}
-
-				/////////  to be continued....  FIXME
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file: ADEVICE = n (copy-from) is not yet implemented. Line %d.\n", line)
+				continue
 			} else {
 				/* First channel of device is valid. */
 				// This might be changed to UDP or STDIN when the device name is examined.
