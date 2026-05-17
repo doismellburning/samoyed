@@ -409,6 +409,15 @@ func (m *netromLinkManager) rxInfoAck(f *netromTransportFrame) {
 		return
 	}
 
+	// Validate that N(R) acknowledges only frames we have actually sent.
+	// toAck and inFlight are computed mod 256; if toAck > inFlight the ACK
+	// refers to frames beyond V(S), which is invalid — discard silently.
+	var toAck = int(f.rxSeq-c.va) & 0xff
+	var inFlight = int(c.vs-c.va) & 0xff
+	if toAck > inFlight {
+		return
+	}
+
 	// Advance V(A) to N(R), clearing outstanding frames.
 	for c.va != f.rxSeq {
 		c.outstanding[c.va] = nil
