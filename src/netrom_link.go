@@ -515,7 +515,8 @@ func (c *netromCircuit) t1Expired() {
 		c.sendDisconnect()
 
 	case nrStateDisconnected:
-		// Nothing to retransmit.
+		// Nothing to retransmit; do not re-arm the timer.
+		return
 	}
 
 	c.startT1()
