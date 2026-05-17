@@ -63,6 +63,10 @@ func netrom_rx(fromChan int, pp *packet_t) {
 		return
 	}
 
+	if fromChan != saveNetromConfig.channel {
+		return
+	}
+
 	var info = ax25_get_info(pp)
 	if len(info) == 0 {
 		return
