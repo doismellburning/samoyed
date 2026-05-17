@@ -1100,7 +1100,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				if i < 0 || i >= MAX_ADEVS {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: Device number %d out of range for ADEVICE command on line %d.\n", adevice, line)
+					dw_printf("Config file: Device number %d out of range for ADEVICE command on line %d.\n", i, line)
 					dw_printf("If you really need more than %d audio devices, increase MAX_ADEVS and recompile.\n", MAX_ADEVS)
 
 					adevice = 0
@@ -1135,11 +1135,9 @@ func config_init(fname string, p_audio_config *audio_s,
 			// New case for release 1.8.
 
 			if t == "=" {
-				t = split("", false)
-				if t != "" { //nolint:staticcheck
-				}
-
-				/////////  to be continued....  FIXME
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file: ADEVICE = n (copy-from) is not yet implemented. Line %d.\n", line)
+				continue
 			} else {
 				/* First channel of device is valid. */
 				// This might be changed to UDP or STDIN when the device name is examined.
@@ -1181,7 +1179,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if adevice < 0 || adevice >= MAX_ADEVS {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Device number %d out of range for PADEVICE command on line %d.\n", adevice, line)
+				dw_printf("Config file: Device number %d out of range for PAIDEVICE command on line %d.\n", adevice, line)
 				adevice = 0
 
 				continue
@@ -1190,7 +1188,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			t = split("", true)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Missing name of audio device for PADEVICE command on line %d.\n", line)
+				dw_printf("Config file: Missing name of audio device for PAIDEVICE command on line %d.\n", line)
 
 				continue
 			}
@@ -1209,7 +1207,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if adevice < 0 || adevice >= MAX_ADEVS {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Device number %d out of range for PADEVICE command on line %d.\n", adevice, line)
+				dw_printf("Config file: Device number %d out of range for PAODEVICE command on line %d.\n", adevice, line)
 				adevice = 0
 
 				continue
@@ -1218,7 +1216,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			t = split("", true)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Missing name of audio device for PADEVICE command on line %d.\n", line)
+				dw_printf("Config file: Missing name of audio device for PAODEVICE command on line %d.\n", line)
 
 				continue
 			}
@@ -5291,7 +5289,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
+					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", j)
 					p_digi_config.enabled[i][j] = false
 				}
 
@@ -5323,7 +5321,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				if IsNoCall(p_audio_config.mycall[j]) {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", i)
+					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", j)
 					p_cdigi_config.enabled[i][j] = false
 				}
 
