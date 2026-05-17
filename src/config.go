@@ -1179,7 +1179,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if adevice < 0 || adevice >= MAX_ADEVS {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Device number %d out of range for PADEVICE command on line %d.\n", adevice, line)
+				dw_printf("Config file: Device number %d out of range for PAIDEVICE command on line %d.\n", adevice, line)
 				adevice = 0
 
 				continue
@@ -1188,7 +1188,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			t = split("", true)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Missing name of audio device for PADEVICE command on line %d.\n", line)
+				dw_printf("Config file: Missing name of audio device for PAIDEVICE command on line %d.\n", line)
 
 				continue
 			}
@@ -1207,7 +1207,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if adevice < 0 || adevice >= MAX_ADEVS {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Device number %d out of range for PADEVICE command on line %d.\n", adevice, line)
+				dw_printf("Config file: Device number %d out of range for PAODEVICE command on line %d.\n", adevice, line)
 				adevice = 0
 
 				continue
@@ -1216,7 +1216,7 @@ func config_init(fname string, p_audio_config *audio_s,
 			t = split("", true)
 			if t == "" {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Missing name of audio device for PADEVICE command on line %d.\n", line)
+				dw_printf("Config file: Missing name of audio device for PAODEVICE command on line %d.\n", line)
 
 				continue
 			}
