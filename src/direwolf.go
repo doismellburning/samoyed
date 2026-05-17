@@ -53,6 +53,7 @@ var waypointSender *WaypointSender
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
 var kissNetSvc *KissNetService
+var rhpSvc *RHPService
 var mheardDB *MHeardDB
 var xmitSvc *XmitService
 var ttGateway *TTGateway
@@ -751,6 +752,7 @@ x = Silence FX.25 information.`)
 	server_init(audio_config, misc_config)
 	kissNetSvc = NewKissNetService(misc_config)
 	kissNetSvc.SetDebug(d_n_opt)
+	rhpSvc = NewRHPService(misc_config)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
@@ -1128,6 +1130,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)   // KISS TCP
 	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
+	rhpSvc.SendRecFrame(channel, pp, fbuf)                                             // RHP2 JSON API
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25_from_text(ais_obj_packet, true)
@@ -1138,6 +1141,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			rhpSvc.SendRecFrame(channel, ao_pp, ao_fbuf)
 			ax25_delete(ao_pp)
 		}
 	}

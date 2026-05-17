@@ -18,7 +18,9 @@ func SLEEP_SEC(s int) {
 }
 
 // Because sometimes it's really convenient to have C's ternary ?:
-func IfThenElse[T any](x bool, a T, b T) T { //nolint:ireturn
+//
+//nolint:ireturn // generic function must return T
+func IfThenElse[T any](x bool, a T, b T) T {
 	if x {
 		return a
 	} else {
