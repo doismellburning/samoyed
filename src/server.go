@@ -1405,7 +1405,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				}
 			}
 
-			if pid == AX25_PID_NETROM && saveNetromConfig != nil && saveNetromConfig.enabled {
+			if pid == AX25_PID_NETROM && saveNetromConfig != nil && saveNetromConfig.enabled && int(cmd.Header.Portx) == saveNetromConfig.channel {
 				gNetromLinkMgr.connectRequest(int(cmd.Header.Portx), client, callsigns[AX25_DESTINATION], gNetromRouter)
 			} else {
 				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
