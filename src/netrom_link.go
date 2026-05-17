@@ -267,8 +267,10 @@ func (m *netromLinkManager) rxConnect(fromChan int, f *netromTransportFrame) {
 	)
 	netromTx(fromChan, f.net.src, payload)
 
-	// Notify the server/application layer.
-	server_link_established(fromChan, c.client, c.remoteCall, c.localCall, true)
+	// Notify the server/application layer if an AGW client owns this callsign.
+	if c.client >= 0 {
+		server_link_established(fromChan, c.client, c.remoteCall, c.localCall, true)
+	}
 }
 
 func (m *netromLinkManager) rxConnAck(f *netromTransportFrame) {
@@ -324,7 +326,7 @@ func (m *netromLinkManager) rxDisconnect(f *netromTransportFrame) {
 
 	var wasConnected = c.state == nrStateConnected || c.state == nrStateAwaitingConnection || c.state == nrStateAwaitingRelease
 	c.state = nrStateDisconnected
-	if wasConnected {
+	if wasConnected && c.client >= 0 {
 		server_link_terminated(c.channel, c.client, c.remoteCall, c.localCall, false)
 	}
 	m.removeCircuit(c)
@@ -385,7 +387,9 @@ func (m *netromLinkManager) rxInfo(f *netromTransportFrame) {
 	}
 
 	// Deliver to application.
-	server_rec_conn_data(c.channel, c.client, c.remoteCall, c.localCall, AX25_PID_NETROM, data)
+	if c.client >= 0 {
+		server_rec_conn_data(c.channel, c.client, c.remoteCall, c.localCall, AX25_PID_NETROM, data)
+	}
 
 	// Send INFO ACK.
 	var ack = netromBuildInfoAck(c.remoteNode, c.localNode, NETROM_TTL_DEFAULT, c.remoteIdx, c.remoteID, c.vr, false, false)
@@ -481,7 +485,9 @@ func (c *netromCircuit) t1Expired() {
 	c.rc++
 	if c.rc > netromMaxRetry {
 		c.state = nrStateDisconnected
-		server_link_terminated(c.channel, c.client, c.remoteCall, c.localCall, true)
+		if c.client >= 0 {
+			server_link_terminated(c.channel, c.client, c.remoteCall, c.localCall, true)
+		}
 		c.mgr.removeCircuit(c)
 		return
 	}
