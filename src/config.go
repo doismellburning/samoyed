@@ -5104,7 +5104,7 @@ func handleKISSPORT(ps *parseState) bool {
 		var channelErr error
 
 		kissChannel, channelErr = strconv.Atoi(t)
-		if ps.channel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
+		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d.\n", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
 
