@@ -3637,7 +3637,7 @@ func handleTTCORRAL(ps *parseState) bool {
 	t = split("", false)
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing longitude for TTCORRAL command.\n", ps.line)
+		dw_printf("Line %d: Missing offset-or-ambiguity for TTCORRAL command.\n", ps.line)
 		return true
 	}
 	ps.tt.corral_offset = parse_ll(t, LAT, ps.line)
