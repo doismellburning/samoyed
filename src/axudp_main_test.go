@@ -108,6 +108,31 @@ func TestAXUDPParseConfig(t *testing.T) {
 	}
 }
 
+func TestAXUDPParseConfigResolvesUDPAddr(t *testing.T) {
+	var dir = t.TempDir()
+	var p = filepath.Join(dir, "axudp.yaml")
+	var content = `maps:
+  - ax25addr: Q1TEST
+    host: 192.0.2.1
+    port: 93
+`
+	writeErr := os.WriteFile(p, []byte(content), 0600)
+	if writeErr != nil {
+		t.Fatal(writeErr)
+	}
+
+	var entries, err = axudpParseConfig(p)
+	if err != nil {
+		t.Fatalf("axudpParseConfig: unexpected error: %v", err)
+	}
+	if entries[0].UDPAddr == nil {
+		t.Fatal("axudpParseConfig: UDPAddr is nil, expected resolved address")
+	}
+	if entries[0].UDPAddr.String() != "192.0.2.1:93" {
+		t.Errorf("UDPAddr = %q, want %q", entries[0].UDPAddr.String(), "192.0.2.1:93")
+	}
+}
+
 func TestAXUDPParseConfigFileNotFound(t *testing.T) {
 	var _, err = axudpParseConfig("/nonexistent/axudp.yaml")
 	if err == nil {
@@ -186,8 +211,8 @@ func TestAXUDPParseConfigBadYAML(t *testing.T) {
 func TestAXUDPLookupMap(t *testing.T) {
 	var b = new(axudpBridge)
 	b.maps = []axudpMapEntry{
-		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93"},   // no SSID — should match all SSIDs
-		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93"}, // with SSID — exact match only
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // no SSID — should match all SSIDs
+		{AX25Addr: "Q2TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // with SSID — exact match only
 	}
 
 	var cases = []struct {

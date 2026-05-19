@@ -17,8 +17,9 @@ import (
 
 // axudpMapEntry holds one MAP line from the config.
 type axudpMapEntry struct {
-	AX25Addr string // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
-	Addr     string // resolved UDP address, e.g. "192.0.2.1:20093"
+	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
+	Addr     string       // UDP address string for display/logging, e.g. "192.0.2.1:20093"
+	UDPAddr  *net.UDPAddr // pre-resolved UDP address for sending
 }
 
 // axudpYAMLConfig is the top-level structure of the axudp.yaml config file.
@@ -57,9 +58,15 @@ func axudpParseConfig(path string) ([]axudpMapEntry, error) {
 		if m.Port < 1 || m.Port > 65535 {
 			return nil, fmt.Errorf("map entry %d: port %d out of range (1-65535)", i, m.Port)
 		}
+		var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
+		var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)
+		if resolveErr != nil {
+			return nil, fmt.Errorf("map entry %d: resolving %s: %w", i, addr, resolveErr)
+		}
 		entries = append(entries, axudpMapEntry{
 			AX25Addr: strings.ToUpper(m.AX25Addr),
-			Addr:     net.JoinHostPort(m.Host, strconv.Itoa(m.Port)),
+			Addr:     addr,
+			UDPAddr:  udpAddr,
 		})
 	}
 	return entries, nil
@@ -186,14 +193,8 @@ func axudpStripCRC(pkt []byte) ([]byte, bool) {
 // sendAXUDP sends a raw AX.25 frame to the given UDP address.
 // A CRC-CCITT checksum is always appended (per RFC 1226 / AXUDP convention).
 func (b *axudpBridge) sendAXUDP(ax25frame []byte, entry axudpMapEntry) {
-	var udpAddr, resolveErr = net.ResolveUDPAddr("udp", entry.Addr)
-	if resolveErr != nil {
-		fmt.Fprintf(os.Stderr, "samoyed-axudp: resolve %s: %v\n", entry.Addr, resolveErr)
-		return
-	}
-
 	var pkt = axudpAddCRC(ax25frame)
-	var n, writeErr = b.udpConn.WriteTo(pkt, udpAddr)
+	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP send to %s: %v\n", entry.Addr, writeErr)
 	} else if b.verbose {
