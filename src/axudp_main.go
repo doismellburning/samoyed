@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v3"
@@ -122,6 +123,11 @@ func (b *axudpBridge) removeClient(c net.Conn) {
 	b.mu.Unlock()
 }
 
+// axudpBroadcastWriteTimeout is the per-write deadline applied when forwarding
+// KISS frames to TCP clients.  A stalled client is disconnected after this
+// duration so it cannot block delivery to other clients.
+const axudpBroadcastWriteTimeout = 5 * time.Second
+
 // broadcastKISS sends a KISS-wrapped AX.25 frame to all KISS TCP clients.
 func (b *axudpBridge) broadcastKISS(ax25frame []byte) {
 	// Prepend type byte 0x00 (channel 0, DATA_FRAME) before KISS-encoding.
@@ -134,6 +140,7 @@ func (b *axudpBridge) broadcastKISS(ax25frame []byte) {
 	b.mu.Unlock()
 
 	for _, c := range snapshot {
+		_ = c.SetWriteDeadline(time.Now().Add(axudpBroadcastWriteTimeout))
 		var _, writeErr = c.Write(kissframe)
 		if writeErr != nil {
 			c.Close()
