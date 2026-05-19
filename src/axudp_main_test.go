@@ -243,3 +243,40 @@ func TestAXUDPLookupMap(t *testing.T) {
 		}
 	}
 }
+
+// TestKISSOverflowDiscarded verifies that a frame whose raw KISS bytes exceed
+// MAX_KISS_LEN is discarded on the closing FEND rather than forwarded in
+// truncated form.  It checks that the state machine resets cleanly.
+func TestKISSOverflowDiscarded(t *testing.T) {
+	// Empty bridge — no maps, so even an accidentally forwarded frame would
+	// just log to stderr rather than panic.
+	var b = new(axudpBridge)
+
+	// Build a KISS input: FEND + type byte + MAX_KISS_LEN data bytes + FEND.
+	// MAX_KISS_LEN data bytes is enough to trigger the overflow condition.
+	var buf []byte
+	buf = append(buf, FEND)
+	buf = append(buf, KISS_CMD_DATA_FRAME)
+	for range MAX_KISS_LEN {
+		buf = append(buf, 0x41)
+	}
+	buf = append(buf, FEND)
+
+	var kf kiss_frame_t
+	var overflow bool
+	for _, by := range buf {
+		my_kiss_rec_byte_axudp(&kf, &overflow, by, b)
+	}
+
+	// After the closing FEND the overflow flag should be cleared and the state
+	// machine should be back in KS_SEARCHING with kiss_len reset.
+	if overflow {
+		t.Error("overflow flag should be cleared after discarding frame")
+	}
+	if kf.state != KS_SEARCHING {
+		t.Errorf("state = %v after overflow frame, want KS_SEARCHING", kf.state)
+	}
+	if kf.kiss_len != 0 {
+		t.Errorf("kiss_len = %d after overflow frame, want 0", kf.kiss_len)
+	}
+}

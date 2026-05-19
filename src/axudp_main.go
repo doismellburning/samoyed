@@ -217,6 +217,7 @@ func (b *axudpBridge) handleKISSClient(conn net.Conn) {
 	b.addClient(conn)
 
 	var kf kiss_frame_t
+	var overflow bool
 
 	var buf = make([]byte, 2048)
 	for {
@@ -231,7 +232,7 @@ func (b *axudpBridge) handleKISSClient(conn net.Conn) {
 		}
 
 		for _, byt := range buf[:n] {
-			my_kiss_rec_byte_axudp(&kf, byt, b)
+			my_kiss_rec_byte_axudp(&kf, &overflow, byt, b)
 		}
 	}
 }
@@ -239,13 +240,17 @@ func (b *axudpBridge) handleKISSClient(conn net.Conn) {
 // my_kiss_rec_byte_axudp accumulates one KISS byte.
 // When a complete frame is collected, the AX.25 payload is extracted
 // and forwarded to the appropriate AXUDP destination.
-func my_kiss_rec_byte_axudp(kf *kiss_frame_t, b byte, b2 *axudpBridge) {
+// overflow must point to a caller-owned bool that persists across calls for the
+// same connection; it is set to true when a frame exceeds MAX_KISS_LEN and
+// cleared when collection resets, so the truncated frame is discarded.
+func my_kiss_rec_byte_axudp(kf *kiss_frame_t, overflow *bool, b byte, b2 *axudpBridge) {
 	switch kf.state {
 	default: // KS_SEARCHING
 		if b == FEND {
 			kf.kiss_len = 0
 			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
+			*overflow = false
 			kf.state = KS_COLLECTING
 		}
 
@@ -255,6 +260,16 @@ func my_kiss_rec_byte_axudp(kf *kiss_frame_t, b byte, b2 *axudpBridge) {
 				// Empty or double-FEND — restart.
 				kf.kiss_msg[0] = b
 				kf.kiss_len = 1
+				*overflow = false
+				return
+			}
+
+			if *overflow {
+				// Frame exceeded MAX_KISS_LEN; discard it entirely.
+				fmt.Fprintf(os.Stderr, "samoyed-axudp: KISS frame exceeded max length (%d bytes), discarding\n", MAX_KISS_LEN)
+				kf.kiss_len = 0
+				*overflow = false
+				kf.state = KS_SEARCHING
 				return
 			}
 
@@ -300,6 +315,8 @@ func my_kiss_rec_byte_axudp(kf *kiss_frame_t, b byte, b2 *axudpBridge) {
 		if kf.kiss_len < MAX_KISS_LEN {
 			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
+		} else {
+			*overflow = true
 		}
 	}
 }
