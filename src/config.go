@@ -5907,7 +5907,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = 0
 			} else if value[0] == 'r' || value[0] == 'R' {
 				var n, _ = strconv.Atoi(value[1:])
-				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
+				if n < 0 || n >= MAX_TOTAL_CHANS {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
+
+					continue
+				}
+				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
 
@@ -5918,7 +5924,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = n
 			} else if value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X' {
 				var n, _ = strconv.Atoi(value[1:])
-				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
+				if n < 0 || n >= MAX_TOTAL_CHANS {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+
+					continue
+				}
+				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
 
@@ -5929,7 +5941,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = n
 			} else {
 				var n, _ = strconv.Atoi(value)
-				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
+				if n < 0 || n >= MAX_TOTAL_CHANS {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+
+					continue
+				}
+				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
 
@@ -6159,7 +6177,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/* Check is here because could be using default channel when SENDTO= is not specified. */
 
 	if b.sendto_type == SENDTO_XMIT {
-		if (b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE) && p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE {
+		if b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
+
+			return errors.New("TODO")
+		}
+
+		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
 
