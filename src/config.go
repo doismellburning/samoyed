@@ -1641,10 +1641,14 @@ func handleNCHANNEL(ps *parseState) bool {
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
+
+			return true
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: NCHANNEL number must in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+
+		return true
 	}
 
 	t = split("", false)
