@@ -115,6 +115,61 @@ func TestAXUDPParseConfigFileNotFound(t *testing.T) {
 	}
 }
 
+func TestAXUDPParseConfigValidation(t *testing.T) {
+	var cases = []struct {
+		name    string
+		content string
+	}{
+		{
+			name: "empty ax25addr",
+			content: `maps:
+  - ax25addr: ""
+    host: 192.0.2.1
+    port: 93
+`,
+		},
+		{
+			name: "empty host",
+			content: `maps:
+  - ax25addr: Q1TEST
+    host: ""
+    port: 93
+`,
+		},
+		{
+			name: "port zero",
+			content: `maps:
+  - ax25addr: Q1TEST
+    host: 192.0.2.1
+    port: 0
+`,
+		},
+		{
+			name: "port too high",
+			content: `maps:
+  - ax25addr: Q1TEST
+    host: 192.0.2.1
+    port: 65536
+`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var dir = t.TempDir()
+			var p = filepath.Join(dir, "axudp.yaml")
+			writeErr := os.WriteFile(p, []byte(tc.content), 0600)
+			if writeErr != nil {
+				t.Fatal(writeErr)
+			}
+			var _, err = axudpParseConfig(p)
+			if err == nil {
+				t.Errorf("axudpParseConfig: expected error for %s, got nil", tc.name)
+			}
+		})
+	}
+}
+
 func TestAXUDPParseConfigBadYAML(t *testing.T) {
 	var dir = t.TempDir()
 	var p = filepath.Join(dir, "axudp.yaml")

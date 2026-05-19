@@ -47,7 +47,16 @@ func axudpParseConfig(path string) ([]axudpMapEntry, error) {
 	}
 
 	var entries = make([]axudpMapEntry, 0, len(cfg.Maps))
-	for _, m := range cfg.Maps {
+	for i, m := range cfg.Maps {
+		if m.AX25Addr == "" {
+			return nil, fmt.Errorf("map entry %d: ax25addr is empty", i)
+		}
+		if m.Host == "" {
+			return nil, fmt.Errorf("map entry %d: host is empty", i)
+		}
+		if m.Port < 1 || m.Port > 65535 {
+			return nil, fmt.Errorf("map entry %d: port %d out of range (1-65535)", i, m.Port)
+		}
 		entries = append(entries, axudpMapEntry{
 			AX25Addr: strings.ToUpper(m.AX25Addr),
 			Addr:     net.JoinHostPort(m.Host, strconv.Itoa(m.Port)),
