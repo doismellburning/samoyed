@@ -297,9 +297,13 @@ func my_kiss_rec_byte_axudp(kf *kiss_frame_t, b byte, b2 *axudpBridge) {
 	}
 }
 
+// maxUDPPayload is the maximum possible UDP payload size; no valid datagram can
+// exceed this, so a buffer of this size guarantees ReadFromUDP never truncates.
+const maxUDPPayload = 65535
+
 // runUDPListener reads incoming AXUDP datagrams and forwards them as KISS to all clients.
 func (b *axudpBridge) runUDPListener() {
-	var buf = make([]byte, 2048)
+	var buf = make([]byte, maxUDPPayload)
 	for {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
