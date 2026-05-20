@@ -1383,29 +1383,35 @@ func handleADEVICE(ps *parseState) bool {
 		return true
 	}
 
-	ps.audio.adev[ps.adevice].defined = 1
-
 	// New case for release 1.8.
 
 	if t == "=" {
+		t = split("", false)
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: ADEVICE = n (copy-from) is not yet implemented. Line %d.\n", ps.line)
+		if t == "" {
+			dw_printf("Config file: ADEVICE%d mapping syntax requires a source device number on line %d.\n", ps.adevice, ps.line)
+		} else {
+			dw_printf("Config file: ADEVICE%d = %s mapping syntax is not implemented on line %d.\n", ps.adevice, t, ps.line)
+		}
 
 		return true
-	} else {
-		/* First channel of device is valid. */
-		// This might be changed to UDP or STDIN when the device name is examined.
-		ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
-
-		ps.audio.adev[ps.adevice].adevice_in = t
-		ps.audio.adev[ps.adevice].adevice_out = t
-
-		t = split("", false)
-		if t != "" {
-			// Different audio devices for receive and transmit.
-			ps.audio.adev[ps.adevice].adevice_out = t
-		}
 	}
+
+	ps.audio.adev[ps.adevice].defined = 1
+
+	/* First channel of device is valid. */
+	// This might be changed to UDP or STDIN when the device name is examined.
+	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
+
+	ps.audio.adev[ps.adevice].adevice_in = t
+	ps.audio.adev[ps.adevice].adevice_out = t
+
+	t = split("", false)
+	if t != "" {
+		// Different audio devices for receive and transmit.
+		ps.audio.adev[ps.adevice].adevice_out = t
+	}
+
 	return false
 }
 
