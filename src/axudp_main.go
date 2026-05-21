@@ -143,8 +143,10 @@ func (b *axudpBridge) broadcastKISS(ax25frame []byte) {
 		_ = c.SetWriteDeadline(time.Now().Add(axudpBroadcastWriteTimeout))
 		var _, writeErr = c.Write(kissframe)
 		if writeErr != nil {
+			// Close the connection to unblock the read goroutine in
+			// handleKISSClient, which will call removeClient via its defer.
+			// We do not call removeClient here to keep teardown centralised.
 			c.Close()
-			b.removeClient(c)
 		}
 	}
 }
