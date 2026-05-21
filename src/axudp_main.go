@@ -338,8 +338,11 @@ func (b *axudpBridge) runUDPListener() {
 	for {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
-			fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP read: %v\n", readErr)
-			return
+			// A UDP read error means the socket is broken; the UDP side of
+			// the bridge is now dead.  Exit so the process can be restarted
+			// rather than silently continuing with no incoming traffic.
+			fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP listener fatal error: %v\n", readErr)
+			os.Exit(1)
 		}
 
 		if n < 1 {
