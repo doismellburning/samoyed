@@ -160,12 +160,17 @@ func ax25AddrBase(cs string) string {
 // lookupMap finds the MAP entry for the given destination AX.25 address.
 // A MAP entry with no SSID matches any SSID of that base address;
 // a MAP entry with an SSID matches only that exact address-SSID pair.
+// Exact matches always take priority over wildcard (no-SSID) matches,
+// regardless of the order entries appear in the config file.
 func (b *axudpBridge) lookupMap(dest string) (axudpMapEntry, bool) {
+	// First pass: exact match (callsign + SSID must match precisely).
 	for _, e := range b.maps {
 		if e.AX25Addr == dest {
 			return e, true
 		}
-		// If the MAP entry has no SSID, match dest regardless of its SSID.
+	}
+	// Second pass: base-call wildcard (entry has no SSID, matches any SSID).
+	for _, e := range b.maps {
 		if !strings.ContainsRune(e.AX25Addr, '-') && ax25AddrBase(dest) == e.AX25Addr {
 			return e, true
 		}

@@ -244,6 +244,35 @@ func TestAXUDPLookupMap(t *testing.T) {
 	}
 }
 
+// TestAXUDPLookupMapExactBeforeWildcard verifies that an exact SSID match takes
+// priority over a no-SSID (wildcard) entry regardless of YAML order.
+func TestAXUDPLookupMapExactBeforeWildcard(t *testing.T) {
+	// Wildcard entry is listed first; specific SSID entry is listed second.
+	// A lookup for Q1TEST-7 must return the specific entry, not the wildcard.
+	var b = new(axudpBridge)
+	b.maps = []axudpMapEntry{
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},   // wildcard — listed first
+		{AX25Addr: "Q1TEST-7", Addr: "192.0.2.2:93", UDPAddr: nil}, // specific SSID-7 — listed second
+	}
+
+	var entry, ok = b.lookupMap("Q1TEST-7")
+	if !ok {
+		t.Fatal("lookupMap(Q1TEST-7): not found")
+	}
+	if entry.Addr != "192.0.2.2:93" {
+		t.Errorf("lookupMap(Q1TEST-7): got addr %q, want specific entry 192.0.2.2:93 (exact match must beat wildcard)", entry.Addr)
+	}
+
+	// Wildcard should still match when no exact entry exists.
+	var entry2, ok2 = b.lookupMap("Q1TEST-3")
+	if !ok2 {
+		t.Fatal("lookupMap(Q1TEST-3): not found via wildcard")
+	}
+	if entry2.Addr != "192.0.2.1:93" {
+		t.Errorf("lookupMap(Q1TEST-3): got addr %q, want wildcard entry 192.0.2.1:93", entry2.Addr)
+	}
+}
+
 // TestKISSOverflowDiscarded verifies that a frame whose raw KISS bytes exceed
 // MAX_KISS_LEN is discarded on the closing FEND rather than forwarded in
 // truncated form.  It checks that the state machine resets cleanly.
