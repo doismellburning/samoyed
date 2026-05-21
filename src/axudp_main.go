@@ -356,8 +356,10 @@ func (b *axudpBridge) runUDPListener() {
 		}
 
 		if b.verbose {
-			var src = axudpExtractDest(ax25frame) // dest field of incoming = the remote station
-			fmt.Printf("samoyed-axudp: received AXUDP datagram, %d bytes, src address=%q\n", n, src)
+			// The first 7 bytes of an AX.25 frame are the destination address —
+			// for an incoming AXUDP datagram this is typically our local callsign.
+			var dest = axudpExtractDest(ax25frame)
+			fmt.Printf("samoyed-axudp: received AXUDP datagram, %d bytes, dest address=%q\n", n, dest)
 		}
 		b.broadcastKISS(ax25frame)
 	}
