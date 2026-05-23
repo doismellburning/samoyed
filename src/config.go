@@ -1652,7 +1652,7 @@ func handleNCHANNEL(ps *parseState) bool {
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: NCHANNEL number must in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+		dw_printf("Line %d: NCHANNEL number must be in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 
 		return true
 	}
