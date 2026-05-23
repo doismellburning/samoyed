@@ -15,7 +15,7 @@ package direwolf
 
 import (
 	"bufio"
-	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -5850,7 +5850,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file: No = found in, %s, on line %d.\n", t, line)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: no = found in %q", line, t)
 		}
 
 		// QUICK TEMP EXPERIMENT, maybe permanent new feature.
@@ -6103,7 +6103,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Invalid option keyword, %s.\n", line, keyword)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: invalid option keyword %q", line, keyword)
 		}
 	}
 
@@ -6187,14 +6187,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: send-to channel %d is out of range", line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: send-to channel %d has no medium configured", line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_IGATE { // Prevent subscript out of bounds.
@@ -6203,14 +6203,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0)
 
-				return errors.New("TODO")
+				return fmt.Errorf("config file line %d: MYCALL must be set for channel 0 before beaconing", line)
 			}
 		} else {
 			if IsNoCall(p_audio_config.mycall[b.sendto_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan)
 
-				return errors.New("TODO")
+				return fmt.Errorf("config file line %d: MYCALL must be set for channel %d before beaconing", line, b.sendto_chan)
 			}
 		}
 	}
