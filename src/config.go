@@ -15,7 +15,7 @@ package direwolf
 
 import (
 	"bufio"
-	"errors"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -1383,29 +1383,35 @@ func handleADEVICE(ps *parseState) bool {
 		return true
 	}
 
-	ps.audio.adev[ps.adevice].defined = 1
-
 	// New case for release 1.8.
 
 	if t == "=" {
+		t = split("", false)
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: ADEVICE = n (copy-from) is not yet implemented. Line %d.\n", ps.line)
+		if t == "" {
+			dw_printf("Config file: ADEVICE%d mapping syntax requires a source device number on line %d.\n", ps.adevice, ps.line)
+		} else {
+			dw_printf("Config file: ADEVICE%d = %s mapping syntax is not implemented on line %d.\n", ps.adevice, t, ps.line)
+		}
 
 		return true
-	} else {
-		/* First channel of device is valid. */
-		// This might be changed to UDP or STDIN when the device name is examined.
-		ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
-
-		ps.audio.adev[ps.adevice].adevice_in = t
-		ps.audio.adev[ps.adevice].adevice_out = t
-
-		t = split("", false)
-		if t != "" {
-			// Different audio devices for receive and transmit.
-			ps.audio.adev[ps.adevice].adevice_out = t
-		}
 	}
+
+	ps.audio.adev[ps.adevice].defined = 1
+
+	/* First channel of device is valid. */
+	// This might be changed to UDP or STDIN when the device name is examined.
+	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
+
+	ps.audio.adev[ps.adevice].adevice_in = t
+	ps.audio.adev[ps.adevice].adevice_out = t
+
+	t = split("", false)
+	if t != "" {
+		// Different audio devices for receive and transmit.
+		ps.audio.adev[ps.adevice].adevice_out = t
+	}
+
 	return false
 }
 
@@ -1641,10 +1647,14 @@ func handleNCHANNEL(ps *parseState) bool {
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
+
+			return true
 		}
 	} else {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: NCHANNEL number must in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+		dw_printf("Line %d: NCHANNEL number must be in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+
+		return true
 	}
 
 	t = split("", false)
@@ -3633,7 +3643,7 @@ func handleTTCORRAL(ps *parseState) bool {
 	t = split("", false)
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing longitude for TTCORRAL command.\n", ps.line)
+		dw_printf("Line %d: Missing offset-or-ambiguity for TTCORRAL command.\n", ps.line)
 		return true
 	}
 	ps.tt.corral_offset = parse_ll(t, LAT, ps.line)
@@ -5100,7 +5110,7 @@ func handleKISSPORT(ps *parseState) bool {
 		var channelErr error
 
 		kissChannel, channelErr = strconv.Atoi(t)
-		if ps.channel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
+		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d.\n", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
 
@@ -5840,7 +5850,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file: No = found in, %s, on line %d.\n", t, line)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: no = found in %q", line, t)
 		}
 
 		// QUICK TEMP EXPERIMENT, maybe permanent new feature.
@@ -5903,7 +5913,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = 0
 			} else if value[0] == 'r' || value[0] == 'R' {
 				var n, _ = strconv.Atoi(value[1:])
-				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
+				if n < 0 || n >= MAX_TOTAL_CHANS {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
+
+					continue
+				}
+				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
 
@@ -5914,7 +5930,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = n
 			} else if value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X' {
 				var n, _ = strconv.Atoi(value[1:])
-				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
+				if n < 0 || n >= MAX_TOTAL_CHANS {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+
+					continue
+				}
+				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
 
@@ -5925,7 +5947,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_chan = n
 			} else {
 				var n, _ = strconv.Atoi(value)
-				if (n < 0 || n >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[n] == MEDIUM_NONE) && p_audio_config.chan_medium[n] != MEDIUM_IGATE {
+				if n < 0 || n >= MAX_TOTAL_CHANS {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+
+					continue
+				}
+				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
 
@@ -6075,7 +6103,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Invalid option keyword, %s.\n", line, keyword)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: invalid option keyword %q", line, keyword)
 		}
 	}
 
@@ -6155,11 +6183,18 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/* Check is here because could be using default channel when SENDTO= is not specified. */
 
 	if b.sendto_type == SENDTO_XMIT {
-		if (b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS || p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE) && p_audio_config.chan_medium[b.sendto_chan] != MEDIUM_IGATE {
+		if b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
 
-			return errors.New("TODO")
+			return fmt.Errorf("config file line %d: send-to channel %d is out of range", line, b.sendto_chan)
+		}
+
+		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
+
+			return fmt.Errorf("config file line %d: send-to channel %d has no medium configured", line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_IGATE { // Prevent subscript out of bounds.
@@ -6168,14 +6203,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0)
 
-				return errors.New("TODO")
+				return fmt.Errorf("config file line %d: MYCALL must be set for channel 0 before beaconing", line)
 			}
 		} else {
 			if IsNoCall(p_audio_config.mycall[b.sendto_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan)
 
-				return errors.New("TODO")
+				return fmt.Errorf("config file line %d: MYCALL must be set for channel %d before beaconing", line, b.sendto_chan)
 			}
 		}
 	}
