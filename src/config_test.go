@@ -340,6 +340,15 @@ func Test_config_init_adevice(t *testing.T) {
 		assert.Equal(t, "hw:1,0", cfg.adev[1].adevice_in)
 		assert.Equal(t, "hw:1,0", cfg.adev[1].adevice_out)
 	})
+
+	t.Run("ADEVICE1 = n mapping syntax is rejected and leaves device 1 undefined", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "ADEVICE1 = 0\n")
+		// The = (copy-from) mapping syntax is unimplemented; the handler must
+		// return early without marking device 1 as defined or assigning any
+		// channel medium for its first channel (channel 2 = ADEVFIRSTCHAN(1)).
+		assert.Equal(t, 0, cfg.adev[1].defined)
+		assert.Equal(t, MEDIUM_NONE, cfg.chan_medium[ADEVFIRSTCHAN(1)])
+	})
 }
 
 // --- config_init CHANNEL directive ---
