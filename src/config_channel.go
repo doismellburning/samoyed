@@ -146,7 +146,14 @@ func handleNCHANNEL(ps *parseState) bool {
 
 		return true
 	}
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil || n < MIN_IP_PORT_NUMBER || n > MAX_IP_PORT_NUMBER {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d.\n",
+			ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
+
+		return true
+	}
 	ps.audio.nettnc_port[nchan] = n
 	return false
 }
