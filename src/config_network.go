@@ -22,7 +22,13 @@ func handleAGWPORT(ps *parseState) bool {
 
 		return true
 	}
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid port number \"%s\" for AGWPORT command.\n", ps.line, t)
+
+		return true
+	}
 
 	t = split("", false)
 	if t != "" {
@@ -74,7 +80,13 @@ func handleKISSPORT(ps *parseState) bool {
 
 		return true
 	}
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid TCP port number \"%s\" for KISSPORT command.\n", ps.line, t)
+
+		return true
+	}
 
 	var tcp_port int
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
