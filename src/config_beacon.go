@@ -236,7 +236,12 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "EVERY") {
 			b.every = parse_interval(value, line)
 		} else if strings.EqualFold(keyword, "SENDTO") {
-			if value[0] == 'i' || value[0] == 'I' {
+			if len(value) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Missing value for SENDTO option.\n", line)
+
+				continue
+			} else if value[0] == 'i' || value[0] == 'I' {
 				b.sendto_type = SENDTO_IGATE
 				b.sendto_chan = 0
 			} else if value[0] == 'r' || value[0] == 'R' {
