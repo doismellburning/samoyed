@@ -33,7 +33,7 @@ func handleADEVICE(ps *parseState) bool {
 
 		if i < 0 || i >= MAX_ADEVS {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Device number %d out of range for ADEVICE command on line %d.\n", ps.adevice, ps.line)
+			dw_printf("Config file: Device number %d out of range for ADEVICE command on line %d.\n", i, ps.line)
 			dw_printf("If you really need more than %d audio devices, increase MAX_ADEVS and recompile.\n", MAX_ADEVS)
 
 			ps.adevice = 0
