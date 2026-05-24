@@ -4,9 +4,12 @@
 package direwolf
 
 import (
+	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestAXUDPAddCRC(t *testing.T) {
@@ -379,5 +382,51 @@ func TestKISSOverflowDiscarded(t *testing.T) {
 	}
 	if kf.kiss_len != 0 {
 		t.Errorf("kiss_len = %d after overflow frame, want 0", kf.kiss_len)
+	}
+}
+
+// fakeConn is a minimal net.Conn implementation that records Write calls.
+type fakeConn struct {
+	mu     sync.Mutex
+	writes [][]byte
+}
+
+func (f *fakeConn) Write(b []byte) (int, error) {
+	f.mu.Lock()
+	f.writes = append(f.writes, append([]byte(nil), b...))
+	f.mu.Unlock()
+	return len(b), nil
+}
+
+func (f *fakeConn) SetWriteDeadline(_ time.Time) error { return nil }
+func (f *fakeConn) Close() error                       { return nil }
+func (f *fakeConn) Read(_ []byte) (int, error)         { return 0, nil }
+func (f *fakeConn) LocalAddr() net.Addr                { return nil }
+func (f *fakeConn) RemoteAddr() net.Addr               { return nil }
+func (f *fakeConn) SetDeadline(_ time.Time) error      { return nil }
+func (f *fakeConn) SetReadDeadline(_ time.Time) error  { return nil }
+
+// TestBroadcastKISSDropsOversizedFrame verifies that broadcastKISS does not
+// write a KISS-encoded frame to clients when the on-wire length would exceed
+// MAX_KISS_LEN.  Oversized frames would be silently truncated by the nettnc.go
+// KISS reader, producing corrupt AX.25 data.
+func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
+	var b = new(axudpBridge)
+	var fc = new(fakeConn)
+	b.clients = []net.Conn{fc}
+
+	// An AX.25 frame large enough that kiss_encapsulate produces > MAX_KISS_LEN
+	// bytes: payload = 1 type byte + ax25frame, encapsulated with 2 FENDs.
+	// With no bytes needing escaping, output = len(payload) + 2 bytes.
+	// We need len(payload) > MAX_KISS_LEN - 2, so len(ax25frame) >= MAX_KISS_LEN - 2.
+	var ax25frame = make([]byte, MAX_KISS_LEN)
+	b.broadcastKISS(ax25frame)
+
+	fc.mu.Lock()
+	var writeCount = len(fc.writes)
+	fc.mu.Unlock()
+
+	if writeCount != 0 {
+		t.Errorf("broadcastKISS wrote %d frame(s) to client for oversized frame, want 0", writeCount)
 	}
 }

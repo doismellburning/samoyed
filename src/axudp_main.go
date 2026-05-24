@@ -134,6 +134,14 @@ func (b *axudpBridge) broadcastKISS(ax25frame []byte) {
 	var payload = append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...)
 	var kissframe = kiss_encapsulate(payload)
 
+	// The nettnc.go KISS reader uses a fixed [MAX_KISS_LEN] accumulator and
+	// will silently truncate any on-wire frame that exceeds that limit,
+	// producing corrupt AX.25 data.  Drop the frame instead.
+	if len(kissframe) > MAX_KISS_LEN {
+		fmt.Fprintf(os.Stderr, "samoyed-axudp: dropping oversized KISS frame (%d bytes > %d), AX.25 frame too large\n", len(kissframe), MAX_KISS_LEN)
+		return
+	}
+
 	b.mu.Lock()
 	var snapshot = make([]net.Conn, len(b.clients))
 	copy(snapshot, b.clients)
