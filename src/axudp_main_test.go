@@ -273,6 +273,78 @@ func TestAXUDPLookupMapExactBeforeWildcard(t *testing.T) {
 	}
 }
 
+// TestKISSExactlyFullBufferDiscarded verifies that a KISS frame that fills the
+// accumulator buffer exactly (kf.kiss_len == MAX_KISS_LEN when the closing FEND
+// arrives, so no room to append the closing FEND) is treated as overflow and
+// discarded rather than forwarded as a truncated/unterminated frame.
+//
+// The frame is constructed so that, if forwarded, sendAXUDP would be called on a
+// bridge with a nil UDP connection, which would panic.  A panic therefore means
+// the frame was forwarded; no panic means it was correctly discarded.
+func TestKISSExactlyFullBufferDiscarded(t *testing.T) {
+	// Build a bridge with a map entry that matches the destination encoded in
+	// the test frame below.  The udpConn is intentionally left nil so that any
+	// accidental call to sendAXUDP panics immediately.
+	var b = new(axudpBridge)
+	b.maps = []axudpMapEntry{
+		{AX25Addr: "Q1TEST", Addr: "192.0.2.1:93", UDPAddr: nil},
+	}
+
+	// The KISS DATA frame payload is: type byte (0x00) followed by an AX.25
+	// frame whose first 7 bytes are the encoded destination "Q1TEST\x00" (SSID
+	// 0, end-of-address bit set → 0xE0).  We pad the rest to reach exactly
+	// MAX_KISS_LEN - 1 content bytes so that together with the opening FEND
+	// the accumulator holds exactly MAX_KISS_LEN bytes when the closing FEND
+	// arrives (kf.kiss_len == MAX_KISS_LEN, *overflow == false).
+	//
+	// AX.25 address encoding: each character shifted left one bit.
+	// Q=0x51<<1=0xA2, 1=0x31<<1=0x62, T=0x54<<1=0xA8, E=0x45<<1=0x8A, S=0x53<<1=0xA6, T=0x54<<1=0xA8
+	// SSID byte: 0xE0 (no SSID, end-of-address-field set for destination)
+	var ax25Dest = []byte{0xA2, 0x62, 0xA8, 0x8A, 0xA6, 0xA8, 0xE0}
+
+	// Total content bytes = 1 (type) + len(ax25Dest) + padding = MAX_KISS_LEN - 1
+	var padLen = MAX_KISS_LEN - 1 - 1 - len(ax25Dest)
+	var content []byte
+	content = append(content, KISS_CMD_DATA_FRAME) // type byte
+	content = append(content, ax25Dest...)
+	for range padLen {
+		content = append(content, 0x41)
+	}
+
+	// Build stream: FEND + content (MAX_KISS_LEN-1 bytes) + FEND.
+	// Opening FEND → kf.kiss_len = 1; content → kf.kiss_len = MAX_KISS_LEN;
+	// closing FEND arrives with kf.kiss_len == MAX_KISS_LEN, *overflow == false.
+	var buf []byte
+	buf = append(buf, FEND)
+	buf = append(buf, content...)
+	buf = append(buf, FEND)
+
+	// If the frame is forwarded despite being unterminated, sendAXUDP will
+	// dereference the nil udpConn and panic — recover it as a test failure.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("exactly-full buffer frame was forwarded (sendAXUDP panicked): %v", r)
+		}
+	}()
+
+	var kf kiss_frame_t
+	var overflow bool
+	for _, by := range buf {
+		my_kiss_rec_byte_axudp(&kf, &overflow, by, b)
+	}
+
+	// After the closing FEND the state machine must reset cleanly.
+	if overflow {
+		t.Error("overflow flag should be cleared after discarding exactly-full frame")
+	}
+	if kf.state != KS_SEARCHING {
+		t.Errorf("state = %v after exactly-full frame, want KS_SEARCHING", kf.state)
+	}
+	if kf.kiss_len != 0 {
+		t.Errorf("kiss_len = %d after exactly-full frame, want 0", kf.kiss_len)
+	}
+}
+
 // TestKISSOverflowDiscarded verifies that a frame whose raw KISS bytes exceed
 // MAX_KISS_LEN is discarded on the closing FEND rather than forwarded in
 // truncated form.  It checks that the state machine resets cleanly.

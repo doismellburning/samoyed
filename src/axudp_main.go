@@ -271,8 +271,9 @@ func my_kiss_rec_byte_axudp(kf *kiss_frame_t, overflow *bool, b byte, b2 *axudpB
 				return
 			}
 
-			if *overflow {
-				// Frame exceeded MAX_KISS_LEN; discard it entirely.
+			if *overflow || kf.kiss_len >= MAX_KISS_LEN {
+				// Frame exceeded MAX_KISS_LEN, or filled the buffer exactly
+				// leaving no room for the closing FEND — discard it entirely.
 				fmt.Fprintf(os.Stderr, "samoyed-axudp: KISS frame exceeded max length (%d bytes), discarding\n", MAX_KISS_LEN)
 				kf.kiss_len = 0
 				*overflow = false
