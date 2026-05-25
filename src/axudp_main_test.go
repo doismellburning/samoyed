@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -405,6 +406,108 @@ func (f *fakeConn) LocalAddr() net.Addr                { return nil }
 func (f *fakeConn) RemoteAddr() net.Addr               { return nil }
 func (f *fakeConn) SetDeadline(_ time.Time) error      { return nil }
 func (f *fakeConn) SetReadDeadline(_ time.Time) error  { return nil }
+
+// singleReadConn is a net.Conn that returns a fixed payload together with
+// io.EOF on the first Read call, simulating a TCP connection that delivers its
+// last bytes in the same call as EOF (the (n>0, err!=nil) case permitted by the
+// io.Reader contract).  Subsequent calls return (0, io.EOF).
+type singleReadConn struct {
+	fakeConn
+
+	data []byte
+	mu   sync.Mutex
+	done bool
+}
+
+func (c *singleReadConn) Read(b []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.done {
+		return 0, io.EOF
+	}
+	c.done = true
+	return copy(b, c.data), io.EOF
+}
+
+// TestHandleKISSClientProcessesFinalReadBytes is a regression test for the
+// case where conn.Read returns (n>0, io.EOF): bytes in the final read must be
+// processed before the loop exits, not silently dropped.
+func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
+	// Create a UDP socket pair: src is used by the bridge, dst receives frames.
+	var srcPkt, srcErr = net.ListenPacket("udp", "127.0.0.1:0")
+	if srcErr != nil {
+		t.Fatal(srcErr)
+	}
+	defer srcPkt.Close()
+
+	var dstPkt, dstErr = net.ListenPacket("udp", "127.0.0.1:0")
+	if dstErr != nil {
+		t.Fatal(dstErr)
+	}
+	defer dstPkt.Close()
+
+	var dstUDP, dstOK = dstPkt.(*net.UDPConn)
+	if !dstOK {
+		t.Fatal("dstPkt is not a *net.UDPConn")
+	}
+	var dstLocalAddr = dstUDP.LocalAddr()
+	var dstAddr, dstAddrOK = dstLocalAddr.(*net.UDPAddr)
+	if !dstAddrOK {
+		t.Fatal("dstPkt local addr is not a *net.UDPAddr")
+	}
+
+	var srcUDP, srcOK = srcPkt.(*net.UDPConn)
+	if !srcOK {
+		t.Fatal("srcPkt is not a *net.UDPConn")
+	}
+
+	// Build a minimal KISS DATA frame carrying an AX.25 frame destined for Q1TEST.
+	// AX.25 encoding: each callsign character shifted left 1 bit.
+	// Q=0xA2 1=0x62 T=0xA8 E=0x8A S=0xA6 T=0xA8  SSID=0xE0 (no SSID, end-of-addr)
+	var ax25Dest = []byte{0xA2, 0x62, 0xA8, 0x8A, 0xA6, 0xA8, 0xE0}
+	// Arbitrary source address with end-of-address bit set.
+	var ax25Src = []byte{0xA4, 0x64, 0xAA, 0x8C, 0xA8, 0xAA, 0x61}
+	var ax25frame = append(ax25Dest, ax25Src...)
+	var payload = append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...)
+	var kissframe = kiss_encapsulate(payload)
+
+	// Set up a bridge with a MAP entry routing Q1TEST to dstPkt.
+	var b = new(axudpBridge)
+	b.maps = []axudpMapEntry{
+		{AX25Addr: "Q1TEST", Addr: dstAddr.String(), UDPAddr: dstAddr},
+	}
+	b.udpConn = srcUDP
+
+	// fconn delivers the full KISS frame + io.EOF in a single Read call.
+	var fconn = new(singleReadConn)
+	fconn.data = kissframe
+
+	var done = make(chan struct{})
+	go func() {
+		b.handleKISSClient(fconn)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("handleKISSClient did not exit after conn returned io.EOF")
+	}
+
+	// An AXUDP datagram must have been forwarded to dstPkt.
+	var setErr = dstUDP.SetReadDeadline(time.Now().Add(time.Second))
+	if setErr != nil {
+		t.Fatal(setErr)
+	}
+	var rxBuf = make([]byte, 4096)
+	var n, _, rxErr = dstUDP.ReadFromUDP(rxBuf)
+	if rxErr != nil {
+		t.Fatalf("no AXUDP datagram received — bytes from final read were dropped: %v", rxErr)
+	}
+	if n == 0 {
+		t.Fatal("received empty AXUDP datagram")
+	}
+}
 
 // TestBroadcastKISSDropsOversizedFrame verifies that broadcastKISS does not
 // write a KISS-encoded frame to clients when the on-wire length would exceed

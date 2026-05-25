@@ -237,17 +237,21 @@ func (b *axudpBridge) handleKISSClient(conn net.Conn) {
 	var buf = make([]byte, 2048)
 	for {
 		var n, readErr = conn.Read(buf)
-		if readErr != nil {
-			fmt.Printf("samoyed-axudp: KISS client %s disconnected: %v\n", conn.RemoteAddr(), readErr)
-			return
-		}
 
-		if b.verbose {
+		// Process any bytes returned in this call before inspecting the error:
+		// Read is permitted to return (n>0, err) simultaneously, and we must
+		// not discard the final bytes of a stream.
+		if b.verbose && n > 0 {
 			fmt.Printf("samoyed-axudp: received %d bytes from KISS client %s\n", n, conn.RemoteAddr())
 		}
 
 		for _, byt := range buf[:n] {
 			my_kiss_rec_byte_axudp(&kf, &overflow, byt, b)
+		}
+
+		if readErr != nil {
+			fmt.Printf("samoyed-axudp: KISS client %s disconnected: %v\n", conn.RemoteAddr(), readErr)
+			return
 		}
 	}
 }
