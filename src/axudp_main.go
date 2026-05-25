@@ -440,11 +440,17 @@ Flags:
 		pflag.PrintDefaults()
 	}
 
+	var help = pflag.Bool("help", false, "Display help text.")
 	var configFile = pflag.String("config", "axudp.yaml", "Path to YAML config file")
 	var udpPort = pflag.Int("udpport", 20093, "UDP port to listen on (and source from)")
 	var kissPort = pflag.Int("kissport", 8002, "TCP port for KISS clients (samoyed-direwolf NCHANNEL target)")
 	var verbose = pflag.Bool("verbose", false, "Log every packet sent and received")
 	pflag.Parse()
+
+	if *help {
+		pflag.Usage()
+		os.Exit(0)
+	}
 
 	var maps, parseErr = axudpParseConfig(*configFile)
 	if parseErr != nil {
