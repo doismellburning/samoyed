@@ -362,8 +362,9 @@ func (b *axudpBridge) runUDPListener() {
 			continue
 		}
 
-		var raw = make([]byte, n)
-		copy(raw, buf[:n])
+		// CRC stripping and broadcastKISS are synchronous below, so it is safe
+		// to slice the read buffer directly without an extra allocation.
+		var raw = buf[:n]
 
 		// RFC 1226 specifies a 16-bit CRC-CCITT checksum for AXIP (TCP/IP);
 		// most AXUDP implementations have copied this over even though UDP
