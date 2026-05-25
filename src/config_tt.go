@@ -959,27 +959,30 @@ func handleTTOBJ(ps *parseState) bool {
 	var app = 0
 	var ig = 0
 
-	for _, part := range strings.Split(t, ",") {
+	for part := range strings.SplitSeq(t, ",") {
 		part = strings.TrimSpace(part)
 		if strings.EqualFold(part, "APP") || strings.EqualFold(part, "A") {
 			app = 1
 		} else if strings.EqualFold(part, "IG") || strings.EqualFold(part, "I") {
 			ig = 1
-		} else if chanNum, chanErr := strconv.Atoi(part); chanErr == nil {
-			x = chanNum
-			if x < 0 || x > MAX_TOTAL_CHANS-1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
-				x = -1
-			} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-				ps.audio.chan_medium[x] != MEDIUM_NETTNC {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
-				x = -1
-			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+			var chanNum, chanErr = strconv.Atoi(part)
+			if chanErr == nil {
+				x = chanNum
+				if x < 0 || x > MAX_TOTAL_CHANS-1 {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
+					x = -1
+				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
+					ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
+					x = -1
+				}
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+			}
 		}
 	}
 
