@@ -19,6 +19,7 @@ path = [
 	"Makefile",
 	"cmd/**",
 	"docs/**",
+	"internal/**",
 	"go.mod",
 	"go.sum",
 	"src/*.go",
