@@ -379,6 +379,10 @@ func (b *axudpBridge) runUDPListener() {
 			ax25frame = raw
 		}
 
+		if len(ax25frame) == 0 {
+			continue
+		}
+
 		if b.verbose {
 			// The first 7 bytes of an AX.25 frame are the destination address —
 			// for an incoming AXUDP datagram this is typically our local callsign.
