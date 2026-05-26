@@ -23,7 +23,14 @@ func handleGPSNMEA(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		var n, _ = strconv.Atoi(t)
+		var n, nErr = strconv.Atoi(t)
+		if nErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file, line %d: Invalid speed \"%s\" for GPSNMEA command.\n", ps.line, t)
+
+			return true
+		}
+
 		ps.misc.gpsnmea_speed = n
 	} else {
 		ps.misc.gpsnmea_speed = 4800 // The standard at one time.
