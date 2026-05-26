@@ -485,7 +485,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/*
 	 * Process symbol now that we have any later overlay.
 	 *
-	 * FIXME: Someone who used this was surprised to end up with Solar Powser  (S-).
+	 * FIXME: Someone who used this was surprised to end up with Solar Power  (S-).
 	 *	overlay=S symbol="/-"
 	 * We should complain if overlay used with symtab other than \.
 	 */

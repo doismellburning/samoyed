@@ -475,7 +475,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	 *			Pattern would be  B[0-9A-D]xxxx...
 	 *			Optional prefix is 10, 6, or 4 digits.
 	 *
-	 *			The total number of digts in both must be 4, 6, 10, or 12.
+	 *			The total number of digits in both must be 4, 6, 10, or 12.
 	 */
 
 	// TODO1.3:  TTMHEAD needs testing.
