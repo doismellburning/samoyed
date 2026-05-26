@@ -306,7 +306,7 @@ func handleMODEM(ps *parseState) bool {
 	t = split("", false)
 	if t == "" {
 		/* all done. */
-		return true
+		return false
 	}
 
 	if alldigits(t) {
