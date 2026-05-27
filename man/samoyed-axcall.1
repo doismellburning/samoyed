@@ -1,0 +1,114 @@
+.TH SAMOYED-AXCALL 1
+
+.SH NAME
+samoyed-axcall \- Interactive outbound AX.25 connect client
+
+.SH SYNOPSIS
+.B samoyed-axcall
+.RI [ options ]
+.I MYCALL
+.I TARGETCALL
+.RI [ via
+.IR DIGI ...]
+
+.SH DESCRIPTION
+\fBsamoyed-axcall\fR connects to a remote packet radio station over an
+established AX.25 link and provides a line-mode interactive session.
+It replaces the \fBaxcall\fR(1) / \fBcall\fR(1) utilities from
+\fIax25-apps\fR for setups that no longer have the Linux kernel AX.25
+socket layer available (removed in Linux 7.1).
+
+\fBsamoyed-axcall\fR does not talk to the kernel directly.  Instead it
+attaches to a running \fBsamoyed-direwolf\fR(1) instance via the AGW
+TCP/IP API (default port 8000) and uses the TNC's connected-mode AX.25
+state machine (LAPB) to establish and maintain the link.
+
+Once connected, text typed on standard input is transmitted to the
+remote station as AX.25 I-frames.  Data received from the remote
+station is printed on standard output.  The session ends when either
+side disconnects or the user enters a tilde escape command.
+
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-hostname " " \fIHOST\fR
+Hostname or IP address of the TNC running \fBsamoyed-direwolf\fR.
+Default: \fBlocalhost\fR.
+.TP
+.BR \-p ", " \-\-port " " \fIPORT\fR
+TCP port of the AGW interface.
+Default: \fB8000\fR.
+.TP
+.BR \-c ", " \-\-channel " " \fICHAN\fR
+Radio channel number (0-based) to use for the connection.
+Default: \fB0\fR.
+.TP
+.BR \-T ", " \-\-idle " " \fISECS\fR
+Disconnect automatically after \fISECS\fR seconds of no traffic in
+either direction.  \fB0\fR (the default) disables the idle timer.
+.TP
+.BR \-\-help
+Display usage information and exit.
+
+.SH ARGUMENTS
+.TP
+.I MYCALL
+Your callsign, with optional SSID (e.g. \fBW1AW-3\fR).
+It is registered with the TNC so that the TNC accepts inbound connect
+requests to this callsign for the duration of the session.
+.TP
+.I TARGETCALL
+Callsign of the remote station to connect to.
+.TP
+.RI [ via " " DIGI ...]
+Optional digipeater path.
+The keyword \fBvia\fR may be omitted; any extra arguments after
+\fITARGETCALL\fR are treated as digipeater callsigns (up to 7).
+
+.SH TILDE ESCAPES
+Tilde escapes are recognised only when the tilde appears at the
+beginning of an input line.  They are not transmitted to the remote
+station.
+.TP
+.BR ~. " or " ~q
+Disconnect from the remote station and exit.
+.TP
+.B ~?
+Display tilde-escape help on standard error.
+.TP
+.B ~r
+Reconnect (not yet implemented).
+
+.SH EXIT STATUS
+.TP
+.B 0
+Clean disconnect or connection closed by remote station.
+.TP
+.B 1
+Connection failed, invalid arguments, or unrecoverable error.
+
+.SH EXAMPLES
+Connect to a BBS:
+.PP
+.B "    samoyed-axcall W1AW-3 W1XYZ-1"
+.PP
+Connect through a digipeater:
+.PP
+.B "    samoyed-axcall W1AW-3 W1XYZ-1 via W1REP"
+.PP
+Connect using a non-default channel and a 5-minute idle timeout:
+.PP
+.B "    samoyed-axcall -c 1 -T 300 W1AW-3 W1XYZ-1"
+.PP
+Connect to a TNC running on a different host:
+.PP
+.B "    samoyed-axcall -h 192.168.1.10 -p 8000 W1AW-3 W1XYZ-1"
+
+.SH SEE ALSO
+.BR samoyed-direwolf (1),
+.BR samoyed-kissutil (1),
+.BR samoyed-appserver (1)
+
+.PP
+The Samoyed documentation (including the guide \fIReplacing the Linux
+kernel AX.25 stack\fR) is built from the \fIdocs/\fR directory of the
+source tree.
