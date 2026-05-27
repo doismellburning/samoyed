@@ -187,7 +187,7 @@ func TestAXUDPParseConfigValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var dir = t.TempDir()
 			var p = filepath.Join(dir, "axudp.yaml")
-			writeErr := os.WriteFile(p, []byte(tc.content), 0600)
+			var writeErr = os.WriteFile(p, []byte(tc.content), 0600)
 			if writeErr != nil {
 				t.Fatal(writeErr)
 			}
