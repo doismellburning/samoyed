@@ -120,7 +120,7 @@ func TestAXUDPParseConfigResolvesUDPAddr(t *testing.T) {
     host: 192.0.2.1
     port: 93
 `
-	writeErr := os.WriteFile(p, []byte(content), 0600)
+	var writeErr = os.WriteFile(p, []byte(content), 0600)
 	if writeErr != nil {
 		t.Fatal(writeErr)
 	}
