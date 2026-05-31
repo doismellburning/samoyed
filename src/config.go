@@ -1347,7 +1347,7 @@ func handleADEVICE(ps *parseState) bool {
 
 	// ps.keyword holds the original token e.g. "ADEVICE" or "ADEVICE1".
 	if len(ps.keyword) >= 8 {
-		var i, iErr = strconv.Atoi(string(ps.keyword[7]))
+		var i, iErr = strconv.Atoi(ps.keyword[7:])
 		if iErr != nil {
 			dw_printf("Config file: Could not parse ADEVICE number on line %d: %s.\n", ps.line, iErr)
 			return true

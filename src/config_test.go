@@ -427,6 +427,23 @@ func Test_config_init_modem_directive(t *testing.T) {
 	}
 }
 
+// --- config_init ADEVICE multi-digit suffix ---
+
+func Test_config_init_adevice_multi_digit_suffix(t *testing.T) {
+	t.Run("ADEVICE11 two-digit suffix is parsed as 11 not 1", func(t *testing.T) {
+		// Regression test: handleADEVICE used string(ps.keyword[7]) which reads
+		// only one byte, so "ADEVICE11" would parse suffix "1" instead of "11".
+		// With the fix, suffix "11" is out of range and must be reported as an error
+		// rather than silently configuring device 1.
+		assert.NotPanics(t, func() {
+			configFromString(t, "ADEVICE11 hw:0,0\n")
+		})
+		// Device 1 must remain undefined (suffix 11 is out of range).
+		var cfg, _ = configFromString(t, "ADEVICE11 hw:0,0\n")
+		assert.Equal(t, 0, cfg.adev[1].defined)
+	})
+}
+
 // --- config_init CHANNEL non-numeric ---
 
 func Test_config_init_channel_non_numeric(t *testing.T) {
