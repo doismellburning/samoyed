@@ -3799,7 +3799,12 @@ func handleTTVECTOR(ps *parseState) bool {
 		dw_printf("Line %d: Missing scale for TTVECTOR command.\n", ps.line)
 		return true
 	}
-	var scale, _ = strconv.ParseFloat(t, 64)
+	var scale, scaleErr = strconv.ParseFloat(t, 64)
+	if scaleErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid scale \"%s\" for TTVECTOR command.\n", ps.line, t)
+		return true
+	}
 
 	// Unit.
 
