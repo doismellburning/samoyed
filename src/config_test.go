@@ -427,6 +427,19 @@ func Test_config_init_modem_directive(t *testing.T) {
 	}
 }
 
+// --- config_init CHANNEL non-numeric ---
+
+func Test_config_init_channel_non_numeric(t *testing.T) {
+	t.Run("CHANNEL with non-numeric value is rejected", func(t *testing.T) {
+		// Regression test: CHANNEL used strconv.Atoi with ignored error; non-numeric
+		// input would silently treat the channel as 0.  Now it must log an error and
+		// leave the channel unchanged.
+		assert.NotPanics(t, func() {
+			configFromString(t, "CHANNEL notanumber\n")
+		})
+	})
+}
+
 // --- config_init AGWPORT directive ---
 
 func Test_config_init_agwport(t *testing.T) {

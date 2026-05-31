@@ -1557,7 +1557,13 @@ func handleCHANNEL(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Channel number must be numeric for CHANNEL command.\n", ps.line)
+
+		return true
+	}
 	if n >= 0 && n < MAX_RADIO_CHANS {
 		ps.channel = n
 
