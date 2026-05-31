@@ -426,3 +426,16 @@ func Test_config_init_modem_directive(t *testing.T) {
 		})
 	}
 }
+
+// --- config_init PBEACON directive (no options) ---
+
+func Test_config_init_pbeacon_no_options(t *testing.T) {
+	t.Run("PBEACON with no options does not panic", func(t *testing.T) {
+		// Regression test: handleXBEACON used ps.text[len("xBEACON")+1:] which
+		// would panic with an index out of range when the line had no trailing
+		// space or options (e.g. just "PBEACON").
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON\n")
+		})
+	})
+}

@@ -5511,7 +5511,12 @@ func handleXBEACON(ps *parseState) bool {
 		/* Save line number because some errors will be reported later. */
 		ps.misc.beacon[ps.misc.num_beacons].lineno = ps.line
 
-		if beacon_options(ps.text[len("xBEACON")+1:], &(ps.misc.beacon[ps.misc.num_beacons]), ps.line, ps.audio) == nil {
+		// Pass "" so beacon_options continues from the current split() position
+		// rather than reinitialising the tokenizer. The main parse loop already
+		// called split(ps.text, false) to extract the keyword, leaving any
+		// options as the remaining state; passing "" here reads those options
+		// correctly and also handles the case where there are none.
+		if beacon_options("", &(ps.misc.beacon[ps.misc.num_beacons]), ps.line, ps.audio) == nil {
 			ps.misc.num_beacons++
 		}
 	} else {
