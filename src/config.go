@@ -4093,7 +4093,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	 *			Pattern would be  B[0-9A-D]xxxx...
 	 *			Optional prefix is 10, 6, or 4 digits.
 	 *
-	 *			The total number of digts in both must be 4, 6, 10, or 12.
+	 *			The total number of digits in both must be 4, 6, 10, or 12.
 	 */
 
 	// TODO1.3:  TTMHEAD needs testing.
@@ -6246,7 +6246,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/*
 	 * Process symbol now that we have any later overlay.
 	 *
-	 * FIXME: Someone who used this was surprised to end up with Solar Powser  (S-).
+	 * FIXME: Someone who used this was surprised to end up with Solar Power  (S-).
 	 *	overlay=S symbol="/-"
 	 * We should complain if overlay used with symtab other than \.
 	 */
