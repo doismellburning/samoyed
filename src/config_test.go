@@ -427,6 +427,31 @@ func Test_config_init_modem_directive(t *testing.T) {
 	}
 }
 
+// --- config_init AGWPORT directive ---
+
+func Test_config_init_agwport(t *testing.T) {
+	t.Run("AGWPORT with non-numeric value is rejected without panic", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "AGWPORT notanumber\n")
+		})
+	})
+
+	t.Run("AGWPORT with valid port sets agwpe_port", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWPORT 8000\n")
+		assert.Equal(t, 8000, misc.agwpe_port)
+	})
+}
+
+// --- config_init KISSPORT directive ---
+
+func Test_config_init_kissport(t *testing.T) {
+	t.Run("KISSPORT with non-numeric value is rejected without panic", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "KISSPORT notanumber\n")
+		})
+	})
+}
+
 // --- config_init SENDTO beacon option (empty value) ---
 
 func Test_config_init_beacon_sendto_empty(t *testing.T) {
