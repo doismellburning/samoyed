@@ -482,6 +482,28 @@ func Test_config_init_kissport(t *testing.T) {
 	})
 }
 
+// --- config_init SENDTO non-numeric channel suffix ---
+
+func Test_config_init_beacon_sendto_non_numeric(t *testing.T) {
+	t.Run("SENDTO=rXYZ with non-numeric channel suffix is rejected", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=rXYZ\n")
+		})
+	})
+
+	t.Run("SENDTO=tXYZ with non-numeric channel suffix is rejected", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=tXYZ\n")
+		})
+	})
+
+	t.Run("SENDTO=XYZ with non-numeric value is rejected", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=XYZ\n")
+		})
+	})
+}
+
 // --- config_init SENDTO beacon option (empty value) ---
 
 func Test_config_init_beacon_sendto_empty(t *testing.T) {
