@@ -427,6 +427,19 @@ func Test_config_init_modem_directive(t *testing.T) {
 	}
 }
 
+// --- config_init SENDTO beacon option (empty value) ---
+
+func Test_config_init_beacon_sendto_empty(t *testing.T) {
+	t.Run("SENDTO= with empty value does not panic", func(t *testing.T) {
+		// Regression test: beacon_options accessed value[0] without first checking
+		// len(value), which would panic with an index out of range when value is empty
+		// (i.e. SENDTO= with nothing after the equals sign).
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=\n")
+		})
+	})
+}
+
 // --- config_init PBEACON directive (no options) ---
 
 func Test_config_init_pbeacon_no_options(t *testing.T) {
