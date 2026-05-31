@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -4773,21 +4774,25 @@ func handleIGSERVER(ps *parseState) bool {
 
 	ps.igate.t2_server_name = t
 
-	/* If there is a : in the name, split it out as the port number. */
+	/* If there is a : in the name, split it out as the port number.
+	 * Use net.SplitHostPort to correctly handle bracketed IPv6 addresses like [::1]:8080.
+	 */
 
 	if strings.Contains(t, ":") {
-		var hostname, portStr, _ = strings.Cut(t, ":")
-		ps.igate.t2_server_name = hostname
+		var hostname, portStr, splitErr = net.SplitHostPort(t)
+		if splitErr == nil {
+			ps.igate.t2_server_name = hostname
 
-		var port, portErr = strconv.Atoi(portStr)
-		if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
-			ps.igate.t2_server_port = port
-		} else {
-			ps.igate.t2_server_port = DEFAULT_IGATE_PORT
+			var port, portErr = strconv.Atoi(portStr)
+			if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
+				ps.igate.t2_server_port = port
+			} else {
+				ps.igate.t2_server_port = DEFAULT_IGATE_PORT
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
-				ps.line, ps.igate.t2_server_port)
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
+					ps.line, ps.igate.t2_server_port)
+			}
 		}
 	}
 
