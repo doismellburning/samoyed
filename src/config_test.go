@@ -482,6 +482,25 @@ func Test_config_init_kissport(t *testing.T) {
 	})
 }
 
+// --- config_init DNSSD directive ---
+
+func Test_config_init_dnssd(t *testing.T) {
+	t.Run("DNSSD with non-numeric value is rejected and disabled", func(t *testing.T) {
+		var _, misc = configFromString(t, "DNSSD notanumber\n")
+		assert.False(t, misc.dns_sd_enabled)
+	})
+
+	t.Run("DNSSD 1 enables dns-sd", func(t *testing.T) {
+		var _, misc = configFromString(t, "DNSSD 1\n")
+		assert.True(t, misc.dns_sd_enabled)
+	})
+
+	t.Run("DNSSD 0 disables dns-sd", func(t *testing.T) {
+		var _, misc = configFromString(t, "DNSSD 0\n")
+		assert.False(t, misc.dns_sd_enabled)
+	})
+}
+
 // --- config_init SENDTO non-numeric channel suffix ---
 
 func Test_config_init_beacon_sendto_non_numeric(t *testing.T) {

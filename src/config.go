@@ -5323,14 +5323,14 @@ func handleDNSSD(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n == 0 || n == 1 {
-		ps.misc.dns_sd_enabled = n != 0
-	} else {
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil || (n != 0 && n != 1) {
 		ps.misc.dns_sd_enabled = false
 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", ps.line)
+	} else {
+		ps.misc.dns_sd_enabled = n != 0
 	}
 	return false
 }
