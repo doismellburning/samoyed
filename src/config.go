@@ -4938,8 +4938,8 @@ func handleIGTXVIA(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n < 0 || n > MAX_TOTAL_CHANS-1 {
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil || n < 0 || n > MAX_TOTAL_CHANS-1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n",
 			MAX_TOTAL_CHANS-1, ps.line)
