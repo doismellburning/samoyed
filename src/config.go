@@ -3964,22 +3964,40 @@ func handleTTUTM(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
+		var scaleVal, scaleErr = strconv.ParseFloat(t, 64)
+		if scaleErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: Invalid scale \"%s\" for TTUTM command.\n", ps.line, t)
+			return true
+		}
 
-		tl.utm.scale, _ = strconv.ParseFloat(t, 64)
+		tl.utm.scale = scaleVal
 
 		// Optional x offset.
 
 		t = split("", false)
 		if t != "" {
+			var xOffset, xErr = strconv.ParseFloat(t, 64)
+			if xErr != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Invalid x offset \"%s\" for TTUTM command.\n", ps.line, t)
+				return true
+			}
 
-			tl.utm.x_offset, _ = strconv.ParseFloat(t, 64)
+			tl.utm.x_offset = xOffset
 
 			// Optional y offset.
 
 			t = split("", false)
 			if t != "" {
+				var yOffset, yErr = strconv.ParseFloat(t, 64)
+				if yErr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Line %d: Invalid y offset \"%s\" for TTUTM command.\n", ps.line, t)
+					return true
+				}
 
-				tl.utm.y_offset, _ = strconv.ParseFloat(t, 64)
+				tl.utm.y_offset = yOffset
 			}
 		}
 	}
