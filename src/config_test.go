@@ -482,6 +482,18 @@ func Test_config_init_kissport(t *testing.T) {
 	})
 }
 
+// --- config_init MODEM all-options success ---
+
+func Test_config_init_modem_returns_success(t *testing.T) {
+	t.Run("MODEM with all options parsed successfully does not block subsequent directives", func(t *testing.T) {
+		// Regression test: handleMODEM returned true (error/stop) when all options
+		// were parsed and split returned "".  This caused subsequent directives like
+		// MYCALL to be skipped.  The correct return when successful is false.
+		var cfg, _ = configFromString(t, "MODEM 1200\nMYCALL Q1TEST\n")
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+	})
+}
+
 // --- config_init DNSSD directive ---
 
 func Test_config_init_dnssd(t *testing.T) {
