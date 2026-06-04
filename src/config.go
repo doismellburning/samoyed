@@ -5288,7 +5288,15 @@ func handleNULLMODEM(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		ps.misc.kiss_serial_speed, _ = strconv.Atoi(t)
+		var n, nErr = strconv.Atoi(t)
+		if nErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file: Invalid speed \"%s\" for NULLMODEM/SERIALKISS command on line %d.\n", t, ps.line)
+
+			return true
+		}
+
+		ps.misc.kiss_serial_speed = n
 	}
 	return false
 }
