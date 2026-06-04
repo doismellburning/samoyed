@@ -4793,6 +4793,12 @@ func handleIGSERVER(ps *parseState) bool {
 				dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
 					ps.line, ps.igate.t2_server_port)
 			}
+		} else {
+			/* net.SplitHostPort failed (e.g. malformed input like "host:"); fall back to simple cut. */
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: Could not parse IGate server address '%s': %v\n",
+				ps.line, t, splitErr)
+			ps.igate.t2_server_name, _, _ = strings.Cut(t, ":")
 		}
 	}
 
