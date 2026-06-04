@@ -50,7 +50,7 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 		(IL2P_SYNC_WORD) & 0xff,
 	}
 
-	var encoded, elen = il2p_encode_frame(pp, max_fec)
+	var encoded, elen = il2p_encode_frame(pp, max_fec, il2p_crc_enabled(channel))
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
