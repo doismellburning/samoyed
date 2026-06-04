@@ -4518,9 +4518,10 @@ func handleTTMACRO(ps *parseState) bool {
 
 	var d_count [3]int
 
-	for j := 0; j < len(otemp.String()); j++ {
-		if otemp.String()[j] >= 'x' && otemp.String()[j] <= 'z' {
-			d_count[otemp.String()[j]-'x']++
+	var otempStr = otemp.String()
+	for j := 0; j < len(otempStr); j++ {
+		if otempStr[j] >= 'x' && otempStr[j] <= 'z' {
+			d_count[otempStr[j]-'x']++
 		}
 	}
 
