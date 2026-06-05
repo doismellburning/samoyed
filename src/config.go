@@ -4576,6 +4576,7 @@ func handleTTOBJ(ps *parseState) bool {
 	var x = -1
 	var app = 0
 	var ig = 0
+	var whereToValid = true
 
 	for part := range strings.SplitSeq(t, ",") {
 		part = strings.TrimSpace(part)
@@ -4591,17 +4592,57 @@ func handleTTOBJ(ps *parseState) bool {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
 					x = -1
+					whereToValid = false
 				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
 					ps.audio.chan_medium[x] != MEDIUM_NETTNC {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
 					x = -1
+					whereToValid = false
 				}
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+				/* Check for legacy compact form like "APPIG" or "AIG" accepted by the old parser. */
+				var isLegacy = true
+				for _, c := range part {
+					if !unicode.IsDigit(c) && !strings.ContainsRune("aApPiIgG", c) {
+						isLegacy = false
+						break
+					}
+				}
+				if isLegacy {
+					for _, c := range part {
+						switch {
+						case c == 'a' || c == 'A':
+							app = 1
+						case c == 'i' || c == 'I':
+							ig = 1
+						case unicode.IsDigit(c):
+							x = int(c - '0')
+							if x < 0 || x > MAX_TOTAL_CHANS-1 {
+								text_color_set(DW_COLOR_ERROR)
+								dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
+								x = -1
+								whereToValid = false
+							} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
+								ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+								text_color_set(DW_COLOR_ERROR)
+								dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
+								x = -1
+								whereToValid = false
+							}
+						}
+					}
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+					whereToValid = false
+				}
 			}
 		}
+	}
+
+	if !whereToValid {
+		return true
 	}
 
 	// This enables the DTMF decoder on the specified channel.
