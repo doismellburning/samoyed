@@ -38,6 +38,13 @@ Samoyed inherits Dire Wolf's feature set:
 - **DNS Service Discovery** — network KISS TNC auto-discovery (Linux)
 - Concurrent operation with multiple soundcards and radio channels
 
+As well as that, Samoyed also adds:
+
+- **IL2P CRC** — support for IL2P's Cyclic Redundancy Check for improved packet reconstruction, per the [IL2P Specification Draft v0.6](https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf)
+- **BPSK** — 300 bps Binary Phase Shift Keying, compatible with NinoTNC at 1500 Hz carrier (`MODEM 300 BPSK`)
+- **UDP audio output** — stream encoded audio to a remote host via UDP (`ADEVICE default udp:host:port`) for testing and experimentation
+- ...and more underway!
+
 ## Installation
 
 Pre-built binaries are available on the [GitHub Releases page](https://github.com/doismellburning/samoyed/releases), including tarballs and `.deb` packages.
