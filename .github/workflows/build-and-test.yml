@@ -159,7 +159,7 @@ jobs:
       - run: make dirhtml
         id: docs-build
       - run: make test
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         id: docs-upload-artifact
         with:
           path: docs/build/dirhtml/
