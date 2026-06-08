@@ -17,6 +17,7 @@ import (
 	"bufio"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1346,7 +1347,7 @@ func handleADEVICE(ps *parseState) bool {
 
 	// ps.keyword holds the original token e.g. "ADEVICE" or "ADEVICE1".
 	if len(ps.keyword) >= 8 {
-		var i, iErr = strconv.Atoi(string(ps.keyword[7]))
+		var i, iErr = strconv.Atoi(ps.keyword[7:])
 		if iErr != nil {
 			dw_printf("Config file: Could not parse ADEVICE number on line %d: %s.\n", ps.line, iErr)
 			return true
@@ -1556,7 +1557,13 @@ func handleCHANNEL(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Channel number must be numeric for CHANNEL command.\n", ps.line)
+
+		return true
+	}
 	if n >= 0 && n < MAX_RADIO_CHANS {
 		ps.channel = n
 
@@ -1675,7 +1682,14 @@ func handleNCHANNEL(ps *parseState) bool {
 
 		return true
 	}
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil || n < MIN_IP_PORT_NUMBER || n > MAX_IP_PORT_NUMBER {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d.\n",
+			ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
+
+		return true
+	}
 	ps.audio.nettnc_port[nchan] = n
 	return false
 }
@@ -1822,7 +1836,7 @@ func handleMODEM(ps *parseState) bool {
 	t = split("", false)
 	if t == "" {
 		/* all done. */
-		return true
+		return false
 	}
 
 	if alldigits(t) {
@@ -3791,7 +3805,12 @@ func handleTTVECTOR(ps *parseState) bool {
 		dw_printf("Line %d: Missing scale for TTVECTOR command.\n", ps.line)
 		return true
 	}
-	var scale, _ = strconv.ParseFloat(t, 64)
+	var scale, scaleErr = strconv.ParseFloat(t, 64)
+	if scaleErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid scale \"%s\" for TTVECTOR command.\n", ps.line, t)
+		return true
+	}
 
 	// Unit.
 
@@ -3945,22 +3964,40 @@ func handleTTUTM(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
+		var scaleVal, scaleErr = strconv.ParseFloat(t, 64)
+		if scaleErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: Invalid scale \"%s\" for TTUTM command.\n", ps.line, t)
+			return true
+		}
 
-		tl.utm.scale, _ = strconv.ParseFloat(t, 64)
+		tl.utm.scale = scaleVal
 
 		// Optional x offset.
 
 		t = split("", false)
 		if t != "" {
+			var xOffset, xErr = strconv.ParseFloat(t, 64)
+			if xErr != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Invalid x offset \"%s\" for TTUTM command.\n", ps.line, t)
+				return true
+			}
 
-			tl.utm.x_offset, _ = strconv.ParseFloat(t, 64)
+			tl.utm.x_offset = xOffset
 
 			// Optional y offset.
 
 			t = split("", false)
 			if t != "" {
+				var yOffset, yErr = strconv.ParseFloat(t, 64)
+				if yErr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Line %d: Invalid y offset \"%s\" for TTUTM command.\n", ps.line, t)
+					return true
+				}
 
-				tl.utm.y_offset, _ = strconv.ParseFloat(t, 64)
+				tl.utm.y_offset = yOffset
 			}
 		}
 	}
@@ -4080,7 +4117,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	 *			Pattern would be  B[0-9A-D]xxxx...
 	 *			Optional prefix is 10, 6, or 4 digits.
 	 *
-	 *			The total number of digts in both must be 4, 6, 10, or 12.
+	 *			The total number of digits in both must be 4, 6, 10, or 12.
 	 */
 
 	// TODO1.3:  TTMHEAD needs testing.
@@ -4481,9 +4518,10 @@ func handleTTMACRO(ps *parseState) bool {
 
 	var d_count [3]int
 
-	for j := 0; j < len(otemp.String()); j++ {
-		if otemp.String()[j] >= 'x' && otemp.String()[j] <= 'z' {
-			d_count[otemp.String()[j]-'x']++
+	var otempStr = otemp.String()
+	for j := 0; j < len(otempStr); j++ {
+		if otempStr[j] >= 'x' && otempStr[j] <= 'z' {
+			d_count[otempStr[j]-'x']++
 		}
 	}
 
@@ -4557,36 +4595,79 @@ func handleTTOBJ(ps *parseState) bool {
 		return true
 	}
 
-	// Can have any combination of number, APP, IG.
-	// Would it be easier with strtok?
+	// Can have any combination of channel number, APP, IG, separated by commas.
+	// Parse as a comma-separated list so multi-digit channels (>= 10) work correctly.
 
 	var x = -1
 	var app = 0
 	var ig = 0
+	var whereToValid = true
 
-	for _, p := range t {
-		if unicode.IsDigit(p) {
-			x = int(p - '0')
-			if x < 0 || x > MAX_TOTAL_CHANS-1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
-				x = -1
-			} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-				ps.audio.chan_medium[x] != MEDIUM_NETTNC {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
-				x = -1
-			}
-		} else if p == 'a' || p == 'A' {
+	for part := range strings.SplitSeq(t, ",") {
+		part = strings.TrimSpace(part)
+		if strings.EqualFold(part, "APP") || strings.EqualFold(part, "A") {
 			app = 1
-		} else if p == 'i' || p == 'I' {
+		} else if strings.EqualFold(part, "IG") || strings.EqualFold(part, "I") {
 			ig = 1
-		} else if strings.ContainsRune("pPgG,", p) {
-			// Skip?
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+			var chanNum, chanErr = strconv.Atoi(part)
+			if chanErr == nil {
+				x = chanNum
+				if x < 0 || x > MAX_TOTAL_CHANS-1 {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
+					x = -1
+					whereToValid = false
+				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
+					ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
+					x = -1
+					whereToValid = false
+				}
+			} else {
+				/* Check for legacy compact form like "APPIG" or "AIG" accepted by the old parser. */
+				var isLegacy = true
+				for _, c := range part {
+					if !unicode.IsDigit(c) && !strings.ContainsRune("aApPiIgG", c) {
+						isLegacy = false
+						break
+					}
+				}
+				if isLegacy {
+					for _, c := range part {
+						switch {
+						case c == 'a' || c == 'A':
+							app = 1
+						case c == 'i' || c == 'I':
+							ig = 1
+						case unicode.IsDigit(c):
+							x = int(c - '0')
+							if x < 0 || x > MAX_TOTAL_CHANS-1 {
+								text_color_set(DW_COLOR_ERROR)
+								dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
+								x = -1
+								whereToValid = false
+							} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
+								ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+								text_color_set(DW_COLOR_ERROR)
+								dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
+								x = -1
+								whereToValid = false
+							}
+						}
+					}
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+					whereToValid = false
+				}
+			}
 		}
+	}
+
+	if !whereToValid {
+		return true
 	}
 
 	// This enables the DTMF decoder on the specified channel.
@@ -4766,21 +4847,31 @@ func handleIGSERVER(ps *parseState) bool {
 
 	ps.igate.t2_server_name = t
 
-	/* If there is a : in the name, split it out as the port number. */
+	/* If there is a : in the name, split it out as the port number.
+	 * Use net.SplitHostPort to correctly handle bracketed IPv6 addresses like [::1]:8080.
+	 */
 
 	if strings.Contains(t, ":") {
-		var hostname, portStr, _ = strings.Cut(t, ":")
-		ps.igate.t2_server_name = hostname
+		var hostname, portStr, splitErr = net.SplitHostPort(t)
+		if splitErr == nil {
+			ps.igate.t2_server_name = hostname
 
-		var port, portErr = strconv.Atoi(portStr)
-		if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
-			ps.igate.t2_server_port = port
+			var port, portErr = strconv.Atoi(portStr)
+			if port >= MIN_IP_PORT_NUMBER && port <= MAX_IP_PORT_NUMBER && portErr == nil {
+				ps.igate.t2_server_port = port
+			} else {
+				ps.igate.t2_server_port = DEFAULT_IGATE_PORT
+
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
+					ps.line, ps.igate.t2_server_port)
+			}
 		} else {
-			ps.igate.t2_server_port = DEFAULT_IGATE_PORT
-
+			/* net.SplitHostPort failed (e.g. malformed input like "host:"); fall back to simple cut. */
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
-				ps.line, ps.igate.t2_server_port)
+			dw_printf("Line %d: Could not parse IGate server address '%s': %v\n",
+				ps.line, t, splitErr)
+			ps.igate.t2_server_name, _, _ = strings.Cut(t, ":")
 		}
 	}
 
@@ -4848,8 +4939,8 @@ func handleIGTXVIA(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n < 0 || n > MAX_TOTAL_CHANS-1 {
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil || n < 0 || n > MAX_TOTAL_CHANS-1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n",
 			MAX_TOTAL_CHANS-1, ps.line)
@@ -5044,7 +5135,13 @@ func handleAGWPORT(ps *parseState) bool {
 
 		return true
 	}
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid port number \"%s\" for AGWPORT command.\n", ps.line, t)
+
+		return true
+	}
 
 	t = split("", false)
 	if t != "" {
@@ -5096,7 +5193,13 @@ func handleKISSPORT(ps *parseState) bool {
 
 		return true
 	}
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid TCP port number \"%s\" for KISSPORT command.\n", ps.line, t)
+
+		return true
+	}
 
 	var tcp_port int
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
@@ -5185,7 +5288,15 @@ func handleNULLMODEM(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		ps.misc.kiss_serial_speed, _ = strconv.Atoi(t)
+		var n, nErr = strconv.Atoi(t)
+		if nErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file: Invalid speed \"%s\" for NULLMODEM/SERIALKISS command on line %d.\n", t, ps.line)
+
+			return true
+		}
+
+		ps.misc.kiss_serial_speed = n
 	}
 	return false
 }
@@ -5239,14 +5350,14 @@ func handleDNSSD(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n == 0 || n == 1 {
-		ps.misc.dns_sd_enabled = n != 0
-	} else {
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil || (n != 0 && n != 1) {
 		ps.misc.dns_sd_enabled = false
 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", ps.line)
+	} else {
+		ps.misc.dns_sd_enabled = n != 0
 	}
 	return false
 }
@@ -5282,7 +5393,14 @@ func handleGPSNMEA(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		var n, _ = strconv.Atoi(t)
+		var n, nErr = strconv.Atoi(t)
+		if nErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file, line %d: Invalid speed \"%s\" for GPSNMEA command.\n", ps.line, t)
+
+			return true
+		}
+
 		ps.misc.gpsnmea_speed = n
 	} else {
 		ps.misc.gpsnmea_speed = 4800 // The standard at one time.
@@ -5511,7 +5629,12 @@ func handleXBEACON(ps *parseState) bool {
 		/* Save line number because some errors will be reported later. */
 		ps.misc.beacon[ps.misc.num_beacons].lineno = ps.line
 
-		if beacon_options(ps.text[len("xBEACON")+1:], &(ps.misc.beacon[ps.misc.num_beacons]), ps.line, ps.audio) == nil {
+		// Pass "" so beacon_options continues from the current split() position
+		// rather than reinitialising the tokenizer. The main parse loop already
+		// called split(ps.text, false) to extract the keyword, leaving any
+		// options as the remaining state; passing "" here reads those options
+		// correctly and also handles the case where there are none.
+		if beacon_options("", &(ps.misc.beacon[ps.misc.num_beacons]), ps.line, ps.audio) == nil {
 			ps.misc.num_beacons++
 		}
 	} else {
@@ -5914,11 +6037,22 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "EVERY") {
 			b.every = parse_interval(value, line)
 		} else if strings.EqualFold(keyword, "SENDTO") {
-			if value[0] == 'i' || value[0] == 'I' {
+			if len(value) == 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Missing value for SENDTO option.\n", line)
+
+				continue
+			} else if value[0] == 'i' || value[0] == 'I' {
 				b.sendto_type = SENDTO_IGATE
 				b.sendto_chan = 0
 			} else if value[0] == 'r' || value[0] == 'R' {
-				var n, _ = strconv.Atoi(value[1:])
+				var n, nErr = strconv.Atoi(value[1:])
+				if nErr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Non-numeric channel \"%s\" for SENDTO=r option.\n", line, value[1:])
+
+					continue
+				}
 				if n < 0 || n >= MAX_TOTAL_CHANS {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
@@ -5935,7 +6069,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_type = SENDTO_RECV
 				b.sendto_chan = n
 			} else if value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X' {
-				var n, _ = strconv.Atoi(value[1:])
+				var n, nErr = strconv.Atoi(value[1:])
+				if nErr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Non-numeric channel \"%s\" for SENDTO=t option.\n", line, value[1:])
+
+					continue
+				}
 				if n < 0 || n >= MAX_TOTAL_CHANS {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
@@ -5952,7 +6092,13 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.sendto_type = SENDTO_XMIT
 				b.sendto_chan = n
 			} else {
-				var n, _ = strconv.Atoi(value)
+				var n, nErr = strconv.Atoi(value)
+				if nErr != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Config file, line %d: Non-numeric channel \"%s\" for SENDTO option.\n", line, value)
+
+					continue
+				}
 				if n < 0 || n >= MAX_TOTAL_CHANS {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
@@ -6158,7 +6304,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/*
 	 * Process symbol now that we have any later overlay.
 	 *
-	 * FIXME: Someone who used this was surprised to end up with Solar Powser  (S-).
+	 * FIXME: Someone who used this was surprised to end up with Solar Power  (S-).
 	 *	overlay=S symbol="/-"
 	 * We should complain if overlay used with symtab other than \.
 	 */

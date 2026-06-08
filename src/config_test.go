@@ -426,3 +426,137 @@ func Test_config_init_modem_directive(t *testing.T) {
 		})
 	}
 }
+
+// --- config_init ADEVICE multi-digit suffix ---
+
+func Test_config_init_adevice_multi_digit_suffix(t *testing.T) {
+	t.Run("ADEVICE11 two-digit suffix is parsed as 11 not 1", func(t *testing.T) {
+		// Regression test: handleADEVICE used string(ps.keyword[7]) which reads
+		// only one byte, so "ADEVICE11" would parse suffix "1" instead of "11".
+		// With the fix, suffix "11" is out of range and must be reported as an error
+		// rather than silently configuring device 1.
+		assert.NotPanics(t, func() {
+			configFromString(t, "ADEVICE11 hw:0,0\n")
+		})
+		// Device 1 must remain undefined (suffix 11 is out of range).
+		var cfg, _ = configFromString(t, "ADEVICE11 hw:0,0\n")
+		assert.Equal(t, 0, cfg.adev[1].defined)
+	})
+}
+
+// --- config_init CHANNEL non-numeric ---
+
+func Test_config_init_channel_non_numeric(t *testing.T) {
+	t.Run("CHANNEL with non-numeric value is rejected", func(t *testing.T) {
+		// Regression test: CHANNEL used strconv.Atoi with ignored error; non-numeric
+		// input would silently treat the channel as 0.  Now it must log an error and
+		// leave the channel unchanged.
+		assert.NotPanics(t, func() {
+			configFromString(t, "CHANNEL notanumber\n")
+		})
+	})
+}
+
+// --- config_init AGWPORT directive ---
+
+func Test_config_init_agwport(t *testing.T) {
+	t.Run("AGWPORT with non-numeric value is rejected without panic", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "AGWPORT notanumber\n")
+		})
+	})
+
+	t.Run("AGWPORT with valid port sets agwpe_port", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWPORT 8000\n")
+		assert.Equal(t, 8000, misc.agwpe_port)
+	})
+}
+
+// --- config_init KISSPORT directive ---
+
+func Test_config_init_kissport(t *testing.T) {
+	t.Run("KISSPORT with non-numeric value is rejected without panic", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "KISSPORT notanumber\n")
+		})
+	})
+}
+
+// --- config_init MODEM all-options success ---
+
+func Test_config_init_modem_returns_success(t *testing.T) {
+	t.Run("MODEM with all options parsed successfully does not block subsequent directives", func(t *testing.T) {
+		// Regression test: handleMODEM returned true (error/stop) when all options
+		// were parsed and split returned "".  This caused subsequent directives like
+		// MYCALL to be skipped.  The correct return when successful is false.
+		var cfg, _ = configFromString(t, "MODEM 1200\nMYCALL Q1TEST\n")
+		assert.Equal(t, "Q1TEST", cfg.mycall[0])
+	})
+}
+
+// --- config_init DNSSD directive ---
+
+func Test_config_init_dnssd(t *testing.T) {
+	t.Run("DNSSD with non-numeric value is rejected and disabled", func(t *testing.T) {
+		var _, misc = configFromString(t, "DNSSD notanumber\n")
+		assert.False(t, misc.dns_sd_enabled)
+	})
+
+	t.Run("DNSSD 1 enables dns-sd", func(t *testing.T) {
+		var _, misc = configFromString(t, "DNSSD 1\n")
+		assert.True(t, misc.dns_sd_enabled)
+	})
+
+	t.Run("DNSSD 0 disables dns-sd", func(t *testing.T) {
+		var _, misc = configFromString(t, "DNSSD 0\n")
+		assert.False(t, misc.dns_sd_enabled)
+	})
+}
+
+// --- config_init SENDTO non-numeric channel suffix ---
+
+func Test_config_init_beacon_sendto_non_numeric(t *testing.T) {
+	t.Run("SENDTO=rXYZ with non-numeric channel suffix is rejected", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=rXYZ\n")
+		})
+	})
+
+	t.Run("SENDTO=tXYZ with non-numeric channel suffix is rejected", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=tXYZ\n")
+		})
+	})
+
+	t.Run("SENDTO=XYZ with non-numeric value is rejected", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=XYZ\n")
+		})
+	})
+}
+
+// --- config_init SENDTO beacon option (empty value) ---
+
+func Test_config_init_beacon_sendto_empty(t *testing.T) {
+	t.Run("SENDTO= with empty value does not panic", func(t *testing.T) {
+		// Regression test: beacon_options accessed value[0] without first checking
+		// len(value), which would panic with an index out of range when value is empty
+		// (i.e. SENDTO= with nothing after the equals sign).
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON SENDTO=\n")
+		})
+	})
+}
+
+// --- config_init PBEACON directive (no options) ---
+
+func Test_config_init_pbeacon_no_options(t *testing.T) {
+	t.Run("PBEACON with no options does not panic", func(t *testing.T) {
+		// Regression test: handleXBEACON used ps.text[len("xBEACON")+1:] which
+		// would panic with an index out of range when the line had no trailing
+		// space or options (e.g. just "PBEACON").
+		assert.NotPanics(t, func() {
+			configFromString(t, "PBEACON\n")
+		})
+	})
+}
