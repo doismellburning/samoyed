@@ -16,7 +16,8 @@ func test_sextet(t *testing.T) {
 	t.Helper()
 
 	for i := range 64 {
-		var ch = sextet_to_char(i)
+		var ch, chErr = sextet_to_char(i)
+		require.NoError(t, chErr)
 		var val, err = char_to_sextet(ch)
 		require.NoError(t, err)
 		assert.Equal(t, i, val)

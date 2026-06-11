@@ -251,16 +251,13 @@ func char_to_sextet(ch byte) (int, error) {
 // Values 40 thru 63 become characters '`' thru 'w'.
 // This is known as "Payload Armoring."
 
-func sextet_to_char(val int) byte {
+func sextet_to_char(val int) (byte, error) {
 	if val >= 0 && val <= 39 {
-		return byte('0' + val)
+		return byte('0' + val), nil
 	} else if val >= 40 && val <= 63 {
-		return byte('`' + val - 40)
+		return byte('`' + val - 40), nil
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid 6 bit value %d from AIS HDLC payload.\n", val)
-
-		return '0'
+		return '0', fmt.Errorf("invalid 6-bit value %d from AIS HDLC payload", val)
 	}
 }
 
@@ -278,7 +275,8 @@ func ais_to_nmea(ais []byte) []byte {
 	// Number of resulting characters for payload.
 	var ns = uint(len(ais)*8+5) / 6
 	for k := range ns {
-		payload = append(payload, sextet_to_char(get_field(ais, k*6, 6)))
+		var ch, _ = sextet_to_char(get_field(ais, k*6, 6))
+		payload = append(payload, ch)
 	}
 
 	var nmea = []byte("!AIVDM,1,1,,A,")
