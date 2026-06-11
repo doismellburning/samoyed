@@ -237,16 +237,13 @@ func get_field_string(base []byte, start uint, length uint) string {
 // Characters '0' thru 'W'  become values 0 thru 39.
 // Characters '`' thru 'w'  become values 40 thru 63.
 
-func char_to_sextet(ch byte) int {
+func char_to_sextet(ch byte) (int, error) {
 	if ch >= '0' && ch <= 'W' {
-		return int(ch - '0')
+		return int(ch - '0'), nil
 	} else if ch >= '`' && ch <= 'w' {
-		return int(ch - '`' + 40)
+		return int(ch - '`' + 40), nil
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid character \"%c\" found in AIS NMEA sentence payload.\n", ch)
-
-		return (0)
+		return 0, fmt.Errorf("invalid character %q in AIS NMEA sentence payload", ch)
 	}
 }
 
@@ -416,7 +413,17 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	var ais = make([]byte, 256)
 
 	for i, b := range payload {
-		set_field(ais, uint(i)*6, 6, char_to_sextet(byte(b)))
+		var val, err = char_to_sextet(byte(b))
+		if err != nil {
+			if !quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("%v\n", err)
+			}
+
+			return aisData, -1
+		}
+
+		set_field(ais, uint(i)*6, 6, val)
 	}
 
 	// Verify number of filler bits.

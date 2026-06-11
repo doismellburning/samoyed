@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_AIS(t *testing.T) {
@@ -15,7 +16,10 @@ func test_sextet(t *testing.T) {
 	t.Helper()
 
 	for i := range 64 {
-		assert.Equal(t, i, char_to_sextet(sextet_to_char(i)))
+		var ch = sextet_to_char(i)
+		var val, err = char_to_sextet(ch)
+		require.NoError(t, err)
+		assert.Equal(t, i, val)
 	}
 }
 
