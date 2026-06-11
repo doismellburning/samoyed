@@ -2538,7 +2538,18 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("{DM")) { // Official after registering {D*
 		aprs_morse_code(A, info)
 	} else if info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
-		var aisData, _ = ais_parse(string(info[3:]), false)
+		var aisData, aisErr = ais_parse(string(info[3:]))
+		if aisErr != nil {
+			if !A.g_quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("%v\n", aisErr)
+			}
+
+			if aisData == nil {
+				A.g_data_type_desc = "AIS"
+				return
+			}
+		}
 
 		A.g_data_type_desc = aisData.description
 		A.g_name = aisData.mssi
