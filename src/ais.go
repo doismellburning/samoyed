@@ -270,12 +270,16 @@ func sextet_to_char(val int) (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func ais_to_nmea(ais []byte) []byte {
+func ais_to_nmea(ais []byte) ([]byte, error) {
 	var payload []byte
 	// Number of resulting characters for payload.
 	var ns = uint(len(ais)*8+5) / 6
 	for k := range ns {
-		var ch, _ = sextet_to_char(get_field(ais, k*6, 6))
+		var ch, err = sextet_to_char(get_field(ais, k*6, 6))
+		if err != nil {
+			return nil, err
+		}
+
 		payload = append(payload, ch)
 	}
 
@@ -300,7 +304,7 @@ func ais_to_nmea(ais []byte) []byte {
 	var checksum = fmt.Sprintf("*%02X", cs&0x7f)
 	nmea = append(nmea, []byte(checksum)...)
 
-	return nmea
+	return nmea, nil
 }
 
 /*-------------------------------------------------------------------
