@@ -4,6 +4,8 @@
 
 ### New Features:
 
+- KISS ACKMODE (G8BPQ extended KISS, command nibble `0x0C`).  A host can send a data frame prefixed with two opaque id bytes; once the frame has actually been transmitted over the air, the TNC echoes those two bytes back to the originating client.  This lets the host start its own timers (FRACK, etc.) from the real transmit time, which matters on HF where a frame can wait a long time in the queue.  The two id bytes are echoed verbatim; XKISS poll mode (`0x0E`) and checksum mode are not implemented.
+
 - Support for CM108 PTT on Mac.
 
 - New NCHANNEL feature to map a channel number to an external network TCP KISS TNC.  See xxx for example of a bridge to LoRa APRS.  See [APRS-LoRa-VHF-APRS-Bridge.pdf](https://github.com/wb2osz/direwolf-doc/blob/main/APRS-LoRa-VHF-APRS-Bridge.pdf) for explanation.
