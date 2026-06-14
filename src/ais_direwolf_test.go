@@ -30,25 +30,25 @@ func test_basic_parse(t *testing.T) {
 
 	var ais = "!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0*4E" // Example from https://www.aggsoft.com/ais-decoder.htm
 
-	var aisData, err = ais_parse(ais)
+	var aisData, err = AISParse(ais)
 
 	require.NoError(t, err)
-	assert.Equal(t, "AIS 1: Position Report Class A", aisData.description)
-	assert.Equal(t, "366730000", aisData.mssi)
-	assert.Empty(t, aisData.comment)
-	assert.InDelta(t, -122, aisData.lon, 1)
-	assert.InDelta(t, 20.8, aisData.knots, 1)
-	assert.InDelta(t, 51.3, aisData.course, 1)
+	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
+	assert.Equal(t, "366730000", aisData.MMSI)
+	assert.Empty(t, aisData.Comment)
+	assert.InDelta(t, -122, aisData.Lon, 1)
+	assert.InDelta(t, 20.8, aisData.Knots, 1)
+	assert.InDelta(t, 51.3, aisData.Course, 1)
 }
 
 func test_parse_errors(t *testing.T) {
 	t.Helper()
 
-	var data, missingChecksumErr = ais_parse("!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0")
+	var data, missingChecksumErr = AISParse("!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0")
 	require.Error(t, missingChecksumErr)
 	assert.Nil(t, data)
 
-	var data2, checksumMismatchErr = ais_parse("!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0*FF")
+	var data2, checksumMismatchErr = AISParse("!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0*FF")
 	require.Error(t, checksumMismatchErr)
 	assert.Nil(t, data2)
 }

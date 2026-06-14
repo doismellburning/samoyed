@@ -270,7 +270,7 @@ func sextet_to_char(val int) (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func ais_to_nmea(ais []byte) ([]byte, error) {
+func AISToNMEA(ais []byte) ([]byte, error) {
 	var payload []byte
 	// Number of resulting characters for payload.
 	var ns = uint(len(ais)*8+5) / 6
@@ -309,7 +309,7 @@ func ais_to_nmea(ais []byte) ([]byte, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        ais_parse
+ * Name:        AISParse
  *
  * Purpose:    	Parse AIS sentence and extract interesting parts.
  *
@@ -330,26 +330,26 @@ func ais_to_nmea(ais []byte) ([]byte, error) {
  *--------------------------------------------------------------------*/
 
 type AISData struct {
-	description string //Description of AIS message type.
-	mssi        string //9 digit identifier.
-	lat         float64
-	lon         float64
-	knots       float64
-	course      float64
-	alt_m       float64
-	symtab      byte
-	symbol      byte
-	comment     string
+	Description string //Description of AIS message type.
+	MMSI        string //9 digit identifier.
+	Lat         float64
+	Lon         float64
+	Knots       float64
+	Course      float64
+	AltM        float64
+	Symtab      byte
+	Symbol      byte
+	Comment     string
 }
 
-func ais_parse(sentence string) (*AISData, error) {
+func AISParse(sentence string) (*AISData, error) {
 	var aisData = new(AISData)
-	aisData.mssi = "?"
-	aisData.lat = G_UNKNOWN
-	aisData.lon = G_UNKNOWN
-	aisData.knots = G_UNKNOWN
-	aisData.course = G_UNKNOWN
-	aisData.alt_m = G_UNKNOWN
+	aisData.MMSI = "?"
+	aisData.Lat = G_UNKNOWN
+	aisData.Lon = G_UNKNOWN
+	aisData.Knots = G_UNKNOWN
+	aisData.Course = G_UNKNOWN
+	aisData.AltM = G_UNKNOWN
 
 	var stemp = sentence
 
@@ -431,100 +431,100 @@ func ais_parse(sentence string) (*AISData, error) {
 	var aisType = get_field(ais, 0, 6)
 
 	if aisType >= 1 && aisType <= 27 {
-		aisData.mssi = fmt.Sprintf("%09d", get_field(ais, 8, 30))
+		aisData.MMSI = fmt.Sprintf("%09d", get_field(ais, 8, 30))
 	}
 
 	switch aisType {
 	case 1, 2, 3: // Position Report Class A
-		aisData.description = fmt.Sprintf("AIS %d: Position Report Class A", aisType)
-		aisData.symtab = '/'
-		aisData.symbol = 's' // Power boat (ship) side view
-		aisData.lon = get_field_lon(ais, 61, 28)
-		aisData.lat = get_field_lat(ais, 89, 27)
-		aisData.knots = get_field_speed(ais, 50, 10)
-		aisData.course = get_field_course(ais, 116, 12)
-		aisData.comment = get_ship_data(aisData.mssi)
+		aisData.Description = fmt.Sprintf("AIS %d: Position Report Class A", aisType)
+		aisData.Symtab = '/'
+		aisData.Symbol = 's' // Power boat (ship) side view
+		aisData.Lon = get_field_lon(ais, 61, 28)
+		aisData.Lat = get_field_lat(ais, 89, 27)
+		aisData.Knots = get_field_speed(ais, 50, 10)
+		aisData.Course = get_field_course(ais, 116, 12)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 4: // Base Station Report
-		aisData.description = fmt.Sprintf("AIS %d: Base Station Report", aisType)
-		aisData.symtab = '\\'
-		aisData.symbol = 'L' // Lighthouse
+		aisData.Description = fmt.Sprintf("AIS %d: Base Station Report", aisType)
+		aisData.Symtab = '\\'
+		aisData.Symbol = 'L' // Lighthouse
 		//year = get_field(ais, 38, 14);
 		//month = get_field(ais, 52, 4);
 		//day = get_field(ais, 56, 5);
 		//hour = get_field(ais, 61, 5);
 		//minute = get_field(ais, 66, 6);
 		//second = get_field(ais, 72, 6);
-		aisData.lon = get_field_lon(ais, 79, 28)
-		aisData.lat = get_field_lat(ais, 107, 27)
+		aisData.Lon = get_field_lon(ais, 79, 28)
+		aisData.Lat = get_field_lat(ais, 107, 27)
 		// Is this suitable or not?  Doesn't hurt, I suppose.
-		aisData.comment = get_ship_data(aisData.mssi)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 5: // Static and Voyage Related Data
-		aisData.description = fmt.Sprintf("AIS %d: Static and Voyage Related Data", aisType)
-		aisData.symtab = '/'
-		aisData.symbol = 's' // Power boat (ship) side view
+		aisData.Description = fmt.Sprintf("AIS %d: Static and Voyage Related Data", aisType)
+		aisData.Symtab = '/'
+		aisData.Symbol = 's' // Power boat (ship) side view
 		{
 			var callsign = get_field_string(ais, 70, 42)
 			var shipname = get_field_string(ais, 112, 120)
 			var destination = get_field_string(ais, 302, 120)
-			save_ship_data(aisData.mssi, shipname, callsign, destination)
-			aisData.comment = get_ship_data(aisData.mssi)
+			save_ship_data(aisData.MMSI, shipname, callsign, destination)
+			aisData.Comment = get_ship_data(aisData.MMSI)
 		}
 
 	case 9: // Standard SAR Aircraft Position Report
-		aisData.description = fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)
-		aisData.symtab = '/'
-		aisData.symbol = '\''                           // Small AIRCRAFT
-		aisData.alt_m = float64(get_field(ais, 38, 12)) // meters, 4095 means not available
-		aisData.lon = get_field_lon(ais, 61, 28)
-		aisData.lat = get_field_lat(ais, 89, 27)
+		aisData.Description = fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)
+		aisData.Symtab = '/'
+		aisData.Symbol = '\''                          // Small AIRCRAFT
+		aisData.AltM = float64(get_field(ais, 38, 12)) // meters, 4095 means not available
+		aisData.Lon = get_field_lon(ais, 61, 28)
+		aisData.Lat = get_field_lat(ais, 89, 27)
 
-		aisData.knots = get_field_speed(ais, 50, 10) // plane is knots, not knots/10
-		if aisData.knots != G_UNKNOWN {
-			aisData.knots *= 10.0
+		aisData.Knots = get_field_speed(ais, 50, 10) // plane is knots, not knots/10
+		if aisData.Knots != G_UNKNOWN {
+			aisData.Knots *= 10.0
 		}
 
-		aisData.course = get_field_course(ais, 116, 12)
-		aisData.comment = get_ship_data(aisData.mssi)
+		aisData.Course = get_field_course(ais, 116, 12)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 18: // Standard Class B CS Position Report
 		// As an oversimplification, Class A is commercial, B is recreational.
-		aisData.description = fmt.Sprintf("AIS %d: Standard Class B CS Position Report", aisType)
-		aisData.symtab = '/'
-		aisData.symbol = 'Y' // YACHT (sail)
-		aisData.lon = get_field_lon(ais, 57, 28)
-		aisData.lat = get_field_lat(ais, 85, 27)
-		aisData.comment = get_ship_data(aisData.mssi)
+		aisData.Description = fmt.Sprintf("AIS %d: Standard Class B CS Position Report", aisType)
+		aisData.Symtab = '/'
+		aisData.Symbol = 'Y' // YACHT (sail)
+		aisData.Lon = get_field_lon(ais, 57, 28)
+		aisData.Lat = get_field_lat(ais, 85, 27)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 19: // Extended Class B CS Position Report
-		aisData.description = fmt.Sprintf("AIS %d: Extended Class B CS Position Report", aisType)
-		aisData.symtab = '/'
-		aisData.symbol = 'Y' // YACHT (sail)
-		aisData.lon = get_field_lon(ais, 57, 28)
-		aisData.lat = get_field_lat(ais, 85, 27)
-		aisData.comment = get_ship_data(aisData.mssi)
+		aisData.Description = fmt.Sprintf("AIS %d: Extended Class B CS Position Report", aisType)
+		aisData.Symtab = '/'
+		aisData.Symbol = 'Y' // YACHT (sail)
+		aisData.Lon = get_field_lon(ais, 57, 28)
+		aisData.Lat = get_field_lat(ais, 85, 27)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 27: // Long Range AIS Broadcast message
-		aisData.description = fmt.Sprintf("AIS %d: Long Range AIS Broadcast message", aisType)
-		aisData.symtab = '\\'
-		aisData.symbol = 's'                     // OVERLAY SHIP/boat (top view)
-		aisData.lon = get_field_lon(ais, 44, 18) // Note: minutes/10 rather than usual /10000.
-		aisData.lat = get_field_lat(ais, 62, 17)
-		aisData.knots = get_field_speed(ais, 79, 6)   // Note: knots, not deciknots.
-		aisData.course = get_field_course(ais, 85, 9) // Note: degrees, not decidegrees.
-		aisData.comment = get_ship_data(aisData.mssi)
+		aisData.Description = fmt.Sprintf("AIS %d: Long Range AIS Broadcast message", aisType)
+		aisData.Symtab = '\\'
+		aisData.Symbol = 's'                     // OVERLAY SHIP/boat (top view)
+		aisData.Lon = get_field_lon(ais, 44, 18) // Note: minutes/10 rather than usual /10000.
+		aisData.Lat = get_field_lat(ais, 62, 17)
+		aisData.Knots = get_field_speed(ais, 79, 6)   // Note: knots, not deciknots.
+		aisData.Course = get_field_course(ais, 85, 9) // Note: degrees, not decidegrees.
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	default:
-		aisData.description = fmt.Sprintf("AIS message type %d", aisType)
+		aisData.Description = fmt.Sprintf("AIS message type %d", aisType)
 	}
 
 	return aisData, fillerErr
-} /* end ais_parse */
+} /* end AISParse */
 
 /*-------------------------------------------------------------------
  *
- * Name:        ais_check_length
+ * Name:        AISCheckLength
  *
  * Purpose:    	Verify frame length against expected.
  *
@@ -538,7 +538,7 @@ func ais_parse(sentence string) (*AISData, error) {
  *
  *--------------------------------------------------------------------*/
 
-func ais_check_length(aisType int, length int) int {
+func AISCheckLength(aisType int, length int) int {
 	if aisType >= 1 && aisType < len(ValidAISLengths) {
 		var b = length * 8
 		if b >= ValidAISLengths[aisType].Min && b <= ValidAISLengths[aisType].Max {
@@ -554,7 +554,7 @@ func ais_check_length(aisType int, length int) int {
 		//dw_printf("AIS ERROR: message type %d is invalid.\n", aisType);
 		return (-1) // Invalid type.
 	}
-} // end ais_check_length
+} // end AISCheckLength
 
 /*-------------------------------------------------------------------
  *
