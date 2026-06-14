@@ -331,7 +331,7 @@ func AISToNMEA(ais []byte) ([]byte, error) {
 
 type AISData struct {
 	Description string //Description of AIS message type.
-	MSSI        string //9 digit identifier.
+	MMSI        string //9 digit identifier.
 	Lat         float64
 	Lon         float64
 	Knots       float64
@@ -344,7 +344,7 @@ type AISData struct {
 
 func AISParse(sentence string) (*AISData, error) {
 	var aisData = new(AISData)
-	aisData.MSSI = "?"
+	aisData.MMSI = "?"
 	aisData.Lat = G_UNKNOWN
 	aisData.Lon = G_UNKNOWN
 	aisData.Knots = G_UNKNOWN
@@ -431,7 +431,7 @@ func AISParse(sentence string) (*AISData, error) {
 	var aisType = get_field(ais, 0, 6)
 
 	if aisType >= 1 && aisType <= 27 {
-		aisData.MSSI = fmt.Sprintf("%09d", get_field(ais, 8, 30))
+		aisData.MMSI = fmt.Sprintf("%09d", get_field(ais, 8, 30))
 	}
 
 	switch aisType {
@@ -443,7 +443,7 @@ func AISParse(sentence string) (*AISData, error) {
 		aisData.Lat = get_field_lat(ais, 89, 27)
 		aisData.Knots = get_field_speed(ais, 50, 10)
 		aisData.Course = get_field_course(ais, 116, 12)
-		aisData.Comment = get_ship_data(aisData.MSSI)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 4: // Base Station Report
 		aisData.Description = fmt.Sprintf("AIS %d: Base Station Report", aisType)
@@ -458,7 +458,7 @@ func AISParse(sentence string) (*AISData, error) {
 		aisData.Lon = get_field_lon(ais, 79, 28)
 		aisData.Lat = get_field_lat(ais, 107, 27)
 		// Is this suitable or not?  Doesn't hurt, I suppose.
-		aisData.Comment = get_ship_data(aisData.MSSI)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 5: // Static and Voyage Related Data
 		aisData.Description = fmt.Sprintf("AIS %d: Static and Voyage Related Data", aisType)
@@ -468,8 +468,8 @@ func AISParse(sentence string) (*AISData, error) {
 			var callsign = get_field_string(ais, 70, 42)
 			var shipname = get_field_string(ais, 112, 120)
 			var destination = get_field_string(ais, 302, 120)
-			save_ship_data(aisData.MSSI, shipname, callsign, destination)
-			aisData.Comment = get_ship_data(aisData.MSSI)
+			save_ship_data(aisData.MMSI, shipname, callsign, destination)
+			aisData.Comment = get_ship_data(aisData.MMSI)
 		}
 
 	case 9: // Standard SAR Aircraft Position Report
@@ -486,7 +486,7 @@ func AISParse(sentence string) (*AISData, error) {
 		}
 
 		aisData.Course = get_field_course(ais, 116, 12)
-		aisData.Comment = get_ship_data(aisData.MSSI)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 18: // Standard Class B CS Position Report
 		// As an oversimplification, Class A is commercial, B is recreational.
@@ -495,7 +495,7 @@ func AISParse(sentence string) (*AISData, error) {
 		aisData.Symbol = 'Y' // YACHT (sail)
 		aisData.Lon = get_field_lon(ais, 57, 28)
 		aisData.Lat = get_field_lat(ais, 85, 27)
-		aisData.Comment = get_ship_data(aisData.MSSI)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 19: // Extended Class B CS Position Report
 		aisData.Description = fmt.Sprintf("AIS %d: Extended Class B CS Position Report", aisType)
@@ -503,17 +503,17 @@ func AISParse(sentence string) (*AISData, error) {
 		aisData.Symbol = 'Y' // YACHT (sail)
 		aisData.Lon = get_field_lon(ais, 57, 28)
 		aisData.Lat = get_field_lat(ais, 85, 27)
-		aisData.Comment = get_ship_data(aisData.MSSI)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	case 27: // Long Range AIS Broadcast message
 		aisData.Description = fmt.Sprintf("AIS %d: Long Range AIS Broadcast message", aisType)
 		aisData.Symtab = '\\'
-		aisData.Symbol = 's'                    // OVERLAY SHIP/boat (top view)
+		aisData.Symbol = 's'                     // OVERLAY SHIP/boat (top view)
 		aisData.Lon = get_field_lon(ais, 44, 18) // Note: minutes/10 rather than usual /10000.
 		aisData.Lat = get_field_lat(ais, 62, 17)
 		aisData.Knots = get_field_speed(ais, 79, 6)   // Note: knots, not deciknots.
 		aisData.Course = get_field_course(ais, 85, 9) // Note: degrees, not decidegrees.
-		aisData.Comment = get_ship_data(aisData.MSSI)
+		aisData.Comment = get_ship_data(aisData.MMSI)
 
 	default:
 		aisData.Description = fmt.Sprintf("AIS message type %d", aisType)

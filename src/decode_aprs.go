@@ -2552,7 +2552,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		}
 
 		A.g_data_type_desc = aisData.Description
-		A.g_name = aisData.MSSI
+		A.g_name = aisData.MMSI
 		A.g_lat = aisData.Lat
 		A.g_lon = aisData.Lon
 		A.g_speed_mph = DW_KNOTS_TO_MPH(aisData.Knots)

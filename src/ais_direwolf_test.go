@@ -34,7 +34,7 @@ func test_basic_parse(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
-	assert.Equal(t, "366730000", aisData.MSSI)
+	assert.Equal(t, "366730000", aisData.MMSI)
 	assert.Empty(t, aisData.Comment)
 	assert.InDelta(t, -122, aisData.Lon, 1)
 	assert.InDelta(t, 20.8, aisData.Knots, 1)
