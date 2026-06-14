@@ -237,16 +237,13 @@ func get_field_string(base []byte, start uint, length uint) string {
 // Characters '0' thru 'W'  become values 0 thru 39.
 // Characters '`' thru 'w'  become values 40 thru 63.
 
-func char_to_sextet(ch byte) int {
+func char_to_sextet(ch byte) (int, error) {
 	if ch >= '0' && ch <= 'W' {
-		return int(ch - '0')
+		return int(ch - '0'), nil
 	} else if ch >= '`' && ch <= 'w' {
-		return int(ch - '`' + 40)
+		return int(ch - '`' + 40), nil
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid character \"%c\" found in AIS NMEA sentence payload.\n", ch)
-
-		return (0)
+		return 0, fmt.Errorf("invalid character %q in AIS NMEA sentence payload", ch)
 	}
 }
 
@@ -254,16 +251,13 @@ func char_to_sextet(ch byte) int {
 // Values 40 thru 63 become characters '`' thru 'w'.
 // This is known as "Payload Armoring."
 
-func sextet_to_char(val int) byte {
+func sextet_to_char(val int) (byte, error) {
 	if val >= 0 && val <= 39 {
-		return byte('0' + val)
+		return byte('0' + val), nil
 	} else if val >= 40 && val <= 63 {
-		return byte('`' + val - 40)
+		return byte('`' + val - 40), nil
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid 6 bit value %d from AIS HDLC payload.\n", val)
-
-		return '0'
+		return '0', fmt.Errorf("invalid 6-bit value %d from AIS HDLC payload", val)
 	}
 }
 
@@ -276,12 +270,17 @@ func sextet_to_char(val int) byte {
  *
  *--------------------------------------------------------------------*/
 
-func ais_to_nmea(ais []byte) []byte {
+func ais_to_nmea(ais []byte) ([]byte, error) {
 	var payload []byte
 	// Number of resulting characters for payload.
 	var ns = uint(len(ais)*8+5) / 6
 	for k := range ns {
-		payload = append(payload, sextet_to_char(get_field(ais, k*6, 6)))
+		var ch, err = sextet_to_char(get_field(ais, k*6, 6))
+		if err != nil {
+			return nil, err
+		}
+
+		payload = append(payload, ch)
 	}
 
 	var nmea = []byte("!AIVDM,1,1,,A,")
@@ -305,7 +304,7 @@ func ais_to_nmea(ais []byte) []byte {
 	var checksum = fmt.Sprintf("*%02X", cs&0x7f)
 	nmea = append(nmea, []byte(checksum)...)
 
-	return nmea
+	return nmea, nil
 }
 
 /*-------------------------------------------------------------------
@@ -316,11 +315,17 @@ func ais_to_nmea(ais []byte) []byte {
  *
  * Inputs:	sentence	NMEA sentence.
  *
- *		quiet		Suppress printing of error messages.
+ * Returns:	(*AISData, nil)		Success.
  *
- * Returns:	*AISData	Structured AIS message data
+ *		(nil, error)		Fatal error; data is unusable.
+ *					Callers should report the error and
+ *					discard the result.
  *
- * 			errcode 	0 for success, -1 for error.
+ *		(*AISData, error)	Non-fatal warning (e.g. filler-bit
+ *					mismatch); the returned AISData is
+ *					populated and may still be used.
+ *					Callers should report the error but
+ *					may proceed with the data.
  *
  *--------------------------------------------------------------------*/
 
@@ -337,7 +342,7 @@ type AISData struct {
 	comment     string
 }
 
-func ais_parse(sentence string, quiet bool) (*AISData, int) {
+func ais_parse(sentence string) (*AISData, error) {
 	var aisData = new(AISData)
 	aisData.mssi = "?"
 	aisData.lat = G_UNKNOWN
@@ -363,24 +368,14 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	var data, checksumStr, found = strings.Cut(stemp, "*")
 
 	if !found {
-		if !quiet {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Missing AIS sentence checksum.\n")
-		}
-
-		return aisData, -1
+		return nil, fmt.Errorf("missing AIS sentence checksum")
 	}
 
 	var _checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
 	var checksum = byte(_checksum)
 
 	if calculatedChecksum != checksum {
-		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("AIS sentence checksum error. Expected %02x but found %s.\n", calculatedChecksum, checksumStr)
-		}
-
-		return aisData, -1
+		return nil, fmt.Errorf("AIS sentence checksum error: expected %02x but found %s", calculatedChecksum, checksumStr)
 	}
 
 	// Extract the comma separated fields.
@@ -403,12 +398,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	_ = radio_chan
 
 	if len(payload) == 0 {
-		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Payload is missing from AIS sentence.\n")
-		}
-
-		return aisData, -1
+		return nil, fmt.Errorf("payload is missing from AIS sentence")
 	}
 
 	// Convert character representation to bit vector.
@@ -416,7 +406,12 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	var ais = make([]byte, 256)
 
 	for i, b := range payload {
-		set_field(ais, uint(i)*6, 6, char_to_sextet(byte(b)))
+		var val, err = char_to_sextet(byte(b))
+		if err != nil {
+			return nil, err
+		}
+
+		set_field(ais, uint(i)*6, 6, val)
 	}
 
 	// Verify number of filler bits.
@@ -425,12 +420,9 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 	var nfill, _ = strconv.Atoi(fill_bits)
 	var nbytes = (plen * 6) / 8
 
+	var fillerErr error
 	if nfill != plen*6-nbytes*8 {
-		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Number of filler bits is %d when %d is expected.\n",
-				nfill, plen*6-nbytes*8)
-		}
+		fillerErr = fmt.Errorf("number of filler bits is %d when %d is expected", nfill, plen*6-nbytes*8)
 	}
 
 	// Extract the fields of interest from a few message types.
@@ -527,7 +519,7 @@ func ais_parse(sentence string, quiet bool) (*AISData, int) {
 		aisData.description = fmt.Sprintf("AIS message type %d", aisType)
 	}
 
-	return aisData, 0
+	return aisData, fillerErr
 } /* end ais_parse */
 
 /*-------------------------------------------------------------------
