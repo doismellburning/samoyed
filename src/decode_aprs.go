@@ -2538,7 +2538,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("{DM")) { // Official after registering {D*
 		aprs_morse_code(A, info)
 	} else if info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
-		var aisData, aisErr = ais_parse(string(info[3:]))
+		var aisData, aisErr = AISParse(string(info[3:]))
 		if aisErr != nil {
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
@@ -2551,16 +2551,16 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 			}
 		}
 
-		A.g_data_type_desc = aisData.description
-		A.g_name = aisData.mssi
-		A.g_lat = aisData.lat
-		A.g_lon = aisData.lon
-		A.g_speed_mph = DW_KNOTS_TO_MPH(aisData.knots)
-		A.g_course = aisData.course
-		A.g_altitude_ft = DW_METERS_TO_FEET(aisData.alt_m)
-		A.g_symbol_table = aisData.symtab
-		A.g_symbol_code = aisData.symbol
-		A.g_comment = aisData.comment
+		A.g_data_type_desc = aisData.Description
+		A.g_name = aisData.MSSI
+		A.g_lat = aisData.Lat
+		A.g_lon = aisData.Lon
+		A.g_speed_mph = DW_KNOTS_TO_MPH(aisData.Knots)
+		A.g_course = aisData.Course
+		A.g_altitude_ft = DW_METERS_TO_FEET(aisData.AltM)
+		A.g_symbol_table = aisData.Symtab
+		A.g_symbol_code = aisData.Symbol
+		A.g_comment = aisData.Comment
 
 		A.g_mfr = ""
 	} else if bytes.HasPrefix(info, []byte("{{")) {

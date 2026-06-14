@@ -729,7 +729,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel aleve
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
 			// Sanity check for AIS.
-			if ais_check_length(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
+			if AISCheckLength(int(H2.frame_buf[0]>>2)&0x3f, H2.frame_len-2) == 0 {
 				multi_modem_process_rec_frame(
 					channel,
 					subchan,
