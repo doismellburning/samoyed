@@ -469,6 +469,7 @@ func (xs *XmitService) xmit_thread(channel int) {
 					dw_printf("%s", stemp) /* stations followed by : */
 					ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 					dw_printf("\n")
+					ackmode_discard(pp)
 					ax25_delete(pp)
 				} /* wait for clear channel error. */
 			} /* Have pp */
@@ -631,6 +632,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 	#endif
 	*/
+	ackmode_notify_sent(pp)
 	ax25_delete(pp)
 
 	/*
@@ -678,6 +680,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 					        dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 				#endif
 				*/
+				ackmode_notify_sent(pp)
 				ax25_delete(pp)
 			}
 		} else {
