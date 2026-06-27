@@ -426,3 +426,30 @@ func Test_config_init_modem_directive(t *testing.T) {
 		})
 	}
 }
+
+// --- config_init ACHANNEL directive ---
+
+func Test_config_init_achannel(t *testing.T) {
+	t.Run("ACHANNEL sets MEDIUM_ARDOP and stores connection params", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "ACHANNEL 9 tnc.example.com 8515 8516\n")
+		assert.Equal(t, MEDIUM_ARDOP, cfg.chan_medium[9])
+		assert.Equal(t, "tnc.example.com", cfg.ardop_addr[9])
+		assert.Equal(t, 8515, cfg.ardop_ctrl_port[9])
+		assert.Equal(t, 8516, cfg.ardop_data_port[9])
+	})
+
+	t.Run("ACHANNEL channel must be in virtual range", func(t *testing.T) {
+		// Channel 0 is a radio channel (below MAX_RADIO_CHANS=6) — must be rejected.
+		var cfg, _ = configFromString(t, "ACHANNEL 0 tnc.example.com 8515 8516\n")
+		assert.NotEqual(t, MEDIUM_ARDOP, cfg.chan_medium[0])
+	})
+
+	t.Run("ACHANNEL channel in use is rejected", func(t *testing.T) {
+		// Use ACHANNEL twice for the same virtual channel — second must not overwrite.
+		var cfg, _ = configFromString(t,
+			"ACHANNEL 9 first.example.com 8515 8516\n"+
+				"ACHANNEL 9 second.example.com 9515 9516\n",
+		)
+		assert.Equal(t, "first.example.com", cfg.ardop_addr[9])
+	})
+}

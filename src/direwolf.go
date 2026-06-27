@@ -598,6 +598,11 @@ x = Silence FX.25 information.`)
 	nettnc_init(audio_config)
 
 	/*
+	 * New - Allow a channel to be mapped to an ARDOP TNC.
+	 */
+	ardop_init(audio_config)
+
+	/*
 	 * Initialize the touch tone decoder & APRStt gateway.
 	 */
 	dtmf_init(audio_config, audio_amplitude)

@@ -841,6 +841,7 @@ var configHandlers = map[string]configHandler{
 	"CHANNEL":        handleCHANNEL,
 	"ICHANNEL":       handleICHANNEL,
 	"NCHANNEL":       handleNCHANNEL,
+	"ACHANNEL":       handleACHANNEL,
 	"MYCALL":         handleMYCALL,
 	"MODEM":          handleMODEM,
 	"DTMF":           handleDTMF,
@@ -1287,7 +1288,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		/* When IGate is enabled, all radio channels must have a callsign associated. */
 
 		if len(ps.igate.t2_login) > 0 &&
-			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC) {
+			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC || ps.audio.chan_medium[i] == MEDIUM_ARDOP) {
 			if IsNoCall(ps.audio.mycall[i]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for receive channel %d before Rx IGate is allowed.\n", i)
@@ -1310,7 +1311,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	if len(ps.igate.t2_login) > 0 {
 		for j := range MAX_TOTAL_CHANS {
-			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC {
+			if ps.audio.chan_medium[j] == MEDIUM_RADIO || ps.audio.chan_medium[j] == MEDIUM_NETTNC || ps.audio.chan_medium[j] == MEDIUM_ARDOP {
 				if ps.digi.filter_str[MAX_TOTAL_CHANS][j] == "" {
 					ps.digi.filter_str[MAX_TOTAL_CHANS][j] = "i/180"
 				}
@@ -1677,6 +1678,80 @@ func handleNCHANNEL(ps *parseState) bool {
 	}
 	var n, _ = strconv.Atoi(t)
 	ps.audio.nettnc_port[nchan] = n
+	return false
+}
+
+// handleACHANNEL handles the ACHANNEL keyword.
+func handleACHANNEL(ps *parseState) bool {
+	/*
+	 * ACHANNEL chan addr ctrlport dataport		- Define ARDOP TNC virtual channel.
+	 *
+	 *	This allows Samoyed to exchange AX.25 packets with an external ARDOP TNC
+	 *	(e.g. ardopc) by using a channel number outside the normal range for modems.
+	 *	This does not change the current channel number used by MODEM, PTT, etc.
+	 *
+	 *	chan     = direwolf channel number.
+	 *	addr     = hostname or IP address of ARDOP TNC.
+	 *	ctrlport = ARDOP TNC control TCP port (typically 8515).
+	 *	dataport = ARDOP TNC data TCP port (typically 8516).
+	 */
+	var t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing virtual channel number for ACHANNEL command.\n", ps.line)
+
+		return true
+	}
+
+	var achan, _ = strconv.Atoi(t)
+	if achan >= MAX_RADIO_CHANS && achan < MAX_TOTAL_CHANS {
+		if ps.audio.chan_medium[achan] == MEDIUM_NONE {
+			ps.audio.chan_medium[achan] = MEDIUM_ARDOP
+		} else {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: ACHANNEL can't use channel %d because it is already in use.\n", ps.line, achan)
+
+			return true
+		}
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: ACHANNEL number must be in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+
+		return true
+	}
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing ARDOP TNC address for ACHANNEL command.\n", ps.line)
+
+		return true
+	}
+
+	ps.audio.ardop_addr[achan] = t
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing ARDOP TNC control TCP port for ACHANNEL command.\n", ps.line)
+
+		return true
+	}
+
+	var ctrlPort, _ = strconv.Atoi(t)
+	ps.audio.ardop_ctrl_port[achan] = ctrlPort
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing ARDOP TNC data TCP port for ACHANNEL command.\n", ps.line)
+
+		return true
+	}
+
+	var dataPort, _ = strconv.Atoi(t)
+	ps.audio.ardop_data_port[achan] = dataPort
+
 	return false
 }
 
@@ -3061,7 +3136,8 @@ func handleDIGIPEAT(ps *parseState) bool {
 	// Channels specified must be radio channels or network TNCs.
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
-		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC {
+		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
+		ps.audio.chan_medium[from_chan] != MEDIUM_ARDOP {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 			ps.line, from_chan)
@@ -3095,7 +3171,8 @@ func handleDIGIPEAT(ps *parseState) bool {
 	}
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
-		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC {
+		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
+		ps.audio.chan_medium[to_chan] != MEDIUM_ARDOP {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 			ps.line, to_chan)
@@ -3459,7 +3536,8 @@ func handleFILTER(ps *parseState) bool {
 		}
 
 		if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
-			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC {
+			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC &&
+			ps.audio.chan_medium[from_chan] != MEDIUM_ARDOP {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
 				ps.line, from_chan)
@@ -3506,7 +3584,8 @@ func handleFILTER(ps *parseState) bool {
 		}
 
 		if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
-			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC {
+			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC &&
+			ps.audio.chan_medium[to_chan] != MEDIUM_ARDOP {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
 				ps.line, to_chan)
@@ -4572,7 +4651,8 @@ func handleTTOBJ(ps *parseState) bool {
 				dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
 				x = -1
 			} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
-				ps.audio.chan_medium[x] != MEDIUM_NETTNC {
+				ps.audio.chan_medium[x] != MEDIUM_NETTNC &&
+				ps.audio.chan_medium[x] != MEDIUM_ARDOP {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
 				x = -1

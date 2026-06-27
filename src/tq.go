@@ -175,7 +175,8 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	// Send somewhere else, rather than the transmit queue.
 
 	if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE ||
-		save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+		save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC ||
+		save_audio_config_p.chan_medium[channel] == MEDIUM_ARDOP {
 		var ts string // optional time stamp.
 
 		if save_audio_config_p.timestamp_format != "" {
@@ -189,20 +190,28 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 		text_color_set(DW_COLOR_XMIT)
 
-		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
+		switch save_audio_config_p.chan_medium[channel] {
+		case MEDIUM_IGATE:
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			igate_send_rec_packet(channel, pp)
-		} else { // network TNC
+		case MEDIUM_NETTNC:
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
 			nettnc_send_packet(channel, pp)
+		default: // ARDOP TNC
+			dw_printf("[%d>ar%s] ", channel, ts)
+			dw_printf("%s", stemp) /* stations followed by : */
+			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
+			dw_printf("\n")
+
+			ardop_send_packet(channel, pp)
 		}
 
 		ax25_delete(pp)
@@ -406,8 +415,9 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	#endif
 	*/
 
-	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
-		// For NETTNC channels, just yeet out the packet and let the external TNC handle it - we don't have enough info to do much else
+	if channel >= 0 && channel < MAX_TOTAL_CHANS &&
+		(save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC || save_audio_config_p.chan_medium[channel] == MEDIUM_ARDOP) {
+		// For NETTNC/ARDOP channels, just yeet out the packet and let the external TNC handle it - we don't have enough info to do much else
 		tq_append(channel, prio, pp)
 		return
 	}
@@ -551,8 +561,9 @@ func lm_seize_request(channel int) {
 	#endif
 	*/
 
-	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
-		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
+	if channel >= 0 && channel < MAX_TOTAL_CHANS &&
+		(save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC || save_audio_config_p.chan_medium[channel] == MEDIUM_ARDOP) {
+		// MEDIUM_NETTNC/ARDOP: no internal modem to seize; confirm the channel immediately.
 		// See lm_data_request for the rationale for allowing MEDIUM_NETTNC.
 		dlq_seize_confirm(channel)
 		return

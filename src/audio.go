@@ -76,6 +76,7 @@ const (
 	MEDIUM_RADIO                  // Internal modem for radio.
 	MEDIUM_IGATE                  // Access IGate as ordinary channel.
 	MEDIUM_NETTNC                 // Remote network TNC.  (new in 1.8)
+	MEDIUM_ARDOP                  // Remote ARDOP TNC via TCP host interface.
 )
 
 type sanity_t int
@@ -430,6 +431,7 @@ type audio_s struct {
 	// MEDIUM_RADIO for internal modem.  (only possibility earlier)
 	// MEDIUM_IGATE allows application access to IGate.
 	// MEDIUM_NETTNC for external TNC via TCP.
+	// MEDIUM_ARDOP for external ARDOP TNC via TCP host interface.
 
 	igate_vchannel int /* Virtual channel mapped to APRS-IS. */
 	/* -1 for none. */
@@ -441,6 +443,12 @@ type audio_s struct {
 	nettnc_addr [MAX_TOTAL_CHANS]string // Network TNC address:  hostname or IP addr.
 
 	nettnc_port [MAX_TOTAL_CHANS]int // Network TNC TCP port.
+
+	// Applies only to ARDOP TNC channels.
+
+	ardop_addr      [MAX_TOTAL_CHANS]string // ARDOP TNC address: hostname or IP addr.
+	ardop_ctrl_port [MAX_TOTAL_CHANS]int    // ARDOP TNC control TCP port (typically 8515).
+	ardop_data_port [MAX_TOTAL_CHANS]int    // ARDOP TNC data TCP port (typically 8516).
 
 	achan [MAX_RADIO_CHANS]achan_param_s
 
