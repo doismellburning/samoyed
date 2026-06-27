@@ -13,7 +13,7 @@ jobs:
     outputs:
       SAMOYED_VERSION: "${{ steps.version.outputs.SAMOYED_VERSION }}"
     steps:
-    - uses: "actions/checkout@v6"
+    - uses: "actions/checkout@v7"
     - name: "Generate Version"
       id: "version"
       run: |
@@ -31,7 +31,7 @@ jobs:
           - "macos-latest"
     runs-on: "${{ matrix.runner }}"
     steps:
-    - uses: "actions/checkout@v6"
+    - uses: "actions/checkout@v7"
     - uses: "actions/setup-go@v6"
       with:
         go-version: "1.25"
@@ -101,7 +101,7 @@ jobs:
     outputs:
       result: "${{ steps.check.outputs.result }}"
     steps:
-    - uses: "actions/checkout@v6"
+    - uses: "actions/checkout@v7"
       with:
         fetch-depth: 2
     - name: "Check if release is warranted"
@@ -150,7 +150,7 @@ jobs:
       UV_LOCKED: 1  # Ensure lockfile is up to date at test time
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
