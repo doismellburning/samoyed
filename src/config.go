@@ -1371,7 +1371,7 @@ func handleADEVICE(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file: Missing name of audio device for ADEVICE command on line %d.\n", ps.line)
 		rtfm()
-		exit(1)
+		os.Exit(1)
 	}
 
 	// Do not allow same adevice to be defined more than once.

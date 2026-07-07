@@ -12,6 +12,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"os"
 	"strings"
 	"unicode"
 )
@@ -949,7 +950,7 @@ func demod_process_sample(channel int, subchan int, sam int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid combination of options.  Exiting.\n")
 			// Would probably work but haven't thought about it or tested yet.
-			exit(1)
+			os.Exit(1)
 		} else {
 			demod_psk_process_sample(channel, subchan, sam, D)
 		}

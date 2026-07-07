@@ -1491,7 +1491,7 @@ func audio_get_real(a int) int {
 				if errors.Is(err, io.EOF) {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nEnd of file on stdin.  Exiting.\n")
-					exit(0)
+					os.Exit(0)
 				}
 
 				text_color_set(DW_COLOR_ERROR)
