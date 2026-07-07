@@ -895,9 +895,9 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			/* we are actually hearing the preceding station in the path. */
 
 			if h >= AX25_REPEATER_2 &&
+				len(heard) == 5 &&
 				strings.EqualFold(heard[:4], "WIDE") &&
-				unicode.IsDigit(rune(heard[4])) &&
-				len(heard) == 5 {
+				unicode.IsDigit(rune(heard[4])) {
 				var probably_really = ax25_get_addr_with_ssid(pp, h-1)
 
 				// audio level applies only for internal modem channels.

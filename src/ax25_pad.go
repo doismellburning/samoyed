@@ -1670,7 +1670,7 @@ func ax25_get_first_not_repeated(this_p *packet_t) int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_rr(this_p *packet_t, n int) int { //nolint:unused
+func ax25_get_rr(this_p *packet_t, n int) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < this_p.num_addr)
