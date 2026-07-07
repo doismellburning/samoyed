@@ -9,7 +9,7 @@ report's §5 sequencing, with quick wins pulled to the top.
 - [x] Fix `strconv.ParseFloat`/`Atoi` error swallowing in
       `cmd/samoyed-ll2utm/main.go` and `cmd/samoyed-utm2ll/main.go` — print
       parse errors + usage instead of silently continuing with zero values.
-- [ ] Remove `//nolint:unused` dead stats counters in `igate.go`, or wire
+- [x] Remove `//nolint:unused` dead stats counters in `igate.go`, or wire
       them up if they should be live.
 - [ ] Delete `IfThenElse` from `util.go` (evaluates both arms — footgun for
       side-effecting/nil-deref arms; hides control flow). Update call sites.

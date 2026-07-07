@@ -146,38 +146,8 @@ var s_debug int
  * TODO: should have debug option to print these occasionally.
  */
 
-var stats_failed_connect int //nolint:unused
-/* Number of times we tried to connect to */
-/* a server and failed.  A small number is not */
-/* a bad thing.  Each name should have a bunch */
-/* of addresses for load balancing and */
-/* redundancy. */
-
-var stats_connects int //nolint:unused
-/* Number of successful connects to a server. */
-/* Normally you'd expect this to be 1.  */
-/* Could be larger if one disappears and we */
-/* try again to find a different one. */
-
-var stats_connect_at time.Time //nolint:unused
-/* Most recent time connection was established. */
-/* can be used to determine elapsed connect time. */
-
-var stats_rf_recv_packets int //nolint:unused
-/* Number of candidate packets from the radio. */
-/* This is not the total number of AX.25 frames received */
-/* over the radio; only APRS packets get this far. */
-
 var stats_uplink_packets int /* Number of packets passed along to the IGate */
 /* server after filtering. */
-
-var stats_uplink_bytes int //nolint:unused
-/* Total number of bytes sent to IGate server */
-/* including login, packets, and heartbeats. */
-
-var stats_downlink_bytes int //nolint:unused
-/* Total number of bytes from IGate server including */
-/* packets, heartbeats, other messages. */
 
 var stats_downlink_packets int /* Number of packets from IGate server for possible transmission. */
 /* Fewer might be transmitted due to filtering or rate limiting. */
@@ -268,13 +238,7 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 	save_igate_config_p = p_igate_config
 	save_digi_config_p = p_digi_config
 
-	stats_failed_connect = 0
-	stats_connects = 0
-	stats_connect_at = time.Time{}
-	stats_rf_recv_packets = 0
 	stats_uplink_packets = 0
-	stats_uplink_bytes = 0
-	stats_downlink_bytes = 0
 	stats_downlink_packets = 0
 	stats_rf_xmit_packets = 0
 	stats_msg_cnt = 0
@@ -353,14 +317,10 @@ func connect_thread() {
 		 */
 		if igate_sock == nil {
 			var conn, connErr = net.Dial("tcp", net.JoinHostPort(server_name, strconv.Itoa(save_igate_config_p.t2_server_port)))
-			stats_connects++
-			stats_connect_at = time.Now()
 
 			if connErr != nil {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
-
-				stats_failed_connect++
 			} else {
 				/* Success. */
 				text_color_set(DW_COLOR_INFO)
@@ -464,10 +424,6 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	if !ok_to_send {
 		return /* Login not complete. */
 	}
-
-	/* Gather statistics. */
-
-	stats_rf_recv_packets++
 
 	/*
 	 * Check for filtering from specified channel to the IGate server.
@@ -825,8 +781,6 @@ func send_msg_to_server(imsg string) {
 
 	imsg += "\r\n"
 
-	stats_uplink_bytes += len(imsg)
-
 	var _, err = igate_sock.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -908,7 +862,6 @@ func igate_recv_thread() {
 
 		for {
 			var ch = get1ch()
-			stats_downlink_bytes++
 
 			// I never expected to see a nul character but it can happen.
 			// If found, change it to <0x00> and ax25_from_text will change it back to a single byte.
