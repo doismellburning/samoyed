@@ -432,11 +432,17 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 
 	degrees *= float64(sign)
 
-	var limit = float64(IfThenElse(which == LAT, 90, 180))
+	var limit = 180.0
+	var whichName = "longitude"
+
+	if which == LAT {
+		limit = 90.0
+		whichName = "latitude"
+	}
+
 	if degrees < -limit || degrees > limit {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Number of degrees in \"%s\" is out of range for %s\n", line, str,
-			IfThenElse(which == LAT, "latitude", "longitude"))
+		dw_printf("Line %d: Number of degrees in \"%s\" is out of range for %s\n", line, str, whichName)
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
 	return degrees
@@ -2031,7 +2037,10 @@ func handleMODEM(ps *parseState) bool {
 					return true
 				}
 
-				ps.audio.achan[ps.channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
+				ps.audio.achan[ps.channel].v26_alternative = V26_B
+				if strings.EqualFold(t, "V26A") {
+					ps.audio.achan[ps.channel].v26_alternative = V26_A
+				}
 			} else if t[0] == '/' { /* /div */
 				var n, _ = strconv.Atoi(t[1:])
 

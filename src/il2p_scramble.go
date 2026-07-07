@@ -58,7 +58,7 @@ func il2p_scramble_block(in []byte) []byte {
 	var om byte = 0x80 // Output bit mask;
 	for ib := range in {
 		for im := byte(0x80); im != 0; im >>= 1 {
-			var s = scramble_bit(IfThenElse(((in[ib]&im) != 0), 1, 0), &tx_lfsr_state)
+			var s = scramble_bit(boolToInt((in[ib]&im) != 0), &tx_lfsr_state)
 			if ib == 0 && im == 0x04 {
 				skipping = false
 			}
@@ -118,7 +118,7 @@ func il2p_descramble_block(in []byte) []byte {
 
 	for b := range in {
 		for m := byte(0x80); m != 0; m >>= 1 {
-			var d = descramble_bit(IfThenElse(((in[b]&m) != 0), 1, 0), &rx_lfsr_state)
+			var d = descramble_bit(boolToInt((in[b]&m) != 0), &rx_lfsr_state)
 			if d != 0 {
 				out[b] |= m
 			}

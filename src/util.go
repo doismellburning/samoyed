@@ -17,13 +17,12 @@ func SLEEP_SEC(s int) {
 	SLEEP_MS(s * 1000)
 }
 
-// Because sometimes it's really convenient to have C's ternary ?:
-func IfThenElse[T any](x bool, a T, b T) T { //nolint:ireturn
-	if x {
-		return a
-	} else {
-		return b
+func boolToInt(b bool) int {
+	if b {
+		return 1
 	}
+
+	return 0
 }
 
 // MAX_NET_CLIENTS is used for both KISS and AGWPE

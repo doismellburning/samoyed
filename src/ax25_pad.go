@@ -535,7 +535,9 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		return (nil)
 	}
 
-	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), IfThenElse(strict, 1, 0))
+	var strictInt = boolToInt(strict)
+
+	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), strictInt)
 
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
@@ -556,7 +558,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	pa, stuff, _ = bytes.Cut(stuff, []byte{','})
 	// Note: if no comma found, pa contains the destination and stuff is empty (no digipeaters)
 
-	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), IfThenElse(strict, 1, 0))
+	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), strictInt)
 
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
@@ -604,7 +606,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 
 		var heardTemp bool
 
-		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), IfThenElse(strict, 1, 0))
+		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), strictInt)
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
@@ -853,7 +855,10 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 
 	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
 
-	var maxlen = IfThenElse(strictness > 0, 6, (AX25_MAX_ADDR_LEN - 1))
+	var maxlen = AX25_MAX_ADDR_LEN - 1
+	if strictness > 0 {
+		maxlen = 6
+	}
 
 	for i, p := range in_addr {
 		if p == '-' || p == '*' {
@@ -2364,6 +2369,15 @@ func pid_to_text(p int) string {
 	}
 }
 
+// printableOrDot returns b, or '.' if b is not a printable character - for hex-dump-style address display.
+func printableOrDot(b byte) byte {
+	if unicode.IsPrint(rune(b)) {
+		return b
+	}
+
+	return '.'
+}
+
 func ax25_hex_dump(this_p *packet_t) {
 	var fptr = this_p.frame_data
 
@@ -2392,24 +2406,24 @@ func ax25_hex_dump(this_p *packet_t) {
 	// Any non printable characters will be printed as "." here.
 
 	dw_printf(" dest    %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
-		IfThenElse(unicode.IsPrint(rune(fptr[0]>>1)), fptr[0]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[1]>>1)), fptr[1]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[2]>>1)), fptr[2]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[3]>>1)), fptr[3]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[4]>>1)), fptr[4]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[5]>>1)), fptr[5]>>1, '.'),
+		printableOrDot(fptr[0]>>1),
+		printableOrDot(fptr[1]>>1),
+		printableOrDot(fptr[2]>>1),
+		printableOrDot(fptr[3]>>1),
+		printableOrDot(fptr[4]>>1),
+		printableOrDot(fptr[5]>>1),
 		(fptr[6]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
 		(fptr[6]&SSID_H_MASK)>>SSID_H_SHIFT,
 		(fptr[6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
 		fptr[6]&SSID_LAST_MASK)
 
 	dw_printf(" source  %c%c%c%c%c%c %2d c/r=%d res=%d last=%d\n",
-		IfThenElse(unicode.IsPrint(rune(fptr[7]>>1)), fptr[7]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[8]>>1)), fptr[8]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[9]>>1)), fptr[9]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[10]>>1)), fptr[10]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[11]>>1)), fptr[11]>>1, '.'),
-		IfThenElse(unicode.IsPrint(rune(fptr[12]>>1)), fptr[12]>>1, '.'),
+		printableOrDot(fptr[7]>>1),
+		printableOrDot(fptr[8]>>1),
+		printableOrDot(fptr[9]>>1),
+		printableOrDot(fptr[10]>>1),
+		printableOrDot(fptr[11]>>1),
+		printableOrDot(fptr[12]>>1),
 		(fptr[13]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
 		(fptr[13]&SSID_H_MASK)>>SSID_H_SHIFT,
 		(fptr[13]&SSID_RR_MASK)>>SSID_RR_SHIFT,
@@ -2418,12 +2432,12 @@ func ax25_hex_dump(this_p *packet_t) {
 	for n := 2; n < this_p.num_addr; n++ {
 		dw_printf(" digi %d  %c%c%c%c%c%c %2d   h=%d res=%d last=%d\n",
 			n-1,
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+0]>>1)), fptr[n*7+0]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+1]>>1)), fptr[n*7+1]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+2]>>1)), fptr[n*7+2]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+3]>>1)), fptr[n*7+3]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+4]>>1)), fptr[n*7+4]>>1, '.'),
-			IfThenElse(unicode.IsPrint(rune(fptr[n*7+5]>>1)), fptr[n*7+5]>>1, '.'),
+			printableOrDot(fptr[n*7+0]>>1),
+			printableOrDot(fptr[n*7+1]>>1),
+			printableOrDot(fptr[n*7+2]>>1),
+			printableOrDot(fptr[n*7+3]>>1),
+			printableOrDot(fptr[n*7+4]>>1),
+			printableOrDot(fptr[n*7+5]>>1),
 			(fptr[n*7+6]&SSID_SSID_MASK)>>SSID_SSID_SHIFT,
 			(fptr[n*7+6]&SSID_H_MASK)>>SSID_H_SHIFT,
 			(fptr[n*7+6]&SSID_RR_MASK)>>SSID_RR_SHIFT,
