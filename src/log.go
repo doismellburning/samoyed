@@ -247,9 +247,9 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			}
 
 			if h >= AX25_REPEATER_2 &&
+				len(heard) == 5 &&
 				heard[:4] == "WIDE" &&
-				unicode.IsDigit(rune(heard[4])) &&
-				len(heard) == 5 {
+				unicode.IsDigit(rune(heard[4])) {
 				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
 			}
 		}
@@ -348,7 +348,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
  *
  *------------------------------------------------------------------*/
 
-func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:unused
+func log_rr_bits(A *decode_aprs_t, pp *packet_t) {
 	if true {
 		// Sanitize system type (manufacturer) changing any comma to period.
 		var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
@@ -369,9 +369,9 @@ func log_rr_bits(A *decode_aprs_t, pp *packet_t) { //nolint:unused
 			}
 
 			if h >= AX25_REPEATER_2 &&
+				len(heard) == 5 &&
 				heard[:4] == "WIDE" &&
-				unicode.IsDigit(rune(heard[4])) &&
-				len(heard) == 5 {
+				unicode.IsDigit(rune(heard[4])) {
 				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
 			}
 
