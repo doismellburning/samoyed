@@ -1,6 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "os"
+
 // Interesting related stuff:
 // https://www.kernel.org/doc/html/v4.15/core-api/librs.html
 // https://berthub.eu/articles/posts/reed-solomon-for-programmers/
@@ -49,7 +51,7 @@ func il2p_init(il2p_debug int) {
 		if Tab[i].rs == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("IL2P internal error: init_rs_char failed!\n")
-			exit(1)
+			os.Exit(1)
 		}
 	}
 } // end il2p_init

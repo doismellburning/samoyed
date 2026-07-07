@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"os"
 	"runtime"
 	"time"
 )
@@ -39,10 +38,6 @@ func dw_printf(format string, a ...any) (int, error) {
 	// Can't call variadic functions through cgo, so let's define our own!
 	// Fortunately dw_printf doesn't do much
 	return fmt.Printf(format, a...)
-}
-
-func exit(x int) {
-	os.Exit(x)
 }
 
 // #define ACHAN2ADEV(n) ((n)>>1)

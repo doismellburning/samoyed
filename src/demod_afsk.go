@@ -22,6 +22,7 @@ package direwolf
 
 import (
 	"math"
+	"os"
 )
 
 var DCD_CONFIG_AFSK = GenericDCDConfig()
@@ -250,7 +251,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid AFSK demodulator profile = %c\n", profile)
-		exit(1)
+		os.Exit(1)
 	}
 
 	TUNE("TUNE_PRE_BAUD", D.prefilter_baud, "prefilter_baud", "%.3f")

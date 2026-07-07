@@ -60,6 +60,7 @@ package direwolf
 
 import (
 	"math"
+	"os"
 	"unicode"
 )
 
@@ -449,7 +450,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
 		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
 			MAX_FILTER_SIZE)
-		exit(1)
+		os.Exit(1)
 	}
 
 	if D.u.psk.delay_line_taps > MAX_FILTER_SIZE {
@@ -458,7 +459,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
 		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
 			MAX_FILTER_SIZE)
-		exit(1)
+		os.Exit(1)
 	}
 
 	if D.u.psk.lp_filter_taps > MAX_FILTER_SIZE {
@@ -467,7 +468,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
 		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
 			MAX_FILTER_SIZE)
-		exit(1)
+		os.Exit(1)
 	}
 
 	/*

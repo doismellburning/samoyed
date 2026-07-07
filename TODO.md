@@ -13,7 +13,7 @@ report's §5 sequencing, with quick wins pulled to the top.
       them up if they should be live.
 - [x] Delete `IfThenElse` from `util.go` (evaluates both arms — footgun for
       side-effecting/nil-deref arms; hides control flow). Update call sites.
-- [ ] Delete `exit()` wrapper from `util.go` so remaining `os.Exit` sites are
+- [x] Delete `exit()` wrapper from `util.go` so remaining `os.Exit` sites are
       grep-able; migrate call sites case-by-case as part of §2.3 below.
 
 ## 1. Move standalone tool implementations out of `src/` (§2.6)

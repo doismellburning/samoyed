@@ -326,7 +326,7 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 				dw_printf("    PTT GPIOD  gpiochip0  %s\n", stemp)
 				dw_printf("You can get a list of gpio chip names and corresponding I/O lines with \"gpioinfo\" command.\n")
 			}
-			exit(1)
+			os.Exit(1)
 		}
 		*/
 	}
@@ -425,7 +425,7 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR! Could not find Path for gpio number %d.n", gpio_num)
-		exit(1)
+		os.Exit(1)
 	}
 
 	/*
