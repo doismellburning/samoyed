@@ -682,11 +682,16 @@ func demod_init(pa *audio_s) int {
 					#endif
 					*/
 
+					var modemName = "K9NG/G3RUH"
+					if save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
+						modemName = "AIS"
+					}
+
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("Channel %d: %d baud, %s, %s, %d sample rate x %d",
 						channel,
 						save_audio_config_p.achan[channel].baud,
-						IfThenElse(save_audio_config_p.achan[channel].modem_type == MODEM_AIS, "AIS", "K9NG/G3RUH"),
+						modemName,
 						save_audio_config_p.achan[channel].profiles,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].upsample)

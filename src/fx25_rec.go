@@ -343,7 +343,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 	var frame_buf []byte
 	for i := 0; i < ilen; i++ {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			var dbit = byte(IfThenElse((pin[i]&imask) != 0, 1, 0))
+			var dbit = byte(boolToInt((pin[i] & imask) != 0))
 
 			pat_det >>= 1 // Shift the most recent eight bits thru the pattern detector.
 			pat_det |= dbit << 7

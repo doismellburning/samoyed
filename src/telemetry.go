@@ -742,7 +742,10 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 				pm.coeff[n][C_B]*araw[n] +
 				pm.coeff[n][C_C]
 
-			var z = IfThenElse(pm.coeff_ndp[n][C_A] == 0, 0, pm.coeff_ndp[n][C_A]+ndp[n]+ndp[n])
+			var z = 0
+			if pm.coeff_ndp[n][C_A] != 0 {
+				z = pm.coeff_ndp[n][C_A] + ndp[n] + ndp[n]
+			}
 			fndp = max(z, max(pm.coeff_ndp[n][C_B]+ndp[n], pm.coeff_ndp[n][C_C]))
 
 			var val_str = fval_to_str(fval, fndp)

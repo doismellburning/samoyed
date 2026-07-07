@@ -287,7 +287,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 		// PID is set to 0, meaning none, for S frames.
 		SET_UI(hdr, 0)
 		SET_PID(hdr, 0)
-		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|(((IfThenElse((cr == cr_cmd), 1, 0))|(IfThenElse((cr == cr_11), 1, 0)))<<2))
+		SET_CONTROL(hdr, (pf<<6)|(nr<<3)|((boolToInt(cr == cr_cmd)|boolToInt(cr == cr_11))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -348,7 +348,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 		// same bits.  We see this in the second example in the protocol spec.
 		// The original UI frame has both C bits of 0 so it is received as a response.
 
-		SET_CONTROL(hdr, (pf<<6)|(((IfThenElse((cr == cr_cmd), 1, 0))|(IfThenElse((cr == cr_11), 1, 0)))<<2))
+		SET_CONTROL(hdr, (pf<<6)|((boolToInt(cr == cr_cmd)|boolToInt(cr == cr_11))<<2))
 
 		// This gets OR'ed into the above.
 		switch frame_type {
@@ -525,7 +525,12 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'S' frame.
 		// The control field contains: P/F N(R) C S S
 		var control = GET_CONTROL(hdr)
-		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+
+		var cr = cr_res
+		if (control & 0x04) != 0 {
+			cr = cr_cmd
+		}
+
 		var ftype ax25_frame_type_t
 
 		switch control & 0x03 {
@@ -548,7 +553,12 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'U' frame other than 'UI'.
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
-		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+
+		var cr = cr_res
+		if (control & 0x04) != 0 {
+			cr = cr_cmd
+		}
+
 		var axpid = 0 // unused for U other than UI.
 		var ftype ax25_frame_type_t
 
@@ -580,7 +590,12 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 		// 'UI' frame.
 		// The control field contains: P/F OPCODE{3) C x x
 		var control = GET_CONTROL(hdr)
-		var cr = IfThenElse((control&0x04) != 0, cr_cmd, cr_res)
+
+		var cr = cr_res
+		if (control & 0x04) != 0 {
+			cr = cr_cmd
+		}
+
 		var ftype = frame_type_U_UI
 		var pf = (control >> 6) & 0x01
 		var axpid = decode_pid(GET_PID(hdr))

@@ -556,7 +556,7 @@ func nudge_pll_9600(channel int, subchannel int, slice int, demod_out_f float64,
 
 	if D.slicer[slice].prev_d_c_pll > 1000000000 && D.slicer[slice].data_clock_pll < -1000000000 {
 		/* Overflow.  Was large positive, wrapped around, now large negative. */
-		hdlc_rec_bit_new(channel, subchannel, slice, IfThenElse(demod_out_f > 0, 1, 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
+		hdlc_rec_bit_new(channel, subchannel, slice, boolToInt(demod_out_f > 0), D.modem_type == MODEM_SCRAMBLE, D.slicer[slice].lfsr,
 			&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		D.slicer[slice].pll_symbol_count++
 
