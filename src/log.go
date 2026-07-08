@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -26,15 +25,24 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
 
-/*------------------------------------------------------------------
+type PacketLogger struct {
+	mu         sync.Mutex // Guards the fields below, since Write/Close may be called from multiple goroutines (e.g. beacon and main receive loop).
+	dailyNames bool       // True if daily names should be generated. In this case path is a directory.
+	logPath    string     // Save directory or full name here for later use.
+	logFp      *os.File   // File pointer for writing. Note that file is kept open. We don't open/close for every new item.
+	openFname  string     // Name of currently open file. Applicable only when dailyNames is true.
+}
+
+/*-------------------------------------------------------------------
  *
- * Function:	log_init
+ * Name:	NewPacketLogger
  *
- * Purpose:	Initialization at start of application.
+ * Purpose:	Initialise and return a new PacketLogger.
  *
  * Inputs:	daily_names	- True if daily names should be generated.
  *				  In this case path is a directory.
@@ -44,48 +52,31 @@ import (
  *				  Use "." for current directory.
  *				  Empty string disables feature.
  *
- * Global Out:	g_daily_names	- True if daily names should be generated.
- *
- *		g_log_path 	- Save directory or full name here for later use.
- *
- *		g_log_fp	- File pointer for writing.
- *				  Note that file is kept open.
- *				  We don't open/close for every new item.
- *
- *		g_open_fname	- Name of currently open file.
- *				  Applicable only when g_daily_names is true.
- *
- *------------------------------------------------------------------*/
+ *---------------------------------------------------------------*/
 
-var g_daily_names bool
-var g_log_path string
-var g_log_fp *os.File
-var g_open_fname string
-
-func log_init(daily_names bool, path string) {
-	g_daily_names = daily_names
-	g_log_path = ""
-	g_log_fp = nil
-	g_open_fname = ""
-
-	if len(path) == 0 {
-		return
+func NewPacketLogger(daily_names bool, path string) *PacketLogger {
+	var pl = &PacketLogger{ //nolint:exhaustruct
+		dailyNames: daily_names,
 	}
 
-	if g_daily_names {
+	if len(path) == 0 {
+		return pl
+	}
+
+	if pl.dailyNames {
 		// Original strategy.  Automatic daily file names.
 		var stat, statErr = os.Stat(path)
 		if statErr == nil {
 			// Exists, but is it a directory?
 			if stat.IsDir() {
 				// Specified directory exists.
-				g_log_path = path
+				pl.logPath = path
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Log file location \"%s\" is not a directory.\n", path)
 				dw_printf("Using current working directory \".\" instead.\n")
 
-				g_log_path = "."
+				pl.logPath = "."
 			}
 		} else {
 			// Doesn't exist.  Try to create it.
@@ -96,14 +87,14 @@ func log_init(daily_names bool, path string) {
 				// Success.
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Log file location \"%s\" has been created.\n", path)
-				g_log_path = path
+				pl.logPath = path
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Failed to create log file location \"%s\".\n", path)
 				dw_printf("%s\n", mkdirErr)
 				dw_printf("Using current working directory \".\" instead.\n")
 
-				g_log_path = "."
+				pl.logPath = "."
 			}
 		}
 	} else {
@@ -111,15 +102,17 @@ func log_init(daily_names bool, path string) {
 		// Typically logrotate would be used to keep size under control.
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Log file is \"%s\"\n", path)
-		g_log_path = path
+		pl.logPath = path
 	}
-} /* end log_init */
 
-/*------------------------------------------------------------------
+	return pl
+} /* end NewPacketLogger */
+
+/*-------------------------------------------------------------------
  *
- * Function:	log_write
+ * Name:        Write
  *
- * Purpose:	Save information to log file.
+ * Purpose:     Save information to log file.
  *
  * Inputs:	chan	- Radio channel where heard.
  *
@@ -131,16 +124,19 @@ func log_init(daily_names bool, path string) {
  *
  *		retries	- Amount of effort to get a good CRC.
  *
- *------------------------------------------------------------------*/
+ *--------------------------------------------------------------------*/
 
-func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries BitFixLevel) {
-	if len(g_log_path) == 0 {
+func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries BitFixLevel) {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+
+	if len(pl.logPath) == 0 {
 		return
 	}
 
 	var now = time.Now().UTC()
 
-	if g_daily_names {
+	if pl.dailyNames {
 		// Original strategy.  Automatic daily file names.
 
 		// Generate the file name from current date, UTC.
@@ -152,14 +148,14 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 
 		// Close current file if name has changed
 
-		if g_log_fp != nil && fname != g_open_fname {
-			log_term()
+		if pl.logFp != nil && fname != pl.openFname {
+			pl.closeLocked()
 		}
 
 		// Open for append if not already open.
 
-		if g_log_fp == nil {
-			var full_path = filepath.Join(g_log_path, fname)
+		if pl.logFp == nil {
+			var full_path = filepath.Join(pl.logPath, fname)
 
 			// See if file already exists and not empty.
 			// This is used later to write a header if it did not exist already.
@@ -172,14 +168,14 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 
 			var f, openErr = os.OpenFile(full_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
 			if openErr == nil {
-				g_log_fp = f
-				g_open_fname = fname
+				pl.logFp = f
+				pl.openFname = fname
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Can't open log file \"%s\" for write.\n", full_path)
 				dw_printf("%s\n", openErr)
 
-				g_open_fname = ""
+				pl.openFname = ""
 
 				return
 			}
@@ -188,31 +184,31 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			// only if this will be the first line.
 
 			if !already_there {
-				fmt.Fprintf(g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n")
+				fmt.Fprintf(pl.logFp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n")
 			}
 		}
 	} else {
 		// Added in version 1.5.  Single file.
 
 		// Open for append if not already open.
-		if g_log_fp == nil {
+		if pl.logFp == nil {
 			// See if file already exists and not empty.
 			// This is used later to write a header if it did not exist already.
-			var _, statErr = os.Stat(g_log_path)
+			var _, statErr = os.Stat(pl.logPath)
 			var already_there = statErr == nil
 
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("Opening log file \"%s\"\n", g_log_path)
+			dw_printf("Opening log file \"%s\"\n", pl.logPath)
 
-			var f, openErr = os.OpenFile(g_log_path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
+			var f, openErr = os.OpenFile(pl.logPath, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644) //nolint:gosec // Happy to trust config-provided log file
 			if openErr == nil {
-				g_log_fp = f
+				pl.logFp = f
 			} else {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't open log file \"%s\" for write.\n", g_log_path)
+				dw_printf("Can't open log file \"%s\" for write.\n", pl.logPath)
 				dw_printf("%s\n", openErr)
 
-				g_log_path = ""
+				pl.logPath = ""
 
 				return
 			}
@@ -221,14 +217,14 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			// only if this will be the first line.
 
 			if !already_there {
-				fmt.Fprintf(g_log_fp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n")
+				fmt.Fprintf(pl.logFp, "chan,utime,isotime,source,heard,level,error,dti,name,symbol,latitude,longitude,speed,course,altitude,frequency,offset,tone,system,status,telemetry,comment\n")
 			}
 		}
 	}
 
 	// Add line to file if it is now open.
 
-	if g_log_fp != nil {
+	if pl.logFp != nil {
 		var itime = now.Format("2006-01-02T15:04:05Z")
 
 		/* Who are we hearing?   Original station or digipeater? */
@@ -317,7 +313,7 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			stone = fmt.Sprintf("D%03o", A.g_dcs)
 		}
 
-		var w = csv.NewWriter(g_log_fp)
+		var w = csv.NewWriter(pl.logFp)
 		w.Write([]string{
 			strconv.Itoa(channel), strconv.Itoa(int(now.Unix())), itime,
 			A.g_src, heard, alevel_text, strconv.Itoa(int(retries)), sdti,
@@ -333,91 +329,97 @@ func log_write(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, ret
 			dw_printf("CSV write error: %s", writeError)
 		}
 	}
-} /* end log_write */
+} /* end Write */
 
-/*------------------------------------------------------------------
+/*-------------------------------------------------------------------
  *
- * Function:	log_rr_bits
+ * Name:        RRBits
  *
- * Purpose:	Quick hack to look at the C and RR bits just to see what is there.
+ * Purpose:     Quick hack to look at the C and RR bits just to see what is there.
  *		This seems like a good place because it is a small subset of the function above.
  *
  * Inputs:	A	- Explode information from APRS packet.
  *
  *		pp	- Received packet object.
  *
- *------------------------------------------------------------------*/
+ *--------------------------------------------------------------------*/
 
-func log_rr_bits(A *decode_aprs_t, pp *packet_t) {
-	if true {
-		// Sanitize system type (manufacturer) changing any comma to period.
-		var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
+func (pl *PacketLogger) RRBits(A *decode_aprs_t, pp *packet_t) {
+	// Sanitize system type (manufacturer) changing any comma to period.
+	var smfr = strings.ReplaceAll(A.g_mfr, ",", ".")
 
-		/* Who are we hearing?   Original station or digipeater? */
-		/* Similar code in direwolf.c.  Combine into one function? */
+	/* Who are we hearing?   Original station or digipeater? */
+	/* Similar code in direwolf.c.  Combine into one function? */
 
-		var heard = ""
+	var heard = ""
 
-		if pp != nil {
-			var h int
-			if ax25_get_num_addr(pp) == 0 {
-				/* Not AX.25. No station to display below. */
-				h = -1
-			} else {
-				h = ax25_get_heard(pp)
-				heard = ax25_get_addr_with_ssid(pp, h)
-			}
-
-			if h >= AX25_REPEATER_2 &&
-				len(heard) == 5 &&
-				heard[:4] == "WIDE" &&
-				unicode.IsDigit(rune(heard[4])) {
-				heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
-			}
-
-			var src_c = ax25_get_h(pp, AX25_SOURCE)
-			var dst_c = ax25_get_h(pp, AX25_DESTINATION)
-			var src_rr = ax25_get_rr(pp, AX25_SOURCE)
-			var dst_rr = ax25_get_rr(pp, AX25_DESTINATION)
-
-			// C RR	for source
-			// C RR	for destination
-			// system type
-			// source
-			// station heard
-
-			text_color_set(DW_COLOR_INFO)
-
-			dw_printf("%d %d%d  %d %d%d,%s,%s,%s\n",
-				src_c, (src_rr>>1)&1, src_rr&1,
-				dst_c, (dst_rr>>1)&1, dst_rr&1,
-				smfr, A.g_src, heard)
+	if pp != nil {
+		var h int
+		if ax25_get_num_addr(pp) == 0 {
+			/* Not AX.25. No station to display below. */
+			h = -1
+		} else {
+			h = ax25_get_heard(pp)
+			heard = ax25_get_addr_with_ssid(pp, h)
 		}
-	}
-} /* end log_rr_bits */
 
-/*------------------------------------------------------------------
+		if h >= AX25_REPEATER_2 &&
+			len(heard) == 5 &&
+			heard[:4] == "WIDE" &&
+			unicode.IsDigit(rune(heard[4])) {
+			heard = ax25_get_addr_with_ssid(pp, h-1) + "?"
+		}
+
+		var src_c = ax25_get_h(pp, AX25_SOURCE)
+		var dst_c = ax25_get_h(pp, AX25_DESTINATION)
+		var src_rr = ax25_get_rr(pp, AX25_SOURCE)
+		var dst_rr = ax25_get_rr(pp, AX25_DESTINATION)
+
+		// C RR	for source
+		// C RR	for destination
+		// system type
+		// source
+		// station heard
+
+		text_color_set(DW_COLOR_INFO)
+
+		dw_printf("%d %d%d  %d %d%d,%s,%s,%s\n",
+			src_c, (src_rr>>1)&1, src_rr&1,
+			dst_c, (dst_rr>>1)&1, dst_rr&1,
+			smfr, A.g_src, heard)
+	}
+} /* end RRBits */
+
+/*-------------------------------------------------------------------
  *
- * Function:	log_term
+ * Name:        Close
  *
  * Purpose:	Close any open log file.
  *		Called when exiting or when date changes.
  *
  *------------------------------------------------------------------*/
 
-func log_term() {
-	if g_log_fp != nil {
+func (pl *PacketLogger) Close() {
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+
+	pl.closeLocked()
+} /* end Close */
+
+// closeLocked does the work of Close, assuming pl.mu is already held.
+func (pl *PacketLogger) closeLocked() {
+	if pl.logFp != nil {
 		text_color_set(DW_COLOR_INFO)
 
-		if g_daily_names {
-			dw_printf("Closing log file \"%s\".\n", g_open_fname)
+		if pl.dailyNames {
+			dw_printf("Closing log file \"%s\".\n", pl.openFname)
 		} else {
-			dw_printf("Closing log file \"%s\".\n", g_log_path)
+			dw_printf("Closing log file \"%s\".\n", pl.logPath)
 		}
 
-		g_log_fp.Close()
+		pl.logFp.Close()
 
-		g_log_fp = nil
-		g_open_fname = ""
+		pl.logFp = nil
+		pl.openFname = ""
 	}
-} /* end log_term */
+}

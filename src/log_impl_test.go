@@ -22,5 +22,6 @@ func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 
 	var A decode_aprs_t
 
-	log_rr_bits(&A, pp)
+	var pl = NewPacketLogger(false, "")
+	pl.RRBits(&A, pp)
 }

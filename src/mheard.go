@@ -137,7 +137,7 @@ func mheard_latlon(dlat float64, dlon float64) string {
  *
  *		retries	- Amount of effort to get a good CRC.
  *
- * Description:	Calling sequence was copied from "log_write."
+ * Description:	Calling sequence was copied from "PacketLogger.Write."
  *		It has a lot more than what we currently keep but the
  *		hooks are there so it will be easy to capture additional
  *		information when the need arises.

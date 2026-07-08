@@ -50,6 +50,7 @@ var dw_tt_config tt_config_s
 var misc_config *misc_config_s
 var aprsSymbolData *APRSSymbolData
 var waypointSender *WaypointSender
+var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
 var kissNetSvc *KissNetService
@@ -779,7 +780,7 @@ x = Silence FX.25 information.`)
 	 * log the tracker beacon transmissions with fake channel 999.
 	 */
 
-	log_init(misc_config.log_daily_names, misc_config.log_path)
+	packetLogger = NewPacketLogger(misc_config.log_daily_names, misc_config.log_path)
 	beaconService = NewBeaconService(audio_config, misc_config, &igate_config)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start()
@@ -1065,10 +1066,10 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		// Send to log file.
 
-		log_write(channel, A, pp, alevel, retries)
+		packetLogger.Write(channel, A, pp, alevel, retries)
 
 		// temp experiment.
-		// log_rr_bits (&A, pp);
+		// packetLogger.RRBits (&A, pp);
 
 		// Add to list of stations heard over the radio.
 
@@ -1226,7 +1227,9 @@ func setup_sigint_handler() {
 func cleanup() {
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("\nQRT\n")
-	log_term()
+	if packetLogger != nil {
+		packetLogger.Close()
+	}
 	ptt_term()
 	dwgps_term()
 
