@@ -31,7 +31,11 @@ func main() {
 		}
 		zlet = unicode.ToUpper(zlet)
 
-		var zone, _ = strconv.Atoi(zoneStr)
+		var zone, zoneErr = strconv.Atoi(zoneStr)
+		if zoneErr != nil {
+			fmt.Printf("Invalid zone: %s\n\n", zoneErr)
+			usage()
+		}
 
 		var hemisphere coordconv.Hemisphere
 		if zlet == 0 {
@@ -49,8 +53,17 @@ func main() {
 			}
 		}
 
-		var easting, _ = strconv.ParseFloat(os.Args[2], 64)
-		var northing, _ = strconv.ParseFloat(os.Args[3], 64)
+		var easting, eastingErr = strconv.ParseFloat(os.Args[2], 64)
+		if eastingErr != nil {
+			fmt.Printf("Invalid easting: %s\n\n", eastingErr)
+			usage()
+		}
+
+		var northing, northingErr = strconv.ParseFloat(os.Args[3], 64)
+		if northingErr != nil {
+			fmt.Printf("Invalid northing: %s\n\n", northingErr)
+			usage()
+		}
 
 		var utmCoord = coordconv.UTMCoord{
 			Zone:       zone,

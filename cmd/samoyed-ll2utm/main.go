@@ -23,8 +23,19 @@ func main() {
 		return
 	}
 
-	var lat, _ = strconv.ParseFloat(os.Args[1], 64)
-	var lon, _ = strconv.ParseFloat(os.Args[2], 64)
+	var lat, latErr = strconv.ParseFloat(os.Args[1], 64)
+	if latErr != nil {
+		fmt.Printf("Invalid latitude: %s\n\n", latErr)
+		usage()
+		os.Exit(1)
+	}
+
+	var lon, lonErr = strconv.ParseFloat(os.Args[2], 64)
+	if lonErr != nil {
+		fmt.Printf("Invalid longitude: %s\n\n", lonErr)
+		usage()
+		os.Exit(1)
+	}
 
 	var latlng = s2.LatLng{
 		Lat: s1.Angle(D2R(lat)),
