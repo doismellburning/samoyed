@@ -752,7 +752,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel alevel_t
-				log_write(999, &A, nil, alevel, 0)
+				packetLogger.Write(999, &A, nil, alevel, 0)
 			}
 		} else {
 			return /* No fix.  Skip this time. */
