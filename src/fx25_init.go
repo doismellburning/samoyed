@@ -39,6 +39,7 @@ package direwolf
 
 import (
 	"math/bits"
+	"os"
 )
 
 const EXIT_FAILURE = 1
@@ -154,7 +155,7 @@ func fx25_init(debug_level int) {
 		if fx25Tab[i].rs == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("FX.25 internal error: init_rs_char failed!\n")
-			exit(EXIT_FAILURE)
+			os.Exit(EXIT_FAILURE)
 		}
 	}
 
