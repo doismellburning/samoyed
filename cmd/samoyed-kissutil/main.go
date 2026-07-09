@@ -217,7 +217,12 @@ func parse_number(str string, de_fault int) int {
 		return de_fault
 	}
 
-	var n, _ = strconv.Atoi(str)
+	var n, err = strconv.Atoi(str)
+	if err != nil {
+		fmt.Printf("Invalid number %q for KISS command.  Using default %d.\n", str, de_fault)
+		return de_fault
+	}
+
 	if n < 0 || n > 255 { // must fit in a byte.
 		fmt.Printf("Number for KISS command is out of range 0-255.  Using default %d.\n", de_fault)
 		return de_fault
