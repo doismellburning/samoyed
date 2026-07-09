@@ -609,7 +609,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 
 		var done = false
 		for !done {
-			var b, err = serial_port_get1(tnctest_serial_fd[my_index])
+			var b, err = SerialPortGet1(tnctest_serial_fd[my_index])
 			if err != nil {
 				fmt.Printf("TNC %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)

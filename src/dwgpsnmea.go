@@ -165,7 +165,7 @@ func read_gpsnmea_thread(fd *term.Term) {
 	var gps_msg string
 
 	for {
-		var ch, err = serial_port_get1(fd)
+		var ch, err = SerialPortGet1(fd)
 		if err != nil {
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */

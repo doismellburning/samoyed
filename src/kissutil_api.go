@@ -39,10 +39,6 @@ func AX25SafePrint(info []byte, asciiOnly bool) {
 	ax25_safe_print(info, asciiOnly)
 }
 
-func SerialPortGet1(fd *term.Term) (byte, error) {
-	return serial_port_get1(fd)
-}
-
 func SerialPortWrite(fd *term.Term, data []byte) int {
 	return serial_port_write(fd, data)
 }

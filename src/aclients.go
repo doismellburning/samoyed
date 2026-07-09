@@ -288,7 +288,7 @@ func client_thread_serial(my_index int, port string, description string, packetC
 		var buffer []byte
 
 		for !done {
-			var b, err = serial_port_get1(fd)
+			var b, err = SerialPortGet1(fd)
 			if err != nil {
 				fmt.Printf("Client %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)

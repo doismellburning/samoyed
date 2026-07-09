@@ -283,7 +283,7 @@ func kissserial_get() (byte, error) {
 		/*
 		 * Normal case, was opened at start up time.
 		 */
-		var ch, err = serial_port_get1(serialport_fd)
+		var ch, err = SerialPortGet1(serialport_fd)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
@@ -308,7 +308,7 @@ func kissserial_get() (byte, error) {
 	for {
 		if serialport_fd != nil {
 			// Open, try to read.
-			var ch, err = serial_port_get1(serialport_fd)
+			var ch, err = SerialPortGet1(serialport_fd)
 			if err == nil {
 				return ch, nil
 			}
