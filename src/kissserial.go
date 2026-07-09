@@ -84,7 +84,7 @@ var g_misc_config_p *misc_config_s
  * Accumulated KISS frame and state of decoder.
  */
 
-var kf *kiss_frame_t
+var kf *KISSFrame
 
 var serialport_fd *term.Term
 
@@ -116,7 +116,7 @@ func kissserial_set_debug(n int) {
 
 func kissserial_init(mc *misc_config_s) {
 	g_misc_config_p = mc
-	kf = new(kiss_frame_t)
+	kf = new(KISSFrame)
 
 	if g_misc_config_p.kiss_serial_port != "" {
 		if g_misc_config_p.kiss_serial_poll == 0 {
@@ -330,7 +330,7 @@ func kissserial_get() (byte, error) {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", g_misc_config_p.kiss_serial_port)
 
-					kf = new(kiss_frame_t) // Start with clean state.
+					kf = new(KISSFrame) // Start with clean state.
 				} else { //nolint:staticcheck
 					// An error message was already displayed.
 				}

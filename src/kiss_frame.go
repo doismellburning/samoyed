@@ -99,7 +99,7 @@ const MAX_KISS_LEN = 2048 /* Spec calls for at least 1024. */
 
 const MAX_NOISE_LEN = 100
 
-type kiss_frame_t struct {
+type KISSFrame struct {
 	state kiss_state_e
 
 	kiss_msg [MAX_KISS_LEN]byte
@@ -140,7 +140,7 @@ type kissport_status_s struct {
 
 	client_sock [MAX_NET_CLIENTS]net.Conn
 
-	kf [MAX_NET_CLIENTS]*kiss_frame_t
+	kf [MAX_NET_CLIENTS]*KISSFrame
 	/* Accumulated KISS frame and state of decoder. */
 }
 
@@ -396,7 +396,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func kiss_rec_byte(kf *kiss_frame_t, ch byte, debug int,
+func kiss_rec_byte(kf *KISSFrame, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);

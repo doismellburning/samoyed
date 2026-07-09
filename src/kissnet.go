@@ -494,7 +494,7 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
 	*/
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
-		kps.kf[client] = new(kiss_frame_t)
+		kps.kf[client] = new(KISSFrame)
 	}
 
 	if kps.tcp_port == 0 {
@@ -609,7 +609,7 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 
 			// Reset the state and buffer.
 			for i := range len(kps.kf) {
-				kps.kf[i] = new(kiss_frame_t)
+				kps.kf[i] = new(KISSFrame)
 			}
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */

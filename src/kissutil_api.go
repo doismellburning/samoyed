@@ -7,9 +7,6 @@ import "github.com/pkg/term"
 // the KISS/AX.25 handling with the rest of direwolf without pulling the
 // whole kissutil CLI into the package.
 
-// KISSFrame is the exported alias for kiss_frame_t.
-type KISSFrame = kiss_frame_t
-
 // ALevel is the exported alias for alevel_t.
 type ALevel = alevel_t
 

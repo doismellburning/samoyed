@@ -131,7 +131,7 @@ func nettnc_attach(channel int, host string, port int) int {
 func nettnc_listen_thread(channel int) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var kstate kiss_frame_t // State machine to gather a KISS frame.
+	var kstate KISSFrame // State machine to gather a KISS frame.
 
 	for {
 		/*
@@ -198,7 +198,7 @@ func nettnc_listen_thread(channel int) {
  *
  *-----------------------------------------------------------------*/
 
-func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int) {
+func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 	//dw_printf ("my_kiss_rec_byte ( %c %02x ) \n", b, b);
 	switch kf.state {
 	/* Searching for starting FEND. */

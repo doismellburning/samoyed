@@ -68,7 +68,7 @@ import (
  * Accumulated KISS frame and state of decoder.
  */
 
-var kisspt_kf *kiss_frame_t
+var kisspt_kf *KISSFrame
 
 /*
  * These are for a Linux pseudo terminal.
@@ -113,7 +113,7 @@ func kisspt_init(mc *misc_config_s) {
 	 */
 	pt_master = nil
 
-	kisspt_kf = new(kiss_frame_t)
+	kisspt_kf = new(KISSFrame)
 
 	if mc.enable_kiss_pt {
 		kisspt_open_pt()
