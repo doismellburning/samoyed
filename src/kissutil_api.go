@@ -39,10 +39,6 @@ func AX25SafePrint(info []byte, asciiOnly bool) {
 	ax25_safe_print(info, asciiOnly)
 }
 
-func KissEncapsulate(in []byte) []byte {
-	return kiss_encapsulate(in)
-}
-
 func KissRecByte(kf *KISSFrame, ch byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	kiss_rec_byte(kf, ch, debug, kps, client, sendfun)
 }

@@ -317,7 +317,7 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.
 
-	var kiss_buff = kiss_encapsulate(frame_buff)
+	var kiss_buff = KissEncapsulate(frame_buff)
 
 	var _, err = s_tnc_sock[channel].Write(kiss_buff)
 	if err != nil {

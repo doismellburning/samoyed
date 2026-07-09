@@ -168,7 +168,7 @@ func kiss_frame_init(pa *audio_s) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_encapsulate
+ * Name:        KissEncapsulate
  *
  * Purpose:     Encapsulate a frame into KISS format.
  *
@@ -199,7 +199,7 @@ func kiss_frame_init(pa *audio_s) {
  *
  *-----------------------------------------------------------------*/
 
-func kiss_encapsulate(in []byte) []byte {
+func KissEncapsulate(in []byte) []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(FEND)

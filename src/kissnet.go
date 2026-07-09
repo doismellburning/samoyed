@@ -303,7 +303,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 								HexDump(fbuf)
 							}
 
-							kiss_buff = kiss_encapsulate(stemp)
+							kiss_buff = KissEncapsulate(stemp)
 
 							/* This has the escapes and the surrounding FENDs. */
 
@@ -378,7 +378,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 								msg[0] = byte(0 | cmd) // set channel to zero.
 							}
 
-							var kiss_buff = kiss_encapsulate(msg)
+							var kiss_buff = KissEncapsulate(msg)
 
 							/* This has the escapes and the surrounding FENDs. */
 

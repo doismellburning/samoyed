@@ -19,7 +19,7 @@ func Test_KISS(t *testing.T) {
 		}
 	}
 
-	var kissed = kiss_encapsulate(din)
+	var kissed = KissEncapsulate(din)
 	assert.Len(t, kissed, (512 + 6))
 
 	var dout = kiss_unwrap(kissed)

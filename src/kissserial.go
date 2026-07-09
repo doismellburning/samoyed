@@ -217,7 +217,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 			HexDump(fbuf)
 		}
 
-		kiss_buff = kiss_encapsulate(stemp)
+		kiss_buff = KissEncapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 

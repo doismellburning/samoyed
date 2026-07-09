@@ -123,7 +123,7 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Encapsulate as KISS and send to TNC.
 	 */
 
-	var kiss_frame = kiss_encapsulate(ax25_frame)
+	var kiss_frame = KissEncapsulate(ax25_frame)
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
