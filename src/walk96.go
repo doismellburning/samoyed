@@ -35,7 +35,7 @@ func Walk96Main() {
 		gpsSerialPort = os.Args[3]
 	}
 
-	tnc = serial_port_open(tncSerialPort, 9600)
+	tnc = SerialPortOpen(tncSerialPort, 9600)
 	if tnc == nil {
 		fmt.Printf("Can't open serial port to KISS TNC.\n")
 		os.Exit(1)

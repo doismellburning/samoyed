@@ -12,7 +12,7 @@ import (
 
 /*-------------------------------------------------------------------
  *
- * Name:	serial_port_open
+ * Name:	SerialPortOpen
  *
  * Purpose:	Open serial port.
  *
@@ -28,11 +28,11 @@ import (
  *
  *---------------------------------------------------------------*/
 
-func serial_port_open(devicename string, baud int) *term.Term {
+func SerialPortOpen(devicename string, baud int) *term.Term {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("serial_port_open ( '%s' )\n", devicename);
+		dw_printf ("SerialPortOpen ( '%s' )\n", devicename);
 	#endif
 	*/
 
@@ -72,7 +72,7 @@ func serial_port_open(devicename string, baud int) *term.Term {
 		fd.SetSpeed(baud)
 	default:
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("serial_port_open: Unsupported speed %d.  Using 4800.\n", baud)
+		dw_printf("SerialPortOpen: Unsupported speed %d.  Using 4800.\n", baud)
 		fd.SetSpeed(4800)
 	}
 

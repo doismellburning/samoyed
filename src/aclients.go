@@ -264,7 +264,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
  *--------------------------------------------------------------------*/
 
 func client_thread_serial(my_index int, port string, description string, packetChan chan<- string) {
-	var fd = serial_port_open(port, 9600)
+	var fd = SerialPortOpen(port, 9600)
 
 	if fd == nil {
 		fmt.Printf("Client %d unable to connect to %s on %s.\n", my_index, description, port)

@@ -560,7 +560,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
  *--------------------------------------------------------------------*/
 
 func tnc_thread_serial(my_index int, port string, description string, tnc_address string) {
-	tnctest_serial_fd[my_index] = serial_port_open(port, 9600)
+	tnctest_serial_fd[my_index] = SerialPortOpen(port, 9600)
 
 	if tnctest_serial_fd[my_index] == nil {
 		fmt.Printf("TNC %d unable to connect to %s on %s.\n", my_index, description, port)

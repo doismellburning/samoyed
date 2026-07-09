@@ -99,7 +99,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = serial_port_open(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	s_gpsnmea_port_fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
 	if s_gpsnmea_port_fd != nil {
 		go read_gpsnmea_thread(s_gpsnmea_port_fd)
