@@ -180,16 +180,17 @@ func main() {
 
 		for _, entry := range entries {
 			var fname = entry.Name()
+			var fpath = filepath.Join(transmit_from, fname)
 			fmt.Printf("Processing %s for transmit...\n", fname)
 
-			var data, err = os.ReadFile(fname) //nolint:gosec
+			var data, err = os.ReadFile(fpath) //nolint:gosec
 			if err != nil {
 				panic(err)
 			}
 
 			process_input(string(data))
 
-			err = os.Remove(fname)
+			err = os.Remove(fpath)
 			if err != nil {
 				panic(err)
 			}
