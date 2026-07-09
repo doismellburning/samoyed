@@ -146,6 +146,12 @@ type kissport_status_s struct {
 
 var KISSUTIL = false // Dynamic replacement for the old #define
 
+// KissutilKissProcessMsg is set by cmd/samoyed-kissutil to handle messages
+// from the TNC when running in KISSUTIL mode. It lives here, rather than
+// kissutil calling back in some other way, because kiss_process_msg needs a
+// hook into kissutil's behaviour without src depending on cmd/samoyed-kissutil.
+var KissutilKissProcessMsg func(kiss_msg []byte) //nolint:gochecknoglobals
+
 /*-------------------------------------------------------------------
  *
  * Name:        kiss_frame_init
@@ -524,7 +530,10 @@ func kiss_rec_byte(kf *kiss_frame_t, ch byte, debug int,
 func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
 	// Temporary for now
 	if KISSUTIL {
-		Kissutil_kiss_process_msg(kiss_msg)
+		if KissutilKissProcessMsg != nil {
+			KissutilKissProcessMsg(kiss_msg)
+		}
+
 		return
 	}
 
