@@ -278,6 +278,10 @@ func process_input(stuff string) {
 		}
 
 		stuff = strings.TrimSpace(after)
+
+		if len(stuff) == 0 {
+			return
+		}
 	}
 
 	/*
