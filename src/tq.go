@@ -184,7 +184,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		}
 
 		// Formated addresses.
-		var stemp = ax25_format_addrs(pp)
+		var stemp = AX25FormatAddrs(pp)
 		var pinfo = ax25_get_info(pp)
 
 		text_color_set(DW_COLOR_XMIT)

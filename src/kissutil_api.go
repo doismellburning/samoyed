@@ -21,10 +21,6 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 	return ax25_from_frame(data, alevel)
 }
 
-func AX25FormatAddrs(pp *packet_t) string {
-	return ax25_format_addrs(pp)
-}
-
 func AX25GetInfo(pp *packet_t) []byte {
 	return ax25_get_info(pp)
 }

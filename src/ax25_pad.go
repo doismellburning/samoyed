@@ -1900,7 +1900,7 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_format_addrs
+ * Function:	AX25FormatAddrs
  *
  * Purpose:	Format all the addresses suitable for printing.
  *
@@ -1928,7 +1928,7 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 
 // TODO: max len for result.  buffer overflow?
 
-func ax25_format_addrs(this_p *packet_t) string {
+func AX25FormatAddrs(this_p *packet_t) string {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1962,7 +1962,7 @@ func ax25_format_addrs(this_p *packet_t) string {
 
 	return result.String()
 
-	// dw_printf ("DEBUG ax25_format_addrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
+	// dw_printf ("DEBUG AX25FormatAddrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
 }
 
 /*------------------------------------------------------------------

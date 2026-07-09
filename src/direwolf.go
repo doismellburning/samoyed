@@ -848,7 +848,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		}
 	}
 
-	var stemp = ax25_format_addrs(pp)
+	var stemp = AX25FormatAddrs(pp)
 
 	var pinfo = ax25_get_info(pp)
 

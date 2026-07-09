@@ -33,7 +33,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	var pp = ax25_from_text(in, true)
 	assert.NotNil(t, pp)
 
-	var rec = ax25_format_addrs(pp)
+	var rec = AX25FormatAddrs(pp)
 	var pinfo = ax25_get_info(pp)
 	rec += string(pinfo)
 
@@ -57,7 +57,7 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	pp = ax25_from_frame(frame, alevel)
 	assert.NotNil(t, pp)
-	rec = ax25_format_addrs(pp)
+	rec = AX25FormatAddrs(pp)
 	pinfo = ax25_get_info(pp)
 	rec += string(pinfo)
 
@@ -85,7 +85,7 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	if result != nil {
 		dedupeService.Remember(result, 0)
-		xmit = ax25_format_addrs(result)
+		xmit = AX25FormatAddrs(result)
 		pinfo = ax25_get_info(result)
 		xmit += string(pinfo)
 

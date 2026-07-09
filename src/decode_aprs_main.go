@@ -157,7 +157,7 @@ func DecodeAPRSLine(line string) {
 			ax25_hex_dump(pp)
 			fmt.Printf("-------------------\n")
 
-			var addrs = ax25_format_addrs(pp)
+			var addrs = AX25FormatAddrs(pp)
 			fmt.Printf("%s", addrs)
 
 			var info = ax25_get_info(pp)
