@@ -520,7 +520,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 					dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 				}
 
-				ax25_delete(pp)
+				AX25Delete(pp)
 
 				return
 			}
@@ -533,11 +533,11 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 
 		var inner_pp = ax25_unwrap_third_party(pp)
 		if inner_pp == nil {
-			ax25_delete(pp)
+			AX25Delete(pp)
 			return
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 		pp = inner_pp
 	}
 
@@ -557,7 +557,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 				dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 			}
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 
 			return
 		}
@@ -573,7 +573,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			dw_printf("Rx IGate: Do not relay generic query.\n")
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -603,7 +603,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			dw_printf("Rx IGate: Information part length is zero.\n")
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -661,7 +661,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 			dw_printf("Rx IGate: Drop duplicate of same packet seen recently.\n")
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -778,7 +778,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	 */
 	rx_to_ig_remember(pp)
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end send_packet_to_server */
 
 /*-------------------------------------------------------------------
@@ -1303,7 +1303,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 				dw_printf("Tx IGate: Do not transmit with %s in path.\n", via)
 			}
 
-			ax25_delete(pp3)
+			AX25Delete(pp3)
 
 			return
 		}
@@ -1365,7 +1365,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			if pfilter(MAX_TOTAL_CHANS, to_chan, save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true) != 1 {
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
-				ax25_delete(pp3)
+				AX25Delete(pp3)
 				return
 			}
 		}
@@ -1448,7 +1448,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			#if ITEST
 				    text_color_set(DW_COLOR_XMIT);
 				    dw_printf ("Xmit: %s\n", radio);
-				    ax25_delete (pradio);
+				    AX25Delete (pradio);
 			#else
 			*/
 			/* This consumes packet so don't reference it again! */
@@ -1474,7 +1474,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 		}
 	}
 
-	ax25_delete(pp3)
+	AX25Delete(pp3)
 } /* end maybe_xmit_packet_from_igate */
 
 /*-------------------------------------------------------------------

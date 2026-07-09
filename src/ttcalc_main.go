@@ -135,10 +135,10 @@ func TTCalcMain() {
 
 				server_sock.Write(reply_bytes)
 
-				ax25_delete(reply_pp)
+				AX25Delete(reply_pp)
 			}
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 		}
 	}
 } /* main */

@@ -311,7 +311,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 			A = decode_aprs(pp_payload, quiet, string(payload_src)) // 1 means used recursively
 			A.g_has_thirdparty_header = true
 
-			ax25_delete(pp_payload)
+			AX25Delete(pp_payload)
 
 			return A
 		} else {

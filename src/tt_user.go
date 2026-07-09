@@ -780,7 +780,7 @@ func xmit_object_report(i int, first_time bool) {
 
 		tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	} else {
-		ax25_delete(pp)
+		AX25Delete(pp)
 	}
 }
 

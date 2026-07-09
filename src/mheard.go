@@ -390,7 +390,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 
 	/*
 		#if 0
-			ax25_delete (pp);
+			AX25Delete (pp);
 		#endif
 	*/
 } /* end SaveIS */

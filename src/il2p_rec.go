@@ -255,7 +255,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("IL2P trailing CRC mismatch.\n")
 					}
-					ax25_delete(pp)
+					AX25Delete(pp)
 					pp = nil
 				}
 			}

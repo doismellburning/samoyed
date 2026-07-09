@@ -816,7 +816,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			dw_printf("[ig] %s\n", beacon_text)
 
 			igate_send_rec_packet(-1, pp) // Channel -1 to avoid RF>IS filtering.
-			ax25_delete(pp)
+			AX25Delete(pp)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 			var alevel ALevel

@@ -1139,7 +1139,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			ax25_delete(ao_pp)
+			AX25Delete(ao_pp)
 		}
 	}
 

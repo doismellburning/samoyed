@@ -469,7 +469,7 @@ func (xs *XmitService) xmit_thread(channel int) {
 					dw_printf("%s", stemp) /* stations followed by : */
 					AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 					dw_printf("\n")
-					ax25_delete(pp)
+					AX25Delete(pp)
 				} /* wait for clear channel error. */
 			} /* Have pp */
 		} /* while queue not empty */
@@ -631,7 +631,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 	#endif
 	*/
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	/*
 	 * See if we can bundle additional frames into this transmission.
@@ -678,7 +678,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 					        dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 				#endif
 				*/
-				ax25_delete(pp)
+				AX25Delete(pp)
 			}
 		} else {
 			done = true
@@ -909,7 +909,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	if xs.p_modem.tts_script == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -930,7 +930,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	 */
 
 	ptt_set(OCTYPE_PTT, c, 0)
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */
@@ -1009,7 +1009,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 	}
 
 	ptt_set(OCTYPE_PTT, c, 0)
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end xmit_morse */
 
 /*-------------------------------------------------------------------
@@ -1063,7 +1063,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 	}
 
 	ptt_set(OCTYPE_PTT, c, 0)
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end xmit_dtmf */
 
 /*-------------------------------------------------------------------

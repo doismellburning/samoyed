@@ -205,7 +205,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 			nettnc_send_packet(channel, pp)
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -222,7 +222,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		dw_printf("original KISS protocol specification.  The solution might be to use\n")
 		dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
 		dw_printf("\n")
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -254,7 +254,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -416,7 +416,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
 		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -715,7 +715,7 @@ func tq_wait_while_empty(channel int) {
  *		prio	- Priority, use TQ_PRIO_0_HI or TQ_PRIO_1_LO.
  *
  * Returns:	Pointer to packet object.
- *		Caller should destroy it with ax25_delete when finished with it.
+ *		Caller should destroy it with AX25Delete when finished with it.
  *
  *--------------------------------------------------------------------*/
 

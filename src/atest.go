@@ -834,7 +834,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 		#endif
 	*/
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end fake dlq_append */
 
 var dcd_start_seconds [MAX_RADIO_CHANS]float64

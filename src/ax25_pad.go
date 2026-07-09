@@ -388,22 +388,22 @@ func ax25_new() *packet_t {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_delete
+ * Name:	AX25Delete
  *
  * Purpose:	Destroy a packet object, freeing up memory it was using.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_delete(this_p *packet_t) {
+func AX25Delete(this_p *packet_t) {
 	/* TODO KG
 	#if DEBUG
 	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("ax25_delete(): before free, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
+	        dw_printf ("AX25Delete(): before free, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
 	#endif
 	*/
 	if this_p == nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - nil pointer passed to ax25_delete.\n")
+		dw_printf("ERROR - nil pointer passed to AX25Delete.\n")
 
 		return
 	}
@@ -510,7 +510,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	stuff, pinfo, colonFound = bytes.Cut(stuff, []byte{':'})
 
 	if !colonFound {
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 		return (nil)
 	}
 
@@ -530,7 +530,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	if !found {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  No source address\n")
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -540,7 +540,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad source address\n")
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -561,7 +561,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad destination address\n")
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -608,7 +608,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
-			ax25_delete(this_p)
+			AX25Delete(this_p)
 
 			return (nil)
 		}
@@ -656,7 +656,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 		if len(info_part) >= AX25_MAX_INFO_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
-			ax25_delete(this_p)
+			AX25Delete(this_p)
 
 			return (nil)
 		}

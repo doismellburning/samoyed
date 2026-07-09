@@ -244,7 +244,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			var fullResult = result + string(info)
 			packetChan <- fullResult
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 
 			packet_count[my_index]++
 		}

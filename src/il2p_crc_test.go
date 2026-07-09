@@ -102,9 +102,9 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 		require.NotNil(t, pp2, "Failed to decode frame with CRC, max_fec=%d", max_fec)
 
 		assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(pp2))
-		ax25_delete(pp2)
+		AX25Delete(pp2)
 	}
-	ax25_delete(pp)
+	AX25Delete(pp)
 }
 
 func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
@@ -144,7 +144,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 			// The last 4 bytes of inputData should be the CRC.
 			assert.Equal(t, encodedCRC[:], b[len(b)-IL2P_CRC_ENCODED_SIZE:])
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 		})
 	}
 }

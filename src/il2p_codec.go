@@ -182,7 +182,7 @@ func il2p_decode_frame(irec []byte) *packet_t {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("IL2P trailing CRC mismatch.\n")
 			}
-			ax25_delete(pp)
+			AX25Delete(pp)
 			return nil
 		}
 	}
@@ -225,7 +225,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected 
 			// It would be possible to have a good header but too many errors in the payload.
 
 			if e <= 0 {
-				ax25_delete(pp)
+				AX25Delete(pp)
 				return nil
 			}
 

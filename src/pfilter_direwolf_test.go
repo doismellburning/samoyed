@@ -252,5 +252,5 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 		pftest_error_count++
 	}
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 }
