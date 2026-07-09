@@ -2020,7 +2020,7 @@ func ax25_format_via_path(this_p *packet_t) string {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_pack
+ * Function:	AX25Pack
  *
  * Purpose:	Put all the pieces into format ready for transmission.
  *
@@ -2030,7 +2030,7 @@ func ax25_format_via_path(this_p *packet_t) string {
  *
  *------------------------------------------------------------------*/
 
-func ax25_pack(this_p *packet_t) []byte {
+func AX25Pack(this_p *packet_t) []byte {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2757,7 +2757,7 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 func ax25_m_m_crc(pp *packet_t) uint16 {
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
-	var fbuf = ax25_pack(pp)
+	var fbuf = AX25Pack(pp)
 
 	var crc uint16 = 0xffff
 	crc = crc16(fbuf, crc)

@@ -115,7 +115,7 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 
 	var ax25_frame = []byte{0} // Insert channel before KISS encapsulation.
 
-	ax25_frame = append(ax25_frame, ax25_pack(pp)...)
+	ax25_frame = append(ax25_frame, AX25Pack(pp)...)
 
 	ax25_delete(pp)
 

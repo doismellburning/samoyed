@@ -127,7 +127,7 @@ func TTCalcMain() {
 				hdr.Portx = channel
 				hdr.DataKind = 'K'
 
-				var reply_bytes = ax25_pack(reply_pp)
+				var reply_bytes = AX25Pack(reply_pp)
 				hdr.DataLen = 1 + uint32(len(reply_bytes))
 
 				binary.Write(server_sock, binary.LittleEndian, hdr)

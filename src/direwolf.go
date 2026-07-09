@@ -1123,7 +1123,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
 	// We see the same sequence in tt_user.c.
 
-	var fbuf = ax25_pack(pp)
+	var fbuf = AX25Pack(pp)
 
 	server_send_rec_packet(channel, pp, fbuf)                                          // AGW net protocol
 	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)   // KISS TCP
@@ -1133,7 +1133,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = ax25_from_text(ais_obj_packet, true)
 		if ao_pp != nil {
-			var ao_fbuf = ax25_pack(ao_pp)
+			var ao_fbuf = AX25Pack(ao_pp)
 
 			server_send_rec_packet(channel, ao_pp, ao_fbuf)
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)

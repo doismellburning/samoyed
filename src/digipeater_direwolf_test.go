@@ -47,7 +47,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * again, and make sure it is still the same.
 	 */
 
-	var frame = ax25_pack(pp)
+	var frame = AX25Pack(pp)
 	ax25_delete(pp)
 
 	var alevel ALevel
