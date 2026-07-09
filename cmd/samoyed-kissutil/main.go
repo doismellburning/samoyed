@@ -247,6 +247,10 @@ func process_input(stuff string) {
 	 */
 	stuff = strings.TrimSpace(stuff)
 
+	if len(stuff) == 0 {
+		return
+	}
+
 	/*
 	 * Optional prefix, like "[9]" or "[99]" to specify channel.
 	 */
