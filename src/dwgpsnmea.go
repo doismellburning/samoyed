@@ -99,7 +99,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = serial_port_open(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	s_gpsnmea_port_fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
 	if s_gpsnmea_port_fd != nil {
 		go read_gpsnmea_thread(s_gpsnmea_port_fd)
@@ -165,7 +165,7 @@ func read_gpsnmea_thread(fd *term.Term) {
 	var gps_msg string
 
 	for {
-		var ch, err = serial_port_get1(fd)
+		var ch, err = SerialPortGet1(fd)
 		if err != nil {
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */

@@ -11,7 +11,7 @@ import "testing"
 func TestLogRRBitsShortHeardDoesNotPanic(t *testing.T) {
 	t.Parallel()
 
-	var pp = ax25_from_text("Q1TEST>APRS,Q2TEST*,AB*:test", true)
+	var pp = AX25FromText("Q1TEST>APRS,Q2TEST*,AB*:test", true)
 	if pp == nil {
 		t.Fatal("failed to parse test packet")
 	}

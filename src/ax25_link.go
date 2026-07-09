@@ -1082,7 +1082,7 @@ func dl_data_request(E *dlq_item_t) {
 	if s_debug_client_app {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_data_request (\"")
-		ax25_safe_print(E.txdata.data[:E.txdata.len], true)
+		AX25SafePrint(E.txdata.data[:E.txdata.len], true)
 		dw_printf("\") state=%d\n", S.state)
 	}
 
@@ -2035,7 +2035,7 @@ func lm_data_indication(E *dlq_item_t) {
 	case frame_type_I: // Information
 		{
 			var pid = ax25_get_pid(E.pp)
-			var info = ax25_get_info(E.pp)
+			var info = AX25GetInfo(E.pp)
 
 			i_frame(S, cr, pf, nr, ns, pid, info)
 		}
@@ -2051,7 +2051,7 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_S_SREJ: // Selective Reject - Ask for selective frame(s) repeat
 		{
-			var info = ax25_get_info(E.pp)
+			var info = AX25GetInfo(E.pp)
 			srej_frame(S, cr, pf, nr, info)
 		}
 
@@ -2078,14 +2078,14 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_U_XID: // Exchange Identification
 		{
-			var info = ax25_get_info(E.pp)
+			var info = AX25GetInfo(E.pp)
 
 			xid_frame(S, cr, pf, info)
 		}
 
 	case frame_type_U_TEST: // Test
 		{
-			var info = ax25_get_info(E.pp)
+			var info = AX25GetInfo(E.pp)
 
 			test_frame(S, cr, pf, info)
 		}
@@ -2421,7 +2421,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		if s_debug_client_app {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, \"", ns, S.vr)
-			ax25_safe_print(info, true)
+			AX25SafePrint(info, true)
 			dw_printf("\"\n")
 		}
 
@@ -2440,7 +2440,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 			if s_debug_client_app {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
-				ax25_safe_print(S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len], true)
+				AX25SafePrint(S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len], true)
 				dw_printf("\"\n")
 			}
 
@@ -2541,7 +2541,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 			if s_debug_misc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
-				ax25_safe_print(info, true)
+				AX25SafePrint(info, true)
 				dw_printf("\"\n")
 			}
 
@@ -2637,7 +2637,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 		   	  if (s_debug_misc) {
 		   	    dw_printf ("%s %d, save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", __func__, __LINE__, ns, S.vr);
-		   	    ax25_safe_print (info_ptr, info_len, 1);
+		   	    AX25SafePrint (info_ptr, info_len, 1);
 		   	    dw_printf ("\"\n");
 		   	  }
 
@@ -5726,7 +5726,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 
 			if s_debug_misc || s_debug_radio { //nolint:staticcheck
 				// dw_printf ("i_frame_pop_off_queue () ns=%d, queue for transmit \"", ns);
-				// ax25_safe_print (txdata.data, txdata.len, 1);
+				// AX25SafePrint (txdata.data, txdata.len, 1);
 				// dw_printf ("\"\n");
 			}
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, txdata.pid, txdata.data[:txdata.len])

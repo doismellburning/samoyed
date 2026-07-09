@@ -35,14 +35,14 @@ func Walk96Main() {
 		gpsSerialPort = os.Args[3]
 	}
 
-	tnc = serial_port_open(tncSerialPort, 9600)
+	tnc = SerialPortOpen(tncSerialPort, 9600)
 	if tnc == nil {
 		fmt.Printf("Can't open serial port to KISS TNC.\n")
 		os.Exit(1)
 	}
 
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
-	serial_port_write(tnc, []byte(cmd))
+	SerialPortWrite(tnc, []byte(cmd))
 
 	var config misc_config_s
 	config.gpsnmea_port = gpsSerialPort
@@ -70,7 +70,7 @@ func Walk96Main() {
 
 	// Exit out of KISS mode.
 
-	serial_port_write(tnc, []byte("\xc0\xff\xc0"))
+	SerialPortWrite(tnc, []byte("\xc0\xff\xc0"))
 
 	SLEEP_MS(100)
 }
@@ -106,26 +106,26 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Convert it into AX.25 frame.
 	 */
 
-	var pp = ax25_from_text(position_report, true)
+	var pp = AX25FromText(position_report, true)
 
 	if pp == nil {
-		fmt.Printf("Unexpected error in ax25_from_text.  Quitting.\n")
+		fmt.Printf("Unexpected error in AX25FromText.  Quitting.\n")
 		os.Exit(1)
 	}
 
 	var ax25_frame = []byte{0} // Insert channel before KISS encapsulation.
 
-	ax25_frame = append(ax25_frame, ax25_pack(pp)...)
+	ax25_frame = append(ax25_frame, AX25Pack(pp)...)
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	/*
 	 * Encapsulate as KISS and send to TNC.
 	 */
 
-	var kiss_frame = kiss_encapsulate(ax25_frame)
+	var kiss_frame = KissEncapsulate(ax25_frame)
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
-	serial_port_write(tnc, kiss_frame)
+	SerialPortWrite(tnc, kiss_frame)
 }

@@ -751,7 +751,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				A.g_altitude_ft = DW_METERS_TO_FEET(float64(gpsinfo.altitude))
 
 				/* Fake channel of 999 to distinguish from real data. */
-				var alevel alevel_t
+				var alevel ALevel
 				packetLogger.Write(999, &A, nil, alevel, 0)
 			}
 		} else {
@@ -806,7 +806,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	}
 
 	var strict = true // Strict packet checking because they will go over air.
-	var pp = ax25_from_text(beacon_text, strict)
+	var pp = AX25FromText(beacon_text, strict)
 
 	if pp != nil {
 		/* Send to desired destination. */
@@ -816,10 +816,10 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			dw_printf("[ig] %s\n", beacon_text)
 
 			igate_send_rec_packet(-1, pp) // Channel -1 to avoid RF>IS filtering.
-			ax25_delete(pp)
+			AX25Delete(pp)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
-			var alevel alevel_t
+			var alevel ALevel
 			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 		default:
 			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)

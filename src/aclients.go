@@ -236,15 +236,15 @@ func client_thread_net(my_index int, hostname string, port string, description s
 		if mon_cmd.DataKind == 'K' && (use_chan == -1 || byte(use_chan) == mon_cmd.Portx) {
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 			use_chan = int(mon_cmd.Portx)
-			var alevel alevel_t
-			var pp = ax25_from_frame(data[1:mon_cmd.DataLen], alevel)
-			var result = ax25_format_addrs(pp)
-			var info = ax25_get_info(pp)
+			var alevel ALevel
+			var pp = AX25FromFrame(data[1:mon_cmd.DataLen], alevel)
+			var result = AX25FormatAddrs(pp)
+			var info = AX25GetInfo(pp)
 
 			var fullResult = result + string(info)
 			packetChan <- fullResult
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 
 			packet_count[my_index]++
 		}
@@ -264,7 +264,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
  *--------------------------------------------------------------------*/
 
 func client_thread_serial(my_index int, port string, description string, packetChan chan<- string) {
-	var fd = serial_port_open(port, 9600)
+	var fd = SerialPortOpen(port, 9600)
 
 	if fd == nil {
 		fmt.Printf("Client %d unable to connect to %s on %s.\n", my_index, description, port)
@@ -288,7 +288,7 @@ func client_thread_serial(my_index int, port string, description string, packetC
 		var buffer []byte
 
 		for !done {
-			var b, err = serial_port_get1(fd)
+			var b, err = SerialPortGet1(fd)
 			if err != nil {
 				fmt.Printf("Client %d fatal read error: %s.\n", my_index, err)
 				os.Exit(1)

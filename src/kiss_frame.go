@@ -99,7 +99,7 @@ const MAX_KISS_LEN = 2048 /* Spec calls for at least 1024. */
 
 const MAX_NOISE_LEN = 100
 
-type kiss_frame_t struct {
+type KISSFrame struct {
 	state kiss_state_e
 
 	kiss_msg [MAX_KISS_LEN]byte
@@ -140,7 +140,7 @@ type kissport_status_s struct {
 
 	client_sock [MAX_NET_CLIENTS]net.Conn
 
-	kf [MAX_NET_CLIENTS]*kiss_frame_t
+	kf [MAX_NET_CLIENTS]*KISSFrame
 	/* Accumulated KISS frame and state of decoder. */
 }
 
@@ -168,7 +168,7 @@ func kiss_frame_init(pa *audio_s) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_encapsulate
+ * Name:        KissEncapsulate
  *
  * Purpose:     Encapsulate a frame into KISS format.
  *
@@ -199,7 +199,7 @@ func kiss_frame_init(pa *audio_s) {
  *
  *-----------------------------------------------------------------*/
 
-func kiss_encapsulate(in []byte) []byte {
+func KissEncapsulate(in []byte) []byte {
 	var buf bytes.Buffer
 
 	buf.WriteByte(FEND)
@@ -346,12 +346,12 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 		}
 	}
 
-	hex_dump(pmsg)
+	HexDump(pmsg)
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_rec_byte
+ * Name:        KissRecByte
  *
  * Purpose:     Process one byte from a KISS client app.
  *
@@ -396,7 +396,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func kiss_rec_byte(kf *kiss_frame_t, ch byte, debug int,
+func KissRecByte(kf *KISSFrame, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
@@ -479,7 +479,7 @@ func kiss_rec_byte(kf *kiss_frame_t, ch byte, debug int,
 				dw_printf("Packet content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				hex_dump(unwrapped[1:])
+				HexDump(unwrapped[1:])
 			}
 
 			kiss_process_msg(unwrapped, debug, kps, client, sendfun)
@@ -499,7 +499,7 @@ func kiss_rec_byte(kf *kiss_frame_t, ch byte, debug int,
 
 		return
 	}
-} /* end kiss_rec_byte */
+} /* end KissRecByte */
 
 /*-------------------------------------------------------------------
  *
@@ -550,7 +550,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		channel = int(kiss_msg[0]>>4) & 0xf
 	}
 
-	var alevel alevel_t
+	var alevel ALevel
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
@@ -626,9 +626,9 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			return
 		}
 
-		alevel = alevel_t{} //nolint:exhaustruct
+		alevel = ALevel{} //nolint:exhaustruct
 
-		var pp = ax25_from_frame(kiss_msg[1:], alevel)
+		var pp = AX25FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR - Invalid KISS data frame from client app.\n")

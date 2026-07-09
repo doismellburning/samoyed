@@ -53,10 +53,10 @@ func TestIL2PSpec(t *testing.T) {
 		require.NotNil(t, pp)
 
 		// Does it have the data we expect?
-		assert.Equal(t, testDatum.expectedAddrs, ax25_format_addrs(pp))
+		assert.Equal(t, testDatum.expectedAddrs, AX25FormatAddrs(pp))
 
 		// Does it match the AX.25 data in the spec?
-		assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), ax25_pack(pp))
+		assert.Equal(t, il2pDataStringToBytes(testDatum.ax25Data), AX25Pack(pp))
 
 		// Verify the trailing CRC bytes are valid for the decoded frame.
 		var frameData = ax25_get_frame_data(pp)

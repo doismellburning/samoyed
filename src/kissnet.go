@@ -221,7 +221,7 @@ func (kns *KissNetService) SetDebug(n int) {
  *				  KISS_CMD_SET_HARDWARE when responding to a query.
  *
  *		flen		- Number of bytes for AX.25 frame.
- *				  When called from kiss_rec_byte, flen will be -1
+ *				  When called from KissRecByte, flen will be -1
  *				  indicating a text string rather than frame content.
  *				  This is used to fake out an application that thinks
  *				  it is using a traditional TNC and tries to put it
@@ -300,10 +300,10 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 								text_color_set(DW_COLOR_DEBUG)
 								dw_printf("\n")
 								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								hex_dump(fbuf)
+								HexDump(fbuf)
 							}
 
-							kiss_buff = kiss_encapsulate(stemp)
+							kiss_buff = KissEncapsulate(stemp)
 
 							/* This has the escapes and the surrounding FENDs. */
 
@@ -378,7 +378,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 								msg[0] = byte(0 | cmd) // set channel to zero.
 							}
 
-							var kiss_buff = kiss_encapsulate(msg)
+							var kiss_buff = KissEncapsulate(msg)
 
 							/* This has the escapes and the surrounding FENDs. */
 
@@ -481,7 +481,7 @@ func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
 
 	for {
 		var ch = kns.get(kps, client)
-		kiss_rec_byte(kps.kf[client], ch, kns.debug, kps, client, kns.SendRecPacket)
+		KissRecByte(kps.kf[client], ch, kns.debug, kps, client, kns.SendRecPacket)
 	}
 } /* end listenThread */
 
@@ -494,7 +494,7 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
 	*/
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
-		kps.kf[client] = new(kiss_frame_t)
+		kps.kf[client] = new(KISSFrame)
 	}
 
 	if kps.tcp_port == 0 {
@@ -609,7 +609,7 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 
 			// Reset the state and buffer.
 			for i := range len(kps.kf) {
-				kps.kf[i] = new(kiss_frame_t)
+				kps.kf[i] = new(KISSFrame)
 			}
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */

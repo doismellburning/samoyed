@@ -68,7 +68,7 @@ import (
  * Accumulated KISS frame and state of decoder.
  */
 
-var kisspt_kf *kiss_frame_t
+var kisspt_kf *KISSFrame
 
 /*
  * These are for a Linux pseudo terminal.
@@ -113,7 +113,7 @@ func kisspt_init(mc *misc_config_s) {
 	 */
 	pt_master = nil
 
-	kisspt_kf = new(kiss_frame_t)
+	kisspt_kf = new(KISSFrame)
 
 	if mc.enable_kiss_pt {
 		kisspt_open_pt()
@@ -291,10 +291,10 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			hex_dump(fbuf)
+			HexDump(fbuf)
 		}
 
-		kiss_buff = kiss_encapsulate(stemp)
+		kiss_buff = KissEncapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 
@@ -419,7 +419,7 @@ func kisspt_get() (byte, error) {
  * Global In:
  *
  * Description:	Reads bytes from the KISS client app and
- *		sends them to kiss_rec_byte for processing.
+ *		sends them to KissRecByte for processing.
  *
  *--------------------------------------------------------------------*/
 
@@ -435,6 +435,6 @@ func kisspt_listen_thread() {
 		if err != nil {
 			return
 		}
-		kiss_rec_byte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
+		KissRecByte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
 	}
 }

@@ -12,7 +12,7 @@ import (
 
 /*-------------------------------------------------------------------
  *
- * Name:	serial_port_open
+ * Name:	SerialPortOpen
  *
  * Purpose:	Open serial port.
  *
@@ -28,11 +28,11 @@ import (
  *
  *---------------------------------------------------------------*/
 
-func serial_port_open(devicename string, baud int) *term.Term {
+func SerialPortOpen(devicename string, baud int) *term.Term {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("serial_port_open ( '%s' )\n", devicename);
+		dw_printf ("SerialPortOpen ( '%s' )\n", devicename);
 	#endif
 	*/
 
@@ -72,7 +72,7 @@ func serial_port_open(devicename string, baud int) *term.Term {
 		fd.SetSpeed(baud)
 	default:
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("serial_port_open: Unsupported speed %d.  Using 4800.\n", baud)
+		dw_printf("SerialPortOpen: Unsupported speed %d.  Using 4800.\n", baud)
 		fd.SetSpeed(4800)
 	}
 
@@ -91,7 +91,7 @@ func serial_port_open(devicename string, baud int) *term.Term {
 
 /*-------------------------------------------------------------------
  *
- * Name:	serial_port_write
+ * Name:	SerialPortWrite
  *
  * Purpose:	Send characters to serial port.
  *
@@ -103,7 +103,7 @@ func serial_port_open(devicename string, baud int) *term.Term {
  *
  *---------------------------------------------------------------*/
 
-func serial_port_write(fd *term.Term, data []byte) int {
+func SerialPortWrite(fd *term.Term, data []byte) int {
 	if fd == nil {
 		return (-1)
 	}
@@ -118,11 +118,11 @@ func serial_port_write(fd *term.Term, data []byte) int {
 	}
 
 	return written
-} /* serial_port_write */
+} /* SerialPortWrite */
 
 /*-------------------------------------------------------------------
  *
- * Name:        serial_port_get1
+ * Name:        SerialPortGet1
  *
  * Purpose:     Get one byte from the serial port.  Wait if not ready.
  *
@@ -132,13 +132,13 @@ func serial_port_write(fd *term.Term, data []byte) int {
  *
  *--------------------------------------------------------------------*/
 
-func serial_port_get1(fd *term.Term) (byte, error) {
+func SerialPortGet1(fd *term.Term) (byte, error) {
 	var bytes = make([]byte, 1)
 	var n, err = fd.Read(bytes)
 
 	if n != 1 {
 		//text_color_set(DW_COLOR_DEBUG);
-		//dw_printf ("serial_port_get1(%d) returns -1 for error.\n", fd);
+		//dw_printf ("SerialPortGet1(%d) returns -1 for error.\n", fd);
 		return 0, err
 	}
 
@@ -146,10 +146,10 @@ func serial_port_get1(fd *term.Term) (byte, error) {
 	   #if DEBUGx
 	   	text_color_set(DW_COLOR_DEBUG);
 	   	if (isprint(ch)) {
-	   	  dw_printf ("serial_port_get1(%d) returns 0x%02x = '%c'\n", fd, ch, ch);
+	   	  dw_printf ("SerialPortGet1(%d) returns 0x%02x = '%c'\n", fd, ch, ch);
 	   	}
 	   	else {
-	   	  dw_printf ("serial_port_get1(%d) returns 0x%02x\n", fd, ch);
+	   	  dw_printf ("SerialPortGet1(%d) returns 0x%02x\n", fd, ch);
 	   	}
 	   #endif
 	*/

@@ -11,7 +11,7 @@ package direwolf
  *		This is a fairly complete implementation with error messages
  *		pointing out various specification violations.
  *
- * Assumptions:	ax25_from_frame() has been called to
+ * Assumptions:	AX25FromFrame() has been called to
  *		separate the header and information.
  *
  *------------------------------------------------------------------*/
@@ -204,7 +204,7 @@ type decode_aprs_t struct {
 
 func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 
@@ -304,14 +304,14 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 
 		// e.g.  WR2X-2>APRS,WA1PLE-13*:}
 		//		K1BOS-B>APOSB,TCPIP,WR2X-2*:@122015z4221.42ND07111.93W&/A=000000SharkRF openSPOT3 MMDVM446.025 MA/SW
-		var pp_payload = ax25_from_text(string(pinfo[1:]), false)
+		var pp_payload = AX25FromText(string(pinfo[1:]), false)
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
 			A = decode_aprs(pp_payload, quiet, string(payload_src)) // 1 means used recursively
 			A.g_has_thirdparty_header = true
 
-			ax25_delete(pp_payload)
+			AX25Delete(pp_payload)
 
 			return A
 		} else {
@@ -738,19 +738,19 @@ func decode_aprs_print(A *decode_aprs_t) {
 	A.g_weather = strings.TrimSpace(A.g_weather)
 
 	if len(A.g_weather) > 0 {
-		ax25_safe_print([]byte(A.g_weather), false)
+		AX25SafePrint([]byte(A.g_weather), false)
 		dw_printf("\n")
 	}
 
 	if len(A.g_telemetry) > 0 {
-		ax25_safe_print([]byte(A.g_telemetry), false)
+		AX25SafePrint([]byte(A.g_telemetry), false)
 		dw_printf("\n")
 	}
 
 	A.g_comment = strings.TrimSpace(A.g_comment)
 
 	if len(A.g_comment) > 0 {
-		ax25_safe_print([]byte(A.g_comment), false)
+		AX25SafePrint([]byte(A.g_comment), false)
 		dw_printf("\n")
 
 		/*

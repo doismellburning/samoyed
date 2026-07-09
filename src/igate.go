@@ -520,7 +520,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 					dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 				}
 
-				ax25_delete(pp)
+				AX25Delete(pp)
 
 				return
 			}
@@ -533,11 +533,11 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 
 		var inner_pp = ax25_unwrap_third_party(pp)
 		if inner_pp == nil {
-			ax25_delete(pp)
+			AX25Delete(pp)
 			return
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 		pp = inner_pp
 	}
 
@@ -557,7 +557,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 				dw_printf("Rx IGate: Do not relay with %s in path.\n", via)
 			}
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 
 			return
 		}
@@ -573,7 +573,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			dw_printf("Rx IGate: Do not relay generic query.\n")
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -592,7 +592,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 		}
 	}
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	/*
 	 * Someone around here occasionally sends a packet with no information part.
@@ -603,7 +603,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 			dw_printf("Rx IGate: Information part length is zero.\n")
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -643,7 +643,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
  *--------------------------------------------------------------------*/
 
 func send_packet_to_server(pp *packet_t, channel int) {
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	/*
 	 * We will often see the same packet multiple times close together due to digipeating.
@@ -661,7 +661,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 			dw_printf("Rx IGate: Drop duplicate of same packet seen recently.\n")
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -692,7 +692,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	 *		IGate that only gates to RF messages for stations heard directly.
 	 */
 
-	var msg = ax25_format_addrs(pp)
+	var msg = AX25FormatAddrs(pp)
 
 	msg = strings.TrimRight(msg, ":") /* Remove trailing ":" */
 
@@ -778,7 +778,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	 */
 	rx_to_ig_remember(pp)
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end send_packet_to_server */
 
 /*-------------------------------------------------------------------
@@ -819,7 +819,7 @@ func send_msg_to_server(imsg string) {
 	if s_debug >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		ax25_safe_print([]byte(imsg), false)
+		AX25SafePrint([]byte(imsg), false)
 		dw_printf("\n")
 	}
 
@@ -911,7 +911,7 @@ func igate_recv_thread() {
 			stats_downlink_bytes++
 
 			// I never expected to see a nul character but it can happen.
-			// If found, change it to <0x00> and ax25_from_text will change it back to a single byte.
+			// If found, change it to <0x00> and AX25FromText will change it back to a single byte.
 			// Along the way we can use the normal C string handling.
 
 			if ch == 0 {
@@ -969,7 +969,7 @@ func igate_recv_thread() {
 			if !ok_to_send {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				ax25_safe_print(message, false)
+				AX25SafePrint(message, false)
 				dw_printf("\n")
 			}
 		} else {
@@ -982,7 +982,7 @@ func igate_recv_thread() {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			ax25_safe_print(message, false)
+			AX25SafePrint(message, false)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {
@@ -1043,9 +1043,9 @@ func igate_recv_thread() {
 
 				var stemp = append([]byte("X>X:}"), message...)
 
-				var pp3 = ax25_from_text(string(stemp), false)
+				var pp3 = AX25FromText(string(stemp), false)
 				if pp3 != nil {
-					var alevel alevel_t
+					var alevel ALevel
 					alevel.mark = -2 // FIXME: Do we want some other special case?
 					alevel.space = -2
 
@@ -1269,7 +1269,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	 * Potential Bug:  Up to 8 digipeaters are allowed in radio format.
 	 * Is there a possibility of finding a larger number here?
 	 */
-	var pp3 = ax25_from_text(string(message), false)
+	var pp3 = AX25FromText(string(message), false)
 	if pp3 == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
@@ -1303,7 +1303,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 				dw_printf("Tx IGate: Do not transmit with %s in path.\n", via)
 			}
 
-			ax25_delete(pp3)
+			AX25Delete(pp3)
 
 			return
 		}
@@ -1341,7 +1341,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	// TODO: Not quite this simple.  Should have a function to check for position.
 	// $ raw gps could be a position.  @ could be weather data depending on symbol.
 
-	var pinfo = ax25_get_info(pp3)
+	var pinfo = AX25GetInfo(pp3)
 
 	var msp_special_case = false
 
@@ -1365,7 +1365,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			if pfilter(MAX_TOTAL_CHANS, to_chan, save_digi_config_p.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true) != 1 {
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
-				ax25_delete(pp3)
+				AX25Delete(pp3)
 				return
 			}
 		}
@@ -1442,13 +1442,13 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			save_igate_config_p.tx_via,
 			payload)
 
-		var pradio = ax25_from_text(radio, true)
+		var pradio = AX25FromText(radio, true)
 		if pradio != nil {
 			/* TODO KG
 			#if ITEST
 				    text_color_set(DW_COLOR_XMIT);
 				    dw_printf ("Xmit: %s\n", radio);
-				    ax25_delete (pradio);
+				    AX25Delete (pradio);
 			#else
 			*/
 			/* This consumes packet so don't reference it again! */
@@ -1474,7 +1474,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 		}
 	}
 
-	ax25_delete(pp3)
+	AX25Delete(pp3)
 } /* end maybe_xmit_packet_from_igate */
 
 /*-------------------------------------------------------------------
@@ -1573,7 +1573,7 @@ func rx_to_ig_remember(pp *packet_t) {
 	if s_debug >= 3 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
@@ -1596,7 +1596,7 @@ func rx_to_ig_allow(pp *packet_t) bool {
 	if s_debug >= 2 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, string(pinfo))
@@ -1865,7 +1865,7 @@ func ig_to_tx_remember(pp *packet_t, channel int, bydigi int) {
 	if s_debug >= 3 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
@@ -1890,7 +1890,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	if s_debug >= 2 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)

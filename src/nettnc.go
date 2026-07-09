@@ -131,7 +131,7 @@ func nettnc_attach(channel int, host string, port int) int {
 func nettnc_listen_thread(channel int) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var kstate kiss_frame_t // State machine to gather a KISS frame.
+	var kstate KISSFrame // State machine to gather a KISS frame.
 
 	for {
 		/*
@@ -190,7 +190,7 @@ func nettnc_listen_thread(channel int) {
  *
  * Returns:	none.
  *
- * Description:	This is a simplified version of kiss_rec_byte used
+ * Description:	This is a simplified version of KissRecByte used
  *		for talking to KISS client applications.  It already has
  *		too many special cases and I don't want to make it worse.
  *		This also needs to make the packet look like it came from
@@ -198,7 +198,7 @@ func nettnc_listen_thread(channel int) {
  *
  *-----------------------------------------------------------------*/
 
-func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int) {
+func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 	//dw_printf ("my_kiss_rec_byte ( %c %02x ) \n", b, b);
 	switch kf.state {
 	/* Searching for starting FEND. */
@@ -250,7 +250,7 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 				dw_printf("Frame content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				hex_dump(unwrapped[1:])
+				HexDump(unwrapped[1:])
 			}
 
 			// Convert to packet object and send to received packet queue.
@@ -258,8 +258,8 @@ func my_kiss_rec_byte(kf *kiss_frame_t, b byte, debug int, channel_override int)
 
 			var subchan = -3
 			var slice = 0
-			var alevel alevel_t
-			var pp = ax25_from_frame(unwrapped[1:], alevel)
+			var alevel ALevel
+			var pp = AX25FromFrame(unwrapped[1:], alevel)
 
 			if pp != nil {
 				var fec_type = fec_type_none
@@ -317,7 +317,7 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 
 	// Next, encapsulate into KISS frame with surrounding FENDs and any escapes.
 
-	var kiss_buff = kiss_encapsulate(frame_buff)
+	var kiss_buff = KissEncapsulate(frame_buff)
 
 	var _, err = s_tnc_sock[channel].Write(kiss_buff)
 	if err != nil {

@@ -45,7 +45,7 @@ package direwolf
  *		                                                       ||||||
  *		What does findu.com do in this case?
  *
- *		ax25_from_text recognizes this representation so it can be used
+ *		AX25FromText recognizes this representation so it can be used
  *		to decode raw data later.
  *
  * TODO:	To make it more useful,
@@ -67,7 +67,7 @@ import (
 func DecodeAPRSMain() {
 	DECODE_APRS_UTIL = true // DECAMAIN define replacement
 
-	text_color_init(0)
+	TextColorInit(0)
 	text_color_set(DW_COLOR_INFO)
 	deviceIDData = NewDeviceIDData()
 	aprsSymbolData = NewAPRSSymbolData()
@@ -88,7 +88,7 @@ func DecodeAPRSMain() {
 func DecodeAPRSLine(line string) {
 	/* Try to process it. */
 	fmt.Printf("\n")
-	ax25_safe_print([]byte(line), false)
+	AX25SafePrint([]byte(line), false)
 	fmt.Printf("\n")
 
 	// Do we have monitor format, KISS, or AX.25 frame?
@@ -132,7 +132,7 @@ func DecodeAPRSLine(line string) {
 			var kiss_frame = bytes
 
 			fmt.Printf("--- KISS frame ---\n")
-			hex_dump(kiss_frame)
+			HexDump(kiss_frame)
 
 			// Put FEND at end to keep kiss_unwrap happy.
 			// Having one at the beginning is optional.
@@ -149,19 +149,19 @@ func DecodeAPRSLine(line string) {
 
 		// Treat as AX.25.
 
-		var alevel alevel_t
+		var alevel ALevel
 
-		var pp = ax25_from_frame(bytes, alevel)
+		var pp = AX25FromFrame(bytes, alevel)
 		if pp != nil {
 			fmt.Printf("--- AX.25 frame ---\n")
 			ax25_hex_dump(pp)
 			fmt.Printf("-------------------\n")
 
-			var addrs = ax25_format_addrs(pp)
+			var addrs = AX25FormatAddrs(pp)
 			fmt.Printf("%s", addrs)
 
-			var info = ax25_get_info(pp)
-			ax25_safe_print(info, true) // Display non-ASCII to hexadecimal.
+			var info = AX25GetInfo(pp)
+			AX25SafePrint(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
 			var A = decode_aprs(pp, false, "") // Extract information into structure.
@@ -170,13 +170,13 @@ func DecodeAPRSLine(line string) {
 
 			ax25_check_addresses(pp) // Errors for invalid addresses.
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 		} else {
 			fmt.Printf("Could not construct AX.25 frame from bytes supplied!\n\n")
 		}
 	} else {
 		// Normal monitoring format.
-		var pp = ax25_from_text(line, true)
+		var pp = AX25FromText(line, true)
 		if pp != nil {
 			var A = decode_aprs(pp, false, "") // Extract information into structure.
 
@@ -188,7 +188,7 @@ func DecodeAPRSLine(line string) {
 
 			// Future?  Add -d option to include hex dump and maybe KISS?
 
-			ax25_delete(pp)
+			AX25Delete(pp)
 		} else {
 			fmt.Printf("ERROR - Could not parse monitoring format input!\n\n")
 		}

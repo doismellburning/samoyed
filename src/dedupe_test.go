@@ -11,7 +11,7 @@ import (
 func Test_dedupe_check_duplicate(t *testing.T) {
 	var ds = NewDedupeService(30 * time.Second)
 
-	var pp = ax25_from_text("W1AW>APRS:test packet", true)
+	var pp = AX25FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
 	ds.Remember(pp, 0)
@@ -22,7 +22,7 @@ func Test_dedupe_check_duplicate(t *testing.T) {
 func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
 	var ds = NewDedupeService(30 * time.Second)
 
-	var pp = ax25_from_text("W1AW>APRS:test packet", true)
+	var pp = AX25FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
 	ds.Remember(pp, 0)
@@ -33,7 +33,7 @@ func Test_dedupe_check_different_channel_not_duplicate(t *testing.T) {
 func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 	var ds = NewDedupeService(30 * time.Second)
 
-	var pp = ax25_from_text("W1AW>APRS:test packet", true)
+	var pp = AX25FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
 	ds.Remember(pp, 0)
@@ -51,7 +51,7 @@ func Test_dedupe_check_expired_not_duplicate(t *testing.T) {
 func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
 	var ds = NewDedupeService(30 * time.Second)
 
-	var pp = ax25_from_text("W1AW>APRS:test packet", true)
+	var pp = AX25FromText("W1AW>APRS:test packet", true)
 	require.NotNil(t, pp)
 
 	assert.False(t, ds.Check(pp, 0), "nothing has been remembered, so no duplicates")

@@ -67,7 +67,7 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
 		}
 
 		// Payload is AX.25 info part.
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		var encodedPayload, k = il2p_encode_payload(pinfo, max_fec)
 		if k > 0 {
@@ -182,7 +182,7 @@ func il2p_decode_frame(irec []byte) *packet_t {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("IL2P trailing CRC mismatch.\n")
 			}
-			ax25_delete(pp)
+			AX25Delete(pp)
 			return nil
 		}
 	}
@@ -225,7 +225,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected 
 			// It would be possible to have a good header but too many errors in the payload.
 
 			if e <= 0 {
-				ax25_delete(pp)
+				AX25Delete(pp)
 				return nil
 			}
 
@@ -253,12 +253,12 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected 
 			return (nil)
 		}
 
-		var alevel alevel_t
+		var alevel ALevel
 		//alevel = demod_get_audio_level (chan, subchan); 	// What TODO? We don't know channel here.
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = ax25_from_frame(extracted, alevel)
+		var pp = AX25FromFrame(extracted, alevel)
 
 		return (pp)
 	}

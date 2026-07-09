@@ -84,7 +84,7 @@ var g_misc_config_p *misc_config_s
  * Accumulated KISS frame and state of decoder.
  */
 
-var kf *kiss_frame_t
+var kf *KISSFrame
 
 var serialport_fd *term.Term
 
@@ -116,12 +116,12 @@ func kissserial_set_debug(n int) {
 
 func kissserial_init(mc *misc_config_s) {
 	g_misc_config_p = mc
-	kf = new(kiss_frame_t)
+	kf = new(KISSFrame)
 
 	if g_misc_config_p.kiss_serial_port != "" {
 		if g_misc_config_p.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
-			serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
+			serialport_fd = SerialPortOpen(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 			if serialport_fd != nil {
 				text_color_set(DW_COLOR_INFO)
@@ -214,10 +214,10 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("\n")
 			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			hex_dump(fbuf)
+			HexDump(fbuf)
 		}
 
-		kiss_buff = kiss_encapsulate(stemp)
+		kiss_buff = KissEncapsulate(stemp)
 
 		/* This has KISS framing and escapes for sending to client app. */
 
@@ -250,7 +250,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 	 *	      command> change CNCA0 EmuBR=yes
 	 */
 
-	var n = serial_port_write(serialport_fd, kiss_buff)
+	var n = SerialPortWrite(serialport_fd, kiss_buff)
 
 	if n != kiss_len {
 		text_color_set(DW_COLOR_ERROR)
@@ -283,7 +283,7 @@ func kissserial_get() (byte, error) {
 		/*
 		 * Normal case, was opened at start up time.
 		 */
-		var ch, err = serial_port_get1(serialport_fd)
+		var ch, err = SerialPortGet1(serialport_fd)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
@@ -308,7 +308,7 @@ func kissserial_get() (byte, error) {
 	for {
 		if serialport_fd != nil {
 			// Open, try to read.
-			var ch, err = serial_port_get1(serialport_fd)
+			var ch, err = SerialPortGet1(serialport_fd)
 			if err == nil {
 				return ch, nil
 			}
@@ -324,13 +324,13 @@ func kissserial_get() (byte, error) {
 			var _, statErr = os.Stat(g_misc_config_p.kiss_serial_port)
 			if statErr == nil {
 				// It's there now.  Try to open.
-				serialport_fd = serial_port_open(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
+				serialport_fd = SerialPortOpen(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 				if serialport_fd != nil {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", g_misc_config_p.kiss_serial_port)
 
-					kf = new(kiss_frame_t) // Start with clean state.
+					kf = new(KISSFrame) // Start with clean state.
 				} else { //nolint:staticcheck
 					// An error message was already displayed.
 				}
@@ -348,8 +348,8 @@ func kissserial_get() (byte, error) {
  * Global In:	serialport_fd
  *
  * Description:	Reads bytes from the serial port KISS client app and
- *		sends them to kiss_rec_byte for processing.
- *		kiss_rec_byte is a common function used by all 3 KISS
+ *		sends them to KissRecByte for processing.
+ *		KissRecByte is a common function used by all 3 KISS
  *		interfaces: serial port, pseudo terminal, and TCP.
  *
  *--------------------------------------------------------------------*/
@@ -367,6 +367,6 @@ func kissserial_listen_thread() {
 			return
 		}
 
-		kiss_rec_byte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
+		KissRecByte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
 	}
 }

@@ -1,6 +1,6 @@
 package direwolf
 
-func hex_dump(p []byte) {
+func HexDump(p []byte) {
 	var offset = 0
 	var length = len(p)
 

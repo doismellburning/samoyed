@@ -14,7 +14,7 @@ import (
 func Test_decode_aprs_empty_info(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	var pp = ax25_from_text("Q1TEST>ID:", true)
+	var pp = AX25FromText("Q1TEST>ID:", true)
 	assert.NotNil(t, pp)
 
 	// Must not panic, and must return a populated struct.

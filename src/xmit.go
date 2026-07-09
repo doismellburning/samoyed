@@ -459,17 +459,17 @@ func (xs *XmitService) xmit_thread(channel int) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
 
-					var stemp = ax25_format_addrs(pp)
+					var stemp = AX25FormatAddrs(pp)
 
-					var pinfo = ax25_get_info(pp)
+					var pinfo = AX25GetInfo(pp)
 
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("[%d%c] ", channel, priorityToRune(prio))
 
 					dw_printf("%s", stemp) /* stations followed by : */
-					ax25_safe_print(pinfo, !ax25_is_aprs(pp))
+					AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 					dw_printf("\n")
-					ax25_delete(pp)
+					AX25Delete(pp)
 				} /* wait for clear channel error. */
 			} /* Have pp */
 		} /* while queue not empty */
@@ -631,7 +631,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 	#endif
 	*/
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	/*
 	 * See if we can bundle additional frames into this transmission.
@@ -678,7 +678,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 					        dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
 				#endif
 				*/
-				ax25_delete(pp)
+				AX25Delete(pp)
 			}
 		} else {
 			done = true
@@ -802,9 +802,9 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	var ts = xs.timestampPrefix()
 
-	var stemp = ax25_format_addrs(pp)
+	var stemp = AX25FormatAddrs(pp)
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	text_color_set(DW_COLOR_XMIT)
 	/*
@@ -830,11 +830,11 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print(pinfo, !ax25_is_aprs(pp))
+			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 		}
 	} else {
-		ax25_safe_print(pinfo, !ax25_is_aprs(pp))
+		AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 		dw_printf("\n")
 	}
 
@@ -901,7 +901,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	 */
 	var ts = xs.timestampPrefix()
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
@@ -909,7 +909,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	if xs.p_modem.tts_script == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Text-to-speech script has not been configured.\n")
-		ax25_delete(pp)
+		AX25Delete(pp)
 
 		return
 	}
@@ -930,7 +930,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	 */
 
 	ptt_set(OCTYPE_PTT, c, 0)
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */
@@ -986,7 +986,7 @@ func (xs *XmitService) timestampPrefix() string {
 func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 	var ts = xs.timestampPrefix()
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
@@ -1009,7 +1009,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 	}
 
 	ptt_set(OCTYPE_PTT, c, 0)
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end xmit_morse */
 
 /*-------------------------------------------------------------------
@@ -1037,7 +1037,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 	var ts = xs.timestampPrefix()
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
@@ -1063,7 +1063,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 	}
 
 	ptt_set(OCTYPE_PTT, c, 0)
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end xmit_dtmf */
 
 /*-------------------------------------------------------------------

@@ -21,7 +21,7 @@ func Test_IL2P(t *testing.T) {
 	IL2P_TEST = true
 
 	var enable_color = 1
-	text_color_init(enable_color)
+	TextColorInit(enable_color)
 
 	var enable_debug_out = 0
 	il2p_init(enable_debug_out)
@@ -295,13 +295,13 @@ func test_example_headers(t *testing.T) {
 
 	var example1 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x6f, 0xb1}
 	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
-	var alevel alevel_t
+	var alevel ALevel
 
-	var pp = ax25_from_frame(example1, alevel)
+	var pp = AX25FromFrame(example1, alevel)
 	assert.NotNil(t, pp)
 	var header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	// dw_printf ("Example 1 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -340,7 +340,7 @@ func test_example_headers(t *testing.T) {
 	_ = frame_type // TODO Check this?
 
 	// TODO: compare binary.
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	dw_printf("Example 1 header OK\n")
 
@@ -366,13 +366,13 @@ func test_example_headers(t *testing.T) {
 	// dw_printf ("---------- example 2 ------------\n");
 	var example2 = []byte{0x86, 0xa2, 0x40, 0x40, 0x40, 0x40, 0x60, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x7f, 0x03, 0xf0}
 	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
-	alevel = alevel_t{} //nolint:exhaustruct
+	alevel = ALevel{} //nolint:exhaustruct
 
-	pp = ax25_from_frame(example2, alevel)
+	pp = AX25FromFrame(example2, alevel)
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	// dw_printf ("Example 2 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -416,7 +416,7 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: compare binary.
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 	// TODO: more examples
 
 	dw_printf("Example 2 header OK\n")
@@ -444,13 +444,13 @@ func test_example_headers(t *testing.T) {
 	var example3 = []byte{0x96, 0x82, 0x64, 0x88, 0x8a, 0xae, 0xe4, 0x96, 0x96, 0x68, 0x90, 0x8a, 0x94, 0x65, 0xb8, 0xcf, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
 	var header3 = []byte{0x2b, 0xe1, 0x52, 0x64, 0x25, 0x77, 0x6b, 0x2b, 0xd4, 0x68, 0x25, 0xaa, 0x22}
 	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
-	alevel = alevel_t{} //nolint:exhaustruct
+	alevel = ALevel{} //nolint:exhaustruct
 
-	pp = ax25_from_frame(example3, alevel)
+	pp = AX25FromFrame(example3, alevel)
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 9, e)
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	// dw_printf ("Example 3 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -497,12 +497,12 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: compare binary.
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 	dw_printf("Example 3 header OK\n")
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = ax25_from_frame(example3, alevel)
+	pp = AX25FromFrame(example3, alevel)
 	assert.NotNil(t, pp)
 
 	var max_fec = 0
@@ -515,7 +515,7 @@ func test_example_headers(t *testing.T) {
 	// Does it match the example in the protocol spec?
 	assert.Equal(t, len(complete3), ioutLen)
 	assert.Equal(t, complete3, iout)
-	ax25_delete(pp)
+	AX25Delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
 } // end test_example_headers
@@ -560,7 +560,7 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 		assert.Equal(t, len1, len2)
 		assert.Equal(t, data1, data2)
 
-		ax25_delete(pp2)
+		AX25Delete(pp2)
 	}
 }
 
@@ -624,7 +624,7 @@ func all_frame_types(t *testing.T) {
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
 				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				ax25_delete(pp)
+				AX25Delete(pp)
 			}
 		}
 	}
@@ -653,7 +653,7 @@ func all_frame_types(t *testing.T) {
 
 				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				ax25_delete(pp)
+				AX25Delete(pp)
 			}
 
 			modulo = modulo_128
@@ -671,7 +671,7 @@ func all_frame_types(t *testing.T) {
 
 				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				ax25_delete(pp)
+				AX25Delete(pp)
 			}
 		}
 	}
@@ -693,7 +693,7 @@ func all_frame_types(t *testing.T) {
 
 		ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
-		ax25_delete(pp)
+		AX25Delete(pp)
 	}
 
 	/* I frame */
@@ -714,7 +714,7 @@ func all_frame_types(t *testing.T) {
 
 			ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			ax25_delete(pp)
+			AX25Delete(pp)
 		}
 
 		modulo = modulo_128
@@ -728,7 +728,7 @@ func all_frame_types(t *testing.T) {
 
 			ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			ax25_delete(pp)
+			AX25Delete(pp)
 		}
 	}
 } // end all_frame_types
@@ -760,7 +760,7 @@ func test_serdes(t *testing.T) {
 		} else {
 			packet = fmt.Sprintf("%s:%s", addrs3, il2pTestText)
 		}
-		var pp = ax25_from_text(packet, true)
+		var pp = AX25FromText(packet, true)
 		assert.NotNil(t, pp)
 
 		var channel = 0
@@ -775,7 +775,7 @@ func test_serdes(t *testing.T) {
 			}
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 	}
 
 	dw_printf("Serdes receive count = %d\n", il2pSerdesRecCount)

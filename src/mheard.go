@@ -144,7 +144,7 @@ func mheard_latlon(dlat float64, dlon float64) string {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries BitFixLevel) {
+func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel ALevel, retries BitFixLevel) {
 	var now = time.Now()
 
 	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
@@ -315,13 +315,13 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 
 	// It is possible that source won't adhere to the AX.25 restrictions.
 	// So we simply extract the source address, as text, from the beginning rather than
-	// using ax25_from_text() and ax25_get_addr_with_ssid().
+	// using AX25FromText() and ax25_get_addr_with_ssid().
 
 	var source, _, _ = strings.Cut(ptext, ">")
 
 	/*
 	    * Keep this here in case I want to revive it to get location.
-	   	packet_t pp = ax25_from_text(ptext, 0);
+	   	packet_t pp = AX25FromText(ptext, 0);
 
 	   	if (pp == nil) {
 	   	  if (mheard_debug) {
@@ -390,7 +390,7 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 
 	/*
 		#if 0
-			ax25_delete (pp);
+			AX25Delete (pp);
 		#endif
 	*/
 } /* end SaveIS */

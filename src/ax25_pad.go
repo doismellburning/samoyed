@@ -133,8 +133,8 @@ package direwolf
  *
  *
  * Constructors: ax25_init		- Clear everything.
- *		ax25_from_text		- Tear apart a text string
- *		ax25_from_frame		- Tear apart an AX.25 frame.
+ *		AX25FromText		- Tear apart a text string
+ *		AX25FromFrame		- Tear apart an AX.25 frame.
  *					  Must be called before any other function.
  *
  * Get methods:	....			- Extract destination, source, or digipeater
@@ -309,7 +309,7 @@ const (
  * Also collect AGC values from the mark and space filters.
  */
 
-type alevel_t struct {
+type ALevel struct {
 	rec   int
 	mark  int
 	space int
@@ -388,22 +388,22 @@ func ax25_new() *packet_t {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_delete
+ * Name:	AX25Delete
  *
  * Purpose:	Destroy a packet object, freeing up memory it was using.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_delete(this_p *packet_t) {
+func AX25Delete(this_p *packet_t) {
 	/* TODO KG
 	#if DEBUG
 	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("ax25_delete(): before free, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
+	        dw_printf ("AX25Delete(): before free, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
 	#endif
 	*/
 	if this_p == nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - nil pointer passed to ax25_delete.\n")
+		dw_printf("ERROR - nil pointer passed to AX25Delete.\n")
 
 		return
 	}
@@ -419,7 +419,7 @@ func ax25_delete(this_p *packet_t) {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_from_text
+ * Name:	AX25FromText
  *
  * Purpose:	Parse a frame in human-readable monitoring format and change
  *		to internal representation.
@@ -466,13 +466,13 @@ func ax25_delete(this_p *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_text(monitor string, strict bool) *packet_t {
+func AX25FromText(monitor string, strict bool) *packet_t {
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
 	 */
 
 	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("DEBUG: ax25_from_text ('%s', %d)\n", monitor, strict);
+	// dw_printf ("DEBUG: AX25FromText ('%s', %d)\n", monitor, strict);
 	// fflush(stdout); sleep(1);
 	var this_p = ax25_new()
 
@@ -510,7 +510,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	stuff, pinfo, colonFound = bytes.Cut(stuff, []byte{':'})
 
 	if !colonFound {
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 		return (nil)
 	}
 
@@ -530,7 +530,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	if !found {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  No source address\n")
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -540,7 +540,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad source address\n")
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -561,7 +561,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad destination address\n")
-		ax25_delete(this_p)
+		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -608,7 +608,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
-			ax25_delete(this_p)
+			AX25Delete(this_p)
 
 			return (nil)
 		}
@@ -646,7 +646,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	   #if DEBUG14H
 	   	text_color_set(DW_COLOR_DEBUG);
 	   	dw_printf ("BEFORE: %s\nSAFE:   ", pinfo);
-	   	ax25_safe_print (pinfo, -1, 0);
+	   	AX25SafePrint (pinfo, -1, 0);
 	   	dw_printf ("\n");
 	   #endif
 	*/
@@ -656,7 +656,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		if len(info_part) >= AX25_MAX_INFO_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
-			ax25_delete(this_p)
+			AX25Delete(this_p)
 
 			return (nil)
 		}
@@ -681,7 +681,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		#if DEBUG14H
 			text_color_set(DW_COLOR_DEBUG);
 			dw_printf ("AFTER:  %s\nSAFE:   ", info_part);
-			ax25_safe_print (info_part, info_len, 0);
+			AX25SafePrint (info_part, info_len, 0);
 			dw_printf ("\n");
 		#endif
 	*/
@@ -697,7 +697,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_from_frame
+ * Name:	AX25FromFrame
  *
  * Purpose:	Split apart an HDLC frame to components.
  *
@@ -713,7 +713,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
+func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 	/*
 	 * First make sure we have an acceptable length:
 	 *
@@ -1054,12 +1054,12 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 		return (nil)
 	}
 
-	var info = ax25_get_info(from_pp)
+	var info = AX25GetInfo(from_pp)
 
 	// Want strict because addresses should conform to AX.25 here.
 	// That's not the case for something from an Internet Server.
 
-	var result_pp = ax25_from_text(string(info[1:]), true)
+	var result_pp = AX25FromText(string(info[1:]), true)
 
 	return (result_pp)
 }
@@ -1078,9 +1078,9 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *
  *		ad	- Address with optional dash and substation id.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
- * TODO:  	ax25_from_text could use this.
+ * TODO:  	AX25FromText could use this.
  *
  * Returns:	None.
  *
@@ -1157,7 +1157,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *
  * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	None.
  *
@@ -1234,7 +1234,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *
  * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	None.
  *
@@ -1273,7 +1273,7 @@ func ax25_remove_addr(this_p *packet_t, n int) {
  *
  * Purpose:	Return number of addresses in current packet.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Number of addresses in the current packet.
  *		Should be in the range of 2 .. AX25_MAX_ADDRS.
@@ -1319,7 +1319,7 @@ func ax25_get_num_addr(this_p *packet_t) int {
  *
  * Purpose:	Return number of repeater addresses in current packet.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Number of addresses in the current packet - 2.
  *		Should be in the range of 0 .. AX25_MAX_ADDRS - 2.
@@ -1353,7 +1353,7 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Character string in usual human readable format,
  *
@@ -1427,7 +1427,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Character string in usual human readable format,
  *
@@ -1484,7 +1484,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
  * Inputs:	n	- Index of address.   Use the symbols
  *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Substation id, as integer 0 .. 15.
  *
@@ -1515,7 +1515,7 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
  *
  *		ssid	- New SSID.  Must be in range of 0 to 15.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Bugs:	Rewrite to keep call and SSID separate internally.
  *
@@ -1545,7 +1545,7 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	True or false.
  *
@@ -1577,7 +1577,7 @@ func ax25_get_h(this_p *packet_t, n int) int {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	None
  *
@@ -1604,7 +1604,7 @@ func ax25_set_h(this_p *packet_t, n int) {
  * Inputs:	none
  *
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	If any of the digipeaters have the has-been-repeated bit set,
  *		return the index of the last one.  Otherwise return index for source.
@@ -1636,7 +1636,7 @@ func ax25_get_heard(this_p *packet_t) int {
  * Inputs:	none
  *
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	In range of X25_REPEATER_1 .. X25_REPEATER_8 or -1 if none.
  *
@@ -1687,7 +1687,7 @@ func ax25_get_rr(this_p *packet_t, n int) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_info
+ * Name:	AX25GetInfo
  *
  * Purpose:	Obtain Information part of current packet.
  *
@@ -1696,12 +1696,12 @@ func ax25_get_rr(this_p *packet_t, n int) int {
  * Returns:	paddr	- Byte slice of the information part
  *		Should have length in the range of AX25_MIN_INFO_LEN .. AX25_MAX_INFO_LEN.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_info(this_p *packet_t) []byte {
+func AX25GetInfo(this_p *packet_t) []byte {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1712,10 +1712,10 @@ func ax25_get_info(this_p *packet_t) []byte {
 		/* Not AX.25.  Treat Whole packet as info. */
 		return ax25_get_frame_data(this_p)
 	}
-} /* end ax25_get_info */
+} /* end AX25GetInfo */
 
 func ax25_set_info(this_p *packet_t, new_info []byte) {
-	var old_info = ax25_get_info(this_p)
+	var old_info = AX25GetInfo(this_p)
 	this_p.frame_len -= len(old_info)
 
 	if len(new_info) > AX25_MAX_INFO_LEN {
@@ -1743,7 +1743,7 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
  * Returns:	Number of characters removed from the end.
  *		0 if not changed.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  *------------------------------------------------------------------------------*/
 
@@ -1751,7 +1751,7 @@ func ax25_cut_at_crlf(this_p *packet_t) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	var info = ax25_get_info(this_p)
+	var info = AX25GetInfo(this_p)
 
 	for j, b := range info {
 		if b == '\r' || b == '\n' {
@@ -1774,7 +1774,7 @@ func ax25_cut_at_crlf(this_p *packet_t) int {
  *
  * Inputs:	None.
  *
- * Assumption:	ax25_from_text or ax25_from_frame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	First byte from the information part.
  *
@@ -1900,7 +1900,7 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_format_addrs
+ * Function:	AX25FormatAddrs
  *
  * Purpose:	Format all the addresses suitable for printing.
  *
@@ -1928,7 +1928,7 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 
 // TODO: max len for result.  buffer overflow?
 
-func ax25_format_addrs(this_p *packet_t) string {
+func AX25FormatAddrs(this_p *packet_t) string {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1962,7 +1962,7 @@ func ax25_format_addrs(this_p *packet_t) string {
 
 	return result.String()
 
-	// dw_printf ("DEBUG ax25_format_addrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
+	// dw_printf ("DEBUG AX25FormatAddrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
 }
 
 /*------------------------------------------------------------------
@@ -2020,7 +2020,7 @@ func ax25_format_via_path(this_p *packet_t) string {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_pack
+ * Function:	AX25Pack
  *
  * Purpose:	Put all the pieces into format ready for transmission.
  *
@@ -2030,7 +2030,7 @@ func ax25_format_via_path(this_p *packet_t) string {
  *
  *------------------------------------------------------------------*/
 
-func ax25_pack(this_p *packet_t) []byte {
+func AX25Pack(this_p *packet_t) []byte {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -2430,7 +2430,7 @@ func ax25_hex_dump(this_p *packet_t) {
 			fptr[n*7+6]&SSID_LAST_MASK)
 	}
 
-	hex_dump(fptr[:this_p.frame_len])
+	HexDump(fptr[:this_p.frame_len])
 } /* end ax25_hex_dump */
 
 /*------------------------------------------------------------------
@@ -2711,7 +2711,7 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
-	var info = ax25_get_info(pp)
+	var info = AX25GetInfo(pp)
 
 	for len(info) >= 1 && (info[len(info)-1] == '\r' ||
 		info[len(info)-1] == '\n' ||
@@ -2757,7 +2757,7 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 func ax25_m_m_crc(pp *packet_t) uint16 {
 	// TODO: I think this can be more efficient by getting the packet content pointer instead of copying.
-	var fbuf = ax25_pack(pp)
+	var fbuf = AX25Pack(pp)
 
 	var crc uint16 = 0xffff
 	crc = crc16(fbuf, crc)
@@ -2767,7 +2767,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_safe_print
+ * Function:	AX25SafePrint
  *
  * Purpose:	Print given string, changing non printable characters to
  *		hexadecimal notation.   Note that character values
@@ -2788,7 +2788,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
  *		For example, a Line Feed character will appear as <0x0a>
  *		rather than dropping down to the next line on the screen.
  *
- *		ax25_from_text can accept this format.
+ *		AX25FromText can accept this format.
  *
  *
  * Example:	W1MED-1>T2QP0S,N1OHZ,N8VIM*,WIDE1-1:'cQBl <0x1c>-/]<0x0d>
@@ -2808,7 +2808,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 
 const MAXSAFE = AX25_MAX_INFO_LEN
 
-func ax25_safe_print(info []byte, ascii_only bool) {
+func AX25SafePrint(info []byte, ascii_only bool) {
 	if len(info) > MAXSAFE {
 		info = info[:MAXSAFE]
 	}
@@ -2836,7 +2836,7 @@ func ax25_safe_print(info []byte, ascii_only bool) {
 	// TODO1.2: should return string rather printing to remove a race condition.
 
 	dw_printf("%s", safe_str.String())
-} /* end ax25_safe_print */
+} /* end AX25SafePrint */
 
 /*------------------------------------------------------------------
  *
@@ -2868,7 +2868,7 @@ func ax25_safe_print(info []byte, ascii_only bool) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_alevel_to_text(alevel alevel_t) string {
+func ax25_alevel_to_text(alevel ALevel) string {
 	if alevel.rec < 0 {
 		return ""
 	}

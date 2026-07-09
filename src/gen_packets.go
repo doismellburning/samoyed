@@ -827,7 +827,7 @@ func send_packet(str string) {
 		// Examples:
 		//	X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-
 		//	X>X:NNNN
-		var pp = ax25_from_text(str, true)
+		var pp = AX25FromText(str, true)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
@@ -835,7 +835,7 @@ func send_packet(str string) {
 			return
 		}
 
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 		if len(pinfo) >= 3 && strings.HasPrefix(string(pinfo), "{DE") {
 			pinfo = pinfo[3:]
 		}
@@ -846,9 +846,9 @@ func send_packet(str string) {
 		}
 
 		eas_send(0, pinfo, repeat, 500, 500)
-		ax25_delete(pp)
+		AX25Delete(pp)
 	} else {
-		var pp = ax25_from_text(str, true)
+		var pp = AX25FromText(str, true)
 		if pp == nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
@@ -889,7 +889,7 @@ func send_packet(str string) {
 			layer2_preamble_postamble(c, 2, true, &modem)
 		}
 
-		ax25_delete(pp)
+		AX25Delete(pp)
 	}
 }
 

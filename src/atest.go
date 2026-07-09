@@ -116,7 +116,7 @@ func AtestMain() {
 
 	var count [MAX_SUBCHANS]int // Experiments G and H
 
-	text_color_init(1)
+	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
 
 	my_audio_config = new(audio_s)
@@ -705,16 +705,16 @@ func audio_get(a int) int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	packets_decoded_one++
 
 	if hdlc_rec_data_detect_any(channel) == 0 {
 		dcd_missing_errors++
 	}
 
-	var stemp = ax25_format_addrs(pp)
+	var stemp = AX25FormatAddrs(pp)
 
-	var info = ax25_get_info(pp)
+	var info = AX25GetInfo(pp)
 
 	/* Print so we can see what is going on. */
 
@@ -802,7 +802,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 	}
 
 	dw_printf("%s", stemp) /* stations followed by : */
-	ax25_safe_print(info, false)
+	AX25SafePrint(info, false)
 	dw_printf("\n")
 
 	/*
@@ -834,7 +834,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 		#endif
 	*/
 
-	ax25_delete(pp)
+	AX25Delete(pp)
 } /* end fake dlq_append */
 
 var dcd_start_seconds [MAX_RADIO_CHANS]float64

@@ -165,7 +165,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *showVersion {
-		text_color_init(*textColor)
+		TextColorInit(*textColor)
 		printVersion(true)
 		os.Exit(0)
 	}
@@ -560,7 +560,7 @@ x = Silence FX.25 information.`)
 	// Might want to print OS version here.   For Windows, see:
 	// https://msdn.microsoft.com/en-us/library/ms724451(v=VS.85).aspx
 
-	text_color_init(*textColor)
+	TextColorInit(*textColor)
 	printVersion(false)
 
 	setup_sigint_handler()
@@ -824,7 +824,7 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
-func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -848,9 +848,9 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		}
 	}
 
-	var stemp = ax25_format_addrs(pp)
+	var stemp = AX25FormatAddrs(pp)
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	/* Print so we can see what is going on. */
 
@@ -991,7 +991,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
-		pinfo = ax25_get_info(pp)
+		pinfo = AX25GetInfo(pp)
 
 		dw_printf("(%s)", desc)
 
@@ -999,7 +999,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print(pinfo, asciiOnly)
+			AX25SafePrint(pinfo, asciiOnly)
 			dw_printf("\n")
 		}
 	} else {
@@ -1008,7 +1008,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// more likely to have compressed data than UTF-8 text.
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
-		ax25_safe_print(pinfo, asciiOnly)
+		AX25SafePrint(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
 
@@ -1026,7 +1026,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		if hasNonPrintable {
 			text_color_set(DW_COLOR_DEBUG)
-			ax25_safe_print(pinfo, true)
+			AX25SafePrint(pinfo, true)
 			dw_printf("\n")
 		}
 	}
@@ -1123,7 +1123,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	// TODO:  Put a wrapper around this so we only call one function to send by all methods.
 	// We see the same sequence in tt_user.c.
 
-	var fbuf = ax25_pack(pp)
+	var fbuf = AX25Pack(pp)
 
 	server_send_rec_packet(channel, pp, fbuf)                                          // AGW net protocol
 	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)   // KISS TCP
@@ -1131,15 +1131,15 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
-		var ao_pp = ax25_from_text(ais_obj_packet, true)
+		var ao_pp = AX25FromText(ais_obj_packet, true)
 		if ao_pp != nil {
-			var ao_fbuf = ax25_pack(ao_pp)
+			var ao_fbuf = AX25Pack(ao_pp)
 
 			server_send_rec_packet(channel, ao_pp, ao_fbuf)
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			ax25_delete(ao_pp)
+			AX25Delete(ao_pp)
 		}
 	}
 

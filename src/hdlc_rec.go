@@ -507,7 +507,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 				    expected_fcs = fcs_calc (H.frame_buf, H.frame_len - 2);
 
 				    if (actual_fcs == expected_fcs) {
-				      alevel_t alevel = demod_get_audio_level (channel, subchannel);
+				      ALevel alevel = demod_get_audio_level (channel, subchannel);
 
 				      multi_modem_process_rec_frame (channel, subchannel, slice, H.frame_buf, H.frame_len - 2, alevel, RETRY_NONE, 0);   // len-2 to remove FCS.
 				    } else {

@@ -84,7 +84,7 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 		ws.serialPortFd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
-			ws.serialPortFd = serial_port_open(mc.waypoint_serial_port, 4800)
+			ws.serialPortFd = SerialPortOpen(mc.waypoint_serial_port, 4800)
 		} else {
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("Note: Sharing same port for GPS input and waypoint output.\n")
@@ -547,7 +547,7 @@ func (ws *WaypointSender) send(sentence []byte) {
 	var final_len = len(final)
 
 	if ws.serialPortFd != nil {
-		serial_port_write(ws.serialPortFd, final)
+		SerialPortWrite(ws.serialPortFd, final)
 	}
 
 	if ws.udpSock != nil {

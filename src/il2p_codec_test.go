@@ -35,7 +35,7 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 	var pinfo = []byte("hello world")
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
-	t.Cleanup(func() { ax25_delete(pp) })
+	t.Cleanup(func() { AX25Delete(pp) })
 
 	var encoded, elen = il2p_encode_frame(pp, 0)
 	require.Positive(t, elen)
@@ -57,7 +57,7 @@ func TestIL2PDecodeFrameJunkTrailingBytesReturnsNil(t *testing.T) {
 	var pinfo = []byte("hello world")
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
-	t.Cleanup(func() { ax25_delete(pp) })
+	t.Cleanup(func() { AX25Delete(pp) })
 
 	var encoded, elen = il2p_encode_frame(pp, 0)
 	require.Positive(t, elen)

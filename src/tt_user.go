@@ -736,7 +736,7 @@ func xmit_object_report(i int, first_time bool) {
 	/*
 	 * Convert text to packet.
 	 */
-	var pp = ax25_from_text(stemp, true)
+	var pp = AX25FromText(stemp, true)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -760,7 +760,7 @@ func xmit_object_report(i int, first_time bool) {
 	if first_time && save_tt_config_p.obj_send_to_app > 0 {
 		// TODO1.3:  Put a wrapper around this so we only call one function to send by all methods.
 		// We see the same sequence in direwolf.c.
-		var fbuf = ax25_pack(pp)
+		var fbuf = AX25Pack(pp)
 
 		server_send_rec_packet(save_tt_config_p.obj_recv_chan, pp, fbuf)
 		kissNetSvc.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
@@ -780,7 +780,7 @@ func xmit_object_report(i int, first_time bool) {
 
 		tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	} else {
-		ax25_delete(pp)
+		AX25Delete(pp)
 	}
 }
 

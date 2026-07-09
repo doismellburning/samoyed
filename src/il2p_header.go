@@ -401,7 +401,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 	SET_FEC_LEVEL(hdr, max_fec)
 	SET_HDR_TYPE(hdr, 1)
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 	if len(pinfo) > IL2P_MAX_PAYLOAD_SIZE {
 		return nil, -2
 	}

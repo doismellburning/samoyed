@@ -30,11 +30,11 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * As an extra test, change text to internal format back to
 	 * text again to make sure it comes out the same.
 	 */
-	var pp = ax25_from_text(in, true)
+	var pp = AX25FromText(in, true)
 	assert.NotNil(t, pp)
 
-	var rec = ax25_format_addrs(pp)
-	var pinfo = ax25_get_info(pp)
+	var rec = AX25FormatAddrs(pp)
+	var pinfo = AX25GetInfo(pp)
 	rec += string(pinfo)
 
 	if in != rec {
@@ -47,18 +47,18 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * again, and make sure it is still the same.
 	 */
 
-	var frame = ax25_pack(pp)
-	ax25_delete(pp)
+	var frame = AX25Pack(pp)
+	AX25Delete(pp)
 
-	var alevel alevel_t
+	var alevel ALevel
 	alevel.rec = 50
 	alevel.mark = 50
 	alevel.space = 50
 
-	pp = ax25_from_frame(frame, alevel)
+	pp = AX25FromFrame(frame, alevel)
 	assert.NotNil(t, pp)
-	rec = ax25_format_addrs(pp)
-	pinfo = ax25_get_info(pp)
+	rec = AX25FormatAddrs(pp)
+	pinfo = AX25GetInfo(pp)
 	rec += string(pinfo)
 
 	if in != rec {
@@ -85,11 +85,11 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	if result != nil {
 		dedupeService.Remember(result, 0)
-		xmit = ax25_format_addrs(result)
-		pinfo = ax25_get_info(result)
+		xmit = AX25FormatAddrs(result)
+		pinfo = AX25GetInfo(result)
 		xmit += string(pinfo)
 
-		ax25_delete(result)
+		AX25Delete(result)
 	}
 
 	text_color_set(DW_COLOR_XMIT)

@@ -258,7 +258,7 @@ func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
 	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
 	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
 
-	hex_dump(pmsg.Data[:pmsg.Header.DataLen])
+	HexDump(pmsg.Data[:pmsg.Header.DataLen])
 }
 
 /*-------------------------------------------------------------------
@@ -564,7 +564,7 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 
 			// Information if any with \r.
 
-			var pinfo = ax25_get_info(pp)
+			var pinfo = AX25GetInfo(pp)
 			var msg_data_len = len(agwpe_msg.Data) // result length so far
 
 			if len(pinfo) > 0 {
@@ -673,7 +673,7 @@ func mon_desc(pp *packet_t) (byte, string) {
 	}
 
 	// I, UI, XID, SREJ, TEST can have information part.
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	switch ftype {
 	case frame_type_I:
@@ -1210,7 +1210,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = ax25_from_text(stemp.String(), true)
+			var pp = AX25FromText(stemp.String(), true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1269,8 +1269,8 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var alevel alevel_t
-			var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
+			var alevel ALevel
+			var pp = AX25FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1490,7 +1490,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = ax25_from_text(stemp, true)
+			var pp = AX25FromText(stemp, true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)

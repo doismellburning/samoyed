@@ -77,7 +77,7 @@ import (
 
 type candidate_t struct {
 	packet_p    *packet_t
-	alevel      alevel_t
+	alevel      ALevel
 	speed_error float64     //nolint:unused
 	fec_type    fec_type_t  // Type of FEC: none(0), fx25, il2p
 	retries     BitFixLevel // For the old "fix bits" strategy, this is the
@@ -251,7 +251,7 @@ func multi_modem_process_sample(channel int, audio_sample int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -278,16 +278,16 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 		// if it happens to get onto RF somehow.
 
 		var monfmt = fmt.Sprintf("AIS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_AIS, string(nmea))
-		pp = ax25_from_text(monfmt, true)
+		pp = AX25FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	case MODEM_EAS:
 		var monfmt = fmt.Sprintf("EAS>%s%1d%1d,NOGATE:{%c%c%s", APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, USER_DEF_USER_ID, USER_DEF_TYPE_EAS, string(fbuf))
-		pp = ax25_from_text(monfmt, true)
+		pp = AX25FromText(monfmt, true)
 
 		// alevel gets in there somehow making me question why it is passed thru here.
 	default:
-		pp = ax25_from_frame(fbuf, alevel)
+		pp = AX25FromFrame(fbuf, alevel)
 	}
 
 	multi_modem_process_rec_packet(channel, subchan, slice, pp, alevel, retries, fec_type)
@@ -295,7 +295,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected internal problem in multi_modem_process_rec_packet_real\n")
@@ -327,7 +327,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 		}
 
 		if drop_it {
-			ax25_delete(pp)
+			AX25Delete(pp)
 		} else {
 			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
@@ -341,7 +341,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 	if candidate[channel][subchan][slice].packet_p != nil {
 		/* Plain old AX.25: Oops!  Didn't expect it to be there. */
 		/* FX.25: Quietly replace anything already there.  It will have priority. */
-		ax25_delete(candidate[channel][subchan][slice].packet_p)
+		AX25Delete(candidate[channel][subchan][slice].packet_p)
 		candidate[channel][subchan][slice].packet_p = nil
 	}
 
@@ -511,7 +511,7 @@ func pick_best_candidate(channel int) {
 
 		var k = slice_from_n(channel, n)
 		if n != best_n && candidate[channel][j][k].packet_p != nil {
-			ax25_delete(candidate[channel][j][k].packet_p)
+			AX25Delete(candidate[channel][j][k].packet_p)
 			candidate[channel][j][k].packet_p = nil
 		}
 	}
@@ -538,7 +538,7 @@ func pick_best_candidate(channel int) {
 	}
 
 	if drop_it {
-		ax25_delete(candidate[channel][j][k].packet_p)
+		AX25Delete(candidate[channel][j][k].packet_p)
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)

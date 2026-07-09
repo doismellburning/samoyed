@@ -28,7 +28,7 @@ func TestIL2PSendFrameCRCDefaultMatchesEnabled(t *testing.T) {
 	var pinfo = []byte("hello")
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
-	t.Cleanup(func() { ax25_delete(pp) })
+	t.Cleanup(func() { AX25Delete(pp) })
 
 	// Compute expected bits: preamble(1B) + sync(3B) + encoded-with-CRC.
 	var _, lenWithCRC = il2p_encode_frame(pp, 0, true)
