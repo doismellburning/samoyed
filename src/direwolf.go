@@ -999,7 +999,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
 		} else {
-			ax25_safe_print(pinfo, asciiOnly)
+			AX25SafePrint(pinfo, asciiOnly)
 			dw_printf("\n")
 		}
 	} else {
@@ -1008,7 +1008,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// more likely to have compressed data than UTF-8 text.
 
 		// TODO: Might want to use d_u_opt for transmitted frames too.
-		ax25_safe_print(pinfo, asciiOnly)
+		AX25SafePrint(pinfo, asciiOnly)
 		dw_printf("\n")
 	}
 
@@ -1026,7 +1026,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		if hasNonPrintable {
 			text_color_set(DW_COLOR_DEBUG)
-			ax25_safe_print(pinfo, true)
+			AX25SafePrint(pinfo, true)
 			dw_printf("\n")
 		}
 	}

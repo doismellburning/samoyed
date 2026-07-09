@@ -802,7 +802,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 	}
 
 	dw_printf("%s", stemp) /* stations followed by : */
-	ax25_safe_print(info, false)
+	AX25SafePrint(info, false)
 	dw_printf("\n")
 
 	/*

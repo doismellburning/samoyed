@@ -20,7 +20,3 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 func AX25GetInfo(pp *packet_t) []byte {
 	return ax25_get_info(pp)
 }
-
-func AX25SafePrint(info []byte, asciiOnly bool) {
-	ax25_safe_print(info, asciiOnly)
-}

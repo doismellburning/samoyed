@@ -646,7 +646,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 	   #if DEBUG14H
 	   	text_color_set(DW_COLOR_DEBUG);
 	   	dw_printf ("BEFORE: %s\nSAFE:   ", pinfo);
-	   	ax25_safe_print (pinfo, -1, 0);
+	   	AX25SafePrint (pinfo, -1, 0);
 	   	dw_printf ("\n");
 	   #endif
 	*/
@@ -681,7 +681,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
 		#if DEBUG14H
 			text_color_set(DW_COLOR_DEBUG);
 			dw_printf ("AFTER:  %s\nSAFE:   ", info_part);
-			ax25_safe_print (info_part, info_len, 0);
+			AX25SafePrint (info_part, info_len, 0);
 			dw_printf ("\n");
 		#endif
 	*/
@@ -2767,7 +2767,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_safe_print
+ * Function:	AX25SafePrint
  *
  * Purpose:	Print given string, changing non printable characters to
  *		hexadecimal notation.   Note that character values
@@ -2808,7 +2808,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 
 const MAXSAFE = AX25_MAX_INFO_LEN
 
-func ax25_safe_print(info []byte, ascii_only bool) {
+func AX25SafePrint(info []byte, ascii_only bool) {
 	if len(info) > MAXSAFE {
 		info = info[:MAXSAFE]
 	}
@@ -2836,7 +2836,7 @@ func ax25_safe_print(info []byte, ascii_only bool) {
 	// TODO1.2: should return string rather printing to remove a race condition.
 
 	dw_printf("%s", safe_str.String())
-} /* end ax25_safe_print */
+} /* end AX25SafePrint */
 
 /*------------------------------------------------------------------
  *

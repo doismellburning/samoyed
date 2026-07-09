@@ -88,7 +88,7 @@ func DecodeAPRSMain() {
 func DecodeAPRSLine(line string) {
 	/* Try to process it. */
 	fmt.Printf("\n")
-	ax25_safe_print([]byte(line), false)
+	AX25SafePrint([]byte(line), false)
 	fmt.Printf("\n")
 
 	// Do we have monitor format, KISS, or AX.25 frame?
@@ -161,7 +161,7 @@ func DecodeAPRSLine(line string) {
 			fmt.Printf("%s", addrs)
 
 			var info = ax25_get_info(pp)
-			ax25_safe_print(info, true) // Display non-ASCII to hexadecimal.
+			AX25SafePrint(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
 			var A = decode_aprs(pp, false, "") // Extract information into structure.

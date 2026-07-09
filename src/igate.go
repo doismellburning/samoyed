@@ -819,7 +819,7 @@ func send_msg_to_server(imsg string) {
 	if s_debug >= 1 {
 		text_color_set(DW_COLOR_XMIT)
 		dw_printf("[rx>ig] ")
-		ax25_safe_print([]byte(imsg), false)
+		AX25SafePrint([]byte(imsg), false)
 		dw_printf("\n")
 	}
 
@@ -969,7 +969,7 @@ func igate_recv_thread() {
 			if !ok_to_send {
 				text_color_set(DW_COLOR_REC)
 				dw_printf("[ig] ")
-				ax25_safe_print(message, false)
+				AX25SafePrint(message, false)
 				dw_printf("\n")
 			}
 		} else {
@@ -982,7 +982,7 @@ func igate_recv_thread() {
 			 */
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\n[ig>tx] ") // formerly just [ig]
-			ax25_safe_print(message, false)
+			AX25SafePrint(message, false)
 			dw_printf("\n")
 
 			if bytes.Contains(message, []byte{0}) {
