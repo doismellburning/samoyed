@@ -29,6 +29,7 @@ import (
 	"unicode"
 
 	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/lestrrat-go/strftime"
 	"github.com/pkg/term"
 	"github.com/spf13/pflag"
 )
@@ -535,7 +536,8 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 			// Like [0] or [2 12:34:56]
 
 			if len(timestamp_format) > 0 {
-				prefix = fmt.Sprintf("[%d %s]", channel, time.Now().Format(timestamp_format)) // TODO Go's formatting is not strftime-y, so this breaks compatibility slightly, but eh
+				var formattedTime, _ = strftime.Format(timestamp_format, time.Now())
+				prefix = fmt.Sprintf("[%d %s]", channel, formattedTime)
 			} else {
 				prefix = fmt.Sprintf("[%d]", channel)
 			}
