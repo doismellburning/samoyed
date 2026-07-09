@@ -204,7 +204,7 @@ type decode_aprs_t struct {
 
 func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	//dw_printf ("DEBUG decode_aprs info=\"%s\"\n", pinfo);
 

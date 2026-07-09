@@ -58,7 +58,7 @@ func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int,
 
 	// Does it have the the expected content?
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 	Assert(len(il2pTestText) == len(pinfo))
 	Assert(il2pTestText == string(pinfo))
 

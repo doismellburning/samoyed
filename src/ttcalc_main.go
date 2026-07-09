@@ -91,7 +91,7 @@ func TTCalcMain() {
 
 			var result = AX25FormatAddrs(pp)
 
-			var pinfo = ax25_get_info(pp)
+			var pinfo = AX25GetInfo(pp)
 
 			fmt.Printf("[%d] %s%s\n", channel, result, string(pinfo))
 

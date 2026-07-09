@@ -239,7 +239,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			var alevel ALevel
 			var pp = AX25FromFrame(data[1:mon_cmd.DataLen], alevel)
 			var result = AX25FormatAddrs(pp)
-			var info = ax25_get_info(pp)
+			var info = AX25GetInfo(pp)
 
 			var fullResult = result + string(info)
 			packetChan <- fullResult

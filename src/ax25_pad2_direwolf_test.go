@@ -214,7 +214,7 @@ func check_ax25_i_frame(t *testing.T, packet *packet_t, cr cmdres_t, pf int, nr 
 
 	dw_printf("check: ftype=%d, desc=\"%s\", pf=%d, nr=%d, ns=%d\n", check_ftype, check_desc, check_pf, check_nr, check_ns)
 
-	var check_info = ax25_get_info(packet)
+	var check_info = AX25GetInfo(packet)
 
 	assert.Equal(t, cr, check_cr)
 	assert.Equal(t, frame_type_I, check_ftype)

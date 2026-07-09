@@ -850,7 +850,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	var stemp = AX25FormatAddrs(pp)
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	/* Print so we can see what is going on. */
 
@@ -991,7 +991,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		var _, desc, _, _, _, ftype = ax25_frame_type(pp)
 
 		/* Could change by 1, since earlier call, if we guess at modulo 128. */
-		pinfo = ax25_get_info(pp)
+		pinfo = AX25GetInfo(pp)
 
 		dw_printf("(%s)", desc)
 

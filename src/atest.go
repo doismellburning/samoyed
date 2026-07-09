@@ -714,7 +714,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 	var stemp = AX25FormatAddrs(pp)
 
-	var info = ax25_get_info(pp)
+	var info = AX25GetInfo(pp)
 
 	/* Print so we can see what is going on. */
 

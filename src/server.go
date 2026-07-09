@@ -564,7 +564,7 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 
 			// Information if any with \r.
 
-			var pinfo = ax25_get_info(pp)
+			var pinfo = AX25GetInfo(pp)
 			var msg_data_len = len(agwpe_msg.Data) // result length so far
 
 			if len(pinfo) > 0 {
@@ -673,7 +673,7 @@ func mon_desc(pp *packet_t) (byte, string) {
 	}
 
 	// I, UI, XID, SREJ, TEST can have information part.
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	switch ftype {
 	case frame_type_I:

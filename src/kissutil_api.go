@@ -8,7 +8,3 @@ package direwolf
 func AX25Delete(pp *packet_t) {
 	ax25_delete(pp)
 }
-
-func AX25GetInfo(pp *packet_t) []byte {
-	return ax25_get_info(pp)
-}

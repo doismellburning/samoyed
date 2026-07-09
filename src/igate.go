@@ -592,7 +592,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 		}
 	}
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	/*
 	 * Someone around here occasionally sends a packet with no information part.
@@ -643,7 +643,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
  *--------------------------------------------------------------------*/
 
 func send_packet_to_server(pp *packet_t, channel int) {
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	/*
 	 * We will often see the same packet multiple times close together due to digipeating.
@@ -1341,7 +1341,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	// TODO: Not quite this simple.  Should have a function to check for position.
 	// $ raw gps could be a position.  @ could be weather data depending on symbol.
 
-	var pinfo = ax25_get_info(pp3)
+	var pinfo = AX25GetInfo(pp3)
 
 	var msp_special_case = false
 
@@ -1573,7 +1573,7 @@ func rx_to_ig_remember(pp *packet_t) {
 	if s_debug >= 3 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_remember [%d] = %s %d \"%s>%s:%s\"\n",
@@ -1596,7 +1596,7 @@ func rx_to_ig_allow(pp *packet_t) bool {
 	if s_debug >= 2 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("rx_to_ig_allow? %d \"%s>%s:%s\"\n", crc, src, dest, string(pinfo))
@@ -1865,7 +1865,7 @@ func ig_to_tx_remember(pp *packet_t, channel int, bydigi int) {
 	if s_debug >= 3 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
 		var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_remember [%d] = ch%d d%d %s %d \"%s>%s:%s\"\n",
@@ -1890,7 +1890,7 @@ func ig_to_tx_allow(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
 
-	var pinfo = ax25_get_info(pp)
+	var pinfo = AX25GetInfo(pp)
 
 	if s_debug >= 2 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)

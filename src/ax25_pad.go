@@ -1054,7 +1054,7 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 		return (nil)
 	}
 
-	var info = ax25_get_info(from_pp)
+	var info = AX25GetInfo(from_pp)
 
 	// Want strict because addresses should conform to AX.25 here.
 	// That's not the case for something from an Internet Server.
@@ -1687,7 +1687,7 @@ func ax25_get_rr(this_p *packet_t, n int) int {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_get_info
+ * Name:	AX25GetInfo
  *
  * Purpose:	Obtain Information part of current packet.
  *
@@ -1701,7 +1701,7 @@ func ax25_get_rr(this_p *packet_t, n int) int {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_get_info(this_p *packet_t) []byte {
+func AX25GetInfo(this_p *packet_t) []byte {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
@@ -1712,10 +1712,10 @@ func ax25_get_info(this_p *packet_t) []byte {
 		/* Not AX.25.  Treat Whole packet as info. */
 		return ax25_get_frame_data(this_p)
 	}
-} /* end ax25_get_info */
+} /* end AX25GetInfo */
 
 func ax25_set_info(this_p *packet_t, new_info []byte) {
-	var old_info = ax25_get_info(this_p)
+	var old_info = AX25GetInfo(this_p)
 	this_p.frame_len -= len(old_info)
 
 	if len(new_info) > AX25_MAX_INFO_LEN {
@@ -1751,7 +1751,7 @@ func ax25_cut_at_crlf(this_p *packet_t) int {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 
-	var info = ax25_get_info(this_p)
+	var info = AX25GetInfo(this_p)
 
 	for j, b := range info {
 		if b == '\r' || b == '\n' {
@@ -2711,7 +2711,7 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 
 	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
-	var info = ax25_get_info(pp)
+	var info = AX25GetInfo(pp)
 
 	for len(info) >= 1 && (info[len(info)-1] == '\r' ||
 		info[len(info)-1] == '\n' ||

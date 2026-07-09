@@ -160,7 +160,7 @@ func DecodeAPRSLine(line string) {
 			var addrs = AX25FormatAddrs(pp)
 			fmt.Printf("%s", addrs)
 
-			var info = ax25_get_info(pp)
+			var info = AX25GetInfo(pp)
 			AX25SafePrint(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 

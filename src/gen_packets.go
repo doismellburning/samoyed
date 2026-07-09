@@ -835,7 +835,7 @@ func send_packet(str string) {
 			return
 		}
 
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 		if len(pinfo) >= 3 && strings.HasPrefix(string(pinfo), "{DE") {
 			pinfo = pinfo[3:]
 		}

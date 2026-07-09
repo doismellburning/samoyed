@@ -67,7 +67,7 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
 		}
 
 		// Payload is AX.25 info part.
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		var encodedPayload, k = il2p_encode_payload(pinfo, max_fec)
 		if k > 0 {

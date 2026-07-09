@@ -19,14 +19,14 @@ func Test_ax25_unwrap_third_party(t *testing.T) {
 
 func Test_ax25_set_info(t *testing.T) {
 	var p = AX25FromText("D>E,F:info", true)
-	var initialInfo = ax25_get_info(p)
+	var initialInfo = AX25GetInfo(p)
 	assert.Equal(t, "info", string(initialInfo)) // Make sure I set this up right!
 
 	var s = "badger"
 	ax25_set_info(p, []byte(s))
 
 	// Check info updated
-	var newInfo = ax25_get_info(p)
+	var newInfo = AX25GetInfo(p)
 	assert.Equal(t, s, string(newInfo))
 
 	// Make sure we didn't break stuff along the way

@@ -145,7 +145,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	/* TODO KG
 	#if DEBUG
 		unsigned char *pinfo;
-		int info_len = ax25_get_info (pp, &pinfo);
+		int info_len = AX25GetInfo (pp, &pinfo);
 		if (info_len > 10) info_len = 10;
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("tq_append (channel=%d, prio=%d, pp=%p) \"%*s\"\n", channel, prio, pp, info_len, (char*)pinfo);
@@ -185,7 +185,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 		// Formated addresses.
 		var stemp = AX25FormatAddrs(pp)
-		var pinfo = ax25_get_info(pp)
+		var pinfo = AX25GetInfo(pp)
 
 		text_color_set(DW_COLOR_XMIT)
 
@@ -381,7 +381,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	/* TODO KG
 	#if DEBUG
 		unsigned char *pinfo;
-		int info_len = ax25_get_info (pp, &pinfo);
+		int info_len = AX25GetInfo (pp, &pinfo);
 		if (info_len > 10) info_len = 10;
 		text_color_set(DW_COLOR_DEBUG);
 		dw_printf ("lm_data_request (channel=%d, prio=%d, pp=%p) \"%*s\"\n", channel, prio, pp, info_len, (char*)pinfo);

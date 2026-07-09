@@ -589,7 +589,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		result = filt_t(pf)
 
 		if pfilter_debug >= 2 {
-			var infop = ax25_get_info(pf.pp)
+			var infop = AX25GetInfo(pf.pp)
 
 			if len(infop) > 0 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -734,7 +734,7 @@ func filt_bodgu(pf *pfstate_t, arg string) int {
 
 func filt_t(pf *pfstate_t) int {
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
-	var infop = ax25_get_info(pf.pp)
+	var infop = AX25GetInfo(pf.pp)
 
 	Assert(len(infop) > 0)
 
