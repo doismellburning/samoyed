@@ -297,7 +297,7 @@ func test_example_headers(t *testing.T) {
 	var header1 = []byte{0x2b, 0xa1, 0x12, 0x24, 0x25, 0x77, 0x6b, 0x2b, 0x54, 0x68, 0x25, 0x2a, 0x27}
 	var alevel ALevel
 
-	var pp = ax25_from_frame(example1, alevel)
+	var pp = AX25FromFrame(example1, alevel)
 	assert.NotNil(t, pp)
 	var header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
@@ -368,7 +368,7 @@ func test_example_headers(t *testing.T) {
 	var header2 = []byte{0x63, 0xf1, 0x40, 0x40, 0x40, 0x00, 0x6b, 0x2b, 0x54, 0x28, 0x25, 0x2a, 0x0f}
 	alevel = ALevel{} //nolint:exhaustruct
 
-	pp = ax25_from_frame(example2, alevel)
+	pp = AX25FromFrame(example2, alevel)
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
@@ -446,7 +446,7 @@ func test_example_headers(t *testing.T) {
 	var complete3 = []byte{0x26, 0x13, 0x6d, 0x02, 0x8c, 0xfe, 0xfb, 0xe8, 0xaa, 0x94, 0x2d, 0x6a, 0x34, 0x43, 0x35, 0x3c, 0x69, 0x9f, 0x0c, 0x75, 0x5a, 0x38, 0xa1, 0x7f, 0xf3, 0xfc}
 	alevel = ALevel{} //nolint:exhaustruct
 
-	pp = ax25_from_frame(example3, alevel)
+	pp = AX25FromFrame(example3, alevel)
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 9, e)
@@ -502,7 +502,7 @@ func test_example_headers(t *testing.T) {
 
 	// Example 3 again, this time the Information part is included.
 
-	pp = ax25_from_frame(example3, alevel)
+	pp = AX25FromFrame(example3, alevel)
 	assert.NotNil(t, pp)
 
 	var max_fec = 0

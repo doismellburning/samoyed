@@ -258,7 +258,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected 
 		// I think alevel gets filled in somewhere later making
 		// this redundant.
 
-		var pp = ax25_from_frame(extracted, alevel)
+		var pp = AX25FromFrame(extracted, alevel)
 
 		return (pp)
 	}

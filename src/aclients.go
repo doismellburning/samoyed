@@ -237,7 +237,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 			use_chan = int(mon_cmd.Portx)
 			var alevel ALevel
-			var pp = ax25_from_frame(data[1:mon_cmd.DataLen], alevel)
+			var pp = AX25FromFrame(data[1:mon_cmd.DataLen], alevel)
 			var result = AX25FormatAddrs(pp)
 			var info = ax25_get_info(pp)
 

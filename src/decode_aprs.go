@@ -11,7 +11,7 @@ package direwolf
  *		This is a fairly complete implementation with error messages
  *		pointing out various specification violations.
  *
- * Assumptions:	ax25_from_frame() has been called to
+ * Assumptions:	AX25FromFrame() has been called to
  *		separate the header and information.
  *
  *------------------------------------------------------------------*/

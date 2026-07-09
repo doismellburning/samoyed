@@ -1270,7 +1270,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			}
 
 			var alevel ALevel
-			var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
+			var pp = AX25FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)

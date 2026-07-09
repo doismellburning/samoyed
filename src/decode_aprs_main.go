@@ -151,7 +151,7 @@ func DecodeAPRSLine(line string) {
 
 		var alevel ALevel
 
-		var pp = ax25_from_frame(bytes, alevel)
+		var pp = AX25FromFrame(bytes, alevel)
 		if pp != nil {
 			fmt.Printf("--- AX.25 frame ---\n")
 			ax25_hex_dump(pp)
