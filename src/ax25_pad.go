@@ -713,7 +713,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func AX25FromFrame(data []byte, alevel ALevel) *packet_t { //nolint:unparam
+func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 	/*
 	 * First make sure we have an acceptable length:
 	 *
