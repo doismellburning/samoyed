@@ -11,14 +11,14 @@ func Test_ax25_unwrap_third_party(t *testing.T) {
 	// Example: Input:      A>B,C:}D>E,F:info
 	// Output:     D>E,F:info
 	// (Except because we're using AX25FormatAddrs, the info part isn't shown)
-	var pp = ax25_from_text("A>B,C:}D>E,F:info", true)
+	var pp = AX25FromText("A>B,C:}D>E,F:info", true)
 	var pp2 = ax25_unwrap_third_party(pp)
 	var addrs = AX25FormatAddrs(pp2)
 	assert.Equal(t, "D>E,F:", addrs)
 }
 
 func Test_ax25_set_info(t *testing.T) {
-	var p = ax25_from_text("D>E,F:info", true)
+	var p = AX25FromText("D>E,F:info", true)
 	var initialInfo = ax25_get_info(p)
 	assert.Equal(t, "info", string(initialInfo)) // Make sure I set this up right!
 

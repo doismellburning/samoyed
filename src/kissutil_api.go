@@ -5,10 +5,6 @@ package direwolf
 // the KISS/AX.25 handling with the rest of direwolf without pulling the
 // whole kissutil CLI into the package.
 
-func AX25FromText(monitor string, strict bool) *packet_t {
-	return ax25_from_text(monitor, strict)
-}
-
 func AX25Delete(pp *packet_t) {
 	ax25_delete(pp)
 }

@@ -1131,7 +1131,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
-		var ao_pp = ax25_from_text(ais_obj_packet, true)
+		var ao_pp = AX25FromText(ais_obj_packet, true)
 		if ao_pp != nil {
 			var ao_fbuf = AX25Pack(ao_pp)
 

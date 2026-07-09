@@ -30,7 +30,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	 * As an extra test, change text to internal format back to
 	 * text again to make sure it comes out the same.
 	 */
-	var pp = ax25_from_text(in, true)
+	var pp = AX25FromText(in, true)
 	assert.NotNil(t, pp)
 
 	var rec = AX25FormatAddrs(pp)

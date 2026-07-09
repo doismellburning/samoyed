@@ -760,7 +760,7 @@ func test_serdes(t *testing.T) {
 		} else {
 			packet = fmt.Sprintf("%s:%s", addrs3, il2pTestText)
 		}
-		var pp = ax25_from_text(packet, true)
+		var pp = AX25FromText(packet, true)
 		assert.NotNil(t, pp)
 
 		var channel = 0

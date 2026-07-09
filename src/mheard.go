@@ -315,13 +315,13 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 
 	// It is possible that source won't adhere to the AX.25 restrictions.
 	// So we simply extract the source address, as text, from the beginning rather than
-	// using ax25_from_text() and ax25_get_addr_with_ssid().
+	// using AX25FromText() and ax25_get_addr_with_ssid().
 
 	var source, _, _ = strings.Cut(ptext, ">")
 
 	/*
 	    * Keep this here in case I want to revive it to get location.
-	   	packet_t pp = ax25_from_text(ptext, 0);
+	   	packet_t pp = AX25FromText(ptext, 0);
 
 	   	if (pp == nil) {
 	   	  if (mheard_debug) {

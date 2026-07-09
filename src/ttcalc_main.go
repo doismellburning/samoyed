@@ -115,7 +115,7 @@ func TTCalcMain() {
 				 * Notice that the special destination will cause it to be spoken.
 				 */
 				var reply_text = fmt.Sprintf("N0CALL>SPEECH:%d", n)
-				var reply_pp = ax25_from_text(reply_text, true)
+				var reply_pp = AX25FromText(reply_text, true)
 
 				/*
 				 * Send it to the TNC.

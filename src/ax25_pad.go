@@ -133,7 +133,7 @@ package direwolf
  *
  *
  * Constructors: ax25_init		- Clear everything.
- *		ax25_from_text		- Tear apart a text string
+ *		AX25FromText		- Tear apart a text string
  *		AX25FromFrame		- Tear apart an AX.25 frame.
  *					  Must be called before any other function.
  *
@@ -419,7 +419,7 @@ func ax25_delete(this_p *packet_t) {
 
 /*------------------------------------------------------------------------------
  *
- * Name:	ax25_from_text
+ * Name:	AX25FromText
  *
  * Purpose:	Parse a frame in human-readable monitoring format and change
  *		to internal representation.
@@ -466,13 +466,13 @@ func ax25_delete(this_p *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_text(monitor string, strict bool) *packet_t {
+func AX25FromText(monitor string, strict bool) *packet_t {
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
 	 */
 
 	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("DEBUG: ax25_from_text ('%s', %d)\n", monitor, strict);
+	// dw_printf ("DEBUG: AX25FromText ('%s', %d)\n", monitor, strict);
 	// fflush(stdout); sleep(1);
 	var this_p = ax25_new()
 
@@ -1059,7 +1059,7 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 	// Want strict because addresses should conform to AX.25 here.
 	// That's not the case for something from an Internet Server.
 
-	var result_pp = ax25_from_text(string(info[1:]), true)
+	var result_pp = AX25FromText(string(info[1:]), true)
 
 	return (result_pp)
 }
@@ -1078,9 +1078,9 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *
  *		ad	- Address with optional dash and substation id.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
- * TODO:  	ax25_from_text could use this.
+ * TODO:  	AX25FromText could use this.
  *
  * Returns:	None.
  *
@@ -1157,7 +1157,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *
  * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	None.
  *
@@ -1234,7 +1234,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *
  * Bugs:	Little validity or bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	None.
  *
@@ -1273,7 +1273,7 @@ func ax25_remove_addr(this_p *packet_t, n int) {
  *
  * Purpose:	Return number of addresses in current packet.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Number of addresses in the current packet.
  *		Should be in the range of 2 .. AX25_MAX_ADDRS.
@@ -1319,7 +1319,7 @@ func ax25_get_num_addr(this_p *packet_t) int {
  *
  * Purpose:	Return number of repeater addresses in current packet.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Number of addresses in the current packet - 2.
  *		Should be in the range of 0 .. AX25_MAX_ADDRS - 2.
@@ -1353,7 +1353,7 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Character string in usual human readable format,
  *
@@ -1427,7 +1427,7 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Character string in usual human readable format,
  *
@@ -1484,7 +1484,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
  * Inputs:	n	- Index of address.   Use the symbols
  *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	Substation id, as integer 0 .. 15.
  *
@@ -1515,7 +1515,7 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
  *
  *		ssid	- New SSID.  Must be in range of 0 to 15.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Bugs:	Rewrite to keep call and SSID separate internally.
  *
@@ -1545,7 +1545,7 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	True or false.
  *
@@ -1577,7 +1577,7 @@ func ax25_get_h(this_p *packet_t, n int) int {
  *
  * Bugs:	No bounds checking is performed.  Be careful.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	None
  *
@@ -1604,7 +1604,7 @@ func ax25_set_h(this_p *packet_t, n int) {
  * Inputs:	none
  *
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	If any of the digipeaters have the has-been-repeated bit set,
  *		return the index of the last one.  Otherwise return index for source.
@@ -1636,7 +1636,7 @@ func ax25_get_heard(this_p *packet_t) int {
  * Inputs:	none
  *
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	In range of X25_REPEATER_1 .. X25_REPEATER_8 or -1 if none.
  *
@@ -1696,7 +1696,7 @@ func ax25_get_rr(this_p *packet_t, n int) int {
  * Returns:	paddr	- Byte slice of the information part
  *		Should have length in the range of AX25_MIN_INFO_LEN .. AX25_MAX_INFO_LEN.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  *
  *------------------------------------------------------------------------------*/
@@ -1743,7 +1743,7 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
  * Returns:	Number of characters removed from the end.
  *		0 if not changed.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  *------------------------------------------------------------------------------*/
 
@@ -1774,7 +1774,7 @@ func ax25_cut_at_crlf(this_p *packet_t) int {
  *
  * Inputs:	None.
  *
- * Assumption:	ax25_from_text or AX25FromFrame was called first.
+ * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
  * Returns:	First byte from the information part.
  *
@@ -2788,7 +2788,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
  *		For example, a Line Feed character will appear as <0x0a>
  *		rather than dropping down to the next line on the screen.
  *
- *		ax25_from_text can accept this format.
+ *		AX25FromText can accept this format.
  *
  *
  * Example:	W1MED-1>T2QP0S,N1OHZ,N8VIM*,WIDE1-1:'cQBl <0x1c>-/]<0x0d>

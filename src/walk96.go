@@ -106,10 +106,10 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	 * Convert it into AX.25 frame.
 	 */
 
-	var pp = ax25_from_text(position_report, true)
+	var pp = AX25FromText(position_report, true)
 
 	if pp == nil {
-		fmt.Printf("Unexpected error in ax25_from_text.  Quitting.\n")
+		fmt.Printf("Unexpected error in AX25FromText.  Quitting.\n")
 		os.Exit(1)
 	}
 

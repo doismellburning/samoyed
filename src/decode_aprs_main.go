@@ -45,7 +45,7 @@ package direwolf
  *		                                                       ||||||
  *		What does findu.com do in this case?
  *
- *		ax25_from_text recognizes this representation so it can be used
+ *		AX25FromText recognizes this representation so it can be used
  *		to decode raw data later.
  *
  * TODO:	To make it more useful,
@@ -176,7 +176,7 @@ func DecodeAPRSLine(line string) {
 		}
 	} else {
 		// Normal monitoring format.
-		var pp = ax25_from_text(line, true)
+		var pp = AX25FromText(line, true)
 		if pp != nil {
 			var A = decode_aprs(pp, false, "") // Extract information into structure.
 

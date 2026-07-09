@@ -1210,7 +1210,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = ax25_from_text(stemp.String(), true)
+			var pp = AX25FromText(stemp.String(), true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
@@ -1490,7 +1490,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			//text_color_set(DW_COLOR_DEBUG);
 			//dw_printf ("Transmit '%s'\n", stemp);
 
-			var pp = ax25_from_text(stemp, true)
+			var pp = AX25FromText(stemp, true)
 
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)

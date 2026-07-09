@@ -736,7 +736,7 @@ func xmit_object_report(i int, first_time bool) {
 	/*
 	 * Convert text to packet.
 	 */
-	var pp = ax25_from_text(stemp, true)
+	var pp = AX25FromText(stemp, true)
 
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)

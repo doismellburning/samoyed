@@ -911,7 +911,7 @@ func igate_recv_thread() {
 			stats_downlink_bytes++
 
 			// I never expected to see a nul character but it can happen.
-			// If found, change it to <0x00> and ax25_from_text will change it back to a single byte.
+			// If found, change it to <0x00> and AX25FromText will change it back to a single byte.
 			// Along the way we can use the normal C string handling.
 
 			if ch == 0 {
@@ -1043,7 +1043,7 @@ func igate_recv_thread() {
 
 				var stemp = append([]byte("X>X:}"), message...)
 
-				var pp3 = ax25_from_text(string(stemp), false)
+				var pp3 = AX25FromText(string(stemp), false)
 				if pp3 != nil {
 					var alevel ALevel
 					alevel.mark = -2 // FIXME: Do we want some other special case?
@@ -1269,7 +1269,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	 * Potential Bug:  Up to 8 digipeaters are allowed in radio format.
 	 * Is there a possibility of finding a larger number here?
 	 */
-	var pp3 = ax25_from_text(string(message), false)
+	var pp3 = AX25FromText(string(message), false)
 	if pp3 == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Tx IGate: Could not parse message from server.\n")
@@ -1442,7 +1442,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			save_igate_config_p.tx_via,
 			payload)
 
-		var pradio = ax25_from_text(radio, true)
+		var pradio = AX25FromText(radio, true)
 		if pradio != nil {
 			/* TODO KG
 			#if ITEST

@@ -151,7 +151,7 @@ var saveRFWithPosUnknown = &decode_aprs_t{ //nolint:exhaustruct
 
 func TestMHeardDBSaveRFNewStation(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 
@@ -165,7 +165,7 @@ func TestMHeardDBSaveRFNewStation(t *testing.T) {
 
 func TestMHeardDBSaveRFPositionSaved(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 
 	mdb.SaveRF(0, saveRFWithPos, pp, saveRFAlevel, RETRY_NONE)
 
@@ -176,7 +176,7 @@ func TestMHeardDBSaveRFPositionSaved(t *testing.T) {
 
 func TestMHeardDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 
@@ -185,7 +185,7 @@ func TestMHeardDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
 
 func TestMHeardDBSaveRFUnknownPositionNotSaved(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 
 	mdb.SaveRF(0, saveRFWithPosUnknown, pp, saveRFAlevel, RETRY_NONE)
 
@@ -194,7 +194,7 @@ func TestMHeardDBSaveRFUnknownPositionNotSaved(t *testing.T) {
 
 func TestMHeardDBSaveRFExistingStationUpdated(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 	// Push the last-heard time back so the 15-second same-transmission guard doesn't fire.
@@ -209,12 +209,12 @@ func TestMHeardDBSaveRFHigherHopSkippedWithin15s(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 
 	// First: heard directly (0 hops).
-	var ppDirect = ax25_from_text("W1AW>APRS:test", true)
+	var ppDirect = AX25FromText("W1AW>APRS:test", true)
 	mdb.SaveRF(0, saveRFNoPos, ppDirect, saveRFAlevel, RETRY_NONE)
 	assert.Equal(t, 0, mdb.db["W1AW"].num_digi_hops)
 
 	// Second: heard via one digipeater, but within 15 seconds of the first.
-	var ppVia = ax25_from_text("W1AW>APRS,RELAY*:test", true)
+	var ppVia = AX25FromText("W1AW>APRS,RELAY*:test", true)
 	mdb.SaveRF(0, saveRFNoPos, ppVia, saveRFAlevel, RETRY_NONE)
 
 	// Should stay at 1 count and 0 hops (the higher-hop copy is ignored).
@@ -226,7 +226,7 @@ func TestMHeardDBSaveRFWideHopHackReducesCount(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	// W3AW* (used, len 4 – not WIDE) then WIDE2* (used, len 5, WIDE prefix, ssid 0).
 	// Raw hops = 2, hack reduces by one → hops = 1.
-	var pp = ax25_from_text("W1AW>APRS,W3AW*,WIDE2*:test", true)
+	var pp = AX25FromText("W1AW>APRS,W3AW*,WIDE2*:test", true)
 
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 
@@ -237,7 +237,7 @@ func TestMHeardDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	// WIDE1-1 has ssid 1, so the hack must not fire.
 	// Raw hops = 2 and nothing should be reduced.
-	var pp = ax25_from_text("W1AW>APRS,W3AW*,WIDE1-1*:test", true)
+	var pp = AX25FromText("W1AW>APRS,W3AW*,WIDE1-1*:test", true)
 
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 
@@ -247,17 +247,17 @@ func TestMHeardDBSaveRFWideHackIgnoresNonZeroSsid(t *testing.T) {
 func TestMHeardDBSaveRFDebug1SkipBranch(t *testing.T) {
 	// debug=1 + higher-hop copy within 15 s → exercises the "skip" debug message.
 	var mdb = NewMHeardDB(1)
-	var ppDirect = ax25_from_text("W1AW>APRS:test", true)
+	var ppDirect = AX25FromText("W1AW>APRS:test", true)
 	mdb.SaveRF(0, saveRFNoPos, ppDirect, saveRFAlevel, RETRY_NONE)
 
-	var ppVia = ax25_from_text("W1AW>APRS,RELAY*:test", true)
+	var ppVia = AX25FromText("W1AW>APRS,RELAY*:test", true)
 	mdb.SaveRF(0, saveRFNoPos, ppVia, saveRFAlevel, RETRY_NONE)
 }
 
 func TestMHeardDBSaveRFDebug1UpdateBranch(t *testing.T) {
 	// debug=1 + update after >15 s → exercises the "update time" debug message.
 	var mdb = NewMHeardDB(1)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 	mdb.db["W1AW"].last_heard_rf = time.Now().Add(-30 * time.Second)
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
@@ -265,14 +265,14 @@ func TestMHeardDBSaveRFDebug1UpdateBranch(t *testing.T) {
 
 func TestMHeardDBSaveRFDebug1TriggersDump(t *testing.T) {
 	var mdb = NewMHeardDB(1)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 	// Must not panic; dump is triggered by debug > 0.
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 }
 
 func TestMHeardDBSaveRFDebug2PrintsCountAndDump(t *testing.T) {
 	var mdb = NewMHeardDB(2)
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 	// Must not panic; both the count debug line and dump are triggered.
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 }
@@ -328,7 +328,7 @@ func TestMHeardDBDumpSort(t *testing.T) {
 	}
 
 	// Trigger dump via SaveRF.
-	var pp = ax25_from_text("W1AW>APRS:test", true)
+	var pp = AX25FromText("W1AW>APRS:test", true)
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 }
 
