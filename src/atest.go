@@ -116,7 +116,7 @@ func AtestMain() {
 
 	var count [MAX_SUBCHANS]int // Experiments G and H
 
-	text_color_init(1)
+	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
 
 	my_audio_config = new(audio_s)

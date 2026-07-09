@@ -67,7 +67,7 @@ import (
 func DecodeAPRSMain() {
 	DECODE_APRS_UTIL = true // DECAMAIN define replacement
 
-	text_color_init(0)
+	TextColorInit(0)
 	text_color_set(DW_COLOR_INFO)
 	deviceIDData = NewDeviceIDData()
 	aprsSymbolData = NewAPRSSymbolData()

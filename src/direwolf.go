@@ -165,7 +165,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if *showVersion {
-		text_color_init(*textColor)
+		TextColorInit(*textColor)
 		printVersion(true)
 		os.Exit(0)
 	}
@@ -560,7 +560,7 @@ x = Silence FX.25 information.`)
 	// Might want to print OS version here.   For Windows, see:
 	// https://msdn.microsoft.com/en-us/library/ms724451(v=VS.85).aspx
 
-	text_color_init(*textColor)
+	TextColorInit(*textColor)
 	printVersion(false)
 
 	setup_sigint_handler()

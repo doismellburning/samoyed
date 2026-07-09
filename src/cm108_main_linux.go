@@ -37,7 +37,7 @@ func cm108_usage() {
 }
 
 func CM108Main() {
-	text_color_init(0) // Turn off text color.
+	TextColorInit(0) // Turn off text color.
 
 	if len(os.Args) >= 2 {
 		var path = os.Args[1]

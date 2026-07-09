@@ -16,7 +16,7 @@ const (
 
 var _text_color_level int
 
-func text_color_init(level int) {
+func TextColorInit(level int) {
 	_text_color_level = level
 }
 
