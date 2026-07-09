@@ -236,7 +236,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 		if mon_cmd.DataKind == 'K' && (use_chan == -1 || byte(use_chan) == mon_cmd.Portx) {
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 			use_chan = int(mon_cmd.Portx)
-			var alevel alevel_t
+			var alevel ALevel
 			var pp = ax25_from_frame(data[1:mon_cmd.DataLen], alevel)
 			var result = ax25_format_addrs(pp)
 			var info = ax25_get_info(pp)

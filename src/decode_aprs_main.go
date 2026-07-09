@@ -149,7 +149,7 @@ func DecodeAPRSLine(line string) {
 
 		// Treat as AX.25.
 
-		var alevel alevel_t
+		var alevel ALevel
 
 		var pp = ax25_from_frame(bytes, alevel)
 		if pp != nil {

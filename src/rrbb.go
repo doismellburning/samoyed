@@ -33,9 +33,9 @@ type rrbb_t struct {
 	subchannel int /* Which modem when more than one per channel. */
 	slice      int /* Which slicer. */
 
-	alevel      alevel_t /* Received audio level at time of frame capture. */
-	speed_error float64  /* Received data speed error as percentage. */
-	length      int      /* Current number of samples in array. */
+	alevel      ALevel  /* Received audio level at time of frame capture. */
+	speed_error float64 /* Received data speed error as percentage. */
+	length      int     /* Current number of samples in array. */
 
 	is_scrambled  bool /* Is data scrambled G3RUH / K9NG style? */
 	descram_state int  /* Descrambler state before first data bit of frame. */
@@ -362,7 +362,7 @@ func rrbb_get_slice(b *rrbb_t) int {
  *
  ***********************************************************************************/
 
-func rrbb_set_audio_level(b *rrbb_t, alevel alevel_t) {
+func rrbb_set_audio_level(b *rrbb_t, alevel ALevel) {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)
@@ -380,7 +380,7 @@ func rrbb_set_audio_level(b *rrbb_t, alevel alevel_t) {
  *
  ***********************************************************************************/
 
-func rrbb_get_audio_level(b *rrbb_t) alevel_t {
+func rrbb_get_audio_level(b *rrbb_t) ALevel {
 	Assert(b != nil)
 	Assert(b.magic1 == MAGIC1)
 	Assert(b.magic2 == MAGIC2)

@@ -705,7 +705,7 @@ func audio_get(a int) int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	packets_decoded_one++
 
 	if hdlc_rec_data_detect_any(channel) == 0 {

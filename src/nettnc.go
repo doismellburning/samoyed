@@ -258,7 +258,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 
 			var subchan = -3
 			var slice = 0
-			var alevel alevel_t
+			var alevel ALevel
 			var pp = ax25_from_frame(unwrapped[1:], alevel)
 
 			if pp != nil {

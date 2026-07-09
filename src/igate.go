@@ -1045,7 +1045,7 @@ func igate_recv_thread() {
 
 				var pp3 = ax25_from_text(string(stemp), false)
 				if pp3 != nil {
-					var alevel alevel_t
+					var alevel ALevel
 					alevel.mark = -2 // FIXME: Do we want some other special case?
 					alevel.space = -2
 

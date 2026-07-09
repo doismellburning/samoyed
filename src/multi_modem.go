@@ -77,7 +77,7 @@ import (
 
 type candidate_t struct {
 	packet_p    *packet_t
-	alevel      alevel_t
+	alevel      ALevel
 	speed_error float64     //nolint:unused
 	fec_type    fec_type_t  // Type of FEC: none(0), fx25, il2p
 	retries     BitFixLevel // For the old "fix bits" strategy, this is the
@@ -251,7 +251,7 @@ func multi_modem_process_sample(channel int, audio_sample int) {
  *
  *--------------------------------------------------------------------*/
 
-func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []byte, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -295,7 +295,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 // TODO: Eliminate function above and move code elsewhere?
 
-func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	if pp == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected internal problem in multi_modem_process_rec_packet_real\n")

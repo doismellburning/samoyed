@@ -309,7 +309,7 @@ const (
  * Also collect AGC values from the mark and space filters.
  */
 
-type alevel_t struct {
+type ALevel struct {
 	rec   int
 	mark  int
 	space int
@@ -713,7 +713,7 @@ func ax25_from_text(monitor string, strict bool) *packet_t {
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_from_frame(data []byte, alevel alevel_t) *packet_t { //nolint:unparam
+func ax25_from_frame(data []byte, alevel ALevel) *packet_t { //nolint:unparam
 	/*
 	 * First make sure we have an acceptable length:
 	 *
@@ -2868,7 +2868,7 @@ func ax25_safe_print(info []byte, ascii_only bool) {
  *
  *------------------------------------------------------------------*/
 
-func ax25_alevel_to_text(alevel alevel_t) string {
+func ax25_alevel_to_text(alevel ALevel) string {
 	if alevel.rec < 0 {
 		return ""
 	}

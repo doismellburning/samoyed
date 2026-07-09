@@ -301,7 +301,7 @@ func hdlc_rec2_block(block *rrbb_t) {
  *
  ***********************************************************************************/
 
-func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool {
+func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel) bool {
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	//int passall = save_audio_config_p.achan[channel].passall;
 
@@ -442,7 +442,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 // TODO:  Remove this.  but first figure out what to do in atest.c
 
-func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t) bool { //nolint:unused
+func hdlc_rec2_try_to_fix_later(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel) bool { //nolint:unused
 	//int len;
 	//BitFixLevel fix_bits = save_audio_config_p.achan[channel].fix_bits;
 	var passall = save_audio_config_p.achan[channel].passall
@@ -548,7 +548,7 @@ func is_sep_bit_modified(bit_idx int, retry_conf *retry_conf_t) bool {
  *
  ***********************************************************************************/
 
-func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel alevel_t, retry_conf *retry_conf_t, passall bool) bool {
+func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALevel, retry_conf *retry_conf_t, passall bool) bool {
 	var retry_conf_mode = retry_conf.mode
 	var retry_conf_type = retry_conf._type
 	var retry_conf_retry = retry_conf.retry

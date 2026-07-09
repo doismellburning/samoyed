@@ -50,7 +50,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	var frame = ax25_pack(pp)
 	ax25_delete(pp)
 
-	var alevel alevel_t
+	var alevel ALevel
 	alevel.rec = 50
 	alevel.mark = 50
 	alevel.space = 50

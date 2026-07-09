@@ -144,7 +144,7 @@ func mheard_latlon(dlat float64, dlon float64) string {
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel alevel_t, retries BitFixLevel) {
+func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel ALevel, retries BitFixLevel) {
 	var now = time.Now()
 
 	var source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)

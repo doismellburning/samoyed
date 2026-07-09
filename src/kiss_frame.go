@@ -550,7 +550,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		channel = int(kiss_msg[0]>>4) & 0xf
 	}
 
-	var alevel alevel_t
+	var alevel ALevel
 	var cmd = kiss_msg[0] & 0xf
 
 	switch cmd {
@@ -626,7 +626,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			return
 		}
 
-		alevel = alevel_t{} //nolint:exhaustruct
+		alevel = ALevel{} //nolint:exhaustruct
 
 		var pp = ax25_from_frame(kiss_msg[1:], alevel)
 		if pp == nil {

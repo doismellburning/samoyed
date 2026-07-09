@@ -751,7 +751,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				A.g_altitude_ft = DW_METERS_TO_FEET(float64(gpsinfo.altitude))
 
 				/* Fake channel of 999 to distinguish from real data. */
-				var alevel alevel_t
+				var alevel ALevel
 				packetLogger.Write(999, &A, nil, alevel, 0)
 			}
 		} else {
@@ -819,7 +819,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			ax25_delete(pp)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
-			var alevel alevel_t
+			var alevel ALevel
 			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 		default:
 			tq_append(bp.sendto_chan, TQ_PRIO_1_LO, pp)

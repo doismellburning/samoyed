@@ -7,9 +7,6 @@ import "github.com/pkg/term"
 // the KISS/AX.25 handling with the rest of direwolf without pulling the
 // whole kissutil CLI into the package.
 
-// ALevel is the exported alias for alevel_t.
-type ALevel = alevel_t
-
 func TextColorInit(level int) {
 	text_color_init(level)
 }

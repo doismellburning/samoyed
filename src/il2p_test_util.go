@@ -49,7 +49,7 @@ func tone_gen_put_bit(channel int, data int) {
 
 // This is called when a complete frame has been deserialized.
 
-func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) { //nolint:unparam
+func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) { //nolint:unparam
 	if il2pSerdesRecCount < 0 {
 		return // Skip check before serdes test.
 	}
@@ -73,7 +73,7 @@ func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int,
 	ax25_delete(pp)
 }
 
-func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *packet_t, alevel alevel_t, retries BitFixLevel, fec_type fec_type_t) {
+func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	if IL2P_TEST {
 		multi_modem_process_rec_packet_fake(channel, subchannel, slice, pp, alevel, retries, fec_type)
 	} else {
@@ -81,12 +81,12 @@ func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *
 	}
 }
 
-func demod_get_audio_level_fake(channel int, subchannel int) alevel_t {
-	var alevel alevel_t
+func demod_get_audio_level_fake(channel int, subchannel int) ALevel {
+	var alevel ALevel
 	return (alevel)
 }
 
-func demod_get_audio_level(channel int, subchannel int) alevel_t {
+func demod_get_audio_level(channel int, subchannel int) ALevel {
 	if IL2P_TEST {
 		return demod_get_audio_level_fake(channel, subchannel)
 	} else {

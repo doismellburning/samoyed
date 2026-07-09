@@ -1269,7 +1269,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				break
 			}
 
-			var alevel alevel_t
+			var alevel ALevel
 			var pp = ax25_from_frame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {
