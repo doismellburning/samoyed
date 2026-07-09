@@ -250,7 +250,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				dw_printf("Frame content after removing KISS framing and any escapes:\n")
 				/* Don't include the "type" indicator. */
 				/* It contains the radio channel and type should always be 0 here. */
-				hex_dump(unwrapped[1:])
+				HexDump(unwrapped[1:])
 			}
 
 			// Convert to packet object and send to received packet queue.

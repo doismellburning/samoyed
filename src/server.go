@@ -258,7 +258,7 @@ func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
 	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
 	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
 
-	hex_dump(pmsg.Data[:pmsg.Header.DataLen])
+	HexDump(pmsg.Data[:pmsg.Header.DataLen])
 }
 
 /*-------------------------------------------------------------------

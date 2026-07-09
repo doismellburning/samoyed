@@ -300,7 +300,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 								text_color_set(DW_COLOR_DEBUG)
 								dw_printf("\n")
 								dw_printf("Packet content before adding KISS framing and any escapes:\n")
-								hex_dump(fbuf)
+								HexDump(fbuf)
 							}
 
 							kiss_buff = kiss_encapsulate(stemp)

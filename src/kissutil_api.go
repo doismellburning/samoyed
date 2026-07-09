@@ -47,10 +47,6 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int, kps *kissport_status_s, clie
 	kiss_rec_byte(kf, ch, debug, kps, client, sendfun)
 }
 
-func HexDump(p []byte) {
-	hex_dump(p)
-}
-
 func SerialPortOpen(devicename string, baud int) *term.Term {
 	return serial_port_open(devicename, baud)
 }

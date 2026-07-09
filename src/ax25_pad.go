@@ -2430,7 +2430,7 @@ func ax25_hex_dump(this_p *packet_t) {
 			fptr[n*7+6]&SSID_LAST_MASK)
 	}
 
-	hex_dump(fptr[:this_p.frame_len])
+	HexDump(fptr[:this_p.frame_len])
 } /* end ax25_hex_dump */
 
 /*------------------------------------------------------------------
