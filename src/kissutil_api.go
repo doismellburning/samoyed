@@ -39,10 +39,6 @@ func AX25SafePrint(info []byte, asciiOnly bool) {
 	ax25_safe_print(info, asciiOnly)
 }
 
-func KissRecByte(kf *KISSFrame, ch byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
-	kiss_rec_byte(kf, ch, debug, kps, client, sendfun)
-}
-
 func SerialPortOpen(devicename string, baud int) *term.Term {
 	return serial_port_open(devicename, baud)
 }

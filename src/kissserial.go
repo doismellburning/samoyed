@@ -348,8 +348,8 @@ func kissserial_get() (byte, error) {
  * Global In:	serialport_fd
  *
  * Description:	Reads bytes from the serial port KISS client app and
- *		sends them to kiss_rec_byte for processing.
- *		kiss_rec_byte is a common function used by all 3 KISS
+ *		sends them to KissRecByte for processing.
+ *		KissRecByte is a common function used by all 3 KISS
  *		interfaces: serial port, pseudo terminal, and TCP.
  *
  *--------------------------------------------------------------------*/
@@ -367,6 +367,6 @@ func kissserial_listen_thread() {
 			return
 		}
 
-		kiss_rec_byte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
+		KissRecByte(kf, ch, kissserial_debug, nil, -1, kissserial_send_rec_packet)
 	}
 }

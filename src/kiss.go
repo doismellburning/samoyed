@@ -419,7 +419,7 @@ func kisspt_get() (byte, error) {
  * Global In:
  *
  * Description:	Reads bytes from the KISS client app and
- *		sends them to kiss_rec_byte for processing.
+ *		sends them to KissRecByte for processing.
  *
  *--------------------------------------------------------------------*/
 
@@ -435,6 +435,6 @@ func kisspt_listen_thread() {
 		if err != nil {
 			return
 		}
-		kiss_rec_byte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
+		KissRecByte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
 	}
 }

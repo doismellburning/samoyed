@@ -351,7 +351,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_rec_byte
+ * Name:        KissRecByte
  *
  * Purpose:     Process one byte from a KISS client app.
  *
@@ -396,7 +396,7 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 
 type kiss_sendfun func(int, int, []byte, int, *kissport_status_s, int)
 
-func kiss_rec_byte(kf *KISSFrame, ch byte, debug int,
+func KissRecByte(kf *KISSFrame, ch byte, debug int,
 	kps *kissport_status_s, client int,
 	sendfun kiss_sendfun) {
 	// dw_printf ("kiss_frame ( %c %02x ) \n", ch, ch);
@@ -499,7 +499,7 @@ func kiss_rec_byte(kf *KISSFrame, ch byte, debug int,
 
 		return
 	}
-} /* end kiss_rec_byte */
+} /* end KissRecByte */
 
 /*-------------------------------------------------------------------
  *

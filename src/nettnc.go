@@ -190,7 +190,7 @@ func nettnc_listen_thread(channel int) {
  *
  * Returns:	none.
  *
- * Description:	This is a simplified version of kiss_rec_byte used
+ * Description:	This is a simplified version of KissRecByte used
  *		for talking to KISS client applications.  It already has
  *		too many special cases and I don't want to make it worse.
  *		This also needs to make the packet look like it came from
