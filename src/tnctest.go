@@ -574,26 +574,26 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 	var cmd string
 
 	cmd = "\003\rreset\r"
-	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
+	SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 	SLEEP_MS(3000)
 
 	cmd = "echo on\r"
-	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
+	SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 	SLEEP_MS(200)
 
 	// do any necessary set up here. such as setting mycall
 
 	cmd = fmt.Sprintf("mycall %s\r", tnc_address)
-	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
+	SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 	SLEEP_MS(200)
 
 	// Don't want to stop tty output when typing begins.
 
 	cmd = "flow off\r"
-	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
+	SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 
 	cmd = "echo off\r"
-	serial_port_write(tnctest_serial_fd[my_index], []byte(cmd))
+	SerialPortWrite(tnctest_serial_fd[my_index], []byte(cmd))
 
 	/* Success. */
 
@@ -690,16 +690,16 @@ func tnc_connect(from int, to int) {
 			SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
-			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+			SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(1500)
 
 			cmd = "\r"
-			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+			SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(200)
 		}
 
 		var cmd = fmt.Sprintf("connect %s\r", tnc_address[to])
-		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+		SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -721,16 +721,16 @@ func tnc_disconnect(from int, to int) {
 			SLEEP_MS(1500)
 
 			cmd = ETX_BREAK
-			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+			SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(1500)
 
 			cmd = "\r"
-			serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+			SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 			SLEEP_MS(200)
 		}
 
 		var cmd = "disconnect\r"
-		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+		SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -746,15 +746,15 @@ func tnc_reset(from int, to int) {
 		SLEEP_MS(1500)
 
 		cmd = ETX_BREAK
-		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+		SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 		SLEEP_MS(1500)
 
 		cmd = "\r"
-		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+		SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 		SLEEP_MS(200)
 
 		cmd = "reset\r"
-		serial_port_write(tnctest_serial_fd[from], []byte(cmd))
+		SerialPortWrite(tnctest_serial_fd[from], []byte(cmd))
 	}
 }
 
@@ -796,7 +796,7 @@ func tnc_send_data(from int, to int, data string) {
 			fmt.Printf("TEST FAILED!\n")
 			os.Exit(1)
 		} else {
-			serial_port_write(tnctest_serial_fd[from], []byte(data))
+			SerialPortWrite(tnctest_serial_fd[from], []byte(data))
 		}
 	}
 }

@@ -250,7 +250,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 	 *	      command> change CNCA0 EmuBR=yes
 	 */
 
-	var n = serial_port_write(serialport_fd, kiss_buff)
+	var n = SerialPortWrite(serialport_fd, kiss_buff)
 
 	if n != kiss_len {
 		text_color_set(DW_COLOR_ERROR)

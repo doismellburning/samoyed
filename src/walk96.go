@@ -42,7 +42,7 @@ func Walk96Main() {
 	}
 
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
-	serial_port_write(tnc, []byte(cmd))
+	SerialPortWrite(tnc, []byte(cmd))
 
 	var config misc_config_s
 	config.gpsnmea_port = gpsSerialPort
@@ -70,7 +70,7 @@ func Walk96Main() {
 
 	// Exit out of KISS mode.
 
-	serial_port_write(tnc, []byte("\xc0\xff\xc0"))
+	SerialPortWrite(tnc, []byte("\xc0\xff\xc0"))
 
 	SLEEP_MS(100)
 }
@@ -127,5 +127,5 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 
 	// kiss_debug_print (1, NULL, kiss_frame, kiss_len);
 
-	serial_port_write(tnc, kiss_frame)
+	SerialPortWrite(tnc, kiss_frame)
 }

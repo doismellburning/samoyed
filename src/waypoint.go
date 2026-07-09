@@ -547,7 +547,7 @@ func (ws *WaypointSender) send(sentence []byte) {
 	var final_len = len(final)
 
 	if ws.serialPortFd != nil {
-		serial_port_write(ws.serialPortFd, final)
+		SerialPortWrite(ws.serialPortFd, final)
 	}
 
 	if ws.udpSock != nil {

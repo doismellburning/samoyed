@@ -1,7 +1,5 @@
 package direwolf
 
-import "github.com/pkg/term"
-
 // Thin exported wrappers around package-internal functionality needed by
 // cmd/samoyed-kissutil, which lives outside this package so it can share
 // the KISS/AX.25 handling with the rest of direwolf without pulling the
@@ -37,8 +35,4 @@ func AX25GetInfo(pp *packet_t) []byte {
 
 func AX25SafePrint(info []byte, asciiOnly bool) {
 	ax25_safe_print(info, asciiOnly)
-}
-
-func SerialPortWrite(fd *term.Term, data []byte) int {
-	return serial_port_write(fd, data)
 }

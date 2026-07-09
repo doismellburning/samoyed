@@ -91,7 +91,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 
 /*-------------------------------------------------------------------
  *
- * Name:	serial_port_write
+ * Name:	SerialPortWrite
  *
  * Purpose:	Send characters to serial port.
  *
@@ -103,7 +103,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
  *
  *---------------------------------------------------------------*/
 
-func serial_port_write(fd *term.Term, data []byte) int {
+func SerialPortWrite(fd *term.Term, data []byte) int {
 	if fd == nil {
 		return (-1)
 	}
@@ -118,7 +118,7 @@ func serial_port_write(fd *term.Term, data []byte) int {
 	}
 
 	return written
-} /* serial_port_write */
+} /* SerialPortWrite */
 
 /*-------------------------------------------------------------------
  *
