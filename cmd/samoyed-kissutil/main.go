@@ -150,6 +150,11 @@ func main() {
 	/* If port begins with digit, consider it to be TCP. */
 	/* Otherwise, treat as serial port name. */
 
+	if len(port) == 0 {
+		fmt.Printf("Port must not be empty.\n")
+		os.Exit(1)
+	}
+
 	using_tcp = unicode.IsDigit(rune(port[0]))
 
 	if using_tcp {
