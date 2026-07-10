@@ -51,13 +51,9 @@ func Test_TTUser(t *testing.T) {
 	//              double longitude, int ambiguity, char *freq, char *ctcss, char *comment, char mic_e, char *dao);
 
 	tt_user_heard("TEST1", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	SLEEP_SEC(1)
 	tt_user_heard("TEST2", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	SLEEP_SEC(1)
 	tt_user_heard("TEST3", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	SLEEP_SEC(1)
 	tt_user_heard("TEST4", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	SLEEP_SEC(1)
 	tt_user_heard("WB2OSZ", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
 	tt_user_heard("K2H", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
 	tt_user_dump()
