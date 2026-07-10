@@ -105,7 +105,7 @@ func digipeater_test(t *testing.T, in, out string) {
 func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
-	dedupeService = NewDedupeService(4 * time.Second)
+	dedupeService = NewDedupeService(100 * time.Millisecond)
 
 	/*
 	 * Compile the patterns.
@@ -219,7 +219,10 @@ func Test_Digipeater(t *testing.T) {
 	/*
 	 * Allow same thing after adequate time.
 	 */
-	time.Sleep(5 * time.Second)
+	time.Sleep(250 * time.Millisecond)
+
+	digipeater_test(t, "W1XYZ>TESTD,R3*,WIDE3-2:info1",
+		"W1XYZ>TESTD,R3,WB2OSZ-9*,WIDE3-1:info1")
 
 	digipeater_test(t, "W1XYZ>TEST,R3*,WIDE3-2:info1",
 		"W1XYZ>TEST,R3,WB2OSZ-9*,WIDE3-1:info1")
