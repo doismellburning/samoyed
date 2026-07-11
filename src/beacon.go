@@ -689,7 +689,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	 */
 	switch bp.btype {
 	case BEACON_POSITION:
-		beacon_text += encode_position(bp.messaging, bp.compress,
+		beacon_text += EncodePosition(bp.messaging, bp.compress,
 			bp.lat, bp.lon, bp.ambiguity,
 			int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
 			bp.symtab, bp.symbol,
@@ -721,7 +721,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				coarse = int(math.Round(float64(gpsinfo.track)))
 			}
 
-			beacon_text += encode_position(bp.messaging, bp.compress,
+			beacon_text += EncodePosition(bp.messaging, bp.compress,
 				float64(gpsinfo.dlat), float64(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				int(bp.power), int(bp.height), int(bp.gain), bp.dir,

@@ -407,7 +407,7 @@ func frequency_spec(freq float64, tone float64, offset float64) string {
 
 /*------------------------------------------------------------------
  *
- * Name:        encode_position
+ * Name:        EncodePosition
  *
  * Purpose:     Construct info part for position report format.
  *
@@ -466,7 +466,7 @@ type aprs_compressed_pos_t struct {
 }
 */
 
-func encode_position(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft int,
+func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft int,
 	symtab byte, symbol byte,
 	power int, height int, gain int, dir string,
 	course int, speed int,
@@ -546,7 +546,7 @@ func encode_position(messaging bool, compressed bool, lat float64, lon float64, 
 	result += comment
 
 	return result
-} /* end encode_position */
+} /* end EncodePosition */
 
 /*------------------------------------------------------------------
  *
