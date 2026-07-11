@@ -8,6 +8,7 @@ shopt -s nullglob
 logdir=$(mktemp --directory)
 pids=()
 
+# shellcheck disable=SC2317 # cleanup is invoked indirectly via trap
 cleanup() {
 	for pid in "${pids[@]}"; do
 		kill "$pid" 2> /dev/null || true
