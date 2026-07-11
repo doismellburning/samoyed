@@ -1,12 +1,48 @@
 #!/bin/bash
 
-set -e
+set -eu
+set -o pipefail
 
-for script in ./test-scripts/check-*
-do
+shopt -s nullglob
+
+logdir=$(mktemp --directory)
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	rm -rf "$logdir"
+}
+trap cleanup EXIT INT TERM
+
+scripts=(./test-scripts/check-*)
+
+for script in "${scripts[@]}"; do
+	name=$(basename "$script")
+	"$script" > "$logdir/$name.log" 2>&1 &
+	pids+=("$!")
+done
+
+failed=0
+
+for i in "${!scripts[@]}"; do
+	script="${scripts[$i]}"
+	name=$(basename "$script")
+
+	if wait "${pids[$i]}"; then
+		status="PASSED"
+	else
+		status="FAILED"
+		failed=1
+	fi
+
 	echo "************************"
-	echo "Running $script"
+	echo "$status: $script"
 	echo "************************"
 	echo ""
-	$script
+	cat "$logdir/$name.log"
 done
+
+exit $failed
