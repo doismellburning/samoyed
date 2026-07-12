@@ -70,7 +70,6 @@ func main() {
 	direwolf.DECODE_APRS_UTIL = true // DECAMAIN define replacement
 
 	direwolf.TextColorInit(0)
-	direwolf.TextColorSetInfo()
 	direwolf.DeviceIDDataInstance = direwolf.NewDeviceIDData()
 	direwolf.APRSSymbolDataInstance = direwolf.NewAPRSSymbolData()
 
