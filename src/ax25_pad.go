@@ -1010,7 +1010,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
+func ax25_check_addresses(pp *packet_t) bool {
 	var all_ok = true
 
 	for n := 0; n < ax25_get_num_addr(pp); n++ {
