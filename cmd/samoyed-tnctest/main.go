@@ -112,10 +112,10 @@ var max_count int
 const ETX_BREAK = "\003\003\003"
 
 func main() {
-	// max_count = 20;
-	max_count = 200
-	// max_count = 6;
-	max_count = 1000
+	// max_count = 20
+	// max_count = 200
+	// max_count = 6
+	// max_count = 1000
 	max_count = 9999
 
 	start_time = time.Now()
