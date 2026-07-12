@@ -128,7 +128,7 @@ func fx25_tag_find_match(t uint64) int {
 
 /*-------------------------------------------------------------
  *
- * Name:	fx25_init
+ * Name:	FX25Init
  *
  * Purpose:	This must be called once before any of the other fx25 functions.
  *
@@ -147,7 +147,7 @@ func fx25_tag_find_match(t uint64) int {
 
 var g_debug_level int
 
-func fx25_init(debug_level int) {
+func FX25Init(debug_level int) {
 	g_debug_level = debug_level
 
 	for i := range FX25_NTAB {
