@@ -205,7 +205,11 @@ func client_thread_net(my_index int, hostname string, port string, description s
 	var mon_cmd = new(direwolf.AGWPEHeader)
 	mon_cmd.DataKind = 'k'
 
-	binary.Write(conn, binary.LittleEndian, mon_cmd)
+	var writeErr = binary.Write(conn, binary.LittleEndian, mon_cmd)
+	if writeErr != nil {
+		fmt.Printf("Client %d write error, %s, enabling monitor mode on %s.\n", my_index, writeErr, description)
+		os.Exit(1)
+	}
 
 	/*
 	 * Print all of the monitored packets.
