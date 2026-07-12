@@ -144,7 +144,7 @@ func FuzzKISSUnwrap(f *testing.F) {
 	f.Add([]byte{FEND})
 
 	f.Fuzz(func(t *testing.T, in []byte) {
-		kiss_unwrap(in)
+		KissUnwrap(in)
 	})
 }
 

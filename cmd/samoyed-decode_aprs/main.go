@@ -145,7 +145,7 @@ func decodeAPRSLine(line string) {
 			fmt.Printf("--- KISS frame ---\n")
 			direwolf.HexDump(kiss_frame)
 
-			// Put FEND at end to keep kiss_unwrap happy.
+			// Put FEND at end to keep KissUnwrap happy.
 			// Having one at the beginning is optional.
 
 			kiss_frame = append(kiss_frame, direwolf.FEND)

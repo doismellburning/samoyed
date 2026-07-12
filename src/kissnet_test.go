@@ -462,7 +462,7 @@ func TestKissNetClientCommandIsAnswered(t *testing.T) {
 
 	var answer = readKissNetFrame(t, conn)
 
-	var unwrapped = kiss_unwrap(answer)
+	var unwrapped = KissUnwrap(answer)
 	require.NotEmpty(t, unwrapped)
 
 	assert.Equal(t, byte(KISS_CMD_SET_HARDWARE), unwrapped[0]&0xf)
@@ -499,7 +499,7 @@ func TestKissNetClientFrameIsCheckedAgainstItsChannelTable(t *testing.T) {
 	_, writeErr = conn.Write(KissEncapsulate(append([]byte{KISS_CMD_SET_HARDWARE}, []byte("TNC:")...)))
 	require.NoError(t, writeErr)
 
-	var unwrapped = kiss_unwrap(readKissNetFrame(t, conn))
+	var unwrapped = KissUnwrap(readKissNetFrame(t, conn))
 	require.NotEmpty(t, unwrapped)
 
 	assert.Equal(t, byte(KISS_CMD_SET_HARDWARE), unwrapped[0]&0xf)

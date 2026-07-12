@@ -324,7 +324,7 @@ func KissEncapsulate(in []byte) []byte {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_unwrap
+ * Name:        KissUnwrap
  *
  * Purpose:     Extract original data from a KISS frame.
  *
@@ -349,7 +349,7 @@ func KissEncapsulate(in []byte) []byte {
  *
  *-----------------------------------------------------------------*/
 
-func kiss_unwrap(in []byte) []byte {
+func KissUnwrap(in []byte) []byte {
 	if len(in) < 2 {
 		/* Need at least the "type indicator" byte and FEND. */
 		/* Probably more. */
@@ -399,7 +399,7 @@ func kiss_unwrap(in []byte) []byte {
 	}
 
 	return buf.Bytes()
-} /* end kiss_unwrap */
+} /* end KissUnwrap */
 
 /*-------------------------------------------------------------------
  *
@@ -414,13 +414,13 @@ func kiss_unwrap(in []byte) []byte {
  *
  * Returns:	The original bytes, and everything wrong with the escaping.
  *
- * Description:	kiss_unwrap does this for a live TNC, where carrying on with a
+ * Description:	KissUnwrap does this for a live TNC, where carrying on with a
  *		complaint is the right thing to do.  Something inspecting a
  *		capture instead wants to know exactly where a bad escape
  *		sequence is, and to decide for itself how to report it, so the
  *		problems are returned rather than printed.
  *
- *		Recovery differs too: kiss_unwrap drops an unexpected byte after
+ *		Recovery differs too: KissUnwrap drops an unexpected byte after
  *		FESC, where this keeps it, so that what is described accounts for
  *		every byte of the capture.
  *
@@ -665,7 +665,7 @@ func KissRecByte(kf *KISSFrame, audioConfig *audio_s, ch byte, debug int,
 				kf_debug_print(kf, "", kf.kiss_msg[:kf.kiss_len])
 			}
 
-			var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
+			var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
