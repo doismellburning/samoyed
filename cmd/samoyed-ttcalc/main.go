@@ -142,10 +142,17 @@ func main() {
 				var reply_bytes = direwolf.AX25Pack(reply_pp)
 				hdr.DataLen = 1 + uint32(len(reply_bytes))
 
-				binary.Write(server_sock, binary.LittleEndian, hdr)
-				server_sock.Write([]byte{0x0})
-
-				server_sock.Write(reply_bytes)
+				var replyWriteErr = binary.Write(server_sock, binary.LittleEndian, hdr)
+				if replyWriteErr == nil {
+					_, replyWriteErr = server_sock.Write([]byte{0x0})
+				}
+				if replyWriteErr == nil {
+					_, replyWriteErr = server_sock.Write(reply_bytes)
+				}
+				if replyWriteErr != nil {
+					fmt.Printf("Write error, %v, sending reply.\n", replyWriteErr)
+					os.Exit(1)
+				}
 
 				direwolf.AX25Delete(reply_pp)
 			}
