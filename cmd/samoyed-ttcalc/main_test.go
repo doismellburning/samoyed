@@ -1,4 +1,4 @@
-package direwolf
+package main
 
 import (
 	"testing"
