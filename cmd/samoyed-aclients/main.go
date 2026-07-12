@@ -143,6 +143,7 @@ func main() {
 			case msg := <-ch:
 				something = true
 				results[i] = msg
+				packet_count[i]++
 			default:
 			}
 		}
@@ -252,8 +253,6 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			packetChan <- fullResult
 
 			direwolf.AX25Delete(pp)
-
-			packet_count[my_index]++
 		}
 	}
 } /* end client_thread_net */
