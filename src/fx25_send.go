@@ -6,11 +6,11 @@ import (
 	"os"
 )
 
-var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "fx25_send_frame" or "???"
+var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendFrame" or "???"
 
 /*-------------------------------------------------------------
  *
- * Name:	fx25_send_frame
+ * Name:	FX25SendFrame
  *
  * Purpose:	Convert HDLC frames to a stream of bits.
  *
@@ -47,7 +47,7 @@ var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "fx25_send
  *
  *--------------------------------------------------------------*/
 
-func fx25_send_frame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
+func FX25SendFrame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
