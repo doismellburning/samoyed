@@ -318,9 +318,10 @@ func NewAPRSSymbolData() *APRSSymbolData {
 	var fp *os.File
 
 	var SymbolsSearchLocations = []string{
-		"symbols-new.txt",         // CWD
-		"data/symbols-new.txt",    // Windows with Cmake
-		"../data/symbols-new.txt", // ?
+		"symbols-new.txt",            // CWD
+		"data/symbols-new.txt",       // Windows with Cmake
+		"../data/symbols-new.txt",    // Source tree, e.g. running tests from src/
+		"../../data/symbols-new.txt", // Source tree, e.g. running tests from cmd/<name>/
 		"/usr/local/share/direwolf/symbols-new.txt",
 		"/usr/share/direwolf/symbols-new.txt",
 		// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458

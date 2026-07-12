@@ -74,9 +74,10 @@ var deviceIDData *DeviceIDData
 // fopen is perfectly happy with / in file path when running on Windows.
 
 var search_locations = []string{
-	"tocalls.yaml",         // Current working directory
-	"data/tocalls.yaml",    // Windows with CMake
-	"../data/tocalls.yaml", // Source tree
+	"tocalls.yaml",            // Current working directory
+	"data/tocalls.yaml",       // Windows with CMake
+	"../data/tocalls.yaml",    // Source tree, e.g. running tests from src/
+	"../../data/tocalls.yaml", // Source tree, e.g. running tests from cmd/<name>/
 	"/usr/local/share/direwolf/tocalls.yaml",
 	"/usr/share/direwolf/tocalls.yaml",
 	// https://groups.yahoo.com/neo/groups/direwolf_packet/conversations/messages/2458
