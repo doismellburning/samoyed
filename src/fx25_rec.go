@@ -35,11 +35,11 @@ type fx_context_s struct {
 var fx_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*fx_context_s
 
 var FXTEST = false
-var fx25_test_count = 0
+var FX25TestCount = 0
 
 /***********************************************************************************
  *
- * Name:        fx25_rec_bit
+ * Name:        FX25RecBit
  *
  * Purpose:     Extract FX.25 codeblocks from a stream of bits.
  *		In a completely integrated AX.25 / FX.25 receive system,
@@ -63,7 +63,7 @@ var fx25_test_count = 0
 
 const FENCE = 0x55 // to detect buffer overflow.
 
-func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
+func FX25RecBit(channel int, subchannel int, slice int, dbit int) {
 	// Allocate context blocks only as needed.
 	var F = fx_context[channel][subchannel][slice]
 	if F == nil {
@@ -263,7 +263,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				}
 
 				if FXTEST {
-					fx25_test_count++
+					FX25TestCount++
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 
