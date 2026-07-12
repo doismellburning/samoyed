@@ -9,10 +9,6 @@ func TextColorSetInfo() {
 	text_color_set(DW_COLOR_INFO)
 }
 
-func AX25HexDump(pp *packet_t) {
-	ax25_hex_dump(pp)
-}
-
 func KissUnwrap(in []byte) []byte {
 	return kiss_unwrap(in)
 }
