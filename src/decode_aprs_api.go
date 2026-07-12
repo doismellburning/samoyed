@@ -8,7 +8,3 @@ package direwolf
 func TextColorSetInfo() {
 	text_color_set(DW_COLOR_INFO)
 }
-
-func KissUnwrap(in []byte) []byte {
-	return kiss_unwrap(in)
-}

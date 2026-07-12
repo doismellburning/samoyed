@@ -241,7 +241,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[0:kf.kiss_len])
 			}
 
-			var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
+			var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
