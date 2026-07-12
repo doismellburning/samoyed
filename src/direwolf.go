@@ -573,7 +573,7 @@ x = Silence FX.25 information.`)
 	 * Files not supported at this time.
 	 * Can always "cat" the file and pipe it into stdin.
 	 */
-	deviceIDData = NewDeviceIDData()
+	DeviceIDDataInstance = NewDeviceIDData()
 
 	var err = audio_open(audio_config)
 	if err < 0 {

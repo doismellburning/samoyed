@@ -12,7 +12,7 @@ import (
 // Test that decode_aprs does not panic on an AX.25 UI frame with an empty
 // information field, as sent by linbpq ID broadcasts (issue #504).
 func Test_decode_aprs_empty_info(t *testing.T) {
-	deviceIDData = NewDeviceIDData()
+	DeviceIDDataInstance = NewDeviceIDData()
 
 	var pp = AX25FromText("Q1TEST>ID:", true)
 	assert.NotNil(t, pp)
