@@ -39,7 +39,7 @@ var fx25_test_count = 0
 
 /***********************************************************************************
  *
- * Name:        fx25_rec_bit
+ * Name:        FX25RecBit
  *
  * Purpose:     Extract FX.25 codeblocks from a stream of bits.
  *		In a completely integrated AX.25 / FX.25 receive system,
@@ -63,7 +63,7 @@ var fx25_test_count = 0
 
 const FENCE = 0x55 // to detect buffer overflow.
 
-func fx25_rec_bit(channel int, subchannel int, slice int, dbit int) {
+func FX25RecBit(channel int, subchannel int, slice int, dbit int) {
 	// Allocate context blocks only as needed.
 	var F = fx_context[channel][subchannel][slice]
 	if F == nil {
