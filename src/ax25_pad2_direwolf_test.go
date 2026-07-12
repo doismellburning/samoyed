@@ -69,7 +69,7 @@ func Test_AX25_PAD2(t *testing.T) {
 
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, nil)
 				check_ax25_u_frame(t, pp, cr, ftype, pf)
-				ax25_hex_dump(pp)
+				AX25HexDump(pp)
 			}
 		}
 	}
@@ -93,7 +93,7 @@ func Test_AX25_PAD2(t *testing.T) {
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-				ax25_hex_dump(pp)
+				AX25HexDump(pp)
 			}
 
 			modulo = modulo_128
@@ -106,7 +106,7 @@ func Test_AX25_PAD2(t *testing.T) {
 				var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, nil)
 				check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-				ax25_hex_dump(pp)
+				AX25HexDump(pp)
 			}
 		}
 	}
@@ -128,7 +128,7 @@ func Test_AX25_PAD2(t *testing.T) {
 		var pp = ax25_s_frame(addrs, num_addr, cr, ftype, modulo, nr, pf, srej_info)
 		check_ax25_s_frame(t, pp, cr, ftype, pf, nr)
 
-		ax25_hex_dump(pp)
+		AX25HexDump(pp)
 	}
 
 	dw_printf("\n----------\n\n")
@@ -149,7 +149,7 @@ func Test_AX25_PAD2(t *testing.T) {
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
 
-			ax25_hex_dump(pp)
+			AX25HexDump(pp)
 		}
 
 		modulo = modulo_128
@@ -163,7 +163,7 @@ func Test_AX25_PAD2(t *testing.T) {
 			var pp = ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, pid, info)
 			check_ax25_i_frame(t, pp, cr, pf, nr, ns, info)
 
-			ax25_hex_dump(pp)
+			AX25HexDump(pp)
 		}
 	}
 

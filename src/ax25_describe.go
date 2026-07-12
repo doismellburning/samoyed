@@ -4,7 +4,7 @@ package direwolf
  *
  * Purpose:	Describe an AX.25 frame in human readable form.
  *
- * Description:	The pieces - ax25_hex_dump, AX25FormatAddrs, decode_aprs -
+ * Description:	The pieces - AX25HexDump, AX25FormatAddrs, decode_aprs -
  *		already exist.  This puts them together the way anything
  *		inspecting frames off the wire wants them, and says what is
  *		wrong with a frame too malformed for the next step, rather
@@ -51,7 +51,7 @@ func DescribeAX25Frame(frame []byte) int {
 
 	/*
 	 * Establish that the frame has the fields the description is about to read
-	 * before reading any of them.  ax25_hex_dump takes the control and PID
+	 * before reading any of them.  AX25HexDump takes the control and PID
 	 * octets on trust, so a frame that stops short of them would otherwise be
 	 * described in terms of the zero padding past its end.
 	 */
@@ -87,7 +87,7 @@ func DescribeAX25Frame(frame []byte) int {
 	}
 
 	fmt.Printf("--- AX.25 frame ---\n")
-	ax25_hex_dump(pp)
+	AX25HexDump(pp)
 	fmt.Printf("-------------------\n")
 
 	var problems = 0
