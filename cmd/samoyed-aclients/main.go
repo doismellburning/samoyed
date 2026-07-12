@@ -229,6 +229,11 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			os.Exit(1)
 		}
 
+		if mon_cmd.DataLen > direwolf.AX25_MAX_PACKET_LEN {
+			fmt.Printf("Client %d got invalid data length %d from %s.\n", my_index, mon_cmd.DataLen, description)
+			os.Exit(1)
+		}
+
 		var data = make([]byte, mon_cmd.DataLen)
 		if mon_cmd.DataLen > 0 {
 			_, readErr = io.ReadFull(conn, data)
