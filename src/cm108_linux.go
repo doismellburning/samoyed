@@ -167,22 +167,22 @@ const MAXX_HIDRAW_NAME_LEN = 150
  * Result of taking inventory of USB soundcards and USB HIDs.
  */
 
-type thing_s struct {
-	vid           int    // vendor id, displayed as four hexadecimal digits.
-	pid           int    // product id, displayed as four hexadecimal digits.
-	card_number   string // "Card" Number.  e.g.  2 for plughw:2,0
-	card_name     string // Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
-	product       string // product name (e.g. manufacturer, model)
-	devnode_sound string // e.g. /dev/snd/pcmC0D0p
-	plughw        string // Above in more familiar format e.g. plughw:0,0
+type CM108Thing struct {
+	VID          int    // vendor id, displayed as four hexadecimal digits.
+	PID          int    // product id, displayed as four hexadecimal digits.
+	CardNumber   string // "Card" Number.  e.g.  2 for plughw:2,0
+	CardName     string // Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
+	Product      string // product name (e.g. manufacturer, model)
+	DevnodeSound string // e.g. /dev/snd/pcmC0D0p
+	Plughw       string // Above in more familiar format e.g. plughw:0,0
 	// Oversized to silence a compiler warning.
-	plughw2        string // With name rather than number.
-	devpath        string // Kernel dev path.  Does not include /sys mount point.
-	devnode_hidraw string
+	Plughw2       string // With name rather than number.
+	Devpath       string // Kernel dev path.  Does not include /sys mount point.
+	DevnodeHidraw string
 	// e.g. /dev/hidraw3  -  for Linux - was length 17
 	// The Windows path for a HID looks like this, lengths up to 95 seen.
 	// \\?\hid#vid_0d8c&pid_000c&mi_03#8&164d11c9&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
-	devnode_usb string // e.g. /dev/bus/usb/001/012
+	DevnodeUSB string // e.g. /dev/bus/usb/001/012
 	// This is what we use to match up audio and HID.
 }
 
@@ -197,7 +197,7 @@ const MAXX_THINGS = 60
 
 /*-------------------------------------------------------------------
  *
- * Name:	cm108_inventory
+ * Name:	CM108Inventory
  *
  * Purpose:	Take inventory of USB audio and HID.
  *
@@ -212,8 +212,8 @@ const MAXX_THINGS = 60
  *
  *------------------------------------------------------------------*/
 
-func cm108_inventory(max_things int) ([]*thing_s, error) {
-	var things []*thing_s
+func CM108Inventory(max_things int) ([]*CM108Thing, error) {
+	var things []*CM108Thing
 
 	/*
 	 * First get a list of the USB audio devices.
@@ -264,16 +264,16 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 				}
 
 				if len(things) < max_things {
-					var thing = new(thing_s)
+					var thing = new(CM108Thing)
 
-					thing.vid = vid
-					thing.pid = pid
-					thing.card_name = pattrsID
-					thing.card_number = pattrsNumber
-					thing.product = parentdev.SysattrValue("product")
-					thing.devnode_sound = devnode
-					thing.devnode_usb = parentdev.Devnode()
-					thing.devpath = cardDevpath
+					thing.VID = vid
+					thing.PID = pid
+					thing.CardName = pattrsID
+					thing.CardNumber = pattrsNumber
+					thing.Product = parentdev.SysattrValue("product")
+					thing.DevnodeSound = devnode
+					thing.DevnodeUSB = parentdev.Devnode()
+					thing.Devpath = cardDevpath
 
 					things = append(things, thing)
 				}
@@ -322,22 +322,22 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 				var matched = false
 
 				for _, thing := range things {
-					if thing.vid == vid && thing.pid == pid && usb != "" && thing.devnode_usb == usb {
+					if thing.VID == vid && thing.PID == pid && usb != "" && thing.DevnodeUSB == usb {
 						matched = true
-						thing.devnode_hidraw = devnode
+						thing.DevnodeHidraw = devnode
 					}
 				}
 
 				// If it did not match to existing, add new entry.
 				if !matched && len(things) < max_things {
-					var thing = new(thing_s)
+					var thing = new(CM108Thing)
 
-					thing.vid = vid
-					thing.pid = pid
-					thing.product = parentdev.SysattrValue("product")
-					thing.devnode_hidraw = devnode
-					thing.devnode_usb = usb
-					thing.devpath = dev.Devpath()
+					thing.VID = vid
+					thing.PID = pid
+					thing.Product = parentdev.SysattrValue("product")
+					thing.DevnodeHidraw = devnode
+					thing.DevnodeUSB = usb
+					thing.Devpath = dev.Devpath()
 
 					things = append(things, thing)
 				}
@@ -355,19 +355,19 @@ func cm108_inventory(max_things int) ([]*thing_s, error) {
 	var pcm_re = regexp.MustCompile("pcmC([0-9]+)D([0-9]+)[cp]")
 
 	for _, thing := range things {
-		var matches = pcm_re.FindStringSubmatch(thing.devnode_sound)
+		var matches = pcm_re.FindStringSubmatch(thing.DevnodeSound)
 
 		if matches != nil {
 			var c = matches[1]
 			var d = matches[2]
 
-			thing.plughw = fmt.Sprintf("plughw:%s,%s", c, d)
-			thing.plughw2 = fmt.Sprintf("plughw:%s,%s", thing.card_name, d)
+			thing.Plughw = fmt.Sprintf("plughw:%s,%s", c, d)
+			thing.Plughw2 = fmt.Sprintf("plughw:%s,%s", thing.CardName, d)
 		}
 	}
 
 	return things, nil
-} /* end cm108_inventory */
+} /* end CM108Inventory */
 
 /*-------------------------------------------------------------------
  *
@@ -394,7 +394,7 @@ func cm108_find_ptt(output_audio_device string) string {
 	var ptt_device = ""
 
 	// Possible improvement: Skip if inventory already taken.
-	var things, _ = cm108_inventory(MAXX_THINGS)
+	var things, _ = CM108Inventory(MAXX_THINGS)
 
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 
@@ -415,14 +415,14 @@ func cm108_find_ptt(output_audio_device string) string {
 	}
 
 	for _, thing := range things {
-		//dw_printf ("DEBUG: i=%d, card_name='%s', card_number='%s'\n", i, things[i].card_name, things[i].card_number);
-		if num_or_name == thing.card_name || num_or_name == thing.card_number {
-			//dw_printf ("DEBUG: success! returning '%s'\n", things[i].devnode_hidraw);
-			ptt_device = thing.devnode_hidraw
-			if !GOOD_DEVICE(thing.vid, thing.pid) {
+		//dw_printf ("DEBUG: i=%d, card_name='%s', card_number='%s'\n", i, things[i].CardName, things[i].CardNumber);
+		if num_or_name == thing.CardName || num_or_name == thing.CardNumber {
+			//dw_printf ("DEBUG: success! returning '%s'\n", things[i].DevnodeHidraw);
+			ptt_device = thing.DevnodeHidraw
+			if !GOOD_DEVICE(thing.VID, thing.PID) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Warning: USB audio card %s (%s) is not a device known to work with GPIO PTT.\n",
-					thing.card_number, thing.card_name)
+					thing.CardNumber, thing.CardName)
 			}
 
 			return ptt_device
@@ -434,7 +434,7 @@ func cm108_find_ptt(output_audio_device string) string {
 
 /*-------------------------------------------------------------------
  *
- * Name:	cm108_set_gpio_pin
+ * Name:	CM108SetGPIOPin
  *
  * Purpose:	Set one GPIO pin of the CM108 or similar.
  *
@@ -459,7 +459,7 @@ func cm108_find_ptt(output_audio_device string) string {
  *
  *------------------------------------------------------------------*/
 
-func cm108_set_gpio_pin(name string, num int, state int) int {
+func CM108SetGPIOPin(name string, num int, state int) int {
 	if num < 1 || num > 8 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%s CM108 GPIO number %d must be in range of 1 thru 8.\n", name, num)
@@ -478,7 +478,7 @@ func cm108_set_gpio_pin(name string, num int, state int) int {
 	var iodata = state << (num - 1) // 0=low, 1=high
 
 	return cm108_write(name, iomask, iodata)
-} /* end cm108_set_gpio_pin */
+} /* end CM108SetGPIOPin */
 
 /*-------------------------------------------------------------------
  *
@@ -499,7 +499,7 @@ func cm108_set_gpio_pin(name string, num int, state int) int {
  * Errors:	A descriptive error message will be printed for any problem.
  *
  * Description:	This is the lowest level function.
- *		An application probably wants to use cm108_set_gpio_pin.
+ *		An application probably wants to use CM108SetGPIOPin.
  *
  *------------------------------------------------------------------*/
 
