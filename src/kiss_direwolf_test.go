@@ -22,11 +22,11 @@ func Test_KISS(t *testing.T) {
 	var kissed = KissEncapsulate(din)
 	assert.Len(t, kissed, (512 + 6))
 
-	var dout = kiss_unwrap(kissed)
+	var dout = KissUnwrap(kissed)
 	assert.Len(t, dout, 512)
 	assert.Equal(t, din, dout)
 
-	dout = kiss_unwrap(kissed[1:])
+	dout = KissUnwrap(kissed[1:])
 	assert.Len(t, dout, 512)
 	assert.Equal(t, din, dout)
 

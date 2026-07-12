@@ -303,7 +303,7 @@ func KissEncapsulate(in []byte) []byte {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kiss_unwrap
+ * Name:        KissUnwrap
  *
  * Purpose:     Extract original data from a KISS frame.
  *
@@ -328,7 +328,7 @@ func KissEncapsulate(in []byte) []byte {
  *
  *-----------------------------------------------------------------*/
 
-func kiss_unwrap(in []byte) []byte {
+func KissUnwrap(in []byte) []byte {
 	if len(in) < 2 {
 		/* Need at least the "type indicator" byte and FEND. */
 		/* Probably more. */
@@ -378,7 +378,7 @@ func kiss_unwrap(in []byte) []byte {
 	}
 
 	return buf.Bytes()
-} /* end kiss_unwrap */
+} /* end KissUnwrap */
 
 /*-------------------------------------------------------------------
  *
@@ -549,7 +549,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[:kf.kiss_len])
 			}
 
-			var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
+			var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
 
 			if debug >= 2 {
 				/* Append CRC to this and it goes out over the radio. */
