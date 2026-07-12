@@ -251,7 +251,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 		 * Listen only to that one.
 		 */
 
-		if mon_cmd.DataKind == 'K' && (use_chan == -1 || byte(use_chan) == mon_cmd.Portx) {
+		if mon_cmd.DataKind == 'K' && mon_cmd.DataLen > 0 && (use_chan == -1 || byte(use_chan) == mon_cmd.Portx) {
 			// printf ("server %d, portx = %d\n", my_index, mon_cmd.portx);
 			use_chan = int(mon_cmd.Portx)
 			var alevel direwolf.ALevel
