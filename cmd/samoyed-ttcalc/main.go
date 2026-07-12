@@ -74,6 +74,11 @@ func main() {
 			os.Exit(1)
 		}
 
+		if mon_cmd.DataLen > direwolf.AX25_MAX_PACKET_LEN {
+			fmt.Printf("Got invalid data length %d from server.\n", mon_cmd.DataLen)
+			os.Exit(1)
+		}
+
 		var data = make([]byte, mon_cmd.DataLen)
 		if mon_cmd.DataLen > 0 {
 			_, readErr = io.ReadFull(server_sock, data)
