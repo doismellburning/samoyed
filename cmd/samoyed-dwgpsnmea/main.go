@@ -9,7 +9,13 @@ import (
 )
 
 func main() {
-	direwolf.DWGPSInit("COM22", 3)
+	var gpsPort = "COM22"
+
+	if len(os.Args) > 1 {
+		gpsPort = os.Args[1]
+	}
+
+	direwolf.DWGPSInit(gpsPort, 3)
 
 	for {
 		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
