@@ -56,7 +56,11 @@ func main() {
 	var mon_cmd direwolf.AGWPEHeader
 	mon_cmd.DataKind = 'k'
 
-	binary.Write(server_sock, binary.LittleEndian, mon_cmd)
+	var writeErr = binary.Write(server_sock, binary.LittleEndian, mon_cmd)
+	if writeErr != nil {
+		fmt.Printf("Write error, %v, enabling monitor mode.\n", writeErr)
+		os.Exit(1)
+	}
 
 	/*
 	 * Print all of the monitored packets.
