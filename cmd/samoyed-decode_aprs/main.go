@@ -193,7 +193,7 @@ func decodeAPRSLine(line string) {
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.
-			// (void)ax25_check_addresses(pp, AddrStrictLowerCaseWarning);	// Errors for invalid addresses.
+			// (void)AX25CheckAddresses(pp, AddrStrictLowerCaseWarning);	// Errors for invalid addresses.
 
 			// Future?  Add -d option to include hex dump and maybe KISS?
 		} else {
