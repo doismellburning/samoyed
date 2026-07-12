@@ -222,7 +222,7 @@ func (f *PacketFilter) eval(from_chan int, to_chan int, filter string, pp *packe
 	}
 
 	if is_aprs {
-		pfstate.decoded = decode_aprs(pp, true, "")
+		pfstate.decoded = DecodeAPRS(pp, true, "")
 	}
 
 	next_token(&pfstate)
@@ -1081,7 +1081,7 @@ func filt_s(pf *pfstate_t) (int, error) {
 	}
 
 	// This applies only for Position, Object, Item.
-	// decode_aprs() should set symbol code to space to mean undefined.
+	// DecodeAPRS() should set symbol code to space to mean undefined.
 
 	if pf.decoded.g_symbol_code == ' ' {
 		return 0, nil

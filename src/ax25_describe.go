@@ -105,9 +105,9 @@ func DescribeAX25Frame(frame []byte) int {
 		fmt.Printf("\n")
 		NoteSafePrintTruncation(len(info))
 
-		var A = decode_aprs(pp, false, "") // Extract information into structure.
+		var A = DecodeAPRS(pp, false, "") // Extract information into structure.
 
-		decode_aprs_print(A) // Now print it in human readable format.
+		DecodeAPRSPrint(A) // Now print it in human readable format.
 	} else {
 		/*
 		 * The control and PID octets are in the dump above, and either of them

@@ -130,7 +130,7 @@ func FuzzDecodeAPRS(f *testing.F) {
 			return
 		}
 
-		decode_aprs(pp, true, "")
+		DecodeAPRS(pp, true, "")
 	})
 }
 

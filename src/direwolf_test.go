@@ -48,7 +48,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	var pp = AX25FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
 	require.NotNil(t, pp)
 
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 
 	require.True(t, A.g_lat.IsJust(), "position should have decoded")
 	assert.True(t, A.g_course.IsNothing(), "course should be unknown, got %v", A.g_course)
@@ -79,7 +79,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	var pp = AX25FromText(fmt.Sprintf("Q1TEST>APRS:{%c%c%s", USER_DEF_USER_ID, USER_DEF_TYPE_AIS, sentence), true)
 	require.NotNil(t, pp)
 
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 
 	var course, speed = ais_object_course_speed(A)
 	assert.Equal(t, maybe.Just(90), course)
