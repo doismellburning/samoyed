@@ -76,7 +76,7 @@ func main() {
 	direwolf.TextColorInit(0)
 	direwolf.TextColorSetInfo()
 	direwolf.DeviceIDDataInstance = direwolf.NewDeviceIDData()
-	direwolf.SetAPRSSymbolData(direwolf.NewAPRSSymbolData())
+	direwolf.APRSSymbolDataInstance = direwolf.NewAPRSSymbolData()
 
 	var scanner = bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
