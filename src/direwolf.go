@@ -48,7 +48,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
-var aprsSymbolData *APRSSymbolData
+var APRSSymbolDataInstance *APRSSymbolData
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
@@ -180,8 +180,8 @@ x = Silence FX.25 information.`)
 	}
 
 	if *symbolDump {
-		aprsSymbolData = NewAPRSSymbolData()
-		aprsSymbolData.symbols_list()
+		APRSSymbolDataInstance = NewAPRSSymbolData()
+		APRSSymbolDataInstance.symbols_list()
 		os.Exit(0)
 	}
 
@@ -286,7 +286,7 @@ x = Silence FX.25 information.`)
 
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
-	aprsSymbolData = NewAPRSSymbolData()
+	APRSSymbolDataInstance = NewAPRSSymbolData()
 
 	audio_config = new(audio_s)
 	misc_config = new(misc_config_s)

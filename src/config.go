@@ -4453,7 +4453,7 @@ func handleTTMACRO(ps *parseState) bool {
 			if len(tmp) > 0 && tmp[0] == '}' {
 				// First try to find something matching the description.
 
-				var symtab, symbol, ok = aprsSymbolData.symbols_code_from_description(' ', stemp.String())
+				var symtab, symbol, ok = APRSSymbolDataInstance.symbols_code_from_description(' ', stemp.String())
 
 				if !ok {
 					text_color_set(DW_COLOR_ERROR)
@@ -4464,7 +4464,7 @@ func handleTTMACRO(ps *parseState) bool {
 
 				// Convert symtab(overlay) & symbol to tone sequence.
 
-				var ttemp = aprsSymbolData.symbols_to_tones(symtab, symbol)
+				var ttemp = APRSSymbolDataInstance.symbols_to_tones(symtab, symbol)
 
 				//text_color_set(DW_COLOR_DEBUG);
 				//dw_printf ("DEBUG config file Line %d: AB{%s} -> %s\n", line, stemp, ttemp);
@@ -6321,7 +6321,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			}
 		} else {
 			/* Try to look up by description. */
-			var symtab, symbol, ok = aprsSymbolData.symbols_code_from_description(b.symtab, temp_symbol)
+			var symtab, symbol, ok = APRSSymbolDataInstance.symbols_code_from_description(b.symtab, temp_symbol)
 			if ok {
 				b.symtab = symtab
 				b.symbol = symbol
