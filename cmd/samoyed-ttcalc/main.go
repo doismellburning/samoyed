@@ -66,7 +66,8 @@ func main() {
 		var readErr = binary.Read(server_sock, binary.LittleEndian, &mon_cmd)
 		if readErr != nil {
 			if readErr == io.EOF {
-				continue
+				fmt.Println("Connection to server closed.")
+				os.Exit(1)
 			}
 
 			fmt.Printf("Read error, received %d.\n", readErr)
