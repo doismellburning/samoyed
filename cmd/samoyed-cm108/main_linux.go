@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 
@@ -26,7 +27,7 @@ import (
 
 func cm108_usage() {
 	fmt.Printf("\n")
-	fmt.Printf("Usage:    cm108  [ device-path [ gpio-num ] ]\n")
+	fmt.Printf("Usage:    %s  [ device-path [ gpio-num ] ]\n", filepath.Base(os.Args[0]))
 	fmt.Printf("\n")
 	fmt.Printf("With no command line arguments, this will produce a list of\n")
 	fmt.Printf("Audio devices and Human Interface Devices (HID) and indicate\n")
