@@ -476,10 +476,11 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 		var readErr = binary.Read(conn, binary.LittleEndian, mon_cmd)
 		if readErr != nil {
 			if readErr == io.EOF {
-				continue
+				fmt.Printf("TNC %d connection closed.\n", my_index)
+			} else {
+				fmt.Printf("Read error, TNC %d got %s.\n", my_index, readErr)
 			}
 
-			fmt.Printf("Read error, TNC %d got %s.\n", my_index, readErr)
 			os.Exit(1)
 		}
 
