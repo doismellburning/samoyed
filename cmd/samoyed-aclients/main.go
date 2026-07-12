@@ -114,6 +114,11 @@ func main() {
 		/* If port begins with digit, consider it to be TCP. */
 		/* Otherwise, treat as serial port name. */
 
+		if len(port[j]) == 0 {
+			fmt.Printf("Port must not be empty for '%s'.\n", description[j])
+			os.Exit(1)
+		}
+
 		if unicode.IsDigit(rune(port[j][0])) {
 			go client_thread_net(j, hostname[j], port[j], description[j], ch)
 		} else {
