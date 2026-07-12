@@ -70,7 +70,7 @@ func main() {
 				os.Exit(1)
 			}
 
-			fmt.Printf("Read error, received %d.\n", readErr)
+			fmt.Printf("Read error, received %v.\n", readErr)
 			os.Exit(1)
 		}
 
