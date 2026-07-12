@@ -221,7 +221,8 @@ func client_thread_net(my_index int, hostname string, port string, description s
 		var readErr = binary.Read(conn, binary.LittleEndian, mon_cmd)
 		if readErr != nil {
 			if readErr == io.EOF {
-				continue
+				fmt.Printf("Client %d connection to %s closed.\n", my_index, description)
+				os.Exit(1)
 			}
 
 			fmt.Printf("Read error, client %d got %s.\n", my_index, readErr)
