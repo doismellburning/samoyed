@@ -18,7 +18,7 @@ func Test_decode_aprs_empty_info(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	// Must not panic, and must return a populated struct.
-	var A = decode_aprs(pp, true, "")
+	var A = DecodeAPRS(pp, true, "")
 	assert.NotNil(t, A)
 	assert.Equal(t, "AX.25 UI frame with empty information field", A.g_data_type_desc)
 	assert.Equal(t, "Q1TEST", A.g_src)

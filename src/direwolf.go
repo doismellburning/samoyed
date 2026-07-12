@@ -1051,11 +1051,11 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	if ax25_is_aprs(pp) {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
-		var A = decode_aprs(pp, q_d_opt, "")
+		var A = DecodeAPRS(pp, q_d_opt, "")
 
 		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
-			decode_aprs_print(A)
+			DecodeAPRSPrint(A)
 		}
 
 		/*

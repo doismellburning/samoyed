@@ -186,7 +186,7 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 	pfstate.is_aprs = is_aprs
 
 	if is_aprs {
-		pfstate.decoded = decode_aprs(pp, true, "")
+		pfstate.decoded = DecodeAPRS(pp, true, "")
 	}
 
 	next_token(&pfstate)

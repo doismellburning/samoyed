@@ -166,7 +166,9 @@ func decodeAPRSLine(line string) {
 			direwolf.AX25SafePrint(info, true) // Display non-ASCII to hexadecimal.
 			fmt.Printf("\n")
 
-			direwolf.DecodeAndPrintAPRS(pp, false, "") // Extract information into structure and print it in human readable format.
+			var A = direwolf.DecodeAPRS(pp, false, "") // Extract information into structure.
+
+			direwolf.DecodeAPRSPrint(A) // Now print it in human readable format.
 
 			direwolf.AX25CheckAddresses(pp) // Errors for invalid addresses.
 
@@ -178,7 +180,9 @@ func decodeAPRSLine(line string) {
 		// Normal monitoring format.
 		var pp = direwolf.AX25FromText(line, true)
 		if pp != nil {
-			direwolf.DecodeAndPrintAPRS(pp, false, "") // Extract information into structure and print it in human readable format.
+			var A = direwolf.DecodeAPRS(pp, false, "") // Extract information into structure.
+
+			direwolf.DecodeAPRSPrint(A) // Now print it in human readable format.
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.
