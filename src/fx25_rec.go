@@ -35,7 +35,7 @@ type fx_context_s struct {
 var fx_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*fx_context_s
 
 var FXTEST = false
-var fx25_test_count = 0
+var FX25TestCount = 0
 
 /***********************************************************************************
  *
@@ -263,7 +263,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 				}
 
 				if FXTEST {
-					fx25_test_count++
+					FX25TestCount++
 				} else {
 					var alevel = demod_get_audio_level(channel, subchannel)
 

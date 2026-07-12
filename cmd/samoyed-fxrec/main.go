@@ -46,11 +46,11 @@ func main() {
 		fp.Close()
 	}
 
-	if direwolf.FX25TestCount() == 11 {
+	if direwolf.FX25TestCount == 11 {
 		fmt.Printf("***** FX25 unit test Success - all tests passed. *****\n")
 		return
 	}
 
-	fmt.Printf("***** FX25 unit test FAILED.  Only %d/11 tests passed. *****\n", direwolf.FX25TestCount())
+	fmt.Printf("***** FX25 unit test FAILED.  Only %d/11 tests passed. *****\n", direwolf.FX25TestCount)
 	os.Exit(1)
 }
