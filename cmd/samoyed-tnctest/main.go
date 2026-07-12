@@ -442,7 +442,8 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	mon_cmd = new(direwolf.AGWPEHeader)
 	mon_cmd.DataKind = 'k'
 
-	if writeErr := binary.Write(conn, binary.LittleEndian, mon_cmd); writeErr != nil {
+	var writeErr = binary.Write(conn, binary.LittleEndian, mon_cmd)
+	if writeErr != nil {
 		fmt.Printf("Write error, TNC %d got %s.\n", my_index, writeErr)
 		os.Exit(1)
 	}
@@ -456,7 +457,8 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	mon_cmd.DataKind = 'X'
 	copy(mon_cmd.CallFrom[:], tnc_address)
 
-	if writeErr := binary.Write(conn, binary.LittleEndian, mon_cmd); writeErr != nil {
+	writeErr = binary.Write(conn, binary.LittleEndian, mon_cmd)
+	if writeErr != nil {
 		fmt.Printf("Write error, TNC %d got %s.\n", my_index, writeErr)
 		os.Exit(1)
 	}
@@ -777,9 +779,17 @@ func tnc_send_data(from int, to int, data string) {
 
 		header.DataLen = uint32(len(data))
 
-		binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
+		var writeErr = binary.Write(tnctest_server_sock[from], binary.LittleEndian, header)
+		if writeErr != nil {
+			fmt.Printf("Write error, TNC %d got %s sending header.\n", from, writeErr)
+			os.Exit(1)
+		}
 
-		tnctest_server_sock[from].Write([]byte(data))
+		writeErr = writeFull(tnctest_server_sock[from], []byte(data))
+		if writeErr != nil {
+			fmt.Printf("Write error, TNC %d got %s sending data.\n", from, writeErr)
+			os.Exit(1)
+		}
 	} else {
 		// The assumption is that we are in CONVERSE mode.
 		// The data should be terminated by carriage return.
@@ -800,4 +810,18 @@ func tnc_send_data(from int, to int, data string) {
 			direwolf.SerialPortWrite(tnctest_serial_fd[from], []byte(data))
 		}
 	}
+}
+
+// writeFull writes all of data to w, looping in case of a short write.
+func writeFull(w io.Writer, data []byte) error {
+	for len(data) > 0 {
+		var n, err = w.Write(data)
+		if err != nil {
+			return err
+		}
+
+		data = data[n:]
+	}
+
+	return nil
 }
