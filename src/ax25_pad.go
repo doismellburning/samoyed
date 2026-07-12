@@ -1133,7 +1133,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 
 	//dw_printf ("------\n");
 	//dw_printf ("dump after ax25_set_addr (%d, %s)\n", n, ad);
-	//ax25_hex_dump (this_p);
+	//AX25HexDump (this_p);
 	//dw_printf ("------\n");
 }
 
@@ -2275,7 +2275,7 @@ func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int
 
 /*------------------------------------------------------------------
  *
- * Function:	ax25_hex_dump
+ * Function:	AX25HexDump
  *
  * Purpose:	Print out packet in hexadecimal for debugging.
  *
@@ -2364,7 +2364,7 @@ func pid_to_text(p int) string {
 	}
 }
 
-func ax25_hex_dump(this_p *packet_t) {
+func AX25HexDump(this_p *packet_t) {
 	var fptr = this_p.frame_data
 
 	if this_p.num_addr >= AX25_MIN_ADDRS && this_p.num_addr <= AX25_MAX_ADDRS {
@@ -2431,7 +2431,7 @@ func ax25_hex_dump(this_p *packet_t) {
 	}
 
 	HexDump(fptr[:this_p.frame_len])
-} /* end ax25_hex_dump */
+} /* end AX25HexDump */
 
 /*------------------------------------------------------------------
  *

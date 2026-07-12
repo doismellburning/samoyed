@@ -812,7 +812,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 	if h_opt {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		ax25_hex_dump(pp)
+		AX25HexDump(pp)
 		dw_printf("------\n")
 	}
 
