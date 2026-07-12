@@ -442,7 +442,10 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	mon_cmd = new(direwolf.AGWPEHeader)
 	mon_cmd.DataKind = 'k'
 
-	binary.Write(conn, binary.LittleEndian, mon_cmd)
+	if writeErr := binary.Write(conn, binary.LittleEndian, mon_cmd); writeErr != nil {
+		fmt.Printf("Write error, TNC %d got %s.\n", my_index, writeErr)
+		os.Exit(1)
+	}
 
 	/*
 	 * Send command to register my callsign for incoming connect request.
@@ -453,7 +456,10 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	mon_cmd.DataKind = 'X'
 	copy(mon_cmd.CallFrom[:], tnc_address)
 
-	binary.Write(conn, binary.LittleEndian, mon_cmd)
+	if writeErr := binary.Write(conn, binary.LittleEndian, mon_cmd); writeErr != nil {
+		fmt.Printf("Write error, TNC %d got %s.\n", my_index, writeErr)
+		os.Exit(1)
+	}
 
 	/*
 	 * Inform main program and observer that we are ready to go.
