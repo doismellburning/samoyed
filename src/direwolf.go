@@ -1062,7 +1062,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		 * Perform validity check on each address.
 		 * This should print an error message if any issues.
 		 */
-		ax25_check_addresses(pp)
+		AX25CheckAddresses(pp)
 
 		// Send to log file.
 

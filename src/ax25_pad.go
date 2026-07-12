@@ -969,7 +969,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 
 /*-------------------------------------------------------------------
  *
- * Name:        ax25_check_addresses
+ * Name:        AX25CheckAddresses
  *
  * Purpose:     Check addresses of given packet and print message if any issues.
  *		We call this when receiving and transmitting.
@@ -1010,7 +1010,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t) bool {
+func AX25CheckAddresses(pp *packet_t) bool {
 	var all_ok = true
 
 	for n := 0; n < ax25_get_num_addr(pp); n++ {
@@ -1029,7 +1029,7 @@ func ax25_check_addresses(pp *packet_t) bool {
 	}
 
 	return all_ok
-} /* end ax25_check_addresses */
+} /* end AX25CheckAddresses */
 
 /*------------------------------------------------------------------------------
  *

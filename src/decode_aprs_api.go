@@ -9,10 +9,6 @@ func TextColorSetInfo() {
 	text_color_set(DW_COLOR_INFO)
 }
 
-func AX25CheckAddresses(pp *packet_t) bool {
-	return ax25_check_addresses(pp)
-}
-
 func AX25HexDump(pp *packet_t) {
 	ax25_hex_dump(pp)
 }
