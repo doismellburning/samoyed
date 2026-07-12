@@ -52,7 +52,7 @@ type DeviceIDData struct {
 	ptocalls []*tocalls
 }
 
-var deviceIDData *DeviceIDData
+var DeviceIDDataInstance *DeviceIDData
 
 /*------------------------------------------------------------------
  *

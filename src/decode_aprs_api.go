@@ -5,10 +5,6 @@ package direwolf
 // the AX.25/APRS decoding with the rest of direwolf without pulling the
 // whole decode_aprs CLI into the package.
 
-func SetDeviceIDData(d *DeviceIDData) {
-	deviceIDData = d
-}
-
 func SetAPRSSymbolData(d *APRSSymbolData) {
 	aprsSymbolData = d
 }
