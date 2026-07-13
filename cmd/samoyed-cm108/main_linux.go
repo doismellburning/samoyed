@@ -141,8 +141,8 @@ func main() {
 	for i := range things {
 		if i == 0 || things[i].Devpath != things[i-1].Devpath {
 			var matches = r.FindStringSubmatch(things[i].Devpath)
-			if len(matches) > 0 {
-				var without_number = matches[0]
+			if len(matches) > 1 {
+				var without_number = matches[1]
 				fmt.Printf("DEVPATH==\"%s?\", ATTR{id}=\"%s\"\n", without_number, suggested_names[iname])
 
 				if iname < 6 {
