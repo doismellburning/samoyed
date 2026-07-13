@@ -52,7 +52,7 @@ type WaypointSender struct {
  *
  *---------------------------------------------------------------*/
 
-func NewWaypointSender(mc *misc_config_s) *WaypointSender {
+func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set (DW_COLOR_DEBUG);
@@ -62,7 +62,10 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 	*/
 	var ws = &WaypointSender{} //nolint:exhaustruct
 
-	if mc.waypoint_udp_portnum > 0 {
+	var udpRequested = mc.waypoint_udp_portnum > 0
+	var serialRequested = mc.waypoint_serial_port != ""
+
+	if udpRequested {
 		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))
 
 		var conn, err = net.Dial("udp", addr)
@@ -80,7 +83,7 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 	 * First try to get fd if they have same device name.
 	 * If that fails, do own serial port open.
 	 */
-	if mc.waypoint_serial_port != "" {
+	if serialRequested {
 		ws.serialPortFd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
@@ -96,6 +99,21 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 		}
 	}
 
+	// If the user asked for waypoint output but every destination they
+	// asked for failed to open, don't hand back a sender that will
+	// silently do nothing on every SendSentence/SendAIS call.
+	if (udpRequested || serialRequested) && ws.udpSock == nil && ws.serialPortFd == nil {
+		var requested []string
+		if udpRequested {
+			requested = append(requested, fmt.Sprintf("UDP %s", net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))))
+		}
+		if serialRequested {
+			requested = append(requested, fmt.Sprintf("serial port %s", mc.waypoint_serial_port))
+		}
+
+		return nil, fmt.Errorf("waypoint output requested but no destination could be opened (%s)", strings.Join(requested, ", "))
+	}
+
 	// Set default formats if user did not specify any.
 
 	ws.formats = mc.waypoint_formats
@@ -107,7 +125,7 @@ func NewWaypointSender(mc *misc_config_s) *WaypointSender {
 		ws.formats |= WPL_FORMAT_NMEA_GENERIC /* See explanation below. */
 	}
 
-	return ws
+	return ws, nil
 }
 
 func (ws *WaypointSender) SetDebug(n int) {

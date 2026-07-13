@@ -771,7 +771,13 @@ x = Silence FX.25 information.`)
 	 */
 	dwgps_init(misc_config, d_g_opt)
 
-	waypointSender = NewWaypointSender(misc_config)
+	var waypointErr error
+	waypointSender, waypointErr = NewWaypointSender(misc_config)
+	if waypointErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("%v\n", waypointErr)
+		os.Exit(1)
+	}
 	waypointSender.SetDebug(d_w_opt)
 
 	/*
