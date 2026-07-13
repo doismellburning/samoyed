@@ -824,10 +824,10 @@ type parseState struct {
 	text    string // current raw scanner line
 	keyword string // original (not uppercased) keyword token
 
-	audio *audio_s
-	digi  *digi_config_s
-	cdigi *cdigi_config_s
-	tt    *tt_config_s
+	audio  *audio_s
+	digi   *digi_config_s
+	cdigi  *cdigi_config_s
+	tt     *tt_config_s
 	igate  *igate_config_s
 	misc   *misc_config_s
 	netrom *netrom_config_s
