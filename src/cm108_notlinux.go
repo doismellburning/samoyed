@@ -6,6 +6,6 @@ func cm108_find_ptt(_ string) string {
 	return ""
 }
 
-func cm108_set_gpio_pin(_ string, _ int, _ int) int {
+func CM108SetGPIOPin(_ string, _ int, _ int) int {
 	return -1
 }
