@@ -202,7 +202,7 @@ type decode_aprs_t struct {
  *
  *------------------------------------------------------------------*/
 
-func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
+func DecodeAPRS(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_t {
 	//dw_printf ("DEBUG decode_aprs quiet=%d, third_party=%p\n", quiet, third_party_src);
 	var pinfo = AX25GetInfo(pp)
 
@@ -308,7 +308,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 		if pp_payload != nil {
 			var payload_src = pinfo[1:]
 			payload_src, _, _ = bytes.Cut(payload_src, []byte{'>'})
-			A = decode_aprs(pp_payload, quiet, string(payload_src)) // 1 means used recursively
+			A = DecodeAPRS(pp_payload, quiet, string(payload_src)) // 1 means used recursively
 			A.g_has_thirdparty_header = true
 
 			AX25Delete(pp_payload)
@@ -359,7 +359,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	case '`': /* Current Mic-E Data */
 
 	default:
-		A.g_mfr = deviceIDData.deviceid_decode_dest(A.g_dest)
+		A.g_mfr = DeviceIDDataInstance.deviceid_decode_dest(A.g_dest)
 	}
 
 	switch pinfo[0] { /* "DTI" data type identifier. */
@@ -494,8 +494,8 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 
 		//dw_printf ("DEBUG decode_aprs@end1 third_party=%d, symbol_table=%c, symbol_code=%c, *pinfo=%c\n", third_party, A.g_symbol_table, A.g_symbol_code, *pinfo);
 		if pinfo[0] != ':' && pinfo[0] != '}' {
-			if aprsSymbolData != nil { // TODO KG Consider some sort of debug message on an else?
-				var symtab, symbol, ok = aprsSymbolData.symbols_from_dest_or_src(pinfo[0], A.g_src, A.g_dest)
+			if APRSSymbolDataInstance != nil { // TODO KG Consider some sort of debug message on an else?
+				var symtab, symbol, ok = APRSSymbolDataInstance.symbols_from_dest_or_src(pinfo[0], A.g_src, A.g_dest)
 				if ok {
 					A.g_symbol_table = symtab
 					A.g_symbol_code = symbol
@@ -509,7 +509,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	return A
 } /* end decode_aprs */
 
-func decode_aprs_print(A *decode_aprs_t) {
+func DecodeAPRSPrint(A *decode_aprs_t) {
 	/*
 	 * First line has:
 	 * - packet type
@@ -534,8 +534,8 @@ func decode_aprs_print(A *decode_aprs_t) {
 	//dw_printf ("DEBUG decode_aprs_print symbol_code=%c=0x%02x\n", A.g_symbol_code, A.g_symbol_code);
 
 	if A.g_symbol_code != ' ' {
-		if aprsSymbolData != nil {
-			var symbol_description = aprsSymbolData.symbols_get_description(A.g_symbol_table, A.g_symbol_code)
+		if APRSSymbolDataInstance != nil {
+			var symbol_description = APRSSymbolDataInstance.symbols_get_description(A.g_symbol_table, A.g_symbol_code)
 
 			//dw_printf ("DEBUG decode_aprs_print symbol_description_description=%s\n", symbol_description);
 
@@ -1534,7 +1534,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	/* The telemetry field, in the original spec, is no longer used. */
 
 	// Comment with vendor/model removed.
-	var trimmed, device = deviceIDData.deviceid_decode_mice(string(mcomment))
+	var trimmed, device = DeviceIDDataInstance.deviceid_decode_mice(string(mcomment))
 	A.g_mfr = device
 
 	// Possible altitude at beginning of remaining comment.

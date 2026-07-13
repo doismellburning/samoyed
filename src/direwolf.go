@@ -48,7 +48,7 @@ var A_opt_ais_to_obj bool /* "-A" Convert received AIS to APRS "Object Report." 
 var audio_config *audio_s
 var dw_tt_config tt_config_s
 var misc_config *misc_config_s
-var aprsSymbolData *APRSSymbolData
+var APRSSymbolDataInstance *APRSSymbolData
 var waypointSender *WaypointSender
 var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
@@ -180,8 +180,8 @@ x = Silence FX.25 information.`)
 	}
 
 	if *symbolDump {
-		aprsSymbolData = NewAPRSSymbolData()
-		aprsSymbolData.symbols_list()
+		APRSSymbolDataInstance = NewAPRSSymbolData()
+		APRSSymbolDataInstance.symbols_list()
 		os.Exit(0)
 	}
 
@@ -286,7 +286,7 @@ x = Silence FX.25 information.`)
 
 	goHamlib.SetDebugLevel(goHamlib.DebugLevel(d_h_opt))
 
-	aprsSymbolData = NewAPRSSymbolData()
+	APRSSymbolDataInstance = NewAPRSSymbolData()
 
 	audio_config = new(audio_s)
 	misc_config = new(misc_config_s)
@@ -573,7 +573,7 @@ x = Silence FX.25 information.`)
 	 * Files not supported at this time.
 	 * Can always "cat" the file and pipe it into stdin.
 	 */
-	deviceIDData = NewDeviceIDData()
+	DeviceIDDataInstance = NewDeviceIDData()
 
 	var err = audio_open(audio_config)
 	if err < 0 {
@@ -1036,7 +1036,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	if d_p_opt {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		ax25_hex_dump(pp)
+		AX25HexDump(pp)
 		dw_printf("------\n")
 	}
 
@@ -1051,18 +1051,18 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	if ax25_is_aprs(pp) {
 		// we still want to decode it for logging and other processing.
 		// Just be quiet about errors if "-qd" is set.
-		var A = decode_aprs(pp, q_d_opt, "")
+		var A = DecodeAPRS(pp, q_d_opt, "")
 
 		if !q_d_opt {
 			// Print it all out in human readable format unless "-q d" option used.
-			decode_aprs_print(A)
+			DecodeAPRSPrint(A)
 		}
 
 		/*
 		 * Perform validity check on each address.
 		 * This should print an error message if any issues.
 		 */
-		ax25_check_addresses(pp)
+		AX25CheckAddresses(pp)
 
 		// Send to log file.
 

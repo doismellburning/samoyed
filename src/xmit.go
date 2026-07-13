@@ -838,14 +838,14 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 		dw_printf("\n")
 	}
 
-	ax25_check_addresses(pp)
+	AX25CheckAddresses(pp)
 
 	/* Optional hex dump of packet. */
 
 	if xs.debugXmitPacket {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
-		ax25_hex_dump(pp)
+		AX25HexDump(pp)
 		dw_printf("------\n")
 	}
 

@@ -415,7 +415,7 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 			kf.kiss_len++
 		}
 
-		var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
+		var unwrapped = KissUnwrap(kf.kiss_msg[:kf.kiss_len])
 
 		// unwrapped[0] is the type byte (channel << 4 | cmd).
 		// We only care about DATA_FRAME commands (lower nibble == 0).
