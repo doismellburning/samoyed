@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -47,27 +48,89 @@ var tnc_port = "8000" /* a TCP port number  */
  * The same user (callsign), on a different channel, is a different session.
  */
 
-type session_s struct {
-	client_addr Callsign // Callsign of other station.
-	// Clear to mean this table entry is not in use.
+type sessionKey struct {
+	channel byte
+	addr    Callsign
+}
 
-	channel byte // Radio channel.
+type session struct {
+	channel    byte     // Radio channel.
+	clientAddr Callsign // Callsign of other station.
 
-	login_time time.Time // Time when connection established.
+	loginTime time.Time // Time when connection established.
 
 	// For the timing test.
 	// Send specified number of frames, optional length.
 	// When finished summarize with statistics.
 
-	tt_start_time time.Time
-	tt_count      int // Number to send.
-	tt_length     int // Bytes in info part.
-	tt_next       int // Next sequence to send.
+	ttStartTime time.Time
+	ttCount     int // Number to send.
+	ttLength    int // Bytes in info part.
+	ttNext      int // Next sequence to send.
 
-	tx_queue_len int // Number in transmit queue.  For flow control.
+	txQueueLen int // Number in transmit queue.  For flow control.
 }
 
-var session []session_s
+type appServer struct {
+	sessions map[sessionKey]*session
+}
+
+func newAppServer() *appServer {
+	var srv = new(appServer)
+
+	srv.sessions = make(map[sessionKey]*session)
+
+	return srv
+}
+
+var srv = newAppServer()
+
+// findSession looks up an existing session, returning nil if there isn't one.
+func (srv *appServer) findSession(channel byte, addr Callsign) *session {
+	return srv.sessions[sessionKey{channel: channel, addr: addr}]
+}
+
+// createSession returns the existing session for channel/addr, creating one if necessary.
+func (srv *appServer) createSession(channel byte, addr Callsign) *session {
+	var key = sessionKey{channel: channel, addr: addr}
+
+	if s, ok := srv.sessions[key]; ok {
+		return s
+	}
+
+	var s = new(session)
+
+	s.channel = channel
+	s.clientAddr = addr
+	s.loginTime = time.Now()
+
+	srv.sessions[key] = s
+
+	return s
+}
+
+func (srv *appServer) removeSession(channel byte, addr Callsign) {
+	delete(srv.sessions, sessionKey{channel: channel, addr: addr})
+}
+
+// sortedSessions returns the current sessions in a stable order, for display purposes.
+func (srv *appServer) sortedSessions() []*session {
+	var sessions = make([]*session, 0, len(srv.sessions))
+
+	for _, s := range srv.sessions {
+		sessions = append(sessions, s)
+	}
+
+	sort.Slice(sessions, func(i, j int) bool {
+		if sessions[i].channel != sessions[j].channel {
+			return sessions[i].channel < sessions[j].channel
+		}
+
+		return string(sessions[i].clientAddr[:]) < string(sessions[j].clientAddr[:])
+	})
+
+	return sessions
+}
 
 /*------------------------------------------------------------------
  *
@@ -144,81 +207,87 @@ func main() {
 	///   should happen automatically now.   agwlib_G_ask_port_information ();
 	for {
 		direwolf.SLEEP_SEC(1) // other places based on 1 second assumption.
-		poll_timing_test()
+		srv.pollTimingTest()
 	}
 } /* end main */
 
-func poll_timing_test() {
-	for s := range session {
-		if session[s].tt_count == 0 {
-			continue // nothing to do
-		} else if session[s].tt_next <= session[s].tt_count {
-			var rem = session[s].tt_count - session[s].tt_next + 1 // remaining to send.
+func (srv *appServer) pollTimingTest() {
+	for _, s := range srv.sessions {
+		s.pollTimingTest()
+	}
+}
 
-			agwlib_Y_outstanding_frames_for_station(session[s].channel, mycall, session[s].client_addr)
-			direwolf.SLEEP_MS(10)
+func (s *session) pollTimingTest() {
+	if s.ttCount == 0 {
+		return // nothing to do
+	}
 
-			if session[s].tx_queue_len > 128 {
-				continue // enough queued up for now.
-			}
+	if s.ttNext <= s.ttCount {
+		var rem = s.ttCount - s.ttNext + 1 // remaining to send.
 
-			if rem > 64 {
-				rem = 64 // add no more than 64 at a time.
-			}
+		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.clientAddr)
+		direwolf.SLEEP_MS(10)
 
-			for range rem {
-				var c = 'a'
+		if s.txQueueLen > 128 {
+			return // enough queued up for now.
+		}
 
-				var stuff = fmt.Sprintf("%06d ", session[s].tt_next)
-				for k := len(stuff); k < session[s].tt_length-1; k++ {
-					stuff += string(c)
+		if rem > 64 {
+			rem = 64 // add no more than 64 at a time.
+		}
 
-					c++
-					if c == 'z'+1 {
-						c = 'A'
-					}
+		for range rem {
+			var c = 'a'
 
-					if c == 'Z'+1 {
-						c = '0'
-					}
+			var stuff = fmt.Sprintf("%06d ", s.ttNext)
+			for k := len(stuff); k < s.ttLength-1; k++ {
+				stuff += string(c)
 
-					if c == '9'+1 {
-						c = 'a'
-					}
+				c++
+				if c == 'z'+1 {
+					c = 'A'
 				}
 
-				stuff += "\r"
-				agwlib_D_send_connected_data(session[s].channel, 0xF0, mycall, session[s].client_addr, []byte(stuff))
+				if c == 'Z'+1 {
+					c = '0'
+				}
 
-				session[s].tt_next++
-			}
-		} else {
-			// All done queuing up the packets.
-			// Wait until they have all been sent and ack'ed by other end.
-			agwlib_Y_outstanding_frames_for_station(session[s].channel, mycall, session[s].client_addr)
-			direwolf.SLEEP_MS(10)
-
-			if session[s].tx_queue_len > 0 {
-				continue // not done yet.
+				if c == '9'+1 {
+					c = 'a'
+				}
 			}
 
-			var elapsed = time.Since(session[s].tt_start_time)
-			if elapsed <= 0 {
-				elapsed = 1 // avoid divide by 0
-			}
+			stuff += "\r"
+			agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.clientAddr, []byte(stuff))
 
-			var byte_count = session[s].tt_count * session[s].tt_length
-
-			var summary = fmt.Sprintf("%d bytes in %d seconds, %d bytes/sec, efficiency %d%% at 1200, %d%% at 9600.\r",
-				byte_count, elapsed, int(float64(byte_count)/elapsed.Seconds()),
-				int(float64(byte_count)*8*100/elapsed.Seconds()/1200),
-				int(float64(byte_count)*8*100/elapsed.Seconds()/9600))
-
-			agwlib_D_send_connected_data(session[s].channel, 0xF0, mycall, session[s].client_addr, []byte(summary))
-			session[s].tt_count = 0 // all done.
+			s.ttNext++
 		}
+	} else {
+		// All done queuing up the packets.
+		// Wait until they have all been sent and ack'ed by other end.
+		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.clientAddr)
+		direwolf.SLEEP_MS(10)
+
+		if s.txQueueLen > 0 {
+			return // not done yet.
+		}
+
+		var elapsed = time.Since(s.ttStartTime)
+		if elapsed <= 0 {
+			elapsed = 1 // avoid divide by 0
+		}
+
+		var byte_count = s.ttCount * s.ttLength
+
+		var summary = fmt.Sprintf("%d bytes in %d seconds, %d bytes/sec, efficiency %d%% at 1200, %d%% at 9600.\r",
+			byte_count, elapsed, int(float64(byte_count)/elapsed.Seconds()),
+			int(float64(byte_count)*8*100/elapsed.Seconds()/1200),
+			int(float64(byte_count)*8*100/elapsed.Seconds()/9600))
+
+		agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.clientAddr, []byte(summary))
+		s.ttCount = 0 // all done.
 	}
-} // end poll_timing_test
+} // end session.pollTimingTest
 
 /*-------------------------------------------------------------------
  *
@@ -282,29 +351,15 @@ func poll_timing_test() {
 
 // old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data)
 func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign, incoming bool, data []byte) { //nolint:unparam
-	var s = find_session(channel, call_from, true)
+	srv.createSession(channel, call_from)
 
-	if s >= 0 {
-		fmt.Printf("Begin session %d: %s\n", s, data)
+	fmt.Printf("Begin session %d,%s: %s\n", channel, call_from, data)
 
-		// Send greeting.
+	// Send greeting.
 
-		var greeting = "Welcome!  Type ? for list of commands or HELP <command> for details.\r"
+	var greeting = "Welcome!  Type ? for list of commands or HELP <command> for details.\r"
 
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-	} else {
-		fmt.Printf("Too many users already: %s\n", data)
-
-		// Sorry, too many users already.
-		var greeting = "Sorry, maximum number of users has been exceeded.  Try again later.\r"
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-
-		// FIXME: Ideally we'd want to wait until nothing in the outgoing queue
-		// to that station so we know the rejection message was received.
-		direwolf.SLEEP_SEC(10)
-		agwlib_d_disconnect(channel, call_to, call_from)
-	}
+	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 } /* end agw_cb_C_connection_received */
 
 /*-------------------------------------------------------------------
@@ -330,17 +385,11 @@ func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign
  *--------------------------------------------------------------------*/
 
 func agw_cb_d_disconnected(channel byte, call_from Callsign, call_to Callsign, data []byte) { //nolint:unparam
-	var s = find_session(channel, call_from, false)
-
 	var dataStr = strings.TrimSpace(string(data))
 
-	fmt.Printf("End session %d: %s\n", s, dataStr)
+	fmt.Printf("End session %d,%s: %s\n", channel, call_from, dataStr)
 
-	// Remove from session table.
-
-	if s >= 0 {
-		session = append(session[:s], session[s+1:]...)
-	}
+	srv.removeSession(channel, call_from)
 } /* end agw_cb_d_disconnected */
 
 /*-------------------------------------------------------------------
@@ -361,20 +410,31 @@ func agw_cb_d_disconnected(channel byte, call_from Callsign, call_to Callsign, d
  *
  *--------------------------------------------------------------------*/
 
+// commandHandler implements one connected-mode user command (e.g. "who", "bye").
+type commandHandler func(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte)
+
+var commandTable = map[string]commandHandler{
+	"who":  cmd_who,
+	"test": cmd_test,
+	"bye":  cmd_bye,
+	"help": cmd_help,
+	"?":    cmd_help,
+}
+
 func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign, data []byte) {
-	var s = find_session(channel, call_from, false)
+	var s = srv.findSession(channel, call_from)
 
 	var dataStr = strings.TrimSpace(string(data))
 
 	// TODO: Should timestamp to all output.
 
-	fmt.Printf("%d,%d,%s: %s\n", s, channel, call_from, dataStr)
-
-	if s < 0 {
+	if s == nil {
 		// Uh oh. Data from some station when not connected.
-		fmt.Printf("Internal error.  Incoming data, no corresponding session.\n")
+		fmt.Printf("Internal error.  Incoming data, no corresponding session: %d,%s: %s\n", channel, call_from, dataStr)
 		return
 	}
+
+	fmt.Printf("%d,%s: %s\n", channel, call_from, dataStr)
 
 	// Process the command from user.
 
@@ -389,70 +449,80 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		return
 	}
 
-	if strings.EqualFold(pcmd, "who") {
-		// who - list people currently logged in.
-		var greeting = "Session Channel User   Since\r"
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-
-		for n := range session {
-			if session[n].client_addr[0] != 0 {
-				var greeting = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, session[n].channel, session[n].client_addr)
-
-				agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-			}
-		}
-	} else if strings.EqualFold(pcmd, "test") {
-		// test - timing test
-		// Send specified number of frames with optional length.
-		var _pcount, rest2, _ = BytesCut(rest, ' ')
-
-		var pcount = string(_pcount)
-
-		var _plength, _, _ = BytesCut(rest2, ' ')
-
-		var plength = string(_plength)
-
-		session[s].tt_start_time = time.Now()
-		session[s].tt_next = 1
-		session[s].tt_length = 256
-		session[s].tt_count = 1
-
-		if plength != "" {
-			session[s].tt_length, _ = strconv.Atoi(plength)
-			if session[s].tt_length < 16 {
-				session[s].tt_length = 16
-			}
-
-			if session[s].tt_length > AX25_MAX_INFO_LEN {
-				session[s].tt_length = AX25_MAX_INFO_LEN
-			}
-		}
-
-		if pcount != "" {
-			session[s].tt_count, _ = strconv.Atoi(pcount)
-		}
-	} else if strings.EqualFold(pcmd, "bye") {
-		// bye - disconnect.
-		var greeting = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-		// Ideally we'd want to wait until nothing in the outgoing queue
-		// to that station so we know the message was received.
-		direwolf.SLEEP_SEC(10)
-		agwlib_d_disconnect(channel, call_to, call_from)
-	} else if strings.EqualFold(pcmd, "help") || strings.EqualFold(pcmd, "?") {
-		// help.
-		var greeting = "Help not yet available.\r"
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-	} else {
+	var handler, ok = commandTable[strings.ToLower(pcmd)]
+	if !ok {
 		// command not recognized.
 		var greeting = "Invalid command. Type ? for list of commands or HELP <command> for details.\r"
 
 		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+
+		return
 	}
+
+	handler(s, channel, call_to, call_from, rest)
 } /* end agw_cb_D_connected_data */
+
+// cmd_who lists people currently logged in.
+func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+	var greeting = "Session Channel User   Since\r"
+
+	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+
+	for n, other := range srv.sortedSessions() {
+		var line = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, other.channel, other.clientAddr)
+
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line))
+	}
+}
+
+// cmd_test runs a timing test: send the specified number of frames with optional length.
+func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+	var _pcount, rest2, _ = BytesCut(rest, ' ')
+
+	var pcount = string(_pcount)
+
+	var _plength, _, _ = BytesCut(rest2, ' ')
+
+	var plength = string(_plength)
+
+	s.ttStartTime = time.Now()
+	s.ttNext = 1
+	s.ttLength = 256
+	s.ttCount = 1
+
+	if plength != "" {
+		s.ttLength, _ = strconv.Atoi(plength)
+		if s.ttLength < 16 {
+			s.ttLength = 16
+		}
+
+		if s.ttLength > AX25_MAX_INFO_LEN {
+			s.ttLength = AX25_MAX_INFO_LEN
+		}
+	}
+
+	if pcount != "" {
+		s.ttCount, _ = strconv.Atoi(pcount)
+	}
+}
+
+// cmd_bye disconnects the user.
+func cmd_bye(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+	var greeting = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
+
+	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+	// Ideally we'd want to wait until nothing in the outgoing queue
+	// to that station so we know the message was received.
+	direwolf.SLEEP_SEC(10)
+	agwlib_d_disconnect(channel, call_to, call_from)
+}
+
+// cmd_help prints help text.
+func cmd_help(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
+	var greeting = "Help not yet available.\r"
+
+	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+}
 
 /*-------------------------------------------------------------------
  *
@@ -524,77 +594,19 @@ func agw_cb_G_port_information(num_chan_avail int, chan_descriptions []string) {
  *--------------------------------------------------------------------*/
 
 func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, call_to Callsign, frame_count int) { //nolint:unparam
-	var s = find_session(channel, call_to, false)
+	var s = srv.findSession(channel, call_to)
 
-	fmt.Printf("debug ----------------------> session %d, callback Y outstanding frame_count %d\n", s, frame_count)
+	if s == nil {
+		fmt.Printf("Oops!  Did not expect to be here.\n")
+		return
+	}
+
+	fmt.Printf("debug ----------------------> session %d,%s, callback Y outstanding frame_count %d\n", channel, call_to, frame_count)
 
 	// Update the transmit queue length
 
-	if s >= 0 {
-		session[s].tx_queue_len = frame_count
-	} else {
-		fmt.Printf("Oops!  Did not expect to be here.\n")
-	}
+	s.txQueueLen = frame_count
 } /* end agw_cb_Y_outstanding_frames_for_station */
-
-/*-------------------------------------------------------------------
- *
- * Name:        find_session
- *
- * Purpose:     Given a channel number and address (callsign), find existing
- *		table entry or create a new one.
- *
- * Inputs:	chan	- Radio channel number.
- *
- *		addr	- Address of station contacting us.
- *
- *		create	- If true, try create a new entry if not already there.
- *
- * Returns:	"session id" which is an index into "session" array or -1 for failure.
- *
- *--------------------------------------------------------------------*/
-
-func find_session(channel byte, addr Callsign, create bool) int {
-	// Is it there already?
-	var s int
-
-	for i := range session {
-		if session[i].channel == channel && session[i].client_addr == addr {
-			s = i
-			break
-		}
-	}
-
-	if s >= 0 {
-		return (s)
-	}
-
-	if !create {
-		return (-1)
-	}
-
-	// No, and there is a request to add a new entry.
-	// See if we have any available space.
-
-	s = -1
-
-	for i := range session {
-		if len(session[i].client_addr) == 0 {
-			s = i
-			break
-		}
-	}
-
-	if s < 0 {
-		return (-1)
-	}
-
-	session[s].client_addr = addr
-	session[s].channel = channel
-	session[s].login_time = time.Now()
-
-	return (s)
-} /* end find_session */
 
 // strings.Cut for []bytes
 func BytesCut(s []byte, b byte) ([]byte, []byte, bool) { //nolint:unparam
