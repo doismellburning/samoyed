@@ -601,7 +601,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 
 		return (ax25_i_frame(addrs, num_addr, cr, modulo, nr, ns, pf, axpid, pinfo))
 	}
-} // end
+}
 
 /*--------------------------------------------------------------------------------
  *

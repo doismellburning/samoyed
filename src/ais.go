@@ -554,7 +554,7 @@ func AISCheckLength(aisType int, length int) int {
 		//dw_printf("AIS ERROR: message type %d is invalid.\n", aisType);
 		return (-1) // Invalid type.
 	}
-} // end AISCheckLength
+}
 
 /*-------------------------------------------------------------------
  *

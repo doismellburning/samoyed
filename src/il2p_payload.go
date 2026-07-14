@@ -85,7 +85,7 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 
 	return p, (p.small_block_count*(p.small_block_size+p.parity_symbols_per_block) +
 		p.large_block_count*(p.large_block_size+p.parity_symbols_per_block))
-} // end il2p_payload_compute
+}
 
 /*--------------------------------------------------------------------------------
  *
@@ -164,7 +164,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 	}
 
 	return pout, encoded_length
-} // end il2p_encode_payload
+}
 
 /*--------------------------------------------------------------------------------
  *
@@ -271,4 +271,4 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 	}
 
 	return pout, decoded_length
-} // end il2p_decode_payload
+}

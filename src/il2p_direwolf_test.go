@@ -75,7 +75,7 @@ func test_scramble(t *testing.T) {
 
 	var scramout = il2p_scramble_block(scramin1)
 	assert.Equal(t, scramout1, scramout)
-} // end test_scramble.
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -261,7 +261,7 @@ func test_payload(t *testing.T) {
 			assert.Equal(t, original_payload[:payload_length], extracted)
 		}
 	}
-} // end test_payload
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -518,7 +518,7 @@ func test_example_headers(t *testing.T) {
 	AX25Delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
-} // end test_example_headers
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -731,7 +731,7 @@ func all_frame_types(t *testing.T) {
 			AX25Delete(pp)
 		}
 	}
-} // end all_frame_types
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 //

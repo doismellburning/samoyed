@@ -186,7 +186,7 @@ func fx25_rec_busy(channel int) bool {
 	}
 
 	return false
-} // end fx25_rec_busy
+}
 
 /***********************************************************************************
  *
@@ -290,7 +290,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d.%d]: FEC failed.  Too many errors.\n", channel, slice)
 	}
-} // process_rs_block
+}
 
 /***********************************************************************************
  *
@@ -391,4 +391,4 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 	fx_hex_dump(pin[:ilen])
 
 	return nil // Should never fall off the end.
-} // my_unstuff
+}

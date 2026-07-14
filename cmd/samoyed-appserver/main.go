@@ -218,7 +218,7 @@ func poll_timing_test() {
 			session[s].tt_count = 0 // all done.
 		}
 	}
-} // end poll_timing_test
+}
 
 /*-------------------------------------------------------------------
  *

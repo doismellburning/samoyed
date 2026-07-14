@@ -261,7 +261,7 @@ func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int
 		multi_modem_process_rec_frame(channel, subchannel, slice, H.frame_buf[:H.frame_len], alevel, 0, 0)
 		H.eas_gathering = false
 	}
-} // end eas_rec_bit
+}
 
 /*
 

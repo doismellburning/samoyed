@@ -624,7 +624,7 @@ func phase_shift_to_symbol(phase_shift float64, bits_per_symbol int, bit_quality
 	}
 
 	return (result)
-} // end phase_shift_to_symbol
+}
 
 /*-------------------------------------------------------------------
  *
