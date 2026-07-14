@@ -150,6 +150,8 @@ func (nt *NetTNC) listenThread(channel int) {
 				nt.sock = conn
 
 				dw_printf("Successfully reattached to network TNC.\n")
+			} else {
+				SLEEP_SEC(5)
 			}
 		} else {
 			const NETTNCBUFSIZ = 2048
