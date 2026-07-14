@@ -1,4 +1,4 @@
-package direwolf
+package main
 
 import (
 	"bytes"
@@ -42,7 +42,7 @@ func Test_atest_basic_1(t *testing.T) {
 	os.Stdout = w
 
 	// Run
-	AtestMain()
+	main()
 
 	w.Close()
 
@@ -113,7 +113,7 @@ func buildWAVWithExtraChunks(t *testing.T) []byte {
 // arbitrary metadata chunks (before "fmt " and between "fmt " and "data")
 // and successfully decodes a file containing such chunks.
 func Test_atest_extraChunks(t *testing.T) {
-	// AtestMain registers flags on pflag.CommandLine; reset it so this test
+	// atestMain registers flags on pflag.CommandLine; reset it so this test
 	// can run independently of Test_atest_basic_1.
 	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 
@@ -136,7 +136,7 @@ func Test_atest_extraChunks(t *testing.T) {
 
 	os.Stdout = w
 
-	AtestMain()
+	main()
 
 	w.Close()
 
