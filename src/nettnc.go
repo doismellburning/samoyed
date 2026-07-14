@@ -86,7 +86,9 @@ func nettnc_init(pa *audio_s) {
 func nettnc_attach(channel int, host string, port int) int {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
-	var nt = &NetTNC{host: host, port: port, sock: nil, debug: 0}
+	var nt = new(NetTNC)
+	nt.host = host
+	nt.port = port
 	s_net_tncs[channel] = nt
 
 	var conn, connErr = net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
