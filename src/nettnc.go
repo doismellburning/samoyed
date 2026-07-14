@@ -335,7 +335,7 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 	var _, err = nt.sock.Write(kiss_buff)
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError %d sending packet to KISS Network TNC for channel %d.  Closing connection.\n\n", err, channel)
+		dw_printf("\nError %v sending packet to KISS Network TNC for channel %d.  Closing connection.\n\n", err, channel)
 		nt.sock.Close()
 		nt.sock = nil
 	}
