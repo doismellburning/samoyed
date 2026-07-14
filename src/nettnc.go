@@ -314,6 +314,13 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 func nettnc_send_packet(channel int, pp *packet_t) {
 	var nt = s_net_tncs[channel]
 
+	if nt == nil || nt.sock == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
+
+		return
+	}
+
 	// First, get the on-air frame format from packet object.
 	// Prepend 0 byte for KISS command and channel.
 	var fbuf = ax25_get_frame_data(pp)
