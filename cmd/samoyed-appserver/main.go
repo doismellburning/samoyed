@@ -54,8 +54,7 @@ type sessionKey struct {
 }
 
 type session struct {
-	channel    byte     // Radio channel.
-	clientAddr Callsign // Callsign of other station.
+	sessionKey // Radio channel & callsign of other station.
 
 	loginTime time.Time // Time when connection established.
 
@@ -100,8 +99,7 @@ func (srv *appServer) getOrCreateSession(channel byte, addr Callsign) *session {
 
 	var s = new(session)
 
-	s.channel = channel
-	s.clientAddr = addr
+	s.sessionKey = key
 	s.loginTime = time.Now()
 
 	srv.sessions[key] = s
@@ -126,7 +124,7 @@ func (srv *appServer) sortedSessions() []*session {
 			return sessions[i].channel < sessions[j].channel
 		}
 
-		return string(sessions[i].clientAddr[:]) < string(sessions[j].clientAddr[:])
+		return string(sessions[i].addr[:]) < string(sessions[j].addr[:])
 	})
 
 	return sessions
@@ -225,7 +223,7 @@ func (s *session) pollTimingTest() {
 	if s.ttNext <= s.ttCount {
 		var rem = s.ttCount - s.ttNext + 1 // remaining to send.
 
-		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.clientAddr)
+		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.addr)
 		direwolf.SLEEP_MS(10)
 
 		if s.txQueueLen > 128 {
@@ -258,14 +256,14 @@ func (s *session) pollTimingTest() {
 			}
 
 			stuff += "\r"
-			agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.clientAddr, []byte(stuff))
+			agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.addr, []byte(stuff))
 
 			s.ttNext++
 		}
 	} else {
 		// All done queuing up the packets.
 		// Wait until they have all been sent and ack'ed by other end.
-		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.clientAddr)
+		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.addr)
 		direwolf.SLEEP_MS(10)
 
 		if s.txQueueLen > 0 {
@@ -284,7 +282,7 @@ func (s *session) pollTimingTest() {
 			int(float64(byte_count)*8*100/elapsed.Seconds()/1200),
 			int(float64(byte_count)*8*100/elapsed.Seconds()/9600))
 
-		agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.clientAddr, []byte(summary))
+		agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.addr, []byte(summary))
 		s.ttCount = 0 // all done.
 	}
 } // end session.pollTimingTest
@@ -469,7 +467,7 @@ func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, res
 	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
 
 	for n, other := range srv.sortedSessions() {
-		var line = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, other.channel, other.clientAddr)
+		var line = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, other.channel, other.addr)
 
 		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line))
 	}
