@@ -1553,7 +1553,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	}
 
 	process_comment(A, []byte(trimmed))
-} // end aprs_mic_e
+}
 
 /*------------------------------------------------------------------
  *

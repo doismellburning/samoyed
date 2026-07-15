@@ -297,7 +297,7 @@ func process_from_tnc(cmd *AGWPECommand) {
 		agw_cb_Y_outstanding_frames_for_station(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, frameCount)
 	default:
 	}
-} // end process_from_tnc
+}
 
 /*-------------------------------------------------------------------
  *

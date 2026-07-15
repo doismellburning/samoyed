@@ -47,7 +47,7 @@ func nettnc_init(pa *audio_s) {
 			}
 		}
 	}
-} // end nettnc_init
+}
 
 /*-------------------------------------------------------------------
  *
@@ -110,7 +110,7 @@ func nettnc_attach(channel int, host string, port int) int {
 	//	}
 
 	return (0)
-} // end nettnc_attach
+}
 
 /*-------------------------------------------------------------------
  *
@@ -172,7 +172,7 @@ func nettnc_listen_thread(channel int) {
 			}
 		} // s_tnc_sock != -1
 	} // while (1)
-} // end nettnc_listen_thread
+}
 
 /*-------------------------------------------------------------------
  *

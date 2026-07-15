@@ -54,7 +54,7 @@ func il2p_init(il2p_debug int) {
 			os.Exit(1)
 		}
 	}
-} // end il2p_init
+}
 
 func il2p_get_debug() int {
 	return g_il2p_debug

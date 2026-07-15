@@ -262,6 +262,6 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected 
 
 		return (pp)
 	}
-} // end il2p_decode_header_payload
+}
 
 // end il2p_codec.c

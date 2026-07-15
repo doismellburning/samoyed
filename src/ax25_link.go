@@ -1537,7 +1537,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 	} else {
 		server_outstanding_frames_reply(S.channel, S.client, S.addrs[OWNCALL], S.addrs[PEERCALL], count1+count2)
 	}
-} // end dl_outstanding_frames_request
+}
 
 /*------------------------------------------------------------------------------
  *

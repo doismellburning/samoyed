@@ -195,7 +195,7 @@ func NewDeviceIDData() *DeviceIDData {
 	})
 
 	return d
-} // end NewDeviceIDData
+}
 
 /*------------------------------------------------------------------
  *
@@ -253,7 +253,7 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
 
 	// Not found in table.
 	return "UNKNOWN vendor/model"
-} // end deviceid_decode_dest
+}
 
 /*------------------------------------------------------------------
  *
