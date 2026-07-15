@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -70,7 +71,11 @@ type session struct {
 	txQueueLen int // Number in transmit queue.  For flow control.
 }
 
+// appServer.sessions is read and written both from the main loop (pollTimingTest)
+// and from the agwlib callback goroutine (agw_cb_* functions started by agwlib_init),
+// so all access must go through mu.
 type appServer struct {
+	mu       sync.RWMutex
 	sessions map[sessionKey]*session
 }
 
@@ -86,12 +91,18 @@ var srv = newAppServer()
 
 // findSession looks up an existing session, returning nil if there isn't one.
 func (srv *appServer) findSession(channel byte, addr Callsign) *session {
+	srv.mu.RLock()
+	defer srv.mu.RUnlock()
+
 	return srv.sessions[sessionKey{channel: channel, addr: addr}]
 }
 
 // getOrCreateSession returns the existing session for channel/addr, creating one if necessary.
 func (srv *appServer) getOrCreateSession(channel byte, addr Callsign) *session {
 	var key = sessionKey{channel: channel, addr: addr}
+
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
 
 	if s, ok := srv.sessions[key]; ok {
 		return s
@@ -108,16 +119,30 @@ func (srv *appServer) getOrCreateSession(channel byte, addr Callsign) *session {
 }
 
 func (srv *appServer) removeSession(channel byte, addr Callsign) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+
 	delete(srv.sessions, sessionKey{channel: channel, addr: addr})
 }
 
-// sortedSessions returns the current sessions in a stable order, for display purposes.
-func (srv *appServer) sortedSessions() []*session {
+// snapshotSessions returns a copy of the current sessions, safe to iterate without
+// holding srv.mu.
+func (srv *appServer) snapshotSessions() []*session {
+	srv.mu.RLock()
+	defer srv.mu.RUnlock()
+
 	var sessions = make([]*session, 0, len(srv.sessions))
 
 	for _, s := range srv.sessions {
 		sessions = append(sessions, s)
 	}
+
+	return sessions
+}
+
+// sortedSessions returns the current sessions in a stable order, for display purposes.
+func (srv *appServer) sortedSessions() []*session {
+	var sessions = srv.snapshotSessions()
 
 	sort.Slice(sessions, func(i, j int) bool {
 		if sessions[i].channel != sessions[j].channel {
@@ -210,7 +235,7 @@ func main() {
 } /* end main */
 
 func (srv *appServer) pollTimingTest() {
-	for _, s := range srv.sessions {
+	for _, s := range srv.snapshotSessions() {
 		s.pollTimingTest()
 	}
 }
