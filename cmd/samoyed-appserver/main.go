@@ -90,8 +90,8 @@ func (srv *appServer) findSession(channel byte, addr Callsign) *session {
 	return srv.sessions[sessionKey{channel: channel, addr: addr}]
 }
 
-// createSession returns the existing session for channel/addr, creating one if necessary.
-func (srv *appServer) createSession(channel byte, addr Callsign) *session {
+// getOrCreateSession returns the existing session for channel/addr, creating one if necessary.
+func (srv *appServer) getOrCreateSession(channel byte, addr Callsign) *session {
 	var key = sessionKey{channel: channel, addr: addr}
 
 	if s, ok := srv.sessions[key]; ok {
@@ -351,7 +351,7 @@ func (s *session) pollTimingTest() {
 
 // old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data)
 func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign, incoming bool, data []byte) { //nolint:unparam
-	srv.createSession(channel, call_from)
+	srv.getOrCreateSession(channel, call_from)
 
 	fmt.Printf("Begin session %d,%s: %s\n", channel, call_from, data)
 
