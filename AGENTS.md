@@ -16,6 +16,8 @@
 * Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary e.g. with a `for` loop variable
 * As this started as a port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet - new things should be, but we don't need to change existing things if not necessary
 * Prefer to use `new(Foo)` over `&Foo{}` - the latter makes the exhaustruct linter grumble
+* Fixed-size byte-array types that hold text (e.g. `Callsign [10]byte`) don't format as text with `%s` - they print as `%!s(main.Callsign=...)`. Give such types a `String()` method (e.g. via `direwolf.ByteArrayToString`, which trims trailing NULs) so `fmt` renders them correctly everywhere, rather than converting at each call site
+* State shared between the main loop and a callback goroutine (e.g. anything started via `agwlib_init`, which dispatches `agw_cb_*` callbacks on a separate thread) needs explicit synchronization - plain maps/slices touched from both sides will race
 
 ### Test Callsigns
 
