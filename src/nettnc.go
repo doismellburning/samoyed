@@ -12,13 +12,45 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 )
 
 type NetTNC struct {
 	host  string
 	port  int
-	sock  net.Conn // Socket handle or file descriptor. nil for invalid.
+	mu    sync.Mutex // Guards sock, since listenThread and nettnc_send_packet access it from different goroutines.
+	sock  net.Conn   // Socket handle or file descriptor. nil for invalid.
 	debug int
+}
+
+// getSock returns the current connection, or nil if not connected.
+func (nt *NetTNC) getSock() net.Conn {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+
+	return nt.sock
+}
+
+// setSock records a newly established connection.
+func (nt *NetTNC) setSock(conn net.Conn) {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+
+	nt.sock = conn
+}
+
+// closeSockIfCurrent closes conn and clears sock, but only if sock still
+// refers to conn - i.e. it hasn't already been replaced by a newer
+// reattached connection from another goroutine.
+func (nt *NetTNC) closeSockIfCurrent(conn net.Conn) {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+
+	if nt.sock == conn {
+		nt.sock = nil
+	}
+
+	conn.Close()
 }
 
 var s_net_tncs [MAX_TOTAL_CHANS]*NetTNC //nolint:gochecknoglobals
@@ -93,7 +125,7 @@ func nettnc_attach(channel int, host string, port int) int {
 
 	var conn, connErr = net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if connErr == nil {
-		nt.sock = conn
+		nt.setSock(conn)
 	} else {
 		return -1
 	}
@@ -139,15 +171,16 @@ func (nt *NetTNC) listenThread(channel int) {
 		/*
 		 * Re-attach to TNC if not currently attached.
 		 */
-		if nt.sock == nil {
+		var conn = nt.getSock()
+		if conn == nil {
 			text_color_set(DW_COLOR_ERROR)
 			// I'm using the term "attach" here, in an attempt to
 			// avoid confusion with the AX.25 connect.
 			dw_printf("Attempting to reattach to network TNC...\n")
 
-			var conn, connErr = net.Dial("tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
+			var newConn, connErr = net.Dial("tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
 			if connErr == nil {
-				nt.sock = conn
+				nt.setSock(newConn)
 
 				dw_printf("Successfully reattached to network TNC.\n")
 			} else {
@@ -157,12 +190,11 @@ func (nt *NetTNC) listenThread(channel int) {
 			const NETTNCBUFSIZ = 2048
 			var buf = make([]byte, NETTNCBUFSIZ)
 
-			var n, readErr = nt.sock.Read(buf)
+			var n, readErr = conn.Read(buf)
 			if readErr != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
-				nt.sock.Close()
-				nt.sock = nil
+				nt.closeSockIfCurrent(conn)
 
 				SLEEP_SEC(5)
 
@@ -313,8 +345,15 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 
 func nettnc_send_packet(channel int, pp *packet_t) {
 	var nt = s_net_tncs[channel]
+	if nt == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
 
-	if nt == nil || nt.sock == nil {
+		return
+	}
+
+	var conn = nt.getSock()
+	if conn == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
 
@@ -332,12 +371,11 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 
 	var kiss_buff = KissEncapsulate(frame_buff)
 
-	var _, err = nt.sock.Write(kiss_buff)
+	var _, err = conn.Write(kiss_buff)
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError %v sending packet to KISS Network TNC for channel %d.  Closing connection.\n\n", err, channel)
-		nt.sock.Close()
-		nt.sock = nil
+		nt.closeSockIfCurrent(conn)
 	}
 
 	// Do not free packet object;  caller will take care of it.
