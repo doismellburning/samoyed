@@ -72,6 +72,12 @@ const MAX_TOTAL_CHANS = 16     // Duplicated from C to avoid cgo
 
 type Callsign [10]byte
 
+// String implements fmt.Stringer so a Callsign is printed as text (trimming
+// the trailing NUL padding) rather than as a raw byte array.
+func (c Callsign) String() string {
+	return direwolf.ByteArrayToString(c[:])
+}
+
 type AGWPEHeader struct {
 	Portx        byte
 	Reserved1    byte
