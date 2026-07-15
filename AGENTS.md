@@ -16,6 +16,9 @@
 * Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary e.g. with a `for` loop variable
 * As this started as a port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet - new things should be, but we don't need to change existing things if not necessary
 * Prefer to use `new(Foo)` over `&Foo{}` - the latter makes the exhaustruct linter grumble
+* `dw_printf` (in `src/util.go`) is not recognised by `go vet`/golangci-lint as a printf-style function, so mismatched verbs (e.g. `%d` on an `error`) are not caught automatically - take extra care with format verbs when using it, especially for `error` values (use `%v`, not `%d`)
+* When refactoring per-channel globals (arrays indexed by channel) into a per-channel struct accessed via a pointer array/map, guard lookups (e.g. `s_foo[channel]`) and any field/method access on the result against `nil` - a channel that was never attached, or whose connection has since dropped, can legitimately be `nil`
+* When a per-channel/per-object struct has a field that's read, mutated, or closed from more than one goroutine (e.g. a listener thread and a send path both touching a connection handle), guard it with a `sync.Mutex` and route access through accessor methods rather than touching the field directly - see `PacketLogger.mu` in `src/log.go` for the existing pattern. When clearing/closing such a field after an error, compare against the value you read before acting on it, so you don't clobber a connection that another goroutine already replaced
 
 ### Test Callsigns
 
