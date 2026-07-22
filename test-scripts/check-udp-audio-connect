@@ -1,0 +1,198 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+# Picks a TCP port in the range direwolf's config parser accepts (KISSPORT
+# requires MIN_IP_PORT_NUMBER..MAX_IP_PORT_NUMBER, see src/config.go), that
+# isn't already in use and isn't one of the ports already handed out earlier
+# in this script (passed in as arguments to exclude).  There's still a TOCTOU
+# race against anything else grabbing the port between us closing the probe
+# socket and direwolf/kissutil binding it, but that's an acceptable risk for
+# a test script.
+free_port() {
+	python3 - "$@" << 'EOF'
+import random
+import socket
+import sys
+
+exclude = {int(p) for p in sys.argv[1:]}
+
+for _ in range(200):
+	port = random.randint(1024, 49151)
+	if port in exclude:
+		continue
+
+	probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		probe.bind(("127.0.0.1", port))
+	except OSError:
+		continue
+	finally:
+		probe.close()
+
+	print(port)
+	break
+else:
+	sys.exit("free_port: couldn't find a free port")
+EOF
+}
+
+# Each connection attempt is wrapped in its own subshell, so its fd 3 is
+# private and closes automatically when the subshell exits — nothing to
+# clean up in this shell. (An earlier version tried to `exec 3<&- 2>
+# /dev/null` here to close fd 3 "just in case"; since `exec` with no command
+# applies its redirections to the current shell, that `2> /dev/null`
+# silently and permanently redirected this whole script's stderr to
+# /dev/null the first time a port wasn't ready yet, swallowing every
+# diagnostic after it — including the FAIL message below. That's what made
+# failures look silent both locally and on GitHub's macOS runners.)
+wait_for_tcp_port() {
+	local port=$1
+	local deadline=$((SECONDS + 30))
+
+	while ! (exec 3<> "/dev/tcp/127.0.0.1/$port") 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for TCP port $port" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+# Waits for at least $3 (default 1) occurrences of $2 in $1.  wait_for_tcp_port's
+# own probe connection shows up as an "Attached" client too, so callers
+# waiting for a *real* client (e.g. a kissutil receiver) after already having
+# called wait_for_tcp_port on that same port must pass a count one higher
+# than the number of real clients, to skip past the probe's own line.
+wait_for_log_line() {
+	local logfile=$1
+	local pattern=$2
+	local mincount=${3:-1}
+	local deadline=$((SECONDS + 30))
+
+	while (($(grep -c "$pattern" "$logfile" 2> /dev/null || true) < mincount)); do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for '$pattern' (x$mincount) in $logfile" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+wait_for_payload() {
+	local dir=$1
+	local payload=$2
+	local deadline=$((SECONDS + 30))
+
+	while ! grep -rq "$payload" "$dir" 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for payload '$payload' in $dir" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# --- port allocation -------------------------------------------------------
+# Two instances of direwolf, each treating channel 0's "audio" as raw AFSK
+# samples carried over a dedicated UDP socket instead of a soundcard, wired
+# so each instance's output feeds the other's input.  This exercises the
+# real modem/HDLC/AX.25 stack end to end between two live processes, not
+# just KISS framing over a bridge.
+
+udp_a=$(free_port)
+udp_b=$(free_port "$udp_a")
+kiss_a=$(free_port "$udp_a" "$udp_b")
+kiss_b=$(free_port "$udp_a" "$udp_b" "$kiss_a")
+
+# --- config files -----------------------------------------------------------
+
+# AGWPORT 0 / KISSPORT 0 disable the default AGW (8000) and KISS (8001)
+# listeners, which are otherwise opened in addition to our explicit
+# KISSPORT and would collide between the two instances.
+
+cat > direwolf-a.conf << EOF
+MYCALL Q1TEST
+ADEVICE udp:$udp_a udp:localhost:$udp_b
+AGWPORT 0
+KISSPORT 0
+KISSPORT $kiss_a
+EOF
+
+cat > direwolf-b.conf << EOF
+MYCALL Q2TEST
+ADEVICE udp:$udp_b udp:localhost:$udp_a
+AGWPORT 0
+KISSPORT 0
+KISSPORT $kiss_b
+EOF
+
+mkdir recv-a recv-b send-a send-b
+
+# --- start direwolf instances ------------------------------------------------
+# Order doesn't matter here: unlike NCHANNEL, UDP audio input is just a local
+# listen and output is just a connectionless send, so neither instance needs
+# the other to already be up.
+
+"$DIREWOLF" -c direwolf-a.conf > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.conf > direwolf-b.log 2>&1 &
+pids+=("$!")
+
+wait_for_tcp_port "$kiss_a"
+wait_for_tcp_port "$kiss_b"
+
+# --- start persistent receivers ----------------------------------------------
+# Without -f, kissutil reads from stdin in a loop and exits (taking its
+# receive goroutine down with it) the moment stdin hits EOF, which would
+# happen almost immediately for a backgrounded process with no terminal.
+# Feed it a stdin that never closes instead. `sleep infinity` is GNU-only —
+# macOS's BSD sleep rejects it outright ("usage: sleep number[unit]"), which
+# made stdin hit EOF immediately there. A plain large number works on both.
+
+"$KISSUTIL" -p "$kiss_a" -o recv-a < <(sleep 3600) > kissutil-recv-a.log 2>&1 &
+pids+=("$!")
+"$KISSUTIL" -p "$kiss_b" -o recv-b < <(sleep 3600) > kissutil-recv-b.log 2>&1 &
+pids+=("$!")
+
+# Wait for each direwolf to see its kissutil receiver actually attach, since
+# a send before that point would be silently dropped (no queuing for absent
+# clients).  mincount=2 skips past wait_for_tcp_port's own probe connection,
+# which shows up as an "Attached" client too.
+wait_for_log_line direwolf-a.log "Attached to KISS TCP client application" 2
+wait_for_log_line direwolf-b.log "Attached to KISS TCP client application" 2
+
+# --- A -> B ------------------------------------------------------------------
+
+echo "Q1TEST>Q2TEST:hello from A" > send-a/msg1
+"$KISSUTIL" -p "$kiss_a" -f send-a > kissutil-send-a.log 2>&1
+
+wait_for_payload recv-b "hello from A"
+
+# --- B -> A (confirm bidirectionality) ----------------------------------------
+
+echo "Q2TEST>Q1TEST:hello from B" > send-b/msg1
+"$KISSUTIL" -p "$kiss_b" -f send-b > kissutil-send-b.log 2>&1
+
+wait_for_payload recv-a "hello from B"
+
+echo "PASS: two samoyed-direwolf instances exchanged AX.25 frames over raw UDP audio"
