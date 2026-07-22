@@ -11,6 +11,12 @@ export FXREC
 GEN_PACKETS="${GEN_PACKETS:-$(dirname "$(realpath "$0")")/../dist/samoyed-gen_packets}"
 export GEN_PACKETS
 
+DIREWOLF="${DIREWOLF:-$(dirname "$(realpath "$0")")/../dist/samoyed-direwolf}"
+export DIREWOLF
+
+KISSUTIL="${KISSUTIL:-$(dirname "$(realpath "$0")")/../dist/samoyed-kissutil}"
+export KISSUTIL
+
 function goto_tmpdir() {
 	TMPDIR=$(mktemp --directory)
 	echo "$TMPDIR"

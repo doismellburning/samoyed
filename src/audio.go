@@ -31,6 +31,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gordonklaus/portaudio"
 )
@@ -715,6 +716,10 @@ type adev_s struct {
 
 	// UDP connection for audio output
 	udp_out_sock net.Conn
+
+	// Stops the silence-keepalive goroutine (UDP output only), see
+	// audioUDPSilenceKeepalive.
+	silenceStopCh chan struct{}
 }
 
 var adev [MAX_ADEVS]*adev_s
@@ -1295,6 +1300,9 @@ func audio_open(pa *audio_s) int {
 
 				adev[a].udp_out_sock = udpOutConn
 				adev[a].outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
+				adev[a].silenceStopCh = make(chan struct{})
+
+				go audioUDPSilenceKeepalive(a, adev[a].silenceStopCh)
 			} else {
 				/*
 				 * Soundcard - blocking write mode.
@@ -1657,6 +1665,55 @@ func audio_flush_real(a int) int {
 	return 0
 } /* end audio_flush */
 
+// silenceKeepaliveInterval controls how often audioUDPSilenceKeepalive sends
+// a chunk of silence to a UDP audio output peer.
+const silenceKeepaliveInterval = 20 * time.Millisecond
+
+// audioUDPSilenceKeepalive keeps a UDP audio output stream flowing during
+// gaps between transmissions.
+//
+// UDP audio output only carries samples while a packet is actually being
+// transmitted; direwolf sends nothing at all the rest of the time. A real
+// sound card or SDR stream instead delivers samples continuously, silence
+// included, which is what lets the receiving demodulator's channel-busy
+// (DCD) state decay back to "clear" between transmissions. Without that, a
+// peer fed purely by bursty UDP audio can block forever in its own
+// ReadFromUDP once a burst ends, leaving DCD latched "busy" and never
+// getting a chance to transmit its own reply (see "Waited too long for
+// clear channel" in xmit.go). This streams silence whenever the device
+// isn't actively mid-transmission, using the same per-device mutex xmit.go
+// already holds for the duration of a real transmission so the two never
+// interleave on the wire.
+func audioUDPSilenceKeepalive(a int, stop chan struct{}) {
+	var ticker = time.NewTicker(silenceKeepaliveInterval)
+	defer ticker.Stop()
+
+	var fill byte
+	if adev[a].bitsPerSample == 8 {
+		fill = 128 // Silence for 8-bit unsigned samples is mid-scale.
+	} // Silence for 16-bit signed samples is zero, the byte slice's zero value.
+
+	var chunk = make([]byte, int(float64(adev[a].bytesPerFrame)*float64(adev[a].sampleRate)*silenceKeepaliveInterval.Seconds()))
+	for i := range chunk {
+		chunk[i] = fill
+	}
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if xmitSvc == nil || !xmitSvc.audioOutDevMutex[a].TryLock() {
+				continue
+			}
+
+			_, _ = adev[a].udp_out_sock.Write(chunk)
+
+			xmitSvc.audioOutDevMutex[a].Unlock()
+		}
+	}
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        audio_wait
@@ -1745,6 +1802,9 @@ func audio_close() int { //nolint:unparam
 			}
 
 			if adev[a].udp_out_sock != nil {
+				close(adev[a].silenceStopCh)
+				adev[a].silenceStopCh = nil
+
 				adev[a].udp_out_sock.Close()
 				adev[a].udp_out_sock = nil
 			}
