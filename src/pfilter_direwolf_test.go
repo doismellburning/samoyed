@@ -247,9 +247,19 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	var pp = AX25FromText(monitor, true)
 	assert.NotNil(t, pp)
 
-	var result = pfilter(0, 0, filter, pp, true)
+	var result, err = pfilter(0, 0, filter, pp, true)
 	if !assert.Equal(t, expected, result, "Unexpected result for test number %d", test_num) {
 		pftest_error_count++
+	}
+
+	if expected == -1 {
+		if !assert.Error(t, err, "Expected an error for test number %d", test_num) { //nolint:testifylint
+			pftest_error_count++
+		}
+	} else {
+		if !assert.NoError(t, err, "Unexpected error for test number %d", test_num) { //nolint:testifylint
+			pftest_error_count++
+		}
 	}
 
 	AX25Delete(pp)

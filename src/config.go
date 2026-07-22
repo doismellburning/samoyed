@@ -3543,6 +3543,14 @@ func handleFILTER(ps *parseState) bool {
 		t = " " /* Empty means permit nothing. */
 	}
 
+	var err = pfilter_validate(t, true)
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Invalid FILTER expression:\n%s\n", ps.line, err)
+
+		return true
+	}
+
 	if ps.digi.filter_str[from_chan][to_chan] != "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Replacing previous filter for same from/to pair:\n        %s\n", ps.line, ps.digi.filter_str[from_chan][to_chan])
@@ -3551,7 +3559,6 @@ func handleFILTER(ps *parseState) bool {
 
 	ps.digi.filter_str[from_chan][to_chan] = t
 
-	// TODO:  Do a test run to see errors now instead of waiting.
 	return false
 }
 
@@ -3626,9 +3633,16 @@ func handleCFILTER(ps *parseState) bool {
 		t = " " /* Empty means permit nothing. */
 	}
 
+	var err = pfilter_validate(t, false)
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Invalid CFILTER expression:\n%s\n", ps.line, err)
+
+		return true
+	}
+
 	ps.cdigi.cfilter_str[from_chan][to_chan] = t
 
-	// TODO1.2:  Do a test run to see errors now instead of waiting.
 	return false
 }
 

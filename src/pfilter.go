@@ -153,15 +153,12 @@ func bool2text(val int) string {
  *
  *--------------------------------------------------------------------*/
 
-func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) int {
+func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) (int, error) {
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR in pfilter: nil packet pointer. Please report this!\n")
-
-		return (-1)
+		return -1, fmt.Errorf("INTERNAL ERROR in pfilter: nil packet pointer, please report this")
 	}
 
 	var pfstate pfstate_t
@@ -192,16 +189,18 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 	next_token(&pfstate)
 
 	var result int
+	var err error
 	if pfstate.token_type == TOKEN_EOL {
 		/* Empty filter means reject all. */
 		result = 0
 	} else {
-		result = parse_expr(&pfstate)
+		result, err = parse_expr(&pfstate)
 
-		if pfstate.token_type != TOKEN_AND &&
+		if err == nil &&
+			pfstate.token_type != TOKEN_AND &&
 			pfstate.token_type != TOKEN_OR &&
 			pfstate.token_type != TOKEN_EOL {
-			print_error(&pfstate, "Expected logical operator or end of line here.")
+			err = newFilterError(&pfstate, "Expected logical operator or end of line here.")
 
 			result = -1
 		}
@@ -221,7 +220,7 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 		}
 	}
 
-	return (result)
+	return result, err
 } /* end pfilter */
 
 /*-------------------------------------------------------------------
@@ -333,105 +332,107 @@ func next_token(pf *pfstate_t) {
  *
  *--------------------------------------------------------------------*/
 
-func parse_expr(pf *pfstate_t) int {
+func parse_expr(pf *pfstate_t) (int, error) {
 	return parse_or_expr(pf)
 }
 
 /* or_expr::	and_expr [ | and_expr ] ... */
 
-func parse_or_expr(pf *pfstate_t) int {
-	var result = parse_and_expr(pf)
-	if result < 0 {
-		return (-1)
+func parse_or_expr(pf *pfstate_t) (int, error) {
+	var result, err = parse_and_expr(pf)
+	if err != nil {
+		return -1, err
 	}
 
 	for pf.token_type == TOKEN_OR {
 		next_token(pf)
-		var e = parse_and_expr(pf)
+		var e, eerr = parse_and_expr(pf)
 
 		if pfilter_debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  %s | %s\n", bool2text(result), bool2text(e))
 		}
 
-		if e < 0 {
-			return (-1)
+		if eerr != nil {
+			return -1, eerr
 		}
 
 		result |= e
 	}
 
-	return (result)
+	return result, nil
 }
 
 /* and_expr::	primary [ & primary ] ... */
 
-func parse_and_expr(pf *pfstate_t) int {
-	var result = parse_primary(pf)
-	if result < 0 {
-		return (-1)
+func parse_and_expr(pf *pfstate_t) (int, error) {
+	var result, err = parse_primary(pf)
+	if err != nil {
+		return -1, err
 	}
 
 	for pf.token_type == TOKEN_AND {
 		next_token(pf)
-		var e = parse_primary(pf)
+		var e, eerr = parse_primary(pf)
 
 		if pfilter_debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  %s & %s\n", bool2text(result), bool2text(e))
 		}
 
-		if e < 0 {
-			return (-1)
+		if eerr != nil {
+			return -1, eerr
 		}
 
 		result &= e
 	}
 
-	return (result)
+	return result, nil
 }
 
 /* primary::	( expr )	*/
 /* 		! primary	*/
 /*		filter_spec	*/
 
-func parse_primary(pf *pfstate_t) int {
+func parse_primary(pf *pfstate_t) (int, error) {
 	var result int
+	var err error
 
 	if pf.token_type == TOKEN_LPAREN { //nolint:staticcheck
 		next_token(pf)
-		result = parse_expr(pf)
+		result, err = parse_expr(pf)
 
 		if pf.token_type == TOKEN_RPAREN {
 			next_token(pf)
-		} else {
-			print_error(pf, "Expected \")\" here.\n")
+		} else if err == nil {
+			err = newFilterError(pf, "Expected \")\" here.")
 
 			result = -1
 		}
 	} else if pf.token_type == TOKEN_NOT {
 		next_token(pf)
-		var e = parse_primary(pf)
+		var e, eerr = parse_primary(pf)
 
 		if pfilter_debug >= 3 {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("  ! %s\n", bool2text(e))
 		}
 
-		if e < 0 {
+		if eerr != nil {
 			result = -1
+			err = eerr
 		} else {
 			result = 1 - e
 		}
 	} else if pf.token_type == TOKEN_FILTER_SPEC {
-		result = parse_filter_spec(pf)
+		result, err = parse_filter_spec(pf)
 	} else {
-		print_error(pf, "Expected filter specification, (, or ! here.")
+		err = newFilterError(pf, "Expected filter specification, (, or ! here.")
 
 		result = -1
 	}
 
-	return (result)
+	return result, err
 }
 
 /*-------------------------------------------------------------------
@@ -456,18 +457,19 @@ func parse_primary(pf *pfstate_t) int {
  *
  *--------------------------------------------------------------------*/
 
-func parse_filter_spec(pf *pfstate_t) int {
+func parse_filter_spec(pf *pfstate_t) (int, error) {
 	// Yes this is always assigned over, but that requires a fair bit of reading to be sure of, so let's have an explicit default
 	var result = -1 //nolint:ineffassign,wastedassign
+	var err error
 
 	if (!pf.is_aprs) && !strings.ContainsRune("01bdvu", rune(pf.token_str[0])) {
-		print_error(pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.")
+		err = newFilterError(pf, "Only b, d, v, and u specifications are allowed for connected mode digipeater filtering.")
 
 		result = -1
 
 		next_token(pf)
 
-		return (result)
+		return result, err
 	}
 
 	/* undocumented: can use 0 or 1 for testing. */
@@ -483,7 +485,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		/* Budlist - AX.25 source address */
 		/* Could be different than source encapsulated by 3rd party header. */
 		var addr = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
-		result = filt_bodgu(pf, addr)
+		result, err = filt_bodgu(pf, addr)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -491,7 +493,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		}
 	} else if pf.token_str[0] == 'o' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* o - object or item name */
-		result = filt_bodgu(pf, pf.decoded.g_name)
+		result, err = filt_bodgu(pf, pf.decoded.g_name)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -501,11 +503,11 @@ func parse_filter_spec(pf *pfstate_t) int {
 		/* d - was digipeated by */
 		// Loop on all AX.25 digipeaters.
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := AX25_REPEATER_1; result == 0 && err == nil && n < ax25_get_num_addr(pf.pp); n++ {
 			// Consider only those with the H (has-been-used) bit set.
 			if ax25_get_h(pf.pp, n) > 0 {
 				var addr = ax25_get_addr_with_ssid(pf.pp, n)
-				result = filt_bodgu(pf, addr)
+				result, err = filt_bodgu(pf, addr)
 			}
 		}
 
@@ -523,12 +525,12 @@ func parse_filter_spec(pf *pfstate_t) int {
 		/* v - via not used */
 		// loop on all AX.25 digipeaters (mnemonic Via)
 		result = 0
-		for n := AX25_REPEATER_1; result == 0 && n < ax25_get_num_addr(pf.pp); n++ {
+		for n := AX25_REPEATER_1; result == 0 && err == nil && n < ax25_get_num_addr(pf.pp); n++ {
 			// This is different than the previous "d" filter.
 			// Consider only those where the the H (has-been-used) bit is NOT set.
 			if ax25_get_h(pf.pp, n) == 0 {
 				var addr = ax25_get_addr_with_ssid(pf.pp, n)
-				result = filt_bodgu(pf, addr)
+				result, err = filt_bodgu(pf, addr)
 			}
 		}
 
@@ -550,7 +552,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 			pf.decoded.g_message_subtype == message_subtype_bulletin ||
 			pf.decoded.g_message_subtype == message_subtype_nws ||
 			pf.decoded.g_message_subtype == message_subtype_directed_query {
-			result = filt_bodgu(pf, pf.decoded.g_addressee)
+			result, err = filt_bodgu(pf, pf.decoded.g_addressee)
 
 			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -570,7 +572,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		/* because destination is used for part of location. */
 		if ax25_get_dti(pf.pp) != '\'' && ax25_get_dti(pf.pp) != '`' {
 			var addr = ax25_get_addr_with_ssid(pf.pp, AX25_DESTINATION)
-			result = filt_bodgu(pf, addr)
+			result, err = filt_bodgu(pf, addr)
 
 			if pfilter_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -586,7 +588,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		}
 	} else if pf.token_str[0] == 't' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* t - packet type: position, weather, telemetry, etc. */
-		result = filt_t(pf)
+		result, err = filt_t(pf)
 
 		if pfilter_debug >= 2 {
 			var infop = AX25GetInfo(pf.pp)
@@ -603,7 +605,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		/* r - range */
 		/* range */
 		var sdist string
-		result, sdist = filt_r(pf)
+		result, sdist, err = filt_r(pf)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -611,7 +613,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 		}
 	} else if pf.token_str[0] == 's' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* s - symbol */
-		result = filt_s(pf)
+		result, err = filt_s(pf)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -627,7 +629,7 @@ func parse_filter_spec(pf *pfstate_t) int {
 	} else if pf.token_str[0] == 'i' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* i - IGate messaging default */
 		/* IGatge messaging */
-		result = filt_i(pf)
+		result, err = filt_i(pf)
 
 		if pfilter_debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -640,14 +642,14 @@ func parse_filter_spec(pf *pfstate_t) int {
 		}
 	} else {
 		/* unrecognized filter type */
-		print_error(pf, fmt.Sprintf("Unrecognized filter type '%c'", pf.token_str[0]))
+		err = newFilterError(pf, fmt.Sprintf("Unrecognized filter type '%c'", pf.token_str[0]))
 
 		result = -1
 	}
 
 	next_token(pf)
 
-	return (result)
+	return result, err
 }
 
 /*------------------------------------------------------------------------------
@@ -679,7 +681,7 @@ func parse_filter_spec(pf *pfstate_t) int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_bodgu(pf *pfstate_t, arg string) int {
+func filt_bodgu(pf *pfstate_t, arg string) (int, error) {
 	var result = 0
 	var str = pf.token_str
 	var sep = str[1]
@@ -691,8 +693,7 @@ func filt_bodgu(pf *pfstate_t, arg string) int {
 		if idx != -1 {
 			/* Wildcarding.  Should have single * on end. */
 			if idx != (len(part) - 1) {
-				print_error(pf, "Any wildcard * must be at the end of pattern.\n")
-				return (-1)
+				return -1, newFilterError(pf, "Any wildcard * must be at the end of pattern.")
 			}
 
 			if strings.HasPrefix(arg, part[:idx]) {
@@ -706,7 +707,7 @@ func filt_bodgu(pf *pfstate_t, arg string) int {
 		}
 	}
 
-	return (result)
+	return result, nil
 }
 
 /*------------------------------------------------------------------------------
@@ -732,7 +733,7 @@ func filt_bodgu(pf *pfstate_t, arg string) int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_t(pf *pfstate_t) int {
+func filt_t(pf *pfstate_t) (int, error) {
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
 	var infop = AX25GetInfo(pf.pp)
 
@@ -742,58 +743,58 @@ func filt_t(pf *pfstate_t) int {
 		switch f {
 		case 'p': /* Position */
 			if pf.decoded.g_packet_type == packet_type_position {
-				return (1)
+				return 1, nil
 			}
 
 		case 'o': /* Object */
 			if pf.decoded.g_packet_type == packet_type_object {
-				return (1)
+				return 1, nil
 			}
 
 		case 'i': /* Item */
 			if pf.decoded.g_packet_type == packet_type_item {
-				return (1)
+				return 1, nil
 			}
 
 		case 'm': // Any "message."
 			if pf.decoded.g_packet_type == packet_type_message {
-				return (1)
+				return 1, nil
 			}
 
 		case 'q': /* Query */
 			if pf.decoded.g_packet_type == packet_type_query {
-				return (1)
+				return 1, nil
 			}
 
 		case 'c': /* station Capabilities - my extension */
 			/* Most often used for IGate statistics. */
 			if pf.decoded.g_packet_type == packet_type_capabilities {
-				return (1)
+				return 1, nil
 			}
 
 		case 's': /* Status */
 			if pf.decoded.g_packet_type == packet_type_status {
-				return (1)
+				return 1, nil
 			}
 
 		case 't': /* Telemetry data or metadata */
 			if pf.decoded.g_packet_type == packet_type_telemetry {
-				return (1)
+				return 1, nil
 			}
 
 		case 'u': /* User-defined */
 			if pf.decoded.g_packet_type == packet_type_userdefined {
-				return (1)
+				return 1, nil
 			}
 
 		case 'h': /* has third party Header - my extension */
 			if pf.decoded.g_has_thirdparty_header {
-				return (1)
+				return 1, nil
 			}
 
 		case 'w': /* Weather */
 			if pf.decoded.g_packet_type == packet_type_weather {
-				return (1)
+				return 1, nil
 			}
 
 			/* Positions !=/@  with symbol code _ are weather. */
@@ -802,21 +803,20 @@ func filt_t(pf *pfstate_t) int {
 
 			if (pf.decoded.g_packet_type == packet_type_position ||
 				pf.decoded.g_packet_type == packet_type_object) && pf.decoded.g_symbol_code == '_' {
-				return (1)
+				return 1, nil
 			}
 
 		case 'n': /* NWS format */
 			if pf.decoded.g_packet_type == packet_type_nws {
-				return (1)
+				return 1, nil
 			}
 
 		default:
-			print_error(pf, "Invalid letter in t/ filter.\n")
-			return (-1)
+			return -1, newFilterError(pf, "Invalid letter in t/ filter.")
 		}
 	}
 
-	return (0) /* Didn't match anything.  Reject */
+	return 0, nil /* Didn't match anything.  Reject */
 } /* end filt_t */
 
 /*------------------------------------------------------------------------------
@@ -845,9 +845,9 @@ func filt_t(pf *pfstate_t) int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_r(pf *pfstate_t) (int, string) {
+func filt_r(pf *pfstate_t) (int, string, error) {
 	if pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN {
-		return 0, ""
+		return 0, "", nil
 	}
 
 	var str = pf.token_str
@@ -857,36 +857,32 @@ func filt_r(pf *pfstate_t) (int, string) {
 	var parts = strings.Split(cp, sep)
 
 	if len(parts) < 1 {
-		print_error(pf, "Missing latitude for Range filter.")
-		return -1, ""
+		return -1, "", newFilterError(pf, "Missing latitude for Range filter.")
 	}
 	var dlat, _ = strconv.ParseFloat(parts[0], 64)
 
 	if len(parts) < 2 {
-		print_error(pf, "Missing longitude for Range filter.")
-		return -1, ""
+		return -1, "", newFilterError(pf, "Missing longitude for Range filter.")
 	}
 	var dlon, _ = strconv.ParseFloat(parts[1], 64)
 
 	if len(parts) < 3 {
-		print_error(pf, "Missing distance for Range filter.")
-		return -1, ""
+		return -1, "", newFilterError(pf, "Missing distance for Range filter.")
 	}
 	var ddist, _ = strconv.ParseFloat(parts[2], 64)
 
 	if len(parts) > 3 {
-		print_error(pf, "Too many parts for Range filter.")
-		return -1, ""
+		return -1, "", newFilterError(pf, "Too many parts for Range filter.")
 	}
 
 	var km = ll_distance_km(dlat, dlon, float64(pf.decoded.g_lat), float64(pf.decoded.g_lon))
 	var sdist = fmt.Sprintf("%.2f km", km)
 
 	if km <= ddist {
-		return 1, sdist
+		return 1, sdist, nil
 	}
 
-	return 0, sdist
+	return 0, sdist, nil
 }
 
 /*------------------------------------------------------------------------------
@@ -954,7 +950,7 @@ func filt_r(pf *pfstate_t) (int, string) {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_s(pf *pfstate_t) int {
+func filt_s(pf *pfstate_t) (int, error) {
 	var str = pf.token_str
 	var sep = string(str[1])
 	var cp = str[2:]
@@ -974,8 +970,7 @@ func filt_s(pf *pfstate_t) int {
 		// Zero length is acceptable if alternate symbol(s) specified.  Will check that later.
 
 		if strings.ContainsFunc(pri, unacceptableChar) {
-			print_error(pf, "Symbol filter, primary must be printable ASCII character(s) other than | or ~.")
-			return (-1)
+			return -1, newFilterError(pf, "Symbol filter, primary must be printable ASCII character(s) other than | or ~.")
 		}
 
 		if len(parts) > 1 {
@@ -984,13 +979,11 @@ func filt_s(pf *pfstate_t) int {
 			// Zero length after second / would be pointless.
 
 			if len(alt) == 0 {
-				print_error(pf, "Nothing specified for alternate symbol table.")
-				return (-1)
+				return -1, newFilterError(pf, "Nothing specified for alternate symbol table.")
 			}
 
 			if strings.ContainsFunc(alt, unacceptableChar) {
-				print_error(pf, "Symbol filter, alternate must be printable ASCII character(s) other than | or ~.")
-				return (-1)
+				return -1, newFilterError(pf, "Symbol filter, alternate must be printable ASCII character(s) other than | or ~.")
 			}
 
 			if len(parts) > 2 {
@@ -1001,32 +994,28 @@ func filt_s(pf *pfstate_t) int {
 				if strings.ContainsFunc(over, func(r rune) bool {
 					return !(unicode.IsUpper(r) || unicode.IsDigit(r) || r == '\\')
 				}) {
-					print_error(pf, "Symbol filter, overlay must be upper case letter, digit, or \\.")
-					return (-1)
+					return -1, newFilterError(pf, "Symbol filter, overlay must be upper case letter, digit, or \\.")
 				}
 
 				if len(parts) > 3 {
-					print_error(pf, "More than 3 delimiter characters in Symbol filter.")
-					return (-1)
+					return -1, newFilterError(pf, "More than 3 delimiter characters in Symbol filter.")
 				}
 			}
 		} else {
 			// No alt part is OK if at least one primary symbol was specified.
 			if len(pri) == 0 {
-				print_error(pf, "No symbols specified for Symbol filter.")
-				return (-1)
+				return -1, newFilterError(pf, "No symbols specified for Symbol filter.")
 			}
 		}
 	} else {
-		print_error(pf, "Missing arguments for Symbol filter.")
-		return (-1)
+		return -1, newFilterError(pf, "Missing arguments for Symbol filter.")
 	}
 
 	// This applies only for Position, Object, Item.
 	// decode_aprs() should set symbol code to space to mean undefined.
 
 	if pf.decoded.g_symbol_code == ' ' {
-		return (0)
+		return 0, nil
 	}
 
 	// Look for Primary symbols.
@@ -1034,15 +1023,15 @@ func filt_s(pf *pfstate_t) int {
 	if pf.decoded.g_symbol_table == '/' {
 		if len(pri) > 0 {
 			if strings.Contains(pri, string(rune(pf.decoded.g_symbol_code))) {
-				return 1
+				return 1, nil
 			} else {
-				return 0
+				return 0, nil
 			}
 		}
 	}
 
 	if alt == "" {
-		return (0)
+		return 0, nil
 	}
 
 	//printf ("alt=\"%s\"  sym='%c'\n", alt, pf.decoded.g_symbol_code);
@@ -1057,30 +1046,30 @@ func filt_s(pf *pfstate_t) int {
 				// Non-zero length overlay part was specified.
 				// Need to match one of them.
 				if strings.Contains(over, string(rune(pf.decoded.g_symbol_table))) {
-					return 1
+					return 1, nil
 				} else {
-					return 0
+					return 0, nil
 				}
 			} else {
 				// Zero length overlay part was specified.
 				// We must have no overlay, i.e.  table is \.
 				if pf.decoded.g_symbol_table == '\\' {
-					return 1
+					return 1, nil
 				} else {
-					return 0
+					return 0, nil
 				}
 			}
 		} else {
 			// No check of overlay part.  Just make sure it is not primary table.
 			if pf.decoded.g_symbol_table != '/' {
-				return 1
+				return 1, nil
 			} else {
-				return 0
+				return 0, nil
 			}
 		}
 	}
 
-	return (0)
+	return 0, nil
 } /* end filt_s */
 
 /*------------------------------------------------------------------------------
@@ -1174,7 +1163,7 @@ func filt_s(pf *pfstate_t) int {
  *
  *------------------------------------------------------------------------------*/
 
-func filt_i(pf *pfstate_t) int {
+func filt_i(pf *pfstate_t) (int, error) {
 	// http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2020-July/048656.html
 	// Default of 3 hours should be good.
 	// One might question why to have a time limit at all.  Messages are very rare
@@ -1206,16 +1195,14 @@ func filt_i(pf *pfstate_t) int {
 	if len(parts) > 0 && len(parts[0]) > 0 {
 		heardtime, _ = strconv.Atoi(parts[0])
 	} else {
-		print_error(pf, "Missing time limit for IGate message filter.")
-		return (-1)
+		return -1, newFilterError(pf, "Missing time limit for IGate message filter.")
 	}
 
 	if len(parts) > 1 {
 		if len(parts[1]) > 0 {
 			maxhops, _ = strconv.Atoi(parts[1])
 		} else {
-			print_error(pf, "Missing max digipeater hops for IGate message filter.")
-			return (-1)
+			return -1, newFilterError(pf, "Missing max digipeater hops for IGate message filter.")
 		}
 
 		if len(parts) > 2 && len(parts[2]) > 0 {
@@ -1224,21 +1211,18 @@ func filt_i(pf *pfstate_t) int {
 			if len(parts) > 3 && len(parts[3]) > 0 {
 				dlon, _ = strconv.ParseFloat(parts[3], 64)
 			} else {
-				print_error(pf, "Missing longitude for IGate message filter.")
-				return (-1)
+				return -1, newFilterError(pf, "Missing longitude for IGate message filter.")
 			}
 
 			if len(parts) > 4 && len(parts[4]) > 0 {
 				km, _ = strconv.ParseFloat(parts[4], 64)
 			} else {
-				print_error(pf, "Missing distance, in km, for IGate message filter.")
-				return (-1)
+				return -1, newFilterError(pf, "Missing distance, in km, for IGate message filter.")
 			}
 		}
 
 		if len(parts) > 5 {
-			print_error(pf, "Something unexpected after distance for IGate message filter.")
-			return (-1)
+			return -1, newFilterError(pf, "Something unexpected after distance for IGate message filter.")
 		}
 	}
 
@@ -1247,11 +1231,11 @@ func filt_i(pf *pfstate_t) int {
 	 * Addressee has already been extracted into pf.decoded.g_addressee.
 	 */
 	if pf.decoded.g_packet_type != packet_type_message {
-		return (0)
+		return 0, nil
 	}
 
 	if pftest_running {
-		return (1) // Replacement for old #ifdef PFTEST
+		return 1, nil // Replacement for old #ifdef PFTEST
 	}
 
 	/* TODO KG Is this still needed? Digipeater tests still seem to pass fine without it...
@@ -1276,7 +1260,7 @@ func filt_i(pf *pfstate_t) int {
 	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
 
 	if was_heard {
-		return (0)
+		return 0, nil
 	}
 
 	/*
@@ -1299,10 +1283,10 @@ func filt_i(pf *pfstate_t) int {
 	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
 
 	if was_heard {
-		return (0)
+		return 0, nil
 	}
 
-	return (1)
+	return 1, nil
 
 	// #endif
 } /* end filt_i */
@@ -1311,15 +1295,15 @@ func filt_i(pf *pfstate_t) int {
  *
  * Name:   	print_error
  *
- * Purpose:     Print error message with context so someone can figure out what caused it.
+ * Purpose:     Build an error with context so someone can figure out what caused it.
  *
  * Inputs:	pf	- Pointer to current state information.
  *
- *		str	- Specific error message.
+ *		msg	- Specific error message.
  *
  *--------------------------------------------------------------------*/
 
-func print_error(pf *pfstate_t, msg string) {
+func newFilterError(pf *pfstate_t, msg string) error {
 	var intro string
 
 	if pf.from_chan == MAX_TOTAL_CHANS {
@@ -1336,9 +1320,50 @@ func print_error(pf *pfstate_t, msg string) {
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
+	return fmt.Errorf("%s%s\n%*s\n%s", intro, pf.filter_str, len(intro)+pf.tokeni+1, "^", msg)
+}
 
-	dw_printf("%s%s\n", intro, pf.filter_str)
-	dw_printf("%*s\n", (len(intro) + pf.tokeni + 1), "^")
-	dw_printf("%s\n", msg)
+// pfilterDummyMonitorLine is a synthetic packet with a known position, symbol
+// and addressee used to exercise as much of the filter grammar as possible
+// during config-time syntax validation.
+//
+// This lives here, not in a _test.go file, because pfilter_validate() is a
+// runtime dependency of config.go (handleFILTER/handleCFILTER), not just
+// something exercised by tests: it needs a real *packet_t to drive the
+// parser/evaluator against when checking FILTER/CFILTER syntax at config
+// load time, and this constant is that fixture.
+const pfilterDummyMonitorLine = "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120.83W#PHG7140Chelmsford MA"
+
+/*-------------------------------------------------------------------
+ *
+ * Name:   	pfilter_validate
+ *
+ * Purpose:     Check a filter expression for syntax errors without needing
+ *		a real packet, so config file problems are caught at load
+ *		time rather than the first time a matching packet flows.
+ *
+ * Inputs:	filter	- Filter specification/expression from the config file.
+ *
+ *		is_aprs	- True for APRS digipeater/IGate filters, false for
+ *			  connected mode digipeater filters.
+ *
+ * Returns:	nil if the filter is syntactically valid, otherwise an error
+ *		describing the problem.
+ *
+ *--------------------------------------------------------------------*/
+
+func pfilter_validate(filter string, is_aprs bool) error {
+	var pp = AX25FromText(pfilterDummyMonitorLine, true)
+	if pp == nil {
+		return nil
+	}
+	defer AX25Delete(pp)
+
+	var saved_pftest_running = pftest_running
+	pftest_running = true
+	defer func() { pftest_running = saved_pftest_running }()
+
+	var _, err = pfilter(0, 0, filter, pp, is_aprs)
+
+	return err
 }
