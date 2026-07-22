@@ -427,6 +427,103 @@ func Test_config_init_modem_directive(t *testing.T) {
 	}
 }
 
+// --- config_init FILTER / CFILTER syntax validation ---
+
+func Test_config_init_filter_syntax_validation(t *testing.T) {
+	var tests = []struct {
+		name          string
+		configContent string
+		wantSet       bool
+	}{
+		{
+			name:          "valid FILTER expression is stored",
+			configContent: "FILTER 0 0 t/p\n",
+			wantSet:       true,
+		},
+		{
+			name:          "FILTER with unrecognized filter type is rejected",
+			configContent: "FILTER 0 0 x/\n",
+			wantSet:       false,
+		},
+		{
+			name:          "FILTER with unbalanced parentheses is rejected",
+			configContent: "FILTER 0 0 t/w & ( t/w | t/w \n",
+			wantSet:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
+			require.NoError(t, err)
+			_, err = tmpFile.WriteString(tt.configContent)
+			require.NoError(t, err)
+			require.NoError(t, tmpFile.Close())
+
+			var audioConfig = new(audio_s)
+			var digiConfig digi_config_s
+			var cdigiConfig cdigi_config_s
+			var ttConfig tt_config_s
+			var igateConfig igate_config_s
+			var miscConfig misc_config_s
+
+			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
+				&ttConfig, &igateConfig, &miscConfig)
+
+			if tt.wantSet {
+				assert.NotEmpty(t, digiConfig.filter_str[0][0])
+			} else {
+				assert.Empty(t, digiConfig.filter_str[0][0])
+			}
+		})
+	}
+}
+
+func Test_config_init_cfilter_syntax_validation(t *testing.T) {
+	var tests = []struct {
+		name          string
+		configContent string
+		wantSet       bool
+	}{
+		{
+			name:          "valid CFILTER expression is stored",
+			configContent: "CFILTER 0 0 b/W2UB\n",
+			wantSet:       true,
+		},
+		{
+			name:          "CFILTER with a filter type only valid for APRS is rejected",
+			configContent: "CFILTER 0 0 t/p\n",
+			wantSet:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
+			require.NoError(t, err)
+			_, err = tmpFile.WriteString(tt.configContent)
+			require.NoError(t, err)
+			require.NoError(t, tmpFile.Close())
+
+			var audioConfig = new(audio_s)
+			var digiConfig digi_config_s
+			var cdigiConfig cdigi_config_s
+			var ttConfig tt_config_s
+			var igateConfig igate_config_s
+			var miscConfig misc_config_s
+
+			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
+				&ttConfig, &igateConfig, &miscConfig)
+
+			if tt.wantSet {
+				assert.NotEmpty(t, cdigiConfig.cfilter_str[0][0])
+			} else {
+				assert.Empty(t, cdigiConfig.cfilter_str[0][0])
+			}
+		})
+	}
+}
+
 // --- config_init ADEVICE multi-digit suffix ---
 
 func Test_config_init_adevice_multi_digit_suffix(t *testing.T) {

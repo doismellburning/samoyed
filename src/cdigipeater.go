@@ -222,7 +222,13 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 	 * But here we only have to do it once.
 	 */
 	if cfilter_str != "" {
-		if pfilter(from_chan, to_chan, cfilter_str, pp, false) != 1 {
+		var result, err = pfilter(from_chan, to_chan, cfilter_str, pp, false)
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("%s\n", err)
+		}
+
+		if result != 1 {
 			return (nil)
 		}
 	}
