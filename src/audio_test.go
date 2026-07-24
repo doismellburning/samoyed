@@ -312,3 +312,58 @@ func Test_audioFlushReal_UDP_emptyBuffer_isNoop(t *testing.T) {
 	// Should return 0 without attempting a write.
 	assert.Equal(t, 0, audio_flush_real(0))
 }
+
+func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
+	// Start a UDP listener to receive the keepalive silence.
+	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	defer listener.Close()
+
+	var conn net.Conn
+	conn, err = net.Dial("udp", listener.LocalAddr().String())
+	require.NoError(t, err)
+
+	defer conn.Close()
+
+	var dev = setupAdev0(t)
+	dev.udp_out_sock = conn
+	dev.bitsPerSample = 16
+	dev.bytesPerFrame = 2  // mono, 16-bit
+	dev.sampleRate = 44100 // 20ms of samples at this rate exceeds UDP_AUDIO_OUT_BUF_MAXLEN, so the chunk must be capped
+
+	var prevXmitSvc = xmitSvc
+	t.Cleanup(func() { xmitSvc = prevXmitSvc })
+	xmitSvc = &XmitService{} //nolint:exhaustruct
+
+	var stop = make(chan struct{})
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+		audioUDPSilenceKeepalive(0, stop)
+	}()
+
+	// Receive a chunk and verify it's frame-aligned and capped. The buffer
+	// is deliberately larger than UDP_AUDIO_OUT_BUF_MAXLEN so an oversize
+	// datagram would show up as a too-large read rather than being silently
+	// truncated by ReadFrom.
+	var buf = make([]byte, UDP_AUDIO_OUT_BUF_MAXLEN*2)
+	require.NoError(t, listener.SetReadDeadline(time.Now().Add(time.Second)))
+
+	var n int
+	n, _, err = listener.ReadFrom(buf)
+	require.NoError(t, err)
+	assert.NotZero(t, n)
+	assert.LessOrEqual(t, n, UDP_AUDIO_OUT_BUF_MAXLEN, "chunk length must not exceed UDP_AUDIO_OUT_BUF_MAXLEN")
+	assert.Zero(t, n%dev.bytesPerFrame, "chunk length must be a multiple of bytesPerFrame")
+
+	// Closing stop should make the goroutine exit promptly.
+	close(stop)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("audioUDPSilenceKeepalive did not stop after stop was closed")
+	}
+}

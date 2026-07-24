@@ -29,6 +29,10 @@
     * Tests ported from Dire Wolf are often in `foo_test_shim.go` because `go test` doesn't support cgo in _test.go files so that was a place to put the test code while the port was ongoing. Now we don't (directly) use cgo, this is obsolete, and they should live in `foo_direwolf_test.go` - kept separately to make it easier to track upstream
     * Tests where an LLM has just generated a test suite for complex functionality live in `foo_impl_test.go` - this signifies that they don't necessarily reflect intended/specified behaviour, they just test an implementation as-is, so failing tests may not necessarily signify a bug
 
+## Concurrency
+
+* For a goroutine that loops on `select { case <-stop: ...; case <-ticker.C: ... }` and reads/writes a resource (socket, buffer) also torn down elsewhere: don't rely on `stop` being closed to prevent the ticker branch from running one more time after teardown starts — `select` picks randomly among ready cases. Instead, have teardown nil the resource under the same mutex the goroutine locks before touching it, and re-check for nil inside that locked section before using it.
+
 ## Licensing
 
 * `make reuse` checks [REUSE](https://reuse.software/) compliance and must always pass
