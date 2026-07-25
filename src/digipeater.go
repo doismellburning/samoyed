@@ -293,7 +293,13 @@ func digipeat_match(
 	 * First check if filtering has been configured.
 	 */
 	if filter_str != "" {
-		if pfilter(from_chan, to_chan, filter_str, pp, true) != 1 {
+		var result, err = pfilter(from_chan, to_chan, filter_str, pp, true)
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("%s\n", err)
+		}
+
+		if result != 1 {
 			return (nil)
 		}
 	}

@@ -16,6 +16,7 @@
 * Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary e.g. with a `for` loop variable
 * As this started as a port from C (Dire Wolf) there are a lot of things that aren't idiomatic Go yet - new things should be, but we don't need to change existing things if not necessary
 * Prefer to use `new(Foo)` over `&Foo{}` - the latter makes the exhaustruct linter grumble
+* Code paths that can run during config-file validation (before the rest of startup init has run, e.g. `pfilter_validate` from `handleFILTER`/`handleCFILTER`) must not assume other subsystems' global config pointers (e.g. `save_igate_config_p`) are non-nil - guard with a nil check and a safe default
 
 ### Test Callsigns
 
