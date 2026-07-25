@@ -117,6 +117,17 @@ pids=()
 
 # shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
 cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log kissutil-recv-a.log kissutil-recv-b.log kissutil-send-a.log kissutil-send-b.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
 	for pid in "${pids[@]}"; do
 		kill "$pid" 2> /dev/null || true
 	done

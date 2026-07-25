@@ -597,6 +597,18 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 				continue
 			}
 
+			// Reset this client's frame decoder state and buffer before
+			// publishing the connection via client_sock. Previously this
+			// reset (a) happened after client_sock was set, so a fast
+			// sender's bytes could reach listenThread's read loop and
+			// start building a frame in the old *KISSFrame before this
+			// goroutine swapped it out from under it, silently corrupting
+			// the frame, and (b) reset every client's slot rather than
+			// just the one that (re)connected, which could just as easily
+			// clobber a frame already in progress on another attached
+			// client.
+			kps.kf[client] = new(KISSFrame)
+
 			kps.client_sock[client] = conn
 
 			text_color_set(DW_COLOR_INFO)
@@ -605,11 +617,6 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 				dw_printf("\nAttached to KISS TCP client application %d on port %d ...\n\n", client, kps.tcp_port)
 			} else {
 				dw_printf("\nAttached to KISS TCP client application %d on port %d (radio channel %d) ...\n\n", client, kps.tcp_port, kps.channel)
-			}
-
-			// Reset the state and buffer.
-			for i := range len(kps.kf) {
-				kps.kf[i] = new(KISSFrame)
 			}
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
