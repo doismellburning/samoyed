@@ -750,7 +750,6 @@ func demod_init(pa *audio_s) int {
 					D.quick_attack = D.agc_fast_attack * 0.2
 					D.sluggish_decay = D.agc_slow_decay * 0.2
 				}
-
 			} /* switch on modulation type. */
 		} /* if channel medium is radio */
 
@@ -962,7 +961,6 @@ func demod_process_sample(channel int, subchan int, sam int) {
 		  case MODEM_AIS:
 		*/
 		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
-
 	} /* switch modem_type */
 } /* end demod_process_sample */
 

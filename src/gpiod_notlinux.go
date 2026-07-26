@@ -18,6 +18,5 @@ func (*dummyGpiodOutputLine) Close() error {
 }
 
 func RequestGPIODLine(chipName string, lineNumber int, initialState int) (*dummyGpiodOutputLine, error) {
-
 	return nil, errors.New("GPIOD not supported on non-Linux operating systems")
 }

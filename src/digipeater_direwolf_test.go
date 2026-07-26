@@ -354,5 +354,4 @@ func Test_Digipeater(t *testing.T) {
 		dw_printf("ERROR - %d digipeater tests failed.\n", digipeaterTestFailed)
 		t.Fail()
 	}
-
 } /* end main */
