@@ -151,6 +151,8 @@ package direwolf
 import (
 	"runtime"
 	"slices"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -484,6 +486,12 @@ type reg_callsign_t struct {
 
 var reg_callsign_list *reg_callsign_t
 
+// reg_callsign_mu guards reg_callsign_list. Registration/lookup normally
+// happens on the data link state machine's own goroutine (via the dlq
+// queue), but NET/ROM's find_registered_client reads it directly from the
+// packet-receive path, so all access must go through this lock.
+var reg_callsign_mu sync.Mutex
+
 // Use these, rather than setting variables directly, to make debug out easier.
 
 func SET_VS(S *ax25_dlsm_t, n int) {
@@ -723,12 +731,14 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	if client == -1 { // from the radio.
 		var found *reg_callsign_t
 
+		reg_callsign_mu.Lock()
 		for r := reg_callsign_list; r != nil && found == nil; r = r.next {
 			if addrs[AX25_DESTINATION] == r.callsign && channel == r.channel {
 				found = r
 				incoming_for_client = r.client
 			}
 		}
+		reg_callsign_mu.Unlock()
 
 		if found == nil {
 			if s_debug_link_handle {
@@ -1383,10 +1393,12 @@ func dl_register_callsign(E *dlq_item_t) {
 	r.callsign = E.addrs[0]
 	r.channel = E._chan
 	r.client = E.client
-	r.next = reg_callsign_list
 	r.magic = RC_MAGIC
 
+	reg_callsign_mu.Lock()
+	r.next = reg_callsign_list
 	reg_callsign_list = r
+	reg_callsign_mu.Unlock()
 } /* end dl_register_callsign */
 
 func dl_unregister_callsign(E *dlq_item_t) {
@@ -1394,6 +1406,9 @@ func dl_unregister_callsign(E *dlq_item_t) {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_unregister_callsign (%s, chan=%d, client=%d)\n", E.addrs[0], E._chan, E.client)
 	}
+
+	reg_callsign_mu.Lock()
+	defer reg_callsign_mu.Unlock()
 
 	var prev *reg_callsign_t
 
@@ -1656,6 +1671,9 @@ func dl_client_cleanup(E *dlq_item_t) {
 	 * Remove registered callsigns for this client.
 	 */
 
+	reg_callsign_mu.Lock()
+	defer reg_callsign_mu.Unlock()
+
 	var rcprev *reg_callsign_t
 
 	var r = reg_callsign_list
@@ -1676,6 +1694,24 @@ func dl_client_cleanup(E *dlq_item_t) {
 		}
 	}
 } /* end dl_client_cleanup */
+
+// find_registered_client returns the client that registered callsign on
+// channel to accept incoming connections (via the AGW 'X' command), or -1 if
+// no client has registered it. Unlike get_link_handle's equivalent lookup,
+// this may be called from goroutines other than the data link state
+// machine's own (e.g. NET/ROM's packet-receive path), hence the match is
+// case-insensitive/trimmed rather than requiring byte-for-byte equality.
+func find_registered_client(channel int, callsign string) int {
+	reg_callsign_mu.Lock()
+	defer reg_callsign_mu.Unlock()
+
+	for r := reg_callsign_list; r != nil; r = r.next {
+		if r.channel == channel && strings.EqualFold(strings.TrimSpace(r.callsign), strings.TrimSpace(callsign)) {
+			return r.client
+		}
+	}
+	return -1
+}
 
 /*------------------------------------------------------------------------------
  *
