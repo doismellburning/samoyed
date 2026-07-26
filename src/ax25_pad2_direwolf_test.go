@@ -27,7 +27,7 @@ func Test_AX25_PAD2(t *testing.T) {
 	/* U frame */
 
 	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
-		for pf := 0; pf <= 1; pf++ {
+		for pf := range 2 {
 			var cmin cmdres_t = 0
 			var cmax cmdres_t = 0
 
@@ -83,7 +83,7 @@ func Test_AX25_PAD2(t *testing.T) {
 	num_addr = 3
 
 	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
-		for pf := 0; pf <= 1; pf++ {
+		for pf := range 2 {
 			var modulo = modulo_8
 			var nr = int(modulo/2 + 1)
 
@@ -120,7 +120,7 @@ func Test_AX25_PAD2(t *testing.T) {
 
 	var ftype = frame_type_S_SREJ
 
-	for pf := 0; pf <= 1; pf++ {
+	for pf := range 2 {
 		var modulo = modulo_128
 		var nr = 127
 		var cr = cr_res
@@ -141,7 +141,7 @@ func Test_AX25_PAD2(t *testing.T) {
 
 	info = []byte("The rain in Spain stays mainly on the plain.")
 
-	for pf := 0; pf <= 1; pf++ {
+	for pf := range 2 {
 		var modulo = modulo_8
 		var nr = 0x55 & int(modulo-1)
 		var ns = 0xaa & int(modulo-1)

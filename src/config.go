@@ -1239,7 +1239,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var b = 0
 
-				for k := 0; k < ps.misc.num_beacons; k++ {
+				for k := range ps.misc.num_beacons {
 					if ps.misc.beacon[k].sendto_chan == j {
 						b++
 					}
@@ -1271,7 +1271,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 				var b = 0
 
-				for k := 0; k < ps.misc.num_beacons; k++ {
+				for k := range ps.misc.num_beacons {
 					if ps.misc.beacon[k].sendto_chan == j {
 						b++
 					}
@@ -4360,7 +4360,7 @@ func handleTTMACRO(ps *parseState) bool {
 	var p_count [3]int
 	var tt_error = 0
 
-	for j := 0; j < len(t); j++ {
+	for j := range len(t) {
 		if !strings.ContainsRune("0123456789ABCDxyz", rune(t[j])) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z.\n", ps.line)
@@ -4529,7 +4529,7 @@ func handleTTMACRO(ps *parseState) bool {
 	var d_count [3]int
 
 	var otempStr = otemp.String()
-	for j := 0; j < len(otempStr); j++ {
+	for j := range len(otempStr) {
 		if otempStr[j] >= 'x' && otempStr[j] <= 'z' {
 			d_count[otempStr[j]-'x']++
 		}

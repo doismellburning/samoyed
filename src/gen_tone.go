@@ -702,11 +702,11 @@ func GenToneMain() {
 	gen_tone_init(&my_audio_config, 100, false)
 
 	for range 2 {
-		for n := 0; n < my_audio_config.achan[0].baud*2; n++ {
+		for range my_audio_config.achan[0].baud * 2 {
 			tone_gen_put_bit(chan1, 1)
 		}
 
-		for n := 0; n < my_audio_config.achan[0].baud*2; n++ {
+		for range my_audio_config.achan[0].baud * 2 {
 			tone_gen_put_bit(chan1, 0)
 		}
 	}
@@ -724,19 +724,19 @@ func GenToneMain() {
 	gen_tone_init(&my_audio_config, 100, false)
 
 	for range 4 {
-		for n := 0; n < my_audio_config.achan[0].baud*2; n++ {
+		for range my_audio_config.achan[0].baud * 2 {
 			tone_gen_put_bit(chan1, 1)
 		}
 
-		for n := 0; n < my_audio_config.achan[0].baud*2; n++ {
+		for range my_audio_config.achan[0].baud * 2 {
 			tone_gen_put_bit(chan1, 0)
 		}
 
-		for n := 0; n < my_audio_config.achan[1].baud*2; n++ {
+		for range my_audio_config.achan[1].baud * 2 {
 			tone_gen_put_bit(chan2, 1)
 		}
 
-		for n := 0; n < my_audio_config.achan[1].baud*2; n++ {
+		for range my_audio_config.achan[1].baud * 2 {
 			tone_gen_put_bit(chan2, 0)
 		}
 	}

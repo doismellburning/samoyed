@@ -239,7 +239,7 @@ func test_payload(t *testing.T) {
 		original_payload[n] = byte(n & 0xff)
 	}
 
-	for max_fec := 0; max_fec <= 1; max_fec++ {
+	for max_fec := range 2 {
 		for payload_length := 1; payload_length <= IL2P_MAX_PAYLOAD_SIZE; payload_length++ {
 			// dw_printf ("\n--------- max_fec = %d, payload_length = %d\n", max_fec, payload_length);
 			var encoded, k = il2p_encode_payload(original_payload[:payload_length], max_fec)
@@ -531,7 +531,7 @@ func test_example_headers(t *testing.T) {
 func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 	t.Helper()
 
-	for max_fec := 0; max_fec <= 1; max_fec++ {
+	for max_fec := range 2 {
 		var encoded, enc_len = il2p_encode_frame(pp1, max_fec)
 		assert.GreaterOrEqual(t, enc_len, 0)
 
@@ -582,7 +582,7 @@ func all_frame_types(t *testing.T) {
 	dw_printf("\nU frames...\n")
 
 	for ftype := frame_type_U_SABME; ftype <= frame_type_U_TEST; ftype++ {
-		for pf := 0; pf <= 1; pf++ {
+		for pf := range 2 {
 			var cmin, cmax cmdres_t
 
 			switch ftype {
@@ -637,7 +637,7 @@ func all_frame_types(t *testing.T) {
 	dw_printf("\nS frames...\n")
 
 	for ftype := frame_type_S_RR; ftype <= frame_type_S_SREJ; ftype++ {
-		for pf := 0; pf <= 1; pf++ {
+		for pf := range 2 {
 			var modulo = modulo_8
 			var nr = int(modulo/2 + 1)
 
@@ -682,7 +682,7 @@ func all_frame_types(t *testing.T) {
 
 	var ftype = frame_type_S_SREJ
 
-	for pf := 0; pf <= 1; pf++ {
+	for pf := range 2 {
 		var modulo = modulo_128
 		var nr = 127
 		var cr = cr_res
@@ -702,7 +702,7 @@ func all_frame_types(t *testing.T) {
 
 	pinfo = []byte("The rain in Spain stays mainly on the plain.")
 
-	for pf := 0; pf <= 1; pf++ {
+	for pf := range 2 {
 		var modulo = modulo_8
 		var nr = 0x55 & int(modulo-1)
 		var ns = 0xaa & int(modulo-1)
@@ -765,7 +765,8 @@ func test_serdes(t *testing.T) {
 
 		var channel = 0
 
-		for max_fec := 0; max_fec <= 1; max_fec++ {
+		for max_fec := range 2 {
+			//nolint:intrange // il2pSerdesPolarity is a package-level global read by callbacks; a range loop would shadow it with a local.
 			for il2pSerdesPolarity = 0; il2pSerdesPolarity <= 2; il2pSerdesPolarity++ { // 2 means throw in some errors.
 				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, il2pSerdesPolarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)

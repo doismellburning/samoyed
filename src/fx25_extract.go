@@ -78,7 +78,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	var count int
 
 	// form the syndromes; i.e., evaluate data(x) at roots of g(x)
-	for i = 0; i < nroots; i++ {
+	for i = range nroots {
 		s[i] = data[0]
 	}
 
@@ -94,7 +94,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 	// Convert syndromes to index form, checking for nonzero condition
 	synError = 0
-	for i = 0; i < nroots; i++ {
+	for i = range nroots {
 		synError |= int(s[i])
 		s[i] = rs.index_of[s[i]]
 	}
@@ -166,7 +166,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 	// for(i=0;i<NROOTS+1;i++)
 	//   b[i] = INDEX_OF[lambda[i]];
-	for i = 0; i < nroots+1; i++ {
+	for i = range nroots + 1 {
 		b[i] = rs.index_of[lambda[i]]
 	}
 
@@ -179,7 +179,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		// Compute discrepancy at the r-th step in poly-form
 		discrR = 0
 
-		for i = 0; i < r; i++ {
+		for i = range r {
 			if lambda[i] != 0 && int(s[r-i-1]) != A0 {
 				discrR ^= rs.alpha_to[modnn(rs, int(rs.index_of[lambda[i]])+int(s[r-i-1]))]
 			}
@@ -195,7 +195,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			// 7 lines below: T(x) <-- lambda(x) - discr_r*x*b(x)
 			t[0] = lambda[0]
 
-			for i = 0; i < nroots; i++ {
+			for i = range nroots {
 				if int(b[i]) != A0 {
 					t[i+1] = lambda[i+1] ^ rs.alpha_to[modnn(rs, int(discrR)+int(b[i]))]
 				} else {
@@ -206,7 +206,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			if 2*el <= r+no_eras-1 {
 				el = r + no_eras - el
 				// 2 lines below: B(x) <-- inv(discr_r) * lambda(x)
-				for i = 0; i <= nroots; i++ {
+				for i = range nroots + 1 {
 					if lambda[i] == 0 {
 						b[i] = byte(A0)
 					} else {
@@ -227,7 +227,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// Convert lambda to index form and compute deg(lambda(x))
 	degLambda = 0
 
-	for i = 0; i < nroots+1; i++ {
+	for i = range nroots + 1 {
 		lambda[i] = rs.index_of[lambda[i]]
 		if int(lambda[i]) != A0 {
 			degLambda = i
@@ -276,7 +276,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 	// x**NROOTS). in index form. Also find deg(omega).
 	degOmega = 0
 
-	for i = 0; i < nroots; i++ {
+	for i = range nroots {
 		tmp = 0
 
 		j = min(degLambda, i)
@@ -334,7 +334,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 
 finish:
 	if eras_pos != nil {
-		for i = 0; i < count; i++ {
+		for i = range count {
 			eras_pos[i] = loc[i]
 		}
 	}

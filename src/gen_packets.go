@@ -858,7 +858,7 @@ func send_packet(str string) {
 
 		// If stereo, put same thing in each channel.
 
-		for c := 0; c < modem.adev[0].num_channels; c++ {
+		for c := range modem.adev[0].num_channels {
 			var samples_per_symbol int
 
 			// Insert random amount of quiet time.

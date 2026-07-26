@@ -65,7 +65,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 	// optional, or not allowed for each beacon type.  Options which
 	// are not applicable are often silently ignored, causing confusion.
 
-	for j := 0; j < bs.miscConfig.num_beacons; j++ {
+	for j := range bs.miscConfig.num_beacons {
 		var channel = bs.miscConfig.beacon[j].sendto_chan
 
 		if channel < 0 {
@@ -186,7 +186,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 	var now = time.Now()
 
-	for j := 0; j < bs.miscConfig.num_beacons; j++ {
+	for j := range bs.miscConfig.num_beacons {
 		var bp = &(bs.miscConfig.beacon[j])
 		/* TODO KG
 		#if DEBUG
@@ -276,7 +276,7 @@ func (bs *BeaconService) SetDebug(level int) {
 func (bs *BeaconService) Start() {
 	var count = 0
 
-	for j := 0; j < bs.miscConfig.num_beacons; j++ {
+	for j := range bs.miscConfig.num_beacons {
 		if bs.miscConfig.beacon[j].btype != BEACON_IGNORE {
 			count++
 		}

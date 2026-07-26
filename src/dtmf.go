@@ -443,7 +443,7 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 	var dtmf float64 // Audio.  Sum of two sine waves.
 	var phasea, phaseb float64
 
-	for i := int(0); i < (ms*dd[channel].sample_rate)/1000; i++ {
+	for range (ms * dd[channel].sample_rate) / 1000 {
 		// This could be more efficient with a precomputed sine wave table
 		// but I'm not that worried about it.
 		// With a Raspberry Pi, model 2, default 1200 receiving takes about 14% of one CPU core.

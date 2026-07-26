@@ -259,7 +259,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 	//
 
 	var k = 0
-	for i := 0; i < D.lp_filter_taps; i++ {
+	for i := range D.lp_filter_taps {
 		D.u.bb.lp_polyphase_1[i] = D.u.bb.lp_filter[k]
 
 		k++
@@ -438,7 +438,7 @@ func process_filtered_sample(channel int, fsam float64, D *demodulator_state_s) 
 		nudge_pll_9600(channel, subchannel, 0, demod_out, D)
 	} else {
 		/* Multiple slicers each feeding its own HDLC decoder. */
-		for slice := int(0); slice < D.num_slicers; slice++ {
+		for slice := range D.num_slicers {
 			demod_data = demod_out-slice_point[slice] > 0
 			nudge_pll_9600(channel, subchannel, slice, demod_out-slice_point[slice], D)
 		}

@@ -341,7 +341,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 	}
 
 	var frame_buf []byte
-	for i := 0; i < ilen; i++ {
+	for i := range ilen {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
 			var dbit = byte(IfThenElse((pin[i]&imask) != 0, 1, 0))
 

@@ -1524,7 +1524,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 
 	var count2 = 0
 
-	for k := 0; k < int(S.modulo); k++ {
+	for k := range S.modulo {
 		if S.txdata_by_ns[k] != nil {
 			count2++
 		}
@@ -1933,7 +1933,7 @@ func lm_data_indication(E *dlq_item_t) {
 
 	// Copy addresses from frame into event structure.
 
-	for n := 0; n < E.num_addr; n++ {
+	for n := range E.num_addr {
 		E.addrs[n] = ax25_get_addr_with_ssid(E.pp, n)
 	}
 

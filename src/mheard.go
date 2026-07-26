@@ -190,7 +190,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 	// HACK - Reduce hop count by number of used WIDEn-0 addresses.
 
 	if hops > 1 {
-		for k := 0; k < ax25_get_num_repeaters(pp); k++ {
+		for k := range ax25_get_num_repeaters(pp) {
 			var digi = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+k)
 			var ssid = ax25_get_ssid(pp, AX25_REPEATER_1+k)
 			var used = ax25_get_h(pp, AX25_REPEATER_1+k)

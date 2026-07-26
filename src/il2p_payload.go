@@ -134,7 +134,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// First the large blocks.
 
-	for b := 0; b < ipp.large_block_count; b++ {
+	for range ipp.large_block_count {
 		var scram = il2p_scramble_block(pin[:ipp.large_block_size])
 		pout = append(pout, scram...)
 
@@ -150,7 +150,7 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 	// Then the small blocks.
 
-	for b := 0; b < ipp.small_block_count; b++ {
+	for range ipp.small_block_count {
 		var scram = il2p_scramble_block(pin[:ipp.small_block_size])
 		pout = append(pout, scram...)
 
@@ -208,7 +208,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 
 	// First the large blocks.
 
-	for b := 0; b < ipp.large_block_count; b++ {
+	for range ipp.large_block_count {
 		var corrected_block, e = il2p_decode_rs(pin[:ipp.large_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
 
 		// dw_printf ("%s:%d: large block decode_rs returned status = %d\n", __FILE__, __LINE__, e);
@@ -234,7 +234,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 
 	// Then the small blocks.
 
-	for b := 0; b < ipp.small_block_count; b++ {
+	for range ipp.small_block_count {
 		var corrected_block, e = il2p_decode_rs(pin[:ipp.small_block_size+ipp.parity_symbols_per_block], ipp.parity_symbols_per_block)
 
 		// dw_printf ("%s:%d: small block decode_rs returned status = %d\n", __FILE__, __LINE__, e);

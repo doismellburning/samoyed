@@ -1013,7 +1013,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
 	var all_ok = true
 
-	for n := 0; n < ax25_get_num_addr(pp); n++ {
+	for n := range ax25_get_num_addr(pp) {
 		var addr = ax25_get_addr_with_ssid(pp, n)
 
 		var _, _, _, ok = ax25_parse_addr(n, addr, 1)

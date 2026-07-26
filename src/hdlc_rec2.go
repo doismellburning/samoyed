@@ -324,7 +324,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	retry_cfg.retry = RETRY_INVERT_SINGLE
 	retry_cfg.contig.nr_bits = 1
 
-	for i := 0; i < length; i++ {
+	for i := range length {
 		/* Set the index of the bit to swap */
 		retry_cfg.contig.bit_idx = i
 
@@ -350,7 +350,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	retry_cfg.retry = RETRY_INVERT_DOUBLE
 	retry_cfg.contig.nr_bits = 2
 
-	for i := 0; i < length-1; i++ {
+	for i := range length - 1 {
 		retry_cfg.contig.bit_idx = i
 
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
@@ -375,7 +375,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	retry_cfg.retry = RETRY_INVERT_TRIPLE
 	retry_cfg.contig.nr_bits = 3
 
-	for i := 0; i < length-2; i++ {
+	for i := range length - 2 {
 		retry_cfg.contig.bit_idx = i
 
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
@@ -412,7 +412,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	#endif
 	*/
 	length = rrbb_get_len(block)
-	for i := 0; i < length-2; i++ {
+	for i := range length - 2 {
 		retry_cfg.sep.bit_idx_a = i
 
 		var ok = false

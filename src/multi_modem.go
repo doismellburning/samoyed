@@ -208,12 +208,12 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 	/* 1.2: We can feed one demodulator but end up with multiple outputs. */
 
 	/* Send same thing to all. */
-	for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+	for d := range save_audio_config_p.achan[channel].num_subchan {
 		demod_process_sample(channel, d, audio_sample)
 	}
 
-	for subchan := 0; subchan < save_audio_config_p.achan[channel].num_subchan; subchan++ {
-		for slice := 0; slice < save_audio_config_p.achan[channel].num_slicers; slice++ {
+	for subchan := range save_audio_config_p.achan[channel].num_subchan {
+		for slice := range save_audio_config_p.achan[channel].num_slicers {
 			if candidate[channel][subchan][slice].packet_p != nil {
 				candidate[channel][subchan][slice].age++
 				if candidate[channel][subchan][slice].age > process_age[channel] {

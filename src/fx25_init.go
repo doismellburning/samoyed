@@ -378,7 +378,7 @@ func init_rs_char(symsize uint, gfpoly uint, fcr uint, prim uint, nroots uint) *
 	rs.alpha_to[rs.nn] = 0       // alpha**-inf = 0
 
 	var sr = 1
-	for i := 0; i < int(rs.nn); i++ {
+	for i := range rs.nn {
 		rs.index_of[sr] = byte(i)
 		rs.alpha_to[i] = byte(sr)
 
