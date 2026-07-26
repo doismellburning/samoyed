@@ -1023,10 +1023,8 @@ func dl_disconnect_request(E *dlq_item_t) {
 	}
 } /* end dl_disconnect_request */
 
-// Number of segments is ceiling( (datalen + 1 ) / (N1 - 1))
-
-// we add one to datalen for the original PID.
-// We subtract one from N1 for the segment identifier header.
+// DIVROUNDUP computes ceiling(a/b). Number of segments is ceiling( (datalen + 1 ) / (N1 - 1)):
+// we add one to datalen for the original PID, and subtract one from N1 for the segment identifier header.
 func DIVROUNDUP(a, b int) int {
 	return (a + b - 1) / b
 }
@@ -2303,8 +2301,8 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 	}
 } /* end i_frame */
 
-// The original spec always sent SABM and went to state 1.
-// I was thinking, why not use v2.2 instead of we were already connected with v2.2?
+// SABME_or_SABM picks the state to enter after connecting. The original spec always sent SABM
+// and went to state 1. I was thinking, why not use v2.2 instead of we were already connected with v2.2?
 // My version of establish_data_link combined the two original functions and
 // already uses SABME or SABM based on S.modulo.
 func SABME_or_SABM(S *ax25_dlsm_t) dlsm_state_e {

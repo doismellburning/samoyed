@@ -25,7 +25,7 @@ type AGWPEMessage struct {
 	Data   []byte
 }
 
-// binary.Write won't send variable-length slices, and I keep forgetting that, so...
+// Write sends msg to w. binary.Write won't send variable-length slices, and I keep forgetting that, so...
 func (msg *AGWPEMessage) Write(w io.Writer, order binary.ByteOrder) (int, error) {
 	var headerErr = binary.Write(w, order, msg.Header)
 	if headerErr != nil {

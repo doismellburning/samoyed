@@ -47,7 +47,7 @@ type DCDConfig struct {
 	DCD_GOOD_WIDTH int
 }
 
-// These values are good for 1200 bps AFSK.
+// GenericDCDConfig returns values that are good for 1200 bps AFSK.
 // Might want to override for other modems.
 func GenericDCDConfig() *DCDConfig {
 	var c = new(DCDConfig)

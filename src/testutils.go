@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// AssertOutputContains runs command and asserts its stdout contains expectedOutputContains.
 // Note that any of the Dire Wolf colour formatting totally screws this for reasons I don't yet understand.
 // See also what happens if you pipe output to a pager...
 func AssertOutputContains(t *testing.T, command func(), expectedOutputContains string) {

@@ -1,4 +1,5 @@
-/* Test fixture for the Dire Wolf demodulators */
+// Test fixture for the Dire Wolf demodulators.
+
 //nolint:gochecknoglobals
 package direwolf
 

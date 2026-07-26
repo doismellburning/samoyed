@@ -1131,7 +1131,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-/* R_M is the average radius of earth in meters. */
+// R_M is the average radius of earth in meters.
 const R_M = 6371000.0
 
 func (g *TTGateway) parseLocation(state *ttParseState, e string) int {

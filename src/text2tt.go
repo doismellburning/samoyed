@@ -24,7 +24,7 @@ func checksum(tt string) int {
 	return (cs % 10)
 }
 
-// Utility program for testing the encoding.
+// Text2TTMain is a utility program for testing the encoding.
 func Text2TTMain() {
 	if len(os.Args) < 2 {
 		fmt.Printf("Supply text string on command line.\n")
