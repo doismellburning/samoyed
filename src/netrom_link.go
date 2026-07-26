@@ -61,17 +61,19 @@ type netromLinkManager struct {
 }
 
 func newNetromLinkManager(nodeCall, nodeAlias string) *netromLinkManager {
-	return &netromLinkManager{
-		mu:        sync.Mutex{},
-		circuits:  nil,
-		nodeCall:  nodeCall,
-		nodeAlias: nodeAlias,
-		nextIdx:   1,
-		nextID:    1,
-	}
+	var m = new(netromLinkManager)
+	m.nodeCall = nodeCall
+	m.nodeAlias = nodeAlias
+	m.nextIdx = 1
+	m.nextID = 1
+	return m
 }
 
-// allocCircuit creates and registers a new circuit, returning it locked.
+// allocCircuit reserves a fresh local idx/id and returns a new circuit that is
+// not yet visible to lookups. Call publishCircuit once its identity fields
+// (channel, localCall, remoteCall, remoteNode, remoteIdx, remoteID) are set,
+// so that findByLocal/findByCallsigns/findByRemote never observe a partially
+// initialised circuit.
 func (m *netromLinkManager) allocCircuit() *netromCircuit {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -92,8 +94,26 @@ func (m *netromLinkManager) allocCircuit() *netromCircuit {
 		m.nextID = 1
 	}
 
-	m.circuits = append(m.circuits, c)
 	return c
+}
+
+// publishCircuit makes c visible to findByLocal/findByCallsigns/findByRemote.
+func (m *netromLinkManager) publishCircuit(c *netromCircuit) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.circuits = append(m.circuits, c)
+}
+
+// setRemote updates a circuit's remote idx/id, which findByRemote uses as
+// lookup keys, under the manager lock rather than c.mu so that finder reads
+// and this write are synchronized by the same mutex.
+func (m *netromLinkManager) setRemote(c *netromCircuit, idx, id byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	c.remoteIdx = idx
+	c.remoteID = id
 }
 
 func (m *netromLinkManager) findByLocal(idx, id byte) *netromCircuit {
@@ -166,6 +186,8 @@ func (m *netromLinkManager) connectRequest(channel, client int, dstNode string, 
 	c.window = NETROM_WINDOW_DEFAULT
 	c.mu.Unlock()
 
+	m.publishCircuit(c)
+
 	var payload = netromBuildConnect(
 		dstNode, m.nodeCall, netromConfigTTL(),
 		0, 0, // remote ckt fields – 0 because remote doesn't have a circuit yet.
@@ -177,7 +199,11 @@ func (m *netromLinkManager) connectRequest(channel, client int, dstNode string, 
 	netromTx(channel, route.neighbor, payload)
 
 	c.mu.Lock()
-	c.startT1()
+	// The CONNECT ACK may already have arrived and transitioned the circuit
+	// while netromTx was in flight; only arm T1 if we're still waiting.
+	if c.state == nrStateAwaitingConnection {
+		c.startT1()
+	}
 	c.mu.Unlock()
 }
 
@@ -241,15 +267,33 @@ func (m *netromLinkManager) rxFrame(fromChan int, f *netromTransportFrame) {
 }
 
 func (m *netromLinkManager) rxConnect(fromChan int, f *netromTransportFrame) {
+	// A retransmitted CONNECT REQUEST (e.g. our CONNECT ACK was lost) should
+	// not allocate a second circuit for the same remote circuit; just resend
+	// the ACK for the circuit we already have.
+	if existing := m.findByRemote(f.net.src, f.origIdx, f.origID); existing != nil {
+		existing.mu.Lock()
+		var ackPayload = netromBuildConnAck(
+			f.net.src, m.nodeCall, netromConfigTTL(),
+			f.origIdx, f.origID,
+			existing.localIdx, existing.localID,
+			existing.window,
+			false,
+		)
+		existing.mu.Unlock()
+		netromTx(fromChan, f.net.src, ackPayload)
+		return
+	}
+
 	// Allocate a circuit for the incoming connection.
 	var c = m.allocCircuit()
+	var client = find_registered_client(fromChan, f.dstCallsign)
 	c.mu.Lock()
 	c.localNode = m.nodeCall
 	c.remoteNode = f.net.src
 	c.localCall = f.dstCallsign
 	c.remoteCall = f.origCallsign
 	c.channel = fromChan
-	c.client = -1 // will be set when an application registers for this callsign.
+	c.client = client
 	c.remoteIdx = f.origIdx
 	c.remoteID = f.origID
 	if f.windowSize > 0 {
@@ -257,6 +301,8 @@ func (m *netromLinkManager) rxConnect(fromChan int, f *netromTransportFrame) {
 	}
 	c.state = nrStateConnected
 	c.mu.Unlock()
+
+	m.publishCircuit(c)
 
 	// Send CONNECT ACK.
 	var payload = netromBuildConnAck(
@@ -288,8 +334,7 @@ func (m *netromLinkManager) rxConnAck(f *netromTransportFrame) {
 	}
 
 	c.stopT1()
-	c.remoteIdx = f.acceptIdx
-	c.remoteID = f.acceptID
+	m.setRemote(c, f.acceptIdx, f.acceptID)
 	if f.windowSize > 0 {
 		c.window = f.windowSize
 	}

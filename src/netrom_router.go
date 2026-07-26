@@ -29,10 +29,9 @@ type netromRouter struct {
 }
 
 func newNetromRouter() *netromRouter {
-	return &netromRouter{
-		mu:     sync.RWMutex{},
-		routes: make(map[string]*netromRouteEntry),
-	}
+	var r = new(netromRouter)
+	r.routes = make(map[string]*netromRouteEntry)
+	return r
 }
 
 // update processes one NODES broadcast received from fromNeighbor.
