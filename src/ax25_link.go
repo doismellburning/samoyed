@@ -1020,7 +1020,6 @@ func dl_disconnect_request(E *dlq_item_t) {
 		STOP_T3(S)
 		START_T1(S)
 		enter_new_state(S, state_2_awaiting_release)
-
 	}
 } /* end dl_disconnect_request */
 
@@ -1876,7 +1875,6 @@ func lm_seize_confirm(E *dlq_item_t) {
 
 				// Erratum: The original spec had LM-SEIZE request here, for state 4, which didn't seem right.
 				// The 2006 revision has LM-RELEASE Request so states 3 & 4 are the same.
-
 			}
 		}
 	}

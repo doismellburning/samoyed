@@ -277,6 +277,5 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		}
 
 		F.state = IL2P_SEARCHING
-
 	} // end of switch
 }

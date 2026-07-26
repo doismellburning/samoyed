@@ -42,7 +42,6 @@ import (
  *--------------------------------------------------------------*/
 
 func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
-
 	var appendCRC = len(crc) > 0 && crc[0]
 
 	// Can a type 1 header be used?

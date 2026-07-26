@@ -282,7 +282,6 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 
 			D.pll_locked_inertia = 0.925
 			D.pll_searching_inertia = 0.50
-
 		}
 
 		D.u.psk.delay_line_width_sym = 1.25 // Delay line > 13/12 * symbol period

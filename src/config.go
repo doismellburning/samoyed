@@ -4396,7 +4396,6 @@ func handleTTMACRO(ps *parseState) bool {
 	tmp = strings.TrimSpace(tmp)
 
 	for len(tmp) != 0 {
-
 		if strings.HasPrefix(tmp, "AC{") {
 			// Convert to fixed length 10 digit callsign.
 			tmp = tmp[3:]
@@ -4423,7 +4422,6 @@ func handleTTMACRO(ps *parseState) bool {
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "AA{") {
-
 			// Convert to object name.
 
 			tmp = tmp[3:]
@@ -4455,7 +4453,6 @@ func handleTTMACRO(ps *parseState) bool {
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "AB{") {
-
 			// Attempt conversion from description to symbol code.
 
 			tmp = tmp[3:]
@@ -4491,7 +4488,6 @@ func handleTTMACRO(ps *parseState) bool {
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "CA{") {
-
 			// Convert to enhanced comment that can contain any ASCII character.
 
 			tmp = tmp[3:]
@@ -4700,7 +4696,6 @@ func handleTTOBJ(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-
 		if check_via_path(t) >= 0 {
 			ps.tt.obj_xmit_via = t
 		} else {
