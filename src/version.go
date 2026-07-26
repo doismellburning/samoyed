@@ -8,13 +8,14 @@ import (
 
 var SAMOYED_VERSION string //nolint:gochecknoglobals // Set at build time via `-ldflags "-X 'github.com/doismellburning/samoyed/src.SAMOYED_VERSION=X'"`
 
-// A bunch of things, both Dire Wolf and APRS, seem to expect two-part single-digit versions.
+// MAJOR_VERSION and MINOR_VERSION exist because a bunch of things, both Dire Wolf and APRS,
+// seem to expect two-part single-digit versions.
 // This obviously doesn't interact well with my choice of CalVer...
 // TODO Figure out what to do with MAJOR_VERSION etc.
 const MAJOR_VERSION = 0
 const MINOR_VERSION = 0
 
-// Put in APRS destination field to identify the equipment used.
+// APP_TOCALL is put in APRS destination field to identify the equipment used.
 // Dire Wolf used APDW - "Assigned by WB4APR in tocalls.txt".
 // KG 2026-01-19: Nobody has assigned SMYD, but I figured it was better to differentiate sooner rather than later.
 const APP_TOCALL = "SMYD"
@@ -22,7 +23,7 @@ const APP_TOCALL = "SMYD"
 // For user-defined data format.
 // APRS protocol spec Chapter 18 and http://www.aprs.org/aprs11/expfmts.txt
 
-// KG 2026-01-19: Dire Wolf has D reserved per
+// USER_DEF_USER_ID : KG 2026-01-19: Dire Wolf has D reserved per
 // https://www.aprs.org/aprs11/expfmts.txt and there seems a lot less space for
 // me to comfortably just DIY like with APP_TOCALL (and S is already assigned).
 // So I'll stick with D for now as it seems the least-worst option.

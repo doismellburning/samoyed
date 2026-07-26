@@ -186,7 +186,7 @@ type CM108Thing struct {
 	// This is what we use to match up audio and HID.
 }
 
-// Test for supported devices.
+// GOOD_DEVICE tests for supported devices.
 func GOOD_DEVICE(v, p int) bool {
 	return (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) || p == CMEDIA_PID_CM108AH ||
 		p == CMEDIA_PID_CM108AH_alt || p == CMEDIA_PID_CM108B || p == CMEDIA_PID_CM119A || p == CMEDIA_PID_CM119B)) ||

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Utility program for testing the decoding.
+// TT2TextMain is a utility program for testing the decoding.
 func TT2TextMain() {
 	if len(os.Args) < 2 {
 		fmt.Printf("Supply button sequence on command line.\n")

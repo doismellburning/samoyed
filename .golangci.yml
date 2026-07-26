@@ -9,7 +9,6 @@ linters:
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines
     - "gocyclo"  # One day
-    - "godoclint"  # There's lots to be done with documentation formatting, but not right now
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
     - "maintidx"  # One day...

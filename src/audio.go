@@ -476,9 +476,9 @@ const UDP_AUDIO_OUT_BUF_MAXLEN = 1472
 
 const DEFAULT_NUM_CHANNELS = 1
 const DEFAULT_SAMPLES_PER_SEC = 44100 /* Very early observations.  Might no longer be valid. */
-/* 22050 works a lot better than 11025. */
-/* 44100 works a little better than 22050. */
-/* If you have a reasonable machine, use the highest rate. */
+// MIN_SAMPLES_PER_SEC : 22050 works a lot better than 11025.
+// 44100 works a little better than 22050.
+// If you have a reasonable machine, use the highest rate.
 const MIN_SAMPLES_PER_SEC = 8000
 
 //const MAX_SAMPLES_PER_SEC	48000	/* Originally 44100.  Later increased because */

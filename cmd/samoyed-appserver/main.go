@@ -633,7 +633,7 @@ func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, c
 	s.txQueueLen = frame_count
 } /* end agw_cb_Y_outstanding_frames_for_station */
 
-// strings.Cut for []bytes
+// BytesCut is strings.Cut for []bytes.
 func BytesCut(s []byte, b byte) ([]byte, []byte, bool) { //nolint:unparam
 	var i = bytes.Index(s, []byte{b})
 
