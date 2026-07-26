@@ -78,6 +78,7 @@ func DecodeAPRSMain() {
 		if len(line) == 0 || strings.HasPrefix(line, "#") {
 			/* comment or blank line */
 			fmt.Printf("%s\n", line)
+
 			continue
 		}
 
@@ -113,6 +114,7 @@ func DecodeAPRSLine(line string) {
 		if bytes[0] == FEND {
 			if len(bytes) < 2 || bytes[1] != 0 {
 				fmt.Printf("Was expecting to find 00 after the initial C0.\n")
+
 				return
 			}
 

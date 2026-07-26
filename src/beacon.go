@@ -216,22 +216,26 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 					var e = bp.every + n
 					if e > 3600 {
 						bp.every = 3600
+
 						break
 					}
 
 					if IS_GOOD(e) {
 						bp.every = e
+
 						break
 					}
 
 					e = bp.every - n
 					if e < 1 {
 						bp.every = 1 // Impose a larger minimum?
+
 						break
 					}
 
 					if IS_GOOD(e) {
 						bp.every = e
+
 						break
 					}
 				}

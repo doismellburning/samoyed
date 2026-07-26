@@ -27,6 +27,7 @@ func readReplyFrom(conn net.Conn) (*AGWPEMessage, error) {
 			return nil, err
 		}
 	}
+
 	return msg, nil
 }
 
@@ -41,6 +42,7 @@ func setupClientPipe(t *testing.T) net.Conn {
 		client.Close()
 		client_sock[0] = nil
 	})
+
 	return client
 }
 
@@ -53,6 +55,7 @@ func asyncReply(conn net.Conn) <-chan *AGWPEMessage {
 		msg, _ := readReplyFrom(conn)
 		ch <- msg
 	}()
+
 	return ch
 }
 
@@ -240,6 +243,7 @@ func dlqAppended(f func()) *dlq_item_t {
 	var newItem = dlq_queue_head
 	dlq_queue_head = savedHead
 	dlq_mutex.Unlock()
+
 	return newItem
 }
 

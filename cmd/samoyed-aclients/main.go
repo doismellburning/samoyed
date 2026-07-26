@@ -258,6 +258,7 @@ func client_thread_net(my_index int, hostname string, port string, description s
 			var pp = direwolf.AX25FromFrame(data[1:mon_cmd.DataLen], alevel)
 			if pp == nil {
 				fmt.Printf("Client %d got invalid AX.25 frame from %s.\n", my_index, description)
+
 				continue
 			}
 

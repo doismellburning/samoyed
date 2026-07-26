@@ -454,6 +454,7 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 	if s == nil {
 		// Uh oh. Data from some station when not connected.
 		fmt.Printf("Internal error.  Incoming data, no corresponding session: %d,%s: %s\n", channel, call_from, dataStr)
+
 		return
 	}
 
@@ -621,6 +622,7 @@ func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, c
 
 	if s == nil {
 		fmt.Printf("Oops!  Did not expect to be here.\n")
+
 		return
 	}
 

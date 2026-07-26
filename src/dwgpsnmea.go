@@ -384,6 +384,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	sentence, err := remove_checksum(sentence, quiet)
 	if err != nil {
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -412,6 +413,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	if pstatus != "" && len(pstatus) == 1 {
 		if pstatus != "A" {
 			result.Fix = DWFIX_NO_FIX
+
 			return result /* Not "Active." Don't parse. */
 		}
 	} else {
@@ -533,6 +535,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	sentence, err := remove_checksum(sentence, quiet)
 	if err != nil {
 		result.Fix = DWFIX_ERROR
+
 		return result
 	}
 
@@ -569,6 +572,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	if len(pfix) == 1 {
 		if pfix == "0" {
 			result.Fix = DWFIX_NO_FIX /* No Fix. Don't parse the rest. */
+
 			return result
 		}
 	} else {

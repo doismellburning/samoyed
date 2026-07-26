@@ -511,6 +511,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 
 	if !colonFound {
 		AX25Delete(this_p)
+
 		return (nil)
 	}
 

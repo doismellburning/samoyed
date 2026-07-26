@@ -227,21 +227,25 @@ func fx25_get_rs(ctag_num int) *rs_t {
 
 func fx25_get_ctag_value(ctag_num int) uint64 {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+
 	return tags[ctag_num].value
 }
 
 func fx25_get_k_data_radio(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+
 	return tags[ctag_num].k_data_radio
 }
 
 func fx25_get_k_data_rs(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+
 	return tags[ctag_num].k_data_rs
 }
 
 func fx25_get_nroots(ctag_num int) int {
 	Assert(ctag_num >= CTAG_MIN && ctag_num <= CTAG_MAX)
+
 	return int(fx25Tab[tags[ctag_num].itab].nroots)
 }
 

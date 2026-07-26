@@ -62,6 +62,7 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
 				var crcBytes = il2p_crc_encode(il2p_crc_calc(ax25_get_frame_data(pp)))
 				outbuf.Write(crcBytes[:])
 			}
+
 			return outbuf.Bytes(), outbuf.Len()
 		}
 
@@ -182,6 +183,7 @@ func il2p_decode_frame(irec []byte) *packet_t {
 				dw_printf("IL2P trailing CRC mismatch.\n")
 			}
 			AX25Delete(pp)
+
 			return nil
 		}
 	}
@@ -225,6 +227,7 @@ func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected 
 
 			if e <= 0 {
 				AX25Delete(pp)
+
 				return nil
 			}
 

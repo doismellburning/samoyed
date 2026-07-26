@@ -1228,6 +1228,7 @@ func get_input_real(it int, channel int) int {
 		var v, parseErr = strconv.Atoi(string(vtemp))
 		if parseErr != nil {
 			dw_printf("Error parsing return value (%s) from GPIO %d: %s\n", vtemp, save_audio_config_p.achan[channel].ictrl[it].in_gpio_num, parseErr)
+
 			return -1
 		}
 

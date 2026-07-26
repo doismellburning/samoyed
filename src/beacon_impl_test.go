@@ -17,6 +17,7 @@ func makeBeaconModemConfig() *audio_s {
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.mycall[0] = "Q1TEST"
+
 	return cfg
 }
 
@@ -25,6 +26,7 @@ func makeBeaconIGateConfig() *igate_config_s {
 	cfg.t2_server_name = "rotate.aprs2.net"
 	cfg.t2_login = "Q1TEST"
 	cfg.t2_passcode = "12345"
+
 	return cfg
 }
 
@@ -38,6 +40,7 @@ func makeSBConfig() *misc_config_s {
 	cfg.sb_turn_time = 15   // seconds
 	cfg.sb_turn_angle = 30  // degrees
 	cfg.sb_turn_slope = 255 // degrees * MPH
+
 	return cfg
 }
 

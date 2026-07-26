@@ -280,6 +280,7 @@ func TestAXUDPLookupMap(t *testing.T) {
 		var entry, ok = b.lookupMap(tc.dest)
 		if ok != tc.wantFound {
 			t.Errorf("lookupMap(%q): found=%v want %v", tc.dest, ok, tc.wantFound)
+
 			continue
 		}
 		if ok && entry.Addr != tc.wantAddr {
@@ -436,6 +437,7 @@ func (f *fakeConn) Write(b []byte) (int, error) {
 	f.mu.Lock()
 	f.writes = append(f.writes, append([]byte(nil), b...))
 	f.mu.Unlock()
+
 	return len(b), nil
 }
 
@@ -466,6 +468,7 @@ func (c *singleReadConn) Read(b []byte) (int, error) {
 		return 0, io.EOF
 	}
 	c.done = true
+
 	return copy(b, c.data), io.EOF
 }
 

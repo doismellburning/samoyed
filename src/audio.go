@@ -827,6 +827,7 @@ func parseALSACardsProc(content string) map[string]int {
 		}
 		result[cardID] = num
 	}
+
 	return result
 }
 
@@ -844,6 +845,7 @@ func resolveALSACardNumber(cardID string) (int, bool) {
 	}
 	var cards = parseALSACardsProc(string(content))
 	var num, ok = cards[cardID]
+
 	return num, ok
 }
 
@@ -1609,6 +1611,7 @@ func audio_flush_real(a int) int {
 
 	if adev[a].outputStream == nil {
 		adev[a].outbufLen = 0
+
 		return -1
 	}
 

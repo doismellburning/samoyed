@@ -409,6 +409,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
 		// For NETTNC channels, just yeet out the packet and let the external TNC handle it - we don't have enough info to do much else
 		tq_append(channel, prio, pp)
+
 		return
 	}
 
@@ -555,6 +556,7 @@ func lm_seize_request(channel int) {
 		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
 		// See lm_data_request for the rationale for allowing MEDIUM_NETTNC.
 		dlq_seize_confirm(channel)
+
 		return
 	}
 

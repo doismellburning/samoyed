@@ -597,6 +597,7 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
 				dw_printf("Accept failed: %v\n", acceptErr)
+
 				continue
 			}
 

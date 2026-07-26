@@ -1027,6 +1027,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		for _, r := range pinfo {
 			if !unicode.IsPrint(rune(r)) {
 				hasNonPrintable = true
+
 				break
 			}
 		}

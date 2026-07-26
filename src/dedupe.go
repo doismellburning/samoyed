@@ -120,6 +120,7 @@ type DedupeService struct {
 func NewDedupeService(ttl time.Duration) *DedupeService {
 	var ds = new(DedupeService)
 	ds.historyTime = ttl
+
 	return ds
 }
 

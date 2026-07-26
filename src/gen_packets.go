@@ -102,6 +102,7 @@ var genPacketsRandSeed int32 = 1
 // Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG
 func genPacketsRand() int32 {
 	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & MY_RAND_MAX)
+
 	return genPacketsRandSeed
 }
 

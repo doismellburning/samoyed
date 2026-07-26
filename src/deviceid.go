@@ -97,6 +97,7 @@ func NewDeviceIDData() *DeviceIDData {
 		fp, err = os.Open(location) //nolint:gosec // G304: location comes from hardcoded search_locations (allowlisted search paths), not user input
 		if err == nil {
 			defer fp.Close()
+
 			break
 		}
 	}
@@ -117,6 +118,7 @@ func NewDeviceIDData() *DeviceIDData {
 	var data, readErr = io.ReadAll(fp)
 	if readErr != nil {
 		dw_printf("Error reading deviceid file %s: %s\n", fp.Name(), readErr)
+
 		return d
 	}
 
@@ -128,6 +130,7 @@ func NewDeviceIDData() *DeviceIDData {
 	var unmarshallErr = yaml.Unmarshal(data, &deviceidConfig)
 	if unmarshallErr != nil {
 		dw_printf("Error parsing deviceid file %s: %s\n", fp.Name(), unmarshallErr)
+
 		return d
 	}
 

@@ -620,6 +620,7 @@ func (sd *APRSSymbolData) symbols_from_dest_or_src(dti byte, src string, dest st
 			var ssid, _ = strconv.Atoi(ssidStr)
 			if ssid >= 1 && ssid <= 15 {
 				var sts = ssidToSym()
+
 				return '/', sts[ssid], true // All in Primary table
 			}
 		}
@@ -656,6 +657,7 @@ func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, b
 	} else if symbol >= '!' && symbol <= '~' && (unicode.IsUpper(rune(symtab)) || unicode.IsDigit(rune(symtab))) {
 		/* Alternate Symbol table with overlay. */
 		var at = alternateSymtab()
+
 		return fmt.Sprintf("GPS%s%c", at[symbol-' '].xy, symtab), true
 	}
 
@@ -708,6 +710,7 @@ func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) stri
 		symbol = ' '
 
 		var pt = primarySymtab()
+
 		return pt[symbol-' '].description
 	}
 

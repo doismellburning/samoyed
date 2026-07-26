@@ -1305,6 +1305,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
 		 */
 		if S.layer_3_initiated {
 			cdata_delete(txdata)
+
 			break
 		}
 
@@ -1701,6 +1702,7 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 		// Ready state.
 		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
 			server_rec_conn_data(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
+
 			return
 		} else if dataBytes[0]&0x80 > 0 {
 			// Ready state, First segment.

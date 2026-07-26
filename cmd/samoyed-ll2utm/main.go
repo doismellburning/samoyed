@@ -20,6 +20,7 @@ func D2R(degrees float64) float64 {
 func main() {
 	if len(os.Args) != 3 {
 		usage()
+
 		return
 	}
 

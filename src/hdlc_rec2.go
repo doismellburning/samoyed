@@ -242,6 +242,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 		#endif
 		*/
 		rrbb_delete(block)
+
 		return
 	}
 
@@ -251,6 +252,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 	 */
 	if try_to_fix_quick_now(block, channel, subchan, slice, alevel) {
 		rrbb_delete(block)
+
 		return
 	}
 
@@ -759,7 +761,8 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
 				multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, RETRY_MAX, 0) /* len-2 to remove FCS. */
-				return true                                                                                                 /* success */
+
+				return true /* success */
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("try_decode: internal error passall = %t, retry_conf_retry = %d, retry_conf_type = %d\n",

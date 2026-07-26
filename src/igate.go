@@ -540,6 +540,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 		var inner_pp = ax25_unwrap_third_party(pp)
 		if inner_pp == nil {
 			AX25Delete(pp)
+
 			return
 		}
 
@@ -1378,6 +1379,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 				// Previously there was a debug message here about the packet being dropped by filtering.
 				// This is now handled better by the "-df" command line option for filtering details.
 				AX25Delete(pp3)
+
 				return
 			}
 		}
