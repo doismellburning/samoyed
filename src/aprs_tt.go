@@ -751,8 +751,10 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	 * Another part of application will try to find corresponding full call.
 	 */
 
-	if (length == 6 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) && unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5]))) ||
-		(length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) && unicode.IsDigit(rune(e[4])) && unicode.IsUpper(rune(e[5])) && unicode.IsDigit(rune(e[6]))) {
+	if (length == 6 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
+		unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5]))) ||
+		(length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
+			unicode.IsDigit(rune(e[4])) && unicode.IsUpper(rune(e[5])) && unicode.IsDigit(rune(e[6]))) {
 		var cs_err = checksum_not_ok(e[1:length-1], length-2, rune(e[length-1]))
 
 		if cs_err != 0 {

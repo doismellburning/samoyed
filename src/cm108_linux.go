@@ -188,7 +188,8 @@ type CM108Thing struct {
 
 // Test for supported devices.
 func GOOD_DEVICE(v, p int) bool {
-	return (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) || p == CMEDIA_PID_CM108AH || p == CMEDIA_PID_CM108AH_alt || p == CMEDIA_PID_CM108B || p == CMEDIA_PID_CM119A || p == CMEDIA_PID_CM119B)) ||
+	return (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) || p == CMEDIA_PID_CM108AH ||
+		p == CMEDIA_PID_CM108AH_alt || p == CMEDIA_PID_CM108B || p == CMEDIA_PID_CM119A || p == CMEDIA_PID_CM119B)) ||
 		(v == SSS_VID && (p == SSS_PID1 || p == SSS_PID2 || p == SSS_PID3)) ||
 		(v == AIOC_VID && p == AIOC_PID)
 }

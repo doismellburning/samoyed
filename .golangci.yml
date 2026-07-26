@@ -12,7 +12,6 @@ linters:
     - "godoclint"  # There's lots to be done with documentation formatting, but not right now
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
-    - "lll"  # We have inherited lots of long lines
     - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
     - "nakedret"  # Naked returns in long functions are kinda an ok tradeoff right now
@@ -27,6 +26,8 @@ linters:
     - "wsl"  # Avoid deprecation warning from enabling all
     - "wsl_v5"  # KG 2026-02-26 I don't have concrete data but it feels like wsl is giving me spurious edits/breakages - it might not be wsl, it might be something else, but it only started being an issue once I enabled wsl, so I'm disabling it again for the foreseeable
   settings:
+    lll:
+      line-length: 200  # Match the golines formatter's max-len so lll doesn't fight it
     cyclop:
       max-complexity: 150  # I sure wish this could be lower
     depguard:

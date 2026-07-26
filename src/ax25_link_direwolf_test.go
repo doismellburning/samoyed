@@ -4,7 +4,7 @@ package direwolf
 Here be (some) dragons.
 
 These are Claude-generated tests for the AX.25 state machine as described in
-[AX.25 Link Access Protocol for Amateur Packet Radio - Version 2.2 Revision 4: 27 October 2025](https://github.com/packethacking/ax25spec/blob/879a00a3d1587e65a04edc2a3e86ea3a4ab2f7b8/doc/ax.25.2.2.4_Oct_25.md).
+[AX.25 Link Access Protocol for Amateur Packet Radio - Version 2.2 Revision 4: 27 October 2025][ax25spec].
 
 These were generated *after* some degree of porting of Dire Wolf's C implementation to Go for Samoyed,
 and by someone (@doismellburning / 2E0KGG) not really in a position to understand their correctness.
@@ -12,6 +12,8 @@ Thus they should not be used as a measure of AX.25 implementation correctness
 (if anyone *does* have a good test suite I'd love to hear about it)
 but instead as a "safety check" for future changes to the current implementation -
 i.e. did we accidentally change/break something.
+
+[ax25spec]: https://github.com/packethacking/ax25spec/blob/879a00a3d1587e65a04edc2a3e86ea3a4ab2f7b8/doc/ax.25.2.2.4_Oct_25.md
 */
 
 import (

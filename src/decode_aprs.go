@@ -1138,7 +1138,8 @@ func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
  *
  * Examples:	Observed on the air.
  *
- *		KB1HNZ-9>TSSP5P,W1IMD,WIDE1,KQ1L-8,N3LLO-3,WIDE2*:`b6,l}#>/]"48}449.225MHz<0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff>=<0x0d>
+ *		KB1HNZ-9>TSSP5P,W1IMD,WIDE1,KQ1L-8,N3LLO-3,WIDE2*:`b6,l}#>/]"48}449.225MHz<0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff>
+ *		<0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff><0xff>=<0x0d>
  *
  *		`       b6,    l}#   >/     ]         "48}    449.225MHz   ......    =       <0x0d>
  *		mic-e  long.   cs    sym    prefix    alt.    freq         comment   suffix   must-ignore
@@ -2334,7 +2335,8 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 /*
 https://groups.io/g/direwolf/topic/95961245#7357
 
-What APRS queries should DireWolf respond to? Well, it should be configurable whether it responds to queries at all, in case some other application is using DireWolf as a dumb TNC (KISS or AGWPE style) and wants to handle the queries itself.
+What APRS queries should DireWolf respond to? Well, it should be configurable whether it responds to queries at all, in
+case some other application is using DireWolf as a dumb TNC (KISS or AGWPE style) and wants to handle the queries itself.
 
 Assuming query responding is enabled, the following broadcast queries should be supported (if the corresponding data is configured in DireWolf):
 

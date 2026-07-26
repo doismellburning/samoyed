@@ -19,7 +19,8 @@ package direwolf
 
 var IL2P_TEST = false
 
-const il2pTestText = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
+const il2pTestText = `'... As I was saying, that seems to be done right - though I haven't time to look it over thoroughly just now - and ` +
+	`that shows that there are three hundred and sixty-four days when you might get un-birthday presents -'
 'Certainly,' said Alice.
 'And only one for birthday presents, you know. There's glory for you!'
 'I don't know what you mean by \"glory\",' Alice said.
