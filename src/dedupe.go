@@ -210,6 +210,8 @@ func (ds *DedupeService) Check(pp *packet_t, channel int) bool {
 			continue
 		}
 
+		MetricsRecordDedupeHit(channel)
+
 		return true
 	}
 

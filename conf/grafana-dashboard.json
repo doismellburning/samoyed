@@ -1,0 +1,133 @@
+{
+  "title": "Samoyed",
+  "uid": "samoyed-tnc",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Frames received",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(samoyed_frames_received_total[5m])",
+          "legendFormat": "channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Frames transmitted",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(samoyed_frames_transmitted_total[5m])",
+          "legendFormat": "channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "FX.25 / IL2P corrected symbols",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(samoyed_corrected_symbols_total[5m])",
+          "legendFormat": "{{type}} channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "AX.25 link retries",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(samoyed_ax25_link_retries_total[5m])",
+          "legendFormat": "channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Data carrier detect",
+      "type": "state-timeline",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "samoyed_dcd",
+          "legendFormat": "channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Received audio level",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "samoyed_audio_receive_level",
+          "legendFormat": "channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Transmit queue depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "expr": "samoyed_tx_queue_depth",
+          "legendFormat": "channel {{channel}} priority {{priority}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Dedupe hits",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "targets": [
+        {
+          "expr": "rate(samoyed_dedupe_hits_total[5m])",
+          "legendFormat": "channel {{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "IGate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
+      "targets": [
+        {
+          "expr": "rate(samoyed_igate_rf_recv_packets_total[5m])",
+          "legendFormat": "RF -> candidate"
+        },
+        {
+          "expr": "rate(samoyed_igate_uplink_packets_total[5m])",
+          "legendFormat": "uplink to APRS-IS"
+        },
+        {
+          "expr": "rate(samoyed_igate_downlink_packets_total[5m])",
+          "legendFormat": "downlink from APRS-IS"
+        },
+        {
+          "expr": "rate(samoyed_igate_rf_xmit_packets_total[5m])",
+          "legendFormat": "IGate -> RF"
+        }
+      ]
+    }
+  ]
+}

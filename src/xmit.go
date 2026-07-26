@@ -870,6 +870,8 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, xs.p_modem)
 
+	MetricsRecordFrameTransmitted(c)
+
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
 	server_send_monitored(c, pp, 1)

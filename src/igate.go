@@ -147,14 +147,16 @@ var s_debug int
  * TODO: should have debug option to print these occasionally.
  */
 
-var stats_failed_connect int //nolint:unused
+var stats_failed_connect int
+
 /* Number of times we tried to connect to */
 /* a server and failed.  A small number is not */
 /* a bad thing.  Each name should have a bunch */
 /* of addresses for load balancing and */
 /* redundancy. */
 
-var stats_connects int //nolint:unused
+var stats_connects int
+
 /* Number of successful connects to a server. */
 /* Normally you'd expect this to be 1.  */
 /* Could be larger if one disappears and we */
@@ -164,7 +166,8 @@ var stats_connect_at time.Time //nolint:unused
 /* Most recent time connection was established. */
 /* can be used to determine elapsed connect time. */
 
-var stats_rf_recv_packets int //nolint:unused
+var stats_rf_recv_packets int
+
 /* Number of candidate packets from the radio. */
 /* This is not the total number of AX.25 frames received */
 /* over the radio; only APRS packets get this far. */

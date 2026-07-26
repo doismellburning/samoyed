@@ -538,6 +538,10 @@ func SET_VR(S *ax25_dlsm_t, n int) {
 }
 
 func SET_RC(S *ax25_dlsm_t, n int) {
+	if n > S.rc {
+		MetricsRecordRetry(S.channel)
+	}
+
 	S.rc = (n)
 
 	if s_debug_variables {

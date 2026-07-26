@@ -136,6 +136,9 @@ type beacon_s struct {
 type misc_config_s struct {
 	agwpe_port int /* TCP Port number for the "AGW TCPIP Socket Interface" */
 
+	metrics_port int /* TCP Port number for the Prometheus "/metrics" HTTP endpoint. */
+	/* 0 (default) disables it. */
+
 	// Previously we allowed only a single TCP port for KISS.
 	// An increasing number of people want to run multiple radios.
 	// Unfortunately, most applications don't know how to deal with multi-radio TNCs.
@@ -891,6 +894,7 @@ var configHandlers = map[string]configHandler{
 	"IGMSP":          handleIGMSP,
 	"SATGATE":        handleSATGATE,
 	"AGWPORT":        handleAGWPORT,
+	"METRICSPORT":    handleMETRICSPORT,
 	"KISSPORT":       handleKISSPORT,
 	"NULLMODEM":      handleNULLMODEM,
 	"SERIALKISS":     handleNULLMODEM,
@@ -1052,6 +1056,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_tt_config.response[TT_ERROR_OK].mtext = "R"
 
 	p_misc_config.agwpe_port = DEFAULT_AGWPE_PORT
+	p_misc_config.metrics_port = 0 // Disabled by default.
 
 	for i := range MAX_KISS_TCP_PORTS {
 		p_misc_config.kiss_port[i] = 0 // entry not used.
@@ -5273,6 +5278,41 @@ func handleAGWPORT(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n",
 			ps.line, ps.misc.agwpe_port)
+	}
+
+	return false
+}
+
+// handleMETRICSPORT handles the METRICSPORT keyword.
+func handleMETRICSPORT(ps *parseState) bool {
+	/*
+	 * METRICSPORT 	- Port number for the Prometheus "/metrics" HTTP endpoint.
+	 *
+	 * 0 disables it.  Disabled by default.
+	 */
+	var t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing port number for METRICSPORT command.\n", ps.line)
+
+		return true
+	}
+
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid port number \"%s\" for METRICSPORT command.\n", ps.line, t)
+
+		return true
+	}
+
+	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
+		ps.misc.metrics_port = n
+	} else {
+		ps.misc.metrics_port = 0
+
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid port number for the metrics endpoint. Disabling it.\n", ps.line)
 	}
 
 	return false
