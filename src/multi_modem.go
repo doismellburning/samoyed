@@ -20,7 +20,7 @@ package direwolf
  *
  *		(a) Main program (direwolf.c or atest.c) calls
  *		    demod_init to set up modem properties and
- *		    hdlc_rec_init for the HDLC decoders.
+ *		    NewHDLCReceiver for the HDLC decoders.
  *
  *		(b) demod_process_sample is called for each audio sample
  *		    from the input audio stream.
@@ -120,7 +120,7 @@ func multi_modem_init(pa *audio_s) {
 	save_audio_config_p = pa
 
 	demod_init(save_audio_config_p)
-	hdlc_rec_init(save_audio_config_p)
+	hdlcReceiver = NewHDLCReceiver(save_audio_config_p)
 
 	for channel := range MAX_RADIO_CHANS {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
