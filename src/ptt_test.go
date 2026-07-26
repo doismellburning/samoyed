@@ -16,11 +16,13 @@ type mockGPIODLine struct {
 
 func (m *mockGPIODLine) SetValue(v int) error {
 	m.value = v
+
 	return nil
 }
 
 func (m *mockGPIODLine) Close() error {
 	m.closed = true
+
 	return nil
 }
 

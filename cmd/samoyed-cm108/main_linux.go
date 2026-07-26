@@ -79,6 +79,7 @@ func main() {
 
 	if len(things) == 0 {
 		fmt.Printf("No relevant USB devices found!\n")
+
 		return
 	}
 

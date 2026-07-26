@@ -405,6 +405,7 @@ func kisspt_get() (byte, error) {
 			pt_master = nil
 
 			os.Remove(TMP_KISSTNC_SYMLINK)
+
 			return 0, err
 		}
 	}

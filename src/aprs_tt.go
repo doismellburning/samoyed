@@ -613,6 +613,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 			/* Found match to a different type.  Really shouldn't be here. */
 			/* Print internal error message... */
 			dw_printf("expand_macro: type != TTLOC_MACRO\n")
+
 			return (TT_ERROR_INTERNAL)
 		}
 
@@ -1564,17 +1565,20 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 
 	if length == 2 && unicode.IsDigit(rune(e[1])) {
 		state.micE = rune(e[1])
+
 		return (0)
 	}
 
 	if length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) && unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5])) &&
 		unicode.IsDigit(rune(e[6])) {
 		state.freq = e[1:4] + "." + e[4:7] + "MHz"
+
 		return (0)
 	}
 
 	if length == 4 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) {
 		state.ctcss = e[1:]
+
 		return (0)
 	}
 

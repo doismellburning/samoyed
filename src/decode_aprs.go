@@ -249,6 +249,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 
 	if len(pinfo) == 0 {
 		A.g_data_type_desc = "AX.25 UI frame with empty information field"
+
 		return A
 	}
 
@@ -1249,11 +1250,13 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 
 	if c >= 'A' && c <= 'J' {
 		*cust_msg |= mask
+
 		return int(c - 'A')
 	}
 
 	if c >= 'P' && c <= 'Y' {
 		*std_msg |= mask
+
 		return int(c - 'P')
 	}
 
@@ -1263,6 +1266,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 
 	if c == 'K' {
 		*cust_msg |= mask
+
 		return (0)
 	}
 
@@ -1272,6 +1276,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 
 	if c == 'Z' {
 		*std_msg |= mask
+
 		return (0)
 	}
 
@@ -1514,6 +1519,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	if len(info) <= sizeof_struct_aprs_mic_e_s {
 		// Too short for a comment.  We are finished.
 		A.g_mfr = "UNKNOWN vendor/model"
+
 		return
 	}
 
@@ -1526,6 +1532,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		if len(mcomment) == 0 {
 			// Nothing left after removing trailing CR.
 			A.g_mfr = "UNKNOWN vendor/model"
+
 			return
 		}
 	}
@@ -2547,6 +2554,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 
 			if aisData == nil {
 				A.g_data_type_desc = "AIS"
+
 				return
 			}
 		}
@@ -3738,12 +3746,14 @@ func directivityString(d int) (string, error) {
 	if d < 0 || d >= len(dirs) {
 		return "", fmt.Errorf("directivity index %d out of range [0,%d]", d, len(dirs)-1)
 	}
+
 	return dirs[d], nil
 }
 
 func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unparam
 	if len(pdext) < 7 {
 		A.g_comment = string(pdext)
+
 		return false
 	}
 
@@ -3754,6 +3764,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 		pdext[4] == 'C' {
 		/* not decoded at this time */
 		process_comment(A, pdext[7:])
+
 		return true
 	}
 
@@ -4024,6 +4035,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 	var atof = func(b []byte) float64 {
 		var f, _ = strconv.ParseFloat(string(b), 64)
+
 		return float64(f)
 	}
 
@@ -4116,6 +4128,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			for i := range NUM_CTCSS {
 				if f == i_ctcss[i] {
 					A.g_tone = f_ctcss[i]
+
 					break
 				}
 			}

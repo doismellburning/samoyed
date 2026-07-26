@@ -295,6 +295,7 @@ func agwConnectedModeAllowed(portx byte) bool {
 		return int(portx) < MAX_RADIO_CHANS
 	}
 	var m = save_audio_config_p.chan_medium[portx]
+
 	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
 }
 
@@ -408,6 +409,7 @@ func server_connect_listen_thread(server_port int) {
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
 				dw_printf("Accept failed: %v\n", acceptErr)
+
 				continue
 			}
 
@@ -1183,6 +1185,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if len(cmd.Data) < 1 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'V' message too short to contain digipeater count.\n")
+
 				break
 			}
 
@@ -1191,6 +1194,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if len(cmd.Data) < 1+10*ndigi {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'V' message too short for %d digipeaters.\n", ndigi)
+
 				break
 			}
 
@@ -1266,6 +1270,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if cmd.Header.DataLen < 1 || int(cmd.Header.DataLen) > len(cmd.Data) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'K' message has invalid data length %d.\n", cmd.Header.DataLen)
+
 				break
 			}
 
@@ -1349,6 +1354,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW connect command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
 				break
 			}
 			/*
@@ -1373,6 +1379,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("\n")
 					dw_printf("AGW client, connect via, has invalid payload: too short\n")
+
 					break
 				}
 
@@ -1390,6 +1397,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("\n")
 						dw_printf("AGW client, connect via, payload too short for %d digipeaters.\n", numDigi)
+
 						break
 					}
 
@@ -1401,6 +1409,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("\n")
 					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", numDigi)
+
 					break
 				}
 			}
@@ -1413,12 +1422,14 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'D' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
 				break
 			}
 
 			if int(cmd.Header.DataLen) > len(cmd.Data) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'D' message has invalid data length %d.\n", cmd.Header.DataLen)
+
 				break
 			}
 
@@ -1436,6 +1447,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'd' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
 				break
 			}
 
@@ -1495,6 +1507,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if pp == nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Failed to create frame from AGW 'M' message.\n")
+
 				break
 			}
 
@@ -1572,6 +1585,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			if !agwConnectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'Y' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+
 				break
 			}
 

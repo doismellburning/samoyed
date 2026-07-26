@@ -29,6 +29,7 @@ func main() {
 			var _, readErr = fp.Read(buf)
 			if readErr != nil && !errors.Is(readErr, io.EOF) {
 				fmt.Printf("Error reading %s: %s.\n", fname, readErr)
+
 				break
 			}
 			var ch = buf[0]
@@ -48,6 +49,7 @@ func main() {
 
 	if direwolf.FX25TestCount == 11 {
 		fmt.Printf("***** FX25 unit test Success - all tests passed. *****\n")
+
 		return
 	}
 

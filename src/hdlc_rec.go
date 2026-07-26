@@ -229,6 +229,7 @@ func (s *hdlcState) recEasBit(raw int, future_use int) { //nolint:unparam
 				   #endif
 				*/
 				s.easGathering = false
+
 				return
 			}
 
@@ -239,6 +240,7 @@ func (s *hdlcState) recEasBit(raw int, future_use int) { //nolint:unparam
 					#endif
 				*/
 				s.easGathering = false
+
 				return
 			}
 
@@ -414,6 +416,7 @@ func (r *HDLCReceiver) RecBitNew(channel int, subchannel int, slice int, _raw in
 
 	if r.audio.achan[channel].modem_type == MODEM_EAS {
 		s.recEasBit(IfThenElse(raw, 1, 0), not_used_remove)
+
 		return
 	}
 
@@ -771,6 +774,7 @@ func (r *HDLCReceiver) DataDetectAny(channel int) int {
 
 func (r *HDLCReceiver) rand() int32 {
 	r.randSeed = int32((uint32(r.randSeed)*1103515245)+12345) & hdlcRecRandMax
+
 	return r.randSeed
 }
 

@@ -955,6 +955,7 @@ func xmit_speak_it(script string, c int, msg string) error {
 func (xs *XmitService) timestampPrefix() string {
 	if xs.p_modem.timestamp_format != "" {
 		var formattedTime, _ = strftime.Format(xs.p_modem.timestamp_format, time.Now())
+
 		return " " + formattedTime // space after channel.
 	}
 

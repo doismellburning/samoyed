@@ -77,6 +77,7 @@ func il2p_crc_encode(crc uint16) [IL2P_CRC_ENCODED_SIZE]byte {
 	encoded[1] = il2p_hamming_encode[(crc>>8)&0x0f]
 	encoded[2] = il2p_hamming_encode[(crc>>4)&0x0f]
 	encoded[3] = il2p_hamming_encode[crc&0x0f]
+
 	return encoded
 }
 
@@ -97,6 +98,7 @@ func il2p_crc_decode(encoded []byte) uint16 {
 	var n1 = uint16(il2p_hamming_decode[encoded[1]&0x7f])
 	var n2 = uint16(il2p_hamming_decode[encoded[2]&0x7f])
 	var n3 = uint16(il2p_hamming_decode[encoded[3]&0x7f])
+
 	return (n0 << 12) | (n1 << 8) | (n2 << 4) | n3
 }
 
@@ -116,6 +118,7 @@ func il2p_crc_decode(encoded []byte) uint16 {
 func il2p_crc_check(frame_data []byte, encoded_crc []byte) bool {
 	var expected = il2p_crc_calc(frame_data)
 	var received = il2p_crc_decode(encoded_crc)
+
 	return expected == received
 }
 
@@ -135,5 +138,6 @@ func il2p_crc_enabled(channel int) bool {
 	if save_audio_config_p == nil {
 		return true // Default to enabled if no config available.
 	}
+
 	return save_audio_config_p.achan[channel].il2p_crc
 }

@@ -231,6 +231,7 @@ func calculator(str string) int {
 			lastop = ADD
 		} else if p == '#' {
 			result = do_lastop(lastop, result, num)
+
 			return result
 		}
 	}

@@ -265,6 +265,7 @@ func find_avail() int {
 	for i := range MAX_TT_USERS {
 		if tt_user[i].callsign == "" {
 			clear_user(i)
+
 			return (i)
 		}
 	}
@@ -725,6 +726,7 @@ func xmit_object_report(i int, first_time bool) {
 
 	if TT_TESTS_RUNNING {
 		dw_printf("---> %s\n\n", stemp)
+
 		return
 	}
 

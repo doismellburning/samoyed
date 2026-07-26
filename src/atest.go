@@ -602,6 +602,7 @@ o = DCD output control
 
 				if audio_sample >= 256*256 {
 					e_o_f = true
+
 					continue
 				}
 
@@ -675,6 +676,7 @@ o = DCD output control
 func audio_get_fake(_ int) int {
 	if wav_data.Datasize <= 0 {
 		e_o_f = true
+
 		return (-1)
 	}
 

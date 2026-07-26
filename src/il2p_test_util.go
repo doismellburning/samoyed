@@ -83,6 +83,7 @@ func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *
 
 func demod_get_audio_level_fake(channel int, subchannel int) ALevel {
 	var alevel ALevel
+
 	return (alevel)
 }
 

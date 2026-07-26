@@ -75,6 +75,7 @@ func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
 			UDPAddr:  udpAddr,
 		})
 	}
+
 	return entries, nil
 }
 
@@ -117,6 +118,7 @@ func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn, verbose bool) *A
 	b.maps = maps
 	b.udpConn = udpConn
 	b.verbose = verbose
+
 	return b
 }
 
@@ -193,6 +195,7 @@ func (b *AXUDPBridge) RunKISSServer(kissPort int) {
 				os.Exit(1)
 			}
 			fmt.Fprintf(os.Stderr, "samoyed-axudp: accept: %v\n", acceptErr)
+
 			continue
 		}
 		fmt.Printf("samoyed-axudp: new KISS client %v\n", conn.RemoteAddr())
@@ -231,6 +234,7 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	// already exceeds the limit, skip the expensive encoding step entirely.
 	if len(ax25frame) > MAX_KISS_LEN-3 {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: dropping oversized AX.25 frame (%d bytes), too large to KISS-encode within %d bytes\n", len(ax25frame), MAX_KISS_LEN)
+
 		return
 	}
 
@@ -244,6 +248,7 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	// panic.  Drop the frame before writing to clients to prevent this.
 	if len(kissframe) > MAX_KISS_LEN {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: dropping oversized KISS frame (%d bytes > %d), AX.25 frame too large after encoding\n", len(kissframe), MAX_KISS_LEN)
+
 		return
 	}
 
@@ -258,6 +263,7 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 			// Cannot set a deadline — treat as a broken connection and close it
 			// to unblock the read goroutine in handleKISSClient.
 			c.Close()
+
 			continue
 		}
 		var _, writeErr = c.Write(kissframe)
@@ -275,6 +281,7 @@ func ax25AddrBase(cs string) string {
 	if idx := strings.LastIndexByte(cs, '-'); idx >= 0 {
 		return cs[:idx]
 	}
+
 	return cs
 }
 
@@ -296,6 +303,7 @@ func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
 			return e, true
 		}
 	}
+
 	return AXUDPMapEntry{}, false //nolint: exhaustruct
 }
 
@@ -304,6 +312,7 @@ func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
 // 0xFFFF) over the frame bytes, appended little-endian.
 func axudpAddCRC(frame []byte) []byte {
 	var crc = fcs_calc(frame)
+
 	return append(append([]byte(nil), frame...), byte(crc), byte(crc>>8))
 }
 
@@ -320,6 +329,7 @@ func axudpStripCRC(pkt []byte) ([]byte, bool) {
 	if got != want {
 		return nil, false
 	}
+
 	return frame, true
 }
 
@@ -362,6 +372,7 @@ func (b *AXUDPBridge) handleKISSClient(conn net.Conn) {
 
 		if readErr != nil {
 			fmt.Printf("samoyed-axudp: KISS client %v disconnected: %v\n", conn.RemoteAddr(), readErr)
+
 			return
 		}
 	}
@@ -424,6 +435,7 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 				if len(unwrapped) > 0 {
 					return unwrapped[0]
 				}
+
 				return 0
 			}())
 		}

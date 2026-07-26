@@ -18,7 +18,6 @@ linters:
     - "nakedret"  # Naked returns in long functions are kinda an ok tradeoff right now
     - "noctx"  # One day I will learn what a Context is, but that is not today
     - "nonamedreturns"  # Named returns seem a useful tradeoff for now - several functions that return ("output") many things, and names help
-    - "nlreturn"  # Lots of false positives on C code that isn't a return
     - "paralleltest"  # One day, but let's have *working* tests first
     - "perfsprint"  # Performance optimisations, worth looking at, but not right now
     - "prealloc"  # One day, but not now

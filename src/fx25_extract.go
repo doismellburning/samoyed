@@ -104,6 +104,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		// if syndrome is zero, data[] is a codeword and there are no
 		// errors to correct. So return data[] unmodified
 		count = 0
+
 		goto finish
 	}
 
@@ -270,6 +271,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 		// deg(lambda) unequal to number of roots => uncorrectable
 		// error detected
 		count = -1
+
 		goto finish
 	}
 	// Compute err+eras evaluator poly omega(x) = s(x)*lambda(x) (modulo
@@ -324,6 +326,7 @@ func decode_rs_char(rs *rs_t, data []byte, eras_pos []int, no_eras int) int {
 			// fprintf(stderr,"\n ERROR: denominator = 0\n");
 			// #endif
 			count = -1
+
 			goto finish
 		}
 		// Apply error to data

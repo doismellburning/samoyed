@@ -1350,6 +1350,7 @@ func handleADEVICE(ps *parseState) bool {
 		var i, iErr = strconv.Atoi(ps.keyword[7:])
 		if iErr != nil {
 			dw_printf("Config file: Could not parse ADEVICE number on line %d: %s.\n", ps.line, iErr)
+
 			return true
 		}
 
@@ -1447,6 +1448,7 @@ func handlePAIDEVICE(ps *parseState) bool {
 	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
 
 	ps.audio.adev[ps.adevice].adevice_in = t
+
 	return false
 }
 
@@ -1480,6 +1482,7 @@ func handlePAODEVICE(ps *parseState) bool {
 	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
 
 	ps.audio.adev[ps.adevice].adevice_out = t
+
 	return false
 }
 
@@ -1504,6 +1507,7 @@ func handleARATE(ps *parseState) bool {
 		dw_printf("Line %d: Use a more reasonable audio sample rate in range of %d - %d.\n",
 			ps.line, MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC)
 	}
+
 	return false
 }
 
@@ -1534,6 +1538,7 @@ func handleACHANNELS(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Number of audio channels must be 1 or 2.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -1582,6 +1587,7 @@ func handleCHANNEL(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Channel number must in range of 0 to %d.\n", ps.line, MAX_RADIO_CHANS-1)
 	}
+
 	return false
 }
 
@@ -1619,6 +1625,7 @@ func handleICHANNEL(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: ICHANNEL number must in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
+
 	return false
 }
 
@@ -1691,6 +1698,7 @@ func handleNCHANNEL(ps *parseState) bool {
 		return true
 	}
 	ps.audio.nettnc_port[nchan] = n
+
 	return false
 }
 
@@ -1730,6 +1738,7 @@ func handleMYCALL(ps *parseState) bool {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -2066,6 +2075,7 @@ func handleMODEM(ps *parseState) bool {
 
 		//dw_printf ("debug: div = %d\n", p_audio_config.achan[channel].decimate);
 	}
+
 	return false
 }
 
@@ -2086,6 +2096,7 @@ func handleDTMF(ps *parseState) bool {
 	}
 
 	ps.audio.achan[ps.channel].dtmf_decode = DTMF_DECODE_ON
+
 	return false
 }
 
@@ -2157,6 +2168,7 @@ func handleFIX_BITS(ps *parseState) bool {
 
 		t = split("", false)
 	}
+
 	return false
 }
 
@@ -2616,6 +2628,7 @@ func handleTXINH(ps *parseState) bool {
 		ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 		// #endif
 	}
+
 	return false
 }
 
@@ -2652,6 +2665,7 @@ func handleDWAIT(ps *parseState) bool {
 		dw_printf("Line %d: Invalid delay time for DWAIT. Using %d.\n",
 			ps.line, ps.audio.achan[ps.channel].dwait)
 	}
+
 	return false
 }
 
@@ -2691,6 +2705,7 @@ func handleSLOTTIME(ps *parseState) bool {
 		dw_printf("section, to understand what this means.\n")
 		dw_printf("Why don't you just use the default?\n")
 	}
+
 	return false
 }
 
@@ -2727,6 +2742,7 @@ func handlePERSIST(ps *parseState) bool {
 		dw_printf("section, to understand what this means.\n")
 		dw_printf("Why don't you just use the default?\n")
 	}
+
 	return false
 }
 
@@ -2778,6 +2794,7 @@ func handleTXDELAY(ps *parseState) bool {
 		dw_printf("Line %d: Invalid time for transmit delay. Using %d.\n",
 			ps.line, ps.audio.achan[ps.channel].txdelay)
 	}
+
 	return false
 }
 
@@ -2827,6 +2844,7 @@ func handleTXTAIL(ps *parseState) bool {
 		dw_printf("Line %d: Invalid time for transmit timing. Using %d.\n",
 			ps.line, ps.audio.achan[ps.channel].txtail)
 	}
+
 	return false
 }
 
@@ -2860,6 +2878,7 @@ func handleFULLDUP(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Expected ON or OFF for FULLDUP.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -2940,6 +2959,7 @@ func handleFX25TX(ps *parseState) bool {
 		dw_printf("Line %d: Unreasonable value for FX.25 transmission mode. Using %d.\n",
 			ps.line, ps.audio.achan[ps.channel].fx25_strength)
 	}
+
 	return false
 }
 
@@ -2978,6 +2998,7 @@ func handleFX25AUTO(ps *parseState) bool {
 		dw_printf("Line %d: Unreasonable count for connected mode automatic FX.25. Using %d.\n",
 			ps.line, ps.audio.fx25_auto_enable)
 	}
+
 	return false
 }
 
@@ -3032,6 +3053,7 @@ func handleIL2PTX(ps *parseState) bool {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -3190,6 +3212,7 @@ func handleDIGIPEAT(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Found \"%s\" where end of line was expected.\n", ps.line, t)
 	}
+
 	return false
 }
 
@@ -3216,6 +3239,7 @@ func handleDEDUPE(ps *parseState) bool {
 		dw_printf("Line %d: Unreasonable value for dedupe time. Using %d.\n",
 			ps.line, ps.digi.dedupe_time)
 	}
+
 	return false
 }
 
@@ -3293,6 +3317,7 @@ func handleREGEN(ps *parseState) bool {
 	}
 
 	ps.digi.regen[from_chan][to_chan] = true
+
 	return false
 }
 
@@ -3400,6 +3425,7 @@ func handleCDIGIPEAT(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: Found \"%s\" where end of line was expected.\n", ps.line, t)
 	}
+
 	return false
 }
 
@@ -3662,6 +3688,7 @@ func handleTTCORRAL(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing latitude for TTCORRAL command.\n", ps.line)
+
 		return true
 	}
 	ps.tt.corral_lat = parse_ll(t, LAT, ps.line)
@@ -3670,6 +3697,7 @@ func handleTTCORRAL(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing longitude for TTCORRAL command.\n", ps.line)
+
 		return true
 	}
 	ps.tt.corral_lon = parse_ll(t, LON, ps.line)
@@ -3678,6 +3706,7 @@ func handleTTCORRAL(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing offset-or-ambiguity for TTCORRAL command.\n", ps.line)
+
 		return true
 	}
 	ps.tt.corral_offset = parse_ll(t, LAT, ps.line)
@@ -3711,6 +3740,7 @@ func handleTTPOINT(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTPOINT command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -3733,6 +3763,7 @@ func handleTTPOINT(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing latitude for TTPOINT command.\n", ps.line)
+
 		return true
 	}
 	tl.point.lat = parse_ll(t, LAT, ps.line)
@@ -3743,11 +3774,13 @@ func handleTTPOINT(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing longitude for TTPOINT command.\n", ps.line)
+
 		return true
 	}
 	tl.point.lon = parse_ll(t, LON, ps.line)
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -3772,6 +3805,7 @@ func handleTTVECTOR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTVECTOR command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -3797,6 +3831,7 @@ func handleTTVECTOR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing latitude for TTVECTOR command.\n", ps.line)
+
 		return true
 	}
 	tl.vector.lat = parse_ll(t, LAT, ps.line)
@@ -3807,6 +3842,7 @@ func handleTTVECTOR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing longitude for TTVECTOR command.\n", ps.line)
+
 		return true
 	}
 	tl.vector.lon = parse_ll(t, LON, ps.line)
@@ -3817,12 +3853,14 @@ func handleTTVECTOR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing scale for TTVECTOR command.\n", ps.line)
+
 		return true
 	}
 	var scale, scaleErr = strconv.ParseFloat(t, 64)
 	if scaleErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid scale \"%s\" for TTVECTOR command.\n", ps.line, t)
+
 		return true
 	}
 
@@ -3832,6 +3870,7 @@ func handleTTVECTOR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing unit for TTVECTOR command.\n", ps.line)
+
 		return true
 	}
 
@@ -3849,6 +3888,7 @@ func handleTTVECTOR(ps *parseState) bool {
 	tl.vector.scale = scale * meters
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -3869,6 +3909,7 @@ func handleTTGRID(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTGRID command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -3890,6 +3931,7 @@ func handleTTGRID(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing minimum latitude for TTGRID command.\n", ps.line)
+
 		return true
 	}
 	tl.grid.lat0 = parse_ll(t, LAT, ps.line)
@@ -3900,6 +3942,7 @@ func handleTTGRID(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing minimum longitude for TTGRID command.\n", ps.line)
+
 		return true
 	}
 	tl.grid.lon0 = parse_ll(t, LON, ps.line)
@@ -3910,6 +3953,7 @@ func handleTTGRID(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing maximum latitude for TTGRID command.\n", ps.line)
+
 		return true
 	}
 	tl.grid.lat9 = parse_ll(t, LAT, ps.line)
@@ -3920,11 +3964,13 @@ func handleTTGRID(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing maximum longitude for TTGRID command.\n", ps.line)
+
 		return true
 	}
 	tl.grid.lon9 = parse_ll(t, LON, ps.line)
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -3946,6 +3992,7 @@ func handleTTUTM(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTUTM command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -3953,6 +4000,7 @@ func handleTTUTM(ps *parseState) bool {
 	if t[0] != 'B' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTUTM pattern must begin with upper case 'B'.\n", ps.line)
+
 		return true
 	}
 	for j := 1; j < len(t); j++ {
@@ -3969,6 +4017,7 @@ func handleTTUTM(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing zone for TTUTM command.\n", ps.line)
+
 		return true
 	}
 
@@ -3982,6 +4031,7 @@ func handleTTUTM(ps *parseState) bool {
 		if scaleErr != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: Invalid scale \"%s\" for TTUTM command.\n", ps.line, t)
+
 			return true
 		}
 
@@ -3995,6 +4045,7 @@ func handleTTUTM(ps *parseState) bool {
 			if xErr != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid x offset \"%s\" for TTUTM command.\n", ps.line, t)
+
 				return true
 			}
 
@@ -4008,6 +4059,7 @@ func handleTTUTM(ps *parseState) bool {
 				if yErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Invalid y offset \"%s\" for TTUTM command.\n", ps.line, t)
+
 					return true
 				}
 
@@ -4029,10 +4081,12 @@ func handleTTUTM(ps *parseState) bool {
 	if geoErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid UTM location: \n%s\n", ps.line, geoErr)
+
 		return true
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -4060,6 +4114,7 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTUSNG/TTMGRS command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -4067,6 +4122,7 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 	if t[0] != 'B' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'.\n", ps.line)
+
 		return true
 	}
 	var num_x = 0
@@ -4087,6 +4143,7 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 	if num_x < 1 || num_x > 5 || num_x != num_y {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y.\n", ps.line)
+
 		return true
 	}
 
@@ -4096,6 +4153,7 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing zone & square for TTUSNG/TTMGRS command.\n", ps.line)
+
 		return true
 	}
 	tl.mgrs.zone = t
@@ -4106,6 +4164,7 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 	if convertErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", ps.line, tl.mgrs.zone, convertErr)
+
 		return true
 	}
 
@@ -4118,6 +4177,7 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -4145,6 +4205,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTMHEAD command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -4152,6 +4213,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	if t[0] != 'B' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTMHEAD pattern must begin with upper case 'B'.\n", ps.line)
+
 		return true
 	}
 
@@ -4177,6 +4239,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	if count_other != 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTMHEAD must have only lower case x to match received data.\n", ps.line)
+
 		return true
 	}
 
@@ -4189,6 +4252,7 @@ func handleTTMHEAD(ps *parseState) bool {
 		if !alldigits(t) || (len(t) != 4 && len(t) != 6 && len(t) != 10) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: TTMHEAD prefix must be 4, 6, or 10 digits.\n", ps.line)
+
 			return true
 		}
 
@@ -4196,6 +4260,7 @@ func handleTTMHEAD(ps *parseState) bool {
 		if mhErrors != 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: TTMHEAD prefix not a valid DTMF sequence.\n", ps.line)
+
 			return true
 		}
 	}
@@ -4205,10 +4270,12 @@ func handleTTMHEAD(ps *parseState) bool {
 	if k != 4 && k != 6 && k != 10 && k != 12 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTMHEAD prefix and user data must have a total of 4, 6, 10, or 12 digits.\n", ps.line)
+
 		return true
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -4235,6 +4302,7 @@ func handleTTSATSQ(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTSATSQ command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -4242,6 +4310,7 @@ func handleTTSATSQ(ps *parseState) bool {
 	if t[0] != 'B' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTSATSQ pattern must begin with upper case 'B'.\n", ps.line)
+
 		return true
 	}
 
@@ -4257,10 +4326,12 @@ func handleTTSATSQ(ps *parseState) bool {
 	if t[j:] != "xxxx" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTSATSQ pattern must end with exactly xxxx in lower case.\n", ps.line)
+
 		return true
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -4287,6 +4358,7 @@ func handleTTAMBIG(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTAMBIG command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -4294,6 +4366,7 @@ func handleTTAMBIG(ps *parseState) bool {
 	if t[0] != 'B' {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTAMBIG pattern must begin with upper case 'B'.\n", ps.line)
+
 		return true
 	}
 
@@ -4309,10 +4382,12 @@ func handleTTAMBIG(ps *parseState) bool {
 	if t[j:] != "x" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: TTAMBIG pattern must end with exactly one x in lower case.\n", ps.line)
+
 		return true
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
+
 	return false
 }
 
@@ -4353,6 +4428,7 @@ func handleTTMACRO(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing pattern for TTMACRO command.\n", ps.line)
+
 		return true
 	}
 	tl.pattern = t
@@ -4365,6 +4441,7 @@ func handleTTMACRO(ps *parseState) bool {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z.\n", ps.line)
 			tt_error++
+
 			break
 		}
 		// Count how many x, y, z in the pattern.
@@ -4384,6 +4461,7 @@ func handleTTMACRO(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing definition for TTMACRO command.\n", ps.line)
 		tl.macro.definition = "" // Don't die on null pointer later.
+
 		return true
 	}
 
@@ -4560,6 +4638,7 @@ func handleTTMACRO(ps *parseState) bool {
 	} else {
 		dw_printf("Line %d: Errors found in TTMACRO, skipping.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -4577,6 +4656,7 @@ func handleTTOBJ(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing DTMF receive channel for TTOBJ command.\n", ps.line)
+
 		return true
 	}
 
@@ -4585,6 +4665,7 @@ func handleTTOBJ(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file: DTMF receive channel must be in range of 0 to %d on line %d.\n",
 			MAX_RADIO_CHANS-1, ps.line)
+
 		return true
 	}
 
@@ -4595,6 +4676,7 @@ func handleTTOBJ(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file, line %d: TTOBJ DTMF receive channel %d is not valid.\n",
 			ps.line, r)
+
 		return true
 	}
 
@@ -4602,6 +4684,7 @@ func handleTTOBJ(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing transmit channel for TTOBJ command.\n", ps.line)
+
 		return true
 	}
 
@@ -4641,6 +4724,7 @@ func handleTTOBJ(ps *parseState) bool {
 				for _, c := range part {
 					if !unicode.IsDigit(c) && !strings.ContainsRune("aApPiIgG", c) {
 						isLegacy = false
+
 						break
 					}
 				}
@@ -4703,6 +4787,7 @@ func handleTTOBJ(ps *parseState) bool {
 			dw_printf("Config file, line %d: invalid via path.\n", ps.line)
 		}
 	}
+
 	return false
 }
 
@@ -4718,6 +4803,7 @@ func handleTTERR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing message identifier for TTERR command.\n", ps.line)
+
 		return true
 	}
 
@@ -4725,6 +4811,7 @@ func handleTTERR(ps *parseState) bool {
 	for n := range TT_ERROR_MAXP1 {
 		if strings.EqualFold(t, ttErrorString(n)) {
 			msg_num = n
+
 			break
 		}
 	}
@@ -4739,6 +4826,7 @@ func handleTTERR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing method (SPEECH, MORSE) for TTERR command.\n", ps.line)
+
 		return true
 	}
 
@@ -4752,6 +4840,7 @@ func handleTTERR(ps *parseState) bool {
 	if method != "MORSE" && method != "SPEECH" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Response method of %s must be SPEECH or MORSE for TTERR command.\n", ps.line, method)
+
 		return true
 	}
 
@@ -4759,6 +4848,7 @@ func handleTTERR(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing response text for TTERR command.\n", ps.line)
+
 		return true
 	}
 
@@ -4772,6 +4862,7 @@ func handleTTERR(ps *parseState) bool {
 	// TODO1.3: Need SSID too!
 
 	ps.tt.response[msg_num].mtext = t
+
 	return false
 }
 
@@ -4787,6 +4878,7 @@ func handleTTSTATUS(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing status number for TTSTATUS command.\n", ps.line)
+
 		return true
 	}
 
@@ -4795,6 +4887,7 @@ func handleTTSTATUS(ps *parseState) bool {
 	if status_num < 1 || status_num > 9 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Status number for TTSTATUS command must be in range of 1 to 9.\n", ps.line)
+
 		return true
 	}
 
@@ -4802,6 +4895,7 @@ func handleTTSTATUS(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing status text for TTSTATUS command.\n", ps.line)
+
 		return true
 	}
 
@@ -4811,6 +4905,7 @@ func handleTTSTATUS(ps *parseState) bool {
 	t = strings.TrimSpace(t)
 
 	ps.tt.status[status_num] = t
+
 	return false
 }
 
@@ -4826,10 +4921,12 @@ func handleTTCMD(ps *parseState) bool {
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing command for TTCMD command.\n", ps.line)
+
 		return true
 	}
 
 	ps.tt.ttcmd = t
+
 	return false
 }
 
@@ -4930,6 +5027,7 @@ func handleIGLOGIN(ps *parseState) bool {
 	}
 
 	ps.igate.t2_passcode = t
+
 	return false
 }
 
@@ -4984,6 +5082,7 @@ func handleIGTXVIA(ps *parseState) bool {
 		   #endif
 		*/
 	}
+
 	return false
 }
 
@@ -5016,6 +5115,7 @@ func handleIGFILTER(ps *parseState) bool {
 		dw_printf("The default behavior is appropriate for most situations.\n")
 		dw_printf("Please read \"Successful-APRS-IGate-Operation.pdf\".\n")
 	}
+
 	return false
 }
 
@@ -5069,6 +5169,7 @@ func handleIGTXLIMIT(ps *parseState) bool {
 			ps.line, ps.igate.tx_limit_5)
 		dw_printf("You won't make friends by setting a limit this high.\n")
 	}
+
 	return false
 }
 
@@ -5096,6 +5197,7 @@ func handleIGMSP(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing number of times for message sender position.  Using default 1.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -5123,6 +5225,7 @@ func handleSATGATE(ps *parseState) bool {
 	} else {
 		ps.igate.satgate_delay = DEFAULT_SATGATE_DELAY
 	}
+
 	return false
 }
 
@@ -5170,6 +5273,7 @@ func handleAGWPORT(ps *parseState) bool {
 		dw_printf("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n",
 			ps.line, ps.misc.agwpe_port)
 	}
+
 	return false
 }
 
@@ -5264,6 +5368,7 @@ func handleKISSPORT(ps *parseState) bool {
 			dw_printf("Line %d: Too many KISSPORT commands.\n", ps.line)
 		}
 	}
+
 	return false
 }
 
@@ -5307,6 +5412,7 @@ func handleNULLMODEM(ps *parseState) bool {
 
 		ps.misc.kiss_serial_speed = n
 	}
+
 	return false
 }
 
@@ -5332,6 +5438,7 @@ func handleSERIALKISSPOLL(ps *parseState) bool {
 		ps.misc.kiss_serial_speed = 0
 		ps.misc.kiss_serial_poll = 1 // set polling.
 	}
+
 	return false
 }
 
@@ -5342,6 +5449,7 @@ func handleKISSCOPY(ps *parseState) bool {
 	 *			  This does not apply to pseudo terminal KISS.
 	 */
 	ps.misc.kiss_copy = true
+
 	return false
 }
 
@@ -5368,6 +5476,7 @@ func handleDNSSD(ps *parseState) bool {
 	} else {
 		ps.misc.dns_sd_enabled = n != 0
 	}
+
 	return false
 }
 
@@ -5382,6 +5491,7 @@ func handleDNSSDNAME(ps *parseState) bool {
 	} else {
 		ps.misc.dns_sd_name = t
 	}
+
 	return false
 }
 
@@ -5414,6 +5524,7 @@ func handleGPSNMEA(ps *parseState) bool {
 	} else {
 		ps.misc.gpsnmea_speed = 4800 // The standard at one time.
 	}
+
 	return false
 }
 
@@ -5534,6 +5645,7 @@ func handleWAYPOINT(ps *parseState) bool {
 			dw_printf("Config file: Invalid output format '%c' for WAYPOINT on line %d.\n", c, ps.line)
 		}
 	}
+
 	return false
 }
 
@@ -5563,6 +5675,7 @@ func handleLOGDIR(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file: LOGDIR on line %d should have directory path and nothing more.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -5592,6 +5705,7 @@ func handleLOGFILE(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Config file: LOGFILE on line %d should have file name and nothing more.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -5605,6 +5719,7 @@ func handleBEACON(ps *parseState) bool {
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("Config file, line %d: Old style 'BEACON' has been replaced with new commands.\n", ps.line)
 	dw_printf("Use PBEACON, OBEACON, TBEACON, or CBEACON instead.\n")
+
 	return false
 }
 
@@ -5652,6 +5767,7 @@ func handleXBEACON(ps *parseState) bool {
 
 		return true
 	}
+
 	return false
 }
 
@@ -5749,6 +5865,7 @@ func handleFRACK(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid FRACK time. Using default %d.\n", ps.line, ps.misc.frack)
 	}
+
 	return false
 }
 
@@ -5772,6 +5889,7 @@ func handleRETRY(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid RETRY number. Using default %d.\n", ps.line, ps.misc.retry)
 	}
+
 	return false
 }
 
@@ -5795,6 +5913,7 @@ func handlePACLEN(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid PACLEN value. Using default %d.\n", ps.line, ps.misc.paclen)
 	}
+
 	return false
 }
 
@@ -5823,6 +5942,7 @@ func handleMAXFRAME(ps *parseState) bool {
 		dw_printf("Line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d.\n",
 			ps.line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, ps.misc.maxframe_basic)
 	}
+
 	return false
 }
 
@@ -5849,6 +5969,7 @@ func handleEMAXFRAME(ps *parseState) bool {
 		dw_printf("Line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d.\n",
 			ps.line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, ps.misc.maxframe_extended)
 	}
+
 	return false
 }
 
@@ -5872,6 +5993,7 @@ func handleMAXV22(ps *parseState) bool {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Invalid MAXV22 number. Will use half of RETRY.\n", ps.line)
 	}
+
 	return false
 }
 
@@ -5906,6 +6028,7 @@ func handleV20(ps *parseState) bool {
 
 		t = split("", false)
 	}
+
 	return false
 }
 
@@ -5941,6 +6064,7 @@ func handleNOXID(ps *parseState) bool {
 
 		t = split("", false)
 	}
+
 	return false
 }
 
