@@ -18,10 +18,17 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
+)
+
+var (
+	errPfilterNilPacket               = errors.New("INTERNAL ERROR in pfilter: nil packet pointer, please report this")
+	errPfilterSyntax                  = errors.New("filter syntax error")
+	errPfilterValidateSyntheticPacket = errors.New("pfilter_validate: failed to construct synthetic packet")
 )
 
 /*
@@ -158,7 +165,7 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
 	if pp == nil {
-		return -1, fmt.Errorf("INTERNAL ERROR in pfilter: nil packet pointer, please report this")
+		return -1, errPfilterNilPacket
 	}
 
 	var pfstate pfstate_t
@@ -1360,7 +1367,7 @@ func newFilterError(pf *pfstate_t, msg string) error {
 		}
 	}
 
-	return fmt.Errorf("%s%s\n%*s\n%s", intro, pf.filter_str, len(intro)+pf.tokeni+1, "^", msg)
+	return fmt.Errorf("%w: %s%s\n%*s\n%s", errPfilterSyntax, intro, pf.filter_str, len(intro)+pf.tokeni+1, "^", msg)
 }
 
 // pfilterDummyMonitorLine is a synthetic packet with a known position, symbol
@@ -1398,7 +1405,7 @@ const pfilterDummyMonitorLine = "WB2OSZ-5>APDW12,WIDE1-1,WIDE2-1:!4237.14NS07120
 func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) error {
 	var pp = AX25FromText(pfilterDummyMonitorLine, true)
 	if pp == nil {
-		return fmt.Errorf("pfilter_validate: failed to construct synthetic packet from %q", pfilterDummyMonitorLine)
+		return fmt.Errorf("%w from %q", errPfilterValidateSyntheticPacket, pfilterDummyMonitorLine)
 	}
 	defer AX25Delete(pp)
 

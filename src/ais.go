@@ -21,9 +21,19 @@ package direwolf
  *******************************************************************************/
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
+)
+
+var (
+	errAISInvalidSextetChar  = errors.New("invalid character in AIS NMEA sentence payload")
+	errAISInvalidSextetValue = errors.New("invalid 6-bit value from AIS HDLC payload")
+	errAISMissingChecksum    = errors.New("missing AIS sentence checksum")
+	errAISChecksumMismatch   = errors.New("AIS sentence checksum error")
+	errAISMissingPayload     = errors.New("payload is missing from AIS sentence")
+	errAISUnexpectedFillBits = errors.New("unexpected number of filler bits in AIS sentence")
 )
 
 // Lengths, in bits, for the AIS message types.
@@ -243,7 +253,7 @@ func char_to_sextet(ch byte) (int, error) {
 	} else if ch >= '`' && ch <= 'w' {
 		return int(ch - '`' + 40), nil
 	} else {
-		return 0, fmt.Errorf("invalid character %q in AIS NMEA sentence payload", ch)
+		return 0, fmt.Errorf("%w: %q", errAISInvalidSextetChar, ch)
 	}
 }
 
@@ -257,7 +267,7 @@ func sextet_to_char(val int) (byte, error) {
 	} else if val >= 40 && val <= 63 {
 		return byte('`' + val - 40), nil
 	} else {
-		return '0', fmt.Errorf("invalid 6-bit value %d from AIS HDLC payload", val)
+		return '0', fmt.Errorf("%w: %d", errAISInvalidSextetValue, val)
 	}
 }
 
@@ -368,14 +378,14 @@ func AISParse(sentence string) (*AISData, error) {
 	var data, checksumStr, found = strings.Cut(stemp, "*")
 
 	if !found {
-		return nil, fmt.Errorf("missing AIS sentence checksum")
+		return nil, errAISMissingChecksum
 	}
 
 	var _checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
 	var checksum = byte(_checksum)
 
 	if calculatedChecksum != checksum {
-		return nil, fmt.Errorf("AIS sentence checksum error: expected %02x but found %s", calculatedChecksum, checksumStr)
+		return nil, fmt.Errorf("%w: expected %02x but found %s", errAISChecksumMismatch, calculatedChecksum, checksumStr)
 	}
 
 	// Extract the comma separated fields.
@@ -398,7 +408,7 @@ func AISParse(sentence string) (*AISData, error) {
 	_ = radio_chan
 
 	if len(payload) == 0 {
-		return nil, fmt.Errorf("payload is missing from AIS sentence")
+		return nil, errAISMissingPayload
 	}
 
 	// Convert character representation to bit vector.
@@ -422,7 +432,7 @@ func AISParse(sentence string) (*AISData, error) {
 
 	var fillerErr error
 	if nfill != plen*6-nbytes*8 {
-		fillerErr = fmt.Errorf("number of filler bits is %d when %d is expected", nfill, plen*6-nbytes*8)
+		fillerErr = fmt.Errorf("%w: is %d when %d is expected", errAISUnexpectedFillBits, nfill, plen*6-nbytes*8)
 	}
 
 	// Extract the fields of interest from a few message types.

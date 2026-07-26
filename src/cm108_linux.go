@@ -89,6 +89,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var (
+	errCM108EnumerateSoundDevices  = errors.New("INTERNAL ERROR: Can't enumerate udev devices")
+	errCM108EnumerateHidrawDevices = errors.New("INTERNAL ERROR: Can't enumerate udev hidraw devices")
+)
+
 /* Dire Wolf cm108.h */
 
 // The CM108, CM109, and CM119 datasheets all say that idProduct can be in the range
@@ -226,10 +231,9 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 	var devices, devicesErr = e.Devices()
 	if devicesErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't enumerate udev devices"
-		dw_printf("%s: %v.\n", msg, devicesErr)
+		dw_printf("%s: %v.\n", errCM108EnumerateSoundDevices, devicesErr)
 
-		return things, errors.New(msg)
+		return things, errCM108EnumerateSoundDevices
 	}
 
 	var cardDevpath string
@@ -290,10 +294,9 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 	var hidDevices, hidDevicesErr = e2.Devices()
 	if hidDevicesErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't enumerate udev hidraw devices"
-		dw_printf("%s: %v.\n", msg, hidDevicesErr)
+		dw_printf("%s: %v.\n", errCM108EnumerateHidrawDevices, hidDevicesErr)
 
-		return nil, errors.New(msg)
+		return nil, errCM108EnumerateHidrawDevices
 	}
 
 	for _, dev := range hidDevices {

@@ -19,6 +19,11 @@ import (
 	"unicode"
 )
 
+var (
+	errMaidenheadWrongPairCount = errors.New("maidenhead locator must be from 1 to a valid number of pairs of characters")
+	errMaidenheadCharOutOfRange = errors.New("character in maidenhead locator is out of range")
+)
+
 /* Use this value for unknown latitude/longitude or other values. */
 
 const G_UNKNOWN = (-999999)
@@ -699,10 +704,10 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	if len(maidenhead)%2 != 0 || np < MH_MIN_PAIR || np > MH_MAX_PAIR {
 		text_color_set(DW_COLOR_ERROR)
 
-		var s = fmt.Sprintf("Maidenhead locator \"%s\" must from 1 to %d pairs of characters.\n", maidenhead, MH_MAX_PAIR)
-		dw_printf("%s", s)
+		var wrappedErr = fmt.Errorf("%w: %q must have from 1 to %d pairs of characters", errMaidenheadWrongPairCount, maidenhead, MH_MAX_PAIR)
+		dw_printf("%s\n", wrappedErr)
 
-		return 0, 0, errors.New(s)
+		return 0, 0, wrappedErr
 	}
 
 	var mh = strings.ToUpper(maidenhead)
@@ -716,11 +721,11 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 			mh[2*n+1] < pairs[n].min_ch || mh[2*n+1] > pairs[n].max_ch {
 			text_color_set(DW_COLOR_ERROR)
 
-			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
-				pairs[n].position, maidenhead, pairs[n].min_ch, pairs[n].max_ch)
-			dw_printf("%s", s)
+			var wrappedErr = fmt.Errorf("%w: the %s pair of characters in %q must be in range of %c thru %c",
+				errMaidenheadCharOutOfRange, pairs[n].position, maidenhead, pairs[n].min_ch, pairs[n].max_ch)
+			dw_printf("%s\n", wrappedErr)
 
-			return 0, 0, errors.New(s)
+			return 0, 0, wrappedErr
 		}
 
 		ilon += int(mh[2*n]-pairs[n].min_ch) * pairs[n].value
