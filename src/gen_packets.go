@@ -98,7 +98,11 @@ var gen_header wav_header
 
 var genPacketsRandSeed int32 = 1
 
-// Although the tests in `test-scripts` all call `atest` with an acceptable *range* of packets, the only way I could get them all to pass was by reimplementing this exact PRNG from Dire Wolf's gen_packets.c - all my attempts to use Go's `math/rand` resulted in decodes that would fall outside of the acceptable range. It's far from impossible that I somehow screwed up my use of `math/rand`, but I think it more likely that the tests depend on this exact PRNG implementation, which I should address at some point. /KG
+// Although the tests in `test-scripts` all call `atest` with an acceptable *range* of packets, the only way I could get
+// them all to pass was by reimplementing this exact PRNG from Dire Wolf's gen_packets.c - all my attempts to use Go's
+// `math/rand` resulted in decodes that would fall outside of the acceptable range. It's far from impossible that I
+// somehow screwed up my use of `math/rand`, but I think it more likely that the tests depend on this exact PRNG
+// implementation, which I should address at some point. /KG
 // Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG
 func genPacketsRand() int32 {
 	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & MY_RAND_MAX)
@@ -150,7 +154,8 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var packetCount = pflag.IntP("packet-count", "N", 0, "Generate specified number of frames.")
 	var amplitude = pflag.IntP("amplitude", "a", 50, "Signal amplitude in range of 0 - 200%.") // 100% is actually half of the digital signal range so we have some headroom for adding noise, etc.
 	var audioSampleRate = pflag.IntP("audio-sample-rate", "r", DEFAULT_SAMPLES_PER_SEC, "Audio sample rate.")
-	// var leadingZeros = pflag.IntP("leading-zeros", "z", 12, "Number of leading zero bits before frame. 12 is .01 seconds at 1200 bits/sec.") // -z option TODO: not implemented, should replace with txdelay frames.
+	// var leadingZeros = pflag.IntP("leading-zeros", "z", 12, "Number of leading zero bits before frame. 12 is .01 seconds at 1200 bits/sec.")
+	// -z option TODO: not implemented, should replace with txdelay frames.
 	var eightBitsPerSample = pflag.BoolP("eight-bps", "8", false, "8 bit audio rather than 16.")
 	var twoSoundChannels = pflag.BoolP("two-sound-channels", "2", false, "2 channels (stereo) audio rather than one channel.")
 	var outputFile = pflag.StringP("output-file", "o", "", "Send output to .wav file.")
