@@ -57,6 +57,7 @@ var kissNetSvc *KissNetService
 var mheardDB *MHeardDB
 var xmitSvc *XmitService
 var ttGateway *TTGateway
+var hdlcReceiver *HDLCReceiver
 
 /*-------------------------------------------------------------------
  *

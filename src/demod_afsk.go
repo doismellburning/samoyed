@@ -16,7 +16,7 @@ package direwolf
  *
  * Input:	Audio samples from either a file or the "sound card."
  *
- * Outputs:	Calls hdlc_rec_bit() for each bit demodulated.
+ * Outputs:	Calls hdlcReceiver.RecBit() for each bit demodulated.
  *
  *---------------------------------------------------------------*/
 
@@ -754,7 +754,7 @@ func nudge_pll_afsk(channel int, subchannel int, slice int, demod_out float64, D
 		*/
 
 		// #if 1
-		hdlc_rec_bit(channel, subchannel, slice, IfThenElse(demod_out > 0, 1, 0), false, quality)
+		hdlcReceiver.RecBit(channel, subchannel, slice, IfThenElse(demod_out > 0, 1, 0), false, quality)
 		/*
 			#else  // TODO: new feature to measure data speed error.
 			// Maybe hdlc_rec_bit could provide indication when frame starts.

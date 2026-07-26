@@ -43,7 +43,7 @@ var FX25TestCount = 0
  *
  * Purpose:     Extract FX.25 codeblocks from a stream of bits.
  *		In a completely integrated AX.25 / FX.25 receive system,
- *		this would see the same bit stream as hdlc_rec_bit.
+ *		this would see the same bit stream as hdlcReceiver.RecBit.
  *
  * Inputs:      channel    - Channel number.
  *

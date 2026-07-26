@@ -9,7 +9,7 @@ package direwolf
  *
  * Input:	Audio samples from either a file or the "sound card."
  *
- * Outputs:	Calls hdlc_rec_bit() for each bit demodulated.
+ * Outputs:	Calls hdlcReceiver.RecBit() for each bit demodulated.
  *
  * References:	MFJ-2400 Product description and manual:
  *
@@ -810,23 +810,23 @@ func nudge_pll_psk(channel int, subchannel int, slice int, demod_bits int, D *de
 		case MODEM_BPSK:
 			var gray = demod_bits
 
-			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
+			hdlcReceiver.RecBitNew(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		case MODEM_QPSK:
 			var gray = demod_bits
 
-			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
+			hdlcReceiver.RecBitNew(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
+			hdlcReceiver.RecBitNew(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		default:
 			var gray = demod_bits
 
-			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>2)&1, false, bit_quality[2],
+			hdlcReceiver.RecBitNew(channel, subchannel, slice, (gray>>2)&1, false, bit_quality[2],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			hdlc_rec_bit_new(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
+			hdlcReceiver.RecBitNew(channel, subchannel, slice, (gray>>1)&1, false, bit_quality[1],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
-			hdlc_rec_bit_new(channel, subchannel, slice, gray&1, false, bit_quality[0],
+			hdlcReceiver.RecBitNew(channel, subchannel, slice, gray&1, false, bit_quality[0],
 				&(D.slicer[slice].pll_nudge_total), &(D.slicer[slice].pll_symbol_count))
 		}
 

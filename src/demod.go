@@ -7,7 +7,7 @@ package direwolf
  *
  * Input:	Audio samples from either a file or the "sound card."
  *
- * Outputs:	Calls hdlc_rec_bit() for each bit demodulated.
+ * Outputs:	Calls hdlcReceiver.RecBit() for each bit demodulated.
  *
  *---------------------------------------------------------------*/
 

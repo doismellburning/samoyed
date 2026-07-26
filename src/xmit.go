@@ -1136,7 +1136,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 	if !fulldup {
 	start_over_again:
 
-		for hdlc_rec_data_detect_any(channel) > 0 {
+		for hdlcReceiver.DataDetectAny(channel) > 0 {
 			SLEEP_MS(WAIT_CHECK_EVERY_MS)
 
 			n++
@@ -1156,7 +1156,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 			SLEEP_MS(xs.p_modem.achan[channel].dwait * 10)
 		}
 
-		if hdlc_rec_data_detect_any(channel) > 0 {
+		if hdlcReceiver.DataDetectAny(channel) > 0 {
 			goto start_over_again
 		}
 
@@ -1167,7 +1167,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(slottime * 10)
 
-			if hdlc_rec_data_detect_any(channel) > 0 {
+			if hdlcReceiver.DataDetectAny(channel) > 0 {
 				goto start_over_again
 			}
 

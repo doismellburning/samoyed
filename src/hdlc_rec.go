@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /********************************************************************************
@@ -33,18 +32,21 @@ func descramble(in int, state *int) int {
  * Should have a reset function instead of initializations here.
  */
 
-type hdlc_state_s struct {
-	prev_raw bool /* Keep track of previous bit so */
+type hdlcState struct {
+	receiver                   *HDLCReceiver
+	channel, subchannel, slice int
+
+	prevRaw bool /* Keep track of previous bit so */
 	/* we can look for transitions. */
 
 	lfsr int /* Descrambler shift register for 9600 baud. */
 
-	prev_descram int /* Previous descrambled for 9600 baud. */
+	prevDescram int /* Previous descrambled for 9600 baud. */
 
-	pat_det byte /* 8 bit pattern detector shift register. */
+	patDet byte /* 8 bit pattern detector shift register. */
 	/* See below for more details. */
 
-	flag4_det uint /* Last 32 raw bits to look for 4 */
+	flag4Det uint /* Last 32 raw bits to look for 4 */
 	/* flag patterns in a row. */
 
 	oacc byte /* Accumulator for building up an octet. */
@@ -55,32 +57,59 @@ type hdlc_state_s struct {
 	/* The value of -1 is a special case meaning */
 	/* bits should not be accumulated. */
 
-	frame_buf [MAX_FRAME_LEN]byte
+	frameBuf [MAX_FRAME_LEN]byte
 	/* One frame is kept here. */
 
-	frame_len int /* Number of octets in frame_buf. */
+	frameLen int /* Number of octets in frameBuf. */
 	/* Should be in range of 0 .. MAX_FRAME_LEN. */
 
 	rrbb *rrbb_t /* Handle for bit array for raw received bits. */
 
-	eas_acc uint64 /* Accumulate most recent 64 bits received for EAS. */
+	easAcc uint64 /* Accumulate most recent 64 bits received for EAS. */
 
-	eas_gathering bool /* Decoding in progress. */
+	easGathering bool /* Decoding in progress. */
 
-	eas_plus_found bool /* "+" seen, indicating end of geographical area list. */
+	easPlusFound bool /* "+" seen, indicating end of geographical area list. */
 
-	eas_fields_after_plus int /* Number of "-" characters after the "+". */
+	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
 }
 
-var hdlc_state [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlc_state_s
+// HDLCReceiver holds the HDLC bit-decoder state for every (channel, subchannel, slicer)
+// combination, along with the aggregated DCD/receive state shared across them.
+type HDLCReceiver struct {
+	slicer        [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*hdlcState
+	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
+	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
+	audio         *audio_s
+	wasInit       bool
 
-var num_subchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
+	// Own copy of random number generator so we can get
+	// same predictable results on different operating systems.
+	// TODO: Consolidate multiple copies somewhere.
+	randSeed int32
+}
 
-var composite_dcd [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
+const hdlcRecRandMax int32 = 0x7fffffff
+
+func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scrambled bool) *hdlcState {
+	var s = new(hdlcState)
+	s.receiver = r
+	s.channel = channel
+	s.subchannel = subchannel
+	s.slice = slice
+	s.olen = -1
+
+	// TODO: FIX13 wasteful if not needed.
+	// Should loop on number of slicers, not max.
+
+	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
+
+	return s
+}
 
 /***********************************************************************************
  *
- * Name:	hdlc_rec_init
+ * Name:	NewHDLCReceiver
  *
  * Purpose:	Call once at the beginning to initialize.
  *
@@ -88,33 +117,24 @@ var composite_dcd [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
  *
  ***********************************************************************************/
 
-var hdlcRecWasInit = false
-
-var g_audio_p *audio_s
-
-func hdlc_rec_init(pa *audio_s) {
+func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("hdlc_rec_init (%p) \n", pa);
+	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
 	Assert(pa != nil)
-	g_audio_p = pa
+
+	var r = new(HDLCReceiver)
+	r.audio = pa
+	r.randSeed = 1
 
 	for ch := range MAX_RADIO_CHANS {
 		if pa.chan_medium[ch] == MEDIUM_RADIO {
-			num_subchannel[ch] = pa.achan[ch].num_subchan
+			r.numSubchannel[ch] = pa.achan[ch].num_subchan
 
-			Assert(num_subchannel[ch] >= 1 && num_subchannel[ch] <= MAX_SUBCHANS)
+			Assert(r.numSubchannel[ch] >= 1 && r.numSubchannel[ch] <= MAX_SUBCHANS)
 
-			for sub := 0; sub < num_subchannel[ch]; sub++ {
+			for sub := 0; sub < r.numSubchannel[ch]; sub++ {
 				for slice := range MAX_SLICERS {
-					var H = new(hdlc_state_s)
-					hdlc_state[ch][sub][slice] = H
-
-					H.olen = -1
-
-					// TODO: FIX13 wasteful if not needed.
-					// Should loop on number of slicers, not max.
-
-					H.rrbb = rrbb_new(ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE, H.lfsr, H.prev_descram)
+					r.slicer[ch][sub][slice] = newHDLCState(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
 				}
 			}
 		}
@@ -122,19 +142,9 @@ func hdlc_rec_init(pa *audio_s) {
 
 	hdlc_rec2_init(pa)
 
-	hdlcRecWasInit = true
-}
+	r.wasInit = true
 
-/* Own copy of random number generator so we can get */
-/* same predictable results on different operating systems. */
-/* TODO: Consolidate multiple copies somewhere. */
-
-var hdlcRecRandSeed int32 = 1
-var hdlcRecRandMax int32 = 0x7fffffff
-
-func hdlcRecRand() int32 {
-	hdlcRecRandSeed = int32((uint32(hdlcRecRandSeed)*1103515245)+12345) & hdlcRecRandMax
-	return hdlcRecRandSeed
+	return r
 }
 
 /***********************************************************************************
@@ -166,47 +176,42 @@ const PREAMBLE_ZCZC = 0x435a435aabababab
 const PREAMBLE_NNNN = 0x4e4e4e4eabababab
 const EAS_MAX_LEN = 268 // Not including preamble.  Up to 31 geographic areas.
 
-func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int) { //nolint:unparam
-	/*
-	 * Different state information for each channel / subchannel / slice.
-	 */
-	var H = hdlc_state[channel][subchannel][slice]
-
-	//dw_printf ("slice %d = %d\n", slice, raw);
+func (s *hdlcState) recEasBit(raw int, future_use int) { //nolint:unparam
+	//dw_printf ("slice %d = %d\n", s.slice, raw);
 
 	// Accumulate most recent 64 bits.
 
-	H.eas_acc >>= 1
+	s.easAcc >>= 1
 	if raw != 0 {
-		H.eas_acc |= 0x8000000000000000
+		s.easAcc |= 0x8000000000000000
 	}
 
 	var done = false
 
-	if H.eas_acc == PREAMBLE_ZCZC {
+	if s.easAcc == PREAMBLE_ZCZC {
 		//dw_printf ("ZCZC\n");
-		H.olen = 0
-		H.eas_gathering = true
-		H.eas_plus_found = false
-		H.eas_fields_after_plus = 0
-		copy(H.frame_buf[:], []byte("ZCZC"))
-		H.frame_len = 4
-	} else if H.eas_acc == PREAMBLE_NNNN {
+		s.olen = 0
+		s.easGathering = true
+		s.easPlusFound = false
+		s.easFieldsAfterPlus = 0
+		copy(s.frameBuf[:], []byte("ZCZC"))
+		s.frameLen = 4
+	} else if s.easAcc == PREAMBLE_NNNN {
 		//dw_printf ("NNNN\n");
-		H.olen = 0
-		H.eas_gathering = true
-		copy(H.frame_buf[:], []byte("NNNN"))
-		H.frame_len = 4
+		s.olen = 0
+		s.easGathering = true
+		copy(s.frameBuf[:], []byte("NNNN"))
+		s.frameLen = 4
 		done = true
-	} else if H.eas_gathering {
-		H.olen++
-		if H.olen == 8 {
-			H.olen = 0
-			var ch = byte(H.eas_acc >> 56)
-			H.frame_buf[H.frame_len] = ch
-			H.frame_len++
-			H.frame_buf[H.frame_len] = 0
-			//dw_printf ("frame_buf = %s\n", H.frame_buf);
+	} else if s.easGathering {
+		s.olen++
+		if s.olen == 8 {
+			s.olen = 0
+			var ch = byte(s.easAcc >> 56)
+			s.frameBuf[s.frameLen] = ch
+			s.frameLen++
+			s.frameBuf[s.frameLen] = 0
+			//dw_printf ("frameBuf = %s\n", s.frameBuf);
 
 			// What characters are acceptable?
 			// Only ASCII is allowed.  i.e. the MSB must be 0.
@@ -220,31 +225,31 @@ func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int
 				//#define DEBUG_E 1
 				/*
 				   #ifdef DEBUG_E
-				   	      dw_printf ("reject %d invalid character = %s\n", slice, H.frame_buf);
+				   	      dw_printf ("reject %d invalid character = %s\n", s.slice, s.frameBuf);
 				   #endif
 				*/
-				H.eas_gathering = false
+				s.easGathering = false
 				return
 			}
 
-			if H.frame_len > EAS_MAX_LEN { // FIXME: look for other places with max length
+			if s.frameLen > EAS_MAX_LEN { // FIXME: look for other places with max length
 				/*
 					#ifdef DEBUG_E
-						      dw_printf ("reject %d too long = %s\n", slice, H.frame_buf);
+						      dw_printf ("reject %d too long = %s\n", s.slice, s.frameBuf);
 					#endif
 				*/
-				H.eas_gathering = false
+				s.easGathering = false
 				return
 			}
 
 			if ch == '+' {
-				H.eas_plus_found = true
-				H.eas_fields_after_plus = 0
+				s.easPlusFound = true
+				s.easFieldsAfterPlus = 0
 			}
 
-			if H.eas_plus_found && ch == '-' {
-				H.eas_fields_after_plus++
-				if H.eas_fields_after_plus == 3 {
+			if s.easPlusFound && ch == '-' {
+				s.easFieldsAfterPlus++
+				if s.easFieldsAfterPlus == 3 {
 					done = true // normal case
 				}
 			}
@@ -254,12 +259,12 @@ func eas_rec_bit(channel int, subchannel int, slice int, raw int, future_use int
 	if done {
 		/*
 			#ifdef DEBUG_E
-				  dw_printf ("frame_buf %d = %s\n", slice, H.frame_buf);
+				  dw_printf ("frameBuf %d = %s\n", s.slice, s.frameBuf);
 			#endif
 		*/
-		var alevel = demod_get_audio_level(channel, subchannel)
-		multi_modem_process_rec_frame(channel, subchannel, slice, H.frame_buf[:H.frame_len], alevel, 0, 0)
-		H.eas_gathering = false
+		var alevel = demod_get_audio_level(s.channel, s.subchannel)
+		multi_modem_process_rec_frame(s.channel, s.subchannel, s.slice, s.frameBuf[:s.frameLen], alevel, 0, 0)
+		s.easGathering = false
 	}
 }
 
@@ -374,18 +379,17 @@ a good modem here and providing a result when it is received.
  *
  ***********************************************************************************/
 
-var dummyll int64
-var dummy int
-
-func hdlc_rec_bit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
-	hdlc_rec_bit_new(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
+func (r *HDLCReceiver) RecBit(channel int, subchannel int, slice int, raw int, is_scrambled bool, not_used_remove int) {
+	var dummyll int64
+	var dummy int
+	r.RecBitNew(channel, subchannel, slice, raw, is_scrambled, not_used_remove, &dummyll, &dummy)
 }
 
-func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
+func (r *HDLCReceiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var raw = _raw != 0
 
-	Assert(hdlcRecWasInit)
+	Assert(r.wasInit)
 
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
@@ -394,27 +398,34 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 	// -e option can be used to artificially introduce the desired
 	// Bit Error Rate (BER) for testing.
 
-	if g_audio_p.recv_ber != 0 {
-		var r = float64(hdlcRecRand()) / float64(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
-		if g_audio_p.recv_ber > r {
+	if r.audio.recv_ber != 0 {
+		var p = float64(r.rand()) / float64(hdlcRecRandMax) // calculate as double to preserve all 31 bits.
+		if r.audio.recv_ber > p {
 			// FIXME
 			//text_color_set(DW_COLOR_DEBUG);
-			//dw_printf ("hdlc_rec_bit randomly clobber bit, ber = %.6f\n", g_audio_p.recv_ber);
+			//dw_printf ("hdlc_rec_bit randomly clobber bit, ber = %.6f\n", r.audio.recv_ber);
 			raw = !raw
 		}
 	}
 
+	var s = r.slicer[channel][subchannel][slice]
+
 	// EAS does not use HDLC.
 
-	if g_audio_p.achan[channel].modem_type == MODEM_EAS {
-		eas_rec_bit(channel, subchannel, slice, IfThenElse(raw, 1, 0), not_used_remove)
+	if r.audio.achan[channel].modem_type == MODEM_EAS {
+		s.recEasBit(IfThenElse(raw, 1, 0), not_used_remove)
 		return
 	}
 
-	/*
-	 * Different state information for each channel / subchannel / slice.
-	 */
-	var H = hdlc_state[channel][subchannel][slice]
+	s.recBitNew(raw, is_scrambled, pll_nudge_total, pll_symbol_count)
+}
+
+func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
+	pll_nudge_total *int64, pll_symbol_count *int) {
+	var channel = s.channel
+	var subchannel = s.subchannel
+	var slice = s.slice
+	var r = s.receiver
 
 	/*
 	 * Using NRZI encoding,
@@ -425,21 +436,21 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 	var dbit bool /* Data bit after undoing NRZI. */
 
 	if is_scrambled {
-		var descram = descramble(IfThenElse(raw, 1, 0), &(H.lfsr))
+		var descram = descramble(IfThenElse(raw, 1, 0), &(s.lfsr))
 
-		dbit = (descram == H.prev_descram)
-		H.prev_descram = descram
-		H.prev_raw = raw
+		dbit = (descram == s.prevDescram)
+		s.prevDescram = descram
+		s.prevRaw = raw
 	} else {
-		dbit = (raw == H.prev_raw)
+		dbit = (raw == s.prevRaw)
 
-		H.prev_raw = raw
+		s.prevRaw = raw
 	}
 
 	// After BER insertion, NRZI, and any descrambling, feed into FX.25 decoder as well.
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
-	if g_audio_p.achan[channel].modem_type != MODEM_AIS {
+	if r.audio.achan[channel].modem_type != MODEM_AIS {
 		FX25RecBit(channel, subchannel, slice, IfThenElse(dbit, 1, 0))
 		il2p_rec_bit(channel, subchannel, slice, IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
@@ -448,20 +459,20 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 	 * Octets are sent LSB first.
 	 * Shift the most recent 8 bits thru the pattern detector.
 	 */
-	H.pat_det >>= 1
+	s.patDet >>= 1
 	if dbit {
-		H.pat_det |= 0x80
+		s.patDet |= 0x80
 	}
 
-	H.flag4_det >>= 1
+	s.flag4Det >>= 1
 	if dbit {
-		H.flag4_det |= 0x80000000
+		s.flag4Det |= 0x80000000
 	}
 
-	rrbb_append_bit(H.rrbb, byte(IfThenElse(raw, 1, 0)))
+	rrbb_append_bit(s.rrbb, byte(IfThenElse(raw, 1, 0)))
 
-	if H.pat_det == 0x7e {
-		rrbb_chop8(H.rrbb)
+	if s.patDet == 0x7e {
+		rrbb_chop8(s.rrbb)
 
 		/*
 		 * The special pattern 01111110 indicates beginning and ending of a frame.
@@ -533,7 +544,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 				  dw_printf ("\nfound flag, channel %d.%d, %d bits in frame\n", channel, subchannel, rrbb_get_len(H.rrbb) - 1);
 			#endif
 		*/
-		if rrbb_get_len(H.rrbb) >= MIN_FRAME_LEN*8 {
+		if rrbb_get_len(s.rrbb) >= MIN_FRAME_LEN*8 {
 			//JWL - end of frame
 			var speed_error float64    // in percentage.
 			if *pll_symbol_count > 0 { // avoid divde by 0.
@@ -552,28 +563,28 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 				speed_error = 0
 			}
 
-			rrbb_set_speed_error(H.rrbb, speed_error)
+			rrbb_set_speed_error(s.rrbb, speed_error)
 
 			var alevel = demod_get_audio_level(channel, subchannel)
 
-			rrbb_set_audio_level(H.rrbb, alevel)
-			hdlc_rec2_block(H.rrbb)
+			rrbb_set_audio_level(s.rrbb, alevel)
+			hdlc_rec2_block(s.rrbb)
 			/* Now owned by someone else who will free it. */
-			H.rrbb = nil
+			s.rrbb = nil
 
-			H.rrbb = rrbb_new(channel, subchannel, slice, is_scrambled, H.lfsr, H.prev_descram) /* Allocate a new one. */
+			s.rrbb = rrbb_new(channel, subchannel, slice, is_scrambled, s.lfsr, s.prevDescram) /* Allocate a new one. */
 		} else {
 			//JWL - start of frame
 			*pll_nudge_total = 0
 			*pll_symbol_count = -1 // comes out better than using 0.
 
-			rrbb_clear(H.rrbb, is_scrambled, H.lfsr, H.prev_descram)
+			rrbb_clear(s.rrbb, is_scrambled, s.lfsr, s.prevDescram)
 		}
 
-		H.olen = 0 /* Allow accumulation of octets. */
-		H.frame_len = 0
+		s.olen = 0 /* Allow accumulation of octets. */
+		s.frameLen = 0
 
-		rrbb_append_bit(H.rrbb, byte(IfThenElse(H.prev_raw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
+		rrbb_append_bit(s.rrbb, byte(IfThenElse(s.prevRaw, 1, 0))) /* Last bit of flag.  Needed to get first data bit. */
 		/* Now that we are saving other initial state information, */
 		/* it would be sensible to do the same for this instead */
 		/* of lumping it in with the frame data bits. */
@@ -603,7 +614,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 		 */
 
 		// #else
-	} else if H.pat_det == 0xfe {
+	} else if s.patDet == 0xfe {
 		/*
 		 * Valid data will never have 7 one bits in a row.
 		 *
@@ -613,11 +624,11 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 		 */
 
 		// #endif
-		H.olen = -1     /* Stop accumulating octets. */
-		H.frame_len = 0 /* Discard anything in progress. */
+		s.olen = -1    /* Stop accumulating octets. */
+		s.frameLen = 0 /* Discard anything in progress. */
 
-		rrbb_clear(H.rrbb, is_scrambled, H.lfsr, H.prev_descram)
-	} else if (H.pat_det & 0xfc) == 0x7c {
+		rrbb_clear(s.rrbb, is_scrambled, s.lfsr, s.prevDescram)
+	} else if (s.patDet & 0xfc) == 0x7c {
 
 		/*
 		 * If we have five '1' bits in a row, followed by a '0' bit,
@@ -633,20 +644,20 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
 		 * In all other cases, accumulate bits into octets, and complete octets
 		 * into the frame buffer.
 		 */
-		if H.olen >= 0 {
-			H.oacc >>= 1
+		if s.olen >= 0 {
+			s.oacc >>= 1
 			if dbit {
-				H.oacc |= 0x80
+				s.oacc |= 0x80
 			}
 
-			H.olen++
+			s.olen++
 
-			if H.olen == 8 {
-				H.olen = 0
+			if s.olen == 8 {
+				s.olen = 0
 
-				if H.frame_len < MAX_FRAME_LEN {
-					H.frame_buf[H.frame_len] = H.oacc
-					H.frame_len++
+				if s.frameLen < MAX_FRAME_LEN {
+					s.frameBuf[s.frameLen] = s.oacc
+					s.frameLen++
 				}
 			}
 		}
@@ -684,7 +695,7 @@ func hdlc_rec_bit_new(channel int, subchannel int, slice int, _raw int, is_scram
  *
  *--------------------------------------------------------------------*/
 
-func dcd_change_real(channel int, subchannel int, slice int, state int) {
+func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchannel >= 0 && subchannel <= MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -697,15 +708,15 @@ func dcd_change_real(channel int, subchannel int, slice int, state int) {
 		#endif
 	*/
 
-	var old = hdlc_rec_data_detect_any(channel)
+	var old = r.DataDetectAny(channel)
 
 	if state != 0 {
-		composite_dcd[channel][subchannel][slice] = true
+		r.compositeDCD[channel][subchannel][slice] = true
 	} else {
-		composite_dcd[channel][subchannel][slice] = false
+		r.compositeDCD[channel][subchannel][slice] = false
 	}
 
-	var newVal = hdlc_rec_data_detect_any(channel)
+	var newVal = r.DataDetectAny(channel)
 
 	if newVal != old {
 		ptt_set(OCTYPE_DCD, channel, newVal)
@@ -742,11 +753,11 @@ func dcd_change_real(channel int, subchannel int, slice int, state int) {
  *
  *--------------------------------------------------------------------*/
 
-func hdlc_rec_data_detect_any(channel int) int {
+func (r *HDLCReceiver) DataDetectAny(channel int) int {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	for sc := 0; sc < num_subchannel[channel]; sc++ {
-		if slices.Contains(composite_dcd[channel][sc][:], true) {
+	for sc := 0; sc < r.numSubchannel[channel]; sc++ {
+		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
 			return (1)
 		}
 	}
@@ -756,6 +767,11 @@ func hdlc_rec_data_detect_any(channel int) int {
 	}
 
 	return (0)
-} /* end hdlc_rec_data_detect_any */
+} /* end DataDetectAny */
+
+func (r *HDLCReceiver) rand() int32 {
+	r.randSeed = int32((uint32(r.randSeed)*1103515245)+12345) & hdlcRecRandMax
+	return r.randSeed
+}
 
 /* end hdlc_rec.c */
