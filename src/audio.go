@@ -23,6 +23,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -1292,7 +1293,7 @@ func audio_open(pa *audio_s) int {
 				 * UDP output - dial to the specified host:port and send audio packets.
 				 */
 				var outAddr = audio_out_name[4:] // skip "udp:"
-				var udpOutConn, dialErr = net.Dial("udp", outAddr)
+				var udpOutConn, dialErr = new(net.Dialer).DialContext(context.Background(), "udp", outAddr)
 				if dialErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)

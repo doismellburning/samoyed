@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"context"
 	"io"
 	"net"
 	"os"
@@ -477,13 +478,13 @@ func (c *singleReadConn) Read(b []byte) (int, error) {
 // processed before the loop exits, not silently dropped.
 func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 	// Create a UDP socket pair: src is used by the bridge, dst receives frames.
-	var srcPkt, srcErr = net.ListenPacket("udp", "127.0.0.1:0")
+	var srcPkt, srcErr = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if srcErr != nil {
 		t.Fatal(srcErr)
 	}
 	defer srcPkt.Close()
 
-	var dstPkt, dstErr = net.ListenPacket("udp", "127.0.0.1:0")
+	var dstPkt, dstErr = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if dstErr != nil {
 		t.Fatal(dstErr)
 	}

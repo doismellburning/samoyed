@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -178,7 +179,7 @@ func (b *AXUDPBridge) RunUDPListener() {
 
 // RunKISSServer accepts TCP connections from KISS clients.
 func (b *AXUDPBridge) RunKISSServer(kissPort int) {
-	var ln, listenErr = net.Listen("tcp", fmt.Sprintf(":%d", kissPort))
+	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", kissPort))
 	if listenErr != nil {
 		fmt.Fprintf(os.Stderr, "samoyed-axudp: TCP listen on port %d: %v\n", kissPort, listenErr)
 		os.Exit(1)

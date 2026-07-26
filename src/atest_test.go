@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"os"
@@ -21,7 +22,7 @@ func Test_atest_basic_1(t *testing.T) {
 
 	var f = filepath.Join(tmpdir, "test1.wav")
 
-	var cmd = exec.Command("gen_packets", "-o", f) //nolint:gosec
+	var cmd = exec.CommandContext(context.Background(), "gen_packets", "-o", f) //nolint:gosec
 
 	var err = cmd.Run()
 	if err != nil {

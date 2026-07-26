@@ -58,6 +58,7 @@ package main
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -136,7 +137,7 @@ func agwlib_init(host string, port string, init_func func() error) error {
 
 	var connErr error
 
-	s_tnc_sock, connErr = net.Dial("tcp4", net.JoinHostPort(host, port))
+	s_tnc_sock, connErr = new(net.Dialer).DialContext(context.Background(), "tcp4", net.JoinHostPort(host, port))
 	if connErr != nil {
 		return connErr
 	}
@@ -183,7 +184,7 @@ func tnc_listen_thread() {
 
 			var connErr error
 
-			s_tnc_sock, connErr = net.Dial("tcp4", net.JoinHostPort(s_tnc_host, s_tnc_port))
+			s_tnc_sock, connErr = new(net.Dialer).DialContext(context.Background(), "tcp4", net.JoinHostPort(s_tnc_host, s_tnc_port))
 			if connErr == nil {
 				fmt.Printf("Successfully reattached to network TNC.\n")
 

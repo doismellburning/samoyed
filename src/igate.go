@@ -26,6 +26,7 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -352,7 +353,7 @@ func connect_thread() {
 		 * Connect to IGate server if not currently connected.
 		 */
 		if igate_sock == nil {
-			var conn, connErr = net.Dial("tcp", net.JoinHostPort(server_name, strconv.Itoa(save_igate_config_p.t2_server_port)))
+			var conn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(server_name, strconv.Itoa(save_igate_config_p.t2_server_port)))
 			stats_connects++
 			stats_connect_at = time.Now()
 

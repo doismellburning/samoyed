@@ -9,6 +9,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"net"
 	"os"
 	"strconv"
@@ -123,7 +124,7 @@ func nettnc_attach(channel int, host string, port int) int {
 	nt.port = port
 	s_net_tncs[channel] = nt
 
-	var conn, connErr = net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	var conn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if connErr == nil {
 		nt.setSock(conn)
 	} else {
@@ -178,7 +179,7 @@ func (nt *NetTNC) listenThread(channel int) {
 			// avoid confusion with the AX.25 connect.
 			dw_printf("Attempting to reattach to network TNC...\n")
 
-			var newConn, connErr = net.Dial("tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
+			var newConn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
 			if connErr == nil {
 				nt.setSock(newConn)
 

@@ -5,6 +5,7 @@ package direwolf
 // A failing test may thus be a problem with the test itself rather than any future changes...
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -154,7 +155,7 @@ func receiveUDP(t *testing.T, conn net.PacketConn) string {
 func setupUDPWaypoint(t *testing.T, formats int) (*WaypointSender, net.PacketConn) {
 	t.Helper()
 
-	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	var mc = misc_config_s{ //nolint: exhaustruct
@@ -306,7 +307,7 @@ func TestWaypointSendAisWrongFormat(t *testing.T) {
 
 // TestWaypointDefaultFormats verifies that NewWaypointSender sets defaults when formats==0.
 func TestWaypointDefaultFormats(t *testing.T) {
-	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	var mc = misc_config_s{ //nolint: exhaustruct
@@ -328,7 +329,7 @@ func TestWaypointDefaultFormats(t *testing.T) {
 
 // TestWaypointGarminImpliesNMEAGeneric verifies Garmin format forces NMEA generic.
 func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
-	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	var mc = misc_config_s{ //nolint: exhaustruct
@@ -350,7 +351,7 @@ func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 
 // TestWaypointTermClearsState verifies that Close resets the struct fields.
 func TestWaypointTermClearsState(t *testing.T) {
-	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		listener.Close() //nolint:errcheck
