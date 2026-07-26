@@ -132,7 +132,7 @@ func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
 
 			Assert(r.numSubchannel[ch] >= 1 && r.numSubchannel[ch] <= MAX_SUBCHANS)
 
-			for sub := 0; sub < r.numSubchannel[ch]; sub++ {
+			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
 					r.slicer[ch][sub][slice] = newHDLCState(r, ch, sub, slice, pa.achan[ch].modem_type == MODEM_SCRAMBLE)
 				}
@@ -756,7 +756,7 @@ func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state i
 func (r *HDLCReceiver) DataDetectAny(channel int) int {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	for sc := 0; sc < r.numSubchannel[channel]; sc++ {
+	for sc := range r.numSubchannel[channel] {
 		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
 			return (1)
 		}

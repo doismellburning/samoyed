@@ -724,26 +724,26 @@ func BenchmarkLatitudeConversions(b *testing.B) {
 	lat := 42.3601
 
 	b.Run("to_str", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = latitude_to_str(lat, 0)
 		}
 	})
 
 	b.Run("to_comp_str", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = latitude_to_comp_str(lat)
 		}
 	})
 
 	b.Run("to_nmea", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_, _ = latitude_to_nmea(lat)
 		}
 	})
 
 	b.Run("from_nmea", func(b *testing.B) {
 		str := "4221.6060"
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = latitude_from_nmea(str, 'N')
 		}
 	})
@@ -755,13 +755,13 @@ func BenchmarkDistanceBearing(b *testing.B) {
 	lat2, lon2 := -33.8688, 151.2093
 
 	b.Run("distance", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = ll_distance_km(lat1, lon1, lat2, lon2)
 		}
 	})
 
 	b.Run("bearing", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = ll_bearing_deg(lat1, lon1, lat2, lon2)
 		}
 	})
@@ -770,7 +770,7 @@ func BenchmarkDistanceBearing(b *testing.B) {
 		dist := 1000.0
 
 		bearing := 45.0
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = ll_dest_lat(lat1, lon1, dist, bearing)
 			_ = ll_dest_lon(lat1, lon1, dist, bearing)
 		}

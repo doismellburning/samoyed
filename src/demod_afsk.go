@@ -568,7 +568,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 				D.m_peak, D.m_valley, _ = agc(m_amp, D.agc_fast_attack, D.agc_slow_decay, D.m_peak, D.m_valley)
 				D.s_peak, D.s_valley, _ = agc(s_amp, D.agc_fast_attack, D.agc_slow_decay, D.s_peak, D.s_valley)
 
-				for slice := int(0); slice < D.num_slicers; slice++ {
+				for slice := range D.num_slicers {
 					var demod_out = m_amp - s_amp*afskSpaceGain[slice]
 
 					var amp = 0.5 * (D.m_peak - D.m_valley + (D.s_peak-D.s_valley)*afskSpaceGain[slice])
@@ -639,7 +639,7 @@ func demod_afsk_process_sample(channel int, subchannel int, sam int, D *demodula
 				//
 				// Assuming a 300 Hz shift, this would put slicing thresholds up
 				// to +-75 Hz from the center.
-				for slice := int(0); slice < D.num_slicers; slice++ {
+				for slice := range D.num_slicers {
 					var offset = -0.5 + float64(slice)*(1./float64(D.num_slicers-1))
 					var demod_out = norm_rate + offset
 

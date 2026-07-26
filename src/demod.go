@@ -285,7 +285,7 @@ func demod_init(pa *audio_s) int {
 							channel, save_audio_config_p.achan[channel].num_freq)
 					}
 
-					for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+					for d := range save_audio_config_p.achan[channel].num_subchan {
 						Assert(d >= 0 && d < MAX_SUBCHANS)
 
 						var D = &demodulator_state[channel][d]
@@ -381,7 +381,7 @@ func demod_init(pa *audio_s) int {
 
 					save_audio_config_p.achan[channel].num_subchan = save_audio_config_p.achan[channel].num_freq
 
-					for d := 0; d < save_audio_config_p.achan[channel].num_freq; d++ {
+					for d := range save_audio_config_p.achan[channel].num_freq {
 						Assert(d >= 0 && d < MAX_SUBCHANS)
 
 						var D = &demodulator_state[channel][d]
@@ -477,7 +477,7 @@ func demod_init(pa *audio_s) int {
 
 				dw_printf(".\n")
 
-				for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+				for d := range save_audio_config_p.achan[channel].num_subchan {
 					Assert(d >= 0 && d < MAX_SUBCHANS)
 					var D = &demodulator_state[channel][d]
 					var profile = save_audio_config_p.achan[channel].profiles[d]
@@ -535,7 +535,7 @@ func demod_init(pa *audio_s) int {
 
 				dw_printf(".\n")
 
-				for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+				for d := range save_audio_config_p.achan[channel].num_subchan {
 					Assert(d >= 0 && d < MAX_SUBCHANS)
 					var D = &demodulator_state[channel][d]
 					var profile = save_audio_config_p.achan[channel].profiles[d]
@@ -588,7 +588,7 @@ func demod_init(pa *audio_s) int {
 
 				dw_printf(".\n")
 
-				for d := 0; d < save_audio_config_p.achan[channel].num_subchan; d++ {
+				for d := range save_audio_config_p.achan[channel].num_subchan {
 					Assert(d >= 0 && d < MAX_SUBCHANS)
 					var D = &demodulator_state[channel][d]
 					var profile = save_audio_config_p.achan[channel].profiles[d]

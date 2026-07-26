@@ -88,7 +88,7 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
-	for max_fec := 0; max_fec <= 1; max_fec++ {
+	for max_fec := range 2 {
 		var encoded, enc_len = il2p_encode_frame(pp, max_fec, true)
 		assert.Positive(t, enc_len)
 

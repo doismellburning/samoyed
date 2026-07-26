@@ -595,7 +595,7 @@ o = DCD output control
 
 		e_o_f = false
 		for !e_o_f {
-			for c := 0; c < (my_audio_config.adev[0].num_channels); c++ {
+			for c := range my_audio_config.adev[0].num_channels {
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
 				var audio_sample = demod_get_sample(ACHAN2ADEV(c))

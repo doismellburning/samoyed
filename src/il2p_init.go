@@ -159,7 +159,7 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 		} else if derrors > 0 {
 			dw_printf("%d errors fixed in positions:\n", derrors)
 
-			for j := 0; j < derrors; j++ {
+			for j := range derrors {
 				dw_printf("        %3d  (0x%02x)\n", derrlocs[j], derrlocs[j])
 			}
 

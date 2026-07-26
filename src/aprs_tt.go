@@ -1451,7 +1451,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
 	// debug dw_printf ("findTTLocMatch: e=%s\n", e);
 	var xstr, ystr, zstr, bstr, dstr string
 
-	for ipat := 0; ipat < len(g.config.ttlocs); ipat++ {
+	for ipat := range len(g.config.ttlocs) {
 		var pattern = g.config.ttlocs[ipat].pattern
 		var length = len(pattern) /* Length of pattern we are trying to match. */
 

@@ -122,7 +122,7 @@ func morse_init(audio_config_p *audio_s, amp int) {
 	 */
 	save_audio_config_p = audio_config_p
 
-	for j := range len(SineTable) {
+	for j := range SineTable {
 		var a = (float64(j) / 256.0) * (2 * math.Pi)
 		var s = int(math.Sin(a) * 32767.0 * float64(amp) / 100.0)
 

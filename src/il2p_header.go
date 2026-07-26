@@ -468,7 +468,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 	// Someone overly ambitious might check the addresses found in the first payload block.
 
 	var byteBuf []byte
-	for i := 0; i <= 5; i++ {
+	for i := range 6 {
 		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i]&0x3f)))
 	}
 
@@ -491,7 +491,7 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 	addrs[AX25_DESTINATION] += fmt.Sprintf("-%d", destSSID)
 
 	byteBuf = []byte{}
-	for i := 0; i <= 5; i++ {
+	for i := range 6 {
 		byteBuf = append(byteBuf, byte(sixbit_to_ascii(hdr[i+6]&0x3f)))
 	}
 
