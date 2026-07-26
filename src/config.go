@@ -15,6 +15,7 @@ package direwolf
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -30,6 +31,14 @@ import (
 )
 
 const DEFAULT_GPSD_PORT = 2947 // Taken from gps.h
+
+var (
+	errConfigNoEqualsInLine       = errors.New("config file: no = found in line")
+	errConfigInvalidOptionKeyword = errors.New("config file: invalid option keyword")
+	errConfigSendToChanOutOfRange = errors.New("config file: send-to channel is out of range")
+	errConfigSendToChanNoMedium   = errors.New("config file: send-to channel has no medium configured")
+	errConfigMyCallNotSet         = errors.New("config file: MYCALL must be set for channel before beaconing")
+)
 
 /*
  * All the leftovers.
@@ -5988,7 +5997,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file: No = found in, %s, on line %d.\n", t, line)
 
-			return fmt.Errorf("config file line %d: no = found in %q", line, t)
+			return fmt.Errorf("%w %d: %q", errConfigNoEqualsInLine, line, t)
 		}
 
 		// QUICK TEMP EXPERIMENT, maybe permanent new feature.
@@ -6264,7 +6273,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Invalid option keyword, %s.\n", line, keyword)
 
-			return fmt.Errorf("config file line %d: invalid option keyword %q", line, keyword)
+			return fmt.Errorf("%w %d: %q", errConfigInvalidOptionKeyword, line, keyword)
 		}
 	}
 
@@ -6348,14 +6357,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
 
-			return fmt.Errorf("config file line %d: send-to channel %d is out of range", line, b.sendto_chan)
+			return fmt.Errorf("%w %d: channel %d", errConfigSendToChanOutOfRange, line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
 
-			return fmt.Errorf("config file line %d: send-to channel %d has no medium configured", line, b.sendto_chan)
+			return fmt.Errorf("%w %d: channel %d", errConfigSendToChanNoMedium, line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_IGATE { // Prevent subscript out of bounds.
@@ -6364,14 +6373,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0)
 
-				return fmt.Errorf("config file line %d: MYCALL must be set for channel 0 before beaconing", line)
+				return fmt.Errorf("%w %d: channel 0", errConfigMyCallNotSet, line)
 			}
 		} else {
 			if IsNoCall(p_audio_config.mycall[b.sendto_chan]) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan)
 
-				return fmt.Errorf("config file line %d: MYCALL must be set for channel %d before beaconing", line, b.sendto_chan)
+				return fmt.Errorf("%w %d: channel %d", errConfigMyCallNotSet, line, b.sendto_chan)
 			}
 		}
 	}

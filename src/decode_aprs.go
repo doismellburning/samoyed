@@ -19,6 +19,7 @@ package direwolf
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -27,6 +28,8 @@ import (
 	"time"
 	"unicode"
 )
+
+var errDirectivityIndexOutOfRange = errors.New("directivity index out of range")
 
 type packet_type_e int
 
@@ -3736,7 +3739,7 @@ func get_maidenhead(A *decode_aprs_t, p []byte) int { //nolint:unparam
 func directivityString(d int) (string, error) {
 	var dirs = []string{"omni", "NE", "E", "SE", "S", "SW", "W", "NW", "N"}
 	if d < 0 || d >= len(dirs) {
-		return "", fmt.Errorf("directivity index %d out of range [0,%d]", d, len(dirs)-1)
+		return "", fmt.Errorf("%w: %d not in [0,%d]", errDirectivityIndexOutOfRange, d, len(dirs)-1)
 	}
 	return dirs[d], nil
 }

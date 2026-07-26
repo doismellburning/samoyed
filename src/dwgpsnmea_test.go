@@ -35,7 +35,7 @@ func Test_remove_checksum(t *testing.T) {
 			name:        "missing asterisk",
 			sent:        "$GPRMC,001431.00",
 			wantErr:     true,
-			errContains: "Missing GPS checksum",
+			errContains: "missing GPS checksum",
 			wantResult:  "",
 		},
 		{

@@ -34,6 +34,11 @@ import (
 	"github.com/pkg/term"
 )
 
+var (
+	errGPSMissingChecksum = errors.New("missing GPS checksum")
+	errGPSChecksumError   = errors.New("GPS checksum error")
+)
+
 // TODO KG var s_debug = 0 /* Enable debug output. */
 /* See dwgpsnmea_init description for values. */
 
@@ -303,14 +308,12 @@ func read_gpsnmea_thread(fd *term.Term) {
 func remove_checksum(sent string, quiet bool) (string, error) {
 	var msg, checksumStr, found = strings.Cut(sent, "*")
 	if !found {
-		var errorMsg = "Missing GPS checksum"
-
 		if !quiet {
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("%s.\n", errorMsg)
+			dw_printf("%s.\n", errGPSMissingChecksum)
 		}
 
-		return "", errors.New(errorMsg)
+		return "", errGPSMissingChecksum
 	}
 
 	var calculatedChecksum int64
@@ -321,14 +324,14 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 	var checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
 
 	if calculatedChecksum != checksum {
-		var errorMsg = fmt.Sprintf("GPS checksum error. Expected %02x but found %s", calculatedChecksum, checksumStr)
+		var wrappedErr = fmt.Errorf("%w. Expected %02x but found %s", errGPSChecksumError, calculatedChecksum, checksumStr)
 
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s.\n", errorMsg)
+			dw_printf("%s.\n", wrappedErr)
 		}
 
-		return "", errors.New(errorMsg)
+		return "", wrappedErr
 	}
 
 	return msg, nil

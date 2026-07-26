@@ -16,6 +16,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	errAXUDPMapEntryEmptyAX25Addr  = errors.New("map entry: ax25addr is empty")
+	errAXUDPMapEntryEmptyHost      = errors.New("map entry: host is empty")
+	errAXUDPMapEntryPortOutOfRange = errors.New("map entry: port out of range (1-65535)")
+)
+
 // AXUDPMapEntry holds one MAP line from the config.
 type AXUDPMapEntry struct {
 	AX25Addr string       // AX.25 address, i.e. callsign and optional SSID, e.g. "Q1TEST" or "Q1TEST-1"
@@ -56,13 +62,13 @@ func ParseAXUDPConfig(path string) ([]AXUDPMapEntry, error) {
 		var ax25addr = strings.ToUpper(strings.TrimSpace(m.AX25Addr))
 		ax25addr = strings.TrimSuffix(ax25addr, "-0")
 		if ax25addr == "" {
-			return nil, fmt.Errorf("map entry %d: ax25addr is empty", i)
+			return nil, fmt.Errorf("%w: %d", errAXUDPMapEntryEmptyAX25Addr, i)
 		}
 		if m.Host == "" {
-			return nil, fmt.Errorf("map entry %d: host is empty", i)
+			return nil, fmt.Errorf("%w: %d", errAXUDPMapEntryEmptyHost, i)
 		}
 		if m.Port < 1 || m.Port > 65535 {
-			return nil, fmt.Errorf("map entry %d: port %d out of range (1-65535)", i, m.Port)
+			return nil, fmt.Errorf("%w: %d has port %d", errAXUDPMapEntryPortOutOfRange, i, m.Port)
 		}
 		var addr = net.JoinHostPort(m.Host, strconv.Itoa(m.Port))
 		var udpAddr, resolveErr = net.ResolveUDPAddr("udp", addr)

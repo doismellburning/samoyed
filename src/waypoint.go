@@ -7,6 +7,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/pkg/term"
 )
+
+var errWaypointNoDestinationOpened = errors.New("waypoint output requested but no destination could be opened")
 
 type WaypointSender struct {
 	serialPortFd *term.Term
@@ -111,7 +114,7 @@ func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
 			requested = append(requested, fmt.Sprintf("serial port %s", mc.waypoint_serial_port))
 		}
 
-		return nil, fmt.Errorf("waypoint output requested but no destination could be opened (%s)", strings.Join(requested, ", "))
+		return nil, fmt.Errorf("%w (%s)", errWaypointNoDestinationOpened, strings.Join(requested, ", "))
 	}
 
 	// Set default formats if user did not specify any.
