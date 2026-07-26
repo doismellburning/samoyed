@@ -34,6 +34,7 @@
 ## Concurrency
 
 * For a goroutine that loops on `select { case <-stop: ...; case <-ticker.C: ... }` and reads/writes a resource (socket, buffer) also torn down elsewhere: don't rely on `stop` being closed to prevent the ticker branch from running one more time after teardown starts — `select` picks randomly among ready cases. Instead, have teardown nil the resource under the same mutex the goroutine locks before touching it, and re-check for nil inside that locked section before using it.
+* If a mutex-guarded struct exposes one accessor per field, and a caller ever needs two of those fields together (e.g. a connection and its paired decoder/session state), add a combined accessor that locks once and returns both. Two separately-locked calls can straddle another goroutine's update, handing back a pair that never coexisted under the lock.
 
 ## Licensing
 

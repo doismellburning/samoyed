@@ -254,7 +254,8 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 		if onlykps == nil || kps == onlykps {
 			for client := range MAX_NET_CLIENTS {
 				if onlyclient == -1 || client == onlyclient {
-					if kps.client_sock[client] != nil {
+					var conn = kps.clientConn(client)
+					if conn != nil {
 						var kiss_buff []byte
 
 						if flen < 0 {
@@ -312,12 +313,12 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 							}
 						}
 
-						var _, err = kps.client_sock[client].Write(kiss_buff)
+						var _, err = conn.Write(kiss_buff)
 						if err != nil {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
-							kps.client_sock[client].Close()
-							kps.client_sock[client] = nil
+							conn.Close()
+							kps.detachClientIfCurrent(client, conn)
 						}
 					} // frame length >= 0
 				} // if all clients or the one specifie
@@ -367,7 +368,8 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 			for client := range MAX_NET_CLIENTS {
 				// To all but origin.
 				if !(kps == from_kps && client == from_client) {
-					if kps.client_sock[client] != nil {
+					var conn = kps.clientConn(client)
+					if conn != nil {
 						if kps.channel == -1 || kps.channel == channel {
 							// Two different cases here:
 							//  - The TCP port allows all channels, or
@@ -386,12 +388,12 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 								kiss_debug_print(TO_CLIENT, "", kiss_buff)
 							}
 
-							var _, err = kps.client_sock[client].Write(kiss_buff)
+							var _, err = conn.Write(kiss_buff)
 							if err != nil {
 								text_color_set(DW_COLOR_ERROR)
 								dw_printf("\nError %s copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", err, kps.tcp_port, client)
-								kps.client_sock[client].Close()
-								kps.client_sock[client] = nil
+								conn.Close()
+								kps.detachClientIfCurrent(client, conn)
 							}
 						} // Channel is allowed on this port.
 					} // socket is open
@@ -419,17 +421,18 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 
 /* Return one byte (value 0 - 255) */
 
-func (kns *KissNetService) get(kps *kissport_status_s, client int) byte {
+func (kns *KissNetService) get(kps *kissport_status_s, client int) (byte, *KISSFrame) {
 	for {
-		for kps.client_sock[client] == nil {
+		var conn, frame = kps.connAndFrame(client)
+		for conn == nil {
 			SLEEP_SEC(1) /* Not connected.  Try again later. */
+			conn, frame = kps.connAndFrame(client)
 		}
 
 		/* Just get one byte at a time. */
 
-		var c = kps.client_sock[client]
 		var ch = make([]byte, 1)
-		var n, _ = c.Read(ch)
+		var n, _ = conn.Read(ch)
 
 		if n == 1 {
 			/* TODO KG
@@ -447,14 +450,19 @@ func (kns *KissNetService) get(kps *kissport_status_s, client int) byte {
 				    if (ch == FEND) fflush (log_fp);
 			#endif
 			*/
-			return (ch[0])
+			return ch[0], frame
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
-		c.Close()
+		conn.Close()
 
-		kps.client_sock[client] = nil
+		// Only clear the slot if conn is still the current connection for
+		// this client. If it isn't, connectListenThread has already
+		// accepted a newer connection here (e.g. the client reconnected)
+		// and we must not clobber it out from under that newer connection.
+		if kps.detachClientIfCurrent(client, conn) {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
+		}
 	}
 }
 
@@ -480,8 +488,8 @@ func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
 	// "Simply KISS" as some call it.
 
 	for {
-		var ch = kns.get(kps, client)
-		KissRecByte(kps.kf[client], ch, kns.debug, kps, client, kns.SendRecPacket)
+		var ch, frame = kns.get(kps, client)
+		KissRecByte(frame, ch, kns.debug, kps, client, kns.SendRecPacket)
 	}
 } /* end listenThread */
 
@@ -575,12 +583,7 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 	*/
 
 	for {
-		var client = -1
-		for c := 0; c < MAX_NET_CLIENTS && client < 0; c++ {
-			if kps.client_sock[c] == nil {
-				client = c
-			}
-		}
+		var client = kps.findFreeClient()
 
 		if client >= 0 {
 			text_color_set(DW_COLOR_INFO)
@@ -597,19 +600,17 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 				continue
 			}
 
-			// Reset this client's frame decoder state and buffer before
-			// publishing the connection via client_sock. Previously this
-			// reset (a) happened after client_sock was set, so a fast
-			// sender's bytes could reach listenThread's read loop and
-			// start building a frame in the old *KISSFrame before this
-			// goroutine swapped it out from under it, silently corrupting
-			// the frame, and (b) reset every client's slot rather than
-			// just the one that (re)connected, which could just as easily
-			// clobber a frame already in progress on another attached
-			// client.
-			kps.kf[client] = new(KISSFrame)
-
-			kps.client_sock[client] = conn
+			// Atomically install this client's connection along with a
+			// freshly reset frame decoder state. Previously these were two
+			// separate, unsynchronized steps: client_sock was published
+			// before kf was reset, so a fast sender's bytes could reach
+			// listenThread's read loop and start building a frame in the
+			// old *KISSFrame before this goroutine swapped it out from
+			// under it, silently corrupting the frame. And the reset
+			// touched every client's slot rather than just the one that
+			// (re)connected, which could just as easily clobber a frame
+			// already in progress on another attached client.
+			kps.attachClient(client, conn)
 
 			text_color_set(DW_COLOR_INFO)
 

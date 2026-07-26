@@ -64,6 +64,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 )
 
 const KISS_CMD_DATA_FRAME = 0
@@ -138,10 +139,88 @@ type kissport_status_s struct {
 	channel int // Radio channel for this tcp port.
 	// -1 for all.
 
+	// mu guards client_sock and kf below, which are read and written from
+	// connectListenThread (accepting new connections), listenThread/get
+	// (reading from a connected client and detecting disconnection), and
+	// SendRecPacket/Copy (writing to connected clients). Once those
+	// goroutines are running, always go through the kissport_status_s
+	// methods below rather than touching these fields directly. The one
+	// exception is initOne, which sets them directly during single-threaded
+	// startup, before any goroutine that shares mu exists.
+	mu sync.Mutex
+
 	client_sock [MAX_NET_CLIENTS]net.Conn
 
 	kf [MAX_NET_CLIENTS]*KISSFrame
 	/* Accumulated KISS frame and state of decoder. */
+}
+
+// clientConn returns the currently connected socket for client, or nil if
+// not connected.
+func (kps *kissport_status_s) clientConn(client int) net.Conn {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	return kps.client_sock[client]
+}
+
+// attachClient installs conn as client's socket, along with a freshly reset
+// decoder state, atomically with respect to clientConn/detachClientIfCurrent.
+// This ensures listenThread can never observe a "live" socket for client
+// paired with decoder state left over from a previous connection, or from
+// another client's slot.
+func (kps *kissport_status_s) attachClient(client int, conn net.Conn) {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	kps.kf[client] = new(KISSFrame)
+	kps.client_sock[client] = conn
+}
+
+// detachClientIfCurrent clears client's socket, but only if it still equals
+// conn. This guards against a goroutine which detected an error/EOF on a
+// now-stale conn racing with, and clobbering, a newer connection that
+// connectListenThread has already installed in the same slot. Returns
+// whether it cleared the slot.
+func (kps *kissport_status_s) detachClientIfCurrent(client int, conn net.Conn) bool {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	if kps.client_sock[client] != conn {
+		return false
+	}
+
+	kps.client_sock[client] = nil
+
+	return true
+}
+
+// findFreeClient returns the index of the first client slot with no
+// connected socket, or -1 if all are in use.
+func (kps *kissport_status_s) findFreeClient() int {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	for c := range MAX_NET_CLIENTS {
+		if kps.client_sock[c] == nil {
+			return c
+		}
+	}
+
+	return -1
+}
+
+// connAndFrame returns client's currently connected socket (or nil) together
+// with its decoder state, fetched under a single lock/unlock. Callers that
+// need to pair a connection with its decoder state (e.g. before reading a
+// byte from it) must use this rather than clientConn/frame separately: two
+// independently-locked calls could observe an attachClient in between them,
+// pairing a conn with a *KISSFrame that belongs to a different connection.
+func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *KISSFrame) {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	return kps.client_sock[client], kps.kf[client]
 }
 
 var KISSUTIL = false // Dynamic replacement for the old #define
