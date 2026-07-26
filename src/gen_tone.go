@@ -29,44 +29,149 @@ import (
 
 // TODO KG Also defined in morse.go: const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
-var ticks_per_sample [MAX_RADIO_CHANS]int /* Same for both channels of same soundcard */
-/* because they have same sample rate */
-/* but less confusing to have for each channel. */
-
-var ticks_per_bit [MAX_RADIO_CHANS]int
-var f1_change_per_sample [MAX_RADIO_CHANS]uint
-var f2_change_per_sample [MAX_RADIO_CHANS]uint
-var samples_per_symbol [MAX_RADIO_CHANS]float64
-
-var sine_table [256]int16
-
-/* Accumulators. */
-
-var tone_phase [MAX_RADIO_CHANS]uint // Phase accumulator for tone generation.
-// Upper bits are used as index into sine table.
+var sine_table [256]int16 // Shared by every channel; built once from the single
+// global amplitude percentage passed to gen_tone_init.
 
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)
 const PHASE_SHIFT_45 = (uint(32) << 24)
 
-var bit_len_acc [MAX_RADIO_CHANS]int // To accumulate fractional samples per bit.
+var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
-var lfsr [MAX_RADIO_CHANS]int // Shift register for scrambler.
+// ToneGenerator holds the direct digital synthesis (DDS) state used to
+// generate AFSK/PSK/etc. tones for one radio channel.
+type ToneGenerator struct {
+	channel     int
+	adevIndex   int
+	audioConfig *audio_s
 
-var bit_count [MAX_RADIO_CHANS]int // Counter incremented for each bit transmitted
-// on the channel.   This is only used for QPSK.
-// The LSB determines if we save the bit until
-// next time, or send this one with the previously saved.
-// The LSB+1 position determines if we add an
-// extra 180 degrees to the phase to compensate
-// for having 1.5 carrier cycles per symbol time.
+	ticksPerSample    int /* Same for both channels of same soundcard */
+	ticksPerBit       int /* because they have same sample rate. */
+	f1ChangePerSample uint
+	f2ChangePerSample uint
+	samplesPerSymbol  float64
 
-// For 8PSK, it has a different meaning.  It is the
-// number of bits in 'save_bit' so we can accumulate
-// three for each symbol.
-var save_bit [MAX_RADIO_CHANS]int
+	tonePhase uint // Phase accumulator for tone generation.
+	// Upper bits are used as index into sine table.
 
-var prev_dat [MAX_RADIO_CHANS]int // Previous data bit.  Used for G3RUH style.
+	bitLenAcc int // To accumulate fractional samples per bit.
+
+	lfsr int // Shift register for scrambler.
+
+	bitCount int // Counter incremented for each bit transmitted
+	// on the channel.   This is only used for QPSK.
+	// The LSB determines if we save the bit until
+	// next time, or send this one with the previously saved.
+	// The LSB+1 position determines if we add an
+	// extra 180 degrees to the phase to compensate
+	// for having 1.5 carrier cycles per symbol time.
+
+	// For 8PSK, it has a different meaning.  It is the
+	// number of bits in 'saveBit' so we can accumulate
+	// three for each symbol.
+	saveBit int
+
+	prevDat int // Previous data bit.  Used for G3RUH style.
+}
+
+/*------------------------------------------------------------------
+ *
+ * Name:        NewToneGenerator
+ *
+ * Purpose:     Initialize per-channel state for AFSK tone generation which
+ *		might be used for RTTY or amateur packet radio.
+ *
+ * Inputs:      channel			- Radio channel number.
+ *
+ *		audioConfig		- Pointer to modem parameter structure, modem_s.
+ *
+ *				The fields we care about are:
+ *
+ *					samples_per_sec
+ *					baud
+ *					mark_freq
+ *					space_freq
+ *					samples_per_sec
+ *
+ * Description:	 Calculate various constants for use by the direct digital synthesis
+ * 		audio tone generation, for one channel.
+ *
+ *----------------------------------------------------------------*/
+
+func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
+	var tg = &ToneGenerator{ //nolint:exhaustruct
+		channel:     channel,
+		adevIndex:   ACHAN2ADEV(channel),
+		audioConfig: audioConfig,
+	}
+
+	var a = tg.adevIndex
+
+	tg.ticksPerSample = (int)((TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+
+	// The terminology is all wrong here.  Didn't matter with 1200 and 9600.
+	// The config speed should be bits per second rather than baud.
+	// ticksPerBit should be ticksPerSymbol.
+
+	switch audioConfig.achan[channel].modem_type {
+	case MODEM_BPSK:
+		audioConfig.achan[channel].mark_freq = 1800
+		audioConfig.achan[channel].space_freq = audioConfig.achan[channel].mark_freq // Not Used.
+
+		// 1 bit per symbol, so symbol time equals bit time
+		tg.ticksPerBit = (int)((TICKS_PER_CYCLE / float64(audioConfig.achan[channel].baud)) + 0.5)
+		tg.f1ChangePerSample = (uint)((float64(audioConfig.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+		tg.f2ChangePerSample = tg.f1ChangePerSample // Not used.
+		tg.samplesPerSymbol = float64(audioConfig.adev[a].samples_per_sec) / float64(audioConfig.achan[channel].baud)
+
+		tg.tonePhase = PHASE_SHIFT_45
+
+	case MODEM_QPSK:
+		audioConfig.achan[channel].mark_freq = 1800
+		audioConfig.achan[channel].space_freq = audioConfig.achan[channel].mark_freq // Not Used.
+
+		// symbol time is 1 / (half of bps)
+		tg.ticksPerBit = (int)((TICKS_PER_CYCLE / (float64(audioConfig.achan[channel].baud) * 0.5)) + 0.5)
+		tg.f1ChangePerSample = (uint)((float64(audioConfig.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+		tg.f2ChangePerSample = tg.f1ChangePerSample // Not used.
+		tg.samplesPerSymbol = 2. * float64(audioConfig.adev[a].samples_per_sec) / float64(audioConfig.achan[channel].baud)
+
+		tg.tonePhase = PHASE_SHIFT_45 // Just to mimic first attempt.
+		// ??? Why?  We are only concerned with the difference
+		// from one symbol to the next.
+
+	case MODEM_8PSK:
+		audioConfig.achan[channel].mark_freq = 1800
+		audioConfig.achan[channel].space_freq = audioConfig.achan[channel].mark_freq // Not Used.
+
+		// symbol time is 1 / (third of bps)
+		tg.ticksPerBit = (int)((TICKS_PER_CYCLE / (float64(audioConfig.achan[channel].baud) / 3.)) + 0.5)
+		tg.f1ChangePerSample = (uint)((float64(audioConfig.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+		tg.f2ChangePerSample = tg.f1ChangePerSample // Not used.
+		tg.samplesPerSymbol = 3. * float64(audioConfig.adev[a].samples_per_sec) / float64(audioConfig.achan[channel].baud)
+
+	case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
+		// Tone is half baud.
+		tg.ticksPerBit = (int)((TICKS_PER_CYCLE / float64(audioConfig.achan[channel].baud)) + 0.5)
+		tg.f1ChangePerSample = (uint)((float64(audioConfig.achan[channel].baud) * 0.5 * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+		tg.samplesPerSymbol = float64(audioConfig.adev[a].samples_per_sec) / float64(audioConfig.achan[channel].baud)
+
+	case MODEM_EAS: //  EAS.
+		// TODO: Proper fix would be to use float for baud, mark, space.
+		tg.ticksPerBit = (int)(math.Floor((TICKS_PER_CYCLE / 520.833333333333) + 0.5))
+		tg.samplesPerSymbol = float64(audioConfig.adev[a].samples_per_sec)/520.83333 + 0.5
+		tg.f1ChangePerSample = (uint)((2083.33333333333 * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+		tg.f2ChangePerSample = (uint)((1562.5000000 * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+
+	default: // AFSK
+		tg.ticksPerBit = (int)((TICKS_PER_CYCLE / float64(audioConfig.achan[channel].baud)) + 0.5)
+		tg.samplesPerSymbol = float64(audioConfig.adev[a].samples_per_sec) / float64(audioConfig.achan[channel].baud)
+		tg.f1ChangePerSample = (uint)((float64(audioConfig.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+		tg.f2ChangePerSample = (uint)((float64(audioConfig.achan[channel].space_freq) * TICKS_PER_CYCLE / float64(audioConfig.adev[a].samples_per_sec)) + 0.5)
+	}
+
+	return tg
+}
 
 /*------------------------------------------------------------------
  *
@@ -116,85 +221,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 
 	for channel := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-			var a = ACHAN2ADEV(channel)
-
-			/* TODO KG
-			#if DEBUG
-				text_color_set(DW_COLOR_DEBUG);
-				dw_printf ("gen_tone_init: channel=%d, modem_type=%d, bps=%d, samples_per_sec=%d\n",
-					channel,
-					save_audio_config_p.achan[channel].modem_type,
-					audio_config_p.achan[channel].baud,
-					audio_config_p.adev[a].samples_per_sec);
-			#endif
-			*/
-
-			tone_phase[channel] = 0
-			bit_len_acc[channel] = 0
-			lfsr[channel] = 0
-
-			ticks_per_sample[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-
-			// The terminology is all wrong here.  Didn't matter with 1200 and 9600.
-			// The config speed should be bits per second rather than baud.
-			// ticks_per_bit should be ticks_per_symbol.
-
-			switch save_audio_config_p.achan[channel].modem_type {
-			case MODEM_BPSK:
-				audio_config_p.achan[channel].mark_freq = 1800
-				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
-
-				// 1 bit per symbol, so symbol time equals bit time
-				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
-				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-				f2_change_per_sample[channel] = f1_change_per_sample[channel] // Not used.
-				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
-
-				tone_phase[channel] = PHASE_SHIFT_45
-
-			case MODEM_QPSK:
-				audio_config_p.achan[channel].mark_freq = 1800
-				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
-
-				// symbol time is 1 / (half of bps)
-				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / (float64(audio_config_p.achan[channel].baud) * 0.5)) + 0.5)
-				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-				f2_change_per_sample[channel] = f1_change_per_sample[channel] // Not used.
-				samples_per_symbol[channel] = 2. * float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
-
-				tone_phase[channel] = PHASE_SHIFT_45 // Just to mimic first attempt.
-				// ??? Why?  We are only concerned with the difference
-				// from one symbol to the next.
-
-			case MODEM_8PSK:
-				audio_config_p.achan[channel].mark_freq = 1800
-				audio_config_p.achan[channel].space_freq = audio_config_p.achan[channel].mark_freq // Not Used.
-
-				// symbol time is 1 / (third of bps)
-				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / (float64(audio_config_p.achan[channel].baud) / 3.)) + 0.5)
-				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-				f2_change_per_sample[channel] = f1_change_per_sample[channel] // Not used.
-				samples_per_symbol[channel] = 3. * float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
-
-			case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
-				// Tone is half baud.
-				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
-				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].baud) * 0.5 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
-
-			case MODEM_EAS: //  EAS.
-				// TODO: Proper fix would be to use float for baud, mark, space.
-				ticks_per_bit[channel] = (int)(math.Floor((TICKS_PER_CYCLE / 520.833333333333) + 0.5))
-				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec)/520.83333 + 0.5
-				f1_change_per_sample[channel] = (uint)((2083.33333333333 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-				f2_change_per_sample[channel] = (uint)((1562.5000000 * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-
-			default: // AFSK
-				ticks_per_bit[channel] = (int)((TICKS_PER_CYCLE / float64(audio_config_p.achan[channel].baud)) + 0.5)
-				samples_per_symbol[channel] = float64(audio_config_p.adev[a].samples_per_sec) / float64(audio_config_p.achan[channel].baud)
-				f1_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].mark_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-				f2_change_per_sample[channel] = (uint)((float64(audio_config_p.achan[channel].space_freq) * TICKS_PER_CYCLE / float64(audio_config_p.adev[a].samples_per_sec)) + 0.5)
-			}
+			toneGenerators[channel] = NewToneGenerator(channel, audio_config_p)
 		}
 	}
 
@@ -314,41 +341,43 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 */
 
 func tone_gen_put_bit_real(channel int, dat int) {
-	var a = ACHAN2ADEV(channel) /* device for channel. */
-
-	Assert(save_audio_config_p != nil)
-
-	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
+	if toneGenerators[channel] == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid channel %d for tone generation.\n", channel)
 
 		return
 	}
 
+	toneGenerators[channel].PutBit(dat)
+} /* end tone_gen_put_bit */
+
+func (tg *ToneGenerator) PutBit(dat int) {
+	var audioConfig = tg.audioConfig
+
 	if dat < 0 {
 		/* Hack to test receive PLL recovery. */
-		bit_len_acc[channel] -= ticks_per_bit[channel]
+		tg.bitLenAcc -= tg.ticksPerBit
 		dat = 0
 	}
 
 	// TODO: change to switch instead of if if if
 
-	if save_audio_config_p.achan[channel].modem_type == MODEM_BPSK {
+	if audioConfig.achan[tg.channel].modem_type == MODEM_BPSK {
 		dat &= 1 // Keep only LSB to be extra safe.
 
 		// For BPSK, each bit is one symbol.
 		// Bit 1 shifts phase by 180 degrees; bit 0 leaves phase unchanged.
 		if dat == 1 {
-			tone_phase[channel] += PHASE_SHIFT_180
+			tg.tonePhase += PHASE_SHIFT_180
 		}
 	}
 
-	if save_audio_config_p.achan[channel].modem_type == MODEM_QPSK {
+	if audioConfig.achan[tg.channel].modem_type == MODEM_QPSK {
 		dat &= 1 // Keep only LSB to be extra safe.
 
-		if (bit_count[channel] & 1) == 0 {
-			save_bit[channel] = dat
-			bit_count[channel]++
+		if (tg.bitCount & 1) == 0 {
+			tg.saveBit = dat
+			tg.bitCount++
 
 			return
 		}
@@ -358,7 +387,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 		// For V.26B, add another 45 degrees.
 		// This seems to work a little better.
 
-		var dibit = (save_bit[channel] << 1) | dat
+		var dibit = (tg.saveBit << 1) | dat
 
 		var symbol = gray2phase_v26[dibit] // 0 .. 3 for QPSK.
 		/*
@@ -374,20 +403,20 @@ func tone_gen_put_bit_real(channel int, dat int) {
 				  xmit_octant[channel] &= 0x7;
 			#else
 		*/
-		tone_phase[channel] += symbol * PHASE_SHIFT_90
-		if save_audio_config_p.achan[channel].v26_alternative == V26_B {
-			tone_phase[channel] += PHASE_SHIFT_45
+		tg.tonePhase += symbol * PHASE_SHIFT_90
+		if audioConfig.achan[tg.channel].v26_alternative == V26_B {
+			tg.tonePhase += PHASE_SHIFT_45
 		}
 		//#endif
-		bit_count[channel]++
+		tg.bitCount++
 	}
 
-	if save_audio_config_p.achan[channel].modem_type == MODEM_8PSK {
+	if audioConfig.achan[tg.channel].modem_type == MODEM_8PSK {
 		dat &= 1 // Keep only LSB to be extra safe.
 
-		if bit_count[channel] < 2 {
-			save_bit[channel] = (save_bit[channel] << 1) | dat
-			bit_count[channel]++
+		if tg.bitCount < 2 {
+			tg.saveBit = (tg.saveBit << 1) | dat
+			tg.bitCount++
 
 			return
 		}
@@ -395,21 +424,21 @@ func tone_gen_put_bit_real(channel int, dat int) {
 		// The bit pattern 001 should give us steady 1800 Hz.
 		// All one bits should flip phase by 180 degrees each time.
 
-		var tribit = (save_bit[channel] << 1) | dat
+		var tribit = (tg.saveBit << 1) | dat
 
 		var symbol = gray2phase_v27[tribit]
-		tone_phase[channel] += symbol * PHASE_SHIFT_45
+		tg.tonePhase += symbol * PHASE_SHIFT_45
 
-		save_bit[channel] = 0
-		bit_count[channel] = 0
+		tg.saveBit = 0
+		tg.bitCount = 0
 	}
 
 	// Would be logical to have MODEM_BASEBAND for IL2P rather than checking here.  But...
 	// That would mean putting in at least 3 places and testing all rather than just one.
-	if save_audio_config_p.achan[channel].modem_type == MODEM_SCRAMBLE &&
-		save_audio_config_p.achan[channel].layer2_xmit != LAYER2_IL2P {
-		var x = (dat ^ (lfsr[channel] >> 16) ^ (lfsr[channel] >> 11)) & 1
-		lfsr[channel] = (lfsr[channel] << 1) | (x & 1)
+	if audioConfig.achan[tg.channel].modem_type == MODEM_SCRAMBLE &&
+		audioConfig.achan[tg.channel].layer2_xmit != LAYER2_IL2P {
+		var x = (dat ^ (tg.lfsr >> 16) ^ (tg.lfsr >> 11)) & 1
+		tg.lfsr = (tg.lfsr << 1) | (x & 1)
 		dat = x
 	}
 	/*
@@ -420,7 +449,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	for { /* until enough audio samples for this symbol. */
 		var sam int
 
-		switch save_audio_config_p.achan[channel].modem_type {
+		switch audioConfig.achan[tg.channel].modem_type {
 		case MODEM_AFSK:
 			/* TODO KG
 			#if DEBUG2
@@ -434,29 +463,29 @@ func tone_gen_put_bit_real(channel int, dat int) {
 			// It never really mattered before because we were using NRZI.
 			// With the addition of IL2P, we need to be more careful.
 			// A data '1' should be the mark tone.
-			var change = f2_change_per_sample[channel]
+			var change = tg.f2ChangePerSample
 			if dat > 0 {
-				change = f1_change_per_sample[channel]
+				change = tg.f1ChangePerSample
 			}
 
-			tone_phase[channel] += change
-			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			tg.tonePhase += change
+			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			tg.PutSample(sam)
 
 		case MODEM_EAS:
-			var change = f2_change_per_sample[channel]
+			var change = tg.f2ChangePerSample
 			if dat > 0 {
-				change = f1_change_per_sample[channel]
+				change = tg.f1ChangePerSample
 			}
 
-			tone_phase[channel] += change
-			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			tg.tonePhase += change
+			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			tg.PutSample(sam)
 
 		case MODEM_BPSK:
-			tone_phase[channel] += f1_change_per_sample[channel]
-			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			tg.tonePhase += tg.f1ChangePerSample
+			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			tg.PutSample(sam)
 
 		case MODEM_QPSK:
 			/* TODO KG
@@ -465,7 +494,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 				      dw_printf ("tone_gen_put_bit %d PSK\n", __LINE__);
 			#endif
 			*/
-			tone_phase[channel] += f1_change_per_sample[channel]
+			tg.tonePhase += tg.f1ChangePerSample
 			/*
 				#if PSKIQ
 				#if 1  // blend JWL
@@ -500,8 +529,8 @@ func tone_gen_put_bit_real(channel int, dat int) {
 				#endif
 				#else
 			*/
-			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			tg.PutSample(sam)
 
 		case MODEM_8PSK:
 			/* TODO KG
@@ -510,54 +539,68 @@ func tone_gen_put_bit_real(channel int, dat int) {
 				      dw_printf ("tone_gen_put_bit %d PSK\n", __LINE__);
 			#endif
 			*/
-			tone_phase[channel] += f1_change_per_sample[channel]
-			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			tg.tonePhase += tg.f1ChangePerSample
+			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			tg.PutSample(sam)
 
 		case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
-			if dat != prev_dat[channel] {
-				tone_phase[channel] += f1_change_per_sample[channel]
+			if dat != tg.prevDat {
+				tg.tonePhase += tg.f1ChangePerSample
 			} else {
-				if tone_phase[channel]&0x80000000 > 0 {
-					tone_phase[channel] = 0xc0000000 // 270 degrees.
+				if tg.tonePhase&0x80000000 > 0 {
+					tg.tonePhase = 0xc0000000 // 270 degrees.
 				} else {
-					tone_phase[channel] = 0x40000000 // 90 degrees.
+					tg.tonePhase = 0x40000000 // 90 degrees.
 				}
 			}
 
-			sam = int(sine_table[(tone_phase[channel]>>24)&0xff])
-			gen_tone_put_sample(channel, a, sam)
+			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			tg.PutSample(sam)
 
 		default:
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("INTERNAL ERROR: achan[%d].modem_type = %d\n",
-				channel, save_audio_config_p.achan[channel].modem_type)
+				tg.channel, audioConfig.achan[tg.channel].modem_type)
 			os.Exit(1)
 		}
 
 		/* Enough for the bit time? */
 
-		bit_len_acc[channel] += ticks_per_sample[channel]
+		tg.bitLenAcc += tg.ticksPerSample
 
-		if bit_len_acc[channel] >= ticks_per_bit[channel] {
+		if tg.bitLenAcc >= tg.ticksPerBit {
 			break
 		}
 	}
 
-	bit_len_acc[channel] -= ticks_per_bit[channel]
+	tg.bitLenAcc -= tg.ticksPerBit
 
-	prev_dat[channel] = dat // Only needed for G3RUH baseband/scrambled.
-} /* end tone_gen_put_bit */
+	tg.prevDat = dat // Only needed for G3RUH baseband/scrambled.
+}
 
-func gen_tone_put_sample(channel int, a int, sam int) {
+func gen_tone_put_sample(channel int, a int, sam int) { //nolint:unparam
+	if toneGenerators[channel] == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Invalid channel %d for tone generation.\n", channel)
+
+		return
+	}
+
+	toneGenerators[channel].PutSample(sam)
+}
+
+func (tg *ToneGenerator) PutSample(sam int) {
 	/* Ship out an audio sample. */
 	/* 16 bit is signed, little endian, range -32768 .. +32767 */
 	/* 8 bit is unsigned, range 0 .. 255 */
-	Assert(save_audio_config_p != nil)
+	var audioConfig = tg.audioConfig
+	var a = tg.adevIndex
 
-	Assert(save_audio_config_p.adev[a].num_channels == 1 || save_audio_config_p.adev[a].num_channels == 2)
+	Assert(audioConfig != nil)
 
-	Assert(save_audio_config_p.adev[a].bits_per_sample == 16 || save_audio_config_p.adev[a].bits_per_sample == 8)
+	Assert(audioConfig.adev[a].num_channels == 1 || audioConfig.adev[a].num_channels == 2)
+
+	Assert(audioConfig.adev[a].bits_per_sample == 16 || audioConfig.adev[a].bits_per_sample == 8)
 
 	// Bad news if we are clipping and distorting the signal.
 	// We are using the full range.
@@ -574,18 +617,18 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 		sam = 32767
 	}
 
-	if save_audio_config_p.adev[a].num_channels == 1 {
+	if audioConfig.adev[a].num_channels == 1 {
 		/* Mono */
-		if save_audio_config_p.adev[a].bits_per_sample == 8 {
+		if audioConfig.adev[a].bits_per_sample == 8 {
 			audio_put(a, uint8(((sam+32768)>>8)&0xff))
 		} else {
 			audio_put(a, uint8(sam&0xff))
 			audio_put(a, uint8((sam>>8)&0xff))
 		}
 	} else {
-		if channel == ADEVFIRSTCHAN(a) {
+		if tg.channel == ADEVFIRSTCHAN(a) {
 			/* Stereo, left channel. */
-			if save_audio_config_p.adev[a].bits_per_sample == 8 {
+			if audioConfig.adev[a].bits_per_sample == 8 {
 				audio_put(a, uint8(((sam+32768)>>8)&0xff))
 				audio_put(a, 0)
 			} else {
@@ -597,7 +640,7 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 			}
 		} else {
 			/* Stereo, right channel. */
-			if save_audio_config_p.adev[a].bits_per_sample == 8 {
+			if audioConfig.adev[a].bits_per_sample == 8 {
 				audio_put(a, 0)
 				audio_put(a, uint8(((sam+32768)>>8)&0xff))
 			} else {
@@ -612,17 +655,25 @@ func gen_tone_put_sample(channel int, a int, sam int) {
 }
 
 func gen_tone_put_quiet_ms(channel int, time_ms int) {
-	var a = ACHAN2ADEV(channel) /* device for channel. */
-	var sam = 0
+	if toneGenerators[channel] == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Invalid channel %d for tone generation.\n", channel)
 
-	var nsamples = int((float64(time_ms) * float64(save_audio_config_p.adev[a].samples_per_sec) / 1000.) + 0.5)
+		return
+	}
+
+	toneGenerators[channel].PutQuietMs(time_ms)
+}
+
+func (tg *ToneGenerator) PutQuietMs(timeMs int) {
+	var nsamples = int((float64(timeMs) * float64(tg.audioConfig.adev[tg.adevIndex].samples_per_sec) / 1000.) + 0.5)
 
 	for range nsamples {
-		gen_tone_put_sample(channel, a, sam)
+		tg.PutSample(0)
 	}
 
 	// Avoid abrupt change when it starts up again.
-	tone_phase[channel] = 0
+	tg.tonePhase = 0
 }
 
 /*-------------------------------------------------------------------
