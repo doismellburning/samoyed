@@ -8,7 +8,7 @@ import (
 )
 
 // TODO Break down log2gpx into something easier to test...!
-// TODO Use a much less brittle test than "compare with exact Dire Wolf output"
+// TODO Use a much less brittle test than "compare with exact Dire Wolf output".
 func Test_log2gpx(t *testing.T) {
 	// Save original stdin/stdout
 	var oldStdin = os.Stdin

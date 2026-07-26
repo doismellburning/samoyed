@@ -30,7 +30,7 @@ import (
  * These are set by init function.
  */
 
-// TODO KG var save_igate_config_p *igate_config_s
+// TODO KG var save_igate_config_p *igate_config_s.
 var pfilter_debug = 0
 var pftest_running = false
 

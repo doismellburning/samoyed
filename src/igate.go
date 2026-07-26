@@ -133,10 +133,10 @@ var ok_to_send = false
  * we need to reestablish the connection later.
  */
 
-// TODO KG static struct audio_s		*save_audio_config_p;
+// TODO KG static struct audio_s		*save_audio_config_p;.
 var save_igate_config_p *igate_config_s
 
-// TODO KG static struct digi_config_s 	*save_digi_config_p;
+// TODO KG static struct digi_config_s 	*save_digi_config_p;.
 var s_debug int
 
 /*

@@ -10,7 +10,6 @@ linters:
     - "funlen"  # We have inherited lots of long lines
     - "gocyclo"  # One day
     - "godoclint"  # There's lots to be done with documentation formatting, but not right now
-    - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
     - "intrange" # Another thing that I like in theory, but am not prioritising right now
     - "lll"  # We have inherited lots of long lines

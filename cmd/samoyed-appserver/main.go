@@ -372,7 +372,7 @@ func (s *session) pollTimingTest() {
  *
  *--------------------------------------------------------------------*/
 
-// old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data)
+// old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data).
 func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign, incoming bool, data []byte) { //nolint:unparam
 	srv.getOrCreateSession(channel, call_from)
 
@@ -631,7 +631,7 @@ func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, c
 	s.txQueueLen = frame_count
 } /* end agw_cb_Y_outstanding_frames_for_station */
 
-// strings.Cut for []bytes
+// strings.Cut for []bytes.
 func BytesCut(s []byte, b byte) ([]byte, []byte, bool) { //nolint:unparam
 	var i = bytes.Index(s, []byte{b})
 

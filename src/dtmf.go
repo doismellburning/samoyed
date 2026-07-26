@@ -363,7 +363,7 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
  *
  *----------------------------------------------------------------*/
 
-// test_mode
+// test_mode.
 var push_button_result string
 
 func push_button_raw(channel int, button rune, ms int, test_mode bool) {

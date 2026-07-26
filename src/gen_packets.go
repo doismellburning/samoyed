@@ -89,7 +89,7 @@ var g_noise_level float64 = 0
 
 var genPacketsOutFile *os.File
 
-// Created in audio_file_open, used for audio_put_fake, flushed in audio_file_close
+// Created in audio_file_open, used for audio_put_fake, flushed in audio_file_close.
 var genPacketsOutBuf *bufio.Writer
 
 var byte_count int /* Number of data bytes written to file. Will be written to header when file is closed. */
@@ -99,7 +99,7 @@ var gen_header wav_header
 var genPacketsRandSeed int32 = 1
 
 // Although the tests in `test-scripts` all call `atest` with an acceptable *range* of packets, the only way I could get them all to pass was by reimplementing this exact PRNG from Dire Wolf's gen_packets.c - all my attempts to use Go's `math/rand` resulted in decodes that would fall outside of the acceptable range. It's far from impossible that I somehow screwed up my use of `math/rand`, but I think it more likely that the tests depend on this exact PRNG implementation, which I should address at some point. /KG
-// Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG
+// Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG.
 func genPacketsRand() int32 {
 	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & MY_RAND_MAX)
 	return genPacketsRandSeed

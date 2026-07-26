@@ -326,7 +326,7 @@ var ax25_new_count = 0
 var ax25_delete_count = 0
 var last_seq_num int = 0
 
-// DECODE_APRS_UTIL is a runtime replacement for DECAMAIN define
+// DECODE_APRS_UTIL is a runtime replacement for DECAMAIN define.
 var DECODE_APRS_UTIL = false
 
 func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {

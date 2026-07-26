@@ -9,7 +9,7 @@ const FX25_MAX_DATA = 239   // i.e. RS(255,239)
 const FX25_MAX_CHECK = 64   // e.g. RS(255, 191)
 const FX25_BLOCK_SIZE = 255 // Block size always 255 for 8 bit symbols.
 
-/* Reed-Solomon codec control block */
+/* Reed-Solomon codec control block. */
 type rs_t struct {
 	mm       uint   /* Bits per symbol */
 	nn       uint   /* Symbols per block (= (1<<mm)-1) */

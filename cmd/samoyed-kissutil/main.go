@@ -591,7 +591,7 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 	}
 } /* end kiss_process_msg */
 
-// Used as both CLI help message and in-usage error reminder
+// Used as both CLI help message and in-usage error reminder.
 func usage2() {
 	fmt.Printf("\n")
 	fmt.Printf("Input, starting with upper case letter or digit, is assumed\n")
@@ -638,7 +638,7 @@ func usage2() {
  *		so it's probably not worth the effort to add another
  *		option.
  *
- *---------------------------------------------------------------*/
+ *---------------------------------------------------------------.*/
 func timestamp_filename() string {
 	var t = time.Now()
 

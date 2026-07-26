@@ -13,7 +13,7 @@ import (
 )
 
 // Convenience function for turning example packets from the spec PDF into Go byte arrays to work with
-// Example input: "26 57 4D 57 F1 D2 A8 F0 6A F2 7B AD 23 BD C0 7F 00 1D 2B"
+// Example input: "26 57 4D 57 F1 D2 A8 F0 6A F2 7B AD 23 BD C0 7F 00 1D 2B".
 func il2pDataStringToBytes(s string) []byte {
 	var data, err = hex.DecodeString(strings.ReplaceAll(s, " ", ""))
 	if err != nil {

@@ -130,7 +130,7 @@ func Test_AX25_Link(t *testing.T) {
 	TestAX25LinkFrameCountStats(t)
 }
 
-// Helper to set up a fresh test environment
+// Helper to set up a fresh test environment.
 func setupTestEnv(t *testing.T) {
 	t.Helper()
 
@@ -153,7 +153,7 @@ func setupTestEnv(t *testing.T) {
 	reg_callsign_list = nil // Clear registered callsigns
 }
 
-// Helper to set up environment with v2.2 support enabled
+// Helper to set up environment with v2.2 support enabled.
 func setupTestEnvV22(t *testing.T) {
 	t.Helper()
 
@@ -176,7 +176,7 @@ func setupTestEnvV22(t *testing.T) {
 	reg_callsign_list = nil // Clear registered callsigns
 }
 
-// Helper to initiate a connect request
+// Helper to initiate a connect request.
 func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
 	t.Helper()
 
@@ -190,7 +190,7 @@ func initiateConnect(t *testing.T, myCall, theirCall string, channel int) {
 	dl_connect_request(E)
 }
 
-// Helper to simulate receiving a frame
+// Helper to simulate receiving a frame.
 func receiveFrame(t *testing.T, pp *packet_t, channel int) {
 	t.Helper()
 
@@ -201,7 +201,7 @@ func receiveFrame(t *testing.T, pp *packet_t, channel int) {
 	lm_data_indication(E)
 }
 
-// Helper to establish a connection (SABM/UA exchange)
+// Helper to establish a connection (SABM/UA exchange).
 func establishConnection(t *testing.T, myCall, theirCall string, channel int) *ax25_dlsm_t { //nolint:unparam
 	t.Helper()
 
@@ -227,7 +227,7 @@ func establishConnection(t *testing.T, myCall, theirCall string, channel int) *a
 // ============================================================================
 
 // SABM/UA Exchange (Modulo 8)
-// Pokes at some of the state machine API in the style of recv_process from recv.go
+// Pokes at some of the state machine API in the style of recv_process from recv.go.
 func TestAX25LinkConnectedBasic(t *testing.T) {
 	t.Helper()
 
@@ -275,7 +275,7 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	assert.Equal(t, ax25_modulo_t(8), list_head.modulo, "Should be modulo 8")
 }
 
-// SABME/UA Exchange (Modulo 128)
+// SABME/UA Exchange (Modulo 128).
 func TestAX25LinkSABMEConnection(t *testing.T) {
 	t.Helper()
 
@@ -306,7 +306,7 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 	assert.Equal(t, ax25_modulo_t(128), list_head.modulo, "Should be modulo 128 for v2.2")
 }
 
-// Connection Rejected with DM
+// Connection Rejected with DM.
 func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 	t.Helper()
 
@@ -332,7 +332,7 @@ func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 	assert.Equal(t, state_0_disconnected, list_head.state, "Should be disconnected after DM")
 }
 
-// Normal DISC/UA Exchange
+// Normal DISC/UA Exchange.
 func TestAX25LinkDISCDisconnection(t *testing.T) {
 	t.Helper()
 
@@ -372,7 +372,7 @@ func TestAX25LinkDISCDisconnection(t *testing.T) {
 	assert.Equal(t, state_0_disconnected, S.state)
 }
 
-// DISC in Disconnected State
+// DISC in Disconnected State.
 func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 	t.Helper()
 
@@ -408,7 +408,7 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 // Information Transfer Tests
 // ============================================================================
 
-// I-Frame Reception
+// I-Frame Reception.
 func TestAX25LinkIFrameExchange(t *testing.T) {
 	t.Helper()
 
@@ -435,7 +435,7 @@ func TestAX25LinkIFrameExchange(t *testing.T) {
 	assert.True(t, S.acknowledge_pending, "Acknowledge should be pending")
 }
 
-// RR Acknowledgement
+// RR Acknowledgement.
 func TestAX25LinkRRResponse(t *testing.T) {
 	t.Helper()
 
@@ -460,7 +460,7 @@ func TestAX25LinkRRResponse(t *testing.T) {
 	assert.Equal(t, state_3_connected, S.state)
 }
 
-// RNR Flow Control
+// RNR Flow Control.
 func TestAX25LinkRNRFlowControl(t *testing.T) {
 	t.Helper()
 
@@ -497,7 +497,7 @@ func TestAX25LinkRNRFlowControl(t *testing.T) {
 // ============================================================================
 
 // REJ Reception handling
-// Note: Full retransmission testing requires having sent I-frames first
+// Note: Full retransmission testing requires having sent I-frames first.
 func TestAX25LinkREJErrorRecovery(t *testing.T) {
 	t.Helper()
 
@@ -527,7 +527,7 @@ func TestAX25LinkREJErrorRecovery(t *testing.T) {
 // State Machine Transition Tests
 // ============================================================================
 
-// SABM Reception in Disconnected (incoming connection)
+// SABM Reception in Disconnected (incoming connection).
 func TestAX25LinkIncomingSABM(t *testing.T) {
 	t.Helper()
 
@@ -566,7 +566,7 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	}
 }
 
-// State variable management
+// State variable management.
 func TestAX25LinkStateVariables(t *testing.T) {
 	t.Helper()
 
@@ -618,7 +618,7 @@ func TestAX25LinkStateVariables(t *testing.T) {
 // Additional Information Transfer Tests
 // ============================================================================
 
-// Multiple sequential I-frame reception with V(R) tracking
+// Multiple sequential I-frame reception with V(R) tracking.
 func TestAX25LinkMultipleIFrames(t *testing.T) {
 	t.Helper()
 
@@ -648,7 +648,7 @@ func TestAX25LinkMultipleIFrames(t *testing.T) {
 	assert.True(t, S.acknowledge_pending, "Acknowledge should be pending")
 }
 
-// Out-of-sequence I-frame sets reject_exception flag
+// Out-of-sequence I-frame sets reject_exception flag.
 func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 	t.Helper()
 
@@ -679,7 +679,7 @@ func TestAX25LinkOutOfSequenceIFrame(t *testing.T) {
 	assert.True(t, S.reject_exception, "Reject exception should be set")
 }
 
-// I-frame with piggybacked acknowledgement updates V(A)
+// I-frame with piggybacked acknowledgement updates V(A).
 func TestAX25LinkIFrameWithAck(t *testing.T) {
 	t.Helper()
 
@@ -710,7 +710,7 @@ func TestAX25LinkIFrameWithAck(t *testing.T) {
 // Additional State Machine Tests
 // ============================================================================
 
-// DISC reception while connected causes transition to disconnected
+// DISC reception while connected causes transition to disconnected.
 func TestAX25LinkDISCWhileConnected(t *testing.T) {
 	t.Helper()
 
@@ -734,7 +734,7 @@ func TestAX25LinkDISCWhileConnected(t *testing.T) {
 	assert.Equal(t, state_0_disconnected, S.state)
 }
 
-// SABM while connected causes link reset
+// SABM while connected causes link reset.
 func TestAX25LinkSABMWhileConnected(t *testing.T) {
 	t.Helper()
 
@@ -765,7 +765,7 @@ func TestAX25LinkSABMWhileConnected(t *testing.T) {
 	assert.Equal(t, 0, S.va, "V(A) should be reset to 0")
 }
 
-// DM response also terminates awaiting release state
+// DM response also terminates awaiting release state.
 func TestAX25LinkDMAfterDISC(t *testing.T) {
 	t.Helper()
 
@@ -799,7 +799,7 @@ func TestAX25LinkDMAfterDISC(t *testing.T) {
 	assert.Equal(t, state_0_disconnected, S.state)
 }
 
-// SABM collision - receive SABM while in awaiting connection state
+// SABM collision - receive SABM while in awaiting connection state.
 func TestAX25LinkSABMCollision(t *testing.T) {
 	t.Helper()
 
@@ -836,7 +836,7 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	assert.Equal(t, state_3_connected, list_head.state)
 }
 
-// Timer recovery state entry on receiving poll
+// Timer recovery state entry on receiving poll.
 func TestAX25LinkTimerRecoveryState(t *testing.T) {
 	t.Helper()
 
@@ -867,7 +867,7 @@ func TestAX25LinkTimerRecoveryState(t *testing.T) {
 // SREJ Tests (Selective Reject)
 // ============================================================================
 
-// SREJ frame handling
+// SREJ frame handling.
 func TestAX25LinkSREJFrame(t *testing.T) {
 	t.Helper()
 
@@ -907,7 +907,7 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 // Window Size Tests
 // ============================================================================
 
-// Window size check function
+// Window size check function.
 func TestAX25LinkWindowSize(t *testing.T) {
 	t.Helper()
 
@@ -944,7 +944,7 @@ func TestAX25LinkWindowSize(t *testing.T) {
 	assert.False(t, WITHIN_WINDOW_SIZE(S), "At window limit with wrap")
 }
 
-// Modulo 128 window size
+// Modulo 128 window size.
 func TestAX25LinkWindowSizeMod128(t *testing.T) {
 	t.Helper()
 
@@ -984,7 +984,7 @@ func TestAX25LinkWindowSizeMod128(t *testing.T) {
 // FRMR Handling Tests
 // ============================================================================
 
-// FRMR reception causes fallback to v2.0
+// FRMR reception causes fallback to v2.0.
 func TestAX25LinkFRMRResponse(t *testing.T) {
 	t.Helper()
 
@@ -1019,7 +1019,7 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 // P/F Bit Tests
 // ============================================================================
 
-// Poll bit in I-frame requires response with F bit
+// Poll bit in I-frame requires response with F bit.
 func TestAX25LinkPollResponse(t *testing.T) {
 	t.Helper()
 
@@ -1045,7 +1045,7 @@ func TestAX25LinkPollResponse(t *testing.T) {
 	assert.Equal(t, state_3_connected, S.state)
 }
 
-// RR command with P=1 should get response
+// RR command with P=1 should get response.
 func TestAX25LinkRRPoll(t *testing.T) {
 	t.Helper()
 
@@ -1073,7 +1073,7 @@ func TestAX25LinkRRPoll(t *testing.T) {
 // is_good_nr Tests
 // ============================================================================
 
-// Test N(R) validation function
+// Test N(R) validation function.
 func TestAX25LinkIsGoodNR(t *testing.T) {
 	t.Helper()
 
@@ -1121,7 +1121,7 @@ func TestAX25LinkIsGoodNR(t *testing.T) {
 // Timer Tests
 // ============================================================================
 
-// T1 timer start/stop
+// T1 timer start/stop.
 func TestAX25LinkT1Timer(t *testing.T) {
 	t.Helper()
 
@@ -1145,7 +1145,7 @@ func TestAX25LinkT1Timer(t *testing.T) {
 	assert.False(t, IS_T1_RUNNING(S), "T1 should not be running after STOP_T1")
 }
 
-// T3 timer start/stop
+// T3 timer start/stop.
 func TestAX25LinkT3Timer(t *testing.T) {
 	t.Helper()
 
@@ -1166,7 +1166,7 @@ func TestAX25LinkT3Timer(t *testing.T) {
 	assert.True(t, S.t3_exp.IsZero(), "T3 should not be running after STOP_T3")
 }
 
-// T1 pause/resume for channel busy
+// T1 pause/resume for channel busy.
 func TestAX25LinkT1PauseResume(t *testing.T) {
 	t.Helper()
 
@@ -1191,7 +1191,7 @@ func TestAX25LinkT1PauseResume(t *testing.T) {
 	assert.True(t, IS_T1_RUNNING(S), "T1 should still be running")
 }
 
-// Timer expiry functions can be called directly
+// Timer expiry functions can be called directly.
 func TestAX25LinkT1Expiry(t *testing.T) {
 	t.Helper()
 
@@ -1213,7 +1213,7 @@ func TestAX25LinkT1Expiry(t *testing.T) {
 	assert.Equal(t, 1, S.rc, "RC should increment on T1 expiry")
 }
 
-// T3 expiry triggers poll
+// T3 expiry triggers poll.
 func TestAX25LinkT3Expiry(t *testing.T) {
 	t.Helper()
 
@@ -1236,7 +1236,7 @@ func TestAX25LinkT3Expiry(t *testing.T) {
 // Collision Tests
 // ============================================================================
 
-// SABM/DISC collision
+// SABM/DISC collision.
 func TestAX25LinkSABMDISCCollision(t *testing.T) {
 	t.Helper()
 
@@ -1263,7 +1263,7 @@ func TestAX25LinkSABMDISCCollision(t *testing.T) {
 	assert.Equal(t, state_1_awaiting_connection, list_head.state)
 }
 
-// Unexpected UA in connected state triggers link reset
+// Unexpected UA in connected state triggers link reset.
 func TestAX25LinkUnexpectedUA(t *testing.T) {
 	t.Helper()
 
@@ -1295,7 +1295,7 @@ func TestAX25LinkUnexpectedUA(t *testing.T) {
 // XID Parameter Negotiation Tests
 // ============================================================================
 
-// XID frame parsing
+// XID frame parsing.
 func TestAX25LinkXIDParse(t *testing.T) {
 	t.Helper()
 
@@ -1310,7 +1310,7 @@ func TestAX25LinkXIDParse(t *testing.T) {
 	assert.Equal(t, 1, status, "Minimal XID should parse successfully")
 }
 
-// XID frame encoding
+// XID frame encoding.
 func TestAX25LinkXIDEncode(t *testing.T) {
 	t.Helper()
 
@@ -1333,7 +1333,7 @@ func TestAX25LinkXIDEncode(t *testing.T) {
 	assert.Equal(t, byte(GI_Group_Identifier), info[1])
 }
 
-// XID roundtrip (encode then parse)
+// XID roundtrip (encode then parse).
 func TestAX25LinkXIDRoundtrip(t *testing.T) {
 	t.Helper()
 
@@ -1363,7 +1363,7 @@ func TestAX25LinkXIDRoundtrip(t *testing.T) {
 	assert.Equal(t, original.retries, parsed.retries)
 }
 
-// XID frame reception in connected state
+// XID frame reception in connected state.
 func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	t.Helper()
 
@@ -1410,7 +1410,7 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 // C/R Bit Encoding Tests
 // ============================================================================
 
-// Command frame has correct C/R bits
+// Command frame has correct C/R bits.
 func TestAX25LinkCommandFrameEncoding(t *testing.T) {
 	t.Helper()
 
@@ -1427,7 +1427,7 @@ func TestAX25LinkCommandFrameEncoding(t *testing.T) {
 	assert.Equal(t, cr_cmd, cr, "SABM should be a command")
 }
 
-// Response frame has correct C/R bits
+// Response frame has correct C/R bits.
 func TestAX25LinkResponseFrameEncoding(t *testing.T) {
 	t.Helper()
 
@@ -1444,7 +1444,7 @@ func TestAX25LinkResponseFrameEncoding(t *testing.T) {
 	assert.Equal(t, cr_res, cr, "UA should be a response")
 }
 
-// I-frame as command
+// I-frame as command.
 func TestAX25LinkIFrameAsCommand(t *testing.T) {
 	t.Helper()
 
@@ -1460,7 +1460,7 @@ func TestAX25LinkIFrameAsCommand(t *testing.T) {
 	assert.Equal(t, frame_type_I, ftype)
 }
 
-// S-frame as command and response
+// S-frame as command and response.
 func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 	t.Helper()
 
@@ -1489,7 +1489,7 @@ func TestAX25LinkSFrameCommandResponse(t *testing.T) {
 // Sequence Number Tests
 // ============================================================================
 
-// Modulo 8 wrap-around
+// Modulo 8 wrap-around.
 func TestAX25LinkModulo8WrapAround(t *testing.T) {
 	t.Helper()
 
@@ -1511,7 +1511,7 @@ func TestAX25LinkModulo8WrapAround(t *testing.T) {
 	assert.Equal(t, 0, S.vr, "V(R) should wrap from 7 to 0")
 }
 
-// Modulo 128 wrap-around
+// Modulo 128 wrap-around.
 func TestAX25LinkModulo128WrapAround(t *testing.T) {
 	t.Helper()
 
@@ -1538,7 +1538,7 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 	assert.Equal(t, 0, S.vs, "V(S) should wrap from 127 to 0")
 }
 
-// N(S) in window check
+// N(S) in window check.
 func TestAX25LinkNSInWindow(t *testing.T) {
 	t.Helper()
 
@@ -1567,7 +1567,7 @@ func TestAX25LinkNSInWindow(t *testing.T) {
 // Segmenter/Reassembler Tests
 // ============================================================================
 
-// Reassembler initial state
+// Reassembler initial state.
 func TestAX25LinkReassemblerInitialState(t *testing.T) {
 	t.Helper()
 
@@ -1583,7 +1583,7 @@ func TestAX25LinkReassemblerInitialState(t *testing.T) {
 	assert.Nil(t, S.ra_buff, "Reassembler buffer should be nil initially")
 }
 
-// First segment with flag set
+// First segment with flag set.
 func TestAX25LinkFirstSegmentFlag(t *testing.T) {
 	t.Helper()
 
@@ -1681,7 +1681,7 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 // Link Multiplexer Tests
 // ============================================================================
 
-// Multiple concurrent links
+// Multiple concurrent links.
 func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 	t.Helper()
 
@@ -1722,7 +1722,7 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 	assert.NotEqual(t, link1, link2)
 }
 
-// Link isolation - action on one link doesn't affect another
+// Link isolation - action on one link doesn't affect another.
 func TestAX25LinkIsolation(t *testing.T) {
 	t.Helper()
 
@@ -1759,7 +1759,7 @@ func TestAX25LinkIsolation(t *testing.T) {
 	assert.Equal(t, 0, link1.vr)
 }
 
-// Channel busy handling
+// Channel busy handling.
 func TestAX25LinkChannelBusy(t *testing.T) {
 	t.Helper()
 
@@ -1788,7 +1788,7 @@ func TestAX25LinkChannelBusy(t *testing.T) {
 // Edge Cases and Error Conditions
 // ============================================================================
 
-// Frame type parsing
+// Frame type parsing.
 func TestAX25LinkFrameTypeParsing(t *testing.T) {
 	t.Helper()
 
@@ -1829,7 +1829,7 @@ func TestAX25LinkFrameTypeParsing(t *testing.T) {
 	}
 }
 
-// S-frame type parsing
+// S-frame type parsing.
 func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 	t.Helper()
 
@@ -1858,7 +1858,7 @@ func TestAX25LinkSFrameTypeParsing(t *testing.T) {
 	assert.Equal(t, frame_type_S_SREJ, parsedType)
 }
 
-// I-frame type parsing
+// I-frame type parsing.
 func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	t.Helper()
 
@@ -1888,7 +1888,7 @@ func TestAX25LinkIFrameTypeParsing(t *testing.T) {
 	assert.Equal(t, 50, ns)
 }
 
-// Invalid N(R) triggers error
+// Invalid N(R) triggers error.
 func TestAX25LinkInvalidNR(t *testing.T) {
 	t.Helper()
 
@@ -1916,7 +1916,7 @@ func TestAX25LinkInvalidNR(t *testing.T) {
 // Exception Condition Tests
 // ============================================================================
 
-// Clear exception conditions
+// Clear exception conditions.
 func TestAX25LinkClearExceptionConditions(t *testing.T) {
 	t.Helper()
 
@@ -1943,7 +1943,7 @@ func TestAX25LinkClearExceptionConditions(t *testing.T) {
 	assert.False(t, S.acknowledge_pending)
 }
 
-// Reject exception flag behavior
+// Reject exception flag behavior.
 func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 	t.Helper()
 
@@ -1983,7 +1983,7 @@ func TestAX25LinkRejectExceptionFlag(t *testing.T) {
 // Retry Counter Tests
 // ============================================================================
 
-// Retry counter management
+// Retry counter management.
 func TestAX25LinkRetryCounter(t *testing.T) {
 	t.Helper()
 
@@ -2010,7 +2010,7 @@ func TestAX25LinkRetryCounter(t *testing.T) {
 // Version Negotiation Tests
 // ============================================================================
 
-// Set version 2.0
+// Set version 2.0.
 func TestAX25LinkSetVersion20(t *testing.T) {
 	t.Helper()
 
@@ -2028,7 +2028,7 @@ func TestAX25LinkSetVersion20(t *testing.T) {
 	assert.Equal(t, ax25_modulo_t(8), S.modulo)
 }
 
-// Set version 2.2
+// Set version 2.2.
 func TestAX25LinkSetVersion22(t *testing.T) {
 	t.Helper()
 
@@ -2057,7 +2057,7 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 // Data Link Queue Tests
 // ============================================================================
 
-// Connect request handling
+// Connect request handling.
 func TestAX25LinkConnectRequestTypes(t *testing.T) {
 	t.Helper()
 
@@ -2080,7 +2080,7 @@ func TestAX25LinkConnectRequestTypes(t *testing.T) {
 	assert.Equal(t, state_1_awaiting_connection, list_head.state)
 }
 
-// Disconnect request handling
+// Disconnect request handling.
 func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
 	t.Helper()
 
@@ -2110,7 +2110,7 @@ func TestAX25LinkDisconnectRequestTypes(t *testing.T) {
 // TEST Frame Tests
 // ============================================================================
 
-// TEST frame handling
+// TEST frame handling.
 func TestAX25LinkTESTFrame(t *testing.T) {
 	t.Helper()
 
@@ -2138,7 +2138,7 @@ func TestAX25LinkTESTFrame(t *testing.T) {
 // UI Frame Tests
 // ============================================================================
 
-// UI frame handling in connected state
+// UI frame handling in connected state.
 func TestAX25LinkUIFrameConnected(t *testing.T) {
 	t.Helper()
 
@@ -2165,7 +2165,7 @@ func TestAX25LinkUIFrameConnected(t *testing.T) {
 // Statistics Tests
 // ============================================================================
 
-// Frame count statistics
+// Frame count statistics.
 func TestAX25LinkFrameCountStats(t *testing.T) {
 	t.Helper()
 

@@ -2702,7 +2702,7 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-// Returns value, newWPP, found=True, or G_UNKNOWN, wpp, found=False
+// Returns value, newWPP, found=True, or G_UNKNOWN, wpp, found=False.
 func getwdata(wpp []byte, id rune, dlen int) (float64, []byte, bool) {
 	Assert(dlen >= 2 && dlen <= 6)
 

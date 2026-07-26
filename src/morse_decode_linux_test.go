@@ -39,7 +39,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 	audio_file_close() // I just realised this all works on globals :s
 }
 
-// gen_packets will generate Morse, so let's test it and try to decode
+// gen_packets will generate Morse, so let's test it and try to decode.
 func Test_Morse_Generate_Decode(t *testing.T) {
 	// First, generate
 	var tmpdir = t.TempDir()

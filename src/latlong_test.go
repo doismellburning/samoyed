@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestLatitudeToNMEA tests conversion of latitude to NMEA format
+// TestLatitudeToNMEA tests conversion of latitude to NMEA format.
 func TestLatitudeToNMEA(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -82,7 +82,7 @@ func TestLatitudeToNMEA(t *testing.T) {
 	}
 }
 
-// TestLatitudeToNMEABounds tests latitude bounds checking
+// TestLatitudeToNMEABounds tests latitude bounds checking.
 func TestLatitudeToNMEABounds(t *testing.T) {
 	tests := []struct {
 		name string
@@ -103,7 +103,7 @@ func TestLatitudeToNMEABounds(t *testing.T) {
 	}
 }
 
-// TestLongitudeToNMEA tests conversion of longitude to NMEA format
+// TestLongitudeToNMEA tests conversion of longitude to NMEA format.
 func TestLongitudeToNMEA(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -176,7 +176,7 @@ func TestLongitudeToNMEA(t *testing.T) {
 	}
 }
 
-// TestLongitudeToNMEABounds tests longitude bounds checking
+// TestLongitudeToNMEABounds tests longitude bounds checking.
 func TestLongitudeToNMEABounds(t *testing.T) {
 	tests := []struct {
 		name string
@@ -197,7 +197,7 @@ func TestLongitudeToNMEABounds(t *testing.T) {
 	}
 }
 
-// TestLatitudeFromNMEA tests parsing NMEA latitude format
+// TestLatitudeFromNMEA tests parsing NMEA latitude format.
 func TestLatitudeFromNMEA(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -276,7 +276,7 @@ func TestLatitudeFromNMEA(t *testing.T) {
 	}
 }
 
-// TestLatitudeFromNMEAErrors tests error cases for NMEA latitude parsing
+// TestLatitudeFromNMEAErrors tests error cases for NMEA latitude parsing.
 func TestLatitudeFromNMEAErrors(t *testing.T) {
 	tests := []struct {
 		name string
@@ -306,7 +306,7 @@ func TestLatitudeFromNMEAErrors(t *testing.T) {
 	})
 }
 
-// TestLongitudeFromNMEA tests parsing NMEA longitude format
+// TestLongitudeFromNMEA tests parsing NMEA longitude format.
 func TestLongitudeFromNMEA(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -385,7 +385,7 @@ func TestLongitudeFromNMEA(t *testing.T) {
 	}
 }
 
-// TestLongitudeFromNMEAErrors tests error cases for NMEA longitude parsing
+// TestLongitudeFromNMEAErrors tests error cases for NMEA longitude parsing.
 func TestLongitudeFromNMEAErrors(t *testing.T) {
 	tests := []struct {
 		name string
@@ -414,7 +414,7 @@ func TestLongitudeFromNMEAErrors(t *testing.T) {
 	})
 }
 
-// TestNMEARoundTrip tests that converting to/from NMEA preserves values
+// TestNMEARoundTrip tests that converting to/from NMEA preserves values.
 func TestNMEARoundTrip(t *testing.T) {
 	tests := []struct {
 		name string
@@ -446,7 +446,7 @@ func TestNMEARoundTrip(t *testing.T) {
 	}
 }
 
-// TestGridSquareEdgeCases tests Maidenhead grid square conversion edge cases
+// TestGridSquareEdgeCases tests Maidenhead grid square conversion edge cases.
 func TestGridSquareEdgeCases(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -537,7 +537,7 @@ func TestGridSquareEdgeCases(t *testing.T) {
 	}
 }
 
-// TestCompressedFormatEdgeCases tests compressed format edge cases
+// TestCompressedFormatEdgeCases tests compressed format edge cases.
 func TestCompressedFormatEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -614,7 +614,7 @@ func TestCompressedFormatEdgeCases(t *testing.T) {
 	}
 }
 
-// TestCoordinateDistanceSymmetry tests that distance is symmetric
+// TestCoordinateDistanceSymmetry tests that distance is symmetric.
 func TestCoordinateDistanceSymmetry(t *testing.T) {
 	tests := []struct {
 		name string
@@ -638,7 +638,7 @@ func TestCoordinateDistanceSymmetry(t *testing.T) {
 	}
 }
 
-// TestBearingAntipodal tests bearing to antipodal points
+// TestBearingAntipodal tests bearing to antipodal points.
 func TestBearingAntipodal(t *testing.T) {
 	// Bearing from a point to its antipode (opposite side of Earth)
 	// should be consistent
@@ -659,7 +659,7 @@ func TestBearingAntipodal(t *testing.T) {
 	assert.Less(t, bearing, 360.0, "bearing should be < 360")
 }
 
-// TestDestinationZeroDistance tests that zero distance returns same point
+// TestDestinationZeroDistance tests that zero distance returns same point.
 func TestDestinationZeroDistance(t *testing.T) {
 	lat := 42.3601
 	lon := -71.0589
@@ -673,7 +673,7 @@ func TestDestinationZeroDistance(t *testing.T) {
 	assert.InDelta(t, lon, newLon, 0.0001, "zero distance should return same longitude")
 }
 
-// TestLatitudeBoundaryClamping tests that out-of-range values are clamped
+// TestLatitudeBoundaryClamping tests that out-of-range values are clamped.
 func TestLatitudeBoundaryClamping(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -696,7 +696,7 @@ func TestLatitudeBoundaryClamping(t *testing.T) {
 	}
 }
 
-// TestLongitudeBoundaryClamping tests that out-of-range values are clamped
+// TestLongitudeBoundaryClamping tests that out-of-range values are clamped.
 func TestLongitudeBoundaryClamping(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -719,7 +719,7 @@ func TestLongitudeBoundaryClamping(t *testing.T) {
 	}
 }
 
-// BenchmarkLatitudeConversions benchmarks latitude conversion functions
+// BenchmarkLatitudeConversions benchmarks latitude conversion functions.
 func BenchmarkLatitudeConversions(b *testing.B) {
 	lat := 42.3601
 
@@ -749,7 +749,7 @@ func BenchmarkLatitudeConversions(b *testing.B) {
 	})
 }
 
-// BenchmarkDistanceBearing benchmarks distance and bearing calculations
+// BenchmarkDistanceBearing benchmarks distance and bearing calculations.
 func BenchmarkDistanceBearing(b *testing.B) {
 	lat1, lon1 := 42.3601, -71.0589
 	lat2, lon2 := -33.8688, 151.2093
@@ -777,7 +777,7 @@ func BenchmarkDistanceBearing(b *testing.B) {
 	})
 }
 
-// TestHaversineFormulaAccuracy tests the accuracy of the haversine implementation
+// TestHaversineFormulaAccuracy tests the accuracy of the haversine implementation.
 func TestHaversineFormulaAccuracy(t *testing.T) {
 	// Test against known distances
 	tests := []struct {
@@ -827,7 +827,7 @@ func TestHaversineFormulaAccuracy(t *testing.T) {
 	}
 }
 
-// TestBearingCalculation tests bearing calculation accuracy
+// TestBearingCalculation tests bearing calculation accuracy.
 func TestBearingCalculation(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -885,7 +885,7 @@ func TestBearingCalculation(t *testing.T) {
 	}
 }
 
-// TestSmallAngles tests coordinate functions with very small angles
+// TestSmallAngles tests coordinate functions with very small angles.
 func TestSmallAngles(t *testing.T) {
 	// Test with very small differences in coordinates
 	lat1, lon1 := 42.0, -71.0
@@ -907,7 +907,7 @@ func TestSmallAngles(t *testing.T) {
 	assert.InDelta(t, lon2, newLon, 0.0001, "round trip longitude should match")
 }
 
-// TestAmbiguityLevels tests all ambiguity levels for latitude/longitude
+// TestAmbiguityLevels tests all ambiguity levels for latitude/longitude.
 func TestAmbiguityLevels(t *testing.T) {
 	lat := 42.3601
 	lon := -71.0589
@@ -949,7 +949,7 @@ func TestAmbiguityLevels(t *testing.T) {
 	}
 }
 
-// TestNaN tests that NaN inputs don't cause panics
+// TestNaN tests that NaN inputs don't cause panics.
 func TestNaN(t *testing.T) {
 	nan := math.NaN()
 

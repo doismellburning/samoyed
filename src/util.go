@@ -16,7 +16,7 @@ func SLEEP_SEC(s int) {
 	SLEEP_MS(s * 1000)
 }
 
-// Because sometimes it's really convenient to have C's ternary ?:
+// Because sometimes it's really convenient to have C's ternary ?:.
 func IfThenElse[T any](x bool, a T, b T) T { //nolint:ireturn
 	if x {
 		return a
@@ -25,7 +25,7 @@ func IfThenElse[T any](x bool, a T, b T) T { //nolint:ireturn
 	}
 }
 
-// MAX_NET_CLIENTS is used for both KISS and AGWPE
+// MAX_NET_CLIENTS is used for both KISS and AGWPE.
 const MAX_NET_CLIENTS = 3
 
 // There are several places where we deal with fixed-width byte arrays containing a string.
@@ -121,7 +121,7 @@ func R2D(r float64) float64 {
 	return r * 180 / math.Pi
 }
 
-// Can't be "assert" because of conflicts with stretchr/testify/assert, but otherwise, it's compatible enough
+// Can't be "assert" because of conflicts with stretchr/testify/assert, but otherwise, it's compatible enough.
 func Assert(t bool) {
 	if !t {
 		_, file, line, _ := runtime.Caller(1)
