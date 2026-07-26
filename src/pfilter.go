@@ -18,6 +18,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -158,7 +159,7 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
 	if pp == nil {
-		return -1, fmt.Errorf("INTERNAL ERROR in pfilter: nil packet pointer, please report this")
+		return -1, errors.New("INTERNAL ERROR in pfilter: nil packet pointer, please report this")
 	}
 
 	var pfstate pfstate_t

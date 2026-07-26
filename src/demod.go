@@ -93,16 +93,16 @@ func demod_init(pa *audio_s) int {
 				 *	- Any plus will be at the end.
 				 */
 				var num_letters = 0
-				var just_letters string
+				var justLettersBuilder strings.Builder
 				var have_plus = 0
 
 				var profileStr = save_audio_config_p.achan[channel].profiles
 				for i, p := range profileStr {
 					if unicode.IsLower(p) {
-						just_letters += string(unicode.ToUpper(p))
+						justLettersBuilder.WriteRune(unicode.ToUpper(p))
 						num_letters++
 					} else if unicode.IsUpper(p) {
-						just_letters += string(p)
+						justLettersBuilder.WriteRune(p)
 						num_letters++
 					} else if p == '+' {
 						have_plus = 1
@@ -126,6 +126,8 @@ func demod_init(pa *audio_s) int {
 							channel, save_audio_config_p.achan[channel].profiles)
 					}
 				}
+
+				var just_letters = justLettersBuilder.String()
 
 				Assert(num_letters == len(just_letters))
 
