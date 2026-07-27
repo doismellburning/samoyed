@@ -17,6 +17,7 @@ package direwolf
 import (
 	"math"
 	"os"
+	"strings"
 )
 
 const DTMF_TIMEOUT_SEC = 5 /* for normal operation. */
@@ -364,7 +365,7 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
  *----------------------------------------------------------------*/
 
 // test_mode
-var push_button_result string
+var push_button_result strings.Builder
 
 func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 	var fa, fb int
@@ -422,18 +423,18 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 	case '?': /* check result */
 		Assert(test_mode)
 
-		if push_button_result == "123A456B789C*0#D123$789$" { //nolint:staticcheck
+		if push_button_result.String() == "123A456B789C*0#D123$789$" {
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\nSuccess!\n")
-		} else if push_button_result == "123A456B789C*0#D123789" {
+		} else if push_button_result.String() == "123A456B789C*0#D123789" {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\n * Time-out failed, otherwise OK *\n")
-			dw_printf("\"%s\"\n", push_button_result)
+			dw_printf("\"%s\"\n", push_button_result.String())
 			os.Exit(1)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\n *** TEST FAILED ***\n")
-			dw_printf("\"%s\"\n", push_button_result)
+			dw_printf("\"%s\"\n", push_button_result.String())
 			os.Exit(1)
 		}
 	}
@@ -464,7 +465,7 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 			//x = dtmf_sample (0, dtmf * 0.001);
 
 			if x != ' ' && x != '.' {
-				push_button_result += string([]rune{x})
+				push_button_result.WriteRune(x)
 			}
 		} else {
 			// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.

@@ -168,7 +168,9 @@ var grid = [10][10]string{
  *----------------------------------------------------------------*/
 
 func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unparam
-	var buttons = ""
+	var buttons strings.Builder
+	var lastButton rune
+	var haveButtons bool
 	var errors = 0
 
 	for _, c := range text {
@@ -184,12 +186,15 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 				}
 			}
 
-			if len(buttons) > 0 && rune(buttons[len(buttons)-1]) == row+'0' {
-				buttons += "A"
+			if haveButtons && lastButton == row+'0' {
+				buttons.WriteRune('A')
+				lastButton = 'A'
 			}
 
 			for ; n > 0; n-- {
-				buttons += string(row + '0')
+				buttons.WriteRune(row + '0')
+				lastButton = row + '0'
+				haveButtons = true
 			}
 		} else {
 			if unicode.IsUpper(c) {
@@ -216,12 +221,15 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 				for col := 0; col < 4 && !found; col++ {
 					if c == translate[row][col] {
 						/* Stick in 'A' if previous character used same button. */
-						if len(buttons) > 0 && rune(buttons[len(buttons)-1]) == rune(row+'0') {
-							buttons += "A"
+						if haveButtons && lastButton == rune(row+'0') {
+							buttons.WriteRune('A')
+							lastButton = 'A'
 						}
 
 						for n := col + 1; n > 0; n-- {
-							buttons += string(rune(row + '0'))
+							buttons.WriteRune(rune(row + '0'))
+							lastButton = rune(row + '0')
+							haveButtons = true
 							found = true
 						}
 					}
@@ -237,7 +245,7 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 		}
 	}
 
-	return buttons, errors
+	return buttons.String(), errors
 } /* end tt_text_to_multipress */
 
 /*------------------------------------------------------------------
@@ -858,7 +866,7 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_call10_to_text(buttons string, quiet bool) (string, int) {
-	var text string
+	var text strings.Builder
 	var errors = 0
 
 	/* Validity check. */
@@ -871,7 +879,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 
 		errors++
 
-		return text, errors
+		return text.String(), errors
 	}
 
 	for _, b := range buttons {
@@ -883,7 +891,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 
 			errors++
 
-			return text, errors
+			return text.String(), errors
 		}
 	}
 
@@ -905,7 +913,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 		}
 
 		if call10encoding[row][col] != 0 {
-			text += string(call10encoding[row][col])
+			text.WriteRune(call10encoding[row][col])
 		} else {
 			errors++
 
@@ -918,9 +926,9 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
 
 	/* Trim any trailing spaces. */
 
-	text = strings.TrimSpace(text)
+	var trimmed = strings.TrimSpace(text.String())
 
-	return text, errors
+	return trimmed, errors
 } /* end tt_call10_to_text */
 
 /*------------------------------------------------------------------
@@ -942,7 +950,7 @@ func tt_call10_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
-	var text string
+	var text strings.Builder
 	var errors = 0
 
 	/* Validity check. */
@@ -955,7 +963,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 
 		errors++
 
-		return text, errors
+		return text.String(), errors
 	}
 
 	for _, b := range buttons {
@@ -967,7 +975,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 
 			errors++
 
-			return text, errors
+			return text.String(), errors
 		}
 	}
 
@@ -989,7 +997,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 		}
 
 		if call10encoding[row][col] != 0 {
-			text += string(call10encoding[row][col])
+			text.WriteRune(call10encoding[row][col])
 		} else {
 			errors++
 
@@ -1004,7 +1012,7 @@ func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
 		return "", errors
 	}
 
-	return text, errors
+	return text.String(), errors
 } /* end tt_call5_suffix_to_text */
 
 /*------------------------------------------------------------------
@@ -1045,7 +1053,7 @@ var mhpair = [MAXMHPAIRS]mhpairType{
 }
 
 func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
-	var text string
+	var text strings.Builder
 	var errors = 0
 
 	/* Validity check. */
@@ -1060,7 +1068,7 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 
 		errors++
 
-		return text, errors
+		return text.String(), errors
 	}
 
 	for _, b := range buttons {
@@ -1072,7 +1080,7 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 
 			errors++
 
-			return text, errors
+			return text.String(), errors
 		}
 	}
 
@@ -1087,16 +1095,16 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 			var e2 int
 
 			t2, e2 = tt_two_digits_to_letter(buttons, quiet)
-			text += t2
+			text.WriteString(t2)
 			errors += e2
 			buttons = buttons[2:]
 
 			t2, e2 = tt_two_digits_to_letter(buttons, quiet)
-			text += t2
+			text.WriteString(t2)
 			errors += e2
 			buttons = buttons[2:]
 		} else {
-			text += buttons[0:2]
+			text.WriteString(buttons[0:2])
 			buttons = buttons[2:]
 		}
 	}
@@ -1104,10 +1112,10 @@ func tt_mhead_to_text(buttons string, quiet bool) (string, int) {
 	// No need to handle case where there's anything remaining - we checked earlier
 
 	if errors != 0 {
-		text = ""
+		return "", errors
 	}
 
-	return text, errors
+	return text.String(), errors
 } /* end tt_mhead_to_text */
 
 /*------------------------------------------------------------------
@@ -1269,12 +1277,12 @@ func tt_satsq_to_text(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
-	var text string
+	var text strings.Builder
 	var errors = 0
 
 	// TODO KG
 	if len(buttons)%2 != 0 {
-		return text, 1
+		return text.String(), 1
 	}
 
 	for i := range len(buttons) / 2 {
@@ -1284,7 +1292,7 @@ func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
 		if unicode.IsDigit(c1) && unicode.IsDigit(c2) {
 			var n = (c1-'0')*10 + (c2 - '0')
 
-			text += string(n + 32)
+			text.WriteRune(n + 32)
 		} else {
 			// Unexpected character.
 			errors++
@@ -1296,7 +1304,7 @@ func tt_ascii2d_to_text(buttons string, quiet bool) (string, int) {
 		}
 	}
 
-	return text, errors
+	return text.String(), errors
 } /* end tt_ascii2d_to_text */
 
 /*------------------------------------------------------------------

@@ -720,13 +720,15 @@ func ival_to_str(x int) string {
 func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]int) string {
 	Assert(pm != nil)
 
-	var output string
+	var output strings.Builder
 
 	if len(pm.project) > 0 {
-		output = pm.project + ": "
+		output.WriteString(pm.project)
+		output.WriteString(": ")
 	}
 
-	output += "Seq=" + ival_to_str(seq)
+	output.WriteString("Seq=")
+	output.WriteString(ival_to_str(seq))
 
 	for n := range T_NUM_ANALOG {
 		// Display all or only defined values?  Only defined for now.
@@ -734,7 +736,9 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 			var fval float64
 			var fndp int
 
-			output += ", " + pm.name[n] + "="
+			output.WriteString(", ")
+			output.WriteString(pm.name[n])
+			output.WriteString("=")
 
 			// Scaling and suitable number of decimal places for display.
 
@@ -747,9 +751,10 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 
 			var val_str = fval_to_str(fval, fndp)
 
-			output += val_str
+			output.WriteString(val_str)
 			if len(pm.unit[n]) > 0 {
-				output += " " + pm.unit[n]
+				output.WriteString(" ")
+				output.WriteString(pm.unit[n])
 			}
 		}
 	}
@@ -759,7 +764,9 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 		if draw[n] != G_UNKNOWN {
 			var dval int
 
-			output += ", " + pm.name[T_NUM_ANALOG+n] + "="
+			output.WriteString(", ")
+			output.WriteString(pm.name[T_NUM_ANALOG+n])
+			output.WriteString("=")
 
 			// Possible inverting for bit sense.
 
@@ -770,14 +777,15 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 
 			var val_str = ival_to_str(dval)
 
-			output += val_str
+			output.WriteString(val_str)
 			if len(pm.unit[T_NUM_ANALOG+n]) > 0 {
-				output += " " + pm.unit[T_NUM_ANALOG+n]
+				output.WriteString(" ")
+				output.WriteString(pm.unit[T_NUM_ANALOG+n])
 			}
 		}
 	}
 
-	return output
+	return output.String()
 
 	/* TODO KG
 	#if DEBUG4

@@ -4503,11 +4503,12 @@ func handleTTMACRO(ps *parseState) bool {
 			// Convert to object name.
 
 			tmp = tmp[3:]
-			var stemp string
+			var sb strings.Builder
 			for len(tmp) > 0 && tmp[0] != '}' && tmp[0] != '*' {
-				stemp += string(tmp[0])
+				sb.WriteByte(tmp[0])
 				tmp = tmp[1:]
 			}
+			var stemp = sb.String()
 			if len(tmp) > 0 && tmp[0] == '}' {
 				if len(stemp) > 9 {
 					text_color_set(DW_COLOR_ERROR)

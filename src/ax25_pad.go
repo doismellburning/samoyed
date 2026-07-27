@@ -1387,10 +1387,11 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 	// Now we return exactly what is in the address field and trim trailing spaces.
 	// This will provide better information for troubleshooting.
 
-	var station string
+	var sb strings.Builder
 	for i := range 6 {
-		station += string((this_p.frame_data[n*7+i] >> 1) & 0x7f)
+		sb.WriteByte((this_p.frame_data[n*7+i] >> 1) & 0x7f)
 	}
+	var station = sb.String()
 
 	if strings.Contains(station, "\000") {
 		text_color_set(DW_COLOR_ERROR)
@@ -1461,12 +1462,11 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 	// Now we return exactly what is in the address field and trim trailing spaces.
 	// This will provide better information for troubleshooting.
 
-	var station string
+	var sb strings.Builder
 	for i := range 6 {
-		station += string((this_p.frame_data[n*7+i] >> 1) & 0x7f)
+		sb.WriteByte((this_p.frame_data[n*7+i] >> 1) & 0x7f)
 	}
-
-	station = strings.TrimRight(station, " ")
+	var station = strings.TrimRight(sb.String(), " ")
 
 	if len(station) == 0 {
 		text_color_set(DW_COLOR_ERROR)

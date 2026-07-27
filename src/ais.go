@@ -21,6 +21,7 @@ package direwolf
  *******************************************************************************/
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -214,15 +215,15 @@ func get_field_ascii(base []byte, start uint, length uint) int {
 
 func get_field_string(base []byte, start uint, length uint) string {
 	Assert(length%6 == 0)
-	var result string
+	var sb strings.Builder
 	var nc = length / 6 // Number of characters.
 	// Caller better provide space for at least this +1.
 	// No bounds checking here.
 	for i := range nc {
-		result += string(rune(get_field_ascii(base, start+i*6, 6)))
+		sb.WriteRune(rune(get_field_ascii(base, start+i*6, 6)))
 	}
 	// Officially it should be terminated/padded with @ but we also see trailing spaces.
-	result = strings.TrimRight(result, "@ ")
+	var result = strings.TrimRight(sb.String(), "@ ")
 
 	return result
 }
@@ -368,7 +369,7 @@ func AISParse(sentence string) (*AISData, error) {
 	var data, checksumStr, found = strings.Cut(stemp, "*")
 
 	if !found {
-		return nil, fmt.Errorf("missing AIS sentence checksum")
+		return nil, errors.New("missing AIS sentence checksum")
 	}
 
 	var _checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
@@ -398,7 +399,7 @@ func AISParse(sentence string) (*AISData, error) {
 	_ = radio_chan
 
 	if len(payload) == 0 {
-		return nil, fmt.Errorf("payload is missing from AIS sentence")
+		return nil, errors.New("payload is missing from AIS sentence")
 	}
 
 	// Convert character representation to bit vector.

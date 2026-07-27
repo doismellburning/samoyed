@@ -105,10 +105,10 @@ func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
 	if (udpRequested || serialRequested) && ws.udpSock == nil && ws.serialPortFd == nil {
 		var requested []string
 		if udpRequested {
-			requested = append(requested, fmt.Sprintf("UDP %s", net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))))
+			requested = append(requested, "UDP "+net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum)))
 		}
 		if serialRequested {
-			requested = append(requested, fmt.Sprintf("serial port %s", mc.waypoint_serial_port))
+			requested = append(requested, "serial port "+mc.waypoint_serial_port)
 		}
 
 		return nil, fmt.Errorf("waypoint output requested but no destination could be opened (%s)", strings.Join(requested, ", "))
