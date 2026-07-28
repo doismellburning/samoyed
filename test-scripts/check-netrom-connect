@@ -1,0 +1,312 @@
+#!/bin/bash
+
+set -eu
+set -o pipefail
+
+source "$(dirname "$(realpath "$0")")/common"
+
+if ! command -v python3 > /dev/null; then
+	echo "FAIL: python3 not found, required for port allocation and the AGW client" >&2
+	exit 1
+fi
+
+goto_tmpdir
+
+# Two samoyed-direwolf instances, each configured as a NET/ROM node, with
+# channel 0's "audio" carried over UDP so each instance's transmitter feeds
+# the other's receiver.  This exercises NET/ROM end to end over the real
+# modem/HDLC/AX.25 stack: NODES broadcasts teach each node about the other,
+# then an AGW client on A opens a circuit to B and sends data through it.
+#
+# Node A is Q1TEST-7 (alias QNODEA); node B is Q2TEST-7 (alias QNODEB).
+# The user callsign initiating the circuit is Q1TEST.
+
+NODE_A="Q1TEST-7"
+NODE_B="Q2TEST-7"
+USER_A="Q1TEST"
+PAYLOAD="netrom payload from A"
+
+# Picks a port in the range the config parser accepts, that isn't already in
+# use and isn't one handed out earlier in this script (passed as arguments
+# to exclude).  Takes the protocol ("tcp" or "udp") to probe, since the TCP
+# and UDP port namespaces are independent.
+free_port() {
+	local proto=$1
+	shift
+
+	python3 - "$proto" "$@" << 'EOF'
+import random
+import socket
+import sys
+
+proto = sys.argv[1]
+exclude = {int(p) for p in sys.argv[2:]}
+sock_type = socket.SOCK_STREAM if proto == "tcp" else socket.SOCK_DGRAM
+
+for _ in range(200):
+	port = random.randint(1024, 49151)
+	if port in exclude:
+		continue
+
+	probe = socket.socket(socket.AF_INET, sock_type)
+	try:
+		probe.bind(("127.0.0.1", port))
+	except OSError:
+		continue
+	finally:
+		probe.close()
+
+	print(port)
+	break
+else:
+	sys.exit("free_port: couldn't find a free port")
+EOF
+}
+
+# Each attempt runs in its own subshell so its fd 3 is private and closes
+# when the subshell exits.  Do not be tempted to `exec 3<&- 2> /dev/null`
+# in this shell: `exec` with no command applies its redirections to the
+# current shell, which would silently swallow every later diagnostic.
+wait_for_tcp_port() {
+	local port=$1
+	local deadline=$((SECONDS + 30))
+
+	while ! (exec 3<> "/dev/tcp/127.0.0.1/$port") 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for TCP port $port" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+wait_for_log_line() {
+	local logfile=$1
+	local pattern=$2
+	local deadline=$((SECONDS + ${3:-60}))
+
+	while ! grep -q "$pattern" "$logfile" 2> /dev/null; do
+		if ((SECONDS > deadline)); then
+			echo "FAIL: timed out waiting for '$pattern' in $logfile" >&2
+			return 1
+		fi
+
+		sleep 0.2
+	done
+}
+
+pids=()
+
+# shellcheck disable=SC2317,SC2329 # cleanup is invoked indirectly via trap
+cleanup() {
+	local status=$?
+
+	if ((status != 0)); then
+		echo "--- FAILURE: dumping logs from $PWD for diagnosis ---" >&2
+
+		for log in direwolf-a.log direwolf-b.log agw-listen-b.log agw-connect-a.log; do
+			echo "--- $log ---" >&2
+			cat "$log" >&2 2> /dev/null || echo "(missing)" >&2
+		done
+	fi
+
+	for pid in "${pids[@]}"; do
+		kill "$pid" 2> /dev/null || true
+	done
+	wait 2> /dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# --- the AGW client --------------------------------------------------------
+# NET/ROM has no user-facing terminal of its own: circuits are driven over
+# the existing AGW TCP interface, with PID 0xCF marking a command as
+# NET/ROM rather than plain AX.25.  This is the smallest client that does
+# that, and doubles as worked documentation of the interface.
+
+cat > agwclient.py << 'EOF'
+import binascii
+import socket
+import struct
+import sys
+
+AGW_HEADER = struct.Struct("<BBBBBBBB10s10sI4s")
+PID_NETROM = 0xCF
+
+
+def frame(kind, *, port=0, pid=0, call_from="", call_to="", data=b""):
+	header = AGW_HEADER.pack(
+		port, 0, 0, 0,
+		ord(kind), 0, pid, 0,
+		call_from.encode(), call_to.encode(),
+		len(data), b"\0\0\0\0",
+	)
+
+	return header + data
+
+
+def read_frame(sock):
+	"""Read one AGW frame, or return None at end of stream."""
+	buf = b""
+	while len(buf) < AGW_HEADER.size:
+		chunk = sock.recv(AGW_HEADER.size - len(buf))
+		if not chunk:
+			return None
+		buf += chunk
+
+	fields = AGW_HEADER.unpack(buf)
+	kind = chr(fields[4])
+	call_from = fields[8].split(b"\0")[0].decode()
+	call_to = fields[9].split(b"\0")[0].decode()
+	length = fields[10]
+
+	data = b""
+	while len(data) < length:
+		chunk = sock.recv(length - len(data))
+		if not chunk:
+			break
+		data += chunk
+
+	return kind, call_from, call_to, data
+
+
+def log(*args):
+	print(*args, flush=True)
+
+
+def listen(port, own_call, expect):
+	"""Register own_call, accept an inbound circuit, await expect."""
+	with socket.create_connection(("127.0.0.1", port), timeout=60) as sock:
+		sock.sendall(frame("X", call_from=own_call))
+
+		while True:
+			got = read_frame(sock)
+			if got is None:
+				sys.exit("listen: connection closed before the data arrived")
+
+			kind, call_from, call_to, data = got
+			if kind == "X":
+				if data != b"\x01":
+					sys.exit(f"listen: callsign registration refused for {own_call}")
+				log(f"registered {own_call}")
+			elif kind == "C":
+				log(f"connected: {call_from} -> {call_to}")
+			elif kind == "d":
+				log(f"disconnected: {call_from} -> {call_to}")
+			elif kind == "D":
+				log(f"data from {call_from}: {binascii.hexlify(data).decode()}")
+				if expect.encode() in data:
+					log("PAYLOAD OK")
+					return
+				sys.exit(f"listen: unexpected payload {data!r}")
+
+
+def connect(port, own_call, node, payload):
+	"""Open a NET/ROM circuit to node and send payload down it."""
+	with socket.create_connection(("127.0.0.1", port), timeout=60) as sock:
+		sock.sendall(frame("c", pid=PID_NETROM, call_from=own_call, call_to=node))
+
+		while True:
+			got = read_frame(sock)
+			if got is None:
+				sys.exit("connect: connection closed before the circuit came up")
+
+			kind, call_from, call_to, _ = got
+			if kind == "C":
+				log(f"connected: {call_from} -> {call_to}")
+				break
+			if kind == "d":
+				sys.exit(f"connect: circuit refused or dropped ({call_from} -> {call_to})")
+
+		sock.sendall(frame(
+			"D", pid=PID_NETROM,
+			call_from=own_call, call_to=node,
+			data=payload.encode(),
+		))
+		log("payload sent")
+
+		# Hold the socket open long enough for the frame to actually go out
+		# over the air; closing immediately would drop the circuit first.
+		sock.settimeout(15)
+		try:
+			while read_frame(sock) is not None:
+				pass
+		except socket.timeout:
+			pass
+
+
+if __name__ == "__main__":
+	if sys.argv[1] == "listen":
+		listen(int(sys.argv[2]), sys.argv[3], sys.argv[4])
+	else:
+		connect(int(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5])
+EOF
+
+# --- port allocation -------------------------------------------------------
+
+udp_a=$(free_port udp)
+udp_b=$(free_port udp "$udp_a")
+agw_a=$(free_port tcp "$udp_a" "$udp_b")
+agw_b=$(free_port tcp "$udp_a" "$udp_b" "$agw_a")
+
+# --- config files ----------------------------------------------------------
+# KISSPORT 0 disables the default KISS listener (8001), which would
+# otherwise collide between the two instances.  NODES 2 keeps the routing
+# broadcast interval short enough for a test; the default is 1800 seconds.
+
+cat > direwolf-a.conf << EOF
+MYCALL $USER_A
+ADEVICE udp:$udp_a udp:localhost:$udp_b
+AGWPORT $agw_a
+KISSPORT 0
+NETROM 0 $NODE_A QNODEA NODES 2 QUALITY 255
+EOF
+
+cat > direwolf-b.conf << EOF
+MYCALL Q2TEST
+ADEVICE udp:$udp_b udp:localhost:$udp_a
+AGWPORT $agw_b
+KISSPORT 0
+NETROM 0 $NODE_B QNODEB NODES 2 QUALITY 255
+EOF
+
+# --- start the nodes -------------------------------------------------------
+
+"$DIREWOLF" -c direwolf-a.conf > direwolf-a.log 2>&1 &
+pids+=("$!")
+"$DIREWOLF" -c direwolf-b.conf > direwolf-b.log 2>&1 &
+pids+=("$!")
+
+wait_for_tcp_port "$agw_a"
+wait_for_tcp_port "$agw_b"
+
+wait_for_log_line direwolf-a.log "NET/ROM node $NODE_A"
+wait_for_log_line direwolf-b.log "NET/ROM node $NODE_B"
+
+# --- wait for routing to converge ------------------------------------------
+# A can only open a circuit to B once it has heard a NODES broadcast naming
+# B, which is what teaches it the route.  Grep for B's own transmission
+# arriving at A rather than just "NODES", which would also match A's own
+# broadcasts echoed in its log.
+
+wait_for_log_line direwolf-a.log "$NODE_B>NODES"
+
+# --- open a circuit and send data ------------------------------------------
+
+python3 agwclient.py listen "$agw_b" "$NODE_B" "$PAYLOAD" > agw-listen-b.log 2>&1 &
+listener=$!
+pids+=("$listener")
+
+wait_for_log_line agw-listen-b.log "registered $NODE_B"
+
+python3 agwclient.py connect "$agw_a" "$USER_A" "$NODE_B" "$PAYLOAD" > agw-connect-a.log 2>&1 &
+pids+=("$!")
+
+# The listener exits 0 only once it has seen the payload arrive over the
+# circuit, so its exit status is the result of the whole test.
+if ! wait "$listener"; then
+	echo "FAIL: NET/ROM circuit did not deliver the payload" >&2
+	exit 1
+fi
+
+echo "PASS: two samoyed-direwolf NET/ROM nodes routed to each other and carried data over a circuit"

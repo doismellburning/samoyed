@@ -383,6 +383,125 @@ func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 	}
 }
 
+// setupNetromTestEnv enables the NET/ROM subsystem for channel 0 with fresh
+// router/link-manager state, and restores the previous globals on cleanup.
+func setupNetromTestEnv(t *testing.T) {
+	t.Helper()
+
+	var savedConfig = saveNetromConfig
+	var savedRouter = gNetromRouter
+	var savedMgr = gNetromLinkMgr
+	t.Cleanup(func() {
+		saveNetromConfig = savedConfig
+		gNetromRouter = savedRouter
+		gNetromLinkMgr = savedMgr
+	})
+
+	var config = new(netrom_config_s)
+	config.enabled = true
+	config.callsign = testNodeCallQ1
+	config.alias = "QNODE1"
+	config.channel = 0
+	saveNetromConfig = config
+	gNetromRouter = newNetromRouter()
+	gNetromLinkMgr = newNetromLinkManager(config.callsign, config.alias)
+
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+	ptt_init(audioConfig)
+	tq_init(audioConfig)
+	t.Cleanup(func() { save_audio_config_p = nil })
+}
+
+// TestHandleClientCommand_D_NetromNoCircuitNoDLQAppend verifies that AGW 'D'
+// data for PID NET/ROM with no matching circuit is dropped (and logged)
+// rather than falling through to the classic AX.25 DLQ path, which would
+// send it out over the air unencapsulated.
+func TestHandleClientCommand_D_NetromNoCircuitNoDLQAppend(t *testing.T) {
+	setupNetromTestEnv(t)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'D'
+	cmd.Header.Portx = 0
+	cmd.Header.PID = AX25_PID_NETROM
+	cmd.Data = []byte("hi")
+	cmd.Header.DataLen = uint32(len(cmd.Data))
+	copy(cmd.Header.CallFrom[:], testNodeCallQ1)
+	copy(cmd.Header.CallTo[:], testNodeCallQ2)
+
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item != nil {
+		t.Errorf("expected no DLQ append for NET/ROM 'D' with no matching circuit, got %+v", item)
+	}
+}
+
+// TestHandleClientCommand_D_NetromDeliversToCircuit verifies that AGW 'D'
+// data for PID NET/ROM with a matching circuit is queued on that circuit
+// rather than going out over the air unencapsulated via the classic AX.25
+// DLQ path.
+func TestHandleClientCommand_D_NetromDeliversToCircuit(t *testing.T) {
+	setupNetromTestEnv(t)
+
+	var c = gNetromLinkMgr.allocCircuit()
+	c.localCall = testNodeCallQ1
+	c.remoteCall = testNodeCallQ2
+	c.remoteNode = testNodeCallQ2
+	c.nextHop = testNodeCallQ2
+	c.channel = 0
+	c.state = nrStateConnected
+	gNetromLinkMgr.publishCircuit(c)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'D'
+	cmd.Header.Portx = 0
+	cmd.Header.PID = AX25_PID_NETROM
+	cmd.Data = []byte("hi")
+	cmd.Header.DataLen = uint32(len(cmd.Data))
+	copy(cmd.Header.CallFrom[:], testNodeCallQ1)
+	copy(cmd.Header.CallTo[:], testNodeCallQ2)
+
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item != nil {
+		t.Errorf("expected no DLQ append for NET/ROM 'D' with a matching circuit, got %+v", item)
+	}
+	// trySend has an open window, so the data is moved straight from
+	// sendQueue into outstanding[vs] and transmitted rather than sitting
+	// queued.
+	if c.vs != 1 || c.outstanding[0] == nil {
+		t.Errorf("expected data to be sent as N(S)=0 on the NET/ROM circuit, got vs=%d outstanding[0]=%v", c.vs, c.outstanding[0])
+	}
+}
+
+// TestHandleClientCommand_d_NetromDisconnectsCircuit verifies that AGW 'd'
+// for a callsign pair with an active NET/ROM circuit disconnects that
+// circuit instead of falling through to the classic AX.25 DLQ path.
+func TestHandleClientCommand_d_NetromDisconnectsCircuit(t *testing.T) {
+	setupNetromTestEnv(t)
+
+	var c = gNetromLinkMgr.allocCircuit()
+	c.localCall = testNodeCallQ1
+	c.remoteCall = testNodeCallQ2
+	c.remoteNode = testNodeCallQ2
+	c.nextHop = testNodeCallQ2
+	c.channel = 0
+	c.state = nrStateConnected
+	gNetromLinkMgr.publishCircuit(c)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'd'
+	cmd.Header.Portx = 0
+	copy(cmd.Header.CallFrom[:], testNodeCallQ1)
+	copy(cmd.Header.CallTo[:], testNodeCallQ2)
+
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item != nil {
+		t.Errorf("expected no DLQ append for NET/ROM 'd' with a matching circuit, got %+v", item)
+	}
+	if c.state != nrStateAwaitingRelease {
+		t.Errorf("expected circuit to move to nrStateAwaitingRelease, got %d", c.state)
+	}
+}
+
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	// Encode the via_info payload: num_digi + 7 x 10-byte callsign slots.
 	var via struct {
@@ -493,4 +612,103 @@ func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
 	assert.Equal(t, byte('X'), reply.Header.DataKind)
 	require.Len(t, reply.Data, 1)
 	assert.Equal(t, byte(1), reply.Data[0]) // success
+}
+
+// TestHandleClientCommand_d_NetromOtherClientsCircuitNotHijacked is the
+// regression test for a disconnect that went nowhere: the 'd' handler used to
+// match any NET/ROM circuit with the right callsigns, whoever owned it, and
+// then break past the AX.25 disconnect path. A client's plain AX.25
+// disconnect could be swallowed by another client's NET/ROM circuit that
+// happened to share the callsign pair.
+func TestHandleClientCommand_d_NetromOtherClientsCircuitNotHijacked(t *testing.T) {
+	setupNetromTestEnv(t)
+
+	// The circuit belongs to client 9.
+	var c = gNetromLinkMgr.allocCircuit()
+	c.localCall = testNodeCallQ1
+	c.remoteCall = testNodeCallQ2
+	c.remoteNode = testNodeCallQ2
+	c.nextHop = testNodeCallQ2
+	c.channel = 0
+	c.client = 9
+	c.state = nrStateConnected
+	gNetromLinkMgr.publishCircuit(c)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'd'
+	cmd.Header.Portx = 0
+	copy(cmd.Header.CallFrom[:], testNodeCallQ1)
+	copy(cmd.Header.CallTo[:], testNodeCallQ2)
+
+	// Client 0 disconnects its own AX.25 link, which must reach the DLQ.
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item == nil {
+		t.Error("expected a DLQ disconnect for a client that owns no NET/ROM circuit")
+	}
+	if c.state != nrStateConnected {
+		t.Errorf("another client's circuit should be untouched, state is now %d", c.state)
+	}
+}
+
+// TestHandleClientCommand_d_NetromWrongChannelNotIntercepted checks that a
+// disconnect on a channel NET/ROM is not configured for goes to the AX.25
+// path, whatever circuits exist elsewhere.
+func TestHandleClientCommand_d_NetromWrongChannelNotIntercepted(t *testing.T) {
+	setupNetromTestEnv(t)
+	save_audio_config_p.chan_medium[1] = MEDIUM_RADIO
+
+	var c = gNetromLinkMgr.allocCircuit()
+	c.localCall = testNodeCallQ1
+	c.remoteCall = testNodeCallQ2
+	c.remoteNode = testNodeCallQ2
+	c.nextHop = testNodeCallQ2
+	c.channel = 1
+	c.client = 0
+	c.state = nrStateConnected
+	gNetromLinkMgr.publishCircuit(c)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'd'
+	cmd.Header.Portx = 1 // NET/ROM is configured for channel 0.
+	copy(cmd.Header.CallFrom[:], testNodeCallQ1)
+	copy(cmd.Header.CallTo[:], testNodeCallQ2)
+
+	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	if item == nil {
+		t.Error("expected a DLQ disconnect on a channel NET/ROM is not configured for")
+	}
+}
+
+// TestHandleClientCommand_D_NetromOtherClientsCircuitNotUsed checks the same
+// ownership rule for connected data: one client's bytes must never be sent
+// down another client's circuit.
+func TestHandleClientCommand_D_NetromOtherClientsCircuitNotUsed(t *testing.T) {
+	setupNetromTestEnv(t)
+
+	var c = gNetromLinkMgr.allocCircuit()
+	c.localCall = testNodeCallQ1
+	c.remoteCall = testNodeCallQ2
+	c.remoteNode = testNodeCallQ2
+	c.nextHop = testNodeCallQ2
+	c.channel = 0
+	c.client = 9
+	c.state = nrStateConnected
+	gNetromLinkMgr.publishCircuit(c)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'D'
+	cmd.Header.Portx = 0
+	cmd.Header.PID = AX25_PID_NETROM
+	cmd.Data = []byte("not for you")
+	cmd.Header.DataLen = uint32(len(cmd.Data))
+	copy(cmd.Header.CallFrom[:], testNodeCallQ1)
+	copy(cmd.Header.CallTo[:], testNodeCallQ2)
+
+	handleClientCommand(0, cmd)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.vs != 0 {
+		t.Error("data from a client that does not own the circuit should not have been sent on it")
+	}
 }

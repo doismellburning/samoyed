@@ -827,12 +827,13 @@ type parseState struct {
 	text    string // current raw scanner line
 	keyword string // original (not uppercased) keyword token
 
-	audio *audio_s
-	digi  *digi_config_s
-	cdigi *cdigi_config_s
-	tt    *tt_config_s
-	igate *igate_config_s
-	misc  *misc_config_s
+	audio  *audio_s
+	digi   *digi_config_s
+	cdigi  *cdigi_config_s
+	tt     *tt_config_s
+	igate  *igate_config_s
+	misc   *misc_config_s
+	netrom *netrom_config_s
 }
 
 // configHandler is a keyword handler. It returns true if the outer scanner loop
@@ -924,6 +925,7 @@ var configHandlers = map[string]configHandler{
 	"MAXV22":         handleMAXV22,
 	"V20":            handleV20,
 	"NOXID":          handleNOXID,
+	"NETROM":         handleNETROM,
 }
 
 func config_init(fname string, p_audio_config *audio_s,
@@ -931,7 +933,8 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
-	p_misc_config *misc_config_s) {
+	p_misc_config *misc_config_s,
+	p_netrom_config *netrom_config_s) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -1140,6 +1143,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		tt:      p_tt_config,
 		igate:   p_igate_config,
 		misc:    p_misc_config,
+		netrom:  p_netrom_config,
 	}
 
 	/*
@@ -6131,6 +6135,109 @@ func handleNOXID(ps *parseState) bool {
 	}
 
 	return false
+}
+
+// handleNETROM handles the NETROM keyword.
+func handleNETROM(ps *parseState) bool {
+	if ps.netrom != nil {
+		parseNetromConfig(ps.line, ps.netrom)
+	}
+
+	return true
+}
+
+// parseNetromConfig parses a NETROM config line into config.
+// Format: NETROM <channel> <callsign> <alias> [TTL <n>] [NODES <seconds>] [QUALITY <n>]
+func parseNetromConfig(line int, config *netrom_config_s) {
+	var t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Missing channel number for NETROM.\n", line)
+
+		return
+	}
+	// A NET/ROM node can sit on a radio channel or on a virtual one (e.g. an
+	// NCHANNEL network TNC), so the bound here is MAX_TOTAL_CHANS rather than
+	// MAX_RADIO_CHANS.  Which medium the channel actually turns out to be is
+	// not known yet: config lines are processed in order, so chan_medium[] is
+	// still unset if this line precedes the NCHANNEL one.  netrom_init does
+	// that check once the whole file has been read.
+	var nrChan, nrChanErr = strconv.Atoi(t)
+	if nrChanErr != nil || nrChan < 0 || nrChan >= MAX_TOTAL_CHANS {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Invalid channel %s for NETROM, must be in range of 0 to %d.\n",
+			line, t, MAX_TOTAL_CHANS-1)
+
+		return
+	}
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Missing callsign for NETROM.\n", line)
+
+		return
+	}
+	var nrCall = strings.ToUpper(t)
+
+	t = split("", false)
+	if t == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file, line %d: Missing alias for NETROM.\n", line)
+
+		return
+	}
+	var nrAlias = strings.ToUpper(t)
+	if len(nrAlias) > netromAliasLen {
+		nrAlias = nrAlias[:netromAliasLen]
+	}
+
+	config.enabled = true
+	config.channel = nrChan
+	config.callsign = nrCall
+	config.alias = nrAlias
+
+	// Parse optional keyword=value pairs.
+	t = split("", false)
+	for t != "" {
+		switch strings.ToUpper(t) {
+		case "TTL":
+			t = split("", false)
+			var n, err = strconv.Atoi(t)
+			if err == nil && n > 0 && n <= 255 {
+				config.ttl = byte(n)
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Invalid TTL value %s for NETROM.\n", line, t)
+			}
+		case "NODES":
+			t = split("", false)
+			var n, err = strconv.Atoi(t)
+			if err == nil && n > 0 {
+				config.nodesInterval = n
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Invalid NODES interval %s for NETROM.\n", line, t)
+			}
+		case "QUALITY":
+			t = split("", false)
+			// The error matters here in a way it does not for TTL and NODES:
+			// 0 is a legal quality, so without this check a non-numeric
+			// value would silently configure quality 0.
+			var n, err = strconv.Atoi(t)
+			if err == nil && n >= 0 && n <= 255 {
+				config.quality = byte(n)
+				config.qualitySet = true
+			} else {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Invalid QUALITY value %s for NETROM.\n", line, t)
+			}
+		default:
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file, line %d: Unexpected NETROM option '%s'.\n", line, t)
+		}
+		t = split("", false)
+	}
 }
 
 /*
