@@ -67,7 +67,6 @@ linters:
       checks:
         - all
         - '-ST1003' # Default
-        - '-ST1016' # Default
         - '-ST1020' # Default
         - '-ST1021' # Default
         - '-ST1022' # Default
