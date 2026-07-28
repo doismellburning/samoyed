@@ -328,7 +328,7 @@ func alldigits(p string) bool {
 
 func alllettersorpm(p string) bool {
 	return !strings.ContainsFunc(p, func(r rune) bool {
-		return !(unicode.IsLetter(r) || r == '+' || r == '-')
+		return !unicode.IsLetter(r) && r != '+' && r != '-'
 	})
 }
 
@@ -1915,7 +1915,7 @@ func handleMODEM(ps *parseState) bool {
 				/* Here we only catch something other than letters and + mixed in. */
 				/* Later, we check for valid letters and no more than one letter if + specified. */
 				if strings.ContainsFunc(t, func(r rune) bool {
-					return !(unicode.IsLetter(r) || r == '+' || r == '-')
+					return !unicode.IsLetter(r) && r != '+' && r != '-'
 				}) {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Demodulator type can only contain letters and + character.\n", ps.line)
@@ -5352,7 +5352,7 @@ func handleKISSPORT(ps *parseState) bool {
 		for i := 0; i < MAX_KISS_TCP_PORTS && slot == -1; i++ {
 			if ps.misc.kiss_port[i] == tcp_port { //nolint:staticcheck
 				slot = i
-				if !(slot == 0 && tcp_port == DEFAULT_KISS_PORT) {
+				if slot != 0 || tcp_port != DEFAULT_KISS_PORT {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Warning: Duplicate TCP port %d will overwrite previous value.\n", ps.line, tcp_port)
 				}

@@ -2601,7 +2601,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 					ask_resend_count++
 
 					x = AX25MODULO(x+1, S.modulo)
-					if !(x != AX25MODULO(last+1, S.modulo)) {
+					if x == AX25MODULO(last+1, S.modulo) {
 						break
 					}
 				}
