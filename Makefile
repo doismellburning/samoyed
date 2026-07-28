@@ -47,6 +47,10 @@ test: gotest test-scripts
 gotest:
 	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
+.PHONY: race
+race:
+	go test $(GOTEST_FLAGS) -race $(SRC_DIRS)
+
 # TODO Better output name, non-PHONY target, docs, etc.
 .PHONY: gotest-bin
 gotest-bin:

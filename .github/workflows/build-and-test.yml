@@ -66,6 +66,7 @@ jobs:
       run: "go clean -cache"
 
     - run: "make test"
+    - run: "make race"
     - run: "make coveragereport"
     - run: "pipx install 'reuse[charset-normalizer]'"  # For validating the licence config
     - run: "make check"
