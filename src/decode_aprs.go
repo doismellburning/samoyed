@@ -3999,23 +3999,23 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	// Third fractional digit can be space instead.
 	// "MHz" should be exactly that capitalization.
 	// Print warning later it not.
-	var std_freq_re = regexp.MustCompile("^[/ ]?([0-9A-O][0-9][0-9]\\.[0-9][0-9][0-9 ])([Mm][Hh][Zz])") /* Frequency in standard format. */
+	var std_freq_re = regexp.MustCompile(`^[/ ]?([0-9A-O][0-9][0-9]\.[0-9][0-9][0-9 ])([Mm][Hh][Zz])`) /* Frequency in standard format. */
 
 	// If no tone, we might gobble up / after any data extension,
 	// We could also have a space but it's not required.
 	// I don't understand the difference between T and C so treat the same for now.
 	// We can also have "off" instead of number to explicitly mean none.
 
-	var std_tone_re = regexp.MustCompile("^[/ ]?([TtCc][012][0-9][0-9])")                                                    /* Tone in standard format. */
-	var std_toff_re = regexp.MustCompile("^[/ ]?[TtCc][Oo][Ff][Ff]")                                                         /* Explicitly no tone. */
-	var std_dcs_re = regexp.MustCompile("^[/ ]?[Dd]([0-7][0-7][0-7])")                                                       /* Digital codes squelch in standard format. */
-	var std_offset_re = regexp.MustCompile("^[/ ]?([+-][0-9][0-9][0-9])")                                                    /* Xmit freq offset in standard format. */
-	var std_range_re = regexp.MustCompile("^[/ ]?[Rr]([0-9][0-9])([mk])")                                                    /* Range in standard format. */
-	var dao_re = regexp.MustCompile("!([A-Z][0-9 ][0-9 ]|[a-z][!-{ ][!-{ ]|T[0-9 B][0-9 ])!")                                /* DAO */
-	var alt_re = regexp.MustCompile("/A=[0-9-][0-9][0-9][0-9][0-9][0-9]")                                                    /* /A= altitude */
-	var bad_freq_re = regexp.MustCompile("[0-9][0-9][0-9]\\.[0-9][0-9][0-9]?")                                               /* Likely frequency, not standard format */
-	var bad_tone_re = regexp.MustCompile("(^|[^0-9.])([6789][0-9]\\.[0-9]|[12][0-9][0-9]\\.[0-9]|67|77|100|123)($|[^0-9.])") /* Likely tone, not standard format */
-	var base91_tel_re = regexp.MustCompile("\\|(([!-{][!-{]){2,7})\\|")                                                      /* Base 91 compressed telemetry data. */
+	var std_tone_re = regexp.MustCompile("^[/ ]?([TtCc][012][0-9][0-9])")                                                  /* Tone in standard format. */
+	var std_toff_re = regexp.MustCompile("^[/ ]?[TtCc][Oo][Ff][Ff]")                                                       /* Explicitly no tone. */
+	var std_dcs_re = regexp.MustCompile("^[/ ]?[Dd]([0-7][0-7][0-7])")                                                     /* Digital codes squelch in standard format. */
+	var std_offset_re = regexp.MustCompile("^[/ ]?([+-][0-9][0-9][0-9])")                                                  /* Xmit freq offset in standard format. */
+	var std_range_re = regexp.MustCompile("^[/ ]?[Rr]([0-9][0-9])([mk])")                                                  /* Range in standard format. */
+	var dao_re = regexp.MustCompile("!([A-Z][0-9 ][0-9 ]|[a-z][!-{ ][!-{ ]|T[0-9 B][0-9 ])!")                              /* DAO */
+	var alt_re = regexp.MustCompile("/A=[0-9-][0-9][0-9][0-9][0-9][0-9]")                                                  /* /A= altitude */
+	var bad_freq_re = regexp.MustCompile(`[0-9][0-9][0-9]\.[0-9][0-9][0-9]?`)                                              /* Likely frequency, not standard format */
+	var bad_tone_re = regexp.MustCompile(`(^|[^0-9.])([6789][0-9]\.[0-9]|[12][0-9][0-9]\.[0-9]|67|77|100|123)($|[^0-9.])`) /* Likely tone, not standard format */
+	var base91_tel_re = regexp.MustCompile(`\|(([!-{][!-{]){2,7})\|`)                                                      /* Base 91 compressed telemetry data. */
 
 	commentData = bytes.TrimRight(commentData, "\x00") // Drop any trailing nulls
 	var clen = len(commentData)
