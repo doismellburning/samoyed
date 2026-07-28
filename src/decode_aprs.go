@@ -3609,13 +3609,13 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
 	}
 	var phms hms_s
 
-	if !(unicode.IsDigit(rune(p[0])) &&
-		unicode.IsDigit(rune(p[1])) &&
-		unicode.IsDigit(rune(p[2])) &&
-		unicode.IsDigit(rune(p[3])) &&
-		unicode.IsDigit(rune(p[4])) &&
-		unicode.IsDigit(rune(p[5])) &&
-		(p[6] == 'z' || p[6] == '/' || p[6] == 'h')) { //nolnit:staticcheck
+	if !unicode.IsDigit(rune(p[0])) ||
+		!unicode.IsDigit(rune(p[1])) ||
+		!unicode.IsDigit(rune(p[2])) ||
+		!unicode.IsDigit(rune(p[3])) ||
+		!unicode.IsDigit(rune(p[4])) ||
+		!unicode.IsDigit(rune(p[5])) ||
+		(p[6] != 'z' && p[6] != '/' && p[6] != 'h') { //nolnit:staticcheck
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n")
 

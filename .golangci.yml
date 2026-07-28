@@ -66,7 +66,6 @@ linters:
     staticcheck:
       checks:
         - all
-        - '-QF1001' # De Morgan's law *would* simplify some logic, but I'm copying upstream's style
         - '-ST1000' # Default
         - '-ST1003' # Default
         - '-ST1016' # Default

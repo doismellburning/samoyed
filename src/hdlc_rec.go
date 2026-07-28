@@ -221,7 +221,7 @@ func (s *hdlcState) recEasBit(raw int, future_use int) { //nolint:unparam
 			// examples contain a slash.
 			// It's not clear if a space can occur in other places.
 
-			if !((ch >= ' ' && ch <= 0x7f) || ch == '\r' || ch == '\n') {
+			if (ch < ' ' || ch > 0x7f) && ch != '\r' && ch != '\n' {
 				//#define DEBUG_E 1
 				/*
 				   #ifdef DEBUG_E

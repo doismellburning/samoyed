@@ -607,7 +607,7 @@ func (bs *BeaconService) sbCalculateNextTime(now time.Time, current_speed_mph fl
 func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	var bp = &(bs.miscConfig.beacon[j])
 
-	if !(bp.sendto_chan >= 0) {
+	if bp.sendto_chan < 0 {
 		panic("assert(bp.sendto_chan >= 0)")
 	}
 

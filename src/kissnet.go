@@ -367,7 +367,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 		for kps := kns.allPorts; kps != nil; kps = kps.pnext {
 			for client := range MAX_NET_CLIENTS {
 				// To all but origin.
-				if !(kps == from_kps && client == from_client) {
+				if kps != from_kps || client != from_client {
 					var conn = kps.clientConn(client)
 					if conn != nil {
 						if kps.channel == -1 || kps.channel == channel {
