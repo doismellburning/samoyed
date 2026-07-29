@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+// Package metrics exposes Prometheus counters and gauges over HTTP.
+//
 //nolint:gochecknoglobals
-package direwolf
+package metrics
 
 /*------------------------------------------------------------------
  *
@@ -12,13 +14,12 @@ package direwolf
  *
  * Description:	Counters (monotonically increasing) are registered with
  *		the default Prometheus registry and updated from the
- *		various subsystems as events happen, via the
- *		MetricsRecord* functions below.  Everything else is a
- *		gauge computed on the fly, at scrape time, by
- *		metricsCollector.Collect, from whatever state the
- *		owning subsystem already keeps (queue depths, DCD
- *		state, IGate counters, etc) - no push instrumentation
- *		required for those.
+ *		various subsystems as events happen, via the Record*
+ *		functions below.  Everything else is a gauge computed on
+ *		the fly, at scrape time, by Collector.Collect, from a
+ *		State snapshot supplied by the caller - this package has
+ *		no knowledge of, or dependency on, the code whose state
+ *		it's reporting.
  *
  *------------------------------------------------------------------*/
 
@@ -57,43 +58,56 @@ var metricDedupeHits = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:e
 	Help: "Number of transmit duplicates suppressed by the digipeater dedupe logic.",
 }, []string{"channel"})
 
-// MetricsRecordFrameReceived is called for every frame accepted with a valid
-// FCS, from app_process_rec_packet.  It also accounts for how much
-// correction (bit fixing, FX.25, or IL2P Reed-Solomon) was needed, if any.
-func MetricsRecordFrameReceived(channel int, fecType fec_type_t, retries BitFixLevel) {
+// RecordFrameReceived is called for every frame accepted with a valid FCS.
+// fecType should be "fx25", "il2p", or "fix_bits", describing what kind of
+// correction (if any) was needed; corrected is the correction amount.
+func RecordFrameReceived(channel int, fecType string, corrected int) {
 	var channelLabel = strconv.Itoa(channel)
 
 	metricFramesReceived.WithLabelValues(channelLabel).Inc()
 
-	if retries <= BitFixNone {
+	if corrected <= 0 {
 		return
 	}
 
-	switch fecType {
-	case fec_type_fx25:
-		metricCorrectedSymbols.WithLabelValues(channelLabel, "fx25").Add(float64(retries))
-	case fec_type_il2p:
-		metricCorrectedSymbols.WithLabelValues(channelLabel, "il2p").Add(float64(retries))
-	case fec_type_none:
-		metricCorrectedSymbols.WithLabelValues(channelLabel, "fix_bits").Add(float64(retries))
-	}
+	metricCorrectedSymbols.WithLabelValues(channelLabel, fecType).Add(float64(corrected))
 }
 
-// MetricsRecordFrameTransmitted is called for every frame handed to the
-// modem for transmission, from XmitService.send_one_frame.
-func MetricsRecordFrameTransmitted(channel int) {
+// RecordFrameTransmitted is called for every frame handed to the modem for transmission.
+func RecordFrameTransmitted(channel int) {
 	metricFramesTransmitted.WithLabelValues(strconv.Itoa(channel)).Inc()
 }
 
-// MetricsRecordRetry is called whenever the AX.25 link layer retry count
-// for a connected-mode session increases, from SET_RC.
-func MetricsRecordRetry(channel int) {
+// RecordRetry is called whenever the AX.25 link layer retry count for a
+// connected-mode session increases.
+func RecordRetry(channel int) {
 	metricAX25Retries.WithLabelValues(strconv.Itoa(channel)).Inc()
 }
 
-// MetricsRecordDedupeHit is called whenever DedupeService.Check finds a duplicate.
-func MetricsRecordDedupeHit(channel int) {
+// RecordDedupeHit is called whenever the digipeater dedupe logic finds a duplicate.
+func RecordDedupeHit(channel int) {
 	metricDedupeHits.WithLabelValues(strconv.Itoa(channel)).Inc()
+}
+
+// ChannelState is a snapshot of one radio channel's gauge-worthy state, as
+// reported by a State provider at scrape time.
+type ChannelState struct {
+	Up        bool
+	DCD       bool
+	AudioRecv int
+	TxQueue   []int // indexed by priority
+}
+
+// State is a snapshot of everything the pull-based gauges report, supplied
+// by the caller at scrape time.
+type State struct {
+	Channels            []ChannelState
+	IgateRFRecv         int
+	IgateRFXmit         int
+	IgateUplink         int
+	IgateDownlink       int
+	IgateConnects       int
+	IgateFailedConnects int
 }
 
 var (
@@ -109,12 +123,19 @@ var (
 	metricsDescIgateFailed = prometheus.NewDesc("samoyed_igate_failed_connects_total", "Number of failed connection attempts to the APRS-IS server.", nil, nil)
 )
 
-// metricsCollector is a pull-based prometheus.Collector for state that
-// other subsystems already track themselves - it just reads that state at
-// scrape time, so none of those subsystems need any push instrumentation.
-type metricsCollector struct{}
+// Collector is a pull-based prometheus.Collector for state that the caller
+// already tracks itself - it just reads a State snapshot at scrape time, so
+// the code being reported on needs no push instrumentation for it.
+type Collector struct {
+	source func() State
+}
 
-func (metricsCollector) Describe(ch chan<- *prometheus.Desc) {
+// NewCollector returns a Collector that calls source to get a fresh State snapshot each scrape.
+func NewCollector(source func() State) *Collector {
+	return &Collector{source: source}
+}
+
+func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- metricsDescChannelUp
 	ch <- metricsDescDCD
 	ch <- metricsDescAudioLevel
@@ -127,32 +148,30 @@ func (metricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- metricsDescIgateFailed
 }
 
-func (metricsCollector) Collect(ch chan<- prometheus.Metric) {
-	for channel := range MAX_RADIO_CHANS {
+func (c *Collector) Collect(ch chan<- prometheus.Metric) {
+	var state = c.source()
+
+	for channel, cs := range state.Channels {
 		var channelLabel = strconv.Itoa(channel)
-		var isRadioChannel = save_audio_config_p != nil && save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO
 
-		ch <- prometheus.MustNewConstMetric(metricsDescChannelUp, prometheus.GaugeValue, boolToFloat(isRadioChannel), channelLabel)
+		ch <- prometheus.MustNewConstMetric(metricsDescChannelUp, prometheus.GaugeValue, boolToFloat(cs.Up), channelLabel)
 
-		if isRadioChannel {
-			if hdlcReceiver != nil {
-				ch <- prometheus.MustNewConstMetric(metricsDescDCD, prometheus.GaugeValue, float64(hdlcReceiver.DataDetectAny(channel)), channelLabel)
-			}
-
-			ch <- prometheus.MustNewConstMetric(metricsDescAudioLevel, prometheus.GaugeValue, float64(demod_get_audio_level(channel, 0).rec), channelLabel)
+		if cs.Up {
+			ch <- prometheus.MustNewConstMetric(metricsDescDCD, prometheus.GaugeValue, boolToFloat(cs.DCD), channelLabel)
+			ch <- prometheus.MustNewConstMetric(metricsDescAudioLevel, prometheus.GaugeValue, float64(cs.AudioRecv), channelLabel)
 		}
 
-		for prio := range TQ_NUM_PRIO {
-			ch <- prometheus.MustNewConstMetric(metricsDescTxQueue, prometheus.GaugeValue, float64(tq_count(channel, prio, "", "", false)), channelLabel, strconv.Itoa(prio))
+		for prio, depth := range cs.TxQueue {
+			ch <- prometheus.MustNewConstMetric(metricsDescTxQueue, prometheus.GaugeValue, float64(depth), channelLabel, strconv.Itoa(prio))
 		}
 	}
 
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateRFRecv, prometheus.CounterValue, float64(stats_rf_recv_packets))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateRFXmit, prometheus.CounterValue, float64(stats_rf_xmit_packets))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateUpl, prometheus.CounterValue, float64(stats_uplink_packets))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateDnl, prometheus.CounterValue, float64(stats_downlink_packets))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateConn, prometheus.CounterValue, float64(stats_connects))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateFailed, prometheus.CounterValue, float64(stats_failed_connect))
+	ch <- prometheus.MustNewConstMetric(metricsDescIgateRFRecv, prometheus.CounterValue, float64(state.IgateRFRecv))
+	ch <- prometheus.MustNewConstMetric(metricsDescIgateRFXmit, prometheus.CounterValue, float64(state.IgateRFXmit))
+	ch <- prometheus.MustNewConstMetric(metricsDescIgateUpl, prometheus.CounterValue, float64(state.IgateUplink))
+	ch <- prometheus.MustNewConstMetric(metricsDescIgateDnl, prometheus.CounterValue, float64(state.IgateDownlink))
+	ch <- prometheus.MustNewConstMetric(metricsDescIgateConn, prometheus.CounterValue, float64(state.IgateConnects))
+	ch <- prometheus.MustNewConstMetric(metricsDescIgateFailed, prometheus.CounterValue, float64(state.IgateFailedConnects))
 }
 
 func boolToFloat(b bool) float64 {
@@ -163,29 +182,21 @@ func boolToFloat(b bool) float64 {
 	return 0
 }
 
-// metrics_init starts the Prometheus "/metrics" HTTP endpoint if a port
-// was configured with METRICSPORT.  A port of 0 (the default) disables it.
-func metrics_init(mc *misc_config_s) {
-	if mc.metrics_port == 0 {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Disabled Prometheus metrics endpoint.\n")
-
-		return
-	}
-
-	prometheus.MustRegister(metricsCollector{})
+// Start starts the Prometheus "/metrics" HTTP endpoint on port, registering
+// a Collector that calls source for gauge state at scrape time, and returns
+// a channel that receives a single error if and when the listener fails.
+// Logging of success/failure is the caller's responsibility.
+func Start(port int, source func() State) <-chan error {
+	prometheus.MustRegister(NewCollector(source))
 
 	var mux = http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
+	var errCh = make(chan error, 1)
+
 	go func() {
-		var err = http.ListenAndServe(fmt.Sprintf(":%d", mc.metrics_port), mux) //nolint:gosec
-		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, err)
-		}
+		errCh <- http.ListenAndServe(fmt.Sprintf(":%d", port), mux) //nolint:gosec
 	}()
 
-	text_color_set(DW_COLOR_INFO)
-	dw_printf("Prometheus metrics endpoint listening on port %d.\n", mc.metrics_port)
+	return errCh
 }

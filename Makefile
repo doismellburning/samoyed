@@ -3,7 +3,7 @@ DEB_STAGING = .deb-staging
 C_FILES = $(shell find * -name \*.c)
 GO_FILES = $(shell find * -name \*.go)
 SHELL_FILES = $(shell grep -rIl '^\#!.*sh' *)
-SRC_DIRS = ./cmd/... ./src/...
+SRC_DIRS = ./cmd/... ./src/... ./internal/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
@@ -45,7 +45,7 @@ test: gotest test-scripts
 
 .PHONY: gotest
 gotest:
-	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
+	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./src/...,./internal/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
 .PHONY: race
 race:

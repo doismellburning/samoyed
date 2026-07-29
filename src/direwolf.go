@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
 	goHamlib "github.com/xylo04/goHamlib"
@@ -838,7 +839,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	Assert(slice >= 0 && slice < MAX_SLICERS)
 	Assert(pp != nil) // 1.1J+
 
-	MetricsRecordFrameReceived(channel, fec_type, retries)
+	metrics.RecordFrameReceived(channel, fecTypeLabel(fec_type), int(retries))
 
 	// Extra stuff before slice indicators.
 	// Can indicate FX.25/IL2P or fix_bits.

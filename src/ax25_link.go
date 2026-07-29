@@ -152,6 +152,8 @@ import (
 	"runtime"
 	"slices"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 // Limits and defaults for parameters.
@@ -539,7 +541,7 @@ func SET_VR(S *ax25_dlsm_t, n int) {
 
 func SET_RC(S *ax25_dlsm_t, n int) {
 	if n > S.rc {
-		MetricsRecordRetry(S.channel)
+		metrics.RecordRetry(S.channel)
 	}
 
 	S.rc = (n)
