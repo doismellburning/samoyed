@@ -5,5 +5,8 @@ source "$(dirname "$(realpath "$0")")/common"
 goto_tmpdir
 
 $GEN_PACKETS -B4800 -n 100 -o test48.wav
-$ATEST -B4800 -F0 -L68 -G74 test48.wav
-$ATEST -B4800 -F1 -L72 -G84 test48.wav
+
+f0() { $ATEST -B4800 -F0 -L68 -G74 test48.wav; }
+f1() { $ATEST -B4800 -F1 -L72 -G84 test48.wav; }
+
+run_parallel f0 f1
