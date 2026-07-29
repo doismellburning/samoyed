@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"context"
 	"net"
 	"os"
 	"path/filepath"
@@ -206,14 +207,14 @@ func setupAdev0(t *testing.T) *adev_s {
 
 func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 	// Start a UDP listener to receive the audio output.
-	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	defer listener.Close()
 
 	// Dial from the "transmitter" side.
 	var conn net.Conn
-	conn, err = net.Dial("udp", listener.LocalAddr().String())
+	conn, err = new(net.Dialer).DialContext(context.Background(), "udp", listener.LocalAddr().String())
 	require.NoError(t, err)
 
 	defer conn.Close()
@@ -315,13 +316,13 @@ func Test_audioFlushReal_UDP_emptyBuffer_isNoop(t *testing.T) {
 
 func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 	// Start a UDP listener to receive the keepalive silence.
-	var listener, err = net.ListenPacket("udp", "127.0.0.1:0")
+	var listener, err = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	defer listener.Close()
 
 	var conn net.Conn
-	conn, err = net.Dial("udp", listener.LocalAddr().String())
+	conn, err = new(net.Dialer).DialContext(context.Background(), "udp", listener.LocalAddr().String())
 	require.NoError(t, err)
 
 	defer conn.Close()

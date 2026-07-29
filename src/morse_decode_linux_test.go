@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"context"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -56,7 +57,7 @@ func Test_Morse_Generate_Decode(t *testing.T) {
 
 	// Now decode
 
-	var cmd = exec.Command("morse2ascii", f) //nolint:gosec
+	var cmd = exec.CommandContext(context.Background(), "morse2ascii", f) //nolint:gosec
 
 	var output, outputErr = cmd.Output()
 

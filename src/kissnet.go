@@ -145,6 +145,7 @@ same direwolf instance.
 */
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"syscall"
@@ -551,7 +552,7 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 		dw_printf("Binding to port %d ... \n", kps.tcp_port);
 	#endif
 	*/
-	var listener, listenErr = net.Listen("tcp", fmt.Sprintf(":%d", kps.tcp_port))
+	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", kps.tcp_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("connectListenThread: Listen failed: %s", listenErr)

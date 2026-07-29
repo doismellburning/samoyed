@@ -7,6 +7,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -68,7 +69,7 @@ func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
 	if udpRequested {
 		var addr = net.JoinHostPort(mc.waypoint_udp_hostname, strconv.Itoa(mc.waypoint_udp_portnum))
 
-		var conn, err = net.Dial("udp", addr)
+		var conn, err = new(net.Dialer).DialContext(context.Background(), "udp", addr)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Couldn't create socket for waypoint send to %s: %s\n", addr, err)

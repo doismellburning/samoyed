@@ -39,6 +39,7 @@ $ ./tnctest localhost:5001=dw1 localhost:5002=dw2
 */
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -421,7 +422,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	/*
 	 * Connect to TNC server.
 	 */
-	var conn, connErr = net.Dial("tcp4", net.JoinHostPort(hostname, port)) //nolint:gosec // G704: hostport should be provided by user-supplied config
+	var conn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp4", net.JoinHostPort(hostname, port))
 	if connErr != nil {
 		fmt.Printf("TNC %d unable to connect to %s on %s, port %s: %s\n",
 			my_index, description, hostname, port, connErr)

@@ -26,6 +26,7 @@ package direwolf
 // What do we call the parts separated by * key?  Field.
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os/exec"
@@ -1681,7 +1682,7 @@ func dw_run_cmd(cmd string, oneline int) ([]byte, error) {
 		cmd = strings.TrimSpace(cmd)
 	}
 
-	return exec.Command(cmd).Output()
+	return exec.CommandContext(context.Background(), cmd).Output()
 }
 
 /* end aprs_tt.c */

@@ -31,6 +31,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -936,7 +937,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 /* Broken out into separate function so configuration can validate it. */
 
 func xmit_speak_it(script string, c int, msg string) error {
-	var cmd = exec.Command(script, strconv.Itoa(c), msg) //nolint:gosec // Trust the user-supplied config
+	var cmd = exec.CommandContext(context.Background(), script, strconv.Itoa(c), msg) //nolint:gosec // Trust the user-supplied config
 
 	var err = cmd.Run()
 	if err != nil {

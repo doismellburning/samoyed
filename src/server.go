@@ -113,6 +113,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -365,7 +366,7 @@ func server_connect_listen_thread(server_port int) {
 	    	dw_printf("Binding to port %d ... \n", server_port);
 	#endif
 	*/
-	var listener, listenErr = net.Listen("tcp", fmt.Sprintf(":%d", server_port))
+	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", server_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
