@@ -5,7 +5,10 @@ source "$(dirname "$(realpath "$0")")/common"
 goto_tmpdir
 
 $GEN_PACKETS -B300 -n 100 -o test3.wav
-$ATEST -B300 -PA -F0 -L65 -G71 test3.wav
-$ATEST -B300 -PA -F1 -L69 -G75 test3.wav
-$ATEST -B300 -PB -F0 -L69 -G75 test3.wav
-$ATEST -B300 -PB -F1 -L73 -G79 test3.wav
+
+pa_f0() { $ATEST -B300 -PA -F0 -L65 -G71 test3.wav; }
+pa_f1() { $ATEST -B300 -PA -F1 -L69 -G75 test3.wav; }
+pb_f0() { $ATEST -B300 -PB -F0 -L69 -G75 test3.wav; }
+pb_f1() { $ATEST -B300 -PB -F1 -L73 -G79 test3.wav; }
+
+run_parallel pa_f0 pa_f1 pb_f0 pb_f1

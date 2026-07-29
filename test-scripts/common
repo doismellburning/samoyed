@@ -22,3 +22,28 @@ function goto_tmpdir() {
 	echo "$TMPDIR"
 	cd "$TMPDIR" || exit
 }
+
+# Runs each named function in parallel, waits for all of them, prints their
+# captured output back out in the order given (for readable logs), and
+# returns non-zero if any of them failed.
+function run_parallel() {
+	local logdir
+	logdir=$(mktemp --directory)
+	local pids=()
+	local names=("$@")
+	local i
+
+	for i in "${!names[@]}"; do
+		"${names[$i]}" > "$logdir/$i.log" 2>&1 &
+		pids+=("$!")
+	done
+
+	local failed=0
+	for i in "${!pids[@]}"; do
+		wait "${pids[$i]}" || failed=1
+		cat "$logdir/$i.log"
+	done
+
+	rm -rf "$logdir"
+	return $failed
+}
