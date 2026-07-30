@@ -5,8 +5,8 @@ go 1.25.0
 require (
 	github.com/brutella/dnssd v1.2.14
 	github.com/creack/pty v1.1.24
+	github.com/gen2brain/malgo v0.11.25
 	github.com/golang/geo v0.0.0-20180826223333-635502111454
-	github.com/gordonklaus/portaudio v0.0.0-20250206071425-98a94950218b
 	github.com/jochenvg/go-udev v0.0.0-20240801134859-b65ed646224b
 	github.com/lestrrat-go/strftime v1.2.0
 	github.com/pkg/term v1.1.0

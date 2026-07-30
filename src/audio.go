@@ -6,10 +6,15 @@ package direwolf
  * Purpose:   	Interface to audio device commonly called a "sound card" for
  *		historical reasons.
  *
- *		This version uses PortAudio for cross-platform audio support.
+ *		This version uses miniaudio (via the malgo bindings) for
+ *		cross-platform audio support. On Linux the ALSA backend is
+ *		requested explicitly so that ALSA device strings like
+ *		"plughw:Loopback,1,1" (including subdevice numbers) are
+ *		passed straight through to ALSA rather than being resolved
+ *		against a separate device enumeration.
  *
- * References:	PortAudio documentation: http://www.portaudio.com/
- *		Go bindings: https://github.com/gordonklaus/portaudio
+ * References:	miniaudio: https://miniaud.io/
+ *		Go bindings: https://github.com/gen2brain/malgo
  *
  * Credits:	Release 1.0: Fabrice FAURE contributed code for the SDR UDP interface.
  *
@@ -19,22 +24,24 @@ package direwolf
  *
  *		1.2 - Add ability to use more than one audio device.
  *		Go port - Replaced ALSA with PortAudio for cross-platform support.
+ *		Replaced PortAudio with miniaudio/malgo.
  *
  *---------------------------------------------------------------*/
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
-	"github.com/gordonklaus/portaudio"
+	"github.com/gen2brain/malgo"
 )
 
 /*
@@ -455,7 +462,7 @@ type audio_s struct {
 
 }
 
-const DEFAULT_ADEVICE = "default" // Use default device for PortAudio.
+const DEFAULT_ADEVICE = "default" // Use default device for ALSA / miniaudio.
 
 /*
  * UDP audio receiving port.  Couldn't find any standard or usage precedent.
@@ -531,7 +538,7 @@ const DEFAULT_FULLDUP = false // false = half duplex
 /* Audio configuration. */
 
 // audioRingBuffer is a thread-safe ring buffer for audio data.
-// The PortAudio callback writes to this buffer, and the main
+// The miniaudio capture callback writes to this buffer, and the main
 // processing thread reads from it.
 type audioRingBuffer struct {
 	buf      []byte
@@ -555,10 +562,10 @@ func newAudioRingBuffer(size int) *audioRingBuffer {
 	return rb
 }
 
-// write adds data to the ring buffer. Called from PortAudio callback.
+// write adds data to the ring buffer. Called from the miniaudio capture callback.
 // Returns true if all data was written, false if some was dropped (overflow).
 // Uses chunk copies (at most two) to minimise time holding the mutex.
-func (rb *audioRingBuffer) write(data []byte) bool { //nolint:unparam
+func (rb *audioRingBuffer) write(data []byte) bool {
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
 
@@ -673,12 +680,133 @@ func (rb *audioRingBuffer) close() {
 	rb.cond.Broadcast()
 }
 
+// playbackRingBuffer is a thread-safe ring buffer bridging audio_flush_real
+// (which fills it as fast as the caller produces frames) and miniaudio's
+// playback callback (which drains it at the device's own pace and must never
+// block). Unlike audioRingBuffer, writes block until space is available
+// rather than dropping old data, since dropping output samples would corrupt
+// what's transmitted; reads never block and pad short reads with silence.
+type playbackRingBuffer struct {
+	buf      []byte
+	size     int
+	readPos  int
+	writePos int
+	count    int
+	silence  byte // fill value for underruns: 0 for 16-bit signed, 128 for 8-bit unsigned
+	mu       sync.Mutex
+	hasSpace *sync.Cond // signalled whenever count decreases (read, or close)
+	closed   bool
+}
+
+func newPlaybackRingBuffer(size int, silence byte) *playbackRingBuffer {
+	var rb = &playbackRingBuffer{ //nolint:exhaustruct
+		buf:     make([]byte, size),
+		size:    size,
+		silence: silence,
+	}
+	rb.hasSpace = sync.NewCond(&rb.mu)
+
+	return rb
+}
+
+// write blocks until all of data has been copied in, or the buffer is
+// closed. Called from audio_flush_real, never from the audio callback.
+func (rb *playbackRingBuffer) write(data []byte) {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	for len(data) > 0 && !rb.closed {
+		for rb.count == rb.size && !rb.closed {
+			rb.hasSpace.Wait()
+		}
+
+		if rb.closed {
+			return
+		}
+
+		var free = rb.size - rb.count
+		var n = len(data)
+		if n > free {
+			n = free
+		}
+
+		var part1 = rb.size - rb.writePos
+		if part1 > n {
+			part1 = n
+		}
+
+		copy(rb.buf[rb.writePos:], data[:part1])
+
+		if n > part1 {
+			copy(rb.buf[0:], data[part1:n])
+		}
+
+		rb.writePos = (rb.writePos + n) % rb.size
+		rb.count += n
+		data = data[n:]
+	}
+}
+
+// read fills dst from the ring buffer without blocking, padding any
+// shortfall with silence. Called from the miniaudio playback callback.
+func (rb *playbackRingBuffer) read(dst []byte) {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	var n = len(dst)
+	if n > rb.count {
+		n = rb.count
+	}
+
+	var part1 = rb.size - rb.readPos
+	if part1 > n {
+		part1 = n
+	}
+
+	copy(dst[:part1], rb.buf[rb.readPos:])
+
+	if n > part1 {
+		copy(dst[part1:n], rb.buf[0:n-part1])
+	}
+
+	for i := n; i < len(dst); i++ {
+		dst[i] = rb.silence
+	}
+
+	rb.readPos = (rb.readPos + n) % rb.size
+	rb.count -= n
+
+	rb.hasSpace.Broadcast()
+}
+
+// waitEmpty blocks until every byte written has been read (i.e. handed to
+// the playback callback), so it's safe to stop the device without cutting
+// off queued audio.
+func (rb *playbackRingBuffer) waitEmpty() {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	for rb.count > 0 && !rb.closed {
+		rb.hasSpace.Wait()
+	}
+}
+
+// close unblocks any in-progress write and read calls without draining the
+// buffer.
+func (rb *playbackRingBuffer) close() {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+
+	rb.closed = true
+	rb.hasSpace.Broadcast()
+}
+
 /* Current state for each of the audio devices. */
 
 type adev_s struct {
-	// PortAudio streams (replaces ALSA handles)
-	inputStream  *portaudio.Stream
-	outputStream *portaudio.Stream
+	// miniaudio devices
+	captureDevice  *malgo.Device
+	playbackDevice *malgo.Device
 
 	// Audio format
 	bytesPerFrame int
@@ -686,13 +814,12 @@ type adev_s struct {
 	numChannels   int
 	bitsPerSample int
 
-	// Ring buffer for input audio (filled by callback)
+	// Ring buffer for input audio (filled by the capture callback)
 	inputRingBuf *audioRingBuffer
 
-	// Output buffers for blocking writes
-	outputBuf16   []int16 // Output buffer for 16-bit blocking writes
-	outputBuf8    []uint8 // Output buffer for 8-bit blocking writes
-	outputStarted bool    // Whether output stream is currently started
+	// Ring buffer for output audio (drained by the playback callback)
+	outputRingBuf *playbackRingBuffer
+	outputStarted bool // Whether the playback device is currently started
 
 	// Byte-level buffers (maintains existing interface for non-soundcard input)
 	inbufSizeInBytes  int
@@ -702,12 +829,6 @@ type adev_s struct {
 	outbufSizeInBytes int
 	outbuf            []byte
 	outbufLen         int
-
-	// Frames per buffer for PortAudio
-	framesPerBuffer int
-
-	// Pre-allocated scratch buffer for zero-allocation int16→byte conversion in the input callback.
-	inputScratchBuf []byte
 
 	// Input type
 	g_audio_in_type audio_in_type_e
@@ -725,16 +846,23 @@ type adev_s struct {
 
 var adev [MAX_ADEVS]*adev_s
 
-// portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
+// malgoCtxMu guards malgoCtx/malgoCtxRefCount and ensures InitContext/Free are
 // correctly paired even if audio_open/audio_close are called concurrently.
-var portaudioMu sync.Mutex
-var portaudioRefCount int
+var malgoCtxMu sync.Mutex
+var malgoCtx *malgo.AllocatedContext
+var malgoCtxRefCount int
 
-// anyDeviceRequiresPortAudio reports whether any configured audio device needs
-// PortAudio (i.e. is a soundcard rather than stdin or UDP).  Used to skip
-// portaudio.Initialize() when all devices are stdin/UDP, so that samoyed can
-// run on systems with no working PortAudio host backend (issue #501).
-func anyDeviceRequiresPortAudio(pa *audio_s) bool {
+// malgoBackends pins the ALSA backend on Linux so that ALSA device strings
+// (e.g. "plughw:Loopback,1,1") are handled directly by ALSA, rather than
+// letting miniaudio auto-detect a backend (e.g. PulseAudio) that wouldn't
+// understand them. Revisit if macOS/Windows support is ever added.
+var malgoBackends = []malgo.Backend{malgo.BackendAlsa}
+
+// anyDeviceRequiresAudioBackend reports whether any configured audio device
+// needs a miniaudio backend (i.e. is a soundcard rather than stdin or UDP).
+// Used to skip malgo.InitContext() when all devices are stdin/UDP, so that
+// samoyed can run on systems with no working audio backend (issue #501).
+func anyDeviceRequiresAudioBackend(pa *audio_s) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
@@ -773,201 +901,24 @@ func calcbufsize(rate int, chans int, bits int) int {
 	return (size2)
 }
 
-/*
- * Find a PortAudio device by name.
- * Supports:
- *   - "default" or "" -> system default device
- *   - "hw:X,Y" style ALSA names -> search by substring
- *   - Direct device name matching
- */
-// parseALSADeviceName parses ALSA device names like "hw:Card,Dev,Sub" or
-// "plughw:Card,Dev,Sub" and returns the card name and device number.
-// Returns ("", -1) if the name doesn't match the ALSA pattern.
-func parseALSADeviceName(name string) (cardName string, devNum int) {
-	// Strip prefix: hw:, plughw:, etc.
-	var lower = strings.ToLower(name)
-
-	var idx = strings.Index(lower, "hw:")
-	if idx < 0 {
-		return "", -1
-	}
-	var rest = name[idx+3:] // after "hw:"
-
-	// Split by comma: Card,Dev[,Sub]
-	var parts = strings.SplitN(rest, ",", 3)
-	if len(parts) < 2 {
-		return parts[0], -1
-	}
-
-	devNum = -1
-	fmt.Sscanf(parts[1], "%d", &devNum)
-
-	return parts[0], devNum
-}
-
-// parseALSACardsProc parses the content of /proc/asound/cards and returns a
-// map from ALSA card ID (e.g. "FTDX10") to card number.
-func parseALSACardsProc(content string) map[string]int {
-	var result = make(map[string]int)
-	for line := range strings.SplitSeq(content, "\n") {
-		var trimmed = strings.TrimSpace(line)
-		var bracketStart = strings.Index(trimmed, "[")
-		if bracketStart < 0 {
-			continue
-		}
-		var bracketEnd = strings.Index(trimmed, "]")
-		if bracketEnd <= bracketStart {
-			continue
-		}
-		var numStr = strings.TrimSpace(trimmed[:bracketStart])
-		var cardID = strings.TrimSpace(trimmed[bracketStart+1 : bracketEnd])
-		var num int
-		var _, sscanfErr = fmt.Sscanf(numStr, "%d", &num)
-		if sscanfErr != nil {
-			continue
-		}
-		result[cardID] = num
-	}
-
-	return result
-}
-
-// alsaCardsPath is the path used by resolveALSACardNumber to read the ALSA
-// card list. It is a variable so tests can substitute a temporary file.
-var alsaCardsPath = "/proc/asound/cards"
-
-// resolveALSACardNumber resolves an ALSA card ID (e.g. "FTDX10", as used in
-// plughw:FTDX10,0) to its numeric card index by reading /proc/asound/cards.
-// Returns (0, false) if the card ID cannot be resolved.
-func resolveALSACardNumber(cardID string) (int, bool) {
-	var content, err = os.ReadFile(alsaCardsPath)
-	if err != nil {
-		return 0, false
-	}
-	var cards = parseALSACardsProc(string(content))
-	var num, ok = cards[cardID]
-
-	return num, ok
-}
-
-// matchPortAudioDeviceByName searches devices for one matching name using
-// several strategies: exact match, substring match, and ALSA-style name
-// matching (including resolution of udev-assigned card IDs via
-// /proc/asound/cards). Returns nil if no match is found.
-func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio.DeviceInfo) *portaudio.DeviceInfo {
-	var devMatchesDirection = func(dev *portaudio.DeviceInfo) bool {
-		if forInput {
-			return dev.MaxInputChannels > 0
-		}
-
-		return dev.MaxOutputChannels > 0
-	}
-
-	// Try exact match first.
-	for _, dev := range devices {
-		if dev.Name == name && devMatchesDirection(dev) {
-			return dev
-		}
-	}
-
-	// Try substring match (check both directions).
-	for _, dev := range devices {
-		if devMatchesDirection(dev) {
-			var nameLower = strings.ToLower(name)
-			var devLower = strings.ToLower(dev.Name)
-			if strings.Contains(devLower, nameLower) || strings.Contains(nameLower, devLower) {
-				return dev
-			}
-		}
-	}
-
-	// Try ALSA-style name matching.
-	// Config names like "plughw:Loopback,1,1" need to match PortAudio names
-	// like "Loopback: PCM (hw:0,1)".
-	// Extract card name and device number from the config, then match against
-	// the card name prefix and (hw:X,Dev) pattern in PortAudio device names.
-	var cardName, devNum = parseALSADeviceName(name)
-	if cardName != "" {
-		// First try matching by card name substring in PortAudio device names.
-		// This covers the common case where the ALSA card name matches part of
-		// the PortAudio description (e.g. "Loopback" appearing in "Loopback: PCM (hw:0,1)").
-		for _, dev := range devices {
-			if !devMatchesDirection(dev) {
-				continue
-			}
-			var devLower = strings.ToLower(dev.Name)
-			if !strings.Contains(devLower, strings.ToLower(cardName)) {
-				continue
-			}
-			if devNum >= 0 {
-				var target = fmt.Sprintf(",%d)", devNum)
-				if strings.Contains(dev.Name, target) {
-					return dev
-				}
-			} else {
-				return dev
-			}
-		}
-
-		// The card name may be a udev-assigned ALSA card ID that differs from
-		// the hardware description PortAudio uses. Resolve it to a numeric card
-		// index via /proc/asound/cards (Linux) and match by (hw:N,M).
-		if cardNum, ok := resolveALSACardNumber(cardName); ok {
-			for _, dev := range devices {
-				if !devMatchesDirection(dev) {
-					continue
-				}
-				if devNum >= 0 {
-					var target = fmt.Sprintf("(hw:%d,%d)", cardNum, devNum)
-					if strings.Contains(dev.Name, target) {
-						return dev
-					}
-				} else {
-					var target = fmt.Sprintf("(hw:%d,", cardNum)
-					if strings.Contains(dev.Name, target) {
-						return dev
-					}
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
-	// Handle default device
-	if name == "" || strings.ToLower(name) == "default" {
-		if forInput {
-			var dev, err = portaudio.DefaultInputDevice()
-			if err != nil {
-				return nil
-			}
-
-			return dev
-		} else {
-			var dev, err = portaudio.DefaultOutputDevice()
-			if err != nil {
-				return nil
-			}
-
-			return dev
-		}
-	}
-
-	// Search through all devices
-	var devices, err = portaudio.Devices()
-	if err != nil {
+// deviceIDFromName builds a malgo.DeviceID from an ALSA device name string
+// (e.g. "hw:0,0", "plughw:Loopback,1,1", "plughw:FTDX10,0"). Since the ALSA
+// backend is pinned (see malgoBackends), miniaudio hands the string straight
+// to ALSA's own snd_pcm_open, which already understands hw:/plughw: syntax,
+// including subdevice numbers and udev-assigned card names - so no separate
+// device enumeration or name-matching is needed here, unlike the PortAudio
+// backend this replaces.
+//
+// Returns nil for "" or "default", meaning: use the default device.
+func deviceIDFromName(name string) *malgo.DeviceID {
+	if name == "" || strings.EqualFold(name, "default") {
 		return nil
 	}
 
-	var dev = matchPortAudioDeviceByName(name, forInput, devices)
-	if dev == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not match audio device '%s' to any PortAudio device.\n", name)
-	}
+	var id malgo.DeviceID
+	copy(id[:], name)
 
-	return dev
+	return &id
 }
 
 /*------------------------------------------------------------------
@@ -997,29 +948,30 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 func audio_open(pa *audio_s) int {
 	save_audio_config_p = pa
 
-	// Initialize PortAudio only if at least one configured device needs a
-	// soundcard.  Pure stdin/UDP configurations must work on systems with no
-	// working PortAudio host backend (issue #501).
-	var portaudioAcquired = false
+	// Initialize the miniaudio context only if at least one configured device
+	// needs a soundcard.  Pure stdin/UDP configurations must work on systems
+	// with no working audio backend (issue #501).
+	var malgoAcquired = false
 
-	if anyDeviceRequiresPortAudio(pa) {
-		portaudioMu.Lock()
+	if anyDeviceRequiresAudioBackend(pa) {
+		malgoCtxMu.Lock()
 
-		if portaudioRefCount == 0 {
-			var err = portaudio.Initialize()
-			if err != nil {
-				portaudioMu.Unlock()
+		if malgoCtxRefCount == 0 {
+			var initErr error
+			malgoCtx, initErr = malgo.InitContext(malgoBackends, malgo.ContextConfig{}, nil) //nolint:exhaustruct
+			if initErr != nil {
+				malgoCtxMu.Unlock()
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("PortAudio initialization failed: %v\n", err)
+				dw_printf("Audio context initialization failed: %v\n", initErr)
 
 				return -1
 			}
 		}
 
-		portaudioRefCount++
-		portaudioAcquired = true
+		malgoCtxRefCount++
+		malgoAcquired = true
 
-		portaudioMu.Unlock()
+		malgoCtxMu.Unlock()
 	}
 
 	// If audio_open fails after this point, roll back the refcount increment
@@ -1027,22 +979,22 @@ func audio_open(pa *audio_s) int {
 	var openSucceeded = false
 
 	defer func() {
-		if portaudioAcquired && !openSucceeded {
-			portaudioMu.Lock()
+		if malgoAcquired && !openSucceeded {
+			malgoCtxMu.Lock()
 
-			portaudioRefCount--
-			if portaudioRefCount == 0 {
-				portaudio.Terminate()
+			malgoCtxRefCount--
+			if malgoCtxRefCount == 0 {
+				_ = malgoCtx.Uninit()
+				malgoCtx.Free()
+				malgoCtx = nil
 			}
 
-			portaudioMu.Unlock()
+			malgoCtxMu.Unlock()
 		}
 	}()
 
 	for a := range MAX_ADEVS {
 		adev[a] = new(adev_s)
-		adev[a].inputStream = nil
-		adev[a].outputStream = nil
 	}
 
 	/*
@@ -1149,8 +1101,12 @@ func audio_open(pa *audio_s) int {
 
 			// Calculate buffer size
 			var bufSizeInBytes = calcbufsize(pa.adev[a].samples_per_sec, pa.adev[a].num_channels, pa.adev[a].bits_per_sample)
-			var framesPerBuffer = bufSizeInBytes / adev[a].bytesPerFrame
-			adev[a].framesPerBuffer = framesPerBuffer
+
+			// miniaudio sample format for this device's bit depth.
+			var format = malgo.FormatS16
+			if pa.adev[a].bits_per_sample == 8 {
+				format = malgo.FormatU8
+			}
 
 			/*
 			 * Now attempt actual opens.
@@ -1162,84 +1118,60 @@ func audio_open(pa *audio_s) int {
 
 			switch adev[a].g_audio_in_type {
 			/*
-			 * Soundcard - PortAudio with callback mode.
+			 * Soundcard - miniaudio callback mode.
 			 * Callback mode is more reliable than blocking read because the
 			 * callback runs on a dedicated audio thread with better timing
 			 * guarantees than Go goroutines.
 			 */
 			case AUDIO_IN_TYPE_SOUNDCARD:
-				var inputDev = findPortAudioDevice(audio_in_name, true)
-				if inputDev == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not find audio input device: %s\n", audio_in_name)
-
-					return -1
-				}
-
 				// Create ring buffer for audio data.
 				// Size it to hold ~1 second of audio for plenty of headroom.
 				// This accommodates Go scheduler delays and processing latency.
 				var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
 				adev[a].inputRingBuf = newAudioRingBuffer(ringBufSize)
 
-				// Create input stream parameters
-				var inputParams = portaudio.StreamParameters{
-					Input: portaudio.StreamDeviceParameters{
-						Device:   inputDev,
-						Channels: pa.adev[a].num_channels,
-						Latency:  inputDev.DefaultHighInputLatency,
-					},
-					Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
-					SampleRate:      float64(pa.adev[a].samples_per_sec),
-					FramesPerBuffer: framesPerBuffer,
-					Flags:           portaudio.NoFlag,
+				var captureConfig = malgo.DefaultDeviceConfig(malgo.Capture)
+				captureConfig.Capture.Format = format
+				captureConfig.Capture.Channels = uint32(pa.adev[a].num_channels)
+				captureConfig.SampleRate = uint32(pa.adev[a].samples_per_sec)
+				captureConfig.PeriodSizeInMilliseconds = ONE_BUF_TIME
+
+				var pinner runtime.Pinner
+
+				var captureID = deviceIDFromName(audio_in_name)
+				if captureID != nil {
+					pinner.Pin(captureID)
+					captureConfig.Capture.DeviceID = unsafe.Pointer(captureID) //nolint:gosec // Unsafe part of the API - worth it
 				}
 
-				// Open input stream with callback.
-				// The callback receives audio data and writes it to the ring buffer.
-				// IMPORTANT: Capture the ring buffer pointer now, not in the closure,
-				// to avoid the classic Go closure-over-loop-variable bug.
+				// IMPORTANT: Capture the ring buffer pointer now, not in the
+				// closure, to avoid the classic Go closure-over-loop-variable bug.
 				var inRingBuf = adev[a].inputRingBuf
-				var err error
+				var captureCallbacks = malgo.DeviceCallbacks{ //nolint:exhaustruct
+					Data: func(_, pInput []byte, _ uint32) {
+						if len(pInput) == 0 {
+							return
+						}
 
-				if pa.adev[a].bits_per_sample == 16 {
-					// Pre-allocate a scratch buffer sized for one full callback invocation
-					// so the callback performs zero heap allocations at runtime.
-					adev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
-					var inScratchBuf = adev[a].inputScratchBuf
-					adev[a].inputStream, err = portaudio.OpenStream(
-						inputParams,
-						func(in []int16) {
-							// Reuse the pre-allocated scratch buffer; slice to actual length.
-							var scratch = inScratchBuf[:len(in)*2]
-							for i, sample := range in {
-								binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
-							}
-
-							inRingBuf.write(scratch)
-						},
-					)
-				} else {
-					adev[a].inputStream, err = portaudio.OpenStream(
-						inputParams,
-						func(in []uint8) {
-							// Write uint8 samples directly to ring buffer
-							inRingBuf.write(in)
-						},
-					)
+						inRingBuf.write(pInput)
+					},
 				}
 
-				if err != nil {
+				var captureErr error
+				adev[a].captureDevice, captureErr = malgo.InitDevice(malgoCtx.Context, captureConfig, captureCallbacks)
+				pinner.Unpin()
+
+				if captureErr != nil {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, err)
+					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, captureErr)
 
 					return -1
 				}
 
-				err = adev[a].inputStream.Start()
-				if err != nil {
+				var startErr = adev[a].captureDevice.Start()
+				if startErr != nil {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not start audio input stream: %v\n", err)
+					dw_printf("Could not start audio input stream: %v\n", startErr)
 
 					return -1
 				}
@@ -1308,44 +1240,50 @@ func audio_open(pa *audio_s) int {
 				go audioUDPSilenceKeepalive(a, adev[a].silenceStopCh)
 			} else {
 				/*
-				 * Soundcard - blocking write mode.
-				 * audio_flush_real fills the typed output buffer and calls Write() to
-				 * send it to PortAudio. The stream is started lazily on first write
-				 * and stopped in audio_wait to avoid underflows during idle periods.
+				 * Soundcard - miniaudio callback mode.
+				 * audio_flush_real writes into outputRingBuf, which the
+				 * playback callback drains (padding with silence on
+				 * underrun). The device is started lazily on first write
+				 * and stopped in audio_wait to avoid underflows during idle
+				 * periods.
 				 */
 
-				var outputDev = findPortAudioDevice(audio_out_name, false)
-				if outputDev == nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Could not find audio output device: %s\n", audio_out_name)
-
-					return -1
+				var silence byte
+				if pa.adev[a].bits_per_sample == 8 {
+					silence = 128
 				}
 
-				// Create output stream parameters
-				var outputParams = portaudio.StreamParameters{
-					Input: portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
-					Output: portaudio.StreamDeviceParameters{
-						Device:   outputDev,
-						Channels: pa.adev[a].num_channels,
-						Latency:  outputDev.DefaultHighOutputLatency,
+				var ringBufSize = pa.adev[a].samples_per_sec * pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
+				adev[a].outputRingBuf = newPlaybackRingBuffer(ringBufSize, silence)
+
+				var playbackConfig = malgo.DefaultDeviceConfig(malgo.Playback)
+				playbackConfig.Playback.Format = format
+				playbackConfig.Playback.Channels = uint32(pa.adev[a].num_channels)
+				playbackConfig.SampleRate = uint32(pa.adev[a].samples_per_sec)
+				playbackConfig.PeriodSizeInMilliseconds = ONE_BUF_TIME
+
+				var pinner runtime.Pinner
+
+				var playbackID = deviceIDFromName(audio_out_name)
+				if playbackID != nil {
+					pinner.Pin(playbackID)
+					playbackConfig.Playback.DeviceID = unsafe.Pointer(playbackID) //nolint:gosec // Unsafe part of the API - worth it
+				}
+
+				var outRingBuf = adev[a].outputRingBuf
+				var playbackCallbacks = malgo.DeviceCallbacks{ //nolint:exhaustruct
+					Data: func(pOutput, _ []byte, _ uint32) {
+						if len(pOutput) == 0 {
+							return
+						}
+
+						outRingBuf.read(pOutput)
 					},
-					SampleRate:      float64(pa.adev[a].samples_per_sec),
-					FramesPerBuffer: framesPerBuffer,
-					Flags:           portaudio.NoFlag,
 				}
 
-				// Open output stream in blocking write mode.
-				// Pass a pointer to a typed buffer; Write() will send buffer contents to PortAudio.
 				var err error
-
-				if pa.adev[a].bits_per_sample == 16 {
-					adev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
-					adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
-				} else {
-					adev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
-					adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
-				}
+				adev[a].playbackDevice, err = malgo.InitDevice(malgoCtx.Context, playbackConfig, playbackCallbacks)
+				pinner.Unpin()
 
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
@@ -1354,7 +1292,7 @@ func audio_open(pa *audio_s) int {
 					return -1
 				}
 
-				// Output stream is opened but NOT started here.
+				// The playback device is opened but NOT started here.
 				// It will be started lazily on first write in audio_flush_real
 				// and stopped in audio_wait, to avoid underflows during idle periods.
 
@@ -1413,7 +1351,7 @@ func audio_get_real(a int) int {
 
 	switch adev[a].g_audio_in_type {
 	/*
-	 * Soundcard - PortAudio callback mode.
+	 * Soundcard - miniaudio callback mode.
 	 * Audio data is written to the ring buffer by the callback.
 	 * We just read one byte from it here.
 	 */
@@ -1610,34 +1548,23 @@ func audio_flush_real(a int) int {
 		return 0
 	}
 
-	if adev[a].outputStream == nil {
+	if adev[a].playbackDevice == nil || adev[a].outputRingBuf == nil {
 		adev[a].outbufLen = 0
 
 		return -1
 	}
 
-	if adev[a].outputBuf16 != nil {
-		var nSamples = adev[a].outbufLen / 2
-		for i := range nSamples {
-			var lo = adev[a].outbuf[i*2]
-			var hi = adev[a].outbuf[i*2+1]
-			adev[a].outputBuf16[i] = int16(uint16(lo) | uint16(hi)<<8)
-		}
+	// Raw bytes go straight into the ring buffer: adev[a].outbuf already holds
+	// little-endian 16-bit (or unsigned 8-bit) PCM, which matches the raw byte
+	// layout miniaudio's FormatS16/FormatU8 callback buffers expect on every
+	// platform we build for, so no per-sample conversion is needed here (unlike
+	// the PortAudio blocking-stream API this replaced, which required typed
+	// []int16/[]uint8 buffers).
+	adev[a].outputRingBuf.write(adev[a].outbuf[:adev[a].outbufLen])
 
-		for i := nSamples; i < len(adev[a].outputBuf16); i++ {
-			adev[a].outputBuf16[i] = 0
-		}
-	} else if adev[a].outputBuf8 != nil {
-		copy(adev[a].outputBuf8, adev[a].outbuf[:adev[a].outbufLen])
-
-		for i := adev[a].outbufLen; i < len(adev[a].outputBuf8); i++ {
-			adev[a].outputBuf8[i] = 128
-		}
-	}
-
-	// Start the output stream lazily on first write.
+	// Start the playback device lazily on first write.
 	if !adev[a].outputStarted {
-		var err = adev[a].outputStream.Start()
+		var err = adev[a].playbackDevice.Start()
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Could not start audio output stream: %v\n", err)
@@ -1646,22 +1573,6 @@ func audio_flush_real(a int) int {
 		}
 
 		adev[a].outputStarted = true
-	}
-
-	var err = adev[a].outputStream.Write()
-	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Audio output write error: %v\n", err)
-
-		var stopErr = adev[a].outputStream.Stop()
-		if stopErr != nil {
-			dw_printf("Audio output stream stop error: %v\n", stopErr)
-		}
-
-		adev[a].outputStarted = false
-		adev[a].outbufLen = 0
-
-		return -1
 	}
 
 	adev[a].outbufLen = 0
@@ -1756,10 +1667,15 @@ func audio_wait(a int) {
 		return
 	}
 
-	// Stop the output stream — Pa_StopStream drains remaining buffers
-	// before returning. It will be restarted lazily on next write.
-	if adev[a].outputStream != nil && adev[a].outputStarted {
-		var err = adev[a].outputStream.Stop()
+	if adev[a].playbackDevice != nil && adev[a].outputStarted {
+		// Unlike PortAudio's blocking Write(), handing bytes to outputRingBuf
+		// doesn't wait for them to actually be played, so wait for the
+		// playback callback to drain it before stopping the device.
+		if adev[a].outputRingBuf != nil {
+			adev[a].outputRingBuf.waitEmpty()
+		}
+
+		var err = adev[a].playbackDevice.Stop()
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("audio_wait: failed to stop output stream for device %d: %v\n", a, err)
@@ -1785,24 +1701,23 @@ func audio_close() int { //nolint:unparam
 	var err = 0
 
 	for a := range MAX_ADEVS {
-		if adev[a] != nil && (adev[a].inputStream != nil || adev[a].outputStream != nil || adev[a].udp_sock != nil || adev[a].udp_out_sock != nil) {
+		if adev[a] != nil && (adev[a].captureDevice != nil || adev[a].playbackDevice != nil || adev[a].udp_sock != nil || adev[a].udp_out_sock != nil) {
 			audio_wait(a)
 
-			if adev[a].inputStream != nil {
-				adev[a].inputStream.Stop()
-				adev[a].inputStream.Close()
-				adev[a].inputStream = nil
+			if adev[a].captureDevice != nil {
+				adev[a].captureDevice.Uninit()
+				adev[a].captureDevice = nil
 			}
 
-			// Close output stream (already stopped by audio_wait above)
-			if adev[a].outputStream != nil {
+			// Uninit playback device (already stopped by audio_wait above)
+			if adev[a].playbackDevice != nil {
 				if adev[a].outputStarted {
-					adev[a].outputStream.Stop()
+					adev[a].playbackDevice.Stop()
 					adev[a].outputStarted = false
 				}
 
-				adev[a].outputStream.Close()
-				adev[a].outputStream = nil
+				adev[a].playbackDevice.Uninit()
+				adev[a].playbackDevice = nil
 			}
 
 			// Then close ring buffers
@@ -1811,8 +1726,10 @@ func audio_close() int { //nolint:unparam
 				adev[a].inputRingBuf = nil
 			}
 
-			adev[a].outputBuf16 = nil
-			adev[a].outputBuf8 = nil
+			if adev[a].outputRingBuf != nil {
+				adev[a].outputRingBuf.close()
+				adev[a].outputRingBuf = nil
+			}
 
 			if adev[a].udp_sock != nil {
 				adev[a].udp_sock.Close()
@@ -1852,17 +1769,19 @@ func audio_close() int { //nolint:unparam
 		}
 	}
 
-	// Terminate PortAudio when the last audio device is closed.
-	portaudioMu.Lock()
+	// Uninitialize the miniaudio context when the last audio device is closed.
+	malgoCtxMu.Lock()
 
-	if portaudioRefCount > 0 {
-		portaudioRefCount--
-		if portaudioRefCount == 0 {
-			portaudio.Terminate()
+	if malgoCtxRefCount > 0 {
+		malgoCtxRefCount--
+		if malgoCtxRefCount == 0 {
+			_ = malgoCtx.Uninit()
+			malgoCtx.Free()
+			malgoCtx = nil
 		}
 	}
 
-	portaudioMu.Unlock()
+	malgoCtxMu.Unlock()
 
 	return (err)
 } /* end audio_close */
