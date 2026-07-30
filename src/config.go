@@ -5537,19 +5537,6 @@ func handleGPSD(ps *parseState) bool {
 	 * GPSD [ host [ port ] ]
 	 */
 
-	/*
-	   TODO KG
-
-	   	#if __WIN32__
-
-	   		    text_color_set(DW_COLOR_ERROR);
-	   		    dw_printf ("Config file, line %d: The GPSD interface is not available for Windows.\n", ps.line);
-	   		    continue;
-
-	   	#elif ENABLE_GPSD
-	*/
-	dw_printf("Warning: GPSD support currently disabled pending a rewrite of the integration.\n")
-
 	ps.misc.gpsd_host = "localhost"
 	ps.misc.gpsd_port = DEFAULT_GPSD_PORT
 
@@ -5571,18 +5558,7 @@ func handleGPSD(ps *parseState) bool {
 			}
 		}
 	}
-	/*
-	   	TODO KG
 
-	   #else
-
-	   	text_color_set(DW_COLOR_ERROR);
-	   	dw_printf ("Config file, line %d: The GPSD interface has not been enabled.\n", ps.line);
-	   	dw_printf ("Install gpsd and libgps-dev packages then rebuild direwolf.\n");
-	   	continue;
-
-	   #endif
-	*/
 	return false
 }
 
