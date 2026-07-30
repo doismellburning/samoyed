@@ -10,9 +10,9 @@ package direwolf
  *		(1) Read NMEA sentences from a serial port (or USB
  *		    that looks line one).  Available for all platforms.
  *
- *		(2) Read from gpsd.  Not available for Windows.
- *		    Including this is optional because it depends
- *		    on another external software component.
+ *		(2) Read from gpsd, over its JSON-over-TCP protocol.
+ *		    Requires a gpsd daemon to be running and reachable;
+ *		    no separate library dependency is needed.
  *
  *
  * API:		dwgps_init	Connect to data stream at start up time.
@@ -115,10 +115,7 @@ func dwgps_init(pconfig *misc_config_s, debug int) {
 
 	dwgpsnmea_init(pconfig, debug)
 
-	/* TODO KG
-	#if ENABLE_GPSD
 	dwgpsd_init(pconfig, debug)
-	*/
 
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
@@ -210,10 +207,7 @@ func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
 func dwgps_term() {
 	dwgpsnmea_term()
 
-	/* TODO KG
-	#if ENABLE_GPSD
 	dwgpsd_term()
-	*/
 } /* end dwgps_term */
 
 /*-------------------------------------------------------------------
