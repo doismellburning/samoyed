@@ -24,16 +24,55 @@ import (
 	"time"
 )
 
-var s_gpsd_debug = 0 /* Enable debug output. */
-/* >= 2 show updates from GPS. */
-
-var s_gpsd_conn net.Conn
-
-var s_gpsd_mutex sync.Mutex
-
 /* Knots per meter/second. */
 
 const MPS_TO_KNOTS = 1.9438444924406
+
+// errNotTPV means the report was valid JSON but not a "class":"TPV" one, so there's nothing to apply.
+var errNotTPV = errors.New("gpsd report is not a TPV")
+
+// gpsdClient holds the state for the connection to the gpsd daemon.
+//
+// debug is set once in dwgpsd_init, before the reader goroutine is started, and
+// only read afterwards, so it doesn't need mutex protection. conn is touched by
+// both dwgpsd_term (caller's goroutine) and read_gpsd_thread (reader goroutine),
+// so it's guarded by mu.
+type gpsdClient struct {
+	debug int
+	mu    sync.Mutex
+	conn  net.Conn
+}
+
+var s_gpsd = new(gpsdClient)
+
+func (c *gpsdClient) setConn(conn net.Conn) {
+	c.mu.Lock()
+	c.conn = conn
+	c.mu.Unlock()
+}
+
+// clearConnIfCurrent nils out conn, but only if it still points at the connection
+// the caller read, so a stale reader thread can't clobber a newer connection.
+func (c *gpsdClient) clearConnIfCurrent(conn net.Conn) {
+	c.mu.Lock()
+
+	if c.conn == conn {
+		c.conn = nil
+	}
+
+	c.mu.Unlock()
+}
+
+func (c *gpsdClient) closeAndClear() {
+	c.mu.Lock()
+
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
+	}
+
+	c.mu.Unlock()
+}
 
 /*-------------------------------------------------------------------
  *
@@ -66,9 +105,9 @@ const MPS_TO_KNOTS = 1.9438444924406
  *--------------------------------------------------------------------*/
 
 func dwgpsd_init(pconfig *misc_config_s, debug int) int {
-	s_gpsd_debug = debug
+	s_gpsd.debug = debug
 
-	if s_gpsd_debug >= 2 {
+	if s_gpsd.debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dwgpsd_init()\n")
 	}
@@ -102,16 +141,14 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
 		return -1
 	}
 
-	s_gpsd_mutex.Lock()
-	s_gpsd_conn = conn
-	s_gpsd_mutex.Unlock()
+	s_gpsd.setConn(conn)
 
 	go read_gpsd_thread(conn)
 
 	/* success */
 
 	return 1
-} /* end dwgpsd_init */
+}
 
 /*-------------------------------------------------------------------
  *
@@ -129,7 +166,7 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
  *--------------------------------------------------------------------*/
 
 func read_gpsd_thread(conn net.Conn) {
-	if s_gpsd_debug >= 2 {
+	if s_gpsd.debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("read_gpsd_thread (%+v)\n", conn)
 	}
@@ -138,7 +175,7 @@ func read_gpsd_thread(conn net.Conn) {
 	dwgps_clear(info)
 	info.fix = DWFIX_NOT_SEEN /* clear not init state. */
 
-	if s_gpsd_debug >= 2 {
+	if s_gpsd.debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSD: ", info)
 	}
@@ -158,7 +195,7 @@ func read_gpsd_thread(conn net.Conn) {
 
 		info.timestamp = time.Now()
 
-		if s_gpsd_debug >= 2 {
+		if s_gpsd.debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 			dwgps_print("GPSD: ", info)
 		}
@@ -175,23 +212,17 @@ func read_gpsd_thread(conn net.Conn) {
 
 	info.fix = DWFIX_ERROR
 
-	if s_gpsd_debug >= 2 {
+	if s_gpsd.debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSD: ", info)
 	}
 
 	dwgps_set_data(info)
 
-	s_gpsd_mutex.Lock()
-
-	if s_gpsd_conn == conn {
-		s_gpsd_conn = nil
-	}
-
-	s_gpsd_mutex.Unlock()
+	s_gpsd.clearConnIfCurrent(conn)
 
 	conn.Close()
-} /* end read_gpsd_thread */
+}
 
 /*-------------------------------------------------------------------
  *
@@ -218,9 +249,6 @@ type gpsdTPV struct {
 	AltMSL *float64 `json:"altMSL"` //nolint:tagliatelle // Field name is dictated by the gpsd JSON protocol.
 	Alt    *float64 `json:"alt"`
 }
-
-// errNotTPV means the report was valid JSON but not a "class":"TPV" one, so there's nothing to apply.
-var errNotTPV = errors.New("gpsd report is not a TPV")
 
 func parse_gpsd_tpv(line []byte) (*gpsdTPV, error) {
 	var classOnly struct {
@@ -311,7 +339,7 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
 	}
 	/* Otherwise keep last known altitude when we downgrade from 3D to 2D fix. */
 	/* Caller knows altitude is outdated if info.fix == DWFIX_2D. */
-} /* end apply_gpsd_tpv */
+}
 
 /*-------------------------------------------------------------------
  *
@@ -326,14 +354,5 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
  *--------------------------------------------------------------------*/
 
 func dwgpsd_term() {
-	s_gpsd_mutex.Lock()
-
-	if s_gpsd_conn != nil {
-		s_gpsd_conn.Close()
-		s_gpsd_conn = nil
-	}
-
-	s_gpsd_mutex.Unlock()
-} /* end dwgpsd_term */
-
-/* end dwgpsd.go */
+	s_gpsd.closeAndClear()
+}
