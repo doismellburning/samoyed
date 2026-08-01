@@ -167,7 +167,7 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
 	// TODO: Should we check timestamp and complain if very stale?
 	// or should we leave that up to the caller?
 
-	return (s_dwgps_info.fix)
+	return (gpsinfo.fix)
 }
 
 /*-------------------------------------------------------------------
