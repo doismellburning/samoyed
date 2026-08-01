@@ -33,6 +33,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 const DEFAULT_IGATE_PORT = 14580
@@ -147,30 +149,9 @@ var s_debug int
  * TODO: should have debug option to print these occasionally.
  */
 
-var stats_failed_connect int
-
-/* Number of times we tried to connect to */
-/* a server and failed.  A small number is not */
-/* a bad thing.  Each name should have a bunch */
-/* of addresses for load balancing and */
-/* redundancy. */
-
-var stats_connects int
-
-/* Number of successful connects to a server. */
-/* Normally you'd expect this to be 1.  */
-/* Could be larger if one disappears and we */
-/* try again to find a different one. */
-
 var stats_connect_at time.Time //nolint:unused
 /* Most recent time connection was established. */
 /* can be used to determine elapsed connect time. */
-
-var stats_rf_recv_packets int
-
-/* Number of candidate packets from the radio. */
-/* This is not the total number of AX.25 frames received */
-/* over the radio; only APRS packets get this far. */
 
 var stats_uplink_packets int /* Number of packets passed along to the IGate */
 /* server after filtering. */
@@ -272,10 +253,7 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 	save_igate_config_p = p_igate_config
 	save_digi_config_p = p_digi_config
 
-	stats_failed_connect = 0
-	stats_connects = 0
 	stats_connect_at = time.Time{}
-	stats_rf_recv_packets = 0
 	stats_uplink_packets = 0
 	stats_uplink_bytes = 0
 	stats_downlink_bytes = 0
@@ -357,14 +335,14 @@ func connect_thread() {
 		 */
 		if igate_sock == nil {
 			var conn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(server_name, strconv.Itoa(save_igate_config_p.t2_server_port)))
-			stats_connects++
+			metrics.RecordIgateConnect()
 			stats_connect_at = time.Now()
 
 			if connErr != nil {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("Connect to IGate server %s failed.\n\n", server_name)
 
-				stats_failed_connect++
+				metrics.RecordIgateFailedConnect()
 			} else {
 				/* Success. */
 				text_color_set(DW_COLOR_INFO)
@@ -471,7 +449,7 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 
 	/* Gather statistics. */
 
-	stats_rf_recv_packets++
+	metrics.RecordRFReceived()
 
 	/*
 	 * Check for filtering from specified channel to the IGate server.
@@ -783,6 +761,7 @@ func send_packet_to_server(pp *packet_t, channel int) {
 	send_msg_to_server(msg)
 
 	stats_uplink_packets++
+	metrics.RecordUplink()
 
 	/*
 	 * Remember what was sent to avoid duplicates in near future.
@@ -1013,6 +992,7 @@ func igate_recv_thread() {
 			mheardDB.SaveIS(string(message))
 
 			stats_downlink_packets++
+			metrics.RecordDownlink()
 
 			/*
 			 * Possibly transmit if so configured.
@@ -1473,6 +1453,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 			tq_append(to_chan, TQ_PRIO_1_LO, pradio)
 			// TODO KG #endif
 			stats_rf_xmit_packets++ // Any type of packet.
+			metrics.RecordRFTransmitted()
 
 			if is_message_message(string(pinfo)) {
 				// We transmitted a "message."  Telemetry metadata is excluded.

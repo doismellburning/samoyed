@@ -12,14 +12,12 @@ package metrics
  *		exposition format over HTTP, so a fleet of digipeaters
  *		can be scraped and monitored.
  *
- * Description:	Counters (monotonically increasing) are registered with
- *		the default Prometheus registry and updated from the
- *		various subsystems as events happen, via the Record*
- *		functions below.  Everything else is a gauge computed on
- *		the fly, at scrape time, by Collector.Collect, from a
- *		State snapshot supplied by the caller - this package has
- *		no knowledge of, or dependency on, the code whose state
- *		it's reporting.
+ * Description:	Everything here is push-based: counters and gauges are
+ *		registered with the default Prometheus registry, and
+ *		updated from the various subsystems as events happen, via
+ *		the exported Record and Set functions below.  This package
+ *		has no knowledge of, or dependency on, the code reporting
+ *		into it.
  *
  *------------------------------------------------------------------*/
 
@@ -27,6 +25,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
+	"sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -89,89 +89,119 @@ func RecordDedupeHit(channel int) {
 	metricDedupeHits.WithLabelValues(strconv.Itoa(channel)).Inc()
 }
 
-// ChannelState is a snapshot of one radio channel's gauge-worthy state, as
-// reported by a State provider at scrape time.
-type ChannelState struct {
-	Up        bool
-	DCD       bool
-	AudioRecv int
-	TxQueue   []int // indexed by priority
+var metricChannelUp = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+	Name: "samoyed_channel_up",
+	Help: "Whether a radio channel is configured (1) or not (0).",
+}, []string{"channel"})
+
+var metricDCD = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+	Name: "samoyed_dcd",
+	Help: "Whether the data carrier detect (squelch) is currently active on a channel.",
+}, []string{"channel"})
+
+var metricTxQueueDepth = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+	Name: "samoyed_tx_queue_depth",
+	Help: "Number of packets currently queued for transmission.",
+}, []string{"channel", "priority"})
+
+var metricAudioLevel = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+	Name: "samoyed_audio_receive_level",
+	Help: "Received audio level, roughly 0 to 100.",
+}, []string{"channel"})
+
+var metricIgateRFRecv = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+	Name: "samoyed_igate_rf_recv_packets_total",
+	Help: "Number of candidate APRS packets seen from the radio.",
+})
+
+var metricIgateRFXmit = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+	Name: "samoyed_igate_rf_xmit_packets_total",
+	Help: "Number of packets transmitted to radio by the IGate function.",
+})
+
+var metricIgateUplink = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+	Name: "samoyed_igate_uplink_packets_total",
+	Help: "Number of packets forwarded to the APRS-IS server.",
+})
+
+var metricIgateDownlink = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+	Name: "samoyed_igate_downlink_packets_total",
+	Help: "Number of packets received from the APRS-IS server.",
+})
+
+var metricIgateConnects = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+	Name: "samoyed_igate_connects_total",
+	Help: "Number of successful connections to the APRS-IS server.",
+})
+
+var metricIgateFailedConnects = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+	Name: "samoyed_igate_failed_connects_total",
+	Help: "Number of failed connection attempts to the APRS-IS server.",
+})
+
+// SetChannelUp is called once per channel at startup, from configuration state.
+func SetChannelUp(channel int, up bool) {
+	metricChannelUp.WithLabelValues(strconv.Itoa(channel)).Set(boolToFloat(up))
 }
 
-// State is a snapshot of everything the pull-based gauges report, supplied
-// by the caller at scrape time.
-type State struct {
-	Channels            []ChannelState
-	IgateRFRecv         int
-	IgateRFXmit         int
-	IgateUplink         int
-	IgateDownlink       int
-	IgateConnects       int
-	IgateFailedConnects int
+// SetDCD is called whenever a channel's data carrier detect (squelch) state changes.
+func SetDCD(channel int, active bool) {
+	metricDCD.WithLabelValues(strconv.Itoa(channel)).Set(boolToFloat(active))
 }
 
-var (
-	metricsDescChannelUp   = prometheus.NewDesc("samoyed_channel_up", "Whether a radio channel is configured (1) or not (0).", []string{"channel"}, nil)
-	metricsDescDCD         = prometheus.NewDesc("samoyed_dcd", "Whether the data carrier detect (squelch) is currently active on a channel.", []string{"channel"}, nil)
-	metricsDescAudioLevel  = prometheus.NewDesc("samoyed_audio_receive_level", "Received audio level, roughly 0 to 100.", []string{"channel"}, nil)
-	metricsDescTxQueue     = prometheus.NewDesc("samoyed_tx_queue_depth", "Number of packets currently queued for transmission.", []string{"channel", "priority"}, nil)
-	metricsDescIgateRFRecv = prometheus.NewDesc("samoyed_igate_rf_recv_packets_total", "Number of candidate APRS packets seen from the radio.", nil, nil)
-	metricsDescIgateRFXmit = prometheus.NewDesc("samoyed_igate_rf_xmit_packets_total", "Number of packets transmitted to radio by the IGate function.", nil, nil)
-	metricsDescIgateUpl    = prometheus.NewDesc("samoyed_igate_uplink_packets_total", "Number of packets forwarded to the APRS-IS server.", nil, nil)
-	metricsDescIgateDnl    = prometheus.NewDesc("samoyed_igate_downlink_packets_total", "Number of packets received from the APRS-IS server.", nil, nil)
-	metricsDescIgateConn   = prometheus.NewDesc("samoyed_igate_connects_total", "Number of successful connections to the APRS-IS server.", nil, nil)
-	metricsDescIgateFailed = prometheus.NewDesc("samoyed_igate_failed_connects_total", "Number of failed connection attempts to the APRS-IS server.", nil, nil)
-)
-
-// Collector is a pull-based prometheus.Collector for state that the caller
-// already tracks itself - it just reads a State snapshot at scrape time, so
-// the code being reported on needs no push instrumentation for it.
-type Collector struct {
-	source func() State
+// SetTxQueueDepth is called whenever a channel/priority's transmit queue depth changes.
+func SetTxQueueDepth(channel, prio, depth int) {
+	metricTxQueueDepth.WithLabelValues(strconv.Itoa(channel), strconv.Itoa(prio)).Set(float64(depth))
 }
 
-// NewCollector returns a Collector that calls source to get a fresh State snapshot each scrape.
-func NewCollector(source func() State) *Collector {
-	return &Collector{source: source}
-}
+// audioLevelSampleCounts decimates SetAudioLevel calls per channel, since
+// the caller reports on every audio sample (up to tens of thousands of
+// times per second) but the metric is only ever scraped every 15-30s.
+var audioLevelSampleCounts sync.Map // channel int -> *atomic.Uint32
 
-func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- metricsDescChannelUp
-	ch <- metricsDescDCD
-	ch <- metricsDescAudioLevel
-	ch <- metricsDescTxQueue
-	ch <- metricsDescIgateRFRecv
-	ch <- metricsDescIgateRFXmit
-	ch <- metricsDescIgateUpl
-	ch <- metricsDescIgateDnl
-	ch <- metricsDescIgateConn
-	ch <- metricsDescIgateFailed
-}
+const audioLevelDecimation = 4410 // ~10Hz at a 44.1kHz sample rate.
 
-func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-	var state = c.source()
+// SetAudioLevel is called on every audio sample with the current received
+// audio level for a channel; actual recording is decimated internally.
+func SetAudioLevel(channel, level int) {
+	var v, _ = audioLevelSampleCounts.LoadOrStore(channel, new(atomic.Uint32))
 
-	for channel, cs := range state.Channels {
-		var channelLabel = strconv.Itoa(channel)
-
-		ch <- prometheus.MustNewConstMetric(metricsDescChannelUp, prometheus.GaugeValue, boolToFloat(cs.Up), channelLabel)
-
-		if cs.Up {
-			ch <- prometheus.MustNewConstMetric(metricsDescDCD, prometheus.GaugeValue, boolToFloat(cs.DCD), channelLabel)
-			ch <- prometheus.MustNewConstMetric(metricsDescAudioLevel, prometheus.GaugeValue, float64(cs.AudioRecv), channelLabel)
-		}
-
-		for prio, depth := range cs.TxQueue {
-			ch <- prometheus.MustNewConstMetric(metricsDescTxQueue, prometheus.GaugeValue, float64(depth), channelLabel, strconv.Itoa(prio))
-		}
+	var counter, _ = v.(*atomic.Uint32)
+	if counter.Add(1)%audioLevelDecimation != 0 {
+		return
 	}
 
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateRFRecv, prometheus.CounterValue, float64(state.IgateRFRecv))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateRFXmit, prometheus.CounterValue, float64(state.IgateRFXmit))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateUpl, prometheus.CounterValue, float64(state.IgateUplink))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateDnl, prometheus.CounterValue, float64(state.IgateDownlink))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateConn, prometheus.CounterValue, float64(state.IgateConnects))
-	ch <- prometheus.MustNewConstMetric(metricsDescIgateFailed, prometheus.CounterValue, float64(state.IgateFailedConnects))
+	metricAudioLevel.WithLabelValues(strconv.Itoa(channel)).Set(float64(level))
+}
+
+// RecordRFReceived is called for every candidate APRS packet seen from the radio.
+func RecordRFReceived() {
+	metricIgateRFRecv.Inc()
+}
+
+// RecordRFTransmitted is called for every packet transmitted to radio by the IGate function.
+func RecordRFTransmitted() {
+	metricIgateRFXmit.Inc()
+}
+
+// RecordUplink is called for every packet forwarded to the APRS-IS server.
+func RecordUplink() {
+	metricIgateUplink.Inc()
+}
+
+// RecordDownlink is called for every packet received from the APRS-IS server.
+func RecordDownlink() {
+	metricIgateDownlink.Inc()
+}
+
+// RecordIgateConnect is called for every attempted connection to the APRS-IS server.
+func RecordIgateConnect() {
+	metricIgateConnects.Inc()
+}
+
+// RecordIgateFailedConnect is called whenever a connection attempt to the APRS-IS server fails.
+func RecordIgateFailedConnect() {
+	metricIgateFailedConnects.Inc()
 }
 
 func boolToFloat(b bool) float64 {
@@ -182,13 +212,10 @@ func boolToFloat(b bool) float64 {
 	return 0
 }
 
-// Start starts the Prometheus "/metrics" HTTP endpoint on port, registering
-// a Collector that calls source for gauge state at scrape time, and returns
+// Start starts the Prometheus "/metrics" HTTP endpoint on port, and returns
 // a channel that receives a single error if and when the listener fails.
 // Logging of success/failure is the caller's responsibility.
-func Start(port int, source func() State) <-chan error {
-	prometheus.MustRegister(NewCollector(source))
-
+func Start(port int) <-chan error {
 	var mux = http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
