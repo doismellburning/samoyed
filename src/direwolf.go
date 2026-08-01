@@ -1005,6 +1005,8 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
+		} else if inp3 := decode_inp3(pp); inp3 != nil {
+			decode_inp3_print(inp3)
 		} else {
 			AX25SafePrint(pinfo, asciiOnly)
 			dw_printf("\n")
