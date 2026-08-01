@@ -15,6 +15,8 @@ import (
 	"os"
 	"strings"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.h
@@ -920,6 +922,10 @@ func demod_process_sample(channel int, subchan int, sam int) {
 		D.alevel_rec_valley = fsam*D.quick_attack + D.alevel_rec_valley*(1.0-D.quick_attack)
 	} else {
 		D.alevel_rec_valley = fsam*D.sluggish_decay + D.alevel_rec_valley*(1.0-D.sluggish_decay)
+	}
+
+	if subchan == 0 {
+		metrics.SetAudioLevel(channel, demod_get_audio_level(channel, 0).rec)
 	}
 
 	/*

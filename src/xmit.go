@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 )
 
@@ -869,6 +870,8 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 	}
 
 	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, xs.p_modem)
+
+	metrics.RecordFrameTransmitted(c)
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 

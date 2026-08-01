@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
 	goHamlib "github.com/xylo04/goHamlib"
@@ -751,6 +752,7 @@ x = Silence FX.25 information.`)
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
 	server_init(audio_config, misc_config)
+	metrics_init(misc_config)
 	kissNetSvc = NewKissNetService(misc_config)
 	kissNetSvc.SetDebug(d_n_opt)
 
@@ -836,6 +838,8 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
 	Assert(pp != nil) // 1.1J+
+
+	metrics.RecordFrameReceived(channel, fecTypeLabel(fec_type), int(retries))
 
 	// Extra stuff before slice indicators.
 	// Can indicate FX.25/IL2P or fix_bits.

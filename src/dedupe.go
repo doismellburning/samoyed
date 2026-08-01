@@ -76,6 +76,8 @@ package direwolf
 
 import (
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 const HISTORY_MAX = 25 /* Maximum number of transmission */
@@ -209,6 +211,8 @@ func (ds *DedupeService) Check(pp *packet_t, channel int) bool {
 		if now.After(expiry) {
 			continue
 		}
+
+		metrics.RecordDedupeHit(channel)
 
 		return true
 	}

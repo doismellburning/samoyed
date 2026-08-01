@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 )
 
@@ -288,6 +289,8 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 	tq_mutex.Unlock()
 
+	metrics.SetTxQueueDepth(channel, prio, tq_count(channel, prio, "", "", false))
+
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -459,6 +462,8 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	tq_mutex.Unlock()
 
+	metrics.SetTxQueueDepth(channel, prio, tq_count(channel, prio, "", "", false))
+
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -607,6 +612,8 @@ func lm_seize_request(channel int) {
 
 	tq_mutex.Unlock()
 
+	metrics.SetTxQueueDepth(channel, prio, tq_count(channel, prio, "", "", false))
+
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -741,6 +748,8 @@ func tq_remove(channel int, prio int) *packet_t {
 	}
 
 	tq_mutex.Unlock()
+
+	metrics.SetTxQueueDepth(channel, prio, tq_count(channel, prio, "", "", false))
 
 	/* TODO KG
 	#if DEBUG

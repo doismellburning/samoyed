@@ -41,3 +41,20 @@ See https://radio.doismellburning.co.uk/projects/direwolf-with-alsa-loopback-dev
 
     $ samoyed-direwolf --config-file dw1.conf  # Run this in one session / terminal / etc.
     $ samoyed-direwolf --config-file dw2.conf  # Run this in another
+
+
+Monitor a station with Prometheus / Grafana
+--------------------------------------------
+
+Add ``METRICSPORT`` to your config file to expose a Prometheus-format
+``/metrics`` endpoint (disabled by default):
+
+.. code::
+
+    METRICSPORT 9090
+
+.. code::
+
+    $ curl http://localhost:9090/metrics
+
+A starter Grafana dashboard is provided at ``conf/grafana-dashboard.json``.
