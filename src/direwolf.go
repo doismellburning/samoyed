@@ -955,6 +955,9 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(pinfo)
 			logEntry.WithField("info", info2text).Info("Packet")
+		} else if inp3 := decode_inp3(pp); inp3 != nil {
+			logEntry.Info("Packet INP3 decode below:")
+			decode_inp3_print(inp3)
 		} else {
 			logEntry.Info("Packet ax25_safe_print below:")
 			AX25SafePrint(pinfo, asciiOnly)
