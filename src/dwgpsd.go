@@ -315,16 +315,21 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
 		info.dlon = *report.Lon
 	}
 
+	/*
+	 * gpsd doesn't repeat every field on every TPV report - one derived from
+	 * $GPRMC alone, for example, won't carry altitude even though mode is
+	 * still 3D from an earlier $GPGGA-derived report. So a missing field here
+	 * just means "unchanged", not "unknown"; keep whatever we saw last
+	 * instead of clobbering it. G_UNKNOWN is the value seen if a field has
+	 * never been reported at all.
+	 */
+
 	if report.Track != nil {
 		info.track = *report.Track
-	} else {
-		info.track = G_UNKNOWN
 	}
 
 	if report.Speed != nil {
 		info.speed_knots = *report.Speed * MPS_TO_KNOTS
-	} else {
-		info.speed_knots = G_UNKNOWN
 	}
 
 	if newFix >= DWFIX_3D {
@@ -334,7 +339,6 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
 		case report.Alt != nil:
 			info.altitude = *report.Alt
 		default:
-			info.altitude = G_UNKNOWN
 		}
 	}
 	/* Otherwise keep last known altitude when we downgrade from 3D to 2D fix. */
