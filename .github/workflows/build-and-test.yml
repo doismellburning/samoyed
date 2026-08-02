@@ -48,6 +48,14 @@ jobs:
     - name: "Install morse2ascii"
       if: "runner.os == 'Linux'"
       run: "sudo apt install --yes morse2ascii"  # For decoding morse for tests; not available on macOS
+    - name: "Install gpsd/gpsfake to test GPSD support (Linux)"
+      if: "runner.os == 'Linux'"
+      run: "sudo apt install --yes gpsd gpsd-clients"  # gpsd-clients provides gpsfake, used to simulate a GPSD daemon for tests; not available on macOS
+    - name: "Put gpsd into AppArmor complain mode (Linux)"
+      if: "runner.os == 'Linux'"
+      # gpsfake feeds gpsd via a pty, which the default confinement profile doesn't allow - see /etc/apparmor.d/usr.sbin.gpsd.
+      # `|| true` since this is a defensive no-op if AppArmor/the profile isn't present at all.
+      run: "sudo /usr/sbin/apparmor_parser -r -C /etc/apparmor.d/usr.sbin.gpsd || true"
     - run: "make stats"
     - run: "make cmds"
     - name: "Install Dire Wolf to test parsing (Linux)"
