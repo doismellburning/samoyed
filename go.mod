@@ -11,7 +11,7 @@ require (
 	github.com/lestrrat-go/strftime v1.2.0
 	github.com/pkg/term v1.1.0
 	github.com/spf13/pflag v1.0.10
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/tzneal/coordconv v0.1.2
 	github.com/warthog618/go-gpiocdev v0.9.1
 	github.com/xylo04/goHamlib v0.0.0-20240309005711-30dd4ae13b38
@@ -21,12 +21,11 @@ require (
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/jkeiser/iter v0.0.0-20200628201005-c8aa0ae784d1 // indirect
 	github.com/miekg/dns v1.1.61 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/vishvananda/netlink v1.2.1-beta.2 // indirect
 	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
