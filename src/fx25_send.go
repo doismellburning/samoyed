@@ -1,11 +1,6 @@
 //nolint:gochecknoglobals
 package direwolf
 
-import (
-	"fmt"
-	"os"
-)
-
 var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendFrame" or "???"
 
 /*-------------------------------------------------------------
@@ -47,15 +42,49 @@ var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendF
  *
  *--------------------------------------------------------------*/
 
-func FX25SendFrame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
+func FX25SendFrame(channel int, fbuf []byte, fx_mode int) int {
+	var ctag_num, data, check = fx25_encode_frame(channel, fbuf, fx_mode)
+	if ctag_num < CTAG_MIN {
+		return (-1)
+	}
+
+	fx25BitsSent[channel] = 0
+
+	var ctag_value = fx25_get_ctag_value(ctag_num)
+
+	for k := range 8 {
+		send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
+	}
+
+	send_bytes(channel, data)
+	send_bytes(channel, check)
+
+	return fx25BitsSent[channel]
+}
+
+/*-------------------------------------------------------------
+ *
+ * Name:	fx25_encode_frame
+ *
+ * Purpose:	Wrap an AX.25 frame up as an FX.25 codeblock.
+ *
+ * Inputs:	channel, fx_mode - As for FX25SendFrame.
+ *
+ *		fbuf	- Frame buffer, without the FCS.
+ *
+ * Returns:	The correlation tag number, the "data" part to be transmitted,
+ *		and the check bytes.
+ *		The tag number is -1, and the other two are nil, for failure.
+ *
+ *--------------------------------------------------------------*/
+
+func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []byte) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		dw_printf("FX.25[%d] send frame: FX.25 mode = %d\n", channel, fx_mode)
 		fx_hex_dump(fbuf)
 	}
-
-	fx25BitsSent[channel] = 0
 
 	// Append the FCS.
 
@@ -76,10 +105,9 @@ func FX25SendFrame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.\n", channel, fx_mode, dlen)
 
-		return (-1)
+		return -1, nil, nil
 	}
 
-	var ctag_value = fx25_get_ctag_value(ctag_num)
 	var k_data_radio = fx25_get_k_data_radio(ctag_num)
 	var k_data_rs = fx25_get_k_data_rs(ctag_num)
 
@@ -115,47 +143,7 @@ func FX25SendFrame(channel int, fbuf []byte, fx_mode int, test_mode bool) int {
 		dw_printf("------\n")
 	}
 
-	if test_mode {
-		// Standalone text application.
-		var flags = []byte{0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e, 0x7e}
-		var fname = fmt.Sprintf("fx%02x.dat", ctag_num)
-
-		var fp, err = os.Create(fname) //nolint:gosec
-		if err != nil {
-			panic(err)
-		}
-		defer fp.Close()
-
-		fp.Write(flags)
-
-		for k := range 8 {
-			var b = byte(ctag_value>>(k*8)) & 0xff // Should be portable to big endian too.
-			fp.Write([]byte{b})
-		}
-
-		for j := 8; j < 16; j++ {
-			data[j] ^= 0xff
-		}
-
-		fp.Write(data[:k_data_radio])
-		fp.Write(check[:nroots])
-		fp.Write(flags)
-	} else {
-		// Normal usage.  Send bits to modulator.
-
-		// Temp hack for testing.  Corrupt first 8 bytes.
-		//	for (int j = 0; j < 16; j++) {
-		//	  data[j] = ~ data[j];
-		//	}
-		for k := range 8 {
-			send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
-		}
-
-		send_bytes(channel, data[:k_data_radio])
-		send_bytes(channel, check[:nroots])
-	}
-
-	return fx25BitsSent[channel]
+	return ctag_num, data[:k_data_radio], check[:nroots]
 }
 
 func send_bytes(channel int, b []byte) {

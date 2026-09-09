@@ -34,9 +34,6 @@ type fx_context_s struct {
 
 var fx_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*fx_context_s
 
-var FXTEST = false
-var FX25TestCount = 0
-
 /***********************************************************************************
  *
  * Name:        FX25RecBit
@@ -64,6 +61,28 @@ var FX25TestCount = 0
 const FENCE = 0x55 // to detect buffer overflow.
 
 func FX25RecBit(channel int, subchannel int, slice int, dbit int) {
+	fx25_rec_bit(channel, subchannel, slice, dbit, fx25_deliver_frame)
+}
+
+// fx25_frame_sink is handed each AX.25 frame, with the FCS removed, extracted
+// from the received bit stream, along with the number of bytes that the FEC
+// decoder had to correct.
+type fx25_frame_sink func(channel int, subchannel int, slice int, frame []byte, derrors int)
+
+// fx25_deliver_frame is the sink used in normal operation, passing the frame on
+// to the rest of the receive path.
+func fx25_deliver_frame(channel int, subchannel int, slice int, frame []byte, derrors int) {
+	var alevel = demod_get_audio_level(channel, subchannel)
+
+	multi_modem_process_rec_frame(channel, subchannel, slice, frame, alevel, BitFixLevel(derrors), 1)
+}
+
+// fx25_rec_bit is FX25RecBit with the frame delivery separated out, so that
+// tests can collect frames rather than feed them to the receive path.
+//
+// Note that the sink is called before the state machine is reset, so that
+// fx25_rec_busy still reports reception in progress during delivery.
+func fx25_rec_bit(channel int, subchannel int, slice int, dbit int, sink fx25_frame_sink) {
 	// Allocate context blocks only as needed.
 	var F = fx_context[channel][subchannel][slice]
 	if F == nil {
@@ -136,7 +155,7 @@ func FX25RecBit(channel int, subchannel int, slice int, dbit int) {
 
 			F.clen++
 			if F.clen >= F.nroots {
-				process_rs_block(channel, subchannel, slice, F) // see below
+				process_rs_block(channel, subchannel, slice, F, sink) // see below
 
 				F.ctag_num = -1
 				F.accum = 0
@@ -213,11 +232,11 @@ func fx25_rec_busy(channel int) bool {
  *		+-----------------------+---------------+---------------+
  *
  * Description:	Use Reed-Solomon decoder to fix up any errors.
- *		Extract the AX.25 frame from the corrected data.
+ *		Extract the AX.25 frame from the corrected data and hand it to sink.
  *
  ***********************************************************************************/
 
-func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
+func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s, sink fx25_frame_sink) {
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
@@ -262,13 +281,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s) {
 					fx_hex_dump(frame_buf[:frame_len])
 				}
 
-				if FXTEST {
-					FX25TestCount++
-				} else {
-					var alevel = demod_get_audio_level(channel, subchannel)
-
-					multi_modem_process_rec_frame(channel, subchannel, slice, frame_buf[:frame_len-2], alevel, BitFixLevel(derrors), 1) /* len-2 to remove FCS. */
-				}
+				sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
 				text_color_set(DW_COLOR_ERROR)
