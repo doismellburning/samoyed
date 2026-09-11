@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/wavwrite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,12 +33,28 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	GEN_PACKETS = true
 
-	audio_file_open(filename, &modem)
+	var wav, wavErr = wavwrite.Create(filename, wavwrite.Format{
+		NumChannels:   modem.adev[0].num_channels,
+		SamplesPerSec: modem.adev[0].samples_per_sec,
+		BitsPerSample: modem.adev[0].bits_per_sample,
+	})
+	require.NoError(t, wavErr)
+
+	GenPacketsSetAudioSink(func(c uint8) int {
+		if wav.WriteByte(c) != nil {
+			return -1
+		}
+
+		return 1
+	})
+
+	defer GenPacketsSetAudioSink(nil)
+
 	var amplitude = 100
 	gen_tone_init(&modem, amplitude, true)
 	morse_init(&modem, amplitude)
 	morse_send(0, message, 10, 100, 100)
-	audio_file_close() // I just realised this all works on globals :s
+	require.NoError(t, wav.Close()) // I just realised this all works on globals :s
 }
 
 // gen_packets will generate Morse, so let's test it and try to decode
