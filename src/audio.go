@@ -1781,7 +1781,7 @@ func audio_wait(a int) {
  *
  *----------------------------------------------------------------*/
 
-func audio_close() int { //nolint:unparam
+func audio_close() int {
 	var err = 0
 
 	for a := range MAX_ADEVS {

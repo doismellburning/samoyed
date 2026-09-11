@@ -10,7 +10,6 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
-	"fmt"
 	"math"
 	"os"
 )
@@ -674,72 +673,4 @@ func (tg *ToneGenerator) PutQuietMs(timeMs int) {
 
 	// Avoid abrupt change when it starts up again.
 	tg.tonePhase = 0
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        main
- *
- * Purpose:     Quick test program for generating tones
- *
- *--------------------------------------------------------------------*/
-
-func GenToneMain() {
-	fmt.Println("Warning, known to fail with an assertion error, needs debugging and fixing.")
-
-	const chan1 = 0
-	const chan2 = 1
-
-	/* to sound card */
-	/* one channel.  2 times:  one second of each tone. */
-
-	var my_audio_config audio_s
-	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
-	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
-	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
-
-	audio_open(&my_audio_config)
-	gen_tone_init(&my_audio_config, 100, false)
-
-	for range 2 {
-		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 1)
-		}
-
-		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 0)
-		}
-	}
-
-	audio_close()
-
-	/* Now try stereo. */
-
-	my_audio_config = audio_s{} //nolint:exhaustruct
-	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
-	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
-	my_audio_config.adev[0].num_channels = 2
-
-	audio_open(&my_audio_config)
-	gen_tone_init(&my_audio_config, 100, false)
-
-	for range 4 {
-		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 1)
-		}
-
-		for range my_audio_config.achan[0].baud * 2 {
-			tone_gen_put_bit(chan1, 0)
-		}
-
-		for range my_audio_config.achan[1].baud * 2 {
-			tone_gen_put_bit(chan2, 1)
-		}
-
-		for range my_audio_config.achan[1].baud * 2 {
-			tone_gen_put_bit(chan2, 0)
-		}
-	}
-
-	audio_close()
 }
