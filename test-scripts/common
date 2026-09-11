@@ -3,11 +3,6 @@
 ATEST="${ATEST:-$(dirname "$(realpath "$0")")/../dist/samoyed-atest}"
 export ATEST
 
-FXSEND="${FXSEND:-$(dirname "$(realpath "$0")")/../dist/samoyed-fxsend}"
-export FXSEND
-FXREC="${FXREC:-$(dirname "$(realpath "$0")")/../dist/samoyed-fxrec}"
-export FXREC
-
 GEN_PACKETS="${GEN_PACKETS:-$(dirname "$(realpath "$0")")/../dist/samoyed-gen_packets}"
 export GEN_PACKETS
 
