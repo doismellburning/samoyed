@@ -36,19 +36,19 @@ func test_tt2text(t *testing.T, buttons string, _expect_mp string, _expect_2k st
 
 	var text string
 
-	text, _ = tt_multipress_to_text(buttons, false)
+	text, _ = TTMultipressToText(buttons, false)
 	assert.Equal(t, _expect_mp, text, "Unexpected multi-press value for buttons %s", buttons)
 
-	text, _ = tt_two_key_to_text(buttons, false)
+	text, _ = TTTwoKeyToText(buttons, false)
 	assert.Equal(t, _expect_2k, text, "Unexpected two-key value for buttons %s", buttons)
 
-	text, _ = tt_call10_to_text(buttons, false)
+	text, _ = TTCall10ToText(buttons, false)
 	assert.Equal(t, _expect_c10, text, "Unexpected call10 value for buttons %s", buttons)
 
-	text, _ = tt_mhead_to_text(buttons, false)
+	text, _ = TTMheadToText(buttons, false)
 	assert.Equal(t, _expect_loc, text, "Unexpected Maidenhead value for buttons %s", buttons)
 
-	text, _ = tt_satsq_to_text(buttons, false)
+	text, _ = TTSatsqToText(buttons, false)
 	assert.Equal(t, _expect_sat, text, "Unexpected SatSq value for buttons %s", buttons)
 }
 

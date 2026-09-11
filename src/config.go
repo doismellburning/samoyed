@@ -4256,7 +4256,7 @@ func handleTTMHEAD(ps *parseState) bool {
 			return true
 		}
 
-		var _, mhErrors = tt_mhead_to_text(t, false)
+		var _, mhErrors = TTMheadToText(t, false)
 		if mhErrors != 0 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Line %d: TTMHEAD prefix not a valid DTMF sequence.\n", ps.line)
