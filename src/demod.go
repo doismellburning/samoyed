@@ -12,7 +12,6 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
-	"os"
 	"strings"
 	"unicode"
 )
@@ -29,6 +28,21 @@ var demodulator_state [MAX_RADIO_CHANS][MAX_SUBCHANS]demodulator_state_s
 
 var sample_sum [MAX_RADIO_CHANS][MAX_SUBCHANS]int
 var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
+
+/*
+ * PSK is always demodulated at the full sample rate; the decimating path was
+ * never implemented for it.  Complain, rather than silently ignoring, when the
+ * configuration asked for decimation.
+ */
+
+func demod_psk_force_no_decimation(channel int) {
+	if save_audio_config_p.achan[channel].decimate > 1 {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
+	}
+
+	save_audio_config_p.achan[channel].decimate = 1
+}
 
 /*------------------------------------------------------------------
  *
@@ -450,7 +464,7 @@ func demod_init(pa *audio_s) {
 
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				save_audio_config_p.achan[channel].decimate = 1 // think about this later.
+				demod_psk_force_no_decimation(channel)
 
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
@@ -514,7 +528,7 @@ func demod_init(pa *audio_s) {
 
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				save_audio_config_p.achan[channel].decimate = 1 // think about this later
+				demod_psk_force_no_decimation(channel)
 
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
@@ -567,7 +581,7 @@ func demod_init(pa *audio_s) {
 
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				save_audio_config_p.achan[channel].decimate = 1
+				demod_psk_force_no_decimation(channel)
 
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
@@ -942,14 +956,9 @@ func demod_process_sample(channel int, subchan int, sam int) {
 		}
 
 	case MODEM_QPSK, MODEM_8PSK, MODEM_BPSK:
-		if save_audio_config_p.achan[channel].decimate > 1 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid combination of options.  Exiting.\n")
-			// Would probably work but haven't thought about it or tested yet.
-			os.Exit(1)
-		} else {
-			demod_psk_process_sample(channel, subchan, sam, D)
-		}
+		// Decimation would probably work but hasn't been thought about or
+		// tested yet, so demod_init has already ruled it out for PSK.
+		demod_psk_process_sample(channel, subchan, sam, D)
 
 	default:
 		/*
