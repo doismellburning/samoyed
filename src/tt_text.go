@@ -152,7 +152,7 @@ var grid = [10][10]string{
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_text_to_multipress
+ * Name:        TTTextToMultipress
  *
  * Purpose:     Convert text to the multi-press representation.
  *
@@ -168,7 +168,8 @@ var grid = [10][10]string{
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unparam
+// TTTextToMultipress converts text to the multi-press representation.
+func TTTextToMultipress(text string, quiet bool) (string, int) {
 	var buttons strings.Builder
 	var lastButton rune
 	var haveButtons bool
@@ -247,11 +248,11 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
 	}
 
 	return buttons.String(), errors
-} /* end tt_text_to_multipress */
+} /* end TTTextToMultipress */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_text_to_two_key
+ * Name:        TTTextToTwoKey
  *
  * Purpose:     Convert text to the two-key representation.
  *
@@ -267,7 +268,8 @@ func tt_text_to_multipress(text string, quiet bool) (string, int) { //nolint:unp
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unparam
+// TTTextToTwoKey converts text to the two-key representation.
+func TTTextToTwoKey(text string, quiet bool) (string, int) {
 	var buttons strings.Builder
 	var errors = 0
 
@@ -315,7 +317,7 @@ func tt_text_to_two_key(text string, quiet bool) (string, int) { //nolint:unpara
 	}
 
 	return buttons.String(), errors
-} /* end tt_text_to_two_key */
+} /* end TTTextToTwoKey */
 
 /*------------------------------------------------------------------
  *
@@ -386,7 +388,7 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_text_to_call10
+ * Name:        TTTextToCall10
  *
  * Purpose:     Convert text to the 10 character callsign format.
  *
@@ -402,7 +404,8 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_call10(text string, quiet bool) (string, int) {
+// TTTextToCall10 converts text to the 10 character callsign format.
+func TTTextToCall10(text string, quiet bool) (string, int) {
 	var errors = 0
 
 	/* Quick validity check. */
@@ -474,11 +477,11 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
 	fmt.Fprintf(&buttons, "%04d", packed)
 
 	return buttons.String(), errors
-} /* end tt_text_to_call10 */
+} /* end TTTextToCall10 */
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_text_to_satsq
+ * Name:        TTTextToSatsq
  *
  * Purpose:     Convert Special Satellite Gridsquare to 4 digit DTMF representation.
  *
@@ -497,7 +500,8 @@ func tt_text_to_call10(text string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_satsq(text string, quiet bool) (string, int) {
+// TTTextToSatsq converts a Special Satellite Gridsquare to the 4 digit DTMF representation.
+func TTTextToSatsq(text string, quiet bool) (string, int) {
 	var errors = 0
 
 	/* Quick validity check. */
@@ -570,7 +574,7 @@ func tt_text_to_satsq(text string, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-} /* end tt_text_to_satsq */
+} /* end TTTextToSatsq */
 
 /*------------------------------------------------------------------
  *
@@ -1125,7 +1129,7 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
 
 /*------------------------------------------------------------------
  *
- * Name:        tt_text_to_mhead
+ * Name:        TTTextToMhead
  *
  * Purpose:     Convert normal text Maidenhead Grid Square Locator to DTMF representation.
  *
@@ -1144,7 +1148,8 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
  *
  *----------------------------------------------------------------*/
 
-func tt_text_to_mhead(text string, quiet bool) (string, int) {
+// TTTextToMhead converts a normal text Maidenhead Grid Square Locator to the DTMF representation.
+func TTTextToMhead(text string, quiet bool) (string, int) {
 	var errors = 0
 	var buttons string
 
@@ -1208,7 +1213,7 @@ func tt_text_to_mhead(text string, quiet bool) (string, int) {
 	}
 
 	return buttons, errors
-} /* tt_text_to_mhead */
+} /* TTTextToMhead */
 
 /*------------------------------------------------------------------
  *

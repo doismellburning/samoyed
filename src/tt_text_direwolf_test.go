@@ -13,19 +13,19 @@ func test_text2tt(t *testing.T, text string, _expect_mp string, _expect_2k strin
 
 	var buttons string
 
-	buttons, _ = tt_text_to_multipress(text, false)
+	buttons, _ = TTTextToMultipress(text, false)
 	assert.Equal(t, _expect_mp, buttons, "Unexpected multi-press value for text %s", text)
 
-	buttons, _ = tt_text_to_two_key(text, false)
+	buttons, _ = TTTextToTwoKey(text, false)
 	assert.Equal(t, _expect_2k, buttons, "Unexpected two-key value for text %s", text)
 
-	buttons, _ = tt_text_to_call10(text, false)
+	buttons, _ = TTTextToCall10(text, false)
 	assert.Equal(t, _expect_c10, buttons, "Unexpected call10 value for text %s", text)
 
-	buttons, _ = tt_text_to_mhead(text, false)
+	buttons, _ = TTTextToMhead(text, false)
 	assert.Equal(t, _expect_loc, buttons, "Unexpected Maidenhead value for text %s", text)
 
-	buttons, _ = tt_text_to_satsq(text, false)
+	buttons, _ = TTTextToSatsq(text, false)
 	assert.Equal(t, _expect_sat, buttons, "Unexpected SatSq value for text %s", text)
 }
 
