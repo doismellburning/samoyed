@@ -239,7 +239,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 			if il2p_get_debug() >= 1 {
 				if pp != nil {
-					ax25_hex_dump(pp)
+					AX25HexDump(pp)
 				} else {
 					// Most likely too many FEC errors.
 					text_color_set(DW_COLOR_ERROR)
