@@ -52,31 +52,14 @@ package direwolf
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/doismellburning/samoyed/internal/wavwrite"
 	"github.com/spf13/pflag"
 )
-
-type wav_header struct { /* .WAV file header. */
-	riff            [4]byte /* "RIFF" */
-	filesize        int32   /* file length - 8 */
-	wave            [4]byte /* "WAVE" */
-	fmt             [4]byte /* "fmt " */
-	fmtsize         int32   /* 16. */
-	wformattag      int16   /* 1 for PCM. */
-	nchannels       int16   /* 1 for mono, 2 for stereo. */
-	nsamplespersec  int32   /* sampling freq, Hz. */
-	navgbytespersec int32   /* = nblockalign * nsamplespersec. */
-	nblockalign     int16   /* = wbitspersample / 8 * nchannels. */
-	wbitspersample  int16   /* 16 or 8. */
-	data            [4]byte /* "data" */
-	datasize        int32   /* number of bytes following. */
-}
 
 const MY_RAND_MAX = 0x7fffffff
 
@@ -87,14 +70,8 @@ var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
 var g_noise_level float64 = 0
 
-var genPacketsOutFile *os.File
-
-// Created in audio_file_open, used for audio_put_fake, flushed in audio_file_close
-var genPacketsOutBuf *bufio.Writer
-
-var byte_count int /* Number of data bytes written to file. Will be written to header when file is closed. */
-
-var gen_header wav_header
+// Created in audio_file_open, used by audio_put_fake, closed in audio_file_close.
+var genPacketsWAV *wavwrite.Writer
 
 var genPacketsRandSeed int32 = 1
 
@@ -688,69 +665,22 @@ func audio_file_open(fname string, pa *audio_s) int {
 	/*
 	 * Write the file header.  Don't know length yet.
 	 */
-	var openErr error
+	var format = wavwrite.Format{
+		NumChannels:   pa.adev[0].num_channels,
+		SamplesPerSec: pa.adev[0].samples_per_sec,
+		BitsPerSample: pa.adev[0].bits_per_sample,
+	}
 
-	genPacketsOutFile, openErr = os.Create(fname) //nolint:gosec // We expect to write to a user-supplied file from CLI
-	if openErr != nil {
+	var w, err = wavwrite.Create(fname, format)
+	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't open %s for write: %s\n", fname, openErr)
+		fmt.Printf("%s\n", err)
 
 		return (-1)
 	}
 
-	// TODO KG Can't get memcpy to work, so just stuff it in manually
-	// C.memcpy(unsafe.Pointer(&gen_header.riff[0]), unsafe.Pointer(C.CString("RIFF")), 4)
-	gen_header.riff[0] = 'R'
-	gen_header.riff[1] = 'I'
-	gen_header.riff[2] = 'F'
-	gen_header.riff[3] = 'F'
-	gen_header.filesize = 0
-	// C.memcpy(unsafe.Pointer(&gen_header.wave[0]), unsafe.Pointer(C.CString("WAVE")), 4)
-	gen_header.wave[0] = 'W'
-	gen_header.wave[1] = 'A'
-	gen_header.wave[2] = 'V'
-	gen_header.wave[3] = 'E'
-	// C.memcpy(unsafe.Pointer(&gen_header.fmt[0]), unsafe.Pointer(C.CString("fmt ")), 4)
-	gen_header.fmt[0] = 'f'
-	gen_header.fmt[1] = 'm'
-	gen_header.fmt[2] = 't'
-	gen_header.fmt[3] = ' '
-	gen_header.fmtsize = 16   // Always 16.
-	gen_header.wformattag = 1 // 1 for PCM.
-
-	gen_header.nchannels = int16(pa.adev[0].num_channels)
-	gen_header.nsamplespersec = int32(pa.adev[0].samples_per_sec)
-	gen_header.wbitspersample = int16(pa.adev[0].bits_per_sample)
-
-	gen_header.nblockalign = gen_header.wbitspersample / 8 * gen_header.nchannels
-	gen_header.navgbytespersec = int32(gen_header.nblockalign) * gen_header.nsamplespersec
-	// C.memcpy(unsafe.Pointer(&gen_header.data[0]), unsafe.Pointer(C.CString("data")), 4)
-	gen_header.data[0] = 'd'
-	gen_header.data[1] = 'a'
-	gen_header.data[2] = 't'
-	gen_header.data[3] = 'a'
-	gen_header.datasize = 0
-
-	if gen_header.nchannels != 1 && gen_header.nchannels != 2 {
-		panic("assert(gen_header.nchannels == 1 || gen_header.nchannels == 2)")
-	}
-
-	var writeErr = binary.Write(genPacketsOutFile, binary.LittleEndian, gen_header)
-	if writeErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't write header to %s: %s\n", fname, writeErr)
-		genPacketsOutFile.Close()
-		genPacketsOutFile = nil
-
-		return (-1)
-	}
-
-	/*
-	 * Number of bytes written will be filled in later.
-	 */
-	byte_count = 0
-
-	genPacketsOutBuf = bufio.NewWriter(genPacketsOutFile)
+	genPacketsWAV = w
+	noiseSample16Pending = false
 
 	return (0)
 } /* end audio_open */
@@ -771,46 +701,22 @@ func audio_file_open(fname string, pa *audio_s) int {
  *----------------------------------------------------------------*/
 
 func audio_file_close() int { //nolint:unparam
-	/*
-	 * Go back and fix up lengths in header.
-	 */
-	gen_header.filesize = int32(byte_count + binary.Size(new(wav_header)) - 8)
-	gen_header.datasize = int32(byte_count)
-
-	if genPacketsOutFile == nil {
+	if genPacketsWAV == nil {
 		return (-1)
 	}
 
-	var flushErr = genPacketsOutBuf.Flush()
-	if flushErr != nil {
-		return -1
-	}
+	var w = genPacketsWAV
 
-	var _, seekErr = genPacketsOutFile.Seek(0, io.SeekStart)
-	if seekErr != nil {
+	genPacketsWAV = nil
+
+	// Close goes back and fixes up the lengths in the header for us.
+	var err = w.Close()
+	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't seek in audio file: %s\n", seekErr)
-		genPacketsOutFile.Close()
-		genPacketsOutFile = nil
-		genPacketsOutBuf = nil
+		fmt.Printf("%s\n", err)
 
 		return (-1)
 	}
-
-	var writeErr = binary.Write(genPacketsOutFile, binary.LittleEndian, gen_header)
-	if writeErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Couldn't write header to audio file: %s\n", writeErr)
-		genPacketsOutFile.Close()
-		genPacketsOutFile = nil
-		genPacketsOutBuf = nil
-
-		return (-1)
-	}
-
-	genPacketsOutFile.Close()
-	genPacketsOutFile = nil
-	genPacketsOutBuf = nil
 
 	return (0)
 } /* end audio_close */
@@ -915,18 +821,22 @@ func send_packet(str string) {
  *
  *----------------------------------------------------------------*/
 
+// Half of a 16 bit sample, waiting for its upper byte before noise can be
+// added to it and it can be written out.
 var sample16 int16
+
+var noiseSample16Pending bool
 
 func audio_put_fake(_ int, c uint8) int {
 	if g_add_noise {
-		if (byte_count & 1) == 0 {
+		if !noiseSample16Pending {
 			sample16 = int16(c) /* save lower byte. */
-			byte_count++
+			noiseSample16Pending = true
 
 			return int(c)
 		} else {
 			sample16 |= int16(c) << 8 /* insert upper byte. */
-			byte_count++
+			noiseSample16Pending = false
 			var s = int32(sample16) // sign extend.
 
 			/* Add random noise to the signal. */
@@ -944,7 +854,7 @@ func audio_put_fake(_ int, c uint8) int {
 				s = -32767
 			}
 
-			var n, writeErr = genPacketsOutBuf.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
+			var n, writeErr = genPacketsWAV.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
 			if writeErr != nil {
 				return -1
 			}
@@ -952,14 +862,12 @@ func audio_put_fake(_ int, c uint8) int {
 			return n
 		}
 	} else {
-		byte_count++
-
-		var n, writeErr = genPacketsOutBuf.Write([]byte{c})
+		var writeErr = genPacketsWAV.WriteByte(c)
 		if writeErr != nil {
 			return -1
 		}
 
-		return n
+		return 1
 	}
 } /* end audio_put */
 
