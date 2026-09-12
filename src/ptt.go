@@ -540,7 +540,7 @@ var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
 
 var otnames [NUM_OCTYPES]string
 
-func ptt_init(audio_config_p *audio_s) {
+func ptt_init(audio_config_p *AudioConfig) {
 	save_audio_config_p = audio_config_p
 
 	otnames[OCTYPE_PTT] = "PTT"
@@ -1315,7 +1315,7 @@ func ptt_term() {
  */
 
 func PTTTestMain() {
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 
 	my_audio_config.adev[0].num_channels = 2
 
@@ -1395,7 +1395,7 @@ func PTTTestMain() {
 
 	// #if __arm__
 
-	my_audio_config = audio_s{} //nolint:exhaustruct
+	my_audio_config = AudioConfig{} //nolint:exhaustruct
 	my_audio_config.adev[0].num_channels = 1
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO

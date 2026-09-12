@@ -194,7 +194,7 @@ func Test_IsNoCall(t *testing.T) {
 
 // configFromString writes content to a temp config file, runs config_init, and
 // returns the resulting audio and misc config structs.
-func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+func configFromString(t *testing.T, content string) (*AudioConfig, *misc_config_s) {
 	t.Helper()
 
 	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
@@ -203,7 +203,7 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	var digiConfig digi_config_s
 	var cdigiConfig cdigi_config_s
 	var ttConfig tt_config_s
@@ -411,7 +411,7 @@ func Test_config_init_modem_directive(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tmpFile.Close())
 
-			var audioConfig = new(audio_s)
+			var audioConfig = new(AudioConfig)
 			var digiConfig digi_config_s
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
@@ -460,7 +460,7 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tmpFile.Close())
 
-			var audioConfig = new(audio_s)
+			var audioConfig = new(AudioConfig)
 			var digiConfig digi_config_s
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s
@@ -505,7 +505,7 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, tmpFile.Close())
 
-			var audioConfig = new(audio_s)
+			var audioConfig = new(AudioConfig)
 			var digiConfig digi_config_s
 			var cdigiConfig cdigi_config_s
 			var ttConfig tt_config_s

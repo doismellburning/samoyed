@@ -18,7 +18,7 @@ var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hd
  *		bad_fcs	- Append an invalid FCS for testing purposes.
  *			  Applies only to regular AX.25.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent including "flags" and the
  *		stuffing bits.
@@ -35,11 +35,11 @@ var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hd
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  *--------------------------------------------------------------*/
 
-func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *audio_s) int {
+func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *AudioConfig) int {
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
 		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
 		if n > 0 {
@@ -117,7 +117,7 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
  *
  *		audio_config_p - Configuration for audio and modems.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent.
  *		There is no bit-stuffing so we would expect this to
@@ -127,11 +127,11 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  *--------------------------------------------------------------*/
 
-func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_config_p *audio_s) int {
+func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_config_p *AudioConfig) int {
 	number_of_bits_sent[channel] = 0
 
 	/* TODO KG
@@ -174,7 +174,7 @@ func send_byte_msb_first(channel int, x int, polarity int) {
 			dbit = 1
 		}
 
-		tone_gen_put_bit(channel, (dbit^polarity)&1)
+		ToneGenPutBit(channel, (dbit^polarity)&1)
 
 		x <<= 1
 		number_of_bits_sent[channel]++
@@ -230,7 +230,7 @@ func send_bit_nrzi(channel int, b bool) {
 		nrziBitOutput[channel] = 1 - nrziBitOutput[channel]
 	}
 
-	tone_gen_put_bit(channel, nrziBitOutput[channel])
+	ToneGenPutBit(channel, nrziBitOutput[channel])
 
 	number_of_bits_sent[channel]++
 }
@@ -265,7 +265,7 @@ func send_bit_nrzi(channel int, b bool) {
 
 func eas_put_byte(channel int, b byte) {
 	for range 8 {
-		tone_gen_put_bit(channel, int(b&1))
+		ToneGenPutBit(channel, int(b&1))
 		b >>= 1
 	}
 }

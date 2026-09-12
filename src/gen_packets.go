@@ -82,7 +82,7 @@ const MY_RAND_MAX = 0x7fffffff
 
 var GEN_PACKETS = false // Switch between fakes and reals at runtime
 
-var modem audio_s
+var modem AudioConfig
 var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
 var g_noise_level float64 = 0
@@ -504,7 +504,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		os.Exit(1)
 	}
 
-	gen_tone_init(&modem, *amplitude/2, true)
+	GenToneInit(&modem, *amplitude/2, true)
 	morse_init(&modem, *amplitude/2)
 	dtmf_init(&modem, *amplitude/2)
 
@@ -594,7 +594,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		for speed_error := -variable_speed_max_error; speed_error <= variable_speed_max_error+0.001; speed_error += variable_speed_increment {
 			// Baud is int so we get some roundoff.  Make it real?
 			modem.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
-			gen_tone_init(&modem, *amplitude/2, true)
+			GenToneInit(&modem, *amplitude/2, true)
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error)
 			send_packet(stemp)
@@ -657,7 +657,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
  *
  * Inputs:      fname		- Name of .WAV file to create.
  *
- *		pa		- Address of structure of type audio_s.
+ *		pa		- Address of structure of type AudioConfig.
  *
  *				The fields that we care about are:
  *					num_channels
@@ -669,7 +669,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
  *
  *----------------------------------------------------------------*/
 
-func audio_file_open(fname string, pa *audio_s) int {
+func audio_file_open(fname string, pa *AudioConfig) int {
 	/*
 	 * Fill in defaults for any missing values.
 	 */

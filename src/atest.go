@@ -93,7 +93,7 @@ var atestBuf *bufio.Reader
 var e_o_f bool
 var packets_decoded_one = 0
 
-var my_audio_config *audio_s
+var my_audio_config *AudioConfig
 
 var space_gain [MAX_SUBCHANS]float64
 
@@ -120,7 +120,7 @@ func AtestMain() {
 	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
 
-	my_audio_config = new(audio_s)
+	my_audio_config = new(AudioConfig)
 
 	/*
 	 * First apply defaults.

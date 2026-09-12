@@ -93,7 +93,7 @@ type digi_config_s struct {
  * Set by digipeater_init and used later.
  */
 
-var digipeater_audio_config *audio_s
+var digipeater_audio_config *AudioConfig
 var save_digi_config_p *digi_config_s
 var dedupeService *DedupeService
 
@@ -123,7 +123,7 @@ func digipeater_get_count(from_chan, to_chan int) int { //nolint:unused
  *
  *------------------------------------------------------------------------------*/
 
-func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
+func digipeater_init(p_audio_config *AudioConfig, p_digi_config *digi_config_s) {
 	digipeater_audio_config = p_audio_config
 	save_digi_config_p = p_digi_config
 

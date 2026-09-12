@@ -29,7 +29,7 @@ import (
 // TODO KG Also defined in morse.go: const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
 
 var sine_table [256]int16 // Shared by every channel; built once from the single
-// global amplitude percentage passed to gen_tone_init.
+// global amplitude percentage passed to GenToneInit.
 
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)
@@ -42,7 +42,7 @@ var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 type ToneGenerator struct {
 	channel     int
 	adevIndex   int
-	audioConfig *audio_s
+	audioConfig *AudioConfig
 
 	ticksPerSample    int /* Same for both channels of same soundcard */
 	ticksPerBit       int /* because they have same sample rate. */
@@ -97,7 +97,7 @@ type ToneGenerator struct {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *AudioConfig) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
@@ -174,7 +174,7 @@ func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
 
 /*------------------------------------------------------------------
  *
- * Name:        gen_tone_init
+ * Name:        GenToneInit
  *
  * Purpose:     Initialize for AFSK tone generation which might
  *		be used for RTTY or amateur packet radio.
@@ -204,7 +204,7 @@ func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
  *
  *----------------------------------------------------------------*/
 
-func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //nolint:unparam
+func GenToneInit(audio_config_p *AudioConfig, amp int, gen_packets bool) int {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);
@@ -246,11 +246,28 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 	}
 
 	return (0)
-} /* end gen_tone_init */
+} /* end GenToneInit */
+
+// NewGenToneTestConfig returns an AudioConfig for the standalone gen_tone
+// test program, using the default audio device with numChannels sound card
+// channels, and marking radio channel 0 as MEDIUM_RADIO if mediumRadio is set.
+func NewGenToneTestConfig(numChannels int, mediumRadio bool) *AudioConfig {
+	var config = new(AudioConfig)
+
+	config.adev[0].adevice_in = DEFAULT_ADEVICE
+	config.adev[0].adevice_out = DEFAULT_ADEVICE
+	config.adev[0].num_channels = numChannels
+
+	if mediumRadio {
+		config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
+	}
+
+	return config
+}
 
 /*-------------------------------------------------------------------
  *
- * Name:        tone_gen_put_bit
+ * Name:        ToneGenPutBit
  *
  * Purpose:     Generate tone of proper duration for one data bit.
  *
@@ -348,7 +365,7 @@ func tone_gen_put_bit_real(channel int, dat int) {
 	}
 
 	toneGenerators[channel].PutBit(dat)
-} /* end tone_gen_put_bit */
+} /* end ToneGenPutBit */
 
 func (tg *ToneGenerator) PutBit(dat int) {
 	var audioConfig = tg.audioConfig

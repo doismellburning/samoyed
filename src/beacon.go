@@ -15,7 +15,7 @@ import (
 )
 
 type BeaconService struct {
-	modemConfig       *audio_s
+	modemConfig       *AudioConfig
 	miscConfig        *misc_config_s
 	igateConfig       *igate_config_s
 	trackerDebugLevel int
@@ -46,7 +46,7 @@ type BeaconService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) *BeaconService {
+func NewBeaconService(pmodem *AudioConfig, pconfig *misc_config_s, pigate *igate_config_s) *BeaconService {
 	var bs = &BeaconService{ //nolint:exhaustruct
 		modemConfig: pmodem,
 		miscConfig:  pconfig,

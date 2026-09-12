@@ -85,7 +85,7 @@ import (
 	"os"
 )
 
-var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
+var save_pa *AudioConfig /* Keep pointer to audio configuration for later use. */
 
 /*------------------------------------------------------------------
  *
@@ -94,7 +94,7 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  * Purpose:     Start up a thread for each audio device.
  *
  *
- * Inputs:      pa		- Address of structure of type audio_s.
+ * Inputs:      pa		- Address of structure of type AudioConfig.
  *
  *
  * Returns:     None.
@@ -104,7 +104,7 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  *
  *----------------------------------------------------------------*/
 
-func recv_init(pa *audio_s) {
+func recv_init(pa *AudioConfig) {
 	save_pa = pa
 
 	for a := range MAX_ADEVS {

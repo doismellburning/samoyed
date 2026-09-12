@@ -15,47 +15,56 @@ import (
 const chan1 = 0
 const chan2 = 1
 
+// No baud rate is configured, so AudioOpen fills in the default.
+const baud = direwolf.DEFAULT_BAUD
+
 func main() {
 	fmt.Println("Warning, known to fail with an assertion error, needs debugging and fixing.")
 
 	/* to sound card */
 	/* one channel.  2 times:  one second of each tone. */
 
-	var baud = direwolf.GenToneTestOpen(1, true)
+	var config = direwolf.NewGenToneTestConfig(1, true)
+
+	direwolf.AudioOpen(config)
+	direwolf.GenToneInit(config, 100, false)
 
 	for range 2 {
-		for range baud[chan1] * 2 {
-			direwolf.GenToneTestPutBit(chan1, 1)
+		for range baud * 2 {
+			direwolf.ToneGenPutBit(chan1, 1)
 		}
 
-		for range baud[chan1] * 2 {
-			direwolf.GenToneTestPutBit(chan1, 0)
+		for range baud * 2 {
+			direwolf.ToneGenPutBit(chan1, 0)
 		}
 	}
 
-	direwolf.GenToneTestClose()
+	direwolf.AudioClose()
 
 	/* Now try stereo. */
 
-	baud = direwolf.GenToneTestOpen(2, false)
+	config = direwolf.NewGenToneTestConfig(2, false)
+
+	direwolf.AudioOpen(config)
+	direwolf.GenToneInit(config, 100, false)
 
 	for range 4 {
-		for range baud[chan1] * 2 {
-			direwolf.GenToneTestPutBit(chan1, 1)
+		for range baud * 2 {
+			direwolf.ToneGenPutBit(chan1, 1)
 		}
 
-		for range baud[chan1] * 2 {
-			direwolf.GenToneTestPutBit(chan1, 0)
+		for range baud * 2 {
+			direwolf.ToneGenPutBit(chan1, 0)
 		}
 
-		for range baud[chan2] * 2 {
-			direwolf.GenToneTestPutBit(chan2, 1)
+		for range baud * 2 {
+			direwolf.ToneGenPutBit(chan2, 1)
 		}
 
-		for range baud[chan2] * 2 {
-			direwolf.GenToneTestPutBit(chan2, 0)
+		for range baud * 2 {
+			direwolf.ToneGenPutBit(chan2, 0)
 		}
 	}
 
-	direwolf.GenToneTestClose()
+	direwolf.AudioClose()
 }

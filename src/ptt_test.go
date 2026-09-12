@@ -35,7 +35,7 @@ func setupGPIODChannel(t *testing.T, invert bool) *mockGPIODLine {
 	var mock = new(mockGPIODLine)
 	gpiod_line[0][OCTYPE_PTT] = mock
 
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIOD
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 0
@@ -91,7 +91,7 @@ func TestPttSetRealGPIOD_Invert_Deactivate(t *testing.T) {
 // TestPttSetRealGPIOD_NilLine verifies that ptt_set_real does not panic when
 // the GPIOD line handle has not been initialised.
 func TestPttSetRealGPIOD_NilLine(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIOD
 	save_audio_config_p = &cfg

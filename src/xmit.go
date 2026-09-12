@@ -85,7 +85,7 @@ type XmitService struct {
 	 */
 	audioOutDevMutex [MAX_ADEVS]sync.Mutex
 
-	p_modem *audio_s
+	p_modem *AudioConfig
 }
 
 /*-------------------------------------------------------------------
@@ -110,7 +110,7 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
+func NewXmitService(p_modem *AudioConfig, debug_xmit_packet bool) *XmitService {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);

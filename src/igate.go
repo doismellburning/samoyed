@@ -246,7 +246,7 @@ func igate_get_dnl_cnt() int {
  *
  *--------------------------------------------------------------------*/
 
-func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level int) {
+func igate_init(p_audio_config *AudioConfig, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level int) {
 	s_debug = debug_level
 	dp_queue_head = nil
 

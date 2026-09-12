@@ -62,7 +62,7 @@ var s_net_tncs [MAX_TOTAL_CHANS]*NetTNC //nolint:gochecknoglobals
  *
  * Purpose:      Attach to Network KISS TNC(s) for NCHANNEL config file item(s).
  *
- * Inputs:	pa              - Address of structure of type audio_s.
+ * Inputs:	pa              - Address of structure of type AudioConfig.
  *
  *		debug ? TBD
  *
@@ -74,7 +74,7 @@ var s_net_tncs [MAX_TOTAL_CHANS]*NetTNC //nolint:gochecknoglobals
  *
  *--------------------------------------------------------------------*/
 
-func nettnc_init(pa *audio_s) {
+func nettnc_init(pa *AudioConfig) {
 	for i := range MAX_TOTAL_CHANS {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			text_color_set(DW_COLOR_DEBUG)

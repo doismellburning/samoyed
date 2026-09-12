@@ -36,7 +36,7 @@ var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
  *
  * Purpose:     Initialize the demodulator(s) used for reception.
  *
- * Inputs:      pa		- Pointer to audio_s structure with
+ * Inputs:      pa		- Pointer to AudioConfig structure with
  *				  various parameters for the modem(s).
  *
  * Returns:     0 for success, -1 for failure.
@@ -47,7 +47,7 @@ var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
  *
  *----------------------------------------------------------------*/
 
-func demod_init(pa *audio_s) int {
+func demod_init(pa *AudioConfig) int {
 	/*
 	 * Save audio configuration for later use.
 	 */

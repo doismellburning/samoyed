@@ -136,7 +136,7 @@ func Test_AX25_Link(t *testing.T) {
 func setupTestEnv(t *testing.T) {
 	t.Helper()
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	ptt_init(audioConfig)
 	tq_init(audioConfig)
 
@@ -159,7 +159,7 @@ func setupTestEnv(t *testing.T) {
 func setupTestEnvV22(t *testing.T) {
 	t.Helper()
 
-	var audioConfig = new(audio_s)
+	var audioConfig = new(AudioConfig)
 	ptt_init(audioConfig)
 	tq_init(audioConfig)
 
