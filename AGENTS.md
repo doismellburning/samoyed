@@ -11,6 +11,31 @@
 
 * Update documentation in `docs/source` where appropriate
 
+## Git and PRs
+
+* A bug fix carries the regression test that reproduces the bug, in the same
+  commit as the fix.
+* Keep merge commits out of a PR: rebase onto `main` rather than merging `main`
+  in.
+* Keep fixup commits out of a PR: when a later commit corrects an earlier one,
+  amend the earlier commit. This holds for review feedback too, so the PR reads
+  as though the point had never been missed. A new commit is for a distinct
+  logical change the review turned up — a second bug, a behaviour the fix newly
+  exposes — not for correcting what an existing commit already does.
+* Commit messages and PR titles are Conventional Commits — `<type>: <summary>`,
+  using a type the tree already uses (`feat`, `fix`, `perf`, `refactor`, `test`,
+  `docs`, `build`, `chore`); check `git log` on `main`. Capitalise the summary
+  after the tag: `feat: Improve ...`.
+* A commit message describes what its own diff does; check the two against each
+  other once the commit exists.
+* An agent's commits carry a `Co-Authored-By:` line for it, and never a
+  `Claude-Session:` trailer.
+* Never name a pull request in a commit message — describe what the other change
+  did instead (`splitting makewholine took the worst of this out already`, not
+  `#1939 did`). Issues are fine and are what `main` already carries: `Fixes
+  #<issue>`, `Refs #<issue>`. Cross-reference PRs in the PR description, where
+  the link is live.
+
 ## Style
 
 * Prefer to declare variables as `var foo = bar` and not `foo := bar`, unless necessary e.g. with a `for` loop variable
