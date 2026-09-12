@@ -39,15 +39,12 @@ var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
  * Inputs:      pa		- Pointer to audio_s structure with
  *				  various parameters for the modem(s).
  *
- * Returns:     0 for success, -1 for failure.
- *
- *
  * Bugs:	This doesn't do much error checking so don't give it
  *		anything crazy.
  *
  *----------------------------------------------------------------*/
 
-func demod_init(pa *audio_s) int {
+func demod_init(pa *audio_s) {
 	/*
 	 * Save audio configuration for later use.
 	 */
@@ -767,8 +764,6 @@ func demod_init(pa *audio_s) int {
 			dw_printf("Channel %d: IGate virtual channel.\n", channel)
 		}
 	}
-
-	return (0)
 } /* end demod_init */
 
 /*------------------------------------------------------------------
