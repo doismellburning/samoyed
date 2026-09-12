@@ -797,8 +797,17 @@ x = Silence FX.25 information.`)
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	recv_init(audio_config)
-	recv_process()
+	var adev_failed = recv_init(audio_config)
+
+	go recv_process()
+
+	// recv_process does not return, so we sit here until an audio device
+	// input fails.  There is no point in going on without audio.
+	var a = <-adev_failed
+
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Terminating after audio device %d input failure.\n", a)
+	os.Exit(1)
 }
 
 /*-------------------------------------------------------------------

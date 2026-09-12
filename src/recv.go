@@ -60,6 +60,8 @@ package direwolf
  *			various other *_init()
  *			recv_init()
  *			recv_process()  -- does not return
+ *					   (run as a goroutine, main then waits
+ *					    for an audio device failure)
  *
  *
  *		recv_init()		This starts up a separate thread
@@ -81,10 +83,6 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-import (
-	"os"
-)
-
 var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
 
 /*------------------------------------------------------------------
@@ -97,24 +95,29 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  * Inputs:      pa		- Address of structure of type audio_s.
  *
  *
- * Returns:     None.
- *
- * Errors:	Exit if error.
- *		No point in going on if we can't get audio.
+ * Returns:     A channel reporting the number of any audio device whose
+ *		input failed.  There is no point in going on without audio,
+ *		so the caller is expected to terminate when one arrives.
  *
  *----------------------------------------------------------------*/
 
-func recv_init(pa *audio_s) {
+func recv_init(pa *audio_s) <-chan int {
 	save_pa = pa
+
+	// Buffered so that a failing device thread can report and finish even
+	// though nobody is listening any more.
+	var failed = make(chan int, MAX_ADEVS)
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
-			go recv_adev_thread(a)
+			go recv_adev_thread(a, failed)
 		}
 	}
+
+	return failed
 } /* end recv_init */
 
-func recv_adev_thread(a int) {
+func recv_adev_thread(a int, failed chan<- int) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 	var first_chan = ADEVFIRSTCHAN(a)
@@ -170,12 +173,10 @@ func recv_adev_thread(a int) {
 	} // while !eof on audio stream
 
 	// What should we do now?
-	// Seimply terminate the application?
+	// Simply terminate the application?
 	// Try to re-init the audio device a couple times before giving up?
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Terminating after audio device %d input failure.\n", a)
-	os.Exit(1)
+	failed <- a
 }
 
 func recv_process() {
