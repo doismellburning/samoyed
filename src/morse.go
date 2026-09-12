@@ -116,7 +116,7 @@ var SineTable [256]int
  *
  *----------------------------------------------------------------*/
 
-func morse_init(audio_config_p *audio_s, amp int) {
+func morse_init(audio_config_p *AudioConfig, amp int) {
 	/*
 	 * Save away modem parameters for later use.
 	 */

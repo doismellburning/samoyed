@@ -75,7 +75,7 @@ var s_amplitude int = 100 // range of 0 .. 100
  *
  *----------------------------------------------------------------*/
 
-func dtmf_init(p_audio_config *audio_s, amp int) {
+func dtmf_init(p_audio_config *AudioConfig, amp int) {
 	s_amplitude = amp
 
 	/*

@@ -15,7 +15,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	// Copied from gen_packets without using all the CLI parsing...
 
-	var modem audio_s
+	var modem AudioConfig
 	modem.adev[0].defined = 1
 	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
 	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
@@ -34,7 +34,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 
 	audio_file_open(filename, &modem)
 	var amplitude = 100
-	gen_tone_init(&modem, amplitude, true)
+	GenToneInit(&modem, amplitude, true)
 	morse_init(&modem, amplitude)
 	morse_send(0, message, 10, 100, 100)
 	audio_file_close() // I just realised this all works on globals :s

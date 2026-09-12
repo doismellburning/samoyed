@@ -113,7 +113,7 @@ var process_age [MAX_RADIO_CHANS]int
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *audio_s) {
+func multi_modem_init(pa *AudioConfig) {
 	/*
 	 * Save audio configuration for later use.
 	 */

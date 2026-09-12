@@ -4,7 +4,7 @@ import "testing"
 
 func Test_dtmf(t *testing.T) {
 	var c = 0 // radio channel.
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 
 	my_audio_config.adev[ACHAN2ADEV(c)].defined = 1
 	my_audio_config.adev[ACHAN2ADEV(c)].samples_per_sec = 44100
@@ -14,7 +14,7 @@ func Test_dtmf(t *testing.T) {
 	// Let's try to set up audio?
 	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1
 	my_audio_config.adev[ACHAN2ADEV(c)].bits_per_sample = 8
-	gen_tone_init(&my_audio_config, 100, false)
+	GenToneInit(&my_audio_config, 100, false)
 	ptt_init(&my_audio_config)
 
 	dtmf_init(&my_audio_config, 50)

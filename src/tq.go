@@ -75,7 +75,7 @@ var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
 
 // TODO KG static struct audio_s *save_audio_config_p;
 
-func tq_init(audio_config_p *audio_s) {
+func tq_init(audio_config_p *AudioConfig) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set(DW_COLOR_DEBUG);

@@ -20,7 +20,7 @@ var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendF
  *			  but this is expected to be mostly for testing, not normal
  *			  operation.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent including "flags" and the
  *		stuffing bits.
@@ -33,7 +33,7 @@ var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendF
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  * Errors:	If something goes wrong, return -1 and the caller should
  *		fallback to sending normal AX.25.
@@ -167,7 +167,7 @@ func send_bit(channel int, b int) {
 		sendBitOutput[channel] = 1 - sendBitOutput[channel]
 	}
 
-	tone_gen_put_bit(channel, sendBitOutput[channel])
+	ToneGenPutBit(channel, sendBitOutput[channel])
 	fx25BitsSent[channel]++
 }
 

@@ -23,7 +23,7 @@ func Test_TTUser(t *testing.T) {
 
 	/* Fake audio config - All we care about is mycall for constructing object report packet. */
 
-	var my_audio_config audio_s
+	var my_audio_config AudioConfig
 
 	my_audio_config.mycall[0] = "WB20SZ-15"
 

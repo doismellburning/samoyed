@@ -19,7 +19,7 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent b
  *		polarity - 0 for normal.  1 to invert signal.
  *			   2 special case for testing - introduce some errors to test FEC.
  *
- * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
+ * Outputs:	Bits are shipped out by calling ToneGenPutBit().
  *
  * Returns:	Number of bits sent including
  *		- Preamble   (01010101...)
@@ -34,7 +34,7 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent b
  *
  * Assumptions:	It is assumed that the tone_gen module has been
  *		properly initialized so that bits sent with
- *		tone_gen_put_bit() are processed correctly.
+ *		ToneGenPutBit() are processed correctly.
  *
  * Errors:	Return -1 for error.  Probably frame too large.
  *
@@ -104,7 +104,7 @@ func send_il2p_bytes(channel int, b []byte, polarity int) {
 // for either polarity but other implementations might not.
 
 func send_il2p_bit(channel int, b int, polarity int) {
-	tone_gen_put_bit(channel, (b^polarity)&1)
+	ToneGenPutBit(channel, (b^polarity)&1)
 	number_of_il2p_bits_sent[channel]++
 }
 

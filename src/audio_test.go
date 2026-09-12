@@ -244,8 +244,8 @@ func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 
 // --- anyDeviceRequiresPortAudio ---
 
-func makeAudioConfig(inName, outName string) *audio_s {
-	var pa = new(audio_s)
+func makeAudioConfig(inName, outName string) *AudioConfig {
+	var pa = new(AudioConfig)
 	pa.adev[0].defined = 1
 	pa.adev[0].adevice_in = inName
 	pa.adev[0].adevice_out = outName
@@ -256,12 +256,12 @@ func makeAudioConfig(inName, outName string) *audio_s {
 func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 	tests := []struct {
 		name string
-		pa   *audio_s
+		pa   *AudioConfig
 		want bool
 	}{
 		{
 			name: "no devices defined",
-			pa:   new(audio_s),
+			pa:   new(AudioConfig),
 			want: false,
 		},
 		{

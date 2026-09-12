@@ -131,7 +131,7 @@ var tt_user [MAX_TT_USERS]tt_user_s
 
 var save_tt_config_p *tt_config_s
 
-func tt_user_init(p_audio_config *audio_s, p_tt_config *tt_config_s) {
+func tt_user_init(p_audio_config *AudioConfig, p_tt_config *tt_config_s) {
 	save_audio_config_p = p_audio_config
 
 	save_tt_config_p = p_tt_config

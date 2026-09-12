@@ -177,7 +177,7 @@ type hdlc_state2_s struct {
  *
  ***********************************************************************************/
 
-func hdlc_rec2_init(p_audio_config *audio_s) {
+func hdlc_rec2_init(p_audio_config *AudioConfig) {
 	save_audio_config_p = p_audio_config
 }
 

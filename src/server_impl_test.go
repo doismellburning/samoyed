@@ -129,7 +129,7 @@ func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_NoPorts(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
 
@@ -147,7 +147,7 @@ func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.adev[0].num_channels = 1
 	save_audio_config_p = &cfg
@@ -185,7 +185,7 @@ func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
 
@@ -207,7 +207,7 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
@@ -251,7 +251,7 @@ func dlqAppended(f func()) *dlq_item_t {
 // Before the bounds-check fix, data[0] could be read on an empty slice,
 // and the digipeater slice could go out of bounds.
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
 
@@ -270,7 +270,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 // Before the bounds-check fix, cmd.Data[1:cmd.Header.DataLen] would panic
 // when DataLen==0 or DataLen exceeded len(cmd.Data).
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
 
@@ -416,7 +416,7 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 }
 
 func TestAgwConnectedModeAllowed_OutOfRange(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
 
@@ -438,7 +438,7 @@ func TestAgwConnectedModeAllowed_NilConfig_NCHANNELRange(t *testing.T) {
 }
 
 func TestAgwConnectedModeAllowed_MediumRadio(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
@@ -447,7 +447,7 @@ func TestAgwConnectedModeAllowed_MediumRadio(t *testing.T) {
 }
 
 func TestAgwConnectedModeAllowed_MediumNETTNC(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
@@ -456,7 +456,7 @@ func TestAgwConnectedModeAllowed_MediumNETTNC(t *testing.T) {
 }
 
 func TestAgwConnectedModeAllowed_MediumIGate(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[0] = MEDIUM_IGATE
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
@@ -465,7 +465,7 @@ func TestAgwConnectedModeAllowed_MediumIGate(t *testing.T) {
 }
 
 func TestAgwConnectedModeAllowed_MediumNone(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	// chan_medium[0] defaults to MEDIUM_NONE
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
@@ -474,7 +474,7 @@ func TestAgwConnectedModeAllowed_MediumNone(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
-	var cfg audio_s
+	var cfg AudioConfig
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
 	save_audio_config_p = &cfg
 	t.Cleanup(func() { save_audio_config_p = nil })
