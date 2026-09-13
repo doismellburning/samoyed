@@ -103,7 +103,10 @@ vet:
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) || true
 	# ...but that's unreachable from some sandboxed containers, so fall back to building the same pinned version ourselves.
 	# We check for the binary rather than the pipeline's exit status, which is `sh`'s and so is 0 even when curl fetched nothing.
-	test -x $@ || GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	# golangci-lint refuses to lint a module targeting a newer Go than golangci-lint
+	# itself was built with, and its own go.mod pins an older toolchain than ours, so
+	# build it with the toolchain this module uses - as the official binaries are.
+	test -x $@ || GOTOOLCHAIN=$$(go env GOVERSION)+auto GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 .PHONY: lint
 lint: ./bin/golangci-lint
