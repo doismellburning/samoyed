@@ -120,6 +120,15 @@ type demodulator_state_s struct {
 	alevel_space_peak float64
 
 	/*
+	 * Counts audio samples so that the received audio level is only pushed to
+	 * the metrics endpoint every audioLevelDecimation samples.  Computing the
+	 * level is not free and we see every sample, but the metric is only ever
+	 * scraped every 15-30s.
+	 */
+
+	alevel_metric_countdown int
+
+	/*
 	 * Outputs from the mark and space amplitude detection,
 	 * used as inputs to the FIR lowpass filters.
 	 * Kernel for the lowpass filters.
