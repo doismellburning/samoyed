@@ -1,6 +1,6 @@
 module github.com/doismellburning/samoyed
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/brutella/dnssd v1.2.14
