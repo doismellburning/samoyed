@@ -150,6 +150,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 )
@@ -316,7 +317,7 @@ type ALevel struct {
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
-var last_seq_num int = 0
+var last_seq_num atomic.Int64
 
 // DECODE_APRS_UTIL is a runtime replacement for DECAMAIN define
 var DECODE_APRS_UTIL = false
@@ -345,14 +346,14 @@ func isxdigit(b byte) bool {
  *------------------------------------------------------------------------------*/
 
 func ax25_new() *packet_t {
-	last_seq_num++
+	var seq = last_seq_num.Add(1)
 
 	var this_p = new(packet_t)
 
 	Assert(this_p != nil)
 
 	this_p.magic1 = MAGIC
-	this_p.seq = last_seq_num
+	this_p.seq = int(seq)
 	this_p.magic2 = MAGIC
 	this_p.num_addr = (-1)
 
