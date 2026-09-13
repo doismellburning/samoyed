@@ -7,6 +7,7 @@
 * `make test` runs the full test suite and should always pass
 * `make check` runs assorted linters and should always pass
 * `make fix` will attempt assorted auto-fixes and also do a partial lint run and is worth running after every change
+* Claude Code on the web sessions run `.claude/hooks/session-start.sh`, which does `make setup` and a little container-specific fixing-up, so a fresh session can build, test and lint without further ceremony
 
 ## Documentation
 
