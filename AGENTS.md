@@ -25,9 +25,11 @@
   logical change the review turned up — a second bug, a behaviour the fix newly
   exposes — not for correcting what an existing commit already does.
 * Commit messages and PR titles are Conventional Commits — `<type>: <summary>`,
-  using a type the tree already uses (`feat`, `fix`, `perf`, `refactor`, `test`,
-  `docs`, `build`, `chore`); check `git log` on `main`. Capitalise the summary
-  after the tag: `feat: Improve ...`.
+  using one of `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`,
+  `refactor`, `revert`, `style`, `test`; check `git log` on `main`. Capitalise
+  the summary after the tag: `feat: Improve ...`.
+  `./check-conventional-commits.sh` checks subjects against this, and CI runs it
+  over every commit in a pull request and the pull request title.
 * A commit message describes what its own diff does; check the two against each
   other once the commit exists.
 * An agent's commits carry a `Co-Authored-By:` line for it, and never a
