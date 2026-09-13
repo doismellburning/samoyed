@@ -10,6 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// morseWPM and morseSamplesPerSec are deliberately not the Dire Wolf defaults
+// (10 WPM, DEFAULT_SAMPLES_PER_SEC). Both only affect how long the generated
+// .WAV is, and both generating and decoding it cost time proportional to that
+// length, so the defaults made this test spend all its time on audio nobody
+// looks at. Sending faster into a lower sample rate shrinks the file ~8x
+// (4x from the speed, 2x from the rate, less the fixed txdelay/txtail) and
+// morse2ascii still decodes it comfortably.
+const morseWPM = 40
+const morseSamplesPerSec = 22050
+
 func morseToFile(t *testing.T, filename string, message string) {
 	t.Helper()
 
@@ -18,7 +28,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 	var modem audio_s
 	modem.adev[0].defined = 1
 	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS
-	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+	modem.adev[0].samples_per_sec = morseSamplesPerSec
 
 	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
 	for channel := range MAX_RADIO_CHANS {
@@ -36,7 +46,7 @@ func morseToFile(t *testing.T, filename string, message string) {
 	var amplitude = 100
 	gen_tone_init(&modem, amplitude, true)
 	morse_init(&modem, amplitude)
-	morse_send(0, message, 10, 100, 100)
+	morse_send(0, message, morseWPM, 100, 100)
 	audio_file_close() // I just realised this all works on globals :s
 }
 
