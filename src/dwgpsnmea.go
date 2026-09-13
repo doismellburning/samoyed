@@ -303,14 +303,12 @@ func read_gpsnmea_thread(fd *term.Term) {
 func remove_checksum(sent string, quiet bool) (string, error) {
 	var msg, checksumStr, found = strings.Cut(sent, "*")
 	if !found {
-		var errorMsg = "Missing GPS checksum"
-
 		if !quiet {
 			text_color_set(DW_COLOR_INFO)
-			dw_printf("%s.\n", errorMsg)
+			dw_printf("Missing GPS checksum.\n")
 		}
 
-		return "", errors.New(errorMsg)
+		return "", errors.New("missing GPS checksum")
 	}
 
 	var calculatedChecksum int64
