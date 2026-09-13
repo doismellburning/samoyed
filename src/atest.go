@@ -246,8 +246,8 @@ o = DCD output control
 		my_audio_config.achan[0].upsample = *upsample
 	}
 
-	if BitFixLevel(*fixBits) < RETRY_NONE || BitFixLevel(*fixBits) > RETRY_MAX {
-		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", RETRY_NONE, RETRY_MAX, *fixBits)
+	if BitFixLevel(*fixBits) < BitFixNone || BitFixLevel(*fixBits) > BitFixPassall {
+		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", BitFixNone, BitFixPassall, *fixBits)
 		pflag.Usage()
 		os.Exit(1)
 	}
@@ -779,7 +779,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 			// No fix_bits or passall specified.
 			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
-			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
+			Assert(retries >= RETRY_NONE && retries <= BitFixPassall) // validate array index.
 			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
 		}
 	}

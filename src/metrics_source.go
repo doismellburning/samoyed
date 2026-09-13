@@ -45,10 +45,10 @@ func isRadioChannel(channel int) bool {
 // samoyed_frames_received_total dominated by internet traffic on an IGate.
 //
 // PASSALL frames are excluded: hdlc_rec2 forwards those after a *failed* FCS
-// check, flagged with RETRY_MAX, so they are neither received with a valid FCS
-// nor bit-corrected.
+// check, flagged with BitFixPassall, so they are neither received with a valid
+// FCS nor bit-corrected.
 func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
-	if retries == RETRY_MAX {
+	if retries == BitFixPassall {
 		return
 	}
 
