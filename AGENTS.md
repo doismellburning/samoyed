@@ -2,10 +2,12 @@
 
 ## Development
 
+* `make setup` installs the system dependencies everything else needs (apt-based Linux and macOS/Homebrew) - it's what CI runs too, so a new build/test/lint dependency belongs in `dev-setup.sh` rather than in a workflow step
 * `make all` builds and tests everything - a good general check
 * `make test` runs the full test suite and should always pass
 * `make check` runs assorted linters and should always pass
 * `make fix` will attempt assorted auto-fixes and also do a partial lint run and is worth running after every change
+* Claude Code on the web sessions run `.claude/hooks/session-start.sh`, which does `make setup` and a little container-specific fixing-up, so a fresh session can build, test and lint without further ceremony
 
 ## Documentation
 

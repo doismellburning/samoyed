@@ -69,13 +69,16 @@ For more detail on configuration and features, see the [Dire Wolf documentation]
 
 ### Prerequisites
 
-See .github/workflows/build-and-test.yml for package dependencies
+[Go](https://go.dev/doc/install), plus a handful of system packages (hamlib, PortAudio, and friends).
+On apt-based Linux and on macOS with Homebrew, `make setup` installs them for you; otherwise see
+[dev-setup.sh](./dev-setup.sh) for the package lists.
 
 ### Build
 
 ```sh
 git clone https://github.com/doismellburning/samoyed
 cd samoyed
+make setup       # install build/test/lint dependencies
 make cmds        # build all binaries into dist/
 make test        # run the full test suite
 ```
@@ -88,6 +91,7 @@ Key `make` targets:
 
 | Target | Description |
 |--------|-------------|
+| `make setup` | Install the system dependencies needed by the targets below |
 | `make all` | Build everything and run all tests — run before committing |
 | `make cmds` | Build all binaries |
 | `make test` | Run the full test suite |
