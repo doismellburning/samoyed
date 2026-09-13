@@ -301,7 +301,6 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 	var header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
-	AX25Delete(pp)
 
 	// dw_printf ("Example 1 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -340,7 +339,6 @@ func test_example_headers(t *testing.T) {
 	_ = frame_type // TODO Check this?
 
 	// TODO: compare binary.
-	AX25Delete(pp)
 
 	dw_printf("Example 1 header OK\n")
 
@@ -372,7 +370,6 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 0, e)
-	AX25Delete(pp)
 
 	// dw_printf ("Example 2 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -416,7 +413,6 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: compare binary.
 
-	AX25Delete(pp)
 	// TODO: more examples
 
 	dw_printf("Example 2 header OK\n")
@@ -450,7 +446,6 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 	header, e = il2p_type_1_header(pp, 0)
 	assert.Equal(t, 9, e)
-	AX25Delete(pp)
 
 	// dw_printf ("Example 3 header:\n");
 	// for (int i = 0 ; i < sizeof(header); i++) {
@@ -497,7 +492,6 @@ func test_example_headers(t *testing.T) {
 
 	// TODO: compare binary.
 
-	AX25Delete(pp)
 	dw_printf("Example 3 header OK\n")
 
 	// Example 3 again, this time the Information part is included.
@@ -515,7 +509,6 @@ func test_example_headers(t *testing.T) {
 	// Does it match the example in the protocol spec?
 	assert.Equal(t, len(complete3), ioutLen)
 	assert.Equal(t, complete3, iout)
-	AX25Delete(pp)
 
 	dw_printf("Example 3 with info OK\n")
 }
@@ -559,8 +552,6 @@ func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 
 		assert.Equal(t, len1, len2)
 		assert.Equal(t, data1, data2)
-
-		AX25Delete(pp2)
 	}
 }
 
@@ -624,7 +615,6 @@ func all_frame_types(t *testing.T) {
 				var pp = ax25_u_frame(addrs, num_addr, cr, ftype, pf, pid, pinfo)
 				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				AX25Delete(pp)
 			}
 		}
 	}
@@ -653,7 +643,6 @@ func all_frame_types(t *testing.T) {
 
 				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				AX25Delete(pp)
 			}
 
 			modulo = modulo_128
@@ -671,7 +660,6 @@ func all_frame_types(t *testing.T) {
 
 				ax25_hex_dump(pp)
 				enc_dec_compare(t, pp)
-				AX25Delete(pp)
 			}
 		}
 	}
@@ -693,7 +681,6 @@ func all_frame_types(t *testing.T) {
 
 		ax25_hex_dump(pp)
 		enc_dec_compare(t, pp)
-		AX25Delete(pp)
 	}
 
 	/* I frame */
@@ -714,7 +701,6 @@ func all_frame_types(t *testing.T) {
 
 			ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			AX25Delete(pp)
 		}
 
 		modulo = modulo_128
@@ -728,7 +714,6 @@ func all_frame_types(t *testing.T) {
 
 			ax25_hex_dump(pp)
 			enc_dec_compare(t, pp)
-			AX25Delete(pp)
 		}
 	}
 }
@@ -775,8 +760,6 @@ func test_serdes(t *testing.T) {
 				il2p_rec_bit(0, 0, 0, 0)
 			}
 		}
-
-		AX25Delete(pp)
 	}
 
 	dw_printf("Serdes receive count = %d\n", il2pSerdesRecCount)

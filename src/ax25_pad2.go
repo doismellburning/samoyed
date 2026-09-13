@@ -166,7 +166,6 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_u_frame: Could not set addresses for U frame.\n")
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -211,7 +210,6 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_u_frame: Invalid ftype %d for U frame.\n", ftype)
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -317,7 +315,6 @@ func ax25_s_frame(
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Could not set addresses for S frame.\n")
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -358,7 +355,6 @@ func ax25_s_frame(
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_s_frame: Invalid ftype %d for S frame.\n", ftype)
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -456,7 +452,6 @@ func ax25_i_frame(
 	if set_addrs(this_p, addrs, num_addr, cr) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error in ax25_i_frame: Could not set addresses for I frame.\n")
-		AX25Delete(this_p)
 
 		return (nil)
 	}

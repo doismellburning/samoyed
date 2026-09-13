@@ -48,7 +48,6 @@ func digipeater_test(t *testing.T, in, out string) {
 	 */
 
 	var frame = AX25Pack(pp)
-	AX25Delete(pp)
 
 	var alevel ALevel
 	alevel.rec = 50
@@ -88,8 +87,6 @@ func digipeater_test(t *testing.T, in, out string) {
 		xmit = AX25FormatAddrs(result)
 		pinfo = AX25GetInfo(result)
 		xmit += string(pinfo)
-
-		AX25Delete(result)
 	}
 
 	text_color_set(DW_COLOR_XMIT)

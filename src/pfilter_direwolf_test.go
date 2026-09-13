@@ -257,10 +257,8 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 			pftest_error_count++
 		}
 	} else {
-		if !assert.NoError(t, err, "Unexpected error for test number %d", test_num) { //nolint:testifylint
+		if !assert.NoError(t, err, "Unexpected error for test number %d", test_num) {
 			pftest_error_count++
 		}
 	}
-
-	AX25Delete(pp)
 }
