@@ -733,6 +733,57 @@ var adev [MAX_ADEVS]*adev_s
 var portaudioMu sync.Mutex
 var portaudioRefCount int
 
+// audioBackendNoise holds what the native audio libraries most recently wrote
+// to stderr from underneath PortAudio, until something goes wrong that it might
+// explain.
+var audioBackendNoiseMu sync.Mutex
+var audioBackendNoise string
+
+// quietPortAudio runs fn - a call into PortAudio - with whatever the native
+// audio libraries write straight to stderr held back (see captureStderrFD).
+// ALSA in particular is extremely chatty about sound cards it can't find, and
+// none of that is worth showing while things are working; it is remembered for
+// printAudioBackendNoise instead, which callers should call after reporting
+// that audio didn't work, so the explanation follows the failure.
+//
+// The lock is held across the call so that what fn provoked is remembered
+// before another call can capture anything of its own, rather than two
+// overlapping opens each ending up with the other's diagnostics.
+func quietPortAudio(fn func() error) error {
+	audioBackendNoiseMu.Lock()
+	defer audioBackendNoiseMu.Unlock()
+
+	var err error
+
+	var noise = captureStderrFD(func() { err = fn() })
+
+	if noise != "" {
+		audioBackendNoise = noise
+	}
+
+	return err
+}
+
+// printAudioBackendNoise prints what the native audio libraries last wrote to
+// stderr while we had them held back, if anything, and forgets it.  Call it
+// after a message about audio not working: the complaints that were noise a
+// moment ago are usually the explanation.
+func printAudioBackendNoise() {
+	audioBackendNoiseMu.Lock()
+
+	var noise = audioBackendNoise
+	audioBackendNoise = ""
+
+	audioBackendNoiseMu.Unlock()
+
+	if noise == "" {
+		return
+	}
+
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("Messages from the audio backend, which may explain this:\n%s", noise)
+}
+
 // portaudioHeldByOpen records whether the audio devices now open took a
 // PortAudio reference: an all-stdin/UDP configuration, or one whose only
 // soundcard was an output we could do without, never initializes PortAudio,
@@ -1052,25 +1103,35 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 	// Handle default device
 	if name == "" || strings.ToLower(name) == "default" {
-		if forInput {
-			var dev, err = portaudio.DefaultInputDevice()
-			if err != nil {
-				return nil
+		var dev *portaudio.DeviceInfo
+
+		var err = quietPortAudio(func() error {
+			var e error
+
+			if forInput {
+				dev, e = portaudio.DefaultInputDevice()
+			} else {
+				dev, e = portaudio.DefaultOutputDevice()
 			}
 
-			return dev
-		} else {
-			var dev, err = portaudio.DefaultOutputDevice()
-			if err != nil {
-				return nil
-			}
-
-			return dev
+			return e
+		})
+		if err != nil {
+			return nil
 		}
+
+		return dev
 	}
 
 	// Search through all devices
-	var devices, err = portaudio.Devices()
+	var devices []*portaudio.DeviceInfo
+
+	var err = quietPortAudio(func() error {
+		var e error
+		devices, e = portaudio.Devices()
+
+		return e
+	})
 	if err != nil {
 		return nil
 	}
@@ -1079,6 +1140,9 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
 	if dev == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not match audio device '%s' to any PortAudio device.\n", name)
+		// The noise is left for audio_open to print after its own message about
+		// the device, so the explanation follows the failure rather than
+		// landing between the two.
 	}
 
 	return dev
@@ -1123,7 +1187,7 @@ func audio_open(pa *audio_s) int {
 
 		var err error
 		if portaudioRefCount == 0 {
-			err = portaudio.Initialize()
+			err = quietPortAudio(portaudio.Initialize)
 		}
 
 		if err == nil {
@@ -1138,6 +1202,7 @@ func audio_open(pa *audio_s) int {
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("PortAudio initialization failed: %v\n", err)
+			printAudioBackendNoise()
 
 			// Without a soundcard we can't receive, so there is nothing left
 			// to do.  Needing one only to transmit is survivable: carry on
@@ -1160,7 +1225,7 @@ func audio_open(pa *audio_s) int {
 			portaudioHeldByOpen = false
 
 			if portaudioRefCount == 0 {
-				portaudio.Terminate()
+				captureStderrFD(func() { _ = portaudio.Terminate() })
 			}
 
 			portaudioMu.Unlock()
@@ -1322,6 +1387,7 @@ func audio_open(pa *audio_s) int {
 				if inputDev == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not find audio input device: %s\n", audio_in_name)
+					printAudioBackendNoise()
 
 					return -1
 				}
@@ -1357,31 +1423,42 @@ func audio_open(pa *audio_s) int {
 					// so the callback performs zero heap allocations at runtime.
 					adev[a].inputScratchBuf = make([]byte, framesPerBuffer*pa.adev[a].num_channels*2)
 					var inScratchBuf = adev[a].inputScratchBuf
-					adev[a].inputStream, err = portaudio.OpenStream(
-						inputParams,
-						func(in []int16) {
-							// Reuse the pre-allocated scratch buffer; slice to actual length.
-							var scratch = inScratchBuf[:len(in)*2]
-							for i, sample := range in {
-								binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
-							}
+					err = quietPortAudio(func() error {
+						var e error
+						adev[a].inputStream, e = portaudio.OpenStream(
+							inputParams,
+							func(in []int16) {
+								// Reuse the pre-allocated scratch buffer; slice to actual length.
+								var scratch = inScratchBuf[:len(in)*2]
+								for i, sample := range in {
+									binary.LittleEndian.PutUint16(scratch[i*2:], uint16(sample))
+								}
 
-							inRingBuf.write(scratch)
-						},
-					)
+								inRingBuf.write(scratch)
+							},
+						)
+
+						return e
+					})
 				} else {
-					adev[a].inputStream, err = portaudio.OpenStream(
-						inputParams,
-						func(in []uint8) {
-							// Write uint8 samples directly to ring buffer
-							inRingBuf.write(in)
-						},
-					)
+					err = quietPortAudio(func() error {
+						var e error
+						adev[a].inputStream, e = portaudio.OpenStream(
+							inputParams,
+							func(in []uint8) {
+								// Write uint8 samples directly to ring buffer
+								inRingBuf.write(in)
+							},
+						)
+
+						return e
+					})
 				}
 
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not open audio device %s for input: %v\n", audio_in_name, err)
+					printAudioBackendNoise()
 
 					return -1
 				}
@@ -1500,6 +1577,7 @@ func audio_open(pa *audio_s) int {
 				if outputDev == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not find audio output device: %s\n", audio_out_name)
+					printAudioBackendNoise()
 
 					if audioOutputRequired(&pa.adev[a]) {
 						return -1
@@ -1529,15 +1607,26 @@ func audio_open(pa *audio_s) int {
 
 				if pa.adev[a].bits_per_sample == 16 {
 					adev[a].outputBuf16 = make([]int16, framesPerBuffer*pa.adev[a].num_channels)
-					adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
+					err = quietPortAudio(func() error {
+						var e error
+						adev[a].outputStream, e = portaudio.OpenStream(outputParams, &adev[a].outputBuf16)
+
+						return e
+					})
 				} else {
 					adev[a].outputBuf8 = make([]uint8, framesPerBuffer*pa.adev[a].num_channels)
-					adev[a].outputStream, err = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
+					err = quietPortAudio(func() error {
+						var e error
+						adev[a].outputStream, e = portaudio.OpenStream(outputParams, &adev[a].outputBuf8)
+
+						return e
+					})
 				}
 
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
+					printAudioBackendNoise()
 
 					if audioOutputRequired(&pa.adev[a]) {
 						return -1
@@ -2057,7 +2146,7 @@ func audio_close() int { //nolint:unparam
 		portaudioHeldByOpen = false
 
 		if portaudioRefCount == 0 {
-			portaudio.Terminate()
+			captureStderrFD(func() { _ = portaudio.Terminate() })
 		}
 	}
 
