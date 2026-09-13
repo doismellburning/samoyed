@@ -366,13 +366,21 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 	cdata = cdata[2:]
 
 	for n := 0; n < T_NUM_ANALOG+1 && 2*n < len(cdata); n++ {
+		var v = two_base91_to_i(cdata[2*n], cdata[2*n+1])
+
+		// An invalid base 91 character leaves this value unknown; taking the
+		// bit pattern of the sentinel apart would invent telemetry readings.
+
+		if v == G_UNKNOWN {
+			continue
+		}
+
 		if n < T_NUM_ANALOG {
-			araw[n] = float64(two_base91_to_i(cdata[2*n], cdata[2*n+1]))
+			araw[n] = float64(v)
 		} else {
-			var b = two_base91_to_i(cdata[2*n], cdata[2*n+1])
 			for k := range T_NUM_DIGITAL {
-				draw[k] = b & 1
-				b >>= 1
+				draw[k] = v & 1
+				v >>= 1
 			}
 		}
 	}
