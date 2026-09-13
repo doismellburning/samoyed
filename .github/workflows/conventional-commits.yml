@@ -1,0 +1,36 @@
+name: "Conventional Commits"
+
+on:
+  pull_request:
+    types:
+    - "opened"
+    - "edited"
+    - "reopened"
+    - "synchronize"
+
+permissions:
+  contents: "read"
+
+# Editing a pull request title fires this repeatedly, and only the newest run
+# says anything useful, so let a new run cancel the one it supersedes.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  conventional_commits:
+    runs-on: "ubuntu-latest"
+    steps:
+    # The merge commit GitHub builds for a pull request is not itself in the
+    # history being merged, so fetch everything and ask about the real range.
+    - uses: "actions/checkout@v7"
+      with:
+        fetch-depth: 0
+    - name: "Check the title and every commit subject"
+      env:
+        PR_TITLE: "${{ github.event.pull_request.title }}"
+        BASE_SHA: "${{ github.event.pull_request.base.sha }}"
+        HEAD_SHA: "${{ github.event.pull_request.head.sha }}"
+      run: |
+        mapfile -t subjects < <(git log --no-merges --format="%s" "$BASE_SHA..$HEAD_SHA")
+        ./check-conventional-commits.sh "$PR_TITLE" "${subjects[@]}"
