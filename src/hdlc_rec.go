@@ -8,6 +8,8 @@ package direwolf
 
 import (
 	"slices"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 /* Undo data scrambling for 9600 baud. */
@@ -723,6 +725,7 @@ func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state i
 
 	if newVal != old {
 		ptt_set(OCTYPE_DCD, channel, newVal)
+		metrics.SetDCD(channel, newVal != 0)
 	}
 }
 

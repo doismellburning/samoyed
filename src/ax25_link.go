@@ -152,6 +152,8 @@ import (
 	"runtime"
 	"slices"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 // Limits and defaults for parameters.
@@ -4727,6 +4729,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			var nopid = 0
 
 			SET_RC(S, S.rc+1)
+			metrics.RecordRetry(S.channel)
 
 			if S.rc > S.peak_rc_value {
 				S.peak_rc_value = S.rc // Keep statistics.
@@ -4755,6 +4758,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			var nopid = 0
 
 			SET_RC(S, S.rc+1)
+			metrics.RecordRetry(S.channel)
 
 			if S.rc > S.peak_rc_value {
 				S.peak_rc_value = S.rc
@@ -4769,6 +4773,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 
 	case state_3_connected:
 		SET_RC(S, 1)
+		metrics.RecordRetry(S.channel)
 		transmit_enquiry(S)
 		enter_new_state(S, state_4_timer_recovery)
 
@@ -4813,6 +4818,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			SET_RC(S, S.rc+1)
+			metrics.RecordRetry(S.channel)
 
 			if S.rc > S.peak_rc_value {
 				S.peak_rc_value = S.rc // gather statistics.

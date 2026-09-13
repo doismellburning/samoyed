@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
 )
 
@@ -29,6 +30,23 @@ const TQ_PRIO_0_HI = 0
 const TQ_PRIO_1_LO = 1
 
 var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
+
+// Number of packets in each queue, maintained alongside queue_head and guarded
+// by the same mutex.  tq_remove pops the head in constant time, so counting the
+// list to publish the depth would make draining a long queue quadratic, under
+// the one mutex every queue operation contends for.
+//
+// This counts what tq_count counts - real packets - so the null frame
+// lm_seize_request queues to wake the transmitter is excluded.  Counting it
+// would report a packet waiting when there is nothing to send, turning
+// ordinary connected-mode acknowledgement into an apparent backlog.
+var queue_len [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+
+// tq_is_real_packet reports whether a queue entry is a real packet rather than
+// lm_seize_request's null wake-up frame, matching tq_count_locked's own test.
+func tq_is_real_packet(pp *packet_t) bool {
+	return ax25_get_num_addr(pp) >= AX25_MIN_ADDRS
+}
 
 var tq_mutex sync.Mutex /* Critical section for updating queues. */
 /* Just one for all queues. */
@@ -87,6 +105,9 @@ func tq_init(audio_config_p *audio_s) {
 	for c := range MAX_RADIO_CHANS {
 		for p := range TQ_NUM_PRIO {
 			queue_head[c][p] = nil
+			queue_len[c][p] = 0
+
+			metrics.SetTxQueueDepth(c, p, 0)
 		}
 	}
 
@@ -282,6 +303,12 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		ax25_set_nextp(plast, pp)
 	}
 
+	if tq_is_real_packet(pp) {
+		queue_len[channel][prio]++
+	}
+
+	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+
 	tq_mutex.Unlock()
 
 	/* TODO KG
@@ -452,6 +479,12 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		ax25_set_nextp(plast, pp)
 	}
 
+	if tq_is_real_packet(pp) {
+		queue_len[channel][prio]++
+	}
+
+	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+
 	tq_mutex.Unlock()
 
 	/* TODO KG
@@ -600,6 +633,12 @@ func lm_seize_request(channel int) {
 		ax25_set_nextp(plast, pp)
 	}
 
+	if tq_is_real_packet(pp) {
+		queue_len[channel][prio]++
+	}
+
+	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+
 	tq_mutex.Unlock()
 
 	/* TODO KG
@@ -732,7 +771,13 @@ func tq_remove(channel int, prio int) *packet_t {
 		result_p = queue_head[channel][prio]
 		queue_head[channel][prio] = ax25_get_nextp(result_p)
 		ax25_set_nextp(result_p, nil)
+
+		if tq_is_real_packet(result_p) {
+			queue_len[channel][prio]--
+		}
 	}
+
+	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
 
 	tq_mutex.Unlock()
 
@@ -868,28 +913,37 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 		return (tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes))
 	}
 
+	// Don't want lists being rearranged while we are traversing them.
+
+	tq_mutex.Lock()
+	defer tq_mutex.Unlock()
+
+	var n = tq_count_locked(channel, prio, source, dest, bytes)
+
+	/* TODO KG
+	#if DEBUG2
+		text_color_set(DW_COLOR_DEBUG);
+		dw_printf ("tq_count(%d, %d, \"%s\", \"%s\", %d) returns %d\n", channel, prio, source, dest, bytes, n);
+	#endif
+	*/
+
+	return (n)
+} /* end tq_count */
+
+// tq_count_locked is tq_count's traversal, for callers that already hold
+// tq_mutex.  Counting a queue and publishing that count have to happen under
+// the same lock acquisition: two separately-locked operations can straddle
+// another goroutine's enqueue and publish observations out of order, leaving
+// the gauge describing a queue depth that never existed.
+func tq_count_locked(channel int, prio int, source string, dest string, bytes bool) int {
 	// Array bounds check.  FIXME: TODO:  should have internal error instead of dying.
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR - tq_count(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
+		dw_printf("INTERNAL ERROR - tq_count_locked(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
 
 		return (0)
 	}
-
-	if queue_head[channel][prio] == nil {
-		/* TODO KG
-		#if DEBUG2
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("tq_count: queue channel %d, prio %d is empty, returning 0.\n", channel, prio);
-		#endif
-		*/
-		return (0)
-	}
-
-	// Don't want lists being rearranged while we are traversing them.
-
-	tq_mutex.Lock()
 
 	var n = 0 // Result.  Number of bytes or packets.
 	var pp = queue_head[channel][prio]
@@ -939,16 +993,7 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 		pp = ax25_get_nextp(pp)
 	}
 
-	tq_mutex.Unlock()
-
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_count(%d, %d, \"%s\", \"%s\", %d) returns %d\n", channel, prio, source, dest, bytes, n);
-	#endif
-	*/
-
 	return (n)
-} /* end tq_count */
+} /* end tq_count_locked */
 
 /* end tq.c */

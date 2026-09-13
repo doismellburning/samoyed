@@ -327,6 +327,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 		}
 
 		if !drop_it {
+			recordRadioFrame(channel, fec_type, retries)
 			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
 
@@ -537,6 +538,7 @@ func pick_best_candidate(channel int) {
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)
+		recordRadioFrame(channel, candidate[channel][j][k].fec_type, candidate[channel][j][k].retries)
 		dlq_rec_frame(channel, j, k,
 			candidate[channel][j][k].packet_p,
 			candidate[channel][j][k].alevel,

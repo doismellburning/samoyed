@@ -657,3 +657,39 @@ func Test_config_init_pbeacon_no_options(t *testing.T) {
 		})
 	})
 }
+
+// --- config_init METRICSPORT directive ---
+
+func Test_config_init_metricsport(t *testing.T) {
+	t.Run("valid value stored", func(t *testing.T) {
+		var _, misc = configFromString(t, "METRICSPORT 9099\n")
+		assert.Equal(t, 9099, misc.metrics_port)
+	})
+
+	t.Run("zero disables", func(t *testing.T) {
+		var _, misc = configFromString(t, "METRICSPORT 0\n")
+		assert.Equal(t, 0, misc.metrics_port)
+	})
+
+	t.Run("disabled by default", func(t *testing.T) {
+		var _, misc = configFromString(t, "")
+		assert.Equal(t, 0, misc.metrics_port)
+	})
+
+	t.Run("out-of-range value disables", func(t *testing.T) {
+		var _, misc = configFromString(t, "METRICSPORT 99999\n")
+		assert.Equal(t, 0, misc.metrics_port)
+	})
+
+	t.Run("non-numeric value is rejected", func(t *testing.T) {
+		var _, misc = configFromString(t, "METRICSPORT nine\n")
+		assert.Equal(t, 0, misc.metrics_port)
+	})
+
+	// Matches handleAGWPORT: trailing junk is a typo, and accepting it silently
+	// would leave the station behaving in a way its config does not describe.
+	t.Run("trailing token is rejected", func(t *testing.T) {
+		var _, misc = configFromString(t, "METRICSPORT 9099 junk\n")
+		assert.Equal(t, 0, misc.metrics_port)
+	})
+}

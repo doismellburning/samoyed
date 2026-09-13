@@ -14,6 +14,8 @@ package direwolf
 import (
 	"strings"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
 var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.h
@@ -25,6 +27,10 @@ var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.
 // Current state of all the decoders.
 
 var demodulator_state [MAX_RADIO_CHANS][MAX_SUBCHANS]demodulator_state_s
+
+// audioLevelDecimation is how many audio samples pass between pushes of the
+// received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
+const audioLevelDecimation = 4410
 
 var sample_sum [MAX_RADIO_CHANS][MAX_SUBCHANS]int
 var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
@@ -929,6 +935,15 @@ func demod_process_sample(channel int, subchan int, sam int) {
 		D.alevel_rec_valley = fsam*D.quick_attack + D.alevel_rec_valley*(1.0-D.quick_attack)
 	} else {
 		D.alevel_rec_valley = fsam*D.sluggish_decay + D.alevel_rec_valley*(1.0-D.sluggish_decay)
+	}
+
+	if subchan == 0 {
+		D.alevel_metric_countdown--
+		if D.alevel_metric_countdown <= 0 {
+			D.alevel_metric_countdown = audioLevelDecimation
+
+			metrics.SetAudioLevel(channel, demod_get_audio_level(channel, 0).rec)
+		}
 	}
 
 	/*
