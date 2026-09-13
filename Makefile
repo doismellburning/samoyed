@@ -92,7 +92,12 @@ shellcheck:
 vet:
 	go vet $(SRC_DIRS)
 
-./bin/golangci-lint:
+# Depending on the Makefile means a GOLANGCI_LINT_VERSION bump reinstalls the binary
+# rather than leaving a stale one in place.
+./bin/golangci-lint: Makefile
+	# Clear out any previous binary first, so the `test -x` below is a real check of
+	# whether the download delivered rather than something a stale binary can satisfy.
+	rm -f $@
 	# This is not pleasant but it's also the/a recommended way of installation and means that we're explicitly pinning version
 	# https://golangci-lint.run/welcome/install/#binaries
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) || true
