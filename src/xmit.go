@@ -86,6 +86,16 @@ type XmitService struct {
 	 */
 	audioOutDevMutex [MAX_ADEVS]sync.Mutex
 
+	/*
+	 * Whether each audio device can transmit at all, sampled once the devices
+	 * are open.  A station with no output device must not key a transmitter
+	 * to send samples that go nowhere.
+	 */
+	audioOutAvailable [MAX_ADEVS]bool
+
+	/* Whether we have said that a channel cannot transmit, so we say it once. */
+	saidCannotTransmit [MAX_RADIO_CHANS]bool
+
 	p_modem *audio_s
 }
 
@@ -145,6 +155,10 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	 * Save parameters for later use.
 	 * TODO1.2:  Any reason to use global config rather than making a copy?
 	 */
+
+	for a := range MAX_ADEVS {
+		xs.audioOutAvailable[a] = audio_transmit_available(a)
+	}
 
 	for j := range MAX_RADIO_CHANS {
 		xs.bits_per_sec[j] = p_modem.achan[j].baud
@@ -366,11 +380,73 @@ func (xs *XmitService) xmit_thread(channel int) {
 		*/
 
 		// Does this extra loop offer any benefit?
-		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
-			xs.xmit_next(channel)
-		} /* while queue not empty */
+		xs.xmit_until_empty(channel)
 	} /* while 1 */
 } /* end xmit_thread */
+
+// xmit_until_empty sends everything queued for a channel, or throws it away if
+// the channel has no transmit device.
+//
+// It is a function of its own, rather than the body of the loop in
+// xmit_thread, so that the decision between the two can be tested: xmit_thread
+// itself never returns.
+func (xs *XmitService) xmit_until_empty(channel int) {
+	for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
+		if !xs.audioOutAvailable[ACHAN2ADEV(channel)] {
+			xs.discard_untransmittable(channel)
+
+			continue
+		}
+
+		xs.xmit_next(channel)
+	} /* while queue not empty */
+}
+
+// discard_untransmittable throws away everything queued for a channel whose
+// audio device has no output.  Sending it would key PTT - putting an
+// unmodulated carrier on the air, and muting the receiver for the duration of
+// a half-duplex transmission - to play samples that go nowhere, so a station
+// with no transmit device does not transmit at all.
+//
+// The null frame lm_seize_request queues is not a frame to send but a request
+// for a transmission opportunity, so it is answered here exactly as
+// send_one_frame answers it.  A connected mode session whose acknowledgement
+// can never go out still has to hear that its turn came and take its normal
+// course; silently dropping the request leaves it waiting for a confirmation
+// that is never coming.
+func (xs *XmitService) discard_untransmittable(channel int) {
+	if !xs.saidCannotTransmit[channel] {
+		xs.saidCannotTransmit[channel] = true
+
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Channel %d has no audio output device, so nothing can be transmitted on it.\n", channel)
+		dw_printf("Frames queued for it are discarded, and this is said only once.\n")
+	}
+
+	var confirmed = false
+
+	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
+		for {
+			var pp = tq_remove(channel, prio)
+			if pp == nil {
+				break
+			}
+
+			if ax25_is_null_frame(pp) {
+				dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the
+				// Data-link State machine, that the transmission opportunity has arrived."
+
+				confirmed = true
+			}
+		}
+	}
+
+	if confirmed {
+		SLEEP_MS(10) // As send_one_frame does after the same confirmation: give the
+		// data link state machine time to queue its response, so the caller sees it
+		// on its next look at the queue rather than going back to sleep first.
+	}
+}
 
 // xmit_next waits for a clear channel and then sends the next packet from the
 // transmit queue, if one is still there.

@@ -504,7 +504,7 @@ x = Silence FX.25 information.`)
 	}
 
 	if input_file != "" {
-		audio_config.adev[0].adevice_in = input_file
+		applyCommandLineAudioSource(&audio_config.adev[0], input_file)
 	}
 
 	audio_config.recv_ber = *bitErrorRate
@@ -679,6 +679,19 @@ x = Silence FX.25 information.`)
 
 		if audio_config.chan_medium[transmitCalibrationChannel] == MEDIUM_RADIO {
 			if audio_config.achan[transmitCalibrationChannel].mark_freq != 0 && audio_config.achan[transmitCalibrationChannel].space_freq != 0 {
+				// Keying the transmitter to send tones that go nowhere would
+				// leave an unmodulated carrier on the air.  "-x p" asks for
+				// exactly that carrier deliberately, and plays no audio, so it
+				// is still the PTT test a receive-only station wants.
+				if transmitCalibrationType != 'p' &&
+					!audio_transmit_available(ACHAN2ADEV(transmitCalibrationChannel)) {
+					text_color_set(DW_COLOR_ERROR)
+					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
+					fmt.Printf("Use -x p to key PTT without audio.\n")
+					text_color_set(DW_COLOR_INFO)
+					os.Exit(1)
+				}
+
 				var max_duration = 60
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 

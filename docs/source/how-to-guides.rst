@@ -52,6 +52,54 @@ naming a bit inversion that worked, and are left out of the frame metrics
 described below.
 
 
+Receive without an audio output device
+--------------------------------------
+
+A transmit device is optional.  A receive-only station - an IGate, a monitor,
+a machine whose sound card can capture but not play - starts normally without
+one, reports
+
+.. code::
+
+    No audio output device, so transmitting is not possible.
+
+and then decodes as usual.  That covers a soundcard that captures but cannot
+play, a system with no playback device at all, and a single-name ``ADEVICE``
+naming an input-only source, where there is no output device to speak of:
+
+.. code::
+
+    ADEVICE stdin     # Or udp:7355, or "-"
+
+Anything such a station would have transmitted - beacons, digipeated frames,
+APRStt responses - is discarded before it reaches the transmitter, so give a
+receive-only station a configuration to match.  The transmitter is never
+keyed: sending samples that go nowhere would put an unmodulated carrier on the
+air, and mute the receiver for the duration of a half-duplex transmission, so
+PTT stays off and ``-x`` calibration tones are refused outright.
+
+An audio source given on the command line is treated the same way as that
+single name, so ``samoyed-direwolf -`` is receive-only unless the
+configuration names a transmit device:
+
+.. code::
+
+    $ samoyed-direwolf -c rx.conf -   # Receive-only, whatever rx.conf leaves at the default
+
+Naming a transmit device explicitly is asking for that device, so Samoyed
+still stops if it is not there, and a command-line source does not take it
+away:
+
+.. code::
+
+    ADEVICE plughw:1,0 plughw:2,0   # Stops if plughw:2,0 cannot be opened
+    PAODEVICE Some Sound Card       # Likewise
+    ADEVICE - default               # Read standard input, transmit on the default device
+
+An audio *input* device is also still required: there is nothing to do without
+one, so Samoyed stops if it cannot be opened.
+
+
 Run two instances talking to each other via ALSA loopback (Linux)
 -----------------------------------------------------------------
 

@@ -106,6 +106,9 @@ type adev_param_s struct {
 
 	adevice_out string /* Name of the audio output device. Can be udp:host:port to send audio via UDP. */
 
+	adevice_out_specified bool /* Was the output device named for transmit, rather than */
+	/* defaulted or copied from the input side? */
+
 	num_channels    int /* Should be 1 for mono or 2 for stereo. */
 	samples_per_sec int /* Audio sampling rate.  Typically 11025, 22050, 44100, or 48000. */
 	bits_per_sample int /* 8 (unsigned char) or 16 (signed short). */
@@ -730,32 +733,143 @@ var adev [MAX_ADEVS]*adev_s
 var portaudioMu sync.Mutex
 var portaudioRefCount int
 
-// anyDeviceRequiresPortAudio reports whether any configured audio device needs
-// PortAudio (i.e. is a soundcard rather than stdin or UDP).  Used to skip
-// portaudio.Initialize() when all devices are stdin/UDP, so that samoyed can
-// run on systems with no working PortAudio host backend (issue #501).
-func anyDeviceRequiresPortAudio(pa *audio_s) bool {
+// portaudioHeldByOpen records whether the audio devices now open took a
+// PortAudio reference: an all-stdin/UDP configuration, or one whose only
+// soundcard was an output we could do without, never initializes PortAudio,
+// and audio_close must not then release a reference it never took.  There is
+// one set of audio devices at a time - audio_open replaces the whole adev
+// table - so one flag describes the open that audio_close is paired with.
+var portaudioHeldByOpen bool
+
+// audioNameIsStdin reports whether an audio device name means standard input.
+func audioNameIsStdin(name string) bool {
+	return strings.EqualFold(name, "stdin") || name == "-"
+}
+
+// audioNameIsUDP reports whether an audio device name is a UDP specification.
+func audioNameIsUDP(name string) bool {
+	return strings.HasPrefix(strings.ToLower(name), "udp:")
+}
+
+// audio_out_type_e says what the transmit side of an audio device is attached to.
+type audio_out_type_e int
+
+const (
+	AUDIO_OUT_TYPE_SOUNDCARD audio_out_type_e = iota
+	AUDIO_OUT_TYPE_UDP
+	AUDIO_OUT_TYPE_NONE
+)
+
+// audioOutType classifies the transmit side of one configured audio device.
+//
+// ADEVICE given a single name - and the "-" command line argument - puts that
+// name on the output side as well, so a receive-only configuration such as
+// "ADEVICE stdin" or "ADEVICE udp:7355" asks for standard input, or a
+// listening port, as its transmit device.  Neither is something we can play
+// audio into, so report that there is no output device rather than trying,
+// and failing, to open one.
+//
+// Call this before audio_open rewrites the input name, so that the input and
+// output names can still be compared.
+func audioOutType(ad *adev_param_s) audio_out_type_e {
+	if audioNameIsStdin(ad.adevice_out) {
+		return AUDIO_OUT_TYPE_NONE
+	}
+
+	if audioNameIsUDP(ad.adevice_out) {
+		// A transmit destination names a host and a port.  The same name on
+		// both sides is a listening port copied over from the input side -
+		// but only when nothing named it for transmit, since a name given for
+		// transmit is a destination whatever it matches.
+		if !ad.adevice_out_specified && strings.EqualFold(ad.adevice_out, ad.adevice_in) {
+			return AUDIO_OUT_TYPE_NONE
+		}
+
+		return AUDIO_OUT_TYPE_UDP
+	}
+
+	return AUDIO_OUT_TYPE_SOUNDCARD
+}
+
+// audioOutputRequired reports whether failing to open a device's transmit side
+// should stop us.  Naming an output device is asking for that device
+// specifically, so not having it is a configuration error worth complaining
+// about; an output device we merely defaulted to, or copied from the input
+// side, was never asked for, so its absence leaves the station receive-only
+// rather than refusing to start.
+func audioOutputRequired(ad *adev_param_s) bool {
+	return ad.adevice_out_specified
+}
+
+// applyCommandLineAudioSource applies a receive source named on the command
+// line to a device's configuration.  The source stands in for the output name
+// too, exactly as a single-name ADEVICE does, unless something named a device
+// for transmit - so "samoyed-direwolf -" does not go looking for the default
+// soundcard to transmit through, while "ADEVICE plughw:1,0 plughw:2,0" keeps
+// transmitting on plughw:2,0.
+func applyCommandLineAudioSource(ad *adev_param_s, name string) {
+	ad.adevice_in = name
+
+	if !ad.adevice_out_specified && strings.EqualFold(ad.adevice_out, DEFAULT_ADEVICE) {
+		ad.adevice_out = name
+	}
+}
+
+// audio_transmit_available reports whether audio device a has anywhere to send
+// transmitted audio.  A receive-only station - one whose output device was
+// absent, or never asked for - does not, and must not key a transmitter to
+// send samples that go nowhere.
+//
+// Read it once the devices are open, and not from a goroutine racing
+// audio_open or audio_close: what it reports cannot change in between, as
+// nothing reopens an output device while running.
+func audio_transmit_available(a int) bool {
+	if a < 0 || a >= MAX_ADEVS || adev[a] == nil {
+		return false
+	}
+
+	return adev[a].outputStream != nil || adev[a].udp_out_sock != nil
+}
+
+// anyInputRequiresPortAudio reports whether any configured audio device needs
+// PortAudio to receive (i.e. is a soundcard rather than stdin or UDP).
+func anyInputRequiresPortAudio(pa *audio_s) bool {
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined == 0 {
 			continue
 		}
 
 		var inName = pa.adev[a].adevice_in
-		var inIsStdinOrDash = strings.EqualFold(inName, "stdin") || inName == "-"
-		var inIsUDP = strings.HasPrefix(strings.ToLower(inName), "udp:")
-
-		if !inIsStdinOrDash && !inIsUDP {
-			return true
-		}
-
-		var outIsUDP = strings.HasPrefix(strings.ToLower(pa.adev[a].adevice_out), "udp:")
-
-		if !outIsUDP {
+		if !audioNameIsStdin(inName) && !audioNameIsUDP(inName) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// anyOutputRequiresPortAudio reports whether any configured audio device needs
+// PortAudio to transmit.
+func anyOutputRequiresPortAudio(pa *audio_s) bool {
+	for a := range MAX_ADEVS {
+		if pa.adev[a].defined == 0 {
+			continue
+		}
+
+		if audioOutType(&pa.adev[a]) == AUDIO_OUT_TYPE_SOUNDCARD {
+			return true
+		}
+	}
+
+	return false
+}
+
+// anyDeviceRequiresPortAudio reports whether any configured audio device needs
+// PortAudio in either direction.  Used to skip portaudio.Initialize() when all
+// devices are stdin/UDP, so that samoyed can run on systems with no working
+// PortAudio host backend (issue #501).
+func anyDeviceRequiresPortAudio(pa *audio_s) bool {
+	return anyInputRequiresPortAudio(pa) || anyOutputRequiresPortAudio(pa)
 }
 
 // Originally 40.  Version 1.2, try 10 for lower latency.
@@ -1001,25 +1115,37 @@ func audio_open(pa *audio_s) int {
 	// soundcard.  Pure stdin/UDP configurations must work on systems with no
 	// working PortAudio host backend (issue #501).
 	var portaudioAcquired = false
+	var portaudioReady = false
+	var inputNeedsPortAudio = anyInputRequiresPortAudio(pa)
 
-	if anyDeviceRequiresPortAudio(pa) {
+	if inputNeedsPortAudio || anyOutputRequiresPortAudio(pa) {
 		portaudioMu.Lock()
 
+		var err error
 		if portaudioRefCount == 0 {
-			var err = portaudio.Initialize()
-			if err != nil {
-				portaudioMu.Unlock()
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("PortAudio initialization failed: %v\n", err)
+			err = portaudio.Initialize()
+		}
 
+		if err == nil {
+			portaudioRefCount++
+			portaudioHeldByOpen = true
+			portaudioAcquired = true
+			portaudioReady = true
+		}
+
+		portaudioMu.Unlock()
+
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("PortAudio initialization failed: %v\n", err)
+
+			// Without a soundcard we can't receive, so there is nothing left
+			// to do.  Needing one only to transmit is survivable: carry on
+			// receive-only, which the output section below reports.
+			if inputNeedsPortAudio {
 				return -1
 			}
 		}
-
-		portaudioRefCount++
-		portaudioAcquired = true
-
-		portaudioMu.Unlock()
 	}
 
 	// If audio_open fails after this point, roll back the refcount increment
@@ -1031,6 +1157,8 @@ func audio_open(pa *audio_s) int {
 			portaudioMu.Lock()
 
 			portaudioRefCount--
+			portaudioHeldByOpen = false
+
 			if portaudioRefCount == 0 {
 				portaudio.Terminate()
 			}
@@ -1103,6 +1231,23 @@ func audio_open(pa *audio_s) int {
 			adev[a].bytesPerFrame = pa.adev[a].num_channels * pa.adev[a].bits_per_sample / 8
 
 			/*
+			 * Determine the type of audio output, while the configured input
+			 * and output names can still be compared.
+			 */
+
+			var outType = audioOutType(&pa.adev[a])
+
+			if outType == AUDIO_OUT_TYPE_NONE && audioOutputRequired(&pa.adev[a]) {
+				// Named for transmit, but not a transmit device: standard
+				// input, or a UDP port to listen on rather than send to.
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Audio device %s cannot transmit.\n", pa.adev[a].adevice_out)
+				dw_printf("A transmit device is a soundcard, or udp:host:port.\n")
+
+				return -1
+			}
+
+			/*
 			 * Determine the type of audio input.
 			 */
 
@@ -1140,9 +1285,14 @@ func audio_open(pa *audio_s) int {
 
 			text_color_set(DW_COLOR_INFO)
 
-			if audio_in_name == audio_out_name {
+			switch {
+			case outType == AUDIO_OUT_TYPE_NONE:
+				dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("No audio output device, so transmitting is not possible.\n")
+			case audio_in_name == audio_out_name:
 				dw_printf("Audio device for both receive and transmit: %s %s\n", audio_in_name, ctemp)
-			} else {
+			default:
 				dw_printf("Audio input device for receive: %s %s\n", audio_in_name, ctemp)
 				dw_printf("Audio out device for transmit: %s %s\n", audio_out_name, ctemp)
 			}
@@ -1288,7 +1438,20 @@ func audio_open(pa *audio_s) int {
 			 * Output device.
 			 */
 
-			if strings.HasPrefix(strings.ToLower(audio_out_name), "udp:") {
+			// An output device that can't be opened costs us the ability to
+			// transmit, but receiving is still useful and is all that some
+			// setups - a receive-only IGate, a machine with a capture device
+			// but nothing to play through - ever wanted.  Warn and carry on
+			// rather than refusing to start.  audio_flush_real discards
+			// anything the transmit path produces while outputStream and
+			// udp_out_sock are both nil.
+			adev[a].outbufSizeInBytes = bufSizeInBytes
+
+			switch outType {
+			case AUDIO_OUT_TYPE_NONE:
+				// Nothing to open; already reported above.
+
+			case AUDIO_OUT_TYPE_UDP:
 				/*
 				 * UDP output - dial to the specified host:port and send audio packets.
 				 */
@@ -1298,7 +1461,13 @@ func audio_open(pa *audio_s) int {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)
 
-					return -1
+					if audioOutputRequired(&pa.adev[a]) {
+						return -1
+					}
+
+					dw_printf("Transmitting will not be possible.\n")
+
+					break
 				}
 
 				adev[a].udp_out_sock = udpOutConn
@@ -1306,7 +1475,8 @@ func audio_open(pa *audio_s) int {
 				adev[a].silenceStopCh = make(chan struct{})
 
 				go audioUDPSilenceKeepalive(a, adev[a].silenceStopCh)
-			} else {
+
+			case AUDIO_OUT_TYPE_SOUNDCARD:
 				/*
 				 * Soundcard - blocking write mode.
 				 * audio_flush_real fills the typed output buffer and calls Write() to
@@ -1314,12 +1484,30 @@ func audio_open(pa *audio_s) int {
 				 * and stopped in audio_wait to avoid underflows during idle periods.
 				 */
 
+				if !portaudioReady {
+					// PortAudio would not initialize, which we reported above.
+					if audioOutputRequired(&pa.adev[a]) {
+						return -1
+					}
+
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("Transmitting will not be possible.\n")
+
+					break
+				}
+
 				var outputDev = findPortAudioDevice(audio_out_name, false)
 				if outputDev == nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not find audio output device: %s\n", audio_out_name)
 
-					return -1
+					if audioOutputRequired(&pa.adev[a]) {
+						return -1
+					}
+
+					dw_printf("Transmitting will not be possible.\n")
+
+					break
 				}
 
 				// Create output stream parameters
@@ -1351,14 +1539,22 @@ func audio_open(pa *audio_s) int {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not open audio device %s for output: %v\n", audio_out_name, err)
 
-					return -1
+					if audioOutputRequired(&pa.adev[a]) {
+						return -1
+					}
+
+					dw_printf("Transmitting will not be possible.\n")
+
+					adev[a].outputBuf16 = nil
+					adev[a].outputBuf8 = nil
+					adev[a].outputStream = nil
+
+					break
 				}
 
 				// Output stream is opened but NOT started here.
 				// It will be started lazily on first write in audio_flush_real
 				// and stopped in audio_wait, to avoid underflows during idle periods.
-
-				adev[a].outbufSizeInBytes = bufSizeInBytes
 			}
 
 			// Version 1.3 - after a report of this situation for Mac OSX version.
@@ -1852,11 +2048,14 @@ func audio_close() int { //nolint:unparam
 		}
 	}
 
-	// Terminate PortAudio when the last audio device is closed.
+	// Terminate PortAudio when the last audio device is closed, and only if
+	// opening those devices took a reference in the first place.
 	portaudioMu.Lock()
 
-	if portaudioRefCount > 0 {
+	if portaudioHeldByOpen && portaudioRefCount > 0 {
 		portaudioRefCount--
+		portaudioHeldByOpen = false
+
 		if portaudioRefCount == 0 {
 			portaudio.Terminate()
 		}
