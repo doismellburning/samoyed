@@ -7,6 +7,19 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A push to a pull request supersedes whatever that pull request was already
+# running, so put those runs in a per-branch group and cancel the older one
+# rather than letting the two compete for runners.
+#
+# Everything else - main, tags, manual dispatches - gets a group to itself, so
+# those runs can neither cancel nor be cancelled. `cancel-in-progress: false`
+# would not be enough: a concurrency group holds only one *pending* run, and a
+# newly queued run evicts the pending one regardless, which on a busy main could
+# silently drop a run that was going to release.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}"
+  cancel-in-progress: true
+
 jobs:
   generate_version:
     runs-on: "ubuntu-latest"
