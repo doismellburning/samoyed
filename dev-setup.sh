@@ -11,8 +11,10 @@ set -euo pipefail
 # humans setting up a new machine - if you find yourself adding a dependency to
 # one of those, add it here instead.
 #
-# Usage: ./dev-setup.sh [build|test|lint|docs|all]...
+# Usage: ./dev-setup.sh [build|test|lint|docs|gpsd-apparmor|all]...
 # (default: all)
+#
+# gpsd-apparmor is not part of `all` outside CI - see install_gpsd_apparmor.
 
 APT_UPDATED=""
 
@@ -76,16 +78,41 @@ install_build() {
 }
 
 # Dire Wolf provides `gen_packets`, which some tests use to check we parse what
-# Dire Wolf produces; morse2ascii decodes our Morse output.
+# Dire Wolf produces; morse2ascii decodes our Morse output; gpsd-clients
+# provides `gpsfake`, which feeds a real gpsd for the GPSD integration test.
 install_test() {
     case "$OS" in
         Linux)
-            apt_install direwolf morse2ascii
+            apt_install direwolf morse2ascii gpsd gpsd-clients
             ;;
         Darwin)
-            brew_install direwolf  # morse2ascii is not packaged for macOS; those tests skip
+            # morse2ascii is not packaged for macOS, and gpsfake needs a pty-backed
+            # fake serial device it can't provide there; those tests skip
+            brew_install direwolf
             ;;
     esac
+}
+
+# gpsfake feeds gpsd through a pty, which gpsd's default AppArmor profile doesn't
+# allow it to open - it only permits real serial devices. Reloading the profile in
+# complain mode lets the GPSD integration test run.
+#
+# Unlike everything else here this relaxes system-wide confinement rather than
+# just installing a package, so it's kept out of the `test` group: CI opts in
+# (see below), and anyone running the GPSD test locally can opt in with
+# `./dev-setup.sh gpsd-apparmor`. It doesn't edit the profile on disk, so
+# enforcing mode comes back on reboot, or on `systemctl reload apparmor`.
+install_gpsd_apparmor() {
+    local profile="/etc/apparmor.d/usr.sbin.gpsd"
+    # apparmor_parser lives in /usr/sbin, which isn't on a non-root user's PATH
+    local parser="/usr/sbin/apparmor_parser"
+
+    if [ ! -e "$profile" ] || [ ! -x "$parser" ]; then
+        return
+    fi
+
+    log "Putting gpsd's AppArmor profile into complain mode"
+    as_root "$parser" -r -C "$profile" || log "WARNING: could not put gpsd into AppArmor complain mode - the GPSD integration test may fail"
 }
 
 install_lint() {
@@ -162,13 +189,24 @@ for group in "${groups[@]}"; do
             install_lint
             log "Installing docs dependencies"
             install_docs
+
+            # Relaxing gpsd's confinement is a system-wide change, so `all` only
+            # does it unprompted on a throwaway CI runner; everyone else asks for
+            # it by name.
+            if [ -n "${CI:-}" ]; then
+                log "Relaxing gpsd's AppArmor confinement (CI)"
+                install_gpsd_apparmor
+            fi
             ;;
         build | test | lint | docs)
             log "Installing $group dependencies"
             "install_$group"
             ;;
+        gpsd-apparmor)
+            install_gpsd_apparmor
+            ;;
         *)
-            echo "Unknown dependency group '$group' - expected one of: build, test, lint, docs, all" >&2
+            echo "Unknown dependency group '$group' - expected one of: build, test, lint, docs, gpsd-apparmor, all" >&2
             exit 1
             ;;
     esac
