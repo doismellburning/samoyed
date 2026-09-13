@@ -387,12 +387,6 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 	if mdb.debug > 0 {
 		mdb.dump()
 	}
-
-	/*
-		#if 0
-			AX25Delete (pp);
-		#endif
-	*/
 } /* end SaveIS */
 
 /*------------------------------------------------------------------

@@ -501,7 +501,7 @@ func pick_best_candidate(channel int) {
 	 * send the best one along.
 	 */
 
-	/* Delete those not chosen. */
+	/* Discard those not chosen. */
 
 	for n := range num_bars {
 		var j = subchan_from_n(channel, n)
@@ -544,7 +544,7 @@ func pick_best_candidate(channel int) {
 			(candidate[channel][j][k].retries),
 			string(spectrum[:num_bars]))
 
-		/* Someone else owns it now and will delete it later. */
+		/* Ownership has been transferred, so drop our reference. */
 		candidate[channel][j][k].packet_p = nil
 	}
 

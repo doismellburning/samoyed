@@ -124,9 +124,9 @@ func tq_init(audio_config_p *audio_s) {
  *				TQ_PRIO_1_LO for normal.
  *
  *		pp	- Address of packet object.
- *				Caller should NOT make any references to
- *				it after this point because it could
- *				be deleted at any time.
+ *				Ownership is handed over to this function, so
+ *				the caller should NOT make any references to
+ *				it after this point.
  *
  * Outputs:
  *
@@ -313,9 +313,9 @@ func tq_append(channel int, prio int, pp *packet_t) {
  *				or TQ_PRIO_1_LO for normal.
  *
  *		pp	- Address of packet object.
- *				Caller should NOT make any references to
- *				it after this point because it could
- *				be deleted at any time.
+ *				Ownership is handed over to this function, so
+ *				the caller should NOT make any references to
+ *				it after this point.
  *
  * Outputs:	A packet object is added to transmit queue.
  *
@@ -767,7 +767,9 @@ func tq_remove(channel int, prio int) *packet_t {
  *
  * Returns:	Pointer to packet object or nil.
  *
- *		Caller should NOT destroy it because it is still in the queue.
+ *		The packet stays in the queue and belongs to it, so the caller
+ *		may inspect it but must not modify it or retain the pointer
+ *		beyond the decision of whether to tq_remove it.
  *
  *--------------------------------------------------------------------*/
 

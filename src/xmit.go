@@ -497,8 +497,8 @@ func priorityToRune(prio int) rune {
  *			  Subsequent frames could be different.
  *
  *		pp	- Packet object pointer.
- *			  It will be deleted so caller should not try
- *			  to reference it after this.
+ *			  Ownership is transferred here so caller should
+ *			  not reference it after this.
  *
  *		max_bundle - Max number of frames to bundle into one transmission.
  *
@@ -767,7 +767,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
  *
  *		p	- Priority.
  *
- *		pp	- Packet object pointer.  Caller will delete it.
+ *		pp	- Packet object pointer.  Caller retains ownership of it.
  *
  * Returns:	Number of bits transmitted.
  *
@@ -884,8 +884,8 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
  * Inputs:	c	- Channel number.
  *
  *		pp	- Packet object pointer.
- *			  It will be deleted so caller should not try
- *			  to reference it after this.
+ *			  Ownership is transferred here so caller should
+ *			  not reference it after this.
  *
  * Description:	Turn on transmitter.
  *		Invoke the text-to-speech script.
@@ -968,8 +968,8 @@ func (xs *XmitService) timestampPrefix() string {
  * Inputs:	c	- Channel number.
  *
  *		pp	- Packet object pointer.
- *			  It will be deleted so caller should not try
- *			  to reference it after this.
+ *			  Ownership is transferred here so caller should
+ *			  not reference it after this.
  *
  *		wpm	- Speed in words per minute.
  *
@@ -1018,8 +1018,8 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
  * Inputs:	c	- Channel number.
  *
  *		pp	- Packet object pointer.
- *			  It will be deleted so caller should not try
- *			  to reference it after this.
+ *			  Ownership is transferred here so caller should
+ *			  not reference it after this.
  *
  *		speed	- Button presses per second.
  *
