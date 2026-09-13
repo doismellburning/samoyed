@@ -316,14 +316,6 @@ type ALevel struct {
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
-/*
- * Accumulate statistics.
- * If ax25_new_count gets much larger than ax25_delete_count plus the size of
- * the transmit queue we have a memory leak.
- */
-
-var ax25_new_count = 0
-var ax25_delete_count = 0
 var last_seq_num int = 0
 
 // DECODE_APRS_UTIL is a runtime replacement for DECAMAIN define
@@ -353,26 +345,7 @@ func isxdigit(b byte) bool {
  *------------------------------------------------------------------------------*/
 
 func ax25_new() *packet_t {
-	/* TODO KG
-	#if DEBUG
-	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("ax25_new(): before alloc, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
-	#endif
-	*/
 	last_seq_num++
-	ax25_new_count++
-
-	/*
-	 * check for memory leak.
-	 */
-
-	// version 1.4 push up the threshold.   We could have considerably more with connected mode.
-
-	//if (ax25_new_count > ax25_delete_count + 100) {
-	if ax25_new_count > ax25_delete_count+256 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Report to WB2OSZ - Memory leak for packet objects.  new=%d, delete=%d\n", ax25_new_count, ax25_delete_count)
-	}
 
 	var this_p = new(packet_t)
 
@@ -384,37 +357,6 @@ func ax25_new() *packet_t {
 	this_p.num_addr = (-1)
 
 	return (this_p)
-}
-
-/*------------------------------------------------------------------------------
- *
- * Name:	AX25Delete
- *
- * Purpose:	Destroy a packet object, freeing up memory it was using.
- *
- *------------------------------------------------------------------------------*/
-
-func AX25Delete(this_p *packet_t) {
-	/* TODO KG
-	#if DEBUG
-	        text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("AX25Delete(): before free, new=%d, delete=%d\n", ax25_new_count, ax25_delete_count);
-	#endif
-	*/
-	if this_p == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - nil pointer passed to AX25Delete.\n")
-
-		return
-	}
-
-	ax25_delete_count++
-
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
-	this_p.magic1 = 0
-	this_p.magic2 = 0
 }
 
 /*------------------------------------------------------------------------------
@@ -510,8 +452,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	stuff, pinfo, colonFound = bytes.Cut(stuff, []byte{':'})
 
 	if !colonFound {
-		AX25Delete(this_p)
-
 		return (nil)
 	}
 
@@ -531,7 +471,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	if !found {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  No source address\n")
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -541,7 +480,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad source address\n")
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -562,7 +500,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Failed to create packet from text.  Bad destination address\n")
-		AX25Delete(this_p)
 
 		return (nil)
 	}
@@ -609,7 +546,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
-			AX25Delete(this_p)
 
 			return (nil)
 		}
@@ -657,7 +593,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 		if len(info_part) >= AX25_MAX_INFO_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
-			AX25Delete(this_p)
 
 			return (nil)
 		}

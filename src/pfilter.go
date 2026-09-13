@@ -1401,7 +1401,6 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 	if pp == nil {
 		return fmt.Errorf("pfilter_validate: failed to construct synthetic packet from %q", pfilterDummyMonitorLine)
 	}
-	defer AX25Delete(pp)
 
 	var saved_pftest_running = pftest_running
 	pftest_running = true

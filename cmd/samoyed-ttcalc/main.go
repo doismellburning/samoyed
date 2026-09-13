@@ -154,11 +154,7 @@ func main() {
 					fmt.Printf("Write error, %v, sending reply.\n", replyWriteErr)
 					os.Exit(1)
 				}
-
-				direwolf.AX25Delete(reply_pp)
 			}
-
-			direwolf.AX25Delete(pp)
 		}
 	}
 } /* main */

@@ -326,9 +326,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 			}
 		}
 
-		if drop_it {
-			AX25Delete(pp)
-		} else {
+		if !drop_it {
 			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
 
@@ -341,7 +339,6 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 	if candidate[channel][subchan][slice].packet_p != nil {
 		/* Plain old AX.25: Oops!  Didn't expect it to be there. */
 		/* FX.25: Quietly replace anything already there.  It will have priority. */
-		AX25Delete(candidate[channel][subchan][slice].packet_p)
 		candidate[channel][subchan][slice].packet_p = nil
 	}
 
@@ -511,7 +508,6 @@ func pick_best_candidate(channel int) {
 
 		var k = slice_from_n(channel, n)
 		if n != best_n && candidate[channel][j][k].packet_p != nil {
-			AX25Delete(candidate[channel][j][k].packet_p)
 			candidate[channel][j][k].packet_p = nil
 		}
 	}
@@ -538,7 +534,6 @@ func pick_best_candidate(channel int) {
 	}
 
 	if drop_it {
-		AX25Delete(candidate[channel][j][k].packet_p)
 		candidate[channel][j][k].packet_p = nil
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)

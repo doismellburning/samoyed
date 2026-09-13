@@ -268,8 +268,6 @@ func client_thread_net(my_index int, hostname string, port string, description s
 
 			var fullResult = result + string(info)
 			packetChan <- fullResult
-
-			direwolf.AX25Delete(pp)
 		}
 	}
 } /* end client_thread_net */

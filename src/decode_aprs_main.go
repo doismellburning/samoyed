@@ -172,8 +172,6 @@ func DecodeAPRSLine(line string) {
 			decode_aprs_print(A) // Now print it in human readable format.
 
 			ax25_check_addresses(pp) // Errors for invalid addresses.
-
-			AX25Delete(pp)
 		} else {
 			fmt.Printf("Could not construct AX.25 frame from bytes supplied!\n\n")
 		}
@@ -190,8 +188,6 @@ func DecodeAPRSLine(line string) {
 			// (void)ax25_check_addresses(pp);	// Errors for invalid addresses.
 
 			// Future?  Add -d option to include hex dump and maybe KISS?
-
-			AX25Delete(pp)
 		} else {
 			fmt.Printf("ERROR - Could not parse monitoring format input!\n\n")
 		}

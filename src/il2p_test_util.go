@@ -70,8 +70,6 @@ func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int,
 	} else { // should be no errors.
 		Assert(retries == 0)
 	}
-
-	AX25Delete(pp)
 }
 
 func multi_modem_process_rec_packet(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {

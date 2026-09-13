@@ -114,8 +114,6 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 
 	ax25_frame = append(ax25_frame, direwolf.AX25Pack(pp)...)
 
-	direwolf.AX25Delete(pp)
-
 	/*
 	 * Encapsulate as KISS and send to TNC.
 	 */

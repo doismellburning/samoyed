@@ -758,7 +758,6 @@ func send_packet(str string) {
 		}
 
 		eas_send(0, pinfo, repeat, 500, 500)
-		AX25Delete(pp)
 	} else {
 		var pp = AX25FromText(str, true)
 		if pp == nil {
@@ -800,8 +799,6 @@ func send_packet(str string) {
 			layer2_send_frame(c, pp, false, &modem)
 			layer2_preamble_postamble(c, 2, true, &modem)
 		}
-
-		AX25Delete(pp)
 	}
 }
 

@@ -310,7 +310,6 @@ func process_input(stuff string) {
 		if pp != nil {
 			var frame_data = direwolf.AX25Pack(pp)
 			send_to_kiss_tnc(channel, direwolf.KISS_CMD_DATA_FRAME, frame_data)
-			direwolf.AX25Delete(pp)
 		} else {
 			fmt.Printf("ERROR! Could not convert to AX.25 frame: %s\n", stuff)
 		}
@@ -579,8 +578,6 @@ func kissutil_kiss_process_msg(kiss_msg []byte) {
 					fmt.Printf("Unable to open for write: %s\n", fullpath)
 				}
 			}
-
-			direwolf.AX25Delete(pp)
 		}
 
 	case direwolf.KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
