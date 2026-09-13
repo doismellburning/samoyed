@@ -19,6 +19,39 @@ Decode packet data from audio
     $ samoyed-atest --bitrate 300 data.wav
 
 
+Decode frames that fail their CRC check
+---------------------------------------
+
+``FIX_BITS`` controls how much effort goes into rescuing a frame whose CRC does
+not match, and it sets two separate things:
+
+.. code::
+
+    FIX_BITS n [ APRS | AX25 | NONE ] [ PASSALL ]
+
+* ``n`` is a level of effort, from 0 (the default - consider only correct
+  frames) up to 4 (invert two separated bits), each level also doing what the
+  levels below it do.  Anything above 1 is not recommended for normal
+  operation: it was "an interesting experiment but turned out to be a bad
+  idea", and the higher levels are expensive enough to stop you keeping up with
+  the audio stream.
+* ``PASSALL`` is not a level of effort.  It hands over frames that still fail
+  the CRC check once the attempts asked for by ``n`` have been exhausted, so
+  what reaches your application is whatever happened to arrive, random garbage
+  included.
+
+``samoyed-atest`` takes the same levels as ``--fix-bits``/``-F``, plus one more
+value that means the highest level and then ``PASSALL``:
+
+.. code::
+
+    $ samoyed-atest --fix-bits 5 data.wav
+
+Frames that ``PASSALL`` forwarded are reported as ``[PASSALL]``, rather than
+naming a bit inversion that worked, and are left out of the frame metrics
+described below.
+
+
 Run two instances talking to each other via ALSA loopback (Linux)
 -----------------------------------------------------------------
 
