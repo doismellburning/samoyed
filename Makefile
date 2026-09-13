@@ -6,6 +6,7 @@ SHELL_FILES = $(shell grep -rIl '^\#!.*sh' *)
 SRC_DIRS = ./cmd/... ./internal/... ./src/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
+GOLANGCI_LINT_VERSION = v2.11.4
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 
 .PHONY: all
@@ -94,7 +95,10 @@ vet:
 ./bin/golangci-lint:
 	# This is not pleasant but it's also the/a recommended way of installation and means that we're explicitly pinning version
 	# https://golangci-lint.run/welcome/install/#binaries
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.11.4
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION) || true
+	# ...but that's unreachable from some sandboxed containers, so fall back to building the same pinned version ourselves.
+	# We check for the binary rather than the pipeline's exit status, which is `sh`'s and so is 0 even when curl fetched nothing.
+	test -x $@ || GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 .PHONY: lint
 lint: ./bin/golangci-lint
