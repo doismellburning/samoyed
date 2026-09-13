@@ -99,7 +99,7 @@ type ToneGenerator struct {
  *----------------------------------------------------------------*/
 
 func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
-	var tg = &ToneGenerator{ //nolint:exhaustruct
+	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
 		audioConfig: audioConfig,
@@ -715,7 +715,7 @@ func GenToneMain() {
 
 	/* Now try stereo. */
 
-	my_audio_config = audio_s{} //nolint:exhaustruct
+	my_audio_config = audio_s{} //nolint:exhaustruct_v5
 	my_audio_config.adev[0].adevice_in = DEFAULT_ADEVICE
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.adev[0].num_channels = 2

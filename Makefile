@@ -6,7 +6,7 @@ SHELL_FILES = $(shell grep -rIl '^\#!.*sh' * .claude)
 SRC_DIRS = ./cmd/... ./internal/... ./src/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
-GOLANGCI_LINT_VERSION = v2.11.4
+GOLANGCI_LINT_VERSION = v2.13.2
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 
 .PHONY: all

@@ -118,7 +118,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 		dw_printf ("xmit_init ( ... )\n");
 	#endif
 	*/
-	var xs = &XmitService{} //nolint:exhaustruct
+	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
 
 	xs.debugXmitPacket = debug_xmit_packet

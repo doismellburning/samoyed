@@ -305,7 +305,7 @@ func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
 		}
 	}
 
-	return AXUDPMapEntry{}, false //nolint: exhaustruct
+	return AXUDPMapEntry{}, false //nolint: exhaustruct_v5
 }
 
 // axudpAddCRC appends the 2-byte AXUDP checksum to frame and returns the

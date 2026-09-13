@@ -114,7 +114,7 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 		upsample = 4
 	}
 
-	*D = demodulator_state_s{} //nolint:exhaustruct
+	*D = demodulator_state_s{} //nolint:exhaustruct_v5
 
 	D.modem_type = modem_type
 	D.num_slicers = 1

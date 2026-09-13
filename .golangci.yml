@@ -6,11 +6,13 @@ linters:
     - "dupword"  # One day
     - "err113"  # Eventually
     - "errcheck"  # I appreciate the intent, but I'm not checking errors on fmt.Printf etc.
+    - "exhaustruct"  # Superseded by exhaustruct_v5; disabled to avoid a deprecation warning from enabling all
     - "forbidigo"  # fmt.Print* are fine for now
     - "funlen"  # We have inherited lots of long lines
     - "gocyclo"  # One day
     - "godot"  # Implicit full stops are ok
     - "godox"  # There will be TODOs
+    - "gomodguard"  # Superseded by gomodguard_v2; disabled to avoid a deprecation warning from enabling all
     - "maintidx"  # One day...
     - "mnd"  # I do not like magic numbers, but there are plenty inherited from upstream, so let's roll with them for now
     - "nakedret"  # Naked returns in long functions are kinda an ok tradeoff right now
@@ -40,6 +42,9 @@ linters:
       min-complexity: 300  # I sure wish this could be lower
     goconst:
       min-occurrences: 10
+      ignore-tests: true  # Test tables repeat literals (callsigns, metric labels, ported-from-upstream expectations) by design
+      ignore-string-values:
+        - "TBD"  # Placeholder description repeated throughout the upstream symbol tables
     gocritic:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now
