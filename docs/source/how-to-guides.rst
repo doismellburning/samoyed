@@ -157,3 +157,35 @@ worked, not how many bits it had to touch, so the two are not comparable
 quantities and are not summed together.
 
 A starter Grafana dashboard is provided at ``conf/grafana-dashboard.json``.
+
+Talk IL2P to v0.4 and v0.6 stations
+------------------------------------
+
+IL2P v0.6 mandates 16 Reed-Solomon parity symbols per payload block and marks
+the header bit that v0.4 used as its "FEC Level" as reserved.  A v0.6 frame
+therefore looks to a v0.4 station like a request for the weaker FEC, and its
+payload blocks come out the wrong size.  Nothing in the frame says which
+version it is, so the choice is a per-channel configuration setting:
+
+.. code::
+
+    IL2PVERSION 0.6
+
+v0.6 is the default, and is what live IL2P largely is - NinoTNC firmware, QtSM
+and MMDVM-TNC all speak it.  The other two settings are for reaching stations
+that do not:
+
+``0.4``
+    The header bit says which FEC level is in use, on transmit and receive.
+    Needed to receive a v0.4 station sending the weaker FEC (Dire Wolf's
+    ``-I 0``, or ``IL2PTX 0`` here), at the cost of no longer reading v0.6.
+
+``compat``
+    Transmit v0.4, receive v0.6.  With the maximum FEC that ``IL2PTX 1``
+    selects by default, a v0.4 frame differs from a v0.6 one only in that
+    header bit, which v0.6 stations ignore - so transmissions are readable by
+    everyone.  Use this on a channel shared with Dire Wolf stations, which
+    implement v0.4 and cannot read our v0.6 transmissions otherwise.
+
+``samoyed-gen_packets`` and ``samoyed-atest`` take the same choice as
+``--il2p-version``, for generating and decoding test audio.

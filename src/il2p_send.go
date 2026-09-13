@@ -13,8 +13,11 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent b
  *
  *		pp	- Pointer to packet object.
  *
+ *		version	- IL2P version to speak.
+ *
  *		max_fec	- 1 to force 16 parity symbols for each payload block.
  *			  0 for automatic depending on block size.
+ *			  Only consulted for IL2P_VERSION_0_4.
  *
  *		polarity - 0 for normal.  1 to invert signal.
  *			   2 special case for testing - introduce some errors to test FEC.
@@ -43,14 +46,14 @@ var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent b
  *
  *--------------------------------------------------------------*/
 
-func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
+func il2p_send_frame(channel int, pp *packet_t, version il2p_version_t, max_fec int, polarity int) int {
 	var syncWordBytes = []byte{
 		(IL2P_SYNC_WORD >> 16) & 0xff,
 		(IL2P_SYNC_WORD >> 8) & 0xff,
 		(IL2P_SYNC_WORD) & 0xff,
 	}
 
-	var encoded, elen = il2p_encode_frame(pp, max_fec, il2p_crc_enabled(channel))
+	var encoded, elen = il2p_encode_frame(pp, version, max_fec, il2p_crc_enabled(channel))
 	if elen <= 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
@@ -64,7 +67,7 @@ func il2p_send_frame(channel int, pp *packet_t, max_fec int, polarity int) int {
 
 	if il2p_get_debug() >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("IL2P frame, max_fec = %d, %d encoded bytes total\n", max_fec, len(data))
+		dw_printf("IL2P v%s frame, max_fec = %d, %d encoded bytes total\n", version.String(), max_fec, len(data))
 		fx_hex_dump(data)
 	}
 

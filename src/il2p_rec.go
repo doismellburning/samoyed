@@ -5,7 +5,7 @@ package direwolf
  *
  * Purpose:     Extract IL2P frames from a stream of bits and process them.
  *
- * References:	http://tarpn.net/t/il2p/il2p-specification0-4.pdf
+ * References:	https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf
  *
  *******************************************************************************/
 
@@ -135,7 +135,8 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 				if F.corrected >= 0 { // Good header.
 					// How much payload is expected?
-					var hdr_type, max_fec, length = il2p_get_header_attributes(F.uhdr[:])
+					var hdr_type, fec_level, length = il2p_get_header_attributes(F.uhdr[:])
+					var max_fec = il2p_rx_max_fec(il2p_channel_version(channel), fec_level)
 
 					var plprop, eplen = il2p_payload_compute(length, max_fec)
 					F.eplen = eplen
@@ -228,12 +229,15 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 		// TODO?:  for symmetry, we might decode the payload here and later build the frame.
 		{
 			// Compute encoded payload size (includes parity symbols).
-			var _, max_fec, payload_len = il2p_get_header_attributes(F.uhdr[:])
+			var version = il2p_channel_version(channel)
+			var _, fec_level, payload_len = il2p_get_header_attributes(F.uhdr[:])
+			var max_fec = il2p_rx_max_fec(version, fec_level)
 			var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
 			var pp = il2p_decode_header_payload(
 				F.uhdr[:],
 				F.spayload[:encoded_payload_size],
+				version,
 				&F.corrected,
 			)
 

@@ -22,7 +22,10 @@ import (
  *
  *		pp	- Packet object pointer.
  *
+ *		version	- IL2P version to speak.
+ *
  *		max_fec	- 1 to send maximum FEC size rather than automatic.
+ *			  Only consulted for IL2P_VERSION_0_4.
  *
  * Outputs:	iout	- Encoded result, excluding the 3 byte sync word.
  *			  Caller should provide  IL2P_MAX_PACKET_SIZE  bytes.
@@ -41,11 +44,13 @@ import (
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
+func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ...bool) ([]byte, int) {
 	var appendCRC = len(crc) > 0 && crc[0]
 
+	var fec_level, use_max_fec = il2p_tx_fec(version, max_fec)
+
 	// Can a type 1 header be used?
-	var hdr, e = il2p_type_1_header(pp, max_fec)
+	var hdr, e = il2p_type_1_header(pp, fec_level)
 
 	if e >= 0 {
 		var outbuf = new(bytes.Buffer)
@@ -69,7 +74,7 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
 		// Payload is AX.25 info part.
 		var pinfo = AX25GetInfo(pp)
 
-		var encodedPayload, k = il2p_encode_payload(pinfo, max_fec)
+		var encodedPayload, k = il2p_encode_payload(pinfo, use_max_fec)
 		if k > 0 {
 			outbuf.Write(encodedPayload)
 
@@ -87,7 +92,7 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
 	} else if e == -1 {
 		// Could not use type 1 header for some reason.
 		// e.g. More than 2 addresses, extended (mod 128) sequence numbers, etc.
-		hdr, e = il2p_type_0_header(pp, max_fec)
+		hdr, e = il2p_type_0_header(pp, fec_level)
 		if e > 0 {
 			var outbuf = new(bytes.Buffer)
 
@@ -101,7 +106,7 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
 
 			var frame_data = ax25_get_frame_data(pp)
 
-			var encodedPayload, k = il2p_encode_payload(frame_data, max_fec)
+			var encodedPayload, k = il2p_encode_payload(frame_data, use_max_fec)
 			if k > 0 {
 				outbuf.Write(encodedPayload)
 
@@ -139,13 +144,15 @@ func il2p_encode_frame(pp *packet_t, max_fec int, crc ...bool) ([]byte, int) {
  *
  * Inputs:	irec	- Received IL2P frame excluding the 3 byte sync word.
  *
+ *		version	- IL2P version to speak.
+ *
  * Future Out:	Number of symbols corrected.
  *
  * Returns:	Packet pointer or nil for error.
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_frame(irec []byte) *packet_t {
+func il2p_decode_frame(irec []byte, version il2p_version_t) *packet_t {
 	if len(irec) < IL2P_HEADER_SIZE+IL2P_HEADER_PARITY {
 		return nil
 	}
@@ -161,7 +168,8 @@ func il2p_decode_frame(irec []byte) *packet_t {
 
 	// Determine if trailing CRC is present by computing the encoded payload size
 	// and checking if there are extra bytes beyond it.
-	var _, max_fec, payload_len = il2p_get_header_attributes(uhdr)
+	var _, fec_level, payload_len = il2p_get_header_attributes(uhdr)
+	var max_fec = il2p_rx_max_fec(version, fec_level)
 	var _, encoded_payload_size = il2p_payload_compute(payload_len, max_fec)
 
 	var crc_bytes []byte
@@ -172,7 +180,7 @@ func il2p_decode_frame(irec []byte) *packet_t {
 		return nil
 	}
 
-	var pp = il2p_decode_header_payload(uhdr, payload, &e)
+	var pp = il2p_decode_header_payload(uhdr, payload, version, &e)
 
 	// Validate CRC if present.
 	if pp != nil && crc_bytes != nil {
@@ -198,6 +206,7 @@ func il2p_decode_frame(irec []byte) *packet_t {
  *
  * Inputs:	uhdr 		- Received header after FEC and descrambling.
  *		epayload	- Encoded payload.
+ *		version		- IL2P version to speak.
  *
  * In/Out:	symbols_corrected - Symbols (bytes) corrected in the header.
  *				  Should be 0 or 1 because it has 2 parity symbols.
@@ -207,8 +216,9 @@ func il2p_decode_frame(irec []byte) *packet_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_decode_header_payload(uhdr []byte, epayload []byte, symbols_corrected *int) *packet_t {
-	var hdr_type, max_fec, payload_len = il2p_get_header_attributes(uhdr)
+func il2p_decode_header_payload(uhdr []byte, epayload []byte, version il2p_version_t, symbols_corrected *int) *packet_t {
+	var hdr_type, fec_level, payload_len = il2p_get_header_attributes(uhdr)
+	var max_fec = il2p_rx_max_fec(version, fec_level)
 
 	if hdr_type == 1 {
 		// Header type 1.  Any payload is the AX.25 Information part.

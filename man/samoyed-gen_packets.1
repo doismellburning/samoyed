@@ -70,11 +70,17 @@ Force G3RUH modem regardless of data rate.
 
 .TP
 .BI "-I " "n"
-Enable IL2P transmit.  n=1 is recommended.  0 uses weaker FEC.
+Enable IL2P transmit.  n=1 is recommended.  0 asks for the weaker FEC that only v0.4 has, so it does nothing unless --il2p-version 0.4 is in use.
 
 .TP
 .BI "-i " "n"
-Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 uses weaker FEC.
+Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for the weaker FEC that only v0.4 has, so it does nothing unless --il2p-version 0.4 is in use.
+
+.TP
+.BI  "--il2p-version " "v"
+IL2P version to transmit: 0.6 (default), 0.4, or compat.
+0.6 always sends 16 parity symbols per payload block and leaves that now reserved bit clear, which stations speaking v0.4 will not understand.
+0.4, like compat, says which FEC level is in use in the header FEC Level bit.
 
 
 .TP

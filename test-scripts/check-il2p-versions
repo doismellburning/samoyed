@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+# v0.6, the default, at both ends.
+$GEN_PACKETS -B9600 -I1 -n 100 -o v06.wav
+$ATEST -B9600 -L70 -G74 v06.wav
+$ATEST -B9600 --il2p-version 0.6 -L70 -G74 v06.wav
+
+# v0.4 with maximum FEC, which is what Dire Wolf sends by default, differs from
+# a v0.6 frame only in the header bit that v0.6 reserves and ignores, so both
+# receivers read it.
+$GEN_PACKETS -B9600 --il2p-version compat -I1 -n 100 -o compat.wav
+$ATEST -B9600 -L72 -G76 compat.wav
+$ATEST -B9600 --il2p-version 0.4 -L72 -G76 compat.wav
+
+# The weaker FEC exists only in v0.4, so it takes v0.4 at both ends.
+$GEN_PACKETS -B9600 --il2p-version 0.4 -I0 -n 100 -o v04weak.wav
+$ATEST -B9600 --il2p-version 0.4 -L64 -G68 v04weak.wav

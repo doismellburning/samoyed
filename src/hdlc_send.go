@@ -41,7 +41,7 @@ var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hd
 
 func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *audio_s) int {
 	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
+		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_version, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}

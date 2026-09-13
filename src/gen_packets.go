@@ -138,9 +138,13 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var outputFile = pflag.StringP("output-file", "o", "", "Send output to .wav file.")
 	var morseWPM = pflag.IntP("morse-wpm", "M", 0, "Send Morse at this speed.")
 	var fx25CheckBytes = pflag.IntP("fx25-check-bytes", "X", 0, "1 to enable FX.25 transmit.  16, 32, 64 for specific number of check bytes.")
-	var il2pNormal = pflag.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 uses weaker FEC.")
-	var il2pInverted = pflag.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 uses weaker FEC.")
+	var il2pNormal = pflag.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see --il2p-version).")
+	var il2pInverted = pflag.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see --il2p-version).")
 	var variableSpeedStr = pflag.StringP("variable-speed", "v", "", "max[,incr] Variable speed with specified maximum error and increment.")
+	var il2pVersion = pflag.String("il2p-version", "0.6", `IL2P version to transmit.
+    0.6     - 16 parity symbols per payload block, that bit reserved.  (default)
+    0.4     - The header FEC Level bit says which FEC level is in use.
+    compat  - Same as 0.4.`)
 	var help = pflag.BoolP("help", "h", false, "Display help text.")
 
 	pflag.Usage = func() {
@@ -433,6 +437,15 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		fmt.Printf("Can't use both -I and -i at the same time.\n")
 		os.Exit(1)
 	}
+
+	var il2p_version, il2p_version_ok = il2p_parse_version(*il2pVersion)
+	if !il2p_version_ok {
+		text_color_set(DW_COLOR_ERROR)
+		fmt.Printf("Invalid IL2P version %s.  Expected 0.4, 0.6, or compat.\n", *il2pVersion)
+		os.Exit(1)
+	}
+
+	modem.achan[0].il2p_version = il2p_version
 
 	if *il2pNormal >= 0 {
 		text_color_set(DW_COLOR_INFO)

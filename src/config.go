@@ -863,6 +863,7 @@ var configHandlers = map[string]configHandler{
 	"FX25TX":         handleFX25TX,
 	"FX25AUTO":       handleFX25AUTO,
 	"IL2PTX":         handleIL2PTX,
+	"IL2PVERSION":    handleIL2PVERSION,
 	"DIGIPEAT":       handleDIGIPEAT,
 	"DIGIPEATER":     handleDIGIPEAT,
 	"DEDUPE":         handleDEDUPE,
@@ -984,6 +985,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 		p_audio_config.achan[channel].layer2_xmit = LAYER2_AX25
 		p_audio_config.achan[channel].il2p_max_fec = 1
+		p_audio_config.achan[channel].il2p_version = IL2P_VERSION_0_6
 		p_audio_config.achan[channel].il2p_invert_polarity = 0
 		p_audio_config.achan[channel].il2p_crc = true
 
@@ -3018,7 +3020,8 @@ func handleIL2PTX(ps *parseState) bool {
 	 *					(command line -I for first channel)
 	 *				"-" means inverted polarity. Do not use for 1200 bps.
 	 *					(command line -i for first channel)
-	 *				"0" means weak FEC.  Not recommended.
+	 *				"0" means weak FEC.  Not recommended, and only v0.4
+	 *					has it, so it does nothing unless IL2PVERSION 0.4.
 	 *				"1" means stronger FEC.  "Max FEC."  Default if not specified.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
@@ -3061,6 +3064,40 @@ func handleIL2PTX(ps *parseState) bool {
 			}
 		}
 	}
+
+	return false
+}
+
+// handleIL2PVERSION handles the IL2PVERSION keyword.
+func handleIL2PVERSION(ps *parseState) bool {
+	/*
+	 * IL2PVERSION  0.4 | 0.6 | COMPAT	- IL2P protocol version, transmit and receive.
+	 *				"0.6" means 16 parity symbols per payload block and
+	 *					that bit is RESERVED.  Default.
+	 *				"0.4" means the header FEC Level bit selects the
+	 *					number of payload parity symbols.
+	 *				"COMPAT" means transmit 0.4 but receive 0.6.
+	 *					With max FEC, 0.4 frames are understood by both,
+	 *					so use this to reach v0.4 stations as well.
+	 */
+	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: IL2PVERSION can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
+
+		return true
+	}
+
+	var t = split("", false)
+
+	var version, ok = il2p_parse_version(t)
+	if !ok {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Invalid IL2P version '%s'.  Expected 0.4, 0.6, or COMPAT.\n", ps.line, t)
+
+		return true
+	}
+
+	ps.audio.achan[ps.channel].il2p_version = version
 
 	return false
 }
