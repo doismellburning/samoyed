@@ -4483,7 +4483,7 @@ func handleTTMACRO(ps *parseState) bool {
 				tmp = tmp[1:]
 			}
 			if len(tmp) > 0 && tmp[0] == '}' {
-				var ttemp, errs = tt_text_to_call10(stemp.String(), false)
+				var ttemp, errs = TTTextToCall10(stemp.String(), false)
 				if errs == 0 {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("DEBUG Line %d: AC{%s} -> AC%s\n", line, stemp, ttemp);
@@ -4515,7 +4515,7 @@ func handleTTMACRO(ps *parseState) bool {
 					dw_printf("Line %d: Object name %s has been truncated to 9 characters.\n", ps.line, stemp)
 					stemp = stemp[:9]
 				}
-				var ttemp, errs = tt_text_to_two_key(stemp, false)
+				var ttemp, errs = TTTextToTwoKey(stemp, false)
 				if errs == 0 {
 					//text_color_set(DW_COLOR_DEBUG);
 					//dw_printf ("DEBUG Line %d: AA{%s} -> AA%s\n", line, stemp, ttemp);
