@@ -21,6 +21,17 @@ import (
 	"unicode"
 )
 
+// unspecified_to_zero maps the G_UNKNOWN sentinel onto 0, the value that
+// "not specified" had before G_UNKNOWN existed, so that a PHG or radio range
+// component nobody gave us doesn't end up in the arithmetic.
+func unspecified_to_zero(x int) int {
+	if x == G_UNKNOWN {
+		return 0
+	}
+
+	return x
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        norm_position
@@ -183,6 +194,13 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	} else if power > 0 || height > 0 || gain > 0 {
 		presult.C = '{' /* radio range. */
 
+		// As in phg_data_extension, only one of the three needs to have been
+		// specified, and G_UNKNOWN would otherwise give a NaN range.
+
+		power = unspecified_to_zero(power)
+		height = unspecified_to_zero(height)
+		gain = unspecified_to_zero(gain)
+
 		if power == 0 {
 			power = 10
 		}
@@ -237,11 +255,6 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
  *
  *----------------------------------------------------------------*/
 
-// TODO (bug):  Doesn't check for G_UNKNOWN.
-// could have a case where some, but not all, values were specified.
-// Callers originally checked for any not zero.
-// now they check for any > 0.
-
 /*
 type phg_t struct {
 	P byte
@@ -255,6 +268,15 @@ type phg_t struct {
 */
 
 func phg_data_extension(power int, height int, gain int, dir string) string {
+	// The callers only check that at least one of the three was specified, so
+	// the others can still be G_UNKNOWN.  Treat those as unspecified, which is
+	// what the zero the callers originally checked for meant, rather than
+	// letting -999999 reach Sqrt/Log2 and produce a NaN that converts to a NUL
+	// byte in the transmitted packet.
+	power = unspecified_to_zero(power)
+	height = unspecified_to_zero(height)
+	gain = unspecified_to_zero(gain)
+
 	var p = math.Round(math.Sqrt(float64(power))) + '0'
 	if p < '0' {
 		p = '0'
