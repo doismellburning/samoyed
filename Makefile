@@ -11,6 +11,12 @@ GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 .PHONY: all
 all: $(CMDS) test
 
+# Installs the system dependencies (hamlib, Dire Wolf, shellcheck, ...) needed
+# by the targets below
+.PHONY: setup
+setup:
+	./dev-setup.sh
+
 .PHONY: cmds
 cmds: $(CMDS)
 

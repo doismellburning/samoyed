@@ -2,6 +2,7 @@
 
 ## Development
 
+* `make setup` installs the system dependencies everything else needs (apt-based Linux and macOS/Homebrew) - it's what CI runs too, so a new build/test/lint dependency belongs in `dev-setup.sh` rather than in a workflow step
 * `make all` builds and tests everything - a good general check
 * `make test` runs the full test suite and should always pass
 * `make check` runs assorted linters and should always pass
