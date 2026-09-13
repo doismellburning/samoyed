@@ -10,13 +10,22 @@ import (
 type BitFixLevel int
 
 const (
-	BitFixNone     BitFixLevel = 0
-	BitFixSingle   BitFixLevel = 1 // invert one bit
-	BitFixDouble   BitFixLevel = 2 // invert two adjacent bits
-	BitFixTriple   BitFixLevel = 3 // invert three adjacent bits
-	BitFixTwoSep   BitFixLevel = 4 // invert two separate bits
-	BitFixLevelMax BitFixLevel = 5
+	BitFixNone   BitFixLevel = 0
+	BitFixSingle BitFixLevel = 1 // invert one bit
+	BitFixDouble BitFixLevel = 2 // invert two adjacent bits
+	BitFixTriple BitFixLevel = 3 // invert three adjacent bits
+	BitFixTwoSep BitFixLevel = 4 // invert two separate bits
+
+	// BitFixPassall is not a level of effort and is never a valid fix_bits
+	// setting.  It appears only as a result, marking a frame that the PASSALL
+	// option forwarded after the FCS check failed and every configured fix up
+	// had been exhausted.
+	BitFixPassall BitFixLevel = 5
 )
+
+// BitFixLevelHighest is the most effort that can be asked for, i.e. the
+// largest valid fix_bits setting.
+const BitFixLevelHighest = BitFixTwoSep
 
 // Legacy names kept for compatibility while callers are updated.
 const (
@@ -25,7 +34,6 @@ const (
 	RETRY_INVERT_DOUBLE  = BitFixDouble
 	RETRY_INVERT_TRIPLE  = BitFixTriple
 	RETRY_INVERT_TWO_SEP = BitFixTwoSep
-	RETRY_MAX            = BitFixLevelMax
 )
 
 func (bfl BitFixLevel) String() string {
@@ -40,7 +48,7 @@ func (bfl BitFixLevel) String() string {
 		return "TRIPLE"
 	case BitFixTwoSep:
 		return "TWO_SEP"
-	case BitFixLevelMax:
+	case BitFixPassall:
 		return "PASSALL"
 	}
 

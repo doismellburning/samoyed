@@ -2130,7 +2130,7 @@ func handleFIX_BITS(ps *parseState) bool {
 	}
 
 	var n, _ = strconv.Atoi(t)
-	if BitFixLevel(n) >= RETRY_NONE && BitFixLevel(n) < RETRY_MAX { // MAX is actually last valid +1
+	if BitFixLevel(n) >= BitFixNone && BitFixLevel(n) <= BitFixLevelHighest {
 		ps.audio.achan[ps.channel].fix_bits = BitFixLevel(n)
 	} else {
 		ps.audio.achan[ps.channel].fix_bits = DEFAULT_FIX_BITS

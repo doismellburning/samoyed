@@ -71,6 +71,8 @@ Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.
 1 = Try to fix only a single bit.
 more = Try modifying more bits to get a good CRC.
+5 = Try everything, then hand over frames that still have a bad CRC, as the
+PASSALL option of the FIX_BITS configuration keyword does.
 
 .TP
 .BI  "-L " 

@@ -77,7 +77,7 @@ func TestFecTypeLabel(t *testing.T) {
 }
 
 // TestRecordRadioFrameExcludesPassall is a regression test: with PASSALL set,
-// hdlc_rec2 forwards frames whose FCS check *failed*, flagged with RETRY_MAX.
+// hdlc_rec2 forwards frames whose FCS check *failed*, flagged with BitFixPassall.
 // Those have neither a valid FCS nor any corrected bits, so they belong on
 // neither samoyed_frames_received_total nor samoyed_frames_bit_corrected_total.
 func TestRecordRadioFrameExcludesPassall(t *testing.T) {
@@ -86,12 +86,12 @@ func TestRecordRadioFrameExcludesPassall(t *testing.T) {
 	var frameLabels = map[string]string{"channel": strconv.Itoa(channel)}
 	var passallLabels = map[string]string{
 		"channel": strconv.Itoa(channel),
-		"level":   RETRY_MAX.String(),
+		"level":   BitFixPassall.String(),
 	}
 
 	var framesBefore = metricValue(t, "samoyed_frames_received_total", frameLabels)
 
-	recordRadioFrame(channel, fec_type_none, RETRY_MAX)
+	recordRadioFrame(channel, fec_type_none, BitFixPassall)
 
 	assert.InDelta(t, framesBefore, metricValue(t, "samoyed_frames_received_total", frameLabels), 0,
 		"a frame forwarded after a failed FCS check is not a received frame")
@@ -110,4 +110,30 @@ func TestRecordRadioFrameExcludesPassall(t *testing.T) {
 
 	assert.InDelta(t, framesBefore+1, metricValue(t, "samoyed_frames_received_total", frameLabels), 0)
 	assert.InDelta(t, fixedBefore+1, metricValue(t, "samoyed_frames_bit_corrected_total", fixedLabels), 0)
+}
+
+// TestRecordRadioFrameCountsFECFrameWithPassallCorrectionCount is a regression
+// test: "retries" is a count of corrected Reed-Solomon symbols for FX.25 and
+// IL2P, so a valid frame can arrive carrying the same value that means PASSALL
+// without FEC.  Such a frame was dropped from every receive metric.
+func TestRecordRadioFrameCountsFECFrameWithPassallCorrectionCount(t *testing.T) {
+	const channel = 1
+
+	var frameLabels = map[string]string{"channel": strconv.Itoa(channel)}
+	var correctedLabels = map[string]string{
+		"channel": strconv.Itoa(channel),
+		"type":    fecTypeLabel(fec_type_fx25),
+	}
+
+	var framesBefore = metricValue(t, "samoyed_frames_received_total", frameLabels)
+	var correctedBefore = metricValue(t, "samoyed_corrected_symbols_total", correctedLabels)
+
+	var corrected = int(BitFixPassall)
+
+	recordRadioFrame(channel, fec_type_fx25, BitFixLevel(corrected))
+
+	assert.InDelta(t, framesBefore+1, metricValue(t, "samoyed_frames_received_total", frameLabels), 0,
+		"an FX.25 frame that needed %d corrections is still a received frame", corrected)
+	assert.InDelta(t, correctedBefore+float64(corrected), metricValue(t, "samoyed_corrected_symbols_total", correctedLabels), 0,
+		"and its corrected symbols are still counted")
 }

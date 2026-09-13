@@ -760,7 +760,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 			if retry_conf_retry == RETRY_NONE && retry_conf_type == RETRY_TYPE_NONE {
 				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("ATTEMPTING PASSALL PROCESSING\n");
-				multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, RETRY_MAX, 0) /* len-2 to remove FCS. */
+				multi_modem_process_rec_frame(channel, subchan, slice, H2.frame_buf[:H2.frame_len-2], alevel, BitFixPassall, 0) /* len-2 to remove FCS. */
 
 				return true /* success */
 			} else {

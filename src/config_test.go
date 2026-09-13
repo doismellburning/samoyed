@@ -693,3 +693,38 @@ func Test_config_init_metricsport(t *testing.T) {
 		assert.Equal(t, 0, misc.metrics_port)
 	})
 }
+
+// --- config_init FIX_BITS directive ---
+
+func Test_config_init_fix_bits(t *testing.T) {
+	t.Run("valid level stored", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS 1\n")
+		assert.Equal(t, BitFixSingle, cfg.achan[0].fix_bits)
+		assert.False(t, cfg.achan[0].passall)
+	})
+
+	t.Run("highest level stored", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS 4\n")
+		assert.Equal(t, BitFixLevelHighest, cfg.achan[0].fix_bits)
+	})
+
+	// PASSALL is not a level of effort, so the value it decodes as is not a
+	// level FIX_BITS accepts.
+	t.Run("passall value falls back to default", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS 5\n")
+		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
+		assert.False(t, cfg.achan[0].passall)
+	})
+
+	t.Run("PASSALL keyword sets passall independently of the level", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS 0 PASSALL\n")
+		assert.Equal(t, BitFixNone, cfg.achan[0].fix_bits)
+		assert.True(t, cfg.achan[0].passall)
+	})
+
+	t.Run("passall off by default", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "")
+		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
+		assert.False(t, cfg.achan[0].passall)
+	})
+}

@@ -112,6 +112,28 @@ var dcd_missing_errors = 0
 const EXPERIMENT_G = true
 const EXPERIMENT_H = true
 
+/*
+ * atestFixBits maps the -F argument onto a fix_bits level and the PASSALL flag.
+ *
+ * 0 up to BitFixLevelHighest are the levels of effort that the FIX_BITS
+ * configuration keyword accepts.  One more than that - the value that decodes
+ * as "PASSALL" - asks for all of them and then hands over frames that still
+ * have a bad CRC, which is the only way to reach PASSALL from the command line
+ * and keeps -F a scale where each value is at least as permissive as the last.
+ *
+ * The final return value is false for an argument outside that range.
+ */
+func atestFixBits(n int) (BitFixLevel, bool, bool) {
+	switch {
+	case n < int(BitFixNone) || n > int(BitFixPassall):
+		return DEFAULT_FIX_BITS, false, false
+	case BitFixLevel(n) == BitFixPassall:
+		return BitFixLevelHighest, true, true
+	default:
+		return BitFixLevel(n), false, true
+	}
+}
+
 func AtestMain() {
 	ATEST_C = true
 
@@ -164,10 +186,11 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var modemProfile = pflag.StringP("modem-profile", "P", "", "Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
 	var decimate = pflag.IntP("decimate", "D", 0, "Divide audio sample rate by n. 0 is auto-select.")
 	var upsample = pflag.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
-	var fixBits = pflag.IntP("fix-bits", "F", 0, `Amount of effort to try fixing frames with an invalid CRC.
+	var fixBits = pflag.IntP("fix-bits", "F", 0, fmt.Sprintf(`Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.
-1 = Try to fix only a sigle bit.
-Higher values = Try modifying more bits to get a good CRC.`)
+1 = Try to fix only a single bit.
+Higher values = Try modifying more bits to get a good CRC.
+%d = Try everything, then hand over frames that still have a bad CRC (PASSALL).`, BitFixPassall))
 	var errorIfLessThan = pflag.IntP("error-if-less-than", "L", -1, "Error if less than this number decoded.")
 	var errorIfGreaterThan = pflag.IntP("error-if-greater-than", "G", -1, "Error if greater than this number decoded.")
 	var channel0 = pflag.BoolP("channel-0", "0", false, "Use channel 0 (left) of stereo audio (default).")
@@ -246,13 +269,15 @@ o = DCD output control
 		my_audio_config.achan[0].upsample = *upsample
 	}
 
-	if BitFixLevel(*fixBits) < RETRY_NONE || BitFixLevel(*fixBits) > RETRY_MAX {
-		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", RETRY_NONE, RETRY_MAX, *fixBits)
+	var fixBitsLevel, fixBitsPassall, fixBitsValid = atestFixBits(*fixBits)
+	if !fixBitsValid {
+		fmt.Fprintf(os.Stderr, "Fix Bits should be between %d and %d inclusive, not %d.\n", BitFixNone, BitFixPassall, *fixBits)
 		pflag.Usage()
 		os.Exit(1)
 	}
 
-	my_audio_config.achan[0].fix_bits = BitFixLevel(*fixBits)
+	my_audio_config.achan[0].fix_bits = fixBitsLevel
+	my_audio_config.achan[0].passall = fixBitsPassall
 
 	var channelFlagCount int
 
@@ -779,7 +804,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 			// No fix_bits or passall specified.
 			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
-			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX) // validate array index.
+			Assert(retries >= RETRY_NONE && retries <= BitFixPassall) // validate array index.
 			dw_printf("%s audio level = %s   [%s]   %s\n", heard, alevel_text, retries.String(), spectrum)
 		}
 	}

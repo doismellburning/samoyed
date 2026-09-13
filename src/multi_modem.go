@@ -425,7 +425,7 @@ func pick_best_candidate(channel int) {
 				/* This didn't work so well when looking for the best score. */
 				/* Around 1.3 dev H, we add an extra 1 in here so the minimum */
 				/* score should now be 1 for anything received.  */
-				candidate[channel][j][k].score = int(RETRY_MAX)*1000 - int(candidate[channel][j][k].retries*1000) + 1
+				candidate[channel][j][k].score = int(BitFixPassall)*1000 - int(candidate[channel][j][k].retries*1000) + 1
 			}
 		}
 	}

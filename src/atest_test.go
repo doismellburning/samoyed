@@ -147,3 +147,36 @@ func Test_atest_extraChunks(t *testing.T) {
 
 	assert.Contains(t, string(outputBytes), "0 packets decoded")
 }
+
+// Test_atest_fixBits covers the mapping of -F onto the fix_bits level and the
+// PASSALL flag.  The top value used to be accepted as a fix_bits level in its
+// own right - one past the highest real level, so it behaved exactly like the
+// level below it - and never set passall, leaving no way to ask atest for the
+// behaviour that value is named after.
+func Test_atest_fixBits(t *testing.T) {
+	var testCases = []struct {
+		arg     int
+		level   BitFixLevel
+		passall bool
+		valid   bool
+	}{
+		{-1, DEFAULT_FIX_BITS, false, false},
+		{0, BitFixNone, false, true},
+		{1, BitFixSingle, false, true},
+		{int(BitFixLevelHighest), BitFixLevelHighest, false, true},
+		{int(BitFixPassall), BitFixLevelHighest, true, true},
+		{int(BitFixPassall) + 1, DEFAULT_FIX_BITS, false, false},
+	}
+
+	for _, testCase := range testCases {
+		var level, passall, valid = atestFixBits(testCase.arg)
+
+		assert.Equal(t, testCase.valid, valid, "-F %d validity", testCase.arg)
+		assert.Equal(t, testCase.level, level, "-F %d level", testCase.arg)
+		assert.Equal(t, testCase.passall, passall, "-F %d passall", testCase.arg)
+
+		// Whatever -F is given, fix_bits only ever holds a level that the
+		// FIX_BITS configuration keyword would also accept.
+		assert.LessOrEqual(t, level, BitFixLevelHighest, "-F %d level in range", testCase.arg)
+	}
+}

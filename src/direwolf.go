@@ -860,7 +860,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		// Possible fix_bits indication.  Only radio channels (< MAX_RADIO_CHANS) have achan entries;
 		// virtual channels such as NCHANNEL do not.
 		if channel < MAX_RADIO_CHANS && (audio_config.achan[channel].fix_bits != RETRY_NONE || audio_config.achan[channel].passall) {
-			Assert(retries >= RETRY_NONE && retries <= RETRY_MAX)
+			Assert(retries >= RETRY_NONE && retries <= BitFixPassall)
 			display_retries = fmt.Sprintf(" [%s] ", retries.String())
 		}
 	}
