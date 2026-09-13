@@ -55,7 +55,7 @@ type PacketLogger struct {
  *---------------------------------------------------------------*/
 
 func NewPacketLogger(daily_names bool, path string) *PacketLogger {
-	var pl = &PacketLogger{ //nolint:exhaustruct
+	var pl = &PacketLogger{ //nolint:exhaustruct_v5
 		dailyNames: daily_names,
 	}
 

@@ -116,7 +116,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		fcos256_table[j] = float64(math.Cos(float64(j) * 2.0 * math.Pi / 256.0))
 	}
 
-	*D = demodulator_state_s{} //nolint:exhaustruct
+	*D = demodulator_state_s{} //nolint:exhaustruct_v5
 
 	D.num_slicers = 1
 

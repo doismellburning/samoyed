@@ -493,27 +493,27 @@ func TestGridSquareEdgeCases(t *testing.T) {
 			minLon:    -157.88,
 			maxLon:    -157.87,
 		},
-		{ //nolint: exhaustruct
+		{ //nolint: exhaustruct_v5
 			name:      "odd number of characters fails",
 			grid:      "BL1",
 			expectErr: true,
 		},
-		{ //nolint: exhaustruct
+		{ //nolint: exhaustruct_v5
 			name:      "empty string fails",
 			grid:      "",
 			expectErr: true,
 		},
-		{ //nolint: exhaustruct
+		{ //nolint: exhaustruct_v5
 			name:      "too many pairs fails",
 			grid:      "BL11BH16OO66XX",
 			expectErr: true,
 		},
-		{ //nolint: exhaustruct
+		{ //nolint: exhaustruct_v5
 			name:      "invalid first character",
 			grid:      "ZZ11",
 			expectErr: true,
 		},
-		{ //nolint: exhaustruct
+		{ //nolint: exhaustruct_v5
 			name:      "invalid second pair character",
 			grid:      "BLA1",
 			expectErr: true,

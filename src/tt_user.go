@@ -243,7 +243,7 @@ func tt_3char_suffix_search(suffix string) (string, int) {
 func clear_user(i int) {
 	Assert(i >= 0 && i < MAX_TT_USERS)
 
-	tt_user[i] = tt_user_s{} //nolint:exhaustruct
+	tt_user[i] = tt_user_s{} //nolint:exhaustruct_v5
 } /* end clear_user */
 
 /*------------------------------------------------------------------

@@ -157,7 +157,7 @@ func TestStartServesMetrics(t *testing.T) {
 	require.NoError(t, startErr)
 	require.NotNil(t, errCh)
 
-	var client = &http.Client{Timeout: 5 * time.Second} //nolint:exhaustruct
+	var client = &http.Client{Timeout: 5 * time.Second} //nolint:exhaustruct_v5
 
 	var req, reqErr = http.NewRequestWithContext(context.Background(), http.MethodGet,
 		"http://127.0.0.1:"+strconv.Itoa(port)+"/metrics", nil)

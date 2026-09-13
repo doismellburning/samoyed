@@ -335,7 +335,7 @@ func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 
 	var prevXmitSvc = xmitSvc
 	t.Cleanup(func() { xmitSvc = prevXmitSvc })
-	xmitSvc = &XmitService{} //nolint:exhaustruct
+	xmitSvc = &XmitService{} //nolint:exhaustruct_v5
 
 	var stop = make(chan struct{})
 	var done = make(chan struct{})

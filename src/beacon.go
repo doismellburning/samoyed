@@ -47,7 +47,7 @@ type BeaconService struct {
  *--------------------------------------------------------------------*/
 
 func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_config_s) *BeaconService {
-	var bs = &BeaconService{ //nolint:exhaustruct
+	var bs = &BeaconService{ //nolint:exhaustruct_v5
 		modemConfig: pmodem,
 		miscConfig:  pconfig,
 		igateConfig: pigate,

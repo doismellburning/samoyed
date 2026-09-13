@@ -30,7 +30,7 @@ func dns_sd_announce(mc *misc_config_s) {
 		name = dns_sd_default_service_name()
 	}
 
-	var cfg = dnssd.Config{ //nolint:exhaustruct
+	var cfg = dnssd.Config{ //nolint:exhaustruct_v5
 		Name: name,
 		Type: DNS_SD_SERVICE,
 		Port: mc.kiss_port[0],

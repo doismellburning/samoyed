@@ -77,7 +77,7 @@ func Test_heading_change(t *testing.T) {
 // Fast and slow speed exact-rate cases are covered by property tests below.
 
 func Test_sbCalculateNextTime_mid_speed_proportional(t *testing.T) {
-	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct
+	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	// At 30 MPH (between 5 and 60), rate = (30 * 60) / 30 = 60 seconds
 	var lastXmit = now.Add(-120 * time.Second)
@@ -89,7 +89,7 @@ func Test_sbCalculateNextTime_mid_speed_proportional(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_unknown_speed(t *testing.T) {
-	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct
+	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	var lastXmit = now.Add(-2000 * time.Second)
 
@@ -101,7 +101,7 @@ func Test_sbCalculateNextTime_unknown_speed(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_corner_pegging(t *testing.T) {
-	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct
+	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	// Last transmitted 20s ago (>= sb_turn_time of 15s)
 	var lastXmit = now.Add(-20 * time.Second)
@@ -113,7 +113,7 @@ func Test_sbCalculateNextTime_corner_pegging(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_corner_pegging_suppressed_too_soon(t *testing.T) {
-	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct
+	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	// Last transmitted only 5s ago (< sb_turn_time of 15s), so no corner pegging
 	var lastXmit = now.Add(-5 * time.Second)
@@ -126,7 +126,7 @@ func Test_sbCalculateNextTime_corner_pegging_suppressed_too_soon(t *testing.T) {
 }
 
 func Test_sbCalculateNextTime_no_corner_peg_below_threshold(t *testing.T) {
-	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct
+	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
 	var now = time.Now()
 	var lastXmit = now.Add(-20 * time.Second)
 
@@ -341,7 +341,7 @@ func Test_BeaconService_Start_no_goroutine_if_all_ignored(t *testing.T) {
 	cfg.num_beacons = 1
 	cfg.beacon[0].btype = BEACON_IGNORE
 
-	var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct
+	var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
 	// If there's no panic, the test passes — goroutine is not started.
 	bs.Start()
 }
@@ -349,7 +349,7 @@ func Test_BeaconService_Start_no_goroutine_if_all_ignored(t *testing.T) {
 // SetDebug test
 
 func Test_BeaconService_SetDebug(t *testing.T) {
-	var bs = &BeaconService{} //nolint:exhaustruct
+	var bs = &BeaconService{} //nolint:exhaustruct_v5
 	bs.SetDebug(2)
 	assert.Equal(t, 2, bs.trackerDebugLevel)
 }
@@ -397,7 +397,7 @@ func Test_heading_change_self_is_zero(t *testing.T) {
 func Test_sbCalculateNextTime_fast_speed_rate_exact(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		var cfg = makeSBConfig()
-		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct
+		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
 
 		// Speed strictly above fast threshold.
 		var speed = rapid.Float64Range(float64(cfg.sb_fast_speed)+0.01, 300).Draw(t, "speed")
@@ -420,7 +420,7 @@ func Test_sbCalculateNextTime_fast_speed_rate_exact(t *testing.T) {
 func Test_sbCalculateNextTime_slow_speed_rate_exact(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		var cfg = makeSBConfig()
-		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct
+		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
 
 		// Speed strictly below slow threshold (but above 1.0 so motion is detected).
 		var speed = rapid.Float64Range(1.01, float64(cfg.sb_slow_speed)-0.01).Draw(t, "speed")
@@ -441,7 +441,7 @@ func Test_sbCalculateNextTime_slow_speed_rate_exact(t *testing.T) {
 func Test_sbCalculateNextTime_result_within_rate_bounds(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		var cfg = makeSBConfig()
-		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct
+		var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
 
 		var speed = rapid.Float64Range(0, 300).Draw(t, "speed")
 		var course = rapid.Float64Range(0, 360).Draw(t, "course")

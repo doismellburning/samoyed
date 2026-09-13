@@ -61,7 +61,7 @@ func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
 		dw_printf ("waypoint_init() destination hostname=%s UDP port=%d\n", mc.waypoint_udp_hostname, mc.waypoint_udp_portnum);
 	#endif
 	*/
-	var ws = &WaypointSender{} //nolint:exhaustruct
+	var ws = &WaypointSender{} //nolint:exhaustruct_v5
 
 	var udpRequested = mc.waypoint_udp_portnum > 0
 	var serialRequested = mc.waypoint_serial_port != ""

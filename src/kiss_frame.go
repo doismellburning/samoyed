@@ -705,7 +705,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 			return
 		}
 
-		alevel = ALevel{} //nolint:exhaustruct
+		alevel = ALevel{} //nolint:exhaustruct_v5
 
 		var pp = AX25FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {

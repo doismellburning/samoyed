@@ -34,38 +34,41 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var metricFramesReceived = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct
+// labelChannel is the Prometheus label naming the radio channel a metric belongs to.
+const labelChannel = "channel"
+
+var metricFramesReceived = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_frames_received_total",
 	Help: "Number of AX.25 frames received with a valid FCS.",
-}, []string{"channel"})
+}, []string{labelChannel})
 
-var metricFramesTransmitted = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricFramesTransmitted = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_frames_transmitted_total",
 	Help: "Number of AX.25 frames handed to the modem for transmission.",
-}, []string{"channel"})
+}, []string{labelChannel})
 
-var metricAX25Retries = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricAX25Retries = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_ax25_link_retries_total",
 	Help: "Number of AX.25 connected-mode link layer retries.",
-}, []string{"channel"})
+}, []string{labelChannel})
 
-var metricCorrectedSymbols = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricCorrectedSymbols = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_corrected_symbols_total",
 	Help: "Number of FX.25/IL2P Reed-Solomon symbols corrected in received frames.",
-}, []string{"channel", "type"})
+}, []string{labelChannel, "type"})
 
 // Frames recovered by the HDLC bit-fix logic are counted separately, because
 // what that path reports is which inversion strategy succeeded, not how many
 // bits it had to touch - summing those ordinals would be meaningless.
-var metricBitCorrectedFrames = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricBitCorrectedFrames = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_frames_bit_corrected_total",
 	Help: "Number of received frames recovered by the HDLC bit-fix logic, by the inversion strategy that succeeded.",
-}, []string{"channel", "level"})
+}, []string{labelChannel, "level"})
 
-var metricDedupeHits = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricDedupeHits = promauto.NewCounterVec(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_dedupe_hits_total",
 	Help: "Number of transmit duplicates suppressed by the digipeater dedupe logic.",
-}, []string{"channel"})
+}, []string{labelChannel})
 
 // RecordFrameReceived is called for every frame accepted with a valid FCS.
 // fecType should be "fx25" or "il2p" when forward error correction recovered
@@ -105,56 +108,56 @@ func RecordDedupeHit(channel int) {
 	metricDedupeHits.WithLabelValues(strconv.Itoa(channel)).Inc()
 }
 
-var metricChannelUp = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+var metricChannelUp = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_channel_up",
 	Help: "Whether a radio channel is configured (1) or not (0).",
-}, []string{"channel"})
+}, []string{labelChannel})
 
-var metricDCD = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+var metricDCD = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_dcd",
 	Help: "Whether the data carrier detect (squelch) is currently active on a channel.",
-}, []string{"channel"})
+}, []string{labelChannel})
 
-var metricTxQueueDepth = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+var metricTxQueueDepth = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_tx_queue_depth",
 	Help: "Number of packets currently queued for transmission.",
-}, []string{"channel", "priority"})
+}, []string{labelChannel, "priority"})
 
-var metricAudioLevel = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct
+var metricAudioLevel = promauto.NewGaugeVec(prometheus.GaugeOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_audio_receive_level",
 	Help: "Received audio level, roughly 0 to 100.",
-}, []string{"channel"})
+}, []string{labelChannel})
 
-var metricIgateRFRecv = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricIgateRFRecv = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_igate_rf_recv_packets_total",
 	// Counted where Dire Wolf keeps stats_rf_recv_packets, which also sees
 	// beacons and APRStt objects, not just traffic received off the air.
 	Help: "Number of candidate APRS packets offered to the IGate for forwarding.",
 })
 
-var metricIgateRFXmit = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricIgateRFXmit = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_igate_rf_xmit_packets_total",
 	// Counted where Dire Wolf keeps stats_rf_xmit_packets: at the queue
 	// insertion, so a packet the transmit queue then discards is included.
 	Help: "Number of packets the IGate function queued for transmission to radio.",
 })
 
-var metricIgateUplink = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricIgateUplink = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_igate_uplink_packets_total",
 	Help: "Number of packets forwarded to the APRS-IS server.",
 })
 
-var metricIgateDownlink = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricIgateDownlink = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_igate_downlink_packets_total",
 	Help: "Number of packets received from the APRS-IS server.",
 })
 
-var metricIgateConnects = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricIgateConnects = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_igate_connects_total",
 	Help: "Number of successful connections to the APRS-IS server.",
 })
 
-var metricIgateFailedConnects = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct
+var metricIgateFailedConnects = promauto.NewCounter(prometheus.CounterOpts{ //nolint:exhaustruct_v5
 	Name: "samoyed_igate_failed_connects_total",
 	Help: "Number of failed connection attempts to the APRS-IS server.",
 })

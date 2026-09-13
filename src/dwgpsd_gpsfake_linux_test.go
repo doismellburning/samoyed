@@ -34,7 +34,7 @@ func startGpsfake(t *testing.T, port int) {
 	var cmd = exec.CommandContext(context.Background(), "gpsfake", "-n", "-P", strconv.Itoa(port), "-c", "0.1", fixture) //nolint:gosec
 
 	// Only Setpgid is relevant here; the rest are fine at their zero values.
-	cmd.SysProcAttr = &syscall.SysProcAttr{ //nolint:exhaustruct
+	cmd.SysProcAttr = &syscall.SysProcAttr{ //nolint:exhaustruct_v5
 		Setpgid: true,
 	}
 
@@ -64,7 +64,7 @@ func startGpsfake(t *testing.T, port int) {
 	var addr = net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 
 	// Only Timeout is relevant here; the rest are fine at their zero values.
-	var dialer = net.Dialer{Timeout: 200 * time.Millisecond} //nolint:exhaustruct
+	var dialer = net.Dialer{Timeout: 200 * time.Millisecond} //nolint:exhaustruct_v5
 
 	var deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {

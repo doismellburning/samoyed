@@ -546,7 +546,7 @@ type audioRingBuffer struct {
 }
 
 func newAudioRingBuffer(size int) *audioRingBuffer {
-	var rb = &audioRingBuffer{ //nolint:exhaustruct
+	var rb = &audioRingBuffer{ //nolint:exhaustruct_v5
 		buf:  make([]byte, size),
 		size: size,
 	}

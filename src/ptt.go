@@ -802,7 +802,7 @@ func ptt_init(audio_config_p *audio_s) {
 							continue
 						}
 
-						var r = &goHamlib.Rig{} //nolint:exhaustruct
+						var r = &goHamlib.Rig{} //nolint:exhaustruct_v5
 
 						var initErr = r.Init(goHamlib.RigModelID(audio_config_p.achan[ch].octrl[ot].ptt_model))
 						if initErr != nil {
@@ -814,7 +814,7 @@ func ptt_init(audio_config_p *audio_s) {
 							continue
 						}
 
-						var port = goHamlib.Port{ //nolint:exhaustruct
+						var port = goHamlib.Port{ //nolint:exhaustruct_v5
 							Portname:  audio_config_p.achan[ch].octrl[ot].ptt_device,
 							Databits:  8,
 							Stopbits:  1,
@@ -1395,7 +1395,7 @@ func PTTTestMain() {
 
 	// #if __arm__
 
-	my_audio_config = audio_s{} //nolint:exhaustruct
+	my_audio_config = audio_s{} //nolint:exhaustruct_v5
 	my_audio_config.adev[0].num_channels = 1
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO

@@ -247,7 +247,7 @@ type ttParseState struct {
 }
 
 func newTTParseState() ttParseState {
-	return ttParseState{ //nolint:exhaustruct
+	return ttParseState{ //nolint:exhaustruct_v5
 		symtabOrOverlay: APRSTT_DEFAULT_SYMTAB,
 		symbolCode:      APRSTT_DEFAULT_SYMBOL,
 		dao:             [5]byte{'!', 'T', ' ', ' ', '!'},
@@ -284,7 +284,7 @@ type TTGateway struct {
  *----------------------------------------------------------------*/
 
 func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
-	var g = &TTGateway{debug: debug} //nolint:exhaustruct
+	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
 
 	g.config = p
 

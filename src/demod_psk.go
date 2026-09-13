@@ -131,7 +131,7 @@ var phase_to_gray_v27 = [8]int{1, 0, 2, 3, 7, 6, 4, 5}
 func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps int, profile rune, D *demodulator_state_s) {
 	var samples_per_sec = float64(_samples_per_sec)
 
-	*D = demodulator_state_s{} //nolint:exhaustruct
+	*D = demodulator_state_s{} //nolint:exhaustruct_v5
 
 	D.modem_type = modem_type
 	D.u.psk.v26_alt = v26_alt
