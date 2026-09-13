@@ -367,115 +367,132 @@ func (xs *XmitService) xmit_thread(channel int) {
 
 		// Does this extra loop offer any benefit?
 		for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
-			/*
-			 * Wait for the channel to be clear.
-			 * If there is something in the high priority queue, begin transmitting immediately.
-			 * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
-			 */
-			var ok = xs.wait_for_clear_channel(channel, xs.slottime[channel], xs.persist[channel], xs.fulldup[channel])
-
-			var prio = TQ_PRIO_1_LO
-
-			var pp = tq_remove(channel, TQ_PRIO_0_HI)
-			if pp != nil {
-				prio = TQ_PRIO_0_HI
-			} else {
-				pp = tq_remove(channel, TQ_PRIO_1_LO)
-			}
-
-			/* TODO KG
-			#if DEBUG
-				    text_color_set(DW_COLOR_DEBUG);
-				    dw_printf ("xmit_thread: tq_remove(channel=%d, prio=%d) returned %p\n", channel, prio, pp);
-			#endif
-			*/
-			// Shouldn't have nil here but be careful.
-
-			if pp != nil {
-				if ok {
-					/*
-					 * Channel is clear and we have lock on output device.
-					 *
-					 * If destination is "SPEECH" send info part to speech synthesizer.
-					 * If destination is "MORSE" send as morse code.
-					 * If destination is "DTMF" send as Touch Tones.
-					 */
-					switch frame_flavor(pp) {
-					case FLAVOR_SPEECH:
-						xs.xmit_speech(channel, pp)
-
-					case FLAVOR_MORSE:
-						var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
-
-						var wpm = MORSE_DEFAULT_WPM
-						if ssid > 0 {
-							wpm = ssid * 2
-						}
-
-						// This is a bit of a hack so we don't respond too quickly for APRStt.
-						// It will be sent in high priority queue while a beacon wouldn't.
-						// Add a little delay so user has time release PTT after sending #.
-						// This and default txdelay would give us a second.
-
-						if prio == TQ_PRIO_0_HI {
-							//text_color_set(DW_COLOR_DEBUG);
-							//dw_printf ("APRStt morse xmit delay hack...\n");
-							SLEEP_MS(700)
-						}
-
-						xs.xmit_morse(channel, pp, wpm)
-
-					case FLAVOR_DTMF:
-						var speed = ax25_get_ssid(pp, AX25_DESTINATION)
-						if speed == 0 {
-							speed = 5 // default half of maximum
-						}
-
-						if speed > 10 {
-							speed = 10
-						}
-
-						xs.xmit_dtmf(channel, pp, speed)
-
-					case FLAVOR_APRS_DIGI:
-						xs.xmit_ax25_frames(channel, prio, pp, 1) /* 1 means don't bundle */
-						// I don't know if this in some official specification
-						// somewhere, but it is generally agreed that APRS digipeaters
-						// should send only one frame at a time rather than
-						// bundling multiple frames into a single transmission.
-						// Discussion here:  http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2021-September/049034.html
-
-					default:
-						xs.xmit_ax25_frames(channel, prio, pp, 256)
-					}
-
-					// Corresponding lock is in wait_for_clear_channel.
-
-					xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
-				} else {
-					/*
-					 * Timeout waiting for clear channel.
-					 * Discard the packet.
-					 * Display with ERROR color rather than XMIT color.
-					 */
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
-
-					var stemp = AX25FormatAddrs(pp)
-
-					var pinfo = AX25GetInfo(pp)
-
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("[%d%c] ", channel, priorityToRune(prio))
-
-					dw_printf("%s", stemp) /* stations followed by : */
-					AX25SafePrint(pinfo, !ax25_is_aprs(pp))
-					dw_printf("\n")
-				} /* wait for clear channel error. */
-			} /* Have pp */
+			xs.xmit_next(channel)
 		} /* while queue not empty */
 	} /* while 1 */
 } /* end xmit_thread */
+
+// xmit_next waits for a clear channel and then sends the next packet from the
+// transmit queue, if one is still there.
+//
+// It is a function of its own, rather than the body of the loop in
+// xmit_thread, so that the audio output device lock taken by
+// wait_for_clear_channel can be released with defer: the release then happens
+// however we return, including on the paths where there turns out to be
+// nothing to send.  A defer in xmit_thread itself would not do, as that never
+// returns, so the lock would be held for the life of the process.
+func (xs *XmitService) xmit_next(channel int) {
+	/*
+	 * Wait for the channel to be clear.
+	 * If there is something in the high priority queue, begin transmitting immediately.
+	 * Otherwise, wait a random amount of time, in hopes of minimizing collisions.
+	 */
+	var ok = xs.wait_for_clear_channel(channel, xs.slottime[channel], xs.persist[channel], xs.fulldup[channel])
+
+	if ok {
+		// Corresponding lock is in wait_for_clear_channel.  Releasing it with
+		// defer, rather than at the end of the transmit path below, means it
+		// is released however we leave this function - notably when the
+		// packet we were about to send has disappeared from the queue.
+		defer xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
+	}
+
+	var prio = TQ_PRIO_1_LO
+
+	var pp = tq_remove(channel, TQ_PRIO_0_HI)
+	if pp != nil {
+		prio = TQ_PRIO_0_HI
+	} else {
+		pp = tq_remove(channel, TQ_PRIO_1_LO)
+	}
+
+	/* TODO KG
+	#if DEBUG
+		    text_color_set(DW_COLOR_DEBUG);
+		    dw_printf ("xmit_thread: tq_remove(channel=%d, prio=%d) returned %p\n", channel, prio, pp);
+	#endif
+	*/
+	// Shouldn't have nil here but be careful.
+
+	if pp != nil {
+		if ok {
+			/*
+			 * Channel is clear and we have lock on output device.
+			 *
+			 * If destination is "SPEECH" send info part to speech synthesizer.
+			 * If destination is "MORSE" send as morse code.
+			 * If destination is "DTMF" send as Touch Tones.
+			 */
+			switch frame_flavor(pp) {
+			case FLAVOR_SPEECH:
+				xs.xmit_speech(channel, pp)
+
+			case FLAVOR_MORSE:
+				var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
+
+				var wpm = MORSE_DEFAULT_WPM
+				if ssid > 0 {
+					wpm = ssid * 2
+				}
+
+				// This is a bit of a hack so we don't respond too quickly for APRStt.
+				// It will be sent in high priority queue while a beacon wouldn't.
+				// Add a little delay so user has time release PTT after sending #.
+				// This and default txdelay would give us a second.
+
+				if prio == TQ_PRIO_0_HI {
+					//text_color_set(DW_COLOR_DEBUG);
+					//dw_printf ("APRStt morse xmit delay hack...\n");
+					SLEEP_MS(700)
+				}
+
+				xs.xmit_morse(channel, pp, wpm)
+
+			case FLAVOR_DTMF:
+				var speed = ax25_get_ssid(pp, AX25_DESTINATION)
+				if speed == 0 {
+					speed = 5 // default half of maximum
+				}
+
+				if speed > 10 {
+					speed = 10
+				}
+
+				xs.xmit_dtmf(channel, pp, speed)
+
+			case FLAVOR_APRS_DIGI:
+				xs.xmit_ax25_frames(channel, prio, pp, 1) /* 1 means don't bundle */
+				// I don't know if this in some official specification
+				// somewhere, but it is generally agreed that APRS digipeaters
+				// should send only one frame at a time rather than
+				// bundling multiple frames into a single transmission.
+				// Discussion here:  http://lists.tapr.org/pipermail/aprssig_lists.tapr.org/2021-September/049034.html
+
+			default:
+				xs.xmit_ax25_frames(channel, prio, pp, 256)
+			}
+		} else {
+			/*
+			 * Timeout waiting for clear channel.
+			 * Discard the packet.
+			 * Display with ERROR color rather than XMIT color.
+			 */
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
+
+			var stemp = AX25FormatAddrs(pp)
+
+			var pinfo = AX25GetInfo(pp)
+
+			text_color_set(DW_COLOR_INFO)
+			dw_printf("[%d%c] ", channel, priorityToRune(prio))
+
+			dw_printf("%s", stemp) /* stations followed by : */
+			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
+			dw_printf("\n")
+		} /* wait for clear channel error. */
+	} /* Have pp */
+} /* end xmit_next */
 
 func priorityToRune(prio int) rune {
 	if prio == TQ_PRIO_0_HI {
