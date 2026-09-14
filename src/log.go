@@ -270,47 +270,47 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 		var scomment = A.g_comment
 
 		var slat = ""
-		if A.g_lat != G_UNKNOWN {
-			slat = fmt.Sprintf("%.6f", A.g_lat)
+		if lat, ok := A.g_lat.Get(); ok {
+			slat = fmt.Sprintf("%.6f", lat)
 		}
 
 		var slon = ""
-		if A.g_lon != G_UNKNOWN {
-			slon = fmt.Sprintf("%.6f", A.g_lon)
+		if lon, ok := A.g_lon.Get(); ok {
+			slon = fmt.Sprintf("%.6f", lon)
 		}
 
 		var sspd = ""
-		if A.g_speed_mph != G_UNKNOWN {
-			sspd = fmt.Sprintf("%.1f", DW_MPH_TO_KNOTS(float64(A.g_speed_mph)))
+		if speed_mph, ok := A.g_speed_mph.Get(); ok {
+			sspd = fmt.Sprintf("%.1f", DW_MPH_TO_KNOTS(speed_mph))
 		}
 
 		var scse = ""
-		if A.g_course != G_UNKNOWN {
-			scse = fmt.Sprintf("%.1f", A.g_course)
+		if course, ok := A.g_course.Get(); ok {
+			scse = fmt.Sprintf("%.1f", course)
 		}
 
 		var salt = ""
-		if A.g_altitude_ft != G_UNKNOWN {
-			salt = fmt.Sprintf("%.1f", DW_FEET_TO_METERS(float64(A.g_altitude_ft)))
+		if altitude_ft, ok := A.g_altitude_ft.Get(); ok {
+			salt = fmt.Sprintf("%.1f", DW_FEET_TO_METERS(altitude_ft))
 		}
 
 		var sfreq = ""
-		if A.g_freq != G_UNKNOWN {
-			sfreq = fmt.Sprintf("%.3f", A.g_freq)
+		if freq, ok := A.g_freq.Get(); ok {
+			sfreq = fmt.Sprintf("%.3f", freq)
 		}
 
 		var soffs = ""
-		if A.g_offset != G_UNKNOWN {
-			soffs = fmt.Sprintf("%+d", A.g_offset)
+		if offset, ok := A.g_offset.Get(); ok {
+			soffs = fmt.Sprintf("%+d", offset)
 		}
 
 		var stone = ""
-		if A.g_tone != G_UNKNOWN {
-			stone = fmt.Sprintf("%.1f", A.g_tone)
+		if tone, ok := A.g_tone.Get(); ok {
+			stone = fmt.Sprintf("%.1f", tone)
 		}
 
-		if A.g_dcs != G_UNKNOWN {
-			stone = fmt.Sprintf("D%03o", A.g_dcs)
+		if dcs, ok := A.g_dcs.Get(); ok {
+			stone = fmt.Sprintf("D%03o", dcs)
 		}
 
 		var w = csv.NewWriter(pl.logFp)

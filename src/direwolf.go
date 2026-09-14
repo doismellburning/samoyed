@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
 	goHamlib "github.com/xylo04/goHamlib"
@@ -854,6 +855,19 @@ x = Silence FX.25 information.`)
 
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
+// ais_object_course_speed rounds a decoded course and speed into the integer
+// degrees and knots encode_object takes, leaving an unknown one as the
+// G_UNKNOWN sentinel it understands.  Rounding the sentinel instead would give
+// a number that is not G_UNKNOWN, which encode_object folds back into range
+// and transmits as a course nobody reported.
+// Should encode_object take floating point here?
+func ais_object_course_speed(A *decode_aprs_t) (int, int) {
+	var course = orUnknown(maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course))
+	var speed = orUnknown(maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph))
+
+	return course, speed
+}
+
 func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
@@ -1116,14 +1130,17 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 		if strings.HasPrefix(string(pinfo), user_def_da) {
 			waypointSender.SendAIS(pinfo[3:])
 
-			if A_opt_ais_to_obj && A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
+			var lat, haveLat = A.g_lat.Get()
+			var lon, haveLon = A.g_lon.Get()
+
+			if A_opt_ais_to_obj && haveLat && haveLon {
+				var course, speed = ais_object_course_speed(A)
+
 				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
-					float64(A.g_lat), float64(A.g_lon), 0, // no ambiguity
+					lat, lon, 0, // no ambiguity
 					A.g_symbol_table, A.g_symbol_code,
 					0, 0, 0, "", // power, height, gain, direction.
-					// Unknown not handled properly.
-					// Should encode_object take floating point here?
-					int(A.g_course+0.5), int(DW_MPH_TO_KNOTS(float64(A.g_speed_mph))+0.5),
+					course, speed,
 					0, 0, 0, A.g_comment) // freq, tone, offset
 
 				// TODO Bodge
@@ -1137,16 +1154,18 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 		// Convert to NMEA waypoint sentence if we have a location.
 
-		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-			var nameIn = A.g_src
-			if len(A.g_name) > 0 {
-				nameIn = A.g_name
-			}
+		if lat, haveLat := A.g_lat.Get(); haveLat {
+			if lon, haveLon := A.g_lon.Get(); haveLon {
+				var nameIn = A.g_src
+				if len(A.g_name) > 0 {
+					nameIn = A.g_name
+				}
 
-			waypointSender.SendSentence(nameIn,
-				float64(A.g_lat), float64(A.g_lon), rune(A.g_symbol_table), A.g_symbol_code,
-				DW_FEET_TO_METERS(float64(A.g_altitude_ft)), float64(A.g_course), DW_MPH_TO_KNOTS(float64(A.g_speed_mph)),
-				A.g_comment)
+				waypointSender.SendSentence(nameIn,
+					lat, lon, rune(A.g_symbol_table), A.g_symbol_code,
+					orUnknown(maybe.Fmap(DW_FEET_TO_METERS, A.g_altitude_ft)), orUnknown(A.g_course), orUnknown(maybe.Fmap(DW_MPH_TO_KNOTS, A.g_speed_mph)),
+					A.g_comment)
+			}
 		}
 	}
 

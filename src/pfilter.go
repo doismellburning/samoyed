@@ -847,7 +847,10 @@ func filt_t(pf *pfstate_t) (int, error) {
  *------------------------------------------------------------------------------*/
 
 func filt_r(pf *pfstate_t) (int, string, error) {
-	if pf.decoded.g_lat == G_UNKNOWN || pf.decoded.g_lon == G_UNKNOWN {
+	var dlat_decoded, haveLat = pf.decoded.g_lat.Get()
+	var dlon_decoded, haveLon = pf.decoded.g_lon.Get()
+
+	if !haveLat || !haveLon {
 		return 0, "", nil
 	}
 
@@ -888,7 +891,7 @@ func filt_r(pf *pfstate_t) (int, string, error) {
 		return -1, "", newFilterError(pf, "Too many parts for Range filter.")
 	}
 
-	var km = ll_distance_km(dlat, dlon, float64(pf.decoded.g_lat), float64(pf.decoded.g_lon))
+	var km = ll_distance_km(dlat, dlon, dlat_decoded, dlon_decoded)
 	var sdist = fmt.Sprintf("%.2f km", km)
 
 	if km <= ddist {

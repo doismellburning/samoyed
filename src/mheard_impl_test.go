@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -138,13 +139,13 @@ var saveRFAlevel = ALevel{}                                       //nolint:exhau
 var saveRFNoPos = &decode_aprs_t{g_packet_type: packet_type_none} //nolint:exhaustruct_v5
 var saveRFWithPos = &decode_aprs_t{                               //nolint:exhaustruct_v5
 	g_packet_type: packet_type_position,
-	g_lat:         42.36,
-	g_lon:         -71.06,
+	g_lat:         maybe.Just(42.36),
+	g_lon:         maybe.Just(-71.06),
 }
 var saveRFWithPosUnknown = &decode_aprs_t{ //nolint:exhaustruct_v5
 	g_packet_type: packet_type_position,
-	g_lat:         G_UNKNOWN,
-	g_lon:         G_UNKNOWN,
+	g_lat:         maybe.Nothing[float64](),
+	g_lon:         maybe.Nothing[float64](),
 }
 
 // --- SaveRF ---
