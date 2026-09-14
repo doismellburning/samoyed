@@ -327,12 +327,27 @@ func Test_config_init_adevice(t *testing.T) {
 		var cfg, _ = configFromString(t, "ADEVICE hw:0,0\n")
 		assert.Equal(t, "hw:0,0", cfg.adev[0].adevice_in)
 		assert.Equal(t, "hw:0,0", cfg.adev[0].adevice_out)
+		// One name is a source, not a choice of transmit device.
+		assert.False(t, cfg.adev[0].adevice_out_specified)
 	})
 
 	t.Run("two args set in and out independently", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "ADEVICE hw:0,0 hw:1,0\n")
 		assert.Equal(t, "hw:0,0", cfg.adev[0].adevice_in)
 		assert.Equal(t, "hw:1,0", cfg.adev[0].adevice_out)
+		assert.True(t, cfg.adev[0].adevice_out_specified)
+	})
+
+	t.Run("PAODEVICE names a transmit device", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "PAODEVICE Some Sound Card\n")
+		assert.Equal(t, "Some Sound Card", cfg.adev[0].adevice_out)
+		assert.True(t, cfg.adev[0].adevice_out_specified)
+	})
+
+	t.Run("no ADEVICE at all leaves the default, which is no choice either", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "MYCALL Q1TEST\n")
+		assert.Equal(t, DEFAULT_ADEVICE, cfg.adev[0].adevice_out)
+		assert.False(t, cfg.adev[0].adevice_out_specified)
 	})
 
 	t.Run("ADEVICE1 numeric suffix sets device 1", func(t *testing.T) {

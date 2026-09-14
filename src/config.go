@@ -949,6 +949,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	for adevice := range MAX_ADEVS {
 		p_audio_config.adev[adevice].adevice_in = DEFAULT_ADEVICE
 		p_audio_config.adev[adevice].adevice_out = DEFAULT_ADEVICE
+		p_audio_config.adev[adevice].adevice_out_specified = false
 
 		p_audio_config.adev[adevice].defined = 0
 		p_audio_config.adev[adevice].copy_from = -1
@@ -1418,6 +1419,7 @@ func handleADEVICE(ps *parseState) bool {
 	if t != "" {
 		// Different audio devices for receive and transmit.
 		ps.audio.adev[ps.adevice].adevice_out = t
+		ps.audio.adev[ps.adevice].adevice_out_specified = true
 	}
 
 	return false
@@ -1487,6 +1489,7 @@ func handlePAODEVICE(ps *parseState) bool {
 	ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)] = MEDIUM_RADIO
 
 	ps.audio.adev[ps.adevice].adevice_out = t
+	ps.audio.adev[ps.adevice].adevice_out_specified = true
 
 	return false
 }

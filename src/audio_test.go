@@ -294,6 +294,21 @@ func Test_anyDeviceRequiresPortAudio(t *testing.T) {
 			pa:   makeAudioConfig("default", "default"),
 			want: true,
 		},
+		{
+			name: "stdin in and out, as a single-name ADEVICE gives",
+			pa:   makeAudioConfig("stdin", "stdin"),
+			want: false,
+		},
+		{
+			name: "dash in and out",
+			pa:   makeAudioConfig("-", "-"),
+			want: false,
+		},
+		{
+			name: "udp in and out, as a single-name ADEVICE gives",
+			pa:   makeAudioConfig("udp:7355", "udp:7355"),
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -367,4 +382,198 @@ func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("audioUDPSilenceKeepalive did not stop after stop was closed")
 	}
+}
+
+// noSuchAudioDevice is a device name no soundcard will match, for testing what
+// happens when an output device turns out not to be there.
+const noSuchAudioDevice = "Q1TEST no such audio device"
+
+// --- audioOutType ---
+
+func Test_audioOutType(t *testing.T) {
+	tests := []struct {
+		name      string
+		inName    string
+		ouName    string
+		specified bool
+		want      audio_out_type_e
+	}{
+		{"soundcard", "plughw:1,0", "plughw:1,0", false, AUDIO_OUT_TYPE_SOUNDCARD},
+		{"separate soundcards", "plughw:1,0", "plughw:2,0", true, AUDIO_OUT_TYPE_SOUNDCARD},
+		{"udp destination", "plughw:1,0", "udp:127.0.0.1:7355", true, AUDIO_OUT_TYPE_UDP},
+		{"udp in, udp destination", "udp:7355", "udp:127.0.0.1:7356", true, AUDIO_OUT_TYPE_UDP},
+		{"stdin both ways", "stdin", "stdin", false, AUDIO_OUT_TYPE_NONE},
+		{"dash both ways", "-", "-", false, AUDIO_OUT_TYPE_NONE},
+		{"stdin out only", "plughw:1,0", "stdin", true, AUDIO_OUT_TYPE_NONE},
+		{"udp listen port copied to the output side", "udp:7355", "udp:7355", false, AUDIO_OUT_TYPE_NONE},
+		{"udp listen port, mixed case", "UDP:7355", "udp:7355", false, AUDIO_OUT_TYPE_NONE},
+		{"same udp name on both sides, but named for transmit", "udp:7355", "udp:7355", true, AUDIO_OUT_TYPE_UDP},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var pa = makeAudioConfig(tt.inName, tt.ouName)
+			pa.adev[0].adevice_out_specified = tt.specified
+
+			assert.Equal(t, tt.want, audioOutType(&pa.adev[0]))
+		})
+	}
+}
+
+// --- audio_open with no output device ---
+
+// A receive-only configuration must open on a machine with no audio output
+// device at all, rather than refusing to start.  "ADEVICE stdin" - and the
+// "-" command line argument - is exactly that: it leaves "stdin" as the
+// output device name too, which is nothing we can transmit through.
+func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
+	var prevAdev = adev
+	var prevConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		audio_close()
+
+		adev = prevAdev
+		save_audio_config_p = prevConfig
+	})
+
+	var pa = makeAudioConfig("stdin", "stdin")
+	var refsBefore = portaudioRefCount
+
+	require.Equal(t, 0, audio_open(pa))
+
+	assert.Nil(t, adev[0].outputStream)
+	assert.Nil(t, adev[0].udp_out_sock)
+
+	// The point of issue #501: nothing here needs a soundcard, so PortAudio
+	// is never initialized.
+	assert.Equal(t, refsBefore, portaudioRefCount)
+
+	// Whatever the transmit path produces on the open device is discarded,
+	// not written anywhere, and does not upset the buffer bookkeeping.
+	require.Equal(t, 0, audio_put_real(0, 42))
+	assert.Equal(t, -1, audio_flush_real(0))
+	assert.Equal(t, 0, adev[0].outbufLen)
+
+	// Closing must not release a PortAudio reference this open never took.
+	audio_close()
+	assert.Equal(t, refsBefore, portaudioRefCount)
+}
+
+// An output device we only defaulted to, and which turns out not to exist,
+// leaves the station receive-only rather than stopping it.
+func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
+	var prevAdev = adev
+	var prevConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		audio_close()
+
+		adev = prevAdev
+		save_audio_config_p = prevConfig
+	})
+
+	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
+
+	require.Equal(t, 0, audio_open(pa))
+
+	assert.Nil(t, adev[0].outputStream)
+}
+
+// An output device named for transmit in the configuration is asked for
+// specifically, so not finding it is a configuration error, not a reason to
+// quietly transmit nothing.
+func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
+	var prevAdev = adev
+	var prevConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		audio_close()
+
+		adev = prevAdev
+		save_audio_config_p = prevConfig
+	})
+
+	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
+	pa.adev[0].adevice_out_specified = true
+
+	assert.Equal(t, -1, audio_open(pa))
+}
+
+// Naming standard input, or a UDP port to listen on, as the transmit device
+// is a configuration error too - neither can transmit.
+func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
+	var prevAdev = adev
+	var prevConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		audio_close()
+
+		adev = prevAdev
+		save_audio_config_p = prevConfig
+	})
+
+	var pa = makeAudioConfig("stdin", "stdin")
+	pa.adev[0].adevice_out_specified = true
+
+	assert.Equal(t, -1, audio_open(pa))
+}
+
+// --- applyCommandLineAudioSource ---
+
+func Test_applyCommandLineAudioSource(t *testing.T) {
+	tests := []struct {
+		name      string
+		ouName    string
+		specified bool
+		wantOut   string
+	}{
+		{"default output follows the source", DEFAULT_ADEVICE, false, "stdin"},
+		{"default output in any case follows the source", "DEFAULT", false, "stdin"},
+		{"a named transmit device is left alone", "plughw:2,0", true, "plughw:2,0"},
+		{"a single-name ADEVICE keeps its soundcard for transmit", "plughw:1,0", false, "plughw:1,0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var pa = makeAudioConfig("plughw:1,0", tt.ouName)
+			pa.adev[0].adevice_out_specified = tt.specified
+
+			applyCommandLineAudioSource(&pa.adev[0], "stdin")
+
+			assert.Equal(t, "stdin", pa.adev[0].adevice_in)
+			assert.Equal(t, tt.wantOut, pa.adev[0].adevice_out)
+		})
+	}
+}
+
+// --- audio_transmit_available ---
+
+func Test_audio_transmit_available(t *testing.T) {
+	t.Run("device that was never opened", func(t *testing.T) {
+		var prev = adev[0]
+
+		t.Cleanup(func() { adev[0] = prev })
+
+		adev[0] = nil
+
+		assert.False(t, audio_transmit_available(0))
+	})
+
+	t.Run("device open with no output", func(t *testing.T) {
+		setupAdev0(t)
+		assert.False(t, audio_transmit_available(0))
+	})
+
+	t.Run("device with UDP output", func(t *testing.T) {
+		var dev = setupAdev0(t)
+		dev.udp_out_sock = &net.UDPConn{}
+
+		assert.True(t, audio_transmit_available(0))
+	})
+
+	t.Run("device number out of range", func(t *testing.T) {
+		assert.False(t, audio_transmit_available(-1))
+		assert.False(t, audio_transmit_available(MAX_ADEVS))
+	})
 }
