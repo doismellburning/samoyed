@@ -55,6 +55,15 @@ linters:
         - underef  # Too many false positives on cgo code
     gocyclo:
       min-complexity: 60  # I sure wish this could be lower
+    ireturn:
+      allow:
+        # The defaults, plus generics: an accessor on a generic type (e.g.
+        # maybe.Maybe[T].Get) can only return its type parameter
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
     gosec:
       excludes:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...

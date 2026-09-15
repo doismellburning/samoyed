@@ -17,7 +17,7 @@ func SLEEP_SEC(s int) {
 }
 
 // IfThenElse exists because sometimes it's really convenient to have C's ternary ?:.
-func IfThenElse[T any](x bool, a T, b T) T { //nolint:ireturn
+func IfThenElse[T any](x bool, a T, b T) T {
 	if x {
 		return a
 	} else {

@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 type BeaconService struct {
@@ -739,20 +741,18 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			/* the signals. */
 
 			if bs.trackerDebugLevel >= 3 {
+				/* Frequency, offset, tone and DCS are unknown here, which is */
+				/* what the zero value of each of those fields already means. */
 				var A decode_aprs_t
-				A.g_freq = G_UNKNOWN
-				A.g_offset = G_UNKNOWN
-				A.g_tone = G_UNKNOWN
-				A.g_dcs = G_UNKNOWN
 
 				A.g_src = mycall
 				A.g_symbol_table = bp.symtab
 				A.g_symbol_code = bp.symbol
-				A.g_lat = float64(gpsinfo.dlat)
-				A.g_lon = float64(gpsinfo.dlon)
-				A.g_speed_mph = DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))
-				A.g_course = float64(coarse)
-				A.g_altitude_ft = DW_METERS_TO_FEET(float64(gpsinfo.altitude))
+				A.g_lat = maybe.Just(float64(gpsinfo.dlat))
+				A.g_lon = maybe.Just(float64(gpsinfo.dlon))
+				A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(float64(gpsinfo.speed_knots)))
+				A.g_course = unlessUnknown(float64(coarse))
+				A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, unlessUnknown(float64(gpsinfo.altitude)))
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ALevel

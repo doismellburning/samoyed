@@ -259,9 +259,12 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 	// by the object location.  Solution: Save location only if position report.
 
 	if A.g_packet_type == packet_type_position {
-		if A.g_lat != G_UNKNOWN && A.g_lon != G_UNKNOWN {
-			mptr.dlat = A.g_lat
-			mptr.dlon = A.g_lon
+		var lat, haveLat = A.g_lat.Get()
+		var lon, haveLon = A.g_lon.Get()
+
+		if haveLat && haveLon {
+			mptr.dlat = lat
+			mptr.dlon = lon
 		}
 	}
 

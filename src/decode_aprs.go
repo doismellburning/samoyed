@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 type packet_type_e int
@@ -95,9 +97,9 @@ type decode_aprs_t struct {
 
 	g_aprstt_loc string /* APRStt location from !DAO! */
 
-	g_lat float64
-	g_lon float64 /* Location, degrees.  Negative for South or West. */
-	/* Set to G_UNKNOWN if missing or error. */
+	g_lat maybe.Maybe[float64]
+	g_lon maybe.Maybe[float64] /* Location, degrees.  Negative for South or West. */
+	/* Nothing if missing or error. */
 
 	g_maidenhead string /* 4 or 6 (or 8?) character maidenhead locator. */
 
@@ -118,24 +120,24 @@ type decode_aprs_t struct {
 	/* Addendum 1.1 has new format {mm} or {mm}aa with only two */
 	/* characters for message number and an ack riding piggyback. */
 
-	g_speed_mph float64 /* Speed in MPH.  */
+	g_speed_mph maybe.Maybe[float64] /* Speed in MPH.  */
 	/* The APRS transmission uses knots so watch out for */
 	/* conversions when sending and receiving APRS packets. */
 
-	g_course float64 /* 0 = North, 90 = East, etc. */
+	g_course maybe.Maybe[float64] /* 0 = North, 90 = East, etc. */
 
-	g_power int /* Transmitter power in watts. */
+	g_power maybe.Maybe[int] /* Transmitter power in watts. */
 
-	g_height int /* Antenna height above average terrain, feet. */
+	g_height maybe.Maybe[int] /* Antenna height above average terrain, feet. */
 	// TODO:  rename to g_height_ft
 
-	g_gain int /* Antenna gain in dBi. */
+	g_gain maybe.Maybe[int] /* Antenna gain in dBi. */
 
 	g_directivity string /* Direction of max signal strength */
 
-	g_range float64 /* Precomputed radio range in miles. */
+	g_range maybe.Maybe[float64] /* Precomputed radio range in miles. */
 
-	g_altitude_ft float64 /* Feet above median sea level.  */
+	g_altitude_ft maybe.Maybe[float64] /* Feet above median sea level.  */
 	/* I used feet here because the APRS specification */
 	/* has units of feet for altitude.  Meters would be */
 	/* more natural to the other 96% of the world. */
@@ -144,13 +146,13 @@ type decode_aprs_t struct {
 
 	g_mic_e_status string /* MIC-E message. */
 
-	g_freq float64 /* Frequency, MHz */
+	g_freq maybe.Maybe[float64] /* Frequency, MHz */
 
-	g_tone float64 /* CTCSS tone, Hz, one fractional digit */
+	g_tone maybe.Maybe[float64] /* CTCSS tone, Hz, one fractional digit */
 
-	g_dcs int /* Digital coded squelch, print as 3 octal digits. */
+	g_dcs maybe.Maybe[int] /* Digital coded squelch, print as 3 octal digits. */
 
-	g_offset int /* Transmit offset, kHz */
+	g_offset maybe.Maybe[int] /* Transmit offset, kHz */
 
 	g_query_type string /* General Query: APRS, IGATE, WX, ... */
 	/* Addressee is NOT set. */
@@ -159,9 +161,9 @@ type decode_aprs_t struct {
 	/* APRSD, APRST, PING?, ... */
 	/* Addressee is set. */
 
-	g_footprint_lat    float64 /* A general query may contain a foot print. */
-	g_footprint_lon    float64 /* Set all to G_UNKNOWN if not used. */
-	g_footprint_radius float64 /* Radius in miles. */
+	g_footprint_lat    maybe.Maybe[float64] /* A general query may contain a foot print. */
+	g_footprint_lon    maybe.Maybe[float64] /* All Nothing if not used. */
+	g_footprint_radius maybe.Maybe[float64] /* Radius in miles. */
 
 	g_query_callsign string //nolint:unused
 	/* Directed query may contain callsign.  */
@@ -173,6 +175,26 @@ type decode_aprs_t struct {
 
 	g_comment string /* Comment. */
 
+}
+
+/*
+ * Bridges to and from the parts of the codebase that still use the G_UNKNOWN
+ * sentinel (gpsinfo, encode_aprs, ...).  They should disappear as those are
+ * converted in their turn.
+ */
+
+// unlessUnknown is Just the value, unless it is the G_UNKNOWN sentinel.
+func unlessUnknown[T ~float64 | ~int](value T) maybe.Maybe[T] {
+	if value == G_UNKNOWN {
+		return maybe.Nothing[T]()
+	}
+
+	return maybe.Just(value)
+}
+
+// orUnknown is the value, or the G_UNKNOWN sentinel for Nothing.
+func orUnknown[T ~float64 | ~int](m maybe.Maybe[T]) T {
+	return maybe.FromMaybe(T(G_UNKNOWN), m)
 }
 
 /*------------------------------------------------------------------
@@ -215,26 +237,8 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	A.g_symbol_table = '/' /* Default to primary table. */
 	A.g_symbol_code = ' '  /* What should we have for default symbol? */
 
-	A.g_lat = G_UNKNOWN
-	A.g_lon = G_UNKNOWN
-
-	A.g_speed_mph = G_UNKNOWN
-	A.g_course = G_UNKNOWN
-
-	A.g_power = G_UNKNOWN
-	A.g_height = G_UNKNOWN
-	A.g_gain = G_UNKNOWN
-
-	A.g_range = G_UNKNOWN
-	A.g_altitude_ft = G_UNKNOWN
-	A.g_freq = G_UNKNOWN
-	A.g_tone = G_UNKNOWN
-	A.g_dcs = G_UNKNOWN
-	A.g_offset = G_UNKNOWN
-
-	A.g_footprint_lat = G_UNKNOWN
-	A.g_footprint_lon = G_UNKNOWN
-	A.g_footprint_radius = G_UNKNOWN
+	/* Everything optional - position, speed, course, power, ... - starts out */
+	/* as Nothing, which is the zero value, so there is nothing to clear here. */
 
 	/*
 	 * Extract source and destination including the SSID.
@@ -570,16 +574,17 @@ func decode_aprs_print(A *decode_aprs_t) {
 
 	//dw_printf ("DEBUG decode_aprs_print stemp5=%s\n", stemp);
 
-	if A.g_power > 0 {
+	if power, ok := A.g_power.Get(); ok && power > 0 {
 		/* Protocol spec doesn't mention whether this is dBd or dBi.  */
 		/* Clarified later. */
 		/* http://eng.usna.navy.mil/~bruninga/aprs/aprs11.html */
 		/* "The Antenna Gain in the PHG format on page 28 is in dBi." */
-		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", A.g_power, A.g_height, DW_FEET_TO_METERS(float64(A.g_height)), A.g_gain, A.g_directivity)
+		var height = maybe.FromMaybe(0, A.g_height)
+		stemp += fmt.Sprintf(", %d W height(HAAT)=%dft=%.0fm %ddBi %s", power, height, DW_FEET_TO_METERS(float64(height)), maybe.FromMaybe(0, A.g_gain), A.g_directivity)
 	}
 
-	if A.g_range > 0 {
-		stemp += fmt.Sprintf(", range=%.1f", A.g_range)
+	if _range, ok := A.g_range.Get(); ok && _range > 0 {
+		stemp += fmt.Sprintf(", range=%.1f", _range)
 	}
 
 	if strings.HasPrefix(stemp, "ERROR") {
@@ -608,11 +613,11 @@ func decode_aprs_print(A *decode_aprs_t) {
 	 */
 
 	if len(A.g_maidenhead) > 0 {
-		if A.g_lat == G_UNKNOWN && A.g_lon == G_UNKNOWN {
+		if A.g_lat.IsNothing() && A.g_lon.IsNothing() {
 			var lat, lon, err = ll_from_grid_square(A.g_maidenhead)
 			if err == nil {
-				A.g_lat = lat
-				A.g_lon = lon
+				A.g_lat = maybe.Just(lat)
+				A.g_lon = maybe.Just(lon)
 			}
 		}
 
@@ -621,19 +626,19 @@ func decode_aprs_print(A *decode_aprs_t) {
 
 	stemp = ""
 
-	if A.g_lat != G_UNKNOWN || A.g_lon != G_UNKNOWN {
+	if A.g_lat.IsJust() || A.g_lon.IsJust() {
 		var s_lat, s_lon string
 		// Have location but it is possible one part is invalid.
 
-		if A.g_lat != G_UNKNOWN {
+		if lat, ok := A.g_lat.Get(); ok {
 			var absll float64
 			var news rune
 
-			if A.g_lat >= 0 {
-				absll = A.g_lat
+			if lat >= 0 {
+				absll = lat
 				news = 'N'
 			} else {
-				absll = -A.g_lat
+				absll = -lat
 				news = 'S'
 			}
 			var deg = int(absll)
@@ -643,15 +648,15 @@ func decode_aprs_print(A *decode_aprs_t) {
 			s_lat = "Invalid Latitude"
 		}
 
-		if A.g_lon != G_UNKNOWN {
+		if lon, ok := A.g_lon.Get(); ok {
 			var absll float64
 			var news rune
 
-			if A.g_lon >= 0 {
-				absll = A.g_lon
+			if lon >= 0 {
+				absll = lon
 				news = 'E'
 			} else {
-				absll = -A.g_lon
+				absll = -lon
 				news = 'W'
 			}
 			var deg = int(absll)
@@ -672,52 +677,52 @@ func decode_aprs_print(A *decode_aprs_t) {
 		stemp += A.g_aprstt_loc
 	}
 
-	if A.g_speed_mph != G_UNKNOWN {
+	if speed_mph, ok := A.g_speed_mph.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", DW_MILES_TO_KM(float64(A.g_speed_mph)), A.g_speed_mph)
+		stemp += fmt.Sprintf("%.0f km/h (%.0f MPH)", DW_MILES_TO_KM(speed_mph), speed_mph)
 	}
 
-	if A.g_course != G_UNKNOWN {
+	if course, ok := A.g_course.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("course %.0f", A.g_course)
+		stemp += fmt.Sprintf("course %.0f", course)
 	}
 
-	if A.g_altitude_ft != G_UNKNOWN {
+	if altitude_ft, ok := A.g_altitude_ft.Get(); ok {
 		if len(stemp) > 0 {
 			stemp += ", "
 		}
 
-		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", DW_FEET_TO_METERS(float64(A.g_altitude_ft)), A.g_altitude_ft)
+		stemp += fmt.Sprintf("alt %.0f m (%.0f ft)", DW_FEET_TO_METERS(altitude_ft), altitude_ft)
 	}
 
-	if A.g_freq != G_UNKNOWN {
-		stemp += fmt.Sprintf(", %.3f MHz", A.g_freq)
+	if freq, ok := A.g_freq.Get(); ok {
+		stemp += fmt.Sprintf(", %.3f MHz", freq)
 	}
 
-	if A.g_offset != G_UNKNOWN {
-		if A.g_offset%1000 == 0 {
-			stemp += fmt.Sprintf(", %+dM", A.g_offset/1000)
+	if offset, ok := A.g_offset.Get(); ok {
+		if offset%1000 == 0 {
+			stemp += fmt.Sprintf(", %+dM", offset/1000)
 		} else {
-			stemp += fmt.Sprintf(", %+dk", A.g_offset)
+			stemp += fmt.Sprintf(", %+dk", offset)
 		}
 	}
 
-	if A.g_tone != G_UNKNOWN {
-		if A.g_tone == 0 {
+	if tone, ok := A.g_tone.Get(); ok {
+		if tone == 0 {
 			stemp += ", no PL"
 		} else {
-			stemp += fmt.Sprintf(", PL %.1f", A.g_tone)
+			stemp += fmt.Sprintf(", PL %.1f", tone)
 		}
 	}
 
-	if A.g_dcs != G_UNKNOWN {
-		stemp += fmt.Sprintf(", DCS %03o", A.g_dcs)
+	if dcs, ok := A.g_dcs.Get(); ok {
+		stemp += fmt.Sprintf(", DCS %03o", dcs)
 	}
 
 	if len(stemp) > 0 {
@@ -1029,18 +1034,18 @@ func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
 		var result = dwgpsnmea_gprmc(string(info), A.g_quiet)
 
-		A.g_lat = result.Lat
-		A.g_lon = result.Lon
-		A.g_course = result.Course
-		A.g_speed_mph = DW_KNOTS_TO_MPH(result.Knots)
+		A.g_lat = unlessUnknown(result.Lat)
+		A.g_lon = unlessUnknown(result.Lon)
+		A.g_course = unlessUnknown(result.Course)
+		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(result.Knots))
 		A.g_data_type_desc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
 		var result = dwgpsnmea_gpgga(string(info), A.g_quiet)
 
-		A.g_lat = result.Lat
-		A.g_lon = result.Lon
-		A.g_altitude_ft = DW_METERS_TO_FEET(result.Alt)
+		A.g_lat = unlessUnknown(result.Lat)
+		A.g_lon = unlessUnknown(result.Lon)
+		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, unlessUnknown(result.Alt))
 		A.g_data_type_desc = "Raw GPS data"
 	}
 
@@ -1318,7 +1323,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	var std_msg = 0
 	var cust_msg = 0
-	A.g_lat = float64(mic_e_digit(A, dest[0], 4, &std_msg, &cust_msg)*10+
+	var lat = float64(mic_e_digit(A, dest[0], 4, &std_msg, &cust_msg)*10+
 		mic_e_digit(A, dest[1], 2, &std_msg, &cust_msg)) +
 		float64(mic_e_digit(A, dest[2], 1, &std_msg, &cust_msg)*1000+
 			mic_e_digit(A, dest[3], 0, &std_msg, &cust_msg)*100+
@@ -1329,7 +1334,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	if (dest[3] >= '0' && dest[3] <= '9') || dest[3] == 'L' {
 		/* South */
-		A.g_lat = (-A.g_lat)
+		lat = (-lat)
 	} else if dest[3] >= 'P' && dest[3] <= 'Z' {
 		/* North */
 	} else {
@@ -1338,6 +1343,8 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 			dw_printf("Invalid MIC-E N/S encoding in 4th character of destination.\n")
 		}
 	}
+
+	A.g_lat = maybe.Just(lat)
 
 	/* Longitude is mostly packed into 3 bytes of message but */
 	/* has a couple bits of information in the destination. */
@@ -1364,16 +1371,17 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	var ch = p.Lon[0]
 
+	var lon maybe.Maybe[float64]
+
 	if offset && ch >= 118 && ch <= 127 {
-		A.g_lon = float64(ch - 118) /* 0 - 9 degrees */
+		lon = maybe.Just(float64(ch - 118)) /* 0 - 9 degrees */
 	} else if !offset && ch >= 38 && ch <= 127 {
-		A.g_lon = float64(ch-38) + 10 /* 10 - 99 degrees */
+		lon = maybe.Just(float64(ch-38) + 10) /* 10 - 99 degrees */
 	} else if offset && ch >= 108 && ch <= 117 {
-		A.g_lon = float64(ch-108) + 100 /* 100 - 109 degrees */
+		lon = maybe.Just(float64(ch-108) + 100) /* 100 - 109 degrees */
 	} else if offset && ch >= 38 && ch <= 107 {
-		A.g_lon = float64(ch-38) + 110 /* 110 - 179 degrees */
+		lon = maybe.Just(float64(ch-38) + 110) /* 110 - 179 degrees */
 	} else {
-		A.g_lon = G_UNKNOWN
 		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid character 0x%02x for MIC-E Longitude Degrees.\n", ch)
@@ -1397,15 +1405,15 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	 * or anything else to corrupt the message.
 	 */
 
-	if A.g_lon != G_UNKNOWN {
+	if degrees, ok := lon.Get(); ok {
 		ch = p.Lon[1]
 
 		if ch >= 88 && ch <= 97 {
-			A.g_lon += float64(ch-88) / 60.0 /* 0 - 9 minutes*/
+			lon = maybe.Just(degrees + float64(ch-88)/60.0) /* 0 - 9 minutes*/
 		} else if ch >= 38 && ch <= 87 {
-			A.g_lon += float64((ch-38)+10) / 60.0 /* 10 - 59 minutes */
+			lon = maybe.Just(degrees + float64((ch-38)+10)/60.0) /* 10 - 59 minutes */
 		} else {
-			A.g_lon = G_UNKNOWN
+			lon = maybe.Nothing[float64]()
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Invalid character 0x%02x for MIC-E Longitude Minutes.\n", ch)
@@ -1416,13 +1424,13 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		/* There are 100 possible values, from 0 to 99. */
 		/* Note that the range includes 4 unprintable control characters and DEL. */
 
-		if A.g_lon != G_UNKNOWN {
+		if minutes, ok := lon.Get(); ok {
 			ch = p.Lon[2]
 
 			if ch >= 28 && ch <= 127 {
-				A.g_lon += float64((ch-28)+0) / 6000.0 /* 0 - 99 hundredths of minutes*/
+				lon = maybe.Just(minutes + float64((ch-28)+0)/6000.0) /* 0 - 99 hundredths of minutes*/
 			} else {
-				A.g_lon = G_UNKNOWN
+				lon = maybe.Nothing[float64]()
 				if !A.g_quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Invalid character 0x%02x for MIC-E Longitude hundredths of Minutes.\n", ch)
@@ -1446,15 +1454,15 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		/* East */
 	} else if dest[5] >= 'P' && dest[5] <= 'Z' {
 		/* West */
-		if A.g_lon != G_UNKNOWN {
-			A.g_lon = (-A.g_lon)
-		}
+		lon = maybe.Fmap(func(degrees float64) float64 { return -degrees }, lon)
 	} else {
 		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid MIC-E E/W encoding in 6th character of destination.\n")
 		}
 	}
+
+	A.g_lon = lon
 
 	/* Symbol table and codes like everyone else. */
 
@@ -1492,7 +1500,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		n -= 800
 	}
 
-	A.g_speed_mph = DW_KNOTS_TO_MPH(float64(n))
+	A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
 
 	n = int((p.SpeedCourse[1]-28)%10)*100 + int(p.SpeedCourse[2]-28)
 	if n >= 400 {
@@ -1504,11 +1512,11 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	switch n {
 	case 0:
-		A.g_course = G_UNKNOWN
+		A.g_course = maybe.Nothing[float64]()
 	case 360:
-		A.g_course = 0
+		A.g_course = maybe.Just(0.0)
 	default:
-		A.g_course = float64(n)
+		A.g_course = maybe.Just(float64(n))
 	}
 
 	// The rest is a comment which can have other information cryptically embedded.
@@ -1551,7 +1559,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		isdigit91(trimmed[1]) &&
 		isdigit91(trimmed[2]) &&
 		trimmed[3] == '}' {
-		A.g_altitude_ft = DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000)
+		A.g_altitude_ft = maybe.Just(DW_METERS_TO_FEET(float64(float64(trimmed[0])-33)*91*91 + (float64(trimmed[1])-33)*91 + (float64(trimmed[2]) - 33) - 10000))
 
 		process_comment(A, []byte(trimmed)[4:])
 
@@ -2417,9 +2425,9 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("DEBUG: General Query footprint = %.6f %.6f %.2f\n", lat, lon, radius)
 
-		A.g_footprint_lat = lat
-		A.g_footprint_lon = lon
-		A.g_footprint_radius = radius
+		A.g_footprint_lat = maybe.Just(lat)
+		A.g_footprint_lon = maybe.Just(lon)
+		A.g_footprint_radius = maybe.Just(radius)
 	} else {
 		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -2561,11 +2569,11 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 
 		A.g_data_type_desc = aisData.Description
 		A.g_name = aisData.MMSI
-		A.g_lat = aisData.Lat
-		A.g_lon = aisData.Lon
-		A.g_speed_mph = DW_KNOTS_TO_MPH(aisData.Knots)
-		A.g_course = aisData.Course
-		A.g_altitude_ft = DW_METERS_TO_FEET(aisData.AltM)
+		A.g_lat = unlessUnknown(aisData.Lat)
+		A.g_lon = unlessUnknown(aisData.Lon)
+		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(aisData.Knots))
+		A.g_course = unlessUnknown(aisData.Course)
+		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, unlessUnknown(aisData.AltM))
 		A.g_symbol_table = aisData.Symtab
 		A.g_symbol_code = aisData.Symbol
 		A.g_comment = aisData.Comment
@@ -2746,17 +2754,19 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 			// Fine point:  Officially, should be values of 001-360.
 			// "000" or "..." or "   " means unknown.
 			// In practice we see do see "000" here.
-			A.g_course = float64(n)
+			A.g_course = maybe.Just(float64(n))
 		}
 
 		count, _ = fmt.Sscanf(string(wp[4:7]), "%3d", &n)
 		if count > 0 {
-			A.g_speed_mph = DW_KNOTS_TO_MPH(float64(n)) /* yes, in knots */
+			A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(float64(n))) /* yes, in knots */
 		}
 
 		wp = wp[7:]
-	} else if A.g_speed_mph == G_UNKNOWN {
-		A.g_course, wp, found = getwdata(wp, 'c', 3)
+	} else if A.g_speed_mph.IsNothing() {
+		var course, speed float64
+
+		course, wp, found = getwdata(wp, 'c', 3)
 		if !found {
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
@@ -2764,28 +2774,32 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 			}
 		}
 
-		A.g_speed_mph, wp, found = getwdata(wp, 's', 3) /* MPH here */
+		A.g_course = unlessUnknown(course)
+
+		speed, wp, found = getwdata(wp, 's', 3) /* MPH here */
 		if !found {
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Didn't find wind speed in form s999.\n")
 			}
 		}
+
+		A.g_speed_mph = unlessUnknown(speed)
 	}
 
 	// At this point, we should have the wind direction and speed
 	// from one of three methods.
 
-	if A.g_speed_mph != G_UNKNOWN {
-		A.g_weather = fmt.Sprintf("wind %.1f mph", A.g_speed_mph)
-		if A.g_course != G_UNKNOWN {
-			A.g_weather += fmt.Sprintf(", direction %.0f", A.g_course)
+	if speed_mph, ok := A.g_speed_mph.Get(); ok {
+		A.g_weather = fmt.Sprintf("wind %.1f mph", speed_mph)
+		if course, ok := A.g_course.Get(); ok {
+			A.g_weather += fmt.Sprintf(", direction %.0f", course)
 		}
 	}
 
 	/* We don't want this to show up on the location line. */
-	A.g_speed_mph = G_UNKNOWN
-	A.g_course = G_UNKNOWN
+	A.g_speed_mph = maybe.Nothing[float64]()
+	A.g_course = maybe.Nothing[float64]()
 
 	/*
 	 * After the mandatory wind direction and speed (in 1 of 3 formats), the
@@ -3149,25 +3163,25 @@ func decode_position(A *decode_aprs_t, ppos *position_t) {
 
 func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) {
 	if isdigit91(pcpos.Y[0]) && isdigit91(pcpos.Y[1]) && isdigit91(pcpos.Y[2]) && isdigit91(pcpos.Y[3]) {
-		A.g_lat = 90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0
+		A.g_lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid character in compressed latitude.  Must be in range of '!' to '{'.\n")
 		}
 
-		A.g_lat = G_UNKNOWN
+		A.g_lat = maybe.Nothing[float64]()
 	}
 
 	if isdigit91(pcpos.X[0]) && isdigit91(pcpos.X[1]) && isdigit91(pcpos.X[2]) && isdigit91(pcpos.X[3]) {
-		A.g_lon = -180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0
+		A.g_lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid character in compressed longitude.  Must be in range of '!' to '{'.\n")
 		}
 
-		A.g_lon = G_UNKNOWN
+		A.g_lon = maybe.Nothing[float64]()
 	}
 
 	if pcpos.SymTableId == '/' || pcpos.SymTableId == '\\' || unicode.IsUpper(rune(pcpos.SymTableId)) {
@@ -3191,13 +3205,13 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 	if pcpos.C == ' ' {
 		/* ignore other two bytes */
 	} else if ((pcpos.T - 33) & 0x18) == 0x10 {
-		A.g_altitude_ft = math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33))
+		A.g_altitude_ft = maybe.Just(math.Pow(1.002, float64(pcpos.C-33)*91+float64(pcpos.S-33)))
 	} else if pcpos.C == '{' {
-		A.g_range = 2.0 * math.Pow(1.08, float64(pcpos.S-33))
+		A.g_range = maybe.Just(2.0 * math.Pow(1.08, float64(pcpos.S-33)))
 	} else if pcpos.C >= '!' && pcpos.C <= 'z' {
 		/* For a weather station, this is wind information. */
-		A.g_course = float64(pcpos.C-33) * 4
-		A.g_speed_mph = float64(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
+		A.g_course = maybe.Just(float64(pcpos.C-33) * 4)
+		A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(math.Pow(1.08, float64(pcpos.S-33)) - 1.0))
 	}
 }
 
@@ -3209,7 +3223,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
  *
  * Inputs:	plat 	- Pointer to first byte.
  *
- * Returns:	Double precision value in degrees.  Negative for South.
+ * Returns:	Maybe a double precision value in degrees.  Negative for South.
  *
  * Description:	Latitude is expressed as a fixed 8-character field, in degrees
  *		and decimal minutes (to two decimal places), followed by the
@@ -3227,13 +3241,13 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
  * Bug:		We don't properly deal with position ambiguity where trailing
  *		digits might be replaced by spaces.  We simply treat them like zeros.
  *
- * Errors:	Return G_UNKNOWN for any type of error.
+ * Errors:	Return Nothing for any type of error.
  *
  *		Should probably print an error message.
  *
  *------------------------------------------------------------------*/
 
-func get_latitude_8(p [8]byte, quiet bool) float64 {
+func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 	type lat_s struct {
 		Deg  [2]byte
 		Minn [2]byte
@@ -3255,7 +3269,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tens of degrees.\n", plat.Deg[0])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plat.Deg[1])) {
@@ -3266,7 +3280,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for degrees.\n", plat.Deg[1])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if plat.Minn[0] >= '0' && plat.Minn[0] <= '5' {
@@ -3279,7 +3293,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-5 for tens of minutes.\n", plat.Minn[0])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plat.Minn[1])) {
@@ -3292,7 +3306,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for minutes.\n", plat.Minn[1])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if plat.Dot != '.' {
@@ -3301,7 +3315,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Unexpected character \"%c\" found where period expected in latitude.\n", plat.Dot)
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plat.HMin[0])) {
@@ -3314,7 +3328,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tenths of minutes.\n", plat.HMin[0])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plat.HMin[1])) {
@@ -3327,37 +3341,37 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
 			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for hundredths of minutes.\n", plat.HMin[1])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	// The spec requires upper case for hemisphere.  Accept lower case but warn.
 
 	switch plat.NS {
 	case 'N':
-		return (result)
+		return maybe.Just(result)
 	case 'n':
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Warning: Lower case n found for latitude hemisphere.  Specification requires upper case N or S.\n")
 		}
 
-		return (result)
+		return maybe.Just(result)
 	case 'S':
-		return (-result)
+		return maybe.Just(-result)
 	case 's':
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Warning: Lower case s found for latitude hemisphere.  Specification requires upper case N or S.\n")
 		}
 
-		return (-result)
+		return maybe.Just(-result)
 	default:
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error: '%c' found for latitude hemisphere.  Specification requires upper case N or S.\n", plat.NS)
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 }
 
@@ -3369,7 +3383,7 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
  *
  * Inputs:	plat 	- Pointer to first byte.
  *
- * Returns:	Double precision value in degrees.  Negative for West.
+ * Returns:	Maybe a double precision value in degrees.  Negative for West.
  *
  * Description:	Longitude is expressed as a fixed 9-character field, in degrees and
  *		decimal minutes (to two decimal places), followed by the letter E
@@ -3385,13 +3399,13 @@ func get_latitude_8(p [8]byte, quiet bool) float64 {
  * Bug:		We don't properly deal with position ambiguity where trailing
  *		digits might be replaced by spaces.  We simply treat them like zeros.
  *
- * Errors:	Return G_UNKNOWN for any type of error.
+ * Errors:	Return Nothing for any type of error.
  *
  * Example:
  *
  *------------------------------------------------------------------*/
 
-func get_longitude_9(p [9]byte, quiet bool) float64 {
+func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 	type lat_s struct {
 		Deg  [3]byte
 		Minn [2]byte
@@ -3413,7 +3427,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0 or 1 for hundreds of degrees.\n", plon.Deg[0])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plon.Deg[1])) {
@@ -3424,7 +3438,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tens of degrees.\n", plon.Deg[1])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plon.Deg[2])) {
@@ -3435,7 +3449,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for degrees.\n", plon.Deg[2])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if plon.Minn[0] >= '0' && plon.Minn[0] <= '5' {
@@ -3447,7 +3461,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-5 for tens of minutes.\n", plon.Minn[0])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plon.Minn[1])) {
@@ -3460,7 +3474,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for minutes.\n", plon.Minn[1])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if plon.Dot != '.' {
@@ -3469,7 +3483,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Unexpected character \"%c\" found where period expected in longitude.\n", plon.Dot)
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plon.HMin[0])) {
@@ -3482,7 +3496,7 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tenths of minutes.\n", plon.HMin[0])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	if unicode.IsDigit(rune(plon.HMin[1])) {
@@ -3495,37 +3509,37 @@ func get_longitude_9(p [9]byte, quiet bool) float64 {
 			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for hundredths of minutes.\n", plon.HMin[1])
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 
 	// The spec requires upper case for hemisphere.  Accept lower case but warn.
 
 	switch plon.EW {
 	case 'E':
-		return (result)
+		return maybe.Just(result)
 	case 'e':
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Warning: Lower case e found for longitude hemisphere.  Specification requires upper case E or W.\n")
 		}
 
-		return (result)
+		return maybe.Just(result)
 	case 'W':
-		return (-result)
+		return maybe.Just(-result)
 	case 'w':
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Warning: Lower case w found for longitude hemisphere.  Specification requires upper case E or W.\n")
 		}
 
-		return (-result)
+		return maybe.Just(-result)
 	default:
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Error: '%c' found for longitude hemisphere.  Specification requires upper case E or W.\n", plon.EW)
 		}
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[float64]()
 	}
 }
 
@@ -3777,12 +3791,12 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		var count, _ = fmt.Sscanf(string(pdext), "%3d", &n)
 		if count > 0 {
-			A.g_course = float64(n)
+			A.g_course = maybe.Just(float64(n))
 		}
 
 		count, _ = fmt.Sscanf(string(pdext[4:]), "%3d", &n)
 		if count > 0 {
-			A.g_speed_mph = DW_KNOTS_TO_MPH(float64(n))
+			A.g_speed_mph = maybe.Just(DW_KNOTS_TO_MPH(float64(n)))
 		}
 
 		/* Bearing and Number/Range/Quality? */
@@ -3799,10 +3813,10 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 	/* check for Station power, height, gain. */
 
 	if bytes.HasPrefix(pdext, []byte("PHG")) {
-		A.g_power = int(pdext[3]-'0') * int(pdext[3]-'0')
-		A.g_height = int(1<<(pdext[4]-'0')) * 10
+		A.g_power = maybe.Just(int(pdext[3]-'0') * int(pdext[3]-'0'))
+		A.g_height = maybe.Just(int(1<<(pdext[4]-'0')) * 10)
 
-		A.g_gain = int(pdext[5] - '0')
+		A.g_gain = maybe.Just(int(pdext[5] - '0'))
 		if pdext[6] >= '0' && pdext[6] <= '8' {
 			A.g_directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
@@ -3822,7 +3836,7 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		var count, _ = fmt.Sscanf(string(pdext[3:]), "%4d", &n)
 		if count > 0 {
-			A.g_range = float64(n)
+			A.g_range = maybe.Just(float64(n))
 		}
 
 		process_comment(A, pdext[7:])
@@ -3834,9 +3848,9 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 	if bytes.HasPrefix(pdext, []byte("DFS")) {
 		//A.g_strength = pdext[3] - '0';
-		A.g_height = int(1<<(pdext[4]-'0')) * 10
+		A.g_height = maybe.Just(int(1<<(pdext[4]-'0')) * 10)
 
-		A.g_gain = int(pdext[5] - '0')
+		A.g_gain = maybe.Just(int(pdext[5] - '0'))
 		if pdext[6] >= '0' && pdext[6] <= '8' {
 			A.g_directivity, _ = directivityString(int(pdext[6] - '0'))
 		}
@@ -4054,37 +4068,37 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		switch sftemp[0] {
 		case 'A':
-			A.g_freq = 1200 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(1200 + atof(sftemp[1:]))
 		case 'B':
-			A.g_freq = 2300 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(2300 + atof(sftemp[1:]))
 		case 'C':
-			A.g_freq = 2400 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(2400 + atof(sftemp[1:]))
 		case 'D':
-			A.g_freq = 3400 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(3400 + atof(sftemp[1:]))
 		case 'E':
-			A.g_freq = 5600 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(5600 + atof(sftemp[1:]))
 		case 'F':
-			A.g_freq = 5700 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(5700 + atof(sftemp[1:]))
 		case 'G':
-			A.g_freq = 5800 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(5800 + atof(sftemp[1:]))
 		case 'H':
-			A.g_freq = 10100 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(10100 + atof(sftemp[1:]))
 		case 'I':
-			A.g_freq = 10200 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(10200 + atof(sftemp[1:]))
 		case 'J':
-			A.g_freq = 10300 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(10300 + atof(sftemp[1:]))
 		case 'K':
-			A.g_freq = 10400 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(10400 + atof(sftemp[1:]))
 		case 'L':
-			A.g_freq = 10500 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(10500 + atof(sftemp[1:]))
 		case 'M':
-			A.g_freq = 24000 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(24000 + atof(sftemp[1:]))
 		case 'N':
-			A.g_freq = 24100 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(24100 + atof(sftemp[1:]))
 		case 'O':
-			A.g_freq = 24200 + atof(sftemp[1:])
+			A.g_freq = maybe.Just(24200 + atof(sftemp[1:]))
 		default:
-			A.g_freq = atof(sftemp)
+			A.g_freq = maybe.Just(atof(sftemp))
 		}
 
 		if bytes.HasPrefix(smtemp, []byte("MHz")) {
@@ -4104,7 +4118,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			(x >= 222 && x <= 225) ||
 			(x >= 420 && x <= 450) ||
 			(x >= 902 && x <= 928) {
-			A.g_freq = float64(x)
+			A.g_freq = maybe.Just(x)
 		}
 	}
 
@@ -4127,13 +4141,13 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			var f, _ = strconv.Atoi(string(sttemp[1:]))
 			for i := range NUM_CTCSS {
 				if f == i_ctcss[i] {
-					A.g_tone = f_ctcss[i]
+					A.g_tone = maybe.Just(f_ctcss[i])
 
 					break
 				}
 			}
 
-			if A.g_tone == G_UNKNOWN {
+			if A.g_tone.IsNothing() {
 				if !A.g_quiet {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Bad CTCSS/PL specification: \"%s\"\n", sttemp)
@@ -4145,7 +4159,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		} else if match := std_toff_re.FindSubmatchIndex(commentData); match != nil {
 			dw_printf("NO tone\n")
 
-			A.g_tone = 0
+			A.g_tone = maybe.Just(0.0)
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_dcs_re.FindSubmatchIndex(commentData); match != nil {
@@ -4153,7 +4167,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 			var offset, _ = strconv.ParseUint(string(sttemp), 8, 64)
 
-			A.g_dcs = int(offset)
+			A.g_dcs = maybe.Just(int(offset))
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_offset_re.FindSubmatchIndex(commentData); match != nil {
@@ -4161,7 +4175,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 			var offset, _ = strconv.Atoi(string(sttemp))
 
-			A.g_offset = 10 * offset
+			A.g_offset = maybe.Just(10 * offset)
 
 			commentData = cutBytes(commentData, match[0], match[1])
 		} else if match := std_range_re.FindSubmatchIndex(commentData); match != nil {
@@ -4171,9 +4185,9 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			var r, _ = strconv.Atoi(string(sttemp))
 
 			if string(sutemp) == "m" {
-				A.g_range = float64(r)
+				A.g_range = maybe.Just(float64(r))
 			} else {
-				A.g_range = DW_KM_TO_MILES(float64(r))
+				A.g_range = maybe.Just(DW_KM_TO_MILES(float64(r)))
 			}
 
 			commentData = cutBytes(commentData, match[0], match[1])
@@ -4241,11 +4255,15 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			 *		Lon:	DDD HH.HHo
 			 */
 			if unicode.IsDigit(rune(a)) {
-				A.g_lat += float64(a-'0') / 60000.0 * aprsSign(A.g_lat)
+				A.g_lat = maybe.Fmap(func(lat float64) float64 {
+					return lat + float64(a-'0')/60000.0*aprsSign(lat)
+				}, A.g_lat)
 			}
 
 			if unicode.IsDigit(rune(o)) {
-				A.g_lon += float64(o-'0') / 60000.0 * aprsSign(A.g_lon)
+				A.g_lon = maybe.Fmap(func(lon float64) float64 {
+					return lon + float64(o-'0')/60000.0*aprsSign(lon)
+				}, A.g_lon)
 			}
 		} else if unicode.IsLower(rune(d)) {
 			/*
@@ -4297,11 +4315,15 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			 * The spec appears to be wrong.  It says '}' is the maximum value when it should be '{'.
 			 */
 			if isdigit91(a) {
-				A.g_lat += float64(a-B91_MIN) * 1.1 / 600000.0 * aprsSign(A.g_lat)
+				A.g_lat = maybe.Fmap(func(lat float64) float64 {
+					return lat + float64(a-B91_MIN)*1.1/600000.0*aprsSign(lat)
+				}, A.g_lat)
 			}
 
 			if isdigit91(o) {
-				A.g_lon += float64(o-B91_MIN) * 1.1 / 600000.0 * aprsSign(A.g_lon)
+				A.g_lon = maybe.Fmap(func(lon float64) float64 {
+					return lon + float64(o-B91_MIN)*1.1/600000.0*aprsSign(lon)
+				}, A.g_lon)
 			}
 		}
 
@@ -4317,7 +4339,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		var temp = commentData[match[0]:match[1]]
 
 		var altitude, _ = strconv.Atoi(string(temp[3:]))
-		A.g_altitude_ft = float64(altitude)
+		A.g_altitude_ft = maybe.Just(float64(altitude))
 
 		commentData = cutBytes(commentData, match[0], match[1])
 	}
@@ -4330,7 +4352,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 	 * standardized format.
 	 * Don't complain if we have already found a valid value.
 	 */
-	if match := bad_freq_re.FindSubmatchIndex(commentData); match != nil && A.g_freq == G_UNKNOWN {
+	if match := bad_freq_re.FindSubmatchIndex(commentData); match != nil && A.g_freq.IsNothing() {
 		var bad = commentData[match[0]:match[1]]
 
 		var x, _ = strconv.ParseFloat(string(bad), 64)
@@ -4347,13 +4369,13 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 				dw_printf("For most systems to recognize it, use exactly this form \"%s\" at beginning of comment.\n", good)
 			}
 
-			if A.g_freq == G_UNKNOWN {
-				A.g_freq = float64(x)
+			if A.g_freq.IsNothing() {
+				A.g_freq = maybe.Just(x)
 			}
 		}
 	}
 
-	if match := bad_tone_re.FindSubmatchIndex(commentData); match != nil && A.g_tone == G_UNKNOWN {
+	if match := bad_tone_re.FindSubmatchIndex(commentData); match != nil && A.g_tone.IsNothing() {
 		var bad1 = commentData[match[4]:match[5]] /* original 99.9 or 999.9 format or one of 67 77 100 123 */
 
 		var bad2 = string(bad1) /* 99.9 or 999.9 format.  ".0" appended for special cases. */
@@ -4384,9 +4406,9 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 					dw_printf("For most systems to recognize it, use exactly this form \"%s\" at near beginning of comment, after any frequency.\n", good)
 				}
 
-				if A.g_tone == G_UNKNOWN {
+				if A.g_tone.IsNothing() {
 					var tone, _ = strconv.ParseFloat(bad2, 64)
-					A.g_tone = tone
+					A.g_tone = maybe.Just(tone)
 				}
 
 				break
@@ -4394,7 +4416,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 		}
 	}
 
-	if (A.g_offset == 6000 || A.g_offset == -6000) && A.g_freq >= 144 && A.g_freq <= 148 {
+	var offset = maybe.FromMaybe(0, A.g_offset)
+	var freq = maybe.FromMaybe(0, A.g_freq)
+
+	if (offset == 6000 || offset == -6000) && freq >= 144 && freq <= 148 {
 		if !A.g_quiet {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("A transmit offset of 6 MHz on the 2 meter band doesn't seem right.\n")
