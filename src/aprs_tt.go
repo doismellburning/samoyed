@@ -321,10 +321,6 @@ func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
 func (g *TTGateway) Button(channel int, button rune) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	// if (button != '.') {
-	//   dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
-	// }
-
 	// TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
 
 	if button == '$' {
@@ -393,13 +389,6 @@ func (g *TTGateway) Button(channel int, button rune) {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) Sequence(channel int, msg string) {
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("\n\"%s\"\n", msg);
-	   #endif
-	*/
-
 	/*
 	 * Discard empty message.
 	 * In case # is there as optional start.
@@ -417,14 +406,6 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	 * Parse the touch tone sequence.
 	 */
 	var err = g.parseFields(&state, msg)
-
-	/* TODO KG
-	#if defined(DEBUG)
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("callsign=\"%s\", ssid=%d, symbol=\"%c%c\", freq=\"%s\", ctcss=\"%s\", comment=\"%s\", lat=%.4f, lon=%.4f, dao=\"%s\"\n",
-			state.callsign, state.ssid, state.symtabOrOverlay, state.symbolCode, state.freq, state.ctcss, state.comment, state.latitude, state.longitude, state.dao);
-	#endif
-	*/
 
 	g.lastParseState = state
 
@@ -518,8 +499,6 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 	var err int
 
 	for _, e := range fields {
-		// text_color_set(DW_COLOR_DEBUG);
-		// dw_printf ("parse_fields () field = %s\n", e);
 		switch e[0] {
 		case 'A':
 			switch e[1] {
@@ -567,9 +546,6 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 		}
 	}
 
-	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("parse_fields () normal return\n");
-
 	return (0)
 } /* end parseFields */
 
@@ -601,11 +577,8 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(e)
 
 	if ipat >= 0 {
-		// Why did we print b & d here?
-		// Documentation says only x, y, z can be used with macros.
-		// Only those 3 are processed below.
-
-		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
+		// Dire Wolf also printed b & d here, but the documentation says only
+		// x, y, z can be used with macros, and only those 3 are processed below.
 		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr)
 
 		dw_printf("Replace with:        '%s'\n", g.config.ttlocs[ipat].macro.definition)
@@ -1147,7 +1120,6 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 	var xstr, ystr, _, bstr, dstr, ipat = g.findTTLocMatch(e)
 
 	if ipat >= 0 {
-		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
 		var ttloc_type = g.config.ttlocs[ipat].ttlocType
 		switch ttloc_type {
 		case TTLOC_POINT:
@@ -1225,28 +1197,12 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			var user_y_max = math.Round(math.Pow(10., float64(len(ystr))) - 1.) // e.g. 999 for 3 digits
 			state.latitude = lat0 + yrange*y/user_y_max
 
-			/* TODO KG
-			#if 0
-				      dw_printf ("TTLOC_GRID LAT min=%f, max=%f, range=%f\n", lat0, lat9, yrange);
-				      dw_printf ("TTLOC_GRID LAT user_y=%f, user_y_max=%f\n", y, user_y_max);
-				      dw_printf ("TTLOC_GRID LAT min + yrange * user_y / user_y_range = %f\n", state.latitude);
-			#endif
-			*/
-
 			var lon0 = float64(g.config.ttlocs[ipat].grid.lon0)
 			var lon9 = float64(g.config.ttlocs[ipat].grid.lon9)
 			var xrange = lon9 - lon0
 			var x, _ = strconv.ParseFloat(xstr, 64)
 			var user_x_max = math.Round(math.Pow(10., float64(len(xstr))) - 1.)
 			state.longitude = lon0 + xrange*x/user_x_max
-
-			/* TODO KG
-			#if 0
-				      dw_printf ("TTLOC_GRID LON min=%f, max=%f, range=%f\n", lon0, lon9, xrange);
-				      dw_printf ("TTLOC_GRID LON user_x=%f, user_x_max=%f\n", x, user_x_max);
-				      dw_printf ("TTLOC_GRID LON min + xrange * user_x / user_x_range = %f\n", state.longitude);
-			#endif
-			*/
 
 			state.dao[2] = e[0]
 			state.dao[3] = e[1]
@@ -1293,8 +1249,6 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			if geoErr == nil {
 				state.latitude = R2D(float64(geo.Lat))
 				state.longitude = R2D(float64(geo.Lng))
-
-				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Conversion from UTM failed:\n%s\n\n", geoErr)
@@ -1322,9 +1276,6 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			loc += xstr
 			loc += ystr
 
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("MGRS/USNG location debug:  %s\n", loc);
-
 			state.locText = loc
 
 			// Apparently also does USNG!
@@ -1332,8 +1283,6 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			if convertErr == nil {
 				state.latitude = R2D(float64(geo.Lat))
 				state.longitude = R2D(float64(geo.Lng))
-
-				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", convertErr)
@@ -1355,13 +1304,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				return (TT_ERROR_INVALID_MHEAD)
 			}
 
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
-
 			var mh, errs = TTMheadToText(stemp, false)
 			if errs == 0 {
-				// text_color_set(DW_COLOR_DEBUG);
-				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
 				state.locText = mh
 
 				var lat, lon, err = ll_from_grid_square(state.locText)
@@ -1452,7 +1396,6 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, string, int) {
-	// debug dw_printf ("findTTLocMatch: e=%s\n", e);
 	var xstr, ystr, zstr, bstr, dstr string
 
 	for ipat := range len(g.config.ttlocs) {
