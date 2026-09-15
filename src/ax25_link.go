@@ -2828,7 +2828,6 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 	if s_debug_retry {
 		text_color_set(DW_COLOR_INFO)
-		//dw_printf ("state=%d, count=%d, k=%d, V(R)=%d, SREJ exception=%d\n", S.state, count, S.k_maxframe, S.vr, selective_reject_exception(S));
 		dw_printf("send_srej_frames s_debug_retry: state=%d, count=%d, k=%d, V(R)=%d\n", S.state, count, S.k_maxframe, S.vr)
 
 		dw_printf("resend[]=")
@@ -3006,7 +3005,6 @@ func RR_OR_RNR(ready bool) ax25_frame_type_t {
 }
 
 func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
-	// dw_printf ("rr_rnr_frame (ready=%d, cr=%d, pf=%d, nr=%d) state=%d\n", ready, cr, pf, nr, S.state);
 	switch S.state {
 	case state_0_disconnected:
 		if cr == cr_cmd {
@@ -3051,7 +3049,6 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 		}
 
 		if is_good_nr(S, nr) {
-			// dw_printf ("rr_rnr_frame (), line %d, state=%d, good nr=%d, calling check_i_frame_ackd\n", __LINE__, S.state, nr);
 			check_i_frame_ackd(S, nr)
 		} else {
 			if s_debug_retry {
@@ -3580,17 +3577,12 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 				START_T3(S)
 				SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
 				enter_new_state(S, state_3_connected)
-
-				// text_color_set(DW_COLOR_ERROR);
-				// dw_printf ("state 4 timer recovery, go to state 3 \n");
 			} else {
 				// Erratum: Difference between two AX.25 revisions.
 
 				// #if 1	// This is from the original protocol spec.
 				// Resend I frame with N(S) equal to the N(R) in the SREJ.
 
-				//text_color_set(DW_COLOR_ERROR);
-				//dw_printf ("state 4 timer recovery, send requested frame(s) \n");
 				var num_resent = resend_for_srej(S, nr, info)
 				if num_resent > 0 {
 					// my addition
@@ -3649,7 +3641,6 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 	if txdata != nil {
 		var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, i_frame_nr, i_frame_ns, p, txdata.pid, txdata.data[:txdata.len])
-		// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
 		lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
 		num_resent++
@@ -5279,11 +5270,6 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 	// I don't think we should be here if SREJ is enabled.
 	// TODO: Figure out why this happens occasionally.
 
-	//	if (S.srej_enable != srej_none) {
-	//	  text_color_set(DW_COLOR_ERROR);
-	//	  dw_printf ("Internal Error, Did not expect to be here when SREJ enabled.  %s %s %d\n", __FILE__, __func__, __LINE__);
-	//	}
-
 	if S.txdata_by_ns[nr_input] == nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal Error, Can't resend starting with N(S) = %d.  It is not available.\n", nr_input)
@@ -5664,20 +5650,11 @@ func is_good_nr(S *ax25_dlsm_t, nr int) bool {
  *------------------------------------------------------------------------------*/
 
 func i_frame_pop_off_queue(S *ax25_dlsm_t) {
-	if s_debug_misc { //nolint:staticcheck
-		// text_color_set(DW_COLOR_DEBUG);
-		// dw_printf ("i_frame_pop_off_queue () state=%d\n", S.state);
-	}
-
 	// TODO:  Were we expecting something in the queue?
 	// or is empty an expected situation?
 
 	if S.i_frame_queue == nil {
-		if s_debug_misc { //nolint:staticcheck
-			// TODO: add different switch for I frame queue.
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("i_frame_pop_off_queue () queue is empty get out, line %d\n", __LINE__);
-		}
+		// TODO: add a different debug switch for the I frame queue.
 
 		// I Frame queue is empty.
 		// Nothing to see here, folks.  Move along.
@@ -5686,11 +5663,6 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 
 	switch S.state {
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
-		if s_debug_misc { //nolint:staticcheck
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("i_frame_pop_off_queue () line %d\n", __LINE__);
-		}
-
 		// This seems to say remove the I Frame from the queue and discard it if "layer 3 initiated" is set.
 
 		// For the case of removing it from the queue and putting it back in we just leave it there.
@@ -5701,21 +5673,12 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 		// is backwards, so it is implemented as documented.
 
 		if S.layer_3_initiated {
-			if s_debug_misc { //nolint:staticcheck
-				// text_color_set(DW_COLOR_DEBUG);
-				// dw_printf ("i_frame_pop_off_queue () discarding due to L3 init. line %d\n", __LINE__);
-			}
 			var txdata = S.i_frame_queue // Remove from head of list.
 			S.i_frame_queue = txdata.next
 			cdata_delete(txdata)
 		}
 
 	case state_3_connected, state_4_timer_recovery:
-		if s_debug_misc { //nolint:staticcheck
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("i_frame_pop_off_queue () state %d, line %d\n", S.state, __LINE__);
-		}
-
 		for (!S.peer_receiver_busy) &&
 			S.i_frame_queue != nil &&
 			WITHIN_WINDOW_SIZE(S) {
@@ -5728,17 +5691,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 			var nr = S.vr
 			var p = 0
 
-			if s_debug_misc || s_debug_radio { //nolint:staticcheck
-				// dw_printf ("i_frame_pop_off_queue () ns=%d, queue for transmit \"", ns);
-				// AX25SafePrint (txdata.data, txdata.len, 1);
-				// dw_printf ("\"\n");
-			}
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, txdata.pid, txdata.data[:txdata.len])
-
-			if s_debug_misc { //nolint:staticcheck
-				// text_color_set(DW_COLOR_DEBUG);
-				// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
-			}
 
 			lm_data_request(S.channel, TQ_PRIO_1_LO, pp)
 
