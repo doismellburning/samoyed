@@ -25,6 +25,8 @@ package direwolf
 
 import (
 	"fmt"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 const FI_Format_Indicator = 0x82
@@ -92,20 +94,31 @@ const (
 	srej_not_specified srej_e = 3
 )
 
+// xid_param_s is a set of XID parameters, as sent or received.  The fields the
+// other station may leave out are Maybe values, whose zero value is Nothing, so
+// one that was never set cannot be mistaken for one that was negotiated to
+// zero.
+//
+// srej and modulo are enums with their own "not specified" members, and only
+// modulo has it at zero: an unset srej reads as srej_none, which
+// complete_negotiation will apply, so build the struct through xid_parse or
+// initiate_negotiation rather than relying on its zero value throughout.  The
+// srej_e order is load-bearing for negotiation, which is why srej_not_specified
+// sits at the end rather than at zero.
 type xid_param_s struct {
-	full_duplex int
+	full_duplex maybe.Maybe[bool]
 
 	srej srej_e
 
 	modulo ax25_modulo_t
 
-	i_field_length_rx int /* In bytes.  XID has it in bits. */
+	i_field_length_rx maybe.Maybe[int] /* In bytes.  XID has it in bits. */
 
-	window_size_rx int
+	window_size_rx maybe.Maybe[int]
 
-	ack_timer int /* "T1" in mSec. */
+	ack_timer maybe.Maybe[int] /* "T1" in mSec. */
 
-	retries int /* "N1" */
+	retries maybe.Maybe[int] /* "N1" */
 }
 
 /*-------------------------------------------------------------------
@@ -138,17 +151,12 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 	// The  AX.25 v2.2 protocol spec says, for most of these,
 	//	"If this field is not present, the current values are retained."
 
-	// We set the numeric values to our usual G_UNKNOWN to mean undefined and let the caller deal with it.
-	// rej and modulo are enum so we can't use G_UNKNOWN there.
+	// The Maybe fields start out Nothing, which is what we want for "undefined",
+	// so only the two enums need setting to their own "not specified" members.
 	var result = new(xid_param_s)
 
-	result.full_duplex = G_UNKNOWN
 	result.srej = srej_not_specified
 	result.modulo = modulo_unknown
-	result.i_field_length_rx = G_UNKNOWN
-	result.window_size_rx = G_UNKNOWN
-	result.ack_timer = G_UNKNOWN
-	result.retries = G_UNKNOWN
 
 	var desc string
 
@@ -216,16 +224,16 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 			if pval&PV_Classes_Procedures_Half_Duplex > 0 && (pval&PV_Classes_Procedures_Full_Duplex) == 0 {
-				result.full_duplex = 0
+				result.full_duplex = maybe.Just(false)
 				desc += "Half-Duplex "
 			} else if pval&PV_Classes_Procedures_Full_Duplex > 0 && (pval&PV_Classes_Procedures_Half_Duplex) == 0 {
-				result.full_duplex = 1
+				result.full_duplex = maybe.Just(true)
 				desc += "Full-Duplex "
 			} else {
 				//  https://groups.io/g/bpq32/topic/113348033#msg44169
 				//text_color_set (DW_COLOR_ERROR);
 				//dw_printf ("XID error: Expected one of Half or Full Duplex be set.\n");
-				result.full_duplex = 0
+				result.full_duplex = maybe.Just(false)
 			}
 
 		case PI_HDLC_Optional_Functions:
@@ -288,9 +296,9 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 		case PI_I_Field_Length_Rx:
-			result.i_field_length_rx = pval / 8
+			result.i_field_length_rx = maybe.Just(pval / 8)
 
-			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", result.i_field_length_rx)
+			desc += fmt.Sprintf("I-Field-Length-Rx=%d ", pval/8)
 
 			if pval&0x7 > 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -298,29 +306,29 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 			}
 
 		case PI_Window_Size_Rx:
-			result.window_size_rx = pval
+			result.window_size_rx = maybe.Just(pval)
 
-			desc += fmt.Sprintf("Window-Size-Rx=%d ", result.window_size_rx)
+			desc += fmt.Sprintf("Window-Size-Rx=%d ", pval)
 
 			if pval < 1 || pval > 127 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Window Size Rx, %d, is not in range of 1 thru 127.\n", pval)
 
-				result.window_size_rx = 127
+				result.window_size_rx = maybe.Just(127)
 				// Let the caller deal with modulo 8 consideration.
 			}
 
 			//continue here with more error checking.
 
 		case PI_Ack_Timer:
-			result.ack_timer = pval
+			result.ack_timer = maybe.Just(pval)
 
-			desc += fmt.Sprintf("Ack-Timer=%d ", result.ack_timer)
+			desc += fmt.Sprintf("Ack-Timer=%d ", pval)
 
 		case PI_Retries: // Is it retrys or retries?
-			result.retries = pval
+			result.retries = maybe.Just(pval)
 
-			desc += fmt.Sprintf("Retries=%d ", result.retries)
+			desc += fmt.Sprintf("Retries=%d ", pval)
 
 		default: // Ignore anything we don't recognize.
 		}
@@ -343,8 +351,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
  * Inputs:	param.
  *			full_duplex	- As command, am I capable of full duplex operation?
  *					  When a response, are we both?
- *					  0 = half duplex.
- *					  1 = full duplex.
+ *					  Nothing is treated as half duplex.
  *
  * 			srej		- Level of selective reject.
  *					  srej_none (use REJ), srej_single, srej_multi
@@ -356,7 +363,7 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
  *			i_field_length_rx - Maximum number of bytes I can handle in info part.
  *					    Default is 256.
  *					    Up to 8191 will fit into the field.
- *					    Use G_UNKNOWN to omit this.
+ *					    Leave it Nothing to omit this.
  *
  *			window_size_rx 	- Maximum window size ("k") that I can handle.
  *				   Defaults are are 4 for modulo 8 and 32 for modulo 128.
@@ -364,11 +371,11 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
  *			ack_timer	- Acknowledge timer in milliseconds.
  *					*** describe meaning.  ***
  *				  Default is 3000.
- *				  Use G_UNKNOWN to omit this.
+ *				  Leave it Nothing to omit this.
  *
  *			retries		- Allows negotiation of retries.
  *				  Default is 10.
- *				  Use G_UNKNOWN to omit this.
+ *				  Leave it Nothing to omit this.
  *
  *		cr	- Is it a command or response?
  *
@@ -414,19 +421,19 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	var m byte = 4 // classes of procedures
 
 	m += 5 // HDLC optional features
-	if param.i_field_length_rx != G_UNKNOWN {
+	if param.i_field_length_rx.IsJust() {
 		m += 4
 	}
 
-	if param.window_size_rx != G_UNKNOWN {
+	if param.window_size_rx.IsJust() {
 		m += 3
 	}
 
-	if param.ack_timer != G_UNKNOWN {
+	if param.ack_timer.IsJust() {
 		m += 4
 	}
 
-	if param.retries != G_UNKNOWN {
+	if param.retries.IsJust() {
 		m += 3
 	}
 
@@ -441,9 +448,9 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 
 	var x = PV_Classes_Procedures_Balanced_ABM
 
-	if param.full_duplex == 1 {
+	if maybe.FromMaybe(false, param.full_duplex) {
 		x |= PV_Classes_Procedures_Full_Duplex
-	} else { // includes G_UNKNOWN
+	} else { // includes Nothing
 		x |= PV_Classes_Procedures_Half_Duplex
 	}
 
@@ -507,11 +514,11 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 	// "I Field Length Rx" - max I field length acceptable to me.
 	// This is in bits.  8191 would be max number of bytes to fit in field.
 
-	if param.i_field_length_rx != G_UNKNOWN {
+	if length, ok := param.i_field_length_rx.Get(); ok {
 		info = append(info, byte(PI_I_Field_Length_Rx))
 		info = append(info, 2)
 
-		var x = param.i_field_length_rx * 8
+		var x = length * 8
 
 		info = append(info, byte(x>>8)&0xff)
 		info = append(info, byte(x)&0xff)
@@ -519,27 +526,27 @@ func xid_encode(param *xid_param_s, cr cmdres_t) []byte {
 
 	// "Window Size Rx"
 
-	if param.window_size_rx != G_UNKNOWN {
+	if window, ok := param.window_size_rx.Get(); ok {
 		info = append(info, byte(PI_Window_Size_Rx))
 		info = append(info, 1)
-		info = append(info, byte(param.window_size_rx))
+		info = append(info, byte(window))
 	}
 
 	// "Ack Timer" milliseconds.  We could handle up to 65535 here.
 
-	if param.ack_timer != G_UNKNOWN {
+	if timer, ok := param.ack_timer.Get(); ok {
 		info = append(info, byte(PI_Ack_Timer))
 		info = append(info, 2)
-		info = append(info, byte(param.ack_timer>>8)&0xff)
-		info = append(info, byte(param.ack_timer)&0xff)
+		info = append(info, byte(timer>>8)&0xff)
+		info = append(info, byte(timer)&0xff)
 	}
 
 	// "Retries."
 
-	if param.retries != G_UNKNOWN {
+	if retries, ok := param.retries.Get(); ok {
 		info = append(info, byte(PI_Retries))
 		info = append(info, 1)
-		info = append(info, byte(param.retries))
+		info = append(info, byte(retries))
 	}
 
 	return info

@@ -4,6 +4,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,13 +74,13 @@ func Test_XID(t *testing.T) {
 	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, 1, n)
-	assert.Equal(t, 0, param.full_duplex)
+	assert.Equal(t, maybe.Just(false), param.full_duplex)
 	assert.Equal(t, srej_single, param.srej)
 	assert.Equal(t, modulo_128, param.modulo)
-	assert.Equal(t, 128, param.i_field_length_rx)
-	assert.Equal(t, 2, param.window_size_rx)
-	assert.Equal(t, 4096, param.ack_timer)
-	assert.Equal(t, 3, param.retries)
+	assert.Equal(t, maybe.Just(128), param.i_field_length_rx)
+	assert.Equal(t, maybe.Just(2), param.window_size_rx)
+	assert.Equal(t, maybe.Just(4096), param.ack_timer)
+	assert.Equal(t, maybe.Just(3), param.retries)
 
 	/* encode and verify it comes out the same. */
 
@@ -90,13 +91,13 @@ func Test_XID(t *testing.T) {
 
 	/* try a couple different values, no srej. */
 
-	param.full_duplex = 1
+	param.full_duplex = maybe.Just(true)
 	param.srej = srej_none
 	param.modulo = modulo_8
-	param.i_field_length_rx = 2048
-	param.window_size_rx = 3
-	param.ack_timer = 1234
-	param.retries = 12
+	param.i_field_length_rx = maybe.Just(2048)
+	param.window_size_rx = maybe.Just(3)
+	param.ack_timer = maybe.Just(1234)
+	param.retries = maybe.Just(12)
 
 	info = xid_encode(param, cr_cmd)
 	param2, desc, _ = xid_parse(info)
@@ -106,23 +107,23 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, 1, param2.full_duplex)
+	assert.Equal(t, maybe.Just(true), param2.full_duplex)
 	assert.Equal(t, srej_none, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, 2048, param2.i_field_length_rx)
-	assert.Equal(t, 3, param2.window_size_rx)
-	assert.Equal(t, 1234, param2.ack_timer)
-	assert.Equal(t, 12, param2.retries)
+	assert.Equal(t, maybe.Just(2048), param2.i_field_length_rx)
+	assert.Equal(t, maybe.Just(3), param2.window_size_rx)
+	assert.Equal(t, maybe.Just(1234), param2.ack_timer)
+	assert.Equal(t, maybe.Just(12), param2.retries)
 
 	/* Other values, single srej. */
 
-	param.full_duplex = 0
+	param.full_duplex = maybe.Just(false)
 	param.srej = srej_single
 	param.modulo = modulo_8
-	param.i_field_length_rx = 61
-	param.window_size_rx = 4
-	param.ack_timer = 5555
-	param.retries = 9
+	param.i_field_length_rx = maybe.Just(61)
+	param.window_size_rx = maybe.Just(4)
+	param.ack_timer = maybe.Just(5555)
+	param.retries = maybe.Just(9)
 
 	info = xid_encode(param, cr_cmd)
 	param2, desc, _ = xid_parse(info)
@@ -132,23 +133,23 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, 0, param2.full_duplex)
+	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, 61, param2.i_field_length_rx)
-	assert.Equal(t, 4, param2.window_size_rx)
-	assert.Equal(t, 5555, param2.ack_timer)
-	assert.Equal(t, 9, param2.retries)
+	assert.Equal(t, maybe.Just(61), param2.i_field_length_rx)
+	assert.Equal(t, maybe.Just(4), param2.window_size_rx)
+	assert.Equal(t, maybe.Just(5555), param2.ack_timer)
+	assert.Equal(t, maybe.Just(9), param2.retries)
 
 	/* Other values, multi srej. */
 
-	param.full_duplex = 0
+	param.full_duplex = maybe.Just(false)
 	param.srej = srej_multi
 	param.modulo = modulo_128
-	param.i_field_length_rx = 61
-	param.window_size_rx = 4
-	param.ack_timer = 5555
-	param.retries = 9
+	param.i_field_length_rx = maybe.Just(61)
+	param.window_size_rx = maybe.Just(4)
+	param.ack_timer = maybe.Just(5555)
+	param.retries = maybe.Just(9)
 
 	info = xid_encode(param, cr_cmd)
 	param2, desc, _ = xid_parse(info)
@@ -158,23 +159,23 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, 0, param2.full_duplex)
+	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_multi, param2.srej)
 	assert.Equal(t, modulo_128, param2.modulo)
-	assert.Equal(t, 61, param2.i_field_length_rx)
-	assert.Equal(t, 4, param2.window_size_rx)
-	assert.Equal(t, 5555, param2.ack_timer)
-	assert.Equal(t, 9, param2.retries)
+	assert.Equal(t, maybe.Just(61), param2.i_field_length_rx)
+	assert.Equal(t, maybe.Just(4), param2.window_size_rx)
+	assert.Equal(t, maybe.Just(5555), param2.ack_timer)
+	assert.Equal(t, maybe.Just(9), param2.retries)
 
 	/* Specify some and not others. */
 
-	param.full_duplex = 0
+	param.full_duplex = maybe.Just(false)
 	param.srej = srej_single
 	param.modulo = modulo_8
-	param.i_field_length_rx = G_UNKNOWN
-	param.window_size_rx = G_UNKNOWN
-	param.ack_timer = 999
-	param.retries = G_UNKNOWN
+	param.i_field_length_rx = maybe.Nothing[int]()
+	param.window_size_rx = maybe.Nothing[int]()
+	param.ack_timer = maybe.Just(999)
+	param.retries = maybe.Nothing[int]()
 
 	info = xid_encode(param, cr_cmd)
 	param2, desc, _ = xid_parse(info)
@@ -184,13 +185,13 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, 0, param2.full_duplex)
+	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
-	assert.Equal(t, G_UNKNOWN, param2.i_field_length_rx)
-	assert.Equal(t, G_UNKNOWN, param2.window_size_rx)
-	assert.Equal(t, 999, param2.ack_timer)
-	assert.Equal(t, G_UNKNOWN, param2.retries)
+	assert.Equal(t, maybe.Nothing[int](), param2.i_field_length_rx)
+	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
+	assert.Equal(t, maybe.Just(999), param2.ack_timer)
+	assert.Equal(t, maybe.Nothing[int](), param2.retries)
 
 	/* Default values for empty info field. */
 
@@ -202,13 +203,13 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_ERROR)
 
-	assert.Equal(t, G_UNKNOWN, param2.full_duplex)
+	assert.Equal(t, maybe.Nothing[bool](), param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)
 	assert.Equal(t, modulo_unknown, param2.modulo)
-	assert.Equal(t, G_UNKNOWN, param2.i_field_length_rx)
-	assert.Equal(t, G_UNKNOWN, param2.window_size_rx)
-	assert.Equal(t, G_UNKNOWN, param2.ack_timer)
-	assert.Equal(t, G_UNKNOWN, param2.retries)
+	assert.Equal(t, maybe.Nothing[int](), param2.i_field_length_rx)
+	assert.Equal(t, maybe.Nothing[int](), param2.window_size_rx)
+	assert.Equal(t, maybe.Nothing[int](), param2.ack_timer)
+	assert.Equal(t, maybe.Nothing[int](), param2.retries)
 
 	text_color_set(DW_COLOR_REC)
 	dw_printf("XID test:  Success.\n")
