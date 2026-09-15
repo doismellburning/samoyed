@@ -91,7 +91,16 @@ func set_bit(base []byte, offset uint, val bool) {
  *
  *--------------------------------------------------------------------*/
 
+// AIS_MAX_FIELD_BITS bounds the width of a bit field: the widest AIS defines
+// is the 30 bit MMSI.  Within it every field value fits in an int on any
+// platform Go supports, signed or not, so nothing has to be narrowed on the
+// way out.  A wider field would be a caller mistake rather than something to
+// truncate quietly, so say so.
+const AIS_MAX_FIELD_BITS = 31
+
 func get_field(base []byte, start uint, length uint) int {
+	Assert(length >= 1 && length <= AIS_MAX_FIELD_BITS)
+
 	var result = 0
 	for k := range length {
 		result <<= 1
@@ -103,17 +112,22 @@ func get_field(base []byte, start uint, length uint) int {
 	return (result)
 }
 
-func set_field(base []byte, start uint, length uint, val int) { // TODO KG int32?
+func set_field(base []byte, start uint, length uint, val int) {
+	Assert(length >= 1 && length <= AIS_MAX_FIELD_BITS)
+
 	for k := range length {
 		set_bit(base, start+k, (val>>(length-1-k))&1 != 0)
 	}
 }
 
-func get_field_signed(base []byte, start uint, length uint) int32 {
-	var result = int32(get_field(base, start, length))
-	// Sign extend.
-	result <<= (32 - length)
-	result >>= (32 - length)
+// get_field_signed reads a two's complement field and sign extends it.  The
+// result is an int, wide enough for every field AIS defines, so no value is
+// ever narrowed on the way out.
+func get_field_signed(base []byte, start uint, length uint) int {
+	var result = get_field(base, start, length)
+	if result&(1<<(length-1)) != 0 {
+		result -= 1 << length // Sign extend.
+	}
 
 	return (result)
 }
@@ -202,25 +216,23 @@ func get_field_course(base []byte, start uint, length uint) float64 {
 	}
 }
 
-func get_field_ascii(base []byte, start uint, length uint) int {
+// AIS "six-bit ASCII": values 0 thru 31 are '@' thru '_', and values 32 thru
+// 63 are ' ' thru '?'.  A table keeps the result a character rather than an
+// int that happens to be in range.
+const sixBitASCII = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?"
+
+func get_field_ascii(base []byte, start uint, length uint) byte {
 	Assert(length == 6)
 
-	var ch = get_field(base, start, length)
-	if ch < 32 {
-		ch += 64
-	}
-
-	return (ch)
+	return sixBitASCII[get_field(base, start, length)]
 }
 
 func get_field_string(base []byte, start uint, length uint) string {
 	Assert(length%6 == 0)
 	var sb strings.Builder
 	var nc = length / 6 // Number of characters.
-	// Caller better provide space for at least this +1.
-	// No bounds checking here.
 	for i := range nc {
-		sb.WriteRune(rune(get_field_ascii(base, start+i*6, 6)))
+		sb.WriteByte(get_field_ascii(base, start+i*6, 6))
 	}
 	// Officially it should be terminated/padded with @ but we also see trailing spaces.
 	var result = strings.TrimRight(sb.String(), "@ ")
