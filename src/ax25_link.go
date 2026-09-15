@@ -153,6 +153,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
@@ -5886,7 +5887,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
-	param.full_duplex = 0
+	param.full_duplex = maybe.Just(false)
 
 	switch S.srej_enable {
 	case srej_single, srej_multi:
@@ -5896,12 +5897,12 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	}
 
 	param.modulo = S.modulo
-	param.i_field_length_rx = S.n1_paclen // Hmmmm.  Should we ask for what the user
+	param.i_field_length_rx = maybe.Just(S.n1_paclen) // Hmmmm.  Should we ask for what the user
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
-	param.window_size_rx = S.k_maxframe
-	param.ack_timer = g_misc_config_p.frack * 1000
-	param.retries = S.n2_retry
+	param.window_size_rx = maybe.Just(S.k_maxframe)
+	param.ack_timer = maybe.Just(g_misc_config_p.frack * 1000)
+	param.retries = maybe.Just(S.n2_retry)
 }
 
 /*------------------------------------------------------------------------------
@@ -5926,7 +5927,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 
 func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// TODO: Integrate with new full duplex capability in v1.5.
-	param.full_duplex = 0
+	param.full_duplex = maybe.Just(false)
 
 	// Other end might want 8.
 	// Seems unlikely.  If it implements XID it should have modulo 128.
@@ -5953,27 +5954,27 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// We can currently do up to 2k.
 	// Take minimum of that and what other guy asks for.
 
-	if param.i_field_length_rx == G_UNKNOWN {
-		param.i_field_length_rx = 256 // Not specified, take default.
+	if length, ok := param.i_field_length_rx.Get(); ok {
+		param.i_field_length_rx = maybe.Just(min(length, AX25_N1_PACLEN_MAX))
 	} else {
-		param.i_field_length_rx = min(param.i_field_length_rx, AX25_N1_PACLEN_MAX)
+		param.i_field_length_rx = maybe.Just(256) // Not specified, take default.
 	}
 
 	// In theory extended mode can have window size of 127 but
 	// I'm limiting it to 63 for the reason mentioned in the SREJ logic.
 
-	if param.window_size_rx == G_UNKNOWN {
-		// not specified, set default.
-		if param.modulo == 128 {
-			param.window_size_rx = 32
+	if window, ok := param.window_size_rx.Get(); ok {
+		if param.modulo == modulo_128 {
+			param.window_size_rx = maybe.Just(min(window, AX25_K_MAXFRAME_EXTENDED_MAX))
 		} else {
-			param.window_size_rx = 4
+			param.window_size_rx = maybe.Just(min(window, AX25_K_MAXFRAME_BASIC_MAX))
 		}
 	} else {
-		if param.modulo == 128 {
-			param.window_size_rx = min(param.window_size_rx, AX25_K_MAXFRAME_EXTENDED_MAX)
+		// not specified, set default.
+		if param.modulo == modulo_128 {
+			param.window_size_rx = maybe.Just(32)
 		} else {
-			param.window_size_rx = min(param.window_size_rx, AX25_K_MAXFRAME_BASIC_MAX)
+			param.window_size_rx = maybe.Just(4)
 		}
 	}
 
@@ -5983,16 +5984,16 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// digipeaters in the path.  I'm assuming this is the FRACK value and any additional time, for
 	// digipeaters will be added in locally at each end on top of this exchanged value.
 
-	if param.ack_timer == G_UNKNOWN {
-		param.ack_timer = 3000 // not specified, set default.
+	if timer, ok := param.ack_timer.Get(); ok {
+		param.ack_timer = maybe.Just(max(timer, g_misc_config_p.frack*1000))
 	} else {
-		param.ack_timer = max(param.ack_timer, g_misc_config_p.frack*1000)
+		param.ack_timer = maybe.Just(3000) // not specified, set default.
 	}
 
-	if param.retries == G_UNKNOWN {
-		param.retries = 10 // not specified, set default.
+	if retries, ok := param.retries.Get(); ok {
+		param.retries = maybe.Just(max(retries, S.n2_retry))
 	} else {
-		param.retries = max(param.retries, S.n2_retry)
+		param.retries = maybe.Just(10) // not specified, set default.
 	}
 
 	// IMPORTANT:  Take values we have agreed upon and put into my running configuration.
@@ -6024,20 +6025,12 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 		S.modulo = param.modulo
 	}
 
-	if param.i_field_length_rx != G_UNKNOWN {
-		S.n1_paclen = param.i_field_length_rx
-	}
+	S.n1_paclen = maybe.FromMaybe(S.n1_paclen, param.i_field_length_rx)
+	S.k_maxframe = maybe.FromMaybe(S.k_maxframe, param.window_size_rx)
+	S.n2_retry = maybe.FromMaybe(S.n2_retry, param.retries)
 
-	if param.window_size_rx != G_UNKNOWN {
-		S.k_maxframe = param.window_size_rx
-	}
-
-	if param.ack_timer != G_UNKNOWN {
-		S.t1v = time.Duration(param.ack_timer) * time.Millisecond
-	}
-
-	if param.retries != G_UNKNOWN {
-		S.n2_retry = param.retries
+	if timer, ok := param.ack_timer.Get(); ok {
+		S.t1v = time.Duration(timer) * time.Millisecond
 	}
 }
 

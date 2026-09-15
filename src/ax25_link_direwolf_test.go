@@ -19,6 +19,7 @@ i.e. did we accidentally change/break something.
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1304,7 +1305,7 @@ func TestAX25LinkXIDParse(t *testing.T) {
 	// Test empty XID info
 	result, _, status := xid_parse(nil)
 	assert.Equal(t, 1, status, "Empty XID should parse successfully")
-	assert.Equal(t, G_UNKNOWN, result.full_duplex)
+	assert.Equal(t, maybe.Nothing[bool](), result.full_duplex)
 
 	// Test XID with just format indicator (minimal valid)
 	info := []byte{FI_Format_Indicator, GI_Group_Identifier, 0x00, 0x00}
@@ -1317,13 +1318,13 @@ func TestAX25LinkXIDEncode(t *testing.T) {
 	t.Helper()
 
 	var param xid_param_s
-	param.full_duplex = 0 // half duplex
+	param.full_duplex = maybe.Just(false) // half duplex
 	param.srej = srej_single
 	param.modulo = 128
-	param.i_field_length_rx = 256
-	param.window_size_rx = 32
-	param.ack_timer = 3000
-	param.retries = 10
+	param.i_field_length_rx = maybe.Just(256)
+	param.window_size_rx = maybe.Just(32)
+	param.ack_timer = maybe.Just(3000)
+	param.retries = maybe.Just(10)
 
 	// Encode the parameters
 	info := xid_encode(&param, cr_cmd)
@@ -1340,13 +1341,13 @@ func TestAX25LinkXIDRoundtrip(t *testing.T) {
 	t.Helper()
 
 	var original xid_param_s
-	original.full_duplex = 1
+	original.full_duplex = maybe.Just(true)
 	original.srej = srej_multi
 	original.modulo = 128
-	original.i_field_length_rx = 512
-	original.window_size_rx = 64
-	original.ack_timer = 5000
-	original.retries = 15
+	original.i_field_length_rx = maybe.Just(512)
+	original.window_size_rx = maybe.Just(64)
+	original.ack_timer = maybe.Just(5000)
+	original.retries = maybe.Just(15)
 
 	// Encode
 	info := xid_encode(&original, cr_cmd)
@@ -1389,13 +1390,13 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 
 	// Receive XID command
 	var param xid_param_s
-	param.full_duplex = 0
+	param.full_duplex = maybe.Just(false)
 	param.srej = srej_single
 	param.modulo = 128
-	param.i_field_length_rx = 256
-	param.window_size_rx = 32
-	param.ack_timer = 3000
-	param.retries = 10
+	param.i_field_length_rx = maybe.Just(256)
+	param.window_size_rx = maybe.Just(32)
+	param.ack_timer = maybe.Just(3000)
+	param.retries = maybe.Just(10)
 
 	xidInfo := xid_encode(&param, cr_cmd)
 
