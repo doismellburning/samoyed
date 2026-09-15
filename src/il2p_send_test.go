@@ -30,9 +30,9 @@ func TestIL2PSendFrameCRCDefaultMatchesEnabled(t *testing.T) {
 	require.NotNil(t, pp)
 
 	// Compute expected bits: preamble(1B) + sync(3B) + encoded-with-CRC.
-	var _, lenWithCRC = il2p_encode_frame(pp, 0, true)
+	var _, lenWithCRC = il2p_encode_frame(pp, IL2P_VERSION_COMPAT, 0, true)
 	var expectedBits = (1 + IL2P_SYNC_WORD_SIZE + lenWithCRC) * 8
 
-	var actual = il2p_send_frame(0, pp, 0, 0)
+	var actual = il2p_send_frame(0, pp, IL2P_VERSION_COMPAT, 0, 0)
 	assert.Equal(t, expectedBits, actual, "il2p_send_frame should append CRC when il2p_crc_enabled returns true")
 }

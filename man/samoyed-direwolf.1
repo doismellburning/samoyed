@@ -91,11 +91,14 @@ Divide audio sample by n for first channel.
 
 .TP
 .BI "-I " "n"
-Enable IL2P transmit.  n=1 is recommended.  0 uses weaker FEC.
+Enable IL2P transmit.  n=1 is recommended.  0 asks for the weaker FEC that only v0.4 has, so it does nothing unless IL2PVERSION 0.4 is in use.
 
 .TP
 .BI "-i " "n"
-Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 uses weaker FEC.
+Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for the weaker FEC that only v0.4 has, so it does nothing unless IL2PVERSION 0.4 is in use.
+.P
+Which version of IL2P is spoken is a per channel configuration file setting, IL2PVERSION.
+It defaults to 0.6; use "IL2PVERSION compat" on a channel shared with stations that speak only v0.4, such as Dire Wolf.
 
 .TP
 .BI "-d " "x"

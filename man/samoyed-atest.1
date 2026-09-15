@@ -86,6 +86,12 @@ Error if Greater than this number decoded.
 .BI  "-P " "m"
 Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.
 
+.TP
+.BI  "--il2p-version " "v"
+IL2P version to receive: 0.6 (default), 0.4, or compat.
+0.6, like compat, always expects the 16 parity symbols per payload block that v0.6 mandates, ignoring that now reserved bit.
+0.4 instead reads the number of payload parity symbols from the header FEC Level bit.
+
 
 
 .SH EXAMPLES

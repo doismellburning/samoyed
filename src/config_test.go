@@ -673,6 +673,40 @@ func Test_config_init_pbeacon_no_options(t *testing.T) {
 	})
 }
 
+// --- config_init IL2PVERSION directive ---
+
+func Test_config_init_il2pversion(t *testing.T) {
+	t.Run("0.6 by default", func(t *testing.T) {
+		var audio, _ = configFromString(t, "")
+		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+	})
+
+	t.Run("0.4 stored", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION 0.4\n")
+		assert.Equal(t, IL2P_VERSION_0_4, audio.achan[0].il2p_version)
+	})
+
+	t.Run("0.6 stored", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION 0.6\n")
+		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+	})
+
+	t.Run("compat stored", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION compat\n")
+		assert.Equal(t, IL2P_VERSION_COMPAT, audio.achan[0].il2p_version)
+	})
+
+	t.Run("unrecognised version leaves the default", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION 0.5\n")
+		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+	})
+
+	t.Run("missing version leaves the default", func(t *testing.T) {
+		var audio, _ = configFromString(t, "CHANNEL 0\nIL2PVERSION\n")
+		assert.Equal(t, IL2P_VERSION_0_6, audio.achan[0].il2p_version)
+	})
+}
+
 // --- config_init METRICSPORT directive ---
 
 func Test_config_init_metricsport(t *testing.T) {

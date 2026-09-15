@@ -10,7 +10,7 @@ import (
  *
  * Purpose:	Functions to deal with the IL2P header.
  *
- * Reference:	http://tarpn.net/t/il2p/il2p-specification0-4.pdf
+ * Reference:	https://tarpn.net/t/il2p/il2p-specification_draft_v0-6.pdf
  *
  *--------------------------------------------------------------------------------*/
 
@@ -209,7 +209,8 @@ func decode_pid(pid int) int {
  *
  * Inputs:	pp	- Packet object.
  *
- *		max_fec	- 1 to use maximum FEC symbols , 0 for automatic.
+ *		fec_level - Value for the header bit which is the FEC Level in
+ *			  v0.4 and RESERVED in v0.6.  See il2p_tx_fec.
  *
  * Returns:	hdr	- IL2P header with no scrambling or parity symbols.
  *			  Must be large enough to hold IL2P_HEADER_SIZE unsigned bytes.
@@ -226,7 +227,7 @@ func decode_pid(pid int) int {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
+func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
 	if ax25_get_num_addr(pp) != 2 {
@@ -398,7 +399,7 @@ func il2p_type_1_header(pp *packet_t, max_fec int) ([]byte, int) {
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]
 
-	SET_FEC_LEVEL(hdr, max_fec)
+	SET_FEC_LEVEL(hdr, fec_level)
 	SET_HDR_TYPE(hdr, 1)
 
 	var pinfo = AX25GetInfo(pp)
@@ -611,7 +612,8 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
  *
  * Inputs:	pp	- Packet object.
  *
- *		max_fec	- 1 to use maximum FEC symbols, 0 for automatic.
+ *		fec_level - Value for the header bit which is the FEC Level in
+ *			  v0.4 and RESERVED in v0.6.  See il2p_tx_fec.
  *
  * Returns:	hdr	- IL2P header with no scrambling or parity symbols.
  *			  Must be large enough to hold IL2P_HEADER_SIZE unsigned bytes.
@@ -626,12 +628,12 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
  *
  *--------------------------------------------------------------------------------*/
 
-func il2p_type_0_header(pp *packet_t, max_fec int) ([]byte, int) {
+func il2p_type_0_header(pp *packet_t, fec_level int) ([]byte, int) {
 	var hdr = make([]byte, IL2P_HEADER_SIZE)
 
 	// Bit 7 has [FEC Level:1], [HDR Type:1], [Payload byte Count:10]
 
-	SET_FEC_LEVEL(hdr, max_fec)
+	SET_FEC_LEVEL(hdr, fec_level)
 	SET_HDR_TYPE(hdr, 0)
 
 	var frame_len = ax25_get_frame_len(pp)
@@ -655,7 +657,8 @@ func il2p_type_0_header(pp *packet_t, max_fec int) ([]byte, int) {
  *
  * Returns:     hdr_type - 0 or 1.
  *
- *		max_fec	- 0 for automatic or 1 for fixed maximum size.
+ *		fec_level - The header bit which is the FEC Level in v0.4 and
+ *			  RESERVED in v0.6.  See il2p_rx_max_fec.
  *
  * Returns:	Payload byte count.   (actual payload size, not the larger encoded format)
  *

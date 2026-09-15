@@ -89,16 +89,16 @@ func TestIL2PCRCEncodeDecodeFrame(t *testing.T) {
 	require.NotNil(t, pp)
 
 	for max_fec := range 2 {
-		var encoded, enc_len = il2p_encode_frame(pp, max_fec, true)
+		var encoded, enc_len = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec, true)
 		assert.Positive(t, enc_len)
 
 		// Encoded should be 4 bytes longer than without CRC.
-		var encodedNoCRC, enc_len_no_crc = il2p_encode_frame(pp, max_fec)
+		var encodedNoCRC, enc_len_no_crc = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec)
 		assert.Equal(t, enc_len_no_crc+IL2P_CRC_ENCODED_SIZE, enc_len)
 		_ = encodedNoCRC
 
 		// Decode should succeed with CRC.
-		var pp2 = il2p_decode_frame(encoded)
+		var pp2 = il2p_decode_frame(encoded, IL2P_VERSION_0_4)
 		require.NotNil(t, pp2, "Failed to decode frame with CRC, max_fec=%d", max_fec)
 
 		assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(pp2))
@@ -130,7 +130,7 @@ func TestIL2PCRCSpecExamplesEndToEnd(t *testing.T) {
 	for _, td := range testData {
 		t.Run(td.name, func(t *testing.T) {
 			var b = il2pDataStringToBytes(td.inputData)
-			var pp = il2p_decode_frame(b)
+			var pp = il2p_decode_frame(b, IL2P_VERSION_COMPAT)
 			require.NotNil(t, pp)
 
 			var frameData = ax25_get_frame_data(pp)

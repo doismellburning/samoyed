@@ -500,7 +500,7 @@ func test_example_headers(t *testing.T) {
 	assert.NotNil(t, pp)
 
 	var max_fec = 0
-	var iout, ioutLen = il2p_encode_frame(pp, max_fec)
+	var iout, ioutLen = il2p_encode_frame(pp, IL2P_VERSION_0_4, max_fec)
 
 	// dw_printf ("expected for example 3:\n");
 	// fx_hex_dump(complete3, sizeof(complete3));
@@ -524,11 +524,23 @@ func test_example_headers(t *testing.T) {
 func enc_dec_compare(t *testing.T, pp1 *packet_t) {
 	t.Helper()
 
-	for max_fec := range 2 {
-		var encoded, enc_len = il2p_encode_frame(pp1, max_fec)
+	// Every version, and for v0.4 both FEC levels, should survive a round trip.
+	var cases = []struct {
+		version il2p_version_t
+		max_fec int
+	}{
+		{IL2P_VERSION_0_4, 0},
+		{IL2P_VERSION_0_4, 1},
+		{IL2P_VERSION_0_6, 0},
+		{IL2P_VERSION_COMPAT, 1}, // Compatibility transmits v0.4 but receives v0.6.
+
+	}
+
+	for _, c := range cases {
+		var encoded, enc_len = il2p_encode_frame(pp1, c.version, c.max_fec)
 		assert.GreaterOrEqual(t, enc_len, 0)
 
-		var pp2 = il2p_decode_frame(encoded)
+		var pp2 = il2p_decode_frame(encoded, c.version)
 		assert.NotNil(t, pp2)
 
 		// Is it the same after encoding to IL2P and then decoding?
@@ -734,6 +746,10 @@ func test_serdes(t *testing.T) {
 
 	dw_printf("\nTest serialize / deserialize...\n")
 
+	// Frames are sent as v0.4, so the receiver has to read the header FEC
+	// Level bit rather than assume the v0.6 fixed size.
+	il2pTestChannelVersion(t, IL2P_VERSION_0_4)
+
 	il2pSerdesRecCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
@@ -753,7 +769,7 @@ func test_serdes(t *testing.T) {
 		for max_fec := range 2 {
 			//nolint:intrange // il2pSerdesPolarity is a package-level global read by callbacks; a range loop would shadow it with a local.
 			for il2pSerdesPolarity = 0; il2pSerdesPolarity <= 2; il2pSerdesPolarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, max_fec, il2pSerdesPolarity)
+				var num_bits_sent = il2p_send_frame(channel, pp, IL2P_VERSION_0_4, max_fec, il2pSerdesPolarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.

@@ -202,6 +202,10 @@ Higher values = Try modifying more bits to get a good CRC.
 x = FX.25
 o = DCD output control
 2 = IL2P`)
+	var il2pVersion = pflag.String("il2p-version", "0.6", `IL2P version to receive.
+    0.6     - 16 parity symbols per payload block, ignoring that reserved bit.  (default)
+    0.4     - The header FEC Level bit selects the number of payload parity symbols.
+    compat  - Same as 0.6.`)
 	var help = pflag.Bool("help", false, "Display help text.")
 
 	pflag.Usage = func() {
@@ -255,6 +259,18 @@ o = DCD output control
 		fmt.Fprintf(os.Stderr, "Decimate should be between 0 and 8 inclusive, not %d.\n", *decimate)
 		pflag.Usage()
 		os.Exit(1)
+	}
+
+	var il2p_version, il2p_version_ok = il2p_parse_version(*il2pVersion)
+	if !il2p_version_ok {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Invalid IL2P version %s.  Expected 0.4, 0.6, or compat.\n", *il2pVersion)
+		pflag.Usage()
+		os.Exit(1)
+	}
+
+	for channel := range MAX_RADIO_CHANS {
+		my_audio_config.achan[channel].il2p_version = il2p_version
 	}
 
 	my_audio_config.achan[0].decimate = *decimate

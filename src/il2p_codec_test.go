@@ -10,7 +10,7 @@ import (
 func TestIL2PDecodeFrameShortInputReturnsNil(t *testing.T) {
 	il2p_init(0)
 	// Input shorter than IL2P_HEADER_SIZE+IL2P_HEADER_PARITY must not panic.
-	var pp = il2p_decode_frame([]byte{0x01, 0x02, 0x03})
+	var pp = il2p_decode_frame([]byte{0x01, 0x02, 0x03}, IL2P_VERSION_0_4)
 	assert.Nil(t, pp)
 }
 
@@ -21,7 +21,7 @@ func TestIL2PDecodeFrameHeaderFECFailureReturnsNil(t *testing.T) {
 	var twoErrors = make([]byte, IL2P_HEADER_SIZE+IL2P_HEADER_PARITY)
 	twoErrors[0] = 0x01
 	twoErrors[1] = 0x01
-	var pp = il2p_decode_frame(twoErrors)
+	var pp = il2p_decode_frame(twoErrors, IL2P_VERSION_0_4)
 	assert.Nil(t, pp)
 }
 
@@ -36,12 +36,12 @@ func TestIL2PDecodeFrameTruncatedPayloadReturnsNil(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
-	var encoded, elen = il2p_encode_frame(pp, 0)
+	var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_4, 0)
 	require.Positive(t, elen)
 
 	// Keep only the header bytes plus 1 byte of payload — far less than encoded_payload_size.
 	var truncated = encoded[:IL2P_HEADER_SIZE+IL2P_HEADER_PARITY+1]
-	var pp2 = il2p_decode_frame(truncated)
+	var pp2 = il2p_decode_frame(truncated, IL2P_VERSION_0_4)
 	assert.Nil(t, pp2)
 }
 
@@ -57,12 +57,12 @@ func TestIL2PDecodeFrameJunkTrailingBytesReturnsNil(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_UI, 0, 0xF0, pinfo)
 	require.NotNil(t, pp)
 
-	var encoded, elen = il2p_encode_frame(pp, 0)
+	var encoded, elen = il2p_encode_frame(pp, IL2P_VERSION_0_4, 0)
 	require.Positive(t, elen)
 
 	for junk := 1; junk < IL2P_CRC_ENCODED_SIZE; junk++ {
 		var padded = append(encoded, make([]byte, junk)...)
-		var pp2 = il2p_decode_frame(padded)
+		var pp2 = il2p_decode_frame(padded, IL2P_VERSION_0_4)
 		assert.Nil(t, pp2, "expected nil for %d trailing junk byte(s)", junk)
 	}
 }
