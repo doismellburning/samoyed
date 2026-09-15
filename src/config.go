@@ -133,12 +133,20 @@ type beacon_s struct {
 	commentcmd string /* Command to append more to Comment or empty. */
 }
 
+// agwpe_login_s is one user name and password pair accepted by the "AGW TCPIP
+// Socket Interface".  AGWPE has a list of these rather than a single one, so a
+// station can hand out separate credentials and withdraw one of them later.
+type agwpe_login_s struct {
+	user     string
+	password string
+}
+
 type misc_config_s struct {
 	agwpe_port int /* TCP Port number for the "AGW TCPIP Socket Interface" */
 
-	agwpe_login    string /* User name and password a client must supply in an AGW */
-	agwpe_password string /* "Application Login" frame before any of its other commands */
-	/* are honoured.  Empty (the default) means no login is required. */
+	agwpe_logins []agwpe_login_s /* User names and passwords, any one of which a client */
+	/* may supply in an AGW "Application Login" frame before any of its other */
+	/* commands are honoured.  Empty (the default) means no login is required. */
 
 	metrics_port int /* TCP Port number for the Prometheus "/metrics" HTTP endpoint. */
 	/* 0 (default) disables it. */
@@ -5301,6 +5309,8 @@ func handleAGWLOGIN(ps *parseState) bool {
 	 * Without this, anyone who can reach the AGW port can use it.  With it, a
 	 * client has to send a matching "Application Login" frame before any of its
 	 * other commands are honoured.
+	 *
+	 * May appear more than once; a client may use any one of the sets.
 	 */
 	var user = split("", false)
 	if user == "" {
@@ -5330,8 +5340,11 @@ func handleAGWLOGIN(ps *parseState) bool {
 		return true
 	}
 
-	ps.misc.agwpe_login = user
-	ps.misc.agwpe_password = password
+	/* Each line adds another set of credentials, rather than replacing the last. */
+	var login = new(agwpe_login_s)
+	login.user = user
+	login.password = password
+	ps.misc.agwpe_logins = append(ps.misc.agwpe_logins, *login)
 
 	return false
 }

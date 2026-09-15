@@ -26,28 +26,35 @@ func loginFrame(user string, password string) *AGWPEMessage {
 	return cmd
 }
 
-// requireLogin configures a user name and password for the AGW port for the
-// duration of the test, and starts client 0 logged out.
-func requireLogin(t *testing.T, user string, password string) {
+// requireLogins configures credentials for the AGW port for the duration of the
+// test, and starts client 0 logged out.  No pairs means no login required.
+func requireLogins(t *testing.T, pairs ...string) {
 	t.Helper()
+	require.Zero(t, len(pairs)%2, "want a password for every user name")
 
-	var oldLogin, oldPassword = agwpe_login, agwpe_password
-	agwpe_login = user
-	agwpe_password = password
+	var logins []agwpe_login_s
+	for i := 0; i < len(pairs); i += 2 {
+		var login = new(agwpe_login_s)
+		login.user = pairs[i]
+		login.password = pairs[i+1]
+		logins = append(logins, *login)
+	}
+
+	var old = agwpe_logins
+	agwpe_logins = logins
 	client_logged_in[0].Store(false)
 
 	t.Cleanup(func() {
-		agwpe_login = oldLogin
-		agwpe_password = oldPassword
+		agwpe_logins = old
 		client_logged_in[0].Store(false)
 	})
 }
 
 func TestAgwLoginRequired(t *testing.T) {
-	requireLogin(t, "", "")
-	assert.False(t, agwLoginRequired(), "no user name configured means no login")
+	requireLogins(t)
+	assert.False(t, agwLoginRequired(), "no credentials configured means no login")
 
-	requireLogin(t, "Q1TEST", "hunter2")
+	requireLogins(t, "Q1TEST", "hunter2")
 	assert.True(t, agwLoginRequired())
 }
 
@@ -124,7 +131,7 @@ func TestParseAGWLogin_OversizedData(t *testing.T) {
 }
 
 func TestHandleClientCommand_P_CorrectCredentialsLogIn(t *testing.T) {
-	requireLogin(t, "Q1TEST", "hunter2")
+	requireLogins(t, "Q1TEST", "hunter2")
 
 	handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
 
@@ -132,7 +139,7 @@ func TestHandleClientCommand_P_CorrectCredentialsLogIn(t *testing.T) {
 }
 
 func TestHandleClientCommand_P_WrongCredentialsDoNotLogIn(t *testing.T) {
-	requireLogin(t, "Q1TEST", "hunter2")
+	requireLogins(t, "Q1TEST", "hunter2")
 
 	handleClientCommand(0, loginFrame("Q1TEST", "hunter3"))
 	assert.False(t, client_logged_in[0].Load(), "wrong password")
@@ -144,10 +151,48 @@ func TestHandleClientCommand_P_WrongCredentialsDoNotLogIn(t *testing.T) {
 	assert.False(t, client_logged_in[0].Load(), "empty credentials")
 }
 
+// AGWPE accepts any one of the user name and password combinations it has been
+// given, so each set has to work in its own right.
+func TestHandleClientCommand_P_AnyConfiguredCredentialsLogIn(t *testing.T) {
+	requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
+
+	handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
+	assert.True(t, client_logged_in[0].Load(), "first set")
+
+	client_logged_in[0].Store(false)
+
+	handleClientCommand(0, loginFrame("Q2TEST", "correct horse"))
+	assert.True(t, client_logged_in[0].Load(), "second set")
+}
+
+// Credentials are matched as a pair, so one user's password does not open
+// another user's account.
+func TestHandleClientCommand_P_CredentialsDoNotCrossBetweenUsers(t *testing.T) {
+	requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
+
+	handleClientCommand(0, loginFrame("Q1TEST", "correct horse"))
+	assert.False(t, client_logged_in[0].Load())
+
+	handleClientCommand(0, loginFrame("Q2TEST", "hunter2"))
+	assert.False(t, client_logged_in[0].Load())
+}
+
+func TestAgwMatchLogin(t *testing.T) {
+	requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
+
+	var matched, accepted = agwMatchLogin("Q2TEST", "correct horse")
+	assert.True(t, accepted)
+	assert.Equal(t, "Q2TEST", matched, "the name reported is the one we configured")
+
+	matched, accepted = agwMatchLogin("Q3TEST", "hunter2")
+	assert.False(t, accepted)
+	assert.Empty(t, matched)
+}
+
 // An accepted login is not permanent: getting it wrong afterwards takes it away
 // again, so a client cannot log in and then hand the socket to someone else.
 func TestHandleClientCommand_P_FailureAfterSuccessLogsOut(t *testing.T) {
-	requireLogin(t, "Q1TEST", "hunter2")
+	requireLogins(t, "Q1TEST", "hunter2")
 
 	handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
 	require.True(t, client_logged_in[0].Load())
@@ -157,7 +202,7 @@ func TestHandleClientCommand_P_FailureAfterSuccessLogsOut(t *testing.T) {
 }
 
 func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
-	requireLogin(t, "Q1TEST", "hunter2")
+	requireLogins(t, "Q1TEST", "hunter2")
 
 	// Shorter than the two fixed size fields, so there is nothing to compare.
 	var cmd = new(AGWPEMessage)
@@ -172,7 +217,7 @@ func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
 
 // Without AGWLOGIN, a login frame is silently ignored, as Dire Wolf does.
 func TestHandleClientCommand_P_IgnoredWhenNoLoginConfigured(t *testing.T) {
-	requireLogin(t, "", "")
+	requireLogins(t)
 
 	handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
 
@@ -180,7 +225,7 @@ func TestHandleClientCommand_P_IgnoredWhenNoLoginConfigured(t *testing.T) {
 }
 
 func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
-	requireLogin(t, "Q1TEST", "hunter2")
+	requireLogins(t, "Q1TEST", "hunter2")
 
 	var client = setupClientPipe(t)
 	var replyCh = asyncReply(client)
@@ -208,7 +253,7 @@ func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
 
 // Without AGWLOGIN nothing changes: commands work without any login at all.
 func TestHandleClientCommand_NoLoginConfiguredCommandsWork(t *testing.T) {
-	requireLogin(t, "", "")
+	requireLogins(t)
 
 	var client = setupClientPipe(t)
 	var replyCh = asyncReply(client)

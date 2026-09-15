@@ -176,6 +176,18 @@ Quote either value if it contains spaces.  To change the password, edit the line
 and restart.  Without an ``AGWLOGIN`` line nothing changes: clients connect and
 work without logging in, as they always have.
 
+Repeat the directive to accept more than one set of credentials, as AGWPE does,
+so that each client can have its own and one of them can be withdrawn without
+disturbing the rest:
+
+.. code::
+
+    AGWLOGIN Q1TEST "correct horse battery staple"
+    AGWLOGIN Q2TEST "trombone vs mahogany"
+
+A client may use any one of them; the user name and password are matched as a
+pair, so one client's password does not unlock another client's user name.
+
 A client authenticates with the protocol's "Application Login" (``'P'``) frame -
 in `pyham_pe <https://github.com/mfncooper/pyham_pe>`__, for instance,
 ``login(userid, password)``.  Note that the protocol has no reply to it, so a

@@ -148,9 +148,12 @@ var enable_send_monitor_to_client [MAX_NET_CLIENTS]bool
 // password, in the data of an "Application Login" frame.  Both are NUL padded.
 const AGW_LOGIN_FIELD_LEN = 255
 
-var agwpe_login string    /* User name and password a client must send in an */
-var agwpe_password string /* "Application Login" frame before we honour any of its */
-/* other commands.  Empty means no login is required. */
+var agwpe_logins []agwpe_login_s
+
+/* User names and passwords, any one of which a client may send in an */
+/* "Application Login" frame before we honour any of its other commands. */
+/* Empty means no login is required.  Written once at startup, read by every */
+/* client's command thread thereafter. */
 
 var client_logged_in [MAX_NET_CLIENTS]atomic.Bool
 
@@ -333,8 +336,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 
 	save_audio_config_p = audio_config_p
 
-	agwpe_login = mc.agwpe_login
-	agwpe_password = mc.agwpe_password
+	agwpe_logins = mc.agwpe_logins
 
 	for client := range MAX_NET_CLIENTS {
 		enable_send_raw_to_client[client] = false
@@ -351,7 +353,8 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 
 	if agwLoginRequired() {
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("AGW client applications must log in as \"%s\".\n", agwpe_login)
+		dw_printf("AGW client applications must log in.  %d set(s) of credentials configured.\n",
+			len(agwpe_logins))
 	}
 
 	/*
@@ -1042,7 +1045,31 @@ func cmd_listen_thread(client int) {
 // agwLoginRequired reports whether a client has to log in before we honour any
 // of its other commands.
 func agwLoginRequired() bool {
-	return agwpe_login != ""
+	return len(agwpe_logins) > 0
+}
+
+// agwMatchLogin looks for credentials from an "Application Login" frame among
+// those configured, and returns the configured user name that matched.
+//
+// Every set is compared, with no early exit, so how long this takes says
+// nothing about which user names exist.  The name it hands back is our own
+// configured text rather than the client's, so it is safe to print.
+func agwMatchLogin(user string, password string) (string, bool) {
+	var matched string
+	var accepted bool
+
+	for _, login := range agwpe_logins {
+		/* Constant time so a password can't be guessed a character at a time. */
+		var userOK = subtle.ConstantTimeCompare([]byte(user), []byte(login.user)) == 1
+		var passwordOK = subtle.ConstantTimeCompare([]byte(password), []byte(login.password)) == 1
+
+		if userOK && passwordOK {
+			matched = login.user
+			accepted = true
+		}
+	}
+
+	return matched, accepted
 }
 
 // parseAGWLogin splits the data of an "Application Login" frame into its user
@@ -1092,11 +1119,8 @@ func handleClientLogin(client int, cmd *AGWPEMessage) {
 		return
 	}
 
-	/* Compared in constant time so a password can't be guessed a character at a time. */
-	var userOK = subtle.ConstantTimeCompare([]byte(user), []byte(agwpe_login)) == 1
-	var passwordOK = subtle.ConstantTimeCompare([]byte(password), []byte(agwpe_password)) == 1
-
-	if !userOK || !passwordOK {
+	var matched, accepted = agwMatchLogin(user, password)
+	if !accepted {
 		/* The user name is not echoed back; it is whatever the other end chose to send. */
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW client application %d sent an incorrect user name or password.  Its commands will be ignored.\n", client)
@@ -1108,7 +1132,7 @@ func handleClientLogin(client int, cmd *AGWPEMessage) {
 	client_logged_in[client].Store(true)
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("AGW client application %d logged in as \"%s\".\n", client, agwpe_login)
+	dw_printf("AGW client application %d logged in as \"%s\".\n", client, matched)
 }
 
 func handleClientCommand(client int, cmd *AGWPEMessage) {

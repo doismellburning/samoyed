@@ -590,38 +590,55 @@ func Test_config_init_agwport(t *testing.T) {
 func Test_config_init_agwlogin(t *testing.T) {
 	t.Run("AGWLOGIN sets user name and password", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWLOGIN Q1TEST hunter2\n")
-		assert.Equal(t, "Q1TEST", misc.agwpe_login)
-		assert.Equal(t, "hunter2", misc.agwpe_password)
+		require.Len(t, misc.agwpe_logins, 1)
+		assert.Equal(t, "Q1TEST", misc.agwpe_logins[0].user)
+		assert.Equal(t, "hunter2", misc.agwpe_logins[0].password)
 	})
 
 	t.Run("AGWLOGIN keeps spaces within a quoted password", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWLOGIN Q1TEST \"correct horse battery staple\"\n")
-		assert.Equal(t, "correct horse battery staple", misc.agwpe_password)
+		require.Len(t, misc.agwpe_logins, 1)
+		assert.Equal(t, "correct horse battery staple", misc.agwpe_logins[0].password)
+	})
+
+	// AGWPE keeps a list of users, so each line adds to it rather than
+	// replacing what came before.
+	t.Run("repeated AGWLOGIN accumulates credentials", func(t *testing.T) {
+		var _, misc = configFromString(t,
+			"AGWLOGIN Q1TEST hunter2\nAGWLOGIN Q2TEST \"correct horse\"\n")
+		require.Len(t, misc.agwpe_logins, 2)
+		assert.Equal(t, "Q1TEST", misc.agwpe_logins[0].user)
+		assert.Equal(t, "hunter2", misc.agwpe_logins[0].password)
+		assert.Equal(t, "Q2TEST", misc.agwpe_logins[1].user)
+		assert.Equal(t, "correct horse", misc.agwpe_logins[1].password)
 	})
 
 	t.Run("no AGWLOGIN means no login required", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWPORT 8000\n")
-		assert.Empty(t, misc.agwpe_login)
-		assert.Empty(t, misc.agwpe_password)
+		assert.Empty(t, misc.agwpe_logins)
 	})
 
 	t.Run("AGWLOGIN without a password is rejected", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWLOGIN Q1TEST\n")
-		assert.Empty(t, misc.agwpe_login)
-		assert.Empty(t, misc.agwpe_password)
+		assert.Empty(t, misc.agwpe_logins)
 	})
 
 	t.Run("AGWLOGIN without a user name is rejected", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWLOGIN\n")
-		assert.Empty(t, misc.agwpe_login)
-		assert.Empty(t, misc.agwpe_password)
+		assert.Empty(t, misc.agwpe_logins)
 	})
 
 	t.Run("AGWLOGIN too long to fit in a login frame is rejected", func(t *testing.T) {
 		var long = strings.Repeat("x", AGW_LOGIN_FIELD_LEN+1)
 		var _, misc = configFromString(t, "AGWLOGIN Q1TEST "+long+"\n")
-		assert.Empty(t, misc.agwpe_login)
-		assert.Empty(t, misc.agwpe_password)
+		assert.Empty(t, misc.agwpe_logins)
+	})
+
+	// A rejected line must not take a good one down with it.
+	t.Run("a rejected AGWLOGIN leaves earlier ones in place", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWLOGIN Q1TEST hunter2\nAGWLOGIN Q2TEST\n")
+		require.Len(t, misc.agwpe_logins, 1)
+		assert.Equal(t, "Q1TEST", misc.agwpe_logins[0].user)
 	})
 }
 
