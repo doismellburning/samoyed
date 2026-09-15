@@ -136,6 +136,10 @@ type beacon_s struct {
 type misc_config_s struct {
 	agwpe_port int /* TCP Port number for the "AGW TCPIP Socket Interface" */
 
+	agwpe_login    string /* User name and password a client must supply in an AGW */
+	agwpe_password string /* "Application Login" frame before any of its other commands */
+	/* are honoured.  Empty (the default) means no login is required. */
+
 	metrics_port int /* TCP Port number for the Prometheus "/metrics" HTTP endpoint. */
 	/* 0 (default) disables it. */
 
@@ -894,6 +898,7 @@ var configHandlers = map[string]configHandler{
 	"IGMSP":          handleIGMSP,
 	"SATGATE":        handleSATGATE,
 	"AGWPORT":        handleAGWPORT,
+	"AGWLOGIN":       handleAGWLOGIN,
 	"METRICSPORT":    handleMETRICSPORT,
 	"KISSPORT":       handleKISSPORT,
 	"NULLMODEM":      handleNULLMODEM,
@@ -5282,6 +5287,51 @@ func handleAGWPORT(ps *parseState) bool {
 		dw_printf("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n",
 			ps.line, ps.misc.agwpe_port)
 	}
+
+	return false
+}
+
+// handleAGWLOGIN handles the AGWLOGIN keyword.
+func handleAGWLOGIN(ps *parseState) bool {
+	/*
+	 * AGWLOGIN		- User name and password for the "AGW TCPIP Socket Interface"
+	 *
+	 * AGWLOGIN  user  password
+	 *
+	 * Without this, anyone who can reach the AGW port can use it.  With it, a
+	 * client has to send a matching "Application Login" frame before any of its
+	 * other commands are honoured.
+	 */
+	var user = split("", false)
+	if user == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing user name for AGWLOGIN command.\n", ps.line)
+
+		return true
+	}
+
+	var password = split("", false)
+	if password == "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Missing password for AGWLOGIN command.\n", ps.line)
+
+		return true
+	}
+
+	/*
+	 * The protocol has a fixed size field for each, so anything longer could
+	 * never be sent, never mind matched.
+	 */
+	if len(user) > AGW_LOGIN_FIELD_LEN || len(password) > AGW_LOGIN_FIELD_LEN {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: User name and password for AGWLOGIN must each be %d characters or fewer.\n",
+			ps.line, AGW_LOGIN_FIELD_LEN)
+
+		return true
+	}
+
+	ps.misc.agwpe_login = user
+	ps.misc.agwpe_password = password
 
 	return false
 }

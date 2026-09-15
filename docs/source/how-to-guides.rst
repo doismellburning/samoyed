@@ -157,3 +157,33 @@ worked, not how many bits it had to touch, so the two are not comparable
 quantities and are not summed together.
 
 A starter Grafana dashboard is provided at ``conf/grafana-dashboard.json``.
+
+
+Put a password on the AGW port
+--------------------------------------------
+
+The "AGW TCPIP Socket Interface" has no authentication of its own, so anything
+that can reach port 8000 can transmit through your radio.  Binding it to
+localhost or firewalling it off remains the strongest protection, but where the
+port has to be reachable, ``AGWLOGIN`` requires a user name and password before
+anything else a client asks for is honoured:
+
+.. code::
+
+    AGWLOGIN Q1TEST "correct horse battery staple"
+
+Quote either value if it contains spaces.  To change the password, edit the line
+and restart.  Without an ``AGWLOGIN`` line nothing changes: clients connect and
+work without logging in, as they always have.
+
+A client authenticates with the protocol's "Application Login" (``'P'``) frame -
+in `pyham_pe <https://github.com/mfncooper/pyham_pe>`__, for instance,
+``login(userid, password)``.  Note that the protocol has no reply to it, so a
+client learns that it got the credentials wrong only by having its subsequent
+commands ignored; the failure is logged at this end.  Not every client can send
+the frame at all - Xastir and QtSoundModem, for example, cannot - so check yours
+before turning this on.
+
+The credentials cross the network in the clear, exactly as the AGW protocol
+specifies them.  Treat this as a way to keep casual traffic off the port, not as
+protection against someone who can watch it.

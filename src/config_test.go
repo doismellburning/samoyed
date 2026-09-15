@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -581,6 +582,46 @@ func Test_config_init_agwport(t *testing.T) {
 	t.Run("AGWPORT with valid port sets agwpe_port", func(t *testing.T) {
 		var _, misc = configFromString(t, "AGWPORT 8000\n")
 		assert.Equal(t, 8000, misc.agwpe_port)
+	})
+}
+
+// --- config_init AGWLOGIN directive ---
+
+func Test_config_init_agwlogin(t *testing.T) {
+	t.Run("AGWLOGIN sets user name and password", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWLOGIN Q1TEST hunter2\n")
+		assert.Equal(t, "Q1TEST", misc.agwpe_login)
+		assert.Equal(t, "hunter2", misc.agwpe_password)
+	})
+
+	t.Run("AGWLOGIN keeps spaces within a quoted password", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWLOGIN Q1TEST \"correct horse battery staple\"\n")
+		assert.Equal(t, "correct horse battery staple", misc.agwpe_password)
+	})
+
+	t.Run("no AGWLOGIN means no login required", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWPORT 8000\n")
+		assert.Empty(t, misc.agwpe_login)
+		assert.Empty(t, misc.agwpe_password)
+	})
+
+	t.Run("AGWLOGIN without a password is rejected", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWLOGIN Q1TEST\n")
+		assert.Empty(t, misc.agwpe_login)
+		assert.Empty(t, misc.agwpe_password)
+	})
+
+	t.Run("AGWLOGIN without a user name is rejected", func(t *testing.T) {
+		var _, misc = configFromString(t, "AGWLOGIN\n")
+		assert.Empty(t, misc.agwpe_login)
+		assert.Empty(t, misc.agwpe_password)
+	})
+
+	t.Run("AGWLOGIN too long to fit in a login frame is rejected", func(t *testing.T) {
+		var long = strings.Repeat("x", AGW_LOGIN_FIELD_LEN+1)
+		var _, misc = configFromString(t, "AGWLOGIN Q1TEST "+long+"\n")
+		assert.Empty(t, misc.agwpe_login)
+		assert.Empty(t, misc.agwpe_password)
 	})
 }
 
