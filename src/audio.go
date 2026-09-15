@@ -463,6 +463,11 @@ type audio_s struct {
 
 const DEFAULT_ADEVICE = "default" // Use default device for PortAudio.
 
+// AUTO_ADEVICE asks, in a configuration file, for the automatic detection that
+// an unspecified device gets anyway.  It exists so that a configuration can say
+// out loud that it wants whatever sound card is attached.
+const AUTO_ADEVICE = "auto"
+
 /*
  * UDP audio receiving port.  Couldn't find any standard or usage precedent.
  * Got the number from this example:   http://gqrx.dk/doc/streaming-audio-over-udp
@@ -805,6 +810,15 @@ func audioNameIsUDP(name string) bool {
 	return strings.HasPrefix(strings.ToLower(name), "udp:")
 }
 
+// audioNameIsDefault reports whether an audio device name asks for whichever
+// device we can find, rather than naming one: what a configuration without an
+// ADEVICE leaves behind, and what "auto" says on purpose.
+func audioNameIsDefault(name string) bool {
+	return name == "" ||
+		strings.EqualFold(name, DEFAULT_ADEVICE) ||
+		strings.EqualFold(name, AUTO_ADEVICE)
+}
+
 // audio_out_type_e says what the transmit side of an audio device is attached to.
 type audio_out_type_e int
 
@@ -864,7 +878,7 @@ func audioOutputRequired(ad *adev_param_s) bool {
 func applyCommandLineAudioSource(ad *adev_param_s, name string) {
 	ad.adevice_in = name
 
-	if !ad.adevice_out_specified && strings.EqualFold(ad.adevice_out, DEFAULT_ADEVICE) {
+	if !ad.adevice_out_specified && audioNameIsDefault(ad.adevice_out) {
 		ad.adevice_out = name
 	}
 }
@@ -1103,9 +1117,281 @@ func matchPortAudioDeviceByName(name string, forInput bool, devices []*portaudio
 	return nil
 }
 
+// alsaHardwareMarker appears in the PortAudio name of an ALSA device that is a
+// real sound card - "USB Audio CODEC: USB Audio (hw:1,0)" - and not in the
+// names of the ALSA plugins that PortAudio enumerates alongside them.
+const alsaHardwareMarker = "(hw:"
+
+// virtualAudioDeviceNames are names that belong to something other than a
+// sound card: ALSA plugins routing to a sound server, to another plugin, or to
+// a card the system picked for us, and the Windows sound mapper.  Automatic
+// detection is looking for the one sound card attached to the machine, so
+// these neither count towards its answer nor can be it.
+var virtualAudioDeviceNames = map[string]bool{
+	"a52":        true,
+	"default":    true,
+	"dmix":       true,
+	"dsnoop":     true,
+	"front":      true,
+	"hdmi":       true,
+	"iec958":     true,
+	"jack":       true,
+	"lavrate":    true,
+	"modem":      true,
+	"null":       true,
+	"oss":        true,
+	"phoneline":  true,
+	"pipewire":   true,
+	"pulse":      true,
+	"samplerate": true,
+	"spdif":      true,
+	"speexrate":  true,
+	"surround21": true,
+	"surround40": true,
+	"surround41": true,
+	"surround50": true,
+	"surround51": true,
+	"surround71": true,
+	"sysdefault": true,
+	"upmix":      true,
+	"usbstream":  true,
+	"vdownmix":   true,
+}
+
+// audioDeviceNameIsVirtual reports whether a PortAudio device name is one of
+// the software devices above, rather than a sound card.
+func audioDeviceNameIsVirtual(name string) bool {
+	var lower = strings.ToLower(strings.TrimSpace(name))
+
+	if virtualAudioDeviceNames[lower] {
+		return true
+	}
+
+	// A plugin can be qualified by the card it wraps: "sysdefault:CARD=Device",
+	// "front:CARD=PCH,DEV=0".  A sound card's own name has its description
+	// before the colon ("USB Audio CODEC: USB Audio (hw:1,0)"), so only the
+	// plugin names match here.
+	if colon := strings.IndexByte(lower, ':'); colon > 0 && virtualAudioDeviceNames[lower[:colon]] {
+		return true
+	}
+
+	// The Windows sound mapper is the system's choice of device, not a device.
+	return strings.HasPrefix(lower, "microsoft sound mapper")
+}
+
+// hardwareAudioDevices returns the sound cards among devices that can capture
+// (forInput) or play (!forInput).
+//
+// ALSA presents both cards and plugins through PortAudio, so where any card is
+// enumerated the plugins are dropped: the plugin list is long, largely fixed,
+// and says nothing about what is attached to the machine, which would leave a
+// single sound card looking like one of a dozen devices.  Other host APIs
+// enumerate cards alone, and keep everything that is left after the software
+// devices above.
+func hardwareAudioDevices(devices []*portaudio.DeviceInfo, forInput bool) []*portaudio.DeviceInfo {
+	var candidates []*portaudio.DeviceInfo
+
+	var anyALSAHardware = false
+
+	for _, dev := range devices {
+		if forInput && dev.MaxInputChannels <= 0 {
+			continue
+		}
+
+		if !forInput && dev.MaxOutputChannels <= 0 {
+			continue
+		}
+
+		if audioDeviceNameIsVirtual(dev.Name) {
+			continue
+		}
+
+		if strings.Contains(dev.Name, alsaHardwareMarker) {
+			anyALSAHardware = true
+		}
+
+		candidates = append(candidates, dev)
+	}
+
+	if !anyALSAHardware {
+		return candidates
+	}
+
+	var hardware []*portaudio.DeviceInfo
+
+	for _, dev := range candidates {
+		if strings.Contains(dev.Name, alsaHardwareMarker) {
+			hardware = append(hardware, dev)
+		}
+	}
+
+	return hardware
+}
+
+// autoDetectAudioDevice returns the one sound card that can serve the given
+// direction.  A machine with none, or with a choice to make, gets nil: only an
+// unambiguous answer is worth acting on without being asked.
+func autoDetectAudioDevice(devices []*portaudio.DeviceInfo, forInput bool) *portaudio.DeviceInfo {
+	var candidates = hardwareAudioDevices(devices, forInput)
+
+	if len(candidates) != 1 {
+		return nil
+	}
+
+	return candidates[0]
+}
+
+// audioDeviceSupportsFormat reports whether dev can be opened with the sample
+// rate, channel count and sample size that ad asks for.
+//
+// Automatic detection picks a sound card directly, where the default device is
+// typically a plugin or sound server that converts whatever it is given, so a
+// card that is busy elsewhere, or that does not do mono, or 44100, would turn
+// a station that used to start into one that does not.  Ask PortAudio first
+// and leave such a card alone.
+func audioDeviceSupportsFormat(dev *portaudio.DeviceInfo, ad *adev_param_s, forInput bool) bool {
+	var params = portaudio.StreamParameters{
+		Input:           portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+		Output:          portaudio.StreamDeviceParameters{Device: nil, Channels: 0, Latency: 0},
+		SampleRate:      float64(ad.samples_per_sec),
+		FramesPerBuffer: portaudio.FramesPerBufferUnspecified,
+		Flags:           portaudio.NoFlag,
+	}
+
+	if forInput {
+		params.Input = portaudio.StreamDeviceParameters{
+			Device:   dev,
+			Channels: ad.num_channels,
+			Latency:  dev.DefaultHighInputLatency,
+		}
+	} else {
+		params.Output = portaudio.StreamDeviceParameters{
+			Device:   dev,
+			Channels: ad.num_channels,
+			Latency:  dev.DefaultHighOutputLatency,
+		}
+	}
+
+	// The sample format comes from the argument type, exactly as it does when
+	// opening the stream; which direction it describes comes from the channel
+	// counts above.
+	var err = quietPortAudio(func() error {
+		if ad.bits_per_sample == 16 {
+			return portaudio.IsFormatSupported(params, func([]int16) {})
+		}
+
+		return portaudio.IsFormatSupported(params, func([]uint8) {})
+	})
+
+	return err == nil
+}
+
+// resolveDefaultAudioDevices names the sound card to use for any device left
+// at the default, so that a machine with one sound card needs no ADEVICE at
+// all.  Anything named in the configuration, and anything that is not a sound
+// card - standard input, UDP - is left alone, as is a default we cannot
+// resolve unambiguously: PortAudio's own default device still answers for
+// those, as it always did.
+//
+// supportsFormat is audioDeviceSupportsFormat outside tests.
+func resolveDefaultAudioDevices(pa *audio_s, devices []*portaudio.DeviceInfo,
+	supportsFormat func(dev *portaudio.DeviceInfo, ad *adev_param_s, forInput bool) bool) {
+	// Detection answers the "one interface, nothing configured" case.  A
+	// configuration defining more than one audio device is choosing devices by
+	// hand, and the card detection would settle on is likely the one another
+	// device already names, so leave its defaults to PortAudio.
+	var defined = 0
+
+	for a := range MAX_ADEVS {
+		if pa.adev[a].defined != 0 {
+			defined++
+		}
+	}
+
+	if defined != 1 {
+		return
+	}
+
+	for a := range MAX_ADEVS {
+		if pa.adev[a].defined == 0 {
+			continue
+		}
+
+		// Classify the output side before the input name changes underneath
+		// it, as audioOutType compares the two.
+		var outType = audioOutType(&pa.adev[a])
+
+		var inDev *portaudio.DeviceInfo
+
+		if audioNameIsDefault(pa.adev[a].adevice_in) {
+			inDev = autoDetectAudioDevice(devices, true)
+			if inDev != nil && !supportsFormat(inDev, &pa.adev[a], true) {
+				inDev = nil
+			}
+
+			if inDev != nil {
+				pa.adev[a].adevice_in = inDev.Name
+			}
+		}
+
+		var outDev *portaudio.DeviceInfo
+
+		if outType == AUDIO_OUT_TYPE_SOUNDCARD && audioNameIsDefault(pa.adev[a].adevice_out) {
+			// A card that captures and plays is one radio interface, so
+			// transmit through the card we receive on rather than detecting
+			// the output side separately: a machine whose only other playback
+			// device is its speakers would otherwise transmit into them.  A
+			// device named for transmit is a choice of its own, so an explicit
+			// "auto" there is detected on its own terms.
+			if inDev != nil && inDev.MaxOutputChannels > 0 && !pa.adev[a].adevice_out_specified {
+				outDev = inDev
+			} else {
+				outDev = autoDetectAudioDevice(devices, false)
+			}
+
+			if outDev != nil && !supportsFormat(outDev, &pa.adev[a], false) {
+				outDev = nil
+			}
+
+			if outDev != nil {
+				pa.adev[a].adevice_out = outDev.Name
+			}
+		}
+
+		announceAutoDetectedDevices(inDev, outDev)
+	}
+}
+
+// announceAutoDetectedDevices says which devices were chosen for the operator,
+// who did not choose them and would otherwise have to work out what "default"
+// turned out to mean.
+func announceAutoDetectedDevices(inDev *portaudio.DeviceInfo, outDev *portaudio.DeviceInfo) {
+	if inDev == nil && outDev == nil {
+		return
+	}
+
+	text_color_set(DW_COLOR_INFO)
+
+	if inDev != nil && inDev == outDev {
+		dw_printf("Automatically selected the only audio device available: %s\n", inDev.Name)
+
+		return
+	}
+
+	if inDev != nil {
+		dw_printf("Automatically selected the only audio input device available: %s\n", inDev.Name)
+	}
+
+	if outDev != nil {
+		dw_printf("Automatically selected the only audio output device available: %s\n", outDev.Name)
+	}
+}
+
 func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
-	// Handle default device
-	if name == "" || strings.ToLower(name) == "default" {
+	// Handle default device.  Automatic detection has already had its say by
+	// this point, so anything still asking for the default is a machine where
+	// detection found no single answer.
+	if audioNameIsDefault(name) {
 		var dev *portaudio.DeviceInfo
 
 		var err = quietPortAudio(func() error {
@@ -1274,6 +1560,26 @@ func audio_open(pa *audio_s) int {
 			if pa.achan[channel].num_subchan == 0 {
 				pa.achan[channel].num_subchan = 1
 			}
+		}
+	}
+
+	/*
+	 * Resolve any device left at the default to the machine's sound card, so
+	 * that what follows - what we report, and what we open - names the device
+	 * actually in use.
+	 */
+
+	if portaudioReady {
+		var devices []*portaudio.DeviceInfo
+
+		var err = quietPortAudio(func() error {
+			var e error
+			devices, e = portaudio.Devices()
+
+			return e
+		})
+		if err == nil {
+			resolveDefaultAudioDevices(pa, devices, audioDeviceSupportsFormat)
 		}
 	}
 
