@@ -130,9 +130,13 @@ var dlq_queue_head *dlq_item_t /* Head of linked list for queue. */
 
 var dlq_mutex sync.Mutex /* Critical section for updating queues. */
 
-var dlq_wake_up_chan = make(chan struct{}) /* Notify received packet processing thread when queue not empty. */
+/* Notify received packet processing thread when queue not empty. */
+/* Buffered, and only ever written to with a non-blocking send, so that a */
+/* sender is never left holding a wake-up nobody is going to take: the */
+/* receive thread may have stopped waiting (woken by an earlier item, or */
+/* its timeout fired) between being sent one and the next sender looking. */
 
-var recv_thread_is_waiting bool
+var dlq_wake_up_chan = make(chan struct{}, 1)
 
 var was_init bool /* was initialization performed? */
 
@@ -164,26 +168,42 @@ func dlq_init() {
 		dw_printf ("dlq_init ( )\n");
 	#endif
 	*/
+	dlq_mutex.Lock()
+	defer dlq_mutex.Unlock()
+
+	dlq_reset_locked()
+} /* end dlq_init */
+
+// dlq_reset_locked empties the queue and discards any wake-up left in the
+// channel.  Caller must hold dlq_mutex.
+func dlq_reset_locked() {
 	dlq_queue_head = nil
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_init: pthread_cond_init...\n");
-	#endif
-	*/
-
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_init: pthread_cond_init returns %d\n", err);
-	#endif
-	*/
-
-	recv_thread_is_waiting = false
+	dlq_discard_wake_up_locked()
 
 	was_init = true
-} /* end dlq_init */
+}
+
+// dlq_init_locked initialises the queue on first use.  The check belongs
+// under the lock: senders and the receive thread can arrive here at the
+// same time, and initialising empties the queue.
+func dlq_init_locked() {
+	if !was_init {
+		dlq_reset_locked()
+	}
+}
+
+// dlq_discard_wake_up_locked throws away a wake-up belonging to an item
+// that has since been taken off the queue, so that it cannot cut short the
+// next wait.  Caller must hold dlq_mutex, and must have found the queue
+// empty: a sender adds its item before sending the wake-up, so with the
+// lock held and nothing queued, any wake-up in the channel is stale.
+func dlq_discard_wake_up_locked() {
+	select {
+	case <-dlq_wake_up_chan:
+	default:
+	}
+}
 
 /*-------------------------------------------------------------------
  *
@@ -305,10 +325,6 @@ func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel 
  *--------------------------------------------------------------------*/
 
 func append_to_queue(pnew *dlq_item_t) {
-	if !was_init {
-		dlq_init()
-	}
-
 	pnew.nextp = nil
 
 	/* TODO
@@ -318,6 +334,8 @@ func append_to_queue(pnew *dlq_item_t) {
 	#endif
 	*/
 	dlq_mutex.Lock()
+
+	dlq_init_locked()
 
 	var plast *dlq_item_t
 	var queue_length int
@@ -335,6 +353,19 @@ func append_to_queue(pnew *dlq_item_t) {
 		}
 
 		plast.nextp = pnew
+	}
+
+	// Wake the receive thread.  Whether it is actually waiting is not
+	// ours to know, so the send must not block.  Doing it while still
+	// holding the lock is what pairs it with the discard in
+	// dlq_wait_while_empty.
+
+	select {
+	case dlq_wake_up_chan <- struct{}{}:
+	default:
+		// Either a wake-up is already pending, which will do for this
+		// item too, or nobody is waiting and the next waiter will find
+		// the item on the queue.
 	}
 
 	dlq_mutex.Unlock()
@@ -395,10 +426,6 @@ func append_to_queue(pnew *dlq_item_t) {
 		dw_printf("Reader thread is probably frozen.\n")
 		dw_printf("This can be caused by using a pseudo terminal (direwolf -p) where another\n")
 		dw_printf("application is not reading the frames from the other side.\n")
-	}
-
-	if recv_thread_is_waiting {
-		dlq_wake_up_chan <- struct{}{}
 	}
 } /* end append_to_queue */
 
@@ -848,34 +875,43 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 	#endif
 	*/
 
-	if !was_init {
-		dlq_init()
+	dlq_mutex.Lock()
+
+	dlq_init_locked()
+
+	var is_empty = dlq_queue_head == nil
+	if is_empty {
+		// Anything in the channel now belongs to an item already taken
+		// off the queue, so drop it rather than let it cut the wait
+		// short.  Doing this under the lock, which append_to_queue also
+		// holds while it sends, means we cannot discard a wake-up for an
+		// item we have not seen.
+		dlq_discard_wake_up_locked()
 	}
 
-	if dlq_queue_head == nil {
+	dlq_mutex.Unlock()
+
+	if is_empty {
 		/* TODO KG
 		#if DEBUG
 			  text_color_set(DW_COLOR_DEBUG);
 			  dw_printf ("dlq_wait_while_empty (): prepare to SLEEP...\n");
 		#endif
 		*/
-		recv_thread_is_waiting = true
-
 		if !timeout.IsZero() {
-			var waitFor = time.Until(timeout)
-
 			// KG: pthread_cond_timedwait in Go...
+			var timer = time.NewTimer(time.Until(timeout))
+			defer timer.Stop()
+
 			select {
 			case <-dlq_wake_up_chan:
 				// Signalled
-			case <-time.After(waitFor):
+			case <-timer.C:
 				timed_out_result = true
 			}
 		} else {
 			<-dlq_wake_up_chan
 		}
-
-		recv_thread_is_waiting = false
 	}
 
 	/* TODO KG
@@ -907,11 +943,9 @@ func dlq_remove() *dlq_item_t {
 		dw_printf ("dlq_remove() enter critical section\n");
 	#endif
 	*/
-	if !was_init {
-		dlq_init()
-	}
-
 	dlq_mutex.Lock()
+
+	dlq_init_locked()
 
 	var result *dlq_item_t
 	if dlq_queue_head != nil {
