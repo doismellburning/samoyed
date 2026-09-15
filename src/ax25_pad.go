@@ -414,9 +414,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	 * Tearing it apart is destructive so make our own copy first.
 	 */
 
-	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("DEBUG: AX25FromText ('%s', %d)\n", monitor, strict);
-	// fflush(stdout); sleep(1);
 	var this_p = ax25_new()
 
 	/* Is it possible to have a nul character (zero byte) in the */
@@ -578,17 +575,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	 * We might want to manually generate UTF-8 characters such as degree.
 	 */
 
-	//#define DEBUG14H 1
-
-	/*
-	   #if DEBUG14H
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("BEFORE: %s\nSAFE:   ", pinfo);
-	   	AX25SafePrint (pinfo, -1, 0);
-	   	dw_printf ("\n");
-	   #endif
-	*/
-
 	var info_part []byte
 	for len(pinfo) > 0 {
 		if len(info_part) >= AX25_MAX_INFO_LEN {
@@ -613,15 +599,6 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 			pinfo = pinfo[1:]
 		}
 	}
-
-	/*
-		#if DEBUG14H
-			text_color_set(DW_COLOR_DEBUG);
-			dw_printf ("AFTER:  %s\nSAFE:   ", info_part);
-			AX25SafePrint (info_part, info_len, 0);
-			dw_printf ("\n");
-		#endif
-	*/
 
 	/*
 	 * Append the info part.
@@ -763,8 +740,6 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 	var ssid int
 	var heard bool
 
-	// dw_printf ("ax25_parse_addr in: position=%d, '%s', strict=%d\n", position, in_addr, strict);
-
 	if position < -1 {
 		position = -1
 	}
@@ -787,8 +762,6 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 		dw_printf("%sAddress \"%s\" is a \"q-construct\" used for communicating with\n", position_name[position], in_addr)
 		dw_printf("APRS Internet Servers.  It should never appear when going over the radio.\n")
 	}
-
-	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
 
 	var maxlen = IfThenElse(strictness > 0, 6, (AX25_MAX_ADDR_LEN - 1))
 
@@ -898,8 +871,6 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 
 		return out_addr, ssid, heard, false
 	}
-
-	// dw_printf ("ax25_parse_addr out: '%s' %d %d\n", out_addr, *out_ssid, *out_heard);
 
 	return out_addr, ssid, heard, true
 } /* end ax25_parse_addr */
@@ -1028,15 +999,12 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < AX25_MAX_ADDRS)
 
-	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
-
 	if len(ad) == 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
 	}
 
 	if n >= 0 && n < this_p.num_addr {
-		//dw_printf ("ax25_set_addr , existing case\n");
 		/*
 		 * Set existing address position.
 		 */
@@ -1058,7 +1026,6 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 
 		ax25_set_ssid(this_p, n, ssidTemp)
 	} else if n == this_p.num_addr {
-		//dw_printf ("ax25_set_addr , appending case\n");
 		/*
 		 * One beyond last position, process as insert.
 		 */
@@ -1067,11 +1034,6 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error, ax25_set_addr, bad position %d for '%s'\n", n, ad)
 	}
-
-	//dw_printf ("------\n");
-	//dw_printf ("dump after ax25_set_addr (%d, %s)\n", n, ad);
-	//ax25_hex_dump (this_p);
-	//dw_printf ("------\n");
 }
 
 /*------------------------------------------------------------------------------
@@ -1105,8 +1067,6 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	Assert(this_p.magic1 == MAGIC)
 	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
-
-	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
 
 	if len(ad) == 0 {
 		text_color_set(DW_COLOR_ERROR)
@@ -1898,8 +1858,6 @@ func AX25FormatAddrs(this_p *packet_t) string {
 	result.WriteString(":")
 
 	return result.String()
-
-	// dw_printf ("DEBUG AX25FormatAddrs, num_addr = %d, result = '%s'\n", this_p.num_addr, result);
 }
 
 /*------------------------------------------------------------------
@@ -2653,12 +2611,6 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 	for len(info) >= 1 && (info[len(info)-1] == '\r' ||
 		info[len(info)-1] == '\n' ||
 		info[len(info)-1] == ' ') {
-		// Temporary for debugging!
-
-		//  if (pinfo[info_len-1] == ' ') {
-		//    text_color_set(DW_COLOR_ERROR);
-		//    dw_printf ("DEBUG:  ax25_dedupe_crc ignoring trailing space.\n");
-		//  }
 		info = info[:len(info)-1]
 	}
 
@@ -2835,8 +2787,6 @@ func ax25_alevel_to_text(alevel ALevel) string {
  * whether "modulo 128 operation" is in effect.
  */
 
-//#define DEBUGX 1
-
 func ax25_get_control_offset(this_p *packet_t) int {
 	return (this_p.num_addr * 7)
 }
@@ -2845,11 +2795,6 @@ func ax25_get_num_control(this_p *packet_t) int {
 	var c = this_p.frame_data[ax25_get_control_offset(this_p)]
 
 	if (c & 0x01) == 0 { /* I   xxxx xxx0 */
-		/*
-			#if DEBUGX
-				  dw_printf ("ax25_get_num_control, %02x is I frame, returns %d\n", c, (this_p.modulo == 128) ? 2 : 1);
-			#endif
-		*/
 		if this_p.modulo == 128 {
 			return 2
 		} else {
@@ -2858,23 +2803,12 @@ func ax25_get_num_control(this_p *packet_t) int {
 	}
 
 	if (c & 0x03) == 1 { /* S   xxxx xx01 */
-		/*
-			#if DEBUGX
-				  dw_printf ("ax25_get_num_control, %02x is S frame, returns %d\n", c, (this_p.modulo == 128) ? 2 : 1);
-			#endif
-		*/
 		if this_p.modulo == 128 {
 			return 2
 		} else {
 			return 1
 		}
 	}
-
-	/*
-		#if DEBUGX
-			dw_printf ("ax25_get_num_control, %02x is U frame, always returns 1.\n", c);
-		#endif
-	*/
 
 	return (1) /* U   xxxx xx11 */
 }
@@ -2896,23 +2830,12 @@ func ax25_get_num_pid(this_p *packet_t) int {
 	if (c&0x01) == 0 || /* I   xxxx xxx0 */
 		c == 0x03 || c == 0x13 { /* UI  000x 0011 */
 		pid = int(this_p.frame_data[ax25_get_pid_offset(this_p)])
-		/*
-			#if DEBUGX
-				  dw_printf ("ax25_get_num_pid, %02x is I or UI frame, pid = %02x, returns %d\n", c, pid, (pid==AX25_PID_ESCAPE_CHARACTER) ? 2 : 1);
-			#endif
-		*/
 		if pid == AX25_PID_ESCAPE_CHARACTER {
 			return (2) /* pid 1111 1111 means another follows. */
 		}
 
 		return (1)
 	}
-
-	/*
-		#if DEBUGX
-			dw_printf ("ax25_get_num_pid, %02x is neither I nor UI frame, returns 0\n", c);
-		#endif
-	*/
 
 	return (0)
 }
@@ -2931,11 +2854,7 @@ func ax25_get_num_pid(this_p *packet_t) int {
 
 func ax25_get_info_offset(this_p *packet_t) int {
 	var offset = ax25_get_control_offset(this_p) + ax25_get_num_control(this_p) + ax25_get_num_pid(this_p)
-	/*
-		#if DEBUGX
-			dw_printf ("ax25_get_info_offset, returns %d\n", offset);
-		#endif
-	*/
+
 	return (offset)
 }
 
