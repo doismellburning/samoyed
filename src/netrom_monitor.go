@@ -162,3 +162,25 @@ func netromPayloadText(info []byte) string {
 func netromAliasText(alias [netromAliasLen]byte) string {
 	return strings.TrimRight(string(alias[:]), " \x00")
 }
+
+// netromPrintInfo writes an AX.25 information field to the monitor, rendering
+// it as NET/ROM where it is a NET/ROM frame and falling back to the raw print
+// otherwise.
+//
+// tq_append's IGate and network-TNC branches print a frame themselves rather
+// than handing it to the transmit queue, so they never reach the monitor code
+// in xmit.go.  Without this they show a NET/ROM frame's binary information
+// field even though the radio transmit path and the receive path both decode
+// it.
+func netromPrintInfo(pp *packet_t, pinfo []byte, asciiOnly bool) {
+	var nrText, isNetrom = netromFrameToText(pp, pinfo)
+
+	if isNetrom {
+		dw_printf("%s\n", nrText)
+
+		return
+	}
+
+	AX25SafePrint(pinfo, asciiOnly)
+	dw_printf("\n")
+}

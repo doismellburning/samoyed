@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -218,5 +219,43 @@ func TestNetromPayloadTextShowsRealBytes(t *testing.T) {
 	var want = `"hi<0xa2><0x00><0x7f>"`
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+// TestTqAppendDecodesNetromOnVirtualChannel covers the monitor output for a
+// channel that is not a radio: tq_append prints IGate and network-TNC frames
+// itself rather than handing them to the transmit queue, so it never reaches
+// the monitor code in xmit.go.  A NET/ROM node can sit on an NCHANNEL, and its
+// NODES broadcasts should be as readable there as on the air.
+func TestTqAppendDecodesNetromOnVirtualChannel(t *testing.T) {
+	var prevAudio = save_audio_config_p
+	t.Cleanup(func() { save_audio_config_p = prevAudio })
+
+	const channel = MAX_RADIO_CHANS
+
+	var audio = new(audio_s)
+	audio.chan_medium[channel] = MEDIUM_NETTNC
+	save_audio_config_p = audio
+
+	var entries = []netromNodesEntry{
+		{
+			dstCallsign: testNodeCallQ2,
+			dstAlias:    netromPadAlias("QNODE2"),
+			neighbor:    testNodeCallQ2,
+			quality:     255,
+		},
+	}
+	var payload = netromBuildRoutingBroadcast(netromPadAlias("QNODE1"), entries)
+	var pp = netromMonitorFrame(t, NETROM_BROADCAST_CALLSIGN, payload)
+
+	// nettnc_send_packet is a no-op for a channel with no connection, so this
+	// exercises the print path without needing a live network TNC.
+	var out = captureStdout(t, func() { tq_append(channel, TQ_PRIO_1_LO, pp) })
+
+	if !strings.Contains(out, "NET/ROM NODES from QNODE1") {
+		t.Errorf("expected a decoded NODES broadcast, got %q", out)
+	}
+	if !strings.Contains(out, "[6>nt]") {
+		t.Errorf("expected the network-TNC channel prefix, got %q", out)
 	}
 }
