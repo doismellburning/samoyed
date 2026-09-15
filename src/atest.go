@@ -873,14 +873,9 @@ func ptt_set_fake(_ int, channel int, ptt_signal int) {
 		text_color_set(DW_COLOR_INFO)
 
 		if ptt_signal != 0 {
-			//sec1 = t;
-			//min1 = (int)(sec1 / 60.);
-			//sec1 -= min1 * 60;
-			//dw_printf ("DCD[%d] = ON    %d:%06.3f\n",  channel, min1, sec1);
 			dcd_count++
 			dcd_start_seconds[channel] = t
 		} else {
-			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - dcd_start_seconds[channel]) * 1000.);
 			var sec1 = dcd_start_seconds[channel]
 			var min1 = (int)(sec1 / 60.)
 			sec1 -= float64(min1 * 60)
