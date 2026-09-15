@@ -331,8 +331,8 @@ func (bs *BeaconService) thread() {
 	}
 
 	var now = time.Now()
-	var sb_prev_time time.Time /* Time of most recent transmission. */
-	var sb_prev_course float64 /* Most recent course reported. */
+	var sb_prev_time time.Time              /* Time of most recent transmission. */
+	var sb_prev_course maybe.Maybe[float64] /* Most recent course reported. */
 
 	for {
 		/*
@@ -380,7 +380,7 @@ func (bs *BeaconService) thread() {
 
 		if number_of_tbeacons > 0 {
 			var fix = dwgps_read(&gpsinfo)
-			var my_speed_mph = DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))
+			var my_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots)
 
 			if bs.trackerDebugLevel >= 1 {
 				var hms = now.Format("15:04:05")
@@ -389,9 +389,14 @@ func (bs *BeaconService) thread() {
 
 				switch fix {
 				case DWFIX_3D:
-					dw_printf("%s  3D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0, %.1f m\n", hms, gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track, gpsinfo.altitude)
+					dw_printf("%s  3D, %s, %s, %s mph, %s\xc2\xb0, %s m\n", hms,
+						formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
+						formatMaybeFloat("%.1f", my_speed_mph), formatMaybeFloat("%.0f", gpsinfo.track),
+						formatMaybeFloat("%.1f", gpsinfo.altitude))
 				case DWFIX_2D:
-					dw_printf("%s  2D, %.6f, %.6f, %.1f mph, %.0f\xc2\xb0\n", hms, gpsinfo.dlat, gpsinfo.dlon, my_speed_mph, gpsinfo.track)
+					dw_printf("%s  2D, %s, %s, %s mph, %s\xc2\xb0\n", hms,
+						formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
+						formatMaybeFloat("%.1f", my_speed_mph), formatMaybeFloat("%.0f", gpsinfo.track))
 				default:
 					dw_printf("%s  No GPS fix\n", hms)
 				}
@@ -405,7 +410,7 @@ func (bs *BeaconService) thread() {
 			 */
 			if bs.miscConfig.sb_configured && fix >= DWFIX_2D {
 				var tnext = bs.sbCalculateNextTime(now,
-					DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots)), float64(gpsinfo.track),
+					my_speed_mph, gpsinfo.track,
 					sb_prev_time, sb_prev_course)
 
 				for j := range bs.miscConfig.num_beacons {
@@ -452,10 +457,10 @@ func (bs *BeaconService) thread() {
 						/* Remember most recent tracker beacon. */
 						/* Compute next time if not turning. */
 						sb_prev_time = now
-						sb_prev_course = float64(gpsinfo.track)
+						sb_prev_course = gpsinfo.track
 
 						bp.next = bs.sbCalculateNextTime(now,
-							float64(DW_KNOTS_TO_MPH(float64(gpsinfo.speed_knots))), float64(gpsinfo.track),
+							maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots), gpsinfo.track,
 							sb_prev_time, sb_prev_course)
 					} else {
 						/* Tracker beacon, fixed spacing. */
@@ -498,10 +503,10 @@ func (bs *BeaconService) thread() {
  * Inputs:	now			- Current time.
  *
  *		current_speed_mph	- Current speed from GPS.
- *			  	  Not expecting G_UNKNOWN but should check for it.
+ *			  	  Not expecting Nothing but should check for it.
  *
  *		current_course		- Current direction of travel.
- *			  	  Could be G_UNKNOWN if stationary.
+ *			  	  Could be Nothing if stationary.
  *
  *		last_xmit_time		- Time of most recent transmission.
  *
@@ -537,27 +542,36 @@ func heading_change(a, b float64) float64 {
 	}
 }
 
-func (bs *BeaconService) sbCalculateNextTime(now time.Time, current_speed_mph float64, current_course float64, last_xmit_time time.Time, last_xmit_course float64) time.Time {
+func (bs *BeaconService) sbCalculateNextTime(
+	now time.Time,
+	current_speed_mph maybe.Maybe[float64],
+	current_course maybe.Maybe[float64],
+	last_xmit_time time.Time,
+	last_xmit_course maybe.Maybe[float64],
+) time.Time {
 	var beacon_rate int
 
 	/*
 	 * Compute time between beacons for travelling in a straight line.
 	 */
 
-	if current_speed_mph == G_UNKNOWN {
+	var speed_mph, speed_known = current_speed_mph.Get()
+
+	switch {
+	case !speed_known:
 		beacon_rate = int(math.Round(float64(bs.miscConfig.sb_fast_rate+bs.miscConfig.sb_slow_rate) / 2.))
-	} else if current_speed_mph > float64(bs.miscConfig.sb_fast_speed) {
+	case speed_mph > float64(bs.miscConfig.sb_fast_speed):
 		beacon_rate = bs.miscConfig.sb_fast_rate
-	} else if current_speed_mph < float64(bs.miscConfig.sb_slow_speed) {
+	case speed_mph < float64(bs.miscConfig.sb_slow_speed):
 		beacon_rate = bs.miscConfig.sb_slow_rate
-	} else {
+	default:
 		/* Can't divide by 0 assuming sb_slow_speed > 0. */
-		beacon_rate = int(math.Round(float64(bs.miscConfig.sb_fast_rate*bs.miscConfig.sb_fast_speed) / current_speed_mph))
+		beacon_rate = int(math.Round(float64(bs.miscConfig.sb_fast_rate*bs.miscConfig.sb_fast_speed) / speed_mph))
 	}
 
 	if bs.trackerDebugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %.1f MPH\n", beacon_rate, current_speed_mph)
+		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %s MPH\n", beacon_rate, formatMaybeFloat("%.1f", current_speed_mph))
 	}
 
 	var next_time = last_xmit_time.Add(time.Duration(beacon_rate) * time.Second)
@@ -565,10 +579,10 @@ func (bs *BeaconService) sbCalculateNextTime(now time.Time, current_speed_mph fl
 	/*
 	 * Test for "Corner Pegging" if moving.
 	 */
-	if current_speed_mph != G_UNKNOWN && current_speed_mph >= 1.0 &&
-		current_course != G_UNKNOWN && last_xmit_course != G_UNKNOWN {
-		var change = heading_change(current_course, last_xmit_course)
-		var turn_threshold = float64(bs.miscConfig.sb_turn_angle) + float64(bs.miscConfig.sb_turn_slope)/current_speed_mph
+	var course_change = maybe.LiftA2(heading_change, current_course, last_xmit_course)
+
+	if change, turning := course_change.Get(); speed_known && speed_mph >= 1.0 && turning {
+		var turn_threshold = float64(bs.miscConfig.sb_turn_angle) + float64(bs.miscConfig.sb_turn_slope)/speed_mph
 
 		if change > turn_threshold && !now.Before(last_xmit_time.Add(time.Duration(bs.miscConfig.sb_turn_time)*time.Second)) {
 			if bs.trackerDebugLevel >= 2 {
@@ -716,22 +730,22 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			/* Transmit altitude only if user asked for it. */
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
-			var my_alt_ft = G_UNKNOWN
-			if gpsinfo.fix >= 3 && gpsinfo.altitude != G_UNKNOWN && bp.alt_m > 0 {
-				my_alt_ft = int(math.Round(DW_METERS_TO_FEET(float64(gpsinfo.altitude))))
+			var my_alt_ft maybe.Maybe[int]
+			if gpsinfo.fix >= DWFIX_3D && bp.alt_m > 0 {
+				my_alt_ft = maybe.Fmap(func(meters float64) int {
+					return int(math.Round(DW_METERS_TO_FEET(meters)))
+				}, gpsinfo.altitude)
 			}
 
-			/* Round to nearest integer. retaining unknown state. */
-			var coarse = G_UNKNOWN
-			if gpsinfo.track != G_UNKNOWN {
-				coarse = int(math.Round(float64(gpsinfo.track)))
-			}
+			/* Round to nearest integer, retaining unknown state. */
+			var coarse = maybe.Fmap(func(degrees float64) int { return int(math.Round(degrees)) }, gpsinfo.track)
+			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.speed_knots)
 
 			beacon_text += EncodePosition(bp.messaging, bp.compress,
-				float64(gpsinfo.dlat), float64(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
+				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, orUnknown(my_alt_ft),
 				bp.symtab, bp.symbol,
 				int(bp.power), int(bp.height), int(bp.gain), bp.dir,
-				coarse, int(math.Round(float64(gpsinfo.speed_knots))),
+				orUnknown(coarse), orUnknown(knots),
 				float64(bp.freq), float64(bp.tone), float64(bp.offset),
 				super_comment)
 
@@ -748,11 +762,11 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				A.g_src = mycall
 				A.g_symbol_table = bp.symtab
 				A.g_symbol_code = bp.symbol
-				A.g_lat = maybe.Just(float64(gpsinfo.dlat))
-				A.g_lon = maybe.Just(float64(gpsinfo.dlon))
-				A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(float64(gpsinfo.speed_knots)))
-				A.g_course = unlessUnknown(float64(coarse))
-				A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, unlessUnknown(float64(gpsinfo.altitude)))
+				A.g_lat = gpsinfo.dlat
+				A.g_lon = gpsinfo.dlon
+				A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots)
+				A.g_course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
+				A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.altitude)
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ALevel

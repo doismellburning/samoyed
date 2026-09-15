@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 /* Knots per meter/second. */
@@ -186,9 +188,7 @@ func read_gpsd_thread(conn net.Conn) {
 		dw_printf("read_gpsd_thread (%+v)\n", conn)
 	}
 
-	var info = new(dwgps_info_t)
-	dwgps_clear(info)
-	info.fix = DWFIX_NOT_SEEN /* clear not init state. */
+	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
 	if s_gpsd.debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -246,8 +246,8 @@ func read_gpsd_thread(conn net.Conn) {
  * Purpose:     Parse a "class":"TPV" report from gpsd.
  *
  * Description:	Fields are pointers so we can tell "absent" from "zero",
- *		matching the same distinction the NMEA parser makes with
- *		G_UNKNOWN.
+ *		which is the same distinction maybe.Maybe makes once the
+ *		report reaches dwgps_info_t.
  *
  *		altMSL is the current field name for altitude above mean
  *		sea level; older gpsd versions (< 3.20) called it "alt".
@@ -322,39 +322,27 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
 		return
 	}
 
-	if report.Lat != nil {
-		info.dlat = *report.Lat
-	}
-
-	if report.Lon != nil {
-		info.dlon = *report.Lon
-	}
+	info.dlat = maybe.FromPointer(report.Lat).Or(info.dlat)
+	info.dlon = maybe.FromPointer(report.Lon).Or(info.dlon)
 
 	/*
 	 * gpsd doesn't repeat every field on every TPV report - one derived from
 	 * $GPRMC alone, for example, won't carry altitude even though mode is
 	 * still 3D from an earlier $GPGGA-derived report. So a missing field here
 	 * just means "unchanged", not "unknown"; keep whatever we saw last
-	 * instead of clobbering it. G_UNKNOWN is the value seen if a field has
-	 * never been reported at all.
+	 * instead of clobbering it. A field that has never been reported at all
+	 * is Nothing.
 	 */
 
-	if report.Track != nil {
-		info.track = *report.Track
-	}
+	info.track = maybe.FromPointer(report.Track).Or(info.track)
 
-	if report.Speed != nil {
-		info.speed_knots = *report.Speed * MPS_TO_KNOTS
-	}
+	var knots = maybe.Fmap(func(mps float64) float64 { return mps * MPS_TO_KNOTS }, maybe.FromPointer(report.Speed))
+	info.speed_knots = knots.Or(info.speed_knots)
 
 	if newFix >= DWFIX_3D {
-		switch {
-		case report.AltMSL != nil:
-			info.altitude = *report.AltMSL
-		case report.Alt != nil:
-			info.altitude = *report.Alt
-		default:
-		}
+		info.altitude = maybe.FromPointer(report.AltMSL).
+			Or(maybe.FromPointer(report.Alt)).
+			Or(info.altitude)
 	}
 	/* Otherwise keep last known altitude when we downgrade from 3D to 2D fix. */
 	/* Caller knows altitude is outdated if info.fix == DWFIX_2D. */

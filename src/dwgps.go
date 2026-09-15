@@ -30,8 +30,11 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 /*
@@ -43,7 +46,7 @@ import (
  *	2 = 2D.
  *	3 = 3D.
  *
- * Undefined float & double values are set to G_UNKNOWN.
+ * Values that have not been reported are Nothing.
  *
  */
 
@@ -58,14 +61,17 @@ const (
 	DWFIX_3D       dwfix_t = 3
 )
 
+// dwgps_info_t is the most recent position report from a GPS receiver.  Its
+// zero value is "nothing heard yet", so a freshly declared one needs no
+// clearing.
 type dwgps_info_t struct {
-	timestamp   time.Time /* When last updated.  System time. */
-	fix         dwfix_t   /* Quality of position fix. */
-	dlat        float64   /* Latitude.  Valid if fix >= 2. */
-	dlon        float64   /* Longitude. Valid if fix >= 2. */
-	speed_knots float64   /* libgps uses meters/sec but we use GPS usual knots. */
-	track       float64   /* What is difference between track and course? */
-	altitude    float64   /* meters above mean sea level. Valid if fix == 3. */
+	timestamp   time.Time            /* When last updated.  System time. */
+	fix         dwfix_t              /* Quality of position fix. */
+	dlat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
+	dlon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
+	speed_knots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
+	track       maybe.Maybe[float64] /* What is difference between track and course? */
+	altitude    maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
 }
 
 var s_dwgps_debug = 0 /* Enable debug output. */
@@ -109,7 +115,7 @@ var s_gps_mutex sync.Mutex
  *--------------------------------------------------------------------*/
 
 func dwgps_init(pconfig *misc_config_s, debug int) {
-	dwgps_clear(s_dwgps_info) // Init the global
+	dwgps_set_data(new(dwgps_info_t)) // Init the global
 
 	s_dwgps_debug = debug
 
@@ -120,24 +126,6 @@ func dwgps_init(pconfig *misc_config_s, debug int) {
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
 } /* end dwgps_init */
-
-/*-------------------------------------------------------------------
- *
- * Name:        dwgps_clear
- *
- * Purpose:    	Clear the gps info structure.
- *
- *--------------------------------------------------------------------*/
-
-func dwgps_clear(gpsinfo *dwgps_info_t) {
-	gpsinfo.timestamp = time.Time{}
-	gpsinfo.fix = DWFIX_NOT_SEEN
-	gpsinfo.dlat = G_UNKNOWN
-	gpsinfo.dlon = G_UNKNOWN
-	gpsinfo.speed_knots = G_UNKNOWN
-	gpsinfo.track = G_UNKNOWN
-	gpsinfo.altitude = G_UNKNOWN
-}
 
 /*-------------------------------------------------------------------
  *
@@ -184,13 +172,20 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
  *--------------------------------------------------------------------*/
 
 func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
-	dw_printf("%stime=%s fix=%d lat=%.6f lon=%.6f trk=%.0f spd=%.1f alt=%.0f\n",
+	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
 		msg,
 		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
-		gpsinfo.dlat, gpsinfo.dlon,
-		gpsinfo.track, gpsinfo.speed_knots,
-		gpsinfo.altitude)
+		formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
+		formatMaybeFloat("%.0f", gpsinfo.track), formatMaybeFloat("%.1f", gpsinfo.speed_knots),
+		formatMaybeFloat("%.0f", gpsinfo.altitude))
 } /* end dwgps_set_data */
+
+// formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
+func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
+	return maybe.Fold("unknown", func(value float64) string {
+		return fmt.Sprintf(format, value)
+	}, m)
+}
 
 /*-------------------------------------------------------------------
  *

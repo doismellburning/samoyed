@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"pgregory.net/rapid"
 )
@@ -82,7 +83,7 @@ func Test_sbCalculateNextTime_mid_speed_proportional(t *testing.T) {
 	// At 30 MPH (between 5 and 60), rate = (30 * 60) / 30 = 60 seconds
 	var lastXmit = now.Add(-120 * time.Second)
 
-	var next = bs.sbCalculateNextTime(now, 30, 90, lastXmit, 90)
+	var next = bs.sbCalculateNextTime(now, maybe.Just(30.0), maybe.Just(90.0), lastXmit, maybe.Just(90.0))
 
 	var expected = lastXmit.Add(60 * time.Second)
 	assert.Equal(t, expected, next)
@@ -93,11 +94,22 @@ func Test_sbCalculateNextTime_unknown_speed(t *testing.T) {
 	var now = time.Now()
 	var lastXmit = now.Add(-2000 * time.Second)
 
-	var next = bs.sbCalculateNextTime(now, G_UNKNOWN, G_UNKNOWN, lastXmit, G_UNKNOWN)
+	var next = bs.sbCalculateNextTime(now, maybe.Nothing[float64](), maybe.Nothing[float64](), lastXmit, maybe.Nothing[float64]())
 
 	// Unknown speed: rate = (fast_rate + slow_rate) / 2 = (30 + 1800) / 2 = 915
 	var expected = lastXmit.Add(915 * time.Second)
 	assert.Equal(t, expected, next)
+}
+
+func Test_sbCalculateNextTime_unknown_course_no_corner_peg(t *testing.T) {
+	var bs = &BeaconService{miscConfig: makeSBConfig()} //nolint:exhaustruct_v5
+	var now = time.Now()
+	var lastXmit = now.Add(-20 * time.Second)
+
+	// Moving, but the GPS reported no course, so there is no turn to detect.
+	var next = bs.sbCalculateNextTime(now, maybe.Just(30.0), maybe.Nothing[float64](), lastXmit, maybe.Just(90.0))
+
+	assert.Equal(t, lastXmit.Add(60*time.Second), next)
 }
 
 func Test_sbCalculateNextTime_corner_pegging(t *testing.T) {
@@ -107,7 +119,7 @@ func Test_sbCalculateNextTime_corner_pegging(t *testing.T) {
 	var lastXmit = now.Add(-20 * time.Second)
 
 	// Large heading change: 90 degrees > turn_threshold (30 + 255/30 = 38.5)
-	var next = bs.sbCalculateNextTime(now, 30, 180, lastXmit, 90)
+	var next = bs.sbCalculateNextTime(now, maybe.Just(30.0), maybe.Just(180.0), lastXmit, maybe.Just(90.0))
 
 	assert.Equal(t, now, next, "corner pegging should trigger immediate transmission")
 }
@@ -118,7 +130,7 @@ func Test_sbCalculateNextTime_corner_pegging_suppressed_too_soon(t *testing.T) {
 	// Last transmitted only 5s ago (< sb_turn_time of 15s), so no corner pegging
 	var lastXmit = now.Add(-5 * time.Second)
 
-	var next = bs.sbCalculateNextTime(now, 30, 180, lastXmit, 90)
+	var next = bs.sbCalculateNextTime(now, maybe.Just(30.0), maybe.Just(180.0), lastXmit, maybe.Just(90.0))
 
 	// Should NOT be now — should be the normal rate-based next time
 	assert.NotEqual(t, now, next)
@@ -131,7 +143,7 @@ func Test_sbCalculateNextTime_no_corner_peg_below_threshold(t *testing.T) {
 	var lastXmit = now.Add(-20 * time.Second)
 
 	// Heading change of 5 degrees is below threshold (~38.5 at 30 MPH)
-	var next = bs.sbCalculateNextTime(now, 30, 95, lastXmit, 90)
+	var next = bs.sbCalculateNextTime(now, maybe.Just(30.0), maybe.Just(95.0), lastXmit, maybe.Just(90.0))
 
 	// Should be rate-based, not now
 	assert.NotEqual(t, now, next)
@@ -408,7 +420,7 @@ func Test_sbCalculateNextTime_fast_speed_rate_exact(t *testing.T) {
 		var lastXmit = time.Now().Add(-time.Duration(rapid.IntRange(cfg.sb_turn_time, 3600).Draw(t, "elapsed")) * time.Second)
 		var now = lastXmit.Add(time.Duration(rapid.IntRange(cfg.sb_turn_time, 3600).Draw(t, "sinceXmit")) * time.Second)
 
-		var next = bs.sbCalculateNextTime(now, speed, course, lastXmit, course)
+		var next = bs.sbCalculateNextTime(now, maybe.Just(speed), maybe.Just(course), lastXmit, maybe.Just(course))
 		var expected = lastXmit.Add(time.Duration(cfg.sb_fast_rate) * time.Second)
 
 		assert.Equal(t, expected, next)
@@ -429,7 +441,7 @@ func Test_sbCalculateNextTime_slow_speed_rate_exact(t *testing.T) {
 		var lastXmit = time.Now().Add(-time.Duration(rapid.IntRange(cfg.sb_turn_time, 3600).Draw(t, "elapsed")) * time.Second)
 		var now = lastXmit.Add(time.Duration(rapid.IntRange(cfg.sb_turn_time, 3600).Draw(t, "sinceXmit")) * time.Second)
 
-		var next = bs.sbCalculateNextTime(now, speed, course, lastXmit, course)
+		var next = bs.sbCalculateNextTime(now, maybe.Just(speed), maybe.Just(course), lastXmit, maybe.Just(course))
 		var expected = lastXmit.Add(time.Duration(cfg.sb_slow_rate) * time.Second)
 
 		assert.Equal(t, expected, next)
@@ -448,7 +460,7 @@ func Test_sbCalculateNextTime_result_within_rate_bounds(t *testing.T) {
 		var lastXmit = time.Now().Add(-time.Duration(rapid.IntRange(cfg.sb_turn_time, 3600).Draw(t, "elapsed")) * time.Second)
 		var now = lastXmit.Add(time.Duration(rapid.IntRange(cfg.sb_turn_time, 3600).Draw(t, "sinceXmit")) * time.Second)
 
-		var next = bs.sbCalculateNextTime(now, speed, course, lastXmit, course)
+		var next = bs.sbCalculateNextTime(now, maybe.Just(speed), maybe.Just(course), lastXmit, maybe.Just(course))
 		var lo = lastXmit.Add(time.Duration(cfg.sb_fast_rate) * time.Second)
 		var hi = lastXmit.Add(time.Duration(cfg.sb_slow_rate) * time.Second)
 
