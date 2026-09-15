@@ -4,10 +4,75 @@
 package direwolf
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// setFieldString encodes text into a six-bit ASCII field, padding with '@' as
+// a real transmitter does.
+func setFieldString(t *testing.T, base []byte, start uint, length uint, s string) {
+	t.Helper()
+	require.LessOrEqual(t, uint(len(s))*6, length)
+
+	for i := range length / 6 {
+		var ch byte = '@'
+		if i < uint(len(s)) {
+			ch = s[i]
+		}
+
+		var val = strings.IndexByte(sixBitASCII, ch)
+		require.GreaterOrEqual(t, val, 0)
+
+		set_field(base, start+i*6, 6, val)
+	}
+}
+
+// A frame whose length is not a multiple of 3 bytes does not end on a sextet
+// boundary, so the last character of the payload is made up partly of padding.
+// Reading it used to run off the end of the frame and panic - and 53 bytes is
+// the length of a type 5 message, which is not exotic at all.
+func Test_ais_to_nmea_frame_length_not_multiple_of_3(t *testing.T) {
+	for n := 1; n <= 53; n++ {
+		var nmea, err = AISToNMEA(make([]byte, n))
+		require.NoError(t, err)
+
+		var _, rest, found = strings.Cut(string(nmea), "!AIVDM,1,1,,A,")
+		require.True(t, found)
+
+		var payload, pad, _ = strings.Cut(rest, ",")
+
+		// One character per 6 bits, rounded up, and the padding count says how
+		// many of the bits in that last character were not in the frame.
+		var ns = (n*8 + 5) / 6
+		assert.Len(t, payload, ns, "frame of %d bytes", n)
+		assert.Equal(t, fmt.Sprintf("%d*", ns*6-n*8), pad[:2], "frame of %d bytes", n)
+	}
+}
+
+// The type 5 message is both a length that needs padding and the one carrying
+// the ship's details, so round trip one whole.
+func Test_ais_type_5_round_trip(t *testing.T) {
+	var ais = make([]byte, 53) // 424 bits.
+
+	set_field(ais, 0, 6, 5)          // Message type.
+	set_field(ais, 8, 30, 366730001) // MMSI.
+	setFieldString(t, ais, 70, 42, "Q1TEST")
+	setFieldString(t, ais, 112, 120, "SAMOYED")
+	setFieldString(t, ais, 302, 120, "LONG BEACH")
+
+	var nmea, err = AISToNMEA(ais)
+	require.NoError(t, err)
+
+	var aisData, parseErr = AISParse(string(nmea))
+	require.NoError(t, parseErr)
+	assert.Equal(t, "AIS 5: Static and Voyage Related Data", aisData.Description)
+	assert.Equal(t, "366730001", aisData.MMSI)
+	assert.Equal(t, "SAMOYED, Q1TEST, dest. LONG BEACH", aisData.Comment)
+}
 
 // Latitude and longitude are two's complement, so the southern and western
 // hemispheres depend on the field being sign extended from its own width.

@@ -284,11 +284,20 @@ func sextet_to_char(val int) (byte, error) {
  *--------------------------------------------------------------------*/
 
 func AISToNMEA(ais []byte) ([]byte, error) {
-	var payload []byte
-	// Number of resulting characters for payload.
+	// Number of resulting characters for payload, rounded up: the last one may
+	// be made from fewer than 6 real bits.
 	var ns = uint(len(ais)*8+5) / 6
+
+	// Read the sextets from a zero padded copy.  A frame whose length is not a
+	// multiple of 3 bytes has no whole sextet at the end, and reading one from
+	// the frame itself would run off the end of it.
+	var padded = make([]byte, (ns*6+7)/8)
+	copy(padded, ais)
+
+	var payload []byte
+
 	for k := range ns {
-		var ch, err = sextet_to_char(get_field(ais, k*6, 6))
+		var ch, err = sextet_to_char(get_field(padded, k*6, 6))
 		if err != nil {
 			return nil, err
 		}
