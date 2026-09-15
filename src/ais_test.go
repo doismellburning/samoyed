@@ -105,6 +105,15 @@ func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
 	assert.Equal(t, "000000000", aisData.MMSI)
 }
 
+// The checksum is over the bytes of the sentence.  Summing its runes instead
+// rejected any sentence carrying a byte above 0x7f, having decoded it to
+// something else entirely.
+func Test_ais_parse_checksum_is_over_bytes(t *testing.T) {
+	var aisData, err = AISParse(nmeaSentence("!AIVDM,1,1,,\xc3,15MgK45P3@G?fl0E`JbR0OwT0@MS,0"))
+	require.NoError(t, err)
+	assert.Equal(t, "366730000", aisData.MMSI)
+}
+
 // Latitude and longitude are two's complement, so the southern and western
 // hemispheres depend on the field being sign extended from its own width.
 func Test_get_field_signed(t *testing.T) {

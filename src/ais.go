@@ -383,12 +383,12 @@ func AISParse(sentence string) (*AISData, error) {
 
 	var calculatedChecksum byte = 0
 
-	for _, p := range stemp[1:] {
+	for _, p := range []byte(stemp[1:]) {
 		if p == '*' {
 			break
 		}
 
-		calculatedChecksum ^= byte(p)
+		calculatedChecksum ^= p
 	}
 
 	var data, checksumStr, found = strings.Cut(stemp, "*")
@@ -435,8 +435,8 @@ func AISParse(sentence string) (*AISData, error) {
 	// though the bits it is missing were zero, as it always has been.
 	var ais = make([]byte, max(AIS_MIN_BITVEC_BYTES, (len(payload)*6+7)/8))
 
-	for i, b := range payload {
-		var val, err = char_to_sextet(byte(b))
+	for i, b := range []byte(payload) {
+		var val, err = char_to_sextet(b)
 		if err != nil {
 			return nil, err
 		}
