@@ -545,14 +545,9 @@ func AISCheckLength(aisType int, length int) int {
 		if b >= ValidAISLengths[aisType].Min && b <= ValidAISLengths[aisType].Max {
 			return (0) // Good.
 		} else {
-			//text_color_set (DW_COLOR_ERROR);
-			//dw_printf("AIS ERROR: type %d, has %d bits when %d to %d expected.\n",
-			//	type, b, valid_len[aisType].min, valid_len[aisType].max);
 			return (1) // Length out of range.
 		}
 	} else {
-		//text_color_set (DW_COLOR_ERROR);
-		//dw_printf("AIS ERROR: message type %d is invalid.\n", aisType);
 		return (-1) // Invalid type.
 	}
 }
