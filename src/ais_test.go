@@ -12,6 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// nmeaSentence wraps a body in the "*XX" checksum an AIS sentence carries.
+func nmeaSentence(body string) string {
+	var cs byte
+
+	for _, p := range []byte(body[1:]) {
+		cs ^= p
+	}
+
+	return fmt.Sprintf("%s*%02X", body, cs)
+}
+
 // setFieldString encodes text into a six-bit ASCII field, padding with '@' as
 // a real transmitter does.
 func setFieldString(t *testing.T, base []byte, start uint, length uint, s string) {
@@ -72,6 +83,26 @@ func Test_ais_type_5_round_trip(t *testing.T) {
 	assert.Equal(t, "AIS 5: Static and Voyage Related Data", aisData.Description)
 	assert.Equal(t, "366730001", aisData.MMSI)
 	assert.Equal(t, "SAMOYED, Q1TEST, dest. LONG BEACH", aisData.Comment)
+}
+
+// The bit vector used to be a fixed 256 bytes, which a user-defined APRS
+// packet could overrun: it can carry far more payload than any real AIS
+// message.
+func Test_ais_parse_payload_longer_than_bit_vector(t *testing.T) {
+	var payload = strings.Repeat("1", 400) // 2400 bits, against 2048 of vector.
+
+	var aisData, err = AISParse(nmeaSentence("!AIVDM,1,1,,A," + payload + ",0"))
+	require.NoError(t, err)
+	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
+}
+
+// A short sentence is decoded as though the bits it lacks were zero, rather
+// than failing or reading whatever follows the vector.
+func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
+	var aisData, err = AISParse(nmeaSentence("!AIVDM,1,1,,A,5,6"))
+	require.NoError(t, err)
+	assert.Equal(t, "AIS 5: Static and Voyage Related Data", aisData.Description)
+	assert.Equal(t, "000000000", aisData.MMSI)
 }
 
 // Latitude and longitude are two's complement, so the southern and western

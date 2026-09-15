@@ -351,6 +351,10 @@ func AISToNMEA(ais []byte) ([]byte, error) {
  *
  *--------------------------------------------------------------------*/
 
+// AIS_MIN_BITVEC_BYTES is the smallest bit vector AISParse decodes into, large
+// enough for every fixed field offset it reads.
+const AIS_MIN_BITVEC_BYTES = 256
+
 type AISData struct {
 	Description string //Description of AIS message type.
 	MMSI        string //9 digit identifier.
@@ -425,7 +429,11 @@ func AISParse(sentence string) (*AISData, error) {
 
 	// Convert character representation to bit vector.
 
-	var ais = make([]byte, 256)
+	// Fields are read from fixed offsets, so the vector has to hold the whole
+	// payload and also the highest offset read below - bit 421, of a type 5
+	// message.  A sentence too short for the type it claims is decoded as
+	// though the bits it is missing were zero, as it always has been.
+	var ais = make([]byte, max(AIS_MIN_BITVEC_BYTES, (len(payload)*6+7)/8))
 
 	for i, b := range payload {
 		var val, err = char_to_sextet(byte(b))
