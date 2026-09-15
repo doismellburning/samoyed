@@ -114,6 +114,35 @@ func Test_ais_parse_checksum_is_over_bytes(t *testing.T) {
 	assert.Equal(t, "366730000", aisData.MMSI)
 }
 
+// A checksum field that is not two hexadecimal digits is an error, rather than
+// being quietly read as zero or accepted for the value it happens to hold.
+func Test_ais_parse_malformed_checksum(t *testing.T) {
+	// The first sentence checksums to 0x4e and the second to 0x02, so each of
+	// these fields is either unparseable or the right value at the wrong width.
+	var testCases = []struct {
+		body     string
+		checksum string
+	}{
+		{"!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0", ""},
+		{"!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0", "zz"},
+		{"!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0", "-4E"},
+		{"!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0", "14E"},
+		{"!AIVDM,1,1,,A,15MgK45P3@G?fl0E`JbR0OwT0@MS,0", "004E"},
+		{"!AIVDM,1,1,,A,15@`,0", "2"},
+	}
+
+	for _, tc := range testCases {
+		var aisData, err = AISParse(tc.body + "*" + tc.checksum)
+		require.Error(t, err, "checksum %q", tc.checksum)
+		assert.Nil(t, aisData, "checksum %q", tc.checksum)
+	}
+
+	// The same short sentence, correctly checksummed, is fine.
+	var aisData, err = AISParse("!AIVDM,1,1,,A,15@`,0*02")
+	require.NoError(t, err)
+	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
+}
+
 // Latitude and longitude are two's complement, so the southern and western
 // hemispheres depend on the field being sign extended from its own width.
 func Test_get_field_signed(t *testing.T) {

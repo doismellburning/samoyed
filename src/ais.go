@@ -355,6 +355,10 @@ func AISToNMEA(ais []byte) ([]byte, error) {
 // enough for every fixed field offset it reads.
 const AIS_MIN_BITVEC_BYTES = 256
 
+// AIS_CHECKSUM_DIGITS is the width of the hexadecimal checksum ending an NMEA
+// sentence.
+const AIS_CHECKSUM_DIGITS = 2
+
 type AISData struct {
 	Description string //Description of AIS message type.
 	MMSI        string //9 digit identifier.
@@ -397,10 +401,18 @@ func AISParse(sentence string) (*AISData, error) {
 		return nil, errors.New("missing AIS sentence checksum")
 	}
 
-	var _checksum, _ = strconv.ParseInt(checksumStr, 16, 0)
-	var checksum = byte(_checksum)
+	// A checksum is exactly two hex digits, as the sentences we emit carry.
+	// ParseUint alone would take "4" or "004E" for the same byte.
+	if len(checksumStr) != AIS_CHECKSUM_DIGITS {
+		return nil, fmt.Errorf("AIS sentence checksum %q is not %d hexadecimal digits", checksumStr, AIS_CHECKSUM_DIGITS)
+	}
 
-	if calculatedChecksum != checksum {
+	var checksum, checksumErr = strconv.ParseUint(checksumStr, 16, 8)
+	if checksumErr != nil {
+		return nil, fmt.Errorf("invalid AIS sentence checksum %q: %w", checksumStr, checksumErr)
+	}
+
+	if uint64(calculatedChecksum) != checksum {
 		return nil, fmt.Errorf("AIS sentence checksum error: expected %02x but found %s", calculatedChecksum, checksumStr)
 	}
 
