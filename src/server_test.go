@@ -4,8 +4,10 @@
 package direwolf
 
 import (
+	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -265,4 +267,155 @@ func TestHandleClientCommand_NoLoginConfiguredCommandsWork(t *testing.T) {
 	var reply = <-replyCh
 	require.NotNil(t, reply)
 	assert.Equal(t, byte('R'), reply.Header.DataKind)
+}
+
+// --- Clients on this machine ---
+
+// stubAddrConn is a net.Conn that reports whatever remote address we give it.
+// Only RemoteAddr is ever called.
+type stubAddrConn struct {
+	net.Conn
+
+	addr net.Addr
+}
+
+func (c *stubAddrConn) RemoteAddr() net.Addr { return c.addr }
+
+func connWithRemoteAddr(addr net.Addr) net.Conn {
+	var conn = new(stubAddrConn)
+	conn.addr = addr
+
+	return conn
+}
+
+func tcpAddr(t *testing.T, ip string) net.Addr {
+	t.Helper()
+
+	var addr = new(net.TCPAddr)
+	addr.IP = net.ParseIP(ip)
+	require.NotNil(t, addr.IP, "unparseable test address %q", ip)
+	addr.Port = 8000
+
+	return addr
+}
+
+// loopbackConns returns a connected pair of real TCP sockets over the loopback
+// interface, as the accept path would see.
+func loopbackConns(t *testing.T) (net.Conn, net.Conn) {
+	t.Helper()
+
+	var ctx = t.Context()
+
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", "127.0.0.1:0")
+	require.NoError(t, listenErr)
+	defer listener.Close()
+
+	var accepted = make(chan net.Conn, 1)
+	go func() {
+		var conn, _ = listener.Accept()
+		accepted <- conn
+	}()
+
+	var client, dialErr = new(net.Dialer).DialContext(ctx, "tcp", listener.Addr().String())
+	require.NoError(t, dialErr)
+
+	var server = <-accepted
+	require.NotNil(t, server)
+
+	t.Cleanup(func() {
+		client.Close()
+		server.Close()
+	})
+
+	/*
+	 * Nothing here should ever wait on the other end for long, and a test that
+	 * fails by hanging tells nobody anything.
+	 */
+	require.NoError(t, client.SetDeadline(time.Now().Add(5*time.Second)))
+	require.NoError(t, server.SetDeadline(time.Now().Add(5*time.Second)))
+
+	return server, client
+}
+
+func TestAgwClientIsLocal(t *testing.T) {
+	var server, _ = loopbackConns(t)
+	assert.True(t, agwClientIsLocal(server), "a real connection over the loopback interface")
+
+	assert.True(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "127.0.0.1"))))
+	assert.True(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "127.1.2.3"))), "all of 127/8")
+	assert.True(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "::1"))))
+	assert.True(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "::ffff:127.0.0.1"))),
+		"IPv4 loopback mapped into IPv6")
+
+	assert.False(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "192.168.1.10"))))
+	assert.False(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "8.8.8.8"))))
+	assert.False(t, agwClientIsLocal(connWithRemoteAddr(tcpAddr(t, "2001:db8::1"))))
+
+	// Anything we can't judge has to log in like everyone else.
+	assert.False(t, agwClientIsLocal(nil))
+
+	var pipeEnd, otherEnd = net.Pipe()
+	t.Cleanup(func() {
+		pipeEnd.Close()
+		otherEnd.Close()
+	})
+	assert.False(t, agwClientIsLocal(pipeEnd), "not a TCP address")
+}
+
+// A client on this machine is exempt, as it is with AGWPE, and so may issue
+// commands without ever sending a login frame.
+func TestAgwClientAccepted_LocalClientNeedsNoLogin(t *testing.T) {
+	requireLogins(t, "Q1TEST", "hunter2")
+
+	var server, client = loopbackConns(t)
+	t.Cleanup(func() { client_sock[0] = nil })
+
+	agwClientAccepted(0, server)
+	assert.True(t, client_logged_in[0].Load())
+
+	var version = new(AGWPEMessage)
+	version.Header.DataKind = 'R'
+	handleClientCommand(0, version)
+
+	var reply, readErr = readReplyFrom(client)
+	require.NoError(t, readErr)
+	assert.Equal(t, byte('R'), reply.Header.DataKind)
+}
+
+func TestAgwClientAccepted_RemoteClientMustLogIn(t *testing.T) {
+	requireLogins(t, "Q1TEST", "hunter2")
+	t.Cleanup(func() { client_sock[0] = nil })
+
+	agwClientAccepted(0, connWithRemoteAddr(tcpAddr(t, "192.168.1.10")))
+
+	assert.False(t, client_logged_in[0].Load())
+}
+
+// Without AGWLOGIN the exemption changes nothing, because nobody has to log in.
+func TestAgwClientAccepted_NoLoginConfigured(t *testing.T) {
+	requireLogins(t)
+	t.Cleanup(func() { client_sock[0] = nil })
+
+	agwClientAccepted(0, connWithRemoteAddr(tcpAddr(t, "192.168.1.10")))
+
+	assert.False(t, agwLoginRequired())
+}
+
+// Accepting a connection clears whatever the previous holder of the slot
+// switched on.
+func TestAgwClientAccepted_ResetsMonitoringState(t *testing.T) {
+	enable_send_raw_to_client[0] = true
+	enable_send_monitor_to_client[0] = true
+	t.Cleanup(func() {
+		enable_send_raw_to_client[0] = false
+		enable_send_monitor_to_client[0] = false
+		client_sock[0] = nil
+	})
+
+	var server, _ = loopbackConns(t)
+	agwClientAccepted(0, server)
+
+	assert.False(t, enable_send_raw_to_client[0])
+	assert.False(t, enable_send_monitor_to_client[0])
+	assert.Equal(t, server, client_sock[0])
 }

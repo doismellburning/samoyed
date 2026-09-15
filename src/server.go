@@ -353,8 +353,8 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 
 	if agwLoginRequired() {
 		text_color_set(DW_COLOR_INFO)
-		dw_printf("AGW client applications must log in.  %d set(s) of credentials configured.\n",
-			len(agwpe_logins))
+		dw_printf("AGW client applications must log in, unless they connect from this machine.\n")
+		dw_printf("%d set(s) of credentials configured.\n", len(agwpe_logins))
 	}
 
 	/*
@@ -446,20 +446,10 @@ func server_connect_listen_thread(server_port int) {
 				continue
 			}
 
-			client_sock[client] = conn
+			agwClientAccepted(client, conn)
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nAttached to AGW client application %d...\n\n", client)
-
-			/*
-			 * The command to change this is actually a toggle, not explicit on or off.
-			 * Make sure it has proper state when we get a new connection.
-			 */
-			enable_send_raw_to_client[client] = false
-			enable_send_monitor_to_client[client] = false
-
-			/* Whoever had this slot before does not vouch for whoever has it now. */
-			client_logged_in[client].Store(false)
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
 		}
@@ -1041,6 +1031,49 @@ func cmd_listen_thread(client int) {
 		handleClientCommand(client, cmd)
 	}
 } /* end cmd_listen_thread */
+
+// agwClientAccepted takes on a newly accepted connection, putting the per-client
+// state into the shape a new client should find it in.
+func agwClientAccepted(client int, conn net.Conn) {
+	client_sock[client] = conn
+
+	/*
+	 * The command to change these is actually a toggle, not explicit on or off.
+	 * Make sure they have proper state when we get a new connection.
+	 */
+	enable_send_raw_to_client[client] = false
+	enable_send_monitor_to_client[client] = false
+
+	/*
+	 * Whoever had this slot before does not vouch for whoever has it now, so a
+	 * client that has to log in starts logged out.
+	 */
+	client_logged_in[client].Store(agwClientIsLocal(conn))
+}
+
+// agwClientIsLocal reports whether a client connected from the machine we are
+// running on.
+//
+// AGWPE's security settings are about which other machines may reach it, and
+// its documentation says a login "should not bother applications running on the
+// same machine where AGWPE is executing", so we exempt those too.  Note that
+// this means every user of a shared machine is exempt; see the "Put a password
+// on the AGW port" section of the documentation.
+//
+// A loopback source address really does mean this machine: the kernel will not
+// accept one that arrived over a network interface.
+func agwClientIsLocal(conn net.Conn) bool {
+	if conn == nil {
+		return false
+	}
+
+	var addr, ok = conn.RemoteAddr().(*net.TCPAddr)
+	if !ok {
+		return false /* Not something we can judge, so make it log in. */
+	}
+
+	return addr.IP.IsLoopback()
+}
 
 // agwLoginRequired reports whether a client has to log in before we honour any
 // of its other commands.

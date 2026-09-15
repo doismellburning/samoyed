@@ -188,6 +188,13 @@ disturbing the rest:
 A client may use any one of them; the user name and password are matched as a
 pair, so one client's password does not unlock another client's user name.
 
+Clients connecting from the machine Samoyed is running on are exempt and never
+have to log in, matching AGWPE, whose documentation says a login "should not
+bother applications running on the same machine".  Be aware of what that means
+on a shared machine: anyone with a shell account on it can use the AGW port
+regardless of ``AGWLOGIN``.  If that is your situation, the login is not the
+control you want - restrict the port itself.
+
 A client authenticates with the protocol's "Application Login" (``'P'``) frame -
 in `pyham_pe <https://github.com/mfncooper/pyham_pe>`__, for instance,
 ``login(userid, password)``.  Note that the protocol has no reply to it, so a
