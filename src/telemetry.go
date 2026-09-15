@@ -26,6 +26,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 const T_NUM_ANALOG = 5  /* Number of analog channels. */
@@ -193,18 +195,14 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 	*/
 	var pm = ts.t_get_metadata(station)
 
-	var araw [T_NUM_ANALOG]float64
+	// The zero value of a Maybe is Nothing, so an unreported channel needs no
+	// initialisation to say so.
+
+	var araw [T_NUM_ANALOG]maybe.Maybe[float64]
 
 	var ndp [T_NUM_ANALOG]int
-	for n := range T_NUM_ANALOG {
-		araw[n] = G_UNKNOWN
-		ndp[n] = 0
-	}
 
-	var draw [T_NUM_DIGITAL]int
-	for n := range T_NUM_DIGITAL {
-		draw[n] = G_UNKNOWN
-	}
+	var draw [T_NUM_DIGITAL]maybe.Maybe[int]
 
 	if !strings.HasPrefix(info, "T#") {
 		if !quiet {
@@ -235,14 +233,15 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 	}
 
 	var comment string
-	var seq, _ = strconv.Atoi(seqStr)
+	var seqNum, _ = strconv.Atoi(seqStr)
+	var seq = maybe.Just(seqNum)
 
 	var parts = strings.SplitN(rest, ",", T_NUM_ANALOG+1)
 	for n, p := range parts {
 		if n < T_NUM_ANALOG {
 			if len(p) > 0 {
 				var f, _ = strconv.ParseFloat(p, 64)
-				araw[n] = f
+				araw[n] = maybe.Just(f)
 				ndp[n] = t_ndp(p)
 			}
 			// Version 1.3: Suppress this message.
@@ -275,9 +274,9 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 			for k, v := range p {
 				switch v {
 				case '0':
-					draw[k] = 0
+					draw[k] = maybe.Just(0)
 				case '1':
-					draw[k] = 1
+					draw[k] = maybe.Just(1)
 				default:
 					if !quiet {
 						text_color_set(DW_COLOR_ERROR)
@@ -342,18 +341,14 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 	*/
 	var pm = ts.t_get_metadata(station)
 
-	var araw [T_NUM_ANALOG]float64
+	// The zero value of a Maybe is Nothing, so an unreported channel needs no
+	// initialisation to say so.
+
+	var araw [T_NUM_ANALOG]maybe.Maybe[float64]
 
 	var ndp [T_NUM_ANALOG]int
-	for n := range T_NUM_ANALOG {
-		araw[n] = G_UNKNOWN
-		ndp[n] = 0
-	}
 
-	var draw [T_NUM_DIGITAL]int
-	for n := range T_NUM_DIGITAL {
-		draw[n] = G_UNKNOWN
-	}
+	var draw [T_NUM_DIGITAL]maybe.Maybe[int]
 
 	if len(cdata) < 4 || len(cdata) > 14 || (len(cdata)%2 == 1) {
 		text_color_set(DW_COLOR_ERROR)
@@ -366,20 +361,19 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 	cdata = cdata[2:]
 
 	for n := 0; n < T_NUM_ANALOG+1 && 2*n < len(cdata); n++ {
-		var v = two_base91_to_i(cdata[2*n], cdata[2*n+1])
+		// An invalid base 91 character leaves this value unknown; taking an
+		// absent value apart would invent telemetry readings.
 
-		// An invalid base 91 character leaves this value unknown; taking the
-		// bit pattern of the sentinel apart would invent telemetry readings.
-
-		if v == G_UNKNOWN {
+		var v, ok = two_base91_to_i(cdata[2*n], cdata[2*n+1]).Get()
+		if !ok {
 			continue
 		}
 
 		if n < T_NUM_ANALOG {
-			araw[n] = float64(v)
+			araw[n] = maybe.Just(float64(v))
 		} else {
 			for k := range T_NUM_DIGITAL {
-				draw[k] = v & 1
+				draw[k] = maybe.Just(v & 1)
 				v >>= 1
 			}
 		}
@@ -707,25 +701,7 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
  *
  *--------------------------------------------------------------------*/
 
-const VAL_STR_SIZE = 64
-
-func fval_to_str(x float64, ndp int) string {
-	if x == G_UNKNOWN {
-		return "?"
-	} else {
-		return fmt.Sprintf("%.*f", ndp, x)
-	}
-}
-
-func ival_to_str(x int) string {
-	if x == G_UNKNOWN {
-		return "?"
-	} else {
-		return strconv.Itoa(x)
-	}
-}
-
-func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]int) string {
+func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]maybe.Maybe[float64], ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]maybe.Maybe[int]) string {
 	Assert(pm != nil)
 
 	var output strings.Builder
@@ -736,30 +712,26 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 	}
 
 	output.WriteString("Seq=")
-	output.WriteString(ival_to_str(seq))
+	output.WriteString(maybe.Fold("?", strconv.Itoa, seq))
 
 	for n := range T_NUM_ANALOG {
 		// Display all or only defined values?  Only defined for now.
-		if araw[n] != G_UNKNOWN {
-			var fval float64
-			var fndp int
-
+		var raw, known = araw[n].Get()
+		if known {
 			output.WriteString(", ")
 			output.WriteString(pm.name[n])
 			output.WriteString("=")
 
 			// Scaling and suitable number of decimal places for display.
 
-			fval = pm.coeff[n][C_A]*araw[n]*araw[n] +
-				pm.coeff[n][C_B]*araw[n] +
+			var fval = pm.coeff[n][C_A]*raw*raw +
+				pm.coeff[n][C_B]*raw +
 				pm.coeff[n][C_C]
 
 			var z = IfThenElse(pm.coeff_ndp[n][C_A] == 0, 0, pm.coeff_ndp[n][C_A]+ndp[n]+ndp[n])
-			fndp = max(z, max(pm.coeff_ndp[n][C_B]+ndp[n], pm.coeff_ndp[n][C_C]))
+			var fndp = max(z, max(pm.coeff_ndp[n][C_B]+ndp[n], pm.coeff_ndp[n][C_C]))
 
-			var val_str = fval_to_str(fval, fndp)
-
-			output.WriteString(val_str)
+			fmt.Fprintf(&output, "%.*f", fndp, fval)
 			if len(pm.unit[n]) > 0 {
 				output.WriteString(" ")
 				output.WriteString(pm.unit[n])
@@ -769,23 +741,17 @@ func t_data_process(pm *t_metadata_s, seq int, araw [T_NUM_ANALOG]float64, ndp [
 
 	for n := range T_NUM_DIGITAL {
 		// Display all or only defined values?  Only defined for now.
-		if draw[n] != G_UNKNOWN {
-			var dval int
-
+		var raw, known = draw[n].Get()
+		if known {
 			output.WriteString(", ")
 			output.WriteString(pm.name[T_NUM_ANALOG+n])
 			output.WriteString("=")
 
 			// Possible inverting for bit sense.
 
-			dval = draw[n]
-			if !pm.sense[n] {
-				dval = 1 - dval
-			}
+			var dval = IfThenElse(pm.sense[n], raw, 1-raw)
 
-			var val_str = ival_to_str(dval)
-
-			output.WriteString(val_str)
+			output.WriteString(strconv.Itoa(dval))
 			if len(pm.unit[T_NUM_ANALOG+n]) > 0 {
 				output.WriteString(" ")
 				output.WriteString(pm.unit[T_NUM_ANALOG+n])

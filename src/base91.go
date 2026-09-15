@@ -1,5 +1,7 @@
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/maybe"
+
 /* Range of digits for Base 91 representation. */
 
 const B91_MIN = '!'
@@ -9,7 +11,7 @@ func isdigit91(c byte) bool {
 	return ((c) >= B91_MIN && (c) <= B91_MAX)
 }
 
-func two_base91_to_i(first, second byte) int {
+func two_base91_to_i(first, second byte) maybe.Maybe[int] {
 	var result int
 
 	Assert(B91_MAX-B91_MIN == 90)
@@ -20,7 +22,7 @@ func two_base91_to_i(first, second byte) int {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("\"%c\" is not a valid character for base 91 telemetry data.\n", first)
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[int]()
 	}
 
 	if isdigit91(second) {
@@ -29,8 +31,8 @@ func two_base91_to_i(first, second byte) int {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("\"%c\" is not a valid character for base 91 telemetry data.\n", second)
 
-		return (G_UNKNOWN)
+		return maybe.Nothing[int]()
 	}
 
-	return (result)
+	return maybe.Just(result)
 }

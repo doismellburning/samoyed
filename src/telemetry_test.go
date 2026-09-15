@@ -9,9 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// two_base91_to_i returns G_UNKNOWN for an invalid character.  Using that
-// result without checking it turned the bit pattern of -999999 into eight
-// "real" digital values, and would have done the same for an analog one.
+// two_base91_to_i has no value for an invalid character.  Using its result
+// without checking it turned the bit pattern of the old G_UNKNOWN sentinel
+// into eight "real" digital values, and would have done the same for an
+// analog one.
 
 func Test_telemetry_data_base91_invalid_character(t *testing.T) {
 	var ts = NewTelemetryState()
