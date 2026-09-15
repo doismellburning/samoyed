@@ -1415,7 +1415,12 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				}
 			}
 
-			dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+			if pid == AX25_PID_NETROM && saveNetromConfig != nil && saveNetromConfig.enabled && int(cmd.Header.Portx) == saveNetromConfig.channel {
+				gNetromLinkMgr.connectRequest(int(cmd.Header.Portx), client,
+					callsigns[AX25_SOURCE], callsigns[AX25_DESTINATION], gNetromRouter)
+			} else {
+				dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+			}
 		}
 
 	case 'D': /* Send Connected Data */
@@ -1440,7 +1445,23 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
-			dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+			if cmd.Header.PID == AX25_PID_NETROM && saveNetromConfig != nil && saveNetromConfig.enabled {
+				var nrCircuit = gNetromLinkMgr.findByCallsigns(
+					int(cmd.Header.Portx),
+					callsigns[AX25_SOURCE],
+					callsigns[AX25_DESTINATION],
+					client,
+				)
+				if nrCircuit != nil {
+					gNetromLinkMgr.dataRequest(nrCircuit.localIdx, nrCircuit.localID, cmd.Data[:cmd.Header.DataLen])
+				} else {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("NET/ROM: AGW 'D': no circuit for %s→%s on port %d; data dropped.\n",
+						callsigns[AX25_SOURCE], callsigns[AX25_DESTINATION], cmd.Header.Portx)
+				}
+			} else {
+				dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+			}
 		}
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
@@ -1457,6 +1478,18 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
+
+			// Only this client's own NET/ROM circuit on the NET/ROM channel
+			// may intercept a disconnect; anything else is a plain AX.25
+			// one and must reach dlq_disconnect_request below.
+			if saveNetromConfig != nil && saveNetromConfig.enabled && int(cmd.Header.Portx) == saveNetromConfig.channel {
+				var nrCircuit = gNetromLinkMgr.findByCallsigns(int(cmd.Header.Portx), callsigns[AX25_SOURCE], callsigns[AX25_DESTINATION], client)
+				if nrCircuit != nil {
+					gNetromLinkMgr.disconnectRequest(nrCircuit.localIdx, nrCircuit.localID)
+
+					break
+				}
+			}
 
 			dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}

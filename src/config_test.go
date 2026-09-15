@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -209,11 +210,120 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 	var ttConfig tt_config_s
 	var igateConfig igate_config_s
 	var miscConfig misc_config_s
+	var netromConfig netrom_config_s
 
 	config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-		&ttConfig, &igateConfig, &miscConfig)
+		&ttConfig, &igateConfig, &miscConfig, &netromConfig)
 
 	return audioConfig, &miscConfig
+}
+
+// netromConfigFromString writes content to a temp config file, runs
+// config_init, and returns the resulting NET/ROM config struct.
+func netromConfigFromString(t *testing.T, content string) *netrom_config_s {
+	t.Helper()
+
+	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
+	require.NoError(t, err)
+	_, err = tmpFile.WriteString(content)
+	require.NoError(t, err)
+	require.NoError(t, tmpFile.Close())
+
+	var audioConfig = new(audio_s)
+	var digiConfig digi_config_s
+	var cdigiConfig cdigi_config_s
+	var ttConfig tt_config_s
+	var igateConfig igate_config_s
+	var miscConfig misc_config_s
+	var netromConfig netrom_config_s
+
+	config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
+		&ttConfig, &igateConfig, &miscConfig, &netromConfig)
+
+	return &netromConfig
+}
+
+// Test_config_init_netrom_quality_rejects_non_numeric is the regression test
+// for a discarded strconv.Atoi error: because 0 is a legal quality, a
+// non-numeric QUALITY used to be accepted as an explicit 0, which then caps
+// every learned route's quality at 0 with nothing said about it.
+func Test_config_init_netrom_quality_rejects_non_numeric(t *testing.T) {
+	var config = netromConfigFromString(t, "NETROM 0 Q1TEST QNODE1 QUALITY notanumber\n")
+
+	assert.True(t, config.enabled, "the NETROM directive itself should still be accepted")
+	assert.False(t, config.qualitySet, "a non-numeric QUALITY should not count as explicitly configured")
+	assert.Equal(t, byte(0), config.quality, "a rejected QUALITY should leave the field untouched")
+}
+
+// Test_config_init_netrom_quality_accepts_explicit_zero checks that the error
+// check above does not cost us a legitimate QUALITY 0.
+func Test_config_init_netrom_quality_accepts_explicit_zero(t *testing.T) {
+	var config = netromConfigFromString(t, "NETROM 0 Q1TEST QNODE1 QUALITY 0\n")
+
+	assert.True(t, config.qualitySet, "QUALITY 0 is a legal value and should be recorded as set")
+	assert.Equal(t, byte(0), config.quality)
+}
+
+// Test_config_init_netrom_options checks the remaining optional keywords.
+func Test_config_init_netrom_options(t *testing.T) {
+	var config = netromConfigFromString(t, "NETROM 1 Q1TEST-2 QNODE1 TTL 5 NODES 600 QUALITY 210\n")
+
+	assert.True(t, config.enabled)
+	assert.Equal(t, 1, config.channel)
+	assert.Equal(t, "Q1TEST-2", config.callsign)
+	assert.Equal(t, "QNODE1", config.alias)
+	assert.Equal(t, byte(5), config.ttl)
+	assert.Equal(t, 600, config.nodesInterval)
+	assert.Equal(t, byte(210), config.quality)
+}
+
+// Test_config_init_netrom_channel_range checks which channel numbers the
+// NETROM directive accepts.  A NET/ROM node can sit on a virtual channel (an
+// NCHANNEL network TNC, which is how it reaches an AXUDP link) as well as on a
+// radio one, so the accepted range runs to MAX_TOTAL_CHANS rather than
+// stopping at MAX_RADIO_CHANS.
+func Test_config_init_netrom_channel_range(t *testing.T) {
+	t.Run("radio channel", func(t *testing.T) {
+		var config = netromConfigFromString(t, "NETROM 0 Q1TEST QNODE1\n")
+
+		assert.True(t, config.enabled)
+		assert.Equal(t, 0, config.channel)
+	})
+
+	t.Run("virtual channel", func(t *testing.T) {
+		var content = fmt.Sprintf("NETROM %d Q1TEST QNODE1\n", MAX_RADIO_CHANS)
+		var config = netromConfigFromString(t, content)
+
+		assert.True(t, config.enabled, "a virtual channel should be accepted at parse time")
+		assert.Equal(t, MAX_RADIO_CHANS, config.channel)
+	})
+
+	t.Run("highest virtual channel", func(t *testing.T) {
+		var content = fmt.Sprintf("NETROM %d Q1TEST QNODE1\n", MAX_TOTAL_CHANS-1)
+		var config = netromConfigFromString(t, content)
+
+		assert.True(t, config.enabled)
+		assert.Equal(t, MAX_TOTAL_CHANS-1, config.channel)
+	})
+
+	t.Run("beyond the last channel is rejected", func(t *testing.T) {
+		var content = fmt.Sprintf("NETROM %d Q1TEST QNODE1\n", MAX_TOTAL_CHANS)
+		var config = netromConfigFromString(t, content)
+
+		assert.False(t, config.enabled, "a channel past MAX_TOTAL_CHANS should be refused")
+	})
+
+	t.Run("negative is rejected", func(t *testing.T) {
+		var config = netromConfigFromString(t, "NETROM -1 Q1TEST QNODE1\n")
+
+		assert.False(t, config.enabled)
+	})
+
+	t.Run("non-numeric is rejected", func(t *testing.T) {
+		var config = netromConfigFromString(t, "NETROM notachannel Q1TEST QNODE1\n")
+
+		assert.False(t, config.enabled)
+	})
 }
 
 // --- config_init MYCALL directive ---
@@ -433,8 +543,9 @@ func Test_config_init_modem_directive(t *testing.T) {
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
 
+			var netromConfig netrom_config_s
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, &netromConfig)
 
 			assert.Equal(t, tt.wantBaud, audioConfig.achan[0].baud)
 			assert.Equal(t, tt.wantModemType, audioConfig.achan[0].modem_type)
@@ -481,9 +592,10 @@ func Test_config_init_filter_syntax_validation(t *testing.T) {
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
+			var netromConfig netrom_config_s
 
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, &netromConfig)
 
 			if tt.wantSet {
 				assert.NotEmpty(t, digiConfig.filter_str[0][0])
@@ -526,9 +638,10 @@ func Test_config_init_cfilter_syntax_validation(t *testing.T) {
 			var ttConfig tt_config_s
 			var igateConfig igate_config_s
 			var miscConfig misc_config_s
+			var netromConfig netrom_config_s
 
 			config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-				&ttConfig, &igateConfig, &miscConfig)
+				&ttConfig, &igateConfig, &miscConfig, &netromConfig)
 
 			if tt.wantSet {
 				assert.NotEmpty(t, cdigiConfig.cfilter_str[0][0])

@@ -213,15 +213,13 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
-			dw_printf("\n")
+			netromPrintInfo(pp, pinfo, !ax25_is_aprs(pp))
 
 			igate_send_rec_packet(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
-			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
-			dw_printf("\n")
+			netromPrintInfo(pp, pinfo, !ax25_is_aprs(pp))
 
 			nettnc_send_packet(channel, pp)
 		}

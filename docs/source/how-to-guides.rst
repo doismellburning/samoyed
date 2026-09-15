@@ -189,3 +189,75 @@ that do not:
 
 ``samoyed-gen_packets`` and ``samoyed-atest`` take the same choice as
 ``--il2p-version``, for generating and decoding test audio.
+
+
+Run a NET/ROM node
+-------------------
+
+NET/ROM is a network and transport layer carried over AX.25 (PID 0xCF).  A node
+advertises itself and the routes it knows in periodic ``NODES`` broadcasts,
+learns routes from the broadcasts it hears, and carries user traffic over
+connected-mode circuits that may cross several hops.
+
+Add a ``NETROM`` directive to enable one:
+
+.. code::
+
+    NETROM <channel> <callsign> <alias> [TTL <n>] [NODES <seconds>] [QUALITY <n>]
+
+For example:
+
+.. code::
+
+    MYCALL Q1TEST
+    NETROM 0 Q1TEST-7 QNODEA NODES 300 QUALITY 255
+
+``callsign`` is the node's own AX.25 address, conventionally the station
+callsign with an SSID, and ``alias`` is the short human-readable name (up to
+six characters) that other nodes display.  ``TTL`` bounds how many hops a frame
+may be forwarded (default 7), ``NODES`` is the broadcast interval in seconds
+(default 1800), and ``QUALITY`` (0-255, default 192) is both what this node
+advertises for itself and what it assumes for a link to a neighbour it hears.
+
+Applications drive circuits over the existing AGW interface, with PID 0xCF
+marking a command as NET/ROM rather than plain AX.25: ``c`` opens a circuit,
+``D`` carries data, and ``d`` closes it.  A circuit belongs to the callsign the
+client gave as its own, and a connect request for a callsign no client has
+registered is refused rather than accepted into a circuit with nothing behind
+it.
+
+``test-scripts/check-netrom-connect`` starts two nodes on cross-wired UDP audio
+and drives a circuit between them, and doubles as a worked example of the AGW
+side.
+
+Running a node over a network link
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The channel need not be a radio channel.  It may equally be a virtual
+``NCHANNEL``, which is how a node reaches a link that is not RF at all -
+including an AXUDP tunnel, via the ``samoyed-axudp`` bridge:
+
+.. code::
+
+    NCHANNEL 6 localhost 8002
+    NETROM 6 Q1TEST-7 QNODEA
+
+An ``ICHANNEL`` is refused: that channel is APRS-IS, where NET/ROM means
+nothing.  A channel that is not configured at all is refused too, with a
+message saying so, rather than starting a node that would transmit nowhere.
+
+Two caveats apply to AXUDP specifically, because ``samoyed-axudp`` routes
+strictly by AX.25 destination address:
+
+* ``NODES`` broadcasts are addressed to the pseudo-callsign ``NODES``, which
+  matches no ``MAP`` entry, so they are dropped.  AXUDP is point-to-point, so
+  even mapping ``NODES`` explicitly would reach only one peer, where NET/ROM
+  needs the frame copied to every neighbour.
+* ``MAP`` entries are keyed on AX.25 callsigns, never on NET/ROM aliases.  An
+  alias lives inside the NET/ROM payload and never appears in the AX.25 address
+  field, so it can never be matched.  Map the neighbour's callsign
+  (``Q2TEST-7``), not its alias (``QNODEB``).
+
+Unicast circuit traffic therefore works over AXUDP once the neighbour's
+callsign is mapped; routing must be arranged by other means until the bridge
+learns to fan broadcasts out to every peer.
