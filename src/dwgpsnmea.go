@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
 )
 
@@ -151,9 +152,7 @@ func read_gpsnmea_thread(fd *term.Term) {
 		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
-	var info = new(dwgps_info_t)
-	dwgps_clear(info)
-	info.fix = DWFIX_NOT_SEEN /* clear not init state. */
+	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
 	if s_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -218,13 +217,8 @@ func read_gpsnmea_thread(fd *term.Term) {
 						dw_printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
-						if f.Knots != G_UNKNOWN {
-							info.speed_knots = f.Knots
-						}
-
-						if f.Course != G_UNKNOWN {
-							info.track = f.Course
-						}
+						info.speed_knots = f.Knots.Or(info.speed_knots)
+						info.track = f.Course.Or(info.track)
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
 					var f = dwgpsnmea_gpgga(gps_msg, false)
@@ -235,17 +229,9 @@ func read_gpsnmea_thread(fd *term.Term) {
 						dw_printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
-						if f.Lat != G_UNKNOWN {
-							info.dlat = f.Lat
-						}
-
-						if f.Lon != G_UNKNOWN {
-							info.dlon = f.Lon
-						}
-
-						if f.Alt != G_UNKNOWN {
-							info.altitude = f.Alt
-						}
+						info.dlat = f.Lat.Or(info.dlat)
+						info.dlon = f.Lon.Or(info.dlon)
+						info.altitude = f.Alt.Or(info.altitude)
 
 						if f.Fix != info.fix { // Print change in location fix.
 							text_color_set(DW_COLOR_INFO)
@@ -363,21 +349,18 @@ func remove_checksum(sent string, quiet bool) (string, error) {
  *--------------------------------------------------------------------*/
 
 type GPRMCResult struct {
-	Lat    float64
-	Lon    float64
-	Knots  float64
-	Course float64
+	Lat    maybe.Maybe[float64]
+	Lon    maybe.Maybe[float64]
+	Knots  maybe.Maybe[float64]
+	Course maybe.Maybe[float64]
 	Fix    dwfix_t
 }
 
 func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
-	var result = &GPRMCResult{
-		Lat:    G_UNKNOWN,
-		Lon:    G_UNKNOWN,
-		Knots:  G_UNKNOWN,
-		Course: G_UNKNOWN,
-		Fix:    DWFIX_NO_FIX, // TODO Default to Error, because that's what most returns are? On the other hand it's good to be explicit...
-	}
+	var result = new(GPRMCResult)
+
+	// TODO Default to Error, because that's what most returns are? On the other hand it's good to be explicit...
+	result.Fix = DWFIX_NO_FIX
 
 	sentence, err := remove_checksum(sentence, quiet)
 	if err != nil {
@@ -426,7 +409,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		result.Lat = latitude_from_nmea(plat, pns[0])
+		result.Lat = unlessUnknown(latitude_from_nmea(plat, pns[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -439,7 +422,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		result.Lon = longitude_from_nmea(plon, pew[0])
+		result.Lon = unlessUnknown(longitude_from_nmea(plon, pew[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -453,7 +436,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 
 	var knots, knotsErr = strconv.ParseFloat(pknots, 64)
 	if knotsErr == nil {
-		result.Knots = knots
+		result.Knots = unlessUnknown(knots)
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -467,11 +450,10 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 
 	var course, courseErr = strconv.ParseFloat(pcourse, 64)
 	if courseErr == nil {
-		result.Course = course
-	} else {
-		/* When stationary, this field might be empty. */
-		result.Course = G_UNKNOWN
+		result.Course = unlessUnknown(course)
 	}
+	/* When stationary, this field might be empty, and Course stays Nothing. */
+	/* A parsed value can still be the G_UNKNOWN sentinel, hence unlessUnknown. */
 
 	//text_color_set (DW_COLOR_INFO);
 	//dw_printf("%.6f %.6f %.1f %.0f\n", *odlat, *odlon, *oknots, *ocourse);
@@ -514,21 +496,17 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
  *--------------------------------------------------------------------*/
 
 type GPGGAResult struct {
-	Lat float64
-	Lon float64
-	Alt float64
-	Sat int
+	Lat maybe.Maybe[float64]
+	Lon maybe.Maybe[float64]
+	Alt maybe.Maybe[float64]
+	Sat maybe.Maybe[int]
 	Fix dwfix_t
 }
 
 func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
-	var result = &GPGGAResult{
-		Lat: G_UNKNOWN,
-		Lon: G_UNKNOWN,
-		Alt: G_UNKNOWN,
-		Sat: G_UNKNOWN,
-		Fix: DWFIX_NO_FIX,
-	}
+	var result = new(GPGGAResult)
+
+	result.Fix = DWFIX_NO_FIX
 
 	sentence, err := remove_checksum(sentence, quiet)
 	if err != nil {
@@ -585,7 +563,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		result.Lat = latitude_from_nmea(plat, pns[0])
+		result.Lat = unlessUnknown(latitude_from_nmea(plat, pns[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -598,7 +576,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		result.Lon = longitude_from_nmea(plon, pew[0])
+		result.Lon = unlessUnknown(longitude_from_nmea(plon, pew[0]))
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -621,7 +599,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		if len(paltitude) > 0 {
 			var altitude, altitudeErr = strconv.ParseFloat(paltitude, 64)
 			if altitudeErr == nil {
-				result.Alt = altitude
+				result.Alt = unlessUnknown(altitude)
 				result.Fix = DWFIX_3D
 			} else {
 				if !quiet {

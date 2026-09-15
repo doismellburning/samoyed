@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -106,7 +107,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	var deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		fix = dwgps_read(info)
-		if fix >= DWFIX_3D && info.altitude != G_UNKNOWN {
+		if fix >= DWFIX_3D && info.altitude.IsJust() {
 			break
 		}
 
@@ -114,9 +115,9 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	}
 
 	require.GreaterOrEqual(t, fix, DWFIX_3D, "never got a 3D location fix from gpsd")
-	require.NotEqual(t, G_UNKNOWN, info.altitude, "never got an altitude from gpsd")
+	require.True(t, info.altitude.IsJust(), "never got an altitude from gpsd")
 
-	assert.InDelta(t, 42.6187, info.dlat, 0.001)
-	assert.InDelta(t, -71.3472, info.dlon, 0.001)
-	assert.InDelta(t, 33.5, info.altitude, 0.001)
+	assert.InDelta(t, 42.6187, maybe.FromJust(info.dlat), 0.001)
+	assert.InDelta(t, -71.3472, maybe.FromJust(info.dlon), 0.001)
+	assert.InDelta(t, 33.5, maybe.FromJust(info.altitude), 0.001)
 }

@@ -276,6 +276,24 @@ func TestMapMaybe(t *testing.T) {
 	}
 }
 
+func TestFromPointer(t *testing.T) {
+	var value = 1
+
+	if got := FromPointer(&value); got != Just(1) {
+		t.Errorf("FromPointer gave %v, want Just 1", got)
+	}
+
+	var zero = 0
+
+	if got := FromPointer(&zero); got != Just(0) {
+		t.Errorf("FromPointer of a pointer to zero gave %v, want Just 0", got)
+	}
+
+	if got := FromPointer[int](nil); got != Nothing[int]() {
+		t.Errorf("FromPointer of nil gave %v, want Nothing", got)
+	}
+}
+
 func TestListToMaybe(t *testing.T) {
 	if got := ListToMaybe([]int{1, 2}); got != Just(1) {
 		t.Errorf("ListToMaybe gave %v, want Just 1", got)

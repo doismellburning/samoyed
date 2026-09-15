@@ -1034,18 +1034,18 @@ func aprs_raw_nmea(A *decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("$GNRMC,")) {
 		var result = dwgpsnmea_gprmc(string(info), A.g_quiet)
 
-		A.g_lat = unlessUnknown(result.Lat)
-		A.g_lon = unlessUnknown(result.Lon)
-		A.g_course = unlessUnknown(result.Course)
-		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(result.Knots))
+		A.g_lat = result.Lat
+		A.g_lon = result.Lon
+		A.g_course = result.Course
+		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, result.Knots)
 		A.g_data_type_desc = "Raw GPS data"
 	} else if bytes.HasPrefix(info, []byte("$GPGGA,")) ||
 		bytes.HasPrefix(info, []byte("$GNGGA,")) {
 		var result = dwgpsnmea_gpgga(string(info), A.g_quiet)
 
-		A.g_lat = unlessUnknown(result.Lat)
-		A.g_lon = unlessUnknown(result.Lon)
-		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, unlessUnknown(result.Alt))
+		A.g_lat = result.Lat
+		A.g_lon = result.Lon
+		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, result.Alt)
 		A.g_data_type_desc = "Raw GPS data"
 	}
 

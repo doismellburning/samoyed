@@ -178,6 +178,17 @@ func MapMaybe[A, B any](f func(A) Maybe[B], values []A) []B {
 	return results
 }
 
+// FromPointer returns Just the value pointed to by pointer, or Nothing if
+// pointer is nil.  It is for the boundary with code that says "absent" with a
+// nil pointer, such as a JSON decoder.
+func FromPointer[T any](pointer *T) Maybe[T] {
+	if pointer == nil {
+		return Nothing[T]()
+	}
+
+	return Just(*pointer)
+}
+
 // ListToMaybe returns Just the first element of values, or Nothing if values
 // is empty.
 func ListToMaybe[T any](values []T) Maybe[T] {
