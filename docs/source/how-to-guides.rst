@@ -189,3 +189,51 @@ that do not:
 
 ``samoyed-gen_packets`` and ``samoyed-atest`` take the same choice as
 ``--il2p-version``, for generating and decoding test audio.
+
+Put a password on the AGW port
+--------------------------------------------
+
+The "AGW TCPIP Socket Interface" has no authentication of its own, so anything
+that can reach port 8000 can transmit through your radio.  Binding it to
+localhost or firewalling it off remains the strongest protection, but where the
+port has to be reachable, ``AGWLOGIN`` requires a user name and password before
+anything else a client asks for is honoured:
+
+.. code::
+
+    AGWLOGIN Q1TEST "correct horse battery staple"
+
+Quote either value if it contains spaces.  To change the password, edit the line
+and restart.  Without an ``AGWLOGIN`` line nothing changes: clients connect and
+work without logging in, as they always have.
+
+Repeat the directive to accept more than one set of credentials, as AGWPE does,
+so that each client can have its own and one of them can be withdrawn without
+disturbing the rest:
+
+.. code::
+
+    AGWLOGIN Q1TEST "correct horse battery staple"
+    AGWLOGIN Q2TEST "trombone vs mahogany"
+
+A client may use any one of them; the user name and password are matched as a
+pair, so one client's password does not unlock another client's user name.
+
+Clients connecting from the machine Samoyed is running on are exempt and never
+have to log in, matching AGWPE, whose documentation says a login "should not
+bother applications running on the same machine".  Be aware of what that means
+on a shared machine: anyone with a shell account on it can use the AGW port
+regardless of ``AGWLOGIN``.  If that is your situation, the login is not the
+control you want - restrict the port itself.
+
+A client authenticates with the protocol's "Application Login" (``'P'``) frame -
+in `pyham_pe <https://github.com/mfncooper/pyham_pe>`__, for instance,
+``login(userid, password)``.  Note that the protocol has no reply to it, so a
+client learns that it got the credentials wrong only by having its subsequent
+commands ignored; the failure is logged at this end.  Not every client can send
+the frame at all - Xastir and QtSoundModem, for example, cannot - so check yours
+before turning this on.
+
+The credentials cross the network in the clear, exactly as the AGW protocol
+specifies them.  Treat this as a way to keep casual traffic off the port, not as
+protection against someone who can watch it.

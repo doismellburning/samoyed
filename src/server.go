@@ -34,6 +34,8 @@ package direwolf
  *
  *			'K'	Transmit raw AX.25 frame.
  *
+ *			'P'	Application Login.  Only checked if AGWLOGIN is configured.
+ *
  *			'X'	Register CallSign
  *
  *			'x'	Unregister CallSign
@@ -113,11 +115,14 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"bytes"
 	"context"
+	"crypto/subtle"
 	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -138,6 +143,31 @@ var enable_send_monitor_to_client [MAX_NET_CLIENTS]bool
 /* Should we send received packets to client app in monitor form? */
 /* Note that it starts as false for a new connection. */
 /* the client app must send a command to enable this. */
+
+// AGW_LOGIN_FIELD_LEN is the size of each of the two fields, user name and
+// password, in the data of an "Application Login" frame.  Both are NUL padded.
+const AGW_LOGIN_FIELD_LEN = 255
+
+var agwpe_logins []agwpe_login_s
+
+/* User names and passwords, any one of which a client may send in an */
+/* "Application Login" frame before we honour any of its other commands. */
+/* Empty means no login is required.  Written once at startup, read by every */
+/* client's command thread thereafter. */
+
+var client_logged_in [MAX_NET_CLIENTS]atomic.Bool
+
+/* Has this client sent an "Application Login" that we accepted? */
+/* Only consulted when a login is required. */
+/* The connection listener and the client's own command thread both */
+/* touch this, hence the atomic. */
+
+var client_login_exempt [MAX_NET_CLIENTS]atomic.Bool
+
+/* Is this client exempt from having to log in at all, by having connected */
+/* from this machine?  Settled when the connection is accepted, before the */
+/* socket is published, and read again whenever the client's login state is */
+/* reset. */
 
 /*-------------------------------------------------------------------
  *
@@ -313,9 +343,13 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 
 	save_audio_config_p = audio_config_p
 
+	agwpe_logins = mc.agwpe_logins
+
 	for client := range MAX_NET_CLIENTS {
 		enable_send_raw_to_client[client] = false
 		enable_send_monitor_to_client[client] = false
+		client_login_exempt[client].Store(false)
+		client_logged_in[client].Store(false)
 	}
 
 	if server_port == 0 {
@@ -323,6 +357,12 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 		dw_printf("Disabled AGW network client port.\n")
 
 		return
+	}
+
+	if agwLoginRequired() {
+		text_color_set(DW_COLOR_INFO)
+		dw_printf("AGW client applications must log in, unless they connect from this machine.\n")
+		dw_printf("%d set(s) of credentials configured.\n", len(agwpe_logins))
 	}
 
 	/*
@@ -414,17 +454,10 @@ func server_connect_listen_thread(server_port int) {
 				continue
 			}
 
-			client_sock[client] = conn
+			agwClientAccepted(client, conn)
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nAttached to AGW client application %d...\n\n", client)
-
-			/*
-			 * The command to change this is actually a toggle, not explicit on or off.
-			 * Make sure it has proper state when we get a new connection.
-			 */
-			enable_send_raw_to_client[client] = false
-			enable_send_monitor_to_client[client] = false
 		} else {
 			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
 		}
@@ -1007,7 +1040,180 @@ func cmd_listen_thread(client int) {
 	}
 } /* end cmd_listen_thread */
 
+// agwClientAccepted takes on a newly accepted connection, putting the per-client
+// state into the shape a new client should find it in.
+func agwClientAccepted(client int, conn net.Conn) {
+	/*
+	 * The command to change these is actually a toggle, not explicit on or off.
+	 * Make sure they have proper state when we get a new connection.
+	 */
+	enable_send_raw_to_client[client] = false
+	enable_send_monitor_to_client[client] = false
+
+	/*
+	 * Whoever had this slot before does not vouch for whoever has it now, so a
+	 * client that has to log in starts logged out.
+	 */
+	client_login_exempt[client].Store(agwClientIsLocal(conn))
+	agwClientLoggedOut(client)
+
+	/*
+	 * Publish the socket last.  cmd_listen_thread is already watching this slot
+	 * for one, and acts on whatever it finds the moment one appears, so
+	 * anything a command is judged against has to be in place first -
+	 * otherwise a client that gets in quickly enough is judged against the
+	 * state the previous holder of the slot left, and a remote one could find
+	 * itself logged in on the strength of somebody else's login.
+	 */
+	client_sock[client] = conn
+}
+
+// agwClientLoggedOut puts a client back to where one that has not logged in
+// starts: needing to log in, unless it is exempt by having connected from this
+// machine.  A client on this machine never has to log in, so a login attempt it
+// gets wrong does not take anything away from it.
+func agwClientLoggedOut(client int) {
+	client_logged_in[client].Store(client_login_exempt[client].Load())
+}
+
+// agwClientIsLocal reports whether a client connected from the machine we are
+// running on.
+//
+// AGWPE's security settings are about which other machines may reach it, and
+// its documentation says a login "should not bother applications running on the
+// same machine where AGWPE is executing", so we exempt those too.  Note that
+// this means every user of a shared machine is exempt; see the "Put a password
+// on the AGW port" section of the documentation.
+//
+// A loopback source address really does mean this machine: the kernel will not
+// accept one that arrived over a network interface.
+func agwClientIsLocal(conn net.Conn) bool {
+	if conn == nil {
+		return false
+	}
+
+	var addr, ok = conn.RemoteAddr().(*net.TCPAddr)
+	if !ok {
+		return false /* Not something we can judge, so make it log in. */
+	}
+
+	return addr.IP.IsLoopback()
+}
+
+// agwLoginRequired reports whether a client has to log in before we honour any
+// of its other commands.
+func agwLoginRequired() bool {
+	return len(agwpe_logins) > 0
+}
+
+// agwMatchLogin looks for credentials from an "Application Login" frame among
+// those configured, and returns the configured user name that matched.
+//
+// Every set is compared, with no early exit, so how long this takes says
+// nothing about which user names exist.  The name it hands back is our own
+// configured text rather than the client's, so it is safe to print.
+func agwMatchLogin(user string, password string) (string, bool) {
+	var matched string
+	var accepted bool
+
+	for _, login := range agwpe_logins {
+		/* Constant time so a password can't be guessed a character at a time. */
+		var userOK = subtle.ConstantTimeCompare([]byte(user), []byte(login.user)) == 1
+		var passwordOK = subtle.ConstantTimeCompare([]byte(password), []byte(login.password)) == 1
+
+		if userOK && passwordOK {
+			matched = login.user
+			accepted = true
+		}
+	}
+
+	return matched, accepted
+}
+
+// parseAGWLogin splits the data of an "Application Login" frame into its user
+// name and password.  Each is a fixed AGW_LOGIN_FIELD_LEN byte field, so
+// anything shorter is not a login we can check.  Anything longer is somebody
+// else's idea of the frame, and the two fields we want are still where the
+// protocol says they are.
+func parseAGWLogin(data []byte) (string, string, bool) {
+	if len(data) < 2*AGW_LOGIN_FIELD_LEN {
+		return "", "", false
+	}
+
+	return agwLoginField(data[:AGW_LOGIN_FIELD_LEN]),
+		agwLoginField(data[AGW_LOGIN_FIELD_LEN : 2*AGW_LOGIN_FIELD_LEN]),
+		true
+}
+
+// agwLoginField takes the text out of one field of an "Application Login"
+// frame.  The protocol describes each as "ended with 0x00 filled till 255
+// bytes", so the value stops at the first NUL; what a client leaves in the pad
+// after it is not part of the value, and is not necessarily NUL.
+func agwLoginField(field []byte) string {
+	var before, _, ok = bytes.Cut(field, []byte{0})
+	if !ok {
+		return string(field) /* No terminator, so the whole field it is. */
+	}
+
+	return string(before)
+}
+
+// handleClientLogin processes an "Application Login" frame.
+//
+// The protocol has no reply for this, so a client that gets it wrong finds out
+// only by having its later commands ignored.  That is also what happens if no
+// login is configured and one is sent anyway.
+//
+// Any attempt that does not succeed leaves the client logged out, whether the
+// credentials were wrong or the frame was not one we could read, so a client
+// that has logged in cannot pass the socket on to one that cannot.  A client on
+// this machine, which never had to log in, keeps its exemption either way.
+func handleClientLogin(client int, cmd *AGWPEMessage) {
+	if !agwLoginRequired() {
+		return /* Nothing to check it against. */
+	}
+
+	var user, password, ok = parseAGWLogin(cmd.Data)
+	if !ok {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW client application %d sent a malformed login: expected %d bytes of data, got %d.\n",
+			client, 2*AGW_LOGIN_FIELD_LEN, len(cmd.Data))
+		agwClientLoggedOut(client)
+
+		return
+	}
+
+	var matched, accepted = agwMatchLogin(user, password)
+	if !accepted {
+		/* The user name is not echoed back; it is whatever the other end chose to send. */
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW client application %d sent an incorrect user name or password.  Its commands will be ignored.\n", client)
+		agwClientLoggedOut(client)
+
+		return
+	}
+
+	client_logged_in[client].Store(true)
+
+	text_color_set(DW_COLOR_INFO)
+	dw_printf("AGW client application %d logged in as \"%s\".\n", client, matched)
+}
+
 func handleClientCommand(client int, cmd *AGWPEMessage) {
+	if cmd.Header.DataKind == 'P' { /* Application Login */
+		handleClientLogin(client, cmd)
+
+		return
+	}
+
+	if agwLoginRequired() && !client_logged_in[client].Load() {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("AGW client application %d sent command '%c' without logging in first.  Ignored.\n",
+			client, cmd.Header.DataKind)
+
+		return
+	}
+
 	switch cmd.Header.DataKind {
 	case 'R': /* Request for version number */
 		{
@@ -1295,10 +1501,6 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 				}
 			}
 		}
-
-	case 'P': /* Application Login  */
-
-		// Silently ignore it.
 
 	case 'X': /* Register CallSign  */
 		{
