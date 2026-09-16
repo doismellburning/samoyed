@@ -233,16 +233,28 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 	}
 
 	var comment string
-	var seqNum, _ = strconv.Atoi(seqStr)
-	var seq = maybe.Just(seqNum)
+
+	// A sequence number that is not a number at all is unknown, rather than
+	// the zero that strconv hands back along with the error.
+
+	var seq maybe.Maybe[int]
+
+	var seqNum, seqErr = strconv.Atoi(seqStr)
+	if seqErr == nil {
+		seq = maybe.Just(seqNum)
+	}
 
 	var parts = strings.SplitN(rest, ",", T_NUM_ANALOG+1)
 	for n, p := range parts {
 		if n < T_NUM_ANALOG {
 			if len(p) > 0 {
-				var f, _ = strconv.ParseFloat(p, 64)
-				araw[n] = maybe.Just(f)
-				ndp[n] = t_ndp(p)
+				// Likewise an analog value that will not parse.
+
+				var f, err = strconv.ParseFloat(p, 64)
+				if err == nil {
+					araw[n] = maybe.Just(f)
+					ndp[n] = t_ndp(p)
+				}
 			}
 			// Version 1.3: Suppress this message.
 			// No one pays attention to the original 000 to 255 range.
