@@ -918,9 +918,13 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 		dw_printf("(%s)", desc)
 
+		var nrText, isNetrom = netromFrameToText(pp, pinfo)
+
 		if ftype == frame_type_U_XID {
 			var _, info2text, _ = xid_parse(pinfo)
 			dw_printf(" %s\n", info2text)
+		} else if isNetrom {
+			dw_printf(" %s\n", nrText)
 		} else {
 			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
