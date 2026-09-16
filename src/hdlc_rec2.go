@@ -67,6 +67,8 @@ package direwolf
 
 import (
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/fcs"
 )
 
 /*
@@ -727,7 +729,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 		/* easier to understand. */
 		var actual_fcs = uint16(H2.frame_buf[H2.frame_len-2]) | (uint16(H2.frame_buf[H2.frame_len-1]) << 8)
 
-		var expected_fcs = fcs_calc(H2.frame_buf[:H2.frame_len-2])
+		var expected_fcs = fcs.Calc(H2.frame_buf[:H2.frame_len-2])
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
 			// Sanity check for AIS.

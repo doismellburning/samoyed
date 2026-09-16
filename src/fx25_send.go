@@ -1,6 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/fcs"
+
 var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendFrame" or "???"
 
 /*-------------------------------------------------------------
@@ -88,9 +90,9 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 
 	// Append the FCS.
 
-	var fcs = fcs_calc(fbuf)
-	fbuf = append(fbuf, byte(fcs)&0xff)
-	fbuf = append(fbuf, byte(fcs>>8)&0xff)
+	var frameFCS = fcs.Calc(fbuf)
+	fbuf = append(fbuf, byte(frameFCS)&0xff)
+	fbuf = append(fbuf, byte(frameFCS>>8)&0xff)
 
 	// Add bit-stuffing, filling to FX25_MAX_DATA bytes with flag patterns
 	var stuffedBytes, meaningfulLen = bitStuff(fbuf, FX25_MAX_DATA)

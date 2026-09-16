@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/fcs"
 	"gopkg.in/yaml.v3"
 )
 
@@ -312,7 +313,7 @@ func (b *AXUDPBridge) lookupMap(dest string) (AXUDPMapEntry, bool) {
 // result.  The checksum is CRC-CCITT (poly 0x1021, seed 0xFFFF, final XOR
 // 0xFFFF) over the frame bytes, appended little-endian.
 func axudpAddCRC(frame []byte) []byte {
-	var crc = fcs_calc(frame)
+	var crc = fcs.Calc(frame)
 
 	return append(append([]byte(nil), frame...), byte(crc), byte(crc>>8))
 }
@@ -325,7 +326,7 @@ func axudpStripCRC(pkt []byte) ([]byte, bool) {
 		return nil, false
 	}
 	var frame = pkt[:len(pkt)-2]
-	var want = fcs_calc(frame)
+	var want = fcs.Calc(frame)
 	var got = uint16(pkt[len(pkt)-2]) | uint16(pkt[len(pkt)-1])<<8
 	if got != want {
 		return nil, false

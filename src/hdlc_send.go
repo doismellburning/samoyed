@@ -1,6 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/fcs"
+
 var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hdlc_send_frame" or "hdlc_send_flags"
 
 /*-------------------------------------------------------------
@@ -85,15 +87,15 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 		send_data_nrzi(channel, fbuf[j])
 	}
 
-	var fcs = fcs_calc(fbuf)
+	var frameFCS = fcs.Calc(fbuf)
 
 	if bad_fcs {
 		/* For testing only - Simulate a frame getting corrupted along the way. */
-		send_data_nrzi(channel, byte(^fcs)&0xff)
-		send_data_nrzi(channel, byte((^fcs)>>8)&0xff)
+		send_data_nrzi(channel, byte(^frameFCS)&0xff)
+		send_data_nrzi(channel, byte((^frameFCS)>>8)&0xff)
 	} else {
-		send_data_nrzi(channel, byte(fcs)&0xff)
-		send_data_nrzi(channel, byte(fcs>>8)&0xff)
+		send_data_nrzi(channel, byte(frameFCS)&0xff)
+		send_data_nrzi(channel, byte(frameFCS>>8)&0xff)
 	}
 
 	send_control_nrzi(channel, 0x7e) /* End frame */
