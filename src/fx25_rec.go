@@ -9,6 +9,8 @@ package direwolf
 
 import (
 	"math/bits"
+
+	"github.com/doismellburning/samoyed/internal/fcs"
 )
 
 type FX25RecState int
@@ -273,7 +275,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s, s
 		if frame_len >= 14+1+2 { // Minimum length: Two addresses & control & FCS.
 			var actual_fcs = uint16(frame_buf[frame_len-2]) | (uint16(frame_buf[frame_len-1]) << 8)
 
-			var expected_fcs = fcs_calc(frame_buf[:frame_len-2])
+			var expected_fcs = fcs.Calc(frame_buf[:frame_len-2])
 			if actual_fcs == expected_fcs {
 				if fx25_get_debug() >= 3 {
 					text_color_set(DW_COLOR_DEBUG)

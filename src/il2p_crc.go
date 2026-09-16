@@ -1,6 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "github.com/doismellburning/samoyed/internal/fcs"
+
 /*-------------------------------------------------------------
  *
  * Purpose:	IL2P Trailing CRC-16-CCITT protected by (7,4) Hamming encoding.
@@ -55,7 +57,7 @@ var il2p_hamming_decode = [128]byte{
  *--------------------------------------------------------------*/
 
 func il2p_crc_calc(data []byte) uint16 {
-	return fcs_calc(data)
+	return fcs.Calc(data)
 }
 
 /*-------------------------------------------------------------

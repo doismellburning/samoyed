@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/fcs"
 )
 
 func TestAXUDPAddCRC(t *testing.T) {
@@ -36,7 +38,7 @@ func TestAXUDPAddCRC(t *testing.T) {
 	}
 
 	// CRC is at the end as a LE uint16 and must equal FCSCalc(frame).
-	var want = fcs_calc(frame)
+	var want = fcs.Calc(frame)
 	var crc = uint16(got[len(frame)]) | uint16(got[len(frame)+1])<<8
 	if crc != want {
 		t.Errorf("axudpAddCRC: crc=0x%04x want 0x%04x", crc, want)

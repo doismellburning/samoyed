@@ -153,6 +153,8 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/fcs"
 )
 
 const AX25_MAX_REPEATERS = 8
@@ -2663,9 +2665,9 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 	}
 
 	var crc uint16 = 0xffff
-	crc = crc16([]byte(src), crc)
-	crc = crc16([]byte(dest), crc)
-	crc = crc16(info, crc)
+	crc = fcs.CRC16([]byte(src), crc)
+	crc = fcs.CRC16([]byte(dest), crc)
+	crc = fcs.CRC16(info, crc)
 
 	return (crc)
 }
@@ -2697,7 +2699,7 @@ func ax25_m_m_crc(pp *packet_t) uint16 {
 	var fbuf = AX25Pack(pp)
 
 	var crc uint16 = 0xffff
-	crc = crc16(fbuf, crc)
+	crc = fcs.CRC16(fbuf, crc)
 
 	return (crc)
 }

@@ -1,10 +1,12 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-/*
- * Calculate the FCS for an AX.25 frame.
- */
+// Package fcs calculates the frame check sequence AX.25 appends to each frame:
+// a 16 bit CRC, over the polynomial defined by the CCITT (now the ITU-T), that
+// a receiver recomputes to tell an intact frame from a corrupted one.
+package fcs
 
-var ccitt_table = [256]uint16{ //nolint:gochecknoglobals // I yearn for const arrays
+var ccittTable = [256]uint16{ //nolint:gochecknoglobals // I yearn for const arrays
 
 	// from http://www.ietf.org/rfc/rfc1549.txt
 
@@ -42,49 +44,25 @@ var ccitt_table = [256]uint16{ //nolint:gochecknoglobals // I yearn for const ar
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78,
 }
 
-/*
- * Use this for an AX.25 frame.
- */
-
-func fcs_calc(data []byte) uint16 {
+// Calc returns the FCS for an AX.25 frame.
+func Calc(data []byte) uint16 {
 	var crc uint16 = 0xffff
 
 	for _, b := range data {
-		crc = (crc >> 8) ^ ccitt_table[(crc^uint16(b))&0xff]
+		crc = (crc >> 8) ^ ccittTable[(crc^uint16(b))&0xff]
 	}
 
 	return (crc ^ 0xffff)
 }
 
-/*
- * CRC is also used for duplicate checking for the digipeater and IGate.
- * A packet is considered a duplicate if the source, destination, and
- * information parts match.  In other words, we ignore the via path
- * which changes along the way.
- * Rather than keeping a variable length string we just keep a 16 bit
- * CRC which takes less memory and processing to compare.
- *
- * This can result in occasional false matches.  If we had a random
- * 16 bit number, there is a 1/65536 ( = 0.0015 % ) chance that it will
- * match and we will drop something that should be passed along.
- *
- * Looking at it another way, there is a 0.9999847412109375 (out of 1)
- * probability of doing the right thing.
- */
-
-/*
- * This can be used when we want to calculate a single CRC over disjoint data.
- *
- * 	crc = crc16 (region1, sizeof(region1), 0xffff);
- *	crc = crc16 (region2, sizeof(region2), crc);
- *	crc = crc16 (region3, sizeof(region3), crc);
- */
-
-func crc16(data []byte, seed uint16) uint16 {
+// CRC16 is Calc with a caller supplied seed, for accumulating one value over
+// disjoint data.  The final XOR is applied on every call, so seeding with a
+// previous result does not give the CRC of the concatenated data.
+func CRC16(data []byte, seed uint16) uint16 {
 	var crc = seed
 
 	for _, b := range data {
-		crc = (crc >> 8) ^ ccitt_table[(crc^uint16(b))&0xff]
+		crc = (crc >> 8) ^ ccittTable[(crc^uint16(b))&0xff]
 	}
 
 	return (crc ^ 0xffff)
