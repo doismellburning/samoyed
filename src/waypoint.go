@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
 )
 
@@ -173,9 +174,9 @@ func appendChecksum(sentence []byte) []byte {
  *		dlong		- Longitude.
  *		symtab		- Symbol table or overlay character.
  *		symbol		- Symbol code.
- *		alt		- Altitude in meters or G_UNKNOWN.
- *		course		- Course in degrees or G_UNKNOWN for unknown.
- *		speed		- Speed in knots or G_UNKNOWN.
+ *		alt		- Altitude in meters, if known.
+ *		course		- Course in degrees, if known.
+ *		speed		- Speed in knots, if known.
  *		comment_in	- Description or message.
  *
  *
@@ -203,7 +204,7 @@ func appendChecksum(sentence []byte) []byte {
  *--------------------------------------------------------------------*/
 
 func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float64, symtab rune, symbol byte,
-	alt float64, course float64, speed float64, comment_in string) {
+	alt maybe.Maybe[float64], course maybe.Maybe[float64], speed maybe.Maybe[float64], comment_in string) {
 	/* TODO KG
 	#if DEBUG
 		text_color_set (DW_COLOR_DEBUG);
@@ -239,26 +240,19 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 
 	/*
 	 * Convert numeric values to character form.
-	 * G_UNKNOWN value will result in an empty string.
+	 * An unknown value will result in an empty string.
 	 */
 
 	var slat, slat_ns = latitude_to_nmea(dlat)
 	var slong, slong_ew = longitude_to_nmea(dlong)
 
-	var salt string
-	if alt != G_UNKNOWN {
-		salt = fmt.Sprintf("%.1f", alt)
+	var oneDecimalPlace = func(value float64) string {
+		return fmt.Sprintf("%.1f", value)
 	}
 
-	var sspeed string
-	if speed != G_UNKNOWN {
-		sspeed = fmt.Sprintf("%.1f", speed)
-	}
-
-	var scourse string
-	if course != G_UNKNOWN {
-		scourse = fmt.Sprintf("%.1f", course)
-	}
+	var salt = maybe.Fold("", oneDecimalPlace, alt)
+	var sspeed = maybe.Fold("", oneDecimalPlace, speed)
+	var scourse = maybe.Fold("", oneDecimalPlace, course)
 
 	/*
 	 *	NMEA Generic.

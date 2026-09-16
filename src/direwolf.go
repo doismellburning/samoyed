@@ -1163,7 +1163,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 				waypointSender.SendSentence(nameIn,
 					lat, lon, rune(A.g_symbol_table), A.g_symbol_code,
-					orUnknown(maybe.Fmap(DW_FEET_TO_METERS, A.g_altitude_ft)), orUnknown(A.g_course), orUnknown(maybe.Fmap(DW_MPH_TO_KNOTS, A.g_speed_mph)),
+					maybe.Fmap(DW_FEET_TO_METERS, A.g_altitude_ft), A.g_course, maybe.Fmap(DW_MPH_TO_KNOTS, A.g_speed_mph),
 					A.g_comment)
 			}
 		}

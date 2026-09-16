@@ -30,6 +30,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 /*
@@ -52,7 +54,7 @@ type mheard_t struct {
 
 	last_heard_is time.Time // Timestamp when last heard from Internet Server.
 
-	dlat, dlon float64 // Last position.  G_UNKNOWN for unknown.
+	dlat, dlon maybe.Maybe[float64] // Last position.
 
 	msp int // Allow message sender position report.
 	// When non zero, an IS>RF position report is allowed.
@@ -113,12 +115,12 @@ func mheard_age(now, t time.Time) string {
 
 /* Convert latitude, longitude to text or - if not defined. */
 
-func mheard_latlon(dlat float64, dlon float64) string {
-	if dlat != G_UNKNOWN && dlon != G_UNKNOWN {
-		return fmt.Sprintf("%6.2f %7.2f", dlat, dlon)
-	} else {
-		return "   -       -  "
-	}
+func mheard_latlon(dlat maybe.Maybe[float64], dlon maybe.Maybe[float64]) string {
+	var text = maybe.LiftA2(func(lat float64, lon float64) string {
+		return fmt.Sprintf("%6.2f %7.2f", lat, lon)
+	}, dlat, dlon)
+
+	return maybe.FromMaybe("   -       -  ", text)
 }
 
 /*------------------------------------------------------------------
@@ -223,9 +225,7 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 		mptr.channel = channel
 		mptr.num_digi_hops = hops
 		mptr.last_heard_rf = now
-		// Why did I do this instead of saving the location for a position report?
-		mptr.dlat = G_UNKNOWN
-		mptr.dlon = G_UNKNOWN
+		// Why did I not save the location for a position report here?
 
 		mdb.db[source] = mptr
 	} else {
@@ -263,8 +263,8 @@ func (mdb *MHeardDB) SaveRF(channel int, A *decode_aprs_t, pp *packet_t, alevel 
 		var lon, haveLon = A.g_lon.Get()
 
 		if haveLat && haveLon {
-			mptr.dlat = lat
-			mptr.dlon = lon
+			mptr.dlat = maybe.Just(lat)
+			mptr.dlon = maybe.Just(lon)
 		}
 	}
 
@@ -356,8 +356,6 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 		mptr.callsign = source
 		mptr.count = 1
 		mptr.last_heard_is = now
-		mptr.dlat = G_UNKNOWN
-		mptr.dlon = G_UNKNOWN
 
 		mdb.db[source] = mptr
 	} else {
@@ -489,14 +487,21 @@ func (mdb *MHeardDB) Count(max_hops int, time_limit int) int {
  *				  digipeater hops or less.  For reporting, we might use:
  *
  *		dlat, dlon, km	- Include only stations within distance of location.
- *				  Not used if G_UNKNOWN is supplied.
+ *				  Not used unless all three are supplied.
  *
  * Returns:	True or false
  *
  *------------------------------------------------------------------*/
 
-func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit int, max_hops int, dlat float64, dlon float64, km float64) bool {
+func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit int, max_hops int, dlat maybe.Maybe[float64], dlon maybe.Maybe[float64], km maybe.Maybe[float64]) bool {
 	var time_limit = time.Duration(_time_limit) * time.Minute
+
+	// The distance check needs a complete location to measure from, and a
+	// distance to compare against; without all three it is not applied.
+	var targetLat, haveTargetLat = dlat.Get()
+	var targetLon, haveTargetLon = dlon.Get()
+	var limitKm, haveLimitKm = km.Get()
+	var haveTarget = haveTargetLat && haveTargetLon && haveLimitKm
 
 	mdb.mu.RLock()
 	defer mdb.mu.RUnlock()
@@ -504,16 +509,16 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 	if role != "" {
 		text_color_set(DW_COLOR_INFO)
 
-		if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN {
+		if haveTarget {
 			dw_printf(
 				"Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops, and within %.1f km of %.2f %.2f?\n",
 				role,
 				callsign,
 				int(time_limit.Minutes()),
 				max_hops,
-				km,
-				dlat,
-				dlon,
+				limitKm,
+				targetLat,
+				targetLon,
 			)
 		} else {
 			dw_printf("Was message %s %s heard in the past %d minutes, with %d or fewer digipeater hops?\n", role, callsign, int(time_limit.Minutes()), max_hops)
@@ -554,10 +559,13 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 
 	// Apply physical distance check?
 
-	if dlat != G_UNKNOWN && dlon != G_UNKNOWN && km != G_UNKNOWN && mptr.dlat != G_UNKNOWN && mptr.dlon != G_UNKNOWN {
-		var dist = ll_distance_km(float64(mptr.dlat), float64(mptr.dlon), float64(dlat), float64(dlon))
+	var stationLat, haveStationLat = mptr.dlat.Get()
+	var stationLon, haveStationLon = mptr.dlon.Get()
 
-		if dist > km {
+	if haveTarget && haveStationLat && haveStationLon {
+		var dist = ll_distance_km(stationLat, stationLon, targetLat, targetLon)
+
+		if dist > limitKm {
 			if role != "" {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("No, %s was %.1f km away although it was %d digipeater hops %d minutes ago.\n", callsign, dist, mptr.num_digi_hops, int(heard_ago.Minutes()))

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -178,7 +179,7 @@ func setupUDPWaypoint(t *testing.T, formats int) (*WaypointSender, net.PacketCon
 func TestWaypointSendSentenceNMEAGeneric(t *testing.T) {
 	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	var got = receiveUDP(t, listener)
 	// Should contain exactly one CRLF-terminated NMEA sentence.
@@ -204,7 +205,7 @@ func TestWaypointSendSentenceNMEAGeneric(t *testing.T) {
 func TestWaypointSendSentenceKenwood(t *testing.T) {
 	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_KENWOOD)
 
-	ws.SendSentence("W1AW", 41.7147, -72.7272, '/', '-', 100.0, 270.0, 10.0, "")
+	ws.SendSentence("W1AW", 41.7147, -72.7272, '/', '-', maybe.Just(100.0), maybe.Just(270.0), maybe.Just(10.0), "")
 
 	var got = receiveUDP(t, listener)
 	assert.True(t, strings.HasPrefix(got, "$PKWDWPL,"), "should be a PKWDWPL sentence")
@@ -216,7 +217,7 @@ func TestWaypointSendSentenceKenwood(t *testing.T) {
 func TestWaypointSendSentenceMagellan(t *testing.T) {
 	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_MAGELLAN)
 
-	ws.SendSentence("MAGSTN", 34.0, -118.0, '/', '-', 50.0, G_UNKNOWN, G_UNKNOWN, "a comment")
+	ws.SendSentence("MAGSTN", 34.0, -118.0, '/', '-', maybe.Just(50.0), maybe.Nothing[float64](), maybe.Nothing[float64](), "a comment")
 
 	var got = receiveUDP(t, listener)
 	assert.True(t, strings.HasPrefix(got, "$PMGNWPL,"), "should be a PMGNWPL sentence")
@@ -229,14 +230,14 @@ func TestWaypointSendSentenceNoDest(t *testing.T) {
 	var ws = new(WaypointSender)
 
 	// Should not panic.
-	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("TEST", 42.0, -71.0, '/', 'a', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 }
 
 // TestWaypointSendSentenceCommaInName verifies comma substitution.
 func TestWaypointSendSentenceCommaInName(t *testing.T) {
 	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	ws.SendSentence("MY,OBJ", 42.0, -71.0, '/', '-', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("MY,OBJ", 42.0, -71.0, '/', '-', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	var got = receiveUDP(t, listener)
 	assert.NotContains(t, got[:strings.LastIndex(got, "*")], ",MY,OBJ,",
@@ -248,7 +249,7 @@ func TestWaypointSendSentenceCommaInName(t *testing.T) {
 func TestWaypointSendSentenceAsteriskInName(t *testing.T) {
 	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_NMEA_GENERIC)
 
-	ws.SendSentence("MY*OBJ", 42.0, -71.0, '/', '-', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("MY*OBJ", 42.0, -71.0, '/', '-', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	var got = receiveUDP(t, listener)
 	assert.Contains(t, got, "MY~OBJ", "asterisk in name should become tilde character")
@@ -259,7 +260,7 @@ func TestWaypointSendSentenceKenwoodSymbolComma(t *testing.T) {
 	var ws, listener = setupUDPWaypoint(t, WPL_FORMAT_KENWOOD)
 
 	// Symbol ',' (Boy Scouts) should be substituted to '|'.
-	ws.SendSentence("BSCOUT", 42.0, -71.0, '/', ',', G_UNKNOWN, G_UNKNOWN, G_UNKNOWN, "")
+	ws.SendSentence("BSCOUT", 42.0, -71.0, '/', ',', maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	var got = receiveUDP(t, listener)
 	// The Kenwood sentence ends with two-char symbol (table + code).

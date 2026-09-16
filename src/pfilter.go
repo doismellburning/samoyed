@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 /*
@@ -1193,9 +1195,9 @@ func filt_i(pf *pfstate_t) (int, error) {
 	if save_igate_config_p != nil {
 		maxhops = save_igate_config_p.max_digi_hops
 	}
-	var dlat float64 = G_UNKNOWN
-	var dlon float64 = G_UNKNOWN
-	var km float64 = G_UNKNOWN
+	var dlat maybe.Maybe[float64]
+	var dlon maybe.Maybe[float64]
+	var km maybe.Maybe[float64]
 
 	//char src[AX25_MAX_ADDR_LEN];
 	//char *infop = nil;
@@ -1235,31 +1237,34 @@ func filt_i(pf *pfstate_t) (int, error) {
 		}
 
 		if len(parts) > 2 && len(parts[2]) > 0 {
-			var dlatErr error
-			dlat, dlatErr = strconv.ParseFloat(parts[2], 64)
+			var dlatValue, dlatErr = strconv.ParseFloat(parts[2], 64)
 
 			if dlatErr != nil {
 				return -1, newFilterError(pf, "Invalid latitude for IGate message filter.")
 			}
 
+			dlat = maybe.Just(dlatValue)
+
 			if len(parts) > 3 && len(parts[3]) > 0 {
-				var dlonErr error
-				dlon, dlonErr = strconv.ParseFloat(parts[3], 64)
+				var dlonValue, dlonErr = strconv.ParseFloat(parts[3], 64)
 
 				if dlonErr != nil {
 					return -1, newFilterError(pf, "Invalid longitude for IGate message filter.")
 				}
+
+				dlon = maybe.Just(dlonValue)
 			} else {
 				return -1, newFilterError(pf, "Missing longitude for IGate message filter.")
 			}
 
 			if len(parts) > 4 && len(parts[4]) > 0 {
-				var kmErr error
-				km, kmErr = strconv.ParseFloat(parts[4], 64)
+				var kmValue, kmErr = strconv.ParseFloat(parts[4], 64)
 
 				if kmErr != nil {
 					return -1, newFilterError(pf, "Invalid distance, in km, for IGate message filter.")
 				}
+
+				km = maybe.Just(kmValue)
 			} else {
 				return -1, newFilterError(pf, "Missing distance, in km, for IGate message filter.")
 			}
@@ -1324,7 +1329,8 @@ func filt_i(pf *pfstate_t) (int, error) {
 	 * the past minute, rather than the usual 180 minutes for the addressee.
 	 */
 
-	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.g_src, 1, 0, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN)
+	was_heard = mheardDB.WasRecentlyNearby("source", pf.decoded.g_src, 1, 0,
+		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]())
 
 	if was_heard {
 		return 0, nil

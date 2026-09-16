@@ -41,20 +41,20 @@ func TestMheardAge(t *testing.T) {
 
 func TestMheardLatlon(t *testing.T) {
 	t.Run("both unknown", func(t *testing.T) {
-		assert.Equal(t, "   -       -  ", mheard_latlon(G_UNKNOWN, G_UNKNOWN))
+		assert.Equal(t, "   -       -  ", mheard_latlon(maybe.Nothing[float64](), maybe.Nothing[float64]()))
 	})
 
 	t.Run("lat unknown lon known", func(t *testing.T) {
-		assert.Equal(t, "   -       -  ", mheard_latlon(G_UNKNOWN, -71.0))
+		assert.Equal(t, "   -       -  ", mheard_latlon(maybe.Nothing[float64](), maybe.Just(-71.0)))
 	})
 
 	t.Run("lat known lon unknown", func(t *testing.T) {
-		assert.Equal(t, "   -       -  ", mheard_latlon(42.0, G_UNKNOWN))
+		assert.Equal(t, "   -       -  ", mheard_latlon(maybe.Just(42.0), maybe.Nothing[float64]()))
 	})
 
 	t.Run("both known", func(t *testing.T) {
 		var expected = fmt.Sprintf("%6.2f %7.2f", 42.36, -71.06)
-		assert.Equal(t, expected, mheard_latlon(42.36, -71.06))
+		assert.Equal(t, expected, mheard_latlon(maybe.Just(42.36), maybe.Just(-71.06)))
 	})
 }
 
@@ -160,8 +160,8 @@ func TestMHeardDBSaveRFNewStation(t *testing.T) {
 	assert.Equal(t, 1, mdb.db["W1AW"].count)
 	assert.Equal(t, 0, mdb.db["W1AW"].num_digi_hops)
 	assert.Equal(t, 0, mdb.db["W1AW"].channel)
-	assert.InDelta(t, float64(G_UNKNOWN), mdb.db["W1AW"].dlat, 0.001)
-	assert.InDelta(t, float64(G_UNKNOWN), mdb.db["W1AW"].dlon, 0.001)
+	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlat)
+	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlon)
 }
 
 func TestMHeardDBSaveRFPositionSaved(t *testing.T) {
@@ -171,8 +171,8 @@ func TestMHeardDBSaveRFPositionSaved(t *testing.T) {
 	mdb.SaveRF(0, saveRFWithPos, pp, saveRFAlevel, RETRY_NONE)
 
 	require.Contains(t, mdb.db, "W1AW")
-	assert.InDelta(t, 42.36, mdb.db["W1AW"].dlat, 0.001)
-	assert.InDelta(t, -71.06, mdb.db["W1AW"].dlon, 0.001)
+	assert.Equal(t, maybe.Just(42.36), mdb.db["W1AW"].dlat)
+	assert.Equal(t, maybe.Just(-71.06), mdb.db["W1AW"].dlon)
 }
 
 func TestMHeardDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
@@ -181,7 +181,7 @@ func TestMHeardDBSaveRFPositionNotSavedForNonPositionPacket(t *testing.T) {
 
 	mdb.SaveRF(0, saveRFNoPos, pp, saveRFAlevel, RETRY_NONE)
 
-	assert.InDelta(t, float64(G_UNKNOWN), mdb.db["W1AW"].dlat, 0.001)
+	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlat)
 }
 
 func TestMHeardDBSaveRFUnknownPositionNotSaved(t *testing.T) {
@@ -190,7 +190,7 @@ func TestMHeardDBSaveRFUnknownPositionNotSaved(t *testing.T) {
 
 	mdb.SaveRF(0, saveRFWithPosUnknown, pp, saveRFAlevel, RETRY_NONE)
 
-	assert.InDelta(t, float64(G_UNKNOWN), mdb.db["W1AW"].dlat, 0.001)
+	assert.Equal(t, maybe.Nothing[float64](), mdb.db["W1AW"].dlat)
 }
 
 func TestMHeardDBSaveRFExistingStationUpdated(t *testing.T) {
@@ -370,7 +370,7 @@ func TestMHeardDBSaveISDebug2(t *testing.T) {
 
 func TestMHeardDBWasRecentlyNearbyUnknownStation(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN))
+	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyISOnlyStation(t *testing.T) {
@@ -379,7 +379,7 @@ func TestMHeardDBWasRecentlyNearbyISOnlyStation(t *testing.T) {
 		callsign:      "W1AW",
 		last_heard_is: time.Now(),
 	}
-	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN))
+	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyTooLongAgo(t *testing.T) {
@@ -389,7 +389,7 @@ func TestMHeardDBWasRecentlyNearbyTooLongAgo(t *testing.T) {
 		last_heard_rf: time.Now().Add(-120 * time.Minute),
 		num_digi_hops: 0,
 	}
-	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN))
+	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyTooManyHops(t *testing.T) {
@@ -399,7 +399,7 @@ func TestMHeardDBWasRecentlyNearbyTooManyHops(t *testing.T) {
 		last_heard_rf: time.Now().Add(-10 * time.Minute),
 		num_digi_hops: 3,
 	}
-	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN))
+	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyTrue(t *testing.T) {
@@ -409,7 +409,7 @@ func TestMHeardDBWasRecentlyNearbyTrue(t *testing.T) {
 		last_heard_rf: time.Now().Add(-10 * time.Minute),
 		num_digi_hops: 1,
 	}
-	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN))
+	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyWithinDistance(t *testing.T) {
@@ -418,11 +418,11 @@ func TestMHeardDBWasRecentlyNearbyWithinDistance(t *testing.T) {
 		callsign:      "W1AW",
 		last_heard_rf: time.Now().Add(-10 * time.Minute),
 		num_digi_hops: 0,
-		dlat:          42.36,
-		dlon:          -71.06,
+		dlat:          maybe.Just(42.36),
+		dlon:          maybe.Just(-71.06),
 	}
 	// Filter at same location → 0 km apart, well within 50 km.
-	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, 42.36, -71.06, 50.0))
+	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Just(42.36), maybe.Just(-71.06), maybe.Just(50.0)))
 }
 
 func TestMHeardDBWasRecentlyNearbyTooFar(t *testing.T) {
@@ -431,11 +431,11 @@ func TestMHeardDBWasRecentlyNearbyTooFar(t *testing.T) {
 		callsign:      "W1AW",
 		last_heard_rf: time.Now().Add(-10 * time.Minute),
 		num_digi_hops: 0,
-		dlat:          42.36, // Boston
-		dlon:          -71.06,
+		dlat:          maybe.Just(42.36), // Boston
+		dlon:          maybe.Just(-71.06),
 	}
 	// Filter at Los Angeles, ~4200 km away.
-	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, 34.05, -118.24, 50.0))
+	assert.False(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Just(34.05), maybe.Just(-118.24), maybe.Just(50.0)))
 }
 
 func TestMHeardDBWasRecentlyNearbyUnknownStationLocationSkipsDistanceCheck(t *testing.T) {
@@ -444,22 +444,22 @@ func TestMHeardDBWasRecentlyNearbyUnknownStationLocationSkipsDistanceCheck(t *te
 		callsign:      "W1AW",
 		last_heard_rf: time.Now().Add(-10 * time.Minute),
 		num_digi_hops: 0,
-		dlat:          G_UNKNOWN,
-		dlon:          G_UNKNOWN,
+		dlat:          maybe.Nothing[float64](),
+		dlon:          maybe.Nothing[float64](),
 	}
 	// Distance filter requested but station location unknown → distance check skipped → true.
-	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, 42.36, -71.06, 50.0))
+	assert.True(t, mdb.WasRecentlyNearby("addressee", "W1AW", 60, 2, maybe.Just(42.36), maybe.Just(-71.06), maybe.Just(50.0)))
 }
 
 func TestMHeardDBWasRecentlyNearbyEmptyRoleSuppressesOutput(t *testing.T) {
 	var mdb = NewMHeardDB(0)
-	assert.False(t, mdb.WasRecentlyNearby("", "UNKNOWN", 60, 2, G_UNKNOWN, G_UNKNOWN, G_UNKNOWN))
+	assert.False(t, mdb.WasRecentlyNearby("", "UNKNOWN", 60, 2, maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]()))
 }
 
 func TestMHeardDBWasRecentlyNearbyRoleWithDistanceFilter(t *testing.T) {
 	var mdb = NewMHeardDB(0)
 	// Station not in db; the verbose branch with distance parameters should print.
-	assert.False(t, mdb.WasRecentlyNearby("addressee", "UNKNOWN", 60, 2, 42.36, -71.06, 50.0))
+	assert.False(t, mdb.WasRecentlyNearby("addressee", "UNKNOWN", 60, 2, maybe.Just(42.36), maybe.Just(-71.06), maybe.Just(50.0)))
 }
 
 // --- SetMSP / GetMSP ---
