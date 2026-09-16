@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -166,4 +167,29 @@ func Test_get_field_signed(t *testing.T) {
 		set_field(base, 1, tc.length, tc.raw) // Offset 1 to catch byte-aligned assumptions.
 		assert.Equal(t, tc.expected, get_field_signed(base, 1, tc.length), "%d bits of %b", tc.length, tc.raw)
 	}
+}
+
+// The altitude of a SAR aircraft is 12 bits, and the all-ones value means it
+// is not available - which was being reported as a position 4095 metres up.
+func Test_ais_type_9_altitude_not_available(t *testing.T) {
+	var altitude = func(raw int) maybe.Maybe[float64] {
+		var ais = make([]byte, 21) // 168 bits.
+
+		set_field(ais, 0, 6, 9)          // Message type.
+		set_field(ais, 8, 30, 366730001) // MMSI.
+		set_field(ais, 38, 12, raw)      // Altitude, metres.
+
+		var nmea, err = AISToNMEA(ais)
+		require.NoError(t, err)
+
+		var aisData, parseErr = AISParse(string(nmea))
+		require.NoError(t, parseErr)
+		assert.Equal(t, "AIS 9: SAR Aircraft Position Report", aisData.Description)
+
+		return aisData.AltM
+	}
+
+	assert.Equal(t, maybe.Just(1500.0), altitude(1500))
+	assert.Equal(t, maybe.Just(4094.0), altitude(4094))
+	assert.Equal(t, maybe.Nothing[float64](), altitude(4095))
 }

@@ -218,6 +218,17 @@ func get_field_course(base []byte, start uint, length uint) maybe.Maybe[float64]
 	}
 }
 
+func get_field_altitude(base []byte, start uint, length uint) maybe.Maybe[float64] {
+	// Raw 4095 means not available; 4094 is the top of the scale and means
+	// 4094 metres or more.
+	var n = get_field(base, start, length)
+	if n == 4095 {
+		return maybe.Nothing[float64]()
+	}
+
+	return maybe.Just(float64(n))
+}
+
 // AIS "six-bit ASCII": values 0 thru 31 are '@' thru '_', and values 32 thru
 // 63 are ' ' thru '?'.  A table keeps the result a character rather than an
 // int that happens to be in range.
@@ -514,8 +525,8 @@ func AISParse(sentence string) (*AISData, error) {
 	case 9: // Standard SAR Aircraft Position Report
 		aisData.Description = fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)
 		aisData.Symtab = '/'
-		aisData.Symbol = '\''                                      // Small AIRCRAFT
-		aisData.AltM = maybe.Just(float64(get_field(ais, 38, 12))) // meters, 4095 means not available
+		aisData.Symbol = '\''                          // Small AIRCRAFT
+		aisData.AltM = get_field_altitude(ais, 38, 12) // meters
 		aisData.Lon = get_field_lon(ais, 61, 28)
 		aisData.Lat = get_field_lat(ais, 89, 27)
 
