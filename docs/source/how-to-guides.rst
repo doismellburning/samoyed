@@ -52,6 +52,48 @@ naming a bit inversion that worked, and are left out of the frame metrics
 described below.
 
 
+Use the only sound card without configuring it
+----------------------------------------------
+
+A machine with one sound card - a USB interface on an otherwise silent
+Raspberry Pi, say - needs no ``ADEVICE`` at all.  With nothing configured,
+Samoyed looks for the one card that can capture, transmits through that same
+card when it can also play, and says which card it settled on:
+
+.. code::
+
+    Automatically selected the only audio device available: USB Audio CODEC: USB Audio (hw:1,0)
+    Audio device for both receive and transmit: USB Audio CODEC: USB Audio (hw:1,0)  (channel 0)
+
+``ADEVICE auto`` asks for the same thing explicitly, and reads more clearly in
+a configuration file than leaving the line out.
+
+Detection only acts on an unambiguous answer.  It stands aside, leaving the
+device where it always was - whatever the sound system offers as its default -
+when:
+
+- more than one sound card can serve that direction.  Transmit is the usual
+  case: a Pi with a USB interface also has its headphone jack, so the card
+  being received on is used for transmit rather than picking between the two;
+
+- the card cannot be opened as configured - it is busy, or does not do mono, or
+  does not do the configured sample rate.  The default device is usually a
+  plugin or sound server that converts whatever it is given, so it remains the
+  better bet;
+
+- the configuration defines more than one audio device.  That configuration is
+  choosing devices by hand, and the card detection would find is probably the
+  one another ``ADEVICE`` already names.
+
+Anything named in the configuration is used as named, and anything that is not
+a sound card - ``stdin``, ``udp:``, a UDP transmit destination - is untouched.
+Where only one side is left at the default it is the only side detected, so
+
+.. code::
+
+    ADEVICE udp:7355 auto     # Receive from an SDR, transmit through the only card
+
+
 Receive without an audio output device
 --------------------------------------
 

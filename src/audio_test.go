@@ -172,6 +172,222 @@ func Test_matchPortAudioDeviceByName_noMatch(t *testing.T) {
 	assert.Nil(t, dev)
 }
 
+// --- automatic device detection ---
+
+// alsaDeviceList is what PortAudio enumerates on a Linux machine with a USB
+// sound card in it: the cards, and the fixed list of ALSA plugins.
+func alsaDeviceList() []*portaudio.DeviceInfo {
+	return []*portaudio.DeviceInfo{
+		makeDevice("bcm2835 Headphones: - (hw:0,0)", 0, 8),
+		makeDevice("USB Audio CODEC: USB Audio (hw:1,0)", 2, 2),
+		makeDevice("sysdefault", 0, 8),
+		makeDevice("hdmi", 0, 8),
+		makeDevice("pulse", 32, 32),
+		makeDevice("default", 32, 32),
+	}
+}
+
+// allFormatsSupported stands in for audioDeviceSupportsFormat where the test
+// is not about what the card can do.
+func allFormatsSupported(_ *portaudio.DeviceInfo, _ *adev_param_s, _ bool) bool {
+	return true
+}
+
+func Test_audioDeviceNameIsVirtual(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"default", true},
+		{"Default", true},
+		{"pulse", true},
+		{"sysdefault:CARD=Device", true},
+		{"front:CARD=PCH,DEV=0", true},
+		{"Microsoft Sound Mapper - Input", true},
+		{"USB Audio CODEC: USB Audio (hw:1,0)", false},
+		{"Built-in Microphone", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, audioDeviceNameIsVirtual(tt.name))
+		})
+	}
+}
+
+// Where ALSA enumerates cards, the plugins alongside them are not candidates:
+// a machine with one sound card should not look like one with a dozen devices.
+func Test_hardwareAudioDevices_alsaKeepsOnlyCards(t *testing.T) {
+	var in = hardwareAudioDevices(alsaDeviceList(), true)
+	require.Len(t, in, 1)
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", in[0].Name)
+
+	var out = hardwareAudioDevices(alsaDeviceList(), false)
+	require.Len(t, out, 2)
+	assert.Equal(t, "bcm2835 Headphones: - (hw:0,0)", out[0].Name)
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", out[1].Name)
+}
+
+// Host APIs that enumerate cards alone keep everything that is not software.
+func Test_hardwareAudioDevices_nonALSAKeepsDevices(t *testing.T) {
+	var devices = []*portaudio.DeviceInfo{
+		makeDevice("Microsoft Sound Mapper - Input", 2, 0),
+		makeDevice("Microphone (USB Audio CODEC)", 2, 0),
+		makeDevice("Speakers (USB Audio CODEC)", 0, 2),
+	}
+
+	var in = hardwareAudioDevices(devices, true)
+	require.Len(t, in, 1)
+	assert.Equal(t, "Microphone (USB Audio CODEC)", in[0].Name)
+
+	var out = hardwareAudioDevices(devices, false)
+	require.Len(t, out, 1)
+	assert.Equal(t, "Speakers (USB Audio CODEC)", out[0].Name)
+}
+
+func Test_autoDetectAudioDevice(t *testing.T) {
+	t.Run("the only card", func(t *testing.T) {
+		var dev = autoDetectAudioDevice(alsaDeviceList(), true)
+		require.NotNil(t, dev)
+		assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", dev.Name)
+	})
+
+	t.Run("a choice to make is not our choice", func(t *testing.T) {
+		assert.Nil(t, autoDetectAudioDevice(alsaDeviceList(), false))
+	})
+
+	t.Run("no card at all", func(t *testing.T) {
+		var devices = []*portaudio.DeviceInfo{makeDevice("default", 32, 32)}
+		assert.Nil(t, autoDetectAudioDevice(devices, true))
+	})
+}
+
+// A machine with one sound card needs no ADEVICE: both directions land on the
+// card, including the transmit side, where the other playback device is the
+// machine's own speakers rather than the other half of the radio.
+func Test_resolveDefaultAudioDevices_theOnlyCard(t *testing.T) {
+	var pa = makeAudioConfig(DEFAULT_ADEVICE, DEFAULT_ADEVICE)
+
+	resolveDefaultAudioDevices(pa, alsaDeviceList(), allFormatsSupported)
+
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", pa.adev[0].adevice_in)
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", pa.adev[0].adevice_out)
+}
+
+// "ADEVICE auto" asks for the same thing out loud.
+func Test_resolveDefaultAudioDevices_autoKeyword(t *testing.T) {
+	var pa = makeAudioConfig(AUTO_ADEVICE, AUTO_ADEVICE)
+
+	resolveDefaultAudioDevices(pa, alsaDeviceList(), allFormatsSupported)
+
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", pa.adev[0].adevice_in)
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", pa.adev[0].adevice_out)
+}
+
+// A card that can only capture leaves the transmit side to be detected on its
+// own, and a machine with more than one playback device keeps the default.
+func Test_resolveDefaultAudioDevices_captureOnlyCard(t *testing.T) {
+	var devices = []*portaudio.DeviceInfo{
+		makeDevice("bcm2835 Headphones: - (hw:0,0)", 0, 8),
+		makeDevice("USB Audio CODEC: USB Audio (hw:1,0)", 2, 0),
+		makeDevice("default", 32, 32),
+	}
+
+	var pa = makeAudioConfig(DEFAULT_ADEVICE, DEFAULT_ADEVICE)
+
+	resolveDefaultAudioDevices(pa, devices, allFormatsSupported)
+
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", pa.adev[0].adevice_in)
+	assert.Equal(t, "bcm2835 Headphones: - (hw:0,0)", pa.adev[0].adevice_out)
+}
+
+// A device named for transmit is a choice of its own, so an explicit default
+// there is detected on its own terms rather than following the input side.
+func Test_resolveDefaultAudioDevices_outputSpecified(t *testing.T) {
+	var pa = makeAudioConfig(DEFAULT_ADEVICE, AUTO_ADEVICE)
+	pa.adev[0].adevice_out_specified = true
+
+	resolveDefaultAudioDevices(pa, alsaDeviceList(), allFormatsSupported)
+
+	assert.Equal(t, "USB Audio CODEC: USB Audio (hw:1,0)", pa.adev[0].adevice_in)
+	assert.Equal(t, AUTO_ADEVICE, pa.adev[0].adevice_out)
+}
+
+// Anything the configuration names is left alone, as is anything that is not a
+// sound card.
+func Test_resolveDefaultAudioDevices_leavesOthersAlone(t *testing.T) {
+	tests := []struct {
+		name    string
+		inName  string
+		outName string
+		wantIn  string
+		wantOut string
+	}{
+		{"named devices", "plughw:1,0", "plughw:2,0", "plughw:1,0", "plughw:2,0"},
+		{"standard input", "stdin", "stdin", "stdin", "stdin"},
+		{"UDP both ways", "udp:7355", "udp:localhost:7356", "udp:7355", "udp:localhost:7356"},
+		{
+			"UDP in, card out",
+			"udp:7355", DEFAULT_ADEVICE,
+			"udp:7355", "bcm2835 Headphones: - (hw:0,0)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var devices = []*portaudio.DeviceInfo{
+				makeDevice("bcm2835 Headphones: - (hw:0,0)", 0, 8),
+				makeDevice("default", 32, 32),
+			}
+
+			var pa = makeAudioConfig(tt.inName, tt.outName)
+
+			resolveDefaultAudioDevices(pa, devices, allFormatsSupported)
+
+			assert.Equal(t, tt.wantIn, pa.adev[0].adevice_in)
+			assert.Equal(t, tt.wantOut, pa.adev[0].adevice_out)
+		})
+	}
+}
+
+// A card that cannot be opened the way the configuration asks - busy, or no
+// mono, or not 44100 - is not an improvement on the default device, which is
+// typically a plugin or sound server that converts whatever it is given.
+func Test_resolveDefaultAudioDevices_unsupportedFormat(t *testing.T) {
+	var pa = makeAudioConfig(DEFAULT_ADEVICE, DEFAULT_ADEVICE)
+
+	resolveDefaultAudioDevices(pa, alsaDeviceList(), func(_ *portaudio.DeviceInfo, _ *adev_param_s, _ bool) bool {
+		return false
+	})
+
+	assert.Equal(t, DEFAULT_ADEVICE, pa.adev[0].adevice_in)
+	assert.Equal(t, DEFAULT_ADEVICE, pa.adev[0].adevice_out)
+}
+
+// A configuration that defines more than one audio device is choosing devices
+// by hand; the card detection would find is probably the one already named.
+func Test_resolveDefaultAudioDevices_severalDevicesDefined(t *testing.T) {
+	var pa = makeAudioConfig(DEFAULT_ADEVICE, DEFAULT_ADEVICE)
+	pa.adev[1].defined = 1
+	pa.adev[1].adevice_in = "USB Audio CODEC: USB Audio (hw:1,0)"
+	pa.adev[1].adevice_out = "USB Audio CODEC: USB Audio (hw:1,0)"
+
+	resolveDefaultAudioDevices(pa, alsaDeviceList(), allFormatsSupported)
+
+	assert.Equal(t, DEFAULT_ADEVICE, pa.adev[0].adevice_in)
+	assert.Equal(t, DEFAULT_ADEVICE, pa.adev[0].adevice_out)
+}
+
+// An audio device that was never defined has nothing to resolve.
+func Test_resolveDefaultAudioDevices_undefinedDevice(t *testing.T) {
+	var pa = makeAudioConfig(DEFAULT_ADEVICE, DEFAULT_ADEVICE)
+
+	resolveDefaultAudioDevices(pa, alsaDeviceList(), allFormatsSupported)
+
+	assert.Empty(t, pa.adev[1].adevice_in)
+	assert.Empty(t, pa.adev[1].adevice_out)
+}
+
 func Test_matchPortAudioDeviceByName_directionFilter(t *testing.T) {
 	// Two devices for the same ALSA card ID: one input-only, one output-only.
 	// This can happen with some USB audio interfaces.
