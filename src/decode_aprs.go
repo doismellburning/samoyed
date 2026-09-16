@@ -2569,11 +2569,11 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 
 		A.g_data_type_desc = aisData.Description
 		A.g_name = aisData.MMSI
-		A.g_lat = unlessUnknown(aisData.Lat)
-		A.g_lon = unlessUnknown(aisData.Lon)
-		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(aisData.Knots))
-		A.g_course = unlessUnknown(aisData.Course)
-		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, unlessUnknown(aisData.AltM))
+		A.g_lat = aisData.Lat
+		A.g_lon = aisData.Lon
+		A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, aisData.Knots)
+		A.g_course = aisData.Course
+		A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, aisData.AltM)
 		A.g_symbol_table = aisData.Symtab
 		A.g_symbol_code = aisData.Symbol
 		A.g_comment = aisData.Comment
