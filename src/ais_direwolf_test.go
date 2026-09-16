@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,9 +37,9 @@ func test_basic_parse(t *testing.T) {
 	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
 	assert.Equal(t, "366730000", aisData.MMSI)
 	assert.Empty(t, aisData.Comment)
-	assert.InDelta(t, -122, aisData.Lon, 1)
-	assert.InDelta(t, 20.8, aisData.Knots, 1)
-	assert.InDelta(t, 51.3, aisData.Course, 1)
+	assert.InDelta(t, -122, maybe.FromJust(aisData.Lon), 1)
+	assert.InDelta(t, 20.8, maybe.FromJust(aisData.Knots), 1)
+	assert.InDelta(t, 51.3, maybe.FromJust(aisData.Course), 1)
 }
 
 func test_parse_errors(t *testing.T) {

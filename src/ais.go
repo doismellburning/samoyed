@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 // Lengths, in bits, for the AIS message types.
@@ -132,47 +134,47 @@ func get_field_signed(base []byte, start uint, length uint) int {
 	return (result)
 }
 
-func get_field_lat(base []byte, start uint, length uint) float64 {
+func get_field_lat(base []byte, start uint, length uint) maybe.Maybe[float64] {
 	// Latitude of 0x3412140 (91 deg) means not available.
 	// Message type 27 uses lower resolution, 17 bits rather than 27.
 	// It encodes minutes/10 rather than normal minutes/10000.
 	var n = get_field_signed(base, start, length)
 	if length == 17 {
 		if n == 91*600 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n) / 600.0
+			return maybe.Just(float64(n) / 600.0)
 		}
 	} else {
 		if n == 91*600000 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n) / 600000.0
+			return maybe.Just(float64(n) / 600000.0)
 		}
 	}
 }
 
-func get_field_lon(base []byte, start uint, length uint) float64 {
+func get_field_lon(base []byte, start uint, length uint) maybe.Maybe[float64] {
 	// Longitude of 0x6791AC0 (181 deg) means not available.
 	// Message type 27 uses lower resolution, 18 bits rather than 28.
 	// It encodes minutes/10 rather than normal minutes/10000.
 	var n = get_field_signed(base, start, length)
 	if length == 18 {
 		if n == 181*600 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n) / 600.0
+			return maybe.Just(float64(n) / 600.0)
 		}
 	} else {
 		if n == 181*600000 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n) / 600000.0
+			return maybe.Just(float64(n) / 600000.0)
 		}
 	}
 }
 
-func get_field_speed(base []byte, start uint, length uint) float64 {
+func get_field_speed(base []byte, start uint, length uint) maybe.Maybe[float64] {
 	// Raw 1023 means not available.
 	// Multiply by 0.1 to get knots.
 	// For aircraft it is knots, not deciknots.
@@ -182,20 +184,20 @@ func get_field_speed(base []byte, start uint, length uint) float64 {
 	var n = get_field(base, start, length)
 	if length == 6 {
 		if n == 63 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n)
+			return maybe.Just(float64(n))
 		}
 	} else {
 		if n == 1023 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n) * 0.1
+			return maybe.Just(float64(n) * 0.1)
 		}
 	}
 }
 
-func get_field_course(base []byte, start uint, length uint) float64 {
+func get_field_course(base []byte, start uint, length uint) maybe.Maybe[float64] {
 	// Raw 3600 means not available.
 	// Multiply by 0.1 to get degrees
 	// Message type 27 uses lower resolution, 9 bits rather than 12.
@@ -203,17 +205,28 @@ func get_field_course(base []byte, start uint, length uint) float64 {
 	var n = get_field(base, start, length)
 	if length == 9 {
 		if n == 360 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n)
+			return maybe.Just(float64(n))
 		}
 	} else {
 		if n == 3600 {
-			return G_UNKNOWN
+			return maybe.Nothing[float64]()
 		} else {
-			return float64(n) * 0.1
+			return maybe.Just(float64(n) * 0.1)
 		}
 	}
+}
+
+func get_field_altitude(base []byte, start uint, length uint) maybe.Maybe[float64] {
+	// Raw 4095 means not available; 4094 is the top of the scale and means
+	// 4094 metres or more.
+	var n = get_field(base, start, length)
+	if n == 4095 {
+		return maybe.Nothing[float64]()
+	}
+
+	return maybe.Just(float64(n))
 }
 
 // AIS "six-bit ASCII": values 0 thru 31 are '@' thru '_', and values 32 thru
@@ -362,11 +375,11 @@ const AIS_CHECKSUM_DIGITS = 2
 type AISData struct {
 	Description string //Description of AIS message type.
 	MMSI        string //9 digit identifier.
-	Lat         float64
-	Lon         float64
-	Knots       float64
-	Course      float64
-	AltM        float64
+	Lat         maybe.Maybe[float64]
+	Lon         maybe.Maybe[float64]
+	Knots       maybe.Maybe[float64]
+	Course      maybe.Maybe[float64]
+	AltM        maybe.Maybe[float64]
 	Symtab      byte
 	Symbol      byte
 	Comment     string
@@ -375,11 +388,6 @@ type AISData struct {
 func AISParse(sentence string) (*AISData, error) {
 	var aisData = new(AISData)
 	aisData.MMSI = "?"
-	aisData.Lat = G_UNKNOWN
-	aisData.Lon = G_UNKNOWN
-	aisData.Knots = G_UNKNOWN
-	aisData.Course = G_UNKNOWN
-	aisData.AltM = G_UNKNOWN
 
 	var stemp = sentence
 
@@ -518,14 +526,13 @@ func AISParse(sentence string) (*AISData, error) {
 		aisData.Description = fmt.Sprintf("AIS %d: SAR Aircraft Position Report", aisType)
 		aisData.Symtab = '/'
 		aisData.Symbol = '\''                          // Small AIRCRAFT
-		aisData.AltM = float64(get_field(ais, 38, 12)) // meters, 4095 means not available
+		aisData.AltM = get_field_altitude(ais, 38, 12) // meters
 		aisData.Lon = get_field_lon(ais, 61, 28)
 		aisData.Lat = get_field_lat(ais, 89, 27)
 
-		aisData.Knots = get_field_speed(ais, 50, 10) // plane is knots, not knots/10
-		if aisData.Knots != G_UNKNOWN {
-			aisData.Knots *= 10.0
-		}
+		// The plane reports knots, not deciknots, so undo the tenths that
+		// get_field_speed applies to the ten bit form.
+		aisData.Knots = maybe.Fmap(func(knots float64) float64 { return knots * 10.0 }, get_field_speed(ais, 50, 10))
 
 		aisData.Course = get_field_course(ais, 116, 12)
 		aisData.Comment = get_ship_data(aisData.MMSI)
