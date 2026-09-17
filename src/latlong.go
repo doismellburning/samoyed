@@ -681,10 +681,7 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	var np = len(maidenhead) / 2 /* Number of pairs of characters. */
 
 	if len(maidenhead)%2 != 0 || np < MH_MIN_PAIR || np > MH_MAX_PAIR {
-		text_color_set(DW_COLOR_ERROR)
-
-		var s = fmt.Sprintf("Maidenhead locator \"%s\" must from 1 to %d pairs of characters.\n", maidenhead, MH_MAX_PAIR)
-		dw_printf("%s", s)
+		var s = fmt.Sprintf("Maidenhead locator \"%s\" must be from 1 to %d pairs of characters.", maidenhead, MH_MAX_PAIR)
 
 		return 0, 0, errors.New(s)
 	}
@@ -698,11 +695,8 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	for n := range np {
 		if mh[2*n] < pairs[n].min_ch || mh[2*n] > pairs[n].max_ch ||
 			mh[2*n+1] < pairs[n].min_ch || mh[2*n+1] > pairs[n].max_ch {
-			text_color_set(DW_COLOR_ERROR)
-
-			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
+			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.",
 				pairs[n].position, maidenhead, pairs[n].min_ch, pairs[n].max_ch)
-			dw_printf("%s", s)
 
 			return 0, 0, errors.New(s)
 		}

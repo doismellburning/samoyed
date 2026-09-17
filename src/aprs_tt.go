@@ -1365,10 +1365,15 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.locText = mh
 
 				var lat, lon, err = ll_from_grid_square(state.locText)
-				if err == nil {
-					state.latitude = lat
-					state.longitude = lon
+				if err != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("%v\n", err)
+
+					return (TT_ERROR_INVALID_MHEAD)
 				}
+
+				state.latitude = lat
+				state.longitude = lon
 			}
 
 			state.dao[2] = e[0]
@@ -1389,10 +1394,15 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				state.locText = mh
 
 				var lat, lon, err = ll_from_grid_square(state.locText)
-				if err == nil {
-					state.latitude = lat
-					state.longitude = lon
+				if err != nil {
+					text_color_set(DW_COLOR_ERROR)
+					dw_printf("%v\n", err)
+
+					return (TT_ERROR_INVALID_SATSQ)
 				}
+
+				state.latitude = lat
+				state.longitude = lon
 			}
 
 			state.dao[2] = e[0]
