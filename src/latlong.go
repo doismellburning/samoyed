@@ -23,6 +23,22 @@ import (
 
 const G_UNKNOWN = (-999999)
 
+/* Latitude and longitude arriving from a config file, the CLI or a decoded
+ * packet can be out of range.  The conversions below are fixed width and
+ * cannot fail, so they confine the value rather than reporting it; whoever
+ * accepted the value is the one with the context to complain about it.
+ */
+
+// clampLat confines a latitude to the representable range.
+func clampLat(dlat float64) float64 {
+	return min(90., max(-90., dlat))
+}
+
+// clampLon confines a longitude to the representable range.
+func clampLon(dlong float64) float64 {
+	return min(180., max(-180., dlong))
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        latitude_to_str
@@ -55,19 +71,7 @@ const G_UNKNOWN = (-999999)
  *----------------------------------------------------------------*/
 
 func latitude_to_str(dlat float64, ambiguity int) string {
-	if dlat < -90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is less than -90.  Changing to -90.\n")
-
-		dlat = -90.
-	}
-
-	if dlat > 90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
-
-		dlat = 90.
-	}
+	dlat = clampLat(dlat)
 
 	var hemi rune /* Hemisphere: N or S */
 
@@ -136,19 +140,7 @@ func latitude_to_str(dlat float64, ambiguity int) string {
  *----------------------------------------------------------------*/
 
 func longitude_to_str(dlong float64, ambiguity int) string {
-	if dlong < -180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is less than -180.  Changing to -180.\n")
-
-		dlong = -180.
-	}
-
-	if dlong > 180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is greater than 180.  Changing to 180.\n")
-
-		dlong = 180.
-	}
+	dlong = clampLon(dlong)
 
 	var hemi rune /* Hemisphere: E or W */
 
@@ -211,19 +203,7 @@ func longitude_to_str(dlong float64, ambiguity int) string {
  *----------------------------------------------------------------*/
 
 func latitude_to_comp_str(dlat float64) string {
-	if dlat < -90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is less than -90.  Changing to -90.\n")
-
-		dlat = -90.
-	}
-
-	if dlat > 90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
-
-		dlat = 90.
-	}
+	dlat = clampLat(dlat)
 
 	var y = int(math.Round(380926. * (90. - dlat)))
 
@@ -258,19 +238,7 @@ func latitude_to_comp_str(dlat float64) string {
  *----------------------------------------------------------------*/
 
 func longitude_to_comp_str(dlong float64) string {
-	if dlong < -180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is less than -180.  Changing to -180.\n")
-
-		dlong = -180.
-	}
-
-	if dlong > 180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is greater than 180.  Changing to 180.\n")
-
-		dlong = 180.
-	}
+	dlong = clampLon(dlong)
 
 	var x = int(math.Round(190463. * (180. + dlong)))
 
@@ -309,19 +277,7 @@ func latitude_to_nmea(dlat float64) (string, string) {
 		return "", ""
 	}
 
-	if dlat < -90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is less than -90.  Changing to -90.\n")
-
-		dlat = -90.
-	}
-
-	if dlat > 90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
-
-		dlat = 90.
-	}
+	dlat = clampLat(dlat)
 
 	var hemi string
 
@@ -366,19 +322,7 @@ func longitude_to_nmea(dlong float64) (string, string) {
 		return "", ""
 	}
 
-	if dlong < -180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("longitude is less than -180.  Changing to -180.\n")
-
-		dlong = -180.
-	}
-
-	if dlong > 180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("longitude is greater than 180.  Changing to 180.\n")
-
-		dlong = 180.
-	}
+	dlong = clampLon(dlong)
 
 	var hemi string
 
