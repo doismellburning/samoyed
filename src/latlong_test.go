@@ -262,16 +262,22 @@ func TestLatitudeFromNMEA(t *testing.T) {
 			expected: 42.3601,
 			delta:    0.0001,
 		},
+		{
+			// Minutes must be under 60, and 59.9999 is, so this is a perfectly
+			// ordinary position rather than something to reject.
+			name:     "just under sixty minutes",
+			str:      "8959.9999",
+			hemi:     'N',
+			expected: 89.999998,
+			delta:    0.000001,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := latitude_from_nmea(tt.str, tt.hemi)
-			if tt.expected == G_UNKNOWN {
-				assert.InDelta(t, float64(G_UNKNOWN), result, 0.0001, "should return G_UNKNOWN")
-			} else {
-				assert.InDelta(t, tt.expected, result, tt.delta, "latitude should match")
-			}
+			result, err := latitude_from_nmea(tt.str, tt.hemi)
+			require.NoError(t, err, "latitude should parse")
+			assert.InDelta(t, tt.expected, result, tt.delta, "latitude should match")
 		})
 	}
 }
@@ -288,21 +294,37 @@ func TestLatitudeFromNMEAErrors(t *testing.T) {
 		{"no decimal point", "422160", 'N'},
 		{"decimal in wrong position", "42.216060", 'N'},
 		{"non-digit at start", "X221.6060", 'N'},
+		// Only the first byte used to be checked, so a non-digit elsewhere in
+		// the degrees was subtracted from '0' anyway, and unparseable minutes
+		// were silently taken as zero - leaving a corrupted field looking like
+		// a plausible whole-degree position.
+		{"non-digit in degrees", "4:21.6060", 'N'},
+		{"non-digit in minutes", "42X1.6060", 'N'},
+		{"non-digit after decimal point", "4221.60X0", 'N'},
+		{"signed minutes", "42-1.6060", 'N'},
+		// Minutes are sixtieths, so 60 of them is the next degree up and the
+		// sender has made a mistake.  These used to come back as 43 and 43.67.
+		{"sixty minutes", "4260.0000", 'N'},
+		{"minutes beyond sixty", "4299.9999", 'N'},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := latitude_from_nmea(tt.str, tt.hemi)
-			// Should return G_UNKNOWN for invalid input
-			assert.InDelta(t, float64(G_UNKNOWN), result, 0.0001, "should return G_UNKNOWN for invalid input")
+			_, err := latitude_from_nmea(tt.str, tt.hemi)
+			assert.Error(t, err, "should return an error for invalid input")
 		})
 	}
 
-	// Note: Invalid hemisphere prints error but still processes the data,
-	// so we just check it doesn't panic
 	t.Run("invalid_hemisphere", func(t *testing.T) {
-		_ = latitude_from_nmea("4221.6060", 'X')
-		// Test passes if it doesn't panic
+		var _, err = latitude_from_nmea("4221.6060", 'X')
+		assert.ErrorContains(t, err, "should be N or S",
+			"a hemisphere that is neither N nor S should be reported")
+	})
+
+	t.Run("out_of_range", func(t *testing.T) {
+		var _, err = latitude_from_nmea("9500.0000", 'N')
+		assert.ErrorContains(t, err, "not in range of 0 to 90",
+			"a latitude beyond 90 degrees should be reported")
 	})
 }
 
@@ -371,16 +393,20 @@ func TestLongitudeFromNMEA(t *testing.T) {
 			expected: 151.2093,
 			delta:    0.0001,
 		},
+		{
+			name:     "just under sixty minutes",
+			str:      "17959.9999",
+			hemi:     'E',
+			expected: 179.999998,
+			delta:    0.000001,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := longitude_from_nmea(tt.str, tt.hemi)
-			if tt.expected == G_UNKNOWN {
-				assert.InDelta(t, float64(G_UNKNOWN), result, 0.0001, "should return G_UNKNOWN")
-			} else {
-				assert.InDelta(t, tt.expected, result, tt.delta, "longitude should match")
-			}
+			result, err := longitude_from_nmea(tt.str, tt.hemi)
+			require.NoError(t, err, "longitude should parse")
+			assert.InDelta(t, tt.expected, result, tt.delta, "longitude should match")
 		})
 	}
 }
@@ -397,19 +423,31 @@ func TestLongitudeFromNMEAErrors(t *testing.T) {
 		{"no decimal point", "1511255", 'E'},
 		{"decimal in wrong position", "151.125580", 'E'},
 		{"non-digit at start", "X5112.5580", 'E'},
+		{"non-digit in degrees", "15:12.5580", 'E'},
+		{"non-digit in minutes", "151X2.5580", 'E'},
+		{"non-digit after decimal point", "15112.55X0", 'E'},
+		{"signed minutes", "151-2.5580", 'E'},
+		{"sixty minutes", "15160.0000", 'E'},
+		{"minutes beyond sixty", "15199.9999", 'E'},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := longitude_from_nmea(tt.str, tt.hemi)
-			assert.InDelta(t, float64(G_UNKNOWN), result, 0.0001, "should return G_UNKNOWN for invalid input")
+			_, err := longitude_from_nmea(tt.str, tt.hemi)
+			assert.Error(t, err, "should return an error for invalid input")
 		})
 	}
 
-	// Note: Invalid hemisphere prints error but still processes the data,
-	// so we just check it doesn't panic
+	t.Run("out_of_range", func(t *testing.T) {
+		var _, err = longitude_from_nmea("18500.0000", 'E')
+		assert.ErrorContains(t, err, "not in range of 0 to 180",
+			"a longitude beyond 180 degrees should be reported")
+	})
+
 	t.Run("invalid_hemisphere", func(t *testing.T) {
-		_ = longitude_from_nmea("15112.5580", 'X')
+		var _, err = longitude_from_nmea("15112.5580", 'X')
+		assert.ErrorContains(t, err, "should be E or W",
+			"a hemisphere that is neither E nor W should be reported")
 		// Test passes if it doesn't panic
 	})
 }
@@ -436,8 +474,10 @@ func TestNMEARoundTrip(t *testing.T) {
 			lonStr, lonHem := longitude_to_nmea(tt.lon)
 
 			// Convert back
-			lat := latitude_from_nmea(latStr, latHem[0])
-			lon := longitude_from_nmea(lonStr, lonHem[0])
+			lat, latErr := latitude_from_nmea(latStr, latHem[0])
+			require.NoError(t, latErr)
+			lon, lonErr := longitude_from_nmea(lonStr, lonHem[0])
+			require.NoError(t, lonErr)
 
 			// Check round trip (NMEA has 4 decimal places for minutes, about 0.00002 degree precision)
 			assert.InDelta(t, tt.lat, lat, 0.0001, "latitude should survive round trip")
@@ -744,7 +784,7 @@ func BenchmarkLatitudeConversions(b *testing.B) {
 	b.Run("from_nmea", func(b *testing.B) {
 		str := "4221.6060"
 		for range b.N {
-			_ = latitude_from_nmea(str, 'N')
+			_, _ = latitude_from_nmea(str, 'N')
 		}
 	})
 }

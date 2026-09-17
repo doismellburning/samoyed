@@ -409,7 +409,19 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		result.Lat = unlessUnknown(latitude_from_nmea(plat, pns[0]))
+		var lat, latErr = latitude_from_nmea(plat, pns[0])
+		if latErr != nil {
+			if !quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Can't get latitude from GPRMC sentence: %v\n", latErr)
+			}
+
+			result.Fix = DWFIX_ERROR
+
+			return result
+		}
+
+		result.Lat = maybe.Just(lat)
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -422,7 +434,19 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		result.Lon = unlessUnknown(longitude_from_nmea(plon, pew[0]))
+		var lon, lonErr = longitude_from_nmea(plon, pew[0])
+		if lonErr != nil {
+			if !quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Can't get longitude from GPRMC sentence: %v\n", lonErr)
+			}
+
+			result.Fix = DWFIX_ERROR
+
+			return result
+		}
+
+		result.Lon = maybe.Just(lon)
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -563,7 +587,19 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		result.Lat = unlessUnknown(latitude_from_nmea(plat, pns[0]))
+		var lat, latErr = latitude_from_nmea(plat, pns[0])
+		if latErr != nil {
+			if !quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Can't get latitude from GPGGA sentence: %v\n", latErr)
+			}
+
+			result.Fix = DWFIX_ERROR
+
+			return result
+		}
+
+		result.Lat = maybe.Just(lat)
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
@@ -576,7 +612,19 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		result.Lon = unlessUnknown(longitude_from_nmea(plon, pew[0]))
+		var lon, lonErr = longitude_from_nmea(plon, pew[0])
+		if lonErr != nil {
+			if !quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Can't get longitude from GPGGA sentence: %v\n", lonErr)
+			}
+
+			result.Fix = DWFIX_ERROR
+
+			return result
+		}
+
+		result.Lon = maybe.Just(lon)
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
