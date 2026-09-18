@@ -23,17 +23,6 @@ import (
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
-// unspecified_to_zero maps the G_UNKNOWN sentinel onto 0, the value that
-// "not specified" had before G_UNKNOWN existed, so that a PHG or radio range
-// component nobody gave us doesn't end up in the arithmetic.
-func unspecified_to_zero(x int) int {
-	if x == G_UNKNOWN {
-		return 0
-	}
-
-	return x
-}
-
 /*------------------------------------------------------------------
  *
  * Name:        norm_position
@@ -122,7 +111,7 @@ func compressed_position_string(p *compressed_position_t) string {
 }
 
 func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
-	power int, height int, gain int,
+	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
 	course int, speed int) *compressed_position_t {
 	var presult = new(compressed_position_t)
 
@@ -171,6 +160,13 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	 * When c is '{', s is range ...
 	 */
 
+	// Only one of power, height and gain needs to have been given.  An absent
+	// one counts as zero, which the radio range calculation below replaces
+	// with its own default.
+	var p = maybe.FromMaybe(0, power)
+	var h = maybe.FromMaybe(0, height)
+	var g = maybe.FromMaybe(0, gain)
+
 	if speed > 0 {
 		var c int
 
@@ -193,30 +189,23 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 		presult.S = byte(s + '!')
 
 		presult.T = 0x26 + '!' /* current, other tracker. */
-	} else if power > 0 || height > 0 || gain > 0 {
+	} else if p > 0 || h > 0 || g > 0 {
 		presult.C = '{' /* radio range. */
 
-		// As in phg_data_extension, only one of the three needs to have been
-		// specified, and G_UNKNOWN would otherwise give a NaN range.
-
-		power = unspecified_to_zero(power)
-		height = unspecified_to_zero(height)
-		gain = unspecified_to_zero(gain)
-
-		if power == 0 {
-			power = 10
+		if p == 0 {
+			p = 10
 		}
 
-		if height == 0 {
-			height = 20
+		if h == 0 {
+			h = 20
 		}
 
-		if gain == 0 {
-			gain = 3
+		if g == 0 {
+			g = 3
 		}
 
 		// from protocol reference page 29.
-		var _range = math.Sqrt(2.0 * float64(height) * math.Sqrt((float64(power)/10.0)*(float64(gain)/2.0)))
+		var _range = math.Sqrt(2.0 * float64(h) * math.Sqrt((float64(p)/10.0)*(float64(g)/2.0)))
 
 		var s = math.Round(math.Log(_range/2.) / math.Log(1.08))
 		if s < 0 {
@@ -269,30 +258,28 @@ type phg_t struct {
 }
 */
 
-func phg_data_extension(power int, height int, gain int, dir string) string {
+func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string) string {
 	// The callers only check that at least one of the three was specified, so
-	// the others can still be G_UNKNOWN.  Treat those as unspecified, which is
-	// what the zero the callers originally checked for meant, rather than
-	// letting -999999 reach Sqrt/Log2 and produce a NaN that converts to a NUL
-	// byte in the transmitted packet.
-	power = unspecified_to_zero(power)
-	height = unspecified_to_zero(height)
-	gain = unspecified_to_zero(gain)
+	// the others can still be absent.  Treat those as unspecified, which is
+	// what the zero the callers originally checked for meant.
+	var watts = maybe.FromMaybe(0, power)
+	var feet = maybe.FromMaybe(0, height)
+	var dBi = maybe.FromMaybe(0, gain)
 
-	var p = math.Round(math.Sqrt(float64(power))) + '0'
+	var p = math.Round(math.Sqrt(float64(watts))) + '0'
 	if p < '0' {
 		p = '0'
 	} else if p > '9' {
 		p = '9'
 	}
 
-	var h = math.Round(math.Log2(float64(height)/10.0)) + '0'
+	var h = math.Round(math.Log2(float64(feet)/10.0)) + '0'
 	if h < '0' {
 		h = '0'
 	}
 	/* Result can go beyond '9'. */
 
-	var g = float64(gain + '0')
+	var g = float64(dBi + '0')
 	if g < '0' {
 		g = '0'
 	} else if g > '9' {
@@ -492,7 +479,7 @@ type aprs_compressed_pos_t struct {
 
 func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft maybe.Maybe[int],
 	symtab byte, symbol byte,
-	power int, height int, gain int, dir string,
+	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course int, speed int,
 	freq float64, tone float64, offset float64,
 	comment string) string {
@@ -529,7 +516,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 		if course != G_UNKNOWN || speed > 0 {
 			var cse = cse_spd_data_extension(course, speed)
 			result += cse
-		} else if power > 0 || height > 0 || gain > 0 {
+		} else if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
 			var phg = phg_data_extension(power, height, gain, dir)
 			result += phg
 		}
@@ -627,7 +614,7 @@ type aprs_object_t struct {
 
 func encode_object(name string, compressed bool, thyme time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
-	power int, height int, gain int, dir string,
+	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course int, speed int,
 	freq float64, tone float64, offset float64, comment string) string {
 	var dti = ';'
@@ -654,7 +641,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 
 		if course != G_UNKNOWN || speed > 0 {
 			result += cse_spd_data_extension(course, speed)
-		} else if power > 0 || height > 0 || gain > 0 {
+		} else if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
 			result += phg_data_extension(power, height, gain, dir)
 		}
 	}

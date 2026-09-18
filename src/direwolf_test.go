@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +59,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	var info = encode_object("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
-		0, 0, 0, "",
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		course, speed,
 		0, 0, 0, "")
 
@@ -85,7 +86,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	var info = encode_object("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
-		0, 0, 0, "",
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		course, speed,
 		0, 0, 0, "")
 

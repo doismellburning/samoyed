@@ -1139,7 +1139,7 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
 					A.g_symbol_table, A.g_symbol_code,
-					0, 0, 0, "", // power, height, gain, direction.
+					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
 					0, 0, 0, A.g_comment) // freq, tone, offset
 

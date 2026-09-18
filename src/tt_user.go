@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 /*
@@ -718,7 +720,8 @@ func xmit_object_report(i int, first_time bool) {
 	// info part of Object Report packet
 	stemp += encode_object(object_name, false, tt_user[i].last_heard, olat, olong, oambig,
 		byte(tt_user[i].overlay), byte(tt_user[i].symbol),
-		0, 0, 0, "", G_UNKNOWN, G_UNKNOWN, /* PHGD, Course/Speed */
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
+		G_UNKNOWN, G_UNKNOWN, /* Course/Speed */
 		freq,
 		ctcss,
 		G_UNKNOWN, /* CTCSS */
