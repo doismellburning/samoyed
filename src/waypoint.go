@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
 )
@@ -86,7 +87,7 @@ func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
 	 * If that fails, do own serial port open.
 	 */
 	if serialRequested {
-		ws.serialPortFd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
+		ws.serialPortFd = dwgps.SharedNMEAPort(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
 			ws.serialPortFd = SerialPortOpen(mc.waypoint_serial_port, 4800)

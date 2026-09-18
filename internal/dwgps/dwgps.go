@@ -1,5 +1,10 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package dwgps obtains the station's location from a GPS receiver.
+//
 //nolint:gochecknoglobals
-package direwolf
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -15,16 +20,16 @@ package direwolf
  *		    no separate library dependency is needed.
  *
  *
- * API:		dwgps_init	Connect to data stream at start up time.
+ * API:		Init		Connect to data stream at start up time.
  *
- *		dwgps_read	Return most recent location to application.
+ *		Read		Return most recent location to application.
  *
- *		dwgps_print	Print contents of structure for debugging.
+ *		Print		Print contents of structure for debugging.
  *
- *		dwgps_term	Shutdown on exit.
+ *		Term		Shutdown on exit.
  *
  *
- * from below:	dwgps_set_data	Called from other two implementations to
+ * from below:	setData		Called from other two implementations to
  *				save data until it is needed.
  *
  *---------------------------------------------------------------*/
@@ -35,6 +40,8 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/textcolor"
+	"github.com/pkg/term"
 )
 
 /*
@@ -50,56 +57,70 @@ import (
  *
  */
 
-type dwfix_t int
+type Fix int
 
 const (
-	DWFIX_NOT_INIT dwfix_t = -2
-	DWFIX_ERROR    dwfix_t = -1
-	DWFIX_NOT_SEEN dwfix_t = 0
-	DWFIX_NO_FIX   dwfix_t = 1
-	DWFIX_2D       dwfix_t = 2
-	DWFIX_3D       dwfix_t = 3
+	FixNotInit Fix = -2
+	FixError   Fix = -1
+	FixNotSeen Fix = 0
+	FixNoFix   Fix = 1
+	Fix2D      Fix = 2
+	Fix3D      Fix = 3
 )
 
-// dwgps_info_t is the most recent position report from a GPS receiver.  Its
-// zero value is "nothing heard yet", so a freshly declared one needs no
-// clearing.
-type dwgps_info_t struct {
-	timestamp   time.Time            /* When last updated.  System time. */
-	fix         dwfix_t              /* Quality of position fix. */
-	dlat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
-	dlon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
-	speed_knots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
-	track       maybe.Maybe[float64] /* What is difference between track and course? */
-	altitude    maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
+// Info is the most recent position report from a GPS receiver.  Its zero value
+// is "nothing heard yet", so a freshly declared one needs no clearing.
+type Info struct {
+	Timestamp  time.Time            /* When last updated.  System time. */
+	Fix        Fix                  /* Quality of position fix. */
+	Lat        maybe.Maybe[float64] /* Latitude.  Valid if Fix >= 2. */
+	Lon        maybe.Maybe[float64] /* Longitude. Valid if Fix >= 2. */
+	SpeedKnots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
+	Track      maybe.Maybe[float64] /* What is difference between track and course? */
+	Altitude   maybe.Maybe[float64] /* meters above mean sea level. Valid if Fix == 3. */
+}
+
+// Config is where to find the GPS, taken from the application's configuration
+// settings.  A serial port is opened through OpenSerialPort rather than by this
+// package, which has no business knowing how the application talks to one.
+type Config struct {
+	NMEAPort  string /* Serial port name for reading NMEA sentences from GPS. e.g. COM22, /dev/ttyACM0 */
+	NMEASpeed int    /* Speed for above, baud. */
+
+	// OpenSerialPort opens NMEAPort, returning nil if it cannot.  A nil
+	// OpenSerialPort means the same thing, so there is no serial GPS.
+	OpenSerialPort func(devicename string, baud int) *term.Term
+
+	GPSDHost string /* Host for gpsd server. e.g. localhost, 192.168.1.2 */
+	GPSDPort int    /* Port number for gpsd server. */
 }
 
 var s_dwgps_debug = 0 /* Enable debug output. */
 /* >= 2 show updates from GPS. */
-/* >= 1 show results from dwgps_read. */
+/* >= 1 show results from Read. */
 
 /*
  * The GPS reader threads deposit current data here when it becomes available.
- * dwgps_read returns it to the requesting application.
+ * Read returns it to the requesting application.
  *
  * A critical region to avoid inconsistency between fields.
  */
 
-var s_dwgps_info = new(dwgps_info_t)
+var s_dwgps_info = new(Info)
 
 var s_gps_mutex sync.Mutex
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_init
+ * Name:        Init
  *
  * Purpose:    	Initialize the GPS interface.
  *
- * Inputs:	pconfig		Configuration settings.  This might include
+ * Inputs:	config		Where to find the GPS.  This might include
  *				serial port name for direct connect and host
  *				name or address for network connection.
  *
- *		debug	- If >= 1, print results when dwgps_read is called.
+ *		debug	- If >= 1, print results when Read is called.
  *				(In this file.)
  *
  *			  If >= 2, location updates are also printed.
@@ -114,22 +135,22 @@ var s_gps_mutex sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_init(pconfig *misc_config_s, debug int) {
-	dwgps_set_data(new(dwgps_info_t)) // Init the global
+func Init(config *Config, debug int) {
+	setData(new(Info)) // Init the global
 
 	s_dwgps_debug = debug
 
-	dwgpsnmea_init(pconfig, debug)
+	nmeaInit(config, debug)
 
-	dwgpsd_init(pconfig, debug)
+	gpsdInit(config, debug)
 
-	SLEEP_MS(500) /* So receive thread(s) can clear the */
+	time.Sleep(500 * time.Millisecond) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
-} /* end dwgps_init */
+} /* end Init */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_read
+ * Name:        Read
  *
  * Purpose:     Return most recent location data available.
  *
@@ -140,7 +161,7 @@ func dwgps_init(pconfig *misc_config_s, debug int) {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
+func Read(gpsinfo *Info) Fix {
 	s_gps_mutex.Lock()
 
 	*gpsinfo = *s_dwgps_info
@@ -148,19 +169,19 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
 	s_gps_mutex.Unlock()
 
 	if s_dwgps_debug >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("gps_read: ", gpsinfo)
+		textcolor.Set(textcolor.Debug)
+		Print("gps_read: ", gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
 	// or should we leave that up to the caller?
 
-	return (gpsinfo.fix)
+	return (gpsinfo.Fix)
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_print
+ * Name:        Print
  *
  * Purpose:     Print gps information for debugging.
  *
@@ -171,17 +192,17 @@ func dwgps_read(gpsinfo *dwgps_info_t) dwfix_t {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
-	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
+func Print(msg string, gpsinfo *Info) {
+	textcolor.Printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
 		msg,
-		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
-		formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
-		formatMaybeFloat("%.0f", gpsinfo.track), formatMaybeFloat("%.1f", gpsinfo.speed_knots),
-		formatMaybeFloat("%.0f", gpsinfo.altitude))
-} /* end dwgps_set_data */
+		gpsinfo.Timestamp.Format(time.RFC3339), gpsinfo.Fix,
+		FormatMaybeFloat("%.6f", gpsinfo.Lat), FormatMaybeFloat("%.6f", gpsinfo.Lon),
+		FormatMaybeFloat("%.0f", gpsinfo.Track), FormatMaybeFloat("%.1f", gpsinfo.SpeedKnots),
+		FormatMaybeFloat("%.0f", gpsinfo.Altitude))
+} /* end Print */
 
-// formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
-func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
+// FormatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
+func FormatMaybeFloat(format string, m maybe.Maybe[float64]) string {
 	return maybe.Fold("unknown", func(value float64) string {
 		return fmt.Sprintf(format, value)
 	}, m)
@@ -189,7 +210,7 @@ func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_term
+ * Name:        Term
  *
  * Purpose:    	Shut down GPS interface before exiting from application.
  *
@@ -199,15 +220,15 @@ func formatMaybeFloat(format string, m maybe.Maybe[float64]) string {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_term() {
-	dwgpsnmea_term()
+func Term() {
+	nmeaTerm()
 
-	dwgpsd_term()
-} /* end dwgps_term */
+	gpsdTerm()
+} /* end Term */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgps_set_data
+ * Name:        setData
  *
  * Purpose:     Called by the GPS interfaces when new data is available.
  *
@@ -215,7 +236,7 @@ func dwgps_term() {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_set_data(gpsinfo *dwgps_info_t) {
+func setData(gpsinfo *Info) {
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 	s_gps_mutex.Lock()
@@ -223,6 +244,6 @@ func dwgps_set_data(gpsinfo *dwgps_info_t) {
 	*s_dwgps_info = *gpsinfo
 
 	s_gps_mutex.Unlock()
-} /* end dwgps_set_data */
+} /* end setData */
 
 /* end dwgps.c */

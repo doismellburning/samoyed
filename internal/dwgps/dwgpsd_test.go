@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 import (
 	"testing"
@@ -102,26 +105,26 @@ func Test_parse_gpsd_tpv(t *testing.T) {
 				assert.InDelta(t, tt.wantLat, *report.Lat, 0.00001)
 			}
 
-			var info = new(dwgps_info_t)
+			var info = new(Info)
 			apply_gpsd_tpv(info, report)
 
 			if tt.checkAlt {
-				assert.InDelta(t, tt.wantAlt, maybe.FromJust(info.altitude), 0.001)
+				assert.InDelta(t, tt.wantAlt, maybe.FromJust(info.Altitude), 0.001)
 			}
 
 			if tt.checkSpd {
-				assert.InDelta(t, tt.wantSpeed, maybe.FromJust(info.speed_knots), 0.001)
+				assert.InDelta(t, tt.wantSpeed, maybe.FromJust(info.SpeedKnots), 0.001)
 			}
 		})
 	}
 }
 
 func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
-	var info = new(dwgps_info_t)
-	info.fix = DWFIX_3D
-	info.dlat = maybe.Just(42.0)
-	info.dlon = maybe.Just(-71.0)
-	info.altitude = maybe.Just(10.0)
+	var info = new(Info)
+	info.Fix = Fix3D
+	info.Lat = maybe.Just(42.0)
+	info.Lon = maybe.Just(-71.0)
+	info.Altitude = maybe.Just(10.0)
 
 	var report, err = parse_gpsd_tpv([]byte(`{"class":"TPV","mode":1}`))
 	require.NoError(t, err)
@@ -129,16 +132,16 @@ func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
 
 	apply_gpsd_tpv(info, report)
 
-	assert.Equal(t, DWFIX_NO_FIX, info.fix)
-	assert.InDelta(t, 42.0, maybe.FromJust(info.dlat), 0.00001)
-	assert.InDelta(t, -71.0, maybe.FromJust(info.dlon), 0.00001)
-	assert.InDelta(t, 10.0, maybe.FromJust(info.altitude), 0.00001)
+	assert.Equal(t, FixNoFix, info.Fix)
+	assert.InDelta(t, 42.0, maybe.FromJust(info.Lat), 0.00001)
+	assert.InDelta(t, -71.0, maybe.FromJust(info.Lon), 0.00001)
+	assert.InDelta(t, 10.0, maybe.FromJust(info.Altitude), 0.00001)
 }
 
 func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
-	var info = new(dwgps_info_t)
-	info.fix = DWFIX_3D
-	info.altitude = maybe.Just(123.0)
+	var info = new(Info)
+	info.Fix = Fix3D
+	info.Altitude = maybe.Just(123.0)
 
 	var report, err = parse_gpsd_tpv([]byte(`{"class":"TPV","mode":2,"lat":1.0,"lon":2.0}`))
 	require.NoError(t, err)
@@ -146,23 +149,23 @@ func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
 
 	apply_gpsd_tpv(info, report)
 
-	assert.Equal(t, DWFIX_2D, info.fix)
-	assert.InDelta(t, 123.0, maybe.FromJust(info.altitude), 0.00001)
+	assert.Equal(t, Fix2D, info.Fix)
+	assert.InDelta(t, 123.0, maybe.FromJust(info.Altitude), 0.00001)
 }
 
 func Test_dwgps_info_zero_value_is_nothing_known(t *testing.T) {
-	var info dwgps_info_t
+	var info Info
 
-	assert.Equal(t, DWFIX_NOT_SEEN, info.fix)
-	assert.Equal(t, maybe.Nothing[float64](), info.dlat)
-	assert.Equal(t, maybe.Nothing[float64](), info.dlon)
-	assert.Equal(t, maybe.Nothing[float64](), info.speed_knots)
-	assert.Equal(t, maybe.Nothing[float64](), info.track)
-	assert.Equal(t, maybe.Nothing[float64](), info.altitude)
+	assert.Equal(t, FixNotSeen, info.Fix)
+	assert.Equal(t, maybe.Nothing[float64](), info.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), info.Lon)
+	assert.Equal(t, maybe.Nothing[float64](), info.SpeedKnots)
+	assert.Equal(t, maybe.Nothing[float64](), info.Track)
+	assert.Equal(t, maybe.Nothing[float64](), info.Altitude)
 }
 
 func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
-	var info = new(dwgps_info_t)
+	var info = new(Info)
 
 	// A 2D report from $GPRMC alone carries neither altitude nor, when
 	// stationary, a track.
@@ -171,8 +174,8 @@ func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
 
 	apply_gpsd_tpv(info, report)
 
-	assert.Equal(t, maybe.Just(42.0), info.dlat)
-	assert.Equal(t, maybe.Nothing[float64](), info.track)
-	assert.Equal(t, maybe.Nothing[float64](), info.speed_knots)
-	assert.Equal(t, maybe.Nothing[float64](), info.altitude)
+	assert.Equal(t, maybe.Just(42.0), info.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), info.Track)
+	assert.Equal(t, maybe.Nothing[float64](), info.SpeedKnots)
+	assert.Equal(t, maybe.Nothing[float64](), info.Altitude)
 }

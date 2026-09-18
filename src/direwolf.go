@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/lestrrat-go/strftime"
 	"github.com/spf13/pflag"
@@ -785,7 +786,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(misc_config, d_g_opt)
+	dwgps.Init(dwgpsConfig(misc_config), d_g_opt)
 
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(misc_config)
@@ -1280,7 +1281,7 @@ func cleanup() {
 		packetLogger.Close()
 	}
 	ptt_term()
-	dwgps_term()
+	dwgps.Term()
 
 	if waypointSender != nil {
 		waypointSender.Close()

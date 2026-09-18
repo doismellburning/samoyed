@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -25,36 +28,39 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/textcolor"
 	"github.com/pkg/term"
 )
 
-// TODO KG var s_debug = 0 /* Enable debug output. */
-/* See dwgpsnmea_init description for values. */
+var s_debug = 0 /* Enable debug output. */
+/* See nmeaInit description for values. */
 
-var s_save_configp *misc_config_s
+var s_save_configp *Config
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_init
+ * Name:        nmeaInit
  *
  * Purpose:    	Open serial port for the GPS receiver.
  *
- * Inputs:	pconfig		Configuration settings.  This includes
+ * Inputs:	pconfig		Where to find the GPS.  This includes the
  *				serial port name for direct connect.
  *
- *		debug	- If >= 1, print results when dwgps_read is called.
+ *		debug	- If >= 1, print results when Read is called.
  *				(In different file.)
  *
  *			  If >= 2, location updates are also printed.
  *				(In this file.)
- *				Why not do it in dwgps_set_data() ?
+ *				Why not do it in setData() ?
  *				Here, we can prefix it with GPSNMEA to
  *				distinguish it from GPSD.
  *
@@ -70,9 +76,9 @@ var s_save_configp *misc_config_s
  *			- Open the appropriate serial port.
  *			- Start up thread to process incoming data.
  *			  It reads from the serial port and deposits into
- *			  dwgps_info, above.
+ *			  s_dwgps_info, in dwgps.go.
  *
- * 		The application calls dwgps_read to get the most recent information.
+ * 		The application calls Read to get the most recent information.
  *
  *--------------------------------------------------------------------*/
 
@@ -80,18 +86,18 @@ var s_save_configp *misc_config_s
 
 var s_gpsnmea_port_fd *term.Term
 
-func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
-	//dwgps_info_t info;
+func nmeaInit(pconfig *Config, debug int) int {
+	//Info info;
 	//int e;
 	s_debug = debug
 	s_save_configp = pconfig
 
 	if s_debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dwgpsnmea_init()\n")
+		textcolor.Set(textcolor.Debug)
+		textcolor.Printf("nmeaInit()\n")
 	}
 
-	if pconfig.gpsnmea_port == "" {
+	if pconfig.NMEAPort == "" || pconfig.OpenSerialPort == nil {
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return (0)
 	}
@@ -100,13 +106,13 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	 * Open serial port connection.
 	 */
 
-	s_gpsnmea_port_fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
+	s_gpsnmea_port_fd = pconfig.OpenSerialPort(pconfig.NMEAPort, pconfig.NMEASpeed)
 
 	if s_gpsnmea_port_fd != nil {
 		go read_gpsnmea_thread(s_gpsnmea_port_fd)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
+		textcolor.Set(textcolor.Error)
+		textcolor.Printf("Could not open serial port %s for GPS receiver.\n", pconfig.NMEAPort)
 
 		return (-1)
 	}
@@ -114,12 +120,19 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	/* success */
 
 	return (1)
-} /* end dwgpsnmea_init */
+} /* end nmeaInit */
 
-/* Return fd to share if waypoint wants same device. */
+// SharedNMEAPort is the serial port the GPS is being read from, if that is the
+// same device, at the same speed, as the caller wants - so waypoint output can
+// share a port with GPS input rather than trying to open it a second time.  It
+// is nil if there is no such port, including before Init has run.
 
-func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
-	if s_save_configp.gpsnmea_port == wp_port_name && speed == s_save_configp.gpsnmea_speed {
+func SharedNMEAPort(wp_port_name string, speed int) *term.Term {
+	if s_save_configp == nil {
+		return nil
+	}
+
+	if s_save_configp.NMEAPort == wp_port_name && speed == s_save_configp.NMEASpeed {
 		return (s_gpsnmea_port_fd)
 	}
 
@@ -131,9 +144,12 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
  * Name:        read_gpsnmea_thread
  *
  * Purpose:     Read information from GPS, as it becomes available, and
- *		store it for later retrieval by dwgps_read.
+ *		store it for later retrieval by Read.
  *
- * Inputs:	fd	- File descriptor for serial port.
+ * Inputs:	fd	- The serial port the GPS is connected to.  It is an
+ *			  io.Reader rather than the port itself because
+ *			  reading is all this does with it - closing on error
+ *			  is done through s_gpsnmea_port_fd, below.
  *
  * Description:	This version reads from serial port and parses the
  *		NMEA sentences.
@@ -142,48 +158,53 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
 
 const TIMEOUT = 5
 
-func read_gpsnmea_thread(fd *term.Term) {
+func read_gpsnmea_thread(fd io.Reader) {
 	// Maximum length of message from GPS receiver is 82 according to some people.
 	// Make buffer considerably larger to be safe.
 	const NMEA_MAX_LEN = 160
 
 	if s_debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
+		textcolor.Set(textcolor.Debug)
+		textcolor.Printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
-	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
+	var info = new(Info) /* Zero value is FixNotSeen, nothing else known. */
 
 	if s_debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("GPSNMEA: ", info)
+		textcolor.Set(textcolor.Debug)
+		Print("GPSNMEA: ", info)
 	}
 
-	dwgps_set_data(info)
+	setData(info)
+
+	var reader = bufio.NewReader(fd)
 
 	var gps_msg string
 
 	for {
-		var ch, err = SerialPortGet1(fd)
+		var ch, err = reader.ReadByte()
 		if err != nil {
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */
 			/* a normal serial port. */
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("----------------------------------------------\n")
-			dw_printf("GPSNMEA: Lost communication with GPS receiver.\n")
-			dw_printf("----------------------------------------------\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("----------------------------------------------\n")
+			textcolor.Printf("GPSNMEA: Lost communication with GPS receiver.\n")
+			textcolor.Printf("----------------------------------------------\n")
 
-			info.fix = DWFIX_ERROR
+			info.Fix = FixError
 
 			if s_debug >= 2 {
-				text_color_set(DW_COLOR_DEBUG)
-				dwgps_print("GPSNMEA: ", info)
+				textcolor.Set(textcolor.Debug)
+				Print("GPSNMEA: ", info)
 			}
 
-			dwgps_set_data(info)
+			setData(info)
 
-			serial_port_close(s_gpsnmea_port_fd)
+			if s_gpsnmea_port_fd != nil {
+				s_gpsnmea_port_fd.Close()
+			}
+
 			s_gpsnmea_port_fd = nil
 
 			// TODO: If the open() was in this thread, we could wait a while and
@@ -199,8 +220,8 @@ func read_gpsnmea_thread(fd *term.Term) {
 		case '\r', '\n':
 			if len(gps_msg) >= 6 && gps_msg[0] == '$' {
 				if s_debug >= 3 {
-					text_color_set(DW_COLOR_DEBUG)
-					dw_printf("%s\n", gps_msg)
+					textcolor.Set(textcolor.Debug)
+					textcolor.Printf("%s\n", gps_msg)
 				}
 
 				/* Process sentence. */
@@ -209,54 +230,54 @@ func read_gpsnmea_thread(fd *term.Term) {
 				if strings.HasPrefix(gps_msg, "$GPRMC") || strings.HasPrefix(gps_msg, "$GNRMC") {
 					// Here we just tuck away the course and speed.
 					// Fix and location will be updated by GxGGA.
-					var f = dwgpsnmea_gprmc(gps_msg, false)
+					var f = ParseGPRMC(gps_msg, false)
 
-					if f.Fix == DWFIX_ERROR {
+					if f.Fix == FixError {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
-						dw_printf("%s\n", gps_msg)
+						textcolor.Set(textcolor.Error)
+						textcolor.Printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
+						textcolor.Printf("%s\n", gps_msg)
 					} else {
-						info.speed_knots = f.Knots.Or(info.speed_knots)
-						info.track = f.Course.Or(info.track)
+						info.SpeedKnots = f.Knots.Or(info.SpeedKnots)
+						info.Track = f.Course.Or(info.Track)
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
-					var f = dwgpsnmea_gpgga(gps_msg, false)
+					var f = ParseGPGGA(gps_msg, false)
 
-					if f.Fix == DWFIX_ERROR {
+					if f.Fix == FixError {
 						/* Parse error.  Shouldn't happen.  Better luck next time. */
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
-						dw_printf("%s\n", gps_msg)
+						textcolor.Set(textcolor.Error)
+						textcolor.Printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
+						textcolor.Printf("%s\n", gps_msg)
 					} else {
-						info.dlat = f.Lat.Or(info.dlat)
-						info.dlon = f.Lon.Or(info.dlon)
-						info.altitude = f.Alt.Or(info.altitude)
+						info.Lat = f.Lat.Or(info.Lat)
+						info.Lon = f.Lon.Or(info.Lon)
+						info.Altitude = f.Alt.Or(info.Altitude)
 
-						if f.Fix != info.fix { // Print change in location fix.
-							text_color_set(DW_COLOR_INFO)
+						if f.Fix != info.Fix { // Print change in location fix.
+							textcolor.Set(textcolor.Info)
 
 							switch f.Fix {
-							case DWFIX_NO_FIX:
-								dw_printf("GPSNMEA: Location fix has been lost.\n")
-							case DWFIX_2D:
-								dw_printf("GPSNMEA: Location fix is now 2D.\n")
-							case DWFIX_3D:
-								dw_printf("GPSNMEA: Location fix is now 3D.\n")
+							case FixNoFix:
+								textcolor.Printf("GPSNMEA: Location fix has been lost.\n")
+							case Fix2D:
+								textcolor.Printf("GPSNMEA: Location fix is now 2D.\n")
+							case Fix3D:
+								textcolor.Printf("GPSNMEA: Location fix is now 3D.\n")
 							default:
 							}
 
-							info.fix = f.Fix
+							info.Fix = f.Fix
 						}
 
-						info.timestamp = time.Now()
+						info.Timestamp = time.Now()
 
 						if s_debug >= 2 {
-							text_color_set(DW_COLOR_DEBUG)
-							dwgps_print("GPSNMEA: ", info)
+							textcolor.Set(textcolor.Debug)
+							Print("GPSNMEA: ", info)
 						}
 
-						dwgps_set_data(info)
+						setData(info)
 					}
 				}
 			}
@@ -290,8 +311,8 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 	var msg, checksumStr, found = strings.Cut(sent, "*")
 	if !found {
 		if !quiet {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Missing GPS checksum.\n")
+			textcolor.Set(textcolor.Info)
+			textcolor.Printf("Missing GPS checksum.\n")
 		}
 
 		return "", errors.New("missing GPS checksum")
@@ -308,8 +329,8 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 		var errorMsg = fmt.Sprintf("GPS checksum error. Expected %02x but found %s", calculatedChecksum, checksumStr)
 
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s.\n", errorMsg)
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("%s.\n", errorMsg)
 		}
 
 		return "", errors.New(errorMsg)
@@ -320,7 +341,7 @@ func remove_checksum(sent string, quiet bool) (string, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_gprmc
+ * Name:        ParseGPRMC
  *
  * Purpose:    	Parse $GPRMC sentence and extract interesting parts.
  *
@@ -337,9 +358,9 @@ func remove_checksum(sent string, quiet bool) (string, error) {
  *
  * Note:	RMC does not contain altitude.
  *
- * Returns:	DWFIX_ERROR	Parse error.
- *		DWFIX_NO_FIX	GPS is there but Position unknown.  Could be temporary.
- *		DWFIX_2D	Valid position.   We don't know if it is really 2D or 3D.
+ * Returns:	FixError	Parse error.
+ *		FixNoFix	GPS is there but Position unknown.  Could be temporary.
+ *		Fix2D	Valid position.   We don't know if it is really 2D or 3D.
  *
  * Examples:	$GPRMC,001431.00,V,,,,,,,121015,,,N*7C
  *		$GPRMC,212404.000,V,4237.1505,N,07120.8602,W,,,150614,,*0B
@@ -353,18 +374,18 @@ type GPRMCResult struct {
 	Lon    maybe.Maybe[float64]
 	Knots  maybe.Maybe[float64]
 	Course maybe.Maybe[float64]
-	Fix    dwfix_t
+	Fix    Fix
 }
 
-func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
+func ParseGPRMC(sentence string, quiet bool) *GPRMCResult {
 	var result = new(GPRMCResult)
 
 	// TODO Default to Error, because that's what most returns are? On the other hand it's good to be explicit...
-	result.Fix = DWFIX_NO_FIX
+	result.Fix = FixNoFix
 
 	sentence, err := remove_checksum(sentence, quiet)
 	if err != nil {
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
@@ -393,30 +414,30 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 
 	if pstatus != "" && len(pstatus) == 1 {
 		if pstatus != "A" {
-			result.Fix = DWFIX_NO_FIX
+			result.Fix = FixNoFix
 
 			return result /* Not "Active." Don't parse. */
 		}
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("No status in GPRMC sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("No status in GPRMC sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		var lat, latErr = latitude_from_nmea(plat, pns[0])
+		var lat, latErr = LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get latitude from GPRMC sentence: %v\n", latErr)
+				textcolor.Set(textcolor.Error)
+				textcolor.Printf("Can't get latitude from GPRMC sentence: %v\n", latErr)
 			}
 
-			result.Fix = DWFIX_ERROR
+			result.Fix = FixError
 
 			return result
 		}
@@ -424,24 +445,24 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		result.Lat = maybe.Just(lat)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get latitude from GPRMC sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("Can't get latitude from GPRMC sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		var lon, lonErr = longitude_from_nmea(plon, pew[0])
+		var lon, lonErr = LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get longitude from GPRMC sentence: %v\n", lonErr)
+				textcolor.Set(textcolor.Error)
+				textcolor.Printf("Can't get longitude from GPRMC sentence: %v\n", lonErr)
 			}
 
-			result.Fix = DWFIX_ERROR
+			result.Fix = FixError
 
 			return result
 		}
@@ -449,11 +470,11 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		result.Lon = maybe.Just(lon)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get longitude from GPRMC sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("Can't get longitude from GPRMC sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
@@ -463,11 +484,11 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		result.Knots = unlessUnknown(knots)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get speed from GPRMC sentence: %s\n", knotsErr)
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("Can't get speed from GPRMC sentence: %s\n", knotsErr)
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
@@ -479,17 +500,17 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	/* When stationary, this field might be empty, and Course stays Nothing. */
 	/* A parsed value can still be the G_UNKNOWN sentinel, hence unlessUnknown. */
 
-	//text_color_set (DW_COLOR_INFO);
-	//dw_printf("%.6f %.6f %.1f %.0f\n", *odlat, *odlon, *oknots, *ocourse);
+	//textcolor.Set(textcolor.Info)
+	//textcolor.Printf("%.6f %.6f %.1f %.0f\n", *odlat, *odlon, *oknots, *ocourse);
 
-	result.Fix = DWFIX_2D
+	result.Fix = Fix2D
 
 	return result
-} /* end dwgpsnmea_gprmc */
+} /* end ParseGPRMC */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_gpgga
+ * Name:        ParseGPGGA
  *
  * Purpose:    	Parse $GPGGA sentence and extract interesting parts.
  *
@@ -506,11 +527,11 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
  *
  * Note:	GGA has altitude but not course and speed so we need to use both.
  *
- * Returns:	DWFIX_ERROR	Parse error.
- *		DWFIX_NO_FIX	GPS is there but Position unknown.  Could be temporary.
- *		DWFIX_2D	Valid position.   We don't know if it is really 2D or 3D.
+ * Returns:	FixError	Parse error.
+ *		FixNoFix	GPS is there but Position unknown.  Could be temporary.
+ *		Fix2D	Valid position.   We don't know if it is really 2D or 3D.
  *				Take more cautious value so we don't try using altitude.
- *		DWFIX_3D	Valid 3D position.
+ *		Fix3D	Valid 3D position.
  *
  * Examples:	$GPGGA,001429.00,,,,,0,00,99.99,,,,,,*68
  *		$GPGGA,212407.000,4237.1505,N,07120.8602,W,0,00,,,M,,M,,*58
@@ -524,17 +545,17 @@ type GPGGAResult struct {
 	Lon maybe.Maybe[float64]
 	Alt maybe.Maybe[float64]
 	Sat maybe.Maybe[int]
-	Fix dwfix_t
+	Fix Fix
 }
 
-func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
+func ParseGPGGA(sentence string, quiet bool) *GPGGAResult {
 	var result = new(GPGGAResult)
 
-	result.Fix = DWFIX_NO_FIX
+	result.Fix = FixNoFix
 
 	sentence, err := remove_checksum(sentence, quiet)
 	if err != nil {
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
@@ -571,30 +592,30 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 
 	if len(pfix) == 1 {
 		if pfix == "0" {
-			result.Fix = DWFIX_NO_FIX /* No Fix. Don't parse the rest. */
+			result.Fix = FixNoFix /* No Fix. Don't parse the rest. */
 
 			return result
 		}
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("No fix in GPGGA sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("No fix in GPGGA sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		var lat, latErr = latitude_from_nmea(plat, pns[0])
+		var lat, latErr = LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get latitude from GPGGA sentence: %v\n", latErr)
+				textcolor.Set(textcolor.Error)
+				textcolor.Printf("Can't get latitude from GPGGA sentence: %v\n", latErr)
 			}
 
-			result.Fix = DWFIX_ERROR
+			result.Fix = FixError
 
 			return result
 		}
@@ -602,24 +623,24 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		result.Lat = maybe.Just(lat)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get latitude from GPGGA sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("Can't get latitude from GPGGA sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		var lon, lonErr = longitude_from_nmea(plon, pew[0])
+		var lon, lonErr = LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't get longitude from GPGGA sentence: %v\n", lonErr)
+				textcolor.Set(textcolor.Error)
+				textcolor.Printf("Can't get longitude from GPGGA sentence: %v\n", lonErr)
 			}
 
-			result.Fix = DWFIX_ERROR
+			result.Fix = FixError
 
 			return result
 		}
@@ -627,11 +648,11 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		result.Lon = maybe.Just(lon)
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get longitude from GPGGA sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("Can't get longitude from GPGGA sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
@@ -648,37 +669,37 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 			var altitude, altitudeErr = strconv.ParseFloat(paltitude, 64)
 			if altitudeErr == nil {
 				result.Alt = unlessUnknown(altitude)
-				result.Fix = DWFIX_3D
+				result.Fix = Fix3D
 			} else {
 				if !quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Can't get altitude from GPGGA sentence: %s\n", altitudeErr)
+					textcolor.Set(textcolor.Error)
+					textcolor.Printf("Can't get altitude from GPGGA sentence: %s\n", altitudeErr)
 				}
 
-				result.Fix = DWFIX_ERROR
+				result.Fix = FixError
 
 				return result
 			}
 		} else {
-			result.Fix = DWFIX_2D
+			result.Fix = Fix2D
 		}
 
 		return result
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get altitude from GPGGA sentence.\n")
+			textcolor.Set(textcolor.Error)
+			textcolor.Printf("Can't get altitude from GPGGA sentence.\n")
 		}
 
-		result.Fix = DWFIX_ERROR
+		result.Fix = FixError
 
 		return result
 	}
-} /* end dwgpsnmea_gpgga */
+} /* end ParseGPGGA */
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsnmea_term
+ * Name:        nmeaTerm
  *
  * Purpose:    	Shut down GPS interface before exiting from application.
  *
@@ -688,13 +709,13 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsnmea_term() {
+func nmeaTerm() {
 
 	// Should probably kill reader thread before closing device to avoid
 	// message about read error.
 
-	// serial_port_close (s_gpsnmea_port_fd);
+	// s_gpsnmea_port_fd.Close()
 
-} /* end dwgps_term */
+} /* end nmeaTerm */
 
 /* end dwgpsnmea.c */

@@ -1,5 +1,8 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 //nolint:gochecknoglobals
-package direwolf
+package dwgps
 
 /*------------------------------------------------------------------
  *
@@ -24,6 +27,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/textcolor"
 )
 
 /* Knots per meter/second. */
@@ -44,9 +48,9 @@ var errNotTPV = errors.New("gpsd report is not a TPV")
 
 // gpsdClient holds the state for the connection to the gpsd daemon.
 //
-// debug is set once in dwgpsd_init, before the reader goroutine is started, and
+// debug is set once in gpsdInit, before the reader goroutine is started, and
 // only read afterwards, so it doesn't need mutex protection. conn is touched by
-// both dwgpsd_term (caller's goroutine) and read_gpsd_thread (reader goroutine),
+// both gpsdTerm (caller's goroutine) and read_gpsd_thread (reader goroutine),
 // so it's guarded by mu.
 type gpsdClient struct {
 	debug int
@@ -90,14 +94,14 @@ func (c *gpsdClient) closeAndClear() {
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsd_init
+ * Name:        gpsdInit
  *
  * Purpose:    	Initialize the GPSD interface.
  *
- * Inputs:	pconfig		Configuration settings.  This includes
+ * Inputs:	pconfig		Where to find the GPS.  This includes the
  *				host name/address and port for gpsd.
  *
- *		debug	- If >= 1, print results when dwgps_read is called.
+ *		debug	- If >= 1, print results when Read is called.
  *				(In dwgps.go.)
  *
  *			  If >= 2, location updates are also printed.
@@ -111,36 +115,36 @@ func (c *gpsdClient) closeAndClear() {
  *		- Enable streaming of JSON reports.
  *		- Start up thread to process incoming data.
  *		  It reads from the daemon and deposits into
- *		  shared region via dwgps_set_data.
+ *		  shared region via setData.
  *
- * 		The application calls dwgps_read to get the most
+ * 		The application calls Read to get the most
  *		recent information.
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_init(pconfig *misc_config_s, debug int) int {
+func gpsdInit(pconfig *Config, debug int) int {
 	s_gpsd.debug = debug
 
 	if s_gpsd.debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("dwgpsd_init()\n")
+		textcolor.Set(textcolor.Debug)
+		textcolor.Printf("gpsdInit()\n")
 	}
 
-	if pconfig.gpsd_host == "" {
+	if pconfig.GPSDHost == "" {
 		/* Nothing to do.  Leave initial fix value for not init. */
 		return 0
 	}
 
-	var addr = net.JoinHostPort(pconfig.gpsd_host, strconv.Itoa(pconfig.gpsd_port))
+	var addr = net.JoinHostPort(pconfig.GPSDHost, strconv.Itoa(pconfig.GPSDPort))
 
 	var dialCtx, cancelDial = context.WithTimeout(context.Background(), GPSD_CONNECT_TIMEOUT)
 	defer cancelDial()
 
 	var conn, connErr = new(net.Dialer).DialContext(dialCtx, "tcp", addr)
 	if connErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to connect to GPSD stream at %s.\n", addr)
-		dw_printf("%v\n", connErr)
+		textcolor.Set(textcolor.Error)
+		textcolor.Printf("Unable to connect to GPSD stream at %s.\n", addr)
+		textcolor.Printf("%v\n", connErr)
 
 		return -1
 	}
@@ -149,9 +153,9 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
 
 	var _, writeErr = conn.Write([]byte("?WATCH={\"enable\":true,\"json\":true}\n"))
 	if writeErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start GPSD watch at %s.\n", addr)
-		dw_printf("%v\n", writeErr)
+		textcolor.Set(textcolor.Error)
+		textcolor.Printf("Unable to start GPSD watch at %s.\n", addr)
+		textcolor.Printf("%v\n", writeErr)
 
 		conn.Close()
 
@@ -172,7 +176,7 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
  * Name:        read_gpsd_thread
  *
  * Purpose:     Read information from GPSD, as it becomes available, and
- *		store it for later retrieval by dwgps_read.
+ *		store it for later retrieval by Read.
  *
  * Inputs:	conn	- Connection to gpsd daemon.
  *
@@ -184,18 +188,18 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
 
 func read_gpsd_thread(conn net.Conn) {
 	if s_gpsd.debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("read_gpsd_thread (%+v)\n", conn)
+		textcolor.Set(textcolor.Debug)
+		textcolor.Printf("read_gpsd_thread (%+v)\n", conn)
 	}
 
-	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
+	var info = new(Info) /* Zero value is FixNotSeen, nothing else known. */
 
 	if s_gpsd.debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("GPSD: ", info)
+		textcolor.Set(textcolor.Debug)
+		Print("GPSD: ", info)
 	}
 
-	dwgps_set_data(info)
+	setData(info)
 
 	var scanner = bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 4096), 1<<20)
@@ -208,31 +212,31 @@ func read_gpsd_thread(conn net.Conn) {
 
 		apply_gpsd_tpv(info, report)
 
-		info.timestamp = time.Now()
+		info.Timestamp = time.Now()
 
 		if s_gpsd.debug >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dwgps_print("GPSD: ", info)
+			textcolor.Set(textcolor.Debug)
+			Print("GPSD: ", info)
 		}
 
-		dwgps_set_data(info)
+		setData(info)
 	}
 
 	/* Lost connection to gpsd, e.g. it was stopped or the network dropped. */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("------------------------------------------\n")
-	dw_printf("GPSD: Lost communication with gpsd server.\n")
-	dw_printf("------------------------------------------\n")
+	textcolor.Set(textcolor.Error)
+	textcolor.Printf("------------------------------------------\n")
+	textcolor.Printf("GPSD: Lost communication with gpsd server.\n")
+	textcolor.Printf("------------------------------------------\n")
 
-	info.fix = DWFIX_ERROR
+	info.Fix = FixError
 
 	if s_gpsd.debug >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("GPSD: ", info)
+		textcolor.Set(textcolor.Debug)
+		Print("GPSD: ", info)
 	}
 
-	dwgps_set_data(info)
+	setData(info)
 
 	s_gpsd.clearConnIfCurrent(conn)
 
@@ -247,7 +251,7 @@ func read_gpsd_thread(conn net.Conn) {
  *
  * Description:	Fields are pointers so we can tell "absent" from "zero",
  *		which is the same distinction maybe.Maybe makes once the
- *		report reaches dwgps_info_t.
+ *		report reaches Info.
  *
  *		altMSL is the current field name for altitude above mean
  *		sea level; older gpsd versions (< 3.20) called it "alt".
@@ -289,41 +293,41 @@ func parse_gpsd_tpv(line []byte) (*gpsdTPV, error) {
 	return report, nil
 }
 
-func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
-	var newFix dwfix_t
+func apply_gpsd_tpv(info *Info, report *gpsdTPV) {
+	var newFix Fix
 
 	switch {
 	case report.Mode >= 3:
-		newFix = DWFIX_3D
+		newFix = Fix3D
 	case report.Mode == 2:
-		newFix = DWFIX_2D
+		newFix = Fix2D
 	default:
-		newFix = DWFIX_NO_FIX
+		newFix = FixNoFix
 	}
 
-	if newFix != info.fix {
-		text_color_set(DW_COLOR_INFO)
+	if newFix != info.Fix {
+		textcolor.Set(textcolor.Info)
 
 		switch newFix {
-		case DWFIX_NO_FIX:
-			dw_printf("GPSD: Location fix has been lost.\n")
-		case DWFIX_2D:
-			dw_printf("GPSD: Location fix is now 2D.\n")
-		case DWFIX_3D:
-			dw_printf("GPSD: Location fix is now 3D.\n")
+		case FixNoFix:
+			textcolor.Printf("GPSD: Location fix has been lost.\n")
+		case Fix2D:
+			textcolor.Printf("GPSD: Location fix is now 2D.\n")
+		case Fix3D:
+			textcolor.Printf("GPSD: Location fix is now 3D.\n")
 		default:
 		}
 	}
 
-	info.fix = newFix
+	info.Fix = newFix
 
-	if newFix < DWFIX_2D {
+	if newFix < Fix2D {
 		/* Keep the last known location; it's better than totally lost. */
 		return
 	}
 
-	info.dlat = maybe.FromPointer(report.Lat).Or(info.dlat)
-	info.dlon = maybe.FromPointer(report.Lon).Or(info.dlon)
+	info.Lat = maybe.FromPointer(report.Lat).Or(info.Lat)
+	info.Lon = maybe.FromPointer(report.Lon).Or(info.Lon)
 
 	/*
 	 * gpsd doesn't repeat every field on every TPV report - one derived from
@@ -334,23 +338,23 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
 	 * is Nothing.
 	 */
 
-	info.track = maybe.FromPointer(report.Track).Or(info.track)
+	info.Track = maybe.FromPointer(report.Track).Or(info.Track)
 
 	var knots = maybe.Fmap(func(mps float64) float64 { return mps * MPS_TO_KNOTS }, maybe.FromPointer(report.Speed))
-	info.speed_knots = knots.Or(info.speed_knots)
+	info.SpeedKnots = knots.Or(info.SpeedKnots)
 
-	if newFix >= DWFIX_3D {
-		info.altitude = maybe.FromPointer(report.AltMSL).
+	if newFix >= Fix3D {
+		info.Altitude = maybe.FromPointer(report.AltMSL).
 			Or(maybe.FromPointer(report.Alt)).
-			Or(info.altitude)
+			Or(info.Altitude)
 	}
 	/* Otherwise keep last known altitude when we downgrade from 3D to 2D fix. */
-	/* Caller knows altitude is outdated if info.fix == DWFIX_2D. */
+	/* Caller knows altitude is outdated if info.Fix == Fix2D. */
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        dwgpsd_term
+ * Name:        gpsdTerm
  *
  * Purpose:    	Shut down GPSD interface before exiting from application.
  *
@@ -360,6 +364,6 @@ func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_term() {
+func gpsdTerm() {
 	s_gpsd.closeAndClear()
 }

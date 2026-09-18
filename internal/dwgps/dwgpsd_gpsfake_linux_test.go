@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dwgps
 
 // Integration test against a real gpsd, driven by gpsfake (from the gpsd-clients
 // package) replaying a canned NMEA log. Linux only, since gpsfake feeds gpsd
@@ -88,17 +91,17 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	startGpsfake(t, port)
 
-	var config = new(misc_config_s)
-	config.gpsd_host = "127.0.0.1"
-	config.gpsd_port = port
+	var config = new(Config)
+	config.GPSDHost = "127.0.0.1"
+	config.GPSDPort = port
 
-	require.Equal(t, 1, dwgpsd_init(config, 3))
+	require.Equal(t, 1, gpsdInit(config, 3))
 
-	t.Cleanup(dwgpsd_term)
+	t.Cleanup(gpsdTerm)
 
-	var info = new(dwgps_info_t)
+	var info = new(Info)
 
-	var fix dwfix_t
+	var fix Fix
 
 	// gpsd emits several TPV reports per cycle as each NMEA sentence arrives:
 	// a 2D-only one from $GPRMC, then a 3D one still without altitude, then
@@ -106,18 +109,32 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	// for that last one rather than just the first 3D report.
 	var deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		fix = dwgps_read(info)
-		if fix >= DWFIX_3D && info.altitude.IsJust() {
+		fix = Read(info)
+		if fix >= Fix3D && info.Altitude.IsJust() {
 			break
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	require.GreaterOrEqual(t, fix, DWFIX_3D, "never got a 3D location fix from gpsd")
-	require.True(t, info.altitude.IsJust(), "never got an altitude from gpsd")
+	require.GreaterOrEqual(t, fix, Fix3D, "never got a 3D location fix from gpsd")
+	require.True(t, info.Altitude.IsJust(), "never got an altitude from gpsd")
 
-	assert.InDelta(t, 42.6187, maybe.FromJust(info.dlat), 0.001)
-	assert.InDelta(t, -71.3472, maybe.FromJust(info.dlon), 0.001)
-	assert.InDelta(t, 33.5, maybe.FromJust(info.altitude), 0.001)
+	assert.InDelta(t, 42.6187, maybe.FromJust(info.Lat), 0.001)
+	assert.InDelta(t, -71.3472, maybe.FromJust(info.Lon), 0.001)
+	assert.InDelta(t, 33.5, maybe.FromJust(info.Altitude), 0.001)
+}
+
+// freeTCPPort returns a loopback port that was free a moment ago.
+func freeTCPPort(t *testing.T) int {
+	t.Helper()
+
+	var l, err = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	var port = l.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
+
+	require.NoError(t, l.Close())
+
+	return port
 }

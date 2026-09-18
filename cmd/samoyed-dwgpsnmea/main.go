@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	direwolf "github.com/doismellburning/samoyed/src"
 )
 
@@ -21,18 +22,18 @@ func main() {
 		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
 
 		switch fix {
-		case int(direwolf.DWFIX_2D), int(direwolf.DWFIX_3D):
+		case dwgps.Fix2D, dwgps.Fix3D:
 			fmt.Printf("%.6f  %.6f", lat, lon)
 			fmt.Printf("  %.1f knots  %.0f degrees", speedKnots, track)
 
-			if fix == int(direwolf.DWFIX_3D) {
+			if fix == dwgps.Fix3D {
 				fmt.Printf("  altitude = %.1f meters", altitude)
 			}
 
 			fmt.Printf("\n")
-		case int(direwolf.DWFIX_NOT_SEEN), int(direwolf.DWFIX_NO_FIX):
+		case dwgps.FixNotSeen, dwgps.FixNoFix:
 			fmt.Printf("Location currently not available.\n")
-		case int(direwolf.DWFIX_NOT_INIT):
+		case dwgps.FixNotInit:
 			fmt.Printf("GPS Init failed.\n")
 			os.Exit(1)
 		default:

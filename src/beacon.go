@@ -13,6 +13,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -118,10 +119,10 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 				case BEACON_TRACKER:
 					{
-						var gpsinfo dwgps_info_t
+						var gpsinfo dwgps.Info
 
-						var fix = dwgps_read(&gpsinfo)
-						if fix == DWFIX_NOT_INIT {
+						var fix = dwgps.Read(&gpsinfo)
+						if fix == dwgps.FixNotInit {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
 							bs.miscConfig.beacon[j].btype = BEACON_IGNORE
@@ -376,11 +377,11 @@ func (bs *BeaconService) thread() {
 		 * This needs to be done before the next scheduled tracker
 		 * beacon because corner pegging make it sooner.
 		 */
-		var gpsinfo dwgps_info_t
+		var gpsinfo dwgps.Info
 
 		if number_of_tbeacons > 0 {
-			var fix = dwgps_read(&gpsinfo)
-			var my_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots)
+			var fix = dwgps.Read(&gpsinfo)
+			var my_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 
 			if bs.trackerDebugLevel >= 1 {
 				var hms = now.Format("15:04:05")
@@ -388,15 +389,15 @@ func (bs *BeaconService) thread() {
 				text_color_set(DW_COLOR_DEBUG)
 
 				switch fix {
-				case DWFIX_3D:
+				case dwgps.Fix3D:
 					dw_printf("%s  3D, %s, %s, %s mph, %s\xc2\xb0, %s m\n", hms,
-						formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
-						formatMaybeFloat("%.1f", my_speed_mph), formatMaybeFloat("%.0f", gpsinfo.track),
-						formatMaybeFloat("%.1f", gpsinfo.altitude))
-				case DWFIX_2D:
+						dwgps.FormatMaybeFloat("%.6f", gpsinfo.Lat), dwgps.FormatMaybeFloat("%.6f", gpsinfo.Lon),
+						dwgps.FormatMaybeFloat("%.1f", my_speed_mph), dwgps.FormatMaybeFloat("%.0f", gpsinfo.Track),
+						dwgps.FormatMaybeFloat("%.1f", gpsinfo.Altitude))
+				case dwgps.Fix2D:
 					dw_printf("%s  2D, %s, %s, %s mph, %s\xc2\xb0\n", hms,
-						formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
-						formatMaybeFloat("%.1f", my_speed_mph), formatMaybeFloat("%.0f", gpsinfo.track))
+						dwgps.FormatMaybeFloat("%.6f", gpsinfo.Lat), dwgps.FormatMaybeFloat("%.6f", gpsinfo.Lon),
+						dwgps.FormatMaybeFloat("%.1f", my_speed_mph), dwgps.FormatMaybeFloat("%.0f", gpsinfo.Track))
 				default:
 					dw_printf("%s  No GPS fix\n", hms)
 				}
@@ -408,9 +409,9 @@ func (bs *BeaconService) thread() {
 			/*
 			 * Run SmartBeaconing calculation if configured and GPS data available.
 			 */
-			if bs.miscConfig.sb_configured && fix >= DWFIX_2D {
+			if bs.miscConfig.sb_configured && fix >= dwgps.Fix2D {
 				var tnext = bs.sbCalculateNextTime(now,
-					my_speed_mph, gpsinfo.track,
+					my_speed_mph, gpsinfo.Track,
 					sb_prev_time, sb_prev_course)
 
 				for j := range bs.miscConfig.num_beacons {
@@ -443,7 +444,7 @@ func (bs *BeaconService) thread() {
 				/* Easy for fixed interval.  SmartBeaconing takes more effort. */
 
 				if bp.btype == BEACON_TRACKER {
-					if gpsinfo.fix < DWFIX_2D {
+					if gpsinfo.Fix < dwgps.Fix2D {
 						/* Fix not available so beacon was not sent. */
 						if bs.miscConfig.sb_configured {
 							/* Try again in a couple seconds. */
@@ -457,10 +458,10 @@ func (bs *BeaconService) thread() {
 						/* Remember most recent tracker beacon. */
 						/* Compute next time if not turning. */
 						sb_prev_time = now
-						sb_prev_course = gpsinfo.track
+						sb_prev_course = gpsinfo.Track
 
 						bp.next = bs.sbCalculateNextTime(now,
-							maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots), gpsinfo.track,
+							maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots), gpsinfo.Track,
 							sb_prev_time, sb_prev_course)
 					} else {
 						/* Tracker beacon, fixed spacing. */
@@ -571,7 +572,7 @@ func (bs *BeaconService) sbCalculateNextTime(
 
 	if bs.trackerDebugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %s MPH\n", beacon_rate, formatMaybeFloat("%.1f", current_speed_mph))
+		dw_printf("SmartBeaconing: Beacon Rate = %d seconds for %s MPH\n", beacon_rate, dwgps.FormatMaybeFloat("%.1f", current_speed_mph))
 	}
 
 	var next_time = last_xmit_time.Add(time.Duration(beacon_rate) * time.Second)
@@ -620,7 +621,7 @@ func (bs *BeaconService) sbCalculateNextTime(
  *
  *--------------------------------------------------------------------*/
 
-func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
+func (bs *BeaconService) send(j int, gpsinfo *dwgps.Info) {
 	var bp = &(bs.miscConfig.beacon[j])
 
 	if bp.sendto_chan < 0 {
@@ -726,23 +727,23 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			bp.freq, bp.tone, bp.offset, super_comment)
 
 	case BEACON_TRACKER:
-		if gpsinfo.fix >= DWFIX_2D {
+		if gpsinfo.Fix >= dwgps.Fix2D {
 			/* Transmit altitude only if user asked for it. */
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
 			var my_alt_ft maybe.Maybe[int]
-			if gpsinfo.fix >= DWFIX_3D && bp.alt_m > 0 {
+			if gpsinfo.Fix >= dwgps.Fix3D && bp.alt_m > 0 {
 				my_alt_ft = maybe.Fmap(func(meters float64) int {
 					return int(math.Round(DW_METERS_TO_FEET(meters)))
-				}, gpsinfo.altitude)
+				}, gpsinfo.Altitude)
 			}
 
 			/* Round to nearest integer, retaining unknown state. */
-			var coarse = maybe.Fmap(func(degrees float64) int { return int(math.Round(degrees)) }, gpsinfo.track)
-			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.speed_knots)
+			var coarse = maybe.Fmap(func(degrees float64) int { return int(math.Round(degrees)) }, gpsinfo.Track)
+			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.SpeedKnots)
 
 			beacon_text += EncodePosition(bp.messaging, bp.compress,
-				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, orUnknown(my_alt_ft),
+				orUnknown(gpsinfo.Lat), orUnknown(gpsinfo.Lon), bp.ambiguity, orUnknown(my_alt_ft),
 				bp.symtab, bp.symbol,
 				int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 				orUnknown(coarse), orUnknown(knots),
@@ -762,11 +763,11 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				A.g_src = mycall
 				A.g_symbol_table = bp.symtab
 				A.g_symbol_code = bp.symbol
-				A.g_lat = gpsinfo.dlat
-				A.g_lon = gpsinfo.dlon
-				A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.speed_knots)
+				A.g_lat = gpsinfo.Lat
+				A.g_lon = gpsinfo.Lon
+				A.g_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 				A.g_course = maybe.Fmap(func(degrees int) float64 { return float64(degrees) }, coarse)
-				A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.altitude)
+				A.g_altitude_ft = maybe.Fmap(DW_METERS_TO_FEET, gpsinfo.Altitude)
 
 				/* Fake channel of 999 to distinguish from real data. */
 				var alevel ALevel

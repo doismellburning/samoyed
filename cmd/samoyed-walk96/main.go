@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/dwgps"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/pkg/term"
 )
@@ -53,7 +54,7 @@ func main() {
 	for range HOWLONG {
 		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
 
-		if fix > int(direwolf.DWFIX_2D) {
+		if fix > dwgps.Fix2D {
 			walk96(fix, lat, lon, speedKnots, track, altitude)
 		} else if fix < 0 {
 			fmt.Printf("Can't communicate with GPS receiver.\n")
@@ -76,7 +77,7 @@ var sequence = 0
 
 /* Should be called once per second. */
 
-func walk96(fix int, lat float64, lon float64, knots float64, course float64, alt float64) { //nolint:unparam
+func walk96(fix dwgps.Fix, lat float64, lon float64, knots float64, course float64, alt float64) { //nolint:unparam
 	sequence++
 	var comment = fmt.Sprintf("Sequence number %04d", sequence)
 
