@@ -559,14 +559,12 @@ func cm108_write(name string, iomask int, iodata int) int {
 	// Just for fun, let's get the device information.
 
 	var info, ioctlErr = unix.IoctlHIDGetRawInfo(int(fd.Fd()))
-	if ioctlErr == nil {
-		if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", name, ioctlErr)
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
-		}
+	if ioctlErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %v.\n", name, ioctlErr)
+	} else if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
 	}
 
 	// To make a long story short, I think we need 0 for the first two bytes.
