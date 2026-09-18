@@ -6,6 +6,8 @@ import (
 	"math"
 	"runtime"
 	"time"
+
+	"github.com/doismellburning/samoyed/internal/textcolor"
 )
 
 func SLEEP_MS(ms int) {
@@ -36,9 +38,7 @@ func ByteArrayToString(b []byte) string {
 }
 
 func dw_printf(format string, a ...any) (int, error) {
-	// Can't call variadic functions through cgo, so let's define our own!
-	// Fortunately dw_printf doesn't do much
-	return fmt.Printf(format, a...)
+	return textcolor.Printf(format, a...)
 }
 
 // ACHAN2ADEV is `#define ACHAN2ADEV(n) ((n)>>1)`.
