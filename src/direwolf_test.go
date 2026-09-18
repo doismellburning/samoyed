@@ -61,7 +61,7 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 		'/', 's',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		course, speed,
-		0, 0, 0, "")
+		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	// The course/speed data extension is "ccc/sss" straight after the symbol.
 	assert.Equal(t, ";366730000*111111z4221.60N/07103.60Ws", info)
@@ -88,7 +88,7 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 		'/', 's',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		course, speed,
-		0, 0, 0, "")
+		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	assert.Equal(t, ";366730000*111111z4221.60N/07103.60Ws090/021", info)
 }

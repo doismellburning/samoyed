@@ -383,29 +383,30 @@ func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) str
  *
  *----------------------------------------------------------------*/
 
-func frequency_spec(freq float64, tone float64, offset float64) string {
+func frequency_spec(freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64]) string {
 	var result string
 
-	if freq > 0 {
+	var megahertz = maybe.FromMaybe(0, freq)
+	if megahertz > 0 {
 		/* TODO: Should use letters for > 999.999. */
 		/* For now, just be sure we have proper field width. */
-		if freq > 999.999 {
-			freq = 999.999
+		if megahertz > 999.999 {
+			megahertz = 999.999
 		}
 
-		result += fmt.Sprintf("%07.3fMHz ", freq)
+		result += fmt.Sprintf("%07.3fMHz ", megahertz)
 	}
 
-	if tone != G_UNKNOWN {
-		if tone == 0 {
+	if hertz, known := tone.Get(); known {
+		if hertz == 0 {
 			result += "Toff "
 		} else {
-			result += fmt.Sprintf("T%03d ", int(tone))
+			result += fmt.Sprintf("T%03d ", int(hertz))
 		}
 	}
 
-	if offset != G_UNKNOWN {
-		result += fmt.Sprintf("%+04d ", int(math.Round(float64(offset)*100)))
+	if megahertz, known := offset.Get(); known {
+		result += fmt.Sprintf("%+04d ", int(math.Round(megahertz*100)))
 	}
 
 	return result
@@ -475,7 +476,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int],
-	freq float64, tone float64, offset float64,
+	freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64],
 	comment string) string {
 	var result string
 
@@ -518,10 +519,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 
 	/* Optional frequency spec. */
 
-	if freq != 0 || tone != 0 || offset != 0 {
-		var fs = frequency_spec(freq, tone, offset)
-		result += fs
-	}
+	result += frequency_spec(freq, tone, offset)
 
 	/* Altitude.  Can be anywhere in comment. */
 	// Officially, altitude must be six digits.
@@ -609,7 +607,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
 	course maybe.Maybe[int], speed maybe.Maybe[int],
-	freq float64, tone float64, offset float64, comment string) string {
+	freq maybe.Maybe[float64], tone maybe.Maybe[float64], offset maybe.Maybe[float64], comment string) string {
 	var dti = ';'
 	var liveKilled = '*'
 
@@ -641,9 +639,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 
 	/* Optional frequency spec. */
 
-	if freq != 0 || tone != 0 || offset != 0 {
-		result += frequency_spec(freq, tone, offset)
-	}
+	result += frequency_spec(freq, tone, offset)
 
 	/* Finally, comment text. */
 	result += comment

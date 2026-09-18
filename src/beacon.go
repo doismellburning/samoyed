@@ -734,7 +734,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
-			bp.freq, bp.tone, bp.offset,
+			unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset),
 			super_comment)
 
 	case BEACON_OBJECT:
@@ -742,7 +742,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
-			bp.freq, bp.tone, bp.offset, super_comment)
+			unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset), super_comment)
 
 	case BEACON_TRACKER:
 		if gpsinfo.fix >= DWFIX_2D {
@@ -765,7 +765,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				bp.symtab, bp.symbol,
 				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 				coarse, knots,
-				float64(bp.freq), float64(bp.tone), float64(bp.offset),
+				unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset),
 				super_comment)
 
 			/* Write to log file for testing. */

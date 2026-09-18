@@ -1138,7 +1138,8 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 					A.g_symbol_table, A.g_symbol_code,
 					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
-					0, 0, 0, A.g_comment) // freq, tone, offset
+					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, tone, offset
+					A.g_comment)
 
 				// TODO Bodge
 				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)

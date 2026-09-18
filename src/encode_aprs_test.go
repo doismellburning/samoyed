@@ -31,17 +31,39 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 func Test_EncodePosition_partially_specified_phg(t *testing.T) {
 	var none = maybe.Nothing[int]()
 	var some = maybe.Just[int]
+	var noFloat = maybe.Nothing[float64]()
 
 	var result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, none, 'D', '&',
-		some(50), none, none, "", none, some(0), 0, 0, 0, "")
+		some(50), none, none, "", none, some(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, "!4234.61ND07126.47W&PHG7000", result)
 
 	// Compressed positions carry the same three values as a radio range.
 
 	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, none, 'D', '&',
-		some(50), none, none, "", none, some(0), 0, 0, 0, "")
+		some(50), none, none, "", none, some(0), noFloat, noFloat, noFloat, "")
 	assert.NotContains(t, result, "\x00", "compressed radio range")
 	assert.Equal(t, EncodePosition(false, true, 42+34.61/60, -(71+26.47/60), 0, none, 'D', '&',
-		some(50), some(0), some(0), "", none, some(0), 0, 0, 0, ""), result,
+		some(50), some(0), some(0), "", none, some(0), noFloat, noFloat, noFloat, ""), result,
 		"absent height/gain should encode as the unspecified defaults")
+}
+
+// An explicitly zero frequency spec asks for "Toff" and a zero offset; it is
+// not the same as having no frequency spec to send.  The two used to be
+// indistinguishable, because a caller with nothing to say passed three zeroes
+// and the encoders guarded on all three being non-zero.
+
+func Test_EncodePosition_explicit_zero_frequency_spec(t *testing.T) {
+	var none = maybe.Nothing[int]()
+	var noFloat = maybe.Nothing[float64]()
+	var zero = maybe.Just(0.0)
+
+	assert.Equal(t, "!4234.61ND07126.47W&Toff +000 ",
+		EncodePosition(false, false, 42+34.61/60, -(71+26.47/60), 0, none, 'D', '&',
+			none, none, none, "", none, maybe.Just(0), zero, zero, zero, ""),
+		"explicit zeroes")
+
+	assert.Equal(t, "!4234.61ND07126.47W&",
+		EncodePosition(false, false, 42+34.61/60, -(71+26.47/60), 0, none, 'D', '&',
+			none, none, none, "", none, maybe.Just(0), noFloat, noFloat, noFloat, ""),
+		"nothing to say")
 }

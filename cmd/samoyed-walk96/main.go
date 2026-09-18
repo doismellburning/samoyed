@@ -103,7 +103,7 @@ func walk96(fix int, lat float64, lon float64, knots maybe.Maybe[float64], cours
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // PHGd not specified
 		maybe.Fmap(func(degrees float64) int { return int(degrees) }, course),
 		maybe.Fmap(func(speed float64) int { return int(speed) }, knots),
-		445.925, 0, 0,
+		maybe.Just(445.925), maybe.Nothing[float64](), maybe.Nothing[float64](),
 		comment)
 
 	var position_report = fmt.Sprintf("%s>WALK96:%s", MYCALL, info)
