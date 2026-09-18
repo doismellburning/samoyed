@@ -1,82 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
 
-/*------------------------------------------------------------------
- *
- * Purpose:   	Use the CM108/CM119 (or compatible) GPIO pins for the Push To Talk (PTT) Control.
- *
- * Description:
- *
- *	There is an increasing demand for using the GPIO pins of USB audio devices for PTT.
- *	We have a few commercial products:
- *
- *		DINAH		https://hamprojects.info/dinah/
- *		PAUL		https://hamprojects.info/paul/
- *		DMK URI		http://www.dmkeng.com/URI_Order_Page.htm
- *		RB-USB RIM	http://www.repeater-builder.com/products/usb-rim-lite.html
- *		RA-35		http://www.masterscommunications.com/products/radio-adapter/ra35.html
- *
- *	and homebrew projects which are all very similar.
- *
- *		http://www.qsl.net/kb9mwr/projects/voip/usbfob-119.pdf
- *		http://rtpdir.weebly.com/uploads/1/6/8/7/1687703/usbfob.pdf
- *		http://www.repeater-builder.com/projects/fob/USB-Fob-Construction.pdf
- *		https://irongarment.wordpress.com/2011/03/29/cm108-compatible-chips-with-gpio/
- *
- *	Homebrew plans all use GPIO 3 because it is easier to tack solder a wire to a pin on the end.
- *	All of the products, that I have seen, also use the same pin so this is the default.
- *
- *	Soundmodem and hamlib paved the way but didn't get too far.
- *	Dire Wolf 1.3 added HAMLIB support (Linux only) which theoretically allows this in a
- *	painful roundabout way.  This is documented in the User Guide, section called,
- *		 "Hamlib PTT Example 2: Use GPIO of USB audio adapter.  (e.g. DMK URI)"
- *
- *	It's rather involved and the explanation doesn't cover the case of multiple
- *	USB-Audio adapters.  It is not as straightforward as you might expect.  Here we have
- *	an example of 3 C-Media USB adapters, a SignaLink USB, a keyboard, and a mouse.
- *
- *
- *	    VID  PID   Product                          Sound                  ADEVICE         HID [ptt]
- *	    ---  ---   -------                          -----                  -------         ---------
- *	**  0d8c 000c  C-Media USB Headphone Set        /dev/snd/pcmC1D0c      plughw:1,0      /dev/hidraw0
- *	**  0d8c 000c  C-Media USB Headphone Set        /dev/snd/pcmC1D0p      plughw:1,0      /dev/hidraw0
- *	**  0d8c 000c  C-Media USB Headphone Set        /dev/snd/controlC1                     /dev/hidraw0
- *	    08bb 2904  USB Audio CODEC                  /dev/snd/pcmC2D0c      plughw:2,0      /dev/hidraw2
- *	    08bb 2904  USB Audio CODEC                  /dev/snd/pcmC2D0p      plughw:2,0      /dev/hidraw2
- *	    08bb 2904  USB Audio CODEC                  /dev/snd/controlC2                     /dev/hidraw2
- *	**  0d8c 000c  C-Media USB Headphone Set        /dev/snd/pcmC0D0c      plughw:0,0      /dev/hidraw1
- *	**  0d8c 000c  C-Media USB Headphone Set        /dev/snd/pcmC0D0p      plughw:0,0      /dev/hidraw1
- *	**  0d8c 000c  C-Media USB Headphone Set        /dev/snd/controlC0                     /dev/hidraw1
- *	**  0d8c 0008  C-Media USB Audio Device         /dev/snd/pcmC4D0c      plughw:4,0      /dev/hidraw6
- *	**  0d8c 0008  C-Media USB Audio Device         /dev/snd/pcmC4D0p      plughw:4,0      /dev/hidraw6
- *	**  0d8c 0008  C-Media USB Audio Device         /dev/snd/controlC4                     /dev/hidraw6
- *	    413c 2010  Dell USB Keyboard                                                       /dev/hidraw4
- *	    0461 4d15  USB Optical Mouse                                                       /dev/hidraw5
- *
- *
- *	The USB soundcards (/dev/snd/pcm...) have an associated Human Interface Device (HID)
- *	corresponding to the GPIO pins which are sometimes connected to pushbuttons.
- *	The mapping has no obvious pattern.
- *
- *		Sound Card 0		HID 1
- *		Sound Card 1		HID 0
- *		Sound Card 2		HID 2
- *		Sound Card 4		HID 6
- *
- *	That would be a real challenge if you had to figure that all out and configure manually.
- *	Dire Wolf version 1.5 makes this much more flexible and easier to use by supporting multiple
- *	sound devices and automatically determining the corresponding HID for the PTT signal.
- *
- *	In version 1.7, we add a half-backed solution for Windows.  It's fine for situations
- *	with a single USB Audio Adapter, but does not automatically handle the multiple device case.
- *	Manual configuration needs to be used in this case.
- *
- *	Here is something new and interesting.  The All in One cable (AIOC).
- *	https://github.com/skuep/AIOC/tree/master
- *
- *	A microcontroller is used to emulate a CM108-compatible soundcard
- *	and a serial port.  It fits right on the side of a Bao Feng or similar.
- *
- *---------------------------------------------------------------*/
+package cm108
 
 import (
 	"errors"
@@ -91,7 +16,7 @@ import (
 
 /*-------------------------------------------------------------------
  *
- * Name:	CM108Inventory
+ * Name:	Inventory
  *
  * Purpose:	Take inventory of USB audio and HID.
  *
@@ -105,8 +30,8 @@ import (
  *
  *------------------------------------------------------------------*/
 
-func CM108Inventory(max_things int) ([]*CM108Thing, error) {
-	var things []*CM108Thing
+func Inventory(max_things int) ([]*Thing, error) {
+	var things []*Thing
 
 	/*
 	 * First get a list of the USB audio devices.
@@ -153,7 +78,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 				}
 
 				if len(things) < max_things {
-					var thing = new(CM108Thing)
+					var thing = new(Thing)
 
 					thing.VID = vid
 					thing.PID = pid
@@ -215,7 +140,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 
 				// If it did not match to existing, add new entry.
 				if !matched && len(things) < max_things {
-					var thing = new(CM108Thing)
+					var thing = new(Thing)
 
 					thing.VID = vid
 					thing.PID = pid
@@ -252,11 +177,11 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 	}
 
 	return things, nil
-} /* end CM108Inventory */
+} /* end Inventory */
 
 /*-------------------------------------------------------------------
  *
- * Name:	cm108_find_ptt
+ * Name:	FindPTT
  *
  * Purpose:	Try to find /dev/hidraw corresponding to a USB audio "card."
  *
@@ -272,15 +197,15 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
  * Returns:	The matching device, whose DevnodeHidraw is something like
  *		/dev/hidraw2.  Nil, with no error, if nothing matched.
  *
- *		The caller is expected to check GOOD_DEVICE on the result: a match
+ *		The caller is expected to check GoodDevice on the result: a match
  *		that is not a known-good device can still be used, but deserves a
  *		warning.
  *
  *------------------------------------------------------------------*/
 
-func cm108_find_ptt(output_audio_device string) (*CM108Thing, error) {
+func FindPTT(output_audio_device string) (*Thing, error) {
 	// Possible improvement: Skip if inventory already taken.
-	var things, inventoryErr = CM108Inventory(MAXX_THINGS)
+	var things, inventoryErr = Inventory(MaxThings)
 	if inventoryErr != nil {
 		return nil, inventoryErr
 	}
@@ -309,7 +234,7 @@ func cm108_find_ptt(output_audio_device string) (*CM108Thing, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:	CM108SetGPIOPin
+ * Name:	SetGPIOPin
  *
  * Purpose:	Set one GPIO pin of the CM108 or similar.
  *
@@ -332,7 +257,7 @@ func cm108_find_ptt(output_audio_device string) (*CM108Thing, error) {
  *
  *------------------------------------------------------------------*/
 
-func CM108SetGPIOPin(name string, num int, state int) error {
+func SetGPIOPin(name string, num int, state int) error {
 	if num < 1 || num > 8 {
 		return fmt.Errorf("%s CM108 GPIO number %d must be in range of 1 thru 8", name, num)
 	}
@@ -344,12 +269,12 @@ func CM108SetGPIOPin(name string, num int, state int) error {
 	var iomask = 1 << (num - 1)     // 0=input, 1=output
 	var iodata = state << (num - 1) // 0=low, 1=high
 
-	return cm108_write(name, iomask, iodata)
-} /* end CM108SetGPIOPin */
+	return write(name, iomask, iodata)
+} /* end SetGPIOPin */
 
 /*-------------------------------------------------------------------
  *
- * Name:	cm108_write
+ * Name:	write
  *
  * Purpose:	Set the GPIO pins of the CM108 or similar.
  *
@@ -364,11 +289,11 @@ func CM108SetGPIOPin(name string, num int, state int) error {
  * Returns:	Nil for success, otherwise a descriptive error.
  *
  * Description:	This is the lowest level function.
- *		An application probably wants to use CM108SetGPIOPin.
+ *		An application probably wants to use SetGPIOPin.
  *
  *------------------------------------------------------------------*/
 
-func cm108_write(name string, iomask int, iodata int) error {
+func write(name string, iomask int, iodata int) error {
 	/*
 	 * By default, the USB HID are accessible only by root:
 	 *
@@ -416,15 +341,15 @@ func cm108_write(name string, iomask int, iodata int) error {
 	defer fd.Close()
 
 	// Just for fun, let's get the device information.
+	// This is only ever a warning, so it is printed rather than returned - note
+	// that direwolf's dw_printf is itself just fmt.Printf.
 
 	var info, ioctlErr = unix.IoctlHIDGetRawInfo(int(fd.Fd()))
 	if ioctlErr == nil {
-		if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", name, ioctlErr)
+		if !GoodDevice(int(info.Vendor), int(info.Product)) {
+			fmt.Printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", name, ioctlErr)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
+			fmt.Printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
 		}
 	}
 
@@ -464,4 +389,4 @@ func cm108_write(name string, iomask int, iodata int) error {
 	}
 
 	return nil
-} /* end cm108_write */
+} /* end write */

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/doismellburning/samoyed/internal/cm108"
 	direwolf "github.com/doismellburning/samoyed/src"
 )
 
@@ -60,7 +61,7 @@ func main() {
 		for {
 			fmt.Printf("%d", state)
 
-			var err = direwolf.CM108SetGPIOPin(path, gpio, state)
+			var err = cm108.SetGPIOPin(path, gpio, state)
 			if err != nil {
 				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO: %v\n", err)
 				cm108_usage()
@@ -75,7 +76,7 @@ func main() {
 
 	// Take inventory of USB Audio adapters and other HID devices.
 
-	var things, inventoryErr = direwolf.CM108Inventory(direwolf.MAXX_THINGS)
+	var things, inventoryErr = cm108.Inventory(cm108.MaxThings)
 	if inventoryErr != nil {
 		fmt.Printf("%v\n", inventoryErr)
 		os.Exit(1)
@@ -105,7 +106,7 @@ func main() {
 
 	for i := range things {
 		var good = "  "
-		if direwolf.GOOD_DEVICE(things[i].VID, things[i].PID) {
+		if cm108.GoodDevice(things[i].VID, things[i].PID) {
 			good = "**"
 		}
 

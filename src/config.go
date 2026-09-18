@@ -26,6 +26,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/cm108"
 	"github.com/tzneal/coordconv"
 )
 
@@ -2464,7 +2465,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// Failure at this point is not an error.
 		// See if config file sets it explicitly before complaining.
 
-		var cm108Thing, cm108Err = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
+		var cm108Thing, cm108Err = cm108.FindPTT(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 		if cm108Err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%v\n", cm108Err)
@@ -2472,7 +2473,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		} else if cm108Thing != nil {
 			ps.audio.achan[ps.channel].octrl[ot].ptt_device = cm108Thing.DevnodeHidraw
 
-			if !GOOD_DEVICE(cm108Thing.VID, cm108Thing.PID) {
+			if !cm108.GoodDevice(cm108Thing.VID, cm108Thing.PID) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Warning: USB audio card %s (%s) is not a device known to work with GPIO PTT.\n",
 					cm108Thing.CardNumber, cm108Thing.CardName)
