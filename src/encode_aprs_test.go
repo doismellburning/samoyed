@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,16 +25,18 @@ func Test_phg_data_extension_partially_specified(t *testing.T) {
 }
 
 func Test_EncodePosition_partially_specified_phg(t *testing.T) {
-	var result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+	var noInt = maybe.Nothing[int]()
+
+	var result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
 		50, G_UNKNOWN, G_UNKNOWN, "", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.Equal(t, "!4234.61ND07126.47W&PHG7000", result)
 
 	// Compressed positions carry the same three values as a radio range.
 
-	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
+	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
 		50, G_UNKNOWN, G_UNKNOWN, "", G_UNKNOWN, 0, 0, 0, 0, "")
 	assert.NotContains(t, result, "\x00", "compressed radio range")
-	assert.Equal(t, EncodePosition(false, true, 42+34.61/60, -(71+26.47/60), 0, G_UNKNOWN, 'D', '&',
+	assert.Equal(t, EncodePosition(false, true, 42+34.61/60, -(71+26.47/60), 0, noInt, 'D', '&',
 		50, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, ""), result,
 		"G_UNKNOWN height/gain should encode as the unspecified defaults")
 }

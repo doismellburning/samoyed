@@ -597,6 +597,14 @@ func (bs *BeaconService) sbCalculateNextTime(
 	return (next_time)
 } /* end sbCalculateNextTime */
 
+// beaconAltitudeFeet converts a configured beacon altitude in metres to the
+// feet EncodePosition wants, or Nothing if no altitude was configured.
+func beaconAltitudeFeet(alt_m float64) maybe.Maybe[int] {
+	return maybe.Fmap(func(meters float64) int {
+		return int(math.Round(DW_METERS_TO_FEET(meters)))
+	}, unlessUnknown(alt_m))
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        send
@@ -711,7 +719,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	case BEACON_POSITION:
 		beacon_text += EncodePosition(bp.messaging, bp.compress,
 			bp.lat, bp.lon, bp.ambiguity,
-			int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
+			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
 			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 			G_UNKNOWN, G_UNKNOWN, /* course, speed */
@@ -742,7 +750,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.speed_knots)
 
 			beacon_text += EncodePosition(bp.messaging, bp.compress,
-				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, orUnknown(my_alt_ft),
+				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				int(bp.power), int(bp.height), int(bp.gain), bp.dir,
 				orUnknown(coarse), orUnknown(knots),

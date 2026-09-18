@@ -19,6 +19,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 // unspecified_to_zero maps the G_UNKNOWN sentinel onto 0, the value that
@@ -488,7 +490,7 @@ type aprs_compressed_pos_t struct {
 }
 */
 
-func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft int,
+func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft maybe.Maybe[int],
 	symtab byte, symbol byte,
 	power int, height int, gain int, dir string,
 	course int, speed int,
@@ -549,19 +551,19 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 	// Most modern applications recognize the form /A=-12345 with minus and five digits.
 	// This maintains the same total field width and the range is more than adequate.
 
-	if alt_ft != G_UNKNOWN {
+	if feet, known := alt_ft.Get(); known {
 		/* Not clear if altitude can be negative. */
 		/* Be sure it will be converted to 6 digits. */
-		// if (alt_ft < 0) alt_ft = 0;
-		if alt_ft < -99999 {
-			alt_ft = -99999
+		// if (feet < 0) feet = 0;
+		if feet < -99999 {
+			feet = -99999
 		}
 
-		if alt_ft > 999999 {
-			alt_ft = 999999
+		if feet > 999999 {
+			feet = 999999
 		}
 
-		result += fmt.Sprintf("/A=%06d", alt_ft) // /A=123456 ot /A=-12345
+		result += fmt.Sprintf("/A=%06d", feet) // /A=123456 ot /A=-12345
 	}
 
 	/* Finally, comment text. */

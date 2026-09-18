@@ -103,7 +103,8 @@ func walk96(fix int, lat float64, lon float64, knots maybe.Maybe[float64], cours
 	var compressed = false
 
 	var info = direwolf.EncodePosition(messaging, compressed,
-		lat, lon, 0, int(direwolf.DW_METERS_TO_FEET(toEncoder(alt))),
+		lat, lon, 0,
+		maybe.Fmap(func(meters float64) int { return int(direwolf.DW_METERS_TO_FEET(meters)) }, alt),
 		'/', '=',
 		0, 0, 0, "", // PHGd: 0 means not specified; encode_position emits PHG only when values > 0
 		int(toEncoder(course)), int(toEncoder(knots)),
