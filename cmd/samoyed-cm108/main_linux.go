@@ -61,8 +61,8 @@ func main() {
 			fmt.Printf("%d", state)
 
 			var err = direwolf.CM108SetGPIOPin(path, gpio, state)
-			if err != 0 {
-				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO!\n")
+			if err != nil {
+				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO: %v\n", err)
 				cm108_usage()
 				os.Exit(1)
 			}
@@ -75,7 +75,11 @@ func main() {
 
 	// Take inventory of USB Audio adapters and other HID devices.
 
-	var things, _ = direwolf.CM108Inventory(direwolf.MAXX_THINGS)
+	var things, inventoryErr = direwolf.CM108Inventory(direwolf.MAXX_THINGS)
+	if inventoryErr != nil {
+		fmt.Printf("%v\n", inventoryErr)
+		os.Exit(1)
+	}
 
 	if len(things) == 0 {
 		fmt.Printf("No relevant USB devices found!\n")

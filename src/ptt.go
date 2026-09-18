@@ -1168,9 +1168,11 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 	 */
 
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
-		if CM108SetGPIOPin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
-			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt) != 0 {
+		var cm108Err = CM108SetGPIOPin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
+			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt)
+		if cm108Err != nil {
 			text_color_set(DW_COLOR_ERROR)
+			dw_printf("%v\n", cm108Err)
 			dw_printf("ERROR:  %s for channel %d has failed.  See User Guide for troubleshooting tips.\n", otnames[ot], channel)
 		}
 	}

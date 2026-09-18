@@ -89,113 +89,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-/* Dire Wolf cm108.h */
-
-// The CM108, CM109, and CM119 datasheets all say that idProduct can be in the range
-// of 0008 to 000f programmable by MSEL and MODE pin.  How can we tell the difference?
-
-// CM108B is 0012.
-// CM119B is 0013.
-// CM108AH is 0139 programmable by MSEL and MODE pin.
-// CM119A is 013A programmable by MSEL and MODE pin.
-
-// To make matters even more confusing, these can be overridden
-// with an external EEPROM.  Some have 8, rather than 4 GPIO.
-
-const CMEDIA_VID = 0xd8c       // Vendor ID
-const CMEDIA_PID1_MIN = 0x0008 // range for CM108, CM109, CM119 (no following letters)
-const CMEDIA_PID1_MAX = 0x000f
-
-const CMEDIA_PID_CM108AH = 0x0139     // CM108AH
-const CMEDIA_PID_CM108AH_alt = 0x013c // CM108AH? - see issue 210
-const CMEDIA_PID_CM108B = 0x0012      // CM108B
-const CMEDIA_PID_CM119A = 0x013a      // CM119A
-const CMEDIA_PID_CM119B = 0x0013      // CM119B
-const CMEDIA_PID_HS100 = 0x013c       // HS100
-
-// The SSS chips seem to be pretty much compatible but they have only two GPIO.
-// https://irongarment.wordpress.com/2011/03/29/cm108-compatible-chips-with-gpio/
-// Data sheet says VID/PID is from an EEPROM but mentions no default.
-
-const SSS_VID = 0x0c76 // SSS1621, SSS1623
-const SSS_PID1 = 0x1605
-const SSS_PID2 = 0x1607
-const SSS_PID3 = 0x160b
-
-// https://github.com/skuep/AIOC/blob/master/stm32/aioc-fw/Src/usb_descriptors.h
-
-const AIOC_VID = 0x1209
-const AIOC_PID = 0x7388
-
-//	Device		VID	PID		Number of GPIO
-//	------		---	---		--------------
-//	CM108		0d8c	0008-000f *	4
-//	CM108AH		0d8c	0139 *		3	Has GPIO 1,3,4 but not 2
-//	CM108B		0d8c	0012		3	Has GPIO 1,3,4 but not 2
-//	CM109		0d8c	0008-000f *	8
-//	CM119		0d8c	0008-000f *	8
-//	CM119A		0d8c	013a *		8
-//	CM119B		0d8c	0013		8
-//	HS100		0d8c	013c		0		(issue 210 reported 013c
-//								 being seen for CM108AH)
-//
-//	SSS1621		0c76	1605		2 	per ZL3AME, Can't find data sheet
-//	SSS1623		0c76	1607,160b	2	per ZL3AME, Not in data sheet.
-//
-//				* idProduct programmable by MSEL and MODE pin.
-//
-
-// 	CMedia pin	GPIO	Notes
-//	----------	----	-----
-//	43		1
-//	11		2	N.C. for CM108AH, CM108B
-//	13		3	Most popular for PTT because it is on the end.
-//	15		4
-//	16		5	CM109, CM119, CM119A, CM119B only
-//	17		6	"
-//	20		7	"
-//	22		8	"
-
-// Maximum length of name for PTT HID.
-// For Linux, this was originally 17 to handle names like /dev/hidraw3.
-// Windows has more complicated names.  The longest I saw was 95 but longer have been reported.
-// Then we have this  https://groups.io/g/direwolf/message/9622  where 127 is not enough.
-
-const MAXX_HIDRAW_NAME_LEN = 150
-
-/*
- * Result of taking inventory of USB soundcards and USB HIDs.
- */
-
-type CM108Thing struct {
-	VID          int    // vendor id, displayed as four hexadecimal digits.
-	PID          int    // product id, displayed as four hexadecimal digits.
-	CardNumber   string // "Card" Number.  e.g.  2 for plughw:2,0
-	CardName     string // Audio Card Name, assigned by system (e.g. Device_1) or by udev rule.
-	Product      string // product name (e.g. manufacturer, model)
-	DevnodeSound string // e.g. /dev/snd/pcmC0D0p
-	Plughw       string // Above in more familiar format e.g. plughw:0,0
-	// Oversized to silence a compiler warning.
-	Plughw2       string // With name rather than number.
-	Devpath       string // Kernel dev path.  Does not include /sys mount point.
-	DevnodeHidraw string
-	// e.g. /dev/hidraw3  -  for Linux - was length 17
-	// The Windows path for a HID looks like this, lengths up to 95 seen.
-	// \\?\hid#vid_0d8c&pid_000c&mi_03#8&164d11c9&0&0000#{4d1e55b2-f16f-11cf-88cb-001111000030}
-	DevnodeUSB string // e.g. /dev/bus/usb/001/012
-	// This is what we use to match up audio and HID.
-}
-
-// GOOD_DEVICE tests for supported devices.
-func GOOD_DEVICE(v, p int) bool {
-	return (v == CMEDIA_VID && ((p >= CMEDIA_PID1_MIN && p <= CMEDIA_PID1_MAX) || p == CMEDIA_PID_CM108AH ||
-		p == CMEDIA_PID_CM108AH_alt || p == CMEDIA_PID_CM108B || p == CMEDIA_PID_CM119A || p == CMEDIA_PID_CM119B)) ||
-		(v == SSS_VID && (p == SSS_PID1 || p == SSS_PID2 || p == SSS_PID3)) ||
-		(v == AIOC_VID && p == AIOC_PID)
-}
-
-const MAXX_THINGS = 60
-
 /*-------------------------------------------------------------------
  *
  * Name:	CM108Inventory
@@ -207,9 +100,8 @@ const MAXX_THINGS = 60
  * Outputs:	things		- Array of items collected.
  *				  Corresponding sound device and HID are merged into one item.
  *
- * Returns:	Number of items placed in things array.
- *		Should be in the range of 0 thru max_things.
- *		-1 for a bad unexpected error.
+ * Returns:	The items found, at most max_things of them, and an error if the
+ *		udev enumeration failed unexpectedly.
  *
  *------------------------------------------------------------------*/
 
@@ -226,11 +118,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 
 	var devices, devicesErr = e.Devices()
 	if devicesErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't enumerate udev devices"
-		dw_printf("%s: %v.\n", msg, devicesErr)
-
-		return things, errors.New(msg)
+		return things, fmt.Errorf("INTERNAL ERROR: Can't enumerate udev devices: %w", devicesErr)
 	}
 
 	var cardDevpath string
@@ -290,11 +178,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 
 	var hidDevices, hidDevicesErr = e2.Devices()
 	if hidDevicesErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't enumerate udev hidraw devices"
-		dw_printf("%s: %v.\n", msg, hidDevicesErr)
-
-		return nil, errors.New(msg)
+		return nil, fmt.Errorf("INTERNAL ERROR: Can't enumerate udev hidraw devices: %w", hidDevicesErr)
 	}
 
 	for _, dev := range hidDevices {
@@ -385,17 +269,21 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
  *					plughw:2,3
  *				  In our case we just need to extract the card number or name.
  *
- * Returns:	ptt_device	- Device name, something like /dev/hidraw2.
- *				  Will be empty string if no match found.
+ * Returns:	The matching device, whose DevnodeHidraw is something like
+ *		/dev/hidraw2.  Nil, with no error, if nothing matched.
+ *
+ *		The caller is expected to check GOOD_DEVICE on the result: a match
+ *		that is not a known-good device can still be used, but deserves a
+ *		warning.
  *
  *------------------------------------------------------------------*/
 
-func cm108_find_ptt(output_audio_device string) string {
-	//dw_printf ("DEBUG: cm108_find_ptt('%s')\n", output_audio_device);
-	var ptt_device = ""
-
+func cm108_find_ptt(output_audio_device string) (*CM108Thing, error) {
 	// Possible improvement: Skip if inventory already taken.
-	var things, _ = CM108Inventory(MAXX_THINGS)
+	var things, inventoryErr = CM108Inventory(MAXX_THINGS)
+	if inventoryErr != nil {
+		return nil, inventoryErr
+	}
 
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 
@@ -404,33 +292,19 @@ func cm108_find_ptt(output_audio_device string) string {
 
 	if matches != nil {
 		num_or_name = matches[2]
-		//dw_printf ("DEBUG: Got '%s' from '%s'\n", num_or_name, output_audio_device);
 	}
 
 	if len(num_or_name) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not extract card number or name from %s\n", output_audio_device)
-		dw_printf("Can't automatically find matching HID for PTT.\n")
-
-		return ptt_device
+		return nil, fmt.Errorf("could not extract card number or name from %s", output_audio_device)
 	}
 
 	for _, thing := range things {
-		//dw_printf ("DEBUG: i=%d, card_name='%s', card_number='%s'\n", i, things[i].CardName, things[i].CardNumber);
 		if num_or_name == thing.CardName || num_or_name == thing.CardNumber {
-			//dw_printf ("DEBUG: success! returning '%s'\n", things[i].DevnodeHidraw);
-			ptt_device = thing.DevnodeHidraw
-			if !GOOD_DEVICE(thing.VID, thing.PID) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Warning: USB audio card %s (%s) is not a device known to work with GPIO PTT.\n",
-					thing.CardNumber, thing.CardName)
-			}
-
-			return ptt_device
+			return thing, nil
 		}
 	}
 
-	return ptt_device
+	return nil, nil //nolint:nilnil // No match is an ordinary outcome, not an error - the caller may yet be told the device explicitly
 }
 
 /*-------------------------------------------------------------------
@@ -446,9 +320,7 @@ func cm108_find_ptt(output_audio_device string) string {
  *
  *		state		- 1 for on, 0 for off.
  *
- * Returns:	0 for success.  -1 for error.
- *
- * Errors:	A descriptive error message will be printed for any problem.
+ * Returns:	Nil for success, otherwise a descriptive error.
  *
  * Shortcut:	For our initial implementation we are making the simplifying
  *		restriction of using only one GPIO pin per device and limit
@@ -460,19 +332,13 @@ func cm108_find_ptt(output_audio_device string) string {
  *
  *------------------------------------------------------------------*/
 
-func CM108SetGPIOPin(name string, num int, state int) int {
+func CM108SetGPIOPin(name string, num int, state int) error {
 	if num < 1 || num > 8 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s CM108 GPIO number %d must be in range of 1 thru 8.\n", name, num)
-
-		return (-1)
+		return fmt.Errorf("%s CM108 GPIO number %d must be in range of 1 thru 8", name, num)
 	}
 
 	if state != 0 && state != 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s CM108 GPIO state %d must be 0 or 1.\n", name, state)
-
-		return (-1)
+		return fmt.Errorf("%s CM108 GPIO state %d must be 0 or 1", name, state)
 	}
 
 	var iomask = 1 << (num - 1)     // 0=input, 1=output
@@ -495,19 +361,14 @@ func CM108SetGPIOPin(name string, num int, state int) int {
  *
  *		iodata		- Output data, same bit order as iomask.
  *
- * Returns:	0 for success.  -1 for error.
- *
- * Errors:	A descriptive error message will be printed for any problem.
+ * Returns:	Nil for success, otherwise a descriptive error.
  *
  * Description:	This is the lowest level function.
  *		An application probably wants to use CM108SetGPIOPin.
  *
  *------------------------------------------------------------------*/
 
-func cm108_write(name string, iomask int, iodata int) int {
-	//text_color_set(DW_COLOR_DEBUG);
-	//dw_printf ("TEMP DEBUG cm108_write:  %s %d %d\n", name, iomask, iodata);
-
+func cm108_write(name string, iomask int, iodata int) error {
 	/*
 	 * By default, the USB HID are accessible only by root:
 	 *
@@ -542,8 +403,6 @@ func cm108_write(name string, iomask int, iodata int) int {
 	 */
 	var fd, err = os.OpenFile(name, os.O_RDWR, 0000) //nolint:gosec // This comes from user-supplied config, all we can really do is trust it
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open %s for write: %s\n", name, err)
 		/* TODO KG UX
 		if errno == EACCES { // 13
 			dw_printf("Type \"ls -l %s\" and verify that it has audio group rw similar to this:\n", name)
@@ -552,7 +411,7 @@ func cm108_write(name string, iomask int, iodata int) int {
 			dw_printf("    crw------- 1 root root 247, 0 Sep 24 09:40 %s\n", name)
 		}
 		*/
-		return (-1)
+		return fmt.Errorf("could not open %s for write: %w", name, err)
 	}
 	defer fd.Close()
 
@@ -583,8 +442,6 @@ func cm108_write(name string, iomask int, iodata int) int {
 		//  Errors observed during development.
 		//  as pi		EACCES          13      /* Permission denied */
 		//  as root		EPIPE           32      /* Broken pipe - Happens if we send 4 bytes */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Write to %s failed, n=%d, err=%v\n", name, n, writeErr)
 
 		/* TODO KG UX
 		if errno == EACCES {
@@ -599,8 +456,12 @@ func cm108_write(name string, iomask int, iodata int) int {
 			dw_printf("Your account must be in the 'audio' group.\n")
 		}
 		*/
-		return (-1)
+		if writeErr == nil {
+			writeErr = errors.New("short write")
+		}
+
+		return fmt.Errorf("write to %s failed, n=%d: %w", name, n, writeErr)
 	}
 
-	return (0)
+	return nil
 } /* end cm108_write */
