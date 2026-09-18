@@ -856,14 +856,11 @@ x = Silence FX.25 information.`)
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
 // ais_object_course_speed rounds a decoded course and speed into the integer
-// degrees and knots encode_object takes, leaving an unknown one as the
-// G_UNKNOWN sentinel it understands.  Rounding the sentinel instead would give
-// a number that is not G_UNKNOWN, which encode_object folds back into range
-// and transmits as a course nobody reported.
+// degrees and knots encode_object takes, leaving an unknown one absent.
 // Should encode_object take floating point here?
-func ais_object_course_speed(A *decode_aprs_t) (int, int) {
-	var course = orUnknown(maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course))
-	var speed = orUnknown(maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph))
+func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[int]) {
+	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course)
+	var speed = maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph)
 
 	return course, speed
 }
@@ -1139,9 +1136,10 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 				var ais_obj_info = encode_object(A.g_name, false, time.Now(),
 					lat, lon, 0, // no ambiguity
 					A.g_symbol_table, A.g_symbol_code,
-					0, 0, 0, "", // power, height, gain, direction.
+					maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // power, height, gain, direction.
 					course, speed,
-					0, 0, 0, A.g_comment) // freq, tone, offset
+					maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), // freq, tone, offset
+					A.g_comment)
 
 				// TODO Bodge
 				ais_obj_packet = fmt.Sprintf("%s>%s%1d%1d,NOGATE:%s", A.g_src, APP_TOCALL, MAJOR_VERSION, MINOR_VERSION, ais_obj_info)

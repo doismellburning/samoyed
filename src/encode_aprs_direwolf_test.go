@@ -4,79 +4,85 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_encode_aprs(t *testing.T) {
 	var result string
 
+	var noInt = maybe.Nothing[int]()
+	var anInt = maybe.Just[int]
+	var noFloat = maybe.Nothing[float64]()
+	var aFloat = maybe.Just[float64]
+
 	/***********  Position  ***********/
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, "")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", noInt, anInt(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, "!4234.61ND07126.47W&", result)
 
 	/* with PHG. */
 	// TODO:  Need to test specifying some but not all.
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		50, 100, 6, "N", G_UNKNOWN, 0, 0, 0, 0, "")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		anInt(50), anInt(100), anInt(6), "N", noInt, anInt(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, "!4234.61ND07126.47W&PHG7368", result)
 
 	/* with freq & tone.  minus offset, no offset, explicit simplex. */
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", G_UNKNOWN, 0, 146.955, 74.4, -0.6, "")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", noInt, anInt(0), aFloat(146.955), aFloat(74.4), aFloat(-0.6), "")
 	assert.Equal(t, "!4234.61ND07126.47W&146.955MHz T074 -060 ", result)
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", G_UNKNOWN, 0, 146.955, 74.4, G_UNKNOWN, "")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", noInt, anInt(0), aFloat(146.955), aFloat(74.4), noFloat, "")
 	assert.Equal(t, "!4234.61ND07126.47W&146.955MHz T074 ", result)
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", G_UNKNOWN, 0, 146.955, 74.4, 0, "")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", noInt, anInt(0), aFloat(146.955), aFloat(74.4), aFloat(0), "")
 	assert.Equal(t, "!4234.61ND07126.47W&146.955MHz T074 +000 ", result)
 
 	/* with course/speed, freq, and comment! */
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, 74.4, -0.6, "River flooding")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", anInt(180), anInt(55), aFloat(146.955), aFloat(74.4), aFloat(-0.6), "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz T074 -060 River flooding", result)
 
 	/* Course speed, no tone, + offset */
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, G_UNKNOWN, 0.6, "River flooding")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", anInt(180), anInt(55), aFloat(146.955), noFloat, aFloat(0.6), "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz +060 River flooding", result)
 
 	/* Course speed, no tone, + offset + altitude */
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, 12345, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, G_UNKNOWN, 0.6, "River flooding")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, anInt(12345), 'D', '&',
+		noInt, noInt, noInt, "", anInt(180), anInt(55), aFloat(146.955), noFloat, aFloat(0.6), "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz +060 /A=012345River flooding", result)
 
-	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, 12345, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, 0, 0.6, "River flooding")
+	result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, anInt(12345), 'D', '&',
+		noInt, noInt, noInt, "", anInt(180), anInt(55), aFloat(146.955), aFloat(0), aFloat(0.6), "River flooding")
 	assert.Equal(t, "!4234.61ND07126.47W&180/055146.955MHz Toff +060 /A=012345River flooding", result)
 
 	// TODO: try boundary conditions of course = 0, 359, 360
 
 	/*********** Compressed position. ***********/
 
-	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, "")
+	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", noInt, anInt(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, "!D8yKC<Hn[&  !", result)
 
 	/* with PHG. In this case it is converted to precomputed radio range.  TODO: check on this.  Is 27.4 correct? */
 
-	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		50, 100, 6, "N", G_UNKNOWN, 0, 0, 0, 0, "")
+	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		anInt(50), anInt(100), anInt(6), "N", noInt, anInt(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, "!D8yKC<Hn[&{CG", result)
 
 	/* with course/speed, freq, and comment!  Roundoff. 55 knots should be 63 MPH.  we get 62. */
 
-	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, G_UNKNOWN, 'D', '&',
-		0, 0, 0, "", 180, 55, 146.955, 74.4, -0.6, "River flooding")
+	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, noInt, 'D', '&',
+		noInt, noInt, noInt, "", anInt(180), anInt(55), aFloat(146.955), aFloat(74.4), aFloat(-0.6), "River flooding")
 	assert.Equal(t, "!D8yKC<Hn[&NUG146.955MHz T074 -060 River flooding", result)
 
 	// TODO:  test alt; cs+alt
@@ -84,7 +90,7 @@ func Test_encode_aprs(t *testing.T) {
 	/*********** Object. ***********/
 
 	result = encode_object("WB1GOF-C", false, time.Time{}, 42+34.61/60, -(71 + 26.47/60), 0, 'D', '&',
-		0, 0, 0, "", G_UNKNOWN, 0, 0, 0, 0, "")
+		noInt, noInt, noInt, "", noInt, anInt(0), noFloat, noFloat, noFloat, "")
 	assert.Equal(t, ";WB1GOF-C *111111z4234.61ND07126.47W&", result)
 
 	// TODO: need more tests.

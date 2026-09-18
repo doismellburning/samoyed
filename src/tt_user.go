@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
 /*
@@ -705,23 +707,26 @@ func xmit_object_report(i int, first_time bool) {
 
 	stemp += ":"
 
-	var freq float64 = G_UNKNOWN
+	var freq maybe.Maybe[float64]
 	if tt_user[i].freq != "" {
-		freq, _ = strconv.ParseFloat(tt_user[i].freq, 64)
+		var megahertz, _ = strconv.ParseFloat(tt_user[i].freq, 64)
+		freq = maybe.Just(megahertz)
 	}
 
-	var ctcss float64 = G_UNKNOWN
+	var ctcss maybe.Maybe[float64]
 	if tt_user[i].ctcss != "" {
-		ctcss, _ = strconv.ParseFloat(tt_user[i].ctcss, 64)
+		var hertz, _ = strconv.ParseFloat(tt_user[i].ctcss, 64)
+		ctcss = maybe.Just(hertz)
 	}
 
 	// info part of Object Report packet
 	stemp += encode_object(object_name, false, tt_user[i].last_heard, olat, olong, oambig,
 		byte(tt_user[i].overlay), byte(tt_user[i].symbol),
-		0, 0, 0, "", G_UNKNOWN, G_UNKNOWN, /* PHGD, Course/Speed */
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
+		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */
 		freq,
 		ctcss,
-		G_UNKNOWN, /* CTCSS */
+		maybe.Nothing[float64](), /* offset */
 		info_comment)
 
 	if TT_TESTS_RUNNING {

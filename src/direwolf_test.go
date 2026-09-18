@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +38,7 @@ func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 // report to an APRS object used to hand encode_object int(G_UNKNOWN + 0.5),
 // which is not G_UNKNOWN, so the course was folded back into range and
 // transmitted as 82 degrees - a heading nobody reported.  Absence must
-// survive as the sentinel encode_object recognises.
+// survive all the way into encode_object.
 func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
@@ -52,15 +53,15 @@ func Test_ais_to_object_without_course_or_speed(t *testing.T) {
 	assert.True(t, A.g_speed_mph.IsNothing(), "speed should be unknown, got %v", A.g_speed_mph)
 
 	var course, speed = ais_object_course_speed(A)
-	assert.Equal(t, G_UNKNOWN, course)
-	assert.Equal(t, G_UNKNOWN, speed)
+	assert.True(t, course.IsNothing(), "course should be unknown, got %v", course)
+	assert.True(t, speed.IsNothing(), "speed should be unknown, got %v", speed)
 
 	var info = encode_object("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
-		0, 0, 0, "",
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		course, speed,
-		0, 0, 0, "")
+		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	// The course/speed data extension is "ccc/sss" straight after the symbol.
 	assert.Equal(t, ";366730000*111111z4221.60N/07103.60Ws", info)
@@ -79,15 +80,15 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 	var A = decode_aprs(pp, true, "")
 
 	var course, speed = ais_object_course_speed(A)
-	assert.Equal(t, 90, course)
-	assert.Equal(t, 21, speed)
+	assert.Equal(t, maybe.Just(90), course)
+	assert.Equal(t, maybe.Just(21), speed)
 
 	var info = encode_object("366730000", false, time.Time{},
 		42.36, -71.06, 0,
 		'/', 's',
-		0, 0, 0, "",
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "",
 		course, speed,
-		0, 0, 0, "")
+		maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64](), "")
 
 	assert.Equal(t, ";366730000*111111z4221.60N/07103.60Ws090/021", info)
 }

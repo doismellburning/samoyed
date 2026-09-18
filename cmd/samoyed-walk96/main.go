@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/pkg/term"
 )
@@ -53,8 +54,13 @@ func main() {
 	for range HOWLONG {
 		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
 
-		if fix > int(direwolf.DWFIX_2D) {
-			walk96(fix, lat, lon, speedKnots, track, altitude)
+		// A fix is reported before the position fields are, so a receiver can
+		// claim a 3D fix while gpsd has yet to report a latitude at all.
+		var latitude, haveLat = lat.Get()
+		var longitude, haveLon = lon.Get()
+
+		if fix > int(direwolf.DWFIX_2D) && haveLat && haveLon {
+			walk96(fix, latitude, longitude, speedKnots, track, altitude)
 		} else if fix < 0 {
 			fmt.Printf("Can't communicate with GPS receiver.\n")
 			os.Exit(1)
@@ -76,7 +82,10 @@ var sequence = 0
 
 /* Should be called once per second. */
 
-func walk96(fix int, lat float64, lon float64, knots float64, course float64, alt float64) { //nolint:unparam
+//nolint:unparam // fix is reported alongside the rest of the GPS reading.
+func walk96(fix int, lat float64, lon float64, knots maybe.Maybe[float64], course maybe.Maybe[float64],
+	alt maybe.Maybe[float64],
+) {
 	sequence++
 	var comment = fmt.Sprintf("Sequence number %04d", sequence)
 
@@ -88,11 +97,13 @@ func walk96(fix int, lat float64, lon float64, knots float64, course float64, al
 	var compressed = false
 
 	var info = direwolf.EncodePosition(messaging, compressed,
-		lat, lon, 0, int(direwolf.DW_METERS_TO_FEET(alt)),
+		lat, lon, 0,
+		maybe.Fmap(func(meters float64) int { return int(direwolf.DW_METERS_TO_FEET(meters)) }, alt),
 		'/', '=',
-		0, 0, 0, "", // PHGd: 0 means not specified; encode_position emits PHG only when values > 0
-		int(course), int(knots),
-		445.925, 0, 0,
+		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // PHGd not specified
+		maybe.Fmap(func(degrees float64) int { return int(degrees) }, course),
+		maybe.Fmap(func(speed float64) int { return int(speed) }, knots),
+		maybe.Just(445.925), maybe.Nothing[float64](), maybe.Nothing[float64](),
 		comment)
 
 	var position_report = fmt.Sprintf("%s>WALK96:%s", MYCALL, info)

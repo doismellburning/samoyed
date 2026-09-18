@@ -597,6 +597,25 @@ func (bs *BeaconService) sbCalculateNextTime(
 	return (next_time)
 } /* end sbCalculateNextTime */
 
+// beaconPHG is a PHG component from the beacon configuration, whose "not
+// specified" is zero rather than G_UNKNOWN.  The beacon_s fields are still
+// plain numbers; see issue #619.
+func beaconPHG(value float64) maybe.Maybe[int] {
+	if value == 0 {
+		return maybe.Nothing[int]()
+	}
+
+	return maybe.Just(int(value))
+}
+
+// beaconAltitudeFeet converts a configured beacon altitude in metres to the
+// feet EncodePosition wants, or Nothing if no altitude was configured.
+func beaconAltitudeFeet(alt_m float64) maybe.Maybe[int] {
+	return maybe.Fmap(func(meters float64) int {
+		return int(math.Round(DW_METERS_TO_FEET(meters)))
+	}, unlessUnknown(alt_m))
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:        send
@@ -711,19 +730,19 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	case BEACON_POSITION:
 		beacon_text += EncodePosition(bp.messaging, bp.compress,
 			bp.lat, bp.lon, bp.ambiguity,
-			int(math.Round(DW_METERS_TO_FEET(float64(bp.alt_m)))),
+			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
-			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
-			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			bp.freq, bp.tone, bp.offset,
+			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
+			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
+			unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset),
 			super_comment)
 
 	case BEACON_OBJECT:
 		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), bp.lat, bp.lon, bp.ambiguity,
 			bp.symtab, bp.symbol,
-			int(bp.power), int(bp.height), int(bp.gain), bp.dir,
-			G_UNKNOWN, G_UNKNOWN, /* course, speed */
-			bp.freq, bp.tone, bp.offset, super_comment)
+			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
+			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
+			unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset), super_comment)
 
 	case BEACON_TRACKER:
 		if gpsinfo.fix >= DWFIX_2D {
@@ -742,11 +761,11 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.speed_knots)
 
 			beacon_text += EncodePosition(bp.messaging, bp.compress,
-				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, orUnknown(my_alt_ft),
+				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
-				int(bp.power), int(bp.height), int(bp.gain), bp.dir,
-				orUnknown(coarse), orUnknown(knots),
-				float64(bp.freq), float64(bp.tone), float64(bp.offset),
+				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
+				coarse, knots,
+				unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset),
 				super_comment)
 
 			/* Write to log file for testing. */
