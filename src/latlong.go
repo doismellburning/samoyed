@@ -23,6 +23,36 @@ import (
 
 const G_UNKNOWN = (-999999)
 
+/* Latitude and longitude arriving from a config file, the CLI or a decoded
+ * packet can be out of range.  The conversions below are fixed width and
+ * cannot fail, so they confine the value rather than reporting it; whoever
+ * accepted the value is the one with the context to complain about it.
+ */
+
+// clampLat confines a latitude to the representable range.
+func clampLat(dlat float64) float64 {
+	return min(90., max(-90., dlat))
+}
+
+// clampLon confines a longitude to the representable range.
+func clampLon(dlong float64) float64 {
+	return min(180., max(-180., dlong))
+}
+
+// allDigits reports whether every byte of s is an ASCII digit.  An NMEA
+// coordinate is fixed width and unsigned, so anything else in it - a sign, a
+// second decimal point, a character corrupted in transit - makes the field
+// unusable rather than something to interpret.
+func allDigits(s string) bool {
+	for i := range len(s) {
+		if !unicode.IsDigit(rune(s[i])) {
+			return false
+		}
+	}
+
+	return true
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        latitude_to_str
@@ -55,19 +85,7 @@ const G_UNKNOWN = (-999999)
  *----------------------------------------------------------------*/
 
 func latitude_to_str(dlat float64, ambiguity int) string {
-	if dlat < -90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is less than -90.  Changing to -90.\n")
-
-		dlat = -90.
-	}
-
-	if dlat > 90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
-
-		dlat = 90.
-	}
+	dlat = clampLat(dlat)
 
 	var hemi rune /* Hemisphere: N or S */
 
@@ -136,19 +154,7 @@ func latitude_to_str(dlat float64, ambiguity int) string {
  *----------------------------------------------------------------*/
 
 func longitude_to_str(dlong float64, ambiguity int) string {
-	if dlong < -180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is less than -180.  Changing to -180.\n")
-
-		dlong = -180.
-	}
-
-	if dlong > 180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is greater than 180.  Changing to 180.\n")
-
-		dlong = 180.
-	}
+	dlong = clampLon(dlong)
 
 	var hemi rune /* Hemisphere: E or W */
 
@@ -211,19 +217,7 @@ func longitude_to_str(dlong float64, ambiguity int) string {
  *----------------------------------------------------------------*/
 
 func latitude_to_comp_str(dlat float64) string {
-	if dlat < -90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is less than -90.  Changing to -90.\n")
-
-		dlat = -90.
-	}
-
-	if dlat > 90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
-
-		dlat = 90.
-	}
+	dlat = clampLat(dlat)
 
 	var y = int(math.Round(380926. * (90. - dlat)))
 
@@ -258,19 +252,7 @@ func latitude_to_comp_str(dlat float64) string {
  *----------------------------------------------------------------*/
 
 func longitude_to_comp_str(dlong float64) string {
-	if dlong < -180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is less than -180.  Changing to -180.\n")
-
-		dlong = -180.
-	}
-
-	if dlong > 180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Longitude is greater than 180.  Changing to 180.\n")
-
-		dlong = 180.
-	}
+	dlong = clampLon(dlong)
 
 	var x = int(math.Round(190463. * (180. + dlong)))
 
@@ -309,19 +291,7 @@ func latitude_to_nmea(dlat float64) (string, string) {
 		return "", ""
 	}
 
-	if dlat < -90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is less than -90.  Changing to -90.\n")
-
-		dlat = -90.
-	}
-
-	if dlat > 90. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Latitude is greater than 90.  Changing to 90.\n")
-
-		dlat = 90.
-	}
+	dlat = clampLat(dlat)
 
 	var hemi string
 
@@ -366,19 +336,7 @@ func longitude_to_nmea(dlong float64) (string, string) {
 		return "", ""
 	}
 
-	if dlong < -180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("longitude is less than -180.  Changing to -180.\n")
-
-		dlong = -180.
-	}
-
-	if dlong > 180. {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("longitude is greater than 180.  Changing to 180.\n")
-
-		dlong = 180.
-	}
+	dlong = clampLon(dlong)
 
 	var hemi string
 
@@ -414,7 +372,8 @@ func longitude_to_nmea(dlong float64) (string, string) {
  * Inputs:	pstr 	- Pointer to numeric string.
  *		phemi	- Pointer to following field.  Should be N or S.
  *
- * Returns:	Double precision value in degrees.  Negative for South.
+ * Returns:	Value in degrees, negative for South, or an error describing
+ *		why the field could not be used.
  *
  * Description:	Latitude field has
  *			2 digits for degrees
@@ -426,33 +385,46 @@ func longitude_to_nmea(dlong float64) (string, string) {
  *
  * Bugs:	Very little validation of data.
  *
- * Errors:	Return constant G_UNKNOWN for any type of error.
+ * Errors:	An error for any type of problem, including a value out of
+ *		range or a hemisphere that is neither N nor S.  Callers are
+ *		expected to have checked that the field is present at all;
+ *		this does not print, because the caller knows which sentence
+ *		the field came from and whether it was asked to stay quiet.
  *
  *------------------------------------------------------------------*/
 
-func latitude_from_nmea(pstr string, phemi byte) float64 {
+func latitude_from_nmea(pstr string, phemi byte) (float64, error) {
 	if len(pstr) < 5 {
-		return (G_UNKNOWN)
+		return 0, fmt.Errorf("latitude %q is too short for ddmm.mm", pstr)
 	}
 
-	if !unicode.IsDigit(rune(pstr[0])) {
-		return (G_UNKNOWN)
+	if !allDigits(pstr[0:4]) {
+		return 0, fmt.Errorf("latitude %q must have four digits of degrees and minutes before the decimal point", pstr)
 	}
 
 	if pstr[4] != '.' {
-		return (G_UNKNOWN)
+		return 0, fmt.Errorf("latitude %q must have a decimal point after the minutes", pstr)
 	}
 
-	var (
-		lat     = float64(pstr[0]-'0')*10 + float64(pstr[1]-'0')
-		mins, _ = strconv.ParseFloat(pstr[2:], 64)
-	)
+	if !allDigits(pstr[5:]) {
+		return 0, fmt.Errorf("latitude %q must have only digits after the decimal point", pstr)
+	}
+
+	var mins, minsErr = strconv.ParseFloat(pstr[2:], 64)
+	if minsErr != nil {
+		return 0, fmt.Errorf("latitude %q has unusable minutes: %w", pstr, minsErr)
+	}
+
+	if mins >= 60 {
+		return 0, fmt.Errorf("latitude %q has %.4f minutes, which must be less than 60", pstr, mins)
+	}
+
+	var lat = float64(pstr[0]-'0')*10 + float64(pstr[1]-'0')
 
 	lat += mins / 60.0
 
 	if lat < 0 || lat > 90 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error: Latitude not in range of 0 to 90.\n")
+		return 0, fmt.Errorf("latitude %.4f is not in range of 0 to 90", lat)
 	}
 
 	// Saw this one time:
@@ -464,15 +436,14 @@ func latitude_from_nmea(pstr string, phemi byte) float64 {
 	// trying to extract any data from it.
 
 	if phemi != 'N' && phemi != 'S' && phemi != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error: Latitude hemisphere should be N or S.\n")
+		return 0, fmt.Errorf("latitude hemisphere %q should be N or S", rune(phemi))
 	}
 
 	if phemi == 'S' {
 		lat = (-lat)
 	}
 
-	return (lat)
+	return lat, nil
 }
 
 /*------------------------------------------------------------------
@@ -484,7 +455,8 @@ func latitude_from_nmea(pstr string, phemi byte) float64 {
  * Inputs:	pstr 	- Pointer to numeric string.
  *		phemi	- Pointer to following field.  Should be E or W.
  *
- * Returns:	Double precision value in degrees.  Negative for West.
+ * Returns:	Value in degrees, negative for West, or an error describing why
+ *		the field could not be used.
  *
  * Description:	Longitude field has
  *			3 digits for degrees
@@ -495,45 +467,57 @@ func latitude_from_nmea(pstr string, phemi byte) float64 {
  *
  * Bugs:	Very little validation of data.
  *
- * Errors:	Return constant G_UNKNOWN for any type of error.
+ * Errors:	An error for any type of problem, including a value out of
+ *		range or a hemisphere that is neither E nor W.  Callers are
+ *		expected to have checked that the field is present at all;
+ *		this does not print, because the caller knows which sentence
+ *		the field came from and whether it was asked to stay quiet.
  *
  *------------------------------------------------------------------*/
 
-func longitude_from_nmea(pstr string, phemi byte) float64 {
+func longitude_from_nmea(pstr string, phemi byte) (float64, error) {
 	if len(pstr) < 6 {
-		return (G_UNKNOWN)
+		return 0, fmt.Errorf("longitude %q is too short for dddmm.mm", pstr)
 	}
 
-	if !unicode.IsDigit(rune(pstr[0])) {
-		return (G_UNKNOWN)
+	if !allDigits(pstr[0:5]) {
+		return 0, fmt.Errorf("longitude %q must have five digits of degrees and minutes before the decimal point", pstr)
 	}
 
 	if pstr[5] != '.' {
-		return (G_UNKNOWN)
+		return 0, fmt.Errorf("longitude %q must have a decimal point after the minutes", pstr)
 	}
 
-	var (
-		lon     = float64(pstr[0]-'0')*100 + float64(pstr[1]-'0')*10 + float64(pstr[2]-'0')
-		mins, _ = strconv.ParseFloat(pstr[3:], 64)
-	)
+	if !allDigits(pstr[6:]) {
+		return 0, fmt.Errorf("longitude %q must have only digits after the decimal point", pstr)
+	}
+
+	var mins, minsErr = strconv.ParseFloat(pstr[3:], 64)
+	if minsErr != nil {
+		return 0, fmt.Errorf("longitude %q has unusable minutes: %w", pstr, minsErr)
+	}
+
+	if mins >= 60 {
+		return 0, fmt.Errorf("longitude %q has %.4f minutes, which must be less than 60", pstr, mins)
+	}
+
+	var lon = float64(pstr[0]-'0')*100 + float64(pstr[1]-'0')*10 + float64(pstr[2]-'0')
 
 	lon += mins / 60.0
 
 	if lon < 0 || lon > 180 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error: Longitude not in range of 0 to 180.\n")
+		return 0, fmt.Errorf("longitude %.4f is not in range of 0 to 180", lon)
 	}
 
 	if phemi != 'E' && phemi != 'W' && phemi != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error: Longitude hemisphere should be E or W.\n")
+		return 0, fmt.Errorf("longitude hemisphere %q should be E or W", rune(phemi))
 	}
 
 	if phemi == 'W' {
 		lon = (-lon)
 	}
 
-	return (lon)
+	return lon, nil
 }
 
 /*------------------------------------------------------------------
@@ -697,10 +681,7 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	var np = len(maidenhead) / 2 /* Number of pairs of characters. */
 
 	if len(maidenhead)%2 != 0 || np < MH_MIN_PAIR || np > MH_MAX_PAIR {
-		text_color_set(DW_COLOR_ERROR)
-
-		var s = fmt.Sprintf("Maidenhead locator \"%s\" must from 1 to %d pairs of characters.\n", maidenhead, MH_MAX_PAIR)
-		dw_printf("%s", s)
+		var s = fmt.Sprintf("Maidenhead locator \"%s\" must be from 1 to %d pairs of characters.", maidenhead, MH_MAX_PAIR)
 
 		return 0, 0, errors.New(s)
 	}
@@ -714,11 +695,8 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	for n := range np {
 		if mh[2*n] < pairs[n].min_ch || mh[2*n] > pairs[n].max_ch ||
 			mh[2*n+1] < pairs[n].min_ch || mh[2*n+1] > pairs[n].max_ch {
-			text_color_set(DW_COLOR_ERROR)
-
-			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.\n",
+			var s = fmt.Sprintf("The %s pair of characters in Maidenhead locator \"%s\" must be in range of %c thru %c.",
 				pairs[n].position, maidenhead, pairs[n].min_ch, pairs[n].max_ch)
-			dw_printf("%s", s)
 
 			return 0, 0, errors.New(s)
 		}

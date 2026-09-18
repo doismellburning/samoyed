@@ -112,12 +112,30 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("unparseable latitude leaves position unknown", func(t *testing.T) {
-		// latitude_from_nmea returns the G_UNKNOWN sentinel for a field it
-		// can't parse; that must not reach the caller as a position.
+		// latitude_from_nmea returns an error for a field it can't parse; that
+		// must not reach the caller as a position, and a sentence carrying one
+		// is as unusable as a sentence with no latitude field at all.
 		var result = dwgpsnmea_gprmc("$GPRMC,003413.710,A,X237.1240,N,07120.8333,W,5.07,291.42,160614,,,A*13", true)
 
 		require.NotNil(t, result)
 		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
+	})
+
+	t.Run("out of range latitude leaves position unknown", func(t *testing.T) {
+		var result = dwgpsnmea_gprmc("$GPRMC,003413.710,A,9537.1240,N,07120.8333,W,5.07,291.42,160614,,,A*75", true)
+
+		require.NotNil(t, result)
+		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
+	})
+
+	t.Run("bad hemisphere leaves position unknown", func(t *testing.T) {
+		var result = dwgpsnmea_gprmc("$GPRMC,003413.710,A,4237.1240,X,07120.8333,W,5.07,291.42,160614,,,A*69", true)
+
+		require.NotNil(t, result)
+		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
 	})
 
 	t.Run("bad checksum returns error", func(t *testing.T) {
@@ -165,11 +183,40 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 		assert.Equal(t, DWFIX_NO_FIX, result.Fix)
 	})
 
+	// GPGGA runs the same error-handling path as GPRMC, so it needs the same
+	// cases: a field that is present but unusable must leave the position
+	// unknown and the fix in error, whatever is wrong with it.
+
 	t.Run("unparseable latitude leaves position unknown", func(t *testing.T) {
 		var result = dwgpsnmea_gpgga("$GPGGA,003518.710,X237.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*37", true)
 
 		require.NotNil(t, result)
 		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
+	})
+
+	t.Run("out of range latitude leaves position unknown", func(t *testing.T) {
+		var result = dwgpsnmea_gpgga("$GPGGA,003518.710,9537.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*51", true)
+
+		require.NotNil(t, result)
+		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
+	})
+
+	t.Run("sixty minutes of latitude leaves position unknown", func(t *testing.T) {
+		var result = dwgpsnmea_gpgga("$GPGGA,003518.710,4260.1250,N,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*59", true)
+
+		require.NotNil(t, result)
+		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
+	})
+
+	t.Run("bad hemisphere leaves position unknown", func(t *testing.T) {
+		var result = dwgpsnmea_gpgga("$GPGGA,003518.710,4237.1250,X,07120.8327,W,1,03,5.9,33.5,M,-33.5,M,,0000*4D", true)
+
+		require.NotNil(t, result)
+		assert.Equal(t, maybe.Nothing[float64](), result.Lat)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
 	})
 
 	t.Run("bad checksum returns error", func(t *testing.T) {

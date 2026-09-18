@@ -618,6 +618,9 @@ func decode_aprs_print(A *decode_aprs_t) {
 			if err == nil {
 				A.g_lat = maybe.Just(lat)
 				A.g_lon = maybe.Just(lon)
+			} else if !A.g_quiet {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("%v\n", err)
 			}
 		}
 
