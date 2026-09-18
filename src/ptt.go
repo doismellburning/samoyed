@@ -119,8 +119,10 @@ package direwolf
 */
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -894,12 +896,30 @@ func ptt_init(audio_config_p *audio_s) {
 		if audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_CM108 {
+					var device = audio_config_p.achan[ch].octrl[ot].ptt_device
+
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("Using %s GPIO %d for channel %d %s control.\n",
-						audio_config_p.achan[ch].octrl[ot].ptt_device,
+						device,
 						audio_config_p.achan[ch].octrl[ot].out_gpio_num,
 						ch,
 						otnames[ot])
+
+					if device == "" {
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("Warning: No CM108 HID found for channel %d %s.  Specify one in the config file.\n", ch, otnames[ot])
+
+						continue
+					}
+
+					// Check it now rather than discovering the hard way at the
+					// first transmission.  An unfamiliar device may still work.
+					var checkErr = CM108CheckDevice(device)
+					if checkErr != nil {
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("Warning: %v.  Proceed at your own risk.\n", checkErr)
+						cm108_print_permission_advice(device, checkErr)
+					}
 				}
 			}
 		}
@@ -1168,13 +1188,41 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 	 */
 
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
-		if CM108SetGPIOPin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
-			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt) != 0 {
+		var err = CM108SetGPIOPin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
+			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt)
+		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR:  %s for channel %d has failed.  See User Guide for troubleshooting tips.\n", otnames[ot], channel)
+			dw_printf("ERROR:  %s for channel %d has failed: %v\n", otnames[ot], channel, err)
+			dw_printf("See User Guide for troubleshooting tips.\n")
 		}
 	}
 } /* end ptt_set */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:	cm108_print_permission_advice
+ *
+ * Purpose:	Explain how to fix the permissions on a CM108 HID, for the
+ *		errors where that is the likely cause.
+ *
+ * Inputs:	name	- Device name, e.g. /dev/hidraw2.
+ *
+ *		err	- Error returned by one of the CM108 functions.
+ *			  Nothing is printed unless it is a permission problem.
+ *
+ *------------------------------------------------------------------*/
+
+func cm108_print_permission_advice(name string, err error) {
+	if !errors.Is(err, fs.ErrPermission) {
+		return
+	}
+
+	text_color_set(DW_COLOR_ERROR)
+
+	for _, line := range CM108PermissionAdvice(name) {
+		dw_printf("%s\n", line)
+	}
+}
 
 /*-------------------------------------------------------------------
  *

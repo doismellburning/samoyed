@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,6 +41,18 @@ func cm108_usage() {
 	os.Exit(1)
 }
 
+// cm108_print_permission_advice explains how to fix the permissions on a CM108
+// HID, for the errors where that is the likely cause.
+func cm108_print_permission_advice(name string, err error) {
+	if !errors.Is(err, fs.ErrPermission) {
+		return
+	}
+
+	for _, line := range direwolf.CM108PermissionAdvice(name) {
+		fmt.Printf("%s\n", line)
+	}
+}
+
 func main() {
 	direwolf.TextColorInit(0) // Turn off text color.
 
@@ -56,13 +70,22 @@ func main() {
 			os.Exit(1)
 		}
 
+		// Telling people whether a device is usable is this tool's job, so
+		// check once here before we start toggling the pin.
+		var checkErr = direwolf.CM108CheckDevice(path)
+		if checkErr != nil {
+			fmt.Printf("Warning: %v.  Proceed at your own risk.\n", checkErr)
+			cm108_print_permission_advice(path, checkErr)
+		}
+
 		var state = 0
 		for {
 			fmt.Printf("%d", state)
 
 			var err = direwolf.CM108SetGPIOPin(path, gpio, state)
-			if err != 0 {
-				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO!\n")
+			if err != nil {
+				fmt.Printf("\nWRITE ERROR for USB Audio Adapter GPIO: %v\n", err)
+				cm108_print_permission_advice(path, err)
 				cm108_usage()
 				os.Exit(1)
 			}
@@ -75,7 +98,11 @@ func main() {
 
 	// Take inventory of USB Audio adapters and other HID devices.
 
-	var things, _ = direwolf.CM108Inventory(direwolf.MAXX_THINGS)
+	var things, inventoryErr = direwolf.CM108Inventory(direwolf.MAXX_THINGS)
+	if inventoryErr != nil {
+		fmt.Printf("%v\n", inventoryErr)
+		os.Exit(1)
+	}
 
 	if len(things) == 0 {
 		fmt.Printf("No relevant USB devices found!\n")
