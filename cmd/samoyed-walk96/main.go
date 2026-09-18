@@ -80,12 +80,6 @@ func main() {
 
 var sequence = 0
 
-// toEncoder hands an optional reading to the encoders, which still speak the
-// G_UNKNOWN sentinel; see issue #619.
-func toEncoder(m maybe.Maybe[float64]) float64 {
-	return maybe.FromMaybe(direwolf.G_UNKNOWN, m)
-}
-
 /* Should be called once per second. */
 
 //nolint:unparam // fix is reported alongside the rest of the GPS reading.
@@ -107,7 +101,8 @@ func walk96(fix int, lat float64, lon float64, knots maybe.Maybe[float64], cours
 		maybe.Fmap(func(meters float64) int { return int(direwolf.DW_METERS_TO_FEET(meters)) }, alt),
 		'/', '=',
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", // PHGd not specified
-		int(toEncoder(course)), int(toEncoder(knots)),
+		maybe.Fmap(func(degrees float64) int { return int(degrees) }, course),
+		maybe.Fmap(func(speed float64) int { return int(speed) }, knots),
 		445.925, 0, 0,
 		comment)
 

@@ -856,14 +856,11 @@ x = Silence FX.25 information.`)
 // TODO:  Use only one printf per line so output doesn't get jumbled up with stuff from other threads.
 
 // ais_object_course_speed rounds a decoded course and speed into the integer
-// degrees and knots encode_object takes, leaving an unknown one as the
-// G_UNKNOWN sentinel it understands.  Rounding the sentinel instead would give
-// a number that is not G_UNKNOWN, which encode_object folds back into range
-// and transmits as a course nobody reported.
+// degrees and knots encode_object takes, leaving an unknown one absent.
 // Should encode_object take floating point here?
-func ais_object_course_speed(A *decode_aprs_t) (int, int) {
-	var course = orUnknown(maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course))
-	var speed = orUnknown(maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph))
+func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[int]) {
+	var course = maybe.Fmap(func(degrees float64) int { return int(degrees + 0.5) }, A.g_course)
+	var speed = maybe.Fmap(func(mph float64) int { return int(DW_MPH_TO_KNOTS(mph) + 0.5) }, A.g_speed_mph)
 
 	return course, speed
 }

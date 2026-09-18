@@ -733,7 +733,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
-			G_UNKNOWN, G_UNKNOWN, /* course, speed */
+			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
 			bp.freq, bp.tone, bp.offset,
 			super_comment)
 
@@ -741,7 +741,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), bp.lat, bp.lon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
-			G_UNKNOWN, G_UNKNOWN, /* course, speed */
+			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
 			bp.freq, bp.tone, bp.offset, super_comment)
 
 	case BEACON_TRACKER:
@@ -764,7 +764,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
-				orUnknown(coarse), orUnknown(knots),
+				coarse, knots,
 				float64(bp.freq), float64(bp.tone), float64(bp.offset),
 				super_comment)
 

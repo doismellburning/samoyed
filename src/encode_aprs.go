@@ -87,7 +87,6 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
  *		gain	- dBi.
  *
  * 		course	- Degrees, 0 - 360 (360 equiv. to 0).
- *			  Use G_UNKNOWN for none or unknown.
  *		speed	- knots.
  *
  *
@@ -112,7 +111,7 @@ func compressed_position_string(p *compressed_position_t) string {
 
 func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int],
-	course int, speed int) *compressed_position_t {
+	course maybe.Maybe[int], speed maybe.Maybe[int]) *compressed_position_t {
 	var presult = new(compressed_position_t)
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
@@ -166,12 +165,13 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	var p = maybe.FromMaybe(0, power)
 	var h = maybe.FromMaybe(0, height)
 	var g = maybe.FromMaybe(0, gain)
+	var knots = maybe.FromMaybe(0, speed)
 
-	if speed > 0 {
+	if knots > 0 {
 		var c int
 
-		if course != G_UNKNOWN {
-			c = (course + 2) / 4
+		if degrees, known := course.Get(); known {
+			c = (degrees + 2) / 4
 			if c < 0 {
 				c += 90
 			}
@@ -179,13 +179,11 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 			if c >= 90 {
 				c -= 90
 			}
-		} else {
-			c = 0
 		}
 
 		presult.C = byte(c + '!')
 
-		var s = math.Round(math.Log(float64(speed)+1.0) / math.Log(1.08))
+		var s = math.Round(math.Log(float64(knots)+1.0) / math.Log(1.08))
 		presult.S = byte(s + '!')
 
 		presult.T = 0x26 + '!' /* current, other tracker. */
@@ -318,7 +316,6 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
  * Purpose:     Fill in parts of the course & speed data extension.
  *
  * Inputs: 	course	- Degrees, 0 - 360 (360 equiv. to 0).
- *			  Use G_UNKNOWN for none or unknown.
  *
  *		speed	- knots.
  *
@@ -330,10 +327,10 @@ func phg_data_extension(power maybe.Maybe[int], height maybe.Maybe[int], gain ma
  *
  *----------------------------------------------------------------*/
 
-func cse_spd_data_extension(course int, speed int) string {
+func cse_spd_data_extension(course maybe.Maybe[int], speed maybe.Maybe[int]) string {
 	var cse int
-	if course != G_UNKNOWN {
-		cse = course
+	if degrees, known := course.Get(); known {
+		cse = degrees
 		for cse < 1 {
 			cse += 360
 		}
@@ -343,13 +340,11 @@ func cse_spd_data_extension(course int, speed int) string {
 		}
 		// Should now be in range of 1 - 360. */
 		// Original value of 0 for north is transmitted as 360. */
-	} else {
-		cse = 0
 	}
 
-	var spd = speed
+	var spd = maybe.FromMaybe(0, speed)
 	if spd < 0 {
-		spd = 0 // would include G_UNKNOWN
+		spd = 0
 	}
 
 	if spd > 999 {
@@ -438,8 +433,7 @@ func frequency_spec(freq float64, tone float64, offset float64) string {
  *		dir	- Directivity: N, NE, etc., omni.
  *
  *		course	- Degrees, 0 - 360 (360 equiv. to 0).
- *			  Use G_UNKNOWN for none or unknown.
- *		speed	- knots.		// TODO:  should distinguish unknown(not revevant) vs. known zero.
+ *		speed	- knots.
  *
  * 	 	freq	- MHz.
  *		tone	- Hz.
@@ -480,7 +474,7 @@ type aprs_compressed_pos_t struct {
 func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, ambiguity int, alt_ft maybe.Maybe[int],
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
-	course int, speed int,
+	course maybe.Maybe[int], speed maybe.Maybe[int],
 	freq float64, tone float64, offset float64,
 	comment string) string {
 	var result string
@@ -513,7 +507,7 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
 		/* Optional data extension. (singular) */
 		/* Can't have both course/speed and PHG.  Former gets priority. */
 
-		if course != G_UNKNOWN || speed > 0 {
+		if course.IsJust() || maybe.FromMaybe(0, speed) > 0 {
 			var cse = cse_spd_data_extension(course, speed)
 			result += cse
 		} else if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
@@ -580,7 +574,6 @@ func EncodePosition(messaging bool, compressed bool, lat float64, lon float64, a
  *		dir	- Direction: N, NE, etc., omni.
  *
  *		course	- Degrees, 0 - 360 (360 equiv. to 0).
- *			  Use G_UNKNOWN for none or unknown.
  *		speed	- knots.
  *
  * 	 	freq	- MHz.
@@ -615,7 +608,7 @@ type aprs_object_t struct {
 func encode_object(name string, compressed bool, thyme time.Time, lat float64, lon float64, ambiguity int,
 	symtab byte, symbol byte,
 	power maybe.Maybe[int], height maybe.Maybe[int], gain maybe.Maybe[int], dir string,
-	course int, speed int,
+	course maybe.Maybe[int], speed maybe.Maybe[int],
 	freq float64, tone float64, offset float64, comment string) string {
 	var dti = ';'
 	var liveKilled = '*'
@@ -639,7 +632,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 		/* Optional data extension. (singular) */
 		/* Can't have both course/speed and PHG.  Former gets priority. */
 
-		if course != G_UNKNOWN || speed > 0 {
+		if course.IsJust() || maybe.FromMaybe(0, speed) > 0 {
 			result += cse_spd_data_extension(course, speed)
 		} else if maybe.FromMaybe(0, power) > 0 || maybe.FromMaybe(0, height) > 0 || maybe.FromMaybe(0, gain) > 0 {
 			result += phg_data_extension(power, height, gain, dir)

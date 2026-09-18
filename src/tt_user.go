@@ -721,7 +721,7 @@ func xmit_object_report(i int, first_time bool) {
 	stemp += encode_object(object_name, false, tt_user[i].last_heard, olat, olong, oambig,
 		byte(tt_user[i].overlay), byte(tt_user[i].symbol),
 		maybe.Nothing[int](), maybe.Nothing[int](), maybe.Nothing[int](), "", /* PHGD */
-		G_UNKNOWN, G_UNKNOWN, /* Course/Speed */
+		maybe.Nothing[int](), maybe.Nothing[int](), /* Course/Speed */
 		freq,
 		ctcss,
 		G_UNKNOWN, /* CTCSS */

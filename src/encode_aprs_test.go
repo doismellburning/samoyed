@@ -33,15 +33,15 @@ func Test_EncodePosition_partially_specified_phg(t *testing.T) {
 	var some = maybe.Just[int]
 
 	var result = EncodePosition(false, false, 42+34.61/60, -(71 + 26.47/60), 0, none, 'D', '&',
-		some(50), none, none, "", G_UNKNOWN, 0, 0, 0, 0, "")
+		some(50), none, none, "", none, some(0), 0, 0, 0, "")
 	assert.Equal(t, "!4234.61ND07126.47W&PHG7000", result)
 
 	// Compressed positions carry the same three values as a radio range.
 
 	result = EncodePosition(false, true, 42+34.61/60, -(71 + 26.47/60), 0, none, 'D', '&',
-		some(50), none, none, "", G_UNKNOWN, 0, 0, 0, 0, "")
+		some(50), none, none, "", none, some(0), 0, 0, 0, "")
 	assert.NotContains(t, result, "\x00", "compressed radio range")
 	assert.Equal(t, EncodePosition(false, true, 42+34.61/60, -(71+26.47/60), 0, none, 'D', '&',
-		some(50), some(0), some(0), "", G_UNKNOWN, 0, 0, 0, 0, ""), result,
+		some(50), some(0), some(0), "", none, some(0), 0, 0, 0, ""), result,
 		"absent height/gain should encode as the unspecified defaults")
 }
