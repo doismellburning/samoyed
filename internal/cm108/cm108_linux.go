@@ -345,12 +345,10 @@ func write(name string, iomask int, iodata int) error {
 	// that direwolf's dw_printf is itself just fmt.Printf.
 
 	var info, ioctlErr = unix.IoctlHIDGetRawInfo(int(fd.Fd()))
-	if ioctlErr == nil {
-		if !GoodDevice(int(info.Vendor), int(info.Product)) {
-			fmt.Printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", name, ioctlErr)
-		} else {
-			fmt.Printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
-		}
+
+	var warning = deviceWarning(name, info, ioctlErr)
+	if warning != "" {
+		fmt.Print(warning)
 	}
 
 	// To make a long story short, I think we need 0 for the first two bytes.
@@ -390,3 +388,26 @@ func write(name string, iomask int, iodata int) error {
 
 	return nil
 } /* end write */
+
+// deviceWarning describes anything untoward about the HID whose device
+// information was just fetched, or returns "" if there is nothing to say.
+//
+// Dire Wolf's cm108.c has the two messages the wrong way round: it reports an
+// ioctl failure when the ioctl succeeded but named an unrecognised device, and
+// reports an unsupported device - using the device information the failed
+// ioctl never filled in - when the ioctl itself failed.  We deliberately
+// differ from upstream here.
+func deviceWarning(name string, info *unix.HIDRawDevInfo, ioctlErr error) string {
+	if ioctlErr != nil {
+		return fmt.Sprintf("ioctl HIDIOCGRAWINFO failed for %s. errno = %v.\n", name, ioctlErr)
+	}
+
+	if info == nil || GoodDevice(int(info.Vendor), int(info.Product)) {
+		return ""
+	}
+
+	// Vendor and Product are int16, matching the kernel's signed hidraw_devinfo
+	// fields, but the message promises four hexadecimal digits.
+	return fmt.Sprintf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n",
+		name, uint16(info.Vendor), uint16(info.Product))
+}
