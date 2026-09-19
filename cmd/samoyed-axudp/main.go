@@ -10,6 +10,7 @@ import (
 	"os"
 
 	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -69,6 +70,12 @@ Flags:
 	var verbose = pflag.Bool("verbose", false, "Log every packet sent and received")
 	pflag.Parse()
 
+	if *verbose {
+		// The per-packet entries are logged at Trace, and logrus defaults to
+		// Info, so they would otherwise be dropped.
+		logrus.SetLevel(logrus.TraceLevel)
+	}
+
 	if *help {
 		pflag.Usage()
 		os.Exit(0)
@@ -106,7 +113,7 @@ Flags:
 	}
 	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", *kissPort)
 
-	var b = direwolf.NewAXUDPBridge(maps, udpConn, *verbose)
+	var b = direwolf.NewAXUDPBridge(maps, udpConn)
 
 	// Either half failing is fatal for the bridge as a whole, so whichever
 	// returns first decides: report it and exit rather than limping along with

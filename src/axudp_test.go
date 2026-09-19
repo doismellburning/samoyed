@@ -595,7 +595,7 @@ func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
 		t.Fatal("pkt is not a *net.UDPConn")
 	}
 
-	var b = NewAXUDPBridge(nil, udpConn, false)
+	var b = NewAXUDPBridge(nil, udpConn)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunUDPListener() }()
@@ -628,7 +628,7 @@ func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
 		t.Fatal(listenErr)
 	}
 
-	var b = NewAXUDPBridge(nil, nil, false)
+	var b = NewAXUDPBridge(nil, nil)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunKISSServer(ln) }()
@@ -676,7 +676,7 @@ func (l *failingListener) Addr() net.Addr { return &net.TCPAddr{IP: net.IPv4zero
 // spins the CPU and floods the log.
 func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 	var ln = new(failingListener)
-	var b = NewAXUDPBridge(nil, nil, false)
+	var b = NewAXUDPBridge(nil, nil)
 
 	var errs = make(chan error, 1)
 	go func() { errs <- b.RunKISSServer(ln) }()
@@ -711,7 +711,7 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 	}
 	defer ln.Close()
 
-	var b = NewAXUDPBridge(nil, nil, false)
+	var b = NewAXUDPBridge(nil, nil)
 
 	go b.RunKISSServer(ln) //nolint:errcheck // the error is the teardown path, covered above
 
