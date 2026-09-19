@@ -1,0 +1,53 @@
+.\" SPDX-FileCopyrightText: The Samoyed Authors
+.\" SPDX-License-Identifier: GPL-2.0-or-later
+.TH SAMOYED\-KISSDUMP 1
+
+.SH NAME
+samoyed\-kissdump \- Decode a captured KISS byte stream.
+
+
+.SH SYNOPSIS
+.B samoyed\-kissdump
+[ \fIoptions\fR ] < \fIcapture\fR
+
+
+.SH DESCRIPTION
+\fBsamoyed\-kissdump\fR reads a capture of the bytes exchanged with a KISS TNC
+from standard input and describes what it contains.
+
+For each frame it undoes the KISS framing, shows the command byte and port
+number, decodes the AX.25 header (addresses, digipeater path with the H bits,
+control and PID), and hands the information field to the APRS decoder where the
+frame is APRS.
+
+Malformed input is reported rather than skipped, since that is usually what is
+being chased: an unterminated frame, a bad escape sequence, a frame too short
+to hold an AX.25 header, and bytes that are not part of any frame are all
+described.  The exit status is non-zero if anything was wrong.
+
+
+.SH OPTIONS
+.TP
+.BI "--hex"
+Input is hexadecimal digits rather than raw bytes, such as
+.B c0 00 82
+or
+.BR c00082 .
+Whitespace is ignored, so it does not matter how the digits are laid out across
+lines, but anything else is an error: the offsets and ASCII column of a hex dump
+have to be cut away first, or they would be read as data.
+.TP
+.BI "--help"
+Display help text.
+
+
+.SH EXAMPLES
+.P
+.B samoyed\-kissdump < capture.bin
+.P
+.B samoyed\-kissdump --hex < capture.txt
+
+
+.SH SEE ALSO
+.BR samoyed-kissutil (1),
+.BR samoyed-decode_aprs (1)

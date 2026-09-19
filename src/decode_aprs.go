@@ -180,6 +180,25 @@ type decode_aprs_t struct {
 
 /*------------------------------------------------------------------
  *
+ * Function:	DecodeAPRSInit
+ *
+ * Purpose:	Prepare the tables that decoding and printing an APRS packet
+ *		need, for a program that does nothing else.
+ *
+ * Description:	The full application sets these up as part of its own startup;
+ *		this is for the standalone tools, which would otherwise be a
+ *		nil pointer away from a crash the first time they decoded
+ *		anything.
+ *
+ *------------------------------------------------------------------*/
+
+func DecodeAPRSInit() {
+	deviceIDData = NewDeviceIDData()
+	aprsSymbolData = NewAPRSSymbolData()
+}
+
+/*------------------------------------------------------------------
+ *
  * Function:	decode_aprs
  *
  * Purpose:	Split APRS packet into separate properties that it contains.
