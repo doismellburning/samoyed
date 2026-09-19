@@ -2858,6 +2858,24 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"OBEACON": {
+			{
+				name:   "an object beacon is stored with its name",
+				config: "MYCALL Q1TEST\nOBEACON OBJNAME=Q2TEST LAT=42N LONG=71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_OBJECT, c.misc.beacon[0].btype)
+					a.Equal("Q2TEST", c.misc.beacon[0].objname)
+				},
+			},
+			{
+				name:   "a rejected line configures no beacon",
+				config: "MYCALL Q1TEST\nOBEACON OBJNAME=Q2TEST BOGUS=1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.num_beacons)
+				},
+			},
+		},
 		"PACLEN": {
 			{
 				name:   "a valid length is stored",
@@ -3771,7 +3789,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"CBEACON",
 		"IBEACON",
-		"OBEACON",
 		"SMARTBEACON",
 		"SMARTBEACONING",
 		"TBEACON",
