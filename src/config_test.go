@@ -2675,6 +2675,33 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal(2, c.misc.maxv22)
 				},
 			},
+			// Regression test: config_init set the default to a concrete
+			// AX25_N2_RETRY_DEFAULT/3, which left the "if maxv22 < 0" fallback at the
+			// end of it dead code, so a configured RETRY no longer scaled the number
+			// of SABMEs.  RETRY 12 gave 3 rather than 4, and only looked right
+			// because RETRY's own default is 10.
+			{
+				name:   "with no MAXV22 the count follows the configured retry count",
+				config: "RETRY 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(4, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "an explicit count is not overridden by the retry count",
+				config: "RETRY 12\nMAXV22 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "an unreadable count with nothing configured still follows the retry count",
+				config: "RETRY 12\nMAXV22 two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(4, c.misc.maxv22)
+					a.Contains(c.output, "Ignoring this line")
+				},
+			},
 		},
 		"NCHANNEL": {
 			{

@@ -1174,8 +1174,11 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT /* Max frames to send before ACK.  mod 128 "Window" size. */
 
-	p_misc_config.maxv22 = AX25_N2_RETRY_DEFAULT / 3 /* Send SABME this many times before falling back to SABM. */
-	p_misc_config.v20_addrs = nil                    /* Go directly to v2.0 for stations listed */
+	// Send SABME this many times before falling back to SABM.  Negative means
+	// the config file did not say, and the end of config_init works it out from
+	// whatever RETRY ended up as.
+	p_misc_config.maxv22 = -1
+	p_misc_config.v20_addrs = nil /* Go directly to v2.0 for stations listed */
 	/* without trying v2.2 first. */
 	p_misc_config.v20_count = 0
 	p_misc_config.noxid_addrs = nil /* Don't send XID to these stations. */
@@ -6258,7 +6261,7 @@ func handleMAXV22(ps *parseState) bool {
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: MAXV22 number must be numeric. Keeping %d.\n", ps.line, ps.misc.maxv22)
+		dw_printf("Line %d: MAXV22 number must be numeric. Ignoring this line.\n", ps.line)
 
 		return false
 	}
