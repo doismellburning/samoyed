@@ -3046,7 +3046,14 @@ func handleFX25TX(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: FEC mode must be numeric for FX25TX command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].fx25_strength)
+
+		return false
+	}
 	if n >= 0 && n < 200 {
 		ps.audio.achan[ps.channel].fx25_strength = n
 		ps.audio.achan[ps.channel].layer2_xmit = LAYER2_FX25
@@ -3087,7 +3094,14 @@ func handleFX25AUTO(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Count must be numeric for FX25AUTO command. Keeping %d.\n",
+			ps.line, ps.audio.fx25_auto_enable)
+
+		return false
+	}
 	if n >= 0 && n < 20 {
 		ps.audio.fx25_auto_enable = n
 	} else {

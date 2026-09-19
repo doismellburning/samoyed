@@ -1306,6 +1306,16 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the count went through an Atoi whose error was
+			// ignored, so "FX25AUTO abc" read as the 0 returned alongside it and
+			// silently disabled the feature.
+			{
+				name:   "an unreadable count leaves the configured one alone",
+				config: "FX25AUTO 3\nFX25AUTO abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.audio.fx25_auto_enable)
+				},
+			},
 		},
 		"FX25TX": {
 			{
@@ -1353,6 +1363,17 @@ func directiveTests() map[string][]directiveCase {
 				check: func(a *assert.Assertions, c configs) {
 					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
 					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the mode went through an Atoi whose error was
+			// ignored, so "FX25TX abc" read as the 0 returned alongside it and
+			// silently replaced a configured number of parity bytes.
+			{
+				name:   "an unreadable mode leaves the configured one alone",
+				config: "FX25TX 16\nFX25TX abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(16, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
 				},
 			},
 		},
