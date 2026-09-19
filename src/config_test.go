@@ -749,6 +749,24 @@ func Test_config_init_beacon_numbers_with_units(t *testing.T) {
 	assert.InDelta(t, 100.0, misc.beacon[0].tone, 0.001)
 }
 
+// --- config_init beacon line rejected part way through ---
+
+func Test_config_init_beacon_rejected_line_does_not_leak(t *testing.T) {
+	// Regression test: a beacon line whose options don't parse does not count
+	// towards num_beacons, so the next beacon line is parsed into the same
+	// array slot.  beacon_options reset only some of the fields, so the good
+	// line inherited the rest - here the rejected line's COMMENT and POWER.
+	var config = "MYCALL Q1TEST\n" +
+		"PBEACON LAT=42N LONG=71W COMMENT=\"leaked\" POWER=50 BOGUS=1\n" +
+		"PBEACON LAT=43N LONG=72W\n"
+
+	var _, misc = configFromString(t, config)
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Empty(t, misc.beacon[0].comment)
+	assert.Zero(t, misc.beacon[0].power)
+}
+
 // --- config_init PBEACON directive (no options) ---
 
 func Test_config_init_pbeacon_no_options(t *testing.T) {

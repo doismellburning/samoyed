@@ -5865,6 +5865,13 @@ func handleXBEACON(ps *parseState) bool {
 	// TODO: maybe add proportional pathing so multiple beacon timing does not need to be manually constructed?
 	// http://www.aprs.org/newN/ProportionalPathing.txt
 	if ps.misc.num_beacons < MAX_BEACONS {
+		/* A beacon line whose options don't parse leaves num_beacons alone, so
+		 * the next beacon line reuses this array slot.  Start it blank rather
+		 * than inheriting whatever the rejected line managed to set. */
+		var blank beacon_s
+
+		ps.misc.beacon[ps.misc.num_beacons] = blank
+
 		if strings.EqualFold(ps.keyword, "PBEACON") {
 			ps.misc.beacon[ps.misc.num_beacons].btype = BEACON_POSITION
 		} else if strings.EqualFold(ps.keyword, "OBEACON") {
