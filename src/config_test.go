@@ -1529,6 +1529,18 @@ func directiveTests() map[string][]directiveCase {
 					a.Contains(c.output, "Invalid port number for GPSD")
 				},
 			},
+			// Regression test: the port went through an Atoi whose error was ignored,
+			// and the handler accepts 0 alongside the usual range, so "GPSD host
+			// two-nine-four-seven" configured port 0 and every connection attempt
+			// failed.
+			{
+				name:   "an unreadable port falls back to the usual one",
+				config: "GPSD gps.example.com twentynineoneseven\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("gps.example.com", c.misc.gpsd_host)
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+				},
+			},
 		},
 		"GPSNMEA": {
 			{

@@ -5816,7 +5816,14 @@ func handleGPSD(ps *parseState) bool {
 
 		t = split("", false)
 		if t != "" {
-			var n, _ = strconv.Atoi(t)
+			var n, nErr = strconv.Atoi(t)
+			if nErr != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Port number must be numeric for GPSD. Using default of %d.\n",
+					ps.line, ps.misc.gpsd_port)
+
+				return false
+			}
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 				ps.misc.gpsd_port = n
 			} else {
