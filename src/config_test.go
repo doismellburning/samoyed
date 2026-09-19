@@ -3660,6 +3660,73 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTMACRO": {
+			{
+				name:   "a pattern and its expansion are stored",
+				config: "TTMACRO xxyyy B9xx*AB1yyy\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_MACRO, c.tt.ttlocs[0].ttlocType)
+					a.Equal("xxyyy", c.tt.ttlocs[0].pattern)
+					a.Equal("B9xx*AB1yyy", c.tt.ttlocs[0].macro.definition)
+				},
+			},
+			{
+				name:   "no TTMACRO means no macros",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "a callsign in braces is converted to tones",
+				config: "TTMACRO 911 B9AC{Q1TEST}\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.NotContains(c.tt.ttlocs[0].macro.definition, "{")
+					a.Contains(c.tt.ttlocs[0].macro.definition, "AC")
+				},
+			},
+			{
+				name:   "an object name in braces is converted to tones",
+				config: "TTMACRO 912 B9AA{FIRETRUCK}\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.NotContains(c.tt.ttlocs[0].macro.definition, "{")
+				},
+			},
+			{
+				name:   "an unclosed brace is reported",
+				config: "TTMACRO 913 B9AC{Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "is missing matching }")
+				},
+			},
+			{
+				name:   "a pattern with unusable characters is reported and skipped",
+				config: "TTMACRO 9w1 B9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "pattern can contain only digits")
+					a.Contains(c.output, "Errors found in TTMACRO, skipping")
+				},
+			},
+			{
+				name:   "a variable field in the pattern that the definition never uses is reported",
+				config: "TTMACRO xxyyy B9xx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "is in TTMACRO pattern but is not used in definition")
+				},
+			},
+			{
+				name:   "a missing definition does not eat the next line",
+				config: "TTMACRO 911\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTMGRS": {
 			{
 				name:   "the other name of the same handler asks for MGRS instead",
@@ -4310,7 +4377,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"TTCMD",
 		"TTERR",
-		"TTMACRO",
 		"TTOBJ",
 		"TTSTATUS",
 	}
