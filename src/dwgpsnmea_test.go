@@ -203,6 +203,19 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 		assert.Equal(t, maybe.Just(-999999.0), result.Alt)
 	})
 
+	t.Run("non-finite altitude is an error", func(t *testing.T) {
+		// Unlike -999999, these do not survive conversion to the integer feet
+		// of an /A= field.
+		for _, field := range []string{"NaN", "inf"} {
+			var sentence = "$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9," + field + ",M,-33.5,M,,0000*21"
+			var result = dwgpsnmea_gpgga(sentence, true)
+
+			require.NotNil(t, result)
+			assert.Equal(t, DWFIX_ERROR, result.Fix, field)
+			assert.Equal(t, maybe.Nothing[float64](), result.Alt, field)
+		}
+	})
+
 	t.Run("fix field zero returns no fix", func(t *testing.T) {
 		// Example from source code comments.
 		var result = dwgpsnmea_gpgga("$GPGGA,001429.00,,,,,0,00,99.99,,,,,,*68", true)

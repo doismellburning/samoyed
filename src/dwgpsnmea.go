@@ -650,14 +650,16 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 
 	if altitudeFound {
 		if len(paltitude) > 0 {
+			/* ParseFloat accepts "NaN" and "inf", neither of which survives
+			 * the conversion to the integer feet of an /A= field. */
 			var altitude, altitudeErr = strconv.ParseFloat(paltitude, 64)
-			if altitudeErr == nil {
+			if altitudeErr == nil && !math.IsNaN(altitude) && !math.IsInf(altitude, 0) {
 				result.Alt = maybe.Just(altitude)
 				result.Fix = DWFIX_3D
 			} else {
 				if !quiet {
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Can't get altitude from GPGGA sentence: %s\n", altitudeErr)
+					dw_printf("Can't get altitude from GPGGA sentence: %s\n", paltitude)
 				}
 
 				result.Fix = DWFIX_ERROR
