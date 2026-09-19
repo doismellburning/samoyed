@@ -108,3 +108,33 @@ func Test_decode_aprs_truncated_weather(t *testing.T) {
 	var A = decode_aprs(AX25FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true, "")
 	assert.Equal(t, `wind 4.6 mph, direction 220, gust 5, ""`, A.g_weather)
 }
+
+// A positionless weather report was decoded by binary.Decode into a struct
+// with a fixed 99-byte comment field.  Any report shorter than the whole 108
+// bytes - which is very nearly all of them - failed the decode and left the
+// struct zeroed, so the weather was thrown away and the station type came out
+// as a hundred NUL bytes.
+func Test_decode_aprs_positionless_weather(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var A = decode_aprs(AX25FromText(
+		"Q1TEST>APRS:_10090556c220s004g005t077r000p000P000h50b09900wRSW", true), true, "")
+
+	assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc)
+	assert.Equal(t,
+		`wind 4.0 mph, direction 220, gust 5, temperature 77, `+
+			`rain 0.00 in last hour, rain 0.00 in last 24 hours, rain 0.00 since midnight, `+
+			`humidity 50, barometer 29.24, "wRSW"`,
+		A.g_weather)
+}
+
+// A positionless weather report with nothing after its timestamp has no
+// weather data to decode, and must say so rather than read off the end.
+func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	for _, info := range []string{"_", "_1009", "_10090556", "_10090556c2"} {
+		var A = decode_aprs(AX25FromText("Q1TEST>APRS:"+info, true), true, "")
+		assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc, "%s", info)
+	}
+}
