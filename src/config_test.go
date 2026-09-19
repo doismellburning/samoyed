@@ -451,6 +451,14 @@ func Test_config_init_txdelay(t *testing.T) {
 		var cfg, _ = configFromString(t, "TXDELAY 999\n")
 		assert.Equal(t, DEFAULT_TXDELAY, cfg.achan[0].txdelay)
 	})
+
+	// Regression test: the value went through an Atoi whose error was ignored,
+	// so "TXDELAY abc" read as 0 - in range, and a transmit delay too short for
+	// another station to hear - rather than being rejected.
+	t.Run("unreadable value leaves the configured one alone", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "TXDELAY 20\nTXDELAY abc\n")
+		assert.Equal(t, 20, cfg.achan[0].txdelay)
+	})
 }
 
 // --- config_init SLOTTIME directive ---
@@ -1190,6 +1198,16 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the value went through an Atoi whose error was
+			// ignored, so an unreadable one read as the 0 it returns alongside it -
+			// which is in range - and silently replaced whatever was configured.
+			{
+				name:   "an unreadable delay leaves the configured one alone",
+				config: "DWAIT 20\nDWAIT abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].dwait)
+				},
+			},
 		},
 		"ICHANNEL": {
 			{
@@ -1395,6 +1413,16 @@ func directiveTests() map[string][]directiveCase {
 				check: func(a *assert.Assertions, c configs) {
 					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
 					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the value went through an Atoi whose error was
+			// ignored, so "TXTAIL abc" read as 0 - in range, and a transmit tail of
+			// nothing at all - rather than being rejected.
+			{
+				name:   "an unreadable time leaves the configured one alone",
+				config: "TXTAIL 20\nTXTAIL abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].txtail)
 				},
 			},
 		},

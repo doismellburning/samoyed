@@ -2733,7 +2733,14 @@ func handleDWAIT(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Delay time must be numeric for DWAIT command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].dwait)
+
+		return false
+	}
 	if n >= 0 && n <= 255 {
 		ps.audio.achan[ps.channel].dwait = n
 	} else {
@@ -2844,7 +2851,14 @@ func handleTXDELAY(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Time must be numeric for TXDELAY command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].txdelay)
+
+		return false
+	}
 	if n >= 0 && n <= 255 {
 		text_color_set(DW_COLOR_ERROR)
 
@@ -2896,7 +2910,14 @@ func handleTXTAIL(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Time must be numeric for TXTAIL command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].txtail)
+
+		return false
+	}
 	if n >= 0 && n <= 255 {
 		if n < 5 {
 			dw_printf("Line %d: Setting TXTAIL that small is a REALLY BAD idea if you want other stations to hear you.\n",
