@@ -3797,6 +3797,82 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTOBJ": {
+			{
+				name:   "a receive and transmit channel enable the gateway",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.obj_recv_chan)
+					a.Equal(1, c.tt.obj_xmit_chan)
+					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].dtmf_decode)
+				},
+			},
+			{
+				name:   "no TTOBJ leaves the gateway off",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+				},
+			},
+			{
+				name:   "APP and IG can be asked for instead of a channel",
+				config: "MYCALL Q1TEST\nTTOBJ 0 APP,IG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.tt.obj_send_to_app)
+					a.Equal(1, c.tt.obj_send_to_ig)
+					a.Equal(-1, c.tt.obj_xmit_chan)
+				},
+			},
+			{
+				name:   "a via path is stored",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1 WIDE1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("WIDE1-1", c.tt.obj_xmit_via)
+				},
+			},
+			{
+				name:   "an unusable via path is rejected but the rest of the line stands",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1 WIDE1-1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.tt.gateway_enabled)
+					a.Empty(c.tt.obj_xmit_via)
+					a.Contains(c.output, "invalid via path")
+				},
+			},
+			{
+				name:   "a receive channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nTTOBJ 1 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Contains(c.output, "DTMF receive channel 1 is not valid")
+				},
+			},
+			{
+				name:   "a transmit channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nTTOBJ 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Contains(c.output, "transmit channel 1 is not valid")
+				},
+			},
+			{
+				name:   "something that is neither a channel, APP nor IG is rejected",
+				config: "MYCALL Q1TEST\nTTOBJ 0 SOMEWHERE\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Contains(c.output, "Expected comma separated list")
+				},
+			},
+			{
+				name:   "a missing transmit destination does not eat the next line",
+				config: "TTOBJ 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTPOINT": {
 			{
 				name:   "a pattern and its position are stored",
@@ -4377,7 +4453,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"TTCMD",
 		"TTERR",
-		"TTOBJ",
 		"TTSTATUS",
 	}
 }
