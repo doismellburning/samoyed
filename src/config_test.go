@@ -1155,6 +1155,17 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"CBEACON": {
+			{
+				name:   "a custom beacon carries the information part as given",
+				config: "MYCALL Q1TEST\nCBEACON INFO=\">Custom status\"\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_CUSTOM, c.misc.beacon[0].btype)
+					a.Equal(">Custom status", c.misc.beacon[0].custom_info)
+				},
+			},
+		},
 		// Connected mode digipeating needs an internal modem at both ends, so a
 		// network TNC channel is not allowed here even though DIGIPEAT allows one.
 		"CDIGIPEAT": {
@@ -3798,7 +3809,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"CBEACON",
 		"IBEACON",
 		"SMARTBEACON",
 		"SMARTBEACONING",
