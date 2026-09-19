@@ -178,26 +178,6 @@ type decode_aprs_t struct {
 
 }
 
-/*
- * Bridges to and from the parts of the codebase that still use the G_UNKNOWN
- * sentinel (gpsinfo, encode_aprs, ...).  They should disappear as those are
- * converted in their turn.
- */
-
-// unlessUnknown is Just the value, unless it is the G_UNKNOWN sentinel.
-func unlessUnknown[T ~float64 | ~int](value T) maybe.Maybe[T] {
-	if value == G_UNKNOWN {
-		return maybe.Nothing[T]()
-	}
-
-	return maybe.Just(value)
-}
-
-// orUnknown is the value, or the G_UNKNOWN sentinel for Nothing.
-func orUnknown[T ~float64 | ~int](m maybe.Maybe[T]) T {
-	return maybe.FromMaybe(T(G_UNKNOWN), m)
-}
-
 /*------------------------------------------------------------------
  *
  * Function:	decode_aprs

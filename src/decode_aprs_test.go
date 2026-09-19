@@ -60,24 +60,6 @@ func Test_decode_aprs_zero_value_has_no_position(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[int](), A.g_power)
 }
 
-// The bridges to the subsystems that still use the sentinel must not turn an
-// absent value into a real one: a GPS fix carries no speed until it has one,
-// and wrapping G_UNKNOWN in Just would log -999999 MPH as though it had been
-// measured.
-func Test_decode_aprs_sentinel_bridges(t *testing.T) {
-	assert.Equal(t, maybe.Nothing[float64](), unlessUnknown(float64(G_UNKNOWN)))
-	assert.Equal(t, maybe.Nothing[int](), unlessUnknown(int(G_UNKNOWN)))
-	assert.Equal(t, maybe.Just(0.0), unlessUnknown(0.0))
-
-	assert.InDelta(t, float64(G_UNKNOWN), orUnknown(maybe.Nothing[float64]()), 0.001)
-	assert.Equal(t, G_UNKNOWN, orUnknown(maybe.Nothing[int]()))
-	assert.InDelta(t, 0.0, orUnknown(maybe.Just(0.0)), 0.001)
-
-	// A conversion of an unknown value stays unknown rather than becoming a
-	// number that no longer looks like the sentinel.
-	assert.Equal(t, maybe.Nothing[float64](), maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(float64(G_UNKNOWN))))
-}
-
 // A weather report that stops in the middle of its fields used to run the
 // decoder off the end of the information field and panic, taking the whole
 // program down with it - from a received packet, so anyone within earshot

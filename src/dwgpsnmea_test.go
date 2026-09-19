@@ -89,18 +89,41 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 		assert.Equal(t, maybe.Nothing[float64](), result.Course)
 	})
 
-	t.Run("sentinel speed and course stay unknown", func(t *testing.T) {
-		// -999999 parses as a float but is the G_UNKNOWN sentinel, so it must
-		// not come back as a speed anyone reported.
-		var speed = dwgpsnmea_gprmc("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,-999999,291.42,160614,,,A*4E", true)
+	t.Run("negative speed is an error", func(t *testing.T) {
+		// Speed over ground is a magnitude, so a receiver cannot have measured
+		// this and the sentence is no more usable than one whose speed field
+		// isn't a number.
+		var result = dwgpsnmea_gprmc("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,-5.07,291.42,160614,,,A*52", true)
 
-		require.NotNil(t, speed)
-		assert.Equal(t, maybe.Nothing[float64](), speed.Knots)
+		require.NotNil(t, result)
+		assert.Equal(t, DWFIX_ERROR, result.Fix)
+		assert.Equal(t, maybe.Nothing[float64](), result.Knots)
+	})
 
-		var course = dwgpsnmea_gprmc("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,5.07,-999999,160614,,,A*40", true)
+	t.Run("non-finite speed is an error", func(t *testing.T) {
+		// ParseFloat is happy to read these, and int(NaN) is not defined.
+		for _, field := range []string{"inf", "NaN"} {
+			var sentence = "$GPRMC,003413.710,A,4237.1240,N,07120.8333,W," + field + ",291.42,160614,,,A*02"
+			var result = dwgpsnmea_gprmc(sentence, true)
 
-		require.NotNil(t, course)
-		assert.Equal(t, maybe.Nothing[float64](), course.Course)
+			require.NotNil(t, result)
+			assert.Equal(t, DWFIX_ERROR, result.Fix, field)
+			assert.Equal(t, maybe.Nothing[float64](), result.Knots, field)
+		}
+	})
+
+	t.Run("course outside a circle stays unknown", func(t *testing.T) {
+		var result = dwgpsnmea_gprmc("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,5.07,361.00,160614,,,A*77", true)
+
+		require.NotNil(t, result)
+		assert.Equal(t, DWFIX_2D, result.Fix)
+		assert.Equal(t, maybe.Nothing[float64](), result.Course)
+
+		// 360 is the same direction as 0 and receivers do send it.
+		var wrapped = dwgpsnmea_gprmc("$GPRMC,003413.710,A,4237.1240,N,07120.8333,W,5.07,360.00,160614,,,A*76", true)
+
+		require.NotNil(t, wrapped)
+		assert.Equal(t, maybe.Just(360.0), wrapped.Course)
 	})
 
 	t.Run("void status returns no fix", func(t *testing.T) {
@@ -168,11 +191,29 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 		assert.Equal(t, maybe.Nothing[float64](), result.Alt)
 	})
 
-	t.Run("sentinel altitude stays unknown", func(t *testing.T) {
+	t.Run("an implausible altitude is still an altitude", func(t *testing.T) {
+		// -999999 was the G_UNKNOWN sentinel, and a value a receiver would
+		// never send, but it is a number and nothing here filters numbers for
+		// plausibility.  This pins that deliberate choice so a sentinel-shaped
+		// special case cannot creep back in unnoticed.
 		var result = dwgpsnmea_gpgga("$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9,-999999,M,-33.5,M,,0000*6D", true)
 
 		require.NotNil(t, result)
-		assert.Equal(t, maybe.Nothing[float64](), result.Alt)
+		assert.Equal(t, DWFIX_3D, result.Fix)
+		assert.Equal(t, maybe.Just(-999999.0), result.Alt)
+	})
+
+	t.Run("non-finite altitude is an error", func(t *testing.T) {
+		// Unlike -999999, these do not survive conversion to the integer feet
+		// of an /A= field.
+		for _, field := range []string{"NaN", "inf"} {
+			var sentence = "$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9," + field + ",M,-33.5,M,,0000*21"
+			var result = dwgpsnmea_gpgga(sentence, true)
+
+			require.NotNil(t, result)
+			assert.Equal(t, DWFIX_ERROR, result.Fix, field)
+			assert.Equal(t, maybe.Nothing[float64](), result.Alt, field)
+		}
 	})
 
 	t.Run("fix field zero returns no fix", func(t *testing.T) {
