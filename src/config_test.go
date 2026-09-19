@@ -3447,6 +3447,26 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// SMARTBEACONING is not ported yet: the handler only says so.  These cases
+		// pin that down, so that the day it works the tests fail rather than the
+		// operator's tracker quietly not smart beaconing.
+		"SMARTBEACON": {
+			{
+				name:   "the line is skipped and said to be skipped",
+				config: "MYCALL Q1TEST\nSMARTBEACON 60 180 5 1800 15 30 255\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.sb_configured)
+					a.Contains(c.output, "SMARTBEACONING support currently disabled")
+				},
+			},
+			{
+				name:   "it does not eat the next line",
+				config: "SMARTBEACON 60 180 5 1800 15 30 255\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"SPEECH": {
 			{
 				name:   "a script name is accepted and does not derail the next line",
@@ -3820,7 +3840,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"SMARTBEACON",
 		"SMARTBEACONING",
 		"TTAMBIG",
 		"TTCMD",
