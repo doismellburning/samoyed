@@ -22,6 +22,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
+	"github.com/sirupsen/logrus"
 )
 
 const TQ_NUM_PRIO = 2 /* Number of priorities. */
@@ -94,12 +95,7 @@ var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
 // TODO KG static struct audio_s *save_audio_config_p;
 
 func tq_init(audio_config_p *audio_s) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_init (  )\n");
-	#endif
-	*/
+	logrus.Debug("tq_init")
 	save_audio_config_p = audio_config_p
 
 	for c := range MAX_RADIO_CHANS {
@@ -163,15 +159,6 @@ func tq_init(audio_config_p *audio_s) {
  *--------------------------------------------------------------------*/
 
 func tq_append(channel int, prio int, pp *packet_t) {
-	/* TODO KG
-	#if DEBUG
-		unsigned char *pinfo;
-		int info_len = AX25GetInfo (pp, &pinfo);
-		if (info_len > 10) info_len = 10;
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_append (channel=%d, prio=%d, pp=%p) \"%*s\"\n", channel, prio, pp, info_len, (char*)pinfo);
-	#endif
-	*/
 	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -179,6 +166,14 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		dw_printf("INTERNAL ERROR:  tq_append nil packet pointer. Please report this!\n")
 
 		return
+	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"info":    string(AX25GetInfo(pp)),
+		}).Debug("tq_append")
 	}
 
 	/* TODO KG
@@ -276,12 +271,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		return
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_append: enter critical section\n");
-	#endif
-	*/
+	logrus.Trace("tq_append: enter critical section")
 
 	tq_mutex.Lock()
 
@@ -311,13 +301,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 	tq_mutex.Unlock()
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_append: left critical section\n");
-		dw_printf ("tq_append (): about to wake up xmit thread.\n");
-	#endif
-	*/
+	logrus.Trace("tq_append: left critical section, about to wake up xmit thread")
 
 	if xmit_thread_is_waiting[channel] {
 		wake_up_mutex[channel].Lock()
@@ -401,15 +385,6 @@ func tq_append(channel int, prio int, pp *packet_t) {
 // TODO: FIXME:  this is a copy of tq_append.  Need to fine tune and explain why.
 
 func lm_data_request(channel int, prio int, pp *packet_t) {
-	/* TODO KG
-	#if DEBUG
-		unsigned char *pinfo;
-		int info_len = AX25GetInfo (pp, &pinfo);
-		if (info_len > 10) info_len = 10;
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_data_request (channel=%d, prio=%d, pp=%p) \"%*s\"\n", channel, prio, pp, info_len, (char*)pinfo);
-	#endif
-	*/
 	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -417,6 +392,14 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		dw_printf("INTERNAL ERROR:  lm_data_request nil packet pointer. Please report this!\n")
 
 		return
+	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"info":    string(AX25GetInfo(pp)),
+		}).Debug("lm_data_request")
 	}
 
 	/* TODO KG
@@ -454,12 +437,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_data_request: enter critical section\n");
-	#endif
-	*/
+	logrus.Trace("lm_data_request: enter critical section")
 
 	tq_mutex.Lock()
 
@@ -487,12 +465,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	tq_mutex.Unlock()
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_data_request: left critical section\n");
-	#endif
-	*/
+	logrus.Trace("lm_data_request: left critical section")
 
 	// Appendix C2a, from the Ax.25 protocol spec, says that a priority frame
 	// will start transmission.  If not already transmitting, normal frames
@@ -503,11 +476,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	//NO!	if (prio == TQ_PRIO_0_HI) {
 
-	/* TODO KG
-	   #if DEBUG
-	   	  dw_printf ("lm_data_request (): about to wake up xmit thread.\n");
-	   #endif
-	*/
+	logrus.Trace("lm_data_request: about to wake up xmit thread")
 	if xmit_thread_is_waiting[channel] {
 		wake_up_mutex[channel].Lock()
 		wake_up_cond[channel].Signal()
@@ -572,13 +541,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 func lm_seize_request(channel int) {
 	var prio = TQ_PRIO_1_LO
 
-	/* TODO KG
-	#if DEBUG
-		unsigned char *pinfo;
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_seize_request (channel=%d)\n", channel);
-	#endif
-	*/
+	logrus.WithField("channel", channel).Debug("lm_seize_request")
 
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
 		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
@@ -608,12 +571,7 @@ func lm_seize_request(channel int) {
 	#endif
 	*/
 
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("lm_seize_request: enter critical section\n");
-	   #endif
-	*/
+	logrus.Trace("lm_seize_request: enter critical section")
 
 	tq_mutex.Lock()
 
@@ -641,18 +599,9 @@ func lm_seize_request(channel int) {
 
 	tq_mutex.Unlock()
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("lm_seize_request: left critical section\n");
-	#endif
-	*/
+	logrus.Trace("lm_seize_request: left critical section")
 
-	/* TODO KG
-	   #if DEBUG
-	   	dw_printf ("lm_seize_request (): about to wake up xmit thread.\n");
-	   #endif
-	*/
+	logrus.Trace("lm_seize_request: about to wake up xmit thread")
 
 	if xmit_thread_is_waiting[channel] {
 		wake_up_mutex[channel].Lock()
@@ -676,68 +625,46 @@ func lm_seize_request(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_wait_while_empty(channel int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_wait_while_empty (%d) : enter critical section\n", channel);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: enter critical section")
+	}
+
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	tq_mutex.Lock()
 
-	/* TODO KG
-	#if DEBUG
-		//text_color_set(DW_COLOR_DEBUG);
-		//dw_printf ("tq_wait_while_empty (%d): after pthread_mutex_lock\n", channel);
-	#endif
-	*/
 	var is_empty = tq_is_empty(channel)
 
 	tq_mutex.Unlock()
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_wait_while_empty (%d) : left critical section\n", channel);
-	#endif
-	*/
-
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("tq_wait_while_empty (%d): is_empty = %d\n", channel, is_empty);
-	   #endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: left critical section")
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"is_empty": is_empty,
+		}).Trace("tq_wait_while_empty")
+	}
 
 	if is_empty {
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("tq_wait_while_empty (%d): SLEEP - about to call cond wait\n", channel);
-		#endif
-		*/
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: SLEEP - about to call cond wait")
+		}
+
 		wake_up_mutex[channel].Lock()
 		xmit_thread_is_waiting[channel] = true
 		wake_up_cond[channel].Wait()
 		xmit_thread_is_waiting[channel] = false
 
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("tq_wait_while_empty (%d): WOKE UP - returned from cond wait, err = %d\n", channel, err);
-		#endif
-		*/
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: WOKE UP - returned from cond wait")
+		}
 
 		wake_up_mutex[channel].Unlock()
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_wait_while_empty (%d) returns\n", channel);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("channel", channel).Trace("tq_wait_while_empty returns")
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -755,12 +682,12 @@ func tq_wait_while_empty(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_remove(channel int, prio int) *packet_t {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_remove(%d,%d) enter critical section\n", channel, prio);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+		}).Trace("tq_remove: enter critical section")
+	}
 	tq_mutex.Lock()
 
 	var result_p *packet_t
@@ -781,12 +708,13 @@ func tq_remove(channel int, prio int) *packet_t {
 
 	tq_mutex.Unlock()
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_remove(%d,%d) leave critical section, returns %p\n", channel, prio, result_p);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"prio":     prio,
+			"result_p": result_p,
+		}).Trace("tq_remove: leave critical section")
+	}
 
 	/* TODO KG
 	   #if AX25MEMDEBUG
@@ -819,12 +747,12 @@ func tq_remove(channel int, prio int) *packet_t {
  *--------------------------------------------------------------------*/
 
 func tq_peek(channel int, prio int) *packet_t {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_peek(%d,%d) enter critical section\n", channel, prio);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+		}).Trace("tq_peek: enter critical section")
+	}
 
 	// I don't think we need critical region here.
 	//dw_mutex_lock (&tq_mutex);
@@ -833,12 +761,13 @@ func tq_peek(channel int, prio int) *packet_t {
 
 	//dw_mutex_unlock (&tq_mutex);
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_remove(%d,%d) leave critical section, returns %p\n", channel, prio, result_p);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"prio":     prio,
+			"result_p": result_p,
+		}).Trace("tq_peek: leave critical section")
+	}
 
 	/* TODO KG
 	   #if AX25MEMDEBUG
@@ -903,12 +832,15 @@ func tq_is_empty(channel int) bool {
 //#define DEBUG2 1
 
 func tq_count(channel int, prio int, source string, dest string, bytes bool) int {
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_count(channel=%d, prio=%d, source=\"%s\", dest=\"%s\", bytes=%d)\n", channel, prio, source, dest, bytes);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"source":  source,
+			"dest":    dest,
+			"bytes":   bytes,
+		}).Trace("tq_count")
+	}
 	if prio == -1 {
 		return (tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes))
 	}
@@ -920,12 +852,16 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 
 	var n = tq_count_locked(channel, prio, source, dest, bytes)
 
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("tq_count(%d, %d, \"%s\", \"%s\", %d) returns %d\n", channel, prio, source, dest, bytes, n);
-	#endif
-	*/
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"source":  source,
+			"dest":    dest,
+			"bytes":   bytes,
+			"n":       n,
+		}).Trace("tq_count returns")
+	}
 
 	return (n)
 } /* end tq_count */
@@ -955,13 +891,9 @@ func tq_count_locked(channel int, prio int, source string, dest string, bytes bo
 
 			if source != "" {
 				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-				/* TODO KG
-				#if DEBUG2
-					// I'm cringing at the thought of printing while in a critical region.  But it's only for temp debug.  :-(
-					    text_color_set(DW_COLOR_DEBUG);
-					    dw_printf ("tq_count: compare to frame source %s\n", frame_source);
-				#endif
-				*/
+				if logrus.IsLevelEnabled(logrus.TraceLevel) {
+					logrus.WithField("frame_source", frame_source).Trace("tq_count: compare to frame source")
+				}
 				if source != frame_source {
 					count_it = 0
 				}
@@ -969,13 +901,9 @@ func tq_count_locked(channel int, prio int, source string, dest string, bytes bo
 
 			if count_it > 0 && dest != "" {
 				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-				/* TODO KG
-				#if DEBUG2
-					// I'm cringing at the thought of printing while in a critical region.  But it's only for debug debug.  :-(
-					    text_color_set(DW_COLOR_DEBUG);
-					    dw_printf ("tq_count: compare to frame destination %s\n", frame_dest);
-				#endif
-				*/
+				if logrus.IsLevelEnabled(logrus.TraceLevel) {
+					logrus.WithField("frame_dest", frame_dest).Trace("tq_count: compare to frame destination")
+				}
 				if dest != frame_dest {
 					count_it = 0
 				}

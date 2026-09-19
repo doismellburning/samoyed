@@ -35,6 +35,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
 
@@ -392,12 +393,7 @@ func (g *TTGateway) Button(channel int, button rune) {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) Sequence(channel int, msg string) {
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("\n\"%s\"\n", msg);
-	   #endif
-	*/
+	logrus.WithField("msg", msg).Debug("aprs_tt Sequence")
 
 	/*
 	 * Discard empty message.
@@ -417,13 +413,17 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	 */
 	var err = g.parseFields(&state, msg)
 
-	/* TODO KG
-	#if defined(DEBUG)
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("callsign=\"%s\", ssid=%d, symbol=\"%c%c\", freq=\"%s\", ctcss=\"%s\", comment=\"%s\", lat=%.4f, lon=%.4f, dao=\"%s\"\n",
-			state.callsign, state.ssid, state.symtabOrOverlay, state.symbolCode, state.freq, state.ctcss, state.comment, state.latitude, state.longitude, state.dao);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"callsign":  state.callsign,
+		"ssid":      state.ssid,
+		"symbol":    string([]rune{state.symtabOrOverlay, state.symbolCode}),
+		"freq":      state.freq,
+		"ctcss":     state.ctcss,
+		"comment":   state.comment,
+		"latitude":  state.latitude,
+		"longitude": state.longitude,
+		"dao":       string(state.dao[:]),
+	}).Debug("APRStt parsed fields")
 
 	g.lastParseState = state
 
@@ -1226,13 +1226,14 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			var user_y_max = math.Round(math.Pow(10., float64(len(ystr))) - 1.) // e.g. 999 for 3 digits
 			state.latitude = maybe.Just(lat0 + yrange*y/user_y_max)
 
-			/* TODO KG
-			#if 0
-				      dw_printf ("TTLOC_GRID LAT min=%f, max=%f, range=%f\n", lat0, lat9, yrange);
-				      dw_printf ("TTLOC_GRID LAT user_y=%f, user_y_max=%f\n", y, user_y_max);
-				      dw_printf ("TTLOC_GRID LAT min + yrange * user_y / user_y_range = %f\n", state.latitude);
-			#endif
-			*/
+			logrus.WithFields(logrus.Fields{
+				"min":        lat0,
+				"max":        lat9,
+				"range":      yrange,
+				"user_y":     y,
+				"user_y_max": user_y_max,
+				"latitude":   state.latitude,
+			}).Debug("TTLOC_GRID LAT")
 
 			var lon0 = float64(g.config.ttlocs[ipat].grid.lon0)
 			var lon9 = float64(g.config.ttlocs[ipat].grid.lon9)
@@ -1241,13 +1242,14 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			var user_x_max = math.Round(math.Pow(10., float64(len(xstr))) - 1.)
 			state.longitude = maybe.Just(lon0 + xrange*x/user_x_max)
 
-			/* TODO KG
-			#if 0
-				      dw_printf ("TTLOC_GRID LON min=%f, max=%f, range=%f\n", lon0, lon9, xrange);
-				      dw_printf ("TTLOC_GRID LON user_x=%f, user_x_max=%f\n", x, user_x_max);
-				      dw_printf ("TTLOC_GRID LON min + xrange * user_x / user_x_range = %f\n", state.longitude);
-			#endif
-			*/
+			logrus.WithFields(logrus.Fields{
+				"min":        lon0,
+				"max":        lon9,
+				"range":      xrange,
+				"user_x":     x,
+				"user_x_max": user_x_max,
+				"longitude":  state.longitude,
+			}).Debug("TTLOC_GRID LON")
 
 			state.dao[2] = e[0]
 			state.dao[3] = e[1]

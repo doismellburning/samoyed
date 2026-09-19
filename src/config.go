@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
 
@@ -643,12 +644,7 @@ func parse_interval(str string, line int) int { //nolint:unparam
 //#define DEBUG8 1
 
 func check_via_path(via_path string) int {
-	/* TODO KG
-	#if DEBUG8
-		text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("check_via_path %s\n", via_path);
-	#endif
-	*/
+	logrus.WithField("via_path", via_path).Debug("check_via_path")
 	var parts = strings.Split(via_path, ",")
 	var num_digi = 0
 	var max_digi_hops = 0
@@ -660,12 +656,8 @@ func check_via_path(via_path string) int {
 		var addr, ssid, _, ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, part, strictness)
 
 		if !ok {
-			/* TODO KG
-			#if DEBUG8
-				    text_color_set(DW_COLOR_DEBUG);
-			            dw_printf ("check_via_path bad address\n");
-			#endif
-			*/
+			logrus.Debug("check_via_path bad address")
+
 			return (-1)
 		}
 
@@ -686,12 +678,10 @@ func check_via_path(via_path string) int {
 		return (-1)
 	}
 
-	/* TODO KG
-	#if DEBUG8
-		text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("check_via_path %d addresses, %d max digi hops\n", num_digi, max_digi_hops);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"num_digi":      num_digi,
+		"max_digi_hops": max_digi_hops,
+	}).Debug("check_via_path")
 
 	return (max_digi_hops)
 } /* end check_via_path */
@@ -946,12 +936,7 @@ func config_init(fname string, p_audio_config *audio_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
 	p_misc_config *misc_config_s) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("config_init ( %s )\n", fname);
-	#endif
-	*/
+	logrus.WithField("fname", fname).Debug("config_init")
 
 	/*
 	 * First apply defaults.

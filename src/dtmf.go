@@ -18,6 +18,8 @@ import (
 	"math"
 	"os"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 const DTMF_TIMEOUT_SEC = 5 /* for normal operation. */
@@ -90,19 +92,9 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 		D.sample_rate = p_audio_config.adev[a].samples_per_sec
 
 		if p_audio_config.achan[c].dtmf_decode != DTMF_DECODE_OFF {
-			/* TODO KG
-			#if DEBUG
-				    text_color_set(DW_COLOR_DEBUG);
-				    dw_printf ("channel %d:\n", c);
-			#endif
-			*/
+			logrus.WithField("channel", c).Debug("dtmf_init")
 			D.block_size = (205 * D.sample_rate) / 8000
 
-			/* TODO KG
-			#if DEBUG
-				    dw_printf ("    freq      k     coef    \n");
-			#endif
-			*/
 			for j := range NUM_TONES {
 				// Why do some insist on rounding k to the nearest integer?
 				// That would move the filter center frequency away from ideal.
@@ -113,11 +105,11 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 				D.coef[j] = float64(2.0 * math.Cos(2.0*math.Pi*float64(k)/float64(D.block_size)))
 
 				Assert(D.coef[j] > 0.0 && D.coef[j] < 2.0)
-				/* TODO KG
-				#if DEBUG
-					      dw_printf ("%8d   %5.1f   %8.5f  \n", DTMF_TONES[j], k, D.coef[j]);
-				#endif
-				*/
+				logrus.WithFields(logrus.Fields{
+					"freq": DTMF_TONES[j],
+					"k":    k,
+					"coef": D.coef[j],
+				}).Debug("DTMF tone filter")
 			}
 		}
 	}
@@ -231,13 +223,9 @@ func dtmf_sample(c int, input float64) rune {
 			col = -1
 		}
 
-		/* TODO KG
-		for i := 0; i < NUM_TONES; i++ {
-			#if DEBUG
-				    dw_printf ("%5.0f ", output[i]);
-			#endif
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("output", output).Trace("dtmf_sample tone outputs")
 		}
-		*/
 
 		var rc2char = []rune{'1', '2', '3', 'A',
 			'4', '5', '6', 'B',
@@ -293,12 +281,15 @@ func dtmf_sample(c int, input float64) rune {
 
 		D.prev_debounced = D.debounced
 
-		/* TODO KG
-		#if DEBUG
-			  dw_printf ("     dec=%c, deb=%c, ret=%c, to=%d \n",
-					decoded, D.debounced, ret, D.timeout);
-		#endif
-		*/
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithFields(logrus.Fields{
+				"dec":     string(decoded),
+				"deb":     string(D.debounced),
+				"ret":     string(ret),
+				"timeout": D.timeout,
+			}).Trace("dtmf_sample")
+		}
+
 		return (ret)
 	}
 

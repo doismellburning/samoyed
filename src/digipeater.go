@@ -38,6 +38,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -337,12 +339,10 @@ func digipeat_match(
 	var repeater = ax25_get_addr_with_ssid(pp, r)
 	var ssid = ax25_get_ssid(pp, r)
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("First unused digipeater is %s, ssid=%d\n", repeater, ssid);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"repeater": repeater,
+		"ssid":     ssid,
+	}).Debug("First unused digipeater")
 
 	/*
 	 * First check for explicit use of my call, including SSID.

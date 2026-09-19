@@ -69,6 +69,7 @@ import (
 	"os"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/sirupsen/logrus"
 )
 
 // Properties of the radio channels.
@@ -469,31 +470,34 @@ func pick_best_candidate(channel int) {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("\n%s\n", spectrum);
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("spectrum", spectrum).Trace("pick_best_candidate")
 
-		for (n = 0; n < num_bars; n++) {
-		  j = subchan_from_n(n);
-		  k = slice_from_n(n);
+		for n := range num_bars {
+			var j = subchan_from_n(channel, n)
+			var k = slice_from_n(channel, n)
+			var c = &candidate[channel][j][k]
 
-		  if (candidate[channel][j][k].packet_p == nil) {
-		    dw_printf ("%d.%d.%d: ptr=%p\n", channel, j, k,
-			candidate[channel][j][k].packet_p);
-		  } else {
-		    dw_printf ("%d.%d.%d: ptr=%p, fec_type=%d, retry=%d, age=%3d, crc=%04x, score=%d  %s\n", channel, j, k,
-			candidate[channel][j][k].packet_p,
-			(int)(candidate[channel][j][k].fec_type),
-			(int)(candidate[channel][j][k].retries),
-			candidate[channel][j][k].age,
-			candidate[channel][j][k].crc,
-			candidate[channel][j][k].score,
-			(n == best_n) ? "***" : "");
-		  }
+			var logEntry = logrus.WithFields(logrus.Fields{
+				"channel": channel,
+				"subchan": j,
+				"slice":   k,
+				"best":    n == best_n,
+			})
+
+			if c.packet_p == nil {
+				logEntry.Trace("candidate: no packet")
+			} else {
+				logEntry.WithFields(logrus.Fields{
+					"fec_type": c.fec_type,
+					"retries":  c.retries,
+					"age":      c.age,
+					"crc":      fmt.Sprintf("%04x", c.crc),
+					"score":    c.score,
+				}).Trace("candidate")
+			}
 		}
-	#endif
-	*/
+	}
 
 	if best_score == 0 {
 		text_color_set(DW_COLOR_ERROR)
