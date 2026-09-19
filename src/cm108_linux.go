@@ -79,7 +79,6 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -207,9 +206,8 @@ const MAXX_THINGS = 60
  * Outputs:	things		- Array of items collected.
  *				  Corresponding sound device and HID are merged into one item.
  *
- * Returns:	Number of items placed in things array.
- *		Should be in the range of 0 thru max_things.
- *		-1 for a bad unexpected error.
+ * Returns:	The items collected, and an error if the underlying udev
+ *		enumeration failed.
  *
  *------------------------------------------------------------------*/
 
@@ -226,11 +224,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 
 	var devices, devicesErr = e.Devices()
 	if devicesErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't enumerate udev devices"
-		dw_printf("%s: %v.\n", msg, devicesErr)
-
-		return things, errors.New(msg)
+		return nil, fmt.Errorf("could not enumerate udev sound devices: %w", devicesErr)
 	}
 
 	var cardDevpath string
@@ -290,11 +284,7 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
 
 	var hidDevices, hidDevicesErr = e2.Devices()
 	if hidDevicesErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		var msg = "INTERNAL ERROR: Can't enumerate udev hidraw devices"
-		dw_printf("%s: %v.\n", msg, hidDevicesErr)
-
-		return nil, errors.New(msg)
+		return nil, fmt.Errorf("could not enumerate udev hidraw devices: %w", hidDevicesErr)
 	}
 
 	for _, dev := range hidDevices {
@@ -388,14 +378,23 @@ func CM108Inventory(max_things int) ([]*CM108Thing, error) {
  * Returns:	ptt_device	- Device name, something like /dev/hidraw2.
  *				  Will be empty string if no match found.
  *
+ *		err		- Non-nil if the search could not be carried
+ *				  out, or if the device found is not one known
+ *				  to work for GPIO PTT.  In the latter case the
+ *				  device name is returned as well and the error
+ *				  wraps ErrUnknownCM108Device, so a caller can
+ *				  warn and carry on.
+ *
  *------------------------------------------------------------------*/
 
-func cm108_find_ptt(output_audio_device string) string {
+func cm108_find_ptt(output_audio_device string) (string, error) {
 	//dw_printf ("DEBUG: cm108_find_ptt('%s')\n", output_audio_device);
-	var ptt_device = ""
 
 	// Possible improvement: Skip if inventory already taken.
-	var things, _ = CM108Inventory(MAXX_THINGS)
+	var things, inventoryErr = CM108Inventory(MAXX_THINGS)
+	if inventoryErr != nil {
+		return "", fmt.Errorf("could not take inventory of USB audio devices: %w", inventoryErr)
+	}
 
 	var sound_re = regexp.MustCompile(".+:(CARD=)?([A-Za-z0-9_]+)(,.*)?")
 
@@ -408,29 +407,23 @@ func cm108_find_ptt(output_audio_device string) string {
 	}
 
 	if len(num_or_name) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not extract card number or name from %s\n", output_audio_device)
-		dw_printf("Can't automatically find matching HID for PTT.\n")
-
-		return ptt_device
+		return "", fmt.Errorf("could not extract card number or name from %s", output_audio_device)
 	}
 
 	for _, thing := range things {
 		//dw_printf ("DEBUG: i=%d, card_name='%s', card_number='%s'\n", i, things[i].CardName, things[i].CardNumber);
 		if num_or_name == thing.CardName || num_or_name == thing.CardNumber {
 			//dw_printf ("DEBUG: success! returning '%s'\n", things[i].DevnodeHidraw);
-			ptt_device = thing.DevnodeHidraw
 			if !GOOD_DEVICE(thing.VID, thing.PID) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Warning: USB audio card %s (%s) is not a device known to work with GPIO PTT.\n",
-					thing.CardNumber, thing.CardName)
+				return thing.DevnodeHidraw, fmt.Errorf("USB audio card %s (%s) is %w",
+					thing.CardNumber, thing.CardName, ErrUnknownCM108Device)
 			}
 
-			return ptt_device
+			return thing.DevnodeHidraw, nil
 		}
 	}
 
-	return ptt_device
+	return "", nil
 }
 
 /*-------------------------------------------------------------------
@@ -446,9 +439,8 @@ func cm108_find_ptt(output_audio_device string) string {
  *
  *		state		- 1 for on, 0 for off.
  *
- * Returns:	0 for success.  -1 for error.
- *
- * Errors:	A descriptive error message will be printed for any problem.
+ * Returns:	nil for success, otherwise an error describing the problem.
+ *		It is for the caller to report it.
  *
  * Shortcut:	For our initial implementation we are making the simplifying
  *		restriction of using only one GPIO pin per device and limit
@@ -460,19 +452,13 @@ func cm108_find_ptt(output_audio_device string) string {
  *
  *------------------------------------------------------------------*/
 
-func CM108SetGPIOPin(name string, num int, state int) int {
+func CM108SetGPIOPin(name string, num int, state int) error {
 	if num < 1 || num > 8 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s CM108 GPIO number %d must be in range of 1 thru 8.\n", name, num)
-
-		return (-1)
+		return fmt.Errorf("%s CM108 GPIO number %d must be in range of 1 thru 8", name, num)
 	}
 
 	if state != 0 && state != 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%s CM108 GPIO state %d must be 0 or 1.\n", name, state)
-
-		return (-1)
+		return fmt.Errorf("%s CM108 GPIO state %d must be 0 or 1", name, state)
 	}
 
 	var iomask = 1 << (num - 1)     // 0=input, 1=output
@@ -480,6 +466,48 @@ func CM108SetGPIOPin(name string, num int, state int) int {
 
 	return cm108_write(name, iomask, iodata)
 } /* end CM108SetGPIOPin */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:	CM108CheckDevice
+ *
+ * Purpose:	Check that a HID is one of the USB audio adapters known to
+ *		work for GPIO PTT.
+ *
+ * Inputs:	name		- Name of device such as /dev/hidraw2.
+ *
+ * Returns:	nil if the device reports a known good vendor and product id.
+ *
+ *		Otherwise an error, which wraps ErrUnknownCM108Device when the
+ *		device could be interrogated but is an unfamiliar type.  That
+ *		is advisory - such a device may still work - so a caller will
+ *		generally want to warn rather than give up.  A permission
+ *		problem wraps fs.ErrPermission, for which
+ *		CM108PermissionAdvice has something to say.
+ *
+ * Description:	This is worth doing once, when setting up, rather than on
+ *		every write, which would be one warning per transmission.
+ *
+ *------------------------------------------------------------------*/
+
+func CM108CheckDevice(name string) error {
+	var fd, err = os.OpenFile(name, os.O_RDWR, 0000) //nolint:gosec // This comes from user-supplied config, all we can really do is trust it
+	if err != nil {
+		return fmt.Errorf("could not open %s: %w", name, err)
+	}
+	defer fd.Close()
+
+	var info, ioctlErr = unix.IoctlHIDGetRawInfo(int(fd.Fd()))
+	if ioctlErr != nil {
+		return fmt.Errorf("ioctl HIDIOCGRAWINFO failed for %s: %w", name, ioctlErr)
+	}
+
+	if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
+		return fmt.Errorf("%s (vid=%04x pid=%04x) is %w", name, info.Vendor, info.Product, ErrUnknownCM108Device)
+	}
+
+	return nil
+} /* end CM108CheckDevice */
 
 /*-------------------------------------------------------------------
  *
@@ -495,16 +523,17 @@ func CM108SetGPIOPin(name string, num int, state int) int {
  *
  *		iodata		- Output data, same bit order as iomask.
  *
- * Returns:	0 for success.  -1 for error.
- *
- * Errors:	A descriptive error message will be printed for any problem.
+ * Returns:	nil for success, otherwise an error describing the problem.
+ *		It is for the caller to report it.  A permission problem wraps
+ *		fs.ErrPermission, for which CM108PermissionAdvice has
+ *		something to say.
  *
  * Description:	This is the lowest level function.
  *		An application probably wants to use CM108SetGPIOPin.
  *
  *------------------------------------------------------------------*/
 
-func cm108_write(name string, iomask int, iodata int) int {
+func cm108_write(name string, iomask int, iodata int) error {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("TEMP DEBUG cm108_write:  %s %d %d\n", name, iomask, iodata);
 
@@ -542,32 +571,9 @@ func cm108_write(name string, iomask int, iodata int) int {
 	 */
 	var fd, err = os.OpenFile(name, os.O_RDWR, 0000) //nolint:gosec // This comes from user-supplied config, all we can really do is trust it
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open %s for write: %s\n", name, err)
-		/* TODO KG UX
-		if errno == EACCES { // 13
-			dw_printf("Type \"ls -l %s\" and verify that it has audio group rw similar to this:\n", name)
-			dw_printf("    crw-rw---- 1 root audio 247, 0 Oct  6 19:24 %s\n", name)
-			dw_printf("rather than root-only access like this:\n")
-			dw_printf("    crw------- 1 root root 247, 0 Sep 24 09:40 %s\n", name)
-		}
-		*/
-		return (-1)
+		return fmt.Errorf("could not open %s for write: %w", name, err)
 	}
 	defer fd.Close()
-
-	// Just for fun, let's get the device information.
-
-	var info, ioctlErr = unix.IoctlHIDGetRawInfo(int(fd.Fd()))
-	if ioctlErr == nil {
-		if !GOOD_DEVICE(int(info.Vendor), int(info.Product)) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ioctl HIDIOCGRAWINFO failed for %s. errno = %s.\n", name, ioctlErr)
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s is not a supported device type.  Proceed at your own risk.  vid=%04x pid=%04x\n", name, info.Vendor, info.Product)
-		}
-	}
 
 	// To make a long story short, I think we need 0 for the first two bytes.
 
@@ -578,29 +584,17 @@ func cm108_write(name string, iomask int, iodata int) int {
 	// Writing 5 bytes works.
 	// I have no idea why.  From the CMedia datasheet it looks like we need 4.
 
+	//  Errors observed during development.
+	//  as pi		EACCES          13      /* Permission denied */
+	//  as root		EPIPE           32      /* Broken pipe - Happens if we send 4 bytes */
 	var n, writeErr = fd.Write(data)
-	if writeErr != nil || n != len(data) {
-		//  Errors observed during development.
-		//  as pi		EACCES          13      /* Permission denied */
-		//  as root		EPIPE           32      /* Broken pipe - Happens if we send 4 bytes */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Write to %s failed, n=%d, err=%v\n", name, n, writeErr)
-
-		/* TODO KG UX
-		if errno == EACCES {
-			dw_printf("Type \"ls -l %s\" and verify that it has audio group rw similar to this:\n", name)
-			dw_printf("    crw-rw---- 1 root audio 247, 0 Oct  6 19:24 %s\n", name)
-			dw_printf("rather than root-only access like this:\n")
-			dw_printf("    crw------- 1 root root 247, 0 Sep 24 09:40 %s\n", name)
-			dw_printf("This permission should be set by one of:\n")
-			dw_printf("/etc/udev/rules.d/99-direwolf-cmedia.rules\n")
-			dw_printf("/usr/lib/udev/rules.d/99-direwolf-cmedia.rules\n")
-			dw_printf("which should be created by the installation process.\n")
-			dw_printf("Your account must be in the 'audio' group.\n")
-		}
-		*/
-		return (-1)
+	if writeErr != nil {
+		return fmt.Errorf("write to %s failed after %d bytes: %w", name, n, writeErr)
 	}
 
-	return (0)
+	if n != len(data) {
+		return fmt.Errorf("write to %s was short, %d of %d bytes", name, n, len(data))
+	}
+
+	return nil
 } /* end cm108_write */

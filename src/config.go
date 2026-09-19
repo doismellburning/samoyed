@@ -15,6 +15,7 @@ package direwolf
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -2464,7 +2465,20 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// Failure at this point is not an error.
 		// See if config file sets it explicitly before complaining.
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
+		var found_ptt, find_ptt_err = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
+
+		ps.audio.achan[ps.channel].octrl[ot].ptt_device = found_ptt
+
+		if find_ptt_err != nil {
+			text_color_set(DW_COLOR_ERROR)
+
+			if errors.Is(find_ptt_err, ErrUnknownCM108Device) {
+				dw_printf("Warning: %v.\n", find_ptt_err)
+			} else {
+				dw_printf("%v.\n", find_ptt_err)
+				dw_printf("Can't automatically find matching HID for PTT.\n")
+			}
+		}
 
 		for {
 			t = split("", false)
