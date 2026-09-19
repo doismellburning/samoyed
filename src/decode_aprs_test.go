@@ -77,3 +77,34 @@ func Test_decode_aprs_sentinel_bridges(t *testing.T) {
 	// number that no longer looks like the sentinel.
 	assert.Equal(t, maybe.Nothing[float64](), maybe.Fmap(DW_KNOTS_TO_MPH, unlessUnknown(float64(G_UNKNOWN))))
 }
+
+// A weather report that stops in the middle of its fields used to run the
+// decoder off the end of the information field and panic, taking the whole
+// program down with it - from a received packet, so anyone within earshot
+// could do it.  Each of these is truncated at a different point.
+func Test_decode_aprs_truncated_weather(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	for _, info := range []string{
+		"!4903.50N/07201.75W_",            // nothing at all after the symbol
+		"!4903.50N/07201.75W_22",          // part way through the wind direction
+		"!4903.50N/07201.75W_220/004",     // wind, then nothing
+		"!4903.50N/07201.75W_220/004g005", // ends after a complete field
+		"!4903.50N/07201.75W_220/004g00",  // ends part way through a field
+		"!4903.50N/07201.75W_c220s004g005t077r000p000P000h50b099",
+	} {
+		var pp = AX25FromText("Q1TEST>APRS:"+info, true)
+		assert.NotNil(t, pp)
+
+		// Must not panic, and must still report the position.
+		var A = decode_aprs(pp, true, "")
+
+		var lat, ok = A.g_lat.Get()
+		assert.True(t, ok, "%s", info)
+		assert.InDelta(t, 49.0583333, lat, 0.0000001, "%s", info)
+	}
+
+	// What did arrive before the truncation is still decoded.
+	var A = decode_aprs(AX25FromText("Q1TEST>APRS:!4903.50N/07201.75W_220/004g005", true), true, "")
+	assert.Equal(t, `wind 4.6 mph, direction 220, gust 5, ""`, A.g_weather)
+}

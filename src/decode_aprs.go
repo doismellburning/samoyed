@@ -2726,6 +2726,12 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 func getwdata(wpp []byte, id rune, dlen int) (float64, []byte, bool) {
 	Assert(dlen >= 2 && dlen <= 6)
 
+	// The field is an id byte and dlen data bytes.  A report that ends
+	// before that does not have this field, rather than having a short one.
+	if len(wpp) < dlen+1 {
+		return G_UNKNOWN, wpp, false
+	}
+
 	if rune(wpp[0]) != id {
 		return G_UNKNOWN, wpp, false
 	}
@@ -2749,7 +2755,11 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 	var wp = wdata
 	var found bool
 
-	if wp[3] == '/' {
+	// The data extension form of the wind is three digits of direction, a
+	// '/', and three digits of speed.
+	const windDataExtensionBytes = 7
+
+	if len(wp) >= windDataExtensionBytes && wp[3] == '/' {
 		var n int
 
 		var count, _ = fmt.Sscanf(string(wp[:3]), "%3d", &n) // TODO KG I *think* this works right but I'd be lying if I said I trusted it... TODO Test better
