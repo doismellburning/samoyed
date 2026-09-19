@@ -3535,6 +3535,52 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTCORRAL": {
+			{
+				name:   "a latitude, longitude and offset are stored",
+				config: "TTCORRAL 42^37.14N 71^20.83W 0^0.30\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.InDelta(42.6190, c.tt.corral_lat, 0.001)
+					a.InDelta(-71.3472, c.tt.corral_lon, 0.001)
+					a.InDelta(0.005, c.tt.corral_offset, 0.001)
+					a.Equal(0, c.tt.corral_ambiguity)
+				},
+			},
+			{
+				name:   "no TTCORRAL leaves no corral",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.tt.corral_lat)
+					a.Zero(c.tt.corral_lon)
+				},
+			},
+			{
+				// 1, 2 and 3 in the third field ask for position ambiguity rather
+				// than an offset.
+				name:   "a small whole number is an ambiguity, not an offset",
+				config: "TTCORRAL 42^37.14N 71^20.83W 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.tt.corral_ambiguity)
+					a.Zero(c.tt.corral_offset)
+				},
+			},
+			{
+				name:   "a missing longitude does not eat the next line",
+				config: "TTCORRAL 42^37.14N\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.tt.corral_lon)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a missing offset does not eat the next line",
+				config: "TTCORRAL 42^37.14N 71^20.83W\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.tt.corral_offset)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TXINH": {
 			{
 				name:   "a GPIO number becomes the transmit inhibit input",
@@ -3852,7 +3898,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"TTAMBIG",
 		"TTCMD",
-		"TTCORRAL",
 		"TTERR",
 		"TTGRID",
 		"TTMACRO",
