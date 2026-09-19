@@ -3581,6 +3581,58 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTPOINT": {
+			{
+				name:   "a pattern and its position are stored",
+				config: "TTPOINT B01 37^55.37N 81^7.86W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_POINT, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B01", c.tt.ttlocs[0].pattern)
+					a.InDelta(37.9228, c.tt.ttlocs[0].point.lat, 0.001)
+					a.InDelta(-81.1310, c.tt.ttlocs[0].point.lon, 0.001)
+				},
+			},
+			{
+				name:   "no TTPOINT means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "several points accumulate",
+				config: "TTPOINT B01 37^55.37N 81^7.86W\nTTPOINT B02 42N 71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 2)
+					a.Equal("B02", c.tt.ttlocs[1].pattern)
+				},
+			},
+			{
+				// The pattern is reported but still used, as it is upstream.
+				name:   "a pattern that does not begin with B is reported",
+				config: "TTPOINT C01 42N 71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "a pattern with something other than digits after the B is reported",
+				config: "TTPOINT B0x 42N 71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "must be B and digits only")
+				},
+			},
+			{
+				name:   "a missing longitude leaves no location and does not eat the next line",
+				config: "TTPOINT B01 42N\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TXINH": {
 			{
 				name:   "a GPIO number becomes the transmit inhibit input",
@@ -3904,7 +3956,6 @@ func directivesNotYetTested() []string {
 		"TTMGRS",
 		"TTMHEAD",
 		"TTOBJ",
-		"TTPOINT",
 		"TTSATSQ",
 		"TTSTATUS",
 		"TTUSNG",
