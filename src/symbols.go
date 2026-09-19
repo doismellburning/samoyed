@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -340,9 +342,8 @@ func NewAPRSSymbolData() *APRSSymbolData {
 	}
 
 	if fp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Could not open 'symbols-new.txt'.\n")
-		dw_printf("The \"new\" OVERLAID character information will not be available.\n")
+		logrus.WithField("searched", SymbolsSearchLocations).
+			Warn("Could not open 'symbols-new.txt' - the \"new\" OVERLAID character information will not be available.")
 
 		return sd
 	}
@@ -387,35 +388,53 @@ func NewAPRSSymbolData() *APRSSymbolData {
  *------------------------------------------------------------------*/
 
 func (sd *APRSSymbolData) symbols_list() {
-	dw_printf("\n")
+	// This is a report the user has explicitly asked for rather than logging, and
+	// its value is in the columns lining up, so it goes to stdout as-is. A logrus
+	// entry per row would prefix each one with a timestamp and level and leave the
+	// tables unreadable. Anything that is a diagnostic - a symbol we can't place in
+	// a table - is a logrus entry.
+
+	fmt.Print("\n")
 
 	var pt = primarySymtab()
 	var at = alternateSymtab()
 
-	dw_printf("\tPRIMARY SYMBOL TABLE\n")
-	dw_printf("\n")
-	dw_printf("sym  GPSxy  GPSCnn  APRStt  Icon\n")
-	dw_printf("---  -----  ------  ------  ----\n")
+	fmt.Print("\tPRIMARY SYMBOL TABLE\n")
+	fmt.Print("\n")
+	fmt.Print("sym  GPSxy  GPSCnn  APRStt  Icon\n")
+	fmt.Print("---  -----  ------  ------  ----\n")
 
 	for n, s := range pt {
-		dw_printf(" /%c     %s      %02d  AB1%02d   %s\n", n+' ', s.xy, n, n, s.description)
+		fmt.Printf(" /%c     %s      %02d  AB1%02d   %s\n", n+' ', s.xy, n, n, s.description)
 	}
 
-	dw_printf("\n")
-	dw_printf("\tALTERNATE SYMBOL TABLE\n")
-	dw_printf("\n")
-	dw_printf("sym  GPSxy  GPSEnn  APRStt  Icon\n")
-	dw_printf("---  -----  ------  ------  ----\n")
+	fmt.Print("\n")
+	fmt.Print("\tALTERNATE SYMBOL TABLE\n")
+	fmt.Print("\n")
+	fmt.Print("sym  GPSxy  GPSEnn  APRStt  Icon\n")
+	fmt.Print("---  -----  ------  ------  ----\n")
 
 	for n, s := range at {
-		dw_printf(" \\%c     %s      %02d  AB2%02d   %s\n", n+' ', s.xy, n, n, s.description)
+		fmt.Printf(" \\%c     %s      %02d  AB2%02d   %s\n", n+' ', s.xy, n, n, s.description)
 	}
 
-	dw_printf("\n")
-	dw_printf("\tNEW SYMBOLS from symbols-new.txt\n")
-	dw_printf("\n")
-	dw_printf("sym  GPSxyz  GPSxnn  APRStt   Icon\n")
-	dw_printf("---  ------  ------  ------   ----\n")
+	fmt.Print("\n")
+	fmt.Print("\tNEW SYMBOLS from symbols-new.txt\n")
+	fmt.Print("\n")
+	fmt.Print("sym  GPSxyz  GPSxnn  APRStt   Icon\n")
+	fmt.Print("---  ------  ------  ------   ----\n")
+
+	// logrus builds an entry's fields before it consults the level, and these
+	// carry string conversions, so the entry is assembled at the point it is
+	// warned rather than once per symbol for the sake of three rare branches.
+	var warnOutOfRange = func(overlay byte, symbol byte, index int, table string) {
+		logrus.WithFields(logrus.Fields{
+			"overlay": string(overlay),
+			"symbol":  string(symbol),
+			"index":   index,
+			"table":   table,
+		}).Warn("Skipping symbol from symbols-new.txt with no entry in the symbol table")
+	}
 
 	for _, s := range sd.newSymbols {
 		var overlay = s.overlay
@@ -426,39 +445,42 @@ func (sd *APRSSymbolData) symbols_list() {
 
 		if overlay == '/' {
 			if index >= len(pt) {
-				// TODO KG Warn somehow?
+				warnOutOfRange(overlay, symbol, index, "primary")
+
 				continue
 			}
 
-			dw_printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
+			fmt.Printf(" %c%c     %s%c     C%02d  %-7s  %s\n", overlay, symbol,
 				pt[index].xy, ' ',
 				index, tones,
 				s.description)
 		} else if unicode.IsUpper(rune(overlay)) || unicode.IsDigit(rune(overlay)) {
 			if index >= len(at) {
-				// TODO KG Warn somehow?
+				warnOutOfRange(overlay, symbol, index, "alternate")
+
 				continue
 			}
 
-			dw_printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
+			fmt.Printf(" %c%c     %s%c          %-7s  %s\n", overlay, symbol,
 				at[index].xy, overlay,
 				tones,
 				s.description)
 		} else {
 			if index >= len(at) {
-				// TODO KG Warn somehow?
+				warnOutOfRange(overlay, symbol, index, "alternate")
+
 				continue
 			}
 
-			dw_printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
+			fmt.Printf(" %c%c     %s%c     E%02d  %-7s  %s\n", overlay, symbol,
 				at[index].xy, ' ',
 				symbol-' ', tones,
 				s.description)
 		}
 	}
 
-	dw_printf("\n")
-	dw_printf("More information here: http://www.aprs.org/symbols.html\n")
+	fmt.Print("\n")
+	fmt.Print("More information here: http://www.aprs.org/symbols.html\n")
 } /* end symbols_list */
 
 /*------------------------------------------------------------------
@@ -661,9 +683,10 @@ func (sd *APRSSymbolData) symbols_into_dest(symtab byte, symbol byte) (string, b
 		return fmt.Sprintf("GPS%s%c", at[symbol-' '].xy, symtab), true
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Could not convert symbol \"%c%c\" to GPSxyz destination format.\n",
-		symtab, symbol)
+	logrus.WithFields(logrus.Fields{
+		"symtab": string(symtab),
+		"symbol": string(symbol),
+	}).Error("Could not convert symbol to GPSxyz destination format.")
 
 	return "GPS???", false
 }
@@ -699,8 +722,8 @@ func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) stri
 		symtab != '\\' &&
 		!unicode.IsDigit(rune(symtab)) &&
 		!unicode.IsUpper(rune(symtab)) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol table identifier is not '/' (primary), '\\' (alternate), or valid overlay character.\n")
+		logrus.WithField("symtab", string(symtab)).
+			Error("Symbol table identifier is not '/' (primary), '\\' (alternate), or valid overlay character.")
 
 		/* Possibilities: */
 		/* Select primary table and keep going, or */
@@ -717,8 +740,8 @@ func (sd *APRSSymbolData) symbols_get_description(symtab byte, symbol byte) stri
 	// Bounds check before using symbol as index into table.
 
 	if symbol < ' ' || symbol > '~' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol code is not a printable character.\n")
+		logrus.WithField("symbol", int(symbol)).
+			Error("Symbol code is not a printable character.")
 
 		symbol = ' ' /* Avoid subscript out of bounds. */
 	}
