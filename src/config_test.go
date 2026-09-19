@@ -1060,6 +1060,22 @@ func Test_config_init_fix_bits(t *testing.T) {
 		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
 		assert.False(t, cfg.achan[0].passall)
 	})
+
+	// Regression test: the level went through an Atoi whose error was ignored,
+	// so "FIX_BITS abc" read as the 0 returned alongside it.  Zero is a level
+	// FIX_BITS accepts, so a typo silently turned bit fixing off, and the
+	// message about an invalid value was never printed.
+	t.Run("unreadable level leaves the configured one alone", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS 1\nFIX_BITS abc\n")
+		assert.Equal(t, BitFixSingle, cfg.achan[0].fix_bits)
+	})
+
+	// PASSALL is read after the level, so it still applies.
+	t.Run("an unreadable level does not stop PASSALL being read", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS abc PASSALL\n")
+		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
+		assert.True(t, cfg.achan[0].passall)
+	})
 }
 
 // --- config directive coverage ---

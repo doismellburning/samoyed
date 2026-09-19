@@ -2192,10 +2192,17 @@ func handleFIX_BITS(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if BitFixLevel(n) >= BitFixNone && BitFixLevel(n) <= BitFixLevelHighest {
+	// An unreadable level leaves the one already configured; the options after
+	// it on the line are still worth reading.
+	var n, nErr = strconv.Atoi(t)
+	switch {
+	case nErr != nil:
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Value must be numeric for FIX_BITS command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].fix_bits)
+	case BitFixLevel(n) >= BitFixNone && BitFixLevel(n) <= BitFixLevelHighest:
 		ps.audio.achan[ps.channel].fix_bits = BitFixLevel(n)
-	} else {
+	default:
 		ps.audio.achan[ps.channel].fix_bits = DEFAULT_FIX_BITS
 
 		text_color_set(DW_COLOR_ERROR)
