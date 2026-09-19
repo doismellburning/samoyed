@@ -194,7 +194,8 @@ func Test_IsNoCall(t *testing.T) {
 
 // --- config_init helpers ---
 
-// configs is the set of structures config_init fills in.
+// configs is the set of structures config_init fills in, along with what it
+// reported while doing so.
 type configs struct {
 	audio *audio_s
 	digi  *digi_config_s
@@ -202,6 +203,11 @@ type configs struct {
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
+
+	// output is everything config_init printed.  A handler that rejects a line
+	// usually has nothing else to show for it, so this is the only way to tell
+	// a line that was reported from one that was quietly ignored.
+	output string
 }
 
 // parseConfig writes content to a temp config file and runs config_init over it.
@@ -215,15 +221,18 @@ func parseConfig(t *testing.T, content string) configs {
 	require.NoError(t, tmpFile.Close())
 
 	var c = configs{
-		audio: new(audio_s),
-		digi:  new(digi_config_s),
-		cdigi: new(cdigi_config_s),
-		tt:    new(tt_config_s),
-		igate: new(igate_config_s),
-		misc:  new(misc_config_s),
+		audio:  new(audio_s),
+		digi:   new(digi_config_s),
+		cdigi:  new(cdigi_config_s),
+		tt:     new(tt_config_s),
+		igate:  new(igate_config_s),
+		misc:   new(misc_config_s),
+		output: "",
 	}
 
-	config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+	c.output = CaptureOutput(t, func() {
+		config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+	})
 
 	return c
 }
