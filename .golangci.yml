@@ -71,7 +71,6 @@ linters:
     gosec:
       excludes:
         - "G104"  # Stop complaining about me not checking a fmt.Printf err via dw_printf...
-        - "G115"  # I appreciate concerns about overflow via cast, but let's deal with them later
         - "G404"  # Weak RNGs are fine for our uses here, certainly for now(!)
         - "G602"  # "slice index out of range" checks that *may* be valid but it's hard to tell - if they're not false positives, they're niche issues
     nestif:
@@ -87,6 +86,16 @@ linters:
     wsl_v5:
       disable:
         - "decl"
+  exclusions:
+    rules:
+      # G115 (integer overflow via conversion) is still deferred across most of
+      # the tree - see issue #294 - but internal/ais has been through it (issue
+      # #325), so keep that package honest rather than letting the backlog hide
+      # a new truncation there.
+      - linters:
+          - "gosec"
+        text: "G115"
+        path-except: "(^|/)internal/ais/"
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
