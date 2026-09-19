@@ -2464,22 +2464,6 @@ func handlePTTDCDCON(ps *parseState) bool {
 		}
 
 		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB
-
-		// #else
-		/* TODO KG
-		   #if __WIN32__
-		   	      text_color_set(DW_COLOR_ERROR);
-		   	      dw_printf ("Config file line %d: Windows version of direwolf does not support HAMLIB.\n", ps.line);
-		   	      exit (EXIT_FAILURE);
-		   #else
-		*/
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", ps.line, otname)
-		dw_printf("You must rebuild direwolf with hamlib support.\n")
-		dw_printf("See User Guide for details.\n")
-		// #endif
-
-		//#endif
 	} else if strings.EqualFold(t, "CM108") {
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
 

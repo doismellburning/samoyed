@@ -3077,6 +3077,19 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the port kept both halves of the C file's
+			// "#ifdef USE_HAMLIB" and dropped the #ifdef, so a RIG line configured
+			// hamlib PTT and then told the operator that hamlib was not supported
+			// and that they would have to rebuild.  Hamlib is supported.
+			{
+				name:   "a hamlib line does not claim hamlib is unsupported",
+				config: "PTT RIG 101 /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_HAMLIB, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.NotContains(c.output, "only available when hamlib support is enabled")
+					a.NotContains(c.output, "must rebuild")
+				},
+			},
 		},
 		"REGEN": {
 			{
