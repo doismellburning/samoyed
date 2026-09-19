@@ -710,8 +710,7 @@ func check_via_path(via_path string) int {
 	for _, part := range parts {
 		num_digi++
 
-		var strictness = 2
-		var addr, ssid, _, ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, part, strictness)
+		var addr, ssid, _, ok = ax25_parse_addr(AX25_REPEATER_1-1+num_digi, part, addrStrictNoStar)
 
 		if !ok {
 			logrus.Debug("check_via_path bad address")
@@ -1781,13 +1780,11 @@ func handleMYCALL(ps *parseState) bool {
 
 		return true
 	} else {
-		var strictness = 2
-
 		/* Silently force upper case. */
 		/* Might change to warning someday. */
 		t = strings.ToUpper(t)
 
-		var _, _, _, ok = ax25_parse_addr(-1, t, strictness)
+		var _, _, _, ok = ax25_parse_addr(-1, t, addrStrictNoStar)
 
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
@@ -4948,7 +4945,7 @@ func handleTTERR(ps *parseState) bool {
 
 	t = strings.ToUpper(t)
 
-	var method, _, _, ok = ax25_parse_addr(-1, t, 1)
+	var method, _, _, ok = ax25_parse_addr(-1, t, addrStrict)
 	if !ok {
 		return true // function above prints any error message
 	}
@@ -6205,8 +6202,7 @@ func handleV20(ps *parseState) bool {
 	}
 
 	for t != "" {
-		var strictness = 2
-		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, strictness)
+		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, addrStrictNoStar)
 
 		if ok {
 			ps.misc.v20_addrs = append(ps.misc.v20_addrs, t)
@@ -6241,8 +6237,7 @@ func handleNOXID(ps *parseState) bool {
 	}
 
 	for t != "" {
-		var strictness = 2
-		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, strictness)
+		var _, _, _, ok = ax25_parse_addr(AX25_DESTINATION, t, addrStrictNoStar)
 
 		if ok {
 			ps.misc.noxid_addrs = append(ps.misc.noxid_addrs, t)

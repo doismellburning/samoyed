@@ -321,8 +321,33 @@ type ALevel struct {
 
 var last_seq_num atomic.Int64
 
-// DECODE_APRS_UTIL is a runtime replacement for DECAMAIN define
-var DECODE_APRS_UTIL = false
+// addrStrictness says how fussy ax25_parse_addr should be about an address.
+type addrStrictness int
+
+const (
+	// addrLenient accepts what an APRS-IS server sends us: addresses longer
+	// than 6 characters, lower case (the "qA" constructs), and an SSID of two
+	// alphanumeric characters rather than a number in the range 0 to 15.
+	addrLenient addrStrictness = iota
+
+	// addrStrict enforces the rules for a packet sent over the air.
+	addrStrict
+
+	// addrStrictNoStar is addrStrict and additionally rejects a "*" at the
+	// end, for the places where a "has been repeated" flag makes no sense.
+	addrStrictNoStar
+
+	// addrStrictLowerCaseWarning is addrStrict except that lower case is
+	// reported and then accepted rather than rejected, so the decode_aprs
+	// utility can go on to explain a packet captured from somewhere such as
+	// aprs.fi instead of giving up on it.
+	addrStrictLowerCaseWarning
+)
+
+// strict reports whether the rules for a packet sent over the air apply.
+func (s addrStrictness) strict() bool {
+	return s != addrLenient
+}
 
 func CLEAR_LAST_ADDR_FLAG(this_p *packet_t) {
 	this_p.frame_data[this_p.num_addr*7-1] &= ^(byte(SSID_LAST_MASK))
@@ -383,6 +408,8 @@ func ax25_new() *packet_t {
  *
  *		strict	- True to enforce rules for packets sent over the air.
  *			  False to be more lenient for packets from IGate server.
+ *			  ax25_from_text takes the addrStrictness directly, for the
+ *			  decode_aprs utility which wants addrStrictLowerCaseWarning.
  *
  *			  Packets from an IGate server can have longer
  *		 	  addresses after qAC.  Up to 9 observed so far.
@@ -412,12 +439,16 @@ func ax25_new() *packet_t {
  *------------------------------------------------------------------------------*/
 
 func AX25FromText(monitor string, strict bool) *packet_t {
+	return ax25_from_text(monitor, IfThenElse(strict, addrStrict, addrLenient))
+}
+
+func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
 	 */
 
 	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("DEBUG: AX25FromText ('%s', %d)\n", monitor, strict);
+	// dw_printf ("DEBUG: ax25_from_text ('%s', %d)\n", monitor, strictness);
 	// fflush(stdout); sleep(1);
 	var this_p = ax25_new()
 
@@ -478,7 +509,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 		return (nil)
 	}
 
-	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), IfThenElse(strict, 1, 0))
+	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), strictness)
 
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
@@ -498,7 +529,7 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	pa, stuff, _ = bytes.Cut(stuff, []byte{','})
 	// Note: if no comma found, pa contains the destination and stuff is empty (no digipeaters)
 
-	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), IfThenElse(strict, 1, 0))
+	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), strictness)
 
 	if !ok {
 		text_color_set(DW_COLOR_ERROR)
@@ -538,14 +569,14 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 
 		// Hack for q construct, from APRS-IS, so it does not cause panic later.
 
-		if !strict && len(pa) >= 3 && pa[0] == 'q' && pa[1] == 'A' {
+		if !strictness.strict() && len(pa) >= 3 && pa[0] == 'q' && pa[1] == 'A' {
 			pa[0] = 'Q'
 			pa[2] = byte(unicode.ToUpper(rune(pa[2])))
 		}
 
 		var heardTemp bool
 
-		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), IfThenElse(strict, 1, 0))
+		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), strictness)
 		if !ok {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
@@ -730,17 +761,21 @@ func ax25_dup(copy_from *packet_t) *packet_t {
  *
  *		in_addr		- Input such as "WB2OSZ-15*"
  *
- * 		strictness		- 1 (true) for strict checking (6 characters, no lower case,
- *				  SSID must be in range of 0 to 15).
+ * 		strictness	- addrStrict for strict checking (6 characters, no lower
+ *				  case, SSID must be in range of 0 to 15).
  *				  Strict is appropriate for packets sent
  *				  over the radio.  Communication with IGate
  *				  allows lower case (e.g. "qAR") and two
- *				  alphanumeric characters for the SSID.
+ *				  alphanumeric characters for the SSID, which is
+ *				  addrLenient.
  *				  We also get messages like this from a server.
  *					KB1POR>APU25N,TCPIP*,qAC,T2NUENGLD:...
  *					K1BOS-B>APOSB,TCPIP,WR2X-2*:...
  *
- *				  2 (extra true) will complain if * is found at end.
+ *				  addrStrictNoStar will complain if * is found at end.
+ *
+ *				  addrStrictLowerCaseWarning only warns about lower
+ *				  case rather than rejecting the address.
  *
  * Returns:	out_addr	- Address without any SSID.
  *				  Must be at least AX25_MAX_ADDR_LEN bytes.
@@ -760,7 +795,7 @@ var position_name = [1 + AX25_MAX_ADDRS]string{
 	"Digi1 ", "Digi2 ", "Digi3 ", "Digi4 ",
 	"Digi5 ", "Digi6 ", "Digi7 ", "Digi8 "}
 
-func ax25_parse_addr(position int, in_addr string, strictness int) (string, int, bool, bool) {
+func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (string, int, bool, bool) {
 	var out_addr string
 	var ssid int
 	var heard bool
@@ -784,7 +819,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 		return out_addr, ssid, heard, false
 	}
 
-	if strictness > 0 && len(in_addr) >= 2 && strings.HasPrefix(in_addr, "qA") {
+	if strictness.strict() && len(in_addr) >= 2 && strings.HasPrefix(in_addr, "qA") {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%sAddress \"%s\" is a \"q-construct\" used for communicating with\n", position_name[position], in_addr)
 		dw_printf("APRS Internet Servers.  It should never appear when going over the radio.\n")
@@ -792,7 +827,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 
 	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
 
-	var maxlen = IfThenElse(strictness > 0, 6, (AX25_MAX_ADDR_LEN - 1))
+	var maxlen = IfThenElse(strictness.strict(), 6, (AX25_MAX_ADDR_LEN - 1))
 
 	for i, p := range in_addr {
 		if p == '-' || p == '*' {
@@ -815,18 +850,16 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 
 		out_addr += string(p)
 
-		if DECODE_APRS_UTIL {
-			// Hack when running in decode_aprs utility
+		if strictness.strict() && unicode.IsLower(p) {
 			// Exempt the "qA..." case because it was already mentioned.
-			if strictness > 0 && unicode.IsLower(p) && !strings.HasPrefix(in_addr, "qA") {
+			if strictness != addrStrictLowerCaseWarning || !strings.HasPrefix(in_addr, "qA") {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
 			}
-		} else {
-			if strictness > 0 && unicode.IsLower(p) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
 
+			// The decode_aprs utility wants to hear about lower case but then
+			// carry on and explain the rest of the packet.
+			if strictness != addrStrictLowerCaseWarning {
 				return out_addr, ssid, heard, false
 			}
 		}
@@ -852,7 +885,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 			}
 
 			sstr.WriteRune(p)
-			if strictness > 0 && !unicode.IsDigit(p) {
+			if strictness.strict() && !unicode.IsDigit(p) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("%sSSID must be digits. \"%s\" has letters in SSID.\n", position_name[position], in_addr)
 
@@ -884,7 +917,7 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
 	if len(in_addr) > 0 && in_addr[0] == '*' {
 		heard = true
 
-		if strictness == 2 {
+		if strictness == addrStrictNoStar {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\"*\" is not allowed at end of address \"%s\" here.\n", in_addr)
 
@@ -913,7 +946,10 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  * Purpose:     Check addresses of given packet and print message if any issues.
  *		We call this when receiving and transmitting.
  *
- * Inputs:	pp	- packet object pointer.
+ * Inputs:	pp		- packet object pointer.
+ *
+ *		strictness	- How fussy to be; see ax25_parse_addr.  Anything
+ *				  received or transmitted over the air is addrStrict.
  *
  * Errors:	Print error message.
  *
@@ -949,13 +985,13 @@ func ax25_parse_addr(position int, in_addr string, strictness int) (string, int,
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t) bool { //nolint:unparam
+func ax25_check_addresses(pp *packet_t, strictness addrStrictness) bool { //nolint:unparam
 	var all_ok = true
 
 	for n := range ax25_get_num_addr(pp) {
 		var addr = ax25_get_addr_with_ssid(pp, n)
 
-		var _, _, _, ok = ax25_parse_addr(n, addr, 1)
+		var _, _, _, ok = ax25_parse_addr(n, addr, strictness)
 
 		all_ok = all_ok && ok
 	}
@@ -1046,7 +1082,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		// Why aren't we setting 'strict' here?
 		// Messages from IGate have q-constructs.
 		// We use this to parse it and later remove unwanted parts.
-		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
+		var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, addrLenient)
 
 		copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
@@ -1137,7 +1173,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	// Messages from IGate have q-constructs.
 	// We use this to parse it and later remove unwanted parts.
 
-	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, 0)
+	var addrTemp, ssidTemp, _, _ = ax25_parse_addr(n, ad, addrLenient)
 	copy(this_p.frame_data[n*7:], bytes.Repeat([]byte{' ' << 1}, 6))
 
 	for i, c := range addrTemp {

@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -61,4 +62,49 @@ func Test_ax25_new_concurrent_seq(t *testing.T) {
 	wg.Wait()
 
 	assert.Len(t, seqs, goroutines*perGoroutine)
+}
+
+func Test_ax25_parse_addr_strictness(t *testing.T) {
+	// Lower case, a trailing "*" and an over-long address are each accepted
+	// or rejected depending on the strictness asked for.  The decode_aprs
+	// utility uses addrStrictLowerCaseWarning so that a packet captured from
+	// somewhere such as aprs.fi still gets explained rather than discarded.
+	var testCases = []struct {
+		addr       string
+		strictness addrStrictness
+		ok         bool
+	}{
+		{"Q1TEST-1", addrLenient, true},
+		{"Q1TEST-1", addrStrict, true},
+		{"Q1TEST-1", addrStrictNoStar, true},
+		{"Q1TEST-1", addrStrictLowerCaseWarning, true},
+
+		// Lower case, as a q-construct or otherwise.
+		{"qAR", addrLenient, true},
+		{"qAR", addrStrict, false},
+		{"qAR", addrStrictNoStar, false},
+		{"qAR", addrStrictLowerCaseWarning, true},
+		{"q1test", addrLenient, true},
+		{"q1test", addrStrict, false},
+		{"q1test", addrStrictNoStar, false},
+		{"q1test", addrStrictLowerCaseWarning, true},
+
+		// "Has been repeated" flag.
+		{"Q1TEST-1*", addrStrict, true},
+		{"Q1TEST-1*", addrStrictNoStar, false},
+		{"Q1TEST-1*", addrStrictLowerCaseWarning, true},
+
+		// Longer than 6 characters is for an APRS-IS server only.
+		{"Q1TESTLONG", addrLenient, true},
+		{"Q1TESTLONG", addrStrict, false},
+		{"Q1TESTLONG", addrStrictNoStar, false},
+		{"Q1TESTLONG", addrStrictLowerCaseWarning, false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s/%d", tc.addr, tc.strictness), func(t *testing.T) {
+			var _, _, _, ok = ax25_parse_addr(AX25_SOURCE, tc.addr, tc.strictness)
+			assert.Equal(t, tc.ok, ok)
+		})
+	}
 }
