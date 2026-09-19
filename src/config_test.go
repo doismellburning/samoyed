@@ -1825,6 +1825,17 @@ func directiveTests() map[string][]directiveCase {
 					a.Zero(c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
 				},
 			},
+			// Regression test: an input type other than GPIO fell through the
+			// handler without a word, so a typo left the transmitter with nothing
+			// holding it off and nothing said about it.
+			{
+				name:   "an unrecognised input type is reported",
+				config: "TXINH SERIAL 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Contains(c.output, "Unrecognized input type name")
+				},
+			},
 		},
 		"TXTAIL": {
 			{

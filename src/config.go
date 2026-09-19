@@ -2711,6 +2711,12 @@ func handleTXINH(ps *parseState) bool {
 
 		ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 		// #endif
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file line %d: Unrecognized input type name \"%s\" for %s command.  GPIO is the only one supported.\n",
+			ps.line, t, itname)
+
+		return true
 	}
 
 	return false
