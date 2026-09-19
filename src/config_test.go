@@ -2522,6 +2522,48 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"SERIALKISSPOLL": {
+			{
+				name:   "a port name is stored and marked for polling",
+				config: "SERIALKISSPOLL /dev/rfcomm0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/rfcomm0", c.misc.kiss_serial_port)
+					a.Equal(1, c.misc.kiss_serial_poll)
+					a.Equal(0, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "nothing is polled by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "it takes no speed, so a second token is left for the next directive to trip over",
+				config: "SERIALKISSPOLL /dev/rfcomm0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/rfcomm0", c.misc.kiss_serial_port)
+					a.Equal(0, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "it replaces a port configured for a fixed speed, and stops polling when replaced in turn",
+				config: "SERIALKISSPOLL /dev/rfcomm0\nSERIALKISS /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "a missing port name does not eat the next line",
+				config: "SERIALKISSPOLL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"SPEECH": {
 			{
 				name:   "a script name is accepted and does not derail the next line",
@@ -2827,7 +2869,6 @@ func directivesNotYetTested() []string {
 		"OBEACON",
 		"PTT",
 		"REGEN",
-		"SERIALKISSPOLL",
 		"SMARTBEACON",
 		"SMARTBEACONING",
 		"TBEACON",
