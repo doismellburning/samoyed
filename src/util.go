@@ -50,66 +50,42 @@ func ADEVFIRSTCHAN(n int) int {
 	return n * 2
 }
 
-// DW_KNOTS_TO_MPH is `#define DW_KNOTS_TO_MPH(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 1.15077945)`.
-func DW_KNOTS_TO_MPH(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
+// The unit conversions below are the Dire Wolf macros of the same names, less
+// their `(x) == G_UNKNOWN ? G_UNKNOWN :` guard: a value that might not be there
+// is a maybe.Maybe, and maybe.Fmap keeps its absence out of the arithmetic.
 
+// DW_KNOTS_TO_MPH converts knots to miles per hour.
+func DW_KNOTS_TO_MPH(x float64) float64 {
 	return x * 1.15077945
 }
 
-// DW_MPH_TO_KNOTS is `#define DW_MPH_TO_KNOTS(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.868976)`.
+// DW_MPH_TO_KNOTS converts miles per hour to knots.
 func DW_MPH_TO_KNOTS(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
-
 	return x * 0.868976
 }
 
-// DW_METERS_TO_FEET is `#define DW_METERS_TO_FEET(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 3.2808399)`.
+// DW_METERS_TO_FEET converts metres to feet.
 func DW_METERS_TO_FEET(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
-
 	return x * 3.2808399
 }
 
-// DW_FEET_TO_METERS is `#define DW_FEET_TO_METERS(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.3048)`.
+// DW_FEET_TO_METERS converts feet to metres.
 func DW_FEET_TO_METERS(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
-
 	return x * 0.3048
 }
 
-// DW_MILES_TO_KM is `#define DW_MILES_TO_KM(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 1.609344)`.
+// DW_MILES_TO_KM converts miles to kilometres.
 func DW_MILES_TO_KM(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
-
 	return x * 1.609344
 }
 
-// DW_MBAR_TO_INHG is `#define DW_MBAR_TO_INHG(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.0295333727)`.
+// DW_MBAR_TO_INHG converts millibars to inches of mercury.
 func DW_MBAR_TO_INHG(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
-
 	return x * 0.0295333727
 }
 
-// DW_KM_TO_MILES is `#define DW_KM_TO_MILES(x) ((x) == G_UNKNOWN ? G_UNKNOWN : (x) * 0.621371192)`.
+// DW_KM_TO_MILES converts kilometres to miles.
 func DW_KM_TO_MILES(x float64) float64 {
-	if x == G_UNKNOWN {
-		return G_UNKNOWN
-	}
-
 	return x * 0.621371192
 }
 
