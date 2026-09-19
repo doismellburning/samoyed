@@ -1751,6 +1751,26 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: both limits went through an Atoi whose error was
+			// ignored, and the handler read anything below 1 as 1.  A typo therefore
+			// clamped the gateway to a single transmission per interval without a
+			// word about it.
+			{
+				name:   "an unreadable one minute limit keeps that default, and the five minute one still counts",
+				config: "IGTXLIMIT three 15\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_DEFAULT, c.igate.tx_limit_1)
+					a.Equal(15, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "an unreadable five minute limit keeps that default only",
+				config: "IGTXLIMIT 3 ten\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_DEFAULT, c.igate.tx_limit_5)
+				},
+			},
 		},
 		"IGTXVIA": {
 			{

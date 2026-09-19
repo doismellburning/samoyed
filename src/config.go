@@ -5292,8 +5292,14 @@ func handleIGTXLIMIT(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n < 1 {
+	// An unreadable limit leaves that one as it was; the other one on the line
+	// is still worth reading.
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: One minute limit must be numeric for IGTXLIMIT command. Keeping %d.\n",
+			ps.line, ps.igate.tx_limit_1)
+	} else if n < 1 {
 		ps.igate.tx_limit_1 = 1
 	} else if n <= IGATE_TX_LIMIT_1_MAX {
 		ps.igate.tx_limit_1 = n
@@ -5314,7 +5320,14 @@ func handleIGTXLIMIT(ps *parseState) bool {
 		return true
 	}
 
-	n, _ = strconv.Atoi(t)
+	n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Five minute limit must be numeric for IGTXLIMIT command. Keeping %d.\n",
+			ps.line, ps.igate.tx_limit_5)
+
+		return false
+	}
 	if n < 1 {
 		ps.igate.tx_limit_5 = 1
 	} else if n <= IGATE_TX_LIMIT_5_MAX {
