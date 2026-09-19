@@ -194,9 +194,18 @@ func Test_IsNoCall(t *testing.T) {
 
 // --- config_init helpers ---
 
-// configFromString writes content to a temp config file, runs config_init, and
-// returns the resulting audio and misc config structs.
-func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+// configs is the set of structures config_init fills in.
+type configs struct {
+	audio *audio_s
+	digi  *digi_config_s
+	cdigi *cdigi_config_s
+	tt    *tt_config_s
+	igate *igate_config_s
+	misc  *misc_config_s
+}
+
+// parseConfig writes content to a temp config file and runs config_init over it.
+func parseConfig(t *testing.T, content string) configs {
 	t.Helper()
 
 	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
@@ -205,17 +214,28 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
 
-	var audioConfig = new(audio_s)
-	var digiConfig digi_config_s
-	var cdigiConfig cdigi_config_s
-	var ttConfig tt_config_s
-	var igateConfig igate_config_s
-	var miscConfig misc_config_s
+	var c = configs{
+		audio: new(audio_s),
+		digi:  new(digi_config_s),
+		cdigi: new(cdigi_config_s),
+		tt:    new(tt_config_s),
+		igate: new(igate_config_s),
+		misc:  new(misc_config_s),
+	}
 
-	config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-		&ttConfig, &igateConfig, &miscConfig)
+	config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
 
-	return audioConfig, &miscConfig
+	return c
+}
+
+// configFromString runs config_init over content and returns the resulting
+// audio and misc config structs.
+func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+	t.Helper()
+
+	var c = parseConfig(t, content)
+
+	return c.audio, c.misc
 }
 
 // --- parse_ll_maybe ---
@@ -1023,4 +1043,178 @@ func Test_config_init_fix_bits(t *testing.T) {
 		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
 		assert.False(t, cfg.achan[0].passall)
 	})
+}
+
+// --- config directive coverage ---
+//
+// The config file is the whole of the user interface, and a parse bug in it is
+// silent by nature, so every keyword in configHandlers is expected to have
+// tests: that a valid line sets what it claims to set, that a malformed or
+// out-of-range one is rejected rather than quietly wrapped or clamped, and that
+// a rejected line neither mutates the configuration nor leaks into the next
+// line.
+//
+// directiveTests holds them as a table, Test_config_directives runs it, and
+// Test_config_directive_coverage fails for a keyword with neither an entry here
+// nor a test of its own, so a newly added handler cannot arrive untested.
+
+// directiveCase is one configuration to parse and what it should leave behind.
+type directiveCase struct {
+	name   string
+	config string
+	check  func(a *assert.Assertions, c configs)
+}
+
+func directiveTests() map[string][]directiveCase {
+	return map[string][]directiveCase{}
+}
+
+func Test_config_directives(t *testing.T) {
+	for keyword, cases := range directiveTests() {
+		t.Run(keyword, func(t *testing.T) {
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					tc.check(assert.New(t), parseConfig(t, tc.config))
+				})
+			}
+		})
+	}
+}
+
+// directivesTestedSeparately names the keywords whose tests predate the table,
+// and the test that covers each of them.
+func directivesTestedSeparately() map[string]string {
+	return map[string]string{
+		"AGWLOGIN":    "Test_config_init_agwlogin",
+		"AGWPORT":     "Test_config_init_agwport",
+		"ARATE":       "Test_config_init_channel",
+		"CFILTER":     "Test_config_init_cfilter_syntax_validation",
+		"CHANNEL":     "Test_config_init_channel",
+		"DNSSD":       "Test_config_init_dnssd",
+		"FILTER":      "Test_config_init_filter_syntax_validation",
+		"FIX_BITS":    "Test_config_init_fix_bits",
+		"FRACK":       "Test_config_init_frack",
+		"IL2PVERSION": "Test_config_init_il2pversion",
+		"KISSPORT":    "Test_config_init_kissport",
+		"METRICSPORT": "Test_config_init_metricsport",
+		"MODEM":       "Test_config_init_modem_directive",
+		"MYCALL":      "Test_config_init_mycall",
+		"PBEACON":     "Test_config_init_pbeacon_no_options",
+		"SLOTTIME":    "Test_config_init_slottime",
+		"TXDELAY":     "Test_config_init_txdelay",
+	}
+}
+
+// directivesNotYetTested is the backlog from issue #648: keywords that have no
+// tests at all yet.  Entries leave as their tests arrive, and the list goes with
+// the last of them.
+func directivesNotYetTested() []string {
+	return []string{
+		"ACHANNELS",
+		"BEACON",
+		"CBEACON",
+		"CDIGIPEAT",
+		"CDIGIPEATER",
+		"CON",
+		"DCD",
+		"DEDUPE",
+		"DIGIPEAT",
+		"DIGIPEATER",
+		"DNSSDNAME",
+		"DTMF",
+		"DWAIT",
+		"EMAXFRAME",
+		"FULLDUP",
+		"FX25AUTO",
+		"FX25TX",
+		"GPSD",
+		"GPSNMEA",
+		"IBEACON",
+		"ICHANNEL",
+		"IGFILTER",
+		"IGLOGIN",
+		"IGMSP",
+		"IGSERVER",
+		"IGTXLIMIT",
+		"IGTXVIA",
+		"IL2PTX",
+		"KISSCOPY",
+		"LOGDIR",
+		"LOGFILE",
+		"MAXFRAME",
+		"MAXV22",
+		"NCHANNEL",
+		"NOXID",
+		"NULLMODEM",
+		"OBEACON",
+		"PACLEN",
+		"PERSIST",
+		"PTT",
+		"REGEN",
+		"RETRY",
+		"SATGATE",
+		"SERIALKISS",
+		"SERIALKISSPOLL",
+		"SMARTBEACON",
+		"SMARTBEACONING",
+		"SPEECH",
+		"TBEACON",
+		"TTAMBIG",
+		"TTCMD",
+		"TTCORRAL",
+		"TTERR",
+		"TTGRID",
+		"TTMACRO",
+		"TTMGRS",
+		"TTMHEAD",
+		"TTOBJ",
+		"TTPOINT",
+		"TTSATSQ",
+		"TTSTATUS",
+		"TTUSNG",
+		"TTUTM",
+		"TTVECTOR",
+		"TXINH",
+		"TXTAIL",
+		"V20",
+		"WAYPOINT",
+	}
+}
+
+func Test_config_directive_coverage(t *testing.T) {
+	var untested = directivesNotYetTested()
+	var tested = directivesTestedSeparately()
+	var table = directiveTests()
+
+	var backlog = make(map[string]bool, len(untested))
+	for _, keyword := range untested {
+		backlog[keyword] = true
+	}
+
+	for keyword := range configHandlers {
+		switch {
+		case len(table[keyword]) > 0:
+		case tested[keyword] != "":
+		case backlog[keyword]:
+			// Awaiting tests - see issue #648.
+		default:
+			t.Errorf("directive %s has no tests: give it a directiveTests entry", keyword)
+		}
+	}
+
+	// A name that is covered now, or that is not a directive at all, comes out
+	// of the lists, so neither can rot into a hole in the coverage check.
+	for _, keyword := range untested {
+		assert.Contains(t, configHandlers, keyword,
+			"%s is listed as untested but is not a directive", keyword)
+		assert.Empty(t, table[keyword],
+			"%s has table tests now: take it out of directivesNotYetTested", keyword)
+		assert.Empty(t, tested[keyword],
+			"%s has tests now: take it out of directivesNotYetTested", keyword)
+	}
+
+	for keyword := range tested {
+		assert.Contains(t, configHandlers, keyword,
+			"%s is listed as tested elsewhere but is not a directive", keyword)
+	}
 }
