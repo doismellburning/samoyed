@@ -2246,6 +2246,60 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// NULLMODEM and SERIALKISS are the same handler under two names, the second
+		// being the one that says what it does.
+		"NULLMODEM": {
+			{
+				name:   "a port name is stored",
+				config: "NULLMODEM /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(0, c.misc.kiss_serial_speed)
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "no NULLMODEM means no serial KISS port",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+				},
+			},
+			{
+				name:   "a speed after the name is stored",
+				config: "NULLMODEM /dev/ttyS0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(9600, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "an unreadable speed is rejected",
+				config: "NULLMODEM /dev/ttyS0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.kiss_serial_speed)
+					a.Contains(c.output, "Invalid speed")
+				},
+			},
+			{
+				// There is only one serial KISS port, so a second line replaces the
+				// first rather than adding to it.
+				name:   "a second line replaces the first and says so",
+				config: "NULLMODEM /dev/ttyS0\nNULLMODEM /dev/ttyS1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS1", c.misc.kiss_serial_port)
+					a.Contains(c.output, "replaces earlier value")
+				},
+			},
+			{
+				name:   "a missing port name does not eat the next line",
+				config: "NULLMODEM\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"PACLEN": {
 			{
 				name:   "a valid length is stored",
@@ -2447,6 +2501,24 @@ func directiveTests() map[string][]directiveCase {
 				config: "SATGATE 20\n",
 				check: func(a *assert.Assertions, c configs) {
 					a.Contains(c.output, "will be removed in a future version")
+				},
+			},
+		},
+		"SERIALKISS": {
+			{
+				name:   "a port name and speed are stored, as for NULLMODEM",
+				config: "SERIALKISS /dev/ttyS0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(9600, c.misc.kiss_serial_speed)
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "it replaces a port name given under the other name",
+				config: "NULLMODEM /dev/ttyS0\nSERIALKISS /dev/ttyS1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS1", c.misc.kiss_serial_port)
 				},
 			},
 		},
@@ -2752,11 +2824,9 @@ func directivesNotYetTested() []string {
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
-		"NULLMODEM",
 		"OBEACON",
 		"PTT",
 		"REGEN",
-		"SERIALKISS",
 		"SERIALKISSPOLL",
 		"SMARTBEACON",
 		"SMARTBEACONING",
