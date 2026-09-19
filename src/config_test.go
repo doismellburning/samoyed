@@ -1138,6 +1138,30 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"DNSSDNAME": {
+			{
+				name:   "a service name is stored",
+				config: "DNSSDNAME Shack TNC\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Shack TNC", c.misc.dns_sd_name)
+				},
+			},
+			{
+				name:   "no DNSSDNAME leaves the name to be derived later",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.dns_sd_name)
+				},
+			},
+			{
+				name:   "a missing name does not eat the next line",
+				config: "DNSSDNAME\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.dns_sd_name)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"DTMF": {
 			{
 				name:   "the decoder is off by default",
@@ -2875,7 +2899,6 @@ func directivesNotYetTested() []string {
 		"DEDUPE",
 		"DIGIPEAT",
 		"DIGIPEATER",
-		"DNSSDNAME",
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
