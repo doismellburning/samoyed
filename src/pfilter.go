@@ -1460,3 +1460,136 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 
 	return err
 }
+
+/*-------------------------------------------------------------------
+ *
+ * Name:   	PfilterStandaloneInit
+ *
+ * Purpose:     Set up the global state pfilter leans on, for a program that
+ *		wants to run filters but is not the TNC.
+ *
+ * Inputs:	debug_level	- As for pfilter_init: 0 for nothing, up to
+ *				  PfilterMaxDebugLevel for the most detail.
+ *
+ * Description:	TNC startup would have put a few things in place that pfilter
+ *		expects: the tables decode_aprs reads, which DecodeAPRSInit
+ *		names, the list of stations heard recently that an "i" filter
+ *		consults, and an IGate configuration to take a default hop
+ *		count from.  The last two are empty here, so an "i" filter
+ *		finds that nothing has been heard and that no IGTXVIA was
+ *		configured.
+ *
+ *--------------------------------------------------------------------*/
+
+func PfilterStandaloneInit(debug_level int) {
+	TextColorInit(0)
+
+	DecodeAPRSInit()
+
+	mheardDB = NewMHeardDB(0)
+
+	pfilter_init(new(igate_config_s), debug_level)
+}
+
+// PfilterMaxDebugLevel is the most verbose debug level pfilter_init has
+// anything to say at.
+const PfilterMaxDebugLevel = 3
+
+// pfilter_check_channels keeps a caller from tripping pfilter's assertion that
+// its channels are channels.
+func pfilter_check_channels(from_chan int, to_chan int) error {
+	if from_chan < 0 || from_chan > MAX_TOTAL_CHANS {
+		return fmt.Errorf("filter from channel %d is not between 0 and %d", from_chan, MAX_TOTAL_CHANS)
+	}
+
+	if to_chan < 0 || to_chan > MAX_TOTAL_CHANS {
+		return fmt.Errorf("filter to channel %d is not between 0 and %d", to_chan, MAX_TOTAL_CHANS)
+	}
+
+	return nil
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:   	PfilterValidate
+ *
+ * Purpose:     pfilter_validate, for a program outside this package.
+ *
+ * Inputs:	from_chan, to_chan - Channels the filter sits between, used
+ *			  only to give context in any error message.
+ *			  MAX_TOTAL_CHANS means the IGate.
+ *
+ *		filter	- Filter specification/expression, as it would appear
+ *			  in the config file.
+ *
+ *		is_aprs	- True for APRS filters (IGFILTER, FILTER), false for
+ *			  connected mode ones (CFILTER).
+ *
+ * Returns:	nil if the filter is valid, otherwise an error describing the
+ *		problem.
+ *
+ *--------------------------------------------------------------------*/
+
+func PfilterValidate(from_chan int, to_chan int, filter string, is_aprs bool) error {
+	var channelErr = pfilter_check_channels(from_chan, to_chan)
+	if channelErr != nil {
+		return channelErr
+	}
+
+	// Validating runs the filter against a synthetic packet of its own, which
+	// is not something the caller asked about, so say nothing about it however
+	// much debug output was asked for.
+	var saved_pfilter_debug = pfilter_debug
+	pfilter_debug = 0
+
+	defer func() { pfilter_debug = saved_pfilter_debug }()
+
+	return pfilter_validate(from_chan, to_chan, filter, is_aprs)
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:   	PfilterMonitorLine
+ *
+ * Purpose:     pfilter, for a program outside this package, against a packet
+ *		written out in the usual monitoring format.
+ *
+ * Inputs:	from_chan, to_chan, filter, is_aprs - As for PfilterValidate.
+ *
+ *		monitor_line - A packet in the usual monitoring format,
+ *			  e.g. "WB2OSZ-1>APDW17:>Hello".
+ *
+ * Returns:	True if the packet passes the filter, false if it does not,
+ *		and an error if the packet could not be parsed or the filter
+ *		could not be evaluated against it.
+ *
+ *--------------------------------------------------------------------*/
+
+func PfilterMonitorLine(from_chan int, to_chan int, filter string, is_aprs bool, monitor_line string) (bool, error) {
+	var channelErr = pfilter_check_channels(from_chan, to_chan)
+	if channelErr != nil {
+		return false, channelErr
+	}
+
+	// Lines pasted from an APRS-IS feed carry a lower case "q-construct" in
+	// the path, which is an error over the air but not on paper, so take the
+	// same view of one that samoyed-decode_aprs does.
+	var pp = ax25_from_text(monitor_line, addrStrictLowerCaseWarning)
+	if pp == nil {
+		return false, fmt.Errorf("could not parse monitoring format input: %q", monitor_line)
+	}
+
+	var result, err = pfilter(from_chan, to_chan, filter, pp, is_aprs)
+	if err != nil {
+		return false, err
+	}
+
+	switch result {
+	case 1:
+		return true, nil
+	case 0:
+		return false, nil
+	default:
+		return false, fmt.Errorf("packet filter returned %d, rather than a yes or a no, for %q", result, monitor_line)
+	}
+}

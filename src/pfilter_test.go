@@ -225,3 +225,215 @@ func Test_pfilter_igate_message_filter_conditions(t *testing.T) {
 		})
 	}
 }
+
+// A position report, a message, a status and a weather report, so a test can
+// pick a packet that a given filter has an opinion about.
+const (
+	pfilterTestPositionPacket = "Q1TEST>APDW17:!4237.14NS07120.83W#PHG7130Chelmsford MA"
+	pfilterTestMessagePacket  = "Q1TEST>APDW17::Q2TEST   :Hello"
+	pfilterTestStatusPacket   = "Q2TEST>APDW17,WIDE1-1*:>Status text"
+	pfilterTestWeatherPacket  = "Q2TEST>APDW17:!4237.14N/07120.83W_180/005g010t077"
+)
+
+// pfilterMonitorLines runs a filter over a handful of packets, reporting each
+// verdict as a pass/drop bool.
+func pfilterMonitorLines(t *testing.T, from_chan int, to_chan int, filter string, is_aprs bool, monitorLines []string) []bool {
+	t.Helper()
+
+	var verdicts []bool
+
+	for _, monitorLine := range monitorLines {
+		var pass, err = PfilterMonitorLine(from_chan, to_chan, filter, is_aprs, monitorLine)
+
+		require.NoError(t, err)
+
+		verdicts = append(verdicts, pass)
+	}
+
+	return verdicts
+}
+
+func Test_PfilterMonitorLine(t *testing.T) {
+	PfilterStandaloneInit(0)
+
+	var testCases = []struct {
+		name     string
+		filter   string
+		packets  []string
+		expected []bool
+	}{
+		{
+			name:     "budlist matches the source address",
+			filter:   "b/Q1TEST",
+			packets:  []string{pfilterTestPositionPacket, pfilterTestStatusPacket},
+			expected: []bool{true, false},
+		},
+		{
+			name:     "budlist wildcard matches a prefix",
+			filter:   "b/Q*",
+			packets:  []string{pfilterTestPositionPacket, pfilterTestStatusPacket},
+			expected: []bool{true, true},
+		},
+		{
+			name:     "packet type selects messages",
+			filter:   "t/m",
+			packets:  []string{pfilterTestMessagePacket, pfilterTestPositionPacket},
+			expected: []bool{true, false},
+		},
+		{
+			name:     "packet type selects weather",
+			filter:   "t/w",
+			packets:  []string{pfilterTestWeatherPacket, pfilterTestPositionPacket},
+			expected: []bool{true, false},
+		},
+		{
+			name:     "digipeater filter matches a used digipeater",
+			filter:   "d/WIDE1-1",
+			packets:  []string{pfilterTestStatusPacket, pfilterTestPositionPacket},
+			expected: []bool{true, false},
+		},
+		{
+			name:     "negation inverts a specification",
+			filter:   "! b/Q1TEST",
+			packets:  []string{pfilterTestPositionPacket, pfilterTestStatusPacket},
+			expected: []bool{false, true},
+		},
+		{
+			name:     "or passes either side",
+			filter:   "b/Q1TEST | t/s",
+			packets:  []string{pfilterTestPositionPacket, pfilterTestStatusPacket, pfilterTestWeatherPacket},
+			expected: []bool{true, true, false},
+		},
+		{
+			name:     "and needs both sides",
+			filter:   "b/Q2TEST & t/s",
+			packets:  []string{pfilterTestStatusPacket, pfilterTestWeatherPacket, pfilterTestMessagePacket},
+			expected: []bool{true, false, false},
+		},
+		{
+			name:     "range filter measures from a point",
+			filter:   "r/42.62/-71.34/10",
+			packets:  []string{pfilterTestPositionPacket},
+			expected: []bool{true},
+		},
+		{
+			name:     "range filter rejects a distant point",
+			filter:   "r/51.5/-0.1/10",
+			packets:  []string{pfilterTestPositionPacket},
+			expected: []bool{false},
+		},
+		{
+			name:     "an empty filter rejects everything",
+			filter:   "",
+			packets:  []string{pfilterTestPositionPacket, pfilterTestMessagePacket},
+			expected: []bool{false, false},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			assert.Equal(t, testCase.expected, pfilterMonitorLines(t, 0, 0, testCase.filter, true, testCase.packets))
+		})
+	}
+}
+
+func Test_PfilterMonitorLine_connectedMode(t *testing.T) {
+	PfilterStandaloneInit(0)
+
+	var packets = []string{pfilterTestPositionPacket, pfilterTestStatusPacket}
+
+	assert.Equal(t, []bool{true, false}, pfilterMonitorLines(t, 0, 0, "b/Q1TEST", false, packets))
+}
+
+func Test_PfilterMonitorLine_unparseablePacket(t *testing.T) {
+	PfilterStandaloneInit(0)
+
+	// AX25FromText has plenty to say about a line it cannot parse, and says it
+	// on stdout, so let it.
+	var pass, err = false, error(nil)
+
+	CaptureOutput(t, func() { pass, err = PfilterMonitorLine(0, 0, "b/Q1TEST", true, "this is not a packet") })
+
+	assert.False(t, pass)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not parse monitoring format input")
+}
+
+func Test_PfilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
+	// PfilterStandaloneInit gives the filter engine an empty "heard recently"
+	// database, and an "i" filter gates a message only to an addressee that
+	// has been heard, so there is nothing here it will pass.
+	PfilterStandaloneInit(0)
+
+	var packets = []string{pfilterTestMessagePacket, pfilterTestStatusPacket}
+
+	var verdicts []bool
+
+	var output = CaptureOutput(t, func() {
+		verdicts = pfilterMonitorLines(t, MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", true, packets)
+	})
+
+	assert.Equal(t, []bool{false, false}, verdicts)
+
+	// The lookup explains itself as it goes, and saying so is how this test
+	// knows it got that far rather than stopping at filt_i's syntax-only
+	// shortcut, which passes a message without asking anything.
+	assert.Contains(t, output, "we have not heard Q2TEST over the radio")
+}
+
+func Test_PfilterValidate(t *testing.T) {
+	PfilterStandaloneInit(0)
+
+	t.Run("a valid filter is accepted", func(t *testing.T) {
+		assert.NoError(t, PfilterValidate(0, 0, "t/m & ! d/WIDE*", true))
+	})
+
+	t.Run("a bad expression is rejected", func(t *testing.T) {
+		var err = PfilterValidate(0, 0, "t/m & ( t/w", true)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `Expected ")" here.`)
+	})
+
+	t.Run("an APRS-only filter type is rejected in connected mode", func(t *testing.T) {
+		assert.Error(t, PfilterValidate(0, 0, "t/m", false))
+	})
+
+	t.Run("the channels appear in the error message", func(t *testing.T) {
+		var err = PfilterValidate(MAX_TOTAL_CHANS, 2, "x/", true)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "filter[IG,2]")
+	})
+
+	t.Run("a channel out of range is rejected rather than asserted on", func(t *testing.T) {
+		require.Error(t, PfilterValidate(-1, 0, "b/Q1TEST", true))
+		require.Error(t, PfilterValidate(0, MAX_TOTAL_CHANS+1, "b/Q1TEST", true))
+
+		var _, err = PfilterMonitorLine(MAX_TOTAL_CHANS+1, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
+		require.Error(t, err)
+	})
+
+	t.Run("validation says nothing about its own synthetic packet", func(t *testing.T) {
+		PfilterStandaloneInit(PfilterMaxDebugLevel)
+
+		defer PfilterStandaloneInit(0)
+
+		var output = CaptureOutput(t, func() {
+			require.NoError(t, PfilterValidate(0, 0, "b/Q1TEST", true))
+		})
+
+		assert.Empty(t, output)
+	})
+}
+
+func Test_PfilterStandaloneInit_debugLevelExplainsTheDecision(t *testing.T) {
+	PfilterStandaloneInit(2)
+
+	defer PfilterStandaloneInit(0)
+
+	AssertOutputContains(t, func() {
+		var _, err = PfilterMonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
+		require.NoError(t, err)
+	}, "b/Q1TEST returns TRUE")
+}
