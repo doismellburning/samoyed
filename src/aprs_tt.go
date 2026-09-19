@@ -236,8 +236,8 @@ type ttParseState struct {
 	symtabOrOverlay rune
 	symbolCode      rune
 	locText         string
-	longitude       float64 /* Set to G_UNKNOWN if not defined. */
-	latitude        float64 /* Set to G_UNKNOWN if not defined. */
+	longitude       maybe.Maybe[float64]
+	latitude        maybe.Maybe[float64]
 	ambiguity       maybe.Maybe[int]
 	comment         string
 	freq            string
@@ -253,8 +253,6 @@ func newTTParseState() ttParseState {
 		symbolCode:      APRSTT_DEFAULT_SYMBOL,
 		dao:             [5]byte{'!', 'T', ' ', ' ', '!'},
 		ssid:            12,
-		latitude:        G_UNKNOWN,
-		longitude:       G_UNKNOWN,
 	}
 }
 
@@ -1152,8 +1150,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 		var ttloc_type = g.config.ttlocs[ipat].ttlocType
 		switch ttloc_type {
 		case TTLOC_POINT:
-			state.latitude = float64(g.config.ttlocs[ipat].point.lat)
-			state.longitude = float64(g.config.ttlocs[ipat].point.lon)
+			state.latitude = maybe.Just(float64(g.config.ttlocs[ipat].point.lat))
+			state.longitude = maybe.Just(float64(g.config.ttlocs[ipat].point.lon))
 
 			/* Is it one of ten or a hundred positions? */
 			/* It's not hardwired to always be B0n or B9nn.  */
@@ -1196,10 +1194,12 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			/* http://movable-type.co.uk/scripts/latlong.html */
 			/* This should probably be a function in latlong.c in case we have another use for it someday. */
 
-			state.latitude = R2D(math.Asin(math.Sin(lat0)*math.Cos(dist/R_M) + math.Cos(lat0)*math.Sin(dist/R_M)*math.Cos(bearing)))
+			var latitude = R2D(math.Asin(math.Sin(lat0)*math.Cos(dist/R_M) + math.Cos(lat0)*math.Sin(dist/R_M)*math.Cos(bearing)))
 
-			state.longitude = R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
-				math.Cos(dist/R_M)-math.Sin(lat0)*math.Sin(D2R(state.latitude))))
+			state.latitude = maybe.Just(latitude)
+
+			state.longitude = maybe.Just(R2D(lon0 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_M)*math.Cos(lat0),
+				math.Cos(dist/R_M)-math.Sin(lat0)*math.Sin(D2R(latitude)))))
 
 			state.dao[2] = e[0]
 			state.dao[3] = e[1]
@@ -1224,7 +1224,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			var yrange = lat9 - lat0
 			var y, _ = strconv.ParseFloat(ystr, 64)
 			var user_y_max = math.Round(math.Pow(10., float64(len(ystr))) - 1.) // e.g. 999 for 3 digits
-			state.latitude = lat0 + yrange*y/user_y_max
+			state.latitude = maybe.Just(lat0 + yrange*y/user_y_max)
 
 			/* TODO KG
 			#if 0
@@ -1239,7 +1239,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			var xrange = lon9 - lon0
 			var x, _ = strconv.ParseFloat(xstr, 64)
 			var user_x_max = math.Round(math.Pow(10., float64(len(xstr))) - 1.)
-			state.longitude = lon0 + xrange*x/user_x_max
+			state.longitude = maybe.Just(lon0 + xrange*x/user_x_max)
 
 			/* TODO KG
 			#if 0
@@ -1292,8 +1292,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
-				state.latitude = R2D(float64(geo.Lat))
-				state.longitude = R2D(float64(geo.Lng))
+				state.latitude = maybe.Just(R2D(float64(geo.Lat)))
+				state.longitude = maybe.Just(R2D(float64(geo.Lng)))
 
 				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
@@ -1331,8 +1331,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			// Apparently also does USNG!
 			var geo, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(loc)
 			if convertErr == nil {
-				state.latitude = R2D(float64(geo.Lat))
-				state.longitude = R2D(float64(geo.Lng))
+				state.latitude = maybe.Just(R2D(float64(geo.Lat)))
+				state.longitude = maybe.Just(R2D(float64(geo.Lng)))
 
 				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
@@ -1373,8 +1373,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 					return (TT_ERROR_INVALID_MHEAD)
 				}
 
-				state.latitude = lat
-				state.longitude = lon
+				state.latitude = maybe.Just(lat)
+				state.longitude = maybe.Just(lon)
 			}
 
 			state.dao[2] = e[0]
@@ -1402,8 +1402,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 					return (TT_ERROR_INVALID_SATSQ)
 				}
 
-				state.latitude = lat
-				state.longitude = lon
+				state.latitude = maybe.Just(lat)
+				state.longitude = maybe.Just(lon)
 			}
 
 			state.dao[2] = e[0]

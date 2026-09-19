@@ -38,6 +38,6 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 
 	assert.Equal(t, TT_ERROR_INVALID_MHEAD, gw.parseLocation(&state, "BA7474"),
 		"an out of range locator should be reported, not ignored")
-	assert.Zero(t, state.latitude, "position should be left alone")
-	assert.Zero(t, state.longitude, "position should be left alone")
+	assert.True(t, state.latitude.IsNothing(), "position should be left alone")
+	assert.True(t, state.longitude.IsNothing(), "position should be left alone")
 }

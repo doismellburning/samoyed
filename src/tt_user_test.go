@@ -30,7 +30,7 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 
 	tt_user_init(&my_audio_config, &my_tt_config)
 
-	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", 37.25, -71.75,
+	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		maybe.Just(2), "", "", "", ' ', "!T99!"))
 
 	var i = tt_user_search("Q2TEST", 'J')
@@ -39,7 +39,7 @@ func TestUserHeardKeepsAmbiguityFromAnEarlierMessage(t *testing.T) {
 
 	// A second sequence that says nothing about ambiguity, as the parse state
 	// hands it over.
-	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", 37.25, -71.75,
+	require.Equal(t, 0, tt_user_heard("Q2TEST", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75),
 		newTTParseState().ambiguity, "", "", "", ' ', "!T99!"))
 
 	assert.Equal(t, maybe.Just(2), tt_user[i].ambiguity,

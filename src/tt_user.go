@@ -370,8 +370,8 @@ func digit_suffix(callsign string) string {
  *
  *----------------------------------------------------------------*/
 
-func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude float64,
-	longitude float64, ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
+func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_heard (%s, %d, %c, %c, %s, ...)\n", callsign, ssid, overlay, symbol, loc_text);
 
@@ -406,11 +406,14 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 		tt_user[i].digit_suffix = digit_suffix(tt_user[i].callsign)
 		tt_user[i].loc_text = loc_text
 
-		if latitude != G_UNKNOWN && longitude != G_UNKNOWN {
+		var lat, haveLat = latitude.Get()
+		var lon, haveLon = longitude.Get()
+
+		if haveLat && haveLon {
 			/* We have specific location. */
 			tt_user[i].corral_slot = 0
-			tt_user[i].latitude = latitude
-			tt_user[i].longitude = longitude
+			tt_user[i].latitude = lat
+			tt_user[i].longitude = lon
 		} else {
 			/* Unknown location, put it in the corral. */
 			tt_user[i].corral_slot = corral_slot()
@@ -445,11 +448,14 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 			tt_user[i].loc_text = loc_text
 		}
 
-		if latitude != G_UNKNOWN && longitude != G_UNKNOWN {
+		var lat, haveLat = latitude.Get()
+		var lon, haveLon = longitude.Get()
+
+		if haveLat && haveLon {
 			/* We have specific location. */
 			tt_user[i].corral_slot = 0
-			tt_user[i].latitude = latitude
-			tt_user[i].longitude = longitude
+			tt_user[i].latitude = lat
+			tt_user[i].longitude = lon
 		}
 
 		tt_user[i].ambiguity = ambiguity.Or(tt_user[i].ambiguity)
