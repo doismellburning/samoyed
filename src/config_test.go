@@ -1629,6 +1629,52 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IGMSP": {
+			{
+				name:   "a count is stored",
+				config: "IGMSP 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.igate.igmsp)
+				},
+			},
+			{
+				name:   "once by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.igmsp)
+				},
+			},
+			{
+				name:   "zero sends no position for the message sender",
+				config: "IGMSP 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.igmsp)
+				},
+			},
+			{
+				name:   "an unreasonable count falls back to once",
+				config: "IGMSP 11\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.igmsp)
+					a.Contains(c.output, "Unreasonable number of times")
+				},
+			},
+			{
+				name:   "a missing count is reported and falls back to once",
+				config: "IGMSP 2\nIGMSP\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.igmsp)
+					a.Contains(c.output, "Missing number of times")
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "IGMSP\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"IGSERVER": {
 			{
 				name:   "a server name is stored with the default port",
@@ -2648,7 +2694,6 @@ func directivesNotYetTested() []string {
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
-		"IGMSP",
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
