@@ -3467,6 +3467,16 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"SMARTBEACONING": {
+			{
+				name:   "the longer name is the same handler, and just as unported",
+				config: "MYCALL Q1TEST\nSMARTBEACONING 60 180 5 1800 15 30 255\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.sb_configured)
+					a.Contains(c.output, "SMARTBEACONING support currently disabled")
+				},
+			},
+		},
 		"SPEECH": {
 			{
 				name:   "a script name is accepted and does not derail the next line",
@@ -3840,7 +3850,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"SMARTBEACONING",
 		"TTAMBIG",
 		"TTCMD",
 		"TTCORRAL",
