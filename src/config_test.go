@@ -3630,6 +3630,83 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// Every response starts out as a Morse "?", so a rejected line is one that
+		// leaves that in place.
+		"TTERR": {
+			{
+				name:   "a response method and text are stored against the message",
+				config: "TTERR BAD_CHECKSUM MORSE Checksum error\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("MORSE", c.tt.response[TT_ERROR_BAD_CHECKSUM].method)
+					a.Equal("Checksum error", c.tt.response[TT_ERROR_BAD_CHECKSUM].mtext)
+				},
+			},
+			{
+				name:   "the defaults are a Morse question mark, and R for success",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("MORSE", c.tt.response[TT_ERROR_BAD_CHECKSUM].method)
+					a.Equal("?", c.tt.response[TT_ERROR_BAD_CHECKSUM].mtext)
+					a.Equal("R", c.tt.response[TT_ERROR_OK].mtext)
+				},
+			},
+			{
+				name:   "SPEECH is the other method",
+				config: "TTERR NO_CALL SPEECH No call sign\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("SPEECH", c.tt.response[TT_ERROR_NO_CALL].method)
+					a.Equal("No call sign", c.tt.response[TT_ERROR_NO_CALL].mtext)
+				},
+			},
+			{
+				name:   "the identifier and method are not case sensitive",
+				config: "TTERR no_call speech No call sign\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("SPEECH", c.tt.response[TT_ERROR_NO_CALL].method)
+				},
+			},
+			{
+				name:   "an unknown message identifier is rejected",
+				config: "TTERR NOT_A_MESSAGE MORSE Some text\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "Invalid message identifier")
+				},
+			},
+			{
+				name:   "a method that is neither SPEECH nor MORSE leaves the default",
+				config: "TTERR NO_CALL FLAGS Some text\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("MORSE", c.tt.response[TT_ERROR_NO_CALL].method)
+					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Contains(c.output, "must be SPEECH or MORSE")
+				},
+			},
+			{
+				// The method goes through the AX.25 address parser, which has its
+				// own ideas about length.
+				name:   "a method too long to be an AX.25 address is rejected",
+				config: "TTERR NO_CALL SEMAPHORE Some text\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Contains(c.output, "has more than 6 characters")
+				},
+			},
+			{
+				name:   "a missing response text leaves the default",
+				config: "TTERR NO_CALL SPEECH\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Contains(c.output, "Missing response text")
+				},
+			},
+			{
+				name:   "a missing identifier does not eat the next line",
+				config: "TTERR\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTGRID": {
 			{
 				name:   "a pattern and the corners of the grid are stored",
@@ -4452,7 +4529,6 @@ func directivesTestedSeparately() map[string]string {
 func directivesNotYetTested() []string {
 	return []string{
 		"TTCMD",
-		"TTERR",
 		"TTSTATUS",
 	}
 }
