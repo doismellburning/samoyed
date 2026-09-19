@@ -3581,6 +3581,36 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTGRID": {
+			{
+				name:   "a pattern and the corners of the grid are stored",
+				config: "TTGRID B2xxyy 37^50.00N 81^00.00W 37^59.99N 81^09.99W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_GRID, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B2xxyy", c.tt.ttlocs[0].pattern)
+					a.InDelta(37.8333, c.tt.ttlocs[0].grid.lat0, 0.001)
+					a.InDelta(-81.0, c.tt.ttlocs[0].grid.lon0, 0.001)
+					a.InDelta(37.9998, c.tt.ttlocs[0].grid.lat9, 0.001)
+					a.InDelta(-81.1665, c.tt.ttlocs[0].grid.lon9, 0.001)
+				},
+			},
+			{
+				name:   "a pattern with something other than digits, x and y is reported",
+				config: "TTGRID B2xxzz 42N 71W 43N 72W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "must be B, optional digit, xxx, yyy")
+				},
+			},
+			{
+				name:   "a missing corner leaves no location and does not eat the next line",
+				config: "TTGRID B2xxyy 42N 71W 43N\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTPOINT": {
 			{
 				name:   "a pattern and its position are stored",
@@ -3996,7 +4026,6 @@ func directivesNotYetTested() []string {
 		"TTAMBIG",
 		"TTCMD",
 		"TTERR",
-		"TTGRID",
 		"TTMACRO",
 		"TTMGRS",
 		"TTMHEAD",
