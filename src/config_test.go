@@ -1520,6 +1520,67 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// MYCALL comes first in each of these: config_init drops the login again if
+		// any radio channel is still NOCALL, since an IGate has to identify itself.
+		"IGLOGIN": {
+			{
+				name:   "a callsign and passcode are stored",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.igate.t2_login)
+					a.Equal("12345", c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "no IGLOGIN leaves no credentials",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_login)
+					a.Empty(c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "a receive-only passcode is just another passcode here",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST-15 -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST-15", c.igate.t2_login)
+					a.Equal("-1", c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "a later line replaces the credentials rather than adding to them",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGLOGIN Q2TEST 54321\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q2TEST", c.igate.t2_login)
+					a.Equal("54321", c.igate.t2_passcode)
+				},
+			},
+			{
+				// igate_init insists on both, so a login with no passcode leaves the
+				// gateway switched off rather than half configured.
+				name:   "a missing passcode leaves nothing to log in with",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "a login without a callsign for the channel is dropped again",
+				config: "IGLOGIN Q1TEST 12345\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_login)
+					a.Contains(c.output, "MYCALL must be set for receive channel")
+				},
+			},
+			{
+				name:   "a missing callsign does not eat the next line",
+				config: "IGLOGIN\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_login)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"IGSERVER": {
 			{
 				name:   "a server name is stored with the default port",
@@ -2399,7 +2460,6 @@ func directivesNotYetTested() []string {
 		"GPSNMEA",
 		"IBEACON",
 		"IGFILTER",
-		"IGLOGIN",
 		"IGMSP",
 		"IGTXLIMIT",
 		"IGTXVIA",
