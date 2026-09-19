@@ -27,6 +27,7 @@ package direwolf
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -458,13 +459,16 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		return result
 	}
 
+	/* Speed over ground is a magnitude, so a negative one is as unusable as
+	 * a field that isn't a number at all - and so is an infinity, which
+	 * ParseFloat is happy to return for "inf". */
 	var knots, knotsErr = strconv.ParseFloat(pknots, 64)
-	if knotsErr == nil {
-		result.Knots = unlessUnknown(knots)
+	if knotsErr == nil && knots >= 0 && !math.IsInf(knots, 0) {
+		result.Knots = maybe.Just(knots)
 	} else {
 		if !quiet {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get speed from GPRMC sentence: %s\n", knotsErr)
+			dw_printf("Can't get speed from GPRMC sentence: %s\n", pknots)
 		}
 
 		result.Fix = DWFIX_ERROR
@@ -472,12 +476,13 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 		return result
 	}
 
+	/* Track made good is degrees true, so anything outside a circle is not a
+	 * course, and is left absent like the empty field a stationary receiver
+	 * sends. */
 	var course, courseErr = strconv.ParseFloat(pcourse, 64)
-	if courseErr == nil {
-		result.Course = unlessUnknown(course)
+	if courseErr == nil && course >= 0 && course <= 360 {
+		result.Course = maybe.Just(course)
 	}
-	/* When stationary, this field might be empty, and Course stays Nothing. */
-	/* A parsed value can still be the G_UNKNOWN sentinel, hence unlessUnknown. */
 
 	//text_color_set (DW_COLOR_INFO);
 	//dw_printf("%.6f %.6f %.1f %.0f\n", *odlat, *odlon, *oknots, *ocourse);
