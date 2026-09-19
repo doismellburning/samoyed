@@ -1066,7 +1066,62 @@ type directiveCase struct {
 }
 
 func directiveTests() map[string][]directiveCase {
-	return map[string][]directiveCase{}
+	return map[string][]directiveCase{
+		"ACHANNELS": {
+			{
+				name:   "two channels makes the second one a radio channel",
+				config: "ACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[0])
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "one channel leaves the second one unused",
+				config: "ACHANNELS 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[0])
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "it applies to the audio device the line follows",
+				config: "ADEVICE1 hw:1,0\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal(2, c.audio.adev[1].num_channels)
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[ADEVFIRSTCHAN(1)])
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[ADEVFIRSTCHAN(1)+1])
+				},
+			},
+			{
+				name:   "a count other than 1 or 2 keeps the default",
+				config: "ACHANNELS 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "an unreadable count keeps the default",
+				config: "ACHANNELS two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "a missing count keeps the default and does not eat the next line",
+				config: "ACHANNELS\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+	}
 }
 
 func Test_config_directives(t *testing.T) {
@@ -1110,7 +1165,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"ACHANNELS",
 		"BEACON",
 		"CBEACON",
 		"CDIGIPEAT",
