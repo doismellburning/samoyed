@@ -1262,6 +1262,55 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"FX25TX": {
+			{
+				name:   "a parity byte count selects FX.25 transmission",
+				config: "FX25TX 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(16, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "AX.25 by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "1 selects the automatic mode",
+				config: "FX25TX 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nFX25TX 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+					a.Equal(LAYER2_FX25, c.audio.achan[1].layer2_xmit)
+				},
+			},
+			{
+				name:   "an unreasonable count falls back to the automatic mode",
+				config: "FX25TX 200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "a missing mode does not eat the next line",
+				config: "FX25TX\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"ICHANNEL": {
 			{
 				name:   "a virtual channel becomes the IGate channel",
@@ -1588,7 +1637,6 @@ func directivesNotYetTested() []string {
 		"DNSSDNAME",
 		"EMAXFRAME",
 		"FX25AUTO",
-		"FX25TX",
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
