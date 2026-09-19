@@ -1817,6 +1817,57 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"NOXID": {
+			{
+				name:   "an address is stored",
+				config: "NOXID Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST"}, c.misc.noxid_addrs)
+					a.Equal(1, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "no NOXID means XID is tried with everyone",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.noxid_addrs)
+					a.Equal(0, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "several addresses on one line are all stored",
+				config: "NOXID Q1TEST Q2TEST-5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST-5"}, c.misc.noxid_addrs)
+					a.Equal(2, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "repeated lines are cumulative",
+				config: "NOXID Q1TEST\nNOXID Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST"}, c.misc.noxid_addrs)
+					a.Equal(2, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "an unusable address is rejected and the rest of the line still counts",
+				config: "NOXID Q1TEST-99 Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q2TEST"}, c.misc.noxid_addrs)
+					a.Equal(1, c.misc.noxid_count)
+					a.Contains(c.output, "Invalid station address for NOXID")
+				},
+			},
+			{
+				name:   "a missing address does not eat the next line",
+				config: "NOXID\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.noxid_addrs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"PACLEN": {
 			{
 				name:   "a valid length is stored",
@@ -2284,7 +2335,6 @@ func directivesNotYetTested() []string {
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
-		"NOXID",
 		"NULLMODEM",
 		"OBEACON",
 		"PTT",
