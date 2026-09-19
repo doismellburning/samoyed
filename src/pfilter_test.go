@@ -24,6 +24,30 @@ func Test_pfilter_empty_info(t *testing.T) {
 	assert.Equal(t, 0, result, "a frame with no information field matches no packet type")
 }
 
+// An "i" filter asks the heard-recently database about the addressee, and
+// pfilter runs in places - config-file validation, and callers that are not
+// the TNC - that can get there before the database exists.  An absent one
+// answers as an empty one does rather than bringing the program down.
+func Test_pfilter_igate_without_a_heard_database(t *testing.T) {
+	var p_igate_config igate_config_s
+	pfilter_init(&p_igate_config, 0)
+
+	deviceIDData = NewDeviceIDData()
+
+	var saved_mheardDB = mheardDB
+	mheardDB = nil
+
+	defer func() { mheardDB = saved_mheardDB }()
+
+	var pp = AX25FromText("Q1TEST>APDW17::Q2TEST   :Hello", true)
+	require.NotNil(t, pp)
+
+	var result, err = pfilter(MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", pp, true)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, result, "an absent database has heard nothing, as an empty one would")
+}
+
 func Test_pfilter_validate(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2

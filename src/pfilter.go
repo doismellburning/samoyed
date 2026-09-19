@@ -1342,6 +1342,15 @@ func filt_i(pf *pfstate_t) (int, error) {
 	 *	 period (range defined as digi hops, distance, or both)."
 	 */
 
+	// An absent database has heard nothing, which is the same answer an empty
+	// one gives: the addressee has not been heard, so there is no point
+	// gating the message to it.  This runs during config-file validation, and
+	// from callers that are not the TNC, either of which can get here before
+	// the database exists.
+	if mheardDB == nil {
+		return 0, nil
+	}
+
 	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
 
 	if !was_heard {
