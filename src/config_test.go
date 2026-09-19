@@ -2167,6 +2167,57 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"V20": {
+			{
+				name:   "an address is stored",
+				config: "V20 Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST"}, c.misc.v20_addrs)
+					a.Equal(1, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "no V20 means every station is offered v2.2 first",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.v20_addrs)
+					a.Equal(0, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "several addresses on one line are all stored",
+				config: "V20 Q1TEST Q2TEST-5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST-5"}, c.misc.v20_addrs)
+					a.Equal(2, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "repeated lines are cumulative",
+				config: "V20 Q1TEST\nV20 Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST"}, c.misc.v20_addrs)
+					a.Equal(2, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "an unusable address is rejected and the rest of the line still counts",
+				config: "V20 Q1TEST-99 Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q2TEST"}, c.misc.v20_addrs)
+					a.Equal(1, c.misc.v20_count)
+					a.Contains(c.output, "Invalid station address for V20")
+				},
+			},
+			{
+				name:   "a missing address does not eat the next line",
+				config: "V20\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.v20_addrs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 	}
 }
 
@@ -2259,7 +2310,6 @@ func directivesNotYetTested() []string {
 		"TTUSNG",
 		"TTUTM",
 		"TTVECTOR",
-		"V20",
 		"WAYPOINT",
 	}
 }
