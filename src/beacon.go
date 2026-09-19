@@ -439,8 +439,9 @@ func (bs *BeaconService) thread() {
 				/* Easy for fixed interval.  SmartBeaconing takes more effort. */
 
 				if bp.btype == BEACON_TRACKER {
-					if gpsinfo.fix < DWFIX_2D {
-						/* Fix not available so beacon was not sent. */
+					var _, _, havePosition = trackerPosition(&gpsinfo)
+					if !havePosition {
+						/* No position available so beacon was not sent. */
 						if bs.miscConfig.sb_configured {
 							/* Try again in a couple seconds. */
 							bp.next = now.Add(2 * time.Second)
@@ -593,6 +594,18 @@ func (bs *BeaconService) sbCalculateNextTime(
 	return (next_time)
 } /* end sbCalculateNextTime */
 
+// trackerPosition is the position a TBEACON can transmit from a GPS reading.
+// A fix is not a promise of a position: gpsd can raise the mode without ever
+// having reported a latitude and longitude.  The scheduler asks the same
+// question as send does, so a beacon that was skipped is not scheduled for as
+// though it had gone out.
+func trackerPosition(gpsinfo *dwgps_info_t) (float64, float64, bool) {
+	var dlat, haveLat = gpsinfo.dlat.Get()
+	var dlon, haveLon = gpsinfo.dlon.Get()
+
+	return dlat, dlon, gpsinfo.fix >= DWFIX_2D && haveLat && haveLon
+}
+
 // beaconPHG is a PHG component from the beacon configuration, whose "not
 // specified" is zero.  The power, height and gain fields are still plain
 // numbers; see issue #619.
@@ -741,7 +754,9 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			bp.freq, bp.tone, bp.offset, super_comment)
 
 	case BEACON_TRACKER:
-		if gpsinfo.fix >= DWFIX_2D {
+		var dlat, dlon, havePosition = trackerPosition(gpsinfo)
+
+		if havePosition {
 			/* Transmit altitude only if user asked for it. */
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
@@ -757,7 +772,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			var knots = maybe.Fmap(func(speed float64) int { return int(math.Round(speed)) }, gpsinfo.speed_knots)
 
 			beacon_text += EncodePosition(bp.messaging, bp.compress,
-				orUnknown(gpsinfo.dlat), orUnknown(gpsinfo.dlon), bp.ambiguity, my_alt_ft,
+				dlat, dlon, bp.ambiguity, my_alt_ft,
 				bp.symtab, bp.symbol,
 				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 				coarse, knots,
@@ -788,7 +803,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				packetLogger.Write(999, &A, nil, alevel, 0)
 			}
 		} else {
-			return /* No fix.  Skip this time. */
+			return /* No position.  Skip this time. */
 		}
 
 	case BEACON_CUSTOM:
