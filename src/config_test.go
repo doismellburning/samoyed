@@ -2122,6 +2122,49 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"LOGDIR": {
+			{
+				name:   "a directory is stored and daily names asked for",
+				config: "LOGDIR /var/log/samoyed\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed", c.misc.log_path)
+					a.True(c.misc.log_daily_names)
+				},
+			},
+			{
+				name:   "no LOGDIR means no logging",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.log_path)
+					a.False(c.misc.log_daily_names)
+				},
+			},
+			{
+				name:   "it replaces an earlier LOGFILE and says so",
+				config: "LOGFILE /var/log/samoyed.log\nLOGDIR /var/log/samoyed\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed", c.misc.log_path)
+					a.True(c.misc.log_daily_names)
+					a.Contains(c.output, "replacing an earlier LOGDIR or LOGFILE")
+				},
+			},
+			{
+				name:   "anything after the directory is reported",
+				config: "LOGDIR /var/log/samoyed extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed", c.misc.log_path)
+					a.Contains(c.output, "should have directory path and nothing more")
+				},
+			},
+			{
+				name:   "a missing directory does not eat the next line",
+				config: "LOGDIR\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.log_path)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"MAXFRAME": {
 			{
 				name:   "a valid window size is stored",
@@ -3070,7 +3113,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEAT",
 		"DIGIPEATER",
 		"IBEACON",
-		"LOGDIR",
 		"LOGFILE",
 		"OBEACON",
 		"PTT",
