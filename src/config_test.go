@@ -1709,6 +1709,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"RETRY": {
+			{
+				name:   "a valid count is stored",
+				config: "RETRY 5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(5, c.misc.retry)
+				},
+			},
+			{
+				name:   "no RETRY leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+				},
+			},
+			{
+				name:   "the limits themselves are accepted",
+				config: "RETRY 15\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_MAX, c.misc.retry)
+				},
+			},
+			{
+				name:   "a count beyond the range keeps the default",
+				config: "RETRY 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+				},
+			},
+			{
+				name:   "never retrying at all is not on offer",
+				config: "RETRY 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+				},
+			},
+			{
+				name:   "an unreadable count keeps the default",
+				config: "RETRY five\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+					a.Contains(c.output, "Invalid RETRY number")
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "RETRY\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"SPEECH": {
 			{
 				name:   "a script name is accepted and does not derail the next line",
@@ -1975,7 +2028,6 @@ func directivesNotYetTested() []string {
 		"PACLEN",
 		"PTT",
 		"REGEN",
-		"RETRY",
 		"SATGATE",
 		"SERIALKISS",
 		"SERIALKISSPOLL",
