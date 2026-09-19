@@ -758,7 +758,12 @@ func filt_t(pf *pfstate_t) (int, error) {
 	// TODO KG Why was this here? var src = ax25_get_addr_with_ssid(pf.pp, AX25_SOURCE)
 	var infop = AX25GetInfo(pf.pp)
 
-	Assert(len(infop) > 0)
+	// A frame with no information field has no data type indicator, so there
+	// is nothing here for a type filter to match.  linbpq's ID broadcasts are
+	// like this.
+	if len(infop) == 0 {
+		return 0, nil
+	}
 
 	for _, f := range pf.token_str[2:] {
 		switch f {

@@ -7,6 +7,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// A UI frame with an empty information field, as sent by linbpq ID broadcasts
+// (issue #504), used to trip an assertion in the type filter.
+func Test_pfilter_empty_info(t *testing.T) {
+	var p_igate_config igate_config_s
+	pfilter_init(&p_igate_config, 0)
+
+	deviceIDData = NewDeviceIDData()
+
+	var pp = AX25FromText("Q1TEST>ID:", true)
+	require.NotNil(t, pp)
+
+	var result, err = pfilter(0, 0, "t/p", pp, true)
+
+	require.NoError(t, err)
+	assert.Equal(t, 0, result, "a frame with no information field matches no packet type")
+}
+
 func Test_pfilter_validate(t *testing.T) {
 	var p_igate_config igate_config_s
 	p_igate_config.max_digi_hops = 2
