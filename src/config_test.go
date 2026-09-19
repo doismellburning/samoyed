@@ -1223,6 +1223,33 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"CON": {
+			{
+				name:   "it configures the connected indicator output",
+				config: "CON /dev/ttyS0 DTR\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_SERIAL, c.audio.achan[0].octrl[OCTYPE_CON].ptt_method)
+					a.Equal(PTT_LINE_DTR, c.audio.achan[0].octrl[OCTYPE_CON].ptt_line)
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "CM108 is rejected for it as well",
+				config: "CON CM108 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_CON].ptt_method)
+					a.Contains(c.output, "only valid for PTT, not CON")
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "CON\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_CON].ptt_method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"DCD": {
 			{
 				name:   "it configures the data carrier detect output, not PTT",
@@ -3727,7 +3754,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"BEACON",
 		"CBEACON",
-		"CON",
 		"IBEACON",
 		"OBEACON",
 		"SMARTBEACON",
