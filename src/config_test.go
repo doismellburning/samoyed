@@ -1520,6 +1520,78 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IGSERVER": {
+			{
+				name:   "a server name is stored with the default port",
+				config: "IGSERVER rotate.aprs2.net\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "no IGSERVER leaves no server to gate to",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_server_name)
+				},
+			},
+			{
+				name:   "a port after a colon is split out",
+				config: "IGSERVER rotate.aprs2.net:14579\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(14579, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a port as a separate token is accepted too",
+				config: "IGSERVER rotate.aprs2.net 14579\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(14579, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a bracketed IPv6 address keeps its colons",
+				config: "IGSERVER [2001:db8::1]:14579\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("2001:db8::1", c.igate.t2_server_name)
+					a.Equal(14579, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "an out-of-range port after a colon falls back to the default",
+				config: "IGSERVER rotate.aprs2.net:99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "an unreadable separate port falls back to the default",
+				config: "IGSERVER rotate.aprs2.net fourteen\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a name with a trailing colon and no port keeps the name",
+				config: "IGSERVER rotate.aprs2.net:\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a missing server name does not eat the next line",
+				config: "IGSERVER\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_server_name)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"IL2PTX": {
 			{
 				name:   "with no options it selects IL2P with max FEC, normal polarity and a CRC",
@@ -2329,7 +2401,6 @@ func directivesNotYetTested() []string {
 		"IGFILTER",
 		"IGLOGIN",
 		"IGMSP",
-		"IGSERVER",
 		"IGTXLIMIT",
 		"IGTXVIA",
 		"KISSCOPY",
