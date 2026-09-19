@@ -1988,6 +1988,22 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"KISSCOPY": {
+			{
+				name:   "the directive turns copying on",
+				config: "KISSCOPY\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.misc.kiss_copy)
+				},
+			},
+			{
+				name:   "off by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.kiss_copy)
+				},
+			},
+		},
 		"MAXFRAME": {
 			{
 				name:   "a valid window size is stored",
@@ -2863,7 +2879,6 @@ func directivesNotYetTested() []string {
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
-		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
 		"OBEACON",
