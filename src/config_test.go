@@ -1489,6 +1489,47 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"GPSD": {
+			{
+				name:   "the directive on its own uses the local gpsd on its usual port",
+				config: "GPSD\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.misc.gpsd_host)
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+				},
+			},
+			{
+				name:   "no GPSD means no gpsd",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsd_host)
+				},
+			},
+			{
+				name:   "a host of its own keeps the usual port",
+				config: "GPSD gps.example.com\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("gps.example.com", c.misc.gpsd_host)
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+				},
+			},
+			{
+				name:   "a host and port are both stored",
+				config: "GPSD gps.example.com 2948\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("gps.example.com", c.misc.gpsd_host)
+					a.Equal(2948, c.misc.gpsd_port)
+				},
+			},
+			{
+				name:   "an out-of-range port falls back to the usual one",
+				config: "GPSD gps.example.com 99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+					a.Contains(c.output, "Invalid port number for GPSD")
+				},
+			},
+		},
 		"GPSNMEA": {
 			{
 				name:   "a serial port is stored with the traditional speed",
@@ -2940,7 +2981,6 @@ func directivesNotYetTested() []string {
 		"DEDUPE",
 		"DIGIPEAT",
 		"DIGIPEATER",
-		"GPSD",
 		"IBEACON",
 		"LOGDIR",
 		"LOGFILE",
