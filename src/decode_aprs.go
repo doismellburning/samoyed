@@ -2724,33 +2724,36 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
  *
  *------------------------------------------------------------------*/
 
-// Returns value, newWPP, found=True, or G_UNKNOWN, wpp, found=False
-func getwdata(wpp []byte, id rune, dlen int) (float64, []byte, bool) {
+// getwdata consumes the weather field introduced by id, which is dlen
+// characters wide.  It returns the value, the remaining weather data, and
+// whether the field was there at all: a field of all spaces or all dots is
+// present but says the value is unknown, so it gives Nothing with found=true.
+func getwdata(wpp []byte, id rune, dlen int) (maybe.Maybe[float64], []byte, bool) {
 	Assert(dlen >= 2 && dlen <= 6)
 
 	// The field is an id byte and dlen data bytes.  A report that ends
 	// before that does not have this field, rather than having a short one.
 	if len(wpp) < dlen+1 {
-		return G_UNKNOWN, wpp, false
+		return maybe.Nothing[float64](), wpp, false
 	}
 
 	if rune(wpp[0]) != id {
-		return G_UNKNOWN, wpp, false
+		return maybe.Nothing[float64](), wpp, false
 	}
 
 	var field = wpp[1 : dlen+1]
 
 	// All spaces or dots means unknown value
 	if bytes.Count(field, []byte{'.'}) == len(field) || bytes.Count(field, []byte{' '}) == len(field) {
-		return G_UNKNOWN, wpp[dlen+1:], true
+		return maybe.Nothing[float64](), wpp[dlen+1:], true
 	}
 
 	var f, floatErr = strconv.ParseFloat(string(field), 64)
 	if floatErr != nil {
-		return G_UNKNOWN, wpp, false
+		return maybe.Nothing[float64](), wpp, false
 	}
 
-	return f, wpp[dlen+1:], true
+	return maybe.Just(f), wpp[dlen+1:], true
 }
 
 func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:unparam
@@ -2780,9 +2783,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 
 		wp = wp[7:]
 	} else if A.g_speed_mph.IsNothing() {
-		var course, speed float64
-
-		course, wp, found = getwdata(wp, 'c', 3)
+		A.g_course, wp, found = getwdata(wp, 'c', 3)
 		if !found {
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
@@ -2790,17 +2791,13 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 			}
 		}
 
-		A.g_course = unlessUnknown(course)
-
-		speed, wp, found = getwdata(wp, 's', 3) /* MPH here */
+		A.g_speed_mph, wp, found = getwdata(wp, 's', 3) /* MPH here */
 		if !found {
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Didn't find wind speed in form s999.\n")
 			}
 		}
-
-		A.g_speed_mph = unlessUnknown(speed)
 	}
 
 	// At this point, we should have the wind direction and speed
@@ -2823,11 +2820,11 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 	 * - gust (peak in mph last 5 minutes)
 	 * - temperature, degrees F, can be negative e.g. -01
 	 */
-	var fval float64
+	var wval maybe.Maybe[float64]
 
-	fval, wp, found = getwdata(wp, 'g', 3)
+	wval, wp, found = getwdata(wp, 'g', 3)
 	if found {
-		if fval != G_UNKNOWN {
+		if fval, ok := wval.Get(); ok {
 			A.g_weather += fmt.Sprintf(", gust %.0f", fval)
 		}
 	} else {
@@ -2837,9 +2834,9 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 		}
 	}
 
-	fval, wp, found = getwdata(wp, 't', 3)
+	wval, wp, found = getwdata(wp, 't', 3)
 	if found {
-		if fval != G_UNKNOWN {
+		if fval, ok := wval.Get(); ok {
 			A.g_weather += fmt.Sprintf(", temperature %.0f", fval)
 		}
 	} else {
@@ -2854,40 +2851,40 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 	 */
 	for {
 		// TODO KG Rebuild this by peeking at wp[0]
-		fval, wp, found = getwdata(wp, 'r', 3)
+		wval, wp, found = getwdata(wp, 'r', 3)
 		if found {
 			/* r = rainfall, 1/100 inch, last hour */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", rain %.2f in last hour", fval/100.)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'p', 3)
+		wval, wp, found = getwdata(wp, 'p', 3)
 		if found {
 			/* p = rainfall, 1/100 inch, last 24 hours */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", rain %.2f in last 24 hours", fval/100.)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'P', 3)
+		wval, wp, found = getwdata(wp, 'P', 3)
 		if found {
 			/* P = rainfall, 1/100 inch, since midnight */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", rain %.2f since midnight", fval/100.)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'h', 2)
+		wval, wp, found = getwdata(wp, 'h', 2)
 		if found {
 			/* h = humidity %, 00 means 100%  */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				if fval == 0 {
 					fval = 100
 				}
@@ -2898,69 +2895,69 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'b', 5)
+		wval, wp, found = getwdata(wp, 'b', 5)
 		if found {
 			/* b = barometric presure (tenths millibars / tenths of hPascal)  */
 			/* Here, display as inches of mercury. */
-			if fval != G_UNKNOWN {
-				fval = DW_MBAR_TO_INHG(float64(fval) * 0.1)
+			if fval, ok := wval.Get(); ok {
+				fval = DW_MBAR_TO_INHG(fval * 0.1)
 				A.g_weather += fmt.Sprintf(", barometer %.2f", fval)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'L', 3)
+		wval, wp, found = getwdata(wp, 'L', 3)
 		if found {
 			/* L = Luminosity, watts/ sq meter, 000-999  */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", %.0f watts/m^2", fval)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'l', 3)
+		wval, wp, found = getwdata(wp, 'l', 3)
 		if found {
 			/* l = Luminosity, watts/ sq meter, 1000-1999  */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", %.0f watts/m^2", fval+1000)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 's', 3)
+		wval, wp, found = getwdata(wp, 's', 3)
 		if found {
 			/* s = Snowfall in last 24 hours, inches  */
 			/* Data can have decimal point so we don't have to worry about scaling. */
 			/* 's' is also used by wind speed but that must be in a fixed */
 			/* position in the message so there is no confusion. */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", %.1f snow in 24 hours", fval)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 's', 3)
+		wval, wp, found = getwdata(wp, 's', 3)
 		if found {
 			/* # = Raw rain counter  */
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", raw rain counter %.f", fval)
 			}
 
 			continue
 		}
 
-		fval, wp, found = getwdata(wp, 'X', 3)
+		wval, wp, found = getwdata(wp, 'X', 3)
 		if found {
 			/* X = Nuclear Radiation.  */
 			/* Encoded as two significant digits and order of magnitude */
 			/* like resistor color code. */
 
 			// TODO: decode this properly
-			if fval != G_UNKNOWN {
+			if fval, ok := wval.Get(); ok {
 				A.g_weather += fmt.Sprintf(", nuclear Radiation %.f", fval)
 			}
 

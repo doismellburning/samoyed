@@ -138,3 +138,62 @@ func Test_decode_aprs_positionless_weather_truncated(t *testing.T) {
 		assert.Equal(t, "Positionless Weather Report", A.g_data_type_desc, "%s", info)
 	}
 }
+
+// A weather field of all dots or all spaces is present but says the value is
+// unknown, and must not be reported as a reading.  It used to come back as the
+// G_UNKNOWN sentinel, which every caller had to remember to test for.
+func Test_decode_aprs_weather_unknown_fields(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var known = decode_aprs(AX25FromText(
+		"Q1TEST>APRS:!4903.50N/07201.75W_220/004g005t077r000p000P000h50b09900wRSW", true), true, "")
+	assert.Equal(t,
+		`wind 4.6 mph, direction 220, gust 5, temperature 77, `+
+			`rain 0.00 in last hour, rain 0.00 in last 24 hours, rain 0.00 since midnight, `+
+			`humidity 50, barometer 29.24, "wRSW"`,
+		known.g_weather)
+
+	// The same report with every optional field blanked out: the fields are
+	// still consumed - the station type is found at the end - but none of
+	// them is reported.
+	var unknown = decode_aprs(AX25FromText(
+		"Q1TEST>APRS:!4903.50N/07201.75W_220/004g...t...r...p...P...h..b.....wRSW", true), true, "")
+	assert.Equal(t, `wind 4.6 mph, direction 220, "wRSW"`, unknown.g_weather)
+}
+
+// The wind direction and speed of a c000s000-form report are unknown, not
+// zero, when their fields are blanked out.  weather_data clears g_course and
+// g_speed_mph before it returns - the wind belongs on the weather line, not on
+// the location line - so the distinction has to be checked at getwdata.
+func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	// The field is there; it just has no value in it.
+	var blank, rest, found = getwdata([]byte("c...s...g005"), 'c', 3)
+	assert.True(t, found)
+	assert.Equal(t, maybe.Nothing[float64](), blank)
+	assert.Equal(t, "s...g005", string(rest))
+
+	// An all-spaces field says the same thing as an all-dots one.  The two
+	// are separate branches of an ||, so one can regress without the other.
+	var spaces, afterSpaces, spacesFound = getwdata([]byte("c   s004"), 'c', 3)
+	assert.True(t, spacesFound)
+	assert.Equal(t, maybe.Nothing[float64](), spaces)
+	assert.Equal(t, "s004", string(afterSpaces))
+
+	// A field of zeroes is a reading of zero, which is not the same thing.
+	var zero, _, _ = getwdata([]byte("c000s000"), 'c', 3)
+	assert.Equal(t, maybe.Just(0.0), zero)
+
+	// A field that is not there at all is not found, and consumes nothing.
+	var missing, untouched, present = getwdata([]byte("g005t077"), 'c', 3)
+	assert.False(t, present)
+	assert.Equal(t, maybe.Nothing[float64](), missing)
+	assert.Equal(t, "g005t077", string(untouched))
+
+	// End to end: the blanked-out wind leaves no wind on the weather line,
+	// and the fields after it still decode.
+	var A = decode_aprs(AX25FromText(
+		"Q1TEST>APRS:!4903.50N/07201.75W_c...s...g005t077wRSW", true), true, "")
+	assert.Equal(t, `, gust 5, temperature 77, "wRSW"`, A.g_weather)
+}
