@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -4708,10 +4709,44 @@ func Test_config_directive_coverage(t *testing.T) {
 		}
 	}
 
-	// A name that is not a directive at all comes out of the list, so it cannot
-	// rot into a hole in the check above.
+	// A name that is not a directive at all comes out of either list, so a
+	// mistyped one cannot sit there looking like coverage while testing nothing.
+	for keyword := range table {
+		assert.Contains(t, configHandlers, keyword,
+			"%s has table tests but is not a directive", keyword)
+	}
+
 	for keyword := range tested {
 		assert.Contains(t, configHandlers, keyword,
 			"%s is listed as tested elsewhere but is not a directive", keyword)
 	}
+
+	// The test named for each of those is a claim about this package, so hold it
+	// to the source: a renamed or deleted test would otherwise leave the
+	// directive looking covered by a test that no longer exists.
+	var sources = packageTestSource(t)
+
+	for keyword, name := range tested {
+		assert.Contains(t, sources, "func "+name+"(t *testing.T)",
+			"%s is listed as tested by %s, which does not exist", keyword, name)
+	}
+}
+
+// packageTestSource returns every _test.go file in this package, concatenated.
+func packageTestSource(t *testing.T) string {
+	t.Helper()
+
+	var names, err = filepath.Glob("*_test.go")
+	require.NoError(t, err)
+	require.NotEmpty(t, names)
+
+	var all strings.Builder
+
+	for _, name := range names {
+		var content, readErr = os.ReadFile(name) //nolint:gosec // The names come from a glob of this package's own directory
+		require.NoError(t, readErr)
+		all.Write(content)
+	}
+
+	return all.String()
 }
