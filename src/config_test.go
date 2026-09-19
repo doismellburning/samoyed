@@ -2884,6 +2884,200 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// PTT, DCD and CON are one handler, keyed on the keyword; the cases here use
+		// PTT, with the other two covering what differs.
+		"PTT": {
+			{
+				name:   "a serial port and control line are stored",
+				config: "PTT /dev/ttyS0 RTS\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_SERIAL, octrl.ptt_method)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+					a.False(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "nothing keys the radio by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "a minus in front of the control line inverts it",
+				config: "PTT /dev/ttyS0 -DTR\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_LINE_DTR, octrl.ptt_line)
+					a.True(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a second control line on the same port is stored too",
+				config: "PTT /dev/ttyS0 RTS -DTR\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+					a.Equal(PTT_LINE_DTR, octrl.ptt_line2)
+					a.True(octrl.ptt_invert2)
+				},
+			},
+			{
+				name:   "the same control line twice is reported",
+				config: "PTT /dev/ttyS0 RTS RTS\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "control line twice")
+				},
+			},
+			{
+				name:   "something that is neither RTS nor DTR is rejected",
+				config: "PTT /dev/ttyS0 XYZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "Expected RTS or DTR")
+				},
+			},
+			{
+				name:   "a GPIO number is stored",
+				config: "PTT GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_GPIO, octrl.ptt_method)
+					a.Equal(25, octrl.out_gpio_num)
+					a.False(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a negative GPIO number is the same line, active low",
+				config: "PTT GPIO -25\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(25, octrl.out_gpio_num)
+					a.True(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a GPIOD chip name becomes a device path",
+				config: "PTT GPIOD gpiochip3 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_GPIOD, octrl.ptt_method)
+					a.Equal("/dev/gpiochip3", octrl.out_gpio_name)
+					a.Equal(12, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a GPIOD chip number becomes a device path as well",
+				config: "PTT GPIOD 3 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/gpiochip3", c.audio.achan[0].octrl[OCTYPE_PTT].out_gpio_name)
+				},
+			},
+			{
+				name:   "a GPIOD device path is taken as given",
+				config: "PTT GPIOD /dev/gpiochip3 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/gpiochip3", c.audio.achan[0].octrl[OCTYPE_PTT].out_gpio_name)
+				},
+			},
+			{
+				name:   "an LPT bit number is stored",
+				config: "PTT LPT 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_LPT, octrl.ptt_method)
+					a.Equal(3, octrl.ptt_lpt_bit)
+					a.False(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a negative LPT bit number inverts it",
+				config: "PTT LPT -3\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(3, octrl.ptt_lpt_bit)
+					a.True(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a hamlib model, port and rate are stored",
+				config: "PTT RIG 101 /dev/ttyS0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_HAMLIB, octrl.ptt_method)
+					a.Equal(101, octrl.ptt_model)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(9600, octrl.ptt_rate)
+				},
+			},
+			{
+				name:   "AUTO asks hamlib to work the model out",
+				config: "PTT RIG AUTO /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_model)
+				},
+			},
+			{
+				name:   "a rig name where the model number belongs is rejected",
+				config: "PTT RIG FT-847 /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "A rig number, not a name")
+				},
+			},
+			{
+				name:   "an unreasonable model number is rejected",
+				config: "PTT RIG 0 /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "Unreasonable model number")
+				},
+			},
+			{
+				name:   "an unreadable CAT rate is rejected",
+				config: "PTT RIG 101 /dev/ttyS0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "optional number is required here")
+				},
+			},
+			{
+				name:   "a CM108 device and its GPIO bit are stored",
+				config: "PTT CM108 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_CM108, octrl.ptt_method)
+					a.Equal("/dev/hidraw9", octrl.ptt_device)
+					a.Equal(3, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a CM108 GPIO bit outside 1 to 8 is rejected",
+				config: "PTT CM108 9 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "is not in range of 1 thru 8")
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nPTT GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[1].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "PTT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"REGEN": {
 			{
 				name:   "a valid line turns regeneration on",
@@ -3457,7 +3651,6 @@ func directivesNotYetTested() []string {
 		"DCD",
 		"IBEACON",
 		"OBEACON",
-		"PTT",
 		"SMARTBEACON",
 		"SMARTBEACONING",
 		"TBEACON",
