@@ -9,10 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// AssertOutputContains runs command and asserts its stdout contains expectedOutputContains.
+// CaptureOutput runs command with stdout redirected, and returns what it wrote
+// there.  Much of the codebase prints via dw_printf, i.e. straight to stdout,
+// so this is how a test gets hold of it.
 // Note that any of the Dire Wolf colour formatting totally screws this for reasons I don't yet understand.
 // See also what happens if you pipe output to a pager...
-func AssertOutputContains(t *testing.T, command func(), expectedOutputContains string) {
+func CaptureOutput(t *testing.T, command func()) string {
 	t.Helper()
 
 	var oldStdout = os.Stdout
@@ -21,7 +23,9 @@ func AssertOutputContains(t *testing.T, command func(), expectedOutputContains s
 		os.Stdout = oldStdout
 	}()
 
-	var r, w, _ = os.Pipe()
+	var r, w, pipeErr = os.Pipe()
+
+	require.NoError(t, pipeErr)
 
 	os.Stdout = w
 
@@ -35,7 +39,12 @@ func AssertOutputContains(t *testing.T, command func(), expectedOutputContains s
 
 	require.NoError(t, readErr)
 
-	var outputString = string(outputBytes)
+	return string(outputBytes)
+}
 
-	assert.Contains(t, outputString, expectedOutputContains)
+// AssertOutputContains runs command and asserts its stdout contains expectedOutputContains.
+func AssertOutputContains(t *testing.T, command func(), expectedOutputContains string) {
+	t.Helper()
+
+	assert.Contains(t, CaptureOutput(t, command), expectedOutputContains)
 }
