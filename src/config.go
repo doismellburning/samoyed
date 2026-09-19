@@ -2303,7 +2303,13 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		var gpio, _ = strconv.Atoi(t)
+		var gpio, gpioErr = strconv.Atoi(t)
+		if gpioErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, otname)
+
+			return true
+		}
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
 			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
@@ -2354,7 +2360,13 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		var gpio, _ = strconv.Atoi(t)
+		var gpio, gpioErr = strconv.Atoi(t)
+		if gpioErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, otname)
+
+			return true
+		}
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
 			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
@@ -2384,7 +2396,13 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		var lpt, _ = strconv.Atoi(t)
+		var lpt, lptErr = strconv.Atoi(t)
+		if lptErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: LPT bit number must be numeric for %s.\n", ps.line, otname)
+
+			return true
+		}
 		if lpt < 0 {
 			ps.audio.achan[ps.channel].octrl[ot].ptt_lpt_bit = -1 * lpt
 			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true

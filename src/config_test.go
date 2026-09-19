@@ -3090,6 +3090,37 @@ func directiveTests() map[string][]directiveCase {
 					a.NotContains(c.output, "must rebuild")
 				},
 			},
+			// Regression test: the GPIO, GPIOD and LPT numbers went through an Atoi
+			// whose error was ignored, so a typo configured GPIO line 0 or LPT bit 0
+			// as the transmit control - which is how a station ends up keying
+			// something that isn't the radio, or not keying at all.
+			{
+				name:   "an unreadable GPIO number leaves the radio unkeyed",
+				config: "PTT GPIO twentyfive\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Zero(octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "an unreadable GPIOD line number leaves the radio unkeyed",
+				config: "PTT GPIOD gpiochip3 twelve\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Zero(octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "an unreadable LPT bit number leaves the radio unkeyed",
+				config: "PTT LPT three\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Zero(octrl.ptt_lpt_bit)
+				},
+			},
 		},
 		"REGEN": {
 			{
