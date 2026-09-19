@@ -2347,12 +2347,14 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// We will allow the user to specify either the name or full device path.
 		// While we are here, also allow only the number as used by the gpiod utilities.
 
+		var gpio_name string
+
 		if t[0] == '/' { // Looks like device path.  Use as given.
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = t
+			gpio_name = t
 		} else if unicode.IsDigit(rune(t[0])) { // or if digit, prepend "/dev/gpiochip"
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = "/dev/gpiochip" + t
+			gpio_name = "/dev/gpiochip" + t
 		} else { // otherwise, prepend "/dev/" to the name
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = "/dev/" + t
+			gpio_name = "/dev/" + t
 		}
 
 		t = split("", false)
@@ -2370,6 +2372,13 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 			return true
 		}
+
+		// Commit the line only once all of it has parsed.  Storing the chip name
+		// first would leave a rejected line's chip beside the line number and
+		// method of an earlier one, and ptt_init hands that pair to
+		// RequestGPIODLine as though it came from a single line.
+		ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = gpio_name
+
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
 			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true

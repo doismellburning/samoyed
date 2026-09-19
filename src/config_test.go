@@ -3268,6 +3268,39 @@ func directiveTests() map[string][]directiveCase {
 					a.Zero(octrl.ptt_lpt_bit)
 				},
 			},
+			// Regression test: the chip name was stored before the line number had
+			// been read, so a line rejected after that point left this line's chip
+			// beside an earlier line's number and method - a pair that never
+			// appeared in the config file, and which ptt_init hands to
+			// RequestGPIODLine as though it had.
+			{
+				name:   "an unreadable GPIOD line number leaves the earlier chip alone",
+				config: "PTT GPIOD gpiochip3 12\nPTT GPIOD gpiochip9 twelve\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_GPIOD, octrl.ptt_method)
+					a.Equal("/dev/gpiochip3", octrl.out_gpio_name)
+					a.Equal(12, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a missing GPIOD line number leaves the earlier chip alone",
+				config: "PTT GPIOD gpiochip3 12\nPTT GPIOD gpiochip9\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal("/dev/gpiochip3", octrl.out_gpio_name)
+					a.Equal(12, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a GPIOD line with no usable number configures no chip at all",
+				config: "PTT GPIOD gpiochip3 twelve\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Empty(octrl.out_gpio_name)
+				},
+			},
 		},
 		"REGEN": {
 			{
