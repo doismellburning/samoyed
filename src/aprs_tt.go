@@ -260,7 +260,7 @@ func newTTParseState() ttParseState {
 // TTGateway is the APRStt gateway. Construct one with NewTTGateway.
 type TTGateway struct {
 	config         *tt_config_s
-	debug          int
+	log            *logrus.Entry
 	msgStr         [MAX_RADIO_CHANS]string
 	pollPeriod     int
 	runningTests   bool
@@ -284,7 +284,9 @@ type TTGateway struct {
  *----------------------------------------------------------------*/
 
 func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
-	var g = &TTGateway{debug: debug} //nolint:exhaustruct_v5
+	SetDebugGroup(DebugAPRSTT, debug > 0)
+
+	var g = &TTGateway{log: debugLogger(DebugAPRSTT)} //nolint:exhaustruct_v5
 
 	g.config = p
 
@@ -594,8 +596,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("Macro tone sequence: '%s'\n", e)
+	g.log.Debugf("Macro tone sequence: %q", e)
 
 	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(e)
 
@@ -604,10 +605,10 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		// Documentation says only x, y, z can be used with macros.
 		// Only those 3 are processed below.
 
-		// dw_printf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
-		dw_printf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s\n", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr)
+		// g.log.Debugf ("Matched pattern %3d: '%s', x=%s, y=%s, z=%s, b=%s, d=%s", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr, bstr, dstr);
+		g.log.Debugf("Matched pattern %3d: '%s', x=%s, y=%s, z=%s", ipat, g.config.ttlocs[ipat].pattern, xstr, ystr, zstr)
 
-		dw_printf("Replace with:        '%s'\n", g.config.ttlocs[ipat].macro.definition)
+		g.log.Debugf("Replace with:        '%s'", g.config.ttlocs[ipat].macro.definition)
 
 		if g.config.ttlocs[ipat].ttlocType != TTLOC_MACRO {
 			/* Found match to a different type.  Really shouldn't be here. */
@@ -648,7 +649,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 		 * Process as if we heard this over the air.
 		 */
 
-		dw_printf("After substitution:  '%s'\n", stemp.String())
+		g.log.Debugf("After substitution:  '%s'", stemp.String())
 
 		return (g.parseFields(state, stemp.String()))
 	} else {
@@ -722,10 +723,7 @@ func checksum_not_ok(str string, length int, found rune) int {
 }
 
 func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
-	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse callsign (starts with A then digit): \"%s\"\n", e)
-	}
+	g.log.Debugf("APRStt parse callsign (starts with A then digit): %q", e)
 
 	Assert(e[0] == 'A')
 
@@ -738,10 +736,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	if length == 4 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) {
 		state.callsign = e[1:]
 
-		if g.debug > 0 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Special case, 3 digit tactical call: \"%s\"\n", state.callsign)
-		}
+		g.log.Debugf("Special case, 3 digit tactical call: %q", state.callsign)
 
 		return (0)
 	}
@@ -774,20 +769,14 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(stemp[0])
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Three digit abbreviation1: callsign \"%s\", symbol code '%c (Box DTMF)', overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
-			}
+			g.log.Debugf("Three digit abbreviation1: callsign %q, symbol code '%c (Box DTMF)', overlay '%c', checksum %c",
+				state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
 		} else {
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(e[length-2])
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Three digit abbreviation2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
-			}
+			g.log.Debugf("Three digit abbreviation2: callsign %q, symbol code '%c' (Box DTMF), overlay '%c', checksum %c",
+				state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
 		}
 
 		return (0)
@@ -815,11 +804,8 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(stemp[0])
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Callsign in two key format1: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
-			}
+			g.log.Debugf("Callsign in two key format1: callsign %q, symbol code '%c' (Box DTMF), overlay '%c', checksum %c",
+				state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
 		} else {
 			var tttemp = e[1 : length-2]
 			state.callsign, _ = TTTwoKeyToText(tttemp, false)
@@ -827,11 +813,8 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 			state.symbolCode = APRSTT_DEFAULT_SYMBOL
 			state.symtabOrOverlay = rune(e[length-2])
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Callsign in two key format2: callsign \"%s\", symbol code '%c' (Box DTMF), overlay '%c', checksum %c\n",
-					state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
-			}
+			g.log.Debugf("Callsign in two key format2: callsign %q, symbol code '%c' (Box DTMF), overlay '%c', checksum %c",
+				state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
 		}
 
 		return (0)
@@ -867,10 +850,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
-	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse object name (starts with AA): \"%s\"\n", e)
-	}
+	g.log.Debugf("APRStt parse object name (starts with AA): %q", e)
 
 	Assert(e[0] == 'A')
 	Assert(e[1] == 'A')
@@ -891,10 +871,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 
 			state.ssid = 0 /* No ssid for object name */
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("Object name in two key format: \"%s\"\n", state.callsign)
-			}
+			g.log.Debugf("Object name in two key format: %q", state.callsign)
 
 			return (0)
 		}
@@ -941,10 +918,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
  *----------------------------------------------------------------*/
 
 func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
-	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse symbol (starts with AB): \"%s\"\n", e)
-	}
+	g.log.Debugf("APRStt parse symbol (starts with AB): %q", e)
 
 	Assert(e[0] == 'A')
 	Assert(e[1] == 'B')
@@ -967,11 +941,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			state.symtabOrOverlay = '/'
 			state.symbolCode = rune(32 + nn)
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("symbol code '%c', primary symbol table '%c'\n",
-					state.symbolCode, state.symtabOrOverlay)
-			}
+			g.log.Debugf("symbol code '%c', primary symbol table '%c'",
+				state.symbolCode, state.symtabOrOverlay)
 
 			return (0)
 
@@ -979,11 +950,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			state.symtabOrOverlay = '\\'
 			state.symbolCode = rune(32 + nn)
 
-			if g.debug > 0 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("symbol code '%c', alternate symbol table '%c'\n",
-					state.symbolCode, state.symtabOrOverlay)
-			}
+			g.log.Debugf("symbol code '%c', alternate symbol table '%c'",
+				state.symbolCode, state.symtabOrOverlay)
 
 			return (0)
 
@@ -994,11 +962,8 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 					state.symbolCode = rune(32 + nn)
 					state.symtabOrOverlay = rune(stemp[0])
 
-					if g.debug > 0 {
-						text_color_set(DW_COLOR_DEBUG)
-						dw_printf("symbol code '%c', alternate symbol table with overlay '%c'\n",
-							state.symbolCode, state.symtabOrOverlay)
-					}
+					g.log.Debugf("symbol code '%c', alternate symbol table with overlay '%c'",
+						state.symbolCode, state.symtabOrOverlay)
 
 					return (0)
 				}
@@ -1041,10 +1006,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 	Assert(e[0] == 'A')
 	Assert(e[1] == 'C')
 
-	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC): \"%s\"\n", e)
-	}
+	g.log.Debugf("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC): %q", e)
 
 	if len(e) == 2+10 {
 		var call, errors = TTCall10ToText(e[2:], true)
@@ -1066,8 +1028,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 				/* In normal operation, try to find full callsign for the suffix received. */
 
 				if _idx >= 0 {
-					text_color_set(DW_COLOR_INFO)
-					dw_printf("Suffix \"%s\" was converted to full callsign \"%s\"\n", suffix, _call)
+					g.log.Infof("Suffix %q was converted to full callsign %q", suffix, _call)
 
 					state.callsign = _call
 				} else {
@@ -1135,11 +1096,8 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 const R_M = 6371000.0
 
 func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
-	if g.debug > 0 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("APRStt parse location (starts with B): \"%s\"\n", e)
-		// TODO: more detail later...
-	}
+	// TODO: more detail later...
+	g.log.Debugf("APRStt parse location (starts with B): %q", e)
 
 	Assert(e[0] == 'B')
 
