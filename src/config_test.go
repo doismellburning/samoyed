@@ -1747,6 +1747,64 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TXINH": {
+			{
+				name:   "a GPIO number becomes the transmit inhibit input",
+				config: "TXINH GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal(25, c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
+					a.False(c.audio.achan[0].ictrl[ICTYPE_TXINH].invert)
+				},
+			},
+			{
+				name:   "a negative GPIO number is the same line, active low",
+				config: "TXINH GPIO -25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal(25, c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
+					a.True(c.audio.achan[0].ictrl[ICTYPE_TXINH].invert)
+				},
+			},
+			{
+				name:   "the type name is not case sensitive",
+				config: "TXINH gpio 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+				},
+			},
+			{
+				name:   "no TXINH means nothing can hold off the transmitter",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nTXINH GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[1].ictrl[ICTYPE_TXINH].method)
+				},
+			},
+			{
+				name:   "a missing type name does not eat the next line",
+				config: "TXINH\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a missing GPIO number leaves the input unconfigured",
+				config: "TXINH GPIO\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TXTAIL": {
 			{
 				name:   "a valid time is stored",
@@ -1907,7 +1965,6 @@ func directivesNotYetTested() []string {
 		"TTUSNG",
 		"TTUTM",
 		"TTVECTOR",
-		"TXINH",
 		"V20",
 		"WAYPOINT",
 	}
