@@ -1345,6 +1345,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TXTAIL": {
+			{
+				name:   "a valid time is stored",
+				config: "TXTAIL 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "no TXTAIL leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nTXTAIL 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+					a.Equal(20, c.audio.achan[1].txtail)
+				},
+			},
+			{
+				name:   "an ill-advised but usable time is still stored, with a warning",
+				config: "TXTAIL 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "a time beyond the byte it is sent in falls back to the default",
+				config: "TXTAIL 256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "a negative time falls back to the default",
+				config: "TXTAIL -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "a missing time does not eat the next line",
+				config: "TXTAIL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 	}
 }
 
@@ -1449,7 +1502,6 @@ func directivesNotYetTested() []string {
 		"TTUTM",
 		"TTVECTOR",
 		"TXINH",
-		"TXTAIL",
 		"V20",
 		"WAYPOINT",
 	}
