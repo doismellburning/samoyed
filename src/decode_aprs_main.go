@@ -66,8 +66,6 @@ import (
 )
 
 func DecodeAPRSMain() {
-	DECODE_APRS_UTIL = true // DECAMAIN define replacement
-
 	TextColorInit(0)
 	text_color_set(DW_COLOR_INFO)
 	deviceIDData = NewDeviceIDData()
@@ -171,13 +169,13 @@ func DecodeAPRSLine(line string) {
 
 			decode_aprs_print(A) // Now print it in human readable format.
 
-			ax25_check_addresses(pp) // Errors for invalid addresses.
+			ax25_check_addresses(pp, addrStrictLowerCaseWarning) // Errors for invalid addresses.
 		} else {
 			fmt.Printf("Could not construct AX.25 frame from bytes supplied!\n\n")
 		}
 	} else {
 		// Normal monitoring format.
-		var pp = AX25FromText(line, true)
+		var pp = ax25_from_text(line, addrStrictLowerCaseWarning)
 		if pp != nil {
 			var A = decode_aprs(pp, false, "") // Extract information into structure.
 
@@ -185,7 +183,7 @@ func DecodeAPRSLine(line string) {
 
 			// This seems to be redundant because we used strict option
 			// when parsing the monitoring format text.
-			// (void)ax25_check_addresses(pp);	// Errors for invalid addresses.
+			// (void)ax25_check_addresses(pp, addrStrictLowerCaseWarning);	// Errors for invalid addresses.
 
 			// Future?  Add -d option to include hex dump and maybe KISS?
 		} else {

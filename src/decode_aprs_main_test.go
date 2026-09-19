@@ -7,10 +7,6 @@ import (
 func Test_DecodeAPRSLine1(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	DECODE_APRS_UTIL = true
-
-	defer func() { DECODE_APRS_UTIL = false }()
-
 	var expected = "Yaesu"
 
 	AssertOutputContains(t, func() { DecodeAPRSLine("N1EDF-9>T2QT8Y,W1CLA-1,WIDE1*,WIDE2-2,00000:`bSbl!Mv/`\"4%}_ <0x0d>") }, expected)
@@ -19,10 +15,6 @@ func Test_DecodeAPRSLine1(t *testing.T) {
 func Test_DecodeAPRSLine2(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
 
-	DECODE_APRS_UTIL = true
-
-	defer func() { DECODE_APRS_UTIL = false }()
-
 	var expected = "Kantronics"
 
 	AssertOutputContains(t, func() { DecodeAPRSLine("WB2OSZ-1>APN383,qAR,N1EDU-2:!4237.14NS07120.83W#PHG7130Chelmsford, MA") }, expected)
@@ -30,10 +22,6 @@ func Test_DecodeAPRSLine2(t *testing.T) {
 
 func Test_DecodeAPRSLine3(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
-
-	DECODE_APRS_UTIL = true
-
-	defer func() { DECODE_APRS_UTIL = false }()
 
 	var expected = "Echolink"
 
@@ -47,10 +35,6 @@ func Test_DecodeAPRSLine3(t *testing.T) {
 
 func Test_DecodeAPRSLine3NoSpaces(t *testing.T) {
 	deviceIDData = NewDeviceIDData()
-
-	DECODE_APRS_UTIL = true
-
-	defer func() { DECODE_APRS_UTIL = false }()
 
 	var expected = "Echolink"
 
