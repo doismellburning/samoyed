@@ -1458,6 +1458,96 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IL2PTX": {
+			{
+				name:   "with no options it selects IL2P with max FEC, normal polarity and a CRC",
+				config: "IL2PTX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_IL2P, c.audio.achan[0].layer2_xmit)
+					a.Equal(1, c.audio.achan[0].il2p_max_fec)
+					a.Equal(0, c.audio.achan[0].il2p_invert_polarity)
+					a.True(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "AX.25 by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "a minus inverts the polarity",
+				config: "IL2PTX -\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+				},
+			},
+			{
+				name:   "a plus is the normal polarity it already had",
+				config: "IL2PTX +\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].il2p_invert_polarity)
+				},
+			},
+			{
+				name:   "0 asks for the weaker FEC",
+				config: "IL2PTX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].il2p_max_fec)
+				},
+			},
+			{
+				name:   "a lower case c drops the CRC",
+				config: "IL2PTX c\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "options can be run together or given separately",
+				config: "IL2PTX -0c\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+					a.Equal(0, c.audio.achan[0].il2p_max_fec)
+					a.False(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "separate options have the same effect as run-together ones",
+				config: "IL2PTX - 0 c\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+					a.Equal(0, c.audio.achan[0].il2p_max_fec)
+					a.False(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "a later line starts again from the defaults",
+				config: "IL2PTX -0c\nIL2PTX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].il2p_invert_polarity)
+					a.Equal(1, c.audio.achan[0].il2p_max_fec)
+					a.True(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nIL2PTX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+					a.Equal(LAYER2_IL2P, c.audio.achan[1].layer2_xmit)
+				},
+			},
+			{
+				name:   "an unrecognised option is reported and the rest still apply",
+				config: "IL2PTX x-\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_IL2P, c.audio.achan[0].layer2_xmit)
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+				},
+			},
+		},
 		"NCHANNEL": {
 			{
 				name:   "a virtual channel, address and port are stored",
@@ -1737,7 +1827,6 @@ func directivesNotYetTested() []string {
 		"IGSERVER",
 		"IGTXLIMIT",
 		"IGTXVIA",
-		"IL2PTX",
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
