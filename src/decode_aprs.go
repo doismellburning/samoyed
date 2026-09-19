@@ -2042,20 +2042,32 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 
 	var name []byte
 
-	for {
-		var b = info[0]
-
-		if b == '!' || b == '_' { // We've hit the live/killed indicator
-			break
-		} else {
-			name = append(name, b)
-			info = info[1:]
-		}
+	for len(info) > 0 && info[0] != '!' && info[0] != '_' { // Stop at the live/killed indicator
+		name = append(name, info[0])
+		info = info[1:]
 	}
 
-	Assert(3 <= len(name) && len(name) <= 9)
-
 	A.g_name = string(name)
+
+	if len(info) == 0 {
+		// The name ran to the end of the information field, so there is no
+		// live/killed indicator and nowhere for a position to be.
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Item name is not followed by the ! or _ that should end it.\n")
+		}
+
+		A.g_data_type_desc = "Item - name not ended by ! or _"
+
+		return
+	}
+
+	if len(name) < 3 || len(name) > 9 {
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Item name \"%s\" is %d characters, not the 3 to 9 required.\n", name, len(name))
+		}
+	}
 
 	var liveOrKilled = info[0]
 	info = info[1:]
@@ -2077,17 +2089,29 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 	var p position_t
 	var q compressed_position_t
 
-	var positionBytes, _ = binary.Decode(info, binary.NativeEndian, &p)
-	var compressedPositionBytes, _ = binary.Decode(info, binary.NativeEndian, &q)
+	/*
+	 * A position that isn't all there is not a position: binary.Decode leaves
+	 * the struct zeroed and says so, and decoding that would report an item at
+	 * a place nobody mentioned.
+	 */
 
-	if unicode.IsDigit(rune(p.Lat[0])) { // Human-readable location.
+	var positionBytes, positionErr = binary.Decode(info, binary.NativeEndian, &p)
+	var compressedPositionBytes, compressedPositionErr = binary.Decode(info, binary.NativeEndian, &q)
+
+	switch {
+	case positionErr == nil && unicode.IsDigit(rune(p.Lat[0])): // Human-readable location.
 		decode_position(A, &p)
 
 		data_extension_comment(A, info[positionBytes:])
-	} else { // Compressed location.
+	case compressedPositionErr == nil: // Compressed location.
 		decode_compressed_position(A, &q)
 
 		process_comment(A, info[compressedPositionBytes:])
+	default:
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Item has only %d bytes after the live/killed indicator, too few for a position.\n", len(info))
+		}
 	}
 }
 
