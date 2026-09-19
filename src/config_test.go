@@ -1940,6 +1940,17 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IBEACON": {
+			{
+				name:   "an IGate statistics beacon is stored",
+				config: "MYCALL Q1TEST\nIBEACON EVERY=1:00\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_IGATE, c.misc.beacon[0].btype)
+					a.Equal(60, c.misc.beacon[0].every)
+				},
+			},
+		},
 		"ICHANNEL": {
 			{
 				name:   "a virtual channel becomes the IGate channel",
@@ -3809,7 +3820,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"IBEACON",
 		"SMARTBEACON",
 		"SMARTBEACONING",
 		"TTAMBIG",
