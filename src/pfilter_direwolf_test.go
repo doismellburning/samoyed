@@ -15,8 +15,6 @@ func Test_pfilter(t *testing.T) {
 	p_igate_config.max_digi_hops = 2
 	pfilter_init(&p_igate_config, 0)
 
-	pftest_running = true // Change behaviour in pfilter.c to terminate early for test convenience
-
 	dw_printf("Quick test for packet filtering.\n")
 	dw_printf("Some error messages are normal.  Look at the final success/fail message.\n")
 
@@ -247,7 +245,10 @@ func pftest(t *testing.T, test_num int, filter string, monitor string, expected 
 	var pp = AX25FromText(monitor, true)
 	assert.NotNil(t, pp)
 
-	var result, err = pfilter(0, 0, filter, pp, true)
+	// These cases exercise the filter grammar rather than the runtime state
+	// behind it, so they run in syntax-only mode: the "i" filter terminates
+	// early instead of consulting the heard list.
+	var result, err = pfilter_eval(0, 0, filter, pp, true, true)
 	if !assert.Equal(t, expected, result, "Unexpected result for test number %d", test_num) {
 		pftest_error_count++
 	}

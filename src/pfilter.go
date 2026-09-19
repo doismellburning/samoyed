@@ -35,7 +35,6 @@ import (
 
 // TODO KG var save_igate_config_p *igate_config_s
 var pfilter_debug = 0
-var pftest_running = false
 
 /*-------------------------------------------------------------------
  *
@@ -93,6 +92,16 @@ type pfstate_t struct {
 	 * This determines which types of filters are available.
 	 */
 	is_aprs bool
+
+	/*
+	 * Are we checking syntax rather than deciding a real packet's fate?
+	 *
+	 * Set when the expression is being parsed against a synthetic packet, so
+	 * a filter spec that would otherwise consult runtime state - the "i"
+	 * IGate messaging filter and its heard list - stops once it has parsed
+	 * its arguments and reports a match.
+	 */
+	syntax_only bool
 
 	/*
 	 * Packet split into separate parts if APRS.
@@ -157,6 +166,14 @@ func bool2text(val int) string {
  *--------------------------------------------------------------------*/
 
 func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool) (int, error) {
+	return pfilter_eval(from_chan, to_chan, filter, pp, is_aprs, false)
+}
+
+// pfilter_eval is pfilter with the syntax_only switch exposed.  With
+// syntax_only set, filter specs that would otherwise consult runtime state
+// stop once their arguments have been parsed, so an expression can be checked
+// against a synthetic packet - see pfilter_validate.
+func pfilter_eval(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bool, syntax_only bool) (int, error) {
 	Assert(from_chan >= 0 && from_chan <= MAX_TOTAL_CHANS)
 	Assert(to_chan >= 0 && to_chan <= MAX_TOTAL_CHANS)
 
@@ -184,6 +201,7 @@ func pfilter(from_chan int, to_chan int, filter string, pp *packet_t, is_aprs bo
 
 	pfstate.pp = pp
 	pfstate.is_aprs = is_aprs
+	pfstate.syntax_only = syntax_only
 
 	if is_aprs {
 		pfstate.decoded = decode_aprs(pp, true, "")
@@ -1283,8 +1301,11 @@ func filt_i(pf *pfstate_t) (int, error) {
 		return 0, nil
 	}
 
-	if pftest_running {
-		return 1, nil // Replacement for old #ifdef PFTEST
+	// Everything from here on asks the heard list about a real packet, which
+	// a syntax check has no business doing.  The arguments have all been
+	// parsed by now, so that check is done.
+	if pf.syntax_only {
+		return 1, nil // Replacement for Dire Wolf's #ifdef PFTEST
 	}
 
 	/* TODO KG Is this still needed? Digipeater tests still seem to pass fine without it...
@@ -1411,11 +1432,7 @@ func pfilter_validate(from_chan int, to_chan int, filter string, is_aprs bool) e
 		return fmt.Errorf("pfilter_validate: failed to construct synthetic packet from %q", pfilterDummyMonitorLine)
 	}
 
-	var saved_pftest_running = pftest_running
-	pftest_running = true
-	defer func() { pftest_running = saved_pftest_running }()
-
-	var _, err = pfilter(from_chan, to_chan, filter, pp, is_aprs)
+	var _, err = pfilter_eval(from_chan, to_chan, filter, pp, is_aprs, true)
 
 	return err
 }
