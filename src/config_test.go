@@ -3472,6 +3472,17 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TBEACON": {
+			{
+				name:   "a tracker beacon takes its position from the GPS, not the line",
+				config: "MYCALL Q1TEST\nTBEACON EVERY=0:30\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_TRACKER, c.misc.beacon[0].btype)
+					a.Equal(30, c.misc.beacon[0].every)
+				},
+			},
+		},
 		"TXINH": {
 			{
 				name:   "a GPIO number becomes the transmit inhibit input",
@@ -3791,7 +3802,6 @@ func directivesNotYetTested() []string {
 		"IBEACON",
 		"SMARTBEACON",
 		"SMARTBEACONING",
-		"TBEACON",
 		"TTAMBIG",
 		"TTCMD",
 		"TTCORRAL",
