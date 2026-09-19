@@ -606,6 +606,17 @@ func trackerPosition(gpsinfo *dwgps_info_t) (float64, float64, bool) {
 	return dlat, dlon, gpsinfo.fix >= DWFIX_2D && haveLat && haveLon
 }
 
+// beaconPosition is the position a fixed beacon was configured with.
+// NewBeaconService refuses a position or object beacon that has neither, so
+// the absent case should be unreachable; unwrapping keeps it that way rather
+// than letting a beacon without a position invent a coordinate.
+func beaconPosition(bp *beacon_s) (float64, float64, bool) {
+	var dlat, haveLat = bp.lat.Get()
+	var dlon, haveLon = bp.lon.Get()
+
+	return dlat, dlon, haveLat && haveLon
+}
+
 // beaconPHG is a PHG component from the beacon configuration, whose "not
 // specified" is zero.  The power, height and gain fields are still plain
 // numbers; see issue #619.
@@ -737,8 +748,13 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	 */
 	switch bp.btype {
 	case BEACON_POSITION:
+		var dlat, dlon, havePosition = beaconPosition(bp)
+		if !havePosition {
+			return
+		}
+
 		beacon_text += EncodePosition(bp.messaging, bp.compress,
-			orUnknown(bp.lat), orUnknown(bp.lon), bp.ambiguity,
+			dlat, dlon, bp.ambiguity,
 			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
@@ -747,7 +763,12 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			super_comment)
 
 	case BEACON_OBJECT:
-		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), orUnknown(bp.lat), orUnknown(bp.lon), bp.ambiguity,
+		var dlat, dlon, havePosition = beaconPosition(bp)
+		if !havePosition {
+			return
+		}
+
+		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), dlat, dlon, bp.ambiguity,
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
