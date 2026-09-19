@@ -2165,6 +2165,41 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"LOGFILE": {
+			{
+				name:   "a file name is stored and daily names turned off",
+				config: "LOGFILE /var/log/samoyed.log\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed.log", c.misc.log_path)
+					a.False(c.misc.log_daily_names)
+				},
+			},
+			{
+				name:   "it replaces an earlier LOGDIR and says so",
+				config: "LOGDIR /var/log/samoyed\nLOGFILE /var/log/samoyed.log\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed.log", c.misc.log_path)
+					a.False(c.misc.log_daily_names)
+					a.Contains(c.output, "replacing an earlier LOGDIR or LOGFILE")
+				},
+			},
+			{
+				name:   "anything after the file name is reported",
+				config: "LOGFILE /var/log/samoyed.log extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed.log", c.misc.log_path)
+					a.Contains(c.output, "should have file name and nothing more")
+				},
+			},
+			{
+				name:   "a missing file name does not eat the next line",
+				config: "LOGFILE\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.log_path)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"MAXFRAME": {
 			{
 				name:   "a valid window size is stored",
@@ -3113,7 +3148,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEAT",
 		"DIGIPEATER",
 		"IBEACON",
-		"LOGFILE",
 		"OBEACON",
 		"PTT",
 		"REGEN",
