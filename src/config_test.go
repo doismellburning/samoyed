@@ -1701,6 +1701,57 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IGTXLIMIT": {
+			{
+				name:   "both limits are stored",
+				config: "IGTXLIMIT 3 10\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.igate.tx_limit_1)
+					a.Equal(10, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "no IGTXLIMIT leaves the defaults",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_DEFAULT, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_DEFAULT, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "a limit of none at all becomes one, since a limit of zero would gate nothing",
+				config: "IGTXLIMIT 0 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.tx_limit_1)
+					a.Equal(1, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "limits that would make no friends are reduced to the maximum",
+				config: "IGTXLIMIT 100 200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_MAX, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_MAX, c.igate.tx_limit_5)
+					a.Contains(c.output, "You won't make friends")
+				},
+			},
+			{
+				name:   "a missing five minute limit leaves that one at its default",
+				config: "IGTXLIMIT 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_DEFAULT, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "a missing one minute limit does not eat the next line",
+				config: "IGTXLIMIT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_DEFAULT, c.igate.tx_limit_1)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"IGTXVIA": {
 			{
 				name:   "a transmit channel is stored",
@@ -2578,7 +2629,6 @@ func directivesNotYetTested() []string {
 		"GPSNMEA",
 		"IBEACON",
 		"IGMSP",
-		"IGTXLIMIT",
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
