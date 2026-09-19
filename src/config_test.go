@@ -1213,6 +1213,16 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"CDIGIPEATER": {
+			{
+				name:   "the longer name is the same handler as CDIGIPEAT",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEATER 0 1 ^Q[12]TEST$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.True(c.cdigi.has_alias[0][1])
+				},
+			},
+		},
 		"DEDUPE": {
 			{
 				name:   "a valid time is stored",
@@ -3443,7 +3453,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"BEACON",
 		"CBEACON",
-		"CDIGIPEATER",
 		"CON",
 		"DCD",
 		"IBEACON",
