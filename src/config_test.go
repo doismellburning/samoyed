@@ -4051,6 +4051,63 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// Statuses 1 to 9 start out as the standard APRS ones, so a rejected line is
+		// one that leaves the default in place.
+		"TTSTATUS": {
+			{
+				name:   "a status number and its text are stored",
+				config: "TTSTATUS 2 Emergency\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Emergency", c.tt.status[2])
+				},
+			},
+			{
+				name:   "the defaults are the standard APRS statuses",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/enroute", c.tt.status[2])
+					a.Empty(c.tt.status[0])
+				},
+			},
+			{
+				name:   "the text is the rest of the line, trimmed",
+				config: "TTSTATUS 3   Out for lunch  \n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Out for lunch", c.tt.status[3])
+				},
+			},
+			{
+				name:   "a status number outside 1 to 9 is rejected",
+				config: "TTSTATUS 0 Nothing\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.status[0])
+					a.Contains(c.output, "must be in range of 1 to 9")
+				},
+			},
+			{
+				name:   "an unreadable status number is rejected",
+				config: "TTSTATUS two Emergency\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/enroute", c.tt.status[2])
+					a.Contains(c.output, "must be in range of 1 to 9")
+				},
+			},
+			{
+				name:   "a missing status text leaves the default",
+				config: "TTSTATUS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/enroute", c.tt.status[2])
+					a.Contains(c.output, "Missing status text")
+				},
+			},
+			{
+				name:   "a missing status number does not eat the next line",
+				config: "TTSTATUS\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		// TTUSNG and TTMGRS are one handler, keyed on the keyword.
 		"TTUSNG": {
 			{
@@ -4529,7 +4586,6 @@ func directivesTestedSeparately() map[string]string {
 func directivesNotYetTested() []string {
 	return []string{
 		"TTCMD",
-		"TTSTATUS",
 	}
 }
 
