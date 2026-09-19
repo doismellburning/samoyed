@@ -3663,6 +3663,58 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// TTUSNG and TTMGRS are one handler, keyed on the keyword.
+		"TTUSNG": {
+			{
+				name:   "a pattern and zone square are stored",
+				config: "TTUSNG B5xxxyyy 19TCG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_USNG, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B5xxxyyy", c.tt.ttlocs[0].pattern)
+					a.Equal("19TCG", c.tt.ttlocs[0].mgrs.zone)
+				},
+			},
+			{
+				name:   "no TTUSNG means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "a pattern with a different number of x and y is rejected",
+				config: "TTUSNG B5xxyyy 19TCG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must have 1 to 5 x and same number y")
+				},
+			},
+			{
+				name:   "a zone square that cannot be converted is rejected",
+				config: "TTUSNG B5xxxyyy 99ZZZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid USNG/MGRS zone & square")
+				},
+			},
+			{
+				name:   "anything after the zone square is reported and ignored",
+				config: "TTUSNG B5xxxyyy 19TCG extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Contains(c.output, "Unexpected stuff at end ignored")
+				},
+			},
+			{
+				name:   "a missing zone square does not eat the next line",
+				config: "TTUSNG B5xxxyyy\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTUTM": {
 			{
 				name:   "a pattern, zone, scale and offsets are stored",
@@ -4097,7 +4149,6 @@ func directivesNotYetTested() []string {
 		"TTOBJ",
 		"TTSATSQ",
 		"TTSTATUS",
-		"TTUSNG",
 	}
 }
 
