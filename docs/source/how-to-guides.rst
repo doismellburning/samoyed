@@ -19,6 +19,61 @@ Decode packet data from audio
     $ samoyed-atest --bitrate 300 data.wav
 
 
+Try a packet filter out before putting it in the config file
+------------------------------------------------------------
+
+``IGFILTER``, ``FILTER`` and ``CFILTER`` are easy to get subtly wrong, and the
+usual way to find out what one does is to run the whole TNC and watch what
+disappears.  ``samoyed-pftest`` runs the same filter engine over packets read
+from stdin - the monitoring format ``samoyed-decode_aprs`` takes - and says
+``PASS`` or ``DROP`` for each:
+
+.. code::
+
+    $ samoyed-pftest 't/m & ! d/WIDE*' < packets.txt
+    DROP	Q1TEST>APDW17:!4237.14NS07120.83W#PHG7130Chelmsford MA
+    PASS	Q1TEST>APDW17::Q2TEST   :Hello
+
+Blank lines and lines beginning with ``#`` are passed through untouched, so a
+file of packets can carry its own commentary.  A line that cannot be parsed is
+answered with ``ERROR``, and makes the exit status non-zero.  Lines copied
+from an APRS-IS feed are fine as they are: the lower case ``qAR``/``qAS``
+q-construct in the path draws a remark rather than a rejection, as it does in
+``samoyed-decode_aprs``.
+
+``--validate`` checks the syntax and stops there, without reading any packets,
+which is what you want from a script or a pre-commit check:
+
+.. code::
+
+    $ samoyed-pftest --validate 't/m & ( t/w'
+    Invalid filter: filter[0,0]: t/m & ( t/w
+                            ^
+    Expected ")" here.
+
+``-v`` asks the filter engine to explain itself, up to three times for more
+detail: once for the final result, twice for each individual filter
+specification, three times for the logical operators as well.
+
+.. code::
+
+    $ echo 'Q1TEST>APDW17::Q2TEST   :Hello' | samoyed-pftest -vv 'b/Q2* | t/m'
+       b/Q2* returns FALSE for Q1TEST
+       t/m returns TRUE for : data type indicator
+     Packet filter for APRS digipeater from radio channel 0 to 0 returns TRUE
+    PASS	Q1TEST>APDW17::Q2TEST   :Hello
+
+``--connected-mode`` selects the smaller grammar that ``CFILTER`` uses, and
+``--from-channel``/``--to-channel`` set the channel numbers that appear in
+error messages and verbose output - ``16`` there means the IGate rather than a
+radio channel.
+
+This is the filter engine on its own rather than the whole TNC, so an ``i``
+filter, which gates a message only to an addressee heard recently, always
+finds an empty "heard" database and so passes nothing, and takes its default
+maximum digipeater hop count from an ``IGTXVIA`` that was never configured.
+
+
 Decode frames that fail their CRC check
 ---------------------------------------
 
