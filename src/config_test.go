@@ -3584,6 +3584,37 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTCMD": {
+			{
+				name:   "the command is the rest of the line",
+				config: "TTCMD /usr/local/bin/ttcmd --verbose\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/usr/local/bin/ttcmd --verbose", c.tt.ttcmd)
+				},
+			},
+			{
+				name:   "no TTCMD means no command is run",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttcmd)
+				},
+			},
+			{
+				name:   "a later line replaces the command",
+				config: "TTCMD /usr/local/bin/first\nTTCMD /usr/local/bin/second\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/usr/local/bin/second", c.tt.ttcmd)
+				},
+			},
+			{
+				name:   "a missing command does not eat the next line",
+				config: "TTCMD\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttcmd)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTCORRAL": {
 			{
 				name:   "a latitude, longitude and offset are stored",
@@ -4580,47 +4611,18 @@ func directivesTestedSeparately() map[string]string {
 	}
 }
 
-// directivesNotYetTested is the backlog from issue #648: keywords that have no
-// tests at all yet.  Entries leave as their tests arrive, and the list goes with
-// the last of them.
-func directivesNotYetTested() []string {
-	return []string{
-		"TTCMD",
-	}
-}
-
 func Test_config_directive_coverage(t *testing.T) {
-	var untested = directivesNotYetTested()
 	var tested = directivesTestedSeparately()
 	var table = directiveTests()
 
-	var backlog = make(map[string]bool, len(untested))
-	for _, keyword := range untested {
-		backlog[keyword] = true
-	}
-
 	for keyword := range configHandlers {
-		switch {
-		case len(table[keyword]) > 0:
-		case tested[keyword] != "":
-		case backlog[keyword]:
-			// Awaiting tests - see issue #648.
-		default:
+		if len(table[keyword]) == 0 && tested[keyword] == "" {
 			t.Errorf("directive %s has no tests: give it a directiveTests entry", keyword)
 		}
 	}
 
-	// A name that is covered now, or that is not a directive at all, comes out
-	// of the lists, so neither can rot into a hole in the coverage check.
-	for _, keyword := range untested {
-		assert.Contains(t, configHandlers, keyword,
-			"%s is listed as untested but is not a directive", keyword)
-		assert.Empty(t, table[keyword],
-			"%s has table tests now: take it out of directivesNotYetTested", keyword)
-		assert.Empty(t, tested[keyword],
-			"%s has tests now: take it out of directivesNotYetTested", keyword)
-	}
-
+	// A name that is not a directive at all comes out of the list, so it cannot
+	// rot into a hole in the check above.
 	for keyword := range tested {
 		assert.Contains(t, configHandlers, keyword,
 			"%s is listed as tested elsewhere but is not a directive", keyword)
