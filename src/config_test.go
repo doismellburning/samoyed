@@ -1663,6 +1663,51 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"MAXV22": {
+			{
+				name:   "a valid count is stored",
+				config: "MAXV22 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a third of the retry count by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "zero means never offering v2.2 at all",
+				config: "MAXV22 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a count beyond the retry maximum keeps the default",
+				config: "MAXV22 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a negative count keeps the default",
+				config: "MAXV22 -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "MAXV22\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"NCHANNEL": {
 			{
 				name:   "a virtual channel, address and port are stored",
@@ -2178,7 +2223,6 @@ func directivesNotYetTested() []string {
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
-		"MAXV22",
 		"NOXID",
 		"NULLMODEM",
 		"OBEACON",
