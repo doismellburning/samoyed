@@ -1520,6 +1520,54 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IGFILTER": {
+			{
+				name:   "a filter expression is stored as the rest of the line",
+				config: "IGFILTER m/50 t/m\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("m/50 t/m", c.igate.t2_filter)
+				},
+			},
+			{
+				name:   "no IGFILTER means no server side filter",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_filter)
+				},
+			},
+			{
+				name:   "an expression with no filter at all leaves none",
+				config: "IGFILTER\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_filter)
+				},
+			},
+			{
+				// One subscription is sent to the server, so a second line would
+				// otherwise silently replace the first.
+				name:   "a second line is reported and ignored",
+				config: "IGFILTER m/50\nIGFILTER t/m\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("m/50", c.igate.t2_filter)
+					a.Contains(c.output, "IGFILTER already configured")
+				},
+			},
+			{
+				name:   "an expression of only a filter is accepted and warned about",
+				config: "IGFILTER m/50\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("m/50", c.igate.t2_filter)
+					a.Contains(c.output, "rarely needed expert level feature")
+				},
+			},
+			{
+				name:   "an empty line does not eat the next one",
+				config: "IGFILTER\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		// MYCALL comes first in each of these: config_init drops the login again if
 		// any radio channel is still NOCALL, since an IGate has to identify itself.
 		"IGLOGIN": {
@@ -2529,7 +2577,6 @@ func directivesNotYetTested() []string {
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
-		"IGFILTER",
 		"IGMSP",
 		"IGTXLIMIT",
 		"KISSCOPY",
