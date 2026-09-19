@@ -1121,6 +1121,30 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"DTMF": {
+			{
+				name:   "the decoder is off by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DTMF_DECODE_OFF, c.audio.achan[0].dtmf_decode)
+				},
+			},
+			{
+				name:   "the directive enables the decoder",
+				config: "DTMF\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].dtmf_decode)
+				},
+			},
+			{
+				name:   "it enables the decoder on the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nDTMF\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DTMF_DECODE_OFF, c.audio.achan[0].dtmf_decode)
+					a.Equal(DTMF_DECODE_ON, c.audio.achan[1].dtmf_decode)
+				},
+			},
+		},
 		"ICHANNEL": {
 			{
 				name:   "a virtual channel becomes the IGate channel",
@@ -1329,7 +1353,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEAT",
 		"DIGIPEATER",
 		"DNSSDNAME",
-		"DTMF",
 		"DWAIT",
 		"EMAXFRAME",
 		"FULLDUP",
