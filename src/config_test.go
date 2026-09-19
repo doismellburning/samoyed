@@ -1489,6 +1489,47 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"GPSNMEA": {
+			{
+				name:   "a serial port is stored with the traditional speed",
+				config: "GPSNMEA /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyUSB0", c.misc.gpsnmea_port)
+					a.Equal(4800, c.misc.gpsnmea_speed)
+				},
+			},
+			{
+				name:   "no GPSNMEA means no directly attached receiver",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsnmea_port)
+				},
+			},
+			{
+				name:   "a speed after the port is stored",
+				config: "GPSNMEA /dev/ttyUSB0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(9600, c.misc.gpsnmea_speed)
+				},
+			},
+			{
+				name:   "an unreadable speed is rejected",
+				config: "GPSNMEA /dev/ttyUSB0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyUSB0", c.misc.gpsnmea_port)
+					a.Equal(0, c.misc.gpsnmea_speed)
+					a.Contains(c.output, "Invalid speed")
+				},
+			},
+			{
+				name:   "a missing port name does not eat the next line",
+				config: "GPSNMEA\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsnmea_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"ICHANNEL": {
 			{
 				name:   "a virtual channel becomes the IGate channel",
@@ -2900,7 +2941,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEAT",
 		"DIGIPEATER",
 		"GPSD",
-		"GPSNMEA",
 		"IBEACON",
 		"LOGDIR",
 		"LOGFILE",
