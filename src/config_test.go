@@ -1121,6 +1121,61 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"ICHANNEL": {
+			{
+				name:   "a virtual channel becomes the IGate channel",
+				config: "ICHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_IGATE, c.audio.chan_medium[6])
+					a.Equal(6, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "there is no IGate channel by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a channel below the virtual range is rejected",
+				config: "ICHANNEL 5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[5])
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a channel beyond the virtual range is rejected",
+				config: "ICHANNEL 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "ICHANNEL six\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a channel already in use is left as it was",
+				config: "NCHANNEL 6 localhost 8001\nICHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "ICHANNEL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 	}
 }
 
@@ -1184,7 +1239,6 @@ func directivesNotYetTested() []string {
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
-		"ICHANNEL",
 		"IGFILTER",
 		"IGLOGIN",
 		"IGMSP",
