@@ -1145,6 +1145,52 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"DWAIT": {
+			{
+				name:   "a valid delay is stored",
+				config: "DWAIT 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "no DWAIT leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nDWAIT 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+					a.Equal(20, c.audio.achan[1].dwait)
+				},
+			},
+			{
+				name:   "a delay beyond the byte it is sent in falls back to the default",
+				config: "DWAIT 256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "a negative delay falls back to the default",
+				config: "DWAIT -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "a missing delay does not eat the next line",
+				config: "DWAIT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"ICHANNEL": {
 			{
 				name:   "a virtual channel becomes the IGate channel",
@@ -1353,7 +1399,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEAT",
 		"DIGIPEATER",
 		"DNSSDNAME",
-		"DWAIT",
 		"EMAXFRAME",
 		"FULLDUP",
 		"FX25AUTO",
