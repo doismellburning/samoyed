@@ -362,7 +362,8 @@ func alllettersorpm(p string) bool {
  *
  *		line	- Line number for use in error message.
  *
- * Returns:     Coordinate in signed degrees.
+ * Returns:     Coordinate in signed degrees, or Nothing if the number could
+ *		not be read at all.
  *
  *----------------------------------------------------------------*/
 
@@ -376,8 +377,20 @@ type parse_ll_which_e int
 const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
-func parse_ll(str string, which parse_ll_which_e, line int) float64 {
+func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[float64] {
 	var stemp = str
+
+	/*
+	 * Nothing to parse, and nothing to index into either.
+	 */
+	if stemp == "" {
+		logrus.WithFields(logrus.Fields{
+			"line":       line,
+			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
+		}).Error("Missing coordinate")
+
+		return maybe.Nothing[float64]()
+	}
 
 	/*
 	 * Remove any negative sign.
@@ -431,13 +444,23 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 
 	var degrees, degreesErr = strconv.ParseFloat(degreesStr, 64)
 	if degreesErr != nil {
-		dw_printf("Line %d: Could not parse degrees string '%s': %s\n", line, degreesStr, degreesErr)
+		logrus.WithFields(logrus.Fields{
+			"line":    line,
+			"degrees": degreesStr,
+		}).WithError(degreesErr).Error("Could not parse degrees")
+
+		return maybe.Nothing[float64]()
 	}
 
 	if minutesFound {
 		var minutes, minutesErr = strconv.ParseFloat(minutesStr, 64)
 		if minutesErr != nil {
-			dw_printf("Line %d: Could not parse minutes string '%s': %s\n", line, minutesStr, minutesErr)
+			logrus.WithFields(logrus.Fields{
+				"line":    line,
+				"minutes": minutesStr,
+			}).WithError(minutesErr).Error("Could not parse minutes")
+
+			return maybe.Nothing[float64]()
 		}
 
 		if minutes >= 60.0 {
@@ -457,7 +480,13 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 			IfThenElse(which == LAT, "latitude", "longitude"))
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
-	return degrees
+	return maybe.Just(degrees)
+}
+
+// parse_ll is parse_ll_maybe for the callers that have nowhere to put the
+// absence yet and so treat an unreadable coordinate as zero; see issue #619.
+func parse_ll(str string, which parse_ll_which_e, line int) float64 {
+	return maybe.FromMaybe(0, parse_ll_maybe(str, which, line))
 }
 
 /*------------------------------------------------------------------
@@ -6437,9 +6466,9 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "OBJNAME") {
 			b.objname = value
 		} else if strings.EqualFold(keyword, "LAT") {
-			b.lat = maybe.Just(parse_ll(value, LAT, line))
+			b.lat = parse_ll_maybe(value, LAT, line)
 		} else if strings.EqualFold(keyword, "LONG") || strings.EqualFold(keyword, "LON") {
-			b.lon = maybe.Just(parse_ll(value, LON, line))
+			b.lon = parse_ll_maybe(value, LON, line)
 		} else if strings.EqualFold(keyword, "AMBIGUITY") || strings.EqualFold(keyword, "AMBIG") {
 			var n, _ = strconv.Atoi(value)
 			if n >= 0 && n <= 4 {

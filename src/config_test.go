@@ -218,6 +218,56 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 	return audioConfig, &miscConfig
 }
 
+// --- parse_ll_maybe ---
+
+func Test_parse_ll_maybe(t *testing.T) {
+	// Regression test: parse_ll logged the ParseFloat error and carried on with
+	// the zero it returns, so "LAT=abc" read as a perfectly good 0 degrees and
+	// a beacon went out from Null Island.
+	// Regression test: parse_ll indexed str[0] before looking at its length, so
+	// "LAT=" in a beacon line panicked rather than being rejected.
+	t.Run("an empty coordinate is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("", LAT, 0))
+	})
+
+	t.Run("a sign on its own is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("-", LON, 0))
+	})
+
+	t.Run("unreadable degrees are Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("abc", LAT, 0))
+	})
+
+	t.Run("unreadable minutes are Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("42^ab", LAT, 0))
+	})
+
+	t.Run("a readable coordinate is Just", func(t *testing.T) {
+		assert.InDelta(t, -71.5, maybe.FromJust(parse_ll_maybe("71.5W", LON, 0)), 0.0001)
+	})
+}
+
+// --- config_init beacon LAT and LONG ---
+
+func Test_config_init_beacon_empty_lat(t *testing.T) {
+	t.Run("LAT= with no value does not panic", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT= LONG=71W\n")
+			assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+		})
+	})
+}
+
+func Test_config_init_beacon_unparseable_lat_long(t *testing.T) {
+	// An unreadable coordinate must leave the beacon without a position, so
+	// that NewBeaconService rejects it rather than transmitting 0 degrees.
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=abc LONG=71W\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+	assert.InDelta(t, -71.0, maybe.FromJust(misc.beacon[0].lon), 0.0001)
+}
+
 // --- config_init MYCALL directive ---
 
 func Test_config_init_mycall(t *testing.T) {
