@@ -1138,6 +1138,23 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"BEACON": {
+			{
+				name:   "the old style line is reported and configures no beacon",
+				config: "MYCALL Q1TEST\nBEACON 0 10 600 \"Hello\"\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.num_beacons)
+					a.Contains(c.output, "Old style 'BEACON' has been replaced")
+				},
+			},
+			{
+				name:   "it does not eat the next line",
+				config: "BEACON 0 10 600 \"Hello\"\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		// Connected mode digipeating needs an internal modem at both ends, so a
 		// network TNC channel is not allowed here even though DIGIPEAT allows one.
 		"CDIGIPEAT": {
@@ -3752,7 +3769,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"BEACON",
 		"CBEACON",
 		"IBEACON",
 		"OBEACON",
