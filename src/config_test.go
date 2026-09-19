@@ -1138,6 +1138,120 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// A digipeater needs two radio channels and a callsign on the transmit one,
+		// so these lines are longer than most: config_init switches digipeating off
+		// again for a channel that is still NOCALL.
+		"DIGIPEAT": {
+			{
+				name:   "a valid line enables digipeating with both patterns",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.enabled[0][1])
+					a.NotNil(c.digi.alias[0][1])
+					a.NotNil(c.digi.wide[0][1])
+					a.Equal(PREEMPT_OFF, c.digi.preempt[0][1])
+				},
+			},
+			{
+				name:   "nothing is digipeated by default",
+				config: "MYCALL Q1TEST\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+				},
+			},
+			{
+				name:   "TRACE asks for preemptive digipeating",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_TRACE, c.digi.preempt[0][1])
+				},
+			},
+			{
+				name:   "PREEMPT is the same thing under a better name",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ PREEMPT\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_TRACE, c.digi.preempt[0][1])
+				},
+			},
+			{
+				name:   "DROP is accepted and discouraged",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ DROP\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_DROP, c.digi.preempt[0][1])
+					a.Contains(c.output, "DROP option is discouraged")
+				},
+			},
+			{
+				name:   "MARK is accepted and discouraged",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ MARK\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_MARK, c.digi.preempt[0][1])
+					a.Contains(c.output, "MARK option is discouraged")
+				},
+			},
+			{
+				name:   "ATGP takes the alias after the equals sign",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ ATGP=Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q2TEST", c.digi.atgp[0][1])
+				},
+			},
+			{
+				name:   "a non-numeric channel is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT zero 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "is not allowed for FROM-channel")
+				},
+			},
+			{
+				name:   "a channel beyond the last one is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 16 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "TO-channel must be in range")
+				},
+			},
+			{
+				name:   "a channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "TO-channel 1 is not valid")
+				},
+			},
+			{
+				name:   "an unusable pattern is rejected and nothing is digipeated",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE([3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "Invalid alias matching pattern")
+				},
+			},
+			{
+				name:   "anything after the options is reported",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.enabled[0][1])
+					a.Contains(c.output, "where end of line was expected")
+				},
+			},
+			{
+				name:   "digipeating a channel with no callsign is switched off again",
+				config: "ACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "MYCALL must be set for transmit channel")
+				},
+			},
+			{
+				name:   "a missing TO-channel does not eat the next line",
+				config: "ACHANNELS 2\nDIGIPEAT 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"DNSSDNAME": {
 			{
 				name:   "a service name is stored",
@@ -3145,7 +3259,6 @@ func directivesNotYetTested() []string {
 		"CON",
 		"DCD",
 		"DEDUPE",
-		"DIGIPEAT",
 		"DIGIPEATER",
 		"IBEACON",
 		"OBEACON",
