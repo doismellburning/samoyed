@@ -2657,22 +2657,24 @@ func aprs_morse_code(A *decode_aprs_t, info []byte) {
  *------------------------------------------------------------------*/
 
 func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
-	type aprs_positionless_weather_s struct {
-		dti        byte    //nolint:unused // _
-		time_stamp [8]byte //nolint:unused // MDHM format
-		comment    [99]byte
-	}
-	var p aprs_positionless_weather_s
+	// The data type indicator '_', then an MDHM timestamp, then the weather.
+	const positionlessWeatherHeaderBytes = 1 + 8
 
 	A.g_data_type_desc = "Positionless Weather Report"
 
 	//time_t ts = 0;
+	// not yet implemented for 8 character format // ts = get_timestamp (A, info[1:9]);
 
-	binary.Decode(info, binary.NativeEndian, &p)
+	if len(info) <= positionlessWeatherHeaderBytes {
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Positionless weather report is too short to hold any weather data.\n")
+		}
 
-	// not yet implemented for 8 character format // ts = get_timestamp (A, p.time_stamp);
+		return
+	}
 
-	weather_data(A, p.comment[:], false)
+	weather_data(A, info[positionlessWeatherHeaderBytes:], false)
 }
 
 /*------------------------------------------------------------------
@@ -2726,6 +2728,12 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 func getwdata(wpp []byte, id rune, dlen int) (float64, []byte, bool) {
 	Assert(dlen >= 2 && dlen <= 6)
 
+	// The field is an id byte and dlen data bytes.  A report that ends
+	// before that does not have this field, rather than having a short one.
+	if len(wpp) < dlen+1 {
+		return G_UNKNOWN, wpp, false
+	}
+
 	if rune(wpp[0]) != id {
 		return G_UNKNOWN, wpp, false
 	}
@@ -2749,7 +2757,11 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 	var wp = wdata
 	var found bool
 
-	if wp[3] == '/' {
+	// The data extension form of the wind is three digits of direction, a
+	// '/', and three digits of speed.
+	const windDataExtensionBytes = 7
+
+	if len(wp) >= windDataExtensionBytes && wp[3] == '/' {
 		var n int
 
 		var count, _ = fmt.Sscanf(string(wp[:3]), "%3d", &n) // TODO KG I *think* this works right but I'd be lying if I said I trusted it... TODO Test better
