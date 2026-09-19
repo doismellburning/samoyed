@@ -1262,6 +1262,51 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"FX25AUTO": {
+			{
+				name:   "a repeat count is stored",
+				config: "FX25AUTO 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "half of the default retry count by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "zero disables the feature",
+				config: "FX25AUTO 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "an unreasonable count falls back to the default",
+				config: "FX25AUTO 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "a negative count falls back to the default",
+				config: "FX25AUTO -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "FX25AUTO\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"FX25TX": {
 			{
 				name:   "a parity byte count selects FX.25 transmission",
@@ -1636,7 +1681,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEATER",
 		"DNSSDNAME",
 		"EMAXFRAME",
-		"FX25AUTO",
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
