@@ -282,15 +282,11 @@ func longitude_to_comp_str(dlong float64) string {
  * Inputs:      dlat		- Floating point degrees.
  *
  * Outputs:	slat		- String in format ddmm.mmmm
- *		hemi		- Hemisphere or empty string.
+ *		hemi		- Hemisphere, N or S.
  *
  *----------------------------------------------------------------*/
 
 func latitude_to_nmea(dlat float64) (string, string) {
-	if dlat == G_UNKNOWN {
-		return "", ""
-	}
-
 	dlat = clampLat(dlat)
 
 	var hemi string
@@ -327,15 +323,11 @@ func latitude_to_nmea(dlat float64) (string, string) {
  * Inputs:      dlong		- Floating point degrees.
  *
  * Outputs:	slong		- String in format dddmm.mmmm
- *		hemi		- Hemisphere or empty string.
+ *		hemi		- Hemisphere, E or W.
  *
  *----------------------------------------------------------------*/
 
 func longitude_to_nmea(dlong float64) (string, string) {
-	if dlong == G_UNKNOWN {
-		return "", ""
-	}
-
 	dlong = clampLon(dlong)
 
 	var hemi string

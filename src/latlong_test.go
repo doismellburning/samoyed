@@ -60,12 +60,6 @@ func TestLatitudeToNMEA(t *testing.T) {
 			expectedHem: "S",
 		},
 		{
-			name:        "unknown latitude returns empty",
-			lat:         G_UNKNOWN,
-			expectedStr: "",
-			expectedHem: "",
-		},
-		{
 			name:        "latitude with rounding edge case",
 			lat:         45.99999,
 			expectedStr: "4559.9994", // NMEA has more precision than APRS format
@@ -152,12 +146,6 @@ func TestLongitudeToNMEA(t *testing.T) {
 			lon:         -0.0166666666,
 			expectedStr: "00001.0000",
 			expectedHem: "W",
-		},
-		{
-			name:        "unknown longitude returns empty",
-			lon:         G_UNKNOWN,
-			expectedStr: "",
-			expectedHem: "",
 		},
 		{
 			name:        "longitude with rounding edge case",
