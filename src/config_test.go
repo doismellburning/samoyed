@@ -3611,6 +3611,17 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTMGRS": {
+			{
+				name:   "the other name of the same handler asks for MGRS instead",
+				config: "TTMGRS B5xxxyyy 19TCG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_MGRS, c.tt.ttlocs[0].ttlocType)
+					a.Equal("19TCG", c.tt.ttlocs[0].mgrs.zone)
+				},
+			},
+		},
 		"TTPOINT": {
 			{
 				name:   "a pattern and its position are stored",
@@ -4144,7 +4155,6 @@ func directivesNotYetTested() []string {
 		"TTCMD",
 		"TTERR",
 		"TTMACRO",
-		"TTMGRS",
 		"TTMHEAD",
 		"TTOBJ",
 		"TTSATSQ",
