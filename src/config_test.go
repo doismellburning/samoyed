@@ -2940,6 +2940,82 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"WAYPOINT": {
+			{
+				name:   "a serial port is stored",
+				config: "WAYPOINT /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.waypoint_serial_port)
+					a.Empty(c.misc.waypoint_udp_hostname)
+					a.Zero(c.misc.waypoint_formats)
+				},
+			},
+			{
+				name:   "no WAYPOINT means no waypoints are sent anywhere",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.waypoint_serial_port)
+					a.Empty(c.misc.waypoint_udp_hostname)
+				},
+			},
+			{
+				name:   "a host and UDP port are split out",
+				config: "WAYPOINT mapper.example.com:8123\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("mapper.example.com", c.misc.waypoint_udp_hostname)
+					a.Equal(8123, c.misc.waypoint_udp_portnum)
+					a.Empty(c.misc.waypoint_serial_port)
+				},
+			},
+			{
+				name:   "a port with no host in front of it means this machine",
+				config: "WAYPOINT :8123\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.misc.waypoint_udp_hostname)
+					a.Equal(8123, c.misc.waypoint_udp_portnum)
+				},
+			},
+			{
+				name:   "the formats after the device are all enabled",
+				config: "WAYPOINT /dev/ttyS0 NGA\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(WPL_FORMAT_NMEA_GENERIC|WPL_FORMAT_GARMIN|WPL_FORMAT_AIS,
+						c.misc.waypoint_formats)
+				},
+			},
+			{
+				name:   "format letters may be lower case and separated by commas",
+				config: "WAYPOINT /dev/ttyS0 m,k\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(WPL_FORMAT_MAGELLAN|WPL_FORMAT_KENWOOD, c.misc.waypoint_formats)
+				},
+			},
+			{
+				name:   "an unrecognised format letter is reported and the rest still apply",
+				config: "WAYPOINT /dev/ttyS0 NX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(WPL_FORMAT_NMEA_GENERIC, c.misc.waypoint_formats)
+					a.Contains(c.output, "Invalid output format")
+				},
+			},
+			{
+				name:   "an out-of-range UDP port is rejected",
+				config: "WAYPOINT mapper.example.com:99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.waypoint_udp_hostname)
+					a.Zero(c.misc.waypoint_udp_portnum)
+					a.Contains(c.output, "Invalid UDP port number")
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "WAYPOINT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.waypoint_serial_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 	}
 }
 
@@ -3017,7 +3093,6 @@ func directivesNotYetTested() []string {
 		"TTUSNG",
 		"TTUTM",
 		"TTVECTOR",
-		"WAYPOINT",
 	}
 }
 
