@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -215,6 +216,146 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 		&ttConfig, &igateConfig, &miscConfig)
 
 	return audioConfig, &miscConfig
+}
+
+// --- parse_ll_maybe ---
+
+func Test_parse_ll_maybe(t *testing.T) {
+	// Regression test: parse_ll logged the ParseFloat error and carried on with
+	// the zero it returns, so "LAT=abc" read as a perfectly good 0 degrees and
+	// a beacon went out from Null Island.
+	// Regression test: parse_ll indexed str[0] before looking at its length, so
+	// "LAT=" in a beacon line panicked rather than being rejected.
+	t.Run("an empty coordinate is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("", LAT, 0))
+	})
+
+	t.Run("a sign on its own is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("-", LON, 0))
+	})
+
+	t.Run("unreadable degrees are Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("abc", LAT, 0))
+	})
+
+	t.Run("unreadable minutes are Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("42^ab", LAT, 0))
+	})
+
+	t.Run("a non-finite coordinate is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("NaN^0", LAT, 0))
+	})
+
+	// Regression test: an out-of-range coordinate only logged and was returned
+	// as though it were usable, so a beacon with LAT=200 passed the "latitude
+	// and longitude are required" check and EncodePosition clamped it to
+	// "!9000.00N" - the station transmitted from the North Pole.
+	t.Run("an out-of-range latitude is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("200", LAT, 0))
+	})
+
+	t.Run("an out-of-range longitude is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("181W", LON, 0))
+	})
+
+	t.Run("the limits themselves are Just", func(t *testing.T) {
+		assert.InDelta(t, 90.0, maybe.FromJust(parse_ll_maybe("90N", LAT, 0)), 0.0001)
+		assert.InDelta(t, -180.0, maybe.FromJust(parse_ll_maybe("180W", LON, 0)), 0.0001)
+	})
+
+	t.Run("a readable coordinate is Just", func(t *testing.T) {
+		assert.InDelta(t, -71.5, maybe.FromJust(parse_ll_maybe("71.5W", LON, 0)), 0.0001)
+	})
+}
+
+// --- config_init beacon LAT and LONG ---
+
+func Test_config_init_beacon_empty_lat(t *testing.T) {
+	t.Run("LAT= with no value does not panic", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT= LONG=71W\n")
+			assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+		})
+	})
+}
+
+func Test_config_init_beacon_unreadable_interval(t *testing.T) {
+	// Regression test: parse_interval ignored the Atoi error and returned the
+	// zero alongside it, so EVERY=abc gave an interval of 0 seconds.  With a
+	// SLOT configured that reached IS_GOOD, which divides 3600 by it and
+	// brought the whole program down on startup; without one, the next
+	// transmission time never advanced.
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W SLOT=1 EVERY=abc\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, 600, misc.beacon[0].every)
+
+	var modem = new(audio_s)
+	modem.chan_medium[0] = MEDIUM_RADIO
+	modem.mycall[0] = "Q1TEST"
+
+	assert.NotPanics(t, func() {
+		NewBeaconService(modem, misc, new(igate_config_s))
+	})
+}
+
+func Test_config_init_beacon_out_of_range_interval(t *testing.T) {
+	t.Run("EVERY=0 keeps the default", func(t *testing.T) {
+		var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W EVERY=0\n")
+		assert.Equal(t, 600, misc.beacon[0].every)
+	})
+
+	t.Run("a readable interval is stored", func(t *testing.T) {
+		var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W EVERY=2:30 DELAY=0:05\n")
+		assert.Equal(t, 150, misc.beacon[0].every)
+		assert.Equal(t, 5, misc.beacon[0].delay)
+	})
+}
+
+func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
+	// Regression test: ParseFloat happily reads "NaN" and "Inf", so a beacon
+	// option could hold a value no arithmetic survives.  int(NaN) is the
+	// smallest int64, which frequency_spec put on the air as
+	// "T-9223372036854775808".
+	var config = "MYCALL Q1TEST\n" +
+		"PBEACON LAT=NaN^0 LONG=71W FREQ=NaN TONE=NaN OFFSET=Inf ALT=-Inf\n"
+
+	var _, misc = configFromString(t, config)
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].freq)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].tone)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].offset)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
+
+	assert.Empty(t, frequency_spec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
+}
+
+func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=200 LONG=71W\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+
+	// With no position the beacon is dropped rather than transmitted from
+	// wherever the clamp lands.
+	var modem = new(audio_s)
+	modem.chan_medium[0] = MEDIUM_RADIO
+	modem.mycall[0] = "Q1TEST"
+
+	var bs = NewBeaconService(modem, misc, new(igate_config_s))
+	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
+}
+
+func Test_config_init_beacon_unparseable_lat_long(t *testing.T) {
+	// An unreadable coordinate must leave the beacon without a position, so
+	// that NewBeaconService rejects it rather than transmitting 0 degrees.
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=abc LONG=71W\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+	assert.InDelta(t, -71.0, maybe.FromJust(misc.beacon[0].lon), 0.0001)
 }
 
 // --- config_init MYCALL directive ---
@@ -716,6 +857,54 @@ func Test_config_init_beacon_sendto_empty(t *testing.T) {
 			configFromString(t, "PBEACON SENDTO=\n")
 		})
 	})
+}
+
+// --- config_init beacon numeric options ---
+
+func Test_config_init_beacon_unparseable_numbers(t *testing.T) {
+	// Regression test: the numeric beacon options ignored the ParseFloat error
+	// and stored the zero it returns, so a typo became a value rather than
+	// nothing at all.  TONE=0 goes out as "Toff", OFFSET=0 as "+000" and ALT=0
+	// as "/A=000000", so "TONE=abc" transmitted a tone setting nobody asked
+	// for.
+	var config = "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W FREQ=abc TONE=def OFFSET=ghi ALT=jkl\n"
+
+	var _, misc = configFromString(t, config)
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].freq)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].tone)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].offset)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
+
+	assert.Empty(t, frequency_spec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
+}
+
+func Test_config_init_beacon_numbers_with_units(t *testing.T) {
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W ALT=100foot FREQ=146.52 TONE=100\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.InDelta(t, 30.48, maybe.FromJust(misc.beacon[0].alt_m), 0.001)
+	assert.InDelta(t, 146.52, maybe.FromJust(misc.beacon[0].freq), 0.001)
+	assert.InDelta(t, 100.0, maybe.FromJust(misc.beacon[0].tone), 0.001)
+}
+
+// --- config_init beacon line rejected part way through ---
+
+func Test_config_init_beacon_rejected_line_does_not_leak(t *testing.T) {
+	// Regression test: a beacon line whose options don't parse does not count
+	// towards num_beacons, so the next beacon line is parsed into the same
+	// array slot.  beacon_options reset only some of the fields, so the good
+	// line inherited the rest - here the rejected line's COMMENT and POWER.
+	var config = "MYCALL Q1TEST\n" +
+		"PBEACON LAT=42N LONG=71W COMMENT=\"leaked\" POWER=50 BOGUS=1\n" +
+		"PBEACON LAT=43N LONG=72W\n"
+
+	var _, misc = configFromString(t, config)
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Empty(t, misc.beacon[0].comment)
+	assert.Zero(t, misc.beacon[0].power)
 }
 
 // --- config_init PBEACON directive (no options) ---

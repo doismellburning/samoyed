@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
@@ -86,7 +87,7 @@ type beacon_s struct {
 
 	delay int /* Seconds to delay before first transmission. */
 
-	slot int /* Seconds after hour for slotted time beacons. */
+	slot maybe.Maybe[int] /* Seconds after hour for slotted time beacons. */
 	/* If specified, it overrides any 'delay' value. */
 
 	every int /* Time between transmissions, seconds. */
@@ -112,10 +113,10 @@ type beacon_s struct {
 	messaging bool /* Set messaging attribute for position report. */
 	/* i.e. Data Type Indicator of '=' rather than '!' */
 
-	lat       float64 /* Latitude and longitude. */
-	lon       float64
-	ambiguity int     /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
-	alt_m     float64 /* Altitude in meters. */
+	lat       maybe.Maybe[float64] /* Latitude and longitude. */
+	lon       maybe.Maybe[float64]
+	ambiguity int                  /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
+	alt_m     maybe.Maybe[float64] /* Altitude in meters. */
 
 	symtab byte /* Symbol table: / or \ or overlay character. */
 	symbol byte /* Symbol code. */
@@ -127,9 +128,9 @@ type beacon_s struct {
 
 	dir string /* 1 or 2 of N,E,W,S, or empty for omni. */
 
-	freq   float64 /* MHz. */
-	tone   float64 /* Hz. */
-	offset float64 /* MHz. */
+	freq   maybe.Maybe[float64] /* MHz. */
+	tone   maybe.Maybe[float64] /* Hz. */
+	offset maybe.Maybe[float64] /* MHz. */
 
 	comment    string /* Comment or empty. */
 	commentcmd string /* Command to append more to Comment or empty. */
@@ -361,7 +362,9 @@ func alllettersorpm(p string) bool {
  *
  *		line	- Line number for use in error message.
  *
- * Returns:     Coordinate in signed degrees.
+ * Returns:     Coordinate in signed degrees, or Nothing if the string does not
+ *		give one: a number that can't be read, isn't finite, or is
+ *		outside the range the hemisphere allows.
  *
  *----------------------------------------------------------------*/
 
@@ -375,8 +378,20 @@ type parse_ll_which_e int
 const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
-func parse_ll(str string, which parse_ll_which_e, line int) float64 {
+func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[float64] {
 	var stemp = str
+
+	/*
+	 * Nothing to parse, and nothing to index into either.
+	 */
+	if stemp == "" {
+		logrus.WithFields(logrus.Fields{
+			"line":       line,
+			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
+		}).Error("Missing coordinate")
+
+		return maybe.Nothing[float64]()
+	}
 
 	/*
 	 * Remove any negative sign.
@@ -430,13 +445,23 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 
 	var degrees, degreesErr = strconv.ParseFloat(degreesStr, 64)
 	if degreesErr != nil {
-		dw_printf("Line %d: Could not parse degrees string '%s': %s\n", line, degreesStr, degreesErr)
+		logrus.WithFields(logrus.Fields{
+			"line":    line,
+			"degrees": degreesStr,
+		}).WithError(degreesErr).Error("Could not parse degrees")
+
+		return maybe.Nothing[float64]()
 	}
 
 	if minutesFound {
 		var minutes, minutesErr = strconv.ParseFloat(minutesStr, 64)
 		if minutesErr != nil {
-			dw_printf("Line %d: Could not parse minutes string '%s': %s\n", line, minutesStr, minutesErr)
+			logrus.WithFields(logrus.Fields{
+				"line":    line,
+				"minutes": minutesStr,
+			}).WithError(minutesErr).Error("Could not parse minutes")
+
+			return maybe.Nothing[float64]()
 		}
 
 		if minutes >= 60.0 {
@@ -449,14 +474,36 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 
 	degrees *= float64(sign)
 
+	if math.IsNaN(degrees) || math.IsInf(degrees, 0) {
+		logrus.WithFields(logrus.Fields{
+			"line":       line,
+			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
+			"value":      str,
+		}).Error("Coordinate is not a finite number")
+
+		return maybe.Nothing[float64]()
+	}
+
 	var limit = float64(IfThenElse(which == LAT, 90, 180))
 	if degrees < -limit || degrees > limit {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Number of degrees in \"%s\" is out of range for %s\n", line, str,
-			IfThenElse(which == LAT, "latitude", "longitude"))
+		logrus.WithFields(logrus.Fields{
+			"line":       line,
+			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
+			"value":      str,
+			"limit":      limit,
+		}).Error("Number of degrees is out of range")
+
+		return maybe.Nothing[float64]()
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
-	return degrees
+	return maybe.Just(degrees)
+}
+
+// parse_ll is parse_ll_maybe for the callers that have nowhere to put the
+// absence yet and so treat a coordinate they can't use as zero; see issue
+// #619.
+func parse_ll(str string, which parse_ll_which_e, line int) float64 {
+	return maybe.FromMaybe(0, parse_ll_maybe(str, which, line))
 }
 
 /*------------------------------------------------------------------
@@ -576,7 +623,10 @@ main ()
  *
  *		line	- Line number for use in error message.
  *
- * Returns:     Number of seconds.
+ * Returns:     Number of seconds, and whether it could be read at all.  A
+ *		value that can't be read is not a value: the zero it would
+ *		otherwise become is a beacon interval that divides by zero in
+ *		IS_GOOD and a next-transmission time that never advances.
  *
  * Description:	This is used by the BEACON configuration items
  *		for initial delay or time between beacons.
@@ -585,23 +635,31 @@ main ()
  *
  *----------------------------------------------------------------*/
 
-func parse_interval(str string, line int) int { //nolint:unparam
-	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
+func parse_interval(keyword string, str string, line int) (int, bool) {
+	var minutesStr, secondsStr, found = strings.Cut(str, ":")
 
-	var minutes, _ = strconv.Atoi(minutesStr)
+	var minutes, minutesErr = strconv.Atoi(minutesStr)
 	var interval = 60 * minutes
 
-	var seconds, _ = strconv.Atoi(secondsStr)
-	interval += seconds
+	var secondsErr error
 
-	/* TODO KG Better logging / error handling
-	if bad > 0 || nc > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Time interval must be of the form minutes or minutes:seconds.\n", line)
+	if found {
+		var seconds int
+		seconds, secondsErr = strconv.Atoi(secondsStr)
+		interval += seconds
 	}
-	*/
 
-	return interval
+	if minutesErr != nil || secondsErr != nil {
+		logrus.WithFields(logrus.Fields{
+			"line":   line,
+			"option": keyword,
+			"value":  str,
+		}).Error("Time interval must be of the form minutes or minutes:seconds, ignoring it")
+
+		return 0, false
+	}
+
+	return interval, true
 } /* end parse_interval */
 
 /*------------------------------------------------------------------
@@ -5865,6 +5923,13 @@ func handleXBEACON(ps *parseState) bool {
 	// TODO: maybe add proportional pathing so multiple beacon timing does not need to be manually constructed?
 	// http://www.aprs.org/newN/ProportionalPathing.txt
 	if ps.misc.num_beacons < MAX_BEACONS {
+		/* A beacon line whose options don't parse leaves num_beacons alone, so
+		 * the next beacon line reuses this array slot.  Start it blank rather
+		 * than inheriting whatever the rejected line managed to set. */
+		var blank beacon_s
+
+		ps.misc.beacon[ps.misc.num_beacons] = blank
+
 		if strings.EqualFold(ps.keyword, "PBEACON") {
 			ps.misc.beacon[ps.misc.num_beacons].btype = BEACON_POSITION
 		} else if strings.EqualFold(ps.keyword, "OBEACON") {
@@ -6195,6 +6260,26 @@ func handleNOXID(ps *parseState) bool {
 	return false
 }
 
+// parse_beacon_number parses the value of a numeric beacon option, reporting
+// failure rather than quietly settling for zero.  Zero is a real value for
+// several of these options - TONE=0 is transmitted as "Toff", OFFSET=0 as
+// "+000" and ALT=0 as "/A=000000" - so a typo would otherwise put on the air a
+// value nobody asked for.
+func parse_beacon_number(keyword string, value string, line int) (float64, bool) {
+	var f, err = strconv.ParseFloat(value, 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		logrus.WithFields(logrus.Fields{
+			"line":   line,
+			"option": keyword,
+			"value":  value,
+		}).Error("Invalid number for beacon option, ignoring it")
+
+		return 0, false
+	}
+
+	return f, true
+}
+
 /*
  * Parse the PBEACON or OBEACON options.
  */
@@ -6207,26 +6292,19 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
-	b.slot = G_UNKNOWN
 	b.every = 600
 	//b.delay = 6;		// temp test.
 	//b.every = 3600;
-	b.lat = G_UNKNOWN
-	b.lon = G_UNKNOWN
 	b.ambiguity = 0
-	b.alt_m = G_UNKNOWN
 	b.symtab = '/'
 	b.symbol = '-' /* house */
-	b.freq = G_UNKNOWN
-	b.tone = G_UNKNOWN
-	b.offset = G_UNKNOWN
 	b.source = ""
 	b.dest = ""
 
 	var zone string
 	var temp_symbol string
-	var easting float64 = G_UNKNOWN
-	var northing float64 = G_UNKNOWN
+	var easting maybe.Maybe[float64]
+	var northing maybe.Maybe[float64]
 
 	for {
 		var t = split("", false)
@@ -6284,9 +6362,25 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 		// end
 		if strings.EqualFold(keyword, "DELAY") {
-			b.delay = parse_interval(value, line)
+			var n, ok = parse_interval(keyword, value, line)
+			if !ok {
+				continue
+			}
+
+			if n < 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Beacon delay, %d, can't be negative.\n", line, n)
+
+				continue
+			}
+
+			b.delay = n
 		} else if strings.EqualFold(keyword, "SLOT") {
-			var n = parse_interval(value, line)
+			var n, ok = parse_interval(keyword, value, line)
+			if !ok {
+				continue
+			}
+
 			if n < 1 || n > 3600 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds.\n", line, n)
@@ -6294,9 +6388,21 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				continue
 			}
 
-			b.slot = n
+			b.slot = maybe.Just(n)
 		} else if strings.EqualFold(keyword, "EVERY") {
-			b.every = parse_interval(value, line)
+			var n, ok = parse_interval(keyword, value, line)
+			if !ok {
+				continue
+			}
+
+			if n < 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Time between beacons, %d, must be at least 1 second.\n", line, n)
+
+				continue
+			}
+
+			b.every = n
 		} else if strings.EqualFold(keyword, "SENDTO") {
 			if len(value) == 0 {
 				text_color_set(DW_COLOR_ERROR)
@@ -6416,9 +6522,9 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "OBJNAME") {
 			b.objname = value
 		} else if strings.EqualFold(keyword, "LAT") {
-			b.lat = parse_ll(value, LAT, line)
+			b.lat = parse_ll_maybe(value, LAT, line)
 		} else if strings.EqualFold(keyword, "LONG") || strings.EqualFold(keyword, "LON") {
-			b.lon = parse_ll(value, LON, line)
+			b.lon = parse_ll_maybe(value, LON, line)
 		} else if strings.EqualFold(keyword, "AMBIGUITY") || strings.EqualFold(keyword, "AMBIG") {
 			var n, _ = strconv.Atoi(value)
 			if n >= 0 && n <= 4 {
@@ -6433,13 +6539,15 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 			})
 
+			var number = value
+			var meters float64 = 1
+
 			if unitIndex != -1 { // Did we find a unit string?
 				var unit = value[unitIndex:]
 
-				var value = value[:unitIndex]
-				value = strings.TrimSpace(value)
+				number = strings.TrimSpace(value[:unitIndex])
 
-				var meters float64 = 0
+				meters = 0
 
 				for _, u := range units {
 					if strings.EqualFold(u.name, unit) {
@@ -6451,26 +6559,24 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unrecognized unit '%s' for altitude.  Using meter.\n", line, unit)
 					dw_printf("Try using singular form.  e.g.  ft or foot rather than feet.\n")
-					var f, _ = strconv.ParseFloat(value, 64)
-					b.alt_m = f
-				} else {
-					// valid unit
-					var f, _ = strconv.ParseFloat(value, 64)
-					b.alt_m = f * meters
+
+					meters = 1
 				}
-			} else {
-				// no unit specified
-				var f, _ = strconv.ParseFloat(value, 64)
-				b.alt_m = f
+			}
+
+			if f, ok := parse_beacon_number(keyword, number, line); ok {
+				b.alt_m = maybe.Just(f * meters)
 			}
 		} else if strings.EqualFold(keyword, "ZONE") {
 			zone = value
 		} else if strings.EqualFold(keyword, "EAST") || strings.EqualFold(keyword, "EASTING") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			easting = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				easting = maybe.Just(f)
+			}
 		} else if strings.EqualFold(keyword, "NORTH") || strings.EqualFold(keyword, "NORTHING") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			northing = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				northing = maybe.Just(f)
+			}
 		} else if strings.EqualFold(keyword, "SYMBOL") {
 			/* Defer processing in case overlay appears later. */
 			temp_symbol = value
@@ -6482,26 +6588,32 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				dw_printf("Config file: Overlay must be one character in range of 0-9 or A-Z, upper case only, on line %d.\n", line)
 			}
 		} else if strings.EqualFold(keyword, "POWER") {
-			var n, _ = strconv.ParseFloat(value, 64)
-			b.power = n
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.power = f
+			}
 		} else if strings.EqualFold(keyword, "HEIGHT") { // This is in feet.
-			var n, _ = strconv.ParseFloat(value, 64)
-			b.height = n
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.height = f
+			}
 			// TODO: ability to add units suffix, e.g.  10m
 		} else if strings.EqualFold(keyword, "GAIN") {
-			var n, _ = strconv.ParseFloat(value, 64)
-			b.gain = n
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.gain = f
+			}
 		} else if strings.EqualFold(keyword, "DIR") || strings.EqualFold(keyword, "DIRECTION") {
 			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			b.freq = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.freq = maybe.Just(f)
+			}
 		} else if strings.EqualFold(keyword, "TONE") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			b.tone = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.tone = maybe.Just(f)
+			}
 		} else if strings.EqualFold(keyword, "OFFSET") || strings.EqualFold(keyword, "OFF") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			b.offset = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.offset = maybe.Just(f)
+			}
 		} else if strings.EqualFold(keyword, "COMMENT") {
 			b.comment = value
 		} else if strings.EqualFold(keyword, "COMMENTCMD") {
@@ -6535,8 +6647,11 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/*
 	 * Convert UTM coordinates to lat / long.
 	 */
-	if len(zone) > 0 || easting != G_UNKNOWN || northing != G_UNKNOWN {
-		if len(zone) > 0 && easting != G_UNKNOWN && northing != G_UNKNOWN {
+	if len(zone) > 0 || easting.IsJust() || northing.IsJust() {
+		var east, eastKnown = easting.Get()
+		var north, northKnown = northing.Get()
+
+		if len(zone) > 0 && eastKnown && northKnown {
 			var _, _hemi, lzone = parse_utm_zone(zone)
 
 			var hemi = HemisphereRuneToCoordconvHemisphere(_hemi)
@@ -6544,14 +6659,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var utm = coordconv.UTMCoord{
 				Zone:       lzone,
 				Hemisphere: hemi,
-				Easting:    float64(easting),
-				Northing:   float64(northing),
+				Easting:    east,
+				Northing:   north,
 			}
 
 			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
-				b.lat = R2D(float64(geo.Lat))
-				b.lon = R2D(float64(geo.Lng))
+				b.lat = maybe.Just(R2D(float64(geo.Lat)))
+				b.lon = maybe.Just(R2D(float64(geo.Lng)))
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, geoErr)

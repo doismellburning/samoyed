@@ -177,8 +177,7 @@ func Test_NewBeaconService_pbeacon_without_lat_lon_is_ignored(t *testing.T) {
 	cfg.beacon[0].sendto_chan = 0
 	cfg.beacon[0].delay = 60
 	cfg.beacon[0].every = 600
-	cfg.beacon[0].lat = G_UNKNOWN
-	cfg.beacon[0].lon = G_UNKNOWN
+	// lat and lon are left unset, which is what the zero value of a Maybe means.
 
 	var bs = NewBeaconService(modem, cfg, igate)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
@@ -194,8 +193,8 @@ func Test_NewBeaconService_pbeacon_with_valid_lat_lon_not_ignored(t *testing.T) 
 	cfg.beacon[0].sendto_chan = 0
 	cfg.beacon[0].delay = 60
 	cfg.beacon[0].every = 600
-	cfg.beacon[0].lat = 42.3601
-	cfg.beacon[0].lon = -71.0589
+	cfg.beacon[0].lat = maybe.Just(42.3601)
+	cfg.beacon[0].lon = maybe.Just(-71.0589)
 
 	var bs = NewBeaconService(modem, cfg, igate)
 	assert.Equal(t, BEACON_POSITION, bs.miscConfig.beacon[0].btype)
@@ -276,8 +275,8 @@ func Test_NewBeaconService_missing_mycall_is_ignored(t *testing.T) {
 	cfg.beacon[0].sendto_chan = 0
 	cfg.beacon[0].delay = 60
 	cfg.beacon[0].every = 600
-	cfg.beacon[0].lat = 42.0
-	cfg.beacon[0].lon = -71.0
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
 
 	var bs = NewBeaconService(modem, cfg, igate)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
@@ -296,8 +295,8 @@ func Test_NewBeaconService_invalid_channel_medium_is_ignored(t *testing.T) {
 	cfg.beacon[0].sendto_chan = 0
 	cfg.beacon[0].delay = 60
 	cfg.beacon[0].every = 600
-	cfg.beacon[0].lat = 42.0
-	cfg.beacon[0].lon = -71.0
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
 
 	var bs = NewBeaconService(modem, cfg, igate)
 	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
@@ -312,10 +311,10 @@ func Test_NewBeaconService_sets_next_time_from_delay(t *testing.T) {
 	cfg.beacon[0].btype = BEACON_POSITION
 	cfg.beacon[0].sendto_chan = 0
 	cfg.beacon[0].delay = 120
-	cfg.beacon[0].slot = G_UNKNOWN // disable slot-based scheduling
+	// No slot, so the delay is what schedules it.
 	cfg.beacon[0].every = 600
-	cfg.beacon[0].lat = 42.0
-	cfg.beacon[0].lon = -71.0
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
 
 	var before = time.Now()
 	var bs = NewBeaconService(modem, cfg, igate)
@@ -333,10 +332,10 @@ func Test_NewBeaconService_slotted_beacon_adjusts_interval_if_not_IS_GOOD(t *tes
 	cfg.num_beacons = 1
 	cfg.beacon[0].btype = BEACON_POSITION
 	cfg.beacon[0].sendto_chan = 0
-	cfg.beacon[0].slot = 0
+	cfg.beacon[0].slot = maybe.Just(0)
 	cfg.beacon[0].every = 7 // 7 is not a divisor of 3600
-	cfg.beacon[0].lat = 42.0
-	cfg.beacon[0].lon = -71.0
+	cfg.beacon[0].lat = maybe.Just(42.0)
+	cfg.beacon[0].lon = maybe.Just(-71.0)
 
 	var bs = NewBeaconService(modem, cfg, igate)
 

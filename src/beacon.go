@@ -97,7 +97,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 				case BEACON_POSITION:
 					/* Location is required. */
-					if bs.miscConfig.beacon[j].lat == G_UNKNOWN || bs.miscConfig.beacon[j].lon == G_UNKNOWN {
+					if bs.miscConfig.beacon[j].lat.IsNothing() || bs.miscConfig.beacon[j].lon.IsNothing() {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("Config file, line %d: Latitude and longitude are required.\n", bs.miscConfig.beacon[j].lineno)
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
@@ -203,7 +203,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 		 * If timeslots, there must be a full number of beacon intervals per hour.
 		 */
 
-		if bp.slot != G_UNKNOWN {
+		if slot, slotted := bp.slot.Get(); slotted {
 			if !IS_GOOD(bp.every) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: When using timeslots, there must be a whole number of beacon intervals per hour.\n", bp.lineno)
@@ -244,7 +244,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 			/*
 			 * Determine when next slot time will arrive.
 			 */
-			bp.delay = bp.slot - (now.Minute()*60 + now.Second())
+			bp.delay = slot - (now.Minute()*60 + now.Second())
 			for bp.delay > bp.every {
 				bp.delay -= bp.every
 			}
@@ -290,7 +290,7 @@ func (bs *BeaconService) Start() {
 }
 
 func IS_GOOD(x int) bool {
-	return (3600/(x))*(x) == 3600
+	return x >= 1 && (3600/(x))*(x) == 3600
 }
 
 /*-------------------------------------------------------------------
@@ -594,8 +594,8 @@ func (bs *BeaconService) sbCalculateNextTime(
 } /* end sbCalculateNextTime */
 
 // beaconPHG is a PHG component from the beacon configuration, whose "not
-// specified" is zero rather than G_UNKNOWN.  The beacon_s fields are still
-// plain numbers; see issue #619.
+// specified" is zero.  The power, height and gain fields are still plain
+// numbers; see issue #619.
 func beaconPHG(value float64) maybe.Maybe[int] {
 	if value == 0 {
 		return maybe.Nothing[int]()
@@ -606,10 +606,10 @@ func beaconPHG(value float64) maybe.Maybe[int] {
 
 // beaconAltitudeFeet converts a configured beacon altitude in metres to the
 // feet EncodePosition wants, or Nothing if no altitude was configured.
-func beaconAltitudeFeet(alt_m float64) maybe.Maybe[int] {
+func beaconAltitudeFeet(alt_m maybe.Maybe[float64]) maybe.Maybe[int] {
 	return maybe.Fmap(func(meters float64) int {
 		return int(math.Round(DW_METERS_TO_FEET(meters)))
-	}, unlessUnknown(alt_m))
+	}, alt_m)
 }
 
 /*-------------------------------------------------------------------
@@ -725,20 +725,20 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 	switch bp.btype {
 	case BEACON_POSITION:
 		beacon_text += EncodePosition(bp.messaging, bp.compress,
-			bp.lat, bp.lon, bp.ambiguity,
+			orUnknown(bp.lat), orUnknown(bp.lon), bp.ambiguity,
 			beaconAltitudeFeet(bp.alt_m),
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
-			unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset),
+			bp.freq, bp.tone, bp.offset,
 			super_comment)
 
 	case BEACON_OBJECT:
-		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), bp.lat, bp.lon, bp.ambiguity,
+		beacon_text += encode_object(bp.objname, bp.compress, time.Now(), orUnknown(bp.lat), orUnknown(bp.lon), bp.ambiguity,
 			bp.symtab, bp.symbol,
 			beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 			maybe.Nothing[int](), maybe.Nothing[int](), /* course, speed */
-			unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset), super_comment)
+			bp.freq, bp.tone, bp.offset, super_comment)
 
 	case BEACON_TRACKER:
 		if gpsinfo.fix >= DWFIX_2D {
@@ -746,7 +746,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			/* A positive altitude in the config file enables */
 			/* transmission of altitude from GPS. */
 			var my_alt_ft maybe.Maybe[int]
-			if gpsinfo.fix >= DWFIX_3D && bp.alt_m > 0 {
+			if gpsinfo.fix >= DWFIX_3D && maybe.FromMaybe(0, bp.alt_m) > 0 {
 				my_alt_ft = maybe.Fmap(func(meters float64) int {
 					return int(math.Round(DW_METERS_TO_FEET(meters)))
 				}, gpsinfo.altitude)
@@ -761,7 +761,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 				bp.symtab, bp.symbol,
 				beaconPHG(bp.power), beaconPHG(bp.height), beaconPHG(bp.gain), bp.dir,
 				coarse, knots,
-				unlessUnknown(bp.freq), unlessUnknown(bp.tone), unlessUnknown(bp.offset),
+				bp.freq, bp.tone, bp.offset,
 				super_comment)
 
 			/* Write to log file for testing. */
