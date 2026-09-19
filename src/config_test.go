@@ -1209,6 +1209,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"FULLDUP": {
+			{
+				name:   "ON selects full duplex",
+				config: "FULLDUP ON\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "the keyword is not case sensitive",
+				config: "FULLDUP on\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "OFF selects half duplex",
+				config: "FULLDUP ON\nFULLDUP OFF\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "half duplex by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_FULLDUP, c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nFULLDUP ON\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+					a.True(c.audio.achan[1].fulldup)
+				},
+			},
+			{
+				name:   "anything other than ON or OFF leaves half duplex",
+				config: "FULLDUP maybe\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "a missing setting does not eat the next line",
+				config: "FULLDUP\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"ICHANNEL": {
 			{
 				name:   "a virtual channel becomes the IGate channel",
@@ -1534,7 +1587,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEATER",
 		"DNSSDNAME",
 		"EMAXFRAME",
-		"FULLDUP",
 		"FX25AUTO",
 		"FX25TX",
 		"GPSD",
