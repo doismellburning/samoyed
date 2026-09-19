@@ -148,7 +148,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"syscall"
 
 	"github.com/sirupsen/logrus"
 )
@@ -181,7 +180,7 @@ type KissNetService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewKissNetService(mc *misc_config_s) *KissNetService {
+func NewKissNetService(ctx context.Context, mc *misc_config_s) *KissNetService {
 	var kns = new(KissNetService)
 	kns.miscConfigP = mc
 
@@ -196,7 +195,7 @@ func NewKissNetService(mc *misc_config_s) *KissNetService {
 			kps.pnext = kns.allPorts
 			kns.allPorts = kps
 
-			kns.initOne(kps)
+			kns.initOne(ctx, kps)
 		}
 	}
 
@@ -424,25 +423,39 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 
 /* Return one byte (value 0 - 255) */
 
-func (kns *KissNetService) get(kps *kissport_status_s, client int) (byte, *KISSFrame) {
-	for {
+// get returns the next byte from a client, and the frame decoder state it
+// belongs to.  It reports false instead if ctx was cancelled, in which case
+// there is no byte and the caller should stop.
+func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, client int) (byte, *KISSFrame, bool) {
+	for ctx.Err() == nil {
 		var conn, frame = kps.connAndFrame(client)
 		for conn == nil {
-			SLEEP_SEC(1) /* Not connected.  Try again later. */
+			if !sleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
+				return 0, nil, false
+			}
+
 			conn, frame = kps.connAndFrame(client)
 		}
 
 		/* Just get one byte at a time. */
 
+		// A client that connects and then says nothing leaves the read below
+		// blocked indefinitely.  What gets us back is the port's stop(),
+		// registered against ctx in initOne, which hangs up on every attached
+		// client - so there is nothing to arm here, once per byte, of our own.
 		var ch = make([]byte, 1)
 		var n, _ = conn.Read(ch)
+
+		if ctx.Err() != nil {
+			return 0, nil, false
+		}
 
 		if n == 1 {
 			if logrus.IsLevelEnabled(logrus.TraceLevel) {
 				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Trace("kissnet get")
 			}
 
-			return ch[0], frame
+			return ch[0], frame, true
 		}
 
 		conn.Close()
@@ -456,9 +469,11 @@ func (kns *KissNetService) get(kps *kissport_status_s, client int) (byte, *KISSF
 			dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
 		}
 	}
+
+	return 0, nil, false
 }
 
-func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
+func (kns *KissNetService) listenThread(ctx context.Context, kps *kissport_status_s, client int) {
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	logrus.WithFields(logrus.Fields{
@@ -478,12 +493,16 @@ func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
 	// "Simply KISS" as some call it.
 
 	for {
-		var ch, frame = kns.get(kps, client)
+		var ch, frame, ok = kns.get(ctx, kps, client)
+		if !ok {
+			return // Cancelled.
+		}
+
 		KissRecByte(frame, ch, kns.debug, kps, client, kns.SendRecPacket)
 	}
 } /* end listenThread */
 
-func (kns *KissNetService) initOne(kps *kissport_status_s) {
+func (kns *KissNetService) initOne(ctx context.Context, kps *kissport_status_s) {
 	logrus.WithFields(logrus.Fields{
 		"tcp_port": kps.tcp_port,
 		"channel":  kps.channel,
@@ -500,10 +519,13 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
 		return
 	}
 
+	// Hang up on whoever is attached when we are asked to stop.
+	context.AfterFunc(ctx, kps.stop)
+
 	/*
 	 * This waits for a client to connect and sets client_sock[n].
 	 */
-	go kns.connectListenThread(kps)
+	go kns.connectListenThread(ctx, kps)
 
 	/*
 	 * These read messages from client when client_sock[n] is valid.
@@ -511,7 +533,7 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
 	for client := range MAX_NET_CLIENTS {
-		go kns.listenThread(kps, client)
+		go kns.listenThread(ctx, kps, client)
 	}
 }
 
@@ -532,9 +554,9 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
  *
  *--------------------------------------------------------------------*/
 
-func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
+func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kissport_status_s) {
 	logrus.WithField("tcp_port", kps.tcp_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", kps.tcp_port))
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", kps.tcp_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("connectListenThread: Listen failed: %s", listenErr)
@@ -542,25 +564,20 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 		return
 	}
 
-	/* Version 1.3 - as suggested by G8BPQ. */
-	/* Without this, if you kill the application then try to run it */
-	/* again quickly the port number is unavailable for a while. */
-	/* Don't try doing the same thing On Windows; It has a different meaning. */
-	/* http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t */
-	// TODO KG Test this
-	// Set SO_REUSEADDR equivalent (handled automatically by Go's net package)
-	if tcpListener, ok := listener.(*net.TCPListener); ok {
-		file, err := tcpListener.File()
-		if err == nil {
-			defer file.Close()
-
-			syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-		}
-	}
+	// As in server.go: Go's net package sets SO_REUSEADDR on a Unix TCP
+	// listener for us, and setting it through TCPListener.File puts the
+	// socket into blocking mode, after which Close can no longer interrupt a
+	// goroutine waiting in Accept.
 
 	logrus.WithField("tcp_port", kps.tcp_port).Debug("opened KISS TCP socket for stream i/o")
 
-	for {
+	// Accept below blocks until a client turns up, which may be never, so
+	// closing the listener is what gets us back when we are asked to stop -
+	// and it gives the port up there and then, rather than holding it until
+	// the process exits.
+	defer closeOnDone(ctx, listener)()
+
+	for ctx.Err() == nil {
 		var client = kps.findFreeClient()
 
 		if client >= 0 {
@@ -574,6 +591,10 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
+				if ctx.Err() != nil {
+					return // We closed the listener ourselves on the way out.
+				}
+
 				dw_printf("Accept failed: %v\n", acceptErr)
 
 				continue
@@ -589,7 +610,15 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 			// touched every client's slot rather than just the one that
 			// (re)connected, which could just as easily clobber a frame
 			// already in progress on another attached client.
-			kps.attachClient(client, conn)
+			if !kps.attachClient(client, conn) {
+				// Cancelled while this connection sat in the accept queue,
+				// so the hanging up has already happened and nothing will
+				// ever read from it.  Do it here instead of attaching a
+				// client nobody is listening to.
+				conn.Close()
+
+				return
+			}
 
 			text_color_set(DW_COLOR_INFO)
 
@@ -598,8 +627,8 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 			} else {
 				dw_printf("\nAttached to KISS TCP client application %d on port %d (radio channel %d) ...\n\n", client, kps.tcp_port, kps.channel)
 			}
-		} else {
-			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
+		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
+			return
 		}
 	}
 }

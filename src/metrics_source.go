@@ -4,6 +4,10 @@
 package direwolf
 
 import (
+	"context"
+	"errors"
+	"net/http"
+
 	"github.com/doismellburning/samoyed/internal/metrics"
 )
 
@@ -68,7 +72,7 @@ func recordRadioFrame(channel int, fecType fec_type_t, retries BitFixLevel) {
 // state from the audio config, seeding the rest of that channel's series at
 // zero (everything else pushes from its own subsystem as events happen).
 // A port of 0 (the default) disables it.
-func metrics_init(mc *misc_config_s) {
+func metrics_init(ctx context.Context, mc *misc_config_s) {
 	if mc.metrics_port == 0 {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("Disabled Prometheus metrics endpoint.\n")
@@ -86,7 +90,7 @@ func metrics_init(mc *misc_config_s) {
 		}
 	}
 
-	var errCh, startErr = metrics.Start(mc.metrics_port)
+	var errCh, startErr = metrics.Start(ctx, mc.metrics_port)
 	if startErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, startErr)
@@ -96,7 +100,7 @@ func metrics_init(mc *misc_config_s) {
 
 	go func() {
 		var err = <-errCh
-		if err != nil {
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", mc.metrics_port, err)
 		}

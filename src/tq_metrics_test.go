@@ -57,7 +57,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -148,7 +148,7 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -195,7 +195,7 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -237,7 +237,7 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -249,7 +249,7 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 	lm_data_request(CHANNEL, PRIO, pp)
 	require.InDelta(t, 1, metricValue(t, "samoyed_tx_queue_depth", labels), 0)
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"re-initialising the queues must clear the published depth too")

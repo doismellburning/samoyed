@@ -263,6 +263,11 @@ const (
 	metricsReadTimeout       = 10 * time.Second
 	metricsWriteTimeout      = 30 * time.Second
 	metricsIdleTimeout       = 60 * time.Second
+
+	// How long a shutdown waits for in-flight scrapes before giving up on
+	// them.  A scrape is a handful of milliseconds of work, so anything
+	// still going after this is not going to finish.
+	metricsShutdownTimeout = 5 * time.Second
 )
 
 // Start starts the Prometheus "/metrics" HTTP endpoint on port.  The listening
@@ -271,11 +276,14 @@ const (
 // channel - the caller can report "listening" without getting ahead of itself.
 // The returned channel receives a single error if and when the server stops.
 // Logging is the caller's responsibility.
-func Start(port int) (<-chan error, error) {
+//
+// Cancelling ctx shuts the endpoint down, so the channel then reports
+// http.ErrServerClosed.
+func Start(ctx context.Context, port int) (<-chan error, error) {
 	var mux = http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
-	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", port))
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
 	if listenErr != nil {
 		return nil, listenErr
 	}
@@ -292,6 +300,18 @@ func Start(port int) (<-chan error, error) {
 	go func() {
 		errCh <- server.Serve(listener)
 	}()
+
+	// Serve holds the listening socket until it is told to stop, so a
+	// cancellation has to reach it here or the port stays bound for as long
+	// as the process runs.
+	context.AfterFunc(ctx, func() {
+		// ctx is cancelled by the time this runs, so the shutdown gets a
+		// deadline of its own rather than inheriting a dead one.
+		var shutdownCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), metricsShutdownTimeout)
+		defer cancel()
+
+		_ = server.Shutdown(shutdownCtx)
+	})
 
 	return errCh, nil
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/sirupsen/logrus"
@@ -115,14 +116,28 @@ Flags:
 
 	var b = direwolf.NewAXUDPBridge(maps, udpConn)
 
+	// Both halves run until the user interrupts us, at which point they give
+	// their sockets up rather than being cut off mid-flight.  Not deferred:
+	// the os.Exit below would skip it anyway, and by the time we get there the
+	// halves have already returned.
+	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt)
+
 	// Either half failing is fatal for the bridge as a whole, so whichever
 	// returns first decides: report it and exit rather than limping along with
 	// traffic flowing in only one direction.  The channel is buffered so the
 	// half we do not wait for cannot leak its goroutine blocking on a send.
 	var errs = make(chan error, 2)
-	go func() { errs <- b.RunUDPListener() }()
-	go func() { errs <- b.RunKISSServer(kissLn) }()
+	go func() { errs <- b.RunUDPListener(ctx) }()
+	go func() { errs <- b.RunKISSServer(ctx, kissLn) }()
 
-	fmt.Fprintf(os.Stderr, "samoyed-axudp: %v\n", <-errs)
-	os.Exit(1)
+	var err = <-errs
+
+	stop()
+
+	// An interrupt is not a failure: both halves return without an error, and
+	// we are simply done.
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "samoyed-axudp: %v\n", err)
+		os.Exit(1)
+	}
 }

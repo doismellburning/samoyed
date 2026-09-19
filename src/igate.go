@@ -231,7 +231,7 @@ func igate_get_dnl_cnt() int {
  *
  *--------------------------------------------------------------------*/
 
-func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level int) {
+func igate_init(ctx context.Context, p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_config *digi_config_s, debug_level int) {
 	s_debug = debug_level
 	dp_queue_head = nil
 
@@ -274,20 +274,20 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 	 * It also sends periodic messages to say I'm still alive.
 	 */
 
-	go connect_thread()
+	go connect_thread(ctx)
 
 	/*
 	 * This reads messages from client when igate_sock is valid.
 	 */
 
-	go igate_recv_thread()
+	go igate_recv_thread(ctx)
 
 	/*
 	 * This lets delayed packets continue after specified amount of time.
 	 */
 
 	if p_igate_config.satgate_delay > 0 {
-		go satgate_delay_thread()
+		go satgate_delay_thread(ctx)
 	}
 } /* end igate_init */
 
@@ -316,8 +316,8 @@ const MAX_HOSTS = 50
 // the outcome.  Exactly one of the connect/failed-connect metrics moves per
 // attempt: samoyed_igate_connects_total counts connections that were actually
 // established, not attempts that were made.
-func igate_dial(server_name string, server_port int) (net.Conn, error) {
-	var conn, err = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(server_name, strconv.Itoa(server_port)))
+func igate_dial(ctx context.Context, server_name string, server_port int) (net.Conn, error) {
+	var conn, err = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(server_name, strconv.Itoa(server_port)))
 	if err != nil {
 		metrics.RecordIgateFailedConnect()
 
@@ -329,20 +329,22 @@ func igate_dial(server_name string, server_port int) (net.Conn, error) {
 	return conn, nil
 }
 
-func connect_thread() {
+// connect_thread keeps a connection to the IGate server up until ctx is
+// cancelled.
+func connect_thread(ctx context.Context) {
 	logrus.WithField("port", save_igate_config_p.t2_server_port).Debug("igate connect_thread start")
 	var server_name = save_igate_config_p.t2_server_name
 
 	/*
-	 * Repeat forever.
+	 * Repeat until told to stop.
 	 */
 
-	for {
+	for ctx.Err() == nil {
 		/*
 		 * Connect to IGate server if not currently connected.
 		 */
 		if igate_sock == nil {
-			var conn, connErr = igate_dial(server_name, save_igate_config_p.t2_server_port)
+			var conn, connErr = igate_dial(ctx, server_name, save_igate_config_p.t2_server_port)
 			stats_connect_at = time.Now()
 
 			if connErr != nil {
@@ -372,7 +374,9 @@ func connect_thread() {
 				 * Software name and version must not contain spaces.
 				 */
 
-				SLEEP_SEC(3)
+				if !sleepSecCtx(ctx, 3) {
+					return
+				}
 
 				var stemp = fmt.Sprintf("user %s pass %s vers Samoyed %s",
 					save_igate_config_p.t2_login, save_igate_config_p.t2_passcode,
@@ -386,7 +390,9 @@ func connect_thread() {
 
 				/* Delay until it is ok to start sending packets. */
 
-				SLEEP_SEC(7)
+				if !sleepSecCtx(ctx, 7) {
+					return
+				}
 
 				ok_to_send = true
 			}
@@ -395,16 +401,10 @@ func connect_thread() {
 		/*
 		 * If connected to IGate server, send heartbeat periodically to keep connection active.
 		 */
-		if igate_sock != nil {
-			SLEEP_SEC(10)
-		}
-
-		if igate_sock != nil {
-			SLEEP_SEC(10)
-		}
-
-		if igate_sock != nil {
-			SLEEP_SEC(10)
+		for range 3 {
+			if igate_sock != nil && !sleepSecCtx(ctx, 10) {
+				return
+			}
 		}
 
 		if igate_sock != nil {
@@ -830,32 +830,64 @@ func send_msg_to_server(imsg string) {
  *
  *--------------------------------------------------------------------*/
 
-func get1ch() byte {
-	for {
+// get1ch returns the next byte from the IGate server.  It reports false
+// instead if ctx was cancelled, in which case there is no byte and the caller
+// should stop.
+func get1ch(ctx context.Context) (byte, bool) {
+	for ctx.Err() == nil {
 		for igate_sock == nil {
-			SLEEP_SEC(5) /* Not connected.  Try again later. */
+			if !sleepSecCtx(ctx, 5) { /* Not connected.  Try again later. */
+				return 0, false
+			}
 		}
 
 		/* Just get one byte at a time. */
 		// TODO: might read complete packets and unpack from own buffer
 		// rather than using a system call for each byte.
 
+		var conn = igate_sock
+		if conn == nil {
+			continue // It went away between the check above and here.
+		}
+
+		// A server with nothing to say leaves the read below blocked, so
+		// closing the socket is what gets us back when we are asked to stop.
+		var stopClose = closeOnDone(ctx, conn)
+
 		var ch = make([]byte, 1)
-		var n, _ = igate_sock.Read(ch)
+		var n, _ = conn.Read(ch)
+
+		stopClose()
+
+		if ctx.Err() != nil {
+			// Ours to close: nothing will read from it again.
+			conn.Close()
+
+			if igate_sock == conn {
+				igate_sock = nil
+			}
+
+			return 0, false
+		}
 
 		if n == 1 {
 			if logrus.IsLevelEnabled(logrus.TraceLevel) {
 				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Trace("get1ch")
 			}
 
-			return (ch[0])
+			return ch[0], true
 		}
 
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError reading from IGate server.  Closing connection.\n\n")
-		igate_sock.Close()
-		igate_sock = nil
+		conn.Close()
+
+		if igate_sock == conn {
+			igate_sock = nil
+		}
 	}
+
+	return 0, false
 } /* end get1ch */
 
 /*-------------------------------------------------------------------
@@ -870,13 +902,18 @@ func get1ch() byte {
  *
  *--------------------------------------------------------------------*/
 
-func igate_recv_thread() {
+func igate_recv_thread(ctx context.Context) {
 	logrus.Debug("igate_recv_thread")
-	for {
+
+	for ctx.Err() == nil {
 		var message []byte
 
 		for {
-			var ch = get1ch()
+			var ch, ok = get1ch(ctx)
+			if !ok {
+				return // Cancelled.
+			}
+
 			stats_downlink_bytes++
 
 			// I never expected to see a nul character but it can happen.
@@ -1119,12 +1156,14 @@ func satgate_delay_packet(pp *packet_t, channel int) { //nolint:unparam
  *
  *--------------------------------------------------------------------*/
 
-func satgate_delay_thread() {
+func satgate_delay_thread(ctx context.Context) {
 	var channel = 0 // TODO:  get receive channel somehow.
 	// only matters if multi channel with different names.
 
 	for {
-		SLEEP_SEC(1)
+		if !sleepSecCtx(ctx, 1) {
+			return
+		}
 
 		/* Don't need critical region just to peek */
 
@@ -1143,7 +1182,7 @@ func satgate_delay_thread() {
 				send_packet_to_server(pp, channel)
 			}
 		} /* if something in queue */
-	} /* while (1) */
+	} /* until cancelled */
 } /* end satgate_delay_thread */
 
 /*-------------------------------------------------------------------

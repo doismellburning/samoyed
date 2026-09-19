@@ -1175,7 +1175,7 @@ func findPortAudioDevice(name string, forInput bool) *portaudio.DeviceInfo {
  *
  *----------------------------------------------------------------*/
 
-func audio_open(pa *audio_s) int {
+func audio_open(ctx context.Context, pa *audio_s) int {
 	save_audio_config_p = pa
 
 	// Initialize PortAudio only if at least one configured device needs a
@@ -1536,7 +1536,7 @@ func audio_open(pa *audio_s) int {
 				 * UDP output - dial to the specified host:port and send audio packets.
 				 */
 				var outAddr = audio_out_name[4:] // skip "udp:"
-				var udpOutConn, dialErr = new(net.Dialer).DialContext(context.Background(), "udp", outAddr)
+				var udpOutConn, dialErr = new(net.Dialer).DialContext(ctx, "udp", outAddr)
 				if dialErr != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Could not connect to UDP output address %s: %v\n", outAddr, dialErr)
@@ -1554,7 +1554,7 @@ func audio_open(pa *audio_s) int {
 				adev[a].outbufSizeInBytes = UDP_AUDIO_OUT_BUF_MAXLEN
 				adev[a].silenceStopCh = make(chan struct{})
 
-				go audioUDPSilenceKeepalive(a, adev[a].silenceStopCh)
+				go audioUDPSilenceKeepalive(ctx, a, adev[a].silenceStopCh)
 
 			case AUDIO_OUT_TYPE_SOUNDCARD:
 				/*
@@ -1976,7 +1976,7 @@ const silenceKeepaliveInterval = 20 * time.Millisecond
 // isn't actively mid-transmission, using the same per-device mutex xmit.go
 // already holds for the duration of a real transmission so the two never
 // interleave on the wire.
-func audioUDPSilenceKeepalive(a int, stop chan struct{}) {
+func audioUDPSilenceKeepalive(ctx context.Context, a int, stop chan struct{}) {
 	var ticker = time.NewTicker(silenceKeepaliveInterval)
 	defer ticker.Stop()
 
@@ -2002,6 +2002,10 @@ func audioUDPSilenceKeepalive(a int, stop chan struct{}) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			// Shutting down.  audio_close closes stop as well, but it
+			// only runs if somebody gets as far as calling it.
+			return
 		case <-stop:
 			return
 		case <-ticker.C:

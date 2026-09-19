@@ -118,7 +118,7 @@ func (c *gpsdClient) closeAndClear() {
  *
  *--------------------------------------------------------------------*/
 
-func dwgpsd_init(pconfig *misc_config_s, debug int) int {
+func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
 	s_gpsd.debug = debug
 
 	if s_gpsd.debug >= 2 {
@@ -133,7 +133,7 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
 
 	var addr = net.JoinHostPort(pconfig.gpsd_host, strconv.Itoa(pconfig.gpsd_port))
 
-	var dialCtx, cancelDial = context.WithTimeout(context.Background(), GPSD_CONNECT_TIMEOUT)
+	var dialCtx, cancelDial = context.WithTimeout(ctx, GPSD_CONNECT_TIMEOUT)
 	defer cancelDial()
 
 	var conn, connErr = new(net.Dialer).DialContext(dialCtx, "tcp", addr)
@@ -160,7 +160,7 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
 
 	s_gpsd.setConn(conn)
 
-	go read_gpsd_thread(conn)
+	go read_gpsd_thread(ctx, conn)
 
 	/* success */
 
@@ -182,7 +182,7 @@ func dwgpsd_init(pconfig *misc_config_s, debug int) int {
  *
  *--------------------------------------------------------------------*/
 
-func read_gpsd_thread(conn net.Conn) {
+func read_gpsd_thread(ctx context.Context, conn net.Conn) {
 	if s_gpsd.debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("read_gpsd_thread (%+v)\n", conn)
@@ -196,6 +196,11 @@ func read_gpsd_thread(conn net.Conn) {
 	}
 
 	dwgps_set_data(info)
+
+	// Scan blocks until gpsd says something, which it need not ever do, so
+	// closing the connection is what gets this goroutine back when we are
+	// asked to stop.
+	defer closeOnDone(ctx, conn)()
 
 	var scanner = bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 4096), 1<<20)
@@ -216,6 +221,10 @@ func read_gpsd_thread(conn net.Conn) {
 		}
 
 		dwgps_set_data(info)
+	}
+
+	if ctx.Err() != nil {
+		return // We closed the connection ourselves on the way out.
 	}
 
 	/* Lost connection to gpsd, e.g. it was stopped or the network dropped. */

@@ -69,6 +69,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -116,7 +117,7 @@ func kissserial_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_init(mc *misc_config_s) {
+func kissserial_init(ctx context.Context, mc *misc_config_s) {
 	g_misc_config_p = mc
 	kf = new(KISSFrame)
 
@@ -138,7 +139,7 @@ func kissserial_init(mc *misc_config_s) {
 		}
 
 		if g_misc_config_p.kiss_serial_poll != 0 || serialport_fd != nil {
-			go kissserial_listen_thread()
+			go kissserial_listen_thread(ctx)
 		}
 	}
 
@@ -277,12 +278,39 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_get() (byte, error) {
+// closeSerialPortKISS closes the serial port, if it is open, and forgets it.
+// Nothing reads from it once the listening goroutine has stopped, so it is
+// ours to close on the way out.
+func closeSerialPortKISS() {
+	if serialport_fd == nil {
+		return
+	}
+
+	serial_port_close(serialport_fd)
+
+	serialport_fd = nil
+}
+
+// kissserial_get returns the next byte from the serial port.
+//
+// A cancellation is noticed between reads rather than during one.  Unlike a
+// socket, the port cannot be closed out from under a blocked reader to get it
+// back: github.com/pkg/term reads the descriptor directly, with blocking mode
+// set explicitly at open, so it is not one the runtime can interrupt - and
+// closing a descriptor another thread is reading is a way to have it read
+// whatever gets that number next.  A port that says nothing therefore holds
+// this goroutine until it does, or until the process exits.
+func kissserial_get(ctx context.Context) (byte, error) {
 	if g_misc_config_p.kiss_serial_poll == 0 {
 		/*
 		 * Normal case, was opened at start up time.
 		 */
 		var ch, err = SerialPortGet1(serialport_fd)
+
+		if ctx.Err() != nil {
+			return 0, ctx.Err()
+		}
+
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
@@ -302,10 +330,15 @@ func kissserial_get() (byte, error) {
 	/*
 	 * Polling case.  Wait until device is present and open.
 	 */
-	for {
+	for ctx.Err() == nil {
 		if serialport_fd != nil {
 			// Open, try to read.
 			var ch, err = SerialPortGet1(serialport_fd)
+
+			if ctx.Err() != nil {
+				return 0, ctx.Err()
+			}
+
 			if err == nil {
 				return ch, nil
 			}
@@ -316,7 +349,9 @@ func kissserial_get() (byte, error) {
 			serialport_fd = nil
 		} else {
 			// Not open.  Wait for it to appear and try opening.
-			SLEEP_SEC(g_misc_config_p.kiss_serial_poll)
+			if !sleepSecCtx(ctx, g_misc_config_p.kiss_serial_poll) {
+				return 0, ctx.Err()
+			}
 
 			var _, statErr = os.Stat(g_misc_config_p.kiss_serial_port)
 			if statErr == nil {
@@ -334,6 +369,8 @@ func kissserial_get() (byte, error) {
 			}
 		}
 	}
+
+	return 0, ctx.Err()
 } /* end kissserial_get */
 
 /*-------------------------------------------------------------------
@@ -351,10 +388,15 @@ func kissserial_get() (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func kissserial_listen_thread() {
+func kissserial_listen_thread(ctx context.Context) {
 	logrus.Debug("kissserial_listen_thread")
-	for {
-		var ch, err = kissserial_get()
+
+	// Ours to close whenever we stop, including when a cancellation lands
+	// between the polling case opening the port and the next look at ctx.
+	defer closeSerialPortKISS()
+
+	for ctx.Err() == nil {
+		var ch, err = kissserial_get(ctx)
 		if err != nil {
 			return
 		}

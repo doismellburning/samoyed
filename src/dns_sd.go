@@ -24,7 +24,7 @@ import (
 
 const DNS_SD_SERVICE = "_kiss-tnc._tcp"
 
-func dns_sd_announce(mc *misc_config_s) {
+func dns_sd_announce(ctx context.Context, mc *misc_config_s) {
 	var name = mc.dns_sd_name
 	if name == "" {
 		name = dns_sd_default_service_name()
@@ -64,8 +64,10 @@ func dns_sd_announce(mc *misc_config_s) {
 	dw_printf("DNS-SD: Announcing KISS TCP on port %d as '%s'\n", mc.kiss_port[0], name)
 
 	go func() {
-		var respondErr = rp.Respond(context.Background())
-		if respondErr != nil {
+		// Respond runs until its context is cancelled, so this is what
+		// stops announcing when we are shutting down.
+		var respondErr = rp.Respond(ctx)
+		if respondErr != nil && ctx.Err() == nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("DNS-SD: Responder error: %v\n", respondErr)
 		}

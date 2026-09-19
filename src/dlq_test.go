@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -36,7 +37,7 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 		var waited = make(chan bool, 1)
 
 		go func() {
-			waited <- dlq_wait_while_empty(time.Now().Add(time.Minute))
+			waited <- dlq_wait_while_empty(t.Context(), time.Now().Add(time.Minute))
 		}()
 
 		time.Sleep(20 * time.Millisecond)
@@ -113,6 +114,32 @@ func TestDLQStaleWakeUpDoesNotCutShortTheNextWait(t *testing.T) {
 	var wait = 100 * time.Millisecond
 	var start = time.Now()
 
-	assert.True(t, dlq_wait_while_empty(time.Now().Add(wait)), "Expected a timeout with an empty queue")
+	assert.True(t, dlq_wait_while_empty(t.Context(), time.Now().Add(wait)), "Expected a timeout with an empty queue")
 	assert.GreaterOrEqual(t, time.Since(start), wait)
+}
+
+// A wait with nothing on the queue is where the receive thread spends most of
+// its life, so a cancellation has to reach it there rather than waiting for an
+// item that is never coming.
+func TestDLQWaitReturnsWhenCancelled(t *testing.T) {
+	dlq_init()
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	var returned = make(chan bool, 1)
+
+	go func() {
+		returned <- dlq_wait_while_empty(ctx, time.Time{}) // No timeout at all.
+	}()
+
+	// Nothing has been queued, so a waiter that returns now did so because of
+	// the cancellation rather than because it found something.
+	cancel()
+
+	select {
+	case timed_out := <-returned:
+		assert.False(t, timed_out, "Cancellation is not a timeout")
+	case <-time.After(time.Second):
+		t.Fatal("dlq_wait_while_empty did not return after its context was cancelled")
+	}
 }

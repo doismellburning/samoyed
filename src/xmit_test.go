@@ -4,7 +4,9 @@
 package direwolf
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +30,7 @@ func TestXmitNextReleasesAudioOutDevWhenQueueIsEmpty(t *testing.T) {
 		}
 	}
 
-	xs.xmit_next(channel)
+	xs.xmit_next(t.Context(), channel)
 
 	if !xs.audioOutDevMutex[ACHAN2ADEV(channel)].TryLock() {
 		t.Fatal("Audio output device is still locked after xmit_next found nothing to send")
@@ -47,7 +49,7 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	var xs = new(XmitService)
 
@@ -74,7 +76,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 	dlq_init()
 
 	var xs = new(XmitService)
@@ -108,7 +110,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	tq_init(t.Context(), audioConfig)
 
 	var xs = new(XmitService)
 	xs.audioOutAvailable[ACHAN2ADEV(channel)] = false
@@ -116,7 +118,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	tq_append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 	tq_append(channel, TQ_PRIO_0_HI, newTestPacket(t))
 
-	xs.xmit_until_empty(channel)
+	xs.xmit_until_empty(t.Context(), channel)
 
 	assert.Nil(t, tq_peek(channel, TQ_PRIO_0_HI))
 	assert.Nil(t, tq_peek(channel, TQ_PRIO_1_LO))
@@ -129,4 +131,70 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	}
 
 	xs.audioOutDevMutex[ACHAN2ADEV(channel)].Unlock()
+}
+
+// A transmit thread with an empty queue is parked in a condition variable
+// wait, which nothing but a wake-up can reach.  Cancelling its context has to
+// be one of those wake-ups, or the thread runs until the process exits.
+func TestXmitThreadStopsWhenCancelled(t *testing.T) {
+	var channel = 0
+
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[channel] = MEDIUM_RADIO
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	tq_init(ctx, audioConfig)
+
+	var xs = new(XmitService)
+
+	var stopped = make(chan struct{})
+
+	go func() {
+		defer close(stopped)
+
+		xs.xmit_thread(ctx, channel)
+	}()
+
+	// Give it time to get as far as the wait, so that the cancellation below
+	// has to wake it rather than just being noticed on the way in.
+	time.Sleep(100 * time.Millisecond)
+
+	cancel()
+
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("xmit_thread did not return after its context was cancelled")
+	}
+}
+
+// A transmit thread whose context is cancelled before it ever waits must not
+// then sit down and wait for a broadcast that has already been and gone.
+func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
+	var channel = 0
+
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[channel] = MEDIUM_RADIO
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	tq_init(ctx, audioConfig)
+	cancel()
+
+	var xs = new(XmitService)
+
+	var stopped = make(chan struct{})
+
+	go func() {
+		defer close(stopped)
+
+		xs.xmit_thread(ctx, channel)
+	}()
+
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("xmit_thread waited for a wake-up that had already happened")
+	}
 }

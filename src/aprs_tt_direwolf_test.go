@@ -157,7 +157,7 @@ func Test_APRS_TT(t *testing.T) {
 	for testNum, testCase := range ttTestCases {
 		dw_printf("\nTest case %d: %s\n", testNum, testCase.toneseq)
 
-		gateway.Sequence(0, testCase.toneseq)
+		gateway.Sequence(t.Context(), 0, testCase.toneseq)
 		check_result(t, testCase)
 	}
 }

@@ -123,7 +123,6 @@ import (
 	"net"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -332,7 +331,7 @@ func agwConnectedModeAllowed(portx byte) bool {
 	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
 }
 
-func server_init(audio_config_p *audio_s, mc *misc_config_s) {
+func server_init(ctx context.Context, audio_config_p *audio_s, mc *misc_config_s) {
 	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
 	logrus.WithField("server_port", server_port).Debug("server_init")
@@ -364,7 +363,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	/*
 	 * This waits for a client to connect and sets an available client_sock[n].
 	 */
-	go server_connect_listen_thread(server_port)
+	go server_connect_listen_thread(ctx, server_port)
 
 	/*
 	 * These read messages from client when client_sock[n] is valid.
@@ -372,7 +371,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	 * Possible later refinement.  Start one now, others only as needed.
 	 */
 	for client := range MAX_NET_CLIENTS {
-		go cmd_listen_thread(client)
+		go cmd_listen_thread(ctx, client)
 	}
 }
 
@@ -395,9 +394,9 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
  *
  *--------------------------------------------------------------------*/
 
-func server_connect_listen_thread(server_port int) {
+func server_connect_listen_thread(ctx context.Context, server_port int) {
 	logrus.WithField("port", server_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", server_port))
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", server_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
@@ -405,23 +404,24 @@ func server_connect_listen_thread(server_port int) {
 		return
 	}
 
-	/* Version 1.3 - as suggested by G8BPQ. */
-	/* Without this, if you kill the application then try to run it */
-	/* again quickly the port number is unavailable for a while. */
-	/* Don't try doing the same thing On Windows; It has a different meaning. */
-	/* http://stackoverflow.com/questions/14388706/socket-options-so-reuseaddr-and-so-reuseport-how-do-they-differ-do-they-mean-t */
-	if tcpListener, ok := listener.(*net.TCPListener); ok {
-		file, err := tcpListener.File()
-		if err == nil {
-			defer file.Close()
-
-			syscall.SetsockoptInt(int(file.Fd()), syscall.SOL_SOCKET, syscall.SO_REUSEADDR, 1)
-		}
-	}
+	// Dire Wolf set SO_REUSEADDR here (its version 1.3, as suggested by
+	// G8BPQ) so that restarting the application straight away could bind the
+	// port again.  Go's net package already sets it on every Unix TCP
+	// listener, and the way we were setting it - TCPListener.File, then
+	// setsockopt on the duplicate - has a sting in the tail: File puts the
+	// underlying socket into blocking mode, which takes it out of the
+	// runtime's poller, and Close then no longer interrupts a goroutine
+	// waiting in Accept.  That is exactly what stopping needs it to do.
 
 	logrus.WithField("port", server_port).Debug("opened socket for stream i/o")
 
-	for {
+	// Accept below blocks until a client turns up, which may be never, so
+	// closing the listener is what gets us back when we are asked to stop.
+	// It also gives the port up rather than holding it until the process
+	// exits, which is what lets a test start a server and then stop it.
+	defer closeOnDone(ctx, listener)()
+
+	for ctx.Err() == nil {
 		var client = -1
 		for c := 0; c < MAX_NET_CLIENTS && client < 0; c++ {
 			if client_sock[c] == nil {
@@ -435,17 +435,31 @@ func server_connect_listen_thread(server_port int) {
 
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
+				if ctx.Err() != nil {
+					return // We closed the listener ourselves on the way out.
+				}
+
 				dw_printf("Accept failed: %v\n", acceptErr)
 
 				continue
+			}
+
+			if ctx.Err() != nil {
+				// Cancelled while this connection sat in the accept queue:
+				// the kernel completes a connection whether or not anybody
+				// is still listening.  Hang up rather than attach a client
+				// nothing will ever read from.
+				conn.Close()
+
+				return
 			}
 
 			agwClientAccepted(client, conn)
 
 			text_color_set(DW_COLOR_INFO)
 			dw_printf("\nAttached to AGW client application %d...\n\n", client)
-		} else {
-			SLEEP_SEC(1) /* wait then check again if more clients allowed. */
+		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
+			return
 		}
 	}
 }
@@ -955,24 +969,83 @@ func send_to_client(client int, reply_p *AGWPEMessage) {
 	reply_p.Write(client_sock[client], binary.LittleEndian)
 }
 
-func cmd_listen_thread(client int) {
+// detachAGWClient hangs up on a client, gives its slot back, and tells the
+// data link machinery that it has gone.  The slot is only cleared if it still
+// holds conn, so a newer connection that has already been accepted into it
+// isn't clobbered by a thread on its way out.
+func detachAGWClient(client int, conn net.Conn) {
+	conn.Close()
+
+	if client_sock[client] == conn {
+		client_sock[client] = nil
+	}
+
+	dlq_client_cleanup(client)
+}
+
+// readCommandData reads an AGW message's data part, if it has one, into
+// cmd.Data.  It returns how many bytes it read, so a caller can tell a short
+// read from a complete one, and reads nothing at all for a message whose
+// header says it has no data.
+func readCommandData(conn net.Conn, cmd *AGWPEMessage) (int, error) {
+	if cmd.Header.DataLen == 0 {
+		return 0, nil
+	}
+
+	var b = make([]byte, cmd.Header.DataLen)
+
+	var n, readErr = conn.Read(b)
+	if readErr != nil {
+		return n, readErr
+	}
+
+	cmd.Data = b[:n]
+
+	return n, nil
+}
+
+func cmd_listen_thread(ctx context.Context, client int) {
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
-	for {
+	for ctx.Err() == nil {
 		for client_sock[client] == nil {
-			SLEEP_SEC(1) /* Not connected.  Try again later. */
+			if !sleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
+				return
+			}
 		}
 
 		var cmd = new(AGWPEMessage)
 
-		var readErr = binary.Read(client_sock[client], binary.LittleEndian, &cmd.Header)
+		var conn = client_sock[client]
+		if conn == nil {
+			continue // It went away between the check above and here.
+		}
+
+		// A client that says nothing, or sends a header and then stops
+		// halfway through its data, leaves the reads below blocked
+		// indefinitely, so closing its socket is what gets us back.  It stays
+		// armed until the whole message has been read, since either read can
+		// be the one that never returns.
+		var stopClose = closeOnDone(ctx, conn)
+
+		var readErr = binary.Read(conn, binary.LittleEndian, &cmd.Header)
+
 		if readErr != nil {
+			stopClose()
+
+			if ctx.Err() != nil {
+				// Hang up rather than leave a client attached to a thread
+				// that has gone, and with connected mode still believing it
+				// is there.
+				detachAGWClient(client, conn)
+
+				return
+			}
+
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
 			dw_printf("Closing connection.\n\n")
-			client_sock[client].Close()
-			client_sock[client] = nil
-			dlq_client_cleanup(client)
+			detachAGWClient(client, conn)
 
 			continue
 		}
@@ -995,23 +1068,24 @@ func cmd_listen_thread(client int) {
 		cmd.Header.CallFrom[len(cmd.Header.CallFrom)-1] = 0
 		cmd.Header.CallTo[len(cmd.Header.CallTo)-1] = 0
 
-		if cmd.Header.DataLen > 0 {
-			var b = make([]byte, cmd.Header.DataLen)
-			var n, readErr = client_sock[client].Read(b)
+		var n, dataErr = readCommandData(conn, cmd)
 
-			if n != int(cmd.Header.DataLen) || readErr != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("\nError getting message data from AGW client application %d: %s\n", client, readErr)
-				dw_printf("Tried to read %d bytes, got %d.\n", cmd.Header.DataLen, n)
-				dw_printf("Closing connection.\n\n")
-				client_sock[client].Close()
-				client_sock[client] = nil
-				dlq_client_cleanup(client)
+		stopClose()
 
-				return
-			}
+		if ctx.Err() != nil {
+			detachAGWClient(client, conn) // As above.
 
-			cmd.Data = b
+			return
+		}
+
+		if n != int(cmd.Header.DataLen) || dataErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("\nError getting message data from AGW client application %d: %s\n", client, dataErr)
+			dw_printf("Tried to read %d bytes, got %d.\n", cmd.Header.DataLen, n)
+			dw_printf("Closing connection.\n\n")
+			detachAGWClient(client, conn)
+
+			return
 		}
 
 		/*

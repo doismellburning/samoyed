@@ -392,7 +392,7 @@ func (g *TTGateway) Button(channel int, button rune) {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) Sequence(channel int, msg string) {
+func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	logrus.WithField("msg", msg).Debug("aprs_tt Sequence")
 
 	/*
@@ -451,7 +451,7 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	var script_response string
 
 	if err == 0 && len(g.config.ttcmd) > 0 {
-		var _script_response, _ = dw_run_cmd(g.config.ttcmd, 1)
+		var _script_response, _ = dw_run_cmd(ctx, g.config.ttcmd, 1)
 		script_response = string(_script_response)
 	}
 
@@ -1685,7 +1685,7 @@ func raw_tt_data_to_app(channel int, msg string) {
  *
  *----------------------------------------------------------------*/
 
-func dw_run_cmd(cmd string, oneline int) ([]byte, error) {
+func dw_run_cmd(ctx context.Context, cmd string, oneline int) ([]byte, error) {
 	if oneline > 0 {
 		cmd = strings.ReplaceAll(cmd, "\r", " ")
 		cmd = strings.ReplaceAll(cmd, "\n", " ")
@@ -1696,7 +1696,7 @@ func dw_run_cmd(cmd string, oneline int) ([]byte, error) {
 		cmd = strings.TrimSpace(cmd)
 	}
 
-	return exec.CommandContext(context.Background(), cmd).Output()
+	return exec.CommandContext(ctx, cmd).Output()
 }
 
 /* end aprs_tt.c */

@@ -143,7 +143,7 @@ func TestStartReportsBindFailureSynchronously(t *testing.T) {
 
 	var port = blocker.Addr().(*net.TCPAddr).Port //nolint:forcetypeassert
 
-	var errCh, startErr = Start(port)
+	var errCh, startErr = Start(t.Context(), port)
 
 	require.Error(t, startErr, "a port already in use must fail before Start returns")
 	assert.Nil(t, errCh)
@@ -152,7 +152,7 @@ func TestStartReportsBindFailureSynchronously(t *testing.T) {
 func TestStartServesMetrics(t *testing.T) {
 	var port = freePort(t)
 
-	var errCh, startErr = Start(port)
+	var errCh, startErr = Start(t.Context(), port)
 
 	require.NoError(t, startErr)
 	require.NotNil(t, errCh)

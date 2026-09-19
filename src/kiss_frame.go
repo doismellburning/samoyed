@@ -153,6 +153,11 @@ type kissport_status_s struct {
 
 	kf [MAX_NET_CLIENTS]*KISSFrame
 	/* Accumulated KISS frame and state of decoder. */
+
+	// Set by stop, and guarded by mu along with everything above, so that a
+	// connection accepted at the same moment cannot be attached after the
+	// hanging up has been and gone.
+	stopped bool
 }
 
 // clientConn returns the currently connected socket for client, or nil if
@@ -169,12 +174,23 @@ func (kps *kissport_status_s) clientConn(client int) net.Conn {
 // This ensures listenThread can never observe a "live" socket for client
 // paired with decoder state left over from a previous connection, or from
 // another client's slot.
-func (kps *kissport_status_s) attachClient(client int, conn net.Conn) {
+//
+// It returns false, having attached nothing, once the port has been stopped:
+// the connection is then the caller's to close.  A connection completed by the
+// kernel sits in the listening socket's accept queue whether or not anybody is
+// still listening, so this can be the first anyone hears of it.
+func (kps *kissport_status_s) attachClient(client int, conn net.Conn) bool {
 	kps.mu.Lock()
 	defer kps.mu.Unlock()
 
+	if kps.stopped {
+		return false
+	}
+
 	kps.kf[client] = new(KISSFrame)
 	kps.client_sock[client] = conn
+
+	return true
 }
 
 // detachClientIfCurrent clears client's socket, but only if it still equals
@@ -208,6 +224,27 @@ func (kps *kissport_status_s) findFreeClient() int {
 	}
 
 	return -1
+}
+
+// stop hangs up on every attached client and refuses any further attachment.
+//
+// A client whose TNC is shutting down should find its connection closed there
+// and then, rather than holding one that will never say anything again; and
+// the per-client read goroutines only close the socket they are actually
+// blocked on, which leaves a client that connected while one of them was
+// between reads still attached.
+func (kps *kissport_status_s) stop() {
+	kps.mu.Lock()
+	defer kps.mu.Unlock()
+
+	kps.stopped = true
+
+	for c := range MAX_NET_CLIENTS {
+		if kps.client_sock[c] != nil {
+			kps.client_sock[c].Close()
+			kps.client_sock[c] = nil
+		}
+	}
 }
 
 // connAndFrame returns client's currently connected socket (or nil) together

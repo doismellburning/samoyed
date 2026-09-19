@@ -83,7 +83,11 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
-import "github.com/sirupsen/logrus"
+import (
+	"context"
+
+	"github.com/sirupsen/logrus"
+)
 
 var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
 
@@ -94,7 +98,9 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  * Purpose:     Start up a thread for each audio device.
  *
  *
- * Inputs:      pa		- Address of structure of type audio_s.
+ * Inputs:      ctx		- Stops the device threads when cancelled.
+ *
+ *		pa		- Address of structure of type audio_s.
  *
  *
  * Returns:     A channel reporting the number of any audio device whose
@@ -103,7 +109,7 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  *
  *----------------------------------------------------------------*/
 
-func recv_init(pa *audio_s) <-chan int {
+func recv_init(ctx context.Context, pa *audio_s) <-chan int {
 	save_pa = pa
 
 	// Buffered so that a failing device thread can report and finish even
@@ -112,14 +118,22 @@ func recv_init(pa *audio_s) <-chan int {
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
-			go recv_adev_thread(a, failed)
+			go recv_adev_thread(ctx, a, failed)
 		}
 	}
 
 	return failed
 } /* end recv_init */
 
-func recv_adev_thread(a int, failed chan<- int) {
+// recv_adev_thread reads one audio device until its input fails or ctx is
+// cancelled.
+//
+// A cancellation is noticed between samples rather than during one:
+// demod_get_sample is a blocking read of the audio device, and interrupting
+// that would mean tearing the device down underneath the demodulator.  A
+// device delivering samples at all therefore stops promptly; one that has gone
+// quiet without failing outright holds the goroutine until it says something.
+func recv_adev_thread(ctx context.Context, a int, failed chan<- int) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 	var first_chan = ADEVFIRSTCHAN(a)
@@ -129,7 +143,7 @@ func recv_adev_thread(a int, failed chan<- int) {
 	 * Get sound samples and decode them.
 	 */
 	var eof = false
-	for !eof {
+	for !eof && ctx.Err() == nil {
 		for c := range num_chan {
 			var audio_sample = demod_get_sample(a)
 
@@ -174,6 +188,11 @@ func recv_adev_thread(a int, failed chan<- int) {
 		/* recv_process, below, drains the queue. */
 	} // while !eof on audio stream
 
+	if ctx.Err() != nil {
+		// Shutting down, so the device didn't fail - nothing to report.
+		return
+	}
+
 	// What should we do now?
 	// Simply terminate the application?
 	// Try to re-init the audio device a couple times before giving up?
@@ -181,11 +200,18 @@ func recv_adev_thread(a int, failed chan<- int) {
 	failed <- a
 }
 
-func recv_process() {
-	for {
+// recv_process drains the received data queue until ctx is cancelled.
+func recv_process(ctx context.Context) {
+	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 
-		var timed_out = dlq_wait_while_empty(timeout_value)
+		var timed_out = dlq_wait_while_empty(ctx, timeout_value)
+
+		if ctx.Err() != nil {
+			// Cancelled rather than woken by an item, so there is nothing
+			// on the queue to process and no timer to expire.
+			return
+		}
 
 		if timed_out {
 			dl_timer_expiry()
@@ -206,7 +232,7 @@ func recv_process() {
 					 *	- Send to Igate.
 					 *	- Digipeater.
 					 */
-					app_process_rec_packet(pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
+					app_process_rec_packet(ctx, pitem._chan, pitem.subchan, pitem.slice, pitem.pp, pitem.alevel, pitem.fec_type, pitem.retries, pitem.spectrum)
 
 					/*
 					 * Link processing.

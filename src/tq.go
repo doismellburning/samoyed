@@ -17,6 +17,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -94,7 +95,7 @@ var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
 
 // TODO KG static struct audio_s *save_audio_config_p;
 
-func tq_init(audio_config_p *audio_s) {
+func tq_init(ctx context.Context, audio_config_p *audio_s) {
 	logrus.Debug("tq_init")
 	save_audio_config_p = audio_config_p
 
@@ -116,9 +117,41 @@ func tq_init(audio_config_p *audio_s) {
 		xmit_thread_is_waiting[c] = false
 
 		if audio_config_p.chan_medium[c] == MEDIUM_RADIO {
-			wake_up_cond[c] = sync.NewCond(&wake_up_mutex[c])
+			// Once a channel has a condition variable it keeps it, rather
+			// than getting a fresh one on a later init.  A transmit thread
+			// waiting on the old one would not be woken by a signal or a
+			// broadcast to its replacement, and would sit there for good.
+			//
+			// Under the mutex because the cancellation broadcast below reads
+			// this, and an earlier context outliving the init that registered
+			// it can have it running while we are here.
+			wake_up_mutex[c].Lock()
+
+			if wake_up_cond[c] == nil {
+				wake_up_cond[c] = sync.NewCond(&wake_up_mutex[c])
+			}
+
+			wake_up_mutex[c].Unlock()
 		}
 	}
+
+	// A transmit thread with nothing to send is parked in a condition
+	// variable wait, which no cancellation can reach on its own.  Wake all of
+	// them when ctx is cancelled so each can notice and return.  The broadcast
+	// takes the same mutex tq_wait_while_empty holds while it decides whether
+	// to wait, so a cancellation cannot slip through the gap between that
+	// decision and the wait itself.
+	context.AfterFunc(ctx, func() {
+		for c := range MAX_RADIO_CHANS {
+			wake_up_mutex[c].Lock()
+
+			if wake_up_cond[c] != nil {
+				wake_up_cond[c].Broadcast()
+			}
+
+			wake_up_mutex[c].Unlock()
+		}
+	})
 } /* end tq_init */
 
 /*-------------------------------------------------------------------
@@ -617,14 +650,18 @@ func lm_seize_request(channel int) {
  * Purpose:     Sleep while the transmit queue is empty rather than
  *		polling periodically.
  *
- * Inputs:	channel	- Audio device number.
+ * Inputs:	ctx	- Return when this is cancelled, rather than waiting
+ *			  for a packet that may never come.  The caller is
+ *			  expected to check it and stop.
+ *
+ *		channel	- Audio device number.
  *
  * Description:	We have one transmit thread for each audio device.
  *		This handles 1 or 2 channels.
  *
  *--------------------------------------------------------------------*/
 
-func tq_wait_while_empty(channel int) {
+func tq_wait_while_empty(ctx context.Context, channel int) {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: enter critical section")
 	}
@@ -651,9 +688,15 @@ func tq_wait_while_empty(channel int) {
 		}
 
 		wake_up_mutex[channel].Lock()
-		xmit_thread_is_waiting[channel] = true
-		wake_up_cond[channel].Wait()
-		xmit_thread_is_waiting[channel] = false
+
+		// tq_init's cancellation broadcast takes this mutex, so checking
+		// here rather than before the lock means we cannot decide to wait
+		// for a broadcast that has already been and gone.
+		if ctx.Err() == nil {
+			xmit_thread_is_waiting[channel] = true
+			wake_up_cond[channel].Wait()
+			xmit_thread_is_waiting[channel] = false
+		}
 
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: WOKE UP - returned from cond wait")

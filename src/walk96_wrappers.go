@@ -4,14 +4,18 @@ package direwolf
 // which was moved out of this package but still needs access to a few
 // unexported GPS internals.
 
-import "github.com/doismellburning/samoyed/internal/maybe"
+import (
+	"context"
+
+	"github.com/doismellburning/samoyed/internal/maybe"
+)
 
 // DWGPSInit is a wrapper around dwgps_init, without exposing misc_config_s.
-func DWGPSInit(gpsnmeaPort string, debug int) {
+func DWGPSInit(ctx context.Context, gpsnmeaPort string, debug int) {
 	var config misc_config_s
 	config.gpsnmea_port = gpsnmeaPort
 
-	dwgps_init(&config, debug)
+	dwgps_init(ctx, &config, debug)
 }
 
 // DWGPSRead is a wrapper around dwgps_read, without exposing dwgps_info_t.

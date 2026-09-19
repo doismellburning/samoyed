@@ -9,6 +9,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -270,12 +271,14 @@ func (bs *BeaconService) SetDebug(level int) {
  *
  * Purpose:     Start the beacon thread.
  *
+ * Inputs:	ctx	- Stops the beacon thread when cancelled.
+ *
  * Description:	Call after all configuration (e.g. SetDebug) is done.
  *		Starts the goroutine only if at least one beacon is valid.
  *
  *--------------------------------------------------------------------*/
 
-func (bs *BeaconService) Start() {
+func (bs *BeaconService) Start(ctx context.Context) {
 	var count = 0
 
 	for j := range bs.miscConfig.num_beacons {
@@ -285,7 +288,7 @@ func (bs *BeaconService) Start() {
 	}
 
 	if count >= 1 {
-		go bs.thread()
+		go bs.thread(ctx)
 	}
 }
 
@@ -309,7 +312,7 @@ func IS_GOOD(x int) bool {
  *
  *--------------------------------------------------------------------*/
 
-func (bs *BeaconService) thread() {
+func (bs *BeaconService) thread(ctx context.Context) {
 	/*
 	 * SmartBeaconing state.
 	 */
@@ -330,7 +333,11 @@ func (bs *BeaconService) thread() {
 	var sb_prev_time time.Time              /* Time of most recent transmission. */
 	var sb_prev_course maybe.Maybe[float64] /* Most recent course reported. */
 
-	for {
+	// The sleep below is where this thread spends nearly all of its life, but
+	// not all of it: a beacon that is already overdue - a short EVERY, or a
+	// stall - goes round without sleeping at all, and would otherwise carry on
+	// transmitting throughout a shutdown.
+	for ctx.Err() == nil {
 		/*
 		 * Sleep until time for the earliest scheduled or
 		 * the soonest we could transmit due to corner pegging.
@@ -359,7 +366,11 @@ func (bs *BeaconService) thread() {
 		}
 
 		if earliest.After(now) {
-			SLEEP_SEC(int(earliest.Sub(now).Seconds()))
+			// Almost all of a beacon thread's life is spent here, so this
+			// is where a cancellation has to reach it.
+			if !sleepCtx(ctx, earliest.Sub(now)) {
+				return
+			}
 		}
 
 		/*
@@ -433,7 +444,7 @@ func (bs *BeaconService) thread() {
 
 			if !bp.next.After(now) {
 				/* Send the beacon. */
-				bs.send(j, &gpsinfo)
+				bs.send(ctx, j, &gpsinfo)
 
 				/* Calculate when the next one should be sent. */
 				/* Easy for fixed interval.  SmartBeaconing takes more effort. */
@@ -659,7 +670,7 @@ func beaconAltitudeFeet(alt_m maybe.Maybe[float64]) maybe.Maybe[int] {
  *
  *--------------------------------------------------------------------*/
 
-func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
+func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t) {
 	var bp = &(bs.miscConfig.beacon[j])
 
 	if bp.sendto_chan < 0 {
@@ -734,7 +745,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 
 	if bp.commentcmd != "" {
 		/* Run given command to get variable part of comment. */
-		var var_comment, k = dw_run_cmd(bp.commentcmd, 2)
+		var var_comment, k = dw_run_cmd(ctx, bp.commentcmd, 2)
 		if k == nil {
 			super_comment += string(var_comment)
 		} else {
@@ -833,7 +844,7 @@ func (bs *BeaconService) send(j int, gpsinfo *dwgps_info_t) {
 			beacon_text += bp.custom_info
 		} else if bp.custom_infocmd != "" {
 			/* Run given command to obtain the info part for packet. */
-			var info_part, k = dw_run_cmd(bp.custom_infocmd, 2)
+			var info_part, k = dw_run_cmd(ctx, bp.custom_infocmd, 2)
 			if k == nil {
 				beacon_text += string(info_part)
 			} else {

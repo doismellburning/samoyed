@@ -30,6 +30,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -114,14 +115,14 @@ var s_gps_mutex sync.Mutex
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_init(pconfig *misc_config_s, debug int) {
+func dwgps_init(ctx context.Context, pconfig *misc_config_s, debug int) {
 	dwgps_set_data(new(dwgps_info_t)) // Init the global
 
 	s_dwgps_debug = debug
 
-	dwgpsnmea_init(pconfig, debug)
+	dwgpsnmea_init(ctx, pconfig, debug)
 
-	dwgpsd_init(pconfig, debug)
+	dwgpsd_init(ctx, pconfig, debug)
 
 	SLEEP_MS(500) /* So receive thread(s) can clear the */
 	/* not init status before it gets checked. */
