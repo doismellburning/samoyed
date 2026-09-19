@@ -91,8 +91,8 @@ type tt_user_s struct {
 	latitude, longitude float64 /* Location either from user or generated */
 	/* position in the corral. */
 
-	ambiguity int /* Number of digits to omit from location. */
-	/* Default 0, max. 4. */
+	ambiguity maybe.Maybe[int] /* Number of digits to omit from location. */
+	/* Max. 4; Nothing until a message says otherwise. */
 
 	freq string /* Frequency in format 999.999MHz */
 
@@ -371,7 +371,7 @@ func digit_suffix(callsign string) string {
  *----------------------------------------------------------------*/
 
 func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude float64,
-	longitude float64, ambiguity int, freq string, ctcss string, comment string, mic_e rune, dao string) int {
+	longitude float64, ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_heard (%s, %d, %c, %c, %s, ...)\n", callsign, ssid, overlay, symbol, loc_text);
 
@@ -452,9 +452,7 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 			tt_user[i].longitude = longitude
 		}
 
-		if ambiguity != G_UNKNOWN {
-			tt_user[i].ambiguity = ambiguity
-		}
+		tt_user[i].ambiguity = ambiguity.Or(tt_user[i].ambiguity)
 
 		if freq != "" {
 			tt_user[i].freq = freq
@@ -616,10 +614,7 @@ func xmit_object_report(i int, first_time bool) {
 		olat = tt_user[i].latitude
 		olong = tt_user[i].longitude
 
-		oambig = tt_user[i].ambiguity
-		if oambig == G_UNKNOWN {
-			oambig = 0
-		}
+		oambig = maybe.FromMaybe(0, tt_user[i].ambiguity)
 	} else {
 		/*
 		 * Use made up position in the corral.

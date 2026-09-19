@@ -34,6 +34,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/tzneal/coordconv"
 )
 
@@ -237,7 +238,7 @@ type ttParseState struct {
 	locText         string
 	longitude       float64 /* Set to G_UNKNOWN if not defined. */
 	latitude        float64 /* Set to G_UNKNOWN if not defined. */
-	ambiguity       int
+	ambiguity       maybe.Maybe[int]
 	comment         string
 	freq            string
 	ctcss           string
@@ -1416,7 +1417,8 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				return (TT_ERROR_INVALID_LOC)
 			}
 
-			state.ambiguity, _ = strconv.Atoi(xstr)
+			var ambiguity, _ = strconv.Atoi(xstr)
+			state.ambiguity = maybe.Just(ambiguity)
 
 		default:
 			panic(fmt.Sprintf("Unknown ttloc type: %d", ttloc_type))
