@@ -83,6 +83,8 @@ package direwolf
  *
  *---------------------------------------------------------------*/
 
+import "github.com/sirupsen/logrus"
+
 var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
 
 /*------------------------------------------------------------------
@@ -231,10 +233,8 @@ func recv_process() {
 				}
 
 				dlq_delete(pitem)
-			} else { //nolint:staticcheck
-				// TODO KG DEBUG
-				// text_color_set(DW_COLOR_DEBUG);
-				// dw_printf ("recv_process: spurious wakeup. (Temp debugging message - not a problem if only occasional.)\n");
+			} else {
+				logrus.Debug("recv_process: spurious wakeup. (Temp debugging message - not a problem if only occasional.)")
 			}
 		}
 	}

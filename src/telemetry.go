@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 const T_NUM_ANALOG = 5  /* Number of analog channels. */
@@ -80,12 +81,7 @@ func NewTelemetryState() *TelemetryState {
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) t_get_metadata(station string) *t_metadata_s {
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("t_get_metadata (station=%s)\n", station);
-	#endif
-	*/
+	logrus.WithField("station", station).Debug("t_get_metadata")
 	for p := ts.mdListHead; p != nil; p = p.pnext {
 		if station == p.station {
 			return (p)
@@ -186,13 +182,7 @@ func t_ndp(str string) int {
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) telemetry_data_original(station string, info string, quiet bool) (string, string) {
-	/* TODO KG
-	   #if DEBUG1
-	   	text_color_set(DW_COLOR_DEBUG);
-
-	   	dw_printf ("\n%s\n\n", info);
-	   #endif
-	*/
+	logrus.WithField("info", info).Debug("telemetry_data_original")
 	var pm = ts.t_get_metadata(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
@@ -310,17 +300,12 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
 	 * Now process the raw data with any metadata available.
 	 */
 
-	/* TODO KG
-	#if DEBUG1
-	text_color_set(DW_COLOR_DECODED)
-
-	dw_printf("%d: %.3f %.3f %.3f %.3f %.3f \n",
-		seq, araw[0], araw[1], araw[2], araw[3], araw[4])
-
-	dw_printf("%d %d %d %d %d %d %d %d \"%s\"\n",
-		draw[0], draw[1], draw[2], draw[3], draw[4], draw[5], draw[6], draw[7], C.GoString(comment))
-		#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"seq":     seq,
+		"araw":    araw,
+		"draw":    draw,
+		"comment": comment,
+	}).Debug("telemetry_data_original: raw data")
 
 	return t_data_process(pm, seq, araw, ndp, draw), comment
 } /* end telemtry_data_original */
@@ -344,13 +329,7 @@ func (ts *TelemetryState) telemetry_data_original(station string, info string, q
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) string {
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("\n%s\n\n", cdata);
-	#endif
-	*/
+	logrus.WithField("cdata", cdata).Debug("telemetry_data_base91")
 	var pm = ts.t_get_metadata(station)
 
 	// The zero value of a Maybe is Nothing, so an unreported channel needs no
@@ -395,18 +374,11 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
 	 * Now process the raw data with any metadata available.
 	 */
 
-	/* TODO KG
-	#if DEBUG2
-		text_color_set(DW_COLOR_DECODED);
-
-		dw_printf ("%d: %.3f %.3f %.3f %.3f %.3f \n",
-			seq, araw[0], araw[1], araw[2], araw[3], araw[4]);
-
-		dw_printf ("%d %d %d %d %d %d %d %d \n",
-			draw[0], draw[1], draw[2], draw[3], draw[4], draw[5], draw[6], draw[7]);
-
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"seq":  seq,
+		"araw": araw,
+		"draw": draw,
+	}).Debug("telemetry_data_base91: raw data")
 
 	return t_data_process(pm, seq, araw, ndp, draw)
 } /* end telemtry_data_base91 */
@@ -436,13 +408,7 @@ func (ts *TelemetryState) telemetry_data_base91(station string, cdata string) st
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("\n%s\n\n", msg);
-	#endif
-	*/
+	logrus.WithField("msg", msg).Debug("telemetry_name_message")
 	msg = strings.TrimSpace(msg)
 
 	var pm = ts.t_get_metadata(station)
@@ -456,16 +422,7 @@ func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("names:\n");
-		for (n = 0; n < T_NUM_ANALOG + T_NUM_DIGITAL; n++) {
-		  dw_printf ("%d=\"%s\"\n", n, pm.name[n]);
-		}
-	#endif
-	*/
+	logrus.WithField("name", pm.name).Debug("names")
 } /* end telemetry_name_message */
 
 /*-------------------------------------------------------------------
@@ -490,13 +447,7 @@ func (ts *TelemetryState) telemetry_name_message(station string, msg string) {
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) telemetry_unit_label_message(station string, msg string) {
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("\n%s\n\n", msg);
-	#endif
-	*/
+	logrus.WithField("msg", msg).Debug("telemetry_unit_label_message")
 
 	/*
 	 * Make a copy of the input string because this will alter it.
@@ -513,16 +464,7 @@ func (ts *TelemetryState) telemetry_unit_label_message(station string, msg strin
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("units/labels:\n");
-		for (n = 0; n < T_NUM_ANALOG + T_NUM_DIGITAL; n++) {
-		  dw_printf ("%d=\"%s\"\n", n, pm.unit[n]);
-		}
-	#endif
-	*/
+	logrus.WithField("unit", pm.unit).Debug("units/labels")
 } /* end telemetry_unit_label_message */
 
 /*-------------------------------------------------------------------
@@ -591,19 +533,10 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
 		}
 	}
 
-	/* TODO KG
-	   #if DEBUG3
-	   	text_color_set(DW_COLOR_DEBUG);
-
-	   	dw_printf ("coeff:\n");
-	   	for (n = 0; n < T_NUM_ANALOG; n++) {
-	   	  dw_printf ("A%d  a=%.*f  b=%.*f  c=%.*f\n", n+1,
-	   			pm.coeff_ndp[n][C_A], pm.coeff[n][C_A],
-	   			pm.coeff_ndp[n][C_B], pm.coeff[n][C_B],
-	   			pm.coeff_ndp[n][C_C], pm.coeff[n][C_C]);
-	   	}
-	   #endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"coeff":     pm.coeff,
+		"coeff_ndp": pm.coeff_ndp,
+	}).Debug("coeff")
 } /* end telemetry_coefficents_message */
 
 /*-------------------------------------------------------------------
@@ -627,13 +560,7 @@ func (ts *TelemetryState) telemetry_coefficents_message(station string, msg stri
  *--------------------------------------------------------------------*/
 
 func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string, quiet bool) {
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("\n%s\n\n", msg);
-	#endif
-	*/
+	logrus.WithField("msg", msg).Debug("telemetry_bit_sense_message")
 	var pm = ts.t_get_metadata(station)
 
 	if len(msg) < 8 {
@@ -675,23 +602,10 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
 
 	pm.project = msg[n:]
 
-	/* TODO KG
-	#if DEBUG3
-		text_color_set(DW_COLOR_DEBUG);
-
-		dw_printf ("bit sense, project:\n");
-		dw_printf ("%d %d %d %d %d %d %d %d \"%s\"\n",
-			pm.sense[0],
-			pm.sense[1],
-			pm.sense[2],
-			pm.sense[3],
-			pm.sense[4],
-			pm.sense[5],
-			pm.sense[6],
-			pm.sense[7],
-			pm.project);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"sense":   pm.sense,
+		"project": pm.project,
+	}).Debug("bit sense, project")
 } /* end telemetry_bit_sense_message */
 
 /*-------------------------------------------------------------------
@@ -771,13 +685,11 @@ func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]m
 		}
 	}
 
-	return output.String()
+	var result = output.String()
 
-	/* TODO KG
-	#if DEBUG4
-		text_color_set(DW_COLOR_DEBUG);
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		logrus.WithField("output", result).Debug("t_data_process")
+	}
 
-		dw_printf ("%s\n", output);
-	#endif
-	*/
+	return result
 } /* end t_data_process */

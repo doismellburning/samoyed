@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/sirupsen/logrus"
 )
 
 const DEFAULT_IGATE_PORT = 14580
@@ -234,17 +235,12 @@ func igate_init(p_audio_config *audio_s, p_igate_config *igate_config_s, p_digi_
 	s_debug = debug_level
 	dp_queue_head = nil
 
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("igate_init ( %s, %d, %s, %s, %s )\n",
-					p_igate_config.t2_server_name,
-					p_igate_config.t2_server_port,
-					p_igate_config.t2_login,
-					p_igate_config.t2_passcode,
-					p_igate_config.t2_filter);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t2_server_name": p_igate_config.t2_server_name,
+		"t2_server_port": p_igate_config.t2_server_port,
+		"t2_login":       p_igate_config.t2_login,
+		"t2_filter":      p_igate_config.t2_filter,
+	}).Debug("igate_init")
 
 	/*
 	 * Save the arguments for later use.
@@ -334,12 +330,7 @@ func igate_dial(server_name string, server_port int) (net.Conn, error) {
 }
 
 func connect_thread() {
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-	        dw_printf ("DEBUG: igate connect_thread start, port = %d = '%s'\n", save_igate_config_p.t2_server_port, server_port_str);
-	#endif
-	*/
+	logrus.WithField("port", save_igate_config_p.t2_server_port).Debug("igate connect_thread start")
 	var server_name = save_igate_config_p.t2_server_name
 
 	/*
@@ -853,16 +844,10 @@ func get1ch() byte {
 		var n, _ = igate_sock.Read(ch)
 
 		if n == 1 {
-			/* TODO KG
-			#if DEBUG9
-				    dw_printf (log_fp, "%02x %c %c", ch,
-						isprint(ch) ? ch : '.' ,
-						(isupper(ch>>1) || isdigit(ch>>1) || (ch>>1) == ' ') ? (ch>>1) : '.');
-				    if (ch == '\r') fprintf (log_fp, "  CR");
-				    if (ch == '\n') fprintf (log_fp, "  LF");
-				    fprintf (log_fp, "\n");
-			#endif
-			*/
+			if logrus.IsLevelEnabled(logrus.DebugLevel) {
+				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Debug("get1ch")
+			}
+
 			return (ch[0])
 		}
 
@@ -886,12 +871,7 @@ func get1ch() byte {
  *--------------------------------------------------------------------*/
 
 func igate_recv_thread() {
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("igate_recv_thread ( socket = %d )\n", igate_sock);
-	#endif
-	*/
+	logrus.Debug("igate_recv_thread")
 	for {
 		var message []byte
 
@@ -1409,12 +1389,7 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 	var dest = ax25_get_addr_with_ssid(pp3, AX25_DESTINATION)
 	var payload = fmt.Sprintf("%s>%s,TCPIP,%s*:%s", string(src), dest, save_audio_config_p.mycall[to_chan], pinfo)
 
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("Tx IGate: DEBUG payload=%s\n", payload);
-	#endif
-	*/
+	logrus.WithField("payload", payload).Debug("Tx IGate")
 
 	/*
 	 * Encapsulate for sending over radio if no reason to drop it.

@@ -1,7 +1,10 @@
 //nolint:gochecknoglobals
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/fcs"
+import (
+	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
+)
 
 var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hdlc_send_frame" or "hdlc_send_flags"
 
@@ -73,13 +76,11 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 	number_of_bits_sent[channel] = 0
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("hdlc_send_frame ( channel = %d, fbuf = %p, flen = %d, bad_fcs = %d)\n", channel, fbuf, flen, bad_fcs);
-		fflush (stdout);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"flen":    len(fbuf),
+		"bad_fcs": bad_fcs,
+	}).Debug("hdlc_send_frame")
 
 	send_control_nrzi(channel, 0x7e) /* Start frame */
 
@@ -136,13 +137,11 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
 func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_config_p *audio_s) int {
 	number_of_bits_sent[channel] = 0
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("hdlc_send_flags ( channel = %d, nflags = %d, finish = %d )\n", channel, nflags, finish);
-		fflush (stdout);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"nbytes":  nbytes,
+		"finish":  finish,
+	}).Debug("layer2_preamble_postamble")
 
 	// When the transmitter is on but not sending data, it should be sending
 	// a stream of a filler pattern.

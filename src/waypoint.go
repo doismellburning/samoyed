@@ -16,6 +16,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
+	"github.com/sirupsen/logrus"
 )
 
 type WaypointSender struct {
@@ -55,13 +56,12 @@ type WaypointSender struct {
  *---------------------------------------------------------------*/
 
 func NewWaypointSender(mc *misc_config_s) (*WaypointSender, error) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set (DW_COLOR_DEBUG);
-		dw_printf ("waypoint_init() serial device=%s formats=%02x\n", mc.waypoint_serial_port, mc.waypoint_formats);
-		dw_printf ("waypoint_init() destination hostname=%s UDP port=%d\n", mc.waypoint_udp_hostname, mc.waypoint_udp_portnum);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"serial_device": mc.waypoint_serial_port,
+		"formats":       mc.waypoint_formats,
+		"udp_hostname":  mc.waypoint_udp_hostname,
+		"udp_port":      mc.waypoint_udp_portnum,
+	}).Debug("waypoint_init")
 	var ws = &WaypointSender{} //nolint:exhaustruct_v5
 
 	var udpRequested = mc.waypoint_udp_portnum > 0
@@ -205,12 +205,10 @@ func appendChecksum(sentence []byte) []byte {
 
 func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float64, symtab rune, symbol byte,
 	alt maybe.Maybe[float64], course maybe.Maybe[float64], speed maybe.Maybe[float64], comment_in string) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set (DW_COLOR_DEBUG);
-		dw_printf ("waypoint_send_sentence (\"%s\", \"%c%c\")\n", name_in, symtab, symbol);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"name":   name_in,
+		"symbol": string([]rune{symtab, rune(symbol)}),
+	}).Debug("waypoint_send_sentence")
 
 	// Don't waste time if no destinations specified.
 	if ws.serialPortFd == nil && ws.udpSock == nil {

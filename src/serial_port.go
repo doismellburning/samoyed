@@ -7,7 +7,10 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"fmt"
+
 	"github.com/pkg/term"
+	"github.com/sirupsen/logrus"
 )
 
 /*-------------------------------------------------------------------
@@ -29,12 +32,7 @@ import (
  *---------------------------------------------------------------*/
 
 func SerialPortOpen(devicename string, baud int) *term.Term {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("SerialPortOpen ( '%s' )\n", devicename);
-	#endif
-	*/
+	logrus.WithField("devicename", devicename).Debug("SerialPortOpen")
 
 	/* Translate Windows device name into Linux name. */
 	/* COM1 -> /dev/ttyS0, etc. */
@@ -142,17 +140,9 @@ func SerialPortGet1(fd *term.Term) (byte, error) {
 		return 0, err
 	}
 
-	/* TODO KG
-	   #if DEBUGx
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	if (isprint(ch)) {
-	   	  dw_printf ("SerialPortGet1(%d) returns 0x%02x = '%c'\n", fd, ch, ch);
-	   	}
-	   	else {
-	   	  dw_printf ("SerialPortGet1(%d) returns 0x%02x\n", fd, ch);
-	   	}
-	   #endif
-	*/
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		logrus.WithField("ch", fmt.Sprintf("0x%02x", bytes[0])).Debug("SerialPortGet1")
+	}
 
 	return bytes[0], nil
 }

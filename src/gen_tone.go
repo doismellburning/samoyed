@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"math"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Properties of the digitized sound stream & modem.
@@ -206,13 +208,10 @@ func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
  *----------------------------------------------------------------*/
 
 func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //nolint:unparam
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("gen_tone_init ( audio_config_p=%p, amp=%d, gen_packets=%d )\n",
-				audio_config_p, amp, gen_packets);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"amp":         amp,
+		"gen_packets": gen_packets,
+	}).Debug("gen_tone_init")
 
 	/*
 	 * Save away modem parameters for later use.
@@ -451,13 +450,6 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 		switch audioConfig.achan[tg.channel].modem_type {
 		case MODEM_AFSK:
-			/* TODO KG
-			#if DEBUG2
-				      text_color_set(DW_COLOR_DEBUG);
-				      dw_printf ("tone_gen_put_bit %d AFSK\n", __LINE__);
-			#endif
-			*/
-
 			// v1.7 reversed.
 			// Previously a data '1' selected the second (usually higher) tone.
 			// It never really mattered before because we were using NRZI.
@@ -488,12 +480,6 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			tg.PutSample(sam)
 
 		case MODEM_QPSK:
-			/* TODO KG
-			#if DEBUG2
-				      text_color_set(DW_COLOR_DEBUG);
-				      dw_printf ("tone_gen_put_bit %d PSK\n", __LINE__);
-			#endif
-			*/
 			tg.tonePhase += tg.f1ChangePerSample
 			/*
 				#if PSKIQ
@@ -533,12 +519,6 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			tg.PutSample(sam)
 
 		case MODEM_8PSK:
-			/* TODO KG
-			#if DEBUG2
-				      text_color_set(DW_COLOR_DEBUG);
-				      dw_printf ("tone_gen_put_bit %d PSK\n", __LINE__);
-			#endif
-			*/
 			tg.tonePhase += tg.f1ChangePerSample
 			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)

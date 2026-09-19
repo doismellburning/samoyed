@@ -149,6 +149,8 @@ import (
 	"fmt"
 	"net"
 	"syscall"
+
+	"github.com/sirupsen/logrus"
 )
 
 // KissNetService manages KISS protocol TCP socket connections.
@@ -436,21 +438,10 @@ func (kns *KissNetService) get(kps *kissport_status_s, client int) (byte, *KISSF
 		var n, _ = conn.Read(ch)
 
 		if n == 1 {
-			/* TODO KG
-			#if DEBUG9
-				    dw_printf (log_fp, "%02x %c %c", ch,
-					    isprint(ch) ? ch : '.' ,
-					    (isupper(ch>>1) || isdigit(ch>>1) || (ch>>1) == ' ') ? (ch>>1) : '.');
-				    if (ch == FEND) fprintf (log_fp, "  FEND");
-				    if (ch == FESC) fprintf (log_fp, "  FESC");
-				    if (ch == TFEND) fprintf (log_fp, "  TFEND");
-				    if (ch == TFESC) fprintf (log_fp, "  TFESC");
-				    if (ch == '\r') fprintf (log_fp, "  CR");
-				    if (ch == '\n') fprintf (log_fp, "  LF");
-				    fprintf (log_fp, "\n");
-				    if (ch == FEND) fflush (log_fp);
-			#endif
-			*/
+			if logrus.IsLevelEnabled(logrus.DebugLevel) {
+				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Debug("kissnet get")
+			}
+
 			return ch[0], frame
 		}
 
@@ -470,12 +461,10 @@ func (kns *KissNetService) get(kps *kissport_status_s, client int) (byte, *KISSF
 func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("kissnet_listen_thread ( tcp_port = %d, client = %d, socket fd = %d )\n", kps.tcp_port, client, kps.client_sock[client]);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"tcp_port": kps.tcp_port,
+		"client":   client,
+	}).Debug("kissnet_listen_thread")
 
 	// So why is SendRecPacket mentioned here for incoming from the client app?
 	// The logic exists for the serial port case where the client might think it is
@@ -495,12 +484,10 @@ func (kns *KissNetService) listenThread(kps *kissport_status_s, client int) {
 } /* end listenThread */
 
 func (kns *KissNetService) initOne(kps *kissport_status_s) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("kissnet_init ( tcp port %d, radio chan = %d )\n", kps.tcp_port, kps.chan);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"tcp_port": kps.tcp_port,
+		"channel":  kps.channel,
+	}).Debug("kissnet_init")
 	for client := range MAX_NET_CLIENTS {
 		kps.client_sock[client] = nil
 		kps.kf[client] = new(KISSFrame)
@@ -546,12 +533,7 @@ func (kns *KissNetService) initOne(kps *kissport_status_s) {
  *--------------------------------------------------------------------*/
 
 func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf("Binding to port %d ... \n", kps.tcp_port);
-	#endif
-	*/
+	logrus.WithField("tcp_port", kps.tcp_port).Debug("Binding to port")
 	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", kps.tcp_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -576,12 +558,7 @@ func (kns *KissNetService) connectListenThread(kps *kissport_status_s) {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-	 	dw_printf("opened KISS TCP socket as fd (%d) on port (%d) for stream i/o\n", listen_sock, ntohs(sockaddr.sin_port) );
-	#endif
-	*/
+	logrus.WithField("tcp_port", kps.tcp_port).Debug("opened KISS TCP socket for stream i/o")
 
 	for {
 		var client = kps.findFreeClient()

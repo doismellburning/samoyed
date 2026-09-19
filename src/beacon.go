@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 type BeaconService struct {
@@ -190,18 +191,13 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 	for j := range bs.miscConfig.num_beacons {
 		var bp = &(bs.miscConfig.beacon[j])
-		/* TODO KG
-		#if DEBUG
-
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("beacon[%d] chan=%d, delay=%d, slot=%d, every=%d\n",
-				j,
-				bp.sendto_chan,
-				bp.delay,
-				bp.slot,
-				bp.every);
-		#endif
-		*/
+		logrus.WithFields(logrus.Fields{
+			"beacon":  j,
+			"channel": bp.sendto_chan,
+			"delay":   bp.delay,
+			"slot":    bp.slot,
+			"every":   bp.every,
+		}).Debug("beacon")
 
 		/*
 		 * If timeslots, there must be a full number of beacon intervals per hour.

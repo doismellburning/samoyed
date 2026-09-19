@@ -45,6 +45,10 @@ linters:
       ignore-tests: true  # Test tables repeat literals (callsigns, metric labels, ported-from-upstream expectations) by design
       ignore-string-values:
         - "TBD"  # Placeholder description repeated throughout the upstream symbol tables
+        # logrus field names repeat by design - the whole point is that the same
+        # key means the same thing wherever it is logged
+        - "channel"
+        - "prio"
     gocritic:
       disabled-checks:
         - captLocal  # I agree, but I want to stay semi-consistent with upstream for now

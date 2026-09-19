@@ -21,6 +21,8 @@ package direwolf
 import (
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 /* A transmit or receive data block for connected mode. */
@@ -162,12 +164,7 @@ var s_cdata_delete_count = 0 // TODO:  need to test.
  *--------------------------------------------------------------------*/
 
 func dlq_init() {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_init ( )\n");
-	#endif
-	*/
+	logrus.Debug("dlq_init")
 	dlq_mutex.Lock()
 	defer dlq_mutex.Unlock()
 
@@ -246,12 +243,7 @@ func dlq_discard_wake_up_locked() {
  *--------------------------------------------------------------------*/
 
 func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_rec_frame (chan=%d, pp=%p, ...)\n", channel, pp);
-	#endif
-	*/
+	logrus.WithField("channel", channel).Debug("dlq_rec_frame")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
 	if pp == nil {
@@ -458,12 +450,10 @@ func append_to_queue(pnew *dlq_item_t) {
  *--------------------------------------------------------------------*/
 
 func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int) { //nolint:unparam // pid is unused
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_connect_request (...)\n");
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"client":  client,
+	}).Debug("dlq_connect_request")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
@@ -507,12 +497,10 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int
  *--------------------------------------------------------------------*/
 
 func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_disconnect_request (...)\n");
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"client":  client,
+	}).Debug("dlq_disconnect_request")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
@@ -561,12 +549,10 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel 
  *--------------------------------------------------------------------*/
 
 func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_outstanding_frames_request (...)\n");
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"client":  client,
+	}).Debug("dlq_outstanding_frames_request")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
@@ -618,12 +604,11 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, 
  *--------------------------------------------------------------------*/
 
 func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, pid int, xdata []byte) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_xmit_data_request (...)\n");
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"client":  client,
+		"pid":     pid,
+	}).Debug("dlq_xmit_data_request")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
@@ -673,12 +658,11 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel i
  *--------------------------------------------------------------------*/
 
 func dlq_register_callsign(addr string, channel int, client int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_register_callsign (%s, chan=%d, client=%d)\n", addr, channel, client);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"addr":    addr,
+		"channel": channel,
+		"client":  client,
+	}).Debug("dlq_register_callsign")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
@@ -698,12 +682,11 @@ func dlq_register_callsign(addr string, channel int, client int) {
 } /* end dlq_register_callsign */
 
 func dlq_unregister_callsign(addr string, channel int, client int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_unregister_callsign (%s, chan=%d, client=%d)\n", addr, channel, client);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"addr":    addr,
+		"channel": channel,
+		"client":  client,
+	}).Debug("dlq_unregister_callsign")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	/* Allocate a new queue item. */
@@ -748,12 +731,11 @@ func dlq_unregister_callsign(addr string, channel int, client int) {
 
 func dlq_channel_busy(channel int, activity int, status int) {
 	if activity == OCTYPE_PTT || activity == OCTYPE_DCD {
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("dlq_channel_busy (...)\n");
-		#endif
-		*/
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"activity": activity,
+			"status":   status,
+		}).Debug("dlq_channel_busy")
 
 		/* Allocate a new queue item. */
 		var pnew = new(dlq_item_t)
@@ -788,12 +770,7 @@ func dlq_channel_busy(channel int, activity int, status int) {
  *--------------------------------------------------------------------*/
 
 func dlq_seize_confirm(channel int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_seize_confirm (chan=%d)\n", channel);
-	#endif
-	*/
+	logrus.WithField("channel", channel).Debug("dlq_seize_confirm")
 
 	/* Allocate a new queue item. */
 	var pnew = new(dlq_item_t)
@@ -825,12 +802,7 @@ func dlq_seize_confirm(channel int) {
  *--------------------------------------------------------------------*/
 
 func dlq_client_cleanup(client int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_client_cleanup (...)\n");
-	#endif
-	*/
+	logrus.WithField("client", client).Debug("dlq_client_cleanup")
 
 	// Assert (client >= 0 && client < MAX_NET_CLIENTS);
 
@@ -868,12 +840,7 @@ func dlq_client_cleanup(client int) {
 func dlq_wait_while_empty(timeout time.Time) bool {
 	var timed_out_result = false
 
-	/* TODO KG
-	#if DEBUG1
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_wait_while_empty (%.3f)\n", timeout);
-	#endif
-	*/
+	logrus.WithField("timeout", timeout).Debug("dlq_wait_while_empty")
 
 	dlq_mutex.Lock()
 
@@ -892,12 +859,7 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 	dlq_mutex.Unlock()
 
 	if is_empty {
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("dlq_wait_while_empty (): prepare to SLEEP...\n");
-		#endif
-		*/
+		logrus.Debug("dlq_wait_while_empty: prepare to SLEEP...")
 		if !timeout.IsZero() {
 			// KG: pthread_cond_timedwait in Go...
 			var timer = time.NewTimer(time.Until(timeout))
@@ -914,12 +876,8 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_wait_while_empty () returns timedout=%d\n", timed_out_result);
-	#endif
-	*/
+	logrus.WithField("timed_out", timed_out_result).Debug("dlq_wait_while_empty returns")
+
 	return (timed_out_result)
 } /* end dlq_wait_while_empty */
 
@@ -937,12 +895,7 @@ func dlq_wait_while_empty(timeout time.Time) bool {
  *--------------------------------------------------------------------*/
 
 func dlq_remove() *dlq_item_t {
-	/* TODO KG
-	#if DEBUG1
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_remove() enter critical section\n");
-	#endif
-	*/
+	logrus.Debug("dlq_remove: enter critical section")
 	dlq_mutex.Lock()
 
 	dlq_init_locked()
@@ -955,12 +908,7 @@ func dlq_remove() *dlq_item_t {
 
 	dlq_mutex.Unlock()
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("dlq_remove()  returns \n");
-	#endif
-	*/
+	logrus.Debug("dlq_remove returns")
 
 	/* TODO KG
 	   #if AX25MEMDEBUG

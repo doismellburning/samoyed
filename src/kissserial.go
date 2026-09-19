@@ -69,9 +69,11 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/pkg/term"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -140,13 +142,10 @@ func kissserial_init(mc *misc_config_s) {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set (DW_COLOR_DEBUG);
-
-		dw_printf ("end of kiss_init: serialport_fd = %d, polling = %d\n", serialport_fd, g_misc_config_p.kiss_serial_poll);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"serial_port_open": serialport_fd != nil,
+		"polling":          g_misc_config_p.kiss_serial_poll,
+	}).Debug("end of kiss_init")
 }
 
 /*-------------------------------------------------------------------
@@ -293,12 +292,10 @@ func kissserial_get() (byte, error) {
 			return ch, err
 		}
 
-		/* TODO KG
-		#if DEBUGx
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("kissserial_get(%d) returns 0x%02x\n", fd, ch);
-		#endif
-		*/
+		if logrus.IsLevelEnabled(logrus.DebugLevel) {
+			logrus.WithField("ch", fmt.Sprintf("0x%02x", ch)).Debug("kissserial_get")
+		}
+
 		return ch, nil
 	}
 
@@ -355,12 +352,7 @@ func kissserial_get() (byte, error) {
  *--------------------------------------------------------------------*/
 
 func kissserial_listen_thread() {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("kissserial_listen_thread ( %d )\n", fd);
-	#endif
-	*/
+	logrus.Debug("kissserial_listen_thread")
 	for {
 		var ch, err = kissserial_get()
 		if err != nil {

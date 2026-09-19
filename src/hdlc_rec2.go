@@ -66,10 +66,12 @@ package direwolf
  *******************************************************************************/
 
 import (
+	"fmt"
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -215,12 +217,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	var passall = save_audio_config_p.achan[channel].passall
 
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("\n--- try to decode ---\n");
-	#endif
-	*/
+	logrus.Debug("--- try to decode ---")
 
 	/* Create an empty retry configuration */
 	var retry_cfg = new(retry_conf_t)
@@ -238,12 +235,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 
 	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
 	if ok {
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_INFO);
-			  dw_printf ("Got it the first time.\n");
-		#endif
-		*/
+		logrus.Debug("Got it the first time.")
 		rrbb_delete(block)
 
 		return
@@ -335,12 +327,11 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
-			/* TODO KG
-			#if DEBUG
-				    text_color_set(DW_COLOR_ERROR);
-				    dw_printf ("*** Success by flipping SINGLE bit %d of %d ***\n", i, len);
-			#endif
-			*/
+			logrus.WithFields(logrus.Fields{
+				"bit": i,
+				"len": length,
+			}).Debug("Success by flipping SINGLE bit")
+
 			return true
 		}
 	}
@@ -360,12 +351,11 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
-			/* TODO KG
-			#if DEBUG
-				    text_color_set(DW_COLOR_ERROR);
-				    dw_printf ("*** Success by flipping DOUBLE bit %d of %d ***\n", i, len);
-			#endif
-			*/
+			logrus.WithFields(logrus.Fields{
+				"bit": i,
+				"len": length,
+			}).Debug("Success by flipping DOUBLE bit")
+
 			return true
 		}
 	}
@@ -385,12 +375,11 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 
 		var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, false)
 		if ok {
-			/* TODO KG
-			#if DEBUG
-				    text_color_set(DW_COLOR_ERROR);
-				    dw_printf ("*** Success by flipping TRIPLE bit %d of %d ***\n", i, len);
-			#endif
-			*/
+			logrus.WithFields(logrus.Fields{
+				"bit": i,
+				"len": length,
+			}).Debug("Success by flipping TRIPLE bit")
+
 			return true
 		}
 	}
@@ -410,12 +399,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	retry_cfg.retry = RETRY_INVERT_TWO_SEP
 	retry_cfg.sep.bit_idx_c = -1
 
-	/* TODO KG
-	#ifdef DEBUG_LATER
-		tstart = dtime_monotonic();
-		dw_printf ("*** Try flipping TWO SEPARATED BITS %d bits\n", len);
-	#endif
-	*/
+	logrus.WithField("len", length).Debug("Try flipping TWO SEPARATED BITS")
 	length = rrbb_get_len(block)
 	for i := range length - 2 {
 		retry_cfg.sep.bit_idx_a = i
@@ -432,12 +416,12 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 		}
 
 		if ok {
-			/* TODO KG
-			#if DEBUG
-				    text_color_set(DW_COLOR_ERROR);
-				    dw_printf ("*** Success by flipping TWO SEPARATED bits %d and %d of %d \n", i, j, len);
-			#endif
-			*/
+			logrus.WithFields(logrus.Fields{
+				"bit_a": i,
+				"bit_b": retry_cfg.sep.bit_idx_b,
+				"len":   length,
+			}).Debug("Success by flipping TWO SEPARATED bits")
+
 			return true
 		}
 	}
@@ -560,6 +544,10 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 
 	var H2 hdlc_state2_s
 
+	// Whether the frame's FCS matched, for the failure diagnostic at the end:
+	// a frame that sanity_check rejects gets here with a perfectly good FCS.
+	var fcs_ok = false
+
 	H2.is_scrambled = rrbb_get_is_scrambled(block)
 	H2.prev_descram = rrbb_get_prev_descram(block)
 	H2.lfsr = rrbb_get_descram_state(block)
@@ -584,13 +572,9 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 
 	var blen = rrbb_get_len(block)
 
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-	        if (retry_conf.type == RETRY_TYPE_NONE)
-	        	dw_printf ("try_decode: blen=%d\n", blen);
-	#endif
-	*/
+	if retry_conf_type == RETRY_TYPE_NONE {
+		logrus.WithField("blen", blen).Debug("try_decode")
+	}
 	for i := 1; i < blen; i++ {
 		/* Get the value for the current bit */
 		var raw = rrbb_get_bit(block, i) > 0
@@ -642,12 +626,8 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 			H2.pat_det |= 0x80
 			/* Valid data will never have 7 one bits in a row: exit. */
 			if H2.pat_det == 0xfe {
-				/* TODO KG
-				#if DEBUGx
-					        text_color_set(DW_COLOR_DEBUG);
-					        dw_printf ("try_decode: found abort, i=%d\n", i);
-				#endif
-				*/
+				logrus.WithField("i", i).Debug("try_decode: found abort")
+
 				return false
 			}
 
@@ -656,12 +636,8 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 		} else {
 			/* The special pattern 01111110 indicates beginning and ending of a frame: exit. */
 			if H2.pat_det == 0x7e {
-				/* TODO KG
-				#if DEBUGx
-					        text_color_set(DW_COLOR_DEBUG);
-					        dw_printf ("try_decode: found flag, i=%d\n", i);
-				#endif
-				*/
+				logrus.WithField("i", i).Debug("try_decode: found flag")
+
 				return false
 				/*
 				 * If we have five '1' bits in a row, followed by a '0' bit,
@@ -698,28 +674,18 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 	 * Do we have a minimum number of complete bytes?
 	 */
 
-	/* TODO KG
-	#if DEBUGx
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("try_decode: olen=%d, frame_len=%d\n", H2.olen, H2.frame_len);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"olen":      H2.olen,
+		"frame_len": H2.frame_len,
+	}).Debug("try_decode")
 
 	if H2.olen == 0 && H2.frame_len >= MIN_FRAME_LEN {
-		/* TODO KG
-		#if DEBUGx
-		        if (retry_conf.type == RETRY_TYPE_NONE) {
-			  int j;
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("NEW WAY: frame len = %d\n", H2.frame_len);
-			  for (j=0; j<H2.frame_len; j++) {
-			    dw_printf ("  %02x", H2.frame_buf[j]);
-			  }
-			  dw_printf ("\n");
-
-		        }
-		#endif
-		*/
+		if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.DebugLevel) {
+			logrus.WithFields(logrus.Fields{
+				"frame_len": H2.frame_len,
+				"frame":     fmt.Sprintf("% x", H2.frame_buf[:H2.frame_len]),
+			}).Debug("try_decode: frame")
+		}
 		/* Check FCS, low byte first, and process... */
 
 		/* Alternatively, it is possible to include the two FCS bytes */
@@ -731,6 +697,8 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 		var actual_fcs = uint16(H2.frame_buf[H2.frame_len-2]) | (uint16(H2.frame_buf[H2.frame_len-1]) << 8)
 
 		var expected_fcs = fcs.Calc(H2.frame_buf[:H2.frame_len-2])
+
+		fcs_ok = actual_fcs == expected_fcs
 
 		if actual_fcs == expected_fcs && save_audio_config_p.achan[channel].modem_type == MODEM_AIS {
 			// Sanity check for AIS.
@@ -784,38 +752,24 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 	}
 
 failure:
-	/* TODO KG
-	   #if DEBUGx
-	           if (retry_conf.type == RETRY_TYPE_NONE ) {
-	                 int j;
-	   	      text_color_set(DW_COLOR_ERROR);
-	                 if (crc_failed)
-	   	            dw_printf ("CRC failed\n");
-	   	      if (H2.olen != 0)
-	   		      dw_printf ("Bad olen: %d \n", H2.olen);
-	   	      else if (H2.frame_len < MIN_FRAME_LEN) {
-	   		      dw_printf ("Frame too small\n");
-	                         goto end;
-	   	      }
+	if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.DebugLevel) {
+		var logEntry = logrus.WithFields(logrus.Fields{
+			"olen":      H2.olen,
+			"frame_len": H2.frame_len,
+		})
 
-	   	      dw_printf ("FAILURE with frame: frame len = %d\n", H2.frame_len);
-	   	      dw_printf ("\n");
-	   	      for (j=0; j<H2.frame_len; j++) {
-	                         dw_printf (" %02x", H2.frame_buf[j]);
-	   	      }
-	   	  dw_printf ("\nDEC\n");
-	   	  for (j=0; j<H2.frame_len; j++) {
-	   	    dw_printf ("%c", H2.frame_buf[j]>>1);
-	   	  }
-	   	  dw_printf ("\nORIG\n");
-	             for (j=0; j<H2.frame_len; j++) {
-	   	    dw_printf ("%c", H2.frame_buf[j]);
-	   	  }
-	   	  dw_printf ("\n");
-	           }
-	   end:
-	   #endif
-	*/
+		switch {
+		case H2.olen != 0:
+			logEntry.Debug("try_decode: FAILURE, bad olen")
+		case H2.frame_len < MIN_FRAME_LEN:
+			logEntry.Debug("try_decode: FAILURE, frame too small")
+		default:
+			logEntry.WithFields(logrus.Fields{
+				"fcs_ok": fcs_ok,
+				"frame":  fmt.Sprintf("% x", H2.frame_buf[:H2.frame_len]),
+			}).Debug("try_decode: FAILURE, frame rejected")
+		}
+	}
 
 	return false /* failure. */
 } /* end try_decode */
@@ -880,12 +834,8 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 	}
 
 	if alen%7 != 0 {
-		/* TODO KG
-		#if DEBUGx
-			  text_color_set(DW_COLOR_ERROR);
-			  dw_printf ("sanity_check: FAILED.  Address part length %d not multiple of 7.\n", alen);
-		#endif
-		*/
+		logrus.WithField("alen", alen).Debug("sanity_check: FAILED.  Address part length not multiple of 7.")
+
 		return false
 	}
 
@@ -894,12 +844,8 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 	 */
 
 	if alen/7 < 2 || alen/7 > 10 {
-		/* TODO KG
-		#if DEBUGx
-			  text_color_set(DW_COLOR_ERROR);
-			  dw_printf ("sanity_check: FAILED.  Too few or many addresses.\n");
-		#endif
-		*/
+		logrus.Debug("sanity_check: FAILED.  Too few or many addresses.")
+
 		return false
 	}
 
@@ -924,12 +870,8 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 			(!unicode.IsUpper(addr[3]) && !unicode.IsDigit(addr[3]) && addr[3] != ' ') ||
 			(!unicode.IsUpper(addr[4]) && !unicode.IsDigit(addr[4]) && addr[4] != ' ') ||
 			(!unicode.IsUpper(addr[5]) && !unicode.IsDigit(addr[5]) && addr[5] != ' ') {
-			/* TODO KG
-			#if DEBUGx
-				    text_color_set(DW_COLOR_ERROR);
-				    dw_printf ("sanity_check: FAILED.  Invalid characters in addresses \"%s\"\n", addr);
-			#endif
-			*/
+			logrus.WithField("addr", string(addr[:])).Debug("sanity_check: FAILED.  Invalid characters in addresses")
+
 			return false
 		}
 	}
@@ -981,12 +923,8 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 		var ch = buf[j]
 
 		if (ch < 0x1c || ch > 0x7f) && ch != 0x0a && ch != 0x0d && ch != 0x80 && ch != 0x9f && ch != 0xc2 && ch != 0xb0 && ch != 0xf8 {
-			/* TODO KG
-			#if DEBUGx
-				    text_color_set(DW_COLOR_ERROR);
-				    dw_printf ("sanity_check: FAILED.  Probably bogus info char 0x%02x\n", ch);
-			#endif
-			*/
+			logrus.WithField("ch", fmt.Sprintf("0x%02x", ch)).Debug("sanity_check: FAILED.  Probably bogus info char")
+
 			return false
 		}
 	}

@@ -14,6 +14,8 @@ package direwolf
 
 import (
 	"math"
+
+	"github.com/sirupsen/logrus"
 )
 
 var DCD_CONFIG_9600 = &DCDConfig{
@@ -148,17 +150,15 @@ func demod_9600_init(modem_type modem_t, original_sample_rate int, upsample int,
 	//	    break;
 	//	}
 
-	/* TODO KG
-	   #if 0
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("----------  %s  (%d, %d)  -----------\n", __func__, samples_per_sec, baud);
-	   	dw_printf ("filter_len_bits = %.2f\n", D.lp_filter_width_sym);
-	   	dw_printf ("lp_filter_taps = %d\n", D.lp_filter_taps);
-	   	dw_printf ("lp_window = %d\n", D.lp_window);
-	   	dw_printf ("lpf_baud = %.2f\n", D.lpf_baud);
-	   	dw_printf ("samples per bit = %.1f\n", (double)samples_per_sec / baud);
-	   #endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"sample_rate":     original_sample_rate * upsample,
+		"baud":            baud,
+		"filter_len_bits": D.lp_filter_width_sym,
+		"lp_filter_taps":  D.lp_filter_taps,
+		"lp_window":       D.lp_window,
+		"lpf_baud":        D.lpf_baud,
+		"samples_per_bit": float64(original_sample_rate*upsample) / float64(baud),
+	}).Debug("demod_9600_init")
 
 	// PLL needs to use the upsampled rate.
 

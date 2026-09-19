@@ -62,6 +62,7 @@ import (
 	"os"
 
 	"github.com/creack/pty"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -123,22 +124,11 @@ func kisspt_init(mc *misc_config_s) {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set (DW_COLOR_DEBUG);
-
-		dw_printf ("end of kisspt_init: pt_master_fd = %d\n", pt_master_fd);
-	#endif
-	*/
+	logrus.WithField("pt_master_open", pt_master != nil).Debug("end of kisspt_init")
 }
 
 func kisspt_open_pt() {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("kisspt_open_pt (  )\n");
-	#endif
-	*/
+	logrus.Debug("kisspt_open_pt")
 	var ptmx, pts, err = pty.Open()
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -425,12 +415,7 @@ func kisspt_get() (byte, error) {
  *--------------------------------------------------------------------*/
 
 func kisspt_listen_thread() {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("kisspt_listen_thread ( %d )\n", fd);
-	#endif
-	*/
+	logrus.Debug("kisspt_listen_thread")
 	for {
 		var ch, err = kisspt_get()
 		if err != nil {

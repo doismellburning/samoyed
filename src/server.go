@@ -125,6 +125,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var client_sock [MAX_NET_CLIENTS]net.Conn
@@ -333,13 +335,7 @@ func agwConnectedModeAllowed(portx byte) bool {
 func server_init(audio_config_p *audio_s, mc *misc_config_s) {
 	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
 
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("server_init ( %d )\n", server_port);
-	   	debug_a = 1;
-	   #endif
-	*/
+	logrus.WithField("server_port", server_port).Debug("server_init")
 
 	save_audio_config_p = audio_config_p
 
@@ -400,12 +396,7 @@ func server_init(audio_config_p *audio_s, mc *misc_config_s) {
  *--------------------------------------------------------------------*/
 
 func server_connect_listen_thread(server_port int) {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-	    	dw_printf("Binding to port %d ... \n", server_port);
-	#endif
-	*/
+	logrus.WithField("port", server_port).Debug("Binding to port")
 	var listener, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", server_port))
 	if listenErr != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -428,12 +419,7 @@ func server_connect_listen_thread(server_port int) {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-	 	dw_printf("opened socket as fd (%d) on port (%d) for stream i/o\n", listen_sock, ntohs(sockaddr.sin_port) );
-	#endif
-	*/
+	logrus.WithField("port", server_port).Debug("opened socket for stream i/o")
 
 	for {
 		var client = -1

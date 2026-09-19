@@ -41,6 +41,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/metrics"
 	"github.com/lestrrat-go/strftime"
+	"github.com/sirupsen/logrus"
 )
 
 const MORSE_DEFAULT_WPM = 10
@@ -122,12 +123,7 @@ type XmitService struct {
  *--------------------------------------------------------------------*/
 
 func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init ( ... )\n");
-	#endif
-	*/
+	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
 
@@ -136,20 +132,10 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	/*
 	 * Push to Talk (PTT) control.
 	 */
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init: about to call ptt_init \n");
-	#endif
-	*/
+	logrus.Debug("xmit_init: about to call ptt_init")
 	ptt_init(p_modem)
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init: back from ptt_init \n");
-	#endif
-	*/
+	logrus.Debug("xmit_init: back from ptt_init")
 
 	/*
 	 * Save parameters for later use.
@@ -169,20 +155,10 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 		xs.fulldup[j] = p_modem.achan[j].fulldup
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init: about to call tq_init \n");
-	#endif
-	*/
+	logrus.Debug("xmit_init: about to call tq_init")
 	tq_init(p_modem)
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init: about to create threads \n");
-	#endif
-	*/
+	logrus.Debug("xmit_init: about to create threads")
 
 	//TODO:  xmit thread should be higher priority to avoid
 	// underrun on the audio output device.
@@ -193,12 +169,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 		}
 	}
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_init: finished \n");
-	#endif
-	*/
+	logrus.Debug("xmit_init: finished")
 
 	return xs
 }
@@ -372,12 +343,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 func (xs *XmitService) xmit_thread(channel int) {
 	for {
 		tq_wait_while_empty(channel)
-		/* TODO KG
-		#if DEBUG
-			  text_color_set(DW_COLOR_DEBUG);
-			  dw_printf ("xmit_thread, channel %d: woke up\n", chan);
-		#endif
-		*/
+		logrus.WithField("channel", channel).Debug("xmit_thread: woke up")
 
 		// Does this extra loop offer any benefit?
 		xs.xmit_until_empty(channel)
@@ -482,12 +448,11 @@ func (xs *XmitService) xmit_next(channel int) {
 		pp = tq_remove(channel, TQ_PRIO_1_LO)
 	}
 
-	/* TODO KG
-	#if DEBUG
-		    text_color_set(DW_COLOR_DEBUG);
-		    dw_printf ("xmit_thread: tq_remove(channel=%d, prio=%d) returned %p\n", channel, prio, pp);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"channel": channel,
+		"prio":    prio,
+		"pp":      pp,
+	}).Debug("xmit_thread: tq_remove returned")
 	// Shouldn't have nil here but be careful.
 
 	if pp != nil {
@@ -663,12 +628,11 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	// TODO: This was written assuming bits/sec = baud.
 	// Does it is need to be scaled differently for PSK?
 
-	/* TODO KG
-	   #if DEBUG
-	   	text_color_set(DW_COLOR_DEBUG);
-	   	dw_printf ("xmit_thread: t=%.3f, Turn on PTT now for channel %d. speed = %d\n", dtime_now()-time_ptt, chan, xs.bits_per_sec[chan]);
-	   #endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":       time.Since(time_ptt),
+		"channel": channel,
+		"speed":   xs.bits_per_sec[channel],
+	}).Debug("xmit_thread: Turn on PTT now")
 	ptt_set(OCTYPE_PTT, channel, 1)
 
 	// Inform data link state machine that we are now transmitting.
@@ -681,31 +645,24 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	/* Total number of bits in transmission including all flags and bit stuffing. */
 	var num_bits = layer2_preamble_postamble(channel, pre_flags, false, xs.p_modem)
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_thread: t=%.3f, txdelay=%d [*10], pre_flags=%d, num_bits=%d\n", dtime_now()-time_ptt, xs.txdelay[channel], pre_flags, num_bits);
-		double presleep = dtime_now();
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":         time.Since(time_ptt),
+		"txdelay":   xs.txdelay[channel],
+		"pre_flags": pre_flags,
+		"num_bits":  num_bits,
+	}).Debug("xmit_thread: preamble")
+
+	var presleep = time.Now()
 
 	SLEEP_MS(10) // Give data link state machine a chance to
 	// to stuff more frames into the transmit queue,
 	// in response to dlq_seize_confirm, so
 	// we don't run off the end too soon.
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		// How long did sleep last?
-		dw_printf ("xmit_thread: t=%.3f, Should be 0.010 second after the above.\n", dtime_now()-time_ptt);
-		double naptime = dtime_now() - presleep;
-		if (naptime > 0.015) {
-		  text_color_set(DW_COLOR_ERROR);
-		  dw_printf ("Sleep for 10 ms actually took %.3f second!\n", naptime);
-		}
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":       time.Since(time_ptt),
+		"naptime": time.Since(presleep),
+	}).Debug("xmit_thread: should be 0.010 second after the above")
 
 	var numframe = 0 /* Number of frames sent during this transmission. */
 
@@ -719,12 +676,12 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	if nb > 0 {
 		numframe++
 	}
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":        time.Since(time_ptt),
+		"nb":       nb,
+		"num_bits": num_bits,
+		"numframe": numframe,
+	}).Debug("xmit_thread: frame sent")
 
 	/*
 	 * See if we can bundle additional frames into this transmission.
@@ -752,12 +709,12 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
 				pp = tq_remove(channel, prio)
-				/* TODO KG
-				#if DEBUG
-					        text_color_set(DW_COLOR_DEBUG);
-					        dw_printf ("xmit_thread: t=%.3f, tq_remove(channel=%d, prio=%d) returned %p\n", dtime_now()-time_ptt, channel, prio, pp);
-				#endif
-				*/
+				logrus.WithFields(logrus.Fields{
+					"t":       time.Since(time_ptt),
+					"channel": channel,
+					"prio":    prio,
+					"pp":      pp,
+				}).Debug("xmit_thread: tq_remove returned")
 
 				nb = xs.send_one_frame(channel, prio, pp)
 
@@ -765,12 +722,12 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 				if nb > 0 {
 					numframe++
 				}
-				/* TODO KG
-				#if DEBUG
-					        text_color_set(DW_COLOR_DEBUG);
-					        dw_printf ("xmit_thread: t=%.3f, nb=%d, num_bits=%d, numframe=%d\n", dtime_now()-time_ptt, nb, num_bits, numframe);
-				#endif
-				*/
+				logrus.WithFields(logrus.Fields{
+					"t":        time.Since(time_ptt),
+					"nb":       nb,
+					"num_bits": num_bits,
+					"numframe": numframe,
+				}).Debug("xmit_thread: bundled frame sent")
 			}
 		} else {
 			done = true
@@ -784,12 +741,13 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	var post_flags = xs.msToBits(xs.txtail[channel]*10, channel) / 8
 	nb = layer2_preamble_postamble(channel, post_flags, true, xs.p_modem)
 	num_bits += nb
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_thread: t=%.3f, txtail=%d [*10], post_flags=%d, nb=%d, num_bits=%d\n", dtime_now()-time_ptt, xs.txtail[channel], post_flags, nb, num_bits);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":          time.Since(time_ptt),
+		"txtail":     xs.txtail[channel],
+		"post_flags": post_flags,
+		"nb":         nb,
+		"num_bits":   num_bits,
+	}).Debug("xmit_thread: postamble")
 
 	/*
 	 * While demodulating is CPU intensive, generating the tones is not.
@@ -817,12 +775,12 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	var already = time.Since(time_ptt)
 	var wait_more = time.Duration(durationMS)*time.Millisecond - already
 
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		dw_printf ("xmit_thread: t=%.3f, xmit duration=%d, %d already elapsed since PTT, wait %d more\n", dtime_now()-time_ptt, duration, already, wait_more );
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":           time.Since(time_ptt),
+		"duration_ms": durationMS,
+		"already":     already,
+		"wait_more":   wait_more,
+	}).Debug("xmit_thread: transmission duration")
 
 	if wait_more > 0 {
 		SLEEP_MS(int(wait_more.Milliseconds()))
@@ -840,13 +798,10 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	/*
 	 * Turn off transmitter.
 	 */
-	/* TODO KG
-	#if DEBUG
-		text_color_set(DW_COLOR_DEBUG);
-		time_now = dtime_now();
-		dw_printf ("xmit_thread: t=%.3f, Turn off PTT now. Actual time on was %d mS, vs. %d desired\n", dtime_now()-time_ptt, (int) ((time_now - time_ptt) * 1000.), duration);
-	#endif
-	*/
+	logrus.WithFields(logrus.Fields{
+		"t":           time.Since(time_ptt),
+		"duration_ms": durationMS,
+	}).Debug("xmit_thread: Turn off PTT now")
 
 	ptt_set(OCTYPE_PTT, channel, 0)
 } /* end xmit_ax25_frames */
