@@ -1376,6 +1376,32 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
 				},
 			},
+			// Regression test: 0 means off, as it does for the -X command line
+			// option, but the handler still switched the channel to LAYER2_FX25.
+			// Every frame then asked for an FX.25 mode that does not exist,
+			// complained twice and fell back to AX.25.
+			{
+				name:   "zero leaves the channel on AX.25",
+				config: "FX25TX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "zero turns off what an earlier line turned on",
+				config: "FX25TX 16\nFX25TX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "zero does not disturb a channel transmitting IL2P",
+				config: "IL2PTX 1\nFX25TX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_IL2P, c.audio.achan[0].layer2_xmit)
+				},
+			},
 		},
 		"ICHANNEL": {
 			{

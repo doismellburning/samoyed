@@ -3054,7 +3054,16 @@ func handleFX25TX(ps *parseState) bool {
 
 		return false
 	}
-	if n >= 0 && n < 200 {
+	if n == 0 {
+		// 0 is off: -X 0 enables nothing either, though it cannot switch off
+		// what the config file turned on.  Leaving the channel on LAYER2_FX25
+		// would mean every frame tried FX.25 with no usable mode, complained,
+		// and fell back to AX.25 anyway.
+		ps.audio.achan[ps.channel].fx25_strength = 0
+		if ps.audio.achan[ps.channel].layer2_xmit == LAYER2_FX25 {
+			ps.audio.achan[ps.channel].layer2_xmit = LAYER2_AX25
+		}
+	} else if n > 0 && n < 200 {
 		ps.audio.achan[ps.channel].fx25_strength = n
 		ps.audio.achan[ps.channel].layer2_xmit = LAYER2_FX25
 	} else {
