@@ -1653,6 +1653,76 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"IGTXVIA": {
+			{
+				name:   "a transmit channel is stored",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.tx_chan)
+					a.Empty(c.igate.tx_via)
+				},
+			},
+			{
+				name:   "no IGTXVIA means nothing is gated to RF",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "a via path is stored with the comma the header needs",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0 WIDE1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(",WIDE1-1", c.igate.tx_via)
+					a.Equal(1, c.igate.max_digi_hops)
+				},
+			},
+			{
+				name:   "the hop count comes from the SSID of a path ending in a digit",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0 WIDE2-2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.igate.max_digi_hops)
+				},
+			},
+			{
+				name:   "an unusable via path is rejected but the channel still stands",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0 WIDE1-1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.tx_chan)
+					a.Empty(c.igate.tx_via)
+					a.Contains(c.output, "invalid via path")
+				},
+			},
+			{
+				name:   "a channel beyond the last one is rejected",
+				config: "MYCALL Q1TEST\nIGTXVIA 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "MYCALL Q1TEST\nIGTXVIA zero\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "a transmit channel with no callsign is dropped again",
+				config: "IGLOGIN Q1TEST 12345\nIGTXVIA 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "IGTXVIA\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"IL2PTX": {
 			{
 				name:   "with no options it selects IL2P with max FEC, normal polarity and a CRC",
@@ -2462,7 +2532,6 @@ func directivesNotYetTested() []string {
 		"IGFILTER",
 		"IGMSP",
 		"IGTXLIMIT",
-		"IGTXVIA",
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
