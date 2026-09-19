@@ -3633,6 +3633,51 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTVECTOR": {
+			{
+				name:   "a pattern, origin and scale are stored, with the scale in metres",
+				config: "TTVECTOR B5bbbddd 37^55.37N 81^7.86W 0.01 mi\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_VECTOR, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B5bbbddd", c.tt.ttlocs[0].pattern)
+					a.InDelta(37.9228, c.tt.ttlocs[0].vector.lat, 0.001)
+					a.InDelta(16.09344, c.tt.ttlocs[0].vector.scale, 0.001)
+				},
+			},
+			{
+				name:   "a pattern without the usual 5bbb is reported",
+				config: "TTVECTOR Bbbbddd 42N 71W 0.01 mi\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "would normally contain")
+				},
+			},
+			{
+				name:   "an unrecognised unit falls back to miles",
+				config: "TTVECTOR B5bbbddd 42N 71W 1 furlongs\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.InDelta(1609.344, c.tt.ttlocs[0].vector.scale, 0.001)
+					a.Contains(c.output, "Unrecognized unit")
+				},
+			},
+			{
+				name:   "an unreadable scale leaves no location",
+				config: "TTVECTOR B5bbbddd 42N 71W wide mi\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid scale")
+				},
+			},
+			{
+				name:   "a missing unit leaves no location and does not eat the next line",
+				config: "TTVECTOR B5bbbddd 42N 71W 0.01\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TXINH": {
 			{
 				name:   "a GPIO number becomes the transmit inhibit input",
@@ -3960,7 +4005,6 @@ func directivesNotYetTested() []string {
 		"TTSTATUS",
 		"TTUSNG",
 		"TTUTM",
-		"TTVECTOR",
 	}
 }
 
