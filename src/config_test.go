@@ -262,6 +262,39 @@ func Test_config_init_beacon_empty_lat(t *testing.T) {
 	})
 }
 
+func Test_config_init_beacon_unreadable_interval(t *testing.T) {
+	// Regression test: parse_interval ignored the Atoi error and returned the
+	// zero alongside it, so EVERY=abc gave an interval of 0 seconds.  With a
+	// SLOT configured that reached IS_GOOD, which divides 3600 by it and
+	// brought the whole program down on startup; without one, the next
+	// transmission time never advanced.
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W SLOT=1 EVERY=abc\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, 600, misc.beacon[0].every)
+
+	var modem = new(audio_s)
+	modem.chan_medium[0] = MEDIUM_RADIO
+	modem.mycall[0] = "Q1TEST"
+
+	assert.NotPanics(t, func() {
+		NewBeaconService(modem, misc, new(igate_config_s))
+	})
+}
+
+func Test_config_init_beacon_out_of_range_interval(t *testing.T) {
+	t.Run("EVERY=0 keeps the default", func(t *testing.T) {
+		var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W EVERY=0\n")
+		assert.Equal(t, 600, misc.beacon[0].every)
+	})
+
+	t.Run("a readable interval is stored", func(t *testing.T) {
+		var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W EVERY=2:30 DELAY=0:05\n")
+		assert.Equal(t, 150, misc.beacon[0].every)
+		assert.Equal(t, 5, misc.beacon[0].delay)
+	})
+}
+
 func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
 	// Regression test: ParseFloat happily reads "NaN" and "Inf", so a beacon
 	// option could hold a value no arithmetic survives.  int(NaN) is the

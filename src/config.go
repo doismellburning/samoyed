@@ -616,7 +616,10 @@ main ()
  *
  *		line	- Line number for use in error message.
  *
- * Returns:     Number of seconds.
+ * Returns:     Number of seconds, and whether it could be read at all.  A
+ *		value that can't be read is not a value: the zero it would
+ *		otherwise become is a beacon interval that divides by zero in
+ *		IS_GOOD and a next-transmission time that never advances.
  *
  * Description:	This is used by the BEACON configuration items
  *		for initial delay or time between beacons.
@@ -625,23 +628,31 @@ main ()
  *
  *----------------------------------------------------------------*/
 
-func parse_interval(str string, line int) int { //nolint:unparam
-	var minutesStr, secondsStr, _ = strings.Cut(str, ":") // Don't need to check found because if not, Cut returns `str, "", false`
+func parse_interval(keyword string, str string, line int) (int, bool) {
+	var minutesStr, secondsStr, found = strings.Cut(str, ":")
 
-	var minutes, _ = strconv.Atoi(minutesStr)
+	var minutes, minutesErr = strconv.Atoi(minutesStr)
 	var interval = 60 * minutes
 
-	var seconds, _ = strconv.Atoi(secondsStr)
-	interval += seconds
+	var secondsErr error
 
-	/* TODO KG Better logging / error handling
-	if bad > 0 || nc > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Time interval must be of the form minutes or minutes:seconds.\n", line)
+	if found {
+		var seconds int
+		seconds, secondsErr = strconv.Atoi(secondsStr)
+		interval += seconds
 	}
-	*/
 
-	return interval
+	if minutesErr != nil || secondsErr != nil {
+		logrus.WithFields(logrus.Fields{
+			"line":   line,
+			"option": keyword,
+			"value":  str,
+		}).Error("Time interval must be of the form minutes or minutes:seconds, ignoring it")
+
+		return 0, false
+	}
+
+	return interval, true
 } /* end parse_interval */
 
 /*------------------------------------------------------------------
@@ -6344,9 +6355,25 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 		// end
 		if strings.EqualFold(keyword, "DELAY") {
-			b.delay = parse_interval(value, line)
+			var n, ok = parse_interval(keyword, value, line)
+			if !ok {
+				continue
+			}
+
+			if n < 0 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Beacon delay, %d, can't be negative.\n", line, n)
+
+				continue
+			}
+
+			b.delay = n
 		} else if strings.EqualFold(keyword, "SLOT") {
-			var n = parse_interval(value, line)
+			var n, ok = parse_interval(keyword, value, line)
+			if !ok {
+				continue
+			}
+
 			if n < 1 || n > 3600 {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds.\n", line, n)
@@ -6356,7 +6383,19 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 			b.slot = maybe.Just(n)
 		} else if strings.EqualFold(keyword, "EVERY") {
-			b.every = parse_interval(value, line)
+			var n, ok = parse_interval(keyword, value, line)
+			if !ok {
+				continue
+			}
+
+			if n < 1 {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Config file, line %d: Time between beacons, %d, must be at least 1 second.\n", line, n)
+
+				continue
+			}
+
+			b.every = n
 		} else if strings.EqualFold(keyword, "SENDTO") {
 			if len(value) == 0 {
 				text_color_set(DW_COLOR_ERROR)
