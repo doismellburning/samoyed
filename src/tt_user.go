@@ -91,8 +91,8 @@ type tt_user_s struct {
 	latitude, longitude float64 /* Location either from user or generated */
 	/* position in the corral. */
 
-	ambiguity int /* Number of digits to omit from location. */
-	/* Default 0, max. 4. */
+	ambiguity maybe.Maybe[int] /* Number of digits to omit from location. */
+	/* Max. 4; Nothing until a message says otherwise. */
 
 	freq string /* Frequency in format 999.999MHz */
 
@@ -370,8 +370,8 @@ func digit_suffix(callsign string) string {
  *
  *----------------------------------------------------------------*/
 
-func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude float64,
-	longitude float64, ambiguity int, freq string, ctcss string, comment string, mic_e rune, dao string) int {
+func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
+	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) int {
 	// text_color_set(DW_COLOR_DEBUG);
 	// dw_printf ("tt_user_heard (%s, %d, %c, %c, %s, ...)\n", callsign, ssid, overlay, symbol, loc_text);
 
@@ -406,11 +406,14 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 		tt_user[i].digit_suffix = digit_suffix(tt_user[i].callsign)
 		tt_user[i].loc_text = loc_text
 
-		if latitude != G_UNKNOWN && longitude != G_UNKNOWN {
+		var lat, haveLat = latitude.Get()
+		var lon, haveLon = longitude.Get()
+
+		if haveLat && haveLon {
 			/* We have specific location. */
 			tt_user[i].corral_slot = 0
-			tt_user[i].latitude = latitude
-			tt_user[i].longitude = longitude
+			tt_user[i].latitude = lat
+			tt_user[i].longitude = lon
 		} else {
 			/* Unknown location, put it in the corral. */
 			tt_user[i].corral_slot = corral_slot()
@@ -445,16 +448,17 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 			tt_user[i].loc_text = loc_text
 		}
 
-		if latitude != G_UNKNOWN && longitude != G_UNKNOWN {
+		var lat, haveLat = latitude.Get()
+		var lon, haveLon = longitude.Get()
+
+		if haveLat && haveLon {
 			/* We have specific location. */
 			tt_user[i].corral_slot = 0
-			tt_user[i].latitude = latitude
-			tt_user[i].longitude = longitude
+			tt_user[i].latitude = lat
+			tt_user[i].longitude = lon
 		}
 
-		if ambiguity != G_UNKNOWN {
-			tt_user[i].ambiguity = ambiguity
-		}
+		tt_user[i].ambiguity = ambiguity.Or(tt_user[i].ambiguity)
 
 		if freq != "" {
 			tt_user[i].freq = freq
@@ -616,10 +620,7 @@ func xmit_object_report(i int, first_time bool) {
 		olat = tt_user[i].latitude
 		olong = tt_user[i].longitude
 
-		oambig = tt_user[i].ambiguity
-		if oambig == G_UNKNOWN {
-			oambig = 0
-		}
+		oambig = maybe.FromMaybe(0, tt_user[i].ambiguity)
 	} else {
 		/*
 		 * Use made up position in the corral.

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,29 +36,29 @@ var ttTestCases = []ttTestCase{
 
 	/* Callsigns & abbreviations, traditional */
 
-	{"A9A2B42A7A7C71#", "WB4APR", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !"}, /* WB4APR/7 */
-	{"A27773#", "277", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !"},            /* abbreviated form */
+	{"A9A2B42A7A7C71#", "WB4APR", "12", "7A", "", "", "Nothing", "Nothing", "!T  !"}, /* WB4APR/7 */
+	{"A27773#", "277", "12", "7A", "", "", "Nothing", "Nothing", "!T  !"},            /* abbreviated form */
 
 	/* Intentionally wrong - Has 6 for checksum when it should be 3. */
-	{"A27776#", "", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"}, /* Expect error message. */
+	{"A27776#", "", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"}, /* Expect error message. */
 
 	/* Example in spec is wrong.  checksum should be 5 in this case. */
-	{"A2A7A7C71#", "", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"},   /* Spelled suffix, overlay, checksum */
-	{"A2A7A7C75#", "APR", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !"}, /* Spelled suffix, overlay, checksum */
-	{"A27773#", "277", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !"},    /* Suffix digits, overlay, checksum */
+	{"A2A7A7C71#", "", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"},   /* Spelled suffix, overlay, checksum */
+	{"A2A7A7C75#", "APR", "12", "7A", "", "", "Nothing", "Nothing", "!T  !"}, /* Spelled suffix, overlay, checksum */
+	{"A27773#", "277", "12", "7A", "", "", "Nothing", "Nothing", "!T  !"},    /* Suffix digits, overlay, checksum */
 
-	{"A9A2B26C7D9D71#", "WB2OSZ", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !"}, /* WB2OSZ/7 numeric overlay */
-	{"A67979#", "679", "12", "7A", "", "", "-999999.0000", "-999999.0000", "!T  !"},            /* abbreviated form */
+	{"A9A2B26C7D9D71#", "WB2OSZ", "12", "7A", "", "", "Nothing", "Nothing", "!T  !"}, /* WB2OSZ/7 numeric overlay */
+	{"A67979#", "679", "12", "7A", "", "", "Nothing", "Nothing", "!T  !"},            /* abbreviated form */
 
-	{"A9A2B26C7D9D5A9#", "WB2OSZ", "12", "JA", "", "", "-999999.0000", "-999999.0000", "!T  !"}, /* WB2OSZ/J letter overlay */
-	{"A6795A7#", "679", "12", "JA", "", "", "-999999.0000", "-999999.0000", "!T  !"},            /* abbreviated form */
+	{"A9A2B26C7D9D5A9#", "WB2OSZ", "12", "JA", "", "", "Nothing", "Nothing", "!T  !"}, /* WB2OSZ/J letter overlay */
+	{"A6795A7#", "679", "12", "JA", "", "", "Nothing", "Nothing", "!T  !"},            /* abbreviated form */
 
-	{"A277#", "277", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"}, /* Tactical call "277" no overlay and no checksum */
+	{"A277#", "277", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"}, /* Tactical call "277" no overlay and no checksum */
 
 	/* QIKcom-2 style 10 digit call & 5 digit suffix */
 
-	{"AC9242771558#", "WB4APR", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"},
-	{"AC27722#", "APR", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"},
+	{"AC9242771558#", "WB4APR", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"},
+	{"AC27722#", "APR", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"},
 
 	/* Locations */
 
@@ -77,11 +78,11 @@ var ttTestCases = []ttTestCase{
 
 	/* Comments */
 
-	{"C1", "", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"},
-	{"C2", "", "12", "\\A", "", "", "-999999.0000", "-999999.0000", "!T  !"},
-	{"C146520", "", "12", "\\A", "146.520MHz", "", "-999999.0000", "-999999.0000", "!T  !"},
+	{"C1", "", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"},
+	{"C2", "", "12", "\\A", "", "", "Nothing", "Nothing", "!T  !"},
+	{"C146520", "", "12", "\\A", "146.520MHz", "", "Nothing", "Nothing", "!T  !"},
 	{"C7788444222550227776669660333666990122223333",
-		"", "12", "\\A", "", "QUICK BROWN FOX 123", "-999999.0000", "-999999.0000", "!T  !"},
+		"", "12", "\\A", "", "QUICK BROWN FOX 123", "Nothing", "Nothing", "!T  !"},
 	/* Macros */
 
 	{"88345", "BIKE 345", "0", "/b", "", "", "12.5000", "56.5000", "!T88!"},
@@ -116,6 +117,14 @@ var aprs_tt_test_config = []*ttloc_s{
 
 var gateway *TTGateway
 
+// fourDecimalPlaces renders a position for comparison against the expected
+// results above, which spell an absent one "Nothing".
+func fourDecimalPlaces(m maybe.Maybe[float64]) string {
+	return maybe.Fold("Nothing", func(value float64) string {
+		return fmt.Sprintf("%.4f", value)
+	}, m)
+}
+
 func check_result(t *testing.T, testCase ttTestCase) {
 	t.Helper()
 
@@ -132,11 +141,9 @@ func check_result(t *testing.T, testCase ttTestCase) {
 
 	assert.Equal(t, testCase.comment, state.comment, testCase.toneseq)
 
-	var latTmp = fmt.Sprintf("%.4f", state.latitude)
-	assert.Equal(t, testCase.latitude, latTmp, testCase.toneseq)
+	assert.Equal(t, testCase.latitude, fourDecimalPlaces(state.latitude), testCase.toneseq)
 
-	var lonTmp = fmt.Sprintf("%.4f", state.longitude)
-	assert.Equal(t, testCase.longitude, lonTmp, testCase.toneseq)
+	assert.Equal(t, testCase.longitude, fourDecimalPlaces(state.longitude), testCase.toneseq)
 
 	assert.Equal(t, testCase.dao, string(state.dao[:]), testCase.toneseq)
 }

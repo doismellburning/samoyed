@@ -11,6 +11,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,17 +51,17 @@ func Test_TTUser(t *testing.T) {
 	// tt_user_heard (char *callsign, int ssid, char overlay, char symbol, char *loc_text, double latitude,
 	//              double longitude, int ambiguity, char *freq, char *ctcss, char *comment, char mic_e, char *dao);
 
-	tt_user_heard("TEST1", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	tt_user_heard("TEST2", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	tt_user_heard("TEST3", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	tt_user_heard("TEST4", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	tt_user_heard("WB2OSZ", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
-	tt_user_heard("K2H", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "", ' ', "!T99!")
+	tt_user_heard("TEST1", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "", ' ', "!T99!")
+	tt_user_heard("TEST2", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "", ' ', "!T99!")
+	tt_user_heard("TEST3", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "", ' ', "!T99!")
+	tt_user_heard("TEST4", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "", ' ', "!T99!")
+	tt_user_heard("WB2OSZ", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "", ' ', "!T99!")
+	tt_user_heard("K2H", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "", ' ', "!T99!")
 	tt_user_dump()
 
-	tt_user_heard("679", 12, 'J', 'A', "", 37.25, -71.75, 0, "", " ", " ", ' ', "!T99!")
-	tt_user_heard("WB2OSZ", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "146.520MHz", "", "", ' ', "!T99!")
-	tt_user_heard("WB1GOF", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "146.955MHz", "074", "", ' ', "!T99!")
-	tt_user_heard("679", 12, 'J', 'A', "", G_UNKNOWN, G_UNKNOWN, 0, "", "", "Hello, world", '9', "!T99!")
+	tt_user_heard("679", 12, 'J', 'A', "", maybe.Just(37.25), maybe.Just(-71.75), maybe.Just(0), "", " ", " ", ' ', "!T99!")
+	tt_user_heard("WB2OSZ", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "146.520MHz", "", "", ' ', "!T99!")
+	tt_user_heard("WB1GOF", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "146.955MHz", "074", "", ' ', "!T99!")
+	tt_user_heard("679", 12, 'J', 'A', "", maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Just(0), "", "", "Hello, world", '9', "!T99!")
 	tt_user_dump()
 }
