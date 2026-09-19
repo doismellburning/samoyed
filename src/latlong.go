@@ -19,10 +19,6 @@ import (
 	"unicode"
 )
 
-/* Use this value for unknown latitude/longitude or other values. */
-
-const G_UNKNOWN = (-999999)
-
 /* Latitude and longitude arriving from a config file, the CLI or a decoded
  * packet can be out of range.  The conversions below are fixed width and
  * cannot fail, so they confine the value rather than reporting it; whoever

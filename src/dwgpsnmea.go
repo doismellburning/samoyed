@@ -652,7 +652,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 		if len(paltitude) > 0 {
 			var altitude, altitudeErr = strconv.ParseFloat(paltitude, 64)
 			if altitudeErr == nil {
-				result.Alt = unlessUnknown(altitude)
+				result.Alt = maybe.Just(altitude)
 				result.Fix = DWFIX_3D
 			} else {
 				if !quiet {

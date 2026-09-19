@@ -191,11 +191,16 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 		assert.Equal(t, maybe.Nothing[float64](), result.Alt)
 	})
 
-	t.Run("sentinel altitude stays unknown", func(t *testing.T) {
+	t.Run("an implausible altitude is still an altitude", func(t *testing.T) {
+		// -999999 was the G_UNKNOWN sentinel, and a value a receiver would
+		// never send, but it is a number and nothing here filters numbers for
+		// plausibility.  This pins that deliberate choice so a sentinel-shaped
+		// special case cannot creep back in unnoticed.
 		var result = dwgpsnmea_gpgga("$GPGGA,003518.710,4237.1250,N,07120.8327,W,1,03,5.9,-999999,M,-33.5,M,,0000*6D", true)
 
 		require.NotNil(t, result)
-		assert.Equal(t, maybe.Nothing[float64](), result.Alt)
+		assert.Equal(t, DWFIX_3D, result.Fix)
+		assert.Equal(t, maybe.Just(-999999.0), result.Alt)
 	})
 
 	t.Run("fix field zero returns no fix", func(t *testing.T) {
