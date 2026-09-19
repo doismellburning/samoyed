@@ -844,8 +844,8 @@ func get1ch() byte {
 		var n, _ = igate_sock.Read(ch)
 
 		if n == 1 {
-			if logrus.IsLevelEnabled(logrus.DebugLevel) {
-				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Debug("get1ch")
+			if logrus.IsLevelEnabled(logrus.TraceLevel) {
+				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Trace("get1ch")
 			}
 
 			return (ch[0])

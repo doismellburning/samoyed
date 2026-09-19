@@ -271,7 +271,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 		return
 	}
 
-	logrus.Debug("tq_append: enter critical section")
+	logrus.Trace("tq_append: enter critical section")
 
 	tq_mutex.Lock()
 
@@ -301,7 +301,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 	tq_mutex.Unlock()
 
-	logrus.Debug("tq_append: left critical section, about to wake up xmit thread")
+	logrus.Trace("tq_append: left critical section, about to wake up xmit thread")
 
 	if xmit_thread_is_waiting[channel] {
 		wake_up_mutex[channel].Lock()
@@ -437,7 +437,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
 	}
 
-	logrus.Debug("lm_data_request: enter critical section")
+	logrus.Trace("lm_data_request: enter critical section")
 
 	tq_mutex.Lock()
 
@@ -465,7 +465,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	tq_mutex.Unlock()
 
-	logrus.Debug("lm_data_request: left critical section")
+	logrus.Trace("lm_data_request: left critical section")
 
 	// Appendix C2a, from the Ax.25 protocol spec, says that a priority frame
 	// will start transmission.  If not already transmitting, normal frames
@@ -476,7 +476,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	//NO!	if (prio == TQ_PRIO_0_HI) {
 
-	logrus.Debug("lm_data_request: about to wake up xmit thread")
+	logrus.Trace("lm_data_request: about to wake up xmit thread")
 	if xmit_thread_is_waiting[channel] {
 		wake_up_mutex[channel].Lock()
 		wake_up_cond[channel].Signal()
@@ -571,7 +571,7 @@ func lm_seize_request(channel int) {
 	#endif
 	*/
 
-	logrus.Debug("lm_seize_request: enter critical section")
+	logrus.Trace("lm_seize_request: enter critical section")
 
 	tq_mutex.Lock()
 
@@ -599,9 +599,9 @@ func lm_seize_request(channel int) {
 
 	tq_mutex.Unlock()
 
-	logrus.Debug("lm_seize_request: left critical section")
+	logrus.Trace("lm_seize_request: left critical section")
 
-	logrus.Debug("lm_seize_request: about to wake up xmit thread")
+	logrus.Trace("lm_seize_request: about to wake up xmit thread")
 
 	if xmit_thread_is_waiting[channel] {
 		wake_up_mutex[channel].Lock()
@@ -625,7 +625,10 @@ func lm_seize_request(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_wait_while_empty(channel int) {
-	logrus.WithField("channel", channel).Debug("tq_wait_while_empty: enter critical section")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: enter critical section")
+	}
+
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	tq_mutex.Lock()
@@ -634,26 +637,34 @@ func tq_wait_while_empty(channel int) {
 
 	tq_mutex.Unlock()
 
-	logrus.WithField("channel", channel).Debug("tq_wait_while_empty: left critical section")
-
-	logrus.WithFields(logrus.Fields{
-		"channel":  channel,
-		"is_empty": is_empty,
-	}).Debug("tq_wait_while_empty")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: left critical section")
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"is_empty": is_empty,
+		}).Trace("tq_wait_while_empty")
+	}
 
 	if is_empty {
-		logrus.WithField("channel", channel).Debug("tq_wait_while_empty: SLEEP - about to call cond wait")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: SLEEP - about to call cond wait")
+		}
+
 		wake_up_mutex[channel].Lock()
 		xmit_thread_is_waiting[channel] = true
 		wake_up_cond[channel].Wait()
 		xmit_thread_is_waiting[channel] = false
 
-		logrus.WithField("channel", channel).Debug("tq_wait_while_empty: WOKE UP - returned from cond wait")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: WOKE UP - returned from cond wait")
+		}
 
 		wake_up_mutex[channel].Unlock()
 	}
 
-	logrus.WithField("channel", channel).Debug("tq_wait_while_empty returns")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("channel", channel).Trace("tq_wait_while_empty returns")
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -671,10 +682,12 @@ func tq_wait_while_empty(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_remove(channel int, prio int) *packet_t {
-	logrus.WithFields(logrus.Fields{
-		"channel": channel,
-		"prio":    prio,
-	}).Debug("tq_remove: enter critical section")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+		}).Trace("tq_remove: enter critical section")
+	}
 	tq_mutex.Lock()
 
 	var result_p *packet_t
@@ -695,11 +708,13 @@ func tq_remove(channel int, prio int) *packet_t {
 
 	tq_mutex.Unlock()
 
-	logrus.WithFields(logrus.Fields{
-		"channel":  channel,
-		"prio":     prio,
-		"result_p": result_p,
-	}).Debug("tq_remove: leave critical section")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"prio":     prio,
+			"result_p": result_p,
+		}).Trace("tq_remove: leave critical section")
+	}
 
 	/* TODO KG
 	   #if AX25MEMDEBUG
@@ -732,10 +747,12 @@ func tq_remove(channel int, prio int) *packet_t {
  *--------------------------------------------------------------------*/
 
 func tq_peek(channel int, prio int) *packet_t {
-	logrus.WithFields(logrus.Fields{
-		"channel": channel,
-		"prio":    prio,
-	}).Debug("tq_peek: enter critical section")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+		}).Trace("tq_peek: enter critical section")
+	}
 
 	// I don't think we need critical region here.
 	//dw_mutex_lock (&tq_mutex);
@@ -744,11 +761,13 @@ func tq_peek(channel int, prio int) *packet_t {
 
 	//dw_mutex_unlock (&tq_mutex);
 
-	logrus.WithFields(logrus.Fields{
-		"channel":  channel,
-		"prio":     prio,
-		"result_p": result_p,
-	}).Debug("tq_peek: leave critical section")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel":  channel,
+			"prio":     prio,
+			"result_p": result_p,
+		}).Trace("tq_peek: leave critical section")
+	}
 
 	/* TODO KG
 	   #if AX25MEMDEBUG
@@ -813,13 +832,15 @@ func tq_is_empty(channel int) bool {
 //#define DEBUG2 1
 
 func tq_count(channel int, prio int, source string, dest string, bytes bool) int {
-	logrus.WithFields(logrus.Fields{
-		"channel": channel,
-		"prio":    prio,
-		"source":  source,
-		"dest":    dest,
-		"bytes":   bytes,
-	}).Debug("tq_count")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"source":  source,
+			"dest":    dest,
+			"bytes":   bytes,
+		}).Trace("tq_count")
+	}
 	if prio == -1 {
 		return (tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes))
 	}
@@ -831,14 +852,16 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 
 	var n = tq_count_locked(channel, prio, source, dest, bytes)
 
-	logrus.WithFields(logrus.Fields{
-		"channel": channel,
-		"prio":    prio,
-		"source":  source,
-		"dest":    dest,
-		"bytes":   bytes,
-		"n":       n,
-	}).Debug("tq_count returns")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"channel": channel,
+			"prio":    prio,
+			"source":  source,
+			"dest":    dest,
+			"bytes":   bytes,
+			"n":       n,
+		}).Trace("tq_count returns")
+	}
 
 	return (n)
 } /* end tq_count */
@@ -868,7 +891,9 @@ func tq_count_locked(channel int, prio int, source string, dest string, bytes bo
 
 			if source != "" {
 				var frame_source = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
-				logrus.WithField("frame_source", frame_source).Debug("tq_count: compare to frame source")
+				if logrus.IsLevelEnabled(logrus.TraceLevel) {
+					logrus.WithField("frame_source", frame_source).Trace("tq_count: compare to frame source")
+				}
 				if source != frame_source {
 					count_it = 0
 				}
@@ -876,7 +901,9 @@ func tq_count_locked(channel int, prio int, source string, dest string, bytes bo
 
 			if count_it > 0 && dest != "" {
 				var frame_dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
-				logrus.WithField("frame_dest", frame_dest).Debug("tq_count: compare to frame destination")
+				if logrus.IsLevelEnabled(logrus.TraceLevel) {
+					logrus.WithField("frame_dest", frame_dest).Trace("tq_count: compare to frame destination")
+				}
 				if dest != frame_dest {
 					count_it = 0
 				}

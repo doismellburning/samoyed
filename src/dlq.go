@@ -840,7 +840,7 @@ func dlq_client_cleanup(client int) {
 func dlq_wait_while_empty(timeout time.Time) bool {
 	var timed_out_result = false
 
-	logrus.WithField("timeout", timeout).Debug("dlq_wait_while_empty")
+	logrus.WithField("timeout", timeout).Trace("dlq_wait_while_empty")
 
 	dlq_mutex.Lock()
 
@@ -859,7 +859,7 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 	dlq_mutex.Unlock()
 
 	if is_empty {
-		logrus.Debug("dlq_wait_while_empty: prepare to SLEEP...")
+		logrus.Trace("dlq_wait_while_empty: prepare to SLEEP...")
 		if !timeout.IsZero() {
 			// KG: pthread_cond_timedwait in Go...
 			var timer = time.NewTimer(time.Until(timeout))
@@ -876,7 +876,7 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 		}
 	}
 
-	logrus.WithField("timed_out", timed_out_result).Debug("dlq_wait_while_empty returns")
+	logrus.WithField("timed_out", timed_out_result).Trace("dlq_wait_while_empty returns")
 
 	return (timed_out_result)
 } /* end dlq_wait_while_empty */
@@ -895,7 +895,7 @@ func dlq_wait_while_empty(timeout time.Time) bool {
  *--------------------------------------------------------------------*/
 
 func dlq_remove() *dlq_item_t {
-	logrus.Debug("dlq_remove: enter critical section")
+	logrus.Trace("dlq_remove: enter critical section")
 	dlq_mutex.Lock()
 
 	dlq_init_locked()
@@ -908,7 +908,7 @@ func dlq_remove() *dlq_item_t {
 
 	dlq_mutex.Unlock()
 
-	logrus.Debug("dlq_remove returns")
+	logrus.Trace("dlq_remove returns")
 
 	/* TODO KG
 	   #if AX25MEMDEBUG

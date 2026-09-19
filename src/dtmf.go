@@ -223,7 +223,9 @@ func dtmf_sample(c int, input float64) rune {
 			col = -1
 		}
 
-		logrus.WithField("output", output).Debug("dtmf_sample tone outputs")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("output", output).Trace("dtmf_sample tone outputs")
+		}
 
 		var rc2char = []rune{'1', '2', '3', 'A',
 			'4', '5', '6', 'B',
@@ -279,12 +281,14 @@ func dtmf_sample(c int, input float64) rune {
 
 		D.prev_debounced = D.debounced
 
-		logrus.WithFields(logrus.Fields{
-			"dec":     string(decoded),
-			"deb":     string(D.debounced),
-			"ret":     string(ret),
-			"timeout": D.timeout,
-		}).Debug("dtmf_sample")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithFields(logrus.Fields{
+				"dec":     string(decoded),
+				"deb":     string(D.debounced),
+				"ret":     string(ret),
+				"timeout": D.timeout,
+			}).Trace("dtmf_sample")
+		}
 
 		return (ret)
 	}

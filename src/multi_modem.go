@@ -470,8 +470,8 @@ func pick_best_candidate(channel int) {
 		}
 	}
 
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		logrus.WithField("spectrum", spectrum).Debug("pick_best_candidate")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("spectrum", spectrum).Trace("pick_best_candidate")
 
 		for n := range num_bars {
 			var j = subchan_from_n(channel, n)
@@ -486,7 +486,7 @@ func pick_best_candidate(channel int) {
 			})
 
 			if c.packet_p == nil {
-				logEntry.Debug("candidate: no packet")
+				logEntry.Trace("candidate: no packet")
 			} else {
 				logEntry.WithFields(logrus.Fields{
 					"fec_type": c.fec_type,
@@ -494,7 +494,7 @@ func pick_best_candidate(channel int) {
 					"age":      c.age,
 					"crc":      fmt.Sprintf("%04x", c.crc),
 					"score":    c.score,
-				}).Debug("candidate")
+				}).Trace("candidate")
 			}
 		}
 	}

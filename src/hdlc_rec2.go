@@ -217,7 +217,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 	var fix_bits = save_audio_config_p.achan[channel].fix_bits
 	var passall = save_audio_config_p.achan[channel].passall
 
-	logrus.Debug("--- try to decode ---")
+	logrus.Trace("--- try to decode ---")
 
 	/* Create an empty retry configuration */
 	var retry_cfg = new(retry_conf_t)
@@ -235,7 +235,7 @@ func hdlc_rec2_block(block *rrbb_t) {
 
 	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
 	if ok {
-		logrus.Debug("Got it the first time.")
+		logrus.Trace("Got it the first time.")
 		rrbb_delete(block)
 
 		return
@@ -330,7 +330,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
 				"len": length,
-			}).Debug("Success by flipping SINGLE bit")
+			}).Trace("Success by flipping SINGLE bit")
 
 			return true
 		}
@@ -354,7 +354,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
 				"len": length,
-			}).Debug("Success by flipping DOUBLE bit")
+			}).Trace("Success by flipping DOUBLE bit")
 
 			return true
 		}
@@ -378,7 +378,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 			logrus.WithFields(logrus.Fields{
 				"bit": i,
 				"len": length,
-			}).Debug("Success by flipping TRIPLE bit")
+			}).Trace("Success by flipping TRIPLE bit")
 
 			return true
 		}
@@ -399,7 +399,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 	retry_cfg.retry = RETRY_INVERT_TWO_SEP
 	retry_cfg.sep.bit_idx_c = -1
 
-	logrus.WithField("len", length).Debug("Try flipping TWO SEPARATED BITS")
+	logrus.WithField("len", length).Trace("Try flipping TWO SEPARATED BITS")
 	length = rrbb_get_len(block)
 	for i := range length - 2 {
 		retry_cfg.sep.bit_idx_a = i
@@ -420,7 +420,7 @@ func try_to_fix_quick_now(block *rrbb_t, channel int, subchan int, slice int, al
 				"bit_a": i,
 				"bit_b": retry_cfg.sep.bit_idx_b,
 				"len":   length,
-			}).Debug("Success by flipping TWO SEPARATED bits")
+			}).Trace("Success by flipping TWO SEPARATED bits")
 
 			return true
 		}
@@ -573,7 +573,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 	var blen = rrbb_get_len(block)
 
 	if retry_conf_type == RETRY_TYPE_NONE {
-		logrus.WithField("blen", blen).Debug("try_decode")
+		logrus.WithField("blen", blen).Trace("try_decode")
 	}
 	for i := 1; i < blen; i++ {
 		/* Get the value for the current bit */
@@ -626,7 +626,9 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 			H2.pat_det |= 0x80
 			/* Valid data will never have 7 one bits in a row: exit. */
 			if H2.pat_det == 0xfe {
-				logrus.WithField("i", i).Debug("try_decode: found abort")
+				if logrus.IsLevelEnabled(logrus.TraceLevel) {
+					logrus.WithField("i", i).Trace("try_decode: found abort")
+				}
 
 				return false
 			}
@@ -636,7 +638,9 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 		} else {
 			/* The special pattern 01111110 indicates beginning and ending of a frame: exit. */
 			if H2.pat_det == 0x7e {
-				logrus.WithField("i", i).Debug("try_decode: found flag")
+				if logrus.IsLevelEnabled(logrus.TraceLevel) {
+					logrus.WithField("i", i).Trace("try_decode: found flag")
+				}
 
 				return false
 				/*
@@ -674,17 +678,19 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 	 * Do we have a minimum number of complete bytes?
 	 */
 
-	logrus.WithFields(logrus.Fields{
-		"olen":      H2.olen,
-		"frame_len": H2.frame_len,
-	}).Debug("try_decode")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"olen":      H2.olen,
+			"frame_len": H2.frame_len,
+		}).Trace("try_decode")
+	}
 
 	if H2.olen == 0 && H2.frame_len >= MIN_FRAME_LEN {
-		if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.DebugLevel) {
+		if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
 				"frame_len": H2.frame_len,
 				"frame":     fmt.Sprintf("% x", H2.frame_buf[:H2.frame_len]),
-			}).Debug("try_decode: frame")
+			}).Trace("try_decode: frame")
 		}
 		/* Check FCS, low byte first, and process... */
 
@@ -752,7 +758,7 @@ func try_decode(block *rrbb_t, channel int, subchan int, slice int, alevel ALeve
 	}
 
 failure:
-	if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.DebugLevel) {
+	if retry_conf_type == RETRY_TYPE_NONE && logrus.IsLevelEnabled(logrus.TraceLevel) {
 		var logEntry = logrus.WithFields(logrus.Fields{
 			"olen":      H2.olen,
 			"frame_len": H2.frame_len,
@@ -760,14 +766,14 @@ failure:
 
 		switch {
 		case H2.olen != 0:
-			logEntry.Debug("try_decode: FAILURE, bad olen")
+			logEntry.Trace("try_decode: FAILURE, bad olen")
 		case H2.frame_len < MIN_FRAME_LEN:
-			logEntry.Debug("try_decode: FAILURE, frame too small")
+			logEntry.Trace("try_decode: FAILURE, frame too small")
 		default:
 			logEntry.WithFields(logrus.Fields{
 				"fcs_ok": fcs_ok,
 				"frame":  fmt.Sprintf("% x", H2.frame_buf[:H2.frame_len]),
-			}).Debug("try_decode: FAILURE, frame rejected")
+			}).Trace("try_decode: FAILURE, frame rejected")
 		}
 	}
 
@@ -834,7 +840,7 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 	}
 
 	if alen%7 != 0 {
-		logrus.WithField("alen", alen).Debug("sanity_check: FAILED.  Address part length not multiple of 7.")
+		logrus.WithField("alen", alen).Trace("sanity_check: FAILED.  Address part length not multiple of 7.")
 
 		return false
 	}
@@ -844,7 +850,7 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 	 */
 
 	if alen/7 < 2 || alen/7 > 10 {
-		logrus.Debug("sanity_check: FAILED.  Too few or many addresses.")
+		logrus.Trace("sanity_check: FAILED.  Too few or many addresses.")
 
 		return false
 	}
@@ -870,7 +876,7 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 			(!unicode.IsUpper(addr[3]) && !unicode.IsDigit(addr[3]) && addr[3] != ' ') ||
 			(!unicode.IsUpper(addr[4]) && !unicode.IsDigit(addr[4]) && addr[4] != ' ') ||
 			(!unicode.IsUpper(addr[5]) && !unicode.IsDigit(addr[5]) && addr[5] != ' ') {
-			logrus.WithField("addr", string(addr[:])).Debug("sanity_check: FAILED.  Invalid characters in addresses")
+			logrus.WithField("addr", string(addr[:])).Trace("sanity_check: FAILED.  Invalid characters in addresses")
 
 			return false
 		}
@@ -923,7 +929,7 @@ func sanity_check(buf []byte, bits_flipped BitFixLevel, sanity_test sanity_t) bo
 		var ch = buf[j]
 
 		if (ch < 0x1c || ch > 0x7f) && ch != 0x0a && ch != 0x0d && ch != 0x80 && ch != 0x9f && ch != 0xc2 && ch != 0xb0 && ch != 0xf8 {
-			logrus.WithField("ch", fmt.Sprintf("0x%02x", ch)).Debug("sanity_check: FAILED.  Probably bogus info char")
+			logrus.WithField("ch", fmt.Sprintf("0x%02x", ch)).Trace("sanity_check: FAILED.  Probably bogus info char")
 
 			return false
 		}

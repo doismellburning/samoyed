@@ -140,8 +140,8 @@ func SerialPortGet1(fd *term.Term) (byte, error) {
 		return 0, err
 	}
 
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		logrus.WithField("ch", fmt.Sprintf("0x%02x", bytes[0])).Debug("SerialPortGet1")
+	if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithField("ch", fmt.Sprintf("0x%02x", bytes[0])).Trace("SerialPortGet1")
 	}
 
 	return bytes[0], nil

@@ -292,8 +292,8 @@ func kissserial_get() (byte, error) {
 			return ch, err
 		}
 
-		if logrus.IsLevelEnabled(logrus.DebugLevel) {
-			logrus.WithField("ch", fmt.Sprintf("0x%02x", ch)).Debug("kissserial_get")
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("ch", fmt.Sprintf("0x%02x", ch)).Trace("kissserial_get")
 		}
 
 		return ch, nil

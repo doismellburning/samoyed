@@ -438,8 +438,8 @@ func (kns *KissNetService) get(kps *kissport_status_s, client int) (byte, *KISSF
 		var n, _ = conn.Read(ch)
 
 		if n == 1 {
-			if logrus.IsLevelEnabled(logrus.DebugLevel) {
-				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Debug("kissnet get")
+			if logrus.IsLevelEnabled(logrus.TraceLevel) {
+				logrus.WithField("ch", fmt.Sprintf("%02x", ch[0])).Trace("kissnet get")
 			}
 
 			return ch[0], frame
