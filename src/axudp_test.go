@@ -5,6 +5,7 @@ package direwolf
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -577,5 +578,179 @@ func TestBroadcastKISSDropsOversizedFrame(t *testing.T) {
 
 	if writeCount != 0 {
 		t.Errorf("broadcastKISS wrote %d frame(s) to client for oversized frame, want 0", writeCount)
+	}
+}
+
+// TestRunUDPListenerReturnsOnReadError verifies that a broken UDP socket makes
+// RunUDPListener return the read error to its caller rather than terminating
+// the process itself, so the caller decides what a dead UDP side means.
+func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
+	var pkt, listenErr = new(net.ListenConfig).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
+	if listenErr != nil {
+		t.Fatal(listenErr)
+	}
+
+	var udpConn, connOK = pkt.(*net.UDPConn)
+	if !connOK {
+		t.Fatal("pkt is not a *net.UDPConn")
+	}
+
+	var b = NewAXUDPBridge(nil, udpConn, false)
+
+	var errs = make(chan error, 1)
+	go func() { errs <- b.RunUDPListener() }()
+
+	// Closing the socket out from under the listener is the broken-socket case.
+	var closeErr = udpConn.Close()
+	if closeErr != nil {
+		t.Fatal(closeErr)
+	}
+
+	select {
+	case runErr := <-errs:
+		if runErr == nil {
+			t.Fatal("RunUDPListener returned nil error after the socket was closed")
+		}
+		if !errors.Is(runErr, net.ErrClosed) {
+			t.Errorf("RunUDPListener returned %v, want an error wrapping net.ErrClosed", runErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("RunUDPListener did not return after the socket was closed")
+	}
+}
+
+// TestRunKISSServerReturnsOnListenerClose verifies that a closed listener makes
+// RunKISSServer return rather than terminating the process or spinning on a
+// socket that cannot recover.
+func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
+	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if listenErr != nil {
+		t.Fatal(listenErr)
+	}
+
+	var b = NewAXUDPBridge(nil, nil, false)
+
+	var errs = make(chan error, 1)
+	go func() { errs <- b.RunKISSServer(ln) }()
+
+	var closeErr = ln.Close()
+	if closeErr != nil {
+		t.Fatal(closeErr)
+	}
+
+	select {
+	case runErr := <-errs:
+		if runErr == nil {
+			t.Fatal("RunKISSServer returned nil error after the listener was closed")
+		}
+		if !errors.Is(runErr, net.ErrClosed) {
+			t.Errorf("RunKISSServer returned %v, want an error wrapping net.ErrClosed", runErr)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("RunKISSServer did not return after the listener was closed")
+	}
+}
+
+// failingListener is a net.Listener whose Accept always fails with an error
+// that is not net.ErrClosed, counting the attempts.
+type failingListener struct {
+	mu       sync.Mutex
+	attempts int
+}
+
+func (l *failingListener) Accept() (net.Conn, error) {
+	l.mu.Lock()
+	l.attempts++
+	l.mu.Unlock()
+
+	return nil, errors.New("accept failed")
+}
+
+func (l *failingListener) Close() error { return nil }
+
+func (l *failingListener) Addr() net.Addr { return &net.TCPAddr{IP: net.IPv4zero, Port: 0, Zone: ""} }
+
+// TestRunKISSServerGivesUpOnPersistentAcceptFailure verifies that an accept
+// that keeps failing for some reason other than a closed listener makes
+// RunKISSServer return, rather than retrying forever in a tight loop that
+// spins the CPU and floods the log.
+func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
+	var ln = new(failingListener)
+	var b = NewAXUDPBridge(nil, nil, false)
+
+	var errs = make(chan error, 1)
+	go func() { errs <- b.RunKISSServer(ln) }()
+
+	select {
+	case runErr := <-errs:
+		if runErr == nil {
+			t.Fatal("RunKISSServer returned nil error after accept kept failing")
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("RunKISSServer did not return while accept kept failing")
+	}
+
+	// Giving up must take a bounded number of attempts, and more than one, so
+	// an isolated failure is still retried rather than killing the bridge.
+	ln.mu.Lock()
+	var attempts = ln.attempts
+	ln.mu.Unlock()
+
+	if attempts != axudpMaxAcceptFailures {
+		t.Errorf("accept was attempted %d times, want %d", attempts, axudpMaxAcceptFailures)
+	}
+}
+
+// TestRunKISSServerRegistersAcceptedClients verifies that a connection accepted
+// by RunKISSServer is registered as a broadcast client, i.e. that frames
+// arriving over UDP would reach it.
+func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
+	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if listenErr != nil {
+		t.Fatal(listenErr)
+	}
+	defer ln.Close()
+
+	var b = NewAXUDPBridge(nil, nil, false)
+
+	go b.RunKISSServer(ln) //nolint:errcheck // the error is the teardown path, covered above
+
+	var client, dialErr = new(net.Dialer).DialContext(context.Background(), "tcp", ln.Addr().String())
+	if dialErr != nil {
+		t.Fatal(dialErr)
+	}
+	defer client.Close()
+
+	// Dial returning does not mean Accept has run, so wait for registration.
+	var deadline = time.Now().Add(2 * time.Second)
+	for {
+		b.mu.Lock()
+		var registered = len(b.clients)
+		b.mu.Unlock()
+		if registered == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("accepted connection was not registered as a client (have %d)", registered)
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	// A broadcast must now reach the client as a KISS frame.
+	var ax25frame = []byte{0xA2, 0x62, 0xA8, 0x8A, 0xA6, 0xA8, 0xE0}
+	b.broadcastKISS(ax25frame)
+
+	var setErr = client.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if setErr != nil {
+		t.Fatal(setErr)
+	}
+	var rxBuf = make([]byte, 256)
+	var n, rxErr = client.Read(rxBuf)
+	if rxErr != nil {
+		t.Fatalf("accepted client received no broadcast: %v", rxErr)
+	}
+	var want = KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25frame...))
+	if string(rxBuf[:n]) != string(want) {
+		t.Errorf("client received %x, want %x", rxBuf[:n], want)
 	}
 }

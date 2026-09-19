@@ -4,7 +4,6 @@
 package direwolf
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -130,17 +129,17 @@ func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn, verbose bool) *A
 // datagram regardless of payload length.
 const maxUDPPayload = 65535
 
-// RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to all clients.
-func (b *AXUDPBridge) RunUDPListener() {
+// RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to
+// all clients.  It only returns on a read error, which means the socket is
+// broken and the UDP side of the bridge is now dead: the caller should report
+// the error and terminate so the process can be restarted, rather than
+// continuing silently with no incoming traffic.
+func (b *AXUDPBridge) RunUDPListener() error {
 	var buf = make([]byte, maxUDPPayload)
 	for {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
-			// A UDP read error means the socket is broken; the UDP side of
-			// the bridge is now dead.  Exit so the process can be restarted
-			// rather than silently continuing with no incoming traffic.
-			fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP listener fatal error: %v\n", readErr)
-			os.Exit(1)
+			return fmt.Errorf("UDP listener: %w", readErr)
 		}
 
 		if n < 1 {
@@ -178,28 +177,53 @@ func (b *AXUDPBridge) RunUDPListener() {
 	}
 }
 
-// RunKISSServer accepts TCP connections from KISS clients.
-func (b *AXUDPBridge) RunKISSServer(kissPort int) {
-	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", kissPort))
-	if listenErr != nil {
-		fmt.Fprintf(os.Stderr, "samoyed-axudp: TCP listen on port %d: %v\n", kissPort, listenErr)
-		os.Exit(1)
-	}
-	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", kissPort)
+// axudpAcceptBackoff is how long RunKISSServer waits after a failed accept
+// before trying again, doubling up to axudpMaxAcceptBackoff.  Accepting can
+// fail for reasons that pass — a client that goes away between the handshake
+// and the accept, or a momentarily exhausted file descriptor table — and
+// retrying immediately would spin the CPU and flood the log until it does.
+const axudpAcceptBackoff = 5 * time.Millisecond
+
+// axudpMaxAcceptBackoff caps that wait.
+const axudpMaxAcceptBackoff = time.Second
+
+// axudpMaxAcceptFailures is how many accepts may fail in a row before
+// RunKISSServer gives up.  Something that has not passed after this many tries
+// is not the transient the backoff is there for.
+const axudpMaxAcceptFailures = 10
+
+// RunKISSServer accepts TCP connections from KISS clients on ln.  The caller
+// owns ln and is responsible for closing it.  It returns once ln is closed, or
+// once accepting has failed axudpMaxAcceptFailures times in a row; neither can
+// be recovered from, so the caller should report the error and terminate
+// rather than spinning on a broken socket.  An isolated accept failure is
+// reported and retried after a backoff.
+func (b *AXUDPBridge) RunKISSServer(ln net.Listener) error {
+	var failures int
+	var backoff = axudpAcceptBackoff
 
 	for {
 		var conn, acceptErr = ln.Accept()
 		if acceptErr != nil {
-			// A closed listener cannot recover; exit so the process can be
-			// restarted rather than spinning on a broken socket.
 			if errors.Is(acceptErr, net.ErrClosed) {
-				fmt.Fprintf(os.Stderr, "samoyed-axudp: accept fatal error: %v\n", acceptErr)
-				os.Exit(1)
+				return fmt.Errorf("KISS server accept: %w", acceptErr)
 			}
+
+			failures++
+			if failures >= axudpMaxAcceptFailures {
+				return fmt.Errorf("KISS server accept failed %d times in a row, last: %w", failures, acceptErr)
+			}
+
 			fmt.Fprintf(os.Stderr, "samoyed-axudp: accept: %v\n", acceptErr)
+			time.Sleep(backoff)
+			backoff = min(backoff*2, axudpMaxAcceptBackoff)
 
 			continue
 		}
+
+		failures = 0
+		backoff = axudpAcceptBackoff
+
 		fmt.Printf("samoyed-axudp: new KISS client %v\n", conn.RemoteAddr())
 		go b.handleKISSClient(conn)
 	}
