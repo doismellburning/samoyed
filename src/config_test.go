@@ -1656,6 +1656,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"PACLEN": {
+			{
+				name:   "a valid length is stored",
+				config: "PACLEN 128\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(128, c.misc.paclen)
+				},
+			},
+			{
+				name:   "no PACLEN leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+				},
+			},
+			{
+				name:   "the limits themselves are accepted",
+				config: "PACLEN 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_MIN, c.misc.paclen)
+				},
+			},
+			{
+				name:   "a length longer than an information field can hold keeps the default",
+				config: "PACLEN 9999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+				},
+			},
+			{
+				name:   "a length of nothing at all keeps the default",
+				config: "PACLEN 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+				},
+			},
+			{
+				name:   "an unreadable length keeps the default",
+				config: "PACLEN long\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+					a.Contains(c.output, "Invalid PACLEN value")
+				},
+			},
+			{
+				name:   "a missing length does not eat the next line",
+				config: "PACLEN\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"PERSIST": {
 			{
 				name:   "a valid probability is stored",
@@ -2025,7 +2078,6 @@ func directivesNotYetTested() []string {
 		"NOXID",
 		"NULLMODEM",
 		"OBEACON",
-		"PACLEN",
 		"PTT",
 		"REGEN",
 		"SATGATE",
