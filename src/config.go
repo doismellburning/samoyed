@@ -2694,7 +2694,13 @@ func handleTXINH(ps *parseState) bool {
 			return true
 		}
 
-		var gpio, _ = strconv.Atoi(t)
+		var gpio, gpioErr = strconv.Atoi(t)
+		if gpioErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, itname)
+
+			return true
+		}
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * gpio
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].invert = true

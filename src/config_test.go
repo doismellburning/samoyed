@@ -1804,6 +1804,18 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the number went through an Atoi whose error was
+			// ignored, so "TXINH GPIO ab" configured GPIO 0 as the transmit inhibit
+			// input.  Whatever that pin happens to be doing then decides whether the
+			// station may transmit at all.
+			{
+				name:   "an unreadable GPIO number leaves the input unconfigured",
+				config: "TXINH GPIO twentyfive\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Zero(c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
+				},
+			},
 		},
 		"TXTAIL": {
 			{
