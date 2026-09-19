@@ -3622,6 +3622,65 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTMHEAD": {
+			{
+				name:   "a pattern of six digits' worth of x is stored",
+				config: "TTMHEAD B1xxxxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_MHEAD, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B1xxxxxx", c.tt.ttlocs[0].pattern)
+					a.Empty(c.tt.ttlocs[0].mhead.prefix)
+				},
+			},
+			{
+				name:   "no TTMHEAD means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "a prefix makes up the rest of the digits",
+				config: "TTMHEAD B1xxxxxx 326129\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal("326129", c.tt.ttlocs[0].mhead.prefix)
+				},
+			},
+			{
+				name:   "a pattern with anything but x after the button is rejected",
+				config: "TTMHEAD B1xxyyxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "only lower case x")
+				},
+			},
+			{
+				name:   "a prefix that is not 4, 6 or 10 digits is rejected",
+				config: "TTMHEAD B1xxxxxx 32612\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "prefix must be 4, 6, or 10 digits")
+				},
+			},
+			{
+				name:   "a prefix and pattern that do not add up to a locator are rejected",
+				config: "TTMHEAD B1xxxx 3261\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "total of 4, 6, 10, or 12 digits")
+				},
+			},
+			{
+				name:   "a missing pattern does not eat the next line",
+				config: "TTMHEAD\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTPOINT": {
 			{
 				name:   "a pattern and its position are stored",
@@ -4155,7 +4214,6 @@ func directivesNotYetTested() []string {
 		"TTCMD",
 		"TTERR",
 		"TTMACRO",
-		"TTMHEAD",
 		"TTOBJ",
 		"TTSATSQ",
 		"TTSTATUS",
