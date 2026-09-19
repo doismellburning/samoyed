@@ -382,6 +382,67 @@ func kiss_unwrap(in []byte) []byte {
 
 /*-------------------------------------------------------------------
  *
+ * Name:        KissUnescape
+ *
+ * Purpose:     Undo the KISS transposition of FEND and FESC, saying what was
+ *		wrong with anything malformed.
+ *
+ * Inputs:	in	- The contents of one frame, without the surrounding
+ *			  FENDs.  This is "binary" data and can contain nul
+ *			  (0x00) values, so don't treat it like a text string.
+ *
+ * Returns:	The original bytes, and everything wrong with the escaping.
+ *
+ * Description:	kiss_unwrap does this for a live TNC, where carrying on with a
+ *		complaint is the right thing to do.  Something inspecting a
+ *		capture instead wants to know exactly where a bad escape
+ *		sequence is, and to decide for itself how to report it, so the
+ *		problems are returned rather than printed.
+ *
+ *		Recovery differs too: kiss_unwrap drops an unexpected byte after
+ *		FESC, where this keeps it, so that what is described accounts for
+ *		every byte of the capture.
+ *
+ *-----------------------------------------------------------------*/
+
+func KissUnescape(in []byte) ([]byte, []error) {
+	var out bytes.Buffer
+
+	var problems []error
+
+	for i := 0; i < len(in); i++ {
+		if in[i] != FESC {
+			out.WriteByte(in[i])
+
+			continue
+		}
+
+		if i == len(in)-1 {
+			problems = append(problems, fmt.Errorf("frame ends with FESC (0x%02x) at offset %d - the escaped byte is missing", FESC, i))
+
+			break
+		}
+
+		i++
+
+		switch in[i] {
+		case TFEND:
+			out.WriteByte(FEND)
+		case TFESC:
+			out.WriteByte(FESC)
+		default:
+			problems = append(problems, fmt.Errorf("FESC (0x%02x) at offset %d is followed by 0x%02x, not TFEND (0x%02x) or TFESC (0x%02x) - taking it literally",
+				FESC, i-1, in[i], TFEND, TFESC))
+
+			out.WriteByte(in[i])
+		}
+	}
+
+	return out.Bytes(), problems
+} /* end KissUnescape */
+
+/*-------------------------------------------------------------------
+ *
  * Name:        kiss_debug_print
  *
  * Purpose:     Print message to/from client for debugging.

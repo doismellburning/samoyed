@@ -985,7 +985,7 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
  *
  *--------------------------------------------------------------------*/
 
-func ax25_check_addresses(pp *packet_t, strictness addrStrictness) bool { //nolint:unparam
+func ax25_check_addresses(pp *packet_t, strictness addrStrictness) bool {
 	var all_ok = true
 
 	for n := range ax25_get_num_addr(pp) {
@@ -2812,6 +2812,26 @@ func AX25SafePrint(info []byte, ascii_only bool) {
 
 	dw_printf("%s", safe_str.String())
 } /* end AX25SafePrint */
+
+/*------------------------------------------------------------------
+ *
+ * Function:	NoteSafePrintTruncation
+ *
+ * Purpose:	Say that AX25SafePrint showed only part of what it was given.
+ *
+ * Inputs:	length	- Number of bytes handed to AX25SafePrint.
+ *
+ * Description:	AX25SafePrint stops after MAXSAFE bytes without mentioning it,
+ *		which is fine for monitoring but not for anything inspecting a
+ *		capture: the reader would take the part for the whole.
+ *
+ *------------------------------------------------------------------*/
+
+func NoteSafePrintTruncation(length int) {
+	if length > MAXSAFE {
+		fmt.Printf("(Only the first %d of %d bytes are shown above.)\n", MAXSAFE, length)
+	}
+}
 
 /*------------------------------------------------------------------
  *

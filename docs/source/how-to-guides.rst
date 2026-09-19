@@ -237,3 +237,37 @@ before turning this on.
 The credentials cross the network in the clear, exactly as the AGW protocol
 specifies them.  Treat this as a way to keep casual traffic off the port, not as
 protection against someone who can watch it.
+
+Decode a captured KISS byte stream
+-----------------------------------
+
+When a KISS client application misbehaves, the question is usually what was
+actually on the wire.  ``samoyed-kissdump`` answers it offline: give it the
+bytes and it describes each frame.
+
+.. code::
+
+    $ samoyed-kissdump < capture.bin
+
+Bytes quoted in a bug report are usually hexadecimal rather than raw, so
+``--hex`` reads them that way.  Whitespace is ignored, so ``c0 00 82`` and
+``c00082`` are the same thing and it does not matter how the digits are laid out
+across lines; anything that is not a hexadecimal digit is an error, so the
+offsets and ASCII column of a hex dump have to be cut away first rather than be
+read as data.
+
+.. code::
+
+    $ samoyed-kissdump --hex < capture.txt
+
+For each frame it undoes the KISS framing, shows the command byte and port
+number, decodes the AX.25 header (addresses, digipeater path with the H bits,
+control and PID), and hands the information field to the APRS decoder where the
+frame is APRS.
+
+Being strict about malformed input is the point, since that is what is being
+chased: a frame the capture never terminates, an escape sequence that is
+neither ``TFEND`` nor ``TFESC``, a data frame too short to hold an AX.25
+header, and an address field whose end-of-address bit is in the wrong place are
+all reported rather than skipped.  The exit status is non-zero if anything was
+wrong, so it can be used as a check.

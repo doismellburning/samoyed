@@ -179,3 +179,49 @@ func Test_decode_aprs_weather_unknown_wind(t *testing.T) {
 		"Q1TEST>APRS:!4903.50N/07201.75W_c...s...g005t077wRSW", true), true, "")
 	assert.Equal(t, `, gust 5, temperature 77, "wRSW"`, A.g_weather)
 }
+
+// An item report whose name runs to the end of the information field has no
+// live/killed indicator.  aprs_item used to walk off the end looking for one,
+// bringing the program down on a packet that arrived off the air.
+func Test_decode_aprs_item_without_live_killed_indicator(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = AX25FromText("Q1TEST>APDW17:)Zb00000Zb00001", true)
+	assert.NotNil(t, pp)
+
+	// Must not panic.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "Item - name not ended by ! or _", A.g_data_type_desc)
+	assert.Equal(t, "Zb00000Zb00001", A.g_name)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
+}
+
+// The name is meant to be 3 to 9 characters.  One that isn't was an assertion
+// failure, which is to say a crash, rather than something to report.
+func Test_decode_aprs_item_with_short_name(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = AX25FromText("Q1TEST>APDW17:)AB!4237.14N/07120.83W#", true)
+	assert.NotNil(t, pp)
+
+	// Must not panic, and the rest of the item still decodes.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "Item", A.g_data_type_desc)
+	assert.Equal(t, "AB", A.g_name)
+	assert.Equal(t, maybe.Just(42.619), A.g_lat)
+}
+
+// An item that stops before its position has no position, rather than the
+// zeroed one binary.Decode leaves behind.
+func Test_decode_aprs_item_without_position(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = AX25FromText("Q1TEST>APDW17:)ABCDE!", true)
+	assert.NotNil(t, pp)
+
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "Item", A.g_data_type_desc)
+	assert.Equal(t, "ABCDE", A.g_name)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
+}
