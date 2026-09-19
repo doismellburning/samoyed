@@ -242,6 +242,10 @@ func Test_parse_ll_maybe(t *testing.T) {
 		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("42^ab", LAT, 0))
 	})
 
+	t.Run("a non-finite coordinate is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("NaN^0", LAT, 0))
+	})
+
 	t.Run("a readable coordinate is Just", func(t *testing.T) {
 		assert.InDelta(t, -71.5, maybe.FromJust(parse_ll_maybe("71.5W", LON, 0)), 0.0001)
 	})
@@ -256,6 +260,26 @@ func Test_config_init_beacon_empty_lat(t *testing.T) {
 			assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
 		})
 	})
+}
+
+func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
+	// Regression test: ParseFloat happily reads "NaN" and "Inf", so a beacon
+	// option could hold a value no arithmetic survives.  int(NaN) is the
+	// smallest int64, which frequency_spec put on the air as
+	// "T-9223372036854775808".
+	var config = "MYCALL Q1TEST\n" +
+		"PBEACON LAT=NaN^0 LONG=71W FREQ=NaN TONE=NaN OFFSET=Inf ALT=-Inf\n"
+
+	var _, misc = configFromString(t, config)
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].freq)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].tone)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].offset)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
+
+	assert.Empty(t, frequency_spec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
 }
 
 func Test_config_init_beacon_unparseable_lat_long(t *testing.T) {

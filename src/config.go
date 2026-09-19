@@ -473,6 +473,16 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[fl
 
 	degrees *= float64(sign)
 
+	if math.IsNaN(degrees) || math.IsInf(degrees, 0) {
+		logrus.WithFields(logrus.Fields{
+			"line":       line,
+			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
+			"value":      str,
+		}).Error("Coordinate is not a finite number")
+
+		return maybe.Nothing[float64]()
+	}
+
 	var limit = float64(IfThenElse(which == LAT, 90, 180))
 	if degrees < -limit || degrees > limit {
 		text_color_set(DW_COLOR_ERROR)
@@ -6239,7 +6249,7 @@ func handleNOXID(ps *parseState) bool {
 // value nobody asked for.
 func parse_beacon_number(keyword string, value string, line int) (float64, bool) {
 	var f, err = strconv.ParseFloat(value, 64)
-	if err != nil {
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
 		logrus.WithFields(logrus.Fields{
 			"line":   line,
 			"option": keyword,
