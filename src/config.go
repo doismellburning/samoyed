@@ -3003,22 +3003,10 @@ func handleSPEECH(ps *parseState) bool {
 		return true
 	}
 
-	/* See if we can run it. */
+	// Dire Wolf tried running the script here, to report a broken one at
+	// startup.  xmit_speak_it does that every time it speaks instead.
+	ps.audio.tts_script = t
 
-	/*
-	   TODO KG Do we *actually* want to do this...? If so, let's do it when we've ported this to Go...
-
-	   	 if (xmit_speak_it(t, -1, " ") == 0) {
-	   	   if (strlcpy (ps.audio.tts_script, t, sizeof(ps.audio.tts_script)) >= sizeof(ps.audio.tts_script)) {
-	   	     text_color_set(DW_COLOR_ERROR);
-	   	     dw_printf ("Line %d: Script for text-to-speech function is too long.\n", ps.line);
-	   	   }
-	   	 } else {
-	   	   text_color_set(DW_COLOR_ERROR);
-	   	   dw_printf ("Line %d: Error trying to run Text-to-Speech function.\n", ps.line);
-	   	   continue;
-	   	}
-	*/
 	return false
 }
 

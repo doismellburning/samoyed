@@ -1715,6 +1715,37 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the port left the assignment commented out, so the
+			// script was read, checked for being present, and thrown away.  xmit
+			// skips speaking when tts_script is empty, so SPEECH did nothing at all.
+			{
+				name:   "the script is stored",
+				config: "SPEECH /bin/echo\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/bin/echo", c.audio.tts_script)
+				},
+			},
+			{
+				name:   "a script name with spaces can be quoted",
+				config: "SPEECH \"/usr/local/bin/say it\"\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/usr/local/bin/say it", c.audio.tts_script)
+				},
+			},
+			{
+				name:   "no SPEECH leaves nothing to speak with",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.tts_script)
+				},
+			},
+			{
+				name:   "a missing script name leaves nothing to speak with",
+				config: "SPEECH\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.tts_script)
+				},
+			},
 		},
 		"TXTAIL": {
 			{
