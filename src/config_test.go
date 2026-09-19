@@ -1557,6 +1557,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"MAXFRAME": {
+			{
+				name:   "a valid window size is stored",
+				config: "MAXFRAME 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "no MAXFRAME leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "the largest window a modulo 8 sequence number allows is accepted",
+				config: "MAXFRAME 7\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_MAX, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "a window that will not fit a modulo 8 sequence number falls back to the default",
+				config: "MAXFRAME 8\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "a window of no frames at all falls back to the default",
+				config: "MAXFRAME 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "an unreadable window size falls back to the default",
+				config: "MAXFRAME two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+					a.Contains(c.output, "Invalid MAXFRAME value")
+				},
+			},
+			{
+				name:   "a missing window size does not eat the next line",
+				config: "MAXFRAME\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"NCHANNEL": {
 			{
 				name:   "a virtual channel, address and port are stored",
@@ -2073,7 +2126,6 @@ func directivesNotYetTested() []string {
 		"KISSCOPY",
 		"LOGDIR",
 		"LOGFILE",
-		"MAXFRAME",
 		"MAXV22",
 		"NOXID",
 		"NULLMODEM",
