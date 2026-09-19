@@ -163,7 +163,11 @@ func recv_adev_thread(a int, failed chan<- int) {
 			if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
 				var tt = dtmf_sample(first_chan+c, float64(audio_sample)/16384.)
 				if tt != ' ' {
-					ttGateway.Button(first_chan+c, tt)
+					var err = ttGateway.Button(first_chan+c, tt)
+					if err != nil {
+						text_color_set(DW_COLOR_ERROR)
+						dw_printf("APRStt: %v\n", err)
+					}
 				}
 			}
 		} // for c is just 0 or 0 then 1

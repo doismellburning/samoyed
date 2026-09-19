@@ -27,6 +27,7 @@ package direwolf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os/exec"
@@ -87,6 +88,46 @@ func ttErrorString(errCode int) string { // TODO Fix the type
 	default:
 		panic(fmt.Sprintf("Unknown errCode: %d", errCode))
 	}
+}
+
+/*
+ * Parsing a tone sequence has two kinds of thing to say for itself, and
+ * neither is this file's business to print.
+ *
+ * A ttError is fatal to the sequence: it carries the TT_ERROR_... code the
+ * caller needs to pick the audible response, and text saying what was wrong.
+ *
+ * A warning is everything short of that - something looked odd but the
+ * sequence was still usable.  Those accumulate in ttParseState.warnings, so
+ * the caller sees all of them rather than just the last.
+ */
+
+type ttError struct {
+	code int
+	msg  string
+}
+
+func (e *ttError) Error() string {
+	return e.msg
+}
+
+// ttErrorf builds a ttError with a printf-style message.
+func ttErrorf(code int, format string, a ...any) error {
+	return &ttError{code: code, msg: fmt.Sprintf(format, a...)}
+}
+
+// ttErrorCode is the TT_ERROR_... code to answer err with.  Anything that
+// isn't a ttError is something we didn't anticipate, hence internal.
+func ttErrorCode(err error) int {
+	if err == nil {
+		return TT_ERROR_OK
+	}
+
+	if ttErr, ok := errors.AsType[*ttError](err); ok {
+		return ttErr.code
+	}
+
+	return TT_ERROR_INTERNAL
 }
 
 /*
@@ -246,6 +287,15 @@ type ttParseState struct {
 	micE            rune
 	dao             [5]byte
 	ssid            int /* Default 12 for APRStt user. */
+
+	/* Things that looked wrong but didn't stop us. The caller decides what */
+	/* to make of them. */
+	warnings []error
+}
+
+// warnf notes something odd about the sequence being parsed, without giving up on it.
+func (state *ttParseState) warnf(format string, a ...any) {
+	state.warnings = append(state.warnings, fmt.Errorf(format, a...))
 }
 
 func newTTParseState() ttParseState {
@@ -305,7 +355,8 @@ func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
  *				$			- No activity timeout.
  *				space			- Quiet time filler.
  *
- * Returns:     None
+ * Returns:     An error if a completed sequence could not be handed on
+ *		to the application, otherwise nil.
  *
  * Description:	Individual key presses are accumulated here until
  *		the # message terminator is found.
@@ -320,11 +371,11 @@ func NewTTGateway(p *tt_config_s, debug int) *TTGateway {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) Button(channel int, button rune) {
+func (g *TTGateway) Button(channel int, button rune) error {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// if (button != '.') {
-	//   dw_printf ("aprs_tt_button (%d, '%c')\n", channel, button);
+	//   g.log.Debugf ("aprs_tt_button (%d, '%c')", channel, button);
 	// }
 
 	// TODO:  Might make more sense to put timeout here rather in the dtmf decoder.
@@ -343,9 +394,11 @@ func (g *TTGateway) Button(channel int, button rune) {
 			 * This way they are all processed by the common receive thread
 			 * rather than the thread associated with the particular audio device.
 			 */
-			raw_tt_data_to_app(channel, g.msgStr[channel])
+			var msg = g.msgStr[channel]
 
 			g.msgStr[channel] = ""
+
+			return raw_tt_data_to_app(channel, msg)
 		}
 	} else {
 		/*
@@ -363,6 +416,8 @@ func (g *TTGateway) Button(channel int, button rune) {
 			}
 		}
 	}
+
+	return nil
 } /* end Button */
 
 /*------------------------------------------------------------------
@@ -377,7 +432,9 @@ func (g *TTGateway) Button(channel int, button rune) {
  *		msg		- String of DTMF buttons.
  *				  # should be the final character.
  *
- * Returns:     None
+ * Returns:     An error if we could not respond to the sender.  A sequence
+ *		we couldn't make sense of is not an error here: that is
+ *		reported to the sender as an audible response, and logged.
  *
  * Description:	Process a complete tone sequence.
  *		It should have one or more fields separated by *
@@ -394,15 +451,15 @@ func (g *TTGateway) Button(channel int, button rune) {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) Sequence(channel int, msg string) {
-	logrus.WithField("msg", msg).Debug("aprs_tt Sequence")
+func (g *TTGateway) Sequence(channel int, msg string) error {
+	g.log.WithField("msg", msg).Debug("aprs_tt Sequence")
 
 	/*
 	 * Discard empty message.
 	 * In case # is there as optional start.
 	 */
 	if msg[0] == '#' {
-		return
+		return nil
 	}
 
 	/*
@@ -413,9 +470,9 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	/*
 	 * Parse the touch tone sequence.
 	 */
-	var err = g.parseFields(&state, msg)
+	var parseErr = g.parseFields(&state, msg)
 
-	logrus.WithFields(logrus.Fields{
+	g.log.WithFields(logrus.Fields{
 		"callsign":  state.callsign,
 		"ssid":      state.ssid,
 		"symbol":    string([]rune{state.symtabOrOverlay, state.symbolCode}),
@@ -430,14 +487,28 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	g.lastParseState = state
 
 	if g.runningTests {
-		return
+		return nil
 	}
+
+	/*
+	 * The parse functions only report what they found; saying so is ours to do.
+	 */
+
+	for _, warning := range state.warnings {
+		g.log.Warn(warning)
+	}
+
+	if parseErr != nil {
+		g.log.Error(parseErr)
+	}
+
+	var err = ttErrorCode(parseErr)
 
 	/*
 	 * If digested successfully.  Add to our list of users and schedule transmissions.
 	 */
 
-	if err == 0 {
+	if err == TT_ERROR_OK {
 		err = tt_user_heard(state.callsign, state.ssid, state.symtabOrOverlay, state.symbolCode,
 			state.locText, state.latitude, state.longitude, state.ambiguity,
 			state.freq, state.ctcss, state.comment, state.micE, string(state.dao[:]))
@@ -452,7 +523,7 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	 */
 	var script_response string
 
-	if err == 0 && len(g.config.ttcmd) > 0 {
+	if err == TT_ERROR_OK && len(g.config.ttcmd) > 0 {
 		var _script_response, _ = dw_run_cmd(g.config.ttcmd, 1)
 		script_response = string(_script_response)
 	}
@@ -475,13 +546,12 @@ func (g *TTGateway) Sequence(channel int, msg string) {
 	var pp = AX25FromText(audible_response, false)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error. Couldn't make frame from \"%s\"\n", audible_response)
-
-		return
+		return fmt.Errorf("couldn't make frame from %q", audible_response)
 	}
 
 	tq_append(channel, TQ_PRIO_0_HI, pp)
+
+	return nil
 } /* end Sequence */
 
 /*------------------------------------------------------------------
@@ -507,71 +577,50 @@ func (g *TTGateway) Sequence(channel int, msg string) {
  *
  *		"To iterate is human, to recurse divine."
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
+func (g *TTGateway) parseFields(state *ttParseState, msg string) error {
 	var fields = strings.FieldsFunc(msg, func(r rune) bool {
 		return strings.ContainsRune("*#", r)
 	})
 
-	var err int
-
 	for _, e := range fields {
-		// text_color_set(DW_COLOR_DEBUG);
-		// dw_printf ("parse_fields () field = %s\n", e);
+		g.log.Debugf("parseFields () field = %s", e)
+
+		var err error
+
 		switch e[0] {
 		case 'A':
 			switch e[1] {
 			case 'A': /* AA object-name */
 				err = g.parseObjectName(state, e)
-				if err != 0 {
-					return (err)
-				}
 			case 'B': /* AB symbol */
 				err = g.parseSymbol(state, e)
-				if err != 0 {
-					return (err)
-				}
 			case 'C': /* AC new-style-callsign */
 				err = g.parseAprstt3Call(state, e)
-				if err != 0 {
-					return (err)
-				}
 			default: /* Traditional style call or suffix */
 				err = g.parseCallsign(state, e)
-				if err != 0 {
-					return (err)
-				}
 			}
 		case 'B':
 			err = g.parseLocation(state, e)
-			if err != 0 {
-				return (err)
-			}
 		case 'C':
 			err = g.parseComment(state, e)
-			if err != 0 {
-				return (err)
-			}
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			err = g.expandMacro(state, e)
-			if err != 0 {
-				return (err)
-			}
 		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Field does not start with A, B, C, or digit: \"%s\"\n", e)
+			err = ttErrorf(TT_ERROR_D_MSG, "field does not start with A, B, C, or digit: %q", e)
+		}
 
-			return (TT_ERROR_D_MSG)
+		if err != nil {
+			return err
 		}
 	}
 
-	// text_color_set(DW_COLOR_DEBUG);
-	// dw_printf ("parse_fields () normal return\n");
+	g.log.Debug("parseFields () normal return")
 
-	return (0)
+	return nil
 } /* end parseFields */
 
 /*------------------------------------------------------------------
@@ -585,7 +634,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
  *				  APRStt message.
  *				  In this case, it should contain only digits.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	Separate out the fields, perform substitution,
  *		call parseFields for processing.
@@ -595,10 +644,10 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
+func (g *TTGateway) expandMacro(state *ttParseState, e string) error {
 	g.log.Debugf("Macro tone sequence: %q", e)
 
-	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(e)
+	var xstr, ystr, zstr, _, _, ipat = g.findTTLocMatch(state, e)
 
 	if ipat >= 0 {
 		// Why did we print b & d here?
@@ -612,10 +661,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 
 		if g.config.ttlocs[ipat].ttlocType != TTLOC_MACRO {
 			/* Found match to a different type.  Really shouldn't be here. */
-			/* Print internal error message... */
-			dw_printf("expand_macro: type != TTLOC_MACRO\n")
-
-			return (TT_ERROR_INTERNAL)
+			return ttErrorf(TT_ERROR_INTERNAL, "expandMacro: pattern %q is not a macro", g.config.ttlocs[ipat].pattern)
 		}
 
 		/*
@@ -651,14 +697,11 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 
 		g.log.Debugf("After substitution:  '%s'", stemp.String())
 
-		return (g.parseFields(state, stemp.String()))
+		return g.parseFields(state, stemp.String())
 	} else {
 		/* Send reject sound. */
 		/* Does not match any macro definitions. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tone sequence did not match any pattern\n")
-
-		return (TT_ERROR_MACRO_NOMATCH)
+		return ttErrorf(TT_ERROR_MACRO_NOMATCH, "tone sequence %q did not match any pattern", e)
 	}
 }
 
@@ -681,7 +724,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
  *					If you want a different symbol, use the new
  *					object name format and separate symbol specification.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	We recognize 3 different formats:
  *
@@ -696,7 +739,9 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func checksum_not_ok(str string, length int, found rune) int {
+// checksumError checks the checksum digit found at the end of a callsign
+// field against the one str should have produced.
+func checksumError(state *ttParseState, str string, found rune) error {
 	var sum = 0
 
 	for _, c := range str {
@@ -705,24 +750,22 @@ func checksum_not_ok(str string, length int, found rune) int {
 		} else if c >= 'A' && c <= 'D' {
 			sum += int(c-'A') + 10
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", c)
+			/* Nothing a DTMF keypad can send, so a definition somewhere is wrong. */
+			/* Carry on and let the checksum come out as it may. */
+			state.warnf("checksum: bad character %q in checksum calculation", c)
 		}
 	}
 
 	var expected = rune('0' + (sum % 10))
 
 	if expected != found {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
-
-		return (TT_ERROR_BAD_CHECKSUM)
+		return ttErrorf(TT_ERROR_BAD_CHECKSUM, "bad checksum for %q: expected %c but received %c", str, expected, found)
 	}
 
-	return (0)
+	return nil
 }
 
-func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
+func (g *TTGateway) parseCallsign(state *ttParseState, e string) error {
 	g.log.Debugf("APRStt parse callsign (starts with A then digit): %q", e)
 
 	Assert(e[0] == 'A')
@@ -738,7 +781,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 
 		g.log.Debugf("Special case, 3 digit tactical call: %q", state.callsign)
 
-		return (0)
+		return nil
 	}
 
 	/*
@@ -750,10 +793,10 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5]))) ||
 		(length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) &&
 			unicode.IsDigit(rune(e[4])) && unicode.IsUpper(rune(e[5])) && unicode.IsDigit(rune(e[6]))) {
-		var cs_err = checksum_not_ok(e[1:length-1], length-2, rune(e[length-1]))
+		var cs_err = checksumError(state, e[1:length-1], rune(e[length-1]))
 
-		if cs_err != 0 {
-			return (cs_err)
+		if cs_err != nil {
+			return cs_err
 		}
 
 		state.callsign = e[1:4]
@@ -779,7 +822,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 				state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
 		}
 
-		return (0)
+		return nil
 	}
 
 	/*
@@ -787,10 +830,10 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 	 */
 
 	if length >= 7 && length <= 24 {
-		var cs_err = checksum_not_ok(e[1:length-1], length-2, rune(e[length-1]))
+		var cs_err = checksumError(state, e[1:length-1], rune(e[length-1]))
 
-		if cs_err != 0 {
-			return (cs_err)
+		if cs_err != nil {
+			return cs_err
 		}
 
 		if unicode.IsUpper(rune(e[length-2])) {
@@ -817,13 +860,10 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 				state.callsign, state.symbolCode, state.symtabOrOverlay, e[length-1])
 		}
 
-		return (0)
+		return nil
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone callsign not valid: \"%s\"\n", e)
-
-	return (TT_ERROR_INVALID_CALL)
+	return ttErrorf(TT_ERROR_INVALID_CALL, "touch tone callsign not valid: %q", e)
 }
 
 /*------------------------------------------------------------------
@@ -841,7 +881,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
  *
  *		state.ssid		- Cleared to remove the default of 12.
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	Data format
  *
@@ -849,7 +889,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
+func (g *TTGateway) parseObjectName(state *ttParseState, e string) error {
 	g.log.Debugf("APRStt parse object name (starts with AA): %q", e)
 
 	Assert(e[0] == 'A')
@@ -862,8 +902,8 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 	 */
 
 	if length >= 2+1 && length <= 30 {
-		var _callsign, errors = TTTwoKeyToText(e[2:], false)
-		if errors == 0 {
+		var _callsign, errs = TTTwoKeyToText(e[2:], false)
+		if errs == 0 {
 			state.callsign = _callsign
 			if len(state.callsign) > 9 {
 				state.callsign = state.callsign[:9]
@@ -873,14 +913,11 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 
 			g.log.Debugf("Object name in two key format: %q", state.callsign)
 
-			return (0)
+			return nil
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone object name not valid: \"%s\"\n", e)
-
-	return (TT_ERROR_INVALID_OBJNAME)
+	return ttErrorf(TT_ERROR_INVALID_OBJNAME, "touch tone object name not valid: %q", e)
 } /* end parseObjectName */
 
 /*------------------------------------------------------------------
@@ -898,7 +935,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
  *
  * 		state.symbolCode
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	Data format
  *
@@ -917,7 +954,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
+func (g *TTGateway) parseSymbol(state *ttParseState, e string) error {
 	g.log.Debugf("APRStt parse symbol (starts with AB): %q", e)
 
 	Assert(e[0] == 'A')
@@ -944,7 +981,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			g.log.Debugf("symbol code '%c', primary symbol table '%c'",
 				state.symbolCode, state.symtabOrOverlay)
 
-			return (0)
+			return nil
 
 		case '2':
 			state.symtabOrOverlay = '\\'
@@ -953,28 +990,25 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 			g.log.Debugf("symbol code '%c', alternate symbol table '%c'",
 				state.symbolCode, state.symtabOrOverlay)
 
-			return (0)
+			return nil
 
 		case '0':
 			if length >= 6 {
-				var stemp, errors = TTTwoKeyToText(e[5:], false)
-				if errors == 0 {
+				var stemp, errs = TTTwoKeyToText(e[5:], false)
+				if errs == 0 {
 					state.symbolCode = rune(32 + nn)
 					state.symtabOrOverlay = rune(stemp[0])
 
 					g.log.Debugf("symbol code '%c', alternate symbol table with overlay '%c'",
 						state.symbolCode, state.symtabOrOverlay)
 
-					return (0)
+					return nil
 				}
 			}
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone symbol not valid: \"%s\"\n", e)
-
-	return (TT_ERROR_INVALID_SYMBOL)
+	return ttErrorf(TT_ERROR_INVALID_SYMBOL, "touch tone symbol not valid: %q", e)
 } /* end parseSymbol */
 
 /*------------------------------------------------------------------
@@ -990,7 +1024,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
  *
  * Outputs:	state.callsign
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	We recognize 3 different formats:
  *
@@ -1002,19 +1036,19 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
+func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) error {
 	Assert(e[0] == 'A')
 	Assert(e[1] == 'C')
 
 	g.log.Debugf("APRStt parse QIKcom-2 / APRStt 3 ten digit call or five digit suffix (starts with AC): %q", e)
 
 	if len(e) == 2+10 {
-		var call, errors = TTCall10ToText(e[2:], true)
+		var call, errs = TTCall10ToText(e[2:], true)
 
-		if errors == 0 {
+		if errs == 0 {
 			state.callsign = call
 		} else {
-			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
+			return ttErrorf(TT_ERROR_INVALID_CALL, "could not convert ten digit call %q to text", e[2:])
 		}
 	} else if len(e) == 2+5 {
 		var suffix, errs = tt_call5_suffix_to_text(e[2:], true)
@@ -1032,20 +1066,18 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 
 					state.callsign = _call
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
-
-					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
+					/* Don't know this user. */
+					return ttErrorf(TT_ERROR_SUFFIX_NO_CALL, "couldn't find full callsign for suffix %q", suffix)
 				}
 			}
 		} else {
-			return (TT_ERROR_INVALID_CALL) /* Could not convert to text */
+			return ttErrorf(TT_ERROR_INVALID_CALL, "could not convert five digit suffix %q to text", e[2:])
 		}
 	} else {
-		return (TT_ERROR_INVALID_CALL) /* Invalid length, not 2+ (10 ir 5) */
+		return ttErrorf(TT_ERROR_INVALID_CALL, "%q should be AC plus either 10 or 5 digits", e)
 	}
 
-	return (0)
+	return nil
 } /* end parseAprstt3Call */
 
 /*------------------------------------------------------------------
@@ -1072,7 +1104,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
  *
  *		state.ambiguity
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	There are many different formats recognizable
  *		by total number of digits and sometimes the first digit.
@@ -1095,16 +1127,16 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 // R_M is the average radius of earth in meters.
 const R_M = 6371000.0
 
-func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
+func (g *TTGateway) parseLocation(state *ttParseState, e string) error {
 	// TODO: more detail later...
 	g.log.Debugf("APRStt parse location (starts with B): %q", e)
 
 	Assert(e[0] == 'B')
 
-	var xstr, ystr, _, bstr, dstr, ipat = g.findTTLocMatch(e)
+	var xstr, ystr, _, bstr, dstr, ipat = g.findTTLocMatch(state, e)
 
 	if ipat >= 0 {
-		// dw_printf ("ipat=%d, x=%s, y=%s, b=%s, d=%s\n", ipat, xstr, ystr, bstr, dstr);
+		g.log.Debugf("ipat=%d, x=%s, y=%s, b=%s, d=%s", ipat, xstr, ystr, bstr, dstr)
 		var ttloc_type = g.config.ttlocs[ipat].ttlocType
 		switch ttloc_type {
 		case TTLOC_POINT:
@@ -1130,15 +1162,11 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_VECTOR:
 			if len(bstr) != 3 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Bearing \"%s\" should be 3 digits.\n", bstr)
-				// return error code?
+				state.warnf("bearing %q should be 3 digits", bstr)
 			}
 
 			if len(dstr) < 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Distance \"%s\" should 1 or more digits.\n", dstr)
-				// return error code?
+				state.warnf("distance %q should be 1 or more digits", dstr)
 			}
 
 			var lat0 = D2R(float64(g.config.ttlocs[ipat].vector.lat))
@@ -1164,15 +1192,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_GRID:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing X coordinate.\n")
+				state.warnf("missing X coordinate")
 
 				xstr = "0"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing Y coordinate.\n")
+				state.warnf("missing Y coordinate")
 
 				ystr = "0"
 			}
@@ -1214,15 +1240,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_UTM:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing X coordinate.\n")
+				state.warnf("missing X coordinate")
 				/* Avoid divide by zero later.  Put in middle of range. */
 				xstr = "5"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing Y coordinate.\n")
+				state.warnf("missing Y coordinate")
 				/* Avoid divide by zero later.  Put in middle of range. */
 				ystr = "5"
 			}
@@ -1252,13 +1276,15 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
-				state.latitude = maybe.Just(R2D(float64(geo.Lat)))
-				state.longitude = maybe.Just(R2D(float64(geo.Lng)))
+				var lat, lon = R2D(float64(geo.Lat)), R2D(float64(geo.Lng))
 
-				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
+				state.latitude = maybe.Just(lat)
+				state.longitude = maybe.Just(lon)
+
+				g.log.Debugf("from UTM, latitude = %.6f, longitude = %.6f", lat, lon)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Conversion from UTM failed:\n%s\n\n", geoErr)
+				/* We still have the location as text, so pass that on without a position. */
+				state.warnf("conversion from UTM failed: %v", geoErr)
 			}
 
 			state.dao[2] = e[0]
@@ -1266,16 +1292,16 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_MGRS, TTLOC_USNG:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("MGRS/USNG: Missing X (easting) coordinate.\n")
 				/* Should not be possible to get here. Fake it and carry on. */
+				state.warnf("MGRS/USNG: missing X (easting) coordinate")
+
 				xstr = "5"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("MGRS/USNG: Missing Y (northing) coordinate.\n")
 				/* Should not be possible to get here. Fake it and carry on. */
+				state.warnf("MGRS/USNG: missing Y (northing) coordinate")
+
 				ystr = "5"
 			}
 
@@ -1283,21 +1309,22 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			loc += xstr
 			loc += ystr
 
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("MGRS/USNG location debug:  %s\n", loc);
+			g.log.Debugf("MGRS/USNG location debug:  %s", loc)
 
 			state.locText = loc
 
 			// Apparently also does USNG!
 			var geo, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(loc)
 			if convertErr == nil {
-				state.latitude = maybe.Just(R2D(float64(geo.Lat)))
-				state.longitude = maybe.Just(R2D(float64(geo.Lng)))
+				var lat, lon = R2D(float64(geo.Lat)), R2D(float64(geo.Lng))
 
-				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
+				state.latitude = maybe.Just(lat)
+				state.longitude = maybe.Just(lon)
+
+				g.log.Debugf("from MGRS/USNG, latitude = %.6f, longitude = %.6f", lat, lon)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", convertErr)
+				/* We still have the location as text, so pass that on without a position. */
+				state.warnf("conversion from MGRS/USNG failed: %v", convertErr)
 			}
 
 			state.dao[2] = e[0]
@@ -1309,28 +1336,22 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			stemp += xstr
 
 			if len(stemp) != 4 && len(stemp) != 6 && len(stemp) != 10 && len(stemp) != 12 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
+				return ttErrorf(TT_ERROR_INVALID_MHEAD,
+					"expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator %q + %q",
 					g.config.ttlocs[ipat].mhead.prefix, xstr)
-
-				return (TT_ERROR_INVALID_MHEAD)
 			}
 
-			// text_color_set(DW_COLOR_DEBUG);
-			// dw_printf ("Case MHEAD: Convert to text \"%s\".\n", stemp);
+			g.log.Debugf("Case MHEAD: Convert to text %q", stemp)
 
 			var mh, errs = TTMheadToText(stemp, false)
 			if errs == 0 {
-				// text_color_set(DW_COLOR_DEBUG);
-				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
+				g.log.Debugf("Case MHEAD: Resulting text %q", mh)
+
 				state.locText = mh
 
 				var lat, lon, err = ll_from_grid_square(state.locText)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("%v\n", err)
-
-					return (TT_ERROR_INVALID_MHEAD)
+					return ttErrorf(TT_ERROR_INVALID_MHEAD, "%v", err)
 				}
 
 				state.latitude = maybe.Just(lat)
@@ -1342,10 +1363,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_SATSQ:
 			if len(xstr) != 4 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected 4 digits for the Satellite Square.\n")
-
-				return (TT_ERROR_INVALID_SATSQ)
+				return ttErrorf(TT_ERROR_INVALID_SATSQ, "expected 4 digits for the Satellite Square, got %q", xstr)
 			}
 
 			/* Convert 4 digits to usual AA99 form, then to location. */
@@ -1356,10 +1374,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				var lat, lon, err = ll_from_grid_square(state.locText)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("%v\n", err)
-
-					return (TT_ERROR_INVALID_SATSQ)
+					return ttErrorf(TT_ERROR_INVALID_SATSQ, "%v", err)
 				}
 
 				state.latitude = maybe.Just(lat)
@@ -1371,10 +1386,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_AMBIG:
 			if len(xstr) != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected 1 digits for the position ambiguity.\n")
-
-				return (TT_ERROR_INVALID_LOC)
+				return ttErrorf(TT_ERROR_INVALID_LOC, "expected 1 digit for the position ambiguity, got %q", xstr)
 			}
 
 			var ambiguity, _ = strconv.Atoi(xstr)
@@ -1384,17 +1396,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			panic(fmt.Sprintf("Unknown ttloc type: %d", ttloc_type))
 		}
 
-		return (0)
+		return nil
 	}
 
 	/* Does not match any location specification. */
-
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Received location \"%s\" does not match any definitions.\n", e)
-
 	/* Send reject sound. */
 
-	return (TT_ERROR_INVALID_LOC)
+	return ttErrorf(TT_ERROR_INVALID_LOC, "received location %q does not match any definitions", e)
 } /* end parseLocation */
 
 /*------------------------------------------------------------------
@@ -1423,8 +1431,9 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, string, int) {
-	// debug dw_printf ("findTTLocMatch: e=%s\n", e);
+func (g *TTGateway) findTTLocMatch(state *ttParseState, e string) (string, string, string, string, string, int) {
+	g.log.Debugf("findTTLocMatch: e=%s", e)
+
 	var xstr, ystr, zstr, bstr, dstr string
 
 	for ipat := range len(g.config.ttlocs) {
@@ -1478,8 +1487,9 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
 						match = false
 					}
 				default:
-					dw_printf("findTTLocMatch: shouldn't be here.\n")
-					/* Shouldn't be here. */
+					/* Shouldn't be here: the configuration has a pattern we can't match against. */
+					state.warnf("pattern %q contains %q, which is not a pattern character", pattern, rune(mc))
+
 					match = false
 				} /* switch */
 			} /* for k */
@@ -1507,7 +1517,7 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
  * Outputs:	state.comment
  *		state.micE
  *
- * Returns:	0 for success or one of the TT_ERROR_... codes.
+ * Returns:	nil for success, or an error carrying one of the TT_ERROR_... codes.
  *
  * Description:	We recognize these different formats:
  *
@@ -1527,7 +1537,12 @@ func (g *TTGateway) findTTLocMatch(e string) (string, string, string, string, st
  *
  *----------------------------------------------------------------*/
 
-func (g *TTGateway) parseComment(state *ttParseState, e string) int {
+// Nothing in here rejects a field: a comment that doesn't convert cleanly is
+// kept as whatever came out.  It still returns an error so that it matches its
+// neighbours, and so parseFields can treat every field the same way.
+//
+//nolint:unparam
+func (g *TTGateway) parseComment(state *ttParseState, e string) error {
 	Assert(e[0] == 'C')
 
 	var length = len(e)
@@ -1535,31 +1550,31 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
 	if e[1] == 'A' {
 		state.comment, _ = tt_ascii2d_to_text(e[2:], false)
 
-		return (0)
+		return nil
 	}
 
 	if length == 2 && unicode.IsDigit(rune(e[1])) {
 		state.micE = rune(e[1])
 
-		return (0)
+		return nil
 	}
 
 	if length == 7 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) && unicode.IsDigit(rune(e[4])) && unicode.IsDigit(rune(e[5])) &&
 		unicode.IsDigit(rune(e[6])) {
 		state.freq = e[1:4] + "." + e[4:7] + "MHz"
 
-		return (0)
+		return nil
 	}
 
 	if length == 4 && unicode.IsDigit(rune(e[1])) && unicode.IsDigit(rune(e[2])) && unicode.IsDigit(rune(e[3])) {
 		state.ctcss = e[1:]
 
-		return (0)
+		return nil
 	}
 
 	state.comment, _ = TTMultipressToText(e[1:], false)
 
-	return (0)
+	return nil
 }
 
 /*------------------------------------------------------------------
@@ -1572,7 +1587,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
  *		msg		- String of button pushes.
  *				  Normally ends with #.
  *
- * Returns:     None
+ * Returns:     An error if the message could not be made into a packet.
  *
  * Description:
  * 		Put raw touch tone message in a packet and send to application.
@@ -1585,7 +1600,7 @@ func (g *TTGateway) parseComment(state *ttParseState, e string) int {
  *
  *----------------------------------------------------------------*/
 
-func raw_tt_data_to_app(channel int, msg string) {
+func raw_tt_data_to_app(channel int, msg string) error {
 	// Set source and dest to something valid to keep rest of processing happy.
 	// For lack of a better idea, make source "DTMF" to indicate where it came from.
 	// Application version might be useful in case we end up using different
@@ -1609,16 +1624,17 @@ func raw_tt_data_to_app(channel int, msg string) {
 	 * This currently doesn't get displayed but we might want it someday.
 	 */
 
-	if pp != nil {
-		var alevel = demod_get_audio_level(channel, 0)
-		alevel.mark = -2
-		alevel.space = -2
-
-		dlq_rec_frame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
-	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)
+	if pp == nil {
+		return fmt.Errorf("could not convert %q into APRS packet", raw_tt_msg)
 	}
+
+	var alevel = demod_get_audio_level(channel, 0)
+	alevel.mark = -2
+	alevel.space = -2
+
+	dlq_rec_frame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
+
+	return nil
 }
 
 /*------------------------------------------------------------------

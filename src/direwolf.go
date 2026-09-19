@@ -1225,13 +1225,21 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	if subchan == -1 { // from DTMF decoder
 		if dw_tt_config.gateway_enabled > 0 && len(pinfo) >= 2 {
-			ttGateway.Sequence(channel, string(pinfo[1:]))
+			var err = ttGateway.Sequence(channel, string(pinfo[1:]))
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("APRStt: %v\n", err)
+			}
 		}
 	} else if len(pinfo) >= 2 && pinfo[0] == 't' && dw_tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		ttGateway.Sequence(channel, string(pinfo[1:]))
+		var err = ttGateway.Sequence(channel, string(pinfo[1:]))
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("APRStt: %v\n", err)
+		}
 	} else {
 		/*
 		 * Send to the IGate processing.
