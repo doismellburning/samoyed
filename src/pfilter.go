@@ -1329,7 +1329,7 @@ func filt_i(pf *pfstate_t) (int, error) {
 
 	var was_heard = mheardDB.WasRecentlyNearby("addressee", pf.decoded.g_addressee, heardtime, maxhops, dlat, dlon, km)
 
-	if was_heard {
+	if !was_heard {
 		return 0, nil
 	}
 
