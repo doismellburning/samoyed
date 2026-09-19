@@ -3663,6 +3663,71 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTUTM": {
+			{
+				name:   "a pattern, zone, scale and offsets are stored",
+				config: "TTUTM B6xxxyyy 19T 10 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_UTM, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B6xxxyyy", c.tt.ttlocs[0].pattern)
+					a.Equal(19, c.tt.ttlocs[0].utm.lzone)
+					a.InDelta(10.0, c.tt.ttlocs[0].utm.scale, 0.001)
+					a.InDelta(300000.0, c.tt.ttlocs[0].utm.x_offset, 0.001)
+					a.InDelta(4500000.0, c.tt.ttlocs[0].utm.y_offset, 0.001)
+				},
+			},
+			{
+				name:   "no TTUTM means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				// The handler converts a sample position to see whether real ones
+				// will convert later.  With no offsets the easting is a few metres,
+				// which is nowhere, so the line would be no use.
+				name:   "a zone with no offsets is rejected as unconvertible",
+				config: "TTUTM B6xxxyyy 19T\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid UTM location")
+				},
+			},
+			{
+				name:   "the southern hemisphere comes from the latitude band",
+				config: "TTUTM B6xxxyyy 19H 10 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal('S', c.tt.ttlocs[0].utm.hemi)
+				},
+			},
+			{
+				name:   "a pattern that does not begin with B leaves no location",
+				config: "TTUTM C6xxxyyy 19T 10 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "an unreadable scale leaves no location",
+				config: "TTUTM B6xxxyyy 19T ten 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid scale")
+				},
+			},
+			{
+				name:   "a missing zone does not eat the next line",
+				config: "TTUTM B6xxxyyy\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTVECTOR": {
 			{
 				name:   "a pattern, origin and scale are stored, with the scale in metres",
@@ -4033,7 +4098,6 @@ func directivesNotYetTested() []string {
 		"TTSATSQ",
 		"TTSTATUS",
 		"TTUSNG",
-		"TTUTM",
 	}
 }
 
