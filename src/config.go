@@ -6195,6 +6195,26 @@ func handleNOXID(ps *parseState) bool {
 	return false
 }
 
+// parse_beacon_number parses the value of a numeric beacon option, reporting
+// failure rather than quietly settling for zero.  Zero is a real value for
+// several of these options - TONE=0 is transmitted as "Toff", OFFSET=0 as
+// "+000" and ALT=0 as "/A=000000" - so a typo would otherwise put on the air a
+// value nobody asked for.
+func parse_beacon_number(keyword string, value string, line int) (float64, bool) {
+	var f, err = strconv.ParseFloat(value, 64)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"line":   line,
+			"option": keyword,
+			"value":  value,
+		}).Error("Invalid number for beacon option, ignoring it")
+
+		return 0, false
+	}
+
+	return f, true
+}
+
 /*
  * Parse the PBEACON or OBEACON options.
  */
@@ -6433,13 +6453,15 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
 			})
 
+			var number = value
+			var meters float64 = 1
+
 			if unitIndex != -1 { // Did we find a unit string?
 				var unit = value[unitIndex:]
 
-				var value = value[:unitIndex]
-				value = strings.TrimSpace(value)
+				number = strings.TrimSpace(value[:unitIndex])
 
-				var meters float64 = 0
+				meters = 0
 
 				for _, u := range units {
 					if strings.EqualFold(u.name, unit) {
@@ -6451,26 +6473,24 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Line %d: Unrecognized unit '%s' for altitude.  Using meter.\n", line, unit)
 					dw_printf("Try using singular form.  e.g.  ft or foot rather than feet.\n")
-					var f, _ = strconv.ParseFloat(value, 64)
-					b.alt_m = f
-				} else {
-					// valid unit
-					var f, _ = strconv.ParseFloat(value, 64)
-					b.alt_m = f * meters
+
+					meters = 1
 				}
-			} else {
-				// no unit specified
-				var f, _ = strconv.ParseFloat(value, 64)
-				b.alt_m = f
+			}
+
+			if f, ok := parse_beacon_number(keyword, number, line); ok {
+				b.alt_m = f * meters
 			}
 		} else if strings.EqualFold(keyword, "ZONE") {
 			zone = value
 		} else if strings.EqualFold(keyword, "EAST") || strings.EqualFold(keyword, "EASTING") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			easting = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				easting = f
+			}
 		} else if strings.EqualFold(keyword, "NORTH") || strings.EqualFold(keyword, "NORTHING") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			northing = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				northing = f
+			}
 		} else if strings.EqualFold(keyword, "SYMBOL") {
 			/* Defer processing in case overlay appears later. */
 			temp_symbol = value
@@ -6482,26 +6502,32 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				dw_printf("Config file: Overlay must be one character in range of 0-9 or A-Z, upper case only, on line %d.\n", line)
 			}
 		} else if strings.EqualFold(keyword, "POWER") {
-			var n, _ = strconv.ParseFloat(value, 64)
-			b.power = n
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.power = f
+			}
 		} else if strings.EqualFold(keyword, "HEIGHT") { // This is in feet.
-			var n, _ = strconv.ParseFloat(value, 64)
-			b.height = n
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.height = f
+			}
 			// TODO: ability to add units suffix, e.g.  10m
 		} else if strings.EqualFold(keyword, "GAIN") {
-			var n, _ = strconv.ParseFloat(value, 64)
-			b.gain = n
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.gain = f
+			}
 		} else if strings.EqualFold(keyword, "DIR") || strings.EqualFold(keyword, "DIRECTION") {
 			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			b.freq = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.freq = f
+			}
 		} else if strings.EqualFold(keyword, "TONE") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			b.tone = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.tone = f
+			}
 		} else if strings.EqualFold(keyword, "OFFSET") || strings.EqualFold(keyword, "OFF") {
-			var f, _ = strconv.ParseFloat(value, 64)
-			b.offset = f
+			if f, ok := parse_beacon_number(keyword, value, line); ok {
+				b.offset = f
+			}
 		} else if strings.EqualFold(keyword, "COMMENT") {
 			b.comment = value
 		} else if strings.EqualFold(keyword, "COMMENTCMD") {

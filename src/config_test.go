@@ -718,6 +718,37 @@ func Test_config_init_beacon_sendto_empty(t *testing.T) {
 	})
 }
 
+// --- config_init beacon numeric options ---
+
+func Test_config_init_beacon_unparseable_numbers(t *testing.T) {
+	// Regression test: the numeric beacon options ignored the ParseFloat error
+	// and stored the zero it returns, so a typo became a value rather than
+	// nothing at all.  TONE=0 goes out as "Toff", OFFSET=0 as "+000" and ALT=0
+	// as "/A=000000", so "TONE=abc" transmitted a tone setting nobody asked
+	// for.
+	var config = "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W FREQ=abc TONE=def OFFSET=ghi ALT=jkl\n"
+
+	var _, misc = configFromString(t, config)
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].freq, 0.001)
+	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].tone, 0.001)
+	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].offset, 0.001)
+	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].alt_m, 0.001)
+
+	assert.Empty(t, frequency_spec(unlessUnknown(misc.beacon[0].freq),
+		unlessUnknown(misc.beacon[0].tone), unlessUnknown(misc.beacon[0].offset)))
+}
+
+func Test_config_init_beacon_numbers_with_units(t *testing.T) {
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W ALT=100foot FREQ=146.52 TONE=100\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.InDelta(t, 30.48, misc.beacon[0].alt_m, 0.001)
+	assert.InDelta(t, 146.52, misc.beacon[0].freq, 0.001)
+	assert.InDelta(t, 100.0, misc.beacon[0].tone, 0.001)
+}
+
 // --- config_init PBEACON directive (no options) ---
 
 func Test_config_init_pbeacon_no_options(t *testing.T) {
