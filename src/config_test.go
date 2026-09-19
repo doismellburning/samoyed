@@ -3733,6 +3733,55 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTSATSQ": {
+			{
+				name:   "a pattern of exactly four x is stored",
+				config: "TTSATSQ B2xxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_SATSQ, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B2xxxx", c.tt.ttlocs[0].pattern)
+				},
+			},
+			{
+				name:   "no TTSATSQ means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "the extra button is optional",
+				config: "TTSATSQ Bxxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+				},
+			},
+			{
+				name:   "a pattern with the wrong number of x is rejected",
+				config: "TTSATSQ B2xxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must end with exactly xxxx")
+				},
+			},
+			{
+				name:   "a pattern that does not begin with B is rejected",
+				config: "TTSATSQ C2xxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "a missing pattern does not eat the next line",
+				config: "TTSATSQ\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		// TTUSNG and TTMGRS are one handler, keyed on the keyword.
 		"TTUSNG": {
 			{
@@ -4215,7 +4264,6 @@ func directivesNotYetTested() []string {
 		"TTERR",
 		"TTMACRO",
 		"TTOBJ",
-		"TTSATSQ",
 		"TTSTATUS",
 	}
 }
