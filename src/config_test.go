@@ -1700,6 +1700,22 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"SPEECH": {
+			{
+				name:   "a script name is accepted and does not derail the next line",
+				config: "SPEECH /bin/echo\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a missing script name does not eat the next line",
+				config: "SPEECH\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TXTAIL": {
 			{
 				name:   "a valid time is stored",
@@ -1844,7 +1860,6 @@ func directivesNotYetTested() []string {
 		"SERIALKISSPOLL",
 		"SMARTBEACON",
 		"SMARTBEACONING",
-		"SPEECH",
 		"TBEACON",
 		"TTAMBIG",
 		"TTCMD",
