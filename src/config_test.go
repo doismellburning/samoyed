@@ -1138,6 +1138,52 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"DEDUPE": {
+			{
+				name:   "a valid time is stored",
+				config: "DEDUPE 45\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(45, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "no DEDUPE leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "zero turns duplicate suppression off",
+				config: "DEDUPE 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "an unreasonable time falls back to the default",
+				config: "DEDUPE 600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Contains(c.output, "Unreasonable value for dedupe time")
+				},
+			},
+			{
+				name:   "a negative time falls back to the default",
+				config: "DEDUPE -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "a missing time does not eat the next line",
+				config: "DEDUPE\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		// A digipeater needs two radio channels and a callsign on the transmit one,
 		// so these lines are longer than most: config_init switches digipeating off
 		// again for a channel that is still NOCALL.
@@ -3269,7 +3315,6 @@ func directivesNotYetTested() []string {
 		"CDIGIPEATER",
 		"CON",
 		"DCD",
-		"DEDUPE",
 		"IBEACON",
 		"OBEACON",
 		"PTT",
