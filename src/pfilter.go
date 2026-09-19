@@ -499,6 +499,16 @@ func parse_filter_spec(pf *pfstate_t) (int, error) {
 		result = 0
 	} else if pf.token_str == "1" {
 		result = 1
+	} else if len(pf.token_str) < 2 {
+		// Every specification below is a type letter, a separator and then
+		// something to match against, so there is nothing here to recognise.
+		err = newFilterError(pf, "Filter specification is a type letter on its own, with no separator or pattern after it.")
+
+		result = -1
+
+		next_token(pf)
+
+		return result, err
 	} else if pf.token_str[0] == 'b' && unicode.IsPunct(rune(pf.token_str[1])) {
 		/* simple string matching */
 

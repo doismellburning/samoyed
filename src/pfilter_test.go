@@ -45,6 +45,14 @@ func Test_pfilter_validate(t *testing.T) {
 		assert.Error(t, pfilter_validate(0, 0, "x/", true))
 	})
 
+	t.Run("a type letter with nothing after it returns an error", func(t *testing.T) {
+		// Each of these reaches a different arm of parse_filter_spec's chain,
+		// and every one of them used to index past the end of the token.
+		for _, filter := range []string{"b", "d", "v", "u", "o", "g", "t", "r", "s", "i"} {
+			assert.Error(t, pfilter_validate(0, 0, filter, true), "filter %q", filter)
+		}
+	})
+
 	t.Run("filter type not allowed in connected mode returns an error", func(t *testing.T) {
 		assert.Error(t, pfilter_validate(0, 0, "t/p", false))
 	})
