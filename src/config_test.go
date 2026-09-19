@@ -1923,11 +1923,14 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 			{
-				name:   "an unreadable speed is rejected",
+				// Regression test: the port was stored before the speed was
+				// read, so a rejected line left a GPS port configured at no
+				// speed at all, which dwgpsnmea_init then tried to open.
+				name:   "an unreadable speed leaves no port configured either",
 				config: "GPSNMEA /dev/ttyUSB0 fast\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal("/dev/ttyUSB0", c.misc.gpsnmea_port)
-					a.Equal(0, c.misc.gpsnmea_speed)
+					a.Empty(c.misc.gpsnmea_port)
+					a.Zero(c.misc.gpsnmea_speed)
 					a.Contains(c.output, "Invalid speed")
 				},
 			},
@@ -1937,6 +1940,14 @@ func directiveTests() map[string][]directiveCase {
 				check: func(a *assert.Assertions, c configs) {
 					a.Empty(c.misc.gpsnmea_port)
 					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a rejected line leaves an earlier one alone",
+				config: "GPSNMEA /dev/ttyUSB0 9600\nGPSNMEA /dev/ttyUSB1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyUSB0", c.misc.gpsnmea_port)
+					a.Equal(9600, c.misc.gpsnmea_speed)
 				},
 			},
 		},

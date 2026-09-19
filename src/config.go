@@ -5799,7 +5799,10 @@ func handleGPSNMEA(ps *parseState) bool {
 		return true
 	}
 
-	ps.misc.gpsnmea_port = t
+	var port = t
+
+	// The standard at one time, for a line that gives no speed.
+	var speed = 4800
 
 	t = split("", false)
 	if t != "" {
@@ -5811,10 +5814,14 @@ func handleGPSNMEA(ps *parseState) bool {
 			return true
 		}
 
-		ps.misc.gpsnmea_speed = n
-	} else {
-		ps.misc.gpsnmea_speed = 4800 // The standard at one time.
+		speed = n
 	}
+
+	// Commit the port only once its speed is known: dwgpsnmea_init opens
+	// whatever port is configured at whatever speed is beside it, so a rejected
+	// line must not leave one without the other.
+	ps.misc.gpsnmea_port = port
+	ps.misc.gpsnmea_speed = speed
 
 	return false
 }
