@@ -1218,6 +1218,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"EMAXFRAME": {
+			{
+				name:   "a valid window size is stored",
+				config: "EMAXFRAME 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(16, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "no EMAXFRAME leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "the largest window we will send is accepted",
+				config: "EMAXFRAME 63\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_MAX, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "a larger window falls back to the default",
+				config: "EMAXFRAME 64\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "a window of no frames at all falls back to the default",
+				config: "EMAXFRAME 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "an unreadable window size falls back to the default",
+				config: "EMAXFRAME sixteen\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+					a.Contains(c.output, "Invalid EMAXFRAME value")
+				},
+			},
+			{
+				name:   "a missing window size does not eat the next line",
+				config: "EMAXFRAME\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"FULLDUP": {
 			{
 				name:   "ON selects full duplex",
@@ -2113,7 +2166,6 @@ func directivesNotYetTested() []string {
 		"DIGIPEAT",
 		"DIGIPEATER",
 		"DNSSDNAME",
-		"EMAXFRAME",
 		"GPSD",
 		"GPSNMEA",
 		"IBEACON",
