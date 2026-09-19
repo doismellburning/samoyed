@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: The Samoyed Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-package direwolf
+package ais
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ func setFieldString(t *testing.T, base []byte, start uint, length uint, s string
 		var val = strings.IndexByte(sixBitASCII, ch)
 		require.GreaterOrEqual(t, val, 0)
 
-		set_field(base, start+i*6, 6, val)
+		SetField(base, start+i*6, 6, val)
 	}
 }
 
@@ -49,7 +49,7 @@ func setFieldString(t *testing.T, base []byte, start uint, length uint, s string
 // the length of a type 5 message, which is not exotic at all.
 func Test_ais_to_nmea_frame_length_not_multiple_of_3(t *testing.T) {
 	for n := 1; n <= 53; n++ {
-		var nmea, err = AISToNMEA(make([]byte, n))
+		var nmea, err = ToNMEA(make([]byte, n))
 		require.NoError(t, err)
 
 		var _, rest, found = strings.Cut(string(nmea), "!AIVDM,1,1,,A,")
@@ -70,16 +70,16 @@ func Test_ais_to_nmea_frame_length_not_multiple_of_3(t *testing.T) {
 func Test_ais_type_5_round_trip(t *testing.T) {
 	var ais = make([]byte, 53) // 424 bits.
 
-	set_field(ais, 0, 6, 5)          // Message type.
-	set_field(ais, 8, 30, 366730001) // MMSI.
+	SetField(ais, 0, 6, 5)          // Message type.
+	SetField(ais, 8, 30, 366730001) // MMSI.
 	setFieldString(t, ais, 70, 42, "Q1TEST")
 	setFieldString(t, ais, 112, 120, "SAMOYED")
 	setFieldString(t, ais, 302, 120, "LONG BEACH")
 
-	var nmea, err = AISToNMEA(ais)
+	var nmea, err = ToNMEA(ais)
 	require.NoError(t, err)
 
-	var aisData, parseErr = AISParse(string(nmea))
+	var aisData, parseErr = Parse(string(nmea))
 	require.NoError(t, parseErr)
 	assert.Equal(t, "AIS 5: Static and Voyage Related Data", aisData.Description)
 	assert.Equal(t, "366730001", aisData.MMSI)
@@ -92,7 +92,7 @@ func Test_ais_type_5_round_trip(t *testing.T) {
 func Test_ais_parse_payload_longer_than_bit_vector(t *testing.T) {
 	var payload = strings.Repeat("1", 400) // 2400 bits, against 2048 of vector.
 
-	var aisData, err = AISParse(nmeaSentence("!AIVDM,1,1,,A," + payload + ",0"))
+	var aisData, err = Parse(nmeaSentence("!AIVDM,1,1,,A," + payload + ",0"))
 	require.NoError(t, err)
 	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
 }
@@ -100,7 +100,7 @@ func Test_ais_parse_payload_longer_than_bit_vector(t *testing.T) {
 // A short sentence is decoded as though the bits it lacks were zero, rather
 // than failing or reading whatever follows the vector.
 func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
-	var aisData, err = AISParse(nmeaSentence("!AIVDM,1,1,,A,5,6"))
+	var aisData, err = Parse(nmeaSentence("!AIVDM,1,1,,A,5,6"))
 	require.NoError(t, err)
 	assert.Equal(t, "AIS 5: Static and Voyage Related Data", aisData.Description)
 	assert.Equal(t, "000000000", aisData.MMSI)
@@ -110,7 +110,7 @@ func Test_ais_parse_payload_shorter_than_message_type(t *testing.T) {
 // rejected any sentence carrying a byte above 0x7f, having decoded it to
 // something else entirely.
 func Test_ais_parse_checksum_is_over_bytes(t *testing.T) {
-	var aisData, err = AISParse(nmeaSentence("!AIVDM,1,1,,\xc3,15MgK45P3@G?fl0E`JbR0OwT0@MS,0"))
+	var aisData, err = Parse(nmeaSentence("!AIVDM,1,1,,\xc3,15MgK45P3@G?fl0E`JbR0OwT0@MS,0"))
 	require.NoError(t, err)
 	assert.Equal(t, "366730000", aisData.MMSI)
 }
@@ -133,13 +133,13 @@ func Test_ais_parse_malformed_checksum(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var aisData, err = AISParse(tc.body + "*" + tc.checksum)
+		var aisData, err = Parse(tc.body + "*" + tc.checksum)
 		require.Error(t, err, "checksum %q", tc.checksum)
 		assert.Nil(t, aisData, "checksum %q", tc.checksum)
 	}
 
 	// The same short sentence, correctly checksummed, is fine.
-	var aisData, err = AISParse("!AIVDM,1,1,,A,15@`,0*02")
+	var aisData, err = Parse("!AIVDM,1,1,,A,15@`,0*02")
 	require.NoError(t, err)
 	assert.Equal(t, "AIS 1: Position Report Class A", aisData.Description)
 }
@@ -164,7 +164,7 @@ func Test_get_field_signed(t *testing.T) {
 
 	for _, tc := range testCases {
 		var base = make([]byte, 8)
-		set_field(base, 1, tc.length, tc.raw) // Offset 1 to catch byte-aligned assumptions.
+		SetField(base, 1, tc.length, tc.raw) // Offset 1 to catch byte-aligned assumptions.
 		assert.Equal(t, tc.expected, get_field_signed(base, 1, tc.length), "%d bits of %b", tc.length, tc.raw)
 	}
 }
@@ -175,14 +175,14 @@ func Test_ais_type_9_altitude_not_available(t *testing.T) {
 	var altitude = func(raw int) maybe.Maybe[float64] {
 		var ais = make([]byte, 21) // 168 bits.
 
-		set_field(ais, 0, 6, 9)          // Message type.
-		set_field(ais, 8, 30, 366730001) // MMSI.
-		set_field(ais, 38, 12, raw)      // Altitude, metres.
+		SetField(ais, 0, 6, 9)          // Message type.
+		SetField(ais, 8, 30, 366730001) // MMSI.
+		SetField(ais, 38, 12, raw)      // Altitude, metres.
 
-		var nmea, err = AISToNMEA(ais)
+		var nmea, err = ToNMEA(ais)
 		require.NoError(t, err)
 
-		var aisData, parseErr = AISParse(string(nmea))
+		var aisData, parseErr = Parse(string(nmea))
 		require.NoError(t, parseErr)
 		assert.Equal(t, "AIS 9: SAR Aircraft Position Report", aisData.Description)
 

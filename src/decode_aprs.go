@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -2556,7 +2557,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		bytes.HasPrefix(info, []byte("{DM")) { // Official after registering {D*
 		aprs_morse_code(A, info)
 	} else if info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
-		var aisData, aisErr = AISParse(string(info[3:]))
+		var aisData, aisErr = ais.Parse(string(info[3:]))
 		if aisErr != nil {
 			if !A.g_quiet {
 				text_color_set(DW_COLOR_ERROR)

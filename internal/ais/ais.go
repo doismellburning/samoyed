@@ -1,5 +1,13 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package ais processes received AIS (Automatic Identification System)
+// transmissions from ships and aircraft, converting between the binary blocks
+// carried in HDLC frames and the AIVDM NMEA sentences the rest of the world
+// speaks.
+//
 //nolint:gochecknoglobals
-package direwolf
+package ais
 
 /********************************************************************************
  *
@@ -31,12 +39,12 @@ import (
 
 // Lengths, in bits, for the AIS message types.
 
-type AISTypeSize struct {
+type TypeSize struct {
 	Min int
 	Max int
 }
 
-var ValidAISLengths = []AISTypeSize{
+var ValidLengths = []TypeSize{
 	{-1, -1},    // 0	not used
 	{168, 168},  // 1
 	{168, 168},  // 2
@@ -93,15 +101,24 @@ func set_bit(base []byte, offset uint, val bool) {
  *
  *--------------------------------------------------------------------*/
 
-// AIS_MAX_FIELD_BITS bounds the width of a bit field: the widest AIS defines
+// MaxFieldBits bounds the width of a bit field: the widest AIS defines
 // is the 30 bit MMSI.  Within it every field value fits in an int on any
 // platform Go supports, signed or not, so nothing has to be narrowed on the
 // way out.  A wider field would be a caller mistake rather than something to
 // truncate quietly, so say so.
-const AIS_MAX_FIELD_BITS = 31
+const MaxFieldBits = 31
+
+// assertFieldBits rejects a width get_field/SetField cannot honestly handle.
+// Callers live outside the package now, so the panic says what was wrong
+// rather than only where.
+func assertFieldBits(length uint) {
+	if length < 1 || length > MaxFieldBits {
+		panic(fmt.Sprintf("AIS field of %d bits is not between 1 and %d", length, MaxFieldBits))
+	}
+}
 
 func get_field(base []byte, start uint, length uint) int {
-	Assert(length >= 1 && length <= AIS_MAX_FIELD_BITS)
+	assertFieldBits(length)
 
 	var result = 0
 	for k := range length {
@@ -114,8 +131,10 @@ func get_field(base []byte, start uint, length uint) int {
 	return (result)
 }
 
-func set_field(base []byte, start uint, length uint, val int) {
-	Assert(length >= 1 && length <= AIS_MAX_FIELD_BITS)
+// SetField writes val into the length bit field starting at start, most
+// significant bit first.  It is how a caller builds a bit vector for ToNMEA.
+func SetField(base []byte, start uint, length uint, val int) {
+	assertFieldBits(length)
 
 	for k := range length {
 		set_bit(base, start+k, (val>>(length-1-k))&1 != 0)
@@ -235,13 +254,17 @@ func get_field_altitude(base []byte, start uint, length uint) maybe.Maybe[float6
 const sixBitASCII = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?"
 
 func get_field_ascii(base []byte, start uint, length uint) byte {
-	Assert(length == 6)
+	if length != 6 {
+		panic(fmt.Sprintf("AIS six-bit ASCII character is %d bits, not 6", length))
+	}
 
 	return sixBitASCII[get_field(base, start, length)]
 }
 
 func get_field_string(base []byte, start uint, length uint) string {
-	Assert(length%6 == 0)
+	if length%6 != 0 {
+		panic(fmt.Sprintf("AIS six-bit ASCII string is %d bits, not a multiple of 6", length))
+	}
 	var sb strings.Builder
 	var nc = length / 6 // Number of characters.
 	for i := range nc {
@@ -296,7 +319,7 @@ func sextet_to_char(val int) (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func AISToNMEA(ais []byte) ([]byte, error) {
+func ToNMEA(ais []byte) ([]byte, error) {
 	// Number of resulting characters for payload, rounded up: the last one may
 	// be made from fewer than 6 real bits.
 	var ns = uint(len(ais)*8+5) / 6
@@ -344,35 +367,35 @@ func AISToNMEA(ais []byte) ([]byte, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        AISParse
+ * Name:        Parse
  *
  * Purpose:    	Parse AIS sentence and extract interesting parts.
  *
  * Inputs:	sentence	NMEA sentence.
  *
- * Returns:	(*AISData, nil)		Success.
+ * Returns:	(*Data, nil)		Success.
  *
  *		(nil, error)		Fatal error; data is unusable.
  *					Callers should report the error and
  *					discard the result.
  *
- *		(*AISData, error)	Non-fatal warning (e.g. filler-bit
- *					mismatch); the returned AISData is
+ *		(*Data, error)	Non-fatal warning (e.g. filler-bit
+ *					mismatch); the returned Data is
  *					populated and may still be used.
  *					Callers should report the error but
  *					may proceed with the data.
  *
  *--------------------------------------------------------------------*/
 
-// AIS_MIN_BITVEC_BYTES is the smallest bit vector AISParse decodes into, large
+// minBitVecBytes is the smallest bit vector Parse decodes into, large
 // enough for every fixed field offset it reads.
-const AIS_MIN_BITVEC_BYTES = 256
+const minBitVecBytes = 256
 
-// AIS_CHECKSUM_DIGITS is the width of the hexadecimal checksum ending an NMEA
+// checksumDigits is the width of the hexadecimal checksum ending an NMEA
 // sentence.
-const AIS_CHECKSUM_DIGITS = 2
+const checksumDigits = 2
 
-type AISData struct {
+type Data struct {
 	Description string //Description of AIS message type.
 	MMSI        string //9 digit identifier.
 	Lat         maybe.Maybe[float64]
@@ -385,8 +408,8 @@ type AISData struct {
 	Comment     string
 }
 
-func AISParse(sentence string) (*AISData, error) {
-	var aisData = new(AISData)
+func Parse(sentence string) (*Data, error) {
+	var aisData = new(Data)
 	aisData.MMSI = "?"
 
 	var stemp = sentence
@@ -411,8 +434,8 @@ func AISParse(sentence string) (*AISData, error) {
 
 	// A checksum is exactly two hex digits, as the sentences we emit carry.
 	// ParseUint alone would take "4" or "004E" for the same byte.
-	if len(checksumStr) != AIS_CHECKSUM_DIGITS {
-		return nil, fmt.Errorf("AIS sentence checksum %q is not %d hexadecimal digits", checksumStr, AIS_CHECKSUM_DIGITS)
+	if len(checksumStr) != checksumDigits {
+		return nil, fmt.Errorf("AIS sentence checksum %q is not %d hexadecimal digits", checksumStr, checksumDigits)
 	}
 
 	var checksum, checksumErr = strconv.ParseUint(checksumStr, 16, 8)
@@ -453,7 +476,7 @@ func AISParse(sentence string) (*AISData, error) {
 	// payload and also the highest offset read below - bit 421, of a type 5
 	// message.  A sentence too short for the type it claims is decoded as
 	// though the bits it is missing were zero, as it always has been.
-	var ais = make([]byte, max(AIS_MIN_BITVEC_BYTES, (len(payload)*6+7)/8))
+	var ais = make([]byte, max(minBitVecBytes, (len(payload)*6+7)/8))
 
 	for i, b := range []byte(payload) {
 		var val, err = char_to_sextet(b)
@@ -461,7 +484,7 @@ func AISParse(sentence string) (*AISData, error) {
 			return nil, err
 		}
 
-		set_field(ais, uint(i)*6, 6, val)
+		SetField(ais, uint(i)*6, 6, val)
 	}
 
 	// Verify number of filler bits.
@@ -569,11 +592,11 @@ func AISParse(sentence string) (*AISData, error) {
 	}
 
 	return aisData, fillerErr
-} /* end AISParse */
+} /* end Parse */
 
 /*-------------------------------------------------------------------
  *
- * Name:        AISCheckLength
+ * Name:        CheckLength
  *
  * Purpose:    	Verify frame length against expected.
  *
@@ -587,10 +610,10 @@ func AISParse(sentence string) (*AISData, error) {
  *
  *--------------------------------------------------------------------*/
 
-func AISCheckLength(aisType int, length int) int {
-	if aisType >= 1 && aisType < len(ValidAISLengths) {
+func CheckLength(aisType int, length int) int {
+	if aisType >= 1 && aisType < len(ValidLengths) {
 		var b = length * 8
-		if b >= ValidAISLengths[aisType].Min && b <= ValidAISLengths[aisType].Max {
+		if b >= ValidLengths[aisType].Min && b <= ValidLengths[aisType].Max {
 			return (0) // Good.
 		} else {
 			//text_color_set (DW_COLOR_ERROR);
