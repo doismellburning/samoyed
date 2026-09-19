@@ -362,8 +362,9 @@ func alllettersorpm(p string) bool {
  *
  *		line	- Line number for use in error message.
  *
- * Returns:     Coordinate in signed degrees, or Nothing if the number could
- *		not be read at all.
+ * Returns:     Coordinate in signed degrees, or Nothing if the string does not
+ *		give one: a number that can't be read, isn't finite, or is
+ *		outside the range the hemisphere allows.
  *
  *----------------------------------------------------------------*/
 
@@ -485,16 +486,22 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[fl
 
 	var limit = float64(IfThenElse(which == LAT, 90, 180))
 	if degrees < -limit || degrees > limit {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Number of degrees in \"%s\" is out of range for %s\n", line, str,
-			IfThenElse(which == LAT, "latitude", "longitude"))
+		logrus.WithFields(logrus.Fields{
+			"line":       line,
+			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
+			"value":      str,
+			"limit":      limit,
+		}).Error("Number of degrees is out of range")
+
+		return maybe.Nothing[float64]()
 	}
 	//dw_printf ("%s = %f\n", str, degrees);
 	return maybe.Just(degrees)
 }
 
 // parse_ll is parse_ll_maybe for the callers that have nowhere to put the
-// absence yet and so treat an unreadable coordinate as zero; see issue #619.
+// absence yet and so treat a coordinate they can't use as zero; see issue
+// #619.
 func parse_ll(str string, which parse_ll_which_e, line int) float64 {
 	return maybe.FromMaybe(0, parse_ll_maybe(str, which, line))
 }

@@ -246,6 +246,23 @@ func Test_parse_ll_maybe(t *testing.T) {
 		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("NaN^0", LAT, 0))
 	})
 
+	// Regression test: an out-of-range coordinate only logged and was returned
+	// as though it were usable, so a beacon with LAT=200 passed the "latitude
+	// and longitude are required" check and EncodePosition clamped it to
+	// "!9000.00N" - the station transmitted from the North Pole.
+	t.Run("an out-of-range latitude is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("200", LAT, 0))
+	})
+
+	t.Run("an out-of-range longitude is Nothing", func(t *testing.T) {
+		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("181W", LON, 0))
+	})
+
+	t.Run("the limits themselves are Just", func(t *testing.T) {
+		assert.InDelta(t, 90.0, maybe.FromJust(parse_ll_maybe("90N", LAT, 0)), 0.0001)
+		assert.InDelta(t, -180.0, maybe.FromJust(parse_ll_maybe("180W", LON, 0)), 0.0001)
+	})
+
 	t.Run("a readable coordinate is Just", func(t *testing.T) {
 		assert.InDelta(t, -71.5, maybe.FromJust(parse_ll_maybe("71.5W", LON, 0)), 0.0001)
 	})
@@ -313,6 +330,22 @@ func Test_config_init_beacon_non_finite_numbers(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
 
 	assert.Empty(t, frequency_spec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
+}
+
+func Test_config_init_beacon_out_of_range_lat(t *testing.T) {
+	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=200 LONG=71W\n")
+
+	require.Equal(t, 1, misc.num_beacons)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].lat)
+
+	// With no position the beacon is dropped rather than transmitted from
+	// wherever the clamp lands.
+	var modem = new(audio_s)
+	modem.chan_medium[0] = MEDIUM_RADIO
+	modem.mycall[0] = "Q1TEST"
+
+	var bs = NewBeaconService(modem, misc, new(igate_config_s))
+	assert.Equal(t, BEACON_IGNORE, bs.miscConfig.beacon[0].btype)
 }
 
 func Test_config_init_beacon_unparseable_lat_long(t *testing.T) {
