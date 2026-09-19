@@ -67,6 +67,8 @@ import (
 	"math"
 	"math/rand"
 	"os"
+
+	"github.com/doismellburning/samoyed/internal/ais"
 )
 
 // Properties of the radio channels.
@@ -262,7 +264,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 	switch save_audio_config_p.achan[channel].modem_type {
 	case MODEM_AIS:
-		var nmea, err = AISToNMEA(fbuf)
+		var nmea, err = ais.ToNMEA(fbuf)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("%v\n", err)

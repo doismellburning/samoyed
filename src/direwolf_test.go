@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,16 +20,16 @@ import (
 func aisPositionReport(t *testing.T, rawSpeed int, rawCourse int) string {
 	t.Helper()
 
-	var ais = make([]byte, 21) // 168 bits
+	var payload = make([]byte, 21) // 168 bits
 
-	set_field(ais, 0, 6, 1)          // message type
-	set_field(ais, 8, 30, 366730000) // MMSI
-	set_field(ais, 50, 10, rawSpeed)
-	set_field(ais, 61, 28, int(-71.06*600000)) // longitude, minutes/10000
-	set_field(ais, 89, 27, int(42.36*600000))  // latitude, minutes/10000
-	set_field(ais, 116, 12, rawCourse)
+	ais.SetField(payload, 0, 6, 1)          // message type
+	ais.SetField(payload, 8, 30, 366730000) // MMSI
+	ais.SetField(payload, 50, 10, rawSpeed)
+	ais.SetField(payload, 61, 28, int(-71.06*600000)) // longitude, minutes/10000
+	ais.SetField(payload, 89, 27, int(42.36*600000))  // latitude, minutes/10000
+	ais.SetField(payload, 116, 12, rawCourse)
 
-	var nmea, err = AISToNMEA(ais)
+	var nmea, err = ais.ToNMEA(payload)
 	require.NoError(t, err)
 
 	return string(nmea)
