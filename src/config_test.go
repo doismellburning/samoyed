@@ -1176,6 +1176,68 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"NCHANNEL": {
+			{
+				name:   "a virtual channel, address and port are stored",
+				config: "NCHANNEL 6 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Equal("localhost", c.audio.nettnc_addr[6])
+					a.Equal(8001, c.audio.nettnc_port[6])
+				},
+			},
+			{
+				name:   "a channel below the virtual range is rejected",
+				config: "NCHANNEL 5 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[5])
+					a.Empty(c.audio.nettnc_addr[5])
+				},
+			},
+			{
+				name:   "a channel beyond the virtual range is rejected",
+				config: "NCHANNEL 16 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.NotEqual(MEDIUM_NETTNC, c.audio.chan_medium[channel])
+					}
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "NCHANNEL six localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.NotEqual(MEDIUM_NETTNC, c.audio.chan_medium[channel])
+					}
+				},
+			},
+			{
+				name:   "a channel already in use is left as it was",
+				config: "ICHANNEL 6\nNCHANNEL 6 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_IGATE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "two network TNCs can be configured at once",
+				config: "NCHANNEL 6 localhost 8001\nNCHANNEL 7 192.0.2.1 8002\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.audio.nettnc_addr[6])
+					a.Equal(8001, c.audio.nettnc_port[6])
+					a.Equal("192.0.2.1", c.audio.nettnc_addr[7])
+					a.Equal(8002, c.audio.nettnc_port[7])
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "NCHANNEL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 	}
 }
 
@@ -1251,7 +1313,6 @@ func directivesNotYetTested() []string {
 		"LOGFILE",
 		"MAXFRAME",
 		"MAXV22",
-		"NCHANNEL",
 		"NOXID",
 		"NULLMODEM",
 		"OBEACON",
