@@ -1155,6 +1155,68 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"ARATE": {
+			{
+				name:   "a valid rate is stored",
+				config: "ARATE 48000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(48000, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "no ARATE leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "it applies to the audio device the line follows",
+				config: "ADEVICE1 hw:1,0\nARATE 48000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Equal(48000, c.audio.adev[1].samples_per_sec)
+				},
+			},
+			{
+				name:   "the lowest usable rate is accepted",
+				config: "ARATE 8000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MIN_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "a rate below the minimum keeps the default",
+				config: "ARATE 7999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Contains(c.output, "more reasonable audio sample rate")
+				},
+			},
+			{
+				name:   "a rate beyond the maximum keeps the default",
+				config: "ARATE 192001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "an unreadable rate keeps the default",
+				config: "ARATE fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Contains(c.output, "more reasonable audio sample rate")
+				},
+			},
+			{
+				name:   "a missing rate does not eat the next line",
+				config: "ARATE\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"BEACON": {
 			{
 				name:   "the old style line is reported and configures no beacon",
@@ -4681,7 +4743,6 @@ func directivesTestedSeparately() map[string]string {
 	return map[string]string{
 		"AGWLOGIN":    "Test_config_init_agwlogin",
 		"AGWPORT":     "Test_config_init_agwport",
-		"ARATE":       "Test_config_init_channel",
 		"CFILTER":     "Test_config_init_cfilter_syntax_validation",
 		"CHANNEL":     "Test_config_init_channel",
 		"DNSSD":       "Test_config_init_dnssd",
