@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
 )
@@ -86,7 +87,7 @@ type beacon_s struct {
 
 	delay int /* Seconds to delay before first transmission. */
 
-	slot int /* Seconds after hour for slotted time beacons. */
+	slot maybe.Maybe[int] /* Seconds after hour for slotted time beacons. */
 	/* If specified, it overrides any 'delay' value. */
 
 	every int /* Time between transmissions, seconds. */
@@ -112,10 +113,10 @@ type beacon_s struct {
 	messaging bool /* Set messaging attribute for position report. */
 	/* i.e. Data Type Indicator of '=' rather than '!' */
 
-	lat       float64 /* Latitude and longitude. */
-	lon       float64
-	ambiguity int     /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
-	alt_m     float64 /* Altitude in meters. */
+	lat       maybe.Maybe[float64] /* Latitude and longitude. */
+	lon       maybe.Maybe[float64]
+	ambiguity int                  /* Number of lower digits to trim from location. 0 (default), 1, 2, 3, 4. */
+	alt_m     maybe.Maybe[float64] /* Altitude in meters. */
 
 	symtab byte /* Symbol table: / or \ or overlay character. */
 	symbol byte /* Symbol code. */
@@ -127,9 +128,9 @@ type beacon_s struct {
 
 	dir string /* 1 or 2 of N,E,W,S, or empty for omni. */
 
-	freq   float64 /* MHz. */
-	tone   float64 /* Hz. */
-	offset float64 /* MHz. */
+	freq   maybe.Maybe[float64] /* MHz. */
+	tone   maybe.Maybe[float64] /* Hz. */
+	offset maybe.Maybe[float64] /* MHz. */
 
 	comment    string /* Comment or empty. */
 	commentcmd string /* Command to append more to Comment or empty. */
@@ -6234,26 +6235,19 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
-	b.slot = G_UNKNOWN
 	b.every = 600
 	//b.delay = 6;		// temp test.
 	//b.every = 3600;
-	b.lat = G_UNKNOWN
-	b.lon = G_UNKNOWN
 	b.ambiguity = 0
-	b.alt_m = G_UNKNOWN
 	b.symtab = '/'
 	b.symbol = '-' /* house */
-	b.freq = G_UNKNOWN
-	b.tone = G_UNKNOWN
-	b.offset = G_UNKNOWN
 	b.source = ""
 	b.dest = ""
 
 	var zone string
 	var temp_symbol string
-	var easting float64 = G_UNKNOWN
-	var northing float64 = G_UNKNOWN
+	var easting maybe.Maybe[float64]
+	var northing maybe.Maybe[float64]
 
 	for {
 		var t = split("", false)
@@ -6321,7 +6315,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				continue
 			}
 
-			b.slot = n
+			b.slot = maybe.Just(n)
 		} else if strings.EqualFold(keyword, "EVERY") {
 			b.every = parse_interval(value, line)
 		} else if strings.EqualFold(keyword, "SENDTO") {
@@ -6443,9 +6437,9 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "OBJNAME") {
 			b.objname = value
 		} else if strings.EqualFold(keyword, "LAT") {
-			b.lat = parse_ll(value, LAT, line)
+			b.lat = maybe.Just(parse_ll(value, LAT, line))
 		} else if strings.EqualFold(keyword, "LONG") || strings.EqualFold(keyword, "LON") {
-			b.lon = parse_ll(value, LON, line)
+			b.lon = maybe.Just(parse_ll(value, LON, line))
 		} else if strings.EqualFold(keyword, "AMBIGUITY") || strings.EqualFold(keyword, "AMBIG") {
 			var n, _ = strconv.Atoi(value)
 			if n >= 0 && n <= 4 {
@@ -6486,17 +6480,17 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			}
 
 			if f, ok := parse_beacon_number(keyword, number, line); ok {
-				b.alt_m = f * meters
+				b.alt_m = maybe.Just(f * meters)
 			}
 		} else if strings.EqualFold(keyword, "ZONE") {
 			zone = value
 		} else if strings.EqualFold(keyword, "EAST") || strings.EqualFold(keyword, "EASTING") {
 			if f, ok := parse_beacon_number(keyword, value, line); ok {
-				easting = f
+				easting = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "NORTH") || strings.EqualFold(keyword, "NORTHING") {
 			if f, ok := parse_beacon_number(keyword, value, line); ok {
-				northing = f
+				northing = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "SYMBOL") {
 			/* Defer processing in case overlay appears later. */
@@ -6525,15 +6519,15 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
 			if f, ok := parse_beacon_number(keyword, value, line); ok {
-				b.freq = f
+				b.freq = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "TONE") {
 			if f, ok := parse_beacon_number(keyword, value, line); ok {
-				b.tone = f
+				b.tone = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "OFFSET") || strings.EqualFold(keyword, "OFF") {
 			if f, ok := parse_beacon_number(keyword, value, line); ok {
-				b.offset = f
+				b.offset = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "COMMENT") {
 			b.comment = value
@@ -6568,8 +6562,11 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 	/*
 	 * Convert UTM coordinates to lat / long.
 	 */
-	if len(zone) > 0 || easting != G_UNKNOWN || northing != G_UNKNOWN {
-		if len(zone) > 0 && easting != G_UNKNOWN && northing != G_UNKNOWN {
+	if len(zone) > 0 || easting.IsJust() || northing.IsJust() {
+		var east, eastKnown = easting.Get()
+		var north, northKnown = northing.Get()
+
+		if len(zone) > 0 && eastKnown && northKnown {
 			var _, _hemi, lzone = parse_utm_zone(zone)
 
 			var hemi = HemisphereRuneToCoordconvHemisphere(_hemi)
@@ -6577,14 +6574,14 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var utm = coordconv.UTMCoord{
 				Zone:       lzone,
 				Hemisphere: hemi,
-				Easting:    float64(easting),
-				Northing:   float64(northing),
+				Easting:    east,
+				Northing:   north,
 			}
 
 			var geo, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 			if geoErr == nil {
-				b.lat = R2D(float64(geo.Lat))
-				b.lon = R2D(float64(geo.Lng))
+				b.lat = maybe.Just(R2D(float64(geo.Lat)))
+				b.lon = maybe.Just(R2D(float64(geo.Lng)))
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, geoErr)

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -731,22 +732,21 @@ func Test_config_init_beacon_unparseable_numbers(t *testing.T) {
 	var _, misc = configFromString(t, config)
 
 	require.Equal(t, 1, misc.num_beacons)
-	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].freq, 0.001)
-	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].tone, 0.001)
-	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].offset, 0.001)
-	assert.InDelta(t, float64(G_UNKNOWN), misc.beacon[0].alt_m, 0.001)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].freq)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].tone)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].offset)
+	assert.Equal(t, maybe.Nothing[float64](), misc.beacon[0].alt_m)
 
-	assert.Empty(t, frequency_spec(unlessUnknown(misc.beacon[0].freq),
-		unlessUnknown(misc.beacon[0].tone), unlessUnknown(misc.beacon[0].offset)))
+	assert.Empty(t, frequency_spec(misc.beacon[0].freq, misc.beacon[0].tone, misc.beacon[0].offset))
 }
 
 func Test_config_init_beacon_numbers_with_units(t *testing.T) {
 	var _, misc = configFromString(t, "MYCALL Q1TEST\nPBEACON LAT=42N LONG=71W ALT=100foot FREQ=146.52 TONE=100\n")
 
 	require.Equal(t, 1, misc.num_beacons)
-	assert.InDelta(t, 30.48, misc.beacon[0].alt_m, 0.001)
-	assert.InDelta(t, 146.52, misc.beacon[0].freq, 0.001)
-	assert.InDelta(t, 100.0, misc.beacon[0].tone, 0.001)
+	assert.InDelta(t, 30.48, maybe.FromJust(misc.beacon[0].alt_m), 0.001)
+	assert.InDelta(t, 146.52, maybe.FromJust(misc.beacon[0].freq), 0.001)
+	assert.InDelta(t, 100.0, maybe.FromJust(misc.beacon[0].tone), 0.001)
 }
 
 // --- config_init beacon line rejected part way through ---
