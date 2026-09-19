@@ -1363,6 +1363,59 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"PERSIST": {
+			{
+				name:   "a valid probability is stored",
+				config: "PERSIST 100\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(100, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "no PERSIST leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nPERSIST 100\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+					a.Equal(100, c.audio.achan[1].persist)
+				},
+			},
+			{
+				name:   "a probability below the accepted range falls back to the default",
+				config: "PERSIST 4\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "a probability that would not fit the byte it is sent in falls back to the default",
+				config: "PERSIST 256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "an unreadable probability falls back to the default",
+				config: "PERSIST abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "a missing probability does not eat the next line",
+				config: "PERSIST\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TXTAIL": {
 			{
 				name:   "a valid time is stored",
@@ -1503,7 +1556,6 @@ func directivesNotYetTested() []string {
 		"NULLMODEM",
 		"OBEACON",
 		"PACLEN",
-		"PERSIST",
 		"PTT",
 		"REGEN",
 		"RETRY",
