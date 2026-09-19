@@ -1138,6 +1138,81 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		// Connected mode digipeating needs an internal modem at both ends, so a
+		// network TNC channel is not allowed here even though DIGIPEAT allows one.
+		"CDIGIPEAT": {
+			{
+				name:   "a valid line enables connected mode digipeating",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.has_alias[0][1])
+				},
+			},
+			{
+				name:   "nothing is digipeated by default",
+				config: "MYCALL Q1TEST\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+				},
+			},
+			{
+				name:   "an alias pattern is stored",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q[12]TEST$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.True(c.cdigi.has_alias[0][1])
+					a.NotNil(c.cdigi.alias[0][1])
+				},
+			},
+			{
+				name:   "an unusable alias pattern is rejected and nothing is enabled",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q([12]TEST$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "Invalid alias matching pattern")
+				},
+			},
+			{
+				name:   "a non-numeric channel is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT zero 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "is not allowed for FROM-channel")
+				},
+			},
+			{
+				name:   "a network TNC channel is not allowed",
+				config: "MYCALL Q1TEST\nNCHANNEL 6 localhost 8001\nCDIGIPEAT 0 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "TO-channel must be in range")
+				},
+			},
+			{
+				name:   "anything after the alias is reported",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q[12]TEST$ extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "where end of line was expected")
+				},
+			},
+			{
+				name:   "digipeating to a channel with no callsign is switched off again",
+				config: "ACHANNELS 2\nCDIGIPEAT 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "MYCALL must be set for transmit channel")
+				},
+			},
+			{
+				name:   "a missing TO-channel does not eat the next line",
+				config: "ACHANNELS 2\nCDIGIPEAT 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"DEDUPE": {
 			{
 				name:   "a valid time is stored",
@@ -3368,7 +3443,6 @@ func directivesNotYetTested() []string {
 	return []string{
 		"BEACON",
 		"CBEACON",
-		"CDIGIPEAT",
 		"CDIGIPEATER",
 		"CON",
 		"DCD",
