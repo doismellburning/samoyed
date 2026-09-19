@@ -1707,6 +1707,16 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the count went through an Atoi whose error was
+			// ignored, so "MAXV22 two" read as the 0 returned alongside it - a valid
+			// count, meaning never offer v2.2 - rather than being rejected.
+			{
+				name:   "an unreadable count keeps the configured one",
+				config: "MAXV22 2\nMAXV22 two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxv22)
+				},
+			},
 		},
 		"NCHANNEL": {
 			{

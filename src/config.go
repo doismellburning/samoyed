@@ -6220,7 +6220,13 @@ func handleMAXV22(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: MAXV22 number must be numeric. Keeping %d.\n", ps.line, ps.misc.maxv22)
+
+		return false
+	}
 	if n >= 0 && n <= AX25_N2_RETRY_MAX {
 		ps.misc.maxv22 = n
 	} else {
