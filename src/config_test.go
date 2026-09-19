@@ -1183,6 +1183,16 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the time went through an Atoi whose error was ignored,
+			// so "DEDUPE abc" read as the 0 returned alongside it - in range, and
+			// duplicate suppression switched off - rather than being rejected.
+			{
+				name:   "an unreadable time keeps the configured one",
+				config: "DEDUPE 45\nDEDUPE abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(45, c.digi.dedupe_time)
+				},
+			},
 		},
 		// A digipeater needs two radio channels and a callsign on the transmit one,
 		// so these lines are longer than most: config_init switches digipeating off

@@ -3386,7 +3386,13 @@ func handleDEDUPE(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Time must be numeric for DEDUPE command. Keeping %d.\n", ps.line, ps.digi.dedupe_time)
+
+		return false
+	}
 	if n >= 0 && n < 600 {
 		ps.digi.dedupe_time = n
 	} else {
