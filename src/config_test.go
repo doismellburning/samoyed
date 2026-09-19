@@ -3535,6 +3535,55 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"TTAMBIG": {
+			{
+				name:   "a pattern of exactly one x is stored",
+				config: "TTAMBIG B3x\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_AMBIG, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B3x", c.tt.ttlocs[0].pattern)
+				},
+			},
+			{
+				name:   "no TTAMBIG means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "the extra button is optional",
+				config: "TTAMBIG Bx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+				},
+			},
+			{
+				name:   "more than one x is rejected",
+				config: "TTAMBIG B3xx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must end with exactly one x")
+				},
+			},
+			{
+				name:   "a pattern that does not begin with B is rejected",
+				config: "TTAMBIG C3x\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "a missing pattern does not eat the next line",
+				config: "TTAMBIG\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"TTCORRAL": {
 			{
 				name:   "a latitude, longitude and offset are stored",
@@ -4259,7 +4308,6 @@ func directivesTestedSeparately() map[string]string {
 // the last of them.
 func directivesNotYetTested() []string {
 	return []string{
-		"TTAMBIG",
 		"TTCMD",
 		"TTERR",
 		"TTMACRO",
