@@ -1223,6 +1223,42 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"DCD": {
+			{
+				name:   "it configures the data carrier detect output, not PTT",
+				config: "DCD /dev/ttyS0 RTS\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_SERIAL, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "a GPIO number is stored for it too",
+				config: "DCD GPIO 24\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Equal(24, c.audio.achan[0].octrl[OCTYPE_DCD].out_gpio_num)
+				},
+			},
+			{
+				// A single CM108 GPIO byte cannot be updated a bit at a time, so only
+				// PTT may use it.
+				name:   "CM108 is rejected for anything but PTT",
+				config: "DCD CM108 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Contains(c.output, "only valid for PTT, not DCD")
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "DCD\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
 		"DEDUPE": {
 			{
 				name:   "a valid time is stored",
@@ -3692,7 +3728,6 @@ func directivesNotYetTested() []string {
 		"BEACON",
 		"CBEACON",
 		"CON",
-		"DCD",
 		"IBEACON",
 		"OBEACON",
 		"SMARTBEACON",
