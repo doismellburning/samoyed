@@ -1252,6 +1252,17 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"DIGIPEATER": {
+			{
+				name:   "the longer name is the same handler as DIGIPEAT",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEATER 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.enabled[0][1])
+					a.NotNil(c.digi.alias[0][1])
+					a.NotNil(c.digi.wide[0][1])
+				},
+			},
+		},
 		"DNSSDNAME": {
 			{
 				name:   "a service name is stored",
@@ -3259,7 +3270,6 @@ func directivesNotYetTested() []string {
 		"CON",
 		"DCD",
 		"DEDUPE",
-		"DIGIPEATER",
 		"IBEACON",
 		"OBEACON",
 		"PTT",
