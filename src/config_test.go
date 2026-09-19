@@ -2405,6 +2405,51 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 		},
+		"SATGATE": {
+			{
+				name:   "a delay is stored",
+				config: "SATGATE 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "no SATGATE means no delay and no SATgate mode",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "the directive on its own takes the default delay",
+				config: "SATGATE\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SATGATE_DELAY, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "a delay shorter than the minimum falls back to the default",
+				config: "SATGATE 4\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SATGATE_DELAY, c.igate.satgate_delay)
+					a.Contains(c.output, "Unreasonable SATgate delay")
+				},
+			},
+			{
+				name:   "a delay longer than the maximum falls back to the default",
+				config: "SATGATE 31\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SATGATE_DELAY, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "the directive says it is on its way out",
+				config: "SATGATE 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "will be removed in a future version")
+				},
+			},
+		},
 		"SPEECH": {
 			{
 				name:   "a script name is accepted and does not derail the next line",
@@ -2711,7 +2756,6 @@ func directivesNotYetTested() []string {
 		"OBEACON",
 		"PTT",
 		"REGEN",
-		"SATGATE",
 		"SERIALKISS",
 		"SERIALKISSPOLL",
 		"SMARTBEACON",
