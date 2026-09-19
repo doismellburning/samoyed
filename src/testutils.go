@@ -27,7 +27,25 @@ func CaptureOutput(t *testing.T, command func()) string {
 
 	require.NoError(t, pipeErr)
 
+	defer r.Close()
+
 	os.Stdout = w
+
+	// Drain the pipe while the command is still filling it.  A pipe holds only
+	// so much - 64 KiB on Linux - so a command that writes more than that
+	// blocks forever if nothing is reading until it returns.
+	type captured struct {
+		output string
+		err    error
+	}
+
+	var done = make(chan captured, 1)
+
+	go func() {
+		var outputBytes, readErr = io.ReadAll(r)
+
+		done <- captured{output: string(outputBytes), err: readErr}
+	}()
 
 	command()
 
@@ -35,11 +53,11 @@ func CaptureOutput(t *testing.T, command func()) string {
 
 	os.Stdout = oldStdout
 
-	var outputBytes, readErr = io.ReadAll(r)
+	var result = <-done
 
-	require.NoError(t, readErr)
+	require.NoError(t, result.err)
 
-	return string(outputBytes)
+	return result.output
 }
 
 // AssertOutputContains runs command and asserts its stdout contains expectedOutputContains.
