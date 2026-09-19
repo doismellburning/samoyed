@@ -1674,6 +1674,16 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the count went through an Atoi whose error was
+			// ignored, so "IGMSP two" read as the 0 returned alongside it - a valid
+			// count, meaning send no position at all - rather than being rejected.
+			{
+				name:   "an unreadable count keeps the configured one",
+				config: "IGMSP 2\nIGMSP two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.igate.igmsp)
+				},
+			},
 		},
 		"IGSERVER": {
 			{

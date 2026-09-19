@@ -5353,7 +5353,14 @@ func handleIGMSP(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t != "" {
-		var n, _ = strconv.Atoi(t)
+		var n, nErr = strconv.Atoi(t)
+		if nErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: Number of times must be numeric for IGMSP command. Keeping %d.\n",
+				ps.line, ps.igate.igmsp)
+
+			return false
+		}
 		if n >= 0 && n <= 10 {
 			ps.igate.igmsp = n
 		} else {
