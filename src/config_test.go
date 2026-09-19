@@ -1237,6 +1237,43 @@ func directiveTests() map[string][]directiveCase {
 					a.Equal("Q1TEST", c.audio.mycall[0])
 				},
 			},
+			// Regression test: the handler marked the channel MEDIUM_NETTNC and
+			// stored the address before it had read the port, so a line that was
+			// then rejected left a network TNC channel behind with port 0.
+			// nettnc_init attaches to every such channel at startup and exits if it
+			// cannot, so a typo took the whole program down.
+			{
+				name:   "a missing port leaves the channel alone",
+				config: "NCHANNEL 6 localhost\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "an out-of-range port leaves the channel alone",
+				config: "NCHANNEL 6 localhost 99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+					a.Zero(c.audio.nettnc_port[6])
+				},
+			},
+			{
+				name:   "an unreadable port leaves the channel alone",
+				config: "NCHANNEL 6 localhost eightthousandandone\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "a missing address leaves the channel alone",
+				config: "NCHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+				},
+			},
 		},
 	}
 }

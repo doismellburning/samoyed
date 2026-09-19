@@ -1722,31 +1722,26 @@ func handleNCHANNEL(ps *parseState) bool {
 	}
 
 	var nchan, _ = strconv.Atoi(t)
-	if nchan >= MAX_RADIO_CHANS && nchan < MAX_TOTAL_CHANS {
-		if ps.audio.chan_medium[nchan] == MEDIUM_NONE {
-			ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
-
-			return true
-		}
-	} else {
+	if nchan < MAX_RADIO_CHANS || nchan >= MAX_TOTAL_CHANS {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: NCHANNEL number must be in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 
 		return true
 	}
+	if ps.audio.chan_medium[nchan] != MEDIUM_NONE {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
 
-	t = split("", false)
-	if t == "" {
+		return true
+	}
+
+	var addr = split("", false)
+	if addr == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing network TNC address for NCHANNEL command.\n", ps.line)
 
 		return true
 	}
-
-	ps.audio.nettnc_addr[nchan] = t
 
 	t = split("", false)
 	if t == "" {
@@ -1763,6 +1758,12 @@ func handleNCHANNEL(ps *parseState) bool {
 
 		return true
 	}
+
+	// Claim the channel only once the whole line has parsed: nettnc_init
+	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
+	// half-read line would otherwise take the program down at startup.
+	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
+	ps.audio.nettnc_addr[nchan] = addr
 	ps.audio.nettnc_port[nchan] = n
 
 	return false
