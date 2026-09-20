@@ -5687,16 +5687,10 @@ func handleNULLMODEM(ps *parseState) bool {
 		dw_printf("Config file: Missing serial port name on line %d.\n", ps.line)
 
 		return true
-	} else {
-		if ps.misc.kiss_serial_port != "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", ps.line)
-		}
-
-		ps.misc.kiss_serial_port = t
-		ps.misc.kiss_serial_speed = 0
-		ps.misc.kiss_serial_poll = 0
 	}
+
+	var port = t
+	var speed = 0
 
 	t = split("", false)
 	if t != "" {
@@ -5708,8 +5702,20 @@ func handleNULLMODEM(ps *parseState) bool {
 			return true
 		}
 
-		ps.misc.kiss_serial_speed = n
+		speed = n
 	}
+
+	// Commit the line only once all of it has parsed, so that a rejected line
+	// leaves the port configured by an earlier one - and the warning below
+	// describes a replacement that is actually happening.
+	if ps.misc.kiss_serial_port != "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", ps.line)
+	}
+
+	ps.misc.kiss_serial_port = port
+	ps.misc.kiss_serial_speed = speed
+	ps.misc.kiss_serial_poll = 0
 
 	return false
 }

@@ -2971,11 +2971,33 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 			{
-				name:   "an unreadable speed is rejected",
+				// Regression test: the port was stored, and the speed and poll
+				// flag reset, before the speed had been read, so a rejected line
+				// replaced a perfectly good serial KISS port with one at no
+				// speed.
+				name:   "an unreadable speed leaves no port configured either",
 				config: "NULLMODEM /dev/ttyS0 fast\n",
 				check: func(a *assert.Assertions, c configs) {
-					a.Equal(0, c.misc.kiss_serial_speed)
+					a.Empty(c.misc.kiss_serial_port)
+					a.Zero(c.misc.kiss_serial_speed)
 					a.Contains(c.output, "Invalid speed")
+				},
+			},
+			{
+				name:   "a rejected line leaves an earlier one untouched",
+				config: "SERIALKISSPOLL /dev/rfcomm0\nNULLMODEM /dev/ttyS1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/rfcomm0", c.misc.kiss_serial_port)
+					a.Equal(1, c.misc.kiss_serial_poll)
+					a.Zero(c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "a rejected line does not undo an earlier speed",
+				config: "NULLMODEM /dev/ttyS0 9600\nNULLMODEM /dev/ttyS1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(9600, c.misc.kiss_serial_speed)
 				},
 			},
 			{
