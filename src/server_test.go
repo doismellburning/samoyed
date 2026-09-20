@@ -6,6 +6,7 @@ package direwolf
 import (
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -129,20 +130,20 @@ func TestHandleClientCommand_P_CorrectCredentialsLogIn(t *testing.T) {
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
 
-	assert.True(t, s.clients[0].loggedIn.Load())
+	assert.True(t, s.isLoggedIn(0))
 }
 
 func TestHandleClientCommand_P_WrongCredentialsDoNotLogIn(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter3"))
-	assert.False(t, s.clients[0].loggedIn.Load(), "wrong password")
+	assert.False(t, s.isLoggedIn(0), "wrong password")
 
 	s.handleClientCommand(0, loginFrame("Q2TEST", "hunter2"))
-	assert.False(t, s.clients[0].loggedIn.Load(), "wrong user name")
+	assert.False(t, s.isLoggedIn(0), "wrong user name")
 
 	s.handleClientCommand(0, loginFrame("", ""))
-	assert.False(t, s.clients[0].loggedIn.Load(), "empty credentials")
+	assert.False(t, s.isLoggedIn(0), "empty credentials")
 }
 
 // AGWPE accepts any one of the user name and password combinations it has been
@@ -151,12 +152,12 @@ func TestHandleClientCommand_P_AnyConfiguredCredentialsLogIn(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
-	assert.True(t, s.clients[0].loggedIn.Load(), "first set")
+	assert.True(t, s.isLoggedIn(0), "first set")
 
-	s.clients[0].loggedIn.Store(false)
+	s.clientLoggedOut(0)
 
 	s.handleClientCommand(0, loginFrame("Q2TEST", "correct horse"))
-	assert.True(t, s.clients[0].loggedIn.Load(), "second set")
+	assert.True(t, s.isLoggedIn(0), "second set")
 }
 
 // Credentials are matched as a pair, so one user's password does not open
@@ -165,10 +166,10 @@ func TestHandleClientCommand_P_CredentialsDoNotCrossBetweenUsers(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2", "Q2TEST", "correct horse")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "correct horse"))
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 
 	s.handleClientCommand(0, loginFrame("Q2TEST", "hunter2"))
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 func TestMatchLogin(t *testing.T) {
@@ -189,10 +190,10 @@ func TestHandleClientCommand_P_FailureAfterSuccessLogsOut(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
-	require.True(t, s.clients[0].loggedIn.Load())
+	require.True(t, s.isLoggedIn(0))
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "wrong"))
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 // A login we cannot read is a failed login like any other, so it takes an
@@ -201,7 +202,7 @@ func TestHandleClientCommand_P_MalformedFrameAfterSuccessLogsOut(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
-	require.True(t, s.clients[0].loggedIn.Load())
+	require.True(t, s.isLoggedIn(0))
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'P'
@@ -210,7 +211,7 @@ func TestHandleClientCommand_P_MalformedFrameAfterSuccessLogsOut(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
@@ -224,7 +225,7 @@ func TestHandleClientCommand_P_MalformedFrameDoesNotLogIn(t *testing.T) {
 
 	s.handleClientCommand(0, cmd)
 
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 // Without AGWLOGIN, a login frame is silently ignored, as Dire Wolf does.
@@ -233,7 +234,7 @@ func TestHandleClientCommand_P_IgnoredWhenNoLoginConfigured(t *testing.T) {
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
 
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
@@ -254,7 +255,7 @@ func TestHandleClientCommand_CommandsIgnoredUntilLoggedIn(t *testing.T) {
 	}
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "hunter2"))
-	require.True(t, s.clients[0].loggedIn.Load())
+	require.True(t, s.isLoggedIn(0))
 
 	s.handleClientCommand(0, version)
 
@@ -380,7 +381,7 @@ func TestClientAccepted_LocalClientNeedsNoLogin(t *testing.T) {
 	var server, client = loopbackConns(t)
 
 	s.clientAccepted(0, server)
-	assert.True(t, s.clients[0].loggedIn.Load())
+	assert.True(t, s.isLoggedIn(0))
 
 	var version = new(AGWPEMessage)
 	version.Header.DataKind = 'R'
@@ -396,7 +397,7 @@ func TestClientAccepted_RemoteClientMustLogIn(t *testing.T) {
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "192.168.1.10")))
 
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 // Without AGWLOGIN the exemption changes nothing, because nobody has to log in.
@@ -415,10 +416,10 @@ func TestClientAccepted_LocalClientSurvivesAFailedLogin(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "127.0.0.1")))
-	require.True(t, s.clients[0].loggedIn.Load())
+	require.True(t, s.isLoggedIn(0))
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "wrong"))
-	assert.True(t, s.clients[0].loggedIn.Load(), "wrong credentials")
+	assert.True(t, s.isLoggedIn(0), "wrong credentials")
 
 	var malformed = new(AGWPEMessage)
 	malformed.Header.DataKind = 'P'
@@ -426,7 +427,7 @@ func TestClientAccepted_LocalClientSurvivesAFailedLogin(t *testing.T) {
 	malformed.Header.DataLen = uint32(len(malformed.Data))
 
 	s.handleClientCommand(0, malformed)
-	assert.True(t, s.clients[0].loggedIn.Load(), "malformed frame")
+	assert.True(t, s.isLoggedIn(0), "malformed frame")
 }
 
 // A remote client does not inherit the exemption of whoever held the slot
@@ -435,13 +436,13 @@ func TestClientAccepted_ExemptionDoesNotOutlastTheLocalClient(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "127.0.0.1")))
-	require.True(t, s.clients[0].loggedIn.Load())
+	require.True(t, s.isLoggedIn(0))
 
 	s.clientAccepted(0, connWithRemoteAddr(tcpAddr(t, "192.168.1.10")))
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 
 	s.handleClientCommand(0, loginFrame("Q1TEST", "wrong"))
-	assert.False(t, s.clients[0].loggedIn.Load(), "a failed login leaves it logged out")
+	assert.False(t, s.isLoggedIn(0), "a failed login leaves it logged out")
 }
 
 // watchingConn reports the socket attached to client 0 at the moment it is
@@ -468,7 +469,7 @@ func (c *watchingConn) RemoteAddr() net.Addr {
 // login - a local one's, in particular.
 func TestClientAccepted_PublishesTheSocketLast(t *testing.T) {
 	var s = requireLogins(t, "Q1TEST", "hunter2")
-	s.clients[0].loggedIn.Store(true) /* As a previous client would have left it. */
+	s.setLoggedIn(0) /* As a previous client would have left it. */
 
 	var conn = new(watchingConn)
 	conn.srv = s
@@ -478,7 +479,7 @@ func TestClientAccepted_PublishesTheSocketLast(t *testing.T) {
 
 	assert.Nil(t, conn.sockWhenAsked, "socket published before the login state was settled")
 	assert.Equal(t, net.Conn(conn), s.clients[0].conn)
-	assert.False(t, s.clients[0].loggedIn.Load())
+	assert.False(t, s.isLoggedIn(0))
 }
 
 // Accepting a connection clears whatever the previous holder of the slot
@@ -494,4 +495,72 @@ func TestClientAccepted_ResetsMonitoringState(t *testing.T) {
 	assert.False(t, s.clients[0].sendRaw)
 	assert.False(t, s.clients[0].sendMonitor)
 	assert.Equal(t, server, s.clients[0].conn)
+}
+
+// --- The client table under concurrent use ---
+
+// nullConn swallows anything written to it and reports a remote address, which
+// is all the server asks of a client's socket here.
+type nullConn struct {
+	net.Conn
+
+	addr net.Addr
+}
+
+func (c *nullConn) Write(b []byte) (int, error) { return len(b), nil }
+func (c *nullConn) Close() error                { return nil }
+func (c *nullConn) RemoteAddr() net.Addr        { return c.addr }
+
+// The client table is reached from more than one goroutine at a time: the
+// thread accepting connections attaches a client to a slot, that client's own
+// command thread switches its monitoring on and off, and the receive and
+// transmit paths walk the whole table for every frame that goes past.  Run
+// under -race, this fails if the table is not guarded.
+func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
+	var s = new(AGWServer)
+
+	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	var conn = new(nullConn)
+	conn.addr = tcpAddr(t, "192.168.1.10")
+
+	var rawToggle = new(AGWPEMessage)
+	rawToggle.Header.DataKind = 'k'
+
+	var monitorToggle = new(AGWPEMessage)
+	monitorToggle.Header.DataKind = 'm'
+
+	var done = make(chan struct{})
+	var wg sync.WaitGroup
+
+	// Detaching a client tells the data link machinery it has gone, and
+	// nothing here drains that queue, so put it back afterwards rather than
+	// leave a pile of cleanups behind for whatever test runs next.
+	dlqAppended(func() {
+		wg.Go(func() { /* The receive path, for every frame heard. */
+			for {
+				select {
+				case <-done:
+					return
+				default:
+				}
+
+				s.SendRecPacket(0, pp, []byte{0x01, 0x02})
+			}
+		})
+
+		wg.Go(func() { /* Connections coming and going, and what they ask for. */
+			defer close(done)
+
+			for range 200 {
+				s.clientAccepted(0, conn)
+				s.handleClientCommand(0, rawToggle)
+				s.handleClientCommand(0, monitorToggle)
+				s.detachClient(0, conn)
+			}
+		})
+
+		wg.Wait()
+	})
 }

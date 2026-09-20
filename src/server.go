@@ -121,7 +121,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -156,6 +156,13 @@ type AGWServer struct {
 	// consults it for every frame.
 	debug int
 
+	// mu guards clients below, which connectListenThread (attaching a newly
+	// accepted connection), each client's own cmdListenThread (acting on what
+	// that client asks for, and noticing when it goes away) and the receive
+	// and transmit paths (walking the table for every frame that goes past)
+	// all reach.  Once those goroutines are running, go through the methods
+	// below rather than touching the table directly.
+	mu      sync.Mutex
 	clients [MAX_NET_CLIENTS]agwClient
 }
 
@@ -175,15 +182,13 @@ type agwClient struct {
 
 	/* Has this client sent an "Application Login" that we accepted? */
 	/* Only consulted when a login is required. */
-	/* The connection listener and the client's own command thread both */
-	/* touch this, hence the atomic. */
-	loggedIn atomic.Bool
+	loggedIn bool
 
 	/* Is this client exempt from having to log in at all, by having connected */
 	/* from this machine?  Settled when the connection is accepted, before the */
 	/* socket is published, and read again whenever the client's login state is */
 	/* reset. */
-	loginExempt atomic.Bool
+	loginExempt bool
 }
 
 /*-------------------------------------------------------------------
@@ -764,12 +769,21 @@ func (s *AGWServer) OutstandingFramesReply(channel int, client int, own_call str
 // clientConn returns the socket currently attached to client, or nil if
 // nothing is.
 func (s *AGWServer) clientConn(client int) net.Conn {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return s.clients[client].conn
 }
 
 // clientWantingRaw returns client's socket if it has asked to be sent received
-// packets in raw form, and nil otherwise.
+// packets in raw form, and nil otherwise.  The socket and the answer come from
+// one look at the table, so a client cannot be sent a frame in a form it asked
+// to stop being sent, nor have one aimed at the socket of whoever held the slot
+// before it.
 func (s *AGWServer) clientWantingRaw(client int) net.Conn {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if !s.clients[client].sendRaw {
 		return nil
 	}
@@ -778,8 +792,12 @@ func (s *AGWServer) clientWantingRaw(client int) net.Conn {
 }
 
 // clientWantingMonitor returns client's socket if it has asked to be sent
-// received packets in monitor form, and nil otherwise.
+// received packets in monitor form, and nil otherwise.  As above, the pair is
+// fetched under a single lock.
 func (s *AGWServer) clientWantingMonitor(client int) net.Conn {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if !s.clients[client].sendMonitor {
 		return nil
 	}
@@ -790,6 +808,9 @@ func (s *AGWServer) clientWantingMonitor(client int) net.Conn {
 // findFreeClient returns the index of the first client slot with no socket
 // attached, or -1 if all are in use.
 func (s *AGWServer) findFreeClient() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for c := range MAX_NET_CLIENTS {
 		if s.clients[c].conn == nil {
 			return c
@@ -797,6 +818,39 @@ func (s *AGWServer) findFreeClient() int {
 	}
 
 	return -1
+}
+
+// toggleSendRaw turns the sending of received packets in raw form to client on
+// if it is off, and off if it is on.
+func (s *AGWServer) toggleSendRaw(client int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.clients[client].sendRaw = !s.clients[client].sendRaw
+}
+
+// toggleSendMonitor does the same for monitor form.
+func (s *AGWServer) toggleSendMonitor(client int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.clients[client].sendMonitor = !s.clients[client].sendMonitor
+}
+
+// isLoggedIn reports whether client may have its commands honoured.
+func (s *AGWServer) isLoggedIn(client int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.clients[client].loggedIn
+}
+
+// setLoggedIn records that client sent an "Application Login" we accepted.
+func (s *AGWServer) setLoggedIn(client int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.clients[client].loggedIn = true
 }
 
 func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *AGWPEMessage) {
@@ -1049,9 +1103,13 @@ func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
 func (s *AGWServer) detachClient(client int, conn net.Conn) {
 	conn.Close()
 
+	s.mu.Lock()
+
 	if s.clients[client].conn == conn {
 		s.clients[client].conn = nil
 	}
+
+	s.mu.Unlock()
 
 	dlq_client_cleanup(client)
 }
@@ -1177,6 +1235,15 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 // state into the shape a new client should find it in.
 func (s *AGWServer) clientAccepted(client int, conn net.Conn) {
 	/*
+	 * Ask the connection about itself before taking the lock, since that is
+	 * the one thing here that does not concern the client table.
+	 */
+	var exempt = agwClientIsLocal(conn)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	/*
 	 * The command to change these is actually a toggle, not explicit on or off.
 	 * Make sure they have proper state when we get a new connection.
 	 */
@@ -1187,8 +1254,8 @@ func (s *AGWServer) clientAccepted(client int, conn net.Conn) {
 	 * Whoever had this slot before does not vouch for whoever has it now, so a
 	 * client that has to log in starts logged out.
 	 */
-	s.clients[client].loginExempt.Store(agwClientIsLocal(conn))
-	s.clientLoggedOut(client)
+	s.clients[client].loginExempt = exempt
+	s.clients[client].loggedIn = exempt
 
 	/*
 	 * Publish the socket last.  cmdListenThread is already watching this slot
@@ -1196,7 +1263,9 @@ func (s *AGWServer) clientAccepted(client int, conn net.Conn) {
 	 * anything a command is judged against has to be in place first -
 	 * otherwise a client that gets in quickly enough is judged against the
 	 * state the previous holder of the slot left, and a remote one could find
-	 * itself logged in on the strength of somebody else's login.
+	 * itself logged in on the strength of somebody else's login.  Holding the
+	 * lock across the lot is what makes that hold; the order is kept because
+	 * it is the right one on its own terms.
 	 */
 	s.clients[client].conn = conn
 }
@@ -1206,7 +1275,10 @@ func (s *AGWServer) clientAccepted(client int, conn net.Conn) {
 // machine.  A client on this machine never has to log in, so a login attempt it
 // gets wrong does not take anything away from it.
 func (s *AGWServer) clientLoggedOut(client int) {
-	s.clients[client].loggedIn.Store(s.clients[client].loginExempt.Load())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.clients[client].loggedIn = s.clients[client].loginExempt
 }
 
 // agwClientIsLocal reports whether a client connected from the machine we are
@@ -1326,7 +1398,7 @@ func (s *AGWServer) handleClientLogin(client int, cmd *AGWPEMessage) {
 		return
 	}
 
-	s.clients[client].loggedIn.Store(true)
+	s.setLoggedIn(client)
 
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("AGW client application %d logged in as \"%s\".\n", client, matched)
@@ -1339,7 +1411,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		return
 	}
 
-	if s.loginRequired() && !s.clients[client].loggedIn.Load() {
+	if s.loginRequired() && !s.isLoggedIn(client) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW client application %d sent command '%c' without logging in first.  Ignored.\n",
 			client, cmd.Header.DataKind)
@@ -1513,11 +1585,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'k': /* Ask to start receiving RAW AX25 frames */
 		// Actually it is a toggle so we must be sure to clear it for a new connection.
-		s.clients[client].sendRaw = !s.clients[client].sendRaw
+		s.toggleSendRaw(client)
 
 	case 'm': /* Ask to start receiving Monitor frames */
 		// Actually it is a toggle so we must be sure to clear it for a new connection.
-		s.clients[client].sendMonitor = !s.clients[client].sendMonitor
+		s.toggleSendMonitor(client)
 
 	case 'V': /* Transmit UI data frame (with digipeater path) */
 		{
