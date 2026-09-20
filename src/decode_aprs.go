@@ -3851,8 +3851,12 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		/* Bearing and Number/Range/Quality? */
 
-		if pdext[7] == '/' && pdext[11] == '/' {
-			process_comment(A, pdext[7+8:])
+		/* That is another 8 characters after the course and speed, so */
+		/* an extension with nothing after the speed has neither. */
+
+		const bearing_nrq_len = 7 + 8
+		if len(pdext) >= bearing_nrq_len && pdext[7] == '/' && pdext[11] == '/' {
+			process_comment(A, pdext[bearing_nrq_len:])
 		} else {
 			process_comment(A, pdext[7:])
 		}

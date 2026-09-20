@@ -241,3 +241,18 @@ func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
 }
+
+// A course and speed extension can be the whole of the information field,
+// with nothing after it - and then there is no bearing and no NRQ to look at.
+func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25_from_text("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", addrLenient)
+	assert.NotNil(t, pp)
+
+	// Must not panic, and the course and speed still decode.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, maybe.Just(0.0), A.g_course)
+	assert.Equal(t, maybe.Just(0.0), A.g_speed_mph)
+	assert.Empty(t, A.g_comment)
+}
