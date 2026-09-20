@@ -407,8 +407,13 @@ func TestKissSerialPollsForTheDeviceToAppear(t *testing.T) {
 		return bytes.Contains(heard, []byte("cmd:"))
 	}, 30*time.Second, 100*time.Millisecond, "the device appearing went unnoticed")
 
-	// A read error puts the polling case back to waiting for the device
-	// rather than ending it, so only the cancellation stops it.
+	// The cancellation alone would not get the goroutine back: it spends its
+	// time in a blocking read of the port, which nothing can interrupt.  The
+	// client going away ends that read; the polling case then goes back to
+	// waiting for the device to reappear, which is what the cancellation
+	// stops.
+	require.NoError(t, client.Close())
+
 	cancel()
 
 	select {

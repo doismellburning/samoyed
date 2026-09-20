@@ -465,8 +465,10 @@ func (kns *KissNetService) get(ctx context.Context, kps *kissport_status_s, clie
 		// accepted a newer connection here (e.g. the client reconnected)
 		// and we must not clobber it out from under that newer connection.
 		if kps.detachClientIfCurrent(client, conn) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nKISS client application %d on TCP port %d has gone away.\n\n", client, kps.tcp_port)
+			logrus.WithFields(logrus.Fields{
+				"tcp_port": kps.tcp_port,
+				"client":   client,
+			}).Info("KISS client application has gone away")
 		}
 	}
 
@@ -558,8 +560,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 	logrus.WithField("tcp_port", kps.tcp_port).Debug("Binding to port")
 	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", kps.tcp_port))
 	if listenErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("connectListenThread: Listen failed: %s", listenErr)
+		logrus.WithError(listenErr).WithField("tcp_port", kps.tcp_port).Error("connectListenThread: Listen failed")
 
 		return
 	}
@@ -581,13 +582,11 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 		var client = kps.findFreeClient()
 
 		if client >= 0 {
-			text_color_set(DW_COLOR_INFO)
-
-			if kps.channel == -1 {
-				dw_printf("Ready to accept KISS TCP client application %d on port %d ...\n", client, kps.tcp_port)
-			} else {
-				dw_printf("Ready to accept KISS TCP client application %d on port %d (radio channel %d) ...\n", client, kps.tcp_port, kps.channel)
-			}
+			logrus.WithFields(logrus.Fields{
+				"tcp_port": kps.tcp_port,
+				"client":   client,
+				"channel":  kps.channel,
+			}).Debug("Ready to accept KISS TCP client application")
 
 			var conn, acceptErr = listener.Accept()
 			if acceptErr != nil {
@@ -595,7 +594,7 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 					return // We closed the listener ourselves on the way out.
 				}
 
-				dw_printf("Accept failed: %v\n", acceptErr)
+				logrus.WithError(acceptErr).WithField("tcp_port", kps.tcp_port).Error("Accept failed")
 
 				continue
 			}
@@ -620,13 +619,11 @@ func (kns *KissNetService) connectListenThread(ctx context.Context, kps *kisspor
 				return
 			}
 
-			text_color_set(DW_COLOR_INFO)
-
-			if kps.channel == -1 {
-				dw_printf("\nAttached to KISS TCP client application %d on port %d ...\n\n", client, kps.tcp_port)
-			} else {
-				dw_printf("\nAttached to KISS TCP client application %d on port %d (radio channel %d) ...\n\n", client, kps.tcp_port, kps.channel)
-			}
+			logrus.WithFields(logrus.Fields{
+				"tcp_port": kps.tcp_port,
+				"client":   client,
+				"channel":  kps.channel,
+			}).Info("Attached to KISS TCP client application")
 		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
 			return
 		}

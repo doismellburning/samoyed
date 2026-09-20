@@ -48,6 +48,7 @@ linters:
         # logrus field names repeat by design - the whole point is that the same
         # key means the same thing wherever it is logged
         - "channel"
+        - "client"
         - "prio"
     gocritic:
       disabled-checks:
