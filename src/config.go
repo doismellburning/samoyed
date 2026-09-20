@@ -479,7 +479,15 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) (maybe.Maybe[f
 		return maybe.Nothing[float64](), errors.Join(problems...)
 	}
 
-	return maybe.Just(degrees), errors.Join(problems...)
+	// A coordinate we had something to say about is not a coordinate.  The
+	// hemisphere is applied before it is checked, so "42.5W" as a latitude
+	// arrives here as a perfectly plausible 42.5 degrees south - which is how a
+	// station ends up beaconing from somewhere nobody configured.
+	if len(problems) > 0 {
+		return maybe.Nothing[float64](), errors.Join(problems...)
+	}
+
+	return maybe.Just(degrees), nil
 }
 
 // coordinateName names a coordinate for an error message.

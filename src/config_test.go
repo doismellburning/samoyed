@@ -5182,3 +5182,33 @@ func Test_config_init_bad_via_path_counted_once(t *testing.T) {
 	// dropped to get the count right.
 	assert.Contains(t, c.output, "invalid via path: maximum of 8 digipeaters has been exceeded")
 }
+
+// --- a coordinate that drew a complaint is not a coordinate ---
+
+func Test_parse_ll_maybe_rejects_what_it_complains_about(t *testing.T) {
+	// Regression test: these two complained and then handed back the number
+	// anyway, so a beacon went out from a plausible-looking place that nobody
+	// configured.  "42.5W" as a latitude is the worst of them: W is applied as
+	// though it were S before the hemisphere is checked, so the station
+	// transmitted from 42.5 degrees south.
+	t.Run("a hemisphere from the wrong axis is Nothing", func(t *testing.T) {
+		var ll, err = parse_ll_maybe("42.5W", LAT, 0)
+
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
+	})
+
+	t.Run("a longitude with a latitude hemisphere is Nothing", func(t *testing.T) {
+		var ll, err = parse_ll_maybe("71.5N", LON, 0)
+
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
+	})
+
+	t.Run("minutes that are not minutes are Nothing", func(t *testing.T) {
+		var ll, err = parse_ll_maybe("42^90", LAT, 0)
+
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
+	})
+}
