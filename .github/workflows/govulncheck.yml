@@ -1,0 +1,47 @@
+name: "govulncheck"
+
+# Deliberately not part of `make check` in build-and-test.yml. Whether this
+# passes depends on the day's advisories and on vuln.go.dev being reachable,
+# neither of which is a property of the commit under test, so a pull request
+# that touches nothing relevant should not go red because an advisory landed
+# that morning. The weekly run surfaces new advisories against `main`, where
+# they are news rather than an ambush; the pull request run is limited to
+# changes that could introduce a vulnerable dependency.
+on:
+  push:
+    branches:
+    - "main"
+  pull_request:
+    paths:
+    - "go.mod"
+    - "go.sum"
+    - ".github/workflows/govulncheck.yml"
+  schedule:
+  - cron: "0 6 * * 1"  # Mondays, 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: "read"
+
+# Only the newest scan of a given ref is interesting - an older one is asking
+# about code we have already moved past - so group by ref and let a new run
+# cancel it. build-and-test.yml deliberately does the opposite for its non-pull
+# request runs, but only because a cancelled run there could drop a release;
+# nothing here releases anything.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/checkout@v7"
+    - uses: "actions/setup-go@v7"
+      with:
+        go-version: "1.27"
+    # govulncheck type-checks every package, and the cgo ones need their C
+    # headers present to type-check at all.
+    - name: "Install dependencies"
+      run: "make setup"
+    - run: "make vuln"
