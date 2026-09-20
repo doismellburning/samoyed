@@ -421,3 +421,55 @@ func TestGetInputRealGPIONoNode(t *testing.T) {
 
 	assert.Equal(t, -1, get_input_real(ICTYPE_TXINH, 0))
 }
+
+// TestPttInitGPIOThenSet is a regression test for a GPIO line that never
+// moved: export_gpio worked out which node under /sys/class/gpio belongs to
+// the configured line number, but kept that to itself, so ptt_set built its
+// path from an empty name and could not open anything.
+func TestPttInitGPIOThenSet(t *testing.T) {
+	var dir = useFakeGPIOSysfs(t)
+	writeFakeGPIOExport(t, dir)
+	writeFakeGPIONode(t, dir, "gpio25_ph11")
+
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
+	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
+	useAudioConfig(t, cfg)
+
+	require.NoError(t, ptt_init(cfg))
+	assert.Equal(t, "gpio25_ph11", cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_name,
+		"the node name found while exporting should be remembered")
+
+	ptt_set_real(OCTYPE_PTT, 0, 1)
+
+	var on, onErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "value")) //nolint:gosec
+	require.NoError(t, onErr)
+	assert.Equal(t, "1", string(on), "PTT on should drive the line")
+
+	ptt_set_real(OCTYPE_PTT, 0, 0)
+
+	var off, offErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "value")) //nolint:gosec
+	require.NoError(t, offErr)
+	assert.Equal(t, "0", string(off), "PTT off should release the line")
+}
+
+// TestPttInitGPIOInputThenGet is the same regression on the input side, where
+// get_input reads the node that export_gpio found.
+func TestPttInitGPIOInputThenGet(t *testing.T) {
+	var dir = useFakeGPIOSysfs(t)
+	writeFakeGPIOExport(t, dir)
+	writeFakeGPIONode(t, dir, "gpio7_pi13")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gpio7_pi13", "value"), []byte("1"), 0o600))
+
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
+	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num = 7
+	useAudioConfig(t, cfg)
+
+	require.NoError(t, ptt_init(cfg))
+	assert.Equal(t, "gpio7_pi13", cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name,
+		"the node name found while exporting should be remembered")
+	assert.Equal(t, 1, get_input_real(ICTYPE_TXINH, 0))
+}

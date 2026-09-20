@@ -429,6 +429,14 @@ func export_gpio(ch int, ot int, invert bool, direction int) error {
 		return fmt.Errorf("could not find path for gpio number %d", gpio_num)
 	}
 
+	// Remember it: everything that drives or reads the line afterwards builds
+	// its path from the node name, not from the number.
+	if direction > 0 {
+		save_audio_config_p.achan[ch].octrl[ot].out_gpio_name = gpio_name
+	} else {
+		save_audio_config_p.achan[ch].ictrl[ot].in_gpio_name = gpio_name
+	}
+
 	if ptt_debug_level >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, gpio_sysfs_dir, gpio_name)
