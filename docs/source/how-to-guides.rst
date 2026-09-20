@@ -59,6 +59,28 @@ This checks the configuration file, not the command line: options such as
 ``-r`` or ``-B`` are not applied, so what you are checking is what the file
 says.
 
+Stop it without leaving the rig keyed
+-------------------------------------
+
+``samoyed-direwolf`` shuts down on SIGINT and SIGTERM: it closes the packet
+log, puts the GPS and waypoint feeds down, and - the part that matters on the
+air - unkeys every PTT it holds.  CM108 and hamlib PTT are state in the device
+rather than in the process, so a stop that skips this can leave the transmitter
+keyed with nothing left running to unkey it.
+
+SIGTERM is what a supervisor sends, so ``systemctl stop``, a container runtime
+and a plain ``kill`` all stop it this way.  Ctrl-C at a terminal sends SIGINT
+instead, and takes the same path:
+
+.. code::
+
+    systemctl stop samoyed-direwolf
+
+Shutting down takes about a second, to give everything it started a moment to
+put its own resources down.  That is well inside systemd's default
+``TimeoutStopSec`` of 90 seconds, and a second signal arriving during it skips
+the wait and ends the process on the spot.
+
 Try a packet filter out before putting it in the config file
 ------------------------------------------------------------
 
