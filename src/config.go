@@ -886,6 +886,26 @@ type parseState struct {
 	// refusing to start.
 	nerrors   int
 	nwarnings int
+
+	// fatal marks a problem that leaves the configuration unusable rather than
+	// merely wrong, so that the daemon refuses to start on it as it always has,
+	// while a check run carries on and reports the rest of the file.
+	fatal bool
+}
+
+// configReport is what reading a configuration file turned up.
+type configReport struct {
+	// errors counts the directives that could not be obeyed as written -
+	// including the ones obeyed only by falling back to a default.
+	errors int
+
+	// warnings counts what parsed but looks suspect.  Warnings are advice, not
+	// grounds for refusing to start.
+	warnings int
+
+	// fatal says the configuration cannot be used at all.  Unlike an error,
+	// which the daemon has always started in spite of, this one stops it.
+	fatal bool
 }
 
 // Complaints about the configuration file are written the way Go wants an error
@@ -1114,15 +1134,14 @@ var configHandlers = map[string]configHandler{
 }
 
 // config_init reads the configuration file, applying defaults first so that the
-// file can override them.  It returns how many errors and how many warnings the
-// file drew, for a caller that wants to act on them - see the ---config-check
-// option in DirewolfMain.
+// file can override them.  It reports what the file drew, for a caller that
+// wants to act on it - see the --config-check option in DirewolfMain.
 func config_init(fname string, p_audio_config *audio_s,
 	p_digi_config *digi_config_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
-	p_misc_config *misc_config_s) (nerrors int, nwarnings int) {
+	p_misc_config *misc_config_s) configReport {
 	logrus.WithField("fname", fname).Debug("config_init")
 
 	/*
@@ -1332,6 +1351,7 @@ func config_init(fname string, p_audio_config *audio_s,
 
 		nerrors:   0,
 		nwarnings: 0,
+		fatal:     false,
 	}
 
 	/*
@@ -1530,7 +1550,7 @@ func config_init(fname string, p_audio_config *audio_s,
 		ps.misc.maxv22 = ps.misc.retry / 3
 	}
 
-	return ps.nerrors, ps.nwarnings
+	return configReport{errors: ps.nerrors, warnings: ps.nwarnings, fatal: ps.fatal}
 } /* end config_init */
 
 // handleADEVICE handles the ADEVICE[n] keyword.
@@ -1581,6 +1601,12 @@ func handleADEVICE(ps *parseState) error {
 		// documentation still follows the complaint it belongs to.
 		ps.errorf("config file: Missing name of audio device for ADEVICE command on line %d", ps.line)
 		rtfm()
+
+		// This used to exit on the spot.  A check run wants to see the rest of
+		// the file, so it carries on and the caller does the refusing instead -
+		// starting the daemon against whatever audio device happened to be the
+		// default is not an option.
+		ps.fatal = true
 
 		return nil
 	}
@@ -4517,7 +4543,9 @@ func handleTTERR(ps *parseState) error {
 
 	var method, _, _, ok = ax25_parse_addr(-1, t, addrStrict)
 	if !ok {
-		return nil // function above prints any error message
+		// ax25_parse_addr has already said what is wrong with it in detail; say
+		// which directive it came from, and count it, as MYCALL and V20 do.
+		return fmt.Errorf("line %d: Invalid method for TTERR command", ps.line)
 	}
 
 	if method != "MORSE" && method != "SPEECH" {

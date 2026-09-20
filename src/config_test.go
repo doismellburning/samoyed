@@ -213,9 +213,11 @@ type configs struct {
 	output string
 
 	// errors and warnings are config_init's tallies, which are what
-	// --config-check makes its exit status out of.
+	// --config-check makes its exit status out of, and fatal says the
+	// configuration is one the daemon refuses to start on at all.
 	errors   int
 	warnings int
+	fatal    bool
 }
 
 // parseConfig writes content to a temp config file and runs config_init over it.
@@ -239,10 +241,12 @@ func parseConfig(t *testing.T, content string) configs {
 
 		errors:   0,
 		warnings: 0,
+		fatal:    false,
 	}
 
 	c.output = CaptureOutput(t, func() {
-		c.errors, c.warnings = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+		var report = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+		c.errors, c.warnings, c.fatal = report.errors, report.warnings, report.fatal
 	})
 
 	return c
@@ -4958,7 +4962,7 @@ func Test_config_init_tallies(t *testing.T) {
 		},
 		{
 			name:         "a line with two things wrong with it counts twice",
-			config:       clean + "PBEACON DELAY=1 EVERY=1 LAT=200 LONG=181W SYMBOL=\"igate\"\n",
+			config:       clean + "PBEACON DELAY=1 EVERY=1 LAT=200 LONG=181W\n",
 			wantErrors:   2,
 			wantWarnings: 0,
 		},
@@ -5118,4 +5122,46 @@ func Test_config_init_counts_every_diagnostic(t *testing.T) {
 			assert.Equal(t, tt.wantWarnings, c.warnings, "warnings; config_init said:\n%s", c.output)
 		})
 	}
+}
+
+// --- a configuration the daemon cannot start on ---
+
+func Test_config_init_fatal(t *testing.T) {
+	t.Run("ADEVICE with no device name is fatal, not merely wrong", func(t *testing.T) {
+		// Regression test: this used to exit on the spot.  It now reads on, so
+		// that a check run can report the rest of the file - but the daemon
+		// must still refuse to start rather than fall back to whatever audio
+		// device happened to be the default.
+		var c = parseConfig(t, "ADEVICE\n")
+
+		assert.True(t, c.fatal, "config_init said:\n%s", c.output)
+		assert.Positive(t, c.errors)
+	})
+
+	t.Run("reading on means the rest of the file is reported too", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE\nNOSUCHKEYWORD 1\n")
+
+		assert.True(t, c.fatal)
+		assert.Contains(t, c.output, "Unrecognized command 'NOSUCHKEYWORD'")
+		assert.Equal(t, 2, c.errors, "config_init said:\n%s", c.output)
+	})
+
+	t.Run("an ordinary bad directive is not fatal", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE plughw:1,0\nAGWPORT notanumber\n")
+
+		assert.False(t, c.fatal, "config_init said:\n%s", c.output)
+		assert.Positive(t, c.errors)
+	})
+}
+
+// --- a TTERR method the address parser rejects ---
+
+func Test_config_init_tterr_bad_method_is_counted(t *testing.T) {
+	// Regression test: the handler returned without a word of its own when
+	// ax25_parse_addr rejected the method, so --config-check printed a
+	// complaint about the line and still exited 0.
+	var c = parseConfig(t, "ADEVICE plughw:1,0\nTTERR OK WAYTOOLONGAMETHOD some text\n")
+
+	assert.Positive(t, c.errors, "config_init said:\n%s", c.output)
+	assert.Contains(t, c.output, "Invalid method for TTERR command")
 }

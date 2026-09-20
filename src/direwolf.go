@@ -315,19 +315,26 @@ x = Silence FX.25 information.`)
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s
 
-	var configErrors, configWarnings = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+	var configResult = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
 
 	if *configCheck {
 		// Checking the configuration file is the whole job here, so stop before
 		// the command line options below override any of it, and well before
 		// anything wants an audio device or a port.
-		reportConfigCheck(*configFileName, configErrors, configWarnings)
+		reportConfigCheck(*configFileName, configResult.errors, configResult.warnings)
 
-		if configErrors > 0 {
+		if configResult.errors > 0 {
 			os.Exit(1)
 		}
 
 		os.Exit(0)
+	}
+
+	// A configuration the daemon cannot use at all.  config_init reported it
+	// and read on so that a check run could show the whole file; there is
+	// nothing to start up with.
+	if configResult.fatal {
+		os.Exit(1)
 	}
 
 	if *audioSampleRate != 0 {
