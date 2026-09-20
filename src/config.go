@@ -1027,16 +1027,15 @@ func (ps *parseState) parseUTMZone(szone string) (rune, rune, int) {
 	return latband, hemi, lzone
 }
 
-// checkViaPath validates a digipeater path from the current line, reporting
-// anything wrong with it.  A path that is no good is a negative hop count, as
-// it was before.
-func (ps *parseState) checkViaPath(via_path string) int {
-	var hops, err = check_via_path(via_path)
-	if err != nil {
-		ps.report(err)
+// invalidViaPath is the complaint a bad digipeater path draws.  check_via_path
+// has detail to add for some of them and not for others; either way this is the
+// only thing reported, so that one bad path is counted once rather than twice.
+func invalidViaPath(line int, detail error) error {
+	if detail != nil {
+		return fmt.Errorf("config file, line %d: invalid via path: %w", line, detail)
 	}
 
-	return hops
+	return fmt.Errorf("config file, line %d: invalid via path", line)
 }
 
 // configHandler is a keyword handler.  A nil return means the directive was
@@ -4497,10 +4496,11 @@ func handleTTOBJ(ps *parseState) error {
 
 	t = split("", false)
 	if t != "" {
-		if ps.checkViaPath(t) >= 0 {
+		var hops, viaErr = check_via_path(t)
+		if hops >= 0 {
 			ps.tt.obj_xmit_via = t
 		} else {
-			ps.errorf("config file, line %d: invalid via path", ps.line)
+			ps.report(invalidViaPath(ps.line, viaErr))
 		}
 	}
 
@@ -4731,12 +4731,14 @@ func handleIGTXVIA(ps *parseState) error {
 	t = split("", false)
 	if t != "" {
 		// TODO KG#if 1	// proper checking
-		n = ps.checkViaPath(t)
+		var viaErr error
+
+		n, viaErr = check_via_path(t)
 		if n >= 0 {
 			ps.igate.max_digi_hops = n
 			ps.igate.tx_via = "," + t
 		} else {
-			ps.errorf("config file, line %d: invalid via path", ps.line)
+			ps.report(invalidViaPath(ps.line, viaErr))
 		}
 
 		/* TODO KG #else	// previously
@@ -5922,10 +5924,11 @@ func beacon_options(cmd string, b *beacon_s, ps *parseState, p_audio_config *aud
 			*/
 		} else if strings.EqualFold(keyword, "VIA") {
 			// #if 1	// proper checking
-			if ps.checkViaPath(value) >= 0 {
+			var hops, viaErr = check_via_path(value)
+			if hops >= 0 {
 				b.via = value
 			} else {
-				ps.errorf("config file, line %d: invalid via path", ps.line)
+				ps.report(invalidViaPath(ps.line, viaErr))
 			}
 
 			/* #else	// previously

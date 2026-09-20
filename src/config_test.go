@@ -5165,3 +5165,20 @@ func Test_config_init_tterr_bad_method_is_counted(t *testing.T) {
 	assert.Positive(t, c.errors, "config_init said:\n%s", c.output)
 	assert.Contains(t, c.output, "Invalid method for TTERR command")
 }
+
+// --- one bad digipeater path, one complaint ---
+
+func Test_config_init_bad_via_path_counted_once(t *testing.T) {
+	// Regression test: check_via_path's own complaint was reported, and then
+	// the caller reported "invalid via path" on top of it, so one bad path came
+	// to two errors and the summary overstated what was wrong with the file.
+	var c = parseConfig(t,
+		"ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\n"+
+			"IGTXVIA 0 Q2TEST,Q3TEST,Q4TEST,Q5TEST,Q6TEST,Q7TEST,Q8TEST,Q9TEST,Q1TEST\n")
+
+	assert.Equal(t, 1, c.errors, "config_init said:\n%s", c.output)
+
+	// The detail is worth keeping, so it joins the complaint rather than being
+	// dropped to get the count right.
+	assert.Contains(t, c.output, "invalid via path: maximum of 8 digipeaters has been exceeded")
+}
