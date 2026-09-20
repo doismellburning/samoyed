@@ -366,9 +366,9 @@ func (s *session) pollTimingTest() {
 		return // not done yet.
 	}
 
-	var elapsed = time.Since(s.ttStartTime)
+	var elapsed = time.Since(s.ttStartTime).Seconds()
 	if elapsed <= 0 {
-		elapsed = 1 // avoid divide by 0
+		elapsed = 0.001 // avoid divide by 0
 	}
 
 	var byte_count = s.ttCount * s.ttLength
@@ -377,10 +377,10 @@ func (s *session) pollTimingTest() {
 
 	s.mu.Unlock()
 
-	var summary = fmt.Sprintf("%d bytes in %d seconds, %d bytes/sec, efficiency %d%% at 1200, %d%% at 9600.\r",
-		byte_count, elapsed, int(float64(byte_count)/elapsed.Seconds()),
-		int(float64(byte_count)*8*100/elapsed.Seconds()/1200),
-		int(float64(byte_count)*8*100/elapsed.Seconds()/9600))
+	var summary = fmt.Sprintf("%d bytes in %.1f seconds, %.0f bytes/sec, efficiency %.0f%% at 1200, %.0f%% at 9600.\r",
+		byte_count, elapsed, float64(byte_count)/elapsed,
+		float64(byte_count)*8*100/elapsed/1200,
+		float64(byte_count)*8*100/elapsed/9600)
 
 	agwlib_D_send_connected_data(s.channel, 0xF0, s.localCall, s.addr, []byte(summary))
 }

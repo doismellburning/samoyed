@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -450,5 +451,46 @@ func TestTestRejectsTooManyFrames(t *testing.T) {
 
 	if s.ttCount != 0 {
 		t.Errorf("A rejected test still started, count %d", s.ttCount)
+	}
+}
+
+// TestTimingTestSummaryIsInSeconds covers a summary that used to print the
+// elapsed time with %d on a time.Duration - so "3 bytes in 21015042 seconds",
+// the nanosecond count, followed by rates derived from a one-nanosecond run.
+func TestTimingTestSummaryIsInSeconds(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	var s = connect(t, tnc)
+
+	send(t, tnc, "test 1 64")
+
+	// First tick queues the frame, second sees the queue drained and reports.
+	s.poll()
+	agw_cb_Y_outstanding_frames_for_station(0, testMyCall, testTheirCall, 0)
+	s.poll()
+
+	var got = sentText(tnc.frames(t))
+
+	var summary = regexp.MustCompile(`64 bytes in ([0-9.]+) seconds, ([0-9]+) bytes/sec`).FindStringSubmatch(got)
+	if summary == nil {
+		t.Fatalf("No timing test summary in %q", got)
+	}
+
+	var seconds, parseErr = strconv.ParseFloat(summary[1], 64)
+	if parseErr != nil {
+		t.Fatalf("Elapsed time %q does not parse: %s", summary[1], parseErr)
+	}
+
+	if seconds > 60 {
+		t.Errorf("Summary reported %s seconds for a test that took a moment; those look like nanoseconds", summary[1])
+	}
+
+	var rate, rateErr = strconv.ParseFloat(summary[2], 64)
+	if rateErr != nil {
+		t.Fatalf("Rate %q does not parse: %s", summary[2], rateErr)
+	}
+
+	if rate <= 0 {
+		t.Errorf("Summary reported a rate of %s bytes/sec", summary[2])
 	}
 }
