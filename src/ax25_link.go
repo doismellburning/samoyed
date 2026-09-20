@@ -738,7 +738,12 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	p.start_time = time.Now()
 	p.stream_id = next_stream_id
 	next_stream_id++
-	p.modulo = 8
+
+	// Start out as a v2.0 link rather than with the parameters all at zero.
+	// A connect request, incoming or outgoing, sets the version again once it
+	// knows which one applies, but nothing else does - and a link with a
+	// maximum information field of zero bytes cannot send anything at all.
+	set_version_2_0(p)
 
 	p.channel = channel
 	p.num_addr = num_addr
