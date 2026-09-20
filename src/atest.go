@@ -709,6 +709,13 @@ o = DCD output control
 		fmt.Printf("\n * * * TEST FAILED: number decoded is greater than %d * * * \n", *errorIfGreaterThan)
 		os.Exit(1)
 	}
+
+	// Put the real functions back.  For the command this changes nothing,
+	// as the process is about to end anyway, but the tests all run in one
+	// process: anything after a test that calls this would otherwise get
+	// the fakes - audio samples read from a WAV file that has been closed,
+	// received frames counted instead of queued, PTT going nowhere.
+	ATEST_C = false
 }
 
 /*

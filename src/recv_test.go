@@ -298,11 +298,16 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	// need configuration that has nothing to do with the receive thread.
 	audioConfig.igate_vchannel = 0
 
-	var origAudioConfig, origLogger, origMheard = audio_config, packetLogger, mheardDB
+	var origAudioConfig, origLogger, origMheard, origATEST = audio_config, packetLogger, mheardDB, ATEST_C
 
 	t.Cleanup(func() {
-		audio_config, packetLogger, mheardDB = origAudioConfig, origLogger, origMheard
+		audio_config, packetLogger, mheardDB, ATEST_C = origAudioConfig, origLogger, origMheard, origATEST
 	})
+
+	// A received frame has to reach the queue for recv_process to dispatch
+	// it, rather than being counted by the atest fake, so say which one we
+	// want instead of inheriting whatever ran before us.
+	ATEST_C = false
 
 	audio_config = audioConfig
 	// A received frame is logged and remembered on its way through, so
