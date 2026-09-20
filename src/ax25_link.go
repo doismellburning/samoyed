@@ -738,7 +738,12 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	p.start_time = time.Now()
 	p.stream_id = next_stream_id
 	next_stream_id++
-	p.modulo = 8
+
+	// Start out as a v2.0 link rather than with the parameters all at zero.
+	// A connect request, incoming or outgoing, sets the version again once it
+	// knows which one applies, but nothing else does - and a link with a
+	// maximum information field of zero bytes cannot send anything at all.
+	set_version_2_0(p)
 
 	p.channel = channel
 	p.num_addr = num_addr
@@ -1073,6 +1078,37 @@ func dl_data_request(E *dlq_item_t) {
 	if E.txdata.len <= S.n1_paclen {
 		data_request_good_size(S, E.txdata)
 		E.txdata = nil // Now part of transmit I frame queue.
+
+		return
+	}
+
+	// Everything below splits the data into pieces of N1 bytes, which only
+	// gets anywhere if a piece can hold something.  XID negotiation takes the
+	// other end's word for N1, and an XID can ask for less than a byte, so
+	// don't take it on trust here.
+
+	// A V2.0 link just splits the data up, so a byte of N1 is enough to make
+	// progress with.  V2.2 segmentation spends a byte of each piece on the
+	// segment header, and another on the original PID in the first piece, so
+	// it needs three before any data fits - and it divides by N1-1, which is
+	// zero for an N1 of one.
+
+	var smallest_usable_n1 = AX25_N1_PACLEN_MIN
+	if S.modulo != 8 {
+		smallest_usable_n1 = 3
+	}
+
+	if S.n1_paclen < smallest_usable_n1 {
+		logrus.WithFields(logrus.Fields{
+			"channel":   S.channel,
+			"peer":      S.addrs[PEERCALL],
+			"len":       E.txdata.len,
+			"n1_paclen": S.n1_paclen,
+			"needed":    smallest_usable_n1,
+		}).Error("Discarding data for a link whose maximum information field is too small to carry anything")
+
+		cdata_delete(E.txdata)
+		E.txdata = nil
 
 		return
 	}
