@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
@@ -241,8 +242,8 @@ func (ws *WaypointSender) SendSentence(name_in string, dlat float64, dlong float
 	 * An unknown value will result in an empty string.
 	 */
 
-	var slat, slat_ns = latitude_to_nmea(dlat)
-	var slong, slong_ew = longitude_to_nmea(dlong)
+	var slat, slat_ns = latlong.LatitudeToNMEA(dlat)
+	var slong, slong_ew = latlong.LongitudeToNMEA(dlong)
 
 	var oneDecimalPlace = func(value float64) string {
 		return fmt.Sprintf("%.1f", value)

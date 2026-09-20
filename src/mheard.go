@@ -31,6 +31,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -563,7 +564,7 @@ func (mdb *MHeardDB) WasRecentlyNearby(role string, callsign string, _time_limit
 	var stationLon, haveStationLon = mptr.dlon.Get()
 
 	if haveTarget && haveStationLat && haveStationLon {
-		var dist = ll_distance_km(stationLat, stationLon, targetLat, targetLon)
+		var dist = latlong.DistanceKm(stationLat, stationLon, targetLat, targetLon)
 
 		if dist > limitKm {
 			if role != "" {

@@ -20,6 +20,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -49,7 +50,7 @@ func normal_position_string(p *position_t) string {
 func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambiguity int) *position_t {
 	var presult = new(position_t)
 
-	copy(presult.Lat[:], latitude_to_str(dlat, ambiguity))
+	copy(presult.Lat[:], latlong.LatitudeToString(dlat, ambiguity))
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
 		text_color_set(DW_COLOR_ERROR)
@@ -58,7 +59,7 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 
 	presult.SymTableId = symtab
 
-	copy(presult.Lon[:], longitude_to_str(dlong, ambiguity))
+	copy(presult.Lon[:], latlong.LongitudeToString(dlong, ambiguity))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)
@@ -129,8 +130,8 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 
 	presult.SymTableId = symtab
 
-	copy(presult.Y[:], latitude_to_comp_str(dlat))
-	copy(presult.X[:], longitude_to_comp_str(dlong))
+	copy(presult.Y[:], latlong.LatitudeToCompressedString(dlat))
+	copy(presult.X[:], latlong.LongitudeToCompressedString(dlong))
 
 	if symbol < '!' || symbol > '~' {
 		text_color_set(DW_COLOR_ERROR)

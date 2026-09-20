@@ -1,4 +1,12 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Package latlong converts latitudes and longitudes between the forms the
+// radio side of things uses: the fixed-width APRS position fields, the
+// compressed base-91 form, NMEA sentence fields and Maidenhead grid squares.
+// It also does the spherical arithmetic - distance, bearing, and the
+// destination a distance and bearing away from a starting point.
+package latlong
 
 /*------------------------------------------------------------------
  *
@@ -51,7 +59,7 @@ func allDigits(s string) bool {
 
 /*------------------------------------------------------------------
  *
- * Name:        latitude_to_str
+ * Name:        LatitudeToString
  *
  * Purpose:     Convert numeric latitude to string for transmission.
  *
@@ -80,7 +88,7 @@ func allDigits(s string) bool {
  *
  *----------------------------------------------------------------*/
 
-func latitude_to_str(dlat float64, ambiguity int) string {
+func LatitudeToString(dlat float64, ambiguity int) string {
 	dlat = clampLat(dlat)
 
 	var hemi rune /* Hemisphere: N or S */
@@ -132,7 +140,7 @@ func latitude_to_str(dlat float64, ambiguity int) string {
 
 /*------------------------------------------------------------------
  *
- * Name:        longitude_to_str
+ * Name:        LongitudeToString
  *
  * Purpose:     Convert numeric longitude to string for transmission.
  *
@@ -149,7 +157,7 @@ func latitude_to_str(dlat float64, ambiguity int) string {
  *
  *----------------------------------------------------------------*/
 
-func longitude_to_str(dlong float64, ambiguity int) string {
+func LongitudeToString(dlong float64, ambiguity int) string {
 	dlong = clampLon(dlong)
 
 	var hemi rune /* Hemisphere: E or W */
@@ -201,7 +209,7 @@ func longitude_to_str(dlong float64, ambiguity int) string {
 
 /*------------------------------------------------------------------
  *
- * Name:        latitude_to_comp_str
+ * Name:        LatitudeToCompressedString
  *
  * Purpose:     Convert numeric latitude to compressed string for transmission.
  *
@@ -212,7 +220,7 @@ func longitude_to_str(dlong float64, ambiguity int) string {
  *
  *----------------------------------------------------------------*/
 
-func latitude_to_comp_str(dlat float64) string {
+func LatitudeToCompressedString(dlat float64) string {
 	dlat = clampLat(dlat)
 
 	var y = int(math.Round(380926. * (90. - dlat)))
@@ -236,7 +244,7 @@ func latitude_to_comp_str(dlat float64) string {
 
 /*------------------------------------------------------------------
  *
- * Name:        longitude_to_comp_str
+ * Name:        LongitudeToCompressedString
  *
  * Purpose:     Convert numeric longitude to compressed string for transmission.
  *
@@ -247,7 +255,7 @@ func latitude_to_comp_str(dlat float64) string {
  *
  *----------------------------------------------------------------*/
 
-func longitude_to_comp_str(dlong float64) string {
+func LongitudeToCompressedString(dlong float64) string {
 	dlong = clampLon(dlong)
 
 	var x = int(math.Round(190463. * (180. + dlong)))
@@ -271,7 +279,7 @@ func longitude_to_comp_str(dlong float64) string {
 
 /*------------------------------------------------------------------
  *
- * Name:        latitude_to_nmea
+ * Name:        LatitudeToNMEA
  *
  * Purpose:     Convert numeric latitude to strings for NMEA sentence.
  *
@@ -282,7 +290,7 @@ func longitude_to_comp_str(dlong float64) string {
  *
  *----------------------------------------------------------------*/
 
-func latitude_to_nmea(dlat float64) (string, string) {
+func LatitudeToNMEA(dlat float64) (string, string) {
 	dlat = clampLat(dlat)
 
 	var hemi string
@@ -312,7 +320,7 @@ func latitude_to_nmea(dlat float64) (string, string) {
 
 /*------------------------------------------------------------------
  *
- * Name:        longitude_to_nmea
+ * Name:        LongitudeToNMEA
  *
  * Purpose:     Convert numeric longitude to strings for NMEA sentence.
  *
@@ -323,7 +331,7 @@ func latitude_to_nmea(dlat float64) (string, string) {
  *
  *----------------------------------------------------------------*/
 
-func longitude_to_nmea(dlong float64) (string, string) {
+func LongitudeToNMEA(dlong float64) (string, string) {
 	dlong = clampLon(dlong)
 
 	var hemi string
@@ -353,7 +361,7 @@ func longitude_to_nmea(dlong float64) (string, string) {
 
 /*------------------------------------------------------------------
  *
- * Function:	latitude_from_nmea
+ * Function:	LatitudeFromNMEA
  *
  * Purpose:	Convert NMEA latitude encoding to degrees.
  *
@@ -381,7 +389,7 @@ func longitude_to_nmea(dlong float64) (string, string) {
  *
  *------------------------------------------------------------------*/
 
-func latitude_from_nmea(pstr string, phemi byte) (float64, error) {
+func LatitudeFromNMEA(pstr string, phemi byte) (float64, error) {
 	if len(pstr) < 5 {
 		return 0, fmt.Errorf("latitude %q is too short for ddmm.mm", pstr)
 	}
@@ -436,7 +444,7 @@ func latitude_from_nmea(pstr string, phemi byte) (float64, error) {
 
 /*------------------------------------------------------------------
  *
- * Function:	longitude_from_nmea
+ * Function:	LongitudeFromNMEA
  *
  * Purpose:	Convert NMEA longitude encoding to degrees.
  *
@@ -463,7 +471,7 @@ func latitude_from_nmea(pstr string, phemi byte) (float64, error) {
  *
  *------------------------------------------------------------------*/
 
-func longitude_from_nmea(pstr string, phemi byte) (float64, error) {
+func LongitudeFromNMEA(pstr string, phemi byte) (float64, error) {
 	if len(pstr) < 6 {
 		return 0, fmt.Errorf("longitude %q is too short for dddmm.mm", pstr)
 	}
@@ -510,7 +518,7 @@ func longitude_from_nmea(pstr string, phemi byte) (float64, error) {
 
 /*------------------------------------------------------------------
  *
- * Function:	ll_distance_km
+ * Function:	DistanceKm
  *
  * Purpose:	Calculate distance between two locations.
  *
@@ -523,9 +531,9 @@ func longitude_from_nmea(pstr string, phemi byte) (float64, error) {
  *
  *------------------------------------------------------------------*/
 
-const R_KM = 6371
+const earthRadiusKm = 6371
 
-func ll_distance_km(lat1, lon1, lat2, lon2 float64) float64 {
+func DistanceKm(lat1, lon1, lat2, lon2 float64) float64 {
 	lat1 *= math.Pi / 180
 	lon1 *= math.Pi / 180
 	lat2 *= math.Pi / 180
@@ -533,12 +541,12 @@ func ll_distance_km(lat1, lon1, lat2, lon2 float64) float64 {
 
 	var a = math.Pow(math.Sin((lat2-lat1)/2), 2) + math.Cos(lat1)*math.Cos(lat2)*math.Pow(math.Sin((lon2-lon1)/2), 2)
 
-	return (R_KM * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a)))
+	return (earthRadiusKm * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a)))
 }
 
 /*------------------------------------------------------------------
  *
- * Function:	ll_bearing_deg
+ * Function:	BearingDeg
  *
  * Purpose:	Calculate bearing between two locations.
  *
@@ -551,7 +559,7 @@ func ll_distance_km(lat1, lon1, lat2, lon2 float64) float64 {
  *
  *------------------------------------------------------------------*/
 
-func ll_bearing_deg(lat1, lon1, lat2, lon2 float64) float64 {
+func BearingDeg(lat1, lon1, lat2, lon2 float64) float64 {
 	lat1 *= math.Pi / 180
 	lon1 *= math.Pi / 180
 	lat2 *= math.Pi / 180
@@ -570,8 +578,8 @@ func ll_bearing_deg(lat1, lon1, lat2, lon2 float64) float64 {
 
 /*------------------------------------------------------------------
  *
- * Function:	ll_dest_lat
- *		ll_dest_lon
+ * Function:	DestLat
+ *		DestLon
  *
  * Purpose:	Calculate the destination location given a starting point,
  *		distance, and bearing,
@@ -585,25 +593,25 @@ func ll_bearing_deg(lat1, lon1, lat2, lon2 float64) float64 {
  *
  *------------------------------------------------------------------*/
 
-func ll_dest_lat(lat1, _, dist, bearing float64) float64 {
+func DestLat(lat1, _, dist, bearing float64) float64 {
 	lat1 *= math.Pi / 180.0 // Everything to radians.
 	bearing *= math.Pi / 180.0
 
-	var lat2 = math.Asin(math.Sin(lat1)*math.Cos(dist/R_KM) + math.Cos(lat1)*math.Sin(dist/R_KM)*math.Cos(bearing))
+	var lat2 = math.Asin(math.Sin(lat1)*math.Cos(dist/earthRadiusKm) + math.Cos(lat1)*math.Sin(dist/earthRadiusKm)*math.Cos(bearing))
 
 	lat2 *= 180.0 / math.Pi // Back to degrees.
 
 	return (lat2)
 }
 
-func ll_dest_lon(lat1, lon1, dist, bearing float64) float64 {
+func DestLon(lat1, lon1, dist, bearing float64) float64 {
 	lat1 *= math.Pi / 180 // Everything to radians.
 	lon1 *= math.Pi / 180
 	bearing *= math.Pi / 180
 
-	var lat2 = math.Asin(math.Sin(lat1)*math.Cos(dist/R_KM) + math.Cos(lat1)*math.Sin(dist/R_KM)*math.Cos(bearing))
+	var lat2 = math.Asin(math.Sin(lat1)*math.Cos(dist/earthRadiusKm) + math.Cos(lat1)*math.Sin(dist/earthRadiusKm)*math.Cos(bearing))
 
-	var lon2 = lon1 + math.Atan2(math.Sin(bearing)*math.Sin(dist/R_KM)*math.Cos(lat1), math.Cos(dist/R_KM)-math.Sin(lat1)*math.Sin(lat2))
+	var lon2 = lon1 + math.Atan2(math.Sin(bearing)*math.Sin(dist/earthRadiusKm)*math.Cos(lat1), math.Cos(dist/earthRadiusKm)-math.Sin(lat1)*math.Sin(lat2))
 
 	lon2 *= 180 / math.Pi // Back to degrees.
 
@@ -612,7 +620,7 @@ func ll_dest_lon(lat1, lon1, dist, bearing float64) float64 {
 
 /*------------------------------------------------------------------
  *
- * Function:	ll_from_grid_square
+ * Function:	FromGridSquare
  *
  * Purpose:	Convert Maidenhead locator to latitude and longitude.
  *
@@ -643,9 +651,9 @@ func ll_dest_lon(lat1, lon1, dist, bearing float64) float64 {
  *
  *------------------------------------------------------------------*/
 
-const MH_MIN_PAIR = 1
-const MH_MAX_PAIR = 6
-const MH_UNITS = (18 * 10 * 24 * 10 * 24 * 10 * 2)
+const mhMinPair = 1
+const mhMaxPair = 6
+const mhUnits = (18 * 10 * 24 * 10 * 24 * 10 * 2)
 
 type mhPair struct {
 	position string
@@ -665,11 +673,11 @@ func mhPairs() []*mhPair {
 	} // Even so we can get center of square.
 }
 
-func ll_from_grid_square(maidenhead string) (float64, float64, error) {
+func FromGridSquare(maidenhead string) (float64, float64, error) {
 	var np = len(maidenhead) / 2 /* Number of pairs of characters. */
 
-	if len(maidenhead)%2 != 0 || np < MH_MIN_PAIR || np > MH_MAX_PAIR {
-		var s = fmt.Sprintf("Maidenhead locator \"%s\" must be from 1 to %d pairs of characters.", maidenhead, MH_MAX_PAIR)
+	if len(maidenhead)%2 != 0 || np < mhMinPair || np > mhMaxPair {
+		var s = fmt.Sprintf("Maidenhead locator \"%s\" must be from 1 to %d pairs of characters.", maidenhead, mhMaxPair)
 
 		return 0, 0, errors.New(s)
 	}
@@ -699,8 +707,8 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	}
 
 	var (
-		dlat = float64(ilat)/MH_UNITS*180. - 90.
-		dlon = float64(ilon)/MH_UNITS*360. - 180.
+		dlat = float64(ilat)/mhUnits*180. - 90.
+		dlon = float64(ilon)/mhUnits*360. - 180.
 	)
 
 	//text_color_set(DW_COLOR_DEBUG);
@@ -709,4 +717,4 @@ func ll_from_grid_square(maidenhead string) (float64, float64, error) {
 	return dlat, dlon, nil
 }
 
-/* end ll_from_grid_square */
+/* end FromGridSquare */

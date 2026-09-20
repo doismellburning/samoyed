@@ -33,6 +33,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/pkg/term"
 )
@@ -420,7 +421,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		var lat, latErr = latitude_from_nmea(plat, pns[0])
+		var lat, latErr = latlong.LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
@@ -445,7 +446,7 @@ func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		var lon, lonErr = longitude_from_nmea(plon, pew[0])
+		var lon, lonErr = latlong.LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
@@ -602,7 +603,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	if len(plat) > 0 && len(pns) > 0 {
-		var lat, latErr = latitude_from_nmea(plat, pns[0])
+		var lat, latErr = latlong.LatitudeFromNMEA(plat, pns[0])
 		if latErr != nil {
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
@@ -627,7 +628,7 @@ func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {
 	}
 
 	if len(plon) > 0 && len(pew) > 0 {
-		var lon, lonErr = longitude_from_nmea(plon, pew[0])
+		var lon, lonErr = latlong.LongitudeFromNMEA(plon, pew[0])
 		if lonErr != nil {
 			if !quiet {
 				text_color_set(DW_COLOR_ERROR)
