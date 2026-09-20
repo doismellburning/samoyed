@@ -304,3 +304,24 @@ func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_lon)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_radius)
 }
+
+// The APRS message branches used to index the message text without checking
+// its length, so a message with nothing after the addressee - or one shorter
+// than the "ack"/"rej" they compare against - read off the end (found by
+// fuzzing).
+func Test_decode_aprs_short_message(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	for _, tc := range []struct{ monitor, comment string }{
+		{"Q1TEST>APDW17::Q2TEST   :", ""},
+		{"Q1TEST>APDW17::Q2TEST   :ab", "ab"},
+	} {
+		var pp = AX25FromText(tc.monitor, true)
+		assert.NotNil(t, pp)
+
+		var A = decode_aprs(pp, true, "")
+		assert.Equal(t, message_subtype_message, A.g_message_subtype)
+		assert.Equal(t, "Q2TEST", A.g_addressee)
+		assert.Equal(t, tc.comment, A.g_comment)
+	}
+}
