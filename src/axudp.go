@@ -4,7 +4,6 @@
 package direwolf
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -107,19 +107,18 @@ func axudpExtractDest(frame []byte) string {
 type AXUDPBridge struct {
 	maps    []AXUDPMapEntry
 	udpConn *net.UDPConn
-	verbose bool
 
 	mu      sync.Mutex
 	clients []net.Conn
 }
 
 // NewAXUDPBridge creates a new AXUDPBridge routing AXUDP datagrams according to maps,
-// sending/receiving on udpConn.  If verbose is set, every packet sent and received is logged.
-func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn, verbose bool) *AXUDPBridge {
+// sending/receiving on udpConn.  Per-packet logging is emitted at logrus Trace
+// level, so enabling that level is what makes the bridge verbose.
+func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn) *AXUDPBridge {
 	var b = new(AXUDPBridge)
 	b.maps = maps
 	b.udpConn = udpConn
-	b.verbose = verbose
 
 	return b
 }
@@ -130,17 +129,17 @@ func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn, verbose bool) *A
 // datagram regardless of payload length.
 const maxUDPPayload = 65535
 
-// RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to all clients.
-func (b *AXUDPBridge) RunUDPListener() {
+// RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to
+// all clients.  It only returns on a read error, which means the socket is
+// broken and the UDP side of the bridge is now dead: the caller should report
+// the error and terminate so the process can be restarted, rather than
+// continuing silently with no incoming traffic.
+func (b *AXUDPBridge) RunUDPListener() error {
 	var buf = make([]byte, maxUDPPayload)
 	for {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
-			// A UDP read error means the socket is broken; the UDP side of
-			// the bridge is now dead.  Exit so the process can be restarted
-			// rather than silently continuing with no incoming traffic.
-			fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP listener fatal error: %v\n", readErr)
-			os.Exit(1)
+			return fmt.Errorf("UDP listener: %w", readErr)
 		}
 
 		if n < 1 {
@@ -168,39 +167,68 @@ func (b *AXUDPBridge) RunUDPListener() {
 			continue
 		}
 
-		if b.verbose {
+		// This fires once per datagram and axudpExtractDest allocates a string
+		// nothing else here needs, so do not pay for it unless it will print.
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			// The first 7 bytes of an AX.25 frame are the destination address —
 			// for an incoming AXUDP datagram this is typically our local callsign.
-			var dest = axudpExtractDest(ax25frame)
-			fmt.Printf("samoyed-axudp: received AXUDP datagram, %d bytes, dest address=%q\n", n, dest)
+			logrus.WithFields(logrus.Fields{
+				"bytes": n,
+				"dest":  axudpExtractDest(ax25frame),
+			}).Trace("Received AXUDP datagram")
 		}
 		b.broadcastKISS(ax25frame)
 	}
 }
 
-// RunKISSServer accepts TCP connections from KISS clients.
-func (b *AXUDPBridge) RunKISSServer(kissPort int) {
-	var ln, listenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", kissPort))
-	if listenErr != nil {
-		fmt.Fprintf(os.Stderr, "samoyed-axudp: TCP listen on port %d: %v\n", kissPort, listenErr)
-		os.Exit(1)
-	}
-	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", kissPort)
+// axudpAcceptBackoff is how long RunKISSServer waits after a failed accept
+// before trying again, doubling up to axudpMaxAcceptBackoff.  Accepting can
+// fail for reasons that pass — a client that goes away between the handshake
+// and the accept, or a momentarily exhausted file descriptor table — and
+// retrying immediately would spin the CPU and flood the log until it does.
+const axudpAcceptBackoff = 5 * time.Millisecond
+
+// axudpMaxAcceptBackoff caps that wait.
+const axudpMaxAcceptBackoff = time.Second
+
+// axudpMaxAcceptFailures is how many accepts may fail in a row before
+// RunKISSServer gives up.  Something that has not passed after this many tries
+// is not the transient the backoff is there for.
+const axudpMaxAcceptFailures = 10
+
+// RunKISSServer accepts TCP connections from KISS clients on ln.  The caller
+// owns ln and is responsible for closing it.  It returns once ln is closed, or
+// once accepting has failed axudpMaxAcceptFailures times in a row; neither can
+// be recovered from, so the caller should report the error and terminate
+// rather than spinning on a broken socket.  An isolated accept failure is
+// reported and retried after a backoff.
+func (b *AXUDPBridge) RunKISSServer(ln net.Listener) error {
+	var failures int
+	var backoff = axudpAcceptBackoff
 
 	for {
 		var conn, acceptErr = ln.Accept()
 		if acceptErr != nil {
-			// A closed listener cannot recover; exit so the process can be
-			// restarted rather than spinning on a broken socket.
 			if errors.Is(acceptErr, net.ErrClosed) {
-				fmt.Fprintf(os.Stderr, "samoyed-axudp: accept fatal error: %v\n", acceptErr)
-				os.Exit(1)
+				return fmt.Errorf("KISS server accept: %w", acceptErr)
 			}
-			fmt.Fprintf(os.Stderr, "samoyed-axudp: accept: %v\n", acceptErr)
+
+			failures++
+			if failures >= axudpMaxAcceptFailures {
+				return fmt.Errorf("KISS server accept failed %d times in a row, last: %w", failures, acceptErr)
+			}
+
+			logrus.WithError(acceptErr).Error("Could not accept KISS client")
+			time.Sleep(backoff)
+			backoff = min(backoff*2, axudpMaxAcceptBackoff)
 
 			continue
 		}
-		fmt.Printf("samoyed-axudp: new KISS client %v\n", conn.RemoteAddr())
+
+		failures = 0
+		backoff = axudpAcceptBackoff
+
+		logrus.WithField("client", conn.RemoteAddr()).Info("New KISS client")
 		go b.handleKISSClient(conn)
 	}
 }
@@ -235,7 +263,10 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	// frame can never be shorter than len(ax25frame)+3. If that best case
 	// already exceeds the limit, skip the expensive encoding step entirely.
 	if len(ax25frame) > MAX_KISS_LEN-3 {
-		fmt.Fprintf(os.Stderr, "samoyed-axudp: dropping oversized AX.25 frame (%d bytes), too large to KISS-encode within %d bytes\n", len(ax25frame), MAX_KISS_LEN)
+		logrus.WithFields(logrus.Fields{
+			"bytes": len(ax25frame),
+			"max":   MAX_KISS_LEN,
+		}).Warn("Dropping AX.25 frame too large to KISS-encode within the maximum")
 
 		return
 	}
@@ -249,7 +280,10 @@ func (b *AXUDPBridge) broadcastKISS(ax25frame []byte) {
 	// FEND then arrives it writes at index MAX_KISS_LEN causing an out-of-bounds
 	// panic.  Drop the frame before writing to clients to prevent this.
 	if len(kissframe) > MAX_KISS_LEN {
-		fmt.Fprintf(os.Stderr, "samoyed-axudp: dropping oversized KISS frame (%d bytes > %d), AX.25 frame too large after encoding\n", len(kissframe), MAX_KISS_LEN)
+		logrus.WithFields(logrus.Fields{
+			"bytes": len(kissframe),
+			"max":   MAX_KISS_LEN,
+		}).Warn("Dropping oversized KISS frame, AX.25 frame too large after encoding")
 
 		return
 	}
@@ -341,9 +375,12 @@ func (b *AXUDPBridge) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
 	var pkt = axudpAddCRC(ax25frame)
 	var n, writeErr = b.udpConn.WriteTo(pkt, entry.UDPAddr)
 	if writeErr != nil {
-		fmt.Fprintf(os.Stderr, "samoyed-axudp: UDP send to %s: %v\n", entry.Addr, writeErr)
-	} else if b.verbose {
-		fmt.Printf("samoyed-axudp: sent %d bytes via AXUDP to %s\n", n, entry.Addr)
+		logrus.WithField("dest", entry.Addr).WithError(writeErr).Error("Could not send AXUDP datagram")
+	} else if logrus.IsLevelEnabled(logrus.TraceLevel) {
+		logrus.WithFields(logrus.Fields{
+			"bytes": n,
+			"dest":  entry.Addr,
+		}).Trace("Sent AXUDP datagram")
 	}
 }
 
@@ -364,8 +401,11 @@ func (b *AXUDPBridge) handleKISSClient(conn net.Conn) {
 		// Process any bytes returned in this call before inspecting the error:
 		// Read is permitted to return (n>0, err) simultaneously, and we must
 		// not discard the final bytes of a stream.
-		if b.verbose && n > 0 {
-			fmt.Printf("samoyed-axudp: received %d bytes from KISS client %v\n", n, conn.RemoteAddr())
+		if n > 0 && logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithFields(logrus.Fields{
+				"bytes":  n,
+				"client": conn.RemoteAddr(),
+			}).Trace("Read from KISS client")
 		}
 
 		for _, byt := range buf[:n] {
@@ -373,7 +413,7 @@ func (b *AXUDPBridge) handleKISSClient(conn net.Conn) {
 		}
 
 		if readErr != nil {
-			fmt.Printf("samoyed-axudp: KISS client %v disconnected: %v\n", conn.RemoteAddr(), readErr)
+			logrus.WithField("client", conn.RemoteAddr()).WithError(readErr).Info("KISS client disconnected")
 
 			return
 		}
@@ -415,7 +455,7 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 		if *overflow || kf.kiss_len >= MAX_KISS_LEN {
 			// Frame exceeded MAX_KISS_LEN, or filled the buffer exactly
 			// leaving no room for the closing FEND — discard it entirely.
-			fmt.Fprintf(os.Stderr, "samoyed-axudp: KISS frame exceeded max length (%d bytes), discarding\n", MAX_KISS_LEN)
+			logrus.WithField("max", MAX_KISS_LEN).Warn("Discarding KISS frame that exceeded the maximum length")
 			*overflow = false
 			kf.kiss_len = 0
 			kf.state = KS_SEARCHING
@@ -432,30 +472,36 @@ func my_kiss_rec_byte_axudp(kf *KISSFrame, overflow *bool, b byte, b2 *AXUDPBrid
 
 		// unwrapped[0] is the type byte (channel << 4 | cmd).
 		// We only care about DATA_FRAME commands (lower nibble == 0).
-		if b2.verbose {
-			fmt.Printf("samoyed-axudp: KISS frame complete, %d bytes unwrapped, type byte 0x%02x\n", len(unwrapped), func() byte {
-				if len(unwrapped) > 0 {
-					return unwrapped[0]
-				}
-
-				return 0
-			}())
+		// Once per frame, and the type byte needs a Sprintf to render as hex,
+		// so do not build the entry unless it will print.
+		if logrus.IsLevelEnabled(logrus.TraceLevel) {
+			var typeByte byte
+			if len(unwrapped) > 0 {
+				typeByte = unwrapped[0]
+			}
+			logrus.WithFields(logrus.Fields{
+				"bytes":     len(unwrapped),
+				"type_byte": fmt.Sprintf("0x%02x", typeByte),
+			}).Trace("KISS frame complete")
 		}
 		if len(unwrapped) >= 2 && (unwrapped[0]&0x0F) == KISS_CMD_DATA_FRAME {
 			var ax25frame = unwrapped[1:]
 			var dest = axudpExtractDest(ax25frame)
-			if b2.verbose {
-				fmt.Printf("samoyed-axudp: AX.25 frame dest=%q, %d bytes, forwarding via AXUDP\n", dest, len(ax25frame))
+			if logrus.IsLevelEnabled(logrus.TraceLevel) {
+				logrus.WithFields(logrus.Fields{
+					"dest":  dest,
+					"bytes": len(ax25frame),
+				}).Trace("Forwarding AX.25 frame via AXUDP")
 			}
 			if dest == "" {
-				fmt.Fprintf(os.Stderr, "samoyed-axudp: frame too short to extract destination\n")
+				logrus.Warn("Dropping AX.25 frame too short to extract a destination from")
 			} else if entry, ok := b2.lookupMap(dest); ok {
 				b2.sendAXUDP(ax25frame, entry)
 			} else {
-				fmt.Fprintf(os.Stderr, "samoyed-axudp: no MAP entry for destination %s, dropping\n", dest)
+				logrus.WithField("dest", dest).Warn("Dropping AX.25 frame with no MAP entry for its destination")
 			}
-		} else if len(unwrapped) >= 1 && b2.verbose {
-			fmt.Printf("samoyed-axudp: ignoring non-data KISS command 0x%02x\n", unwrapped[0]&0x0F)
+		} else if len(unwrapped) >= 1 && logrus.IsLevelEnabled(logrus.TraceLevel) {
+			logrus.WithField("command", fmt.Sprintf("0x%02x", unwrapped[0]&0x0F)).Trace("Ignoring non-data KISS command")
 		}
 
 		kf.kiss_len = 0

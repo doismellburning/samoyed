@@ -4,11 +4,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 
 	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -68,6 +70,12 @@ Flags:
 	var verbose = pflag.Bool("verbose", false, "Log every packet sent and received")
 	pflag.Parse()
 
+	if *verbose {
+		// The per-packet entries are logged at Trace, and logrus defaults to
+		// Info, so they would otherwise be dropped.
+		logrus.SetLevel(logrus.TraceLevel)
+	}
+
 	if *help {
 		pflag.Usage()
 		os.Exit(0)
@@ -98,8 +106,23 @@ Flags:
 	}
 	fmt.Printf("samoyed-axudp: AXUDP listening on UDP port %d\n", *udpPort)
 
-	var b = direwolf.NewAXUDPBridge(maps, udpConn, *verbose)
+	var kissLn, kissListenErr = new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", *kissPort))
+	if kissListenErr != nil {
+		fmt.Fprintf(os.Stderr, "samoyed-axudp: TCP listen on port %d: %v\n", *kissPort, kissListenErr)
+		os.Exit(1)
+	}
+	fmt.Printf("samoyed-axudp: KISS TCP server listening on port %d\n", *kissPort)
 
-	go b.RunUDPListener()
-	b.RunKISSServer(*kissPort)
+	var b = direwolf.NewAXUDPBridge(maps, udpConn)
+
+	// Either half failing is fatal for the bridge as a whole, so whichever
+	// returns first decides: report it and exit rather than limping along with
+	// traffic flowing in only one direction.  The channel is buffered so the
+	// half we do not wait for cannot leak its goroutine blocking on a send.
+	var errs = make(chan error, 2)
+	go func() { errs <- b.RunUDPListener() }()
+	go func() { errs <- b.RunKISSServer(kissLn) }()
+
+	fmt.Fprintf(os.Stderr, "samoyed-axudp: %v\n", <-errs)
+	os.Exit(1)
 }
