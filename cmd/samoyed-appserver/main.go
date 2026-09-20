@@ -634,8 +634,10 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 	fmt.Printf("%d,%s: %s\n", channel, call_from, dataStr)
 
 	// Process the command from user.
+	// A terminal ends the line with a carriage return, and some send a line
+	// feed too; neither is part of the command or of its arguments.
 
-	var _pcmd, rest, _ = BytesCut(data, ' ')
+	var _pcmd, rest, _ = BytesCut(bytes.TrimSpace(data), ' ')
 
 	var pcmd = string(_pcmd)
 	if pcmd == "" {

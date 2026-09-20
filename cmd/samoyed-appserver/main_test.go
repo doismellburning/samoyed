@@ -366,3 +366,24 @@ func TestWhoShowsLoginTimes(t *testing.T) {
 		t.Errorf("who did not list the connected station, got %q", got)
 	}
 }
+
+// TestCommandsIgnoreTheLineEnding covers a terminal that ends the line the way
+// terminals do: the carriage return used to be parsed as part of the command,
+// or of its last argument, so "who\r" was an invalid command.
+func TestCommandsIgnoreTheLineEnding(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	connect(t, tnc)
+
+	for _, ending := range []string{"\r", "\r\n", "\n", ""} {
+		var got = sentText(send(t, tnc, "who"+ending))
+
+		if strings.Contains(got, "Invalid command") {
+			t.Errorf("who%q was rejected: %q", ending, got)
+		}
+
+		if !strings.Contains(got, "Session") {
+			t.Errorf("who%q did not list the sessions: %q", ending, got)
+		}
+	}
+}
