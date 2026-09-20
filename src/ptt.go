@@ -132,7 +132,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func _TIOCM(fd int, value int, on bool) {
+func _TIOCM_real(fd int, value int, on bool) {
 	var stuff, _ = unix.IoctlGetInt(fd, unix.TIOCMGET)
 	if on {
 		stuff |= value
