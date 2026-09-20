@@ -7,6 +7,7 @@ SRC_DIRS = ./cmd/... ./internal/... ./src/...
 CMDS = $(notdir $(wildcard ./cmd/*))
 COVERAGE_FILE = cover.out
 GOLANGCI_LINT_VERSION = v2.13.2
+GOVULNCHECK_VERSION = v1.8.0
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
 
 .PHONY: all
@@ -111,6 +112,26 @@ vet:
 .PHONY: lint
 lint: ./bin/golangci-lint
 	./bin/golangci-lint run $(SRC_DIRS)
+
+# Depending on the Makefile means a GOVULNCHECK_VERSION bump reinstalls the binary
+# rather than leaving a stale one in place.
+./bin/govulncheck: Makefile
+	rm -f $@
+	# govulncheck type-checks our packages with the go/types it was built against, so
+	# one built with an older toolchain than ours reports "package requires newer Go
+	# version" for every package and checks nothing. Build it with the toolchain this
+	# module uses, as with golangci-lint above.
+	GOTOOLCHAIN=$$(go env GOVERSION)+auto GOBIN=$(CURDIR)/bin go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION)
+
+# Reports advisories from https://vuln.go.dev whose vulnerable symbols we actually
+# call, so it stays quiet about vulnerabilities in code we never reach.
+#
+# Deliberately not part of `check`: its answer depends on the day's advisories and
+# on vuln.go.dev being reachable, where everything else `check` runs gives the same
+# answer for a given commit forever. It gets its own scheduled workflow instead.
+.PHONY: vuln
+vuln: ./bin/govulncheck
+	./bin/govulncheck $(SRC_DIRS)
 
 .PHONY: fix
 fix: ./bin/golangci-lint

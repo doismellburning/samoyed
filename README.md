@@ -97,6 +97,7 @@ Key `make` targets:
 | `make test` | Run the full test suite |
 | `make check` | Run linters (`vet`, `golangci-lint`, `shellcheck`, `reuse`) |
 | `make fix` | Auto-fix linting issues where possible |
+| `make vuln` | Check dependencies and the toolchain for reachable vulnerabilities |
 | `make coveragereport` | Show test coverage breakdown |
 | `make stats` | Show lines-of-code breakdown (C vs Go) |
 
