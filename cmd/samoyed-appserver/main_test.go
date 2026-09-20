@@ -343,3 +343,26 @@ func TestEveryCommandIsDocumented(t *testing.T) {
 		}
 	}
 }
+
+// TestWhoShowsLoginTimes covers the Since column, which used to be the literal
+// string "[time later]" even though the login time was right there.
+func TestWhoShowsLoginTimes(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	var s = connect(t, tnc)
+
+	var got = sentText(send(t, tnc, "who"))
+
+	if strings.Contains(got, "[time later]") {
+		t.Errorf("who still has a placeholder where the login time goes: %q", got)
+	}
+
+	var want = s.loginTime.UTC().Format(loginTimeFormat)
+	if !strings.Contains(got, want) {
+		t.Errorf("who did not show the login time %q, got %q", want, got)
+	}
+
+	if !strings.Contains(got, testTheirCall.String()) {
+		t.Errorf("who did not list the connected station, got %q", got)
+	}
+}

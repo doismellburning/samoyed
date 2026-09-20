@@ -667,17 +667,21 @@ func sendLines(channel byte, call_to Callsign, call_from Callsign, lines []strin
 	}
 }
 
+// loginTimeFormat renders a login time for "who".  UTC, because the stations
+// listed are not necessarily in the same time zone as the one reading it, and
+// packet operators think in UTC anyway.
+const loginTimeFormat = "2006-01-02 15:04:05Z"
+
 // cmd_who lists people currently logged in.
 func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
-	var greeting = "Session Channel User   Since\r"
-
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+	var lines = []string{fmt.Sprintf("%-7s %-7s %-9s %s", "Session", "Channel", "User", "Since")}
 
 	for n, other := range srv.sortedSessions() {
-		var line = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, other.channel, other.addr)
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line))
+		lines = append(lines, fmt.Sprintf("%-7d %-7d %-9s %s",
+			n, other.channel, other.addr, other.loginTime.UTC().Format(loginTimeFormat)))
 	}
+
+	sendLines(channel, call_to, call_from, lines)
 }
 
 // cmd_test runs a timing test: send the specified number of frames with optional length.
