@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -1311,6 +1313,15 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 // then ends the process.
 func wait_for_shutdown(ctx context.Context) {
 	<-ctx.Done()
+
+	// Shutting down is the one thing a second signal should be able to cut
+	// short.  The handler that cancelled ctx is still installed - the caller's
+	// stop function is deferred behind a DirewolfMain that cleanup never
+	// returns from - so without this, a supervisor that lost patience with us
+	// would have to reach for SIGKILL.  Putting the default disposition back
+	// means its second SIGTERM ends us instead.
+	signal.Reset(os.Interrupt, syscall.SIGTERM)
+
 	cleanup()
 }
 
@@ -1327,6 +1338,10 @@ func cleanup() {
 		waypointSender.Close()
 	}
 
+	// A moment for the goroutines that took the same context to notice it and
+	// put their own resources down before the process goes away underneath
+	// them.  Well inside any supervisor's patience - systemd waits 90s by
+	// default - and a second signal now skips it entirely.
 	SLEEP_SEC(1)
 	os.Exit(0)
 }

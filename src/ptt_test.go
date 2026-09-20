@@ -473,3 +473,17 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 		"the node name found while exporting should be remembered")
 	assert.Equal(t, 1, get_input_real(ICTYPE_TXINH, 0))
 }
+
+// TestPttTermBeforeAudioConfig covers a stop signal that arrives while we are
+// still starting up: the shutdown path runs cleanup, and ptt_term used to
+// dereference the audio configuration that audio_open had not installed yet,
+// so a stop during startup panicked instead of shutting down.
+func TestPttTermBeforeAudioConfig(t *testing.T) {
+	var saved = save_audio_config_p
+
+	save_audio_config_p = nil
+
+	t.Cleanup(func() { save_audio_config_p = saved })
+
+	require.NotPanics(t, ptt_term)
+}
