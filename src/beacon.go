@@ -674,7 +674,12 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 	var bp = &(bs.miscConfig.beacon[j])
 
 	if bp.sendto_chan < 0 {
-		panic("assert(bp.sendto_chan >= 0)")
+		logrus.WithFields(logrus.Fields{
+			"line":    bp.lineno,
+			"channel": bp.sendto_chan,
+		}).Error("Beacon has no channel to send to, skipping it")
+
+		return
 	}
 
 	/*

@@ -213,11 +213,18 @@ func kisspt_open_pt() {
 
 	var symlinkErr = os.Symlink(pt_slave.Name(), TMP_KISSTNC_SYMLINK)
 	if symlinkErr == nil {
-		dw_printf("Created symlink %s -> %s\n", TMP_KISSTNC_SYMLINK, pt_slave.Name())
+		logrus.WithFields(logrus.Fields{
+			"symlink": TMP_KISSTNC_SYMLINK,
+			"device":  pt_slave.Name(),
+		}).Debug("Created KISS TNC symlink")
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create symlink %s: %s\n", TMP_KISSTNC_SYMLINK, symlinkErr)
-		panic("")
+		// The symlink is a convenience, so the application's configuration
+		// does not have to change when the pseudo terminal name does.  The
+		// TNC is usable without it.
+		logrus.WithError(symlinkErr).WithFields(logrus.Fields{
+			"symlink": TMP_KISSTNC_SYMLINK,
+			"device":  pt_slave.Name(),
+		}).Error("Could not create the KISS TNC symlink; use the device directly")
 	}
 }
 
