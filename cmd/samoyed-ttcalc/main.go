@@ -227,13 +227,14 @@ func calculator(str string) int {
 			num = 0
 			lastop = ADD
 		} else if p == '#' {
-			result = do_lastop(lastop, result, num)
-
-			return result
+			return do_lastop(lastop, result, num)
 		}
 	}
 
-	panic("Should never get here!")
+	// The sequence came off the air, so it need not have the "#" that ends a
+	// well-formed one.  Finish the operation in hand and answer with that
+	// rather than taking the process down.
+	return do_lastop(lastop, result, num)
 }
 
 /*------------------------------------------------------------------
