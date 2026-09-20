@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,7 +139,8 @@ func Test_parse_ll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result = parse_ll(tt.input, tt.which, 0)
+			var result, err = parse_ll(tt.input, tt.which, 0)
+			require.NoError(t, err)
 			assert.InDelta(t, tt.want, result, tt.delta)
 		})
 	}
@@ -209,6 +211,13 @@ type configs struct {
 	// usually has nothing else to show for it, so this is the only way to tell
 	// a line that was reported from one that was quietly ignored.
 	output string
+
+	// errors and warnings are config_init's tallies, which are what
+	// --config-check makes its exit status out of, and fatal says the
+	// configuration is one the daemon refuses to start on at all.
+	errors   int
+	warnings int
+	fatal    bool
 }
 
 // parseConfig writes content to a temp config file and runs config_init over it.
@@ -229,10 +238,15 @@ func parseConfig(t *testing.T, content string) configs {
 		igate:  new(igate_config_s),
 		misc:   new(misc_config_s),
 		output: "",
+
+		errors:   0,
+		warnings: 0,
+		fatal:    false,
 	}
 
 	c.output = CaptureOutput(t, func() {
-		config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+		var report = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+		c.errors, c.warnings, c.fatal = report.errors, report.warnings, report.fatal
 	})
 
 	return c
@@ -257,23 +271,33 @@ func Test_parse_ll_maybe(t *testing.T) {
 	// Regression test: parse_ll indexed str[0] before looking at its length, so
 	// "LAT=" in a beacon line panicked rather than being rejected.
 	t.Run("an empty coordinate is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("", LAT, 0))
+		var ll, err = parse_ll_maybe("", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("a sign on its own is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("-", LON, 0))
+		var ll, err = parse_ll_maybe("-", LON, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("unreadable degrees are Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("abc", LAT, 0))
+		var ll, err = parse_ll_maybe("abc", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("unreadable minutes are Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("42^ab", LAT, 0))
+		var ll, err = parse_ll_maybe("42^ab", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("a non-finite coordinate is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("NaN^0", LAT, 0))
+		var ll, err = parse_ll_maybe("NaN^0", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	// Regression test: an out-of-range coordinate only logged and was returned
@@ -281,20 +305,31 @@ func Test_parse_ll_maybe(t *testing.T) {
 	// and longitude are required" check and EncodePosition clamped it to
 	// "!9000.00N" - the station transmitted from the North Pole.
 	t.Run("an out-of-range latitude is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("200", LAT, 0))
+		var ll, err = parse_ll_maybe("200", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("an out-of-range longitude is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("181W", LON, 0))
+		var ll, err = parse_ll_maybe("181W", LON, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("the limits themselves are Just", func(t *testing.T) {
-		assert.InDelta(t, 90.0, maybe.FromJust(parse_ll_maybe("90N", LAT, 0)), 0.0001)
-		assert.InDelta(t, -180.0, maybe.FromJust(parse_ll_maybe("180W", LON, 0)), 0.0001)
+		var lat, latErr = parse_ll_maybe("90N", LAT, 0)
+		require.NoError(t, latErr)
+		assert.InDelta(t, 90.0, maybe.FromJust(lat), 0.0001)
+
+		var lon, lonErr = parse_ll_maybe("180W", LON, 0)
+		require.NoError(t, lonErr)
+		assert.InDelta(t, -180.0, maybe.FromJust(lon), 0.0001)
 	})
 
 	t.Run("a readable coordinate is Just", func(t *testing.T) {
-		assert.InDelta(t, -71.5, maybe.FromJust(parse_ll_maybe("71.5W", LON, 0)), 0.0001)
+		var lon, err = parse_ll_maybe("71.5W", LON, 0)
+		require.NoError(t, err)
+		assert.InDelta(t, -71.5, maybe.FromJust(lon), 0.0001)
 	})
 }
 
@@ -4886,4 +4921,294 @@ func packageTestSource(t *testing.T) string {
 	}
 
 	return all.String()
+}
+
+// --- the tallies --config-check works from ---
+
+func Test_config_init_tallies(t *testing.T) {
+	const clean = "ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 1200\nAGWPORT 8000\n"
+
+	tests := []struct {
+		name         string
+		config       string
+		wantErrors   int
+		wantWarnings int
+	}{
+		{
+			name:         "a config with nothing wrong with it draws nothing",
+			config:       clean,
+			wantErrors:   0,
+			wantWarnings: 0,
+		},
+		{
+			name:         "a comment and a blank line are not problems",
+			config:       "# a comment\n\n" + clean,
+			wantErrors:   0,
+			wantWarnings: 0,
+		},
+		{
+			name:         "an unrecognised keyword is an error",
+			config:       clean + "NOSUCHKEYWORD 1\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+		},
+		{
+			// The point of the whole exercise: parsing does not stop at the
+			// first problem, so one run tells you about all of them.
+			name:         "every bad line is counted, not just the first",
+			config:       clean + "NOSUCHKEYWORD 1\nAGWPORT\nAGWPORT notanumber\nDWAIT abc\n",
+			wantErrors:   4,
+			wantWarnings: 0,
+		},
+		{
+			name:         "a line with two things wrong with it counts twice",
+			config:       clean + "PBEACON DELAY=1 EVERY=1 LAT=200 LONG=181W\n",
+			wantErrors:   2,
+			wantWarnings: 0,
+		},
+		{
+			// TXDELAY 3 is obeyed; the lecture that follows it is advice, and
+			// advice must not fail a config check.
+			name:         "advice about a directive that was obeyed is a warning",
+			config:       clean + "TXDELAY 3\n",
+			wantErrors:   0,
+			wantWarnings: 1,
+		},
+		{
+			name:         "a directive that was not obeyed is an error, not a warning",
+			config:       clean + "TXDELAY 999\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+		},
+		{
+			name:         "errors and warnings are counted apart from each other",
+			config:       clean + "TXDELAY 3\nNOSUCHKEYWORD 1\n",
+			wantErrors:   1,
+			wantWarnings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c = parseConfig(t, tt.config)
+
+			assert.Equal(t, tt.wantErrors, c.errors, "errors; config_init said:\n%s", c.output)
+			assert.Equal(t, tt.wantWarnings, c.warnings, "warnings; config_init said:\n%s", c.output)
+		})
+	}
+}
+
+// --- rendering a complaint for the person who wrote the config file ---
+
+func Test_asSentence(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want string
+	}{
+		{
+			// Go wants an error string to start lower case so that it still
+			// reads correctly wrapped inside a bigger one; nobody configuring a
+			// TNC wants to read it that way.
+			name: "an error string becomes a sentence",
+			msg:  "line 7: Missing port number for AGWPORT command",
+			want: "Line 7: Missing port number for AGWPORT command.",
+		},
+		{
+			name: "a question keeps its question mark",
+			msg:  "line 7: Non-standard data rate.  Are you sure?",
+			want: "Line 7: Non-standard data rate.  Are you sure?",
+		},
+		{
+			name: "a complaint that already ends in a full stop gains no second one",
+			msg:  "line 7: Invalid time for transmit delay. Using 30.",
+			want: "Line 7: Invalid time for transmit delay. Using 30.",
+		},
+		{
+			name: "a complaint that runs onto further lines is punctuated at the end",
+			msg:  "line 7: Unexpected \"x\" after the port number\nPerhaps you meant KISSPORT",
+			want: "Line 7: Unexpected \"x\" after the port number\nPerhaps you meant KISSPORT.",
+		},
+		{
+			// Only the opening letter is ours to change - the rest of the
+			// message, including anything substituted into it, is left alone.
+			name: "only the first letter is capitalised",
+			msg:  "config file, line 7: Invalid FILTER expression:\nfilter[0,IG]: nosuchfilter",
+			want: "Config file, line 7: Invalid FILTER expression:\nfilter[0,IG]: nosuchfilter.",
+		},
+		{
+			name: "an empty complaint is left alone",
+			msg:  "",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, asSentence(tt.msg))
+		})
+	}
+}
+
+// --- a file we could not read all of ---
+
+func Test_config_init_unreadable_file_is_not_clean(t *testing.T) {
+	// Regression test: the scanner loop never looked at scanner.Err(), so a
+	// line too long for its buffer ended the parse without a word about it.
+	// Everything after that line went unread, and --config-check called the
+	// file clean.
+	var overlong = strings.Repeat("Q", bufio.MaxScanTokenSize+1)
+
+	var c = parseConfig(t, "ADEVICE plughw:1,0\nMYCALL "+overlong+"\nAGWPORT 8000\n")
+
+	assert.Positive(t, c.errors, "config_init said:\n%s", c.output)
+	assert.Contains(t, c.output, "Could not read")
+}
+
+// --- diagnostics that used to print without being counted ---
+
+func Test_config_init_counts_every_diagnostic(t *testing.T) {
+	// Regression test: these were reported with a bare dw_printf rather than
+	// through the error path, so they printed and the tallies stayed where they
+	// were - and --config-check called the file clean while telling the reader
+	// something was wrong with it.
+	const clean = "ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 1200\n"
+
+	tests := []struct {
+		name         string
+		config       string
+		wantErrors   int
+		wantWarnings int
+		wantOutput   string
+	}{
+		{
+			name:         "an ADEVICE number that is not a number",
+			config:       "ADEVICEx plughw:1,0\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+			wantOutput:   "Could not parse ADEVICE number",
+		},
+		{
+			name:         "a directive that is not implemented and so is skipped",
+			config:       clean + "SMARTBEACONING 60 180 5 30 15 45 255\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+			wantOutput:   "SMARTBEACONING support currently disabled",
+		},
+		{
+			// The directive is obeyed, so the lecture that comes with it is
+			// advice and must not fail a config check.
+			name:         "a FIX_BITS setting above the default",
+			config:       clean + "FIX_BITS 2\n",
+			wantErrors:   0,
+			wantWarnings: 1,
+			wantOutput:   "is not recommended for normal operation",
+		},
+		{
+			name:         "a directive on its way out",
+			config:       clean + "SATGATE\n",
+			wantErrors:   0,
+			wantWarnings: 1,
+			wantOutput:   "will be removed in a future version",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c = parseConfig(t, tt.config)
+
+			assert.Contains(t, c.output, tt.wantOutput)
+			assert.Equal(t, tt.wantErrors, c.errors, "errors; config_init said:\n%s", c.output)
+			assert.Equal(t, tt.wantWarnings, c.warnings, "warnings; config_init said:\n%s", c.output)
+		})
+	}
+}
+
+// --- a configuration the daemon cannot start on ---
+
+func Test_config_init_fatal(t *testing.T) {
+	t.Run("ADEVICE with no device name is fatal, not merely wrong", func(t *testing.T) {
+		// Regression test: this used to exit on the spot.  It now reads on, so
+		// that a check run can report the rest of the file - but the daemon
+		// must still refuse to start rather than fall back to whatever audio
+		// device happened to be the default.
+		var c = parseConfig(t, "ADEVICE\n")
+
+		assert.True(t, c.fatal, "config_init said:\n%s", c.output)
+		assert.Positive(t, c.errors)
+	})
+
+	t.Run("reading on means the rest of the file is reported too", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE\nNOSUCHKEYWORD 1\n")
+
+		assert.True(t, c.fatal)
+		assert.Contains(t, c.output, "Unrecognized command 'NOSUCHKEYWORD'")
+		assert.Equal(t, 2, c.errors, "config_init said:\n%s", c.output)
+	})
+
+	t.Run("an ordinary bad directive is not fatal", func(t *testing.T) {
+		var c = parseConfig(t, "ADEVICE plughw:1,0\nAGWPORT notanumber\n")
+
+		assert.False(t, c.fatal, "config_init said:\n%s", c.output)
+		assert.Positive(t, c.errors)
+	})
+}
+
+// --- a TTERR method the address parser rejects ---
+
+func Test_config_init_tterr_bad_method_is_counted(t *testing.T) {
+	// Regression test: the handler returned without a word of its own when
+	// ax25_parse_addr rejected the method, so --config-check printed a
+	// complaint about the line and still exited 0.
+	var c = parseConfig(t, "ADEVICE plughw:1,0\nTTERR OK WAYTOOLONGAMETHOD some text\n")
+
+	assert.Positive(t, c.errors, "config_init said:\n%s", c.output)
+	assert.Contains(t, c.output, "Invalid method for TTERR command")
+}
+
+// --- one bad digipeater path, one complaint ---
+
+func Test_config_init_bad_via_path_counted_once(t *testing.T) {
+	// Regression test: check_via_path's own complaint was reported, and then
+	// the caller reported "invalid via path" on top of it, so one bad path came
+	// to two errors and the summary overstated what was wrong with the file.
+	var c = parseConfig(t,
+		"ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\n"+
+			"IGTXVIA 0 Q2TEST,Q3TEST,Q4TEST,Q5TEST,Q6TEST,Q7TEST,Q8TEST,Q9TEST,Q1TEST\n")
+
+	assert.Equal(t, 1, c.errors, "config_init said:\n%s", c.output)
+
+	// The detail is worth keeping, so it joins the complaint rather than being
+	// dropped to get the count right.
+	assert.Contains(t, c.output, "invalid via path: maximum of 8 digipeaters has been exceeded")
+}
+
+// --- a coordinate that drew a complaint is not a coordinate ---
+
+func Test_parse_ll_maybe_rejects_what_it_complains_about(t *testing.T) {
+	// Regression test: these two complained and then handed back the number
+	// anyway, so a beacon went out from a plausible-looking place that nobody
+	// configured.  "42.5W" as a latitude is the worst of them: W is applied as
+	// though it were S before the hemisphere is checked, so the station
+	// transmitted from 42.5 degrees south.
+	t.Run("a hemisphere from the wrong axis is Nothing", func(t *testing.T) {
+		var ll, err = parse_ll_maybe("42.5W", LAT, 0)
+
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
+	})
+
+	t.Run("a longitude with a latitude hemisphere is Nothing", func(t *testing.T) {
+		var ll, err = parse_ll_maybe("71.5N", LON, 0)
+
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
+	})
+
+	t.Run("minutes that are not minutes are Nothing", func(t *testing.T) {
+		var ll, err = parse_ll_maybe("42^90", LAT, 0)
+
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
+	})
 }

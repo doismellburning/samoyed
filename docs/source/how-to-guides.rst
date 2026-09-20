@@ -19,6 +19,46 @@ Decode packet data from audio
     $ samoyed-atest --bitrate 300 data.wav
 
 
+Check a config file without starting up
+---------------------------------------
+
+Finding out whether ``direwolf.conf`` is right by starting ``samoyed-direwolf``
+means having the audio devices and ports it wants, which a build machine or a
+headless box being edited over SSH generally does not.  ``--config-check``
+reads the file and stops there:
+
+.. code::
+
+    $ samoyed-direwolf -c /etc/direwolf.conf --config-check
+
+    Reading config file /etc/direwolf.conf
+    Line 12: Invalid port number "eight thousand" for AGWPORT command.
+    Config file: Unrecognized command 'MYCAL' on line 17.
+
+    Configuration file /etc/direwolf.conf: 2 errors, 0 warnings.
+
+Every problem in the file is reported rather than just the first, so one run
+tells you everything there is to fix.  The exit status is 1 if any of them was
+an error and 0 otherwise, which is what makes it useful in CI, in a git hook,
+or in a systemd unit:
+
+.. code::
+
+    [Service]
+    ExecStartPre=/usr/bin/samoyed-direwolf -c /etc/direwolf.conf --config-check
+    ExecStart=/usr/bin/samoyed-direwolf -c /etc/direwolf.conf
+
+Warnings are counted separately and do not fail the check.  They are advice
+about a directive that was obeyed all the same - ``TXDELAY 3`` is accepted, and
+warned about, because it is too short for most radios to key up in - so a
+configuration that works today still passes its own check.  A directive that
+was *not* obeyed as written, including one that fell back to a default, is an
+error.
+
+This checks the configuration file, not the command line: options such as
+``-r`` or ``-B`` are not applied, so what you are checking is what the file
+says.
+
 Try a packet filter out before putting it in the config file
 ------------------------------------------------------------
 
