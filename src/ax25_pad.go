@@ -1682,7 +1682,14 @@ func AX25GetInfo(this_p *packet_t) []byte {
 
 	if this_p.num_addr >= 2 {
 		/* AX.25 */
-		return this_p.frame_data[ax25_get_info_offset(this_p):this_p.frame_len]
+		/* The shortest frame we accept is addresses plus a control byte, with */
+		/* no PID and no information part, so the offset can land past the end. */
+		var offset = ax25_get_info_offset(this_p)
+		if offset >= this_p.frame_len {
+			return nil
+		}
+
+		return this_p.frame_data[offset:this_p.frame_len]
 	} else {
 		/* Not AX.25.  Treat Whole packet as info. */
 		return ax25_get_frame_data(this_p)
@@ -1760,7 +1767,10 @@ func ax25_get_dti(this_p *packet_t) byte {
 	Assert(this_p.magic2 == MAGIC)
 
 	if this_p.num_addr >= 2 {
-		return this_p.frame_data[ax25_get_info_offset(this_p)]
+		var info = AX25GetInfo(this_p)
+		if len(info) > 0 {
+			return info[0]
+		}
 	}
 
 	return (' ')
@@ -2997,7 +3007,7 @@ func ax25_get_info_offset(this_p *packet_t) int {
 	return (offset)
 }
 
-func ax25_get_num_info(this_p *packet_t) int { //nolint:unused
+func ax25_get_num_info(this_p *packet_t) int {
 	/* assuming AX.25 frame. */
 	var length = this_p.frame_len - this_p.num_addr*7 - ax25_get_num_control(this_p) - ax25_get_num_pid(this_p)
 	if length < 0 {

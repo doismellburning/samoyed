@@ -1,7 +1,12 @@
 //nolint:gochecknoglobals
 package direwolf
 
-import "os"
+import (
+	"fmt"
+	"os"
+
+	"github.com/sirupsen/logrus"
+)
 
 // Interesting related stuff:
 // https://www.kernel.org/doc/html/v4.15/core-api/librs.html
@@ -62,17 +67,18 @@ func il2p_get_debug() int {
 
 // Find RS codec control block for specified number of parity symbols.
 
-func il2p_find_rs(nparity int) *rs_t {
+func il2p_find_rs(nparity int) (*rs_t, error) {
 	for n := range NTAB {
 		if Tab[n].nroots == uint(nparity) {
-			return Tab[n].rs
+			if Tab[n].rs == nil {
+				return nil, fmt.Errorf("RS control block for nparity = %d is not set up; il2p_init has not been called", nparity)
+			}
+
+			return Tab[n].rs, nil
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("IL2P INTERNAL ERROR: il2p_find_rs: control block not found for nparity = %d.\n", nparity)
-
-	return Tab[0].rs
+	return nil, fmt.Errorf("no RS control block for nparity = %d", nparity)
 }
 
 /*-------------------------------------------------------------
@@ -93,7 +99,7 @@ func il2p_find_rs(nparity int) *rs_t {
  *
  *--------------------------------------------------------------*/
 
-func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
+func il2p_encode_rs(tx_data []byte, num_parity int) ([]byte, error) {
 	var data_size = len(tx_data)
 
 	Assert(data_size >= 1)
@@ -101,13 +107,18 @@ func il2p_encode_rs(tx_data []byte, num_parity int) []byte {
 	Assert(num_parity == 2 || num_parity == 4 || num_parity == 6 || num_parity == 8 || num_parity == 16)
 	Assert(data_size+num_parity <= 255)
 
+	var rs, err = il2p_find_rs(num_parity)
+	if err != nil {
+		return nil, err
+	}
+
 	var rs_block [FX25_BLOCK_SIZE]byte
 	copy(rs_block[len(rs_block)-data_size-num_parity:], tx_data)
 
 	var parity_out = make([]byte, num_parity)
-	encode_rs_char(il2p_find_rs(num_parity), rs_block[:], parity_out)
+	encode_rs_char(rs, rs_block[:], parity_out)
 
-	return parity_out
+	return parity_out, nil
 }
 
 /*-------------------------------------------------------------
@@ -149,7 +160,14 @@ func il2p_decode_rs(rec_block []byte, num_parity int) ([]byte, int) {
 
 	var derrlocs [FX25_MAX_CHECK]int // Half would probably be OK.
 
-	var derrors = decode_rs_char(il2p_find_rs(num_parity), rs_block[:], derrlocs[:], 0)
+	var rs, err = il2p_find_rs(num_parity)
+	if err != nil {
+		logrus.WithError(err).Error("Cannot check an IL2P block")
+
+		return make([]byte, data_size), -1
+	}
+
+	var derrors = decode_rs_char(rs, rs_block[:], derrlocs[:], 0)
 	var out = make([]byte, data_size)
 	copy(out, rs_block[len(rs_block)-n:len(rs_block)-n+data_size])
 

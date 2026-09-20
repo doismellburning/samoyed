@@ -2,6 +2,8 @@ package direwolf
 
 import (
 	"bytes"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*-------------------------------------------------------------
@@ -58,7 +60,13 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 		var scrambled = il2p_scramble_block(hdr)
 		outbuf.Write(scrambled)
 
-		var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+		var parity, err = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+		if err != nil {
+			logrus.WithError(err).Error("Cannot encode an IL2P header")
+
+			return nil, -1
+		}
+
 		outbuf.Write(parity)
 
 		if e == 0 {
@@ -99,7 +107,13 @@ func il2p_encode_frame(pp *packet_t, version il2p_version_t, max_fec int, crc ..
 			var scrambled = il2p_scramble_block(hdr)
 			outbuf.Write(scrambled)
 
-			var parity = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+			var parity, err = il2p_encode_rs(scrambled, IL2P_HEADER_PARITY)
+			if err != nil {
+				logrus.WithError(err).Error("Cannot encode an IL2P header")
+
+				return nil, -1
+			}
+
 			outbuf.Write(parity)
 
 			// Payload is entire AX.25 frame.

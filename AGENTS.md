@@ -6,6 +6,7 @@
 * `make all` builds and tests everything - a good general check
 * `make test` runs the full test suite and should always pass
 * `make check` runs assorted linters and should always pass
+* `make fuzz` runs each `Fuzz*` target for `FUZZTIME` (30s by default) - the decoders are what anyone on frequency can reach, so a new one deserves a target; its seed corpus runs as an ordinary test under `make test` either way
 * `make fix` will attempt assorted auto-fixes and also do a partial lint run and is worth running after every change
 * Claude Code on the web sessions run `.claude/hooks/session-start.sh`, which does `make setup` and a little container-specific fixing-up, so a fresh session can build, test and lint without further ceremony
 

@@ -225,3 +225,48 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
 }
+
+// A Mic-E destination is really a latitude of six digits, but a lenient parse
+// - what the APRS-IS input and samoyed-decode_aprs both use - will accept a
+// shorter one, which used to be read off the end of the address.
+func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25_from_text("Q1TEST>0:'0000000000000000000", addrLenient)
+	assert.NotNil(t, pp)
+
+	// Must not panic, and must not claim a position it never read.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "MIC-E", A.g_data_type_desc)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
+}
+
+// A course and speed extension can be the whole of the information field,
+// with nothing after it - and then there is no bearing and no NRQ to look at.
+func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25_from_text("Q1TEST>APDW17:!0000.00N/00000.00W/000/000", addrLenient)
+	assert.NotNil(t, pp)
+
+	// Must not panic, and the course and speed still decode.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, maybe.Just(0.0), A.g_course)
+	assert.Equal(t, maybe.Just(0.0), A.g_speed_mph)
+	assert.Empty(t, A.g_comment)
+}
+
+// User-defined data is a user ID and a type after the "{", and an information
+// field that stops before them is user-defined data we know nothing about
+// rather than something to read off the end of.
+func Test_decode_aprs_user_defined_without_id(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25_from_text("Q1TEST>APDW17:{", addrLenient)
+	assert.NotNil(t, pp)
+
+	// Must not panic.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "User-Defined Data", A.g_data_type_desc)
+}

@@ -1,5 +1,7 @@
 package direwolf
 
+import "github.com/sirupsen/logrus"
+
 /*--------------------------------------------------------------------------------
  *
  * Purpose:	Functions dealing with the payload.
@@ -142,7 +144,13 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 
 		encoded_length += ipp.large_block_size
 
-		var parity = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
+		var parity, err = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
+		if err != nil {
+			logrus.WithError(err).Error("Cannot encode an IL2P payload block")
+
+			return nil, -1
+		}
+
 		pout = append(pout, parity...)
 
 		encoded_length += ipp.parity_symbols_per_block
@@ -157,7 +165,13 @@ func il2p_encode_payload(payload []byte, max_fec int) ([]byte, int) {
 		pin = pin[ipp.small_block_size:]
 		encoded_length += ipp.small_block_size
 
-		var parity = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
+		var parity, err = il2p_encode_rs(scram, ipp.parity_symbols_per_block)
+		if err != nil {
+			logrus.WithError(err).Error("Cannot encode an IL2P payload block")
+
+			return nil, -1
+		}
+
 		pout = append(pout, parity...)
 
 		encoded_length += ipp.parity_symbols_per_block

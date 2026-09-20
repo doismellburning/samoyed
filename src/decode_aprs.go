@@ -1325,6 +1325,19 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
+	/* Trailing spaces are trimmed off the address, so a destination that is */
+	/* not really a latitude can be shorter than the six digits we read. */
+
+	const mic_e_dest_len = 6
+	if len(dest) < mic_e_dest_len {
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("MIC-E destination \"%s\" must have %d characters to hold a latitude.\n", dest, mic_e_dest_len)
+		}
+
+		return
+	}
+
 	var std_msg = 0
 	var cust_msg = 0
 	var lat = float64(mic_e_digit(A, dest[0], 4, &std_msg, &cust_msg)*10+
@@ -2580,7 +2593,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 	} else if bytes.HasPrefix(info, []byte("{mc")) || // Historical.
 		bytes.HasPrefix(info, []byte("{DM")) { // Official after registering {D*
 		aprs_morse_code(A, info)
-	} else if info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
+	} else if len(info) >= 3 && info[0] == '{' && info[1] == USER_DEF_USER_ID && info[2] == USER_DEF_TYPE_AIS {
 		var aisData, aisErr = ais.Parse(string(info[3:]))
 		if aisErr != nil {
 			if !A.g_quiet {
@@ -3838,8 +3851,12 @@ func data_extension_comment(A *decode_aprs_t, pdext []byte) bool { //nolint:unpa
 
 		/* Bearing and Number/Range/Quality? */
 
-		if pdext[7] == '/' && pdext[11] == '/' {
-			process_comment(A, pdext[7+8:])
+		/* That is another 8 characters after the course and speed, so */
+		/* an extension with nothing after the speed has neither. */
+
+		const bearing_nrq_len = 7 + 8
+		if len(pdext) >= bearing_nrq_len && pdext[7] == '/' && pdext[11] == '/' {
+			process_comment(A, pdext[bearing_nrq_len:])
 		} else {
 			process_comment(A, pdext[7:])
 		}
