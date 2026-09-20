@@ -2428,7 +2428,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 	after = bytes.TrimSpace(after)
 
 	var parts = bytes.Split(after, []byte{','})
-	if len(parts) != 3 {
+	if len(parts) == 3 {
 		var lat, latErr = strconv.ParseFloat(string(parts[0]), 64)
 
 		if latErr != nil || lat < -90 || lat > 90 {
@@ -2451,7 +2451,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 			return
 		}
 
-		var radius, radiusErr = strconv.ParseFloat(string(parts[1]), 64)
+		var radius, radiusErr = strconv.ParseFloat(string(parts[2]), 64)
 
 		if radiusErr != nil || radius <= 0 || radius > 9999 {
 			if !A.g_quiet {
