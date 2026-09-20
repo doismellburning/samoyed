@@ -628,8 +628,6 @@ func (ts *TelemetryState) telemetry_bit_sense_message(station string, msg string
  *--------------------------------------------------------------------*/
 
 func t_data_process(pm *t_metadata_s, seq maybe.Maybe[int], araw [T_NUM_ANALOG]maybe.Maybe[float64], ndp [T_NUM_ANALOG]int, draw [T_NUM_DIGITAL]maybe.Maybe[int]) string {
-	Assert(pm != nil)
-
 	var output strings.Builder
 
 	if len(pm.project) > 0 {

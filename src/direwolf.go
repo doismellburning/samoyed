@@ -616,6 +616,12 @@ x = Silence FX.25 information.`)
 	 */
 	deviceIDData = NewDeviceIDData()
 
+	var adevErr = audio_config.adev[0].validate()
+	if adevErr != nil {
+		logrus.WithError(adevErr).Error("Unusable audio device configuration")
+		os.Exit(1)
+	}
+
 	var err = audio_open(ctx, audio_config)
 	if err < 0 {
 		text_color_set(DW_COLOR_ERROR)
@@ -653,18 +659,6 @@ x = Silence FX.25 information.`)
 	 */
 	gen_tone_init(audio_config, audio_amplitude, false)
 	morse_init(audio_config, audio_amplitude)
-
-	if audio_config.adev[0].bits_per_sample != 8 && audio_config.adev[0].bits_per_sample != 16 {
-		panic("audio_config.adev[0].bits_per_sample == 8 || audio_config.adev[0].bits_per_sample == 16")
-	}
-
-	if audio_config.adev[0].num_channels != 1 && audio_config.adev[0].num_channels != 2 {
-		panic("assert(audio_config.adev[0].num_channels == 1 || audio_config.adev[0].num_channels == 2)")
-	}
-
-	if audio_config.adev[0].samples_per_sec < MIN_SAMPLES_PER_SEC || audio_config.adev[0].samples_per_sec > MAX_SAMPLES_PER_SEC {
-		panic("assert(audio_config.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && audio_config.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
-	}
 
 	/*
 	 * Initialize the transmit queue.

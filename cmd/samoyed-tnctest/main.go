@@ -656,9 +656,12 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 			}
 
 			if result == "Not while connected" {
-				// Not expecting this.
-				// What to do?
-				panic("???")
+				// Not expecting this: we track the connection state from the
+				// TNC's own "*** CONNECTED" and "*** DISCONNECTED" lines, so
+				// the two have got out of step and the run is not testing what
+				// it thinks it is.
+				panic(fmt.Sprintf("TNC %d refused a command as \"Not while connected\", but we think it is %s",
+					my_index, map[int]string{0: "disconnected", 1: "connected"}[is_connected[my_index]]))
 			}
 
 			process_rec_data(my_index, result)

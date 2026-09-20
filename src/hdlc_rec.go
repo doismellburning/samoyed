@@ -83,7 +83,6 @@ type HDLCReceiver struct {
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 	audio         *audio_s
-	wasInit       bool
 
 	// Own copy of random number generator so we can get
 	// same predictable results on different operating systems.
@@ -122,7 +121,6 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
-	Assert(pa != nil)
 
 	var r = new(HDLCReceiver)
 	r.audio = pa
@@ -131,8 +129,6 @@ func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
 	for ch := range MAX_RADIO_CHANS {
 		if pa.chan_medium[ch] == MEDIUM_RADIO {
 			r.numSubchannel[ch] = pa.achan[ch].num_subchan
-
-			Assert(r.numSubchannel[ch] >= 1 && r.numSubchannel[ch] <= MAX_SUBCHANS)
 
 			for sub := range r.numSubchannel[ch] {
 				for slice := range MAX_SLICERS {
@@ -143,8 +139,6 @@ func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
 	}
 
 	hdlc_rec2_init(pa)
-
-	r.wasInit = true
 
 	return r
 }
@@ -322,7 +316,6 @@ Case 3: Slice 6 is a mismatch (EAs vs. EAS).
 	2 & 4 don't match either (012141 vs. 012101).
 	We have another case where no two match so there is no clear winner.
 
-
 	reject 5 invalid character = ZCZC-EAS-RWT-012057-012081-012101-012103-012115+▒
 	frame_buf 7 = ZCZC-EAS-RST-012057-012081-012101-012103-012115+0030-2780415-WTSP/TV-
 	frame_buf 6 = ZCZC-EAs-RWT-012057-012081-012101-012103-012115+0030-2780415-WTSP/TV-
@@ -392,12 +385,6 @@ func (r *HDLCReceiver) RecBit(channel int, subchannel int, slice int, raw int, i
 func (r *HDLCReceiver) RecBitNew(channel int, subchannel int, slice int, _raw int, is_scrambled bool, not_used_remove int,
 	pll_nudge_total *int64, pll_symbol_count *int) {
 	var raw = _raw != 0
-
-	Assert(r.wasInit)
-
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
 
 	// -e option can be used to artificially introduce the desired
 	// Bit Error Rate (BER) for testing.
@@ -701,11 +688,6 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
  *--------------------------------------------------------------------*/
 
 func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state int) {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel <= MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
-	Assert(state == 0 || state == 1)
-
 	/*
 		#if DEBUG3
 			text_color_set(DW_COLOR_DEBUG);
@@ -760,8 +742,6 @@ func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state i
  *--------------------------------------------------------------------*/
 
 func (r *HDLCReceiver) DataDetectAny(channel int) int {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
 	for sc := range r.numSubchannel[channel] {
 		if slices.Contains(r.compositeDCD[channel][sc][:], true) {
 			return (1)

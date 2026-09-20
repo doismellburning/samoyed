@@ -253,9 +253,6 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 
 	if repeater == mycall_rec {
 		var result = ax25_dup(pp)
-		if result == nil {
-			panic("assert (result != nil)")
-		}
 
 		/* If using multiple radio channels, they could have different calls. */
 
@@ -271,9 +268,6 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 	if has_alias {
 		if alias.MatchString(repeater) {
 			var result = ax25_dup(pp)
-			if result == nil {
-				panic("assert (result != nil)")
-			}
 
 			ax25_set_addr(result, r, mycall_xmit)
 			ax25_set_h(result, r)

@@ -203,8 +203,6 @@ const AX25_PID_ESCAPE_CHARACTER = 0xff
 
 const AX25_ALEVEL_TO_TEXT_SIZE = 40 // overkill but safe.
 
-const MAGIC = 0x41583235
-
 /*
 * The 7th octet of each address contains:
  *
@@ -236,8 +234,6 @@ const SSID_SSID_SHIFT = 1
 const SSID_LAST_MASK = 0x01
 
 type packet_t struct {
-	magic1 int /* for error checking. */
-
 	seq int /* unique sequence number for debugging. */
 
 	release_time time.Time /* When to release from the SATgate mode delay queue. */
@@ -264,8 +260,6 @@ type packet_t struct {
 
 	frame_data [AX25_MAX_PACKET_LEN + 1]byte
 	/* Raw frame contents, without the CRC. */
-
-	magic2 int /* Will get stomped on if above overflows. */
 }
 
 type cmdres_t int
@@ -377,11 +371,7 @@ func ax25_new() *packet_t {
 
 	var this_p = new(packet_t)
 
-	Assert(this_p != nil)
-
-	this_p.magic1 = MAGIC
 	this_p.seq = int(seq)
-	this_p.magic2 = MAGIC
 	this_p.num_addr = (-1)
 
 	return (this_p)
@@ -739,7 +729,6 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 
 func ax25_dup(copy_from *packet_t) *packet_t {
 	var this_p = ax25_new()
-	Assert(this_p != nil)
 
 	var save_seq = this_p.seq
 
@@ -1062,8 +1051,6 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_addr(this_p *packet_t, n int, ad string) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < AX25_MAX_ADDRS)
 
 	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
@@ -1140,8 +1127,6 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *------------------------------------------------------------------------------*/
 
 func ax25_insert_addr(this_p *packet_t, n int, ad string) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
 
 	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
@@ -1217,8 +1202,6 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *------------------------------------------------------------------------------*/
 
 func ax25_remove_addr(this_p *packet_t, n int) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
 
 	/* Shift those beyond to fill this position. */
@@ -1258,9 +1241,6 @@ func ax25_remove_addr(this_p *packet_t, n int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_num_addr(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	/* Use cached value if already set. */
 
 	if this_p.num_addr >= 0 {
@@ -1302,9 +1282,6 @@ func ax25_get_num_addr(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_num_repeaters(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if this_p.num_addr >= 2 {
 		return this_p.num_addr - 2
 	}
@@ -1336,9 +1313,6 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if n < 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
@@ -1411,9 +1385,6 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if n < 0 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error detected in ax25_get_addr_no_ssid.\n")
@@ -1466,9 +1437,6 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_ssid(this_p *packet_t, n int) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
 	} else {
@@ -1497,9 +1465,6 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if n >= 0 && n < this_p.num_addr {
 		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(byte(SSID_SSID_MASK))) |
 			byte((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
@@ -1527,8 +1492,6 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_h(this_p *packet_t, n int) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < this_p.num_addr)
 
 	if n >= 0 && n < this_p.num_addr {
@@ -1559,9 +1522,6 @@ func ax25_get_h(this_p *packet_t, n int) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_h(this_p *packet_t, n int) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if n >= 0 && n < this_p.num_addr {
 		this_p.frame_data[n*7+6] |= SSID_H_MASK
 	} else {
@@ -1587,9 +1547,6 @@ func ax25_set_h(this_p *packet_t, n int) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_heard(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	var result = AX25_SOURCE
 
 	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
@@ -1618,9 +1575,6 @@ func ax25_get_heard(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_first_not_repeated(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	for i := AX25_REPEATER_1; i < ax25_get_num_addr(this_p); i++ {
 		if ax25_get_h(this_p, i) == 0 {
 			return i
@@ -1646,8 +1600,6 @@ func ax25_get_first_not_repeated(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_rr(this_p *packet_t, n int) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
 	Assert(n >= 0 && n < this_p.num_addr)
 
 	if n >= 0 && n < this_p.num_addr {
@@ -1677,9 +1629,6 @@ func ax25_get_rr(this_p *packet_t, n int) int {
  *------------------------------------------------------------------------------*/
 
 func AX25GetInfo(this_p *packet_t) []byte {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if this_p.num_addr >= 2 {
 		/* AX.25 */
 		/* The shortest frame we accept is addresses plus a control byte, with */
@@ -1730,9 +1679,6 @@ func ax25_set_info(this_p *packet_t, new_info []byte) {
  *------------------------------------------------------------------------------*/
 
 func ax25_cut_at_crlf(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	var info = AX25GetInfo(this_p)
 
 	for j, b := range info {
@@ -1763,9 +1709,6 @@ func ax25_cut_at_crlf(this_p *packet_t) int {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_dti(this_p *packet_t) byte {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if this_p.num_addr >= 2 {
 		var info = AX25GetInfo(this_p)
 		if len(info) > 0 {
@@ -1791,9 +1734,6 @@ func ax25_get_dti(this_p *packet_t) byte {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	this_p.nextp = next_p
 }
 
@@ -1810,9 +1750,6 @@ func ax25_set_nextp(this_p *packet_t, next_p *packet_t) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_nextp(this_p *packet_t) *packet_t {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	return (this_p.nextp)
 }
 
@@ -1829,9 +1766,6 @@ func ax25_get_nextp(this_p *packet_t) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	this_p.release_time = release_time
 }
 
@@ -1844,9 +1778,6 @@ func ax25_set_release_time(this_p *packet_t, release_time time.Time) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_release_time(this_p *packet_t) time.Time {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	return (this_p.release_time)
 }
 
@@ -1859,9 +1790,6 @@ func ax25_get_release_time(this_p *packet_t) time.Time {
  *------------------------------------------------------------------------------*/
 
 func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	this_p.modulo = modulo
 }
 
@@ -1877,9 +1805,6 @@ func ax25_set_modulo(this_p *packet_t, modulo ax25_modulo_t) {
  *------------------------------------------------------------------------------*/
 
 func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	return (this_p.modulo)
 }
 
@@ -1914,9 +1839,6 @@ func ax25_get_modulo(this_p *packet_t) ax25_modulo_t {
 // TODO: max len for result.  buffer overflow?
 
 func AX25FormatAddrs(this_p *packet_t) string {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	/* New in 0.9. */
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
@@ -1976,9 +1898,6 @@ func AX25FormatAddrs(this_p *packet_t) string {
  *------------------------------------------------------------------*/
 
 func ax25_format_via_path(this_p *packet_t) string {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	/* Don't get upset if no addresses.  */
 	/* This will allow packets that do not comply to AX.25 format. */
 
@@ -2016,9 +1935,6 @@ func ax25_format_via_path(this_p *packet_t) string {
  *------------------------------------------------------------------*/
 
 func AX25Pack(this_p *packet_t) []byte {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
 	var result = make([]byte, this_p.frame_len)
@@ -2060,9 +1976,6 @@ func ax25_frame_type_only(this_p *packet_t) ax25_frame_type_t {
 }
 
 func ax25_frame_type(this_p *packet_t) (cr cmdres_t, desc string, pf int, nr int, ns int, frameType ax25_frame_type_t) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	desc = "????"
 	cr = cr_11
 	pf = -1
@@ -2440,9 +2353,6 @@ func ax25_hex_dump(this_p *packet_t) {
  *------------------------------------------------------------------*/
 
 func ax25_is_aprs(this_p *packet_t) bool {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if this_p.frame_len == 0 {
 		return false
 	}
@@ -2472,9 +2382,6 @@ func ax25_is_aprs(this_p *packet_t) bool {
  *------------------------------------------------------------------*/
 
 func ax25_is_null_frame(this_p *packet_t) bool {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	var is_null = this_p.frame_len == 0
 
 	return is_null
@@ -2495,9 +2402,6 @@ func ax25_is_null_frame(this_p *packet_t) bool {
 *------------------------------------------------------------------*/
 
 func ax25_get_control(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if this_p.frame_len == 0 {
 		return -1
 	}
@@ -2510,9 +2414,6 @@ func ax25_get_control(this_p *packet_t) int {
 }
 
 func ax25_get_c2(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	if this_p.frame_len == 0 {
 		return (-1)
 	}
@@ -2547,9 +2448,6 @@ func ax25_get_c2(this_p *packet_t) int {
  *------------------------------------------------------------------*/
 
 func ax25_set_pid(this_p *packet_t, pid byte) {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	// Some applications set this to 0 which is an error.
 	// Change 0 to 0xF0 meaning no layer 3 protocol.
 
@@ -2596,9 +2494,6 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
  *------------------------------------------------------------------*/
 
 func ax25_get_pid(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	// TODO: handle 2 control byte case.
 	// TODO: sanity check: is it I or UI frame?
 
@@ -2627,18 +2522,12 @@ func ax25_get_pid(this_p *packet_t) int {
  *------------------------------------------------------------------*/
 
 func ax25_get_frame_len(this_p *packet_t) int {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	Assert(this_p.frame_len >= 0 && this_p.frame_len <= AX25_MAX_PACKET_LEN)
 
 	return (this_p.frame_len)
 } /* end ax25_get_frame_len */
 
 func ax25_get_frame_data(this_p *packet_t) []byte {
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	return this_p.frame_data[:this_p.frame_len]
 } /* end ax25_get_frame_data_ptr */
 

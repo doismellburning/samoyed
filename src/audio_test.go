@@ -577,3 +577,39 @@ func Test_audio_transmit_available(t *testing.T) {
 		assert.False(t, audio_transmit_available(MAX_ADEVS))
 	})
 }
+
+// Regression test for #671: an unusable sound device setting used to be an
+// assert whose message was the C boolean expression that failed, so a bad
+// ACHANNELS or ARATE gave a stack trace rather than a sentence naming the
+// directive.
+func Test_adev_param_validate(t *testing.T) {
+	var good = new(adev_param_s)
+	good.bits_per_sample = DEFAULT_BITS_PER_SAMPLE
+	good.num_channels = DEFAULT_NUM_CHANNELS
+	good.samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+
+	require.NoError(t, good.validate())
+
+	for _, bits := range []int{0, 1, 12, 24, 32} {
+		var adev = *good
+		adev.bits_per_sample = bits
+		require.ErrorContains(t, adev.validate(), "bits per audio sample")
+	}
+
+	for _, channels := range []int{-1, 0, 3, MAX_ADEVS + 1} {
+		var adev = *good
+		adev.num_channels = channels
+		require.ErrorContains(t, adev.validate(), "ACHANNELS")
+	}
+
+	for _, rate := range []int{0, MIN_SAMPLES_PER_SEC - 1, MAX_SAMPLES_PER_SEC + 1} {
+		var adev = *good
+		adev.samples_per_sec = rate
+		require.ErrorContains(t, adev.validate(), "ARATE")
+	}
+
+	// The message says what it will take, not which expression failed.
+	var adev = *good
+	adev.num_channels = 3
+	require.EqualError(t, adev.validate(), "number of audio channels (ACHANNELS) must be 1 or 2, not 3")
+}

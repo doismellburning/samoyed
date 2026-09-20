@@ -94,7 +94,6 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int, sink fx25_fr
 
 		F = new(fx_context_s)
 		fx_context[channel][subchannel][slice] = F
-		Assert(F != nil)
 	}
 
 	// State machine to identify correlation tag then gather appropriate number of data and check bytes.

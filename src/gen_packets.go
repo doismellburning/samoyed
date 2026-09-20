@@ -58,6 +58,7 @@ import (
 	"strings"
 
 	"github.com/doismellburning/samoyed/internal/wavwrite"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -486,6 +487,12 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		os.Exit(1)
 	}
 
+	var adevErr = modem.adev[0].validate()
+	if adevErr != nil {
+		logrus.WithError(adevErr).Error("Unusable audio device configuration")
+		os.Exit(1)
+	}
+
 	var err = audio_file_open(*outputFile, &modem)
 
 	if err < 0 {
@@ -503,18 +510,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	FX25Init(1)
 	il2p_init(0) // There are no "-d" options so far but it could be handy here.
-
-	if modem.adev[0].bits_per_sample != 8 && modem.adev[0].bits_per_sample != 16 {
-		panic("assert(modem.adev[0].bits_per_sample == 8 || modem.adev[0].bits_per_sample == 16)")
-	}
-
-	if modem.adev[0].num_channels != 1 && modem.adev[0].num_channels != 2 {
-		panic("assert(modem.adev[0].num_channels == 1 || modem.adev[0].num_channels == 2)")
-	}
-
-	if modem.adev[0].samples_per_sec < MIN_SAMPLES_PER_SEC || modem.adev[0].samples_per_sec > MAX_SAMPLES_PER_SEC {
-		panic("assert(modem.adev[0].samples_per_sec >= MIN_SAMPLES_PER_SEC && modem.adev[0].samples_per_sec <= MAX_SAMPLES_PER_SEC)")
-	}
 
 	/*
 	 * Get user packets(s) from file or stdin if specified.

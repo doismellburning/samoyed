@@ -115,6 +115,31 @@ type adev_param_s struct {
 
 }
 
+// validate reports a sound device configuration that the tone generator, the
+// demodulators and the .WAV writer cannot work with.
+//
+// Each of these settings is checked where it is read, so reaching here with a
+// bad one means something downstream of that - a device copied from another
+// with ADEVICE's copy_from, a default that never got filled in - has gone
+// wrong.  Dire Wolf asserted them, which aborts with a C boolean expression
+// for a message; say which setting it is and what is accepted instead.
+func (adev *adev_param_s) validate() error {
+	if adev.bits_per_sample != 8 && adev.bits_per_sample != 16 {
+		return fmt.Errorf("bits per audio sample (-b) must be 8 or 16, not %d", adev.bits_per_sample)
+	}
+
+	if adev.num_channels != 1 && adev.num_channels != 2 {
+		return fmt.Errorf("number of audio channels (ACHANNELS) must be 1 or 2, not %d", adev.num_channels)
+	}
+
+	if adev.samples_per_sec < MIN_SAMPLES_PER_SEC || adev.samples_per_sec > MAX_SAMPLES_PER_SEC {
+		return fmt.Errorf("audio sample rate (ARATE) must be in the range %d - %d, not %d",
+			MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC, adev.samples_per_sec)
+	}
+
+	return nil
+}
+
 type modem_t int
 
 const (

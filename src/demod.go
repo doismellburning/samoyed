@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/sirupsen/logrus"
 )
 
 var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.h
@@ -63,6 +64,28 @@ func demod_psk_force_no_decimation(channel int) {
  *		anything crazy.
  *
  *----------------------------------------------------------------*/
+
+// capProfiles limits a channel's demodulator types to the number of
+// demodulators there is room for.  Each letter is a demodulator of its own and
+// demodulator_state is a fixed MAX_SUBCHANS wide, so a longer list would run
+// off the end of it - which Dire Wolf left to an assert over the subchannel
+// index, taking the whole program down at startup.  Say which channel asked
+// for what instead, and use as many as there are.
+func capProfiles(channel int, profiles string) string {
+	if len(profiles) <= MAX_SUBCHANS {
+		return profiles
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"channel":   channel,
+		"profiles":  profiles,
+		"requested": len(profiles),
+		"available": MAX_SUBCHANS,
+		"using":     profiles[:MAX_SUBCHANS],
+	}).Error("More demodulator types than there are demodulators")
+
+	return profiles[:MAX_SUBCHANS]
+}
 
 func demod_init(pa *audio_s) {
 	/*
@@ -155,13 +178,18 @@ func demod_init(pa *audio_s) {
 				 */
 				if num_letters == 0 {
 					just_letters = "A"
-					num_letters = 1
 
 					if have_plus != -1 {
 						have_plus = 1 // Add as default for version 1.2
 						// If not explicitly turned off.
 					}
 				}
+
+				// The default above and the cap below both change just_letters,
+				// so take the count from it once they are both done rather than
+				// keeping the two in step by hand.
+				just_letters = capProfiles(channel, just_letters)
+				num_letters = len(just_letters)
 
 				/*
 				 * Special case for ARM.
@@ -468,6 +496,7 @@ func demod_init(pa *audio_s) {
 					//#endif
 				}
 
+				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
 				demod_psk_force_no_decimation(channel)
@@ -532,6 +561,7 @@ func demod_init(pa *audio_s) {
 					//#endif
 				}
 
+				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
 				demod_psk_force_no_decimation(channel)
@@ -585,6 +615,7 @@ func demod_init(pa *audio_s) {
 					save_audio_config_p.achan[channel].profiles = "LMNO"
 				}
 
+				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
 				demod_psk_force_no_decimation(channel)

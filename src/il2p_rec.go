@@ -79,8 +79,6 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 
 		F = new(il2p_context_s)
 		il2p_context[channel][subchannel][slice] = F
-
-		Assert(F != nil)
 	}
 
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
