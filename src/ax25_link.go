@@ -224,10 +224,6 @@ const (
 	state_5_awaiting_v22_connection dlsm_state_e = 5
 )
 
-const MAGIC1 = 0x11592201
-const MAGIC2 = 0x02221201
-const MAGIC3 = 0x03331301
-
 const OWNCALL = AX25_SOURCE
 
 // addrs[OWNCALL] is owncall for this end of link.
@@ -259,8 +255,6 @@ const mdl_state_0_ready mdl_state_e = 0
 const mdl_state_1_negotiating mdl_state_e = 1
 
 type ax25_dlsm_t struct {
-	magic1 int // Look out for bad pointer or corruption.
-
 	next *ax25_dlsm_t // Next in linked list.
 
 	stream_id int // Unique number for each stream.
@@ -430,13 +424,9 @@ type ax25_dlsm_t struct {
 	// Indexed by N(S) in case it gets lost and needs to be sent again.
 	// Cleared out when we get ACK for it.
 
-	magic3 int // Look out for out of bounds for above.
-
 	rxdata_by_ns [128]*cdata_t // "Receive buffer"
 	// Data which has been received out of sequence.
 	// Indexed by N(S).
-
-	magic2 int // Look out for out of bounds for above.
 
 	// "Management Data Link"  (MDL) state machine for XID exchange.
 
@@ -476,14 +466,11 @@ var list_head *ax25_dlsm_t
  * Registered callsigns for incoming connections.
  */
 
-const RC_MAGIC = 0x08291951
-
 type reg_callsign_t struct {
 	callsign string
 	channel  int
 	client   int
 	next     *reg_callsign_t
-	magic    int
 }
 
 var reg_callsign_list *reg_callsign_t
@@ -748,7 +735,6 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 
 	var p = new(ax25_dlsm_t)
 
-	p.magic1 = MAGIC1
 	p.start_time = time.Now()
 	p.stream_id = next_stream_id
 	next_stream_id++
@@ -780,9 +766,6 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 
 	p.state = state_0_disconnected
 	p.t1_remaining_when_last_stopped = -999 // Invalid, don't use.
-
-	p.magic2 = MAGIC2
-	p.magic3 = MAGIC3
 
 	// No need for critical region because this should all be in one thread.
 	p.next = list_head
@@ -1386,7 +1369,6 @@ func dl_register_callsign(E *dlq_item_t) {
 	r.channel = E._chan
 	r.client = E.client
 	r.next = reg_callsign_list
-	r.magic = RC_MAGIC
 
 	reg_callsign_list = r
 } /* end dl_register_callsign */
@@ -1401,8 +1383,6 @@ func dl_unregister_callsign(E *dlq_item_t) {
 
 	var r = reg_callsign_list
 	for r != nil {
-		Assert(r.magic == RC_MAGIC)
-
 		if r.callsign == E.addrs[0] && r.channel == E._chan && r.client == E.client {
 			if r == reg_callsign_list {
 				reg_callsign_list = r.next
@@ -1570,9 +1550,6 @@ func dl_client_cleanup(E *dlq_item_t) {
 	var S = list_head
 	for S != nil {
 		// Look for corruption or double freeing.
-		Assert(S.magic1 == MAGIC1)
-		Assert(S.magic2 == MAGIC2)
-		Assert(S.magic3 == MAGIC3)
 
 		if S.client == E.client {
 			if s_debug_stats {
@@ -1630,10 +1607,6 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 			// Take S out of list.
 
-			S.magic1 = 0
-			S.magic2 = 0
-			S.magic3 = 0
-
 			if S == list_head { // first one on list.
 				list_head = S.next
 				S = list_head
@@ -1662,8 +1635,6 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 	var r = reg_callsign_list
 	for r != nil {
-		Assert(r.magic == RC_MAGIC)
-
 		if r.client == E.client {
 			if r == reg_callsign_list {
 				reg_callsign_list = r.next
@@ -2645,7 +2616,6 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		   	// use earlier technique of sending only needed SREJ for any second
 		   	// and later gaps in a single multiframe transmission.
 
-
 		   	  if (S.rxdata_by_ns[ns] != nil) {
 		   	    cdata_delete (S.rxdata_by_ns[ns]);
 		   	    S.rxdata_by_ns[ns] = nil;
@@ -2660,9 +2630,6 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		   	    AX25SafePrint (info_ptr, info_len, 1);
 		   	    dw_printf ("\"\n");
 		   	  }
-
-
-
 
 		   	  if (selective_reject_exception(S) == 0) {
 

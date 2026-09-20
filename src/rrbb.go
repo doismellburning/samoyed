@@ -26,8 +26,7 @@ var delete_count = 0
 const MAX_NUM_BITS = (MAX_FRAME_LEN * 8 * 6 / 5)
 
 type rrbb_t struct {
-	magic1 int
-	nextp  *rrbb_t /* Next pointer to maintain a queue. */
+	nextp *rrbb_t /* Next pointer to maintain a queue. */
 
 	channel    int /* Radio channel from which it was received. */
 	subchannel int /* Which modem when more than one per channel. */
@@ -42,8 +41,6 @@ type rrbb_t struct {
 	prev_descram  int  /* Previous descrambled bit. */
 
 	fdata [MAX_NUM_BITS]byte
-
-	magic2 int
 }
 
 /***********************************************************************************
@@ -77,11 +74,9 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
 
 	var result = new(rrbb_t)
 
-	result.magic1 = MAGIC1
 	result.channel = channel
 	result.subchannel = subchannel
 	result.slice = slice
-	result.magic2 = MAGIC2
 
 	new_count++
 
@@ -112,9 +107,6 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
  ***********************************************************************************/
 
 func rrbb_clear(b *rrbb_t, is_scrambled bool, descram_state int, prev_descram int) {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	Assert(prev_descram == 0 || prev_descram == 1)
 
 	b.nextp = nil
@@ -163,9 +155,6 @@ func rrbb_append_bit(b *rrbb_t, val byte) {
  ***********************************************************************************/
 
 func rrbb_chop8(b *rrbb_t) {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	if b.length >= 8 {
 		b.length -= 8
 	}
@@ -182,9 +171,6 @@ func rrbb_chop8(b *rrbb_t) {
  ***********************************************************************************/
 
 func rrbb_get_len(b *rrbb_t) int {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return b.length
 }
 
@@ -218,10 +204,6 @@ func rrbb_get_bit(b *rrbb_t, ind int) byte {
 //{
 //	unsigned int di, mi;
 //
-//	Assert (b != nil);
-//	Assert (b.magic1 == MAGIC1);
-//	Assert (b.magic2 == MAGIC2);
-//
 //	Assert (ind < b.len);
 //
 //	di = ind / SOI;
@@ -234,19 +216,17 @@ func rrbb_get_bit(b *rrbb_t, ind int) byte {
  *
  * Name:	rrbb_delete
  *
- * Purpose:	Free the storage associated with the bit array.
+ * Purpose:	Note that the caller is finished with a bit array.
  *
  * Inputs:	Handle for bit array.
  *
+ * Description:	Go's garbage collector does the freeing; all that is left to do
+ *		here is keep the count that rrbb_new compares against, so the
+ *		"MEMORY LEAK" warning still means something.
+ *
  ***********************************************************************************/
 
-func rrbb_delete(b *rrbb_t) {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
-	b.magic1 = 0
-	b.magic2 = 0
-
+func rrbb_delete(_ *rrbb_t) {
 	delete_count++
 }
 
@@ -262,9 +242,6 @@ func rrbb_delete(b *rrbb_t) {
  ***********************************************************************************/
 
 func rrbb_set_nextp(b *rrbb_t, np *rrbb_t) { //nolint:unused
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	b.nextp = np
 }
 
@@ -279,9 +256,6 @@ func rrbb_set_nextp(b *rrbb_t, np *rrbb_t) { //nolint:unused
  ***********************************************************************************/
 
 func rrbb_get_nextp(b *rrbb_t) *rrbb_t { //nolint:unused
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return (b.nextp)
 }
 
@@ -296,9 +270,6 @@ func rrbb_get_nextp(b *rrbb_t) *rrbb_t { //nolint:unused
  ***********************************************************************************/
 
 func rrbb_get_chan(b *rrbb_t) int {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	Assert(b.channel >= 0 && b.channel < MAX_RADIO_CHANS)
 
 	return (b.channel)
@@ -315,9 +286,6 @@ func rrbb_get_chan(b *rrbb_t) int {
  ***********************************************************************************/
 
 func rrbb_get_subchan(b *rrbb_t) int {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	Assert(b.subchannel >= 0 && b.subchannel < MAX_SUBCHANS)
 
 	return (b.subchannel)
@@ -334,9 +302,6 @@ func rrbb_get_subchan(b *rrbb_t) int {
  ***********************************************************************************/
 
 func rrbb_get_slice(b *rrbb_t) int {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	Assert(b.slice >= 0 && b.slice < MAX_SLICERS)
 
 	return (b.slice)
@@ -354,9 +319,6 @@ func rrbb_get_slice(b *rrbb_t) int {
  ***********************************************************************************/
 
 func rrbb_set_audio_level(b *rrbb_t, alevel ALevel) {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	b.alevel = alevel
 }
 
@@ -371,9 +333,6 @@ func rrbb_set_audio_level(b *rrbb_t, alevel ALevel) {
  ***********************************************************************************/
 
 func rrbb_get_audio_level(b *rrbb_t) ALevel {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return (b.alevel)
 }
 
@@ -389,9 +348,6 @@ func rrbb_get_audio_level(b *rrbb_t) ALevel {
  ***********************************************************************************/
 
 func rrbb_set_speed_error(b *rrbb_t, speed_error float64) {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	b.speed_error = speed_error
 }
 
@@ -408,9 +364,6 @@ func rrbb_set_speed_error(b *rrbb_t, speed_error float64) {
  ***********************************************************************************/
 
 func rrbb_get_speed_error(b *rrbb_t) float64 { //nolint:unused
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return (b.speed_error)
 }
 
@@ -427,9 +380,6 @@ func rrbb_get_speed_error(b *rrbb_t) float64 { //nolint:unused
  ***********************************************************************************/
 
 func rrbb_get_is_scrambled(b *rrbb_t) bool {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return (b.is_scrambled)
 }
 
@@ -444,9 +394,6 @@ func rrbb_get_is_scrambled(b *rrbb_t) bool {
  ***********************************************************************************/
 
 func rrbb_get_descram_state(b *rrbb_t) int {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return (b.descram_state)
 }
 
@@ -461,9 +408,6 @@ func rrbb_get_descram_state(b *rrbb_t) int {
  ***********************************************************************************/
 
 func rrbb_get_prev_descram(b *rrbb_t) int {
-	Assert(b.magic1 == MAGIC1)
-	Assert(b.magic2 == MAGIC2)
-
 	return (b.prev_descram)
 }
 

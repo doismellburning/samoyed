@@ -259,9 +259,6 @@ func ax25_u_frame(addrs [AX25_MAX_ADDRS]string, num_addr int, cr cmdres_t, ftype
 		}
 	}
 
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	return (this_p)
 } /* end ax25_u_frame */
 
@@ -395,9 +392,6 @@ func ax25_s_frame(
 		}
 	}
 
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
-
 	return (this_p)
 } /* end ax25_s_frame */
 
@@ -521,9 +515,6 @@ func ax25_i_frame(
 		copy(this_p.frame_data[this_p.frame_len:], info)
 		this_p.frame_len += len(info)
 	}
-
-	Assert(this_p.magic1 == MAGIC)
-	Assert(this_p.magic2 == MAGIC)
 
 	return (this_p)
 } /* end ax25_i_frame */
