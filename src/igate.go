@@ -494,7 +494,6 @@ func igate_send_rec_packet(channel int, recv_pp *packet_t) {
 	 */
 
 	var pp = ax25_dup(recv_pp)
-	Assert(pp != nil)
 
 	/*
 	 * Third party frames require special handling to unwrap payload.
@@ -1749,7 +1748,6 @@ func rx_to_ig_allow(pp *packet_t) bool {
 
 /*
 Here is another complete example, with the "-diii" debugging option to show details.
-
 
 We receive the signal directly from the source: (zzz.log 1011)
 

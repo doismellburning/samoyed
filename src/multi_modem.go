@@ -346,8 +346,6 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 		candidate[channel][subchan][slice].packet_p = nil
 	}
 
-	Assert(pp != nil)
-
 	candidate[channel][subchan][slice].packet_p = pp
 	candidate[channel][subchan][slice].alevel = alevel
 	candidate[channel][subchan][slice].fec_type = fec_type

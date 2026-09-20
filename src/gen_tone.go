@@ -501,7 +501,6 @@ func (tg *ToneGenerator) PutBit(dat int) {
 						//b = 1;		// 78 decoded with this.
 									// only 39 without.
 
-
 					      //float blended_i = new_i * b + old_i * (1.0f - b);
 					      //float blended_q = new_q * b + old_q * (1.0f - b);
 
@@ -576,8 +575,6 @@ func (tg *ToneGenerator) PutSample(sam int) {
 	/* 8 bit is unsigned, range 0 .. 255 */
 	var audioConfig = tg.audioConfig
 	var a = tg.adevIndex
-
-	Assert(audioConfig != nil)
 
 	Assert(audioConfig.adev[a].num_channels == 1 || audioConfig.adev[a].num_channels == 2)
 

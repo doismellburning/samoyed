@@ -122,7 +122,6 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
-	Assert(pa != nil)
 
 	var r = new(HDLCReceiver)
 	r.audio = pa
@@ -321,7 +320,6 @@ Case 3: Slice 6 is a mismatch (EAs vs. EAS).
 	Slice 7 has RST rather than RWT.
 	2 & 4 don't match either (012141 vs. 012101).
 	We have another case where no two match so there is no clear winner.
-
 
 	reject 5 invalid character = ZCZC-EAS-RWT-012057-012081-012101-012103-012115+▒
 	frame_buf 7 = ZCZC-EAS-RST-012057-012081-012101-012103-012115+0030-2780415-WTSP/TV-

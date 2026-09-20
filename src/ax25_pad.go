@@ -377,8 +377,6 @@ func ax25_new() *packet_t {
 
 	var this_p = new(packet_t)
 
-	Assert(this_p != nil)
-
 	this_p.magic1 = MAGIC
 	this_p.seq = int(seq)
 	this_p.magic2 = MAGIC
@@ -739,7 +737,6 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 
 func ax25_dup(copy_from *packet_t) *packet_t {
 	var this_p = ax25_new()
-	Assert(this_p != nil)
 
 	var save_seq = this_p.seq
 
