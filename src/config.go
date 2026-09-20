@@ -1556,9 +1556,7 @@ func handleADEVICE(ps *parseState) error {
 	if len(ps.keyword) >= 8 {
 		var i, iErr = strconv.Atoi(ps.keyword[7:])
 		if iErr != nil {
-			dw_printf("Config file: Could not parse ADEVICE number on line %d: %s.\n", ps.line, iErr)
-
-			return nil
+			return fmt.Errorf("config file: Could not parse ADEVICE number on line %d: %w", ps.line, iErr)
 		}
 
 		if i < 0 || i >= MAX_ADEVS {
@@ -2240,12 +2238,11 @@ func handleFIX_BITS(ps *parseState) error {
 	}
 
 	if ps.audio.achan[ps.channel].fix_bits > DEFAULT_FIX_BITS {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Line %d: Using a FIX_BITS value greater than %d is not recommended for normal operation.\n",
+		ps.warnf("line %d: Using a FIX_BITS value greater than %d is not recommended for normal operation.\n"+
+			"FIX_BITS > 1 was an interesting experiment but turned out to be a bad idea.\n"+
+			"Don't be surprised if it takes 100%% CPU, direwolf can't keep up with the audio stream,\n"+
+			"and you see messages like \"Audio input device 0 error code -32: Broken pipe\"",
 			ps.line, DEFAULT_FIX_BITS)
-		dw_printf("FIX_BITS > 1 was an interesting experiment but turned out to be a bad idea.\n")
-		dw_printf("Don't be surprised if it takes 100%% CPU, direwolf can't keep up with the audio stream,\n")
-		dw_printf("and you see messages like \"Audio input device 0 error code -32: Broken pipe\"\n")
 	}
 
 	t = split("", false)
@@ -2551,18 +2548,16 @@ func handlePTTDCDCON(ps *parseState) error {
 		}
 
 		if octrl.ptt_device == "" {
-			ps.errorf("config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s", ps.line,
-				ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 			/* TODO KG
 			#if __WIN32__
 				        dw_printf ("You must explicitly mention a HID path.\n");
 			#else
 			*/
-			dw_printf("You must explicitly mention a device name such as /dev/hidraw1.\n")
-			dw_printf("Run \"cm108\" utility to get a list.\n")
-			dw_printf("See Interface Guide for details.\n")
-
-			return nil
+			return fmt.Errorf("config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s\n"+
+				"You must explicitly mention a device name such as /dev/hidraw1.\n"+
+				"Run \"cm108\" utility to get a list.\n"+
+				"See Interface Guide for details",
+				ps.line, ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 		}
 
 		octrl.ptt_method = PTT_METHOD_CM108
@@ -2629,8 +2624,7 @@ func handlePTTDCDCON(ps *parseState) error {
 			/* Would not make sense to specify the same one twice. */
 
 			if octrl.ptt_line == octrl.ptt_line2 {
-				dw_printf("Config file line %d: Doesn't make sense to specify the some control line twice.\n",
-					ps.line)
+				ps.errorf("config file line %d: Doesn't make sense to specify the some control line twice", ps.line)
 			}
 		} /* end of second serial port control ps.line. */
 	} /* end of serial port case. */
@@ -4349,6 +4343,9 @@ func handleTTMACRO(ps *parseState) error {
 	if tt_error == 0 {
 		ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 	} else {
+		// Each of those errors was reported and counted as it was found, so
+		// this says what became of the line rather than being a complaint of
+		// its own.
 		dw_printf("Line %d: Errors found in TTMACRO, skipping.\n", ps.line)
 	}
 
@@ -4850,8 +4847,7 @@ func handleSATGATE(ps *parseState) error {
 	 *
 	 * SATGATE [ n ]
 	 */
-	text_color_set(DW_COLOR_INFO)
-	dw_printf("Line %d: SATGATE is pretty useless and will be removed in a future version.\n", ps.line)
+	ps.warnf("line %d: SATGATE is pretty useless and will be removed in a future version", ps.line)
 
 	var t = split("", false)
 	if t != "" {
@@ -5417,7 +5413,7 @@ func handleSMARTBEACON(ps *parseState) error {
 	 *
 	 * Parameters must be all or nothing.
 	 */
-	dw_printf("SMARTBEACONING support currently disabled due to mid-stage porting complexity - line %d skipped.\n", ps.line)
+	ps.errorf("SMARTBEACONING support currently disabled due to mid-stage porting complexity - line %d skipped", ps.line)
 
 	/* TODO KG
 	   #define SB_NUM(name,sbvar,minn,maxx,unit)  							\

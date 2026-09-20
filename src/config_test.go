@@ -5060,3 +5060,62 @@ func Test_config_init_unreadable_file_is_not_clean(t *testing.T) {
 	assert.Positive(t, c.errors, "config_init said:\n%s", c.output)
 	assert.Contains(t, c.output, "Could not read")
 }
+
+// --- diagnostics that used to print without being counted ---
+
+func Test_config_init_counts_every_diagnostic(t *testing.T) {
+	// Regression test: these were reported with a bare dw_printf rather than
+	// through the error path, so they printed and the tallies stayed where they
+	// were - and --config-check called the file clean while telling the reader
+	// something was wrong with it.
+	const clean = "ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 1200\n"
+
+	tests := []struct {
+		name         string
+		config       string
+		wantErrors   int
+		wantWarnings int
+		wantOutput   string
+	}{
+		{
+			name:         "an ADEVICE number that is not a number",
+			config:       "ADEVICEx plughw:1,0\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+			wantOutput:   "Could not parse ADEVICE number",
+		},
+		{
+			name:         "a directive that is not implemented and so is skipped",
+			config:       clean + "SMARTBEACONING 60 180 5 30 15 45 255\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+			wantOutput:   "SMARTBEACONING support currently disabled",
+		},
+		{
+			// The directive is obeyed, so the lecture that comes with it is
+			// advice and must not fail a config check.
+			name:         "a FIX_BITS setting above the default",
+			config:       clean + "FIX_BITS 2\n",
+			wantErrors:   0,
+			wantWarnings: 1,
+			wantOutput:   "is not recommended for normal operation",
+		},
+		{
+			name:         "a directive on its way out",
+			config:       clean + "SATGATE\n",
+			wantErrors:   0,
+			wantWarnings: 1,
+			wantOutput:   "will be removed in a future version",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c = parseConfig(t, tt.config)
+
+			assert.Contains(t, c.output, tt.wantOutput)
+			assert.Equal(t, tt.wantErrors, c.errors, "errors; config_init said:\n%s", c.output)
+			assert.Equal(t, tt.wantWarnings, c.warnings, "warnings; config_init said:\n%s", c.output)
+		})
+	}
+}
