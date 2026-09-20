@@ -68,10 +68,6 @@ type rrbb_t struct {
  ***********************************************************************************/
 
 func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram_state int, prev_descram int) *rrbb_t {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-	Assert(slice >= 0 && slice < MAX_SLICERS)
-
 	var result = new(rrbb_t)
 
 	result.channel = channel
@@ -270,8 +266,6 @@ func rrbb_get_nextp(b *rrbb_t) *rrbb_t { //nolint:unused
  ***********************************************************************************/
 
 func rrbb_get_chan(b *rrbb_t) int {
-	Assert(b.channel >= 0 && b.channel < MAX_RADIO_CHANS)
-
 	return (b.channel)
 }
 
@@ -286,8 +280,6 @@ func rrbb_get_chan(b *rrbb_t) int {
  ***********************************************************************************/
 
 func rrbb_get_subchan(b *rrbb_t) int {
-	Assert(b.subchannel >= 0 && b.subchannel < MAX_SUBCHANS)
-
 	return (b.subchannel)
 }
 
@@ -302,8 +294,6 @@ func rrbb_get_subchan(b *rrbb_t) int {
  ***********************************************************************************/
 
 func rrbb_get_slice(b *rrbb_t) int {
-	Assert(b.slice >= 0 && b.slice < MAX_SLICERS)
-
 	return (b.slice)
 }
 
