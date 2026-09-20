@@ -1,0 +1,135 @@
+#!/bin/bash -e
+
+# --config-check is a contract with scripts rather than with people: whatever it
+# prints, what a systemd ExecStartPre= or a CI job acts on is the exit status.
+# The Go tests cover the tallies; this covers what the process does with them,
+# and that it stops before wanting any hardware.
+
+source "$(dirname "$(realpath "$0")")/common"
+
+goto_tmpdir
+
+# Names an audio device that does not exist, so a run that gets as far as
+# opening one has not stopped where it should have.
+cat > clean.conf <<'EOF'
+ADEVICE plughw:99,0
+ACHANNELS 1
+CHANNEL 0
+MYCALL Q1TEST-1
+MODEM 1200
+AGWPORT 8000
+EOF
+
+# TXDELAY 3 is obeyed, and lectured about.  Advice is not grounds for refusing a
+# configuration that works.
+cat > warnings.conf <<'EOF'
+ADEVICE plughw:99,0
+ACHANNELS 1
+CHANNEL 0
+MYCALL Q1TEST-1
+MODEM 1200
+TXDELAY 3
+EOF
+
+cat > errors.conf <<'EOF'
+ADEVICE plughw:99,0
+ACHANNELS 1
+CHANNEL 0
+MYCALL Q1TEST-1
+NOSUCHKEYWORD 1
+AGWPORT notanumber
+EOF
+
+# ADEVICE with no device name leaves nothing to start up with, whatever else the
+# file says.
+cat > fatal.conf <<'EOF'
+ADEVICE
+NOSUCHKEYWORD 1
+EOF
+
+# timeout(1) is GNU coreutils, which a macOS base system does not have.  These
+# runs all exit promptly, so it is a backstop rather than a requirement: without
+# it a --config-check that stopped exiting would hang rather than fail, which is
+# worth having where the tool is to be had.
+limit=()
+if command -v timeout > /dev/null; then
+	limit=(timeout 30)
+elif command -v gtimeout > /dev/null; then
+	limit=(gtimeout 30)
+fi
+
+function status_of() {
+	local conf="$1"
+	shift
+
+	local status=0
+	${limit[@]+"${limit[@]}"} "$DIREWOLF" -c "$conf" -t 0 "$@" > "$conf.out" 2>&1 || status=$?
+
+	echo "$status"
+}
+
+function expect_status() {
+	local want="$1"
+	local got="$2"
+	local what="$3"
+
+	if [ "$got" != "$want" ]; then
+		echo "FAIL: $what: expected exit status $want, got $got"
+		cat "${4:-/dev/null}"
+		exit 1
+	fi
+
+	echo "ok: $what (exit $got)"
+}
+
+expect_status 0 "$(status_of clean.conf --config-check)" \
+	"a configuration with nothing wrong with it passes" clean.conf.out
+expect_status 0 "$(status_of warnings.conf --config-check)" \
+	"warnings alone do not fail the check" warnings.conf.out
+expect_status 1 "$(status_of errors.conf --config-check)" \
+	"errors fail the check" errors.conf.out
+expect_status 1 "$(status_of fatal.conf --config-check)" \
+	"an unusable configuration fails the check" fatal.conf.out
+expect_status 1 "$(status_of missing.conf --config-check)" \
+	"a configuration file that is not there fails the check" missing.conf.out
+
+function expect_output() {
+	local file="$1"
+	local want="$2"
+	local what="$3"
+
+	if ! grep -qF "$want" "$file"; then
+		echo "FAIL: $what: expected $file to contain:"
+		echo "    $want"
+		echo "but it says:"
+		cat "$file"
+		exit 1
+	fi
+
+	echo "ok: $what"
+}
+
+# Every problem, not just the first: two bad directives, two complaints.
+expect_output errors.conf.out "Unrecognized command 'NOSUCHKEYWORD'" \
+	"an unrecognised directive is reported"
+expect_output errors.conf.out "Invalid port number \"notanumber\" for AGWPORT command" \
+	"the directive after it is reported too, not just the first"
+expect_output errors.conf.out "2 errors, 0 warnings" \
+	"both are counted"
+
+expect_output clean.conf.out "no problems found" \
+	"a clean file says so rather than counting nothing"
+expect_output warnings.conf.out "0 errors, 1 warning" \
+	"warnings are counted apart from errors"
+
+# The check reads the file and stops.  plughw:99,0 is not there to be opened, so
+# a run that reached the audio device would have had plenty to say about it -
+# without --config-check the same file draws dozens of lines about ALSA.
+# -E because \| is a GNU extension that BSD grep does not read as alternation.
+if grep -qiE "audio|portaudio|alsa" clean.conf.out; then
+	echo "FAIL: --config-check went as far as the audio device"
+	cat clean.conf.out
+	exit 1
+fi
+
+echo "ok: --config-check stops before opening an audio device"
