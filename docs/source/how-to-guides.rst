@@ -326,3 +326,47 @@ neither ``TFEND`` nor ``TFESC``, a data frame too short to hold an AX.25
 header, and an address field whose end-of-address bit is in the wrong place are
 all reported rather than skipped.  The exit status is non-zero if anything was
 wrong, so it can be used as a check.
+
+Accept incoming connections (connected mode)
+---------------------------------------------
+
+Setting ``MYCALL`` does not make a station connectable.  ``MYCALL`` is the APRS
+identity - it is what beacons and digipeated frames are sent as - and the
+connected-mode link layer does not consult it at all.  A station with nothing
+but ``MYCALL`` configured ignores incoming connect requests, so the calling
+station retries until it gives up and reports something like "retry count
+exceeded", with nothing on this end to explain it.
+
+The link layer answers a SABM only for a callsign an AGW client has registered
+over the AGW port, with the protocol's ``'X'`` "Register CallSign" command.
+That is deliberate: a callsign nobody has claimed is not ours to answer for,
+and several TNCs can share a frequency, so replying - even with a DM - to a
+connect request addressed to another station would be wrong.  The connect
+request is now logged at ``Info`` when it happens:
+
+.. code::
+
+    level=info msg="Ignoring connect request - no client has registered this callsign" channel=0 destination=Q1TEST source=Q2TEST
+
+So to be connectable, run a client that registers the callsign.
+``samoyed-appserver`` is the worked example - a small application server that
+answers connections and responds to commands:
+
+.. code::
+
+    $ samoyed-appserver Q1TEST
+
+It attaches to the AGW port (``--hostname`` and ``--port``, defaulting to
+``localhost`` and ``8000``, so ``AGWPORT`` must not be disabled), asks the TNC
+what radio channels it has, and registers the callsign on each of them.  From
+then on a SABM addressed to ``Q1TEST`` on any channel gets a UA, and the
+connected station is talking to the appserver rather than to Samoyed itself.
+It is meant as a starting point for your own application; any AGW client that
+sends ``'X'`` will do, including ones written against `pyham_pe
+<https://github.com/mfncooper/pyham_pe>`__.
+
+A KISS client is a different matter entirely.  Linux AX.25, and anything else
+attached over KISS, runs its own link layer: it sees the raw frames and sends
+its own UA, so connected mode there is configured in that software and never
+reaches the path described above.  Registering a callsign over the AGW port
+has no bearing on it.
