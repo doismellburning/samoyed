@@ -9,8 +9,10 @@ package main
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	direwolf "github.com/doismellburning/samoyed/src"
@@ -46,12 +48,26 @@ func main() {
 	var cmd = "\r\rhbaud 9600\rkiss on\rrestart\r"
 	direwolf.SerialPortWrite(tnc, []byte(cmd))
 
-	var debug_gps = 0
-	direwolf.DWGPSInit(gpsSerialPort, debug_gps)
+	// GPS reading runs in a goroutine of its own, which this stops when the
+	// user interrupts us.  Taking the signal this way also takes away the
+	// default "an interrupt ends the process", so the loop below has to end
+	// on it too - and it then still leaves the TNC out of KISS mode.
+	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	direwolf.SLEEP_SEC(1) /* Wait for sample before reading. */
+	var debug_gps = 0
+	direwolf.DWGPSInit(ctx, gpsSerialPort, debug_gps)
+
+	// Wait for sample before reading.  An interrupt cuts the wait short, and
+	// the loop below then does nothing, so we carry on to leaving KISS mode
+	// rather than returning and abandoning the TNC in it.
+	_ = direwolf.SleepSecCtx(ctx, 1)
 
 	for range HOWLONG {
+		if ctx.Err() != nil {
+			break
+		}
+
 		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
 
 		// A fix is reported before the position fields are, so a receiver can
@@ -68,7 +84,9 @@ func main() {
 			fmt.Printf("GPS fix not available.\n")
 		}
 
-		direwolf.SLEEP_SEC(1)
+		if !direwolf.SleepSecCtx(ctx, 1) {
+			break
+		}
 	}
 
 	// Exit out of KISS mode.

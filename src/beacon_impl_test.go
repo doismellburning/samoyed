@@ -354,7 +354,7 @@ func Test_BeaconService_Start_no_goroutine_if_all_ignored(t *testing.T) {
 
 	var bs = &BeaconService{miscConfig: cfg} //nolint:exhaustruct_v5
 	// If there's no panic, the test passes — goroutine is not started.
-	bs.Start()
+	bs.Start(t.Context())
 }
 
 // SetDebug test

@@ -25,6 +25,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -81,7 +82,7 @@ var s_save_configp *misc_config_s
 
 var s_gpsnmea_port_fd *term.Term
 
-func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
+func dwgpsnmea_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
 	//dwgps_info_t info;
 	//int e;
 	s_debug = debug
@@ -104,7 +105,7 @@ func dwgpsnmea_init(pconfig *misc_config_s, debug int) int {
 	s_gpsnmea_port_fd = SerialPortOpen(pconfig.gpsnmea_port, pconfig.gpsnmea_speed)
 
 	if s_gpsnmea_port_fd != nil {
-		go read_gpsnmea_thread(s_gpsnmea_port_fd)
+		go read_gpsnmea_thread(ctx, s_gpsnmea_port_fd)
 	} else {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Could not open serial port %s for GPS receiver.\n", pconfig.gpsnmea_port)
@@ -143,7 +144,7 @@ func dwgpsnmea_get_fd(wp_port_name string, speed int) *term.Term {
 
 const TIMEOUT = 5
 
-func read_gpsnmea_thread(fd *term.Term) {
+func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 	// Maximum length of message from GPS receiver is 82 according to some people.
 	// Make buffer considerably larger to be safe.
 	const NMEA_MAX_LEN = 160
@@ -164,9 +165,18 @@ func read_gpsnmea_thread(fd *term.Term) {
 
 	var gps_msg string
 
-	for {
+	// As in kissserial_get, a cancellation is noticed between sentences
+	// rather than during one: the port is read directly rather than through
+	// something the runtime can interrupt, so closing it would not get this
+	// goroutine back - and this port can be shared with the waypoint sender
+	// (see dwgpsnmea_get_fd), which closes it in its own teardown.
+	for ctx.Err() == nil {
 		var ch, err = SerialPortGet1(fd)
 		if err != nil {
+			if ctx.Err() != nil {
+				return // We closed it ourselves on the way out.
+			}
+
 			/* This might happen if a USB  device is unplugged. */
 			/* I can't imagine anything that would cause it with */
 			/* a normal serial port. */

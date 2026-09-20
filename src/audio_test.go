@@ -357,7 +357,7 @@ func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
 
 	go func() {
 		defer close(done)
-		audioUDPSilenceKeepalive(0, stop)
+		audioUDPSilenceKeepalive(t.Context(), 0, stop)
 	}()
 
 	// Receive a chunk and verify it's frame-aligned and capped. The buffer
@@ -440,7 +440,7 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 	var pa = makeAudioConfig("stdin", "stdin")
 	var refsBefore = portaudioRefCount
 
-	require.Equal(t, 0, audio_open(pa))
+	require.Equal(t, 0, audio_open(t.Context(), pa))
 
 	assert.Nil(t, adev[0].outputStream)
 	assert.Nil(t, adev[0].udp_out_sock)
@@ -475,7 +475,7 @@ func Test_audioOpen_defaultedOutputDeviceMissing_isNotFatal(t *testing.T) {
 
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
 
-	require.Equal(t, 0, audio_open(pa))
+	require.Equal(t, 0, audio_open(t.Context(), pa))
 
 	assert.Nil(t, adev[0].outputStream)
 }
@@ -497,7 +497,7 @@ func Test_audioOpen_namedOutputDeviceMissing_isFatal(t *testing.T) {
 	var pa = makeAudioConfig("stdin", noSuchAudioDevice)
 	pa.adev[0].adevice_out_specified = true
 
-	assert.Equal(t, -1, audio_open(pa))
+	assert.Equal(t, -1, audio_open(t.Context(), pa))
 }
 
 // Naming standard input, or a UDP port to listen on, as the transmit device
@@ -516,7 +516,7 @@ func Test_audioOpen_namedOutputDeviceCannotTransmit_isFatal(t *testing.T) {
 	var pa = makeAudioConfig("stdin", "stdin")
 	pa.adev[0].adevice_out_specified = true
 
-	assert.Equal(t, -1, audio_open(pa))
+	assert.Equal(t, -1, audio_open(t.Context(), pa))
 }
 
 // --- applyCommandLineAudioSource ---

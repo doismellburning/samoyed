@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -130,15 +131,24 @@ func NewAXUDPBridge(maps []AXUDPMapEntry, udpConn *net.UDPConn) *AXUDPBridge {
 const maxUDPPayload = 65535
 
 // RunUDPListener reads incoming AXUDP datagrams and forwards them as KISS to
-// all clients.  It only returns on a read error, which means the socket is
-// broken and the UDP side of the bridge is now dead: the caller should report
-// the error and terminate so the process can be restarted, rather than
-// continuing silently with no incoming traffic.
-func (b *AXUDPBridge) RunUDPListener() error {
+// all clients, until ctx is cancelled.  It returns an error only on a read
+// error, which means the socket is broken and the UDP side of the bridge is
+// now dead: the caller should report the error and terminate so the process
+// can be restarted, rather than continuing silently with no incoming traffic.
+// A cancellation is not such a failure and returns nil.
+func (b *AXUDPBridge) RunUDPListener(ctx context.Context) error {
+	// The read below blocks until a datagram turns up, which may be never, so
+	// closing the socket is what gets us back when we are asked to stop.
+	defer closeOnDone(ctx, b.udpConn)()
+
 	var buf = make([]byte, maxUDPPayload)
-	for {
+	for ctx.Err() == nil {
 		var n, _, readErr = b.udpConn.ReadFromUDP(buf)
 		if readErr != nil {
+			if ctx.Err() != nil {
+				return nil // We closed it ourselves on the way out.
+			}
+
 			return fmt.Errorf("UDP listener: %w", readErr)
 		}
 
@@ -179,6 +189,8 @@ func (b *AXUDPBridge) RunUDPListener() error {
 		}
 		b.broadcastKISS(ax25frame)
 	}
+
+	return nil
 }
 
 // axudpAcceptBackoff is how long RunKISSServer waits after a failed accept
@@ -196,19 +208,29 @@ const axudpMaxAcceptBackoff = time.Second
 // is not the transient the backoff is there for.
 const axudpMaxAcceptFailures = 10
 
-// RunKISSServer accepts TCP connections from KISS clients on ln.  The caller
-// owns ln and is responsible for closing it.  It returns once ln is closed, or
-// once accepting has failed axudpMaxAcceptFailures times in a row; neither can
-// be recovered from, so the caller should report the error and terminate
-// rather than spinning on a broken socket.  An isolated accept failure is
-// reported and retried after a backoff.
-func (b *AXUDPBridge) RunKISSServer(ln net.Listener) error {
+// RunKISSServer accepts TCP connections from KISS clients on ln, until ctx is
+// cancelled.  The caller owns ln and is responsible for closing it.  It
+// returns once ln is closed, or once accepting has failed
+// axudpMaxAcceptFailures times in a row; neither can be recovered from, so the
+// caller should report the error and terminate rather than spinning on a
+// broken socket.  An isolated accept failure is reported and retried after a
+// backoff.  A cancellation is not a failure and returns nil.
+func (b *AXUDPBridge) RunKISSServer(ctx context.Context, ln net.Listener) error {
 	var failures int
 	var backoff = axudpAcceptBackoff
 
-	for {
+	// Accept blocks until a client turns up, so closing the listener is what
+	// gets us back when we are asked to stop.  The caller still owns it; this
+	// only brings its close forward to the cancellation.
+	defer closeOnDone(ctx, ln)()
+
+	for ctx.Err() == nil {
 		var conn, acceptErr = ln.Accept()
 		if acceptErr != nil {
+			if ctx.Err() != nil {
+				return nil // We closed the listener ourselves on the way out.
+			}
+
 			if errors.Is(acceptErr, net.ErrClosed) {
 				return fmt.Errorf("KISS server accept: %w", acceptErr)
 			}
@@ -219,7 +241,11 @@ func (b *AXUDPBridge) RunKISSServer(ln net.Listener) error {
 			}
 
 			logrus.WithError(acceptErr).Error("Could not accept KISS client")
-			time.Sleep(backoff)
+
+			if !sleepCtx(ctx, backoff) {
+				return nil
+			}
+
 			backoff = min(backoff*2, axudpMaxAcceptBackoff)
 
 			continue
@@ -229,8 +255,10 @@ func (b *AXUDPBridge) RunKISSServer(ln net.Listener) error {
 		backoff = axudpAcceptBackoff
 
 		logrus.WithField("client", conn.RemoteAddr()).Info("New KISS client")
-		go b.handleKISSClient(conn)
+		go b.handleKISSClient(ctx, conn)
 	}
+
+	return nil
 }
 
 func (b *AXUDPBridge) addClient(c net.Conn) {
@@ -384,18 +412,23 @@ func (b *AXUDPBridge) sendAXUDP(ax25frame []byte, entry AXUDPMapEntry) {
 	}
 }
 
-// handleKISSClient reads KISS frames from one TCP client and routes them as AXUDP.
-func (b *AXUDPBridge) handleKISSClient(conn net.Conn) {
+// handleKISSClient reads KISS frames from one TCP client and routes them as
+// AXUDP, until the client goes away or ctx is cancelled.
+func (b *AXUDPBridge) handleKISSClient(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	defer b.removeClient(conn)
 
 	b.addClient(conn)
 
+	// A client that connects and then says nothing leaves the read below
+	// blocked indefinitely, so closing its socket is what gets us back.
+	defer closeOnDone(ctx, conn)()
+
 	var kf KISSFrame
 	var overflow bool
 
 	var buf = make([]byte, 2048)
-	for {
+	for ctx.Err() == nil {
 		var n, readErr = conn.Read(buf)
 
 		// Process any bytes returned in this call before inspecting the error:

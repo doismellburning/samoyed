@@ -10,6 +10,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"os"
@@ -678,7 +679,7 @@ func GenToneMain() {
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
-	audio_open(&my_audio_config)
+	audio_open(context.Background(), &my_audio_config)
 	gen_tone_init(&my_audio_config, 100, false)
 
 	for range 2 {
@@ -700,7 +701,7 @@ func GenToneMain() {
 	my_audio_config.adev[0].adevice_out = DEFAULT_ADEVICE
 	my_audio_config.adev[0].num_channels = 2
 
-	audio_open(&my_audio_config)
+	audio_open(context.Background(), &my_audio_config)
 	gen_tone_init(&my_audio_config, 100, false)
 
 	for range 4 {

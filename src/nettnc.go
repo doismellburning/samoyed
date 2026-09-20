@@ -40,6 +40,23 @@ func (nt *NetTNC) setSock(conn net.Conn) {
 	nt.sock = conn
 }
 
+// closeSock closes the current connection, if there is one, and forgets it.
+// Nothing reads from a network TNC once its listening goroutine has stopped,
+// so it is that goroutine's to hang up on however it comes to stop - including
+// when a cancellation lands between a reconnect and the next read.
+func (nt *NetTNC) closeSock() {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+
+	if nt.sock == nil {
+		return
+	}
+
+	nt.sock.Close()
+
+	nt.sock = nil
+}
+
 // closeSockIfCurrent closes conn, and also clears sock if it still refers
 // to conn - i.e. it hasn't already been replaced by a newer reattached
 // connection from another goroutine.
@@ -62,7 +79,9 @@ var s_net_tncs [MAX_TOTAL_CHANS]*NetTNC //nolint:gochecknoglobals
  *
  * Purpose:      Attach to Network KISS TNC(s) for NCHANNEL config file item(s).
  *
- * Inputs:	pa              - Address of structure of type audio_s.
+ * Inputs:	ctx             - Stops the listening threads when cancelled.
+ *
+ *		pa              - Address of structure of type audio_s.
  *
  *		debug ? TBD
  *
@@ -74,13 +93,13 @@ var s_net_tncs [MAX_TOTAL_CHANS]*NetTNC //nolint:gochecknoglobals
  *
  *--------------------------------------------------------------------*/
 
-func nettnc_init(pa *audio_s) {
+func nettnc_init(ctx context.Context, pa *audio_s) {
 	for i := range MAX_TOTAL_CHANS {
 		if pa.chan_medium[i] == MEDIUM_NETTNC {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Channel %d: Network TNC %s %d\n", i, pa.nettnc_addr[i], pa.nettnc_port[i])
 
-			var e = nettnc_attach(i, pa.nettnc_addr[i], pa.nettnc_port[i])
+			var e = nettnc_attach(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i])
 			if e < 0 {
 				os.Exit(1)
 			}
@@ -116,7 +135,7 @@ func nettnc_init(pa *audio_s) {
  *
  *--------------------------------------------------------------------*/
 
-func nettnc_attach(channel int, host string, port int) int {
+func nettnc_attach(ctx context.Context, channel int, host string, port int) int {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var nt = new(NetTNC)
@@ -124,7 +143,7 @@ func nettnc_attach(channel int, host string, port int) int {
 	nt.port = port
 	s_net_tncs[channel] = nt
 
-	var conn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
+	var conn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if connErr == nil {
 		nt.setSock(conn)
 	} else {
@@ -136,7 +155,7 @@ func nettnc_attach(channel int, host string, port int) int {
 	 * If the TNC disappears, try to reestablish communication.
 	 */
 
-	go nt.listenThread(channel)
+	go nt.listenThread(ctx, channel)
 
 	// TNC initialization if specified.
 
@@ -163,12 +182,14 @@ func nettnc_attach(channel int, host string, port int) int {
  *
  *--------------------------------------------------------------------*/
 
-func (nt *NetTNC) listenThread(channel int) {
+func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	var kstate KISSFrame // State machine to gather a KISS frame.
 
-	for {
+	defer nt.closeSock()
+
+	for ctx.Err() == nil {
 		/*
 		 * Re-attach to TNC if not currently attached.
 		 */
@@ -179,25 +200,38 @@ func (nt *NetTNC) listenThread(channel int) {
 			// avoid confusion with the AX.25 connect.
 			dw_printf("Attempting to reattach to network TNC...\n")
 
-			var newConn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
+			var newConn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
 			if connErr == nil {
 				nt.setSock(newConn)
 
 				dw_printf("Successfully reattached to network TNC.\n")
-			} else {
-				SLEEP_SEC(5)
+			} else if !sleepSecCtx(ctx, 5) {
+				return
 			}
 		} else {
 			const NETTNCBUFSIZ = 2048
 			var buf = make([]byte, NETTNCBUFSIZ)
 
+			// The read below blocks until the TNC says something, which
+			// could be never, so closing the socket is the only thing that
+			// gets this goroutine back when we are asked to stop.
+			var stopClose = closeOnDone(ctx, conn)
 			var n, readErr = conn.Read(buf)
+
+			stopClose()
+
+			if ctx.Err() != nil {
+				return // The deferred closeSock hangs up on the way out.
+			}
+
 			if readErr != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
 				nt.closeSockIfCurrent(conn)
 
-				SLEEP_SEC(5)
+				if !sleepSecCtx(ctx, 5) {
+					return
+				}
 
 				continue
 			}
@@ -208,7 +242,7 @@ func (nt *NetTNC) listenThread(channel int) {
 				my_kiss_rec_byte(&kstate, buf[j], nt.debug, channel)
 			}
 		} // nt.sock != nil
-	} // while (1)
+	} // until cancelled
 }
 
 /*-------------------------------------------------------------------

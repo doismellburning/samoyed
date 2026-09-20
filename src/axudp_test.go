@@ -531,7 +531,7 @@ func TestHandleKISSClientProcessesFinalReadBytes(t *testing.T) {
 
 	var done = make(chan struct{})
 	go func() {
-		b.handleKISSClient(fconn)
+		b.handleKISSClient(t.Context(), fconn)
 		close(done)
 	}()
 
@@ -598,7 +598,7 @@ func TestRunUDPListenerReturnsOnReadError(t *testing.T) {
 	var b = NewAXUDPBridge(nil, udpConn)
 
 	var errs = make(chan error, 1)
-	go func() { errs <- b.RunUDPListener() }()
+	go func() { errs <- b.RunUDPListener(t.Context()) }()
 
 	// Closing the socket out from under the listener is the broken-socket case.
 	var closeErr = udpConn.Close()
@@ -631,7 +631,7 @@ func TestRunKISSServerReturnsOnListenerClose(t *testing.T) {
 	var b = NewAXUDPBridge(nil, nil)
 
 	var errs = make(chan error, 1)
-	go func() { errs <- b.RunKISSServer(ln) }()
+	go func() { errs <- b.RunKISSServer(t.Context(), ln) }()
 
 	var closeErr = ln.Close()
 	if closeErr != nil {
@@ -679,7 +679,7 @@ func TestRunKISSServerGivesUpOnPersistentAcceptFailure(t *testing.T) {
 	var b = NewAXUDPBridge(nil, nil)
 
 	var errs = make(chan error, 1)
-	go func() { errs <- b.RunKISSServer(ln) }()
+	go func() { errs <- b.RunKISSServer(t.Context(), ln) }()
 
 	select {
 	case runErr := <-errs:
@@ -713,7 +713,7 @@ func TestRunKISSServerRegistersAcceptedClients(t *testing.T) {
 
 	var b = NewAXUDPBridge(nil, nil)
 
-	go b.RunKISSServer(ln) //nolint:errcheck // the error is the teardown path, covered above
+	go b.RunKISSServer(t.Context(), ln) //nolint:errcheck // the error is the teardown path, covered above
 
 	var client, dialErr = new(net.Dialer).DialContext(context.Background(), "tcp", ln.Addr().String())
 	if dialErr != nil {

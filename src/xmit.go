@@ -122,7 +122,7 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
@@ -156,7 +156,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 	}
 
 	logrus.Debug("xmit_init: about to call tq_init")
-	tq_init(p_modem)
+	tq_init(ctx, p_modem)
 
 	logrus.Debug("xmit_init: about to create threads")
 
@@ -165,7 +165,7 @@ func NewXmitService(p_modem *audio_s, debug_xmit_packet bool) *XmitService {
 
 	for j := range MAX_RADIO_CHANS {
 		if p_modem.chan_medium[j] == MEDIUM_RADIO {
-			go xs.xmit_thread(j)
+			go xs.xmit_thread(ctx, j)
 		}
 	}
 
@@ -340,14 +340,17 @@ func frame_flavor(pp *packet_t) flavor_t {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_thread(channel int) {
-	for {
-		tq_wait_while_empty(channel)
+// xmit_thread runs until ctx is cancelled.  Anything already queued when that
+// happens still goes out: the packets are on the air or about to be, and
+// dropping them mid-transmission would be worse than a slightly later exit.
+func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
+	for ctx.Err() == nil {
+		tq_wait_while_empty(ctx, channel)
 		logrus.WithField("channel", channel).Debug("xmit_thread: woke up")
 
 		// Does this extra loop offer any benefit?
-		xs.xmit_until_empty(channel)
-	} /* while 1 */
+		xs.xmit_until_empty(ctx, channel)
+	} /* until cancelled */
 } /* end xmit_thread */
 
 // xmit_until_empty sends everything queued for a channel, or throws it away if
@@ -356,7 +359,7 @@ func (xs *XmitService) xmit_thread(channel int) {
 // It is a function of its own, rather than the body of the loop in
 // xmit_thread, so that the decision between the two can be tested: xmit_thread
 // itself never returns.
-func (xs *XmitService) xmit_until_empty(channel int) {
+func (xs *XmitService) xmit_until_empty(ctx context.Context, channel int) {
 	for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
 		if !xs.audioOutAvailable[ACHAN2ADEV(channel)] {
 			xs.discard_untransmittable(channel)
@@ -364,7 +367,7 @@ func (xs *XmitService) xmit_until_empty(channel int) {
 			continue
 		}
 
-		xs.xmit_next(channel)
+		xs.xmit_next(ctx, channel)
 	} /* while queue not empty */
 }
 
@@ -423,7 +426,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 // however we return, including on the paths where there turns out to be
 // nothing to send.  A defer in xmit_thread itself would not do, as that never
 // returns, so the lock would be held for the life of the process.
-func (xs *XmitService) xmit_next(channel int) {
+func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 	/*
 	 * Wait for the channel to be clear.
 	 * If there is something in the high priority queue, begin transmitting immediately.
@@ -466,7 +469,7 @@ func (xs *XmitService) xmit_next(channel int) {
 			 */
 			switch frame_flavor(pp) {
 			case FLAVOR_SPEECH:
-				xs.xmit_speech(channel, pp)
+				xs.xmit_speech(ctx, channel, pp)
 
 			case FLAVOR_MORSE:
 				var ssid = ax25_get_ssid(pp, AX25_DESTINATION)
@@ -944,7 +947,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
  *
  *--------------------------------------------------------------------*/
 
-func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
+func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
 	/*
 	 * Print spoken packet.  Prefix by channel.
 	 */
@@ -971,7 +974,7 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 	 * Invoke the speech-to-text script.
 	 */
 
-	xmit_speak_it(xs.p_modem.tts_script, c, string(pinfo))
+	xmit_speak_it(ctx, xs.p_modem.tts_script, c, string(pinfo))
 
 	/*
 	 * Turn off transmitter.
@@ -982,8 +985,16 @@ func (xs *XmitService) xmit_speech(c int, pp *packet_t) {
 
 /* Broken out into separate function so configuration can validate it. */
 
-func xmit_speak_it(script string, c int, msg string) error {
-	var cmd = exec.CommandContext(context.Background(), script, strconv.Itoa(c), msg) //nolint:gosec // Trust the user-supplied config
+func xmit_speak_it(ctx context.Context, script string, c int, msg string) error {
+	// Deliberately not cancelled with ctx.  xmit_thread finishes sending what
+	// is already queued when it is cancelled, and a SPEECH frame in that
+	// drain has already keyed PTT by the time we get here: a script killed
+	// before it starts would put an unmodulated carrier on the air instead of
+	// the announcement.  The caller's context still bounds how long the rest
+	// of the application waits.
+	var speakCtx = context.WithoutCancel(ctx)
+
+	var cmd = exec.CommandContext(speakCtx, script, strconv.Itoa(c), msg) //nolint:gosec // Trust the user-supplied config
 
 	var err = cmd.Run()
 	if err != nil {

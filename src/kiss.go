@@ -59,6 +59,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"os"
 
 	"github.com/creack/pty"
@@ -108,7 +109,7 @@ func kisspt_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_init(mc *misc_config_s) {
+func kisspt_init(ctx context.Context, mc *misc_config_s) {
 	/*
 	 * This reads messages from client.
 	 */
@@ -120,7 +121,7 @@ func kisspt_init(mc *misc_config_s) {
 		kisspt_open_pt()
 
 		if pt_master != nil {
-			go kisspt_listen_thread()
+			go kisspt_listen_thread(ctx)
 		}
 	}
 
@@ -325,8 +326,8 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_get() (byte, error) {
-	for {
+func kisspt_get(ctx context.Context) (byte, error) {
+	for ctx.Err() == nil {
 		/*
 		 * Since the beginning we've always had a couple annoying problems with
 		 * the pseudo terminal KISS interface.
@@ -383,6 +384,13 @@ func kisspt_get() (byte, error) {
 		*/
 		var ch = make([]byte, 1)
 		var n, err = pt_master.Read(ch)
+
+		if ctx.Err() != nil {
+			closeKissPT() // Ours to close: nothing will read from it again.
+
+			return 0, ctx.Err()
+		}
+
 		if n > 0 {
 			return ch[0], nil
 		}
@@ -399,6 +407,8 @@ func kisspt_get() (byte, error) {
 			return 0, err
 		}
 	}
+
+	return 0, ctx.Err()
 }
 
 /*-------------------------------------------------------------------
@@ -414,10 +424,37 @@ func kisspt_get() (byte, error) {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_listen_thread() {
+// closeKissPT closes the pseudo terminal, if it is open, and forgets it,
+// along with the symlink that points at its far end.
+func closeKissPT() {
+	if pt_master == nil {
+		return
+	}
+
+	pt_master.Close()
+
+	pt_master = nil
+
+	os.Remove(TMP_KISSTNC_SYMLINK)
+}
+
+func kisspt_listen_thread(ctx context.Context) {
 	logrus.Debug("kisspt_listen_thread")
-	for {
-		var ch, err = kisspt_get()
+
+	// Nothing obliges the client at the other end of the pseudo terminal to
+	// send anything, so closing the master is what ends a read that would
+	// otherwise never return.  Armed once here rather than around each read:
+	// this goroutine reads one byte at a time, and the pseudo terminal is
+	// never reopened underneath it.
+	defer closeOnDone(ctx, pt_master)()
+
+	// Nothing else tears the pseudo terminal down - cleanup has no teardown
+	// for it - so it is ours to close whenever we stop, including when a
+	// cancellation arrives before we ever get as far as a read.
+	defer closeKissPT()
+
+	for ctx.Err() == nil {
+		var ch, err = kisspt_get(ctx)
 		if err != nil {
 			return
 		}

@@ -2,7 +2,9 @@ package direwolf
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"math"
 	"runtime"
 	"time"
@@ -14,6 +16,72 @@ func SLEEP_MS(ms int) {
 
 func SLEEP_SEC(s int) {
 	SLEEP_MS(s * 1000)
+}
+
+// sleepCtx sleeps for d, or until ctx is cancelled, whichever comes first.
+//
+// It reports whether the whole of d elapsed, so a false return says the caller
+// is being shut down and should return rather than carry on with whatever it
+// woke up to do.  That makes it the replacement for a SLEEP_MS or SLEEP_SEC in
+// a long-lived goroutine's loop: such a sleep is where the goroutine spends
+// most of its life, and nothing else in the loop can notice a cancellation
+// until it finishes.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	var timer = time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+// sleepSecCtx is sleepCtx taking whole seconds, as the loops ported from C
+// count in whole seconds via SLEEP_SEC.
+func sleepSecCtx(ctx context.Context, s int) bool {
+	return sleepCtx(ctx, time.Duration(s)*time.Second)
+}
+
+// SleepSecCtx is sleepSecCtx for the commands outside this package, which have
+// the same problem in their own loops: taking a signal as a context means the
+// default "an interrupt ends the process" is gone, so every wait in the loop
+// has to be one the interrupt can cut short.
+func SleepSecCtx(ctx context.Context, s int) bool {
+	return sleepSecCtx(ctx, s)
+}
+
+// closeOnDone closes c once ctx is cancelled, and returns a function that
+// cancels that arrangement.
+//
+// A goroutine blocked in Accept or Read cannot see a cancellation at all: it
+// is inside a system call, not at the top of its loop.  Closing what it is
+// blocked on is what gets it back - the call returns an error, and the
+// goroutine then finds ctx.Err() non-nil and returns.  Call the returned
+// function, usually deferred, when finished with c, so a long-lived context
+// doesn't hold on to something already closed and forgotten.
+//
+// The two can happen at once: the goroutine can be on its way out for its own
+// reasons at the moment of cancellation, and get in before the close.  It then
+// closes c itself rather than leaving a socket nobody is watching any more
+// open for the rest of the process's life.
+//
+// That still leaves the reverse order - the call returns, and a cancellation
+// arrives after the check above but before the caller looks at ctx.Err() - so
+// this is how to interrupt a blocking call, not a promise about who closes c
+// in the end.  A caller that owns c closes it on its own cancellation path
+// too.
+func closeOnDone(ctx context.Context, c io.Closer) func() {
+	var stop = context.AfterFunc(ctx, func() {
+		_ = c.Close()
+	})
+
+	return func() {
+		if stop() && ctx.Err() != nil {
+			_ = c.Close()
+		}
+	}
 }
 
 // IfThenElse exists because sometimes it's really convenient to have C's ternary ?:.

@@ -2,8 +2,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	direwolf "github.com/doismellburning/samoyed/src"
@@ -18,15 +20,27 @@ func show(format string, m maybe.Maybe[float64]) string {
 }
 
 func main() {
+	os.Exit(run())
+}
+
+// run is main's body, so that a deferred cleanup still happens on the way out.
+func run() int {
 	var gpsPort = "COM22"
 
 	if len(os.Args) > 1 {
 		gpsPort = os.Args[1]
 	}
 
-	direwolf.DWGPSInit(gpsPort, 3)
+	// GPS reading runs in a goroutine of its own, which this stops when the
+	// user interrupts us.  Taking the signal this way also takes away the
+	// default "an interrupt ends the process", so the loop below has to end
+	// on it too.
+	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
-	for {
+	direwolf.DWGPSInit(ctx, gpsPort, 3)
+
+	for ctx.Err() == nil {
 		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead()
 
 		switch fix {
@@ -43,11 +57,16 @@ func main() {
 			fmt.Printf("Location currently not available.\n")
 		case int(direwolf.DWFIX_NOT_INIT):
 			fmt.Printf("GPS Init failed.\n")
-			os.Exit(1)
+
+			return 1
 		default:
 			fmt.Printf("ERROR getting GPS information.\n")
 		}
 
-		direwolf.SLEEP_SEC(3)
+		if !direwolf.SleepSecCtx(ctx, 3) {
+			break
+		}
 	}
+
+	return 0
 }

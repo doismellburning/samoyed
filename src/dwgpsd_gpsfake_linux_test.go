@@ -92,7 +92,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	config.gpsd_host = "127.0.0.1"
 	config.gpsd_port = port
 
-	require.Equal(t, 1, dwgpsd_init(config, 3))
+	require.Equal(t, 1, dwgpsd_init(t.Context(), config, 3))
 
 	t.Cleanup(dwgpsd_term)
 

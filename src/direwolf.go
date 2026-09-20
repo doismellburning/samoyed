@@ -4,12 +4,11 @@
 package direwolf
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unicode"
 
@@ -81,7 +80,13 @@ const audio_amplitude = 100 /* % of audio sample range. */
 /* This translates to +-32k for 16 bit samples. */
 /* Currently no option to change this. */
 
-func DirewolfMain() {
+// DirewolfMain is the main program.
+//
+// ctx is cancelled when the application is asked to stop - an interrupt from
+// the terminal, say.  Everything long-lived started from here takes it, so a
+// cancellation reaches the goroutines doing the work rather than only the
+// process itself.
+func DirewolfMain(ctx context.Context) {
 	// logrus writes to stderr by default, while everything still going through
 	// dw_printf writes to stdout. Until the conversion is finished the two are
 	// halves of one console stream - a "Packet" entry on stderr whose packet
@@ -577,7 +582,7 @@ x = Silence FX.25 information.`)
 	TextColorInit(*textColor)
 	printVersion(false)
 
-	setup_sigint_handler()
+	go wait_for_shutdown(ctx)
 
 	/*
 	 * Open the audio source
@@ -589,7 +594,7 @@ x = Silence FX.25 information.`)
 	 */
 	deviceIDData = NewDeviceIDData()
 
-	var err = audio_open(audio_config)
+	var err = audio_open(ctx, audio_config)
 	if err < 0 {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
@@ -610,7 +615,7 @@ x = Silence FX.25 information.`)
 	 * an internal modem and radio.
 	 * I put it here so channel properties would come out in right order.
 	 */
-	nettnc_init(audio_config)
+	nettnc_init(ctx, audio_config)
 
 	/*
 	 * Initialize the touch tone decoder & APRStt gateway.
@@ -643,7 +648,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(audio_config, d_p_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, d_p_opt)
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
@@ -768,7 +773,7 @@ x = Silence FX.25 information.`)
 	 */
 	mheardDB = NewMHeardDB(d_m_opt)
 	digipeater_init(audio_config, &digi_config)
-	igate_init(audio_config, &igate_config, &digi_config, d_i_opt)
+	igate_init(ctx, audio_config, &igate_config, &digi_config, d_i_opt)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(misc_config, d_c_opt)
@@ -776,31 +781,31 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	server_init(audio_config, misc_config)
-	metrics_init(misc_config)
-	kissNetSvc = NewKissNetService(misc_config)
+	server_init(ctx, audio_config, misc_config)
+	metrics_init(ctx, misc_config)
+	kissNetSvc = NewKissNetService(ctx, misc_config)
 	kissNetSvc.SetDebug(d_n_opt)
 
 	// TODO KG This checks `misc_config.kiss_port > 0` but `kiss_port` is now an array?
 	// Let's just check [0] for now...
 	if misc_config.kiss_port[0] > 0 && misc_config.dns_sd_enabled {
-		dns_sd_announce(misc_config)
+		dns_sd_announce(ctx, misc_config)
 	}
 
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kisspt_init(misc_config)
-	kissserial_init(misc_config)
+	kisspt_init(ctx, misc_config)
+	kissserial_init(ctx, misc_config)
 	kiss_frame_init(audio_config)
 
 	/*
 	 * Open port for communication with GPS.
 	 */
-	dwgps_init(misc_config, d_g_opt)
+	dwgps_init(ctx, misc_config, d_g_opt)
 
 	var waypointErr error
-	waypointSender, waypointErr = NewWaypointSender(misc_config)
+	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config)
 	if waypointErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%v\n", waypointErr)
@@ -817,19 +822,21 @@ x = Silence FX.25 information.`)
 	packetLogger = NewPacketLogger(misc_config.log_daily_names, misc_config.log_path)
 	beaconService = NewBeaconService(audio_config, misc_config, &igate_config)
 	beaconService.SetDebug(d_t_opt)
-	beaconService.Start()
+	beaconService.Start(ctx)
 
 	/*
 	 * Get sound samples and decode them.
 	 * Use hot attribute for all functions called for every audio sample.
 	 */
 
-	var adev_failed = recv_init(audio_config)
+	var adev_failed = recv_init(ctx, audio_config)
 
-	go recv_process()
+	go recv_process(ctx)
 
-	// recv_process does not return, so we sit here until an audio device
-	// input fails.  There is no point in going on without audio.
+	// recv_process runs until it is cancelled, so we sit here until an audio
+	// device input fails.  There is no point in going on without audio.  A
+	// cancellation does not arrive here at all: wait_for_shutdown, above, is
+	// what ends the process then.
 	var a = <-adev_failed
 
 	text_color_set(DW_COLOR_ERROR)
@@ -877,7 +884,7 @@ func ais_object_course_speed(A *decode_aprs_t) (maybe.Maybe[int], maybe.Maybe[in
 	return course, speed
 }
 
-func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL for virtual channels
 	Assert(subchan >= -3 && subchan < MAX_SUBCHANS)
 	Assert(slice >= 0 && slice < MAX_SLICERS)
@@ -1225,13 +1232,13 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 
 	if subchan == -1 { // from DTMF decoder
 		if dw_tt_config.gateway_enabled > 0 && len(pinfo) >= 2 {
-			ttGateway.Sequence(channel, string(pinfo[1:]))
+			ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
 		}
 	} else if len(pinfo) >= 2 && pinfo[0] == 't' && dw_tt_config.gateway_enabled > 0 {
 		// For testing.
 		// Would be nice to verify it was generated locally,
 		// not received over the air.
-		ttGateway.Sequence(channel, string(pinfo[1:]))
+		ttGateway.Sequence(ctx, channel, string(pinfo[1:]))
 	} else {
 		/*
 		 * Send to the IGate processing.
@@ -1275,15 +1282,14 @@ func app_process_rec_packet(channel int, subchan int, slice int, pp *packet_t, a
 	}
 } /* end app_process_rec_packet */
 
-func setup_sigint_handler() {
-	var sigChan = make(chan os.Signal, 1)
-
-	signal.Notify(sigChan, syscall.SIGINT)
-
-	go func() {
-		<-sigChan
-		cleanup()
-	}()
+// wait_for_shutdown tears the application down once ctx is cancelled.
+//
+// The goroutines started during startup take the same context and wind
+// themselves up, but they are not waited for: cleanup gives them a moment and
+// then ends the process.
+func wait_for_shutdown(ctx context.Context) {
+	<-ctx.Done()
+	cleanup()
 }
 
 func cleanup() {

@@ -36,7 +36,7 @@ func TestIgateDialCountsOnlySuccessfulConnections(t *testing.T) {
 	var connectsBefore = metricValue(t, connects, noLabels)
 	var failedBefore = metricValue(t, failed, noLabels)
 
-	var conn, dialErr = igate_dial(addr.IP.String(), addr.Port)
+	var conn, dialErr = igate_dial(t.Context(), addr.IP.String(), addr.Port)
 	require.NoError(t, dialErr)
 	require.NotNil(t, conn)
 
@@ -51,7 +51,7 @@ func TestIgateDialCountsOnlySuccessfulConnections(t *testing.T) {
 	connectsBefore = metricValue(t, connects, noLabels)
 	failedBefore = metricValue(t, failed, noLabels)
 
-	var badConn, badErr = igate_dial("127.0.0.1", closedPort)
+	var badConn, badErr = igate_dial(t.Context(), "127.0.0.1", closedPort)
 	require.Error(t, badErr)
 	assert.Nil(t, badConn)
 

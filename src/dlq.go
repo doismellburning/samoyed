@@ -19,6 +19,7 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -827,7 +828,12 @@ func dlq_client_cleanup(client int) {
  * Purpose:     Sleep while the received data queue is empty rather than
  *		polling periodically.
  *
- * Inputs:	timeout		- Return at this time even if queue is empty.
+ * Inputs:	ctx		- Return when this is cancelled, whatever the
+ *				  state of the queue.  The caller is expected to
+ *				  check it and stop rather than look for an item
+ *				  that isn't there.
+ *
+ *		timeout		- Return at this time even if queue is empty.
  *				  Zero for no timeout.
  *
  * Returns:	True if timed out before any event arrived.
@@ -837,7 +843,7 @@ func dlq_client_cleanup(client int) {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_wait_while_empty(timeout time.Time) bool {
+func dlq_wait_while_empty(ctx context.Context, timeout time.Time) bool {
 	var timed_out_result = false
 
 	logrus.WithField("timeout", timeout).Trace("dlq_wait_while_empty")
@@ -870,9 +876,17 @@ func dlq_wait_while_empty(timeout time.Time) bool {
 				// Signalled
 			case <-timer.C:
 				timed_out_result = true
+			case <-ctx.Done():
+				// Shutting down.  Not a timeout: there is nothing for
+				// the caller to do now except stop.
 			}
 		} else {
-			<-dlq_wake_up_chan
+			select {
+			case <-dlq_wake_up_chan:
+				// Signalled
+			case <-ctx.Done():
+				// Shutting down, as above.
+			}
 		}
 	}
 

@@ -32,7 +32,7 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 	for dlq_remove() != nil {
 	}
 
-	bs.send(0, gpsinfo)
+	bs.send(t.Context(), 0, gpsinfo)
 
 	var item = dlq_remove()
 	if item != nil {

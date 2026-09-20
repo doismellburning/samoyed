@@ -164,7 +164,7 @@ func setupUDPWaypoint(t *testing.T, formats int) (*WaypointSender, net.PacketCon
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      formats,
 	}
-	var ws, sendErr = NewWaypointSender(&mc)
+	var ws, sendErr = NewWaypointSender(t.Context(), &mc)
 	require.NoError(t, sendErr)
 
 	t.Cleanup(func() {
@@ -316,7 +316,7 @@ func TestWaypointDefaultFormats(t *testing.T) {
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      0, // let NewWaypointSender pick defaults
 	}
-	var ws, sendErr = NewWaypointSender(&mc)
+	var ws, sendErr = NewWaypointSender(t.Context(), &mc)
 	require.NoError(t, sendErr)
 
 	t.Cleanup(func() {
@@ -338,7 +338,7 @@ func TestWaypointGarminImpliesNMEAGeneric(t *testing.T) {
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      WPL_FORMAT_GARMIN,
 	}
-	var ws, sendErr = NewWaypointSender(&mc)
+	var ws, sendErr = NewWaypointSender(t.Context(), &mc)
 	require.NoError(t, sendErr)
 
 	t.Cleanup(func() {
@@ -363,7 +363,7 @@ func TestWaypointTermClearsState(t *testing.T) {
 		waypoint_udp_portnum:  udpPort(t, listener),
 		waypoint_formats:      WPL_FORMAT_KENWOOD,
 	}
-	var ws, sendErr = NewWaypointSender(&mc)
+	var ws, sendErr = NewWaypointSender(t.Context(), &mc)
 	require.NoError(t, sendErr)
 	require.NotNil(t, ws.udpSock, "socket should be open after NewWaypointSender")
 
@@ -377,7 +377,7 @@ func TestWaypointTermClearsState(t *testing.T) {
 func TestNewWaypointSenderNoDestRequested(t *testing.T) {
 	var mc = misc_config_s{} //nolint: exhaustruct_v5
 
-	var ws, err = NewWaypointSender(&mc)
+	var ws, err = NewWaypointSender(t.Context(), &mc)
 	require.NoError(t, err)
 	require.NotNil(t, ws)
 	assert.Nil(t, ws.udpSock)
@@ -392,7 +392,7 @@ func TestNewWaypointSenderUDPFailureReturnsError(t *testing.T) {
 		waypoint_udp_portnum:  12345,
 	}
 
-	var ws, err = NewWaypointSender(&mc)
+	var ws, err = NewWaypointSender(t.Context(), &mc)
 	require.Error(t, err, "should report an error rather than a silently useless sender")
 	assert.Nil(t, ws)
 	assert.Contains(t, err.Error(), "12345", "error should identify the destination that failed to open")
