@@ -1357,6 +1357,15 @@ func get_input_real(it int, channel int) int {
  *--------------------------------------------------------------------*/
 
 func ptt_term() {
+	// A stop signal can arrive while we are still starting up, and the
+	// shutdown path runs this on its way out.  Nothing has been keyed if
+	// audio_open has not installed the configuration yet, so there is nothing
+	// to release - and reading the channels out of a nil configuration would
+	// panic rather than shut down.
+	if save_audio_config_p == nil {
+		return
+	}
+
 	for n := range MAX_RADIO_CHANS {
 		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
