@@ -3759,11 +3759,18 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
  *------------------------------------------------------------------*/
 
 func get_maidenhead(A *decode_aprs_t, p []byte) int { //nolint:unparam
+	/* Callers pass whatever field they have, which can be shorter than a */
+	/* locator - the 4 character form is handed exactly 4 bytes. */
+	if len(p) < 4 {
+		return 0
+	}
+
 	if unicode.ToUpper(rune(p[0])) >= 'A' && unicode.ToUpper(rune(p[0])) <= 'R' &&
 		unicode.ToUpper(rune(p[1])) >= 'A' && unicode.ToUpper(rune(p[1])) <= 'R' &&
 		unicode.IsDigit(rune(p[2])) && unicode.IsDigit(rune(p[3])) {
 		/* We have 4 characters matching the rule. */
-		if unicode.ToUpper(rune(p[4])) >= 'A' && unicode.ToUpper(rune(p[4])) <= 'X' &&
+		if len(p) >= 6 &&
+			unicode.ToUpper(rune(p[4])) >= 'A' && unicode.ToUpper(rune(p[4])) <= 'X' &&
 			unicode.ToUpper(rune(p[5])) >= 'A' && unicode.ToUpper(rune(p[5])) <= 'X' {
 			/* We have 6 characters matching the rule. */
 			return 6
