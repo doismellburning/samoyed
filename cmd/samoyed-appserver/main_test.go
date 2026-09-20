@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -385,5 +386,69 @@ func TestCommandsIgnoreTheLineEnding(t *testing.T) {
 		if !strings.Contains(got, "Session") {
 			t.Errorf("who%q did not list the sessions: %q", ending, got)
 		}
+	}
+}
+
+// TestTestAcknowledgesTheRequest covers a "test" that used to start sending
+// without telling the user anything had happened.
+func TestTestAcknowledgesTheRequest(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	var s = connect(t, tnc)
+
+	var got = sentText(send(t, tnc, "test 3 64"))
+
+	if !strings.Contains(got, "3 frame(s) of 64 bytes") {
+		t.Errorf("test did not say what it was about to send, got %q", got)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ttCount != 3 || s.ttLength != 64 {
+		t.Errorf("test set count %d length %d, wanted 3 and 64", s.ttCount, s.ttLength)
+	}
+}
+
+// TestTestRejectsAnUnreadableCount checks that a typo is reported rather than
+// quietly setting the count to zero and doing nothing.
+func TestTestRejectsAnUnreadableCount(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	var s = connect(t, tnc)
+
+	var got = sentText(send(t, tnc, "test wombat"))
+
+	if !strings.Contains(got, "not a frame count") {
+		t.Errorf("test with a bad count said %q", got)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ttCount != 0 {
+		t.Errorf("A rejected test still started, count %d", s.ttCount)
+	}
+}
+
+// TestTestRejectsTooManyFrames checks the cap on how much air one station can
+// ask for: any positive int used to be accepted, and the main loop would have
+// kept feeding the channel for as long as the station stayed connected.
+func TestTestRejectsTooManyFrames(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	var s = connect(t, tnc)
+
+	var got = sentText(send(t, tnc, "test "+strconv.Itoa(maxTestCount+1)))
+
+	if !strings.Contains(got, "not a frame count") {
+		t.Errorf("test with an excessive count said %q", got)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ttCount != 0 {
+		t.Errorf("A rejected test still started, count %d", s.ttCount)
 	}
 }

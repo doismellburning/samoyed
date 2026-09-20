@@ -583,8 +583,9 @@ func userCommands() []command {
 			detail: []string{
 				"TEST [count [length]]",
 				"Send count frames of length bytes each, then report how long it took",
-				"and how close that came to the channel's bit rate.  count defaults to",
-				"1 and length to 256; length is clamped to between 16 and 2048 bytes.",
+				"and how close that came to the channel's bit rate.",
+				fmt.Sprintf("count defaults to 1 and may be up to %d; length defaults to 256", maxTestCount),
+				fmt.Sprintf("and is clamped to between 16 and %d bytes.", AX25_MAX_INFO_LEN),
 			},
 			handler: cmd_test,
 		},
@@ -686,6 +687,12 @@ func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, res
 	sendLines(channel, call_to, call_from, lines)
 }
 
+// maxTestCount caps the frames one TEST may ask for.  The test transmits for as
+// long as it takes and the channel is shared, so an unbounded count would let
+// one station hold the air for as long as it cared to stay connected.  A
+// thousand frames is several minutes at 9600 baud, and TEST can be run again.
+const maxTestCount = 1000
+
 // cmd_test runs a timing test: send the specified number of frames with optional length.
 func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
 	var _pcount, rest2, _ = BytesCut(rest, ' ')
@@ -696,10 +703,32 @@ func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, re
 
 	var plength = string(_plength)
 
+	var count = 1
+
+	if pcount != "" {
+		var countErr error
+
+		count, countErr = strconv.Atoi(pcount)
+		if countErr != nil || count < 1 || count > maxTestCount {
+			sendLines(channel, call_to, call_from,
+				[]string{fmt.Sprintf("TEST: %s is not a frame count between 1 and %d.  Type HELP TEST.", pcount, maxTestCount)})
+
+			return
+		}
+	}
+
 	var length = 256
 
 	if plength != "" {
-		length, _ = strconv.Atoi(plength)
+		var lengthErr error
+
+		length, lengthErr = strconv.Atoi(plength)
+		if lengthErr != nil {
+			sendLines(channel, call_to, call_from, []string{fmt.Sprintf("TEST: %s is not a frame length.  Type HELP TEST.", plength)})
+
+			return
+		}
+
 		if length < 16 {
 			length = 16
 		}
@@ -709,19 +738,18 @@ func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, re
 		}
 	}
 
-	var count = 1
-
-	if pcount != "" {
-		count, _ = strconv.Atoi(pcount)
-	}
-
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	s.ttStartTime = time.Now()
 	s.ttNext = 1
 	s.ttLength = length
 	s.ttCount = count
+
+	s.mu.Unlock()
+
+	// Say so: the frames themselves start arriving a second later, from the
+	// main loop, and until now nothing told the user anything had begun.
+	sendLines(channel, call_to, call_from, []string{fmt.Sprintf("Sending %d frame(s) of %d bytes; summary to follow.", count, length)})
 }
 
 // cmd_bye says farewell and hands the disconnect to the main loop, which waits
