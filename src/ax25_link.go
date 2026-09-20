@@ -155,6 +155,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/sirupsen/logrus"
 )
 
 // Limits and defaults for parameters.
@@ -1962,7 +1963,25 @@ func lm_data_indication(E *dlq_item_t) {
 		(ft == frame_type_U_SABM) || (ft == frame_type_U_SABME))
 
 	if S == nil {
-		// TODO KG Log this, it's a pain when testing!
+		var entry = logrus.WithFields(logrus.Fields{
+			"channel":     E._chan,
+			"source":      E.addrs[AX25_SOURCE],
+			"destination": E.addrs[AX25_DESTINATION],
+		})
+
+		if ft == frame_type_U_SABM || ft == frame_type_U_SABME {
+			// Silence is the right answer - a callsign nobody registered is not
+			// ours to answer for, and several stations can share a frequency -
+			// but the operator has no other way to tell that the connect request
+			// ever arrived, and the remote end just reports a retry timeout.
+			// The remote station's retry timer bounds how often this can fire.
+			entry.Info("Ignoring connect request - no client has registered this callsign")
+		} else {
+			// Traffic between two other stations is the normal case on a shared
+			// frequency, so this one is driven by whatever is on the air.
+			entry.Trace("Ignoring frame - no link for these addresses")
+		}
+
 		return
 	}
 

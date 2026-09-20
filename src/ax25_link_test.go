@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // newNegotiationTestLink is a link whose parameters are all distinct from the
@@ -142,4 +145,49 @@ func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
 	assert.Equal(t, 128, S.n1_paclen)
 	assert.Equal(t, 2, S.k_maxframe)
 	assert.Equal(t, 5, S.n2_retry)
+}
+
+// A SABM addressed to a callsign no client has registered goes unanswered - we
+// are not the station it was sent to - but it used to go unremarked as well, so
+// an operator who had set MYCALL and expected connected mode to work saw
+// nothing at all while the far end timed out.  Regression test for issue #665:
+// the frame is still ignored, and now says so.
+func TestIgnoredConnectRequestIsLogged(t *testing.T) {
+	const (
+		MY_CALL    = "Q1TEST"
+		THEIR_CALL = "Q2TEST"
+		CHANNEL    = 1
+	)
+
+	setupTestEnv(t) // Leaves reg_callsign_list empty, so nothing is registered.
+
+	var hook = test.NewGlobal()
+
+	t.Cleanup(hook.Reset)
+
+	var previousLevel = logrus.GetLevel()
+
+	logrus.SetLevel(logrus.InfoLevel)
+
+	t.Cleanup(func() { logrus.SetLevel(previousLevel) })
+
+	var addrs [AX25_MAX_ADDRS]string
+	addrs[AX25_SOURCE] = THEIR_CALL
+	addrs[AX25_DESTINATION] = MY_CALL
+
+	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 1, 0, nil)
+	require.NotNil(t, pp)
+
+	receiveFrame(t, pp, CHANNEL)
+
+	assert.Nil(t, list_head, "an unregistered callsign gets no link state machine")
+
+	var entry = hook.LastEntry()
+
+	require.NotNil(t, entry, "an ignored connect request must be logged")
+	assert.Equal(t, logrus.InfoLevel, entry.Level)
+	assert.Contains(t, entry.Message, "no client has registered this callsign")
+	assert.Equal(t, CHANNEL, entry.Data["channel"])
+	assert.Equal(t, THEIR_CALL, entry.Data["source"])
+	assert.Equal(t, MY_CALL, entry.Data["destination"])
 }
