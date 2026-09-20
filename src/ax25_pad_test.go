@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_ax25_unwrap_third_party(t *testing.T) {
@@ -107,4 +108,32 @@ func Test_ax25_parse_addr_strictness(t *testing.T) {
 			assert.Equal(t, tc.ok, ok)
 		})
 	}
+}
+
+func Test_ax25_frame_with_no_pid(t *testing.T) {
+	// The shortest frame AX25FromFrame accepts is two addresses plus a control
+	// byte: no PID and no information part.  Everything that reads the
+	// information part has to cope with an offset that lands past the end of
+	// the frame rather than slicing off it.
+	var frame = []byte("000000000000010")
+	require.Len(t, frame, AX25_MIN_PACKET_LEN)
+
+	var alevel ALevel
+
+	var pp = AX25FromFrame(frame, alevel)
+	require.NotNil(t, pp)
+	assert.Equal(t, 2, pp.num_addr)
+
+	assert.Empty(t, AX25GetInfo(pp))
+	assert.Equal(t, 0, ax25_get_num_info(pp))
+	assert.Equal(t, byte(' '), ax25_get_dti(pp))
+	assert.False(t, ax25_is_aprs(pp))
+
+	// The rest of the receive path's getters should survive it too.
+	assert.NotPanics(t, func() {
+		AX25FormatAddrs(pp)
+		ax25_format_via_path(pp)
+		ax25_frame_type(pp)
+		ax25_dedupe_crc(pp)
+	})
 }
