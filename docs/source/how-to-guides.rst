@@ -365,6 +365,26 @@ It is meant as a starting point for your own application; any AGW client that
 sends ``'X'`` will do, including ones written against `pyham_pe
 <https://github.com/mfncooper/pyham_pe>`__.
 
+What the connected station gets is a greeting and a handful of commands:
+
+.. code::
+
+    Welcome!  Type ? for list of commands or HELP <command> for details.
+    ?
+    Commands:
+      BYE                   Disconnect.
+      HELP <command>        Describe one command.
+      TEST [count [length]] Measure throughput.
+      WHO                   List the stations connected now.
+    Type HELP <command> for details.
+
+``WHO`` lists the stations connected to the server, the channel each came in
+on and when it connected.  ``TEST`` sends frames back and reports how long
+they took and how close that came to the channel's bit rate.  ``BYE``
+disconnects, once everything queued for the station has been acknowledged.
+It is a demonstration rather than a BBS, and the commands are there to be
+replaced by your own.
+
 A KISS client is a different matter entirely.  Linux AX.25, and anything else
 attached over KISS, runs its own link layer: it sees the raw frames and sends
 its own UA, so connected mode there is configured in that software and never

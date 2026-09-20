@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/spf13/pflag"
 )
@@ -57,7 +59,14 @@ type sessionKey struct {
 type session struct {
 	sessionKey // Radio channel & callsign of other station.
 
+	localCall Callsign // Callsign of ours the other station connected to.  Might be an alias.
+
 	loginTime time.Time // Time when connection established.
+
+	// mu guards everything below it.  The main loop (poll) and the agwlib
+	// callback goroutine (the agw_cb_* functions, dispatched by the thread
+	// agwlib_init starts) both read and write these.
+	mu sync.Mutex
 
 	// For the timing test.
 	// Send specified number of frames, optional length.
@@ -68,10 +77,24 @@ type session struct {
 	ttLength    int // Bytes in info part.
 	ttNext      int // Next sequence to send.
 
-	txQueueLen int // Number in transmit queue.  For flow control.
+	// txQueueLen is how many frames the TNC still holds for this station, as
+	// of the last 'Y' reply.  Nothing until one has arrived, which is not the
+	// same as an empty queue: mistaking it for one disconnects a station
+	// before its farewell has gone out.
+	txQueueLen maybe.Maybe[int]
+
+	// byeDeadline is set when the user says "bye".  The main loop disconnects
+	// once the transmit queue has drained - so we know the farewell arrived -
+	// or once the deadline passes, whichever comes first.  Nothing when no
+	// disconnect is pending.
+	byeDeadline maybe.Maybe[time.Time]
 }
 
-// appServer.sessions is read and written both from the main loop (pollTimingTest)
+// byeDrainTimeout caps how long a pending "bye" waits for the other station to
+// acknowledge the farewell before we disconnect regardless.
+const byeDrainTimeout = 10 * time.Second
+
+// appServer.sessions is read and written both from the main loop (poll)
 // and from the agwlib callback goroutine (agw_cb_* functions started by agwlib_init),
 // so all access must go through mu.
 type appServer struct {
@@ -98,7 +121,8 @@ func (srv *appServer) findSession(channel byte, addr Callsign) *session {
 }
 
 // getOrCreateSession returns the existing session for channel/addr, creating one if necessary.
-func (srv *appServer) getOrCreateSession(channel byte, addr Callsign) *session {
+// localCall is the callsign of ours that the other station connected to.
+func (srv *appServer) getOrCreateSession(channel byte, addr Callsign, localCall Callsign) *session {
 	var key = sessionKey{channel: channel, addr: addr}
 
 	srv.mu.Lock()
@@ -111,6 +135,7 @@ func (srv *appServer) getOrCreateSession(channel byte, addr Callsign) *session {
 	var s = new(session)
 
 	s.sessionKey = key
+	s.localCall = localCall
 	s.loginTime = time.Now()
 
 	srv.sessions[key] = s
@@ -230,86 +255,162 @@ func main() {
 	///   should happen automatically now.   agwlib_G_ask_port_information ();
 	for {
 		direwolf.SLEEP_SEC(1) // other places based on 1 second assumption.
-		srv.pollTimingTest()
+		srv.poll()
 	}
 } /* end main */
 
-func (srv *appServer) pollTimingTest() {
+func (srv *appServer) poll() {
 	for _, s := range srv.snapshotSessions() {
-		s.pollTimingTest()
+		s.poll()
 	}
 }
 
-func (s *session) pollTimingTest() {
-	if s.ttCount == 0 {
-		return // nothing to do
+// poll advances this session's background work, once per main-loop tick.
+// Anything that has to wait for the other station belongs here rather than in a
+// command handler: the handlers run on the agwlib listener goroutine, which is
+// shared by every session on every channel, so blocking one blocks them all.
+func (s *session) poll() {
+	s.mu.Lock()
+	var timingTest = s.ttCount != 0
+	var goodbye = s.byeDeadline.IsJust()
+	s.mu.Unlock()
+
+	if !timingTest && !goodbye {
+		return
 	}
 
+	// The answer comes back as a 'Y' frame on the listener goroutine and lands
+	// in s.txQueueLen; give it a moment to arrive.
+	agwlib_Y_outstanding_frames_for_station(s.channel, s.localCall, s.addr)
+	direwolf.SLEEP_MS(10)
+
+	if timingTest {
+		s.pollTimingTest()
+	}
+
+	if goodbye {
+		s.pollBye()
+	}
+}
+
+// pollBye disconnects a station that said "bye", once everything we sent it has
+// been acknowledged - or once it is clear that it never will be.
+func (s *session) pollBye() {
+	s.mu.Lock()
+
+	var deadline, pending = s.byeDeadline.Get()
+	if !pending {
+		s.mu.Unlock()
+
+		return
+	}
+
+	// Only a queue length the TNC has actually reported counts as drained.
+	var drained = s.txQueueLen == maybe.Just(0)
+
+	if !drained && time.Now().Before(deadline) {
+		s.mu.Unlock()
+
+		return // farewell not acknowledged yet.
+	}
+
+	s.byeDeadline = maybe.Nothing[time.Time]()
+
+	s.mu.Unlock()
+
+	agwlib_d_disconnect(s.channel, s.localCall, s.addr)
+}
+
+func (s *session) pollTimingTest() {
+	s.mu.Lock()
+
+	// Unlike the disconnect, the test reads an unreported queue as empty, which
+	// is what it did before there was anything else to read: the worst that
+	// costs it is a first second of frames sent without flow control.
+	var queued = maybe.FromMaybe(0, s.txQueueLen)
+
 	if s.ttNext <= s.ttCount {
-		var rem = s.ttCount - s.ttNext + 1 // remaining to send.
+		if queued > 128 {
+			s.mu.Unlock()
 
-		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.addr)
-		direwolf.SLEEP_MS(10)
-
-		if s.txQueueLen > 128 {
 			return // enough queued up for now.
 		}
 
+		var rem = s.ttCount - s.ttNext + 1 // remaining to send.
 		if rem > 64 {
 			rem = 64 // add no more than 64 at a time.
 		}
 
-		for range rem {
-			var c = 'a'
+		var first = s.ttNext
 
-			var stuff = fmt.Sprintf("%06d ", s.ttNext)
-			for k := len(stuff); k < s.ttLength-1; k++ {
-				stuff += string(c)
+		var length = s.ttLength
 
-				c++
-				if c == 'z'+1 {
-					c = 'A'
-				}
+		s.ttNext += rem
 
-				if c == 'Z'+1 {
-					c = '0'
-				}
+		// Don't hold the lock while writing to the TNC: the listener goroutine
+		// needs it to record the 'Y' replies, and a socket write can block.
+		s.mu.Unlock()
 
-				if c == '9'+1 {
-					c = 'a'
-				}
-			}
-
-			stuff += "\r"
-			agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.addr, []byte(stuff))
-
-			s.ttNext++
-		}
-	} else {
-		// All done queuing up the packets.
-		// Wait until they have all been sent and ack'ed by other end.
-		agwlib_Y_outstanding_frames_for_station(s.channel, mycall, s.addr)
-		direwolf.SLEEP_MS(10)
-
-		if s.txQueueLen > 0 {
-			return // not done yet.
+		for n := range rem {
+			agwlib_D_send_connected_data(s.channel, 0xF0, s.localCall, s.addr, timingTestFrame(first+n, length))
 		}
 
-		var elapsed = time.Since(s.ttStartTime)
-		if elapsed <= 0 {
-			elapsed = 1 // avoid divide by 0
-		}
-
-		var byte_count = s.ttCount * s.ttLength
-
-		var summary = fmt.Sprintf("%d bytes in %d seconds, %d bytes/sec, efficiency %d%% at 1200, %d%% at 9600.\r",
-			byte_count, elapsed, int(float64(byte_count)/elapsed.Seconds()),
-			int(float64(byte_count)*8*100/elapsed.Seconds()/1200),
-			int(float64(byte_count)*8*100/elapsed.Seconds()/9600))
-
-		agwlib_D_send_connected_data(s.channel, 0xF0, mycall, s.addr, []byte(summary))
-		s.ttCount = 0 // all done.
+		return
 	}
+
+	// All done queuing up the packets.
+	// Wait until they have all been sent and ack'ed by other end.
+	if queued > 0 {
+		s.mu.Unlock()
+
+		return // not done yet.
+	}
+
+	var elapsed = time.Since(s.ttStartTime).Seconds()
+	if elapsed <= 0 {
+		elapsed = 0.001 // avoid divide by 0
+	}
+
+	var byte_count = s.ttCount * s.ttLength
+
+	s.ttCount = 0 // all done.
+
+	s.mu.Unlock()
+
+	var summary = fmt.Sprintf("%d bytes in %.1f seconds, %.0f bytes/sec, efficiency %.0f%% at 1200, %.0f%% at 9600.\r",
+		byte_count, elapsed, float64(byte_count)/elapsed,
+		float64(byte_count)*8*100/elapsed/1200,
+		float64(byte_count)*8*100/elapsed/9600)
+
+	agwlib_D_send_connected_data(s.channel, 0xF0, s.localCall, s.addr, []byte(summary))
+}
+
+// timingTestFrame builds one frame of the timing test: the sequence number
+// followed by enough repeating alphanumeric filler to reach length bytes.
+func timingTestFrame(seq int, length int) []byte {
+	var c = 'a'
+
+	var stuff = fmt.Sprintf("%06d ", seq)
+	for k := len(stuff); k < length-1; k++ {
+		stuff += string(c)
+
+		c++
+		if c == 'z'+1 {
+			c = 'A'
+		}
+
+		if c == 'Z'+1 {
+			c = '0'
+		}
+
+		if c == '9'+1 {
+			c = 'a'
+		}
+	}
+
+	stuff += "\r"
+
+	return []byte(stuff)
 }
 
 /*-------------------------------------------------------------------
@@ -374,7 +475,7 @@ func (s *session) pollTimingTest() {
 
 // old void agw_cb_C_connection_received (int chan, char *call_from, char *call_to, int data_len, char *data)
 func on_C_connection_received(channel byte, call_from Callsign, call_to Callsign, incoming bool, data []byte) { //nolint:unparam
-	srv.getOrCreateSession(channel, call_from)
+	srv.getOrCreateSession(channel, call_from, call_to)
 
 	fmt.Printf("Begin session %d,%s: %s\n", channel, call_from, data)
 
@@ -436,12 +537,85 @@ func agw_cb_d_disconnected(channel byte, call_from Callsign, call_to Callsign, d
 // commandHandler implements one connected-mode user command (e.g. "who", "bye").
 type commandHandler func(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte)
 
-var commandTable = map[string]commandHandler{
-	"who":  cmd_who,
-	"test": cmd_test,
-	"bye":  cmd_bye,
-	"help": cmd_help,
-	"?":    cmd_help,
+// command is one user command, along with what "?" and "HELP" say about it.
+type command struct {
+	name    string   // What the user types.  Lower case; input is folded to match.
+	aliases []string // Other names for the same command.
+	usage   string   // Name and arguments, for the command list.
+	summary string   // One line, for the command list.
+	detail  []string // What "HELP <command>" prints.
+	handler commandHandler
+}
+
+// userCommands returns the commands, in the order "?" lists them.  It is a
+// function rather than a package variable so that cmd_help, which is one of the
+// handlers here, can read the table it appears in.
+func userCommands() []command {
+	return []command{
+		{
+			name:    "bye",
+			aliases: nil,
+			usage:   "BYE",
+			summary: "Disconnect.",
+			detail: []string{
+				"BYE",
+				"Say goodbye and hang up.  The link stays up until everything queued",
+				"for you has been acknowledged, so nothing gets cut off.",
+			},
+			handler: cmd_bye,
+		},
+		{
+			name:    "help",
+			aliases: []string{"?"},
+			usage:   "HELP <command>",
+			summary: "Describe one command.",
+			detail: []string{
+				"HELP <command>",
+				"Describe one command.  With nothing after it, or as ?, list them all.",
+			},
+			handler: cmd_help,
+		},
+		{
+			name:    "test",
+			aliases: nil,
+			usage:   "TEST [count [length]]",
+			summary: "Measure throughput.",
+			detail: []string{
+				"TEST [count [length]]",
+				"Send count frames of length bytes each, then report how long it took",
+				"and how close that came to the channel's bit rate.",
+				fmt.Sprintf("count defaults to 1 and may be up to %d; length defaults to 256", maxTestCount),
+				fmt.Sprintf("and is clamped to between 16 and %d bytes.", AX25_MAX_INFO_LEN),
+			},
+			handler: cmd_test,
+		},
+		{
+			name:    "who",
+			aliases: nil,
+			usage:   "WHO",
+			summary: "List the stations connected now.",
+			detail: []string{
+				"WHO",
+				"List the stations connected to this server, with the channel each one",
+				"came in on and when it connected.",
+			},
+			handler: cmd_who,
+		},
+	}
+}
+
+// lookupCommand finds the command answering to name, which must be lower case,
+// and returns nil if there is not one.
+func lookupCommand(name string) *command {
+	var cmds = userCommands()
+
+	for n := range cmds {
+		if cmds[n].name == name || slices.Contains(cmds[n].aliases, name) {
+			return &cmds[n]
+		}
+	}
+
+	return nil
 }
 
 func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign, data []byte) {
@@ -461,8 +635,10 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 	fmt.Printf("%d,%s: %s\n", channel, call_from, dataStr)
 
 	// Process the command from user.
+	// A terminal ends the line with a carriage return, and some send a line
+	// feed too; neither is part of the command or of its arguments.
 
-	var _pcmd, rest, _ = BytesCut(data, ' ')
+	var _pcmd, rest, _ = BytesCut(bytes.TrimSpace(data), ' ')
 
 	var pcmd = string(_pcmd)
 	if pcmd == "" {
@@ -473,8 +649,8 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		return
 	}
 
-	var handler, ok = commandTable[strings.ToLower(pcmd)]
-	if !ok {
+	var cmd = lookupCommand(strings.ToLower(pcmd))
+	if cmd == nil {
 		// command not recognized.
 		var greeting = "Invalid command. Type ? for list of commands or HELP <command> for details.\r"
 
@@ -483,21 +659,39 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		return
 	}
 
-	handler(s, channel, call_to, call_from, rest)
+	cmd.handler(s, channel, call_to, call_from, rest)
 } /* end agw_cb_D_connected_data */
+
+// sendLines sends one connected-mode frame per line, each ending with the
+// carriage return AX.25 terminals expect.
+func sendLines(channel byte, call_to Callsign, call_from Callsign, lines []string) {
+	for _, line := range lines {
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line+"\r"))
+	}
+}
+
+// loginTimeFormat renders a login time for "who".  UTC, because the stations
+// listed are not necessarily in the same time zone as the one reading it, and
+// packet operators think in UTC anyway.
+const loginTimeFormat = "2006-01-02 15:04:05Z"
 
 // cmd_who lists people currently logged in.
 func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
-	var greeting = "Session Channel User   Since\r"
-
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+	var lines = []string{fmt.Sprintf("%-7s %-7s %-9s %s", "Session", "Channel", "User", "Since")}
 
 	for n, other := range srv.sortedSessions() {
-		var line = fmt.Sprintf("  %2d       %d    %-9s [time later]\r", n, other.channel, other.addr)
-
-		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line))
+		lines = append(lines, fmt.Sprintf("%-7d %-7d %-9s %s",
+			n, other.channel, other.addr, other.loginTime.UTC().Format(loginTimeFormat)))
 	}
+
+	sendLines(channel, call_to, call_from, lines)
 }
+
+// maxTestCount caps the frames one TEST may ask for.  The test transmits for as
+// long as it takes and the channel is shared, so an unbounded count would let
+// one station hold the air for as long as it cared to stay connected.  A
+// thousand frames is several minutes at 9600 baud, and TEST can be run again.
+const maxTestCount = 1000
 
 // cmd_test runs a timing test: send the specified number of frames with optional length.
 func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
@@ -509,43 +703,96 @@ func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, re
 
 	var plength = string(_plength)
 
-	s.ttStartTime = time.Now()
-	s.ttNext = 1
-	s.ttLength = 256
-	s.ttCount = 1
-
-	if plength != "" {
-		s.ttLength, _ = strconv.Atoi(plength)
-		if s.ttLength < 16 {
-			s.ttLength = 16
-		}
-
-		if s.ttLength > AX25_MAX_INFO_LEN {
-			s.ttLength = AX25_MAX_INFO_LEN
-		}
-	}
+	var count = 1
 
 	if pcount != "" {
-		s.ttCount, _ = strconv.Atoi(pcount)
+		var countErr error
+
+		count, countErr = strconv.Atoi(pcount)
+		if countErr != nil || count < 1 || count > maxTestCount {
+			sendLines(channel, call_to, call_from,
+				[]string{fmt.Sprintf("TEST: %s is not a frame count between 1 and %d.  Type HELP TEST.", pcount, maxTestCount)})
+
+			return
+		}
 	}
+
+	var length = 256
+
+	if plength != "" {
+		var lengthErr error
+
+		length, lengthErr = strconv.Atoi(plength)
+		if lengthErr != nil {
+			sendLines(channel, call_to, call_from, []string{fmt.Sprintf("TEST: %s is not a frame length.  Type HELP TEST.", plength)})
+
+			return
+		}
+
+		if length < 16 {
+			length = 16
+		}
+
+		if length > AX25_MAX_INFO_LEN {
+			length = AX25_MAX_INFO_LEN
+		}
+	}
+
+	s.mu.Lock()
+
+	s.ttStartTime = time.Now()
+	s.ttNext = 1
+	s.ttLength = length
+	s.ttCount = count
+
+	s.mu.Unlock()
+
+	// Say so: the frames themselves start arriving a second later, from the
+	// main loop, and until now nothing told the user anything had begun.
+	sendLines(channel, call_to, call_from, []string{fmt.Sprintf("Sending %d frame(s) of %d bytes; summary to follow.", count, length)})
 }
 
-// cmd_bye disconnects the user.
+// cmd_bye says farewell and hands the disconnect to the main loop, which waits
+// for the outgoing queue to drain before pulling the link down.  We are on the
+// listener goroutine here, and every session on every channel shares it, so
+// waiting for anything at all would freeze the lot of them.
 func cmd_bye(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
-	var greeting = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
+	var farewell = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
 
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-	// Ideally we'd want to wait until nothing in the outgoing queue
-	// to that station so we know the message was received.
-	direwolf.SLEEP_SEC(10)
-	agwlib_d_disconnect(channel, call_to, call_from)
+	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(farewell))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.byeDeadline = maybe.Just(time.Now().Add(byeDrainTimeout))
 }
 
-// cmd_help prints help text.
+// cmd_help lists the commands, or describes the one named.
 func cmd_help(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
-	var greeting = "Help not yet available.\r"
+	var _topic, _, _ = BytesCut(bytes.TrimSpace(rest), ' ')
 
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+	var topic = strings.ToLower(string(_topic))
+
+	var topicCommand = lookupCommand(topic)
+
+	var lines []string
+
+	switch {
+	case topic == "":
+		lines = append(lines, "Commands:")
+
+		for _, c := range userCommands() {
+			lines = append(lines, fmt.Sprintf("  %-21s %s", c.usage, c.summary))
+		}
+
+		lines = append(lines, "Type HELP <command> for details.")
+	case topicCommand != nil:
+		lines = topicCommand.detail
+	default:
+		lines = []string{fmt.Sprintf("No such command: %s.  Type ? for the list.", topic)}
+	}
+
+	sendLines(channel, call_to, call_from, lines)
 }
 
 /*-------------------------------------------------------------------
@@ -630,7 +877,10 @@ func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, c
 
 	// Update the transmit queue length
 
-	s.txQueueLen = frame_count
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.txQueueLen = maybe.Just(frame_count)
 } /* end agw_cb_Y_outstanding_frames_for_station */
 
 // BytesCut is strings.Cut for []bytes.
