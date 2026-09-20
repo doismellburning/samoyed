@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
@@ -378,19 +379,19 @@ type parse_ll_which_e int
 const LAT parse_ll_which_e = 0
 const LON parse_ll_which_e = 1
 
-func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[float64] {
+func parse_ll_maybe(str string, which parse_ll_which_e, line int) (maybe.Maybe[float64], error) {
+	// One bad coordinate can be wrong in more than one way - a hemisphere that
+	// does not belong to this axis and minutes that are not minutes - so gather
+	// the complaints rather than stopping at the first.
+	var problems []error
+
 	var stemp = str
 
 	/*
 	 * Nothing to parse, and nothing to index into either.
 	 */
 	if stemp == "" {
-		logrus.WithFields(logrus.Fields{
-			"line":       line,
-			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
-		}).Error("Missing coordinate")
-
-		return maybe.Nothing[float64]()
+		return maybe.Nothing[float64](), fmt.Errorf("line %d: Missing %s", line, coordinateName(which))
 	}
 
 	/*
@@ -421,13 +422,11 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[fl
 
 			if which == LAT {
 				if hemi != 'N' && hemi != 'S' {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Latitude hemisphere in \"%s\" is not N or S.\n", line, str)
+					problems = append(problems, fmt.Errorf("line %d: Latitude hemisphere in \"%s\" is not N or S", line, str))
 				}
 			} else {
 				if hemi != 'E' && hemi != 'W' {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Longitude hemisphere in \"%s\" is not E or W.\n", line, str)
+					problems = append(problems, fmt.Errorf("line %d: Longitude hemisphere in \"%s\" is not E or W", line, str))
 				}
 			}
 		}
@@ -445,28 +444,21 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[fl
 
 	var degrees, degreesErr = strconv.ParseFloat(degreesStr, 64)
 	if degreesErr != nil {
-		logrus.WithFields(logrus.Fields{
-			"line":    line,
-			"degrees": degreesStr,
-		}).WithError(degreesErr).Error("Could not parse degrees")
+		problems = append(problems, fmt.Errorf("line %d: Number of degrees in \"%s\" is not a number: %w", line, degreesStr, degreesErr))
 
-		return maybe.Nothing[float64]()
+		return maybe.Nothing[float64](), errors.Join(problems...)
 	}
 
 	if minutesFound {
 		var minutes, minutesErr = strconv.ParseFloat(minutesStr, 64)
 		if minutesErr != nil {
-			logrus.WithFields(logrus.Fields{
-				"line":    line,
-				"minutes": minutesStr,
-			}).WithError(minutesErr).Error("Could not parse minutes")
+			problems = append(problems, fmt.Errorf("line %d: Number of minutes in \"%s\" is not a number: %w", line, minutesStr, minutesErr))
 
-			return maybe.Nothing[float64]()
+			return maybe.Nothing[float64](), errors.Join(problems...)
 		}
 
 		if minutes >= 60.0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Number of minutes in \"%s\" is >= 60.\n", line, minutesStr)
+			problems = append(problems, fmt.Errorf("line %d: Number of minutes in \"%s\" is >= 60", line, minutesStr))
 		}
 
 		degrees += minutes / 60
@@ -475,35 +467,33 @@ func parse_ll_maybe(str string, which parse_ll_which_e, line int) maybe.Maybe[fl
 	degrees *= float64(sign)
 
 	if math.IsNaN(degrees) || math.IsInf(degrees, 0) {
-		logrus.WithFields(logrus.Fields{
-			"line":       line,
-			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
-			"value":      str,
-		}).Error("Coordinate is not a finite number")
+		problems = append(problems, fmt.Errorf("line %d: %s \"%s\" is not a finite number", line, coordinateName(which), str))
 
-		return maybe.Nothing[float64]()
+		return maybe.Nothing[float64](), errors.Join(problems...)
 	}
 
 	var limit = float64(IfThenElse(which == LAT, 90, 180))
 	if degrees < -limit || degrees > limit {
-		logrus.WithFields(logrus.Fields{
-			"line":       line,
-			"coordinate": IfThenElse(which == LAT, "latitude", "longitude"),
-			"value":      str,
-			"limit":      limit,
-		}).Error("Number of degrees is out of range")
+		problems = append(problems, fmt.Errorf("line %d: %s \"%s\" is out of range of +- %.0f degrees", line, coordinateName(which), str, limit))
 
-		return maybe.Nothing[float64]()
+		return maybe.Nothing[float64](), errors.Join(problems...)
 	}
-	//dw_printf ("%s = %f\n", str, degrees);
-	return maybe.Just(degrees)
+
+	return maybe.Just(degrees), errors.Join(problems...)
+}
+
+// coordinateName names a coordinate for an error message.
+func coordinateName(which parse_ll_which_e) string {
+	return IfThenElse(which == LAT, "latitude", "longitude")
 }
 
 // parse_ll is parse_ll_maybe for the callers that have nowhere to put the
 // absence yet and so treat a coordinate they can't use as zero; see issue
 // #619.
-func parse_ll(str string, which parse_ll_which_e, line int) float64 {
-	return maybe.FromMaybe(0, parse_ll_maybe(str, which, line))
+func parse_ll(str string, which parse_ll_which_e, line int) (float64, error) {
+	var ll, err = parse_ll_maybe(str, which, line)
+
+	return maybe.FromMaybe(0, ll), err
 }
 
 /*------------------------------------------------------------------
@@ -535,7 +525,11 @@ func parse_ll(str string, which parse_ll_which_e, line int) float64 {
  *
  *----------------------------------------------------------------*/
 
-func parse_utm_zone(szone string) (rune, rune, int) {
+func parse_utm_zone(szone string) (rune, rune, int, error) {
+	// A zone can be wrong in both its band letter and its number, so gather the
+	// complaints rather than stopping at the first.
+	var problems []error
+
 	var latband = ' '
 	var hemi = 'N' /* default */
 
@@ -565,19 +559,17 @@ func parse_utm_zone(szone string) (rune, rune, int) {
 				hemi = 'S'
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Latitudinal band in \"%s\" must be one of CDEFGHJKLMNPQRSTUVWX.\n", szone)
+			problems = append(problems, fmt.Errorf("latitudinal band in \"%s\" must be one of CDEFGHJKLMNPQRSTUVWX", szone))
 
 			hemi = '?'
 		}
 	}
 
 	if lzone < 1 || lzone > 60 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("UTM Zone number %d must be in range of 1 to 60.\n", lzone)
+		problems = append(problems, fmt.Errorf("UTM Zone number %d must be in range of 1 to 60", lzone))
 	}
 
-	return latband, hemi, lzone
+	return latband, hemi, lzone, errors.Join(problems...)
 } /* end parse_utm_zone */
 
 /*
@@ -635,7 +627,7 @@ main ()
  *
  *----------------------------------------------------------------*/
 
-func parse_interval(keyword string, str string, line int) (int, bool) {
+func parse_interval(keyword string, str string, line int) (int, error) {
 	var minutesStr, secondsStr, found = strings.Cut(str, ":")
 
 	var minutes, minutesErr = strconv.Atoi(minutesStr)
@@ -650,16 +642,10 @@ func parse_interval(keyword string, str string, line int) (int, bool) {
 	}
 
 	if minutesErr != nil || secondsErr != nil {
-		logrus.WithFields(logrus.Fields{
-			"line":   line,
-			"option": keyword,
-			"value":  str,
-		}).Error("Time interval must be of the form minutes or minutes:seconds, ignoring it")
-
-		return 0, false
+		return 0, fmt.Errorf("line %d: Time interval for %s, \"%s\", must be of the form minutes or minutes:seconds.  Ignoring it", line, keyword, str)
 	}
 
-	return interval, true
+	return interval, nil
 } /* end parse_interval */
 
 /*------------------------------------------------------------------
@@ -701,7 +687,7 @@ func parse_interval(keyword string, str string, line int) (int, bool) {
 
 //#define DEBUG8 1
 
-func check_via_path(via_path string) int {
+func check_via_path(via_path string) (int, error) {
 	logrus.WithField("via_path", via_path).Debug("check_via_path")
 	var parts = strings.Split(via_path, ",")
 	var num_digi = 0
@@ -715,7 +701,7 @@ func check_via_path(via_path string) int {
 		if !ok {
 			logrus.Debug("check_via_path bad address")
 
-			return (-1)
+			return -1, nil
 		}
 
 		/* Based on assumption that a callsign can't end with a digit. */
@@ -729,10 +715,7 @@ func check_via_path(via_path string) int {
 	}
 
 	if num_digi > AX25_MAX_REPEATERS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Maximum of 8 digipeaters has been exceeded.\n")
-
-		return (-1)
+		return -1, errors.New("maximum of 8 digipeaters has been exceeded")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -740,7 +723,7 @@ func check_via_path(via_path string) int {
 		"max_digi_hops": max_digi_hops,
 	}).Debug("check_via_path")
 
-	return (max_digi_hops)
+	return max_digi_hops, nil
 } /* end check_via_path */
 
 /*-------------------------------------------------------------------
@@ -870,6 +853,8 @@ outerLoop:
  *
  *--------------------------------------------------------------------*/
 
+// rtfm points at the documentation.  It is a trailer on someone else's
+// complaint rather than a complaint of its own, so it is not counted.
 func rtfm() {
 	text_color_set(DW_COLOR_ERROR)
 	dw_printf("See online documentation:\n")
@@ -893,11 +878,152 @@ type parseState struct {
 	tt    *tt_config_s
 	igate *igate_config_s
 	misc  *misc_config_s
+
+	// Tallies of what the file turned out to be like, for the caller to act on.
+	// An error means the configuration is wrong - a directive that could not be
+	// obeyed, or was obeyed only by falling back to a default.  A warning means
+	// it parsed but looks suspect, which is advice rather than grounds for
+	// refusing to start.
+	nerrors   int
+	nwarnings int
 }
 
-// configHandler is a keyword handler. It returns true if the outer scanner loop
-// should `continue` (i.e. skip to the next line).
-type configHandler func(ps *parseState) bool
+// Complaints about the configuration file are written the way Go wants an error
+// string - starting lower case and with no full stop, so that one still reads
+// correctly wrapped inside another.  Nobody configuring a TNC wants to read
+// that, though, so printProblem renders one as a sentence on its way out.
+
+// errorf reports a problem with the current line and counts it.
+//
+// A handler that has nothing more to do with the line returns its complaint
+// instead, and config_init reports it; errorf is for the sites that carry on -
+// "out of range, using the default" and the like - and so have more of the line
+// to get through before they can return.
+func (ps *parseState) errorf(format string, a ...any) {
+	ps.nerrors++
+
+	ps.printProblem(fmt.Sprintf(format, a...))
+}
+
+// warnf reports something that parses but looks suspect.  Warnings are counted
+// separately from errors: they are advice, and do not on their own mean the
+// configuration should be rejected.
+func (ps *parseState) warnf(format string, a ...any) {
+	ps.nwarnings++
+
+	ps.printProblem(fmt.Sprintf(format, a...))
+}
+
+// report prints a problem a handler returned, and counts it.  errors.Join
+// gathers several complaints about one line into a single error, so unwrap
+// those and take them one at a time - otherwise a line with three things wrong
+// with it would be counted once.
+func (ps *parseState) report(err error) {
+	var joined interface{ Unwrap() []error }
+	if errors.As(err, &joined) {
+		for _, e := range joined.Unwrap() {
+			ps.report(e)
+		}
+
+		return
+	}
+
+	ps.nerrors++
+
+	ps.printProblem(err.Error())
+}
+
+// printProblem writes one complaint out for whoever wrote the configuration
+// file: a capital letter to start and a full stop to finish, unless the
+// complaint already ends in punctuation of its own.
+func (ps *parseState) printProblem(msg string) {
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("%s\n", asSentence(msg))
+}
+
+// asSentence renders an error string as a sentence.
+func asSentence(msg string) string {
+	if msg == "" {
+		return msg
+	}
+
+	var first, size = utf8.DecodeRuneInString(msg)
+	if unicode.IsLower(first) {
+		msg = string(unicode.ToUpper(first)) + msg[size:]
+	}
+
+	switch msg[len(msg)-1] {
+	case '.', '?', '!', ':':
+		return msg
+	}
+
+	return msg + "."
+}
+
+// reportedOK reports err, if there is one, and says whether the value beside it
+// can be used.  It keeps the "read a number, or leave the option alone" shape
+// of the beacon options readable at each of the dozen places it appears.
+func (ps *parseState) reportedOK(err error) bool {
+	if err != nil {
+		ps.report(err)
+
+		return false
+	}
+
+	return true
+}
+
+// parseLL reads a coordinate from the current line, reporting anything wrong
+// with it.  A coordinate that cannot be read at all comes back as zero, as it
+// did before there was anywhere to put its absence (see issue #619).
+func (ps *parseState) parseLL(str string, which parse_ll_which_e) float64 {
+	var ll, err = parse_ll(str, which, ps.line)
+	if err != nil {
+		ps.report(err)
+	}
+
+	return ll
+}
+
+// parseLLMaybe is parseLL for the callers that can represent a coordinate that
+// is not there.
+func (ps *parseState) parseLLMaybe(str string, which parse_ll_which_e) maybe.Maybe[float64] {
+	var ll, err = parse_ll_maybe(str, which, ps.line)
+	if err != nil {
+		ps.report(err)
+	}
+
+	return ll
+}
+
+// parseUTMZone reads a UTM zone from the current line, reporting anything wrong
+// with it.
+func (ps *parseState) parseUTMZone(szone string) (rune, rune, int) {
+	var latband, hemi, lzone, err = parse_utm_zone(szone)
+	if err != nil {
+		ps.report(err)
+	}
+
+	return latband, hemi, lzone
+}
+
+// checkViaPath validates a digipeater path from the current line, reporting
+// anything wrong with it.  A path that is no good is a negative hop count, as
+// it was before.
+func (ps *parseState) checkViaPath(via_path string) int {
+	var hops, err = check_via_path(via_path)
+	if err != nil {
+		ps.report(err)
+	}
+
+	return hops
+}
+
+// configHandler is a keyword handler.  A nil return means the directive was
+// accepted; anything else is a problem with the line, which config_init reports
+// and counts.  A handler with several complaints about one line joins them with
+// errors.Join.
+type configHandler func(ps *parseState) error
 
 var configHandlers = map[string]configHandler{
 	"ARATE":          handleARATE,
@@ -987,12 +1113,16 @@ var configHandlers = map[string]configHandler{
 	"NOXID":          handleNOXID,
 }
 
+// config_init reads the configuration file, applying defaults first so that the
+// file can override them.  It returns how many errors and how many warnings the
+// file drew, for a caller that wants to act on them - see the ---config-check
+// option in DirewolfMain.
 func config_init(fname string, p_audio_config *audio_s,
 	p_digi_config *digi_config_s,
 	p_cdigi_config *cdigi_config_s,
 	p_tt_config *tt_config_s,
 	p_igate_config *igate_config_s,
-	p_misc_config *misc_config_s) {
+	p_misc_config *misc_config_s) (nerrors int, nwarnings int) {
 	logrus.WithField("fname", fname).Debug("config_init")
 
 	/*
@@ -1199,6 +1329,9 @@ func config_init(fname string, p_audio_config *audio_s,
 		tt:      p_tt_config,
 		igate:   p_igate_config,
 		misc:    p_misc_config,
+
+		nerrors:   0,
+		nwarnings: 0,
 	}
 
 	/*
@@ -1221,12 +1354,15 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	var fp, fpErr = os.Open(absFilePath) //nolint:gosec
 	if fpErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not open configuration file %s: %s\n", absFilePath, fpErr)
-		dw_printf("Try using -c command line option for alternate location.\n")
-		dw_printf("A sample direwolf.conf file should be found in one of:\n")
-		dw_printf("    /usr/local/share/doc/direwolf/conf/\n")
-		dw_printf("    /usr/share/doc/direwolf/conf/\n")
+		ps.errorf(
+			"ERROR - Could not open configuration file %s: %s\n"+
+				"Try using -c command line option for alternate location.\n"+
+				"A sample direwolf.conf file should be found in one of:\n"+
+				"    /usr/local/share/doc/direwolf/conf/\n"+
+				"    /usr/share/doc/direwolf/conf/",
+			absFilePath,
+			fpErr,
+		)
 		rtfm()
 		os.Exit(1)
 	} else {
@@ -1251,30 +1387,31 @@ func config_init(fname string, p_audio_config *audio_s,
 		}
 
 		ps.keyword = t
+
 		var keyword = strings.ToUpper(t)
+
+		var err error
 		// Some config keywords actually incorporate a device number, e.g. ADEVICE0
-		if strings.HasPrefix(keyword, "ADEVICE") {
-			if handleADEVICE(ps) {
-				continue
+		switch {
+		case strings.HasPrefix(keyword, "ADEVICE"):
+			err = handleADEVICE(ps)
+		case strings.HasPrefix(keyword, "PAIDEVICE"):
+			err = handlePAIDEVICE(ps)
+		case strings.HasPrefix(keyword, "PAODEVICE"):
+			err = handlePAODEVICE(ps)
+		default:
+			if handler, ok := configHandlers[keyword]; ok {
+				err = handler(ps)
+			} else {
+				/*
+				 * Invalid command.
+				 */
+				err = fmt.Errorf("config file: Unrecognized command '%s' on line %d", t, ps.line)
 			}
-		} else if strings.HasPrefix(keyword, "PAIDEVICE") {
-			if handlePAIDEVICE(ps) {
-				continue
-			}
-		} else if strings.HasPrefix(keyword, "PAODEVICE") {
-			if handlePAODEVICE(ps) {
-				continue
-			}
-		} else if handler, ok := configHandlers[keyword]; ok {
-			if handler(ps) {
-				continue
-			}
-		} else {
-			/*
-			 * Invalid command.
-			 */
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Unrecognized command '%s' on line %d.\n", t, ps.line)
+		}
+
+		if err != nil {
+			ps.report(err)
 		}
 	}
 
@@ -1293,14 +1430,12 @@ func config_init(fname string, p_audio_config *audio_s,
 			/* APRS digipeating. */
 			if ps.digi.enabled[i][j] {
 				if IsNoCall(ps.audio.mycall[i]) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
+					ps.errorf("config file: MYCALL must be set for receive channel %d before digipeating is allowed", i)
 					ps.digi.enabled[i][j] = false
 				}
 
 				if IsNoCall(ps.audio.mycall[j]) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", j)
+					ps.errorf("config file: MYCALL must be set for transmit channel %d before digipeating is allowed", j)
 					ps.digi.enabled[i][j] = false
 				}
 
@@ -1313,8 +1448,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				if b == 0 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: Beaconing should be configured for channel %d when digipeating is enabled.\n", j)
+					ps.warnf("config file: Beaconing should be configured for channel %d when digipeating is enabled", j)
 					// It's a recommendation, not a requirement.
 					// Was there some good reason to turn it off in earlier version?
 					//ps.digi.enabled[i][j] = 0;
@@ -1325,14 +1459,12 @@ func config_init(fname string, p_audio_config *audio_s,
 
 			if i < MAX_RADIO_CHANS && j < MAX_RADIO_CHANS && ps.cdigi.enabled[i][j] {
 				if IsNoCall(ps.audio.mycall[i]) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for receive channel %d before digipeating is allowed.\n", i)
+					ps.errorf("config file: MYCALL must be set for receive channel %d before digipeating is allowed", i)
 					ps.cdigi.enabled[i][j] = false
 				}
 
 				if IsNoCall(ps.audio.mycall[j]) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: MYCALL must be set for transmit channel %d before digipeating is allowed.\n", j)
+					ps.errorf("config file: MYCALL must be set for transmit channel %d before digipeating is allowed", j)
 					ps.cdigi.enabled[i][j] = false
 				}
 
@@ -1345,8 +1477,7 @@ func config_init(fname string, p_audio_config *audio_s,
 				}
 
 				if b == 0 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: Beaconing should be configured for channel %d when digipeating is enabled.\n", j)
+					ps.warnf("config file: Beaconing should be configured for channel %d when digipeating is enabled", j)
 					// It's a recommendation, not a requirement.
 				}
 			}
@@ -1357,16 +1488,14 @@ func config_init(fname string, p_audio_config *audio_s,
 		if len(ps.igate.t2_login) > 0 &&
 			(ps.audio.chan_medium[i] == MEDIUM_RADIO || ps.audio.chan_medium[i] == MEDIUM_NETTNC) {
 			if IsNoCall(ps.audio.mycall[i]) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: MYCALL must be set for receive channel %d before Rx IGate is allowed.\n", i)
+				ps.errorf("config file: MYCALL must be set for receive channel %d before Rx IGate is allowed", i)
 
 				ps.igate.t2_login = ""
 			}
 			// Currently we can have only one transmit channel.
 			// This might be generalized someday to allow more.
 			if ps.igate.tx_chan >= 0 && IsNoCall(ps.audio.mycall[ps.igate.tx_chan]) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: MYCALL must be set for transmit channel %d before Tx IGate is allowed.\n", i)
+				ps.errorf("config file: MYCALL must be set for transmit channel %d before Tx IGate is allowed", i)
 
 				ps.igate.tx_chan = -1
 			}
@@ -1391,10 +1520,12 @@ func config_init(fname string, p_audio_config *audio_s,
 	if ps.misc.maxv22 < 0 {
 		ps.misc.maxv22 = ps.misc.retry / 3
 	}
+
+	return ps.nerrors, ps.nwarnings
 } /* end config_init */
 
 // handleADEVICE handles the ADEVICE[n] keyword.
-func handleADEVICE(ps *parseState) bool {
+func handleADEVICE(ps *parseState) error {
 	/*
 	 * ADEVICE[n] 		- Name of input sound device, and optionally output, if different.
 	 *
@@ -1418,17 +1549,20 @@ func handleADEVICE(ps *parseState) bool {
 		if iErr != nil {
 			dw_printf("Config file: Could not parse ADEVICE number on line %d: %s.\n", ps.line, iErr)
 
-			return true
+			return nil
 		}
 
 		if i < 0 || i >= MAX_ADEVS {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Device number %d out of range for ADEVICE command on line %d.\n", i, ps.line)
-			dw_printf("If you really need more than %d audio devices, increase MAX_ADEVS and recompile.\n", MAX_ADEVS)
+			ps.errorf(
+				"Config file: Device number %d out of range for ADEVICE command on line %d.\nIf you really need more than %d audio devices, increase MAX_ADEVS and recompile.",
+				i,
+				ps.line,
+				MAX_ADEVS,
+			)
 
 			ps.adevice = 0
 
-			return true
+			return nil
 		}
 
 		ps.adevice = i
@@ -1436,10 +1570,12 @@ func handleADEVICE(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing name of audio device for ADEVICE command on line %d.\n", ps.line)
+		// Reported here rather than returned, so that the pointer at the
+		// documentation still follows the complaint it belongs to.
+		ps.errorf("config file: Missing name of audio device for ADEVICE command on line %d", ps.line)
 		rtfm()
-		os.Exit(1)
+
+		return nil
 	}
 
 	// Do not allow same adevice to be defined more than once.
@@ -1447,24 +1583,18 @@ func handleADEVICE(ps *parseState) bool {
 	// In that case defined was 2.  That's why we check for 1, not just non-zero.
 
 	if ps.audio.adev[ps.adevice].defined == 1 { // 1 means defined by user.
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: ADEVICE%d can't be defined more than once. Line %d.\n", ps.adevice, ps.line)
-
-		return true
+		return fmt.Errorf("config file: ADEVICE%d can't be defined more than once. Line %d", ps.adevice, ps.line)
 	}
 
 	// New case for release 1.8.
 
 	if t == "=" {
 		t = split("", false)
-		text_color_set(DW_COLOR_ERROR)
 		if t == "" {
-			dw_printf("Config file: ADEVICE%d mapping syntax requires a source device number on line %d.\n", ps.adevice, ps.line)
-		} else {
-			dw_printf("Config file: ADEVICE%d = %s mapping syntax is not implemented on line %d.\n", ps.adevice, t, ps.line)
+			return fmt.Errorf("config file: ADEVICE%d mapping syntax requires a source device number on line %d", ps.adevice, ps.line)
 		}
 
-		return true
+		return fmt.Errorf("config file: ADEVICE%d = %s mapping syntax is not implemented on line %d", ps.adevice, t, ps.line)
 	}
 
 	ps.audio.adev[ps.adevice].defined = 1
@@ -1483,11 +1613,11 @@ func handleADEVICE(ps *parseState) bool {
 		ps.audio.adev[ps.adevice].adevice_out_specified = true
 	}
 
-	return false
+	return nil
 }
 
 // handlePAIDEVICE handles PAIDEVICE[n].
-func handlePAIDEVICE(ps *parseState) bool {
+func handlePAIDEVICE(ps *parseState) error {
 	// ps.keyword holds the original token e.g. "PAIDEVICE" or "PAIDEVICE1".
 	ps.adevice = 0
 	if len(ps.keyword) > 9 && unicode.IsDigit(rune(ps.keyword[9])) {
@@ -1495,19 +1625,15 @@ func handlePAIDEVICE(ps *parseState) bool {
 	}
 
 	if ps.adevice < 0 || ps.adevice >= MAX_ADEVS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Device number %d out of range for PAIDEVICE command on line %d.\n", ps.adevice, ps.line)
+		ps.errorf("config file: Device number %d out of range for PAIDEVICE command on line %d", ps.adevice, ps.line)
 		ps.adevice = 0
 
-		return true
+		return nil
 	}
 
 	var t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing name of audio device for PAIDEVICE command on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing name of audio device for PAIDEVICE command on line %d", ps.line)
 	}
 
 	ps.audio.adev[ps.adevice].defined = 1
@@ -1517,11 +1643,11 @@ func handlePAIDEVICE(ps *parseState) bool {
 
 	ps.audio.adev[ps.adevice].adevice_in = t
 
-	return false
+	return nil
 }
 
 // handlePAODEVICE handles PAODEVICE[n].
-func handlePAODEVICE(ps *parseState) bool {
+func handlePAODEVICE(ps *parseState) error {
 	// ps.keyword holds the original token e.g. "PAODEVICE" or "PAODEVICE1".
 	ps.adevice = 0
 	if len(ps.keyword) > 9 && unicode.IsDigit(rune(ps.keyword[9])) {
@@ -1529,19 +1655,15 @@ func handlePAODEVICE(ps *parseState) bool {
 	}
 
 	if ps.adevice < 0 || ps.adevice >= MAX_ADEVS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Device number %d out of range for PAODEVICE command on line %d.\n", ps.adevice, ps.line)
+		ps.errorf("config file: Device number %d out of range for PAODEVICE command on line %d", ps.adevice, ps.line)
 		ps.adevice = 0
 
-		return true
+		return nil
 	}
 
 	var t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing name of audio device for PAODEVICE command on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing name of audio device for PAODEVICE command on line %d", ps.line)
 	}
 
 	ps.audio.adev[ps.adevice].defined = 1
@@ -1552,45 +1674,37 @@ func handlePAODEVICE(ps *parseState) bool {
 	ps.audio.adev[ps.adevice].adevice_out = t
 	ps.audio.adev[ps.adevice].adevice_out_specified = true
 
-	return false
+	return nil
 }
 
 // handleARATE handles the ARATE keyword.
-func handleARATE(ps *parseState) bool {
+func handleARATE(ps *parseState) error {
 	/*
 	 * ARATE 		- Audio samples per second, 11025, 22050, 44100, etc.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing audio sample rate for ARATE command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing audio sample rate for ARATE command", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
 	if n >= MIN_SAMPLES_PER_SEC && n <= MAX_SAMPLES_PER_SEC {
 		ps.audio.adev[ps.adevice].samples_per_sec = n
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Use a more reasonable audio sample rate in range of %d - %d.\n",
-			ps.line, MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC)
+		ps.errorf("line %d: Use a more reasonable audio sample rate in range of %d - %d", ps.line, MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC)
 	}
 
-	return false
+	return nil
 }
 
 // handleACHANNELS handles the ACHANNELS keyword.
-func handleACHANNELS(ps *parseState) bool {
+func handleACHANNELS(ps *parseState) error {
 	/*
 	 * ACHANNELS 		- Number of audio channels for current device: 1 or 2
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing number of audio channels for ACHANNELS command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing number of audio channels for ACHANNELS command", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
@@ -1604,15 +1718,14 @@ func handleACHANNELS(ps *parseState) bool {
 			ps.audio.chan_medium[ADEVFIRSTCHAN(ps.adevice)+1] = MEDIUM_RADIO
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Number of audio channels must be 1 or 2.\n", ps.line)
+		ps.errorf("line %d: Number of audio channels must be 1 or 2", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleCHANNEL handles the CHANNEL keyword.
-func handleCHANNEL(ps *parseState) bool {
+func handleCHANNEL(ps *parseState) error {
 	/*
 	 * ==================== Radio channel parameters ====================
 	 */
@@ -1625,43 +1738,32 @@ func handleCHANNEL(ps *parseState) bool {
 	// Watch out for achan[] out of bounds.
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing channel number for CHANNEL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing channel number for CHANNEL command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Channel number must be numeric for CHANNEL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Channel number must be numeric for CHANNEL command", ps.line)
 	}
 	if n >= 0 && n < MAX_RADIO_CHANS {
 		ps.channel = n
 
 		if ps.audio.chan_medium[n] != MEDIUM_RADIO {
 			if ps.audio.adev[ACHAN2ADEV(n)].defined == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Channel number %d is not valid because audio device %d is not defined.\n",
-					ps.line, n, ACHAN2ADEV(n))
+				ps.errorf("line %d: Channel number %d is not valid because audio device %d is not defined", ps.line, n, ACHAN2ADEV(n))
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Channel number %d is not valid because audio device %d is not in stereo.\n",
-					ps.line, n, ACHAN2ADEV(n))
+				ps.errorf("line %d: Channel number %d is not valid because audio device %d is not in stereo", ps.line, n, ACHAN2ADEV(n))
 			}
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Channel number must in range of 0 to %d.\n", ps.line, MAX_RADIO_CHANS-1)
+		ps.errorf("line %d: Channel number must in range of 0 to %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
-	return false
+	return nil
 }
 
 // handleICHANNEL handles the ICHANNEL keyword.
-func handleICHANNEL(ps *parseState) bool {
+func handleICHANNEL(ps *parseState) error {
 	/*
 	 * ICHANNEL n			- Define IGate virtual channel.
 	 *
@@ -1672,10 +1774,7 @@ func handleICHANNEL(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing virtual channel number for ICHANNEL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing virtual channel number for ICHANNEL command", ps.line)
 	}
 
 	var ichan, _ = strconv.Atoi(t)
@@ -1687,19 +1786,17 @@ func handleICHANNEL(ps *parseState) bool {
 			// the channels for each packet.
 			ps.audio.igate_vchannel = ichan
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: ICHANNEL can't use channel %d because it is already in use.\n", ps.line, ichan)
+			ps.errorf("line %d: ICHANNEL can't use channel %d because it is already in use", ps.line, ichan)
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: ICHANNEL number must in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
+		ps.errorf("line %d: ICHANNEL number must in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
 
-	return false
+	return nil
 }
 
 // handleNCHANNEL handles the NCHANNEL keyword.
-func handleNCHANNEL(ps *parseState) bool {
+func handleNCHANNEL(ps *parseState) error {
 	/*
 	 * NCHANNEL chan addr port			- Define Network TNC virtual channel.
 	 *
@@ -1718,48 +1815,29 @@ func handleNCHANNEL(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing virtual channel number for NCHANNEL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing virtual channel number for NCHANNEL command", ps.line)
 	}
 
 	var nchan, _ = strconv.Atoi(t)
 	if nchan < MAX_RADIO_CHANS || nchan >= MAX_TOTAL_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: NCHANNEL number must be in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: NCHANNEL number must be in range of %d to %d", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 	}
 	if ps.audio.chan_medium[nchan] != MEDIUM_NONE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
-
-		return true
+		return fmt.Errorf("line %d: NCHANNEL can't use channel %d because it is already in use", ps.line, nchan)
 	}
 
 	var addr = split("", false)
 	if addr == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing network TNC address for NCHANNEL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing network TNC address for NCHANNEL command", ps.line)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing network TNC TCP port for NCHANNEL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing network TNC TCP port for NCHANNEL command", ps.line)
 	}
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil || n < MIN_IP_PORT_NUMBER || n > MAX_IP_PORT_NUMBER {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d.\n",
-			ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
-
-		return true
+		return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for NCHANNEL command. Must be in range %d to %d", ps.line, t, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
 	// Claim the channel only once the whole line has parsed: nettnc_init
@@ -1769,20 +1847,17 @@ func handleNCHANNEL(ps *parseState) bool {
 	ps.audio.nettnc_addr[nchan] = addr
 	ps.audio.nettnc_port[nchan] = n
 
-	return false
+	return nil
 }
 
 // handleMYCALL handles the MYCALL keyword.
-func handleMYCALL(ps *parseState) bool {
+func handleMYCALL(ps *parseState) error {
 	/*
 	 * MYCALL station
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing value for MYCALL command on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing value for MYCALL command on line %d", ps.line)
 	} else {
 		/* Silently force upper case. */
 		/* Might change to warning someday. */
@@ -1791,10 +1866,7 @@ func handleMYCALL(ps *parseState) bool {
 		var _, _, _, ok = ax25_parse_addr(-1, t, addrStrictNoStar)
 
 		if !ok {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Invalid value for MYCALL command on line %d.\n", ps.line)
-
-			return true
+			return fmt.Errorf("config file: Invalid value for MYCALL command on line %d", ps.line)
 		}
 
 		// Definitely set for current channel.
@@ -1807,11 +1879,11 @@ func handleMYCALL(ps *parseState) bool {
 		}
 	}
 
-	return false
+	return nil
 }
 
 // handleMODEM handles the MODEM keyword.
-func handleMODEM(ps *parseState) bool {
+func handleMODEM(ps *parseState) error {
 	/*
 	 * MODEM	- Set modem properties for current channel.
 	 *
@@ -1832,18 +1904,12 @@ func handleMODEM(ps *parseState) bool {
 	 *	v26a or v26b	- V.26 alternative.  a=original, b=MFJ compatible
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: MODEM can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: MODEM can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing data transmission speed for MODEM command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing data transmission speed for MODEM command", ps.line)
 	}
 
 	var n int
@@ -1858,15 +1924,12 @@ func handleMODEM(ps *parseState) bool {
 	if n >= MIN_BAUD && n <= MAX_BAUD {
 		ps.audio.achan[ps.channel].baud = n
 		if n != 300 && n != 1200 && n != 2400 && n != 4800 && n != 9600 && n != 19200 && n != MAX_BAUD-1 && n != MAX_BAUD-2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?\n", ps.line, n)
+			ps.warnf("line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?", ps.line, n)
 		}
 	} else {
 		ps.audio.achan[ps.channel].baud = DEFAULT_BAUD
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unreasonable data rate. Using %d bits per second.\n",
-			ps.line, ps.audio.achan[ps.channel].baud)
+		ps.errorf("line %d: Unreasonable data rate. Using %d bits per second", ps.line, ps.audio.achan[ps.channel].baud)
 	}
 
 	/* Set defaults based on speed. */
@@ -1913,13 +1976,12 @@ func handleMODEM(ps *parseState) bool {
 	t = split("", false)
 	if t == "" {
 		/* all done. */
-		return false
+		return nil
 	}
 
 	if alldigits(t) {
 		/* old style */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Old style (pre version 1.2) format will no longer be supported in next version.\n", ps.line)
+		ps.errorf("line %d: Old style (pre version 1.2) format will no longer be supported in next version", ps.line)
 
 		n, _ = strconv.Atoi(t)
 		/* Originally the upper limit was 3000. */
@@ -1932,19 +1994,14 @@ func handleMODEM(ps *parseState) bool {
 		} else {
 			ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Unreasonable mark tone frequency. Using %d.\n",
-				ps.line, ps.audio.achan[ps.channel].mark_freq)
+			ps.errorf("line %d: Unreasonable mark tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].mark_freq)
 		}
 
 		/* Get space frequency */
 
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Missing tone frequency for space.\n", ps.line)
-
-			return true
+			return fmt.Errorf("line %d: Missing tone frequency for space", ps.line)
 		}
 
 		n, _ = strconv.Atoi(t)
@@ -1953,9 +2010,7 @@ func handleMODEM(ps *parseState) bool {
 		} else {
 			ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Unreasonable space tone frequency. Using %d.\n",
-				ps.line, ps.audio.achan[ps.channel].space_freq)
+			ps.errorf("line %d: Unreasonable space tone frequency. Using %d", ps.line, ps.audio.achan[ps.channel].space_freq)
 		}
 
 		/* Gently guide users toward new format. */
@@ -1963,15 +2018,13 @@ func handleMODEM(ps *parseState) bool {
 		if ps.audio.achan[ps.channel].baud == 1200 &&
 			ps.audio.achan[ps.channel].mark_freq == 1200 &&
 			ps.audio.achan[ps.channel].space_freq == 2200 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200.\n", ps.line)
+			ps.errorf("line %d: The AFSK frequencies can be omitted when using the 1200 baud default 1200:2200", ps.line)
 		}
 
 		if ps.audio.achan[ps.channel].baud == 300 &&
 			ps.audio.achan[ps.channel].mark_freq == 1600 &&
 			ps.audio.achan[ps.channel].space_freq == 1800 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800.\n", ps.line)
+			ps.errorf("line %d: The AFSK frequencies can be omitted when using the 300 baud default 1600:1800", ps.line)
 		}
 
 		/* New feature in 0.9 - Optional filter profile(s). */
@@ -1985,18 +2038,14 @@ func handleMODEM(ps *parseState) bool {
 				if strings.ContainsFunc(t, func(r rune) bool {
 					return !unicode.IsLetter(r) && r != '+' && r != '-'
 				}) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Demodulator type can only contain letters and + character.\n", ps.line)
+					ps.errorf("line %d: Demodulator type can only contain letters and + character", ps.line)
 				}
 
 				ps.audio.achan[ps.channel].profiles = t
 
 				t = split("", false)
 				if len(ps.audio.achan[ps.channel].profiles) > 1 && t != "" {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Can't combine multiple demodulator types and multiple frequencies.\n", ps.line)
-
-					return true
+					return fmt.Errorf("line %d: Can't combine multiple demodulator types and multiple frequencies", ps.line)
 				}
 			}
 		}
@@ -2006,8 +2055,7 @@ func handleMODEM(ps *parseState) bool {
 		if t != "" {
 			n, _ = strconv.Atoi(t)
 			if n < 1 || n > MAX_SUBCHANS {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Number of demodulators is out of range. Using 3.\n", ps.line)
+				ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
 
 				n = 3
 			}
@@ -2018,20 +2066,17 @@ func handleMODEM(ps *parseState) bool {
 			if t != "" {
 				n, _ = strconv.Atoi(t)
 				if n < 5 || n > int(math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Unreasonable value for offset between modems.  Using 50 Hz.\n", ps.line)
+					ps.errorf("line %d: Unreasonable value for offset between modems.  Using 50 Hz", ps.line)
 
 					n = 50
 				}
 
 				ps.audio.achan[ps.channel].offset = n
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: New style for multiple demodulators is %d@%d\n", ps.line,
+				ps.errorf("line %d: New style for multiple demodulators is %d@%d", ps.line,
 					ps.audio.achan[ps.channel].num_freq, ps.audio.achan[ps.channel].offset)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Missing frequency offset between modems.  Using 50 Hz.\n", ps.line)
+				ps.errorf("line %d: Missing frequency offset between modems.  Using 50 Hz", ps.line)
 
 				ps.audio.achan[ps.channel].offset = 50
 			}
@@ -2055,17 +2100,13 @@ func handleMODEM(ps *parseState) bool {
 					if ps.audio.achan[ps.channel].mark_freq < 300 || ps.audio.achan[ps.channel].mark_freq > 5000 {
 						ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
 
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Line %d: Unreasonable mark tone frequency. Using %d instead.\n",
-							ps.line, ps.audio.achan[ps.channel].mark_freq)
+						ps.errorf("line %d: Unreasonable mark tone frequency. Using %d instead", ps.line, ps.audio.achan[ps.channel].mark_freq)
 					}
 
 					if ps.audio.achan[ps.channel].space_freq < 300 || ps.audio.achan[ps.channel].space_freq > 5000 {
 						ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
 
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Line %d: Unreasonable space tone frequency. Using %d instead.\n",
-							ps.line, ps.audio.achan[ps.channel].space_freq)
+						ps.errorf("line %d: Unreasonable space tone frequency. Using %d instead", ps.line, ps.audio.achan[ps.channel].space_freq)
 					}
 				}
 			} else if strings.Contains(t, "@") { /* num@offset */
@@ -2077,16 +2118,14 @@ func handleMODEM(ps *parseState) bool {
 				ps.audio.achan[ps.channel].offset = offset
 
 				if ps.audio.achan[ps.channel].num_freq < 1 || ps.audio.achan[ps.channel].num_freq > MAX_SUBCHANS {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Number of demodulators is out of range. Using 3.\n", ps.line)
+					ps.errorf("line %d: Number of demodulators is out of range. Using 3", ps.line)
 
 					ps.audio.achan[ps.channel].num_freq = 3
 				}
 
 				if ps.audio.achan[ps.channel].offset < 5 ||
 					float64(ps.audio.achan[ps.channel].offset) > math.Abs(float64(ps.audio.achan[ps.channel].mark_freq-ps.audio.achan[ps.channel].space_freq))/2 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Offset between demodulators is unreasonable. Using 50 Hz.\n", ps.line)
+					ps.errorf("line %d: Offset between demodulators is unreasonable. Using 50 Hz", ps.line)
 
 					ps.audio.achan[ps.channel].offset = 50
 				}
@@ -2102,10 +2141,7 @@ func handleMODEM(ps *parseState) bool {
 				strings.EqualFold(t, "V26B") { /* Compatible with MFJ-2400.  New in 1.6. */
 				if ps.audio.achan[ps.channel].modem_type != MODEM_QPSK ||
 					ps.audio.achan[ps.channel].baud != 2400 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: %s option can only be used with 2400 bps PSK.\n", ps.line, t)
-
-					return true
+					return fmt.Errorf("line %d: %s option can only be used with 2400 bps PSK", ps.line, t)
 				}
 
 				ps.audio.achan[ps.channel].v26_alternative = IfThenElse((strings.EqualFold(t, "V26A")), V26_A, V26_B)
@@ -2115,8 +2151,7 @@ func handleMODEM(ps *parseState) bool {
 				if n >= 1 && n <= 8 {
 					ps.audio.achan[ps.channel].decimate = n
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Ignoring unreasonable sample rate division factor of %d.\n", ps.line, n)
+					ps.errorf("line %d: Ignoring unreasonable sample rate division factor of %d", ps.line, n)
 				}
 			} else if t[0] == '*' { /* *upsample */
 				var n, _ = strconv.Atoi(t[1:])
@@ -2124,15 +2159,13 @@ func handleMODEM(ps *parseState) bool {
 				if n >= 1 && n <= 4 {
 					ps.audio.achan[ps.channel].upsample = n
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Ignoring unreasonable upsample ratio of %d.\n", ps.line, n)
+					ps.errorf("line %d: Ignoring unreasonable upsample ratio of %d", ps.line, n)
 				}
 			} else if alllettersorpm(t) { /* profile of letter(s) + - */
 				// Will be validated later.
 				ps.audio.achan[ps.channel].profiles = t
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Unrecognized option for MODEM: %s\n", ps.line, t)
+				ps.errorf("line %d: Unrecognized option for MODEM: %s", ps.line, t)
 			}
 
 			t = split("", false)
@@ -2144,11 +2177,11 @@ func handleMODEM(ps *parseState) bool {
 		//dw_printf ("debug: div = %d\n", p_audio_config.achan[channel].decimate);
 	}
 
-	return false
+	return nil
 }
 
 // handleDTMF handles the DTMF keyword.
-func handleDTMF(ps *parseState) bool {
+func handleDTMF(ps *parseState) error {
 	/*
 	 * DTMF  		- Enable DTMF decoder.
 	 *
@@ -2157,19 +2190,16 @@ func handleDTMF(ps *parseState) bool {
 	 *	Disable normal demodulator to reduce CPU requirements.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: DTMF can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: DTMF can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	ps.audio.achan[ps.channel].dtmf_decode = DTMF_DECODE_ON
 
-	return false
+	return nil
 }
 
 // handleFIX_BITS handles the FIX_BITS keyword.
-func handleFIX_BITS(ps *parseState) bool {
+func handleFIX_BITS(ps *parseState) error {
 	/*
 	 * FIX_BITS  n  [ APRS | AX25 | NONE ] [ PASSALL ]
 	 *
@@ -2178,18 +2208,12 @@ func handleFIX_BITS(ps *parseState) bool {
 	 *	- Optional sanity check & allow everything even with bad FCS.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: FIX_BITS can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: FIX_BITS can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for FIX_BITS command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for FIX_BITS command", ps.line)
 	}
 
 	// An unreadable level leaves the one already configured; the options after
@@ -2197,17 +2221,13 @@ func handleFIX_BITS(ps *parseState) bool {
 	var n, nErr = strconv.Atoi(t)
 	switch {
 	case nErr != nil:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Value must be numeric for FIX_BITS command. Keeping %d.\n",
-			ps.line, ps.audio.achan[ps.channel].fix_bits)
+		ps.errorf("line %d: Value must be numeric for FIX_BITS command. Keeping %d", ps.line, ps.audio.achan[ps.channel].fix_bits)
 	case BitFixLevel(n) >= BitFixNone && BitFixLevel(n) <= BitFixLevelHighest:
 		ps.audio.achan[ps.channel].fix_bits = BitFixLevel(n)
 	default:
 		ps.audio.achan[ps.channel].fix_bits = DEFAULT_FIX_BITS
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid value %d for FIX_BITS. Using default of %d.\n",
-			ps.line, n, ps.audio.achan[ps.channel].fix_bits)
+		ps.errorf("line %d: Invalid value %d for FIX_BITS. Using default of %d", ps.line, n, ps.audio.achan[ps.channel].fix_bits)
 	}
 
 	if ps.audio.achan[ps.channel].fix_bits > DEFAULT_FIX_BITS {
@@ -2231,24 +2251,25 @@ func handleFIX_BITS(ps *parseState) bool {
 		} else if strings.EqualFold(t, "PASSALL") {
 			ps.audio.achan[ps.channel].passall = true
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: There is an old saying, \"Be careful what you ask for because you might get it.\"\n", ps.line)
-			dw_printf("The PASSALL option means allow all frames even when they are invalid.\n")
-			dw_printf("You are asking to receive random trash and you WILL get your wish.\n")
-			dw_printf("Don't complain when you see all sorts of random garbage.  That's what you asked for.\n")
+			ps.errorf(
+				"Line %d: There is an old saying, \"Be careful what you ask for because you might get it.\"\n"+
+					"The PASSALL option means allow all frames even when they are invalid.\n"+
+					"You are asking to receive random trash and you WILL get your wish.\n"+
+					"Don't complain when you see all sorts of random garbage.  That's what you asked for.",
+				ps.line,
+			)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid option '%s' for FIX_BITS.\n", ps.line, t)
+			ps.errorf("line %d: Invalid option '%s' for FIX_BITS", ps.line, t)
 		}
 
 		t = split("", false)
 	}
 
-	return false
+	return nil
 }
 
 // handlePTTDCDCON handles the PTTDCDCON keyword.
-func handlePTTDCDCON(ps *parseState) bool {
+func handlePTTDCDCON(ps *parseState) error {
 	/*
 	 * PTT 		- Push To Talk signal line.
 	 * DCD		- Data Carrier Detect indicator.
@@ -2268,10 +2289,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 	 * Applies to most recent CHANNEL command.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: PTT can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: PTT can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 	var ot int
 	var otname string
@@ -2294,11 +2312,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file line %d: Missing output control device for %s command.\n",
-			ps.line, otname)
-
-		return true
+		return fmt.Errorf("config file line %d: Missing output control device for %s command", ps.line, otname)
 	}
 
 	if strings.EqualFold(t, "GPIO") {
@@ -2312,18 +2326,12 @@ func handlePTTDCDCON(ps *parseState) bool {
 		*/
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing GPIO number for %s.\n", ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
 
 		var gpio, gpioErr = strconv.Atoi(t)
 		if gpioErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, otname)
 		}
 		if gpio < 0 {
 			octrl.out_gpio_num = -1 * gpio
@@ -2345,11 +2353,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// #if defined(USE_GPIOD)
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing GPIO chip name for %s.\n", ps.line, otname)
-			dw_printf("Use the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines.\n")
-
-			return true
+			return fmt.Errorf("config file line %d: Missing GPIO chip name for %s.\nUse the \"gpioinfo\" command to get a list of gpio chip names and corresponding I/O lines", ps.line, otname)
 		}
 
 		// Issue 590.  Originally we used the chip name, like gpiochip3, and fed it into
@@ -2369,18 +2373,12 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing GPIO number for %s.\n", ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, otname)
 		}
 
 		var gpio, gpioErr = strconv.Atoi(t)
 		if gpioErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, otname)
 		}
 
 		if gpio < 0 {
@@ -2406,18 +2404,12 @@ func handlePTTDCDCON(ps *parseState) bool {
 		//#if  ( defined(__i386__) || defined(__x86_64__) ) && ( defined(__linux__) || defined(__unix__) )
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing LPT bit number for %s.\n", ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing LPT bit number for %s", ps.line, otname)
 		}
 
 		var lpt, lptErr = strconv.Atoi(t)
 		if lptErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: LPT bit number must be numeric for %s.\n", ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: LPT bit number must be numeric for %s", ps.line, otname)
 		}
 		if lpt < 0 {
 			octrl.ptt_lpt_bit = -1 * lpt
@@ -2438,30 +2430,24 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// TODO KG #ifdef USE_HAMLIB
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing model number for hamlib.\n", ps.line)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing model number for hamlib", ps.line)
 		}
 
 		if strings.EqualFold(t, "AUTO") {
 			octrl.ptt_model = -1
 		} else {
 			if !alldigits(t) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: A rig number, not a name, is required here.\n", ps.line)
-				dw_printf("For example, if you have a Yaesu FT-847, specify 101.\n")
-				dw_printf("See https://github.com/Hamlib/Hamlib/wiki/Supported-Radios for more details.\n")
-
-				return true
+				return fmt.Errorf(
+					"config file line %d: A rig number, not a name, is required here.\n"+
+						"For example, if you have a Yaesu FT-847, specify 101.\n"+
+						"See https://github.com/Hamlib/Hamlib/wiki/Supported-Radios for more details",
+					ps.line,
+				)
 			}
 
 			var n, _ = strconv.Atoi(t)
 			if n < 1 || n > 9999 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: Unreasonable model number %d for hamlib.\n", ps.line, n)
-
-				return true
+				return fmt.Errorf("config file line %d: Unreasonable model number %d for hamlib", ps.line, n)
 			}
 
 			octrl.ptt_model = n
@@ -2469,10 +2455,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing port for hamlib.\n", ps.line)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing port for hamlib", ps.line)
 		}
 
 		octrl.ptt_device = t
@@ -2482,10 +2465,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		t = split("", false)
 		if t != "" {
 			if !alldigits(t) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: An optional number is required here for CAT serial port speed: %s\n", ps.line, t)
-
-				return true
+				return fmt.Errorf("config file line %d: An optional number is required here for CAT serial port speed: %s", ps.line, t)
 			}
 			var n, _ = strconv.Atoi(t)
 			octrl.ptt_rate = n
@@ -2493,8 +2473,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 		t = split("", false)
 		if t != "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: %s was not expected after model & port for hamlib.\n", ps.line, t)
+			ps.errorf("config file line %d: %s was not expected after model & port for hamlib", ps.line, t)
 		}
 
 		octrl.ptt_method = PTT_METHOD_HAMLIB
@@ -2508,10 +2487,8 @@ func handlePTTDCDCON(ps *parseState) bool {
 			// We would need to keep track of what is currently there, change one bit, in our local
 			// copy of the status and then write out the byte for all of the pins.
 			// Let's keep it simple with just PTT for the first stab at this.
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: PTT CM108 option is only valid for PTT, not %s.\n", ps.line, otname)
 
-			return true
+			return fmt.Errorf("config file line %d: PTT CM108 option is only valid for PTT, not %s", ps.line, otname)
 		}
 
 		octrl.out_gpio_num = 3 // All known designs use GPIO 3.
@@ -2529,13 +2506,12 @@ func handlePTTDCDCON(ps *parseState) bool {
 		octrl.ptt_device = found_ptt
 
 		if find_ptt_err != nil {
-			text_color_set(DW_COLOR_ERROR)
-
+			// A device we don't recognise may still be the right one, so that
+			// is advice; anything else means there is no PTT to be had here.
 			if errors.Is(find_ptt_err, ErrUnknownCM108Device) {
-				dw_printf("Warning: %v.\n", find_ptt_err)
+				ps.warnf("warning: %v", find_ptt_err)
 			} else {
-				dw_printf("%v.\n", find_ptt_err)
-				dw_printf("Can't automatically find matching HID for PTT.\n")
+				ps.errorf("can't automatically find matching HID for PTT: %v", find_ptt_err)
 			}
 		}
 
@@ -2556,24 +2532,17 @@ func handlePTTDCDCON(ps *parseState) bool {
 			} else if t[0] == '/' {
 				octrl.ptt_device = t
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1.\n", ps.line, t)
-
-				return true
+				return fmt.Errorf("config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1", ps.line, t)
 			}
 		}
 
 		if octrl.out_gpio_num < 1 || octrl.out_gpio_num > 8 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: CM108 GPIO number %d is not in range of 1 thru 8.\n", ps.line,
+			return fmt.Errorf("config file line %d: CM108 GPIO number %d is not in range of 1 thru 8", ps.line,
 				octrl.out_gpio_num)
-
-			return true
 		}
 
 		if octrl.ptt_device == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", ps.line,
+			ps.errorf("config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s", ps.line,
 				ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 			/* TODO KG
 			#if __WIN32__
@@ -2584,7 +2553,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			dw_printf("Run \"cm108\" utility to get a list.\n")
 			dw_printf("See Interface Guide for details.\n")
 
-			return true
+			return nil
 		}
 
 		octrl.ptt_method = PTT_METHOD_CM108
@@ -2605,11 +2574,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing RTS or DTR after %s device name.\n",
-				ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing RTS or DTR after %s device name", ps.line, otname)
 		}
 
 		if strings.EqualFold(t, "rts") {
@@ -2625,11 +2590,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			octrl.ptt_line = PTT_LINE_DTR
 			octrl.ptt_invert = true
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
-				ps.line, otname)
-
-			return true
+			return fmt.Errorf("config file line %d: Expected RTS or DTR after %s device name", ps.line, otname)
 		}
 
 		octrl.ptt_method = PTT_METHOD_SERIAL
@@ -2653,11 +2614,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 				octrl.ptt_line2 = PTT_LINE_DTR
 				octrl.ptt_invert2 = true
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file line %d: Expected RTS or DTR after first RTS or DTR.\n",
-					ps.line)
-
-				return true
+				return fmt.Errorf("config file line %d: Expected RTS or DTR after first RTS or DTR", ps.line)
 			}
 
 			/* Would not make sense to specify the same one twice. */
@@ -2672,11 +2629,11 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 	ps.audio.achan[ps.channel].octrl[ot] = octrl
 
-	return false
+	return nil
 }
 
 // handleTXINH handles the TXINH keyword.
-func handleTXINH(ps *parseState) bool {
+func handleTXINH(ps *parseState) error {
 	/*
 	 * INPUTS
 	 *
@@ -2685,19 +2642,13 @@ func handleTXINH(ps *parseState) bool {
 	 * TXINH GPIO [-]gpio-num (only type supported so far)
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TXINH can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: TXINH can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 	var itname = "TXINH"
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file line %d: Missing input type name for %s command.\n", ps.line, itname)
-
-		return true
+		return fmt.Errorf("config file line %d: Missing input type name for %s command", ps.line, itname)
 	}
 
 	if strings.EqualFold(t, "GPIO") {
@@ -2709,18 +2660,12 @@ func handleTXINH(ps *parseState) bool {
 		*/
 		t = split("", false)
 		if t == "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: Missing GPIO number for %s.\n", ps.line, itname)
-
-			return true
+			return fmt.Errorf("config file line %d: Missing GPIO number for %s", ps.line, itname)
 		}
 
 		var gpio, gpioErr = strconv.Atoi(t)
 		if gpioErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, itname)
-
-			return true
+			return fmt.Errorf("config file line %d: GPIO number must be numeric for %s", ps.line, itname)
 		}
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * gpio
@@ -2733,18 +2678,14 @@ func handleTXINH(ps *parseState) bool {
 		ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 		// #endif
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file line %d: Unrecognized input type name \"%s\" for %s command.  GPIO is the only one supported.\n",
-			ps.line, t, itname)
-
-		return true
+		return fmt.Errorf("config file line %d: Unrecognized input type name \"%s\" for %s command.  GPIO is the only one supported", ps.line, t, itname)
 	}
 
-	return false
+	return nil
 }
 
 // handleDWAIT handles the DWAIT keyword.
-func handleDWAIT(ps *parseState) bool {
+func handleDWAIT(ps *parseState) error {
 	/*
 	 * DWAIT n		- Extra delay for receiver squelch. n = 10 mS units.
 	 *
@@ -2752,59 +2693,41 @@ func handleDWAIT(ps *parseState) bool {
 	 * Now undocumented in User Guide.  Might disappear someday.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: DWAIT can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: DWAIT can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing delay time for DWAIT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing delay time for DWAIT command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Delay time must be numeric for DWAIT command. Keeping %d.\n",
-			ps.line, ps.audio.achan[ps.channel].dwait)
-
-		return false
+		return fmt.Errorf("line %d: Delay time must be numeric for DWAIT command. Keeping %d", ps.line, ps.audio.achan[ps.channel].dwait)
 	}
 	if n >= 0 && n <= 255 {
 		ps.audio.achan[ps.channel].dwait = n
 	} else {
 		ps.audio.achan[ps.channel].dwait = DEFAULT_DWAIT
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid delay time for DWAIT. Using %d.\n",
-			ps.line, ps.audio.achan[ps.channel].dwait)
+		ps.errorf("line %d: Invalid delay time for DWAIT. Using %d", ps.line, ps.audio.achan[ps.channel].dwait)
 	}
 
-	return false
+	return nil
 }
 
 // handleSLOTTIME handles the SLOTTIME keyword.
-func handleSLOTTIME(ps *parseState) bool {
+func handleSLOTTIME(ps *parseState) error {
 	/*
 	 * SLOTTIME n		- For non-digipeat transmit delay timing. n = 10 mS units.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: SLOTTIME can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: SLOTTIME can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing delay time for SLOTTIME command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing delay time for SLOTTIME command", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
@@ -2816,35 +2739,31 @@ func handleSLOTTIME(ps *parseState) bool {
 	} else {
 		ps.audio.achan[ps.channel].slottime = DEFAULT_SLOTTIME
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid delay time for persist algorithm. Using default %d.\n",
-			ps.line, ps.audio.achan[ps.channel].slottime)
-		dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-		dw_printf("section, to understand what this means.\n")
-		dw_printf("Why don't you just use the default?\n")
+		ps.errorf(
+			"Line %d: Invalid delay time for persist algorithm. Using default %d.\n"+
+				"Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n"+
+				"section, to understand what this means.\n"+
+				"Why don't you just use the default?",
+			ps.line,
+			ps.audio.achan[ps.channel].slottime,
+		)
 	}
 
-	return false
+	return nil
 }
 
 // handlePERSIST handles the PERSIST keyword.
-func handlePERSIST(ps *parseState) bool {
+func handlePERSIST(ps *parseState) error {
 	/*
 	 * PERSIST 		- For non-digipeat transmit delay timing.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: PERSIST can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: PERSIST can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing probability for PERSIST command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing probability for PERSIST command", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
@@ -2853,151 +2772,115 @@ func handlePERSIST(ps *parseState) bool {
 	} else {
 		ps.audio.achan[ps.channel].persist = DEFAULT_PERSIST
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid probability for persist algorithm. Using default %d.\n",
-			ps.line, ps.audio.achan[ps.channel].persist)
-		dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-		dw_printf("section, to understand what this means.\n")
-		dw_printf("Why don't you just use the default?\n")
+		ps.errorf(
+			"Line %d: Invalid probability for persist algorithm. Using default %d.\n"+
+				"Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n"+
+				"section, to understand what this means.\n"+
+				"Why don't you just use the default?",
+			ps.line,
+			ps.audio.achan[ps.channel].persist,
+		)
 	}
 
-	return false
+	return nil
 }
 
 // handleTXDELAY handles the TXDELAY keyword.
-func handleTXDELAY(ps *parseState) bool {
+func handleTXDELAY(ps *parseState) error {
 	/*
 	 * TXDELAY n		- For transmit delay timing. n = 10 mS units.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TXDELAY can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: TXDELAY can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing time for TXDELAY command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing time for TXDELAY command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Time must be numeric for TXDELAY command. Keeping %d.\n",
-			ps.line, ps.audio.achan[ps.channel].txdelay)
-
-		return false
+		return fmt.Errorf("line %d: Time must be numeric for TXDELAY command. Keeping %d", ps.line, ps.audio.achan[ps.channel].txdelay)
 	}
 	if n >= 0 && n <= 255 {
-		text_color_set(DW_COLOR_ERROR)
-
 		if n < 10 {
-			dw_printf("Line %d: Setting TXDELAY this small is a REALLY BAD idea if you want other stations to hear you.\n",
-				ps.line)
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
-			dw_printf("Why don't you just use the default rather than reducing reliability?\n")
+			ps.warnf("line %d: Setting TXDELAY this small is a REALLY BAD idea if you want other stations to hear you.\n"+
+				"Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n"+
+				"section, to understand what this means.\n"+
+				"Why don't you just use the default rather than reducing reliability?", ps.line)
 		} else if n >= 100 {
-			dw_printf("Line %d: Keeping with tradition, going back to the 1980s, TXDELAY is in 10 millisecond units.\n",
-				ps.line)
-			dw_printf("Line %d: The value %d would be %.3f seconds which seems rather excessive.  Are you sure you want that?\n",
-				ps.line, n, float64(n)*10./1000.)
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
-			dw_printf("Why don't you just use the default?\n")
+			ps.warnf("line %d: Keeping with tradition, going back to the 1980s, TXDELAY is in 10 millisecond units.\n"+
+				"Line %d: The value %d would be %.3f seconds which seems rather excessive.  Are you sure you want that?\n"+
+				"Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n"+
+				"section, to understand what this means.\n"+
+				"Why don't you just use the default?", ps.line, ps.line, n, float64(n)*10./1000.)
 		}
 
 		ps.audio.achan[ps.channel].txdelay = n
 	} else {
 		ps.audio.achan[ps.channel].txdelay = DEFAULT_TXDELAY
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid time for transmit delay. Using %d.\n",
-			ps.line, ps.audio.achan[ps.channel].txdelay)
+		ps.errorf("line %d: Invalid time for transmit delay. Using %d", ps.line, ps.audio.achan[ps.channel].txdelay)
 	}
 
-	return false
+	return nil
 }
 
 // handleTXTAIL handles the TXTAIL keyword.
-func handleTXTAIL(ps *parseState) bool {
+func handleTXTAIL(ps *parseState) error {
 	/*
 	 * TXTAIL n		- For transmit timing. n = 10 mS units.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TXTAIL can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: TXTAIL can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing time for TXTAIL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing time for TXTAIL command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Time must be numeric for TXTAIL command. Keeping %d.\n",
-			ps.line, ps.audio.achan[ps.channel].txtail)
-
-		return false
+		return fmt.Errorf("line %d: Time must be numeric for TXTAIL command. Keeping %d", ps.line, ps.audio.achan[ps.channel].txtail)
 	}
 	if n >= 0 && n <= 255 {
 		if n < 5 {
-			dw_printf("Line %d: Setting TXTAIL that small is a REALLY BAD idea if you want other stations to hear you.\n",
-				ps.line)
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
-			dw_printf("Why don't you just use the default rather than reducing reliability?\n")
+			ps.warnf("line %d: Setting TXTAIL that small is a REALLY BAD idea if you want other stations to hear you.\n"+
+				"Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n"+
+				"section, to understand what this means.\n"+
+				"Why don't you just use the default rather than reducing reliability?", ps.line)
 		} else if n >= 50 {
-			dw_printf("Line %d: Keeping with tradition, going back to the 1980s, TXTAIL is in 10 millisecond units.\n",
-				ps.line)
-			dw_printf("Line %d: The value %d would be %.3f seconds which seems rather excessive.  Are you sure you want that?\n",
-				ps.line, n, float64(n)*10./1000.)
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
-			dw_printf("Why don't you just use the default?\n")
+			ps.warnf("line %d: Keeping with tradition, going back to the 1980s, TXTAIL is in 10 millisecond units.\n"+
+				"Line %d: The value %d would be %.3f seconds which seems rather excessive.  Are you sure you want that?\n"+
+				"Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n"+
+				"section, to understand what this means.\n"+
+				"Why don't you just use the default?", ps.line, ps.line, n, float64(n)*10./1000.)
 		}
 
 		ps.audio.achan[ps.channel].txtail = n
 	} else {
 		ps.audio.achan[ps.channel].txtail = DEFAULT_TXTAIL
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid time for transmit timing. Using %d.\n",
-			ps.line, ps.audio.achan[ps.channel].txtail)
+		ps.errorf("line %d: Invalid time for transmit timing. Using %d", ps.line, ps.audio.achan[ps.channel].txtail)
 	}
 
-	return false
+	return nil
 }
 
 // handleFULLDUP handles the FULLDUP keyword.
-func handleFULLDUP(ps *parseState) bool {
+func handleFULLDUP(ps *parseState) error {
 	/*
 	 * FULLDUP  {on|off} 		- Full Duplex
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: FULLDUP can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: FULLDUP can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing parameter for FULLDUP command.  Expecting ON or OFF.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing parameter for FULLDUP command.  Expecting ON or OFF", ps.line)
 	}
 
 	if strings.EqualFold(t, "ON") {
@@ -3007,44 +2890,37 @@ func handleFULLDUP(ps *parseState) bool {
 	} else {
 		ps.audio.achan[ps.channel].fulldup = false
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Expected ON or OFF for FULLDUP.\n", ps.line)
+		ps.errorf("line %d: Expected ON or OFF for FULLDUP", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleSPEECH handles the SPEECH keyword.
-func handleSPEECH(ps *parseState) bool {
+func handleSPEECH(ps *parseState) error {
 	/*
 	 * SPEECH  script
 	 *
 	 * Specify script for text-to-speech function.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: SPEECH can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: SPEECH can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing script for Text-to-Speech function.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing script for Text-to-Speech function", ps.line)
 	}
 
 	// Dire Wolf tried running the script here, to report a broken one at
 	// startup.  xmit_speak_it does that every time it speaks instead.
 	ps.audio.tts_script = t
 
-	return false
+	return nil
 }
 
 // handleFX25TX handles the FX25TX keyword.
-func handleFX25TX(ps *parseState) bool {
+func handleFX25TX(ps *parseState) error {
 	/*
 	 * FX25TX n		- Enable FX.25 transmission.  Default off.
 	 *				0 = off, 1 = auto mode, others are suggestions for testing
@@ -3053,27 +2929,17 @@ func handleFX25TX(ps *parseState) bool {
 	 *				V1.7 changed from global to per-channel setting.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: FX25TX can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: FX25TX can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing FEC mode for FX25TX command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing FEC mode for FX25TX command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: FEC mode must be numeric for FX25TX command. Keeping %d.\n",
-			ps.line, ps.audio.achan[ps.channel].fx25_strength)
-
-		return false
+		return fmt.Errorf("line %d: FEC mode must be numeric for FX25TX command. Keeping %d", ps.line, ps.audio.achan[ps.channel].fx25_strength)
 	}
 	if n == 0 {
 		// 0 is off: -X 0 enables nothing either, though it cannot switch off
@@ -3091,16 +2957,14 @@ func handleFX25TX(ps *parseState) bool {
 		ps.audio.achan[ps.channel].fx25_strength = 1
 		ps.audio.achan[ps.channel].layer2_xmit = LAYER2_FX25
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unreasonable value for FX.25 transmission mode. Using %d.\n",
-			ps.line, ps.audio.achan[ps.channel].fx25_strength)
+		ps.errorf("line %d: Unreasonable value for FX.25 transmission mode. Using %d", ps.line, ps.audio.achan[ps.channel].fx25_strength)
 	}
 
-	return false
+	return nil
 }
 
 // handleFX25AUTO handles the FX25AUTO keyword.
-func handleFX25AUTO(ps *parseState) bool {
+func handleFX25AUTO(ps *parseState) error {
 	/*
 	 * FX25AUTO n		- Enable Automatic use of FX.25 for connected mode.  *** Not Implemented ***
 	 *				Automatically enable, for that session only, when an identical
@@ -3110,43 +2974,31 @@ func handleFX25AUTO(ps *parseState) bool {
 	 *				Current a global setting.  Could be per channel someday.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: FX25AUTO can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: FX25AUTO can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing count for FX25AUTO command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing count for FX25AUTO command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Count must be numeric for FX25AUTO command. Keeping %d.\n",
-			ps.line, ps.audio.fx25_auto_enable)
-
-		return false
+		return fmt.Errorf("line %d: Count must be numeric for FX25AUTO command. Keeping %d", ps.line, ps.audio.fx25_auto_enable)
 	}
 	if n >= 0 && n < 20 {
 		ps.audio.fx25_auto_enable = n
 	} else {
 		ps.audio.fx25_auto_enable = AX25_N2_RETRY_DEFAULT / 2
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unreasonable count for connected mode automatic FX.25. Using %d.\n",
-			ps.line, ps.audio.fx25_auto_enable)
+		ps.errorf("line %d: Unreasonable count for connected mode automatic FX.25. Using %d", ps.line, ps.audio.fx25_auto_enable)
 	}
 
-	return false
+	return nil
 }
 
 // handleIL2PTX handles the IL2PTX keyword.
-func handleIL2PTX(ps *parseState) bool {
+func handleIL2PTX(ps *parseState) error {
 	/*
 	 * IL2PTX  [ + - ] [ 0 1 ]	- Enable IL2P transmission.  Default off.
 	 *				"+" means normal polarity. Redundant since it is the default.
@@ -3158,10 +3010,7 @@ func handleIL2PTX(ps *parseState) bool {
 	 *				"1" means stronger FEC.  "Max FEC."  Default if not specified.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: IL2PTX can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: IL2PTX can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	ps.audio.achan[ps.channel].layer2_xmit = LAYER2_IL2P
@@ -3190,19 +3039,18 @@ func handleIL2PTX(ps *parseState) bool {
 			case 'c':
 				ps.audio.achan[ps.channel].il2p_crc = false
 			default:
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid parameter '%c' for IL2PTX command.\n", ps.line, c)
+				ps.errorf("line %d: Invalid parameter '%c' for IL2PTX command", ps.line, c)
 
 				continue
 			}
 		}
 	}
 
-	return false
+	return nil
 }
 
 // handleIL2PVERSION handles the IL2PVERSION keyword.
-func handleIL2PVERSION(ps *parseState) bool {
+func handleIL2PVERSION(ps *parseState) error {
 	/*
 	 * IL2PVERSION  0.4 | 0.6 | COMPAT	- IL2P protocol version, transmit and receive.
 	 *				"0.6" means 16 parity symbols per payload block and
@@ -3214,29 +3062,23 @@ func handleIL2PVERSION(ps *parseState) bool {
 	 *					so use this to reach v0.4 stations as well.
 	 */
 	if ps.channel < 0 || ps.channel >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: IL2PVERSION can only be used with radio channel 0 - %d.\n", ps.line, MAX_RADIO_CHANS-1)
-
-		return true
+		return fmt.Errorf("line %d: IL2PVERSION can only be used with radio channel 0 - %d", ps.line, MAX_RADIO_CHANS-1)
 	}
 
 	var t = split("", false)
 
 	var version, ok = il2p_parse_version(t)
 	if !ok {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid IL2P version '%s'.  Expected 0.4, 0.6, or COMPAT.\n", ps.line, t)
-
-		return true
+		return fmt.Errorf("line %d: Invalid IL2P version '%s'.  Expected 0.4, 0.6, or COMPAT", ps.line, t)
 	}
 
 	ps.audio.achan[ps.channel].il2p_version = version
 
-	return false
+	return nil
 }
 
 // handleDIGIPEAT handles the DIGIPEAT keyword.
-func handleDIGIPEAT(ps *parseState) bool {
+func handleDIGIPEAT(ps *parseState) error {
 	/*
 	 * ==================== APRS Digipeater parameters ====================
 	 */
@@ -3249,106 +3091,64 @@ func handleDIGIPEAT(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing FROM-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
 
 	if !alldigits(t) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number.\n",
-			ps.line, t)
-
-		return true
+		return fmt.Errorf("config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number", ps.line, t)
 	}
 
 	var from_chan, _ = strconv.Atoi(t)
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
-			MAX_TOTAL_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: FROM-channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 	}
 
 	// Channels specified must be radio channels or network TNCs.
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
 		ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
-			ps.line, from_chan)
-
-		return true
+		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing TO-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
 
 	if !alldigits(t) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: '%s' is not allowed for TO-channel.  It must be a number.\n",
-			ps.line, t)
-
-		return true
+		return fmt.Errorf("config file, line %d: '%s' is not allowed for TO-channel.  It must be a number", ps.line, t)
 	}
 
 	var to_chan, _ = strconv.Atoi(t)
 	if to_chan < 0 || to_chan >= MAX_TOTAL_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
-			MAX_TOTAL_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: TO-channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 	}
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
 		ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
-			ps.line, to_chan)
-
-		return true
+		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing alias pattern on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing alias pattern on line %d", ps.line)
 	}
 
 	var r, err = regexp.Compile(t)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n", ps.line, err)
-
-		return true
+		return fmt.Errorf("config file: Invalid alias matching pattern on line %d:\n%w", ps.line, err)
 	}
 
 	ps.digi.alias[from_chan][to_chan] = r
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing wide pattern on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing wide pattern on line %d", ps.line)
 	}
 
 	r, err = regexp.Compile(t)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Invalid wide matching pattern on line %d:\n%s\n", ps.line, err)
-
-		return true
+		return fmt.Errorf("config file: Invalid wide matching pattern on line %d:\n%w", ps.line, err)
 	}
 
 	ps.digi.wide[from_chan][to_chan] = r
@@ -3362,18 +3162,18 @@ func handleDIGIPEAT(ps *parseState) bool {
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_OFF
 			t = split("", false)
 		} else if strings.EqualFold(t, "DROP") {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Preemptive digipeating DROP option is discouraged.\n", ps.line)
-			dw_printf("It can create a via path which is misleading about the actual path taken.\n")
-			dw_printf("PREEMPT is the best choice for this feature.\n")
+			ps.errorf(
+				"Config file, line %d: Preemptive digipeating DROP option is discouraged.\nIt can create a via path which is misleading about the actual path taken.\nPREEMPT is the best choice for this feature.",
+				ps.line,
+			)
 
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_DROP
 			t = split("", false)
 		} else if strings.EqualFold(t, "MARK") {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Preemptive digipeating MARK option is discouraged.\n", ps.line)
-			dw_printf("It can create a via path which is misleading about the actual path taken.\n")
-			dw_printf("PREEMPT is the best choice for this feature.\n")
+			ps.errorf(
+				"Config file, line %d: Preemptive digipeating MARK option is discouraged.\nIt can create a via path which is misleading about the actual path taken.\nPREEMPT is the best choice for this feature.",
+				ps.line,
+			)
 
 			ps.digi.preempt[from_chan][to_chan] = PREEMPT_MARK
 			t = split("", false)
@@ -3387,126 +3187,87 @@ func handleDIGIPEAT(ps *parseState) bool {
 	}
 
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Found \"%s\" where end of line was expected.\n", ps.line, t)
+		ps.errorf("config file, line %d: Found \"%s\" where end of line was expected", ps.line, t)
 	}
 
-	return false
+	return nil
 }
 
 // handleDEDUPE handles the DEDUPE keyword.
-func handleDEDUPE(ps *parseState) bool {
+func handleDEDUPE(ps *parseState) error {
 	/*
 	 * DEDUPE 		- Time to suppress digipeating of duplicate APRS packets.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing time for DEDUPE command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing time for DEDUPE command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Time must be numeric for DEDUPE command. Keeping %d.\n", ps.line, ps.digi.dedupe_time)
-
-		return false
+		return fmt.Errorf("line %d: Time must be numeric for DEDUPE command. Keeping %d", ps.line, ps.digi.dedupe_time)
 	}
 	if n >= 0 && n < 600 {
 		ps.digi.dedupe_time = n
 	} else {
 		ps.digi.dedupe_time = DEFAULT_DEDUPE
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unreasonable value for dedupe time. Using %d.\n",
-			ps.line, ps.digi.dedupe_time)
+		ps.errorf("line %d: Unreasonable value for dedupe time. Using %d", ps.line, ps.digi.dedupe_time)
 	}
 
-	return false
+	return nil
 }
 
 // handleREGEN handles the REGEN keyword.
-func handleREGEN(ps *parseState) bool {
+func handleREGEN(ps *parseState) error {
 	/*
 	 * REGEN 		- Signal regeneration.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing FROM-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
 
 	if !alldigits(t) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number.\n",
-			ps.line, t)
-
-		return true
+		return fmt.Errorf("config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number", ps.line, t)
 	}
 
 	var from_chan, _ = strconv.Atoi(t)
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: FROM-channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	// Only radio channels are valid for regenerate.
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
-			ps.line, from_chan)
-
-		return true
+		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing TO-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
 
 	if !alldigits(t) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: '%s' is not allowed for TO-channel.  It must be a number.\n",
-			ps.line, t)
-
-		return true
+		return fmt.Errorf("config file, line %d: '%s' is not allowed for TO-channel.  It must be a number", ps.line, t)
 	}
 
 	var to_chan, _ = strconv.Atoi(t)
 	if to_chan < 0 || to_chan >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: TO-channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
-			ps.line, to_chan)
-
-		return true
+		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
 	ps.digi.regen[from_chan][to_chan] = true
 
-	return false
+	return nil
 }
 
 // handleCDIGIPEAT handles the CDIGIPEAT keyword.
-func handleCDIGIPEAT(ps *parseState) bool {
+func handleCDIGIPEAT(ps *parseState) error {
 	/*
 	 * ==================== Connected Digipeater parameters ====================
 	 */
@@ -3516,27 +3277,16 @@ func handleCDIGIPEAT(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing FROM-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
 
 	if !alldigits(t) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number.\n",
-			ps.line, t)
-
-		return true
+		return fmt.Errorf("config file, line %d: '%s' is not allowed for FROM-channel.  It must be a number", ps.line, t)
 	}
 
 	var from_chan, _ = strconv.Atoi(t)
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: FROM-channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: FROM-channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	// For connected mode Link layer, only internal modems should be allowed.
@@ -3545,46 +3295,25 @@ func handleCDIGIPEAT(ps *parseState) bool {
 	// Why-is-9600-only-twice-as-fast-as-1200.pdf
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
-			ps.line, from_chan)
-		dw_printf("Only internal modems can be used for connected mode packet.\n")
-
-		return true
+		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid.\nOnly internal modems can be used for connected mode packet", ps.line, from_chan)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing TO-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
 
 	if !alldigits(t) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: '%s' is not allowed for TO-channel.  It must be a number.\n",
-			ps.line, t)
-
-		return true
+		return fmt.Errorf("config file, line %d: '%s' is not allowed for TO-channel.  It must be a number", ps.line, t)
 	}
 
 	var to_chan, _ = strconv.Atoi(t)
 	if to_chan < 0 || to_chan >= MAX_RADIO_CHANS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: TO-channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: TO-channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
-			ps.line, to_chan)
-		dw_printf("Only internal modems can be used for connected mode packet.\n")
-
-		return true
+		return fmt.Errorf("config file, line %d: TO-channel %d is not valid.\nOnly internal modems can be used for connected mode packet", ps.line, to_chan)
 	}
 
 	t = split("", false)
@@ -3594,10 +3323,7 @@ func handleCDIGIPEAT(ps *parseState) bool {
 			ps.cdigi.alias[from_chan][to_chan] = r
 			ps.cdigi.has_alias[from_chan][to_chan] = true
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Invalid alias matching pattern on line %d:\n%s\n", ps.line, err)
-
-			return true
+			return fmt.Errorf("config file: Invalid alias matching pattern on line %d:\n%w", ps.line, err)
 		}
 
 		t = split("", false)
@@ -3606,15 +3332,14 @@ func handleCDIGIPEAT(ps *parseState) bool {
 	ps.cdigi.enabled[from_chan][to_chan] = true
 
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Found \"%s\" where end of line was expected.\n", ps.line, t)
+		ps.errorf("config file, line %d: Found \"%s\" where end of line was expected", ps.line, t)
 	}
 
-	return false
+	return nil
 }
 
 // handleFILTER handles the FILTER keyword.
-func handleFILTER(ps *parseState) bool {
+func handleFILTER(ps *parseState) error {
 	/*
 	 * ==================== Packet Filtering for APRS digipeater or IGate ====================
 	 */
@@ -3655,95 +3380,69 @@ func handleFILTER(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing FROM-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
 
 	if t[0] == 'i' || t[0] == 'I' {
 		from_chan = MAX_TOTAL_CHANS
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: FILTER IG ... on line %d.\n", ps.line)
-		dw_printf("Warning! Don't mess with IS>RF filtering unless you are an expert and have an unusual situation.\n")
-		dw_printf("Warning! The default is fine for nearly all situations.\n")
-		dw_printf("Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .\n")
-		dw_printf("Warning! If you insist, be sure to add \" | i/180 \" so you don't break messaging.\n")
+		ps.warnf(
+			"Config file: FILTER IG ... on line %d.\n"+
+				"Warning! Don't mess with IS>RF filtering unless you are an expert and have an unusual situation.\n"+
+				"Warning! The default is fine for nearly all situations.\n"+
+				"Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .\n"+
+				"Warning! If you insist, be sure to add \" | i/180 \" so you don't break messaging.",
+			ps.line,
+		)
 	} else {
 		var fromChanErr error
 
 		from_chan, fromChanErr = strconv.Atoi(t)
 		if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS || fromChanErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Filter FROM-channel must be in range of 0 to %d or \"IG\" on line %d.\n",
-				MAX_TOTAL_CHANS-1, ps.line)
-
-			return true
+			return fmt.Errorf("config file: Filter FROM-channel must be in range of 0 to %d or \"IG\" on line %d", MAX_TOTAL_CHANS-1, ps.line)
 		}
 
 		if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO &&
 			ps.audio.chan_medium[from_chan] != MEDIUM_NETTNC {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
-				ps.line, from_chan)
-
-			return true
+			return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 		}
 
 		if ps.audio.chan_medium[from_chan] == MEDIUM_IGATE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Use 'IG' rather than %d for FROM-channel.\n",
-				ps.line, from_chan)
-
-			return true
+			return fmt.Errorf("config file, line %d: Use 'IG' rather than %d for FROM-channel", ps.line, from_chan)
 		}
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing TO-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
 
 	if t[0] == 'i' || t[0] == 'I' {
 		to_chan = MAX_TOTAL_CHANS
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: FILTER ... IG ... on line %d.\n", ps.line)
-		dw_printf("Warning! Don't mess with RF>IS filtering unless you are an expert and have an unusual situation.\n")
-		dw_printf("Warning! Expected behavior is for everything to go from RF to IS.\n")
-		dw_printf("Warning! The default is fine for nearly all situations.\n")
-		dw_printf("Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .\n")
+		ps.warnf(
+			"Config file: FILTER ... IG ... on line %d.\n"+
+				"Warning! Don't mess with RF>IS filtering unless you are an expert and have an unusual situation.\n"+
+				"Warning! Expected behavior is for everything to go from RF to IS.\n"+
+				"Warning! The default is fine for nearly all situations.\n"+
+				"Warning! Be sure to read carefully and understand  \"Successful-APRS-Gateway-Operation.pdf\" .",
+			ps.line,
+		)
 	} else {
 		var toChanErr error
 
 		to_chan, toChanErr = strconv.Atoi(t)
 		if to_chan < 0 || to_chan >= MAX_TOTAL_CHANS || toChanErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Filter TO-channel must be in range of 0 to %d or \"IG\" on line %d.\n",
-				MAX_TOTAL_CHANS-1, ps.line)
-
-			return true
+			return fmt.Errorf("config file: Filter TO-channel must be in range of 0 to %d or \"IG\" on line %d", MAX_TOTAL_CHANS-1, ps.line)
 		}
 
 		if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO &&
 			ps.audio.chan_medium[to_chan] != MEDIUM_NETTNC {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
-				ps.line, to_chan)
-
-			return true
+			return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 		}
 
 		if ps.audio.chan_medium[to_chan] == MEDIUM_IGATE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Use 'IG' rather than %d for TO-channel.\n",
-				ps.line, to_chan)
-
-			return true
+			return fmt.Errorf("config file, line %d: Use 'IG' rather than %d for TO-channel", ps.line, to_chan)
 		}
 	}
 
@@ -3755,25 +3454,21 @@ func handleFILTER(ps *parseState) bool {
 
 	var err = pfilter_validate(from_chan, to_chan, t, true)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Invalid FILTER expression:\n%s\n", ps.line, err)
-
-		return true
+		return fmt.Errorf("config file, line %d: Invalid FILTER expression:\n%w", ps.line, err)
 	}
 
 	if ps.digi.filter_str[from_chan][to_chan] != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Replacing previous filter for same from/to pair:\n        %s\n", ps.line, ps.digi.filter_str[from_chan][to_chan])
+		ps.errorf("config file, line %d: Replacing previous filter for same from/to pair:\n        %s", ps.line, ps.digi.filter_str[from_chan][to_chan])
 		ps.digi.filter_str[from_chan][to_chan] = ""
 	}
 
 	ps.digi.filter_str[from_chan][to_chan] = t
 
-	return false
+	return nil
 }
 
 // handleCFILTER handles the CFILTER keyword.
-func handleCFILTER(ps *parseState) bool {
+func handleCFILTER(ps *parseState) error {
 	/*
 	 * ==================== Packet Filtering for connected digipeater ====================
 	 */
@@ -3786,55 +3481,33 @@ func handleCFILTER(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing FROM-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing FROM-channel on line %d", ps.line)
 	}
 
 	var from_chan, fromChanErr = strconv.Atoi(t)
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS || fromChanErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Filter FROM-channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: Filter FROM-channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	// DO NOT allow a network TNC here.
 	// Must be internal modem to have necessary knowledge about channel status.
 
 	if ps.audio.chan_medium[from_chan] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: FROM-channel %d is not valid.\n",
-			ps.line, from_chan)
-
-		return true
+		return fmt.Errorf("config file, line %d: FROM-channel %d is not valid", ps.line, from_chan)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing TO-channel on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing TO-channel on line %d", ps.line)
 	}
 
 	var to_chan, toChanErr = strconv.Atoi(t)
 	if to_chan < 0 || to_chan >= MAX_RADIO_CHANS || toChanErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Filter TO-channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: Filter TO-channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	if ps.audio.chan_medium[to_chan] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: TO-channel %d is not valid.\n",
-			ps.line, to_chan)
-
-		return true
+		return fmt.Errorf("config file, line %d: TO-channel %d is not valid", ps.line, to_chan)
 	}
 
 	t = split("", true) /* Take rest of ps.line including spaces. */
@@ -3845,19 +3518,16 @@ func handleCFILTER(ps *parseState) bool {
 
 	var err = pfilter_validate(from_chan, to_chan, t, false)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Invalid CFILTER expression:\n%s\n", ps.line, err)
-
-		return true
+		return fmt.Errorf("config file, line %d: Invalid CFILTER expression:\n%w", ps.line, err)
 	}
 
 	ps.cdigi.cfilter_str[from_chan][to_chan] = t
 
-	return false
+	return nil
 }
 
 // handleTTCORRAL handles the TTCORRAL keyword.
-func handleTTCORRAL(ps *parseState) bool {
+func handleTTCORRAL(ps *parseState) error {
 	/*
 	 * ==================== APRStt gateway ====================
 	 */
@@ -3870,30 +3540,21 @@ func handleTTCORRAL(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing latitude for TTCORRAL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing latitude for TTCORRAL command", ps.line)
 	}
-	ps.tt.corral_lat = parse_ll(t, LAT, ps.line)
+	ps.tt.corral_lat = ps.parseLL(t, LAT)
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing longitude for TTCORRAL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing longitude for TTCORRAL command", ps.line)
 	}
-	ps.tt.corral_lon = parse_ll(t, LON, ps.line)
+	ps.tt.corral_lon = ps.parseLL(t, LON)
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing offset-or-ambiguity for TTCORRAL command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing offset-or-ambiguity for TTCORRAL command", ps.line)
 	}
-	ps.tt.corral_offset = parse_ll(t, LAT, ps.line)
+	ps.tt.corral_offset = ps.parseLL(t, LAT)
 	if ps.tt.corral_offset == 1 ||
 		ps.tt.corral_offset == 2 ||
 		ps.tt.corral_offset == 3 {
@@ -3904,11 +3565,11 @@ func handleTTCORRAL(ps *parseState) bool {
 	// dw_printf ("DEBUG: corral %f %f %f %d\n", p_tt_config.corral_lat,
 	//
 	//	p_tt_config.corral_lon, p_tt_config.corral_offset, p_tt_config.corral_ambiguity);
-	return false
+	return nil
 }
 
 // handleTTPOINT handles the TTPOINT keyword.
-func handleTTPOINT(ps *parseState) bool {
+func handleTTPOINT(ps *parseState) error {
 	/*
 	 * TTPOINT 		- Define a point represented by touch tone sequence.
 	 *
@@ -3922,22 +3583,17 @@ func handleTTPOINT(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTPOINT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTPOINT command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTPOINT pattern must begin with upper case 'B'.\n", ps.line)
+		ps.errorf("line %d: TTPOINT pattern must begin with upper case 'B'", ps.line)
 	}
 
 	for _, j := range t[1:] {
 		if !unicode.IsDigit(j) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTPOINT pattern must be B and digits only.\n", ps.line)
+			ps.errorf("line %d: TTPOINT pattern must be B and digits only", ps.line)
 		}
 	}
 
@@ -3945,31 +3601,25 @@ func handleTTPOINT(ps *parseState) bool {
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing latitude for TTPOINT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing latitude for TTPOINT command", ps.line)
 	}
-	tl.point.lat = parse_ll(t, LAT, ps.line)
+	tl.point.lat = ps.parseLL(t, LAT)
 
 	// Longitude
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing longitude for TTPOINT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing longitude for TTPOINT command", ps.line)
 	}
-	tl.point.lon = parse_ll(t, LON, ps.line)
+	tl.point.lon = ps.parseLL(t, LON)
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTVECTOR handles the TTVECTOR keyword.
-func handleTTVECTOR(ps *parseState) bool {
+func handleTTVECTOR(ps *parseState) error {
 	/*
 	 * TTVECTOR 		- Touch tone location with bearing and distance.
 	 *
@@ -3987,25 +3637,19 @@ func handleTTVECTOR(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTVECTOR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTVECTOR command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTVECTOR pattern must begin with upper case 'B'.\n", ps.line)
+		ps.errorf("line %d: TTVECTOR pattern must begin with upper case 'B'", ps.line)
 	}
 	if !strings.HasPrefix(t[1:], "5bbb") {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTVECTOR pattern would normally contain \"5bbb\".\n", ps.line)
+		ps.errorf("line %d: TTVECTOR pattern would normally contain \"5bbb\"", ps.line)
 	}
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'b' && t[j] != 'd' {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTVECTOR pattern must contain only B, digits, b, and d.\n", ps.line)
+			ps.errorf("line %d: TTVECTOR pattern must contain only B, digits, b, and d", ps.line)
 		}
 	}
 
@@ -4013,49 +3657,34 @@ func handleTTVECTOR(ps *parseState) bool {
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing latitude for TTVECTOR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing latitude for TTVECTOR command", ps.line)
 	}
-	tl.vector.lat = parse_ll(t, LAT, ps.line)
+	tl.vector.lat = ps.parseLL(t, LAT)
 
 	// Longitude
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing longitude for TTVECTOR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing longitude for TTVECTOR command", ps.line)
 	}
-	tl.vector.lon = parse_ll(t, LON, ps.line)
+	tl.vector.lon = ps.parseLL(t, LON)
 
 	// Longitude
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing scale for TTVECTOR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing scale for TTVECTOR command", ps.line)
 	}
 	var scale, scaleErr = strconv.ParseFloat(t, 64)
 	if scaleErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid scale \"%s\" for TTVECTOR command.\n", ps.line, t)
-
-		return true
+		return fmt.Errorf("line %d: Invalid scale \"%s\" for TTVECTOR command", ps.line, t)
 	}
 
 	// Unit.
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing unit for TTVECTOR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing unit for TTVECTOR command", ps.line)
 	}
 
 	var meters float64
@@ -4065,19 +3694,18 @@ func handleTTVECTOR(ps *parseState) bool {
 		}
 	}
 	if meters == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unrecognized unit for TTVECTOR command.  Using miles.\n", ps.line)
+		ps.errorf("line %d: Unrecognized unit for TTVECTOR command.  Using miles", ps.line)
 		meters = 1609.344
 	}
 	tl.vector.scale = scale * meters
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTGRID handles the TTGRID keyword.
-func handleTTGRID(ps *parseState) bool {
+func handleTTGRID(ps *parseState) error {
 	/*
 	 * TTGRID 		- Define a grid for touch tone locations.
 	 *
@@ -4091,21 +3719,16 @@ func handleTTGRID(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTGRID command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTGRID command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTGRID pattern must begin with upper case 'B'.\n", ps.line)
+		ps.errorf("line %d: TTGRID pattern must begin with upper case 'B'", ps.line)
 	}
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTGRID pattern must be B, optional digit, xxx, yyy.\n", ps.line)
+			ps.errorf("line %d: TTGRID pattern must be B, optional digit, xxx, yyy", ps.line)
 		}
 	}
 
@@ -4113,53 +3736,41 @@ func handleTTGRID(ps *parseState) bool {
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing minimum latitude for TTGRID command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing minimum latitude for TTGRID command", ps.line)
 	}
-	tl.grid.lat0 = parse_ll(t, LAT, ps.line)
+	tl.grid.lat0 = ps.parseLL(t, LAT)
 
 	// Minimum Longitude - all zeros in received data
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing minimum longitude for TTGRID command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing minimum longitude for TTGRID command", ps.line)
 	}
-	tl.grid.lon0 = parse_ll(t, LON, ps.line)
+	tl.grid.lon0 = ps.parseLL(t, LON)
 
 	// Maximum Latitude - all nines in received data
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing maximum latitude for TTGRID command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing maximum latitude for TTGRID command", ps.line)
 	}
-	tl.grid.lat9 = parse_ll(t, LAT, ps.line)
+	tl.grid.lat9 = ps.parseLL(t, LAT)
 
 	// Maximum Longitude - all nines in received data
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing maximum longitude for TTGRID command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing maximum longitude for TTGRID command", ps.line)
 	}
-	tl.grid.lon9 = parse_ll(t, LON, ps.line)
+	tl.grid.lon9 = ps.parseLL(t, LON)
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTUTM handles the TTUTM keyword.
-func handleTTUTM(ps *parseState) bool {
+func handleTTUTM(ps *parseState) error {
 	/*
 	 * TTUTM 		- Specify UTM zone for touch tone locations.
 	 *
@@ -4174,23 +3785,16 @@ func handleTTUTM(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTUTM command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTUTM command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTUTM pattern must begin with upper case 'B'.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTUTM pattern must begin with upper case 'B'", ps.line)
 	}
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTUTM pattern must be B, optional digit, xxx, yyy.\n", ps.line)
+			ps.errorf("line %d: TTUTM pattern must be B, optional digit, xxx, yyy", ps.line)
 			// Bail out somehow.  continue would match inner for.
 		}
 	}
@@ -4199,13 +3803,10 @@ func handleTTUTM(ps *parseState) bool {
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing zone for TTUTM command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing zone for TTUTM command", ps.line)
 	}
 
-	tl.utm.latband, tl.utm.hemi, tl.utm.lzone = parse_utm_zone(t)
+	tl.utm.latband, tl.utm.hemi, tl.utm.lzone = ps.parseUTMZone(t)
 
 	// Optional scale.
 
@@ -4213,10 +3814,7 @@ func handleTTUTM(ps *parseState) bool {
 	if t != "" {
 		var scaleVal, scaleErr = strconv.ParseFloat(t, 64)
 		if scaleErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid scale \"%s\" for TTUTM command.\n", ps.line, t)
-
-			return true
+			return fmt.Errorf("line %d: Invalid scale \"%s\" for TTUTM command", ps.line, t)
 		}
 
 		tl.utm.scale = scaleVal
@@ -4227,10 +3825,7 @@ func handleTTUTM(ps *parseState) bool {
 		if t != "" {
 			var xOffset, xErr = strconv.ParseFloat(t, 64)
 			if xErr != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid x offset \"%s\" for TTUTM command.\n", ps.line, t)
-
-				return true
+				return fmt.Errorf("line %d: Invalid x offset \"%s\" for TTUTM command", ps.line, t)
 			}
 
 			tl.utm.x_offset = xOffset
@@ -4241,10 +3836,7 @@ func handleTTUTM(ps *parseState) bool {
 			if t != "" {
 				var yOffset, yErr = strconv.ParseFloat(t, 64)
 				if yErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Invalid y offset \"%s\" for TTUTM command.\n", ps.line, t)
-
-					return true
+					return fmt.Errorf("line %d: Invalid y offset \"%s\" for TTUTM command", ps.line, t)
 				}
 
 				tl.utm.y_offset = yOffset
@@ -4263,19 +3855,16 @@ func handleTTUTM(ps *parseState) bool {
 	var _, geoErr = coordconv.DefaultUTMConverter.ConvertToGeodetic(utm)
 
 	if geoErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid UTM location: \n%s\n", ps.line, geoErr)
-
-		return true
+		return fmt.Errorf("line %d: Invalid UTM location: \n%w", ps.line, geoErr)
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTUSNGMGRS handles the TTUSNGMGRS keyword.
-func handleTTUSNGMGRS(ps *parseState) bool {
+func handleTTUSNGMGRS(ps *parseState) error {
 	/*
 	 * TTUSNG, TTMGRS 		- Specify zone/square for touch tone locations.
 	 *
@@ -4296,25 +3885,18 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTUSNG/TTMGRS command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTUSNG/TTMGRS command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTUSNG/TTMGRS pattern must begin with upper case 'B'", ps.line)
 	}
 	var num_x = 0
 	var num_y = 0
 	for j := 1; j < len(t); j++ {
 		if !unicode.IsDigit(rune(t[j])) && t[j] != 'x' && t[j] != 'y' {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTUSNG/TTMGRS pattern must be B, optional digit, xxx, yyy.\n", ps.line)
+			ps.errorf("line %d: TTUSNG/TTMGRS pattern must be B, optional digit, xxx, yyy", ps.line)
 			// Bail out somehow.  continue would match inner for.
 		}
 		if t[j] == 'x' {
@@ -4325,20 +3907,14 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 		}
 	}
 	if num_x < 1 || num_x > 5 || num_x != num_y {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTUSNG/TTMGRS must have 1 to 5 x and same number y", ps.line)
 	}
 
 	// Zone 1 - 60 and optional latitudinal letter.
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing zone & square for TTUSNG/TTMGRS command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing zone & square for TTUSNG/TTMGRS command", ps.line)
 	}
 	tl.mgrs.zone = t
 
@@ -4346,27 +3922,23 @@ func handleTTUSNGMGRS(ps *parseState) bool {
 
 	var _, convertErr = coordconv.DefaultMGRSConverter.ConvertToGeodetic(tl.mgrs.zone)
 	if convertErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid USNG/MGRS zone & square:  %s\n%s\n", ps.line, tl.mgrs.zone, convertErr)
-
-		return true
+		return fmt.Errorf("line %d: Invalid USNG/MGRS zone & square:  %s\n%w", ps.line, tl.mgrs.zone, convertErr)
 	}
 
 	// Should be the end.
 
 	t = split("", false)
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unexpected stuff at end ignored:  %s\n", ps.line, t)
+		ps.errorf("line %d: Unexpected stuff at end ignored:  %s", ps.line, t)
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTMHEAD handles the TTMHEAD keyword.
-func handleTTMHEAD(ps *parseState) bool {
+func handleTTMHEAD(ps *parseState) error {
 	/*
 	 * TTMHEAD 		- Define pattern to be used for Maidenhead Locator.
 	 *
@@ -4387,18 +3959,12 @@ func handleTTMHEAD(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTMHEAD command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTMHEAD command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTMHEAD pattern must begin with upper case 'B'.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTMHEAD pattern must begin with upper case 'B'", ps.line)
 	}
 
 	// Optionally one of 0-9ABCD
@@ -4421,10 +3987,7 @@ func handleTTMHEAD(ps *parseState) bool {
 	}
 
 	if count_other != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTMHEAD must have only lower case x to match received data.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTMHEAD must have only lower case x to match received data", ps.line)
 	}
 
 	// optional prefix
@@ -4434,37 +3997,28 @@ func handleTTMHEAD(ps *parseState) bool {
 		tl.mhead.prefix = t
 
 		if !alldigits(t) || (len(t) != 4 && len(t) != 6 && len(t) != 10) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTMHEAD prefix must be 4, 6, or 10 digits.\n", ps.line)
-
-			return true
+			return fmt.Errorf("line %d: TTMHEAD prefix must be 4, 6, or 10 digits", ps.line)
 		}
 
 		var _, mhErrors = TTMheadToText(t, false)
 		if mhErrors != 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTMHEAD prefix not a valid DTMF sequence.\n", ps.line)
-
-			return true
+			return fmt.Errorf("line %d: TTMHEAD prefix not a valid DTMF sequence", ps.line)
 		}
 	}
 
 	var k = len(tl.mhead.prefix) + count_x
 
 	if k != 4 && k != 6 && k != 10 && k != 12 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTMHEAD prefix and user data must have a total of 4, 6, 10, or 12 digits.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTMHEAD prefix and user data must have a total of 4, 6, 10, or 12 digits", ps.line)
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTSATSQ handles the TTSATSQ keyword.
-func handleTTSATSQ(ps *parseState) bool {
+func handleTTSATSQ(ps *parseState) error {
 	/*
 	 * TTSATSQ 		- Define pattern to be used for Satellite square.
 	 *
@@ -4484,18 +4038,12 @@ func handleTTSATSQ(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTSATSQ command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTSATSQ command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTSATSQ pattern must begin with upper case 'B'.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTSATSQ pattern must begin with upper case 'B'", ps.line)
 	}
 
 	// Optionally one of 0-9ABCD
@@ -4508,19 +4056,16 @@ func handleTTSATSQ(ps *parseState) bool {
 	}
 
 	if t[j:] != "xxxx" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTSATSQ pattern must end with exactly xxxx in lower case.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTSATSQ pattern must end with exactly xxxx in lower case", ps.line)
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTAMBIG handles the TTAMBIG keyword.
-func handleTTAMBIG(ps *parseState) bool {
+func handleTTAMBIG(ps *parseState) error {
 	/*
 	 * TTAMBIG 		- Define pattern to be used for Object Location Ambiguity.
 	 *
@@ -4540,18 +4085,12 @@ func handleTTAMBIG(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTAMBIG command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTAMBIG command", ps.line)
 	}
 	tl.pattern = t
 
 	if t[0] != 'B' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTAMBIG pattern must begin with upper case 'B'.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTAMBIG pattern must begin with upper case 'B'", ps.line)
 	}
 
 	// Optionally one of 0-9ABCD
@@ -4564,19 +4103,16 @@ func handleTTAMBIG(ps *parseState) bool {
 	}
 
 	if t[j:] != "x" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: TTAMBIG pattern must end with exactly one x in lower case.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: TTAMBIG pattern must end with exactly one x in lower case", ps.line)
 	}
 
 	ps.tt.ttlocs = append(ps.tt.ttlocs, tl)
 
-	return false
+	return nil
 }
 
 // handleTTMACRO handles the TTMACRO keyword.
-func handleTTMACRO(ps *parseState) bool {
+func handleTTMACRO(ps *parseState) error {
 	/*
 	 * TTMACRO 		- Define compact message format with full expansion
 	 *
@@ -4610,10 +4146,7 @@ func handleTTMACRO(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing pattern for TTMACRO command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing pattern for TTMACRO command", ps.line)
 	}
 	tl.pattern = t
 
@@ -4622,8 +4155,7 @@ func handleTTMACRO(ps *parseState) bool {
 
 	for j := range len(t) {
 		if !strings.ContainsRune("0123456789ABCDxyz", rune(t[j])) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z.\n", ps.line)
+			ps.errorf("line %d: TTMACRO pattern can contain only digits, A, B, C, D, and lower case x, y, or z", ps.line)
 			tt_error++
 
 			break
@@ -4642,11 +4174,10 @@ func handleTTMACRO(ps *parseState) bool {
 
 	t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing definition for TTMACRO command.\n", ps.line)
+		ps.errorf("line %d: Missing definition for TTMACRO command", ps.line)
 		tl.macro.definition = "" // Don't die on null pointer later.
 
-		return true
+		return nil
 	}
 
 	// Make a pass over the definition, looking for the xx{...} substitutions.
@@ -4673,14 +4204,12 @@ func handleTTMACRO(ps *parseState) bool {
 					//dw_printf ("DEBUG Line %d: AC{%s} -> AC%s\n", line, stemp, ttemp);
 					otemp.WriteString("AC" + ttemp)
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: AC{%s} could not be converted to tones for callsign.\n", ps.line, stemp.String())
+					ps.errorf("line %d: AC{%s} could not be converted to tones for callsign", ps.line, stemp.String())
 					tt_error++
 				}
 				tmp = tmp[1:]
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: AC{... is missing matching } in TTMACRO definition.\n", ps.line)
+				ps.errorf("line %d: AC{... is missing matching } in TTMACRO definition", ps.line)
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "AA{") {
@@ -4695,8 +4224,7 @@ func handleTTMACRO(ps *parseState) bool {
 			var stemp = sb.String()
 			if len(tmp) > 0 && tmp[0] == '}' {
 				if len(stemp) > 9 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Object name %s has been truncated to 9 characters.\n", ps.line, stemp)
+					ps.errorf("line %d: Object name %s has been truncated to 9 characters", ps.line, stemp)
 					stemp = stemp[:9]
 				}
 				var ttemp, errs = TTTextToTwoKey(stemp, false)
@@ -4705,14 +4233,12 @@ func handleTTMACRO(ps *parseState) bool {
 					//dw_printf ("DEBUG Line %d: AA{%s} -> AA%s\n", line, stemp, ttemp);
 					otemp.WriteString("AA" + ttemp)
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: AA{%s} could not be converted to tones for object name.\n", ps.line, stemp)
+					ps.errorf("line %d: AA{%s} could not be converted to tones for object name", ps.line, stemp)
 					tt_error++
 				}
 				tmp = tmp[1:]
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: AA{... is missing matching } in TTMACRO definition.\n", ps.line)
+				ps.errorf("line %d: AA{... is missing matching } in TTMACRO definition", ps.line)
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "AB{") {
@@ -4730,8 +4256,7 @@ func handleTTMACRO(ps *parseState) bool {
 				var symtab, symbol, ok = aprsSymbolData.symbols_code_from_description(' ', stemp.String())
 
 				if !ok {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default.\n", ps.line, stemp.String())
+					ps.errorf("line %d: Couldn't convert \"%s\" to APRS symbol code.  Using default", ps.line, stemp.String())
 					symtab = '\\' // Alternate
 					symbol = 'A'  // Box
 				}
@@ -4746,8 +4271,7 @@ func handleTTMACRO(ps *parseState) bool {
 				otemp.WriteString(ttemp)
 				tmp = tmp[1:]
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: AB{... is missing matching } in TTMACRO definition.\n", ps.line)
+				ps.errorf("line %d: AB{... is missing matching } in TTMACRO definition", ps.line)
 				tt_error++
 			}
 		} else if strings.HasPrefix(tmp, "CA{") {
@@ -4766,22 +4290,19 @@ func handleTTMACRO(ps *parseState) bool {
 					//dw_printf ("DEBUG Line %d: CA{%s} -> CA%s\n", line, stemp, ttemp);
 					otemp.WriteString("CA" + ttemp)
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: CA{%s} could not be converted to tones for enhanced comment.\n", ps.line, stemp.String())
+					ps.errorf("line %d: CA{%s} could not be converted to tones for enhanced comment", ps.line, stemp.String())
 					tt_error++
 				}
 				tmp = tmp[1:]
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: CA{... is missing matching } in TTMACRO definition.\n", ps.line)
+				ps.errorf("line %d: CA{... is missing matching } in TTMACRO definition", ps.line)
 				tt_error++
 			}
 		} else if strings.ContainsRune("0123456789ABCD*#xyz", rune(tmp[0])) {
 			otemp.WriteString(string(tmp[0]))
 			tmp = tmp[1:]
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: TTMACRO definition can contain only 0-9, A, B, C, D, *, #, x, y, z.\n", ps.line)
+			ps.errorf("line %d: TTMACRO definition can contain only 0-9, A, B, C, D, *, #, x, y, z", ps.line)
 			tt_error++
 			tmp = tmp[1:]
 		}
@@ -4802,12 +4323,10 @@ func handleTTMACRO(ps *parseState) bool {
 
 	for j := range 3 {
 		if p_count[j] > 0 && d_count[j] == 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: '%c' is in TTMACRO pattern but is not used in definition.\n", ps.line, 'x'+j)
+			ps.errorf("line %d: '%c' is in TTMACRO pattern but is not used in definition", ps.line, 'x'+j)
 		}
 		if d_count[j] > 0 && p_count[j] == 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: '%c' is referenced in TTMACRO definition but does not appear in the pattern.\n", ps.line, 'x'+j)
+			ps.errorf("line %d: '%c' is referenced in TTMACRO definition but does not appear in the pattern", ps.line, 'x'+j)
 		}
 	}
 
@@ -4824,11 +4343,11 @@ func handleTTMACRO(ps *parseState) bool {
 		dw_printf("Line %d: Errors found in TTMACRO, skipping.\n", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleTTOBJ handles the TTOBJ keyword.
-func handleTTOBJ(ps *parseState) bool {
+func handleTTOBJ(ps *parseState) error {
 	/*
 	 * TTOBJ 		- TT Object Report options.
 	 *
@@ -4839,38 +4358,24 @@ func handleTTOBJ(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing DTMF receive channel for TTOBJ command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing DTMF receive channel for TTOBJ command", ps.line)
 	}
 
 	var r, rErr = strconv.Atoi(t)
 	if r < 0 || r > MAX_RADIO_CHANS-1 || rErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: DTMF receive channel must be in range of 0 to %d on line %d.\n",
-			MAX_RADIO_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: DTMF receive channel must be in range of 0 to %d on line %d", MAX_RADIO_CHANS-1, ps.line)
 	}
 
 	// I suppose we need internal modem channel here.
 	// otherwise a DTMF decoder would not be available.
 
 	if ps.audio.chan_medium[r] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: TTOBJ DTMF receive channel %d is not valid.\n",
-			ps.line, r)
-
-		return true
+		return fmt.Errorf("config file, line %d: TTOBJ DTMF receive channel %d is not valid", ps.line, r)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing transmit channel for TTOBJ command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing transmit channel for TTOBJ command", ps.line)
 	}
 
 	// Can have any combination of channel number, APP, IG, separated by commas.
@@ -4892,14 +4397,12 @@ func handleTTOBJ(ps *parseState) bool {
 			if chanErr == nil {
 				x = chanNum
 				if x < 0 || x > MAX_TOTAL_CHANS-1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
+					ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 					x = -1
 					whereToValid = false
 				} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
 					ps.audio.chan_medium[x] != MEDIUM_NETTNC {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
+					ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 					x = -1
 					whereToValid = false
 				}
@@ -4923,22 +4426,19 @@ func handleTTOBJ(ps *parseState) bool {
 						case unicode.IsDigit(c):
 							x = int(c - '0')
 							if x < 0 || x > MAX_TOTAL_CHANS-1 {
-								text_color_set(DW_COLOR_ERROR)
-								dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n", MAX_TOTAL_CHANS-1, ps.line)
+								ps.errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 								x = -1
 								whereToValid = false
 							} else if ps.audio.chan_medium[x] != MEDIUM_RADIO &&
 								ps.audio.chan_medium[x] != MEDIUM_NETTNC {
-								text_color_set(DW_COLOR_ERROR)
-								dw_printf("Config file, line %d: TTOBJ transmit channel %d is not valid.\n", ps.line, x)
+								ps.errorf("config file, line %d: TTOBJ transmit channel %d is not valid", ps.line, x)
 								x = -1
 								whereToValid = false
 							}
 						}
 					}
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG.\n", ps.line)
+					ps.errorf("config file, line %d: Expected comma separated list with some combination of transmit channel, APP, and IG", ps.line)
 					whereToValid = false
 				}
 			}
@@ -4946,7 +4446,7 @@ func handleTTOBJ(ps *parseState) bool {
 	}
 
 	if !whereToValid {
-		return true
+		return nil
 	}
 
 	// This enables the DTMF decoder on the specified channel.
@@ -4965,19 +4465,18 @@ func handleTTOBJ(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		if check_via_path(t) >= 0 {
+		if ps.checkViaPath(t) >= 0 {
 			ps.tt.obj_xmit_via = t
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: invalid via path.\n", ps.line)
+			ps.errorf("config file, line %d: invalid via path", ps.line)
 		}
 	}
 
-	return false
+	return nil
 }
 
 // handleTTERR handles the TTERR keyword.
-func handleTTERR(ps *parseState) bool {
+func handleTTERR(ps *parseState) error {
 	/*
 	 * TTERR 		- TT responses for success or errors.
 	 *
@@ -4986,10 +4485,7 @@ func handleTTERR(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing message identifier for TTERR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing message identifier for TTERR command", ps.line)
 	}
 
 	var msg_num = -1
@@ -5001,40 +4497,30 @@ func handleTTERR(ps *parseState) bool {
 		}
 	}
 	if msg_num < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid message identifier for TTERR command.\n", ps.line)
+		ps.errorf("line %d: Invalid message identifier for TTERR command", ps.line)
 		// pick one of ...
-		return true
+		return nil
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing method (SPEECH, MORSE) for TTERR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing method (SPEECH, MORSE) for TTERR command", ps.line)
 	}
 
 	t = strings.ToUpper(t)
 
 	var method, _, _, ok = ax25_parse_addr(-1, t, addrStrict)
 	if !ok {
-		return true // function above prints any error message
+		return nil // function above prints any error message
 	}
 
 	if method != "MORSE" && method != "SPEECH" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Response method of %s must be SPEECH or MORSE for TTERR command.\n", ps.line, method)
-
-		return true
+		return fmt.Errorf("line %d: Response method of %s must be SPEECH or MORSE for TTERR command", ps.line, method)
 	}
 
 	t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing response text for TTERR command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing response text for TTERR command", ps.line)
 	}
 
 	//text_color_set(DW_COLOR_DEBUG);
@@ -5048,11 +4534,11 @@ func handleTTERR(ps *parseState) bool {
 
 	ps.tt.response[msg_num].mtext = t
 
-	return false
+	return nil
 }
 
 // handleTTSTATUS handles the TTSTATUS keyword.
-func handleTTSTATUS(ps *parseState) bool {
+func handleTTSTATUS(ps *parseState) error {
 	/*
 	 * TTSTATUS 		- TT custom status messages.
 	 *
@@ -5061,27 +4547,18 @@ func handleTTSTATUS(ps *parseState) bool {
 
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing status number for TTSTATUS command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing status number for TTSTATUS command", ps.line)
 	}
 
 	var status_num, _ = strconv.Atoi(t)
 
 	if status_num < 1 || status_num > 9 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Status number for TTSTATUS command must be in range of 1 to 9.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Status number for TTSTATUS command must be in range of 1 to 9", ps.line)
 	}
 
 	t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing status text for TTSTATUS command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing status text for TTSTATUS command", ps.line)
 	}
 
 	//text_color_set(DW_COLOR_DEBUG);
@@ -5091,11 +4568,11 @@ func handleTTSTATUS(ps *parseState) bool {
 
 	ps.tt.status[status_num] = t
 
-	return false
+	return nil
 }
 
 // handleTTCMD handles the TTCMD keyword.
-func handleTTCMD(ps *parseState) bool {
+func handleTTCMD(ps *parseState) error {
 	/*
 	 * TTCMD 		- Command to run when valid sequence is received.
 	 *			  Any text generated will be sent back to user.
@@ -5104,19 +4581,16 @@ func handleTTCMD(ps *parseState) bool {
 	 */
 	var t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing command for TTCMD command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing command for TTCMD command", ps.line)
 	}
 
 	ps.tt.ttcmd = t
 
-	return false
+	return nil
 }
 
 // handleIGSERVER handles the IGSERVER keyword.
-func handleIGSERVER(ps *parseState) bool {
+func handleIGSERVER(ps *parseState) error {
 	/*
 	 * ==================== Internet gateway ====================
 	 */
@@ -5130,10 +4604,7 @@ func handleIGSERVER(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing IGate server name for IGSERVER command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing IGate server name for IGSERVER command", ps.line)
 	}
 
 	ps.igate.t2_server_name = t
@@ -5153,15 +4624,11 @@ func handleIGSERVER(ps *parseState) bool {
 			} else {
 				ps.igate.t2_server_port = DEFAULT_IGATE_PORT
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
-					ps.line, ps.igate.t2_server_port)
+				ps.errorf("line %d: Invalid port number for IGate server. Using default %d", ps.line, ps.igate.t2_server_port)
 			}
 		} else {
 			/* net.SplitHostPort failed (e.g. malformed input like "host:"); fall back to simple cut. */
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Could not parse IGate server address '%s': %v\n",
-				ps.line, t, splitErr)
+			ps.errorf("line %d: Could not parse IGate server address '%s': %v", ps.line, t, splitErr)
 			ps.igate.t2_server_name, _, _ = strings.Cut(t, ":")
 		}
 	}
@@ -5176,18 +4643,16 @@ func handleIGSERVER(ps *parseState) bool {
 		} else {
 			ps.igate.t2_server_port = DEFAULT_IGATE_PORT
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid port number for IGate server. Using default %d.\n",
-				ps.line, ps.igate.t2_server_port)
+			ps.errorf("line %d: Invalid port number for IGate server. Using default %d", ps.line, ps.igate.t2_server_port)
 		}
 	}
 	// dw_printf ("DEBUG  server=%s   port=%d\n", p_igate_config.t2_server_name, p_igate_config.t2_server_port);
 	// exit (0);
-	return false
+	return nil
 }
 
 // handleIGLOGIN handles the IGLOGIN keyword.
-func handleIGLOGIN(ps *parseState) bool {
+func handleIGLOGIN(ps *parseState) error {
 	/*
 	 * IGLOGIN 		- Login callsign and passcode for IGate server
 	 *
@@ -5195,29 +4660,23 @@ func handleIGLOGIN(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing login callsign for IGLOGIN command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing login callsign for IGLOGIN command", ps.line)
 	}
 	// TODO: Wouldn't hurt to do validity checking of format.
 	ps.igate.t2_login = t
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing passcode for IGLOGIN command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing passcode for IGLOGIN command", ps.line)
 	}
 
 	ps.igate.t2_passcode = t
 
-	return false
+	return nil
 }
 
 // handleIGTXVIA handles the IGTXVIA keyword.
-func handleIGTXVIA(ps *parseState) bool {
+func handleIGTXVIA(ps *parseState) error {
 	/*
 	 * IGTXVIA 		- Transmit channel and VIA path for messages from IGate server
 	 *
@@ -5225,19 +4684,12 @@ func handleIGTXVIA(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing transmit channel for IGTXVIA command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing transmit channel for IGTXVIA command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil || n < 0 || n > MAX_TOTAL_CHANS-1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Transmit channel must be in range of 0 to %d on line %d.\n",
-			MAX_TOTAL_CHANS-1, ps.line)
-
-		return true
+		return fmt.Errorf("config file: Transmit channel must be in range of 0 to %d on line %d", MAX_TOTAL_CHANS-1, ps.line)
 	}
 
 	ps.igate.tx_chan = n
@@ -5245,13 +4697,12 @@ func handleIGTXVIA(ps *parseState) bool {
 	t = split("", false)
 	if t != "" {
 		// TODO KG#if 1	// proper checking
-		n = check_via_path(t)
+		n = ps.checkViaPath(t)
 		if n >= 0 {
 			ps.igate.max_digi_hops = n
 			ps.igate.tx_via = "," + t
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: invalid via path.\n", ps.line)
+			ps.errorf("config file, line %d: invalid via path", ps.line)
 		}
 
 		/* TODO KG #else	// previously
@@ -5268,11 +4719,11 @@ func handleIGTXVIA(ps *parseState) bool {
 		*/
 	}
 
-	return false
+	return nil
 }
 
 // handleIGFILTER handles the IGFILTER keyword.
-func handleIGFILTER(ps *parseState) bool {
+func handleIGFILTER(ps *parseState) error {
 	/*
 	 * IGFILTER 		- IGate Server side filters.
 	 *			  Is this name too confusing.  Too similar to FILTER IG 0 ...
@@ -5284,28 +4735,29 @@ func handleIGFILTER(ps *parseState) bool {
 	var t = split("", true) /* Take rest of ps.line as one string. */
 
 	if ps.igate.t2_filter != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Warning - IGFILTER already configured (%s), this one (%s) will be ignored.\n", ps.line, ps.igate.t2_filter, t)
+		ps.warnf("line %d: Warning - IGFILTER already configured (%s), this one (%s) will be ignored", ps.line, ps.igate.t2_filter, t)
 
-		return true
+		return nil
 	}
 
 	if t != "" {
 		ps.igate.t2_filter = t
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Warning - IGFILTER is a rarely needed expert level feature.\n", ps.line)
-		dw_printf("If you don't have a special situation and a good understanding of\n")
-		dw_printf("how this works, you probably should not be messing with it.\n")
-		dw_printf("The default behavior is appropriate for most situations.\n")
-		dw_printf("Please read \"Successful-APRS-IGate-Operation.pdf\".\n")
+		ps.warnf(
+			"Line %d: Warning - IGFILTER is a rarely needed expert level feature.\n"+
+				"If you don't have a special situation and a good understanding of\n"+
+				"how this works, you probably should not be messing with it.\n"+
+				"The default behavior is appropriate for most situations.\n"+
+				"Please read \"Successful-APRS-IGate-Operation.pdf\".",
+			ps.line,
+		)
 	}
 
-	return false
+	return nil
 }
 
 // handleIGTXLIMIT handles the IGTXLIMIT keyword.
-func handleIGTXLIMIT(ps *parseState) bool {
+func handleIGTXLIMIT(ps *parseState) error {
 	/*
 	 * IGTXLIMIT 		- Limit transmissions during 1 and 5 minute intervals.
 	 *
@@ -5313,19 +4765,14 @@ func handleIGTXLIMIT(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing one minute limit for IGTXLIMIT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing one minute limit for IGTXLIMIT command", ps.line)
 	}
 
 	// An unreadable limit leaves that one as it was; the other one on the line
 	// is still worth reading.
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: One minute limit must be numeric for IGTXLIMIT command. Keeping %d.\n",
-			ps.line, ps.igate.tx_limit_1)
+		ps.errorf("line %d: One minute limit must be numeric for IGTXLIMIT command. Keeping %d", ps.line, ps.igate.tx_limit_1)
 	} else if n < 1 {
 		ps.igate.tx_limit_1 = 1
 	} else if n <= IGATE_TX_LIMIT_1_MAX {
@@ -5333,27 +4780,17 @@ func handleIGTXLIMIT(ps *parseState) bool {
 	} else {
 		ps.igate.tx_limit_1 = IGATE_TX_LIMIT_1_MAX
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: One minute transmit limit has been reduced to %d.\n",
-			ps.line, ps.igate.tx_limit_1)
-		dw_printf("You won't make friends by setting a limit this high.\n")
+		ps.errorf("line %d: One minute transmit limit has been reduced to %d.\nYou won't make friends by setting a limit this high", ps.line, ps.igate.tx_limit_1)
 	}
 
 	t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing five minute limit for IGTXLIMIT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing five minute limit for IGTXLIMIT command", ps.line)
 	}
 
 	n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Five minute limit must be numeric for IGTXLIMIT command. Keeping %d.\n",
-			ps.line, ps.igate.tx_limit_5)
-
-		return false
+		return fmt.Errorf("line %d: Five minute limit must be numeric for IGTXLIMIT command. Keeping %d", ps.line, ps.igate.tx_limit_5)
 	}
 	if n < 1 {
 		ps.igate.tx_limit_5 = 1
@@ -5362,17 +4799,14 @@ func handleIGTXLIMIT(ps *parseState) bool {
 	} else {
 		ps.igate.tx_limit_5 = IGATE_TX_LIMIT_5_MAX
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Five minute transmit limit has been reduced to %d.\n",
-			ps.line, ps.igate.tx_limit_5)
-		dw_printf("You won't make friends by setting a limit this high.\n")
+		ps.errorf("line %d: Five minute transmit limit has been reduced to %d.\nYou won't make friends by setting a limit this high", ps.line, ps.igate.tx_limit_5)
 	}
 
-	return false
+	return nil
 }
 
 // handleIGMSP handles the IGMSP keyword.
-func handleIGMSP(ps *parseState) bool {
+func handleIGMSP(ps *parseState) error {
 	/*
 	 * IGMSP 		- Number of times to send position of message sender.
 	 *
@@ -5382,32 +4816,26 @@ func handleIGMSP(ps *parseState) bool {
 	if t != "" {
 		var n, nErr = strconv.Atoi(t)
 		if nErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Number of times must be numeric for IGMSP command. Keeping %d.\n",
-				ps.line, ps.igate.igmsp)
-
-			return false
+			return fmt.Errorf("line %d: Number of times must be numeric for IGMSP command. Keeping %d", ps.line, ps.igate.igmsp)
 		}
 		if n >= 0 && n <= 10 {
 			ps.igate.igmsp = n
 		} else {
 			ps.igate.igmsp = 1
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Unreasonable number of times for message sender position.  Using default 1.\n", ps.line)
+			ps.errorf("line %d: Unreasonable number of times for message sender position.  Using default 1", ps.line)
 		}
 	} else {
 		ps.igate.igmsp = 1
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing number of times for message sender position.  Using default 1.\n", ps.line)
+		ps.errorf("line %d: Missing number of times for message sender position.  Using default 1", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleSATGATE handles the SATGATE keyword.
-func handleSATGATE(ps *parseState) bool {
+func handleSATGATE(ps *parseState) error {
 	/*
 	 * SATGATE 		- Special SATgate mode to delay packets heard directly.
 	 *
@@ -5424,18 +4852,17 @@ func handleSATGATE(ps *parseState) bool {
 		} else {
 			ps.igate.satgate_delay = DEFAULT_SATGATE_DELAY
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Unreasonable SATgate delay.  Using default.\n", ps.line)
+			ps.errorf("line %d: Unreasonable SATgate delay.  Using default", ps.line)
 		}
 	} else {
 		ps.igate.satgate_delay = DEFAULT_SATGATE_DELAY
 	}
 
-	return false
+	return nil
 }
 
 // handleAGWPORT handles the AGWPORT keyword.
-func handleAGWPORT(ps *parseState) bool {
+func handleAGWPORT(ps *parseState) error {
 	/*
 	 * ==================== All the left overs ====================
 	 */
@@ -5447,26 +4874,16 @@ func handleAGWPORT(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing port number for AGWPORT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing port number for AGWPORT command", ps.line)
 	}
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid port number \"%s\" for AGWPORT command.\n", ps.line, t)
-
-		return true
+		return fmt.Errorf("line %d: Invalid port number \"%s\" for AGWPORT command", ps.line, t)
 	}
 
 	t = split("", false)
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unexpected \"%s\" after the port number.\n", ps.line, t)
-		dw_printf("Perhaps you were trying to use feature available only with KISSPORT.\n")
-
-		return true
+		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number.\nPerhaps you were trying to use feature available only with KISSPORT", ps.line, t)
 	}
 
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
@@ -5474,16 +4891,14 @@ func handleAGWPORT(ps *parseState) bool {
 	} else {
 		ps.misc.agwpe_port = DEFAULT_AGWPE_PORT
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d.\n",
-			ps.line, ps.misc.agwpe_port)
+		ps.errorf("line %d: Invalid port number for AGW TCPIP Socket Interface. Using %d", ps.line, ps.misc.agwpe_port)
 	}
 
-	return false
+	return nil
 }
 
 // handleAGWLOGIN handles the AGWLOGIN keyword.
-func handleAGWLOGIN(ps *parseState) bool {
+func handleAGWLOGIN(ps *parseState) error {
 	/*
 	 * AGWLOGIN		- User name and password for the "AGW TCPIP Socket Interface"
 	 *
@@ -5497,18 +4912,12 @@ func handleAGWLOGIN(ps *parseState) bool {
 	 */
 	var user = split("", false)
 	if user == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing user name for AGWLOGIN command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing user name for AGWLOGIN command", ps.line)
 	}
 
 	var password = split("", false)
 	if password == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing password for AGWLOGIN command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing password for AGWLOGIN command", ps.line)
 	}
 
 	/*
@@ -5516,11 +4925,7 @@ func handleAGWLOGIN(ps *parseState) bool {
 	 * never be sent, never mind matched.
 	 */
 	if len(user) > AGW_LOGIN_FIELD_LEN || len(password) > AGW_LOGIN_FIELD_LEN {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: User name and password for AGWLOGIN must each be %d characters or fewer.\n",
-			ps.line, AGW_LOGIN_FIELD_LEN)
-
-		return true
+		return fmt.Errorf("line %d: User name and password for AGWLOGIN must each be %d characters or fewer", ps.line, AGW_LOGIN_FIELD_LEN)
 	}
 
 	/* Each line adds another set of credentials, rather than replacing the last. */
@@ -5529,11 +4934,11 @@ func handleAGWLOGIN(ps *parseState) bool {
 	login.password = password
 	ps.misc.agwpe_logins = append(ps.misc.agwpe_logins, *login)
 
-	return false
+	return nil
 }
 
 // handleMETRICSPORT handles the METRICSPORT keyword.
-func handleMETRICSPORT(ps *parseState) bool {
+func handleMETRICSPORT(ps *parseState) error {
 	/*
 	 * METRICSPORT 	- Port number for the Prometheus "/metrics" HTTP endpoint.
 	 *
@@ -5541,26 +4946,17 @@ func handleMETRICSPORT(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing port number for METRICSPORT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing port number for METRICSPORT command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid port number \"%s\" for METRICSPORT command.\n", ps.line, t)
-
-		return true
+		return fmt.Errorf("line %d: Invalid port number \"%s\" for METRICSPORT command", ps.line, t)
 	}
 
 	t = split("", false)
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Unexpected \"%s\" after the port number.\n", ps.line, t)
-
-		return true
+		return fmt.Errorf("line %d: Unexpected \"%s\" after the port number", ps.line, t)
 	}
 
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
@@ -5568,15 +4964,14 @@ func handleMETRICSPORT(ps *parseState) bool {
 	} else {
 		ps.misc.metrics_port = 0
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid port number for the metrics endpoint. Disabling it.\n", ps.line)
+		ps.errorf("line %d: Invalid port number for the metrics endpoint. Disabling it", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleKISSPORT handles the KISSPORT keyword.
-func handleKISSPORT(ps *parseState) bool {
+func handleKISSPORT(ps *parseState) error {
 	/*
 	 * KISSPORT port [ chan ]		- Port number for KISS over IP.
 	 */
@@ -5599,28 +4994,18 @@ func handleKISSPORT(ps *parseState) bool {
 	//				# Transmit to radio channel 1, ignoring KISS channel.
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing TCP port number for KISSPORT command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing TCP port number for KISSPORT command", ps.line)
 	}
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid TCP port number \"%s\" for KISSPORT command.\n", ps.line, t)
-
-		return true
+		return fmt.Errorf("line %d: Invalid TCP port number \"%s\" for KISSPORT command", ps.line, t)
 	}
 
 	var tcp_port int
 	if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 		tcp_port = n
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\n", ps.line)
-		dw_printf("Use something in the range of %d to %d.\n", MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
-
-		return true
+		return fmt.Errorf("line %d: Invalid TCP port number for KISS TCPIP Socket Interface.\nUse something in the range of %d to %d", ps.line, MIN_IP_PORT_NUMBER, MAX_IP_PORT_NUMBER)
 	}
 
 	t = split("", false)
@@ -5631,10 +5016,7 @@ func handleKISSPORT(ps *parseState) bool {
 
 		kissChannel, channelErr = strconv.Atoi(t)
 		if kissChannel < 0 || kissChannel >= MAX_TOTAL_CHANS || channelErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d.\n", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
-
-			return true
+			return fmt.Errorf("line %d: Invalid channel %d for KISSPORT command.  Must be in range 0 thru %d", ps.line, kissChannel, MAX_TOTAL_CHANS-1)
 		}
 	}
 
@@ -5650,8 +5032,7 @@ func handleKISSPORT(ps *parseState) bool {
 			if ps.misc.kiss_port[i] == tcp_port { //nolint:staticcheck
 				slot = i
 				if slot != 0 || tcp_port != DEFAULT_KISS_PORT {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Warning: Duplicate TCP port %d will overwrite previous value.\n", ps.line, tcp_port)
+					ps.warnf("line %d: Warning: Duplicate TCP port %d will overwrite previous value", ps.line, tcp_port)
 				}
 			} else if ps.misc.kiss_port[i] == 0 {
 				slot = i
@@ -5662,16 +5043,15 @@ func handleKISSPORT(ps *parseState) bool {
 			ps.misc.kiss_port[slot] = tcp_port
 			ps.misc.kiss_chan[slot] = kissChannel
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Too many KISSPORT commands.\n", ps.line)
+			ps.errorf("line %d: Too many KISSPORT commands", ps.line)
 		}
 	}
 
-	return false
+	return nil
 }
 
 // handleNULLMODEM handles the NULLMODEM keyword.
-func handleNULLMODEM(ps *parseState) bool {
+func handleNULLMODEM(ps *parseState) error {
 	/*
 	 * NULLMODEM name [ speed ]	- Device name for serial port or our end of the virtual "null modem"
 	 * SERIALKISS name  [ speed ]
@@ -5683,10 +5063,7 @@ func handleNULLMODEM(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing serial port name on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing serial port name on line %d", ps.line)
 	}
 
 	var port = t
@@ -5696,10 +5073,7 @@ func handleNULLMODEM(ps *parseState) bool {
 	if t != "" {
 		var n, nErr = strconv.Atoi(t)
 		if nErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Invalid speed \"%s\" for NULLMODEM/SERIALKISS command on line %d.\n", t, ps.line)
-
-			return true
+			return fmt.Errorf("config file: Invalid speed \"%s\" for NULLMODEM/SERIALKISS command on line %d", t, ps.line)
 		}
 
 		speed = n
@@ -5709,33 +5083,28 @@ func handleNULLMODEM(ps *parseState) bool {
 	// leaves the port configured by an earlier one - and the warning below
 	// describes a replacement that is actually happening.
 	if ps.misc.kiss_serial_port != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", ps.line)
+		ps.warnf("config file: Warning serial port name on line %d replaces earlier value", ps.line)
 	}
 
 	ps.misc.kiss_serial_port = port
 	ps.misc.kiss_serial_speed = speed
 	ps.misc.kiss_serial_poll = 0
 
-	return false
+	return nil
 }
 
 // handleSERIALKISSPOLL handles the SERIALKISSPOLL keyword.
-func handleSERIALKISSPOLL(ps *parseState) bool {
+func handleSERIALKISSPOLL(ps *parseState) error {
 	/*
 	 * SERIALKISSPOLL name		- Poll for serial port name that might come and go.
 	 *			  	  e.g. /dev/rfcomm0 for bluetooth.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing serial port name on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing serial port name on line %d", ps.line)
 	} else {
 		if ps.misc.kiss_serial_port != "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", ps.line)
+			ps.warnf("config file: Warning serial port name on line %d replaces earlier value", ps.line)
 		}
 
 		ps.misc.kiss_serial_port = t
@@ -5743,73 +5112,63 @@ func handleSERIALKISSPOLL(ps *parseState) bool {
 		ps.misc.kiss_serial_poll = 1 // set polling.
 	}
 
-	return false
+	return nil
 }
 
 // handleKISSCOPY handles the KISSCOPY keyword.
-func handleKISSCOPY(ps *parseState) bool {
+func handleKISSCOPY(ps *parseState) error {
 	/*
 	 * KISSCOPY 		- Data from network KISS client is copied to all others.
 	 *			  This does not apply to pseudo terminal KISS.
 	 */
 	ps.misc.kiss_copy = true
 
-	return false
+	return nil
 }
 
 // handleDNSSD handles the DNSSD keyword.
-func handleDNSSD(ps *parseState) bool {
+func handleDNSSD(ps *parseState) error {
 	/*
 	 * DNSSD 		- Enable or disable (1/0) dns-sd, DNS Service Discovery announcements
 	 * DNSSDNAME            - Set DNS-SD service name, defaults to "Dire Wolf on <hostname>"
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing integer value for DNSSD command.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing integer value for DNSSD command", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil || (n != 0 && n != 1) {
 		ps.misc.dns_sd_enabled = false
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid integer value for DNSSD. Disabling dns-sd.\n", ps.line)
+		ps.errorf("line %d: Invalid integer value for DNSSD. Disabling dns-sd", ps.line)
 	} else {
 		ps.misc.dns_sd_enabled = n != 0
 	}
 
-	return false
+	return nil
 }
 
 // handleDNSSDNAME handles the DNSSDNAME keyword.
-func handleDNSSDNAME(ps *parseState) bool {
+func handleDNSSDNAME(ps *parseState) error {
 	var t = split("", true)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing service name for DNSSDNAME.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing service name for DNSSDNAME", ps.line)
 	} else {
 		ps.misc.dns_sd_name = t
 	}
 
-	return false
+	return nil
 }
 
 // handleGPSNMEA handles the GPSNMEA keyword.
-func handleGPSNMEA(ps *parseState) bool {
+func handleGPSNMEA(ps *parseState) error {
 	/*
 	 * GPSNMEA  serial-device  [ speed ]		- Direct connection to GPS receiver.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Missing serial port name for GPS receiver.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file, line %d: Missing serial port name for GPS receiver", ps.line)
 	}
 
 	var port = t
@@ -5821,10 +5180,7 @@ func handleGPSNMEA(ps *parseState) bool {
 	if t != "" {
 		var n, nErr = strconv.Atoi(t)
 		if nErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Invalid speed \"%s\" for GPSNMEA command.\n", ps.line, t)
-
-			return true
+			return fmt.Errorf("config file, line %d: Invalid speed \"%s\" for GPSNMEA command", ps.line, t)
 		}
 
 		speed = n
@@ -5836,11 +5192,11 @@ func handleGPSNMEA(ps *parseState) bool {
 	ps.misc.gpsnmea_port = port
 	ps.misc.gpsnmea_speed = speed
 
-	return false
+	return nil
 }
 
 // handleGPSD handles the GPSD keyword.
-func handleGPSD(ps *parseState) bool {
+func handleGPSD(ps *parseState) error {
 	/*
 	 * GPSD		- Use GPSD server.
 	 *
@@ -5858,29 +5214,23 @@ func handleGPSD(ps *parseState) bool {
 		if t != "" {
 			var n, nErr = strconv.Atoi(t)
 			if nErr != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Port number must be numeric for GPSD. Using default of %d.\n",
-					ps.line, ps.misc.gpsd_port)
-
-				return false
+				return fmt.Errorf("line %d: Port number must be numeric for GPSD. Using default of %d", ps.line, ps.misc.gpsd_port)
 			}
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 				ps.misc.gpsd_port = n
 			} else {
 				ps.misc.gpsd_port = DEFAULT_GPSD_PORT
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid port number for GPSD Socket Interface. Using default of %d.\n",
-					ps.line, ps.misc.gpsd_port)
+				ps.errorf("line %d: Invalid port number for GPSD Socket Interface. Using default of %d", ps.line, ps.misc.gpsd_port)
 			}
 		}
 	}
 
-	return false
+	return nil
 }
 
 // handleWAYPOINT handles the WAYPOINT keyword.
-func handleWAYPOINT(ps *parseState) bool {
+func handleWAYPOINT(ps *parseState) error {
 	/*
 	 * WAYPOINT		- Generate WPL and AIS NMEA sentences for display on map.
 	 *
@@ -5890,10 +5240,7 @@ func handleWAYPOINT(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing output device for WAYPOINT on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing output device for WAYPOINT on line %d", ps.line)
 	}
 
 	/* If there is a ':' in the name, split it into hostname:udpportnum. */
@@ -5911,8 +5258,7 @@ func handleWAYPOINT(ps *parseState) bool {
 
 			ps.misc.waypoint_udp_portnum = port
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid UDP port number %d for sending waypoints.\n", ps.line, port)
+			ps.errorf("line %d: Invalid UDP port number %d for sending waypoints", ps.line, port)
 		}
 	} else {
 		ps.misc.waypoint_serial_port = t
@@ -5935,29 +5281,24 @@ func handleWAYPOINT(ps *parseState) bool {
 			ps.misc.waypoint_formats |= WPL_FORMAT_AIS
 		case ' ', ',':
 		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Invalid output format '%c' for WAYPOINT on line %d.\n", c, ps.line)
+			ps.errorf("config file: Invalid output format '%c' for WAYPOINT on line %d", c, ps.line)
 		}
 	}
 
-	return false
+	return nil
 }
 
 // handleLOGDIR handles the LOGDIR keyword.
-func handleLOGDIR(ps *parseState) bool {
+func handleLOGDIR(ps *parseState) error {
 	/*
 	 * LOGDIR	- Directory name for automatically named daily log files.  Use "." for current working directory.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing directory name for LOGDIR on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing directory name for LOGDIR on line %d", ps.line)
 	} else {
 		if ps.misc.log_path != "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: LOGDIR on line %d is replacing an earlier LOGDIR or LOGFILE.\n", ps.line)
+			ps.errorf("config file: LOGDIR on line %d is replacing an earlier LOGDIR or LOGFILE", ps.line)
 		}
 
 		ps.misc.log_daily_names = true
@@ -5966,28 +5307,23 @@ func handleLOGDIR(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: LOGDIR on line %d should have directory path and nothing more.\n", ps.line)
+		ps.errorf("config file: LOGDIR on line %d should have directory path and nothing more", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleLOGFILE handles the LOGFILE keyword.
-func handleLOGFILE(ps *parseState) bool {
+func handleLOGFILE(ps *parseState) error {
 	/*
 	 * LOGFILE	- Log file name, including any directory part.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Missing file name for LOGFILE on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Missing file name for LOGFILE on line %d", ps.line)
 	} else {
 		if ps.misc.log_path != "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: LOGFILE on line %d is replacing an earlier LOGDIR or LOGFILE.\n", ps.line)
+			ps.errorf("config file: LOGFILE on line %d is replacing an earlier LOGDIR or LOGFILE", ps.line)
 		}
 
 		ps.misc.log_daily_names = false
@@ -5996,29 +5332,25 @@ func handleLOGFILE(ps *parseState) bool {
 
 	t = split("", false)
 	if t != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: LOGFILE on line %d should have file name and nothing more.\n", ps.line)
+		ps.errorf("config file: LOGFILE on line %d should have file name and nothing more", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleBEACON handles the BEACON keyword.
-func handleBEACON(ps *parseState) bool {
+func handleBEACON(ps *parseState) error {
 	/*
 	 * BEACON channel delay every message
 	 *
 	 * Original handcrafted style.  Removed in version 1.0.
 	 */
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Config file, line %d: Old style 'BEACON' has been replaced with new commands.\n", ps.line)
-	dw_printf("Use PBEACON, OBEACON, TBEACON, or CBEACON instead.\n")
 
-	return false
+	return fmt.Errorf("config file, line %d: Old style 'BEACON' has been replaced with new commands.\nUse PBEACON, OBEACON, TBEACON, or CBEACON instead", ps.line)
 }
 
 // handleXBEACON handles the XBEACON keyword.
-func handleXBEACON(ps *parseState) bool {
+func handleXBEACON(ps *parseState) error {
 	/*
 	 * PBEACON keyword=value ...
 	 * OBEACON keyword=value ...
@@ -6059,21 +5391,18 @@ func handleXBEACON(ps *parseState) bool {
 		// called split(ps.text, false) to extract the keyword, leaving any
 		// options as the remaining state; passing "" here reads those options
 		// correctly and also handles the case where there are none.
-		if beacon_options("", &(ps.misc.beacon[ps.misc.num_beacons]), ps.line, ps.audio) == nil {
+		if beacon_options("", &(ps.misc.beacon[ps.misc.num_beacons]), ps, ps.audio) == nil {
 			ps.misc.num_beacons++
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Maximum number of beacons exceeded on line %d.\n", ps.line)
-
-		return true
+		return fmt.Errorf("config file: Maximum number of beacons exceeded on line %d", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleSMARTBEACON handles the SMARTBEACON keyword.
-func handleSMARTBEACON(ps *parseState) bool {
+func handleSMARTBEACON(ps *parseState) error {
 	/*
 	 * SMARTBEACONING [ fast_speed fast_rate slow_speed slow_rate turn_time turn_angle turn_slope ]
 	 *
@@ -6139,11 +5468,11 @@ func handleSMARTBEACON(ps *parseState) bool {
 
 	/* If I was ambitious, I might allow optional */
 	/* unit at end for miles or km / hour. */
-	return false
+	return nil
 }
 
 // handleFRACK handles the FRACK keyword.
-func handleFRACK(ps *parseState) bool {
+func handleFRACK(ps *parseState) error {
 	/*
 	 * ==================== AX.25 connected mode ====================
 	 */
@@ -6153,73 +5482,61 @@ func handleFRACK(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for FRACK.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for FRACK", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
 	if n >= AX25_T1V_FRACK_MIN && n <= AX25_T1V_FRACK_MAX {
 		ps.misc.frack = n
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid FRACK time. Using default %d.\n", ps.line, ps.misc.frack)
+		ps.errorf("line %d: Invalid FRACK time. Using default %d", ps.line, ps.misc.frack)
 	}
 
-	return false
+	return nil
 }
 
 // handleRETRY handles the RETRY keyword.
-func handleRETRY(ps *parseState) bool {
+func handleRETRY(ps *parseState) error {
 	/*
 	 * RETRY  n 		- Number of times to retry before giving up.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for RETRY.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for RETRY", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
 	if n >= AX25_N2_RETRY_MIN && n <= AX25_N2_RETRY_MAX {
 		ps.misc.retry = n
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid RETRY number. Using default %d.\n", ps.line, ps.misc.retry)
+		ps.errorf("line %d: Invalid RETRY number. Using default %d", ps.line, ps.misc.retry)
 	}
 
-	return false
+	return nil
 }
 
 // handlePACLEN handles the PACLEN keyword.
-func handlePACLEN(ps *parseState) bool {
+func handlePACLEN(ps *parseState) error {
 	/*
 	 * PACLEN  n 		- Maximum number of bytes in information part.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for PACLEN.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for PACLEN", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
 	if n >= AX25_N1_PACLEN_MIN && n <= AX25_N1_PACLEN_MAX {
 		ps.misc.paclen = n
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid PACLEN value. Using default %d.\n", ps.line, ps.misc.paclen)
+		ps.errorf("line %d: Invalid PACLEN value. Using default %d", ps.line, ps.misc.paclen)
 	}
 
-	return false
+	return nil
 }
 
 // handleMAXFRAME handles the MAXFRAME keyword.
-func handleMAXFRAME(ps *parseState) bool {
+func handleMAXFRAME(ps *parseState) error {
 	/*
 	 * MAXFRAME  n 		- Max frames to send before ACK.  mod 8 "Window" size.
 	 *
@@ -6227,10 +5544,7 @@ func handleMAXFRAME(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for MAXFRAME.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for MAXFRAME", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
@@ -6239,25 +5553,20 @@ func handleMAXFRAME(ps *parseState) bool {
 	} else {
 		ps.misc.maxframe_basic = AX25_K_MAXFRAME_BASIC_DEFAULT
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d.\n",
-			ps.line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, ps.misc.maxframe_basic)
+		ps.errorf("line %d: Invalid MAXFRAME value outside range of %d to %d. Using default %d", ps.line, AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX, ps.misc.maxframe_basic)
 	}
 
-	return false
+	return nil
 }
 
 // handleEMAXFRAME handles the EMAXFRAME keyword.
-func handleEMAXFRAME(ps *parseState) bool {
+func handleEMAXFRAME(ps *parseState) error {
 	/*
 	 * EMAXFRAME  n 		- Max frames to send before ACK.  mod 128 "Window" size.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for EMAXFRAME.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for EMAXFRAME", ps.line)
 	}
 
 	var n, _ = strconv.Atoi(t)
@@ -6266,46 +5575,37 @@ func handleEMAXFRAME(ps *parseState) bool {
 	} else {
 		ps.misc.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d.\n",
-			ps.line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, ps.misc.maxframe_extended)
+		ps.errorf("line %d: Invalid EMAXFRAME value outside of range %d to %d. Using default %d", ps.line, AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX, ps.misc.maxframe_extended)
 	}
 
-	return false
+	return nil
 }
 
 // handleMAXV22 handles the MAXV22 keyword.
-func handleMAXV22(ps *parseState) bool {
+func handleMAXV22(ps *parseState) error {
 	/*
 	 * MAXV22  n 		- Max number of SABME sent before trying SABM.
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing value for MAXV22.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing value for MAXV22", ps.line)
 	}
 
 	var n, nErr = strconv.Atoi(t)
 	if nErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: MAXV22 number must be numeric. Ignoring this line.\n", ps.line)
-
-		return false
+		return fmt.Errorf("line %d: MAXV22 number must be numeric. Ignoring this line", ps.line)
 	}
 	if n >= 0 && n <= AX25_N2_RETRY_MAX {
 		ps.misc.maxv22 = n
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Invalid MAXV22 number. Will use half of RETRY.\n", ps.line)
+		ps.errorf("line %d: Invalid MAXV22 number. Will use half of RETRY", ps.line)
 	}
 
-	return false
+	return nil
 }
 
 // handleV20 handles the V20 keyword.
-func handleV20(ps *parseState) bool {
+func handleV20(ps *parseState) error {
 	/*
 	 * V20  address [ address ... ] 	- Stations known to support only AX.25 v2.0.
 	 *					  When connecting to these, skip SABME and go right to SABM.
@@ -6313,10 +5613,7 @@ func handleV20(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing address(es) for V20.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing address(es) for V20", ps.line)
 	}
 
 	for t != "" {
@@ -6326,8 +5623,7 @@ func handleV20(ps *parseState) bool {
 			ps.misc.v20_addrs = append(ps.misc.v20_addrs, t)
 			ps.misc.v20_count++
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid station address for V20 command.\n", ps.line)
+			ps.errorf("line %d: Invalid station address for V20 command", ps.line)
 
 			// continue processing any others following.
 		}
@@ -6335,11 +5631,11 @@ func handleV20(ps *parseState) bool {
 		t = split("", false)
 	}
 
-	return false
+	return nil
 }
 
 // handleNOXID handles the NOXID keyword.
-func handleNOXID(ps *parseState) bool {
+func handleNOXID(ps *parseState) error {
 	/*
 	 * NOXID  address [ address ... ] 	- Stations known not to understand XID.
 	 *					  After connecting to these (with v2.2 obviously), don't try using XID command.
@@ -6348,10 +5644,7 @@ func handleNOXID(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Line %d: Missing address(es) for NOXID.\n", ps.line)
-
-		return true
+		return fmt.Errorf("line %d: Missing address(es) for NOXID", ps.line)
 	}
 
 	for t != "" {
@@ -6361,8 +5654,7 @@ func handleNOXID(ps *parseState) bool {
 			ps.misc.noxid_addrs = append(ps.misc.noxid_addrs, t)
 			ps.misc.noxid_count++
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: Invalid station address for NOXID command.\n", ps.line)
+			ps.errorf("line %d: Invalid station address for NOXID command", ps.line)
 
 			// continue processing any others following.
 		}
@@ -6370,7 +5662,7 @@ func handleNOXID(ps *parseState) bool {
 		t = split("", false)
 	}
 
-	return false
+	return nil
 }
 
 // parse_beacon_number parses the value of a numeric beacon option, reporting
@@ -6378,19 +5670,13 @@ func handleNOXID(ps *parseState) bool {
 // several of these options - TONE=0 is transmitted as "Toff", OFFSET=0 as
 // "+000" and ALT=0 as "/A=000000" - so a typo would otherwise put on the air a
 // value nobody asked for.
-func parse_beacon_number(keyword string, value string, line int) (float64, bool) {
+func parse_beacon_number(keyword string, value string, line int) (float64, error) {
 	var f, err = strconv.ParseFloat(value, 64)
 	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
-		logrus.WithFields(logrus.Fields{
-			"line":   line,
-			"option": keyword,
-			"value":  value,
-		}).Error("Invalid number for beacon option, ignoring it")
-
-		return 0, false
+		return 0, fmt.Errorf("line %d: Invalid number for beacon option %s, \"%s\".  Ignoring it", line, keyword, value)
 	}
 
-	return f, true
+	return f, nil
 }
 
 /*
@@ -6401,7 +5687,7 @@ func parse_beacon_number(keyword string, value string, line int) (float64, bool)
 // e.g.  IBEACON DELAY=1 EVERY=1 SENDTO=IG OVERLAY=R SYMBOL="igate" LAT=37^44.46N LONG=122^27.19W COMMENT="N1KOL-1 IGATE"
 // Just ignores overlay, symbol, lat, long, and comment.
 
-func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) error { //nolint:unparam
+func beacon_options(cmd string, b *beacon_s, ps *parseState, p_audio_config *audio_s) error { //nolint:unparam
 	b.sendto_type = SENDTO_XMIT
 	b.sendto_chan = 0
 	b.delay = 60
@@ -6427,10 +5713,9 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 		var keyword, value, found = strings.Cut(t, "=")
 		if !found {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: No = found in, %s, on line %d.\n", t, line)
+			ps.errorf("config file: No = found in, %s, on line %d", t, ps.line)
 
-			return fmt.Errorf("config file line %d: no = found in %q", line, t)
+			return fmt.Errorf("config file line %d: no = found in %q", ps.line, t)
 		}
 
 		// QUICK TEMP EXPERIMENT, maybe permanent new feature.
@@ -6475,42 +5760,45 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 		// end
 		if strings.EqualFold(keyword, "DELAY") {
-			var n, ok = parse_interval(keyword, value, line)
-			if !ok {
+			var n, intervalErr = parse_interval(keyword, value, ps.line)
+			if intervalErr != nil {
+				ps.report(intervalErr)
+
 				continue
 			}
 
 			if n < 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Beacon delay, %d, can't be negative.\n", line, n)
+				ps.errorf("config file, line %d: Beacon delay, %d, can't be negative", ps.line, n)
 
 				continue
 			}
 
 			b.delay = n
 		} else if strings.EqualFold(keyword, "SLOT") {
-			var n, ok = parse_interval(keyword, value, line)
-			if !ok {
+			var n, intervalErr = parse_interval(keyword, value, ps.line)
+			if intervalErr != nil {
+				ps.report(intervalErr)
+
 				continue
 			}
 
 			if n < 1 || n > 3600 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds.\n", line, n)
+				ps.errorf("config file, line %d: Beacon time slot, %d, must be in range of 1 to 3600 seconds", ps.line, n)
 
 				continue
 			}
 
 			b.slot = maybe.Just(n)
 		} else if strings.EqualFold(keyword, "EVERY") {
-			var n, ok = parse_interval(keyword, value, line)
-			if !ok {
+			var n, intervalErr = parse_interval(keyword, value, ps.line)
+			if intervalErr != nil {
+				ps.report(intervalErr)
+
 				continue
 			}
 
 			if n < 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Time between beacons, %d, must be at least 1 second.\n", line, n)
+				ps.errorf("config file, line %d: Time between beacons, %d, must be at least 1 second", ps.line, n)
 
 				continue
 			}
@@ -6518,8 +5806,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			b.every = n
 		} else if strings.EqualFold(keyword, "SENDTO") {
 			if len(value) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Missing value for SENDTO option.\n", line)
+				ps.errorf("config file, line %d: Missing value for SENDTO option", ps.line)
 
 				continue
 			} else if value[0] == 'i' || value[0] == 'I' {
@@ -6528,20 +5815,17 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			} else if value[0] == 'r' || value[0] == 'R' {
 				var n, nErr = strconv.Atoi(value[1:])
 				if nErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Non-numeric channel \"%s\" for SENDTO=r option.\n", line, value[1:])
+					ps.errorf("config file, line %d: Non-numeric channel \"%s\" for SENDTO=r option", ps.line, value[1:])
 
 					continue
 				}
 				if n < 0 || n >= MAX_TOTAL_CHANS {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
+					ps.errorf("config file, line %d: Simulated receive on channel %d is not valid", ps.line, n)
 
 					continue
 				}
 				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Simulated receive on channel %d is not valid.\n", line, n)
+					ps.errorf("config file, line %d: Simulated receive on channel %d is not valid", ps.line, n)
 
 					continue
 				}
@@ -6551,20 +5835,17 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			} else if value[0] == 't' || value[0] == 'T' || value[0] == 'x' || value[0] == 'X' {
 				var n, nErr = strconv.Atoi(value[1:])
 				if nErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Non-numeric channel \"%s\" for SENDTO=t option.\n", line, value[1:])
+					ps.errorf("config file, line %d: Non-numeric channel \"%s\" for SENDTO=t option", ps.line, value[1:])
 
 					continue
 				}
 				if n < 0 || n >= MAX_TOTAL_CHANS {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
 					continue
 				}
 				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
 					continue
 				}
@@ -6574,20 +5855,17 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			} else {
 				var n, nErr = strconv.Atoi(value)
 				if nErr != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Non-numeric channel \"%s\" for SENDTO option.\n", line, value)
+					ps.errorf("config file, line %d: Non-numeric channel \"%s\" for SENDTO option", ps.line, value)
 
 					continue
 				}
 				if n < 0 || n >= MAX_TOTAL_CHANS {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
 					continue
 				}
 				if p_audio_config.chan_medium[n] == MEDIUM_NONE {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, n)
+					ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, n)
 
 					continue
 				}
@@ -6611,11 +5889,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			*/
 		} else if strings.EqualFold(keyword, "VIA") {
 			// #if 1	// proper checking
-			if check_via_path(value) >= 0 {
+			if ps.checkViaPath(value) >= 0 {
 				b.via = value
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: invalid via path.\n", line)
+				ps.errorf("config file, line %d: invalid via path", ps.line)
 			}
 
 			/* #else	// previously
@@ -6635,16 +5912,15 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		} else if strings.EqualFold(keyword, "OBJNAME") {
 			b.objname = value
 		} else if strings.EqualFold(keyword, "LAT") {
-			b.lat = parse_ll_maybe(value, LAT, line)
+			b.lat = ps.parseLLMaybe(value, LAT)
 		} else if strings.EqualFold(keyword, "LONG") || strings.EqualFold(keyword, "LON") {
-			b.lon = parse_ll_maybe(value, LON, line)
+			b.lon = ps.parseLLMaybe(value, LON)
 		} else if strings.EqualFold(keyword, "AMBIGUITY") || strings.EqualFold(keyword, "AMBIG") {
 			var n, _ = strconv.Atoi(value)
 			if n >= 0 && n <= 4 {
 				b.ambiguity = n
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Location ambiguity, on line %d, must be in range of 0 to 4.\n", line)
+				ps.errorf("config file: Location ambiguity, on line %d, must be in range of 0 to 4", ps.line)
 			}
 		} else if strings.EqualFold(keyword, "ALT") || strings.EqualFold(keyword, "ALTITUDE") {
 			// Parse something like "10 metres" or "10" or "10metres"
@@ -6669,25 +5945,26 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				}
 
 				if meters == 0 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Line %d: Unrecognized unit '%s' for altitude.  Using meter.\n", line, unit)
-					dw_printf("Try using singular form.  e.g.  ft or foot rather than feet.\n")
+					ps.errorf("line %d: Unrecognized unit '%s' for altitude.  Using meter.\nTry using singular form.  e.g.  ft or foot rather than feet", ps.line, unit)
 
 					meters = 1
 				}
 			}
 
-			if f, ok := parse_beacon_number(keyword, number, line); ok {
+			var f, numErr = parse_beacon_number(keyword, number, ps.line)
+			if ps.reportedOK(numErr) {
 				b.alt_m = maybe.Just(f * meters)
 			}
 		} else if strings.EqualFold(keyword, "ZONE") {
 			zone = value
 		} else if strings.EqualFold(keyword, "EAST") || strings.EqualFold(keyword, "EASTING") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				easting = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "NORTH") || strings.EqualFold(keyword, "NORTHING") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				northing = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "SYMBOL") {
@@ -6697,34 +5974,39 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			if len(value) == 1 && (unicode.IsUpper(rune(value[0])) || unicode.IsDigit(rune(value[0]))) {
 				b.symtab = value[0]
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: Overlay must be one character in range of 0-9 or A-Z, upper case only, on line %d.\n", line)
+				ps.errorf("config file: Overlay must be one character in range of 0-9 or A-Z, upper case only, on line %d", ps.line)
 			}
 		} else if strings.EqualFold(keyword, "POWER") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				b.power = f
 			}
 		} else if strings.EqualFold(keyword, "HEIGHT") { // This is in feet.
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				b.height = f
 			}
 			// TODO: ability to add units suffix, e.g.  10m
 		} else if strings.EqualFold(keyword, "GAIN") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				b.gain = f
 			}
 		} else if strings.EqualFold(keyword, "DIR") || strings.EqualFold(keyword, "DIRECTION") {
 			b.dir = value
 		} else if strings.EqualFold(keyword, "FREQ") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				b.freq = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "TONE") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				b.tone = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "OFFSET") || strings.EqualFold(keyword, "OFF") {
-			if f, ok := parse_beacon_number(keyword, value, line); ok {
+			var f, numErr = parse_beacon_number(keyword, value, ps.line)
+			if ps.reportedOK(numErr) {
 				b.offset = maybe.Just(f)
 			}
 		} else if strings.EqualFold(keyword, "COMMENT") {
@@ -6738,21 +6020,18 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 			var n, _ = strconv.Atoi(value)
 			b.messaging = n != 0
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Invalid option keyword, %s.\n", line, keyword)
+			ps.errorf("config file, line %d: Invalid option keyword, %s", ps.line, keyword)
 
-			return fmt.Errorf("config file line %d: invalid option keyword %q", line, keyword)
+			return fmt.Errorf("config file line %d: invalid option keyword %q", ps.line, keyword)
 		}
 	}
 
 	if b.custom_info != "" && b.custom_infocmd != "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Can't use both INFO and INFOCMD at the same time.\n", line)
+		ps.errorf("config file, line %d: Can't use both INFO and INFOCMD at the same time", ps.line)
 	}
 
 	if b.compress && b.ambiguity != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file, line %d: Position ambiguity can't be used with compressed location format.\n", line)
+		ps.errorf("config file, line %d: Position ambiguity can't be used with compressed location format", ps.line)
 
 		b.ambiguity = 0
 	}
@@ -6765,7 +6044,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 		var north, northKnown = northing.Get()
 
 		if len(zone) > 0 && eastKnown && northKnown {
-			var _, _hemi, lzone = parse_utm_zone(zone)
+			var _, _hemi, lzone = ps.parseUTMZone(zone)
 
 			var hemi = HemisphereRuneToCoordconvHemisphere(_hemi)
 
@@ -6781,12 +6060,10 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.lat = maybe.Just(R2D(float64(geo.Lat)))
 				b.lon = maybe.Just(R2D(float64(geo.Lng)))
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Line %d: Invalid UTM location: \n%s\n", line, geoErr)
+				ps.errorf("line %d: Invalid UTM location: \n%v", ps.line, geoErr)
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: When any of ZONE, EASTING, NORTHING specified, they must all be specified.\n", line)
+			ps.errorf("config file, line %d: When any of ZONE, EASTING, NORTHING specified, they must all be specified", ps.line)
 		}
 	}
 
@@ -6815,8 +6092,7 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 				b.symtab = symtab
 				b.symbol = symbol
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Could not find symbol matching %s.\n", line, temp_symbol)
+				ps.errorf("config file, line %d: Could not find symbol matching %s", ps.line, temp_symbol)
 			}
 		}
 	}
@@ -6825,33 +6101,29 @@ func beacon_options(cmd string, b *beacon_s, line int, p_audio_config *audio_s) 
 
 	if b.sendto_type == SENDTO_XMIT {
 		if b.sendto_chan < 0 || b.sendto_chan >= MAX_TOTAL_CHANS {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
+			ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, b.sendto_chan)
 
-			return fmt.Errorf("config file line %d: send-to channel %d is out of range", line, b.sendto_chan)
+			return fmt.Errorf("config file line %d: send-to channel %d is out of range", ps.line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_NONE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Send to channel %d is not valid.\n", line, b.sendto_chan)
+			ps.errorf("config file, line %d: Send to channel %d is not valid", ps.line, b.sendto_chan)
 
-			return fmt.Errorf("config file line %d: send-to channel %d has no medium configured", line, b.sendto_chan)
+			return fmt.Errorf("config file line %d: send-to channel %d has no medium configured", ps.line, b.sendto_chan)
 		}
 
 		if p_audio_config.chan_medium[b.sendto_chan] == MEDIUM_IGATE { // Prevent subscript out of bounds.
 			// Will be using call from chan 0 later.
 			if IsNoCall(p_audio_config.mycall[0]) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", 0)
+				ps.errorf("config file: MYCALL must be set for channel %d before beaconing is allowed", 0)
 
-				return fmt.Errorf("config file line %d: MYCALL must be set for channel 0 before beaconing", line)
+				return fmt.Errorf("config file line %d: MYCALL must be set for channel 0 before beaconing", ps.line)
 			}
 		} else {
 			if IsNoCall(p_audio_config.mycall[b.sendto_chan]) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file: MYCALL must be set for channel %d before beaconing is allowed.\n", b.sendto_chan)
+				ps.errorf("config file: MYCALL must be set for channel %d before beaconing is allowed", b.sendto_chan)
 
-				return fmt.Errorf("config file line %d: MYCALL must be set for channel %d before beaconing", line, b.sendto_chan)
+				return fmt.Errorf("config file line %d: MYCALL must be set for channel %d before beaconing", ps.line, b.sendto_chan)
 			}
 		}
 	}

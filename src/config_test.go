@@ -138,7 +138,8 @@ func Test_parse_ll(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result = parse_ll(tt.input, tt.which, 0)
+			var result, err = parse_ll(tt.input, tt.which, 0)
+			require.NoError(t, err)
 			assert.InDelta(t, tt.want, result, tt.delta)
 		})
 	}
@@ -257,23 +258,33 @@ func Test_parse_ll_maybe(t *testing.T) {
 	// Regression test: parse_ll indexed str[0] before looking at its length, so
 	// "LAT=" in a beacon line panicked rather than being rejected.
 	t.Run("an empty coordinate is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("", LAT, 0))
+		var ll, err = parse_ll_maybe("", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("a sign on its own is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("-", LON, 0))
+		var ll, err = parse_ll_maybe("-", LON, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("unreadable degrees are Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("abc", LAT, 0))
+		var ll, err = parse_ll_maybe("abc", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("unreadable minutes are Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("42^ab", LAT, 0))
+		var ll, err = parse_ll_maybe("42^ab", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("a non-finite coordinate is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("NaN^0", LAT, 0))
+		var ll, err = parse_ll_maybe("NaN^0", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	// Regression test: an out-of-range coordinate only logged and was returned
@@ -281,20 +292,31 @@ func Test_parse_ll_maybe(t *testing.T) {
 	// and longitude are required" check and EncodePosition clamped it to
 	// "!9000.00N" - the station transmitted from the North Pole.
 	t.Run("an out-of-range latitude is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("200", LAT, 0))
+		var ll, err = parse_ll_maybe("200", LAT, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("an out-of-range longitude is Nothing", func(t *testing.T) {
-		assert.Equal(t, maybe.Nothing[float64](), parse_ll_maybe("181W", LON, 0))
+		var ll, err = parse_ll_maybe("181W", LON, 0)
+		require.Error(t, err)
+		assert.Equal(t, maybe.Nothing[float64](), ll)
 	})
 
 	t.Run("the limits themselves are Just", func(t *testing.T) {
-		assert.InDelta(t, 90.0, maybe.FromJust(parse_ll_maybe("90N", LAT, 0)), 0.0001)
-		assert.InDelta(t, -180.0, maybe.FromJust(parse_ll_maybe("180W", LON, 0)), 0.0001)
+		var lat, latErr = parse_ll_maybe("90N", LAT, 0)
+		require.NoError(t, latErr)
+		assert.InDelta(t, 90.0, maybe.FromJust(lat), 0.0001)
+
+		var lon, lonErr = parse_ll_maybe("180W", LON, 0)
+		require.NoError(t, lonErr)
+		assert.InDelta(t, -180.0, maybe.FromJust(lon), 0.0001)
 	})
 
 	t.Run("a readable coordinate is Just", func(t *testing.T) {
-		assert.InDelta(t, -71.5, maybe.FromJust(parse_ll_maybe("71.5W", LON, 0)), 0.0001)
+		var lon, err = parse_ll_maybe("71.5W", LON, 0)
+		require.NoError(t, err)
+		assert.InDelta(t, -71.5, maybe.FromJust(lon), 0.0001)
 	})
 }
 
@@ -4886,4 +4908,56 @@ func packageTestSource(t *testing.T) string {
 	}
 
 	return all.String()
+}
+
+// --- rendering a complaint for the person who wrote the config file ---
+
+func Test_asSentence(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  string
+		want string
+	}{
+		{
+			// Go wants an error string to start lower case so that it still
+			// reads correctly wrapped inside a bigger one; nobody configuring a
+			// TNC wants to read it that way.
+			name: "an error string becomes a sentence",
+			msg:  "line 7: Missing port number for AGWPORT command",
+			want: "Line 7: Missing port number for AGWPORT command.",
+		},
+		{
+			name: "a question keeps its question mark",
+			msg:  "line 7: Non-standard data rate.  Are you sure?",
+			want: "Line 7: Non-standard data rate.  Are you sure?",
+		},
+		{
+			name: "a complaint that already ends in a full stop gains no second one",
+			msg:  "line 7: Invalid time for transmit delay. Using 30.",
+			want: "Line 7: Invalid time for transmit delay. Using 30.",
+		},
+		{
+			name: "a complaint that runs onto further lines is punctuated at the end",
+			msg:  "line 7: Unexpected \"x\" after the port number\nPerhaps you meant KISSPORT",
+			want: "Line 7: Unexpected \"x\" after the port number\nPerhaps you meant KISSPORT.",
+		},
+		{
+			// Only the opening letter is ours to change - the rest of the
+			// message, including anything substituted into it, is left alone.
+			name: "only the first letter is capitalised",
+			msg:  "config file, line 7: Invalid FILTER expression:\nfilter[0,IG]: nosuchfilter",
+			want: "Config file, line 7: Invalid FILTER expression:\nfilter[0,IG]: nosuchfilter.",
+		},
+		{
+			name: "an empty complaint is left alone",
+			msg:  "",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, asSentence(tt.msg))
+		})
+	}
 }
