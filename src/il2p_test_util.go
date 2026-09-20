@@ -40,14 +40,6 @@ func tone_gen_put_bit_fake(channel int, data int) {
 	il2p_rec_bit(channel, 0, 0, data)
 }
 
-func tone_gen_put_bit(channel int, data int) {
-	if IL2P_TEST {
-		tone_gen_put_bit_fake(channel, data)
-	} else {
-		tone_gen_put_bit_real(channel, data)
-	}
-}
-
 // This is called when a complete frame has been deserialized.
 
 func multi_modem_process_rec_packet_fake(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) { //nolint:unparam
