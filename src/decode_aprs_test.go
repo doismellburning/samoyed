@@ -225,3 +225,19 @@ func Test_decode_aprs_item_without_position(t *testing.T) {
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
 	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
 }
+
+// A Mic-E destination is really a latitude of six digits, but a lenient parse
+// - what the APRS-IS input and samoyed-decode_aprs both use - will accept a
+// shorter one, which used to be read off the end of the address.
+func Test_decode_aprs_mic_e_short_destination(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25_from_text("Q1TEST>0:'0000000000000000000", addrLenient)
+	assert.NotNil(t, pp)
+
+	// Must not panic, and must not claim a position it never read.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "MIC-E", A.g_data_type_desc)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_lon)
+}

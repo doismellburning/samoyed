@@ -1325,6 +1325,19 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	var dest = ax25_get_addr_with_ssid(pp, AX25_DESTINATION)
 
+	/* Trailing spaces are trimmed off the address, so a destination that is */
+	/* not really a latitude can be shorter than the six digits we read. */
+
+	const mic_e_dest_len = 6
+	if len(dest) < mic_e_dest_len {
+		if !A.g_quiet {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("MIC-E destination \"%s\" must have %d characters to hold a latitude.\n", dest, mic_e_dest_len)
+		}
+
+		return
+	}
+
 	var std_msg = 0
 	var cust_msg = 0
 	var lat = float64(mic_e_digit(A, dest[0], 4, &std_msg, &cust_msg)*10+
