@@ -192,17 +192,20 @@ func ptt_set_debug(debug int) {
 
 const MAX_GROUPS = 50
 
-func get_access_to_gpio(path string) {
+// gpio_sysfs_dir is the root of the sysfs GPIO user interface.  It is a
+// variable rather than a constant so that a test can point it at a fake tree
+// and exercise the GPIO paths without a kernel that offers the real one.
+var gpio_sysfs_dir = "/sys/class/gpio"
+
+func get_access_to_gpio(path string) error {
 	/*
 	 * Does path even exist?
 	 */
 	var _, err = os.Stat(path)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Can't get properties of %s: %s\n", path, err)
-		dw_printf("This system is not configured with the GPIO user interface.\n")
-		dw_printf("Use a different method for PTT control.\n")
-		os.Exit(1)
+		return fmt.Errorf("can't get properties of %s: %w"+
+			" (this system is not configured with the GPIO user interface;"+
+			" use a different method for PTT control)", path, err)
 	}
 
 	var my_uid = os.Geteuid()
@@ -255,6 +258,8 @@ func get_access_to_gpio(path string) {
 	 */
 
 	// TODO KG I don't love what was here, but I need to figure out what (if anything) I want to replace it with
+
+	return nil
 }
 
 /*-------------------------------------------------------------------
@@ -274,7 +279,7 @@ func get_access_to_gpio(path string) {
  *
  *------------------------------------------------------------------*/
 
-func export_gpio(ch int, ot int, invert bool, direction int) {
+func export_gpio(ch int, ot int, invert bool, direction int) error {
 	// Raspberry Pi was easy.  GPIO 24 has the name gpio24.
 	// Others, such as the Cubieboard, take a little more effort.
 	// The name might be gpio24_ph11 meaning connector H, pin 11.
@@ -291,16 +296,17 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 		gpio_name = save_audio_config_p.achan[ch].ictrl[ot].in_gpio_name
 	}
 
-	const gpio_export_path = "/sys/class/gpio/export"
+	var gpio_export_path = gpio_sysfs_dir + "/export"
 
-	get_access_to_gpio(gpio_export_path)
+	var accessErr = get_access_to_gpio(gpio_export_path)
+	if accessErr != nil {
+		return accessErr
+	}
 
 	var fd, err = os.OpenFile(gpio_export_path, os.O_WRONLY, 0)
 	if err != nil {
-		// Not expected.  Above should have obtained permission or exited.
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Permissions do not allow access to GPIO.\n")
-		os.Exit(1)
+		// Not expected.  Above should have obtained permission.
+		return fmt.Errorf("permissions do not allow access to GPIO: %w", err)
 	}
 
 	var stemp = strconv.Itoa(gpio_num)
@@ -370,17 +376,17 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 
 	if ptt_debug_level >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Contents of /sys/class/gpio:\n")
+		dw_printf("Contents of %s:\n", gpio_sysfs_dir)
 	}
 
-	var dirEntries, readDirErr = os.ReadDir("/sys/class/gpio")
+	var dirEntries, readDirErr = os.ReadDir(gpio_sysfs_dir)
 
 	var ok = false
 
 	if readDirErr != nil {
 		// Something went wrong.  Fill in the simple expected name and keep going.
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR! Could not get directory listing for /sys/class/gpio\n")
+		dw_printf("ERROR! Could not get directory listing for %s\n", gpio_sysfs_dir)
 
 		gpio_name = fmt.Sprintf("gpio%d", gpio_num)
 		ok = true
@@ -419,30 +425,29 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 	/*
 	 * We should now have the corresponding node name.
 	 */
-	if ok {
-		if ptt_debug_level >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("Path for gpio number %d is /sys/class/gpio/%s\n", gpio_num, gpio_name)
-		}
-	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR! Could not find Path for gpio number %d.n", gpio_num)
-		os.Exit(1)
+	if !ok {
+		return fmt.Errorf("could not find path for gpio number %d", gpio_num)
+	}
+
+	if ptt_debug_level >= 2 {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, gpio_sysfs_dir, gpio_name)
 	}
 
 	/*
 	 * Set output direction and initial state
 	 */
 
-	var gpio_direction_path = fmt.Sprintf("/sys/class/gpio/%s/direction", gpio_name)
-	get_access_to_gpio(gpio_direction_path)
+	var gpio_direction_path = fmt.Sprintf("%s/%s/direction", gpio_sysfs_dir, gpio_name)
+
+	accessErr = get_access_to_gpio(gpio_direction_path)
+	if accessErr != nil {
+		return accessErr
+	}
 
 	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0) //nolint:gosec
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error opening %s\n", gpio_direction_path)
-		dw_printf("%s\n", err)
-		os.Exit(1)
+		return fmt.Errorf("error opening %s: %w", gpio_direction_path, err)
 	}
 
 	var gpio_val string
@@ -458,11 +463,16 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 	}
 
 	n, writeErr = fd.WriteString(gpio_val)
-	if n != len(gpio_val) || writeErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Error writing initial state to %s\n", gpio_direction_path)
-		dw_printf("%s\n", writeErr)
-		os.Exit(1)
+	if writeErr != nil {
+		fd.Close()
+
+		return fmt.Errorf("error writing initial state to %s: %w", gpio_direction_path, writeErr)
+	}
+
+	if n != len(gpio_val) {
+		fd.Close()
+
+		return fmt.Errorf("error writing initial state to %s: wrote %d of %d bytes", gpio_direction_path, n, len(gpio_val))
 	}
 
 	fd.Close()
@@ -472,8 +482,9 @@ func export_gpio(ch int, ot int, invert bool, direction int) {
 	 * Do it once here, rather than each time we want to use it.
 	 */
 
-	var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", gpio_name)
-	get_access_to_gpio(gpio_value_path)
+	var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, gpio_name)
+
+	return get_access_to_gpio(gpio_value_path)
 }
 
 /*-------------------------------------------------------------------
@@ -542,7 +553,25 @@ var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
 
 var otnames [NUM_OCTYPES]string
 
-func ptt_init(audio_config_p *audio_s) {
+func ptt_init(audio_config_p *audio_s) error {
+	var err = ptt_setup(audio_config_p)
+	if err != nil {
+		// Setting up is incremental, so a failure can come after serial ports
+		// have been opened or GPIOD lines requested, and the caller has no
+		// handle on those - they live in this file's globals.  Put them back
+		// before reporting, so a caller that carries on, or tries again, is
+		// not left with open descriptors and hardware we no longer track.
+		ptt_term()
+
+		return err
+	}
+
+	return nil
+}
+
+// ptt_setup does the work of ptt_init, stopping at the first failure.  Call
+// ptt_init rather than this: it is the one that tidies up after a failure.
+func ptt_setup(audio_config_p *audio_s) error {
 	save_audio_config_p = audio_config_p
 
 	otnames[OCTYPE_PTT] = "PTT"
@@ -673,7 +702,10 @@ func ptt_init(audio_config_p *audio_s) {
 	}
 
 	if using_gpio {
-		get_access_to_gpio("/sys/class/gpio/export")
+		var accessErr = get_access_to_gpio(gpio_sysfs_dir + "/export")
+		if accessErr != nil {
+			return accessErr
+		}
 	}
 	// GPIOD
 	for ch := range MAX_RADIO_CHANS {
@@ -686,10 +718,8 @@ func ptt_init(audio_config_p *audio_s) {
 
 					var line, lineErr = RequestGPIODLine(chip_name, line_number, initialState)
 					if lineErr != nil {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Can't request GPIOD line %d on %s: %v\n", line_number, chip_name, lineErr)
-						dw_printf("Terminating due to failed PTT on channel %d\n", ch)
-						os.Exit(1)
+						return fmt.Errorf("can't request GPIOD line %d on %s for channel %d %s: %w",
+							line_number, chip_name, ch, otnames[ot], lineErr)
 					}
 
 					gpiod_line[ch][ot] = line
@@ -714,13 +744,19 @@ func ptt_init(audio_config_p *audio_s) {
 			// output control type, PTT, DCD, CON, ...
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
+					var exportErr = export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
+					if exportErr != nil {
+						return fmt.Errorf("channel %d %s: %w", ch, otnames[ot], exportErr)
+					}
 				}
 			}
 			// input control type
 			for it := range NUM_ICTYPES {
 				if audio_config_p.achan[ch].ictrl[it].method == PTT_METHOD_GPIO {
-					export_gpio(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
+					var exportErr = export_gpio(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
+					if exportErr != nil {
+						return fmt.Errorf("channel %d input %d: %w", ch, it, exportErr)
+					}
 				}
 			}
 		}
@@ -870,10 +906,9 @@ func ptt_init(audio_config_p *audio_s) {
 						}
 
 						if openErr != nil {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Hamlib Rig open error for channel %d: %s\n", ch, openErr)
 							r.Cleanup() //nolint:errcheck
-							os.Exit(1)
+
+							return fmt.Errorf("hamlib rig open for channel %d: %w", ch, openErr)
 						}
 
 						// Successful.  Later code should check for rig[ch][ot] not nil.
@@ -955,7 +990,9 @@ func ptt_init(audio_config_p *audio_s) {
 			}
 		}
 	}
-} /* end ptt_init */
+
+	return nil
+} /* end ptt_setup */
 
 /*-------------------------------------------------------------------
  *
@@ -1090,7 +1127,7 @@ func ptt_set_real(ot int, channel int, ptt_signal int) {
 	 */
 
 	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", save_audio_config_p.achan[channel].octrl[ot].out_gpio_name)
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, save_audio_config_p.achan[channel].octrl[ot].out_gpio_name)
 
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
@@ -1249,10 +1286,11 @@ func get_input_real(it int, channel int) int {
 	}
 
 	if save_audio_config_p.achan[channel].ictrl[it].method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("/sys/class/gpio/%s/value", save_audio_config_p.achan[channel].ictrl[it].in_gpio_name)
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, save_audio_config_p.achan[channel].ictrl[it].in_gpio_name)
 
-		get_access_to_gpio(gpio_value_path)
-
+		// No need to check access first: this runs on every transmit attempt,
+		// export_gpio checked it at startup, and the open below reports the
+		// same thing once rather than twice.
 		var fd, openErr = os.Open(gpio_value_path) //nolint:gosec
 		if openErr != nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -1362,7 +1400,7 @@ func ptt_term() {
  * TODO:  Retest this, add CM108 GPIO to test.
  */
 
-func PTTTestMain() {
+func PTTTestMain() error {
 	var my_audio_config audio_s
 
 	my_audio_config.adev[0].num_channels = 2
@@ -1380,7 +1418,10 @@ func PTTTestMain() {
 
 	/* initialize - both off */
 
-	ptt_init(&my_audio_config)
+	var initErr = ptt_init(&my_audio_config)
+	if initErr != nil {
+		return initErr
+	}
 
 	SLEEP_SEC(2)
 
@@ -1413,7 +1454,10 @@ func PTTTestMain() {
 
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
-	ptt_init(&my_audio_config)
+	initErr = ptt_init(&my_audio_config)
+	if initErr != nil {
+		return initErr
+	}
 
 	SLEEP_SEC(2)
 
@@ -1451,7 +1495,10 @@ func PTTTestMain() {
 
 	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
 
-	ptt_init(&my_audio_config)
+	initErr = ptt_init(&my_audio_config)
+	if initErr != nil {
+		return initErr
+	}
 
 	SLEEP_SEC(2)
 
@@ -1500,6 +1547,8 @@ func PTTTestMain() {
 
 	   #endif
 	*/
+
+	return nil
 }
 
 /* end ptt.c */

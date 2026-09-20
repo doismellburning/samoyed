@@ -648,7 +648,13 @@ x = Silence FX.25 information.`)
 	 * Initialize the transmit queue.
 	 */
 
-	xmitSvc = NewXmitService(ctx, audio_config, d_p_opt)
+	var xmitErr error
+
+	xmitSvc, xmitErr = NewXmitService(ctx, audio_config, d_p_opt)
+	if xmitErr != nil {
+		logrus.WithError(xmitErr).Error("Could not set up transmit")
+		os.Exit(1)
+	}
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
