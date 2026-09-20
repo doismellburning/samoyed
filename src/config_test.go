@@ -1,6 +1,7 @@
 package direwolf
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
@@ -5043,4 +5044,19 @@ func Test_asSentence(t *testing.T) {
 			assert.Equal(t, tt.want, asSentence(tt.msg))
 		})
 	}
+}
+
+// --- a file we could not read all of ---
+
+func Test_config_init_unreadable_file_is_not_clean(t *testing.T) {
+	// Regression test: the scanner loop never looked at scanner.Err(), so a
+	// line too long for its buffer ended the parse without a word about it.
+	// Everything after that line went unread, and --config-check called the
+	// file clean.
+	var overlong = strings.Repeat("Q", bufio.MaxScanTokenSize+1)
+
+	var c = parseConfig(t, "ADEVICE plughw:1,0\nMYCALL "+overlong+"\nAGWPORT 8000\n")
+
+	assert.Positive(t, c.errors, "config_init said:\n%s", c.output)
+	assert.Contains(t, c.output, "Could not read")
 }

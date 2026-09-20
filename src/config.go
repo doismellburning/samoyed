@@ -1415,6 +1415,15 @@ func config_init(fname string, p_audio_config *audio_s,
 		}
 	}
 
+	// Scan stops on a read failure, or on a line too long for the scanner's
+	// buffer, and says so only here.  The rest of the file went unread, so
+	// nothing below can be trusted - say so, rather than letting a file we only
+	// got halfway through look like one with nothing wrong with it.
+	var scanErr = scanner.Err()
+	if scanErr != nil {
+		ps.errorf("config file: Could not read %s past line %d: %v", absFilePath, ps.line, scanErr)
+	}
+
 	/*
 	 * A little error checking for option interactions.
 	 */
