@@ -32,6 +32,7 @@ package direwolf
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -109,7 +110,9 @@ type XmitService struct {
  * Inputs:	p_modem		- Structure with modem and timing parameters.
  *
  *
- * Outputs:	Returns a new XmitService with required information set up.
+ * Outputs:	Returns a new XmitService with required information set up, or an
+ *		error if the PTT hardware could not be set up, in which case
+ *		nothing has been started and the caller decides what to do.
  *
  * Description:	Initialize the queue to be empty and set up other
  *		mechanisms for sharing it between different threads.
@@ -122,7 +125,7 @@ type XmitService struct {
  *
  *--------------------------------------------------------------------*/
 
-func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet bool) *XmitService {
+func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet bool) (*XmitService, error) {
 	logrus.Debug("xmit_init")
 	var xs = &XmitService{} //nolint:exhaustruct_v5
 	xs.p_modem = p_modem
@@ -133,7 +136,11 @@ func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet boo
 	 * Push to Talk (PTT) control.
 	 */
 	logrus.Debug("xmit_init: about to call ptt_init")
-	ptt_init(p_modem)
+
+	var pttErr = ptt_init(p_modem)
+	if pttErr != nil {
+		return nil, fmt.Errorf("PTT init: %w", pttErr)
+	}
 
 	logrus.Debug("xmit_init: back from ptt_init")
 
@@ -171,7 +178,7 @@ func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet boo
 
 	logrus.Debug("xmit_init: finished")
 
-	return xs
+	return xs, nil
 }
 
 /*-------------------------------------------------------------------

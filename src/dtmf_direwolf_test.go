@@ -1,6 +1,10 @@
 package direwolf
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func Test_dtmf(t *testing.T) {
 	var c = 0 // radio channel.
@@ -15,7 +19,7 @@ func Test_dtmf(t *testing.T) {
 	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1
 	my_audio_config.adev[ACHAN2ADEV(c)].bits_per_sample = 8
 	gen_tone_init(&my_audio_config, 100, false)
-	ptt_init(&my_audio_config)
+	require.NoError(t, ptt_init(&my_audio_config))
 
 	dtmf_init(&my_audio_config, 50)
 
