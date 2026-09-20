@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -128,47 +127,135 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var client_sock [MAX_NET_CLIENTS]net.Conn
-
-/* Socket for */
-/* communication with client application. */
-
-var enable_send_raw_to_client [MAX_NET_CLIENTS]bool
-
-/* Should we send received packets to client app in raw form? */
-/* Note that it starts as false for a new connection. */
-/* the client app must send a command to enable this. */
-
-var enable_send_monitor_to_client [MAX_NET_CLIENTS]bool
-
-/* Should we send received packets to client app in monitor form? */
-/* Note that it starts as false for a new connection. */
-/* the client app must send a command to enable this. */
-
 // AGW_LOGIN_FIELD_LEN is the size of each of the two fields, user name and
 // password, in the data of an "Application Login" frame.  Both are NUL padded.
 const AGW_LOGIN_FIELD_LEN = 255
 
-var agwpe_logins []agwpe_login_s
+// AGWServer provides the "AGW TCPIP Socket Interface" to client applications.
+//
+// The main program makes one of these, and everything the interface remembers
+// about its clients lives in it.  The methods the rest of the program calls to
+// tell a client something do nothing on a nil server, so a caller on a path
+// that runs without one - a test, or a build of the program that never started
+// the interface - needs no special case of its own.
+type AGWServer struct {
+	// What sort of thing each channel is, which decides the channels
+	// connected mode may be used on.  audio.go owns this; we only read it,
+	// and it is nil in tests that do not set one up.
+	audioConfigP *audio_s
 
-/* User names and passwords, any one of which a client may send in an */
-/* "Application Login" frame before we honour any of its other commands. */
-/* Empty means no login is required.  Written once at startup, read by every */
-/* client's command thread thereafter. */
+	// User names and passwords, any one of which a client may send in an
+	// "Application Login" frame before we honour any of its other commands.
+	// Empty means no login is required.  Written once at startup, read by
+	// every client's command thread thereafter.
+	logins []agwpe_login_s
 
-var client_logged_in [MAX_NET_CLIENTS]atomic.Bool
+	// Print information flowing from and to client.  Settled by the
+	// constructor, before it starts the goroutines that read it, and never
+	// written again - so no lock, and none of the cost of one on a path that
+	// consults it for every frame.
+	debug int
 
-/* Has this client sent an "Application Login" that we accepted? */
-/* Only consulted when a login is required. */
-/* The connection listener and the client's own command thread both */
-/* touch this, hence the atomic. */
+	clients [MAX_NET_CLIENTS]agwClient
+}
 
-var client_login_exempt [MAX_NET_CLIENTS]atomic.Bool
+// agwClient is what the server remembers about one of its client slots.  A
+// slot whose conn is nil is free for the next client to connect.
+type agwClient struct {
+	/* Socket for communication with client application. */
+	conn net.Conn
 
-/* Is this client exempt from having to log in at all, by having connected */
-/* from this machine?  Settled when the connection is accepted, before the */
-/* socket is published, and read again whenever the client's login state is */
-/* reset. */
+	/* Should we send received packets to client app in raw form? */
+	/* Note that it starts as false for a new connection. */
+	/* the client app must send a command to enable this. */
+	sendRaw bool
+
+	/* As above, but in monitor form. */
+	sendMonitor bool
+
+	/* Has this client sent an "Application Login" that we accepted? */
+	/* Only consulted when a login is required. */
+	/* The connection listener and the client's own command thread both */
+	/* touch this, hence the atomic. */
+	loggedIn atomic.Bool
+
+	/* Is this client exempt from having to log in at all, by having connected */
+	/* from this machine?  Settled when the connection is accepted, before the */
+	/* socket is published, and read again whenever the client's login state is */
+	/* reset. */
+	loginExempt atomic.Bool
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        NewAGWServer
+ *
+ * Purpose:     Set up a server to listen for connection requests from
+ *		an application such as Xastir.
+ *
+ * Inputs:	mc.agwpe_port	- TCP port for server.
+ *				  Main program has default of 8000 but allows
+ *				  an alternative to be specified on the command line
+ *
+ *				0 means disable.  New in version 1.2.
+ *
+ *		debug		- "-d a" level: print the messages flowing to and
+ *				  from clients.
+ *
+ * Outputs:
+ *
+ * Description:	This starts at least two threads:
+ *		  *  one to listen for a connection from client app.
+ *		  *  one or more to listen for commands from client app.
+ *		so the main application doesn't block while we wait for these.
+ *
+ *--------------------------------------------------------------------*/
+
+func NewAGWServer(ctx context.Context, audio_config_p *audio_s, mc *misc_config_s, debug int) *AGWServer {
+	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
+
+	logrus.WithField("server_port", server_port).Debug("NewAGWServer")
+
+	var s = new(AGWServer)
+	s.audioConfigP = audio_config_p
+	s.logins = mc.agwpe_logins
+	s.debug = debug
+
+	/*
+	 * A new server starts with every client slot empty, and with none of the
+	 * things a client can switch on switched on, because that is what the
+	 * zero value of the client table is.
+	 */
+
+	if server_port == 0 {
+		text_color_set(DW_COLOR_INFO)
+		dw_printf("Disabled AGW network client port.\n")
+
+		return s
+	}
+
+	if s.loginRequired() {
+		text_color_set(DW_COLOR_INFO)
+		dw_printf("AGW client applications must log in, unless they connect from this machine.\n")
+		dw_printf("%d set(s) of credentials configured.\n", len(s.logins))
+	}
+
+	/*
+	 * This waits for a client to connect and attaches it to a free slot.
+	 */
+	go s.connectListenThread(ctx, server_port)
+
+	/*
+	 * These read messages from client when the client's slot holds a socket.
+	 * Currently we start up a separate thread for each potential connection.
+	 * Possible later refinement.  Start one now, others only as needed.
+	 */
+	for client := range MAX_NET_CLIENTS {
+		go s.cmdListenThread(ctx, client)
+	}
+
+	return s
+}
 
 /*-------------------------------------------------------------------
  *
@@ -182,287 +269,6 @@ var client_login_exempt [MAX_NET_CLIENTS]atomic.Bool
  *		msg_len		- Length of the message.
  *
  *--------------------------------------------------------------------*/
-
-var debug_client int = 0 /* Debug option: Print information flowing from and to client. */
-
-func server_set_debug(n int) {
-	debug_client = n
-}
-
-func debug_print(fromto fromto_t, client int, pmsg *AGWPEMessage) {
-	var direction, datakind string
-
-	switch fromto {
-	case FROM_CLIENT:
-		direction = "from" /* from the client application */
-
-		switch pmsg.Header.DataKind {
-		case 'P':
-			datakind = "Application Login"
-		case 'X':
-			datakind = "Register CallSign"
-		case 'x':
-			datakind = "Unregister CallSign"
-		case 'G':
-			datakind = "Ask Port Information"
-		case 'm':
-			datakind = "Enable Reception of Monitoring Frames"
-		case 'R':
-			datakind = "AGWPE Version Info"
-		case 'g':
-			datakind = "Ask Port Capabilities"
-		case 'H':
-			datakind = "Callsign Heard on a Port"
-		case 'y':
-			datakind = "Ask Outstanding frames waiting on a Port"
-		case 'Y':
-			datakind = "Ask Outstanding frames waiting for a connection"
-		case 'M':
-			datakind = "Send UNPROTO Information"
-		case 'C':
-			datakind = "Connect, Start an AX.25 Connection"
-		case 'D':
-			datakind = "Send Connected Data"
-		case 'd':
-			datakind = "Disconnect, Terminate an AX.25 Connection"
-		case 'v':
-			datakind = "Connect VIA, Start an AX.25 circuit thru digipeaters"
-		case 'V':
-			datakind = "Send UNPROTO VIA"
-		case 'c':
-			datakind = "Non-Standard Connections, Connection with PID"
-		case 'K':
-			datakind = "Send data in raw AX.25 format"
-		case 'k':
-			datakind = "Activate reception of Frames in raw format"
-		default:
-			datakind = "**INVALID**"
-		}
-
-	case TO_CLIENT:
-		direction = "to"
-
-		switch pmsg.Header.DataKind {
-		case 'R':
-			datakind = "Version Number"
-		case 'X':
-			datakind = "Callsign Registration"
-		case 'G':
-			datakind = "Port Information"
-		case 'g':
-			datakind = "Capabilities of a Port"
-		case 'y':
-			datakind = "Frames Outstanding on a Port"
-		case 'Y':
-			datakind = "Frames Outstanding on a Connection"
-		case 'H':
-			datakind = "Heard Stations on a Port"
-		case 'C':
-			datakind = "AX.25 Connection Received"
-		case 'D':
-			datakind = "Connected AX.25 Data"
-		case 'd':
-			datakind = "Disconnected"
-		case 'I':
-			datakind = "Monitored Connected Information"
-		case 'S':
-			datakind = "Monitored Supervisory Information"
-		case 'U':
-			datakind = "Monitored Unproto Information"
-		case 'T':
-			datakind = "Monitoring Own Information"
-		case 'K':
-			datakind = "Monitored Information in Raw Format"
-		default:
-			datakind = "**INVALID**"
-		}
-	default:
-		panic(fmt.Sprintf("Unknown fromto: %v", fromto))
-	}
-
-	text_color_set(DW_COLOR_DEBUG)
-	dw_printf("\n")
-
-	dw_printf("%s %s %s AGWPE client application %d\n",
-		FROMTO_PREFIX[fromto], datakind, direction, client)
-
-	dw_printf("\tportx = %d, datakind = '%c', pid = 0x%02x\n", pmsg.Header.Portx, pmsg.Header.DataKind, pmsg.Header.PID)
-	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
-	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
-
-	HexDump(pmsg.Data[:pmsg.Header.DataLen])
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        server_init
- *
- * Purpose:     Set up a server to listen for connection requests from
- *		an application such as Xastir.
- *
- * Inputs:	mc.agwpe_port	- TCP port for server.
- *				  Main program has default of 8000 but allows
- *				  an alternative to be specified on the command line
- *
- *				0 means disable.  New in version 1.2.
- *
- * Outputs:
- *
- * Description:	This starts at least two threads:
- *		  *  one to listen for a connection from client app.
- *		  *  one or more to listen for commands from client app.
- *		so the main application doesn't block while we wait for these.
- *
- *--------------------------------------------------------------------*/
-
-// agwConnectedModeAllowed reports whether AX.25 connected mode is allowed on portx.
-// Connected mode is supported for MEDIUM_RADIO channels and MEDIUM_NETTNC channels.
-// When save_audio_config_p is nil (e.g. in unit tests), only channels < MAX_RADIO_CHANS
-// are permitted, preserving the previous behaviour.
-func agwConnectedModeAllowed(portx byte) bool {
-	if int(portx) >= MAX_TOTAL_CHANS {
-		return false
-	}
-	if save_audio_config_p == nil {
-		return int(portx) < MAX_RADIO_CHANS
-	}
-	var m = save_audio_config_p.chan_medium[portx]
-
-	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
-}
-
-func server_init(ctx context.Context, audio_config_p *audio_s, mc *misc_config_s) {
-	var server_port = mc.agwpe_port /* Usually 8000 but can be changed. */
-
-	logrus.WithField("server_port", server_port).Debug("server_init")
-
-	save_audio_config_p = audio_config_p
-
-	agwpe_logins = mc.agwpe_logins
-
-	for client := range MAX_NET_CLIENTS {
-		enable_send_raw_to_client[client] = false
-		enable_send_monitor_to_client[client] = false
-		client_login_exempt[client].Store(false)
-		client_logged_in[client].Store(false)
-	}
-
-	if server_port == 0 {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("Disabled AGW network client port.\n")
-
-		return
-	}
-
-	if agwLoginRequired() {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("AGW client applications must log in, unless they connect from this machine.\n")
-		dw_printf("%d set(s) of credentials configured.\n", len(agwpe_logins))
-	}
-
-	/*
-	 * This waits for a client to connect and sets an available client_sock[n].
-	 */
-	go server_connect_listen_thread(ctx, server_port)
-
-	/*
-	 * These read messages from client when client_sock[n] is valid.
-	 * Currently we start up a separate thread for each potential connection.
-	 * Possible later refinement.  Start one now, others only as needed.
-	 */
-	for client := range MAX_NET_CLIENTS {
-		go cmd_listen_thread(ctx, client)
-	}
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        connect_listen_thread
- *
- * Purpose:     Wait for a connection request from an application.
- *
- * Inputs:	arg		- TCP port for server.
- *				  Main program has default of 8000 but allows
- *				  an alternative to be specified on the command line
- *
- * Outputs:	client_sock	- File descriptor for communicating with client app.
- *
- * Description:	Wait for connection request from client and establish
- *		communication.
- *		Note that the client can go away and come back again and
- *		re-establish communication without restarting this application.
- *
- *--------------------------------------------------------------------*/
-
-func server_connect_listen_thread(ctx context.Context, server_port int) {
-	logrus.WithField("port", server_port).Debug("Binding to port")
-	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", server_port))
-	if listenErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
-
-		return
-	}
-
-	// Dire Wolf set SO_REUSEADDR here (its version 1.3, as suggested by
-	// G8BPQ) so that restarting the application straight away could bind the
-	// port again.  Go's net package already sets it on every Unix TCP
-	// listener, and the way we were setting it - TCPListener.File, then
-	// setsockopt on the duplicate - has a sting in the tail: File puts the
-	// underlying socket into blocking mode, which takes it out of the
-	// runtime's poller, and Close then no longer interrupts a goroutine
-	// waiting in Accept.  That is exactly what stopping needs it to do.
-
-	logrus.WithField("port", server_port).Debug("opened socket for stream i/o")
-
-	// Accept below blocks until a client turns up, which may be never, so
-	// closing the listener is what gets us back when we are asked to stop.
-	// It also gives the port up rather than holding it until the process
-	// exits, which is what lets a test start a server and then stop it.
-	defer closeOnDone(ctx, listener)()
-
-	for ctx.Err() == nil {
-		var client = -1
-		for c := 0; c < MAX_NET_CLIENTS && client < 0; c++ {
-			if client_sock[c] == nil {
-				client = c
-			}
-		}
-
-		if client >= 0 {
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("Ready to accept AGW client application %d on port %d ...\n", client, server_port)
-
-			var conn, acceptErr = listener.Accept()
-			if acceptErr != nil {
-				if ctx.Err() != nil {
-					return // We closed the listener ourselves on the way out.
-				}
-
-				dw_printf("Accept failed: %v\n", acceptErr)
-
-				continue
-			}
-
-			if ctx.Err() != nil {
-				// Cancelled while this connection sat in the accept queue:
-				// the kernel completes a connection whether or not anybody
-				// is still listening.  Hang up rather than attach a client
-				// nothing will ever read from.
-				conn.Close()
-
-				return
-			}
-
-			agwClientAccepted(client, conn)
-
-			text_color_set(DW_COLOR_INFO)
-			dw_printf("\nAttached to AGW client application %d...\n\n", client)
-		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
-			return
-		}
-	}
-}
 
 /*-------------------------------------------------------------------
  *
@@ -487,12 +293,17 @@ func server_connect_listen_thread(ctx context.Context, server_port int) {
  *
  *--------------------------------------------------------------------*/
 
-func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
+func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
+	if s == nil {
+		return
+	}
+
 	/*
 	 * RAW format
 	 */
 	for client := range MAX_NET_CLIENTS {
-		if enable_send_raw_to_client[client] && client_sock[client] != nil {
+		var conn = s.clientWantingRaw(client)
+		if conn != nil {
 			var agwpe_msg = new(AGWPEMessage)
 
 			agwpe_msg.Header.Portx = byte(channel)
@@ -514,27 +325,29 @@ func server_send_rec_packet(channel int, pp *packet_t, fbuf []byte) {
 
 			copy(agwpe_msg.Data[1:], fbuf)
 
-			if debug_client > 0 {
-				debug_print(TO_CLIENT, client, agwpe_msg)
+			if s.debug > 0 {
+				s.debugPrint(TO_CLIENT, client, agwpe_msg)
 			}
 
-			var _, err = agwpe_msg.Write(client_sock[client], binary.LittleEndian)
+			var _, err = agwpe_msg.Write(conn, binary.LittleEndian)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application.  Closing connection.\n\n")
-				client_sock[client].Close()
-				client_sock[client] = nil
-				dlq_client_cleanup(client)
+				s.detachClient(client, conn)
 			}
 		}
 	}
 
 	// Application might want more human readable format.
 
-	server_send_monitored(channel, pp, 0)
-} /* end server_send_rec_packet */
+	s.SendMonitored(channel, pp, 0)
+} /* end SendRecPacket */
 
-func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
+func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
+	if s == nil {
+		return
+	}
+
 	/*
 	 * MONITOR format - 	'I' for information frames.
 	 *			'U' for unnumbered information.
@@ -543,7 +356,8 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 	 *			'T' for own transmitted frames.
 	 */
 	for client := range MAX_NET_CLIENTS {
-		if enable_send_monitor_to_client[client] && client_sock[client] != nil {
+		var conn = s.clientWantingMonitor(client)
+		if conn != nil {
 			var agwpe_msg = new(AGWPEMessage)
 
 			agwpe_msg.Header.Portx = byte(channel) // datakind is added later.
@@ -617,21 +431,19 @@ func server_send_monitored(channel int, pp *packet_t, own_xmit int) {
 			msg_data_len++
 			agwpe_msg.Header.DataLen = uint32(msg_data_len) // TODO KG Just len(Data)
 
-			if debug_client > 0 {
-				debug_print(TO_CLIENT, client, agwpe_msg)
+			if s.debug > 0 {
+				s.debugPrint(TO_CLIENT, client, agwpe_msg)
 			}
 
-			var _, err = agwpe_msg.Write(client_sock[client], binary.LittleEndian)
+			var _, err = agwpe_msg.Write(conn, binary.LittleEndian)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
-				client_sock[client].Close()
-				client_sock[client] = nil
-				dlq_client_cleanup(client)
+				s.detachClient(client, conn)
 			}
 		}
 	}
-} /* server_send_monitored */
+} /* SendMonitored */
 
 // Next two are broken out in case they can be reused elsewhere.
 
@@ -762,7 +574,7 @@ func mon_desc(pp *packet_t) (byte, string) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        server_link_established
+ * Name:        LinkEstablished
  *
  * Purpose:     Send notification to client app when a link has
  *		been established with another station.
@@ -782,7 +594,11 @@ func mon_desc(pp *packet_t) (byte, string) {
  *
  *--------------------------------------------------------------------*/
 
-func server_link_established(channel int, client int, remote_call string, own_call string, incoming bool) {
+func (s *AGWServer) LinkEstablished(channel int, client int, remote_call string, own_call string, incoming bool) {
+	if s == nil {
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -804,12 +620,12 @@ func server_link_established(channel int, client int, remote_call string, own_ca
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
 
-	send_to_client(client, reply)
-} /* end server_link_established */
+	s.sendToClient(client, reply)
+} /* end LinkEstablished */
 
 /*-------------------------------------------------------------------
  *
- * Name:        server_link_terminated
+ * Name:        LinkTerminated
  *
  * Purpose:     Send notification to client app when a link with
  *		another station has been terminated or a connection
@@ -831,7 +647,11 @@ func server_link_established(channel int, client int, remote_call string, own_ca
  *
  *--------------------------------------------------------------------*/
 
-func server_link_terminated(channel int, client int, remote_call string, own_call string, timeout bool) {
+func (s *AGWServer) LinkTerminated(channel int, client int, remote_call string, own_call string, timeout bool) {
+	if s == nil {
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -848,12 +668,12 @@ func server_link_terminated(channel int, client int, remote_call string, own_cal
 	reply.Data = append(reply.Data, 0)
 	reply.Header.DataLen = uint32(len(reply.Data))
 
-	send_to_client(client, reply)
-} /* end server_link_terminated */
+	s.sendToClient(client, reply)
+} /* end LinkTerminated */
 
 /*-------------------------------------------------------------------
  *
- * Name:        server_rec_conn_data
+ * Name:        RecConnData
  *
  * Purpose:     Send received connected data to the application.
  *
@@ -875,7 +695,11 @@ func server_link_terminated(channel int, client int, remote_call string, own_cal
  *
  *--------------------------------------------------------------------*/
 
-func server_rec_conn_data(channel int, client int, remote_call string, own_call string, pid int, data []byte) {
+func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own_call string, pid int, data []byte) {
+	if s == nil {
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -895,12 +719,12 @@ func server_rec_conn_data(channel int, client int, remote_call string, own_call 
 	copy(reply.Data, data)
 	reply.Header.DataLen = uint32(len(data))
 
-	send_to_client(client, reply)
-} /* end server_rec_conn_data */
+	s.sendToClient(client, reply)
+} /* end RecConnData */
 
 /*-------------------------------------------------------------------
  *
- * Name:        server_outstanding_frames_reply
+ * Name:        OutstandingFramesReply
  *
  * Purpose:     Send 'Y' Outstanding frames for connected data to the application.
  *
@@ -917,7 +741,11 @@ func server_rec_conn_data(channel int, client int, remote_call string, own_call 
  *
  *--------------------------------------------------------------------*/
 
-func server_outstanding_frames_reply(channel int, client int, own_call string, remote_call string, count int) {
+func (s *AGWServer) OutstandingFramesReply(channel int, client int, own_call string, remote_call string, count int) {
+	if s == nil {
+		return
+	}
+
 	var reply = new(AGWPEMessage)
 
 	reply.Header.Portx = byte(channel)
@@ -930,18 +758,262 @@ func server_outstanding_frames_reply(channel int, client int, own_call string, r
 	reply.Data = make([]byte, 4)
 	binary.LittleEndian.PutUint32(reply.Data, uint32(count))
 
-	send_to_client(client, reply)
-} /* end server_outstanding_frames_reply */
+	s.sendToClient(client, reply)
+} /* end OutstandingFramesReply */
+
+// clientConn returns the socket currently attached to client, or nil if
+// nothing is.
+func (s *AGWServer) clientConn(client int) net.Conn {
+	return s.clients[client].conn
+}
+
+// clientWantingRaw returns client's socket if it has asked to be sent received
+// packets in raw form, and nil otherwise.
+func (s *AGWServer) clientWantingRaw(client int) net.Conn {
+	if !s.clients[client].sendRaw {
+		return nil
+	}
+
+	return s.clients[client].conn
+}
+
+// clientWantingMonitor returns client's socket if it has asked to be sent
+// received packets in monitor form, and nil otherwise.
+func (s *AGWServer) clientWantingMonitor(client int) net.Conn {
+	if !s.clients[client].sendMonitor {
+		return nil
+	}
+
+	return s.clients[client].conn
+}
+
+// findFreeClient returns the index of the first client slot with no socket
+// attached, or -1 if all are in use.
+func (s *AGWServer) findFreeClient() int {
+	for c := range MAX_NET_CLIENTS {
+		if s.clients[c].conn == nil {
+			return c
+		}
+	}
+
+	return -1
+}
+
+func (s *AGWServer) debugPrint(fromto fromto_t, client int, pmsg *AGWPEMessage) {
+	var direction, datakind string
+
+	switch fromto {
+	case FROM_CLIENT:
+		direction = "from" /* from the client application */
+
+		switch pmsg.Header.DataKind {
+		case 'P':
+			datakind = "Application Login"
+		case 'X':
+			datakind = "Register CallSign"
+		case 'x':
+			datakind = "Unregister CallSign"
+		case 'G':
+			datakind = "Ask Port Information"
+		case 'm':
+			datakind = "Enable Reception of Monitoring Frames"
+		case 'R':
+			datakind = "AGWPE Version Info"
+		case 'g':
+			datakind = "Ask Port Capabilities"
+		case 'H':
+			datakind = "Callsign Heard on a Port"
+		case 'y':
+			datakind = "Ask Outstanding frames waiting on a Port"
+		case 'Y':
+			datakind = "Ask Outstanding frames waiting for a connection"
+		case 'M':
+			datakind = "Send UNPROTO Information"
+		case 'C':
+			datakind = "Connect, Start an AX.25 Connection"
+		case 'D':
+			datakind = "Send Connected Data"
+		case 'd':
+			datakind = "Disconnect, Terminate an AX.25 Connection"
+		case 'v':
+			datakind = "Connect VIA, Start an AX.25 circuit thru digipeaters"
+		case 'V':
+			datakind = "Send UNPROTO VIA"
+		case 'c':
+			datakind = "Non-Standard Connections, Connection with PID"
+		case 'K':
+			datakind = "Send data in raw AX.25 format"
+		case 'k':
+			datakind = "Activate reception of Frames in raw format"
+		default:
+			datakind = "**INVALID**"
+		}
+
+	case TO_CLIENT:
+		direction = "to"
+
+		switch pmsg.Header.DataKind {
+		case 'R':
+			datakind = "Version Number"
+		case 'X':
+			datakind = "Callsign Registration"
+		case 'G':
+			datakind = "Port Information"
+		case 'g':
+			datakind = "Capabilities of a Port"
+		case 'y':
+			datakind = "Frames Outstanding on a Port"
+		case 'Y':
+			datakind = "Frames Outstanding on a Connection"
+		case 'H':
+			datakind = "Heard Stations on a Port"
+		case 'C':
+			datakind = "AX.25 Connection Received"
+		case 'D':
+			datakind = "Connected AX.25 Data"
+		case 'd':
+			datakind = "Disconnected"
+		case 'I':
+			datakind = "Monitored Connected Information"
+		case 'S':
+			datakind = "Monitored Supervisory Information"
+		case 'U':
+			datakind = "Monitored Unproto Information"
+		case 'T':
+			datakind = "Monitoring Own Information"
+		case 'K':
+			datakind = "Monitored Information in Raw Format"
+		default:
+			datakind = "**INVALID**"
+		}
+	default:
+		panic(fmt.Sprintf("Unknown fromto: %v", fromto))
+	}
+
+	text_color_set(DW_COLOR_DEBUG)
+	dw_printf("\n")
+
+	dw_printf("%s %s %s AGWPE client application %d\n",
+		FROMTO_PREFIX[fromto], datakind, direction, client)
+
+	dw_printf("\tportx = %d, datakind = '%c', pid = 0x%02x\n", pmsg.Header.Portx, pmsg.Header.DataKind, pmsg.Header.PID)
+	dw_printf("\tcall_from = \"%s\", call_to = \"%s\"\n", pmsg.Header.CallFrom, pmsg.Header.CallTo)
+	dw_printf("\tdata_len = %d, user_reserved = %d, data =\n", pmsg.Header.DataLen, pmsg.Header.UserReserved)
+
+	HexDump(pmsg.Data[:pmsg.Header.DataLen])
+}
+
+// connectedModeAllowed reports whether AX.25 connected mode is allowed on portx.
+// Connected mode is supported for MEDIUM_RADIO channels and MEDIUM_NETTNC channels.
+// When there is no audio configuration to consult (e.g. in unit tests), only
+// channels < MAX_RADIO_CHANS are permitted, preserving the previous behaviour.
+func (s *AGWServer) connectedModeAllowed(portx byte) bool {
+	if int(portx) >= MAX_TOTAL_CHANS {
+		return false
+	}
+
+	if s == nil || s.audioConfigP == nil {
+		return int(portx) < MAX_RADIO_CHANS
+	}
+
+	var m = s.audioConfigP.chan_medium[portx]
+
+	return m == MEDIUM_RADIO || m == MEDIUM_NETTNC
+}
 
 /*-------------------------------------------------------------------
  *
- * Name:        cmd_listen_thread
+ * Name:        connect_listen_thread
+ *
+ * Purpose:     Wait for a connection request from an application.
+ *
+ * Inputs:	arg		- TCP port for server.
+ *				  Main program has default of 8000 but allows
+ *				  an alternative to be specified on the command line
+ *
+ * Outputs:	The accepted connection is attached to a free client slot.
+ *
+ * Description:	Wait for connection request from client and establish
+ *		communication.
+ *		Note that the client can go away and come back again and
+ *		re-establish communication without restarting this application.
+ *
+ *--------------------------------------------------------------------*/
+
+func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
+	logrus.WithField("port", server_port).Debug("Binding to port")
+	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", server_port))
+	if listenErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
+
+		return
+	}
+
+	// Dire Wolf set SO_REUSEADDR here (its version 1.3, as suggested by
+	// G8BPQ) so that restarting the application straight away could bind the
+	// port again.  Go's net package already sets it on every Unix TCP
+	// listener, and the way we were setting it - TCPListener.File, then
+	// setsockopt on the duplicate - has a sting in the tail: File puts the
+	// underlying socket into blocking mode, which takes it out of the
+	// runtime's poller, and Close then no longer interrupts a goroutine
+	// waiting in Accept.  That is exactly what stopping needs it to do.
+
+	logrus.WithField("port", server_port).Debug("opened socket for stream i/o")
+
+	// Accept below blocks until a client turns up, which may be never, so
+	// closing the listener is what gets us back when we are asked to stop.
+	// It also gives the port up rather than holding it until the process
+	// exits, which is what lets a test start a server and then stop it.
+	defer closeOnDone(ctx, listener)()
+
+	for ctx.Err() == nil {
+		var client = s.findFreeClient()
+
+		if client >= 0 {
+			text_color_set(DW_COLOR_INFO)
+			dw_printf("Ready to accept AGW client application %d on port %d ...\n", client, server_port)
+
+			var conn, acceptErr = listener.Accept()
+			if acceptErr != nil {
+				if ctx.Err() != nil {
+					return // We closed the listener ourselves on the way out.
+				}
+
+				dw_printf("Accept failed: %v\n", acceptErr)
+
+				continue
+			}
+
+			if ctx.Err() != nil {
+				// Cancelled while this connection sat in the accept queue:
+				// the kernel completes a connection whether or not anybody
+				// is still listening.  Hang up rather than attach a client
+				// nothing will ever read from.
+				conn.Close()
+
+				return
+			}
+
+			s.clientAccepted(client, conn)
+
+			text_color_set(DW_COLOR_INFO)
+			dw_printf("\nAttached to AGW client application %d...\n\n", client)
+		} else if !sleepSecCtx(ctx, 1) { /* wait then check again if more clients allowed. */
+			return
+		}
+	}
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        cmdListenThread
  *
  * Purpose:     Wait for command messages from an application.
  *
  * Inputs:	arg		- client number, 0 .. MAX_NET_CLIENTS-1
  *
- * Outputs:	client_sock[n]	- File descriptor for communicating with client app.
+ * Outputs:	The client's slot is emptied when its connection goes away.
  *
  * Description:	Process messages from the client application.
  *		Note that the client can go away and come back again and
@@ -949,8 +1021,9 @@ func server_outstanding_frames_reply(channel int, client int, own_call string, r
  *
  *--------------------------------------------------------------------*/
 
-func send_to_client(client int, reply_p *AGWPEMessage) {
-	if client_sock[client] == nil {
+func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
+	var conn = s.clientConn(client)
+	if conn == nil {
 		return
 	}
 
@@ -959,25 +1032,25 @@ func send_to_client(client int, reply_p *AGWPEMessage) {
 	if ph.DataLen > 4096 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Invalid data length %d for AGW protocol message to client %d.\n", ph.DataLen, client)
-		debug_print(TO_CLIENT, client, reply_p)
+		s.debugPrint(TO_CLIENT, client, reply_p)
 	}
 
-	if debug_client > 0 {
-		debug_print(TO_CLIENT, client, reply_p)
+	if s.debug > 0 {
+		s.debugPrint(TO_CLIENT, client, reply_p)
 	}
 
-	reply_p.Write(client_sock[client], binary.LittleEndian)
+	reply_p.Write(conn, binary.LittleEndian)
 }
 
-// detachAGWClient hangs up on a client, gives its slot back, and tells the
-// data link machinery that it has gone.  The slot is only cleared if it still
-// holds conn, so a newer connection that has already been accepted into it
-// isn't clobbered by a thread on its way out.
-func detachAGWClient(client int, conn net.Conn) {
+// detachClient hangs up on a client, gives its slot back, and tells the data
+// link machinery that it has gone.  The slot is only cleared if it still holds
+// conn, so a newer connection that has already been accepted into it isn't
+// clobbered by a thread on its way out.
+func (s *AGWServer) detachClient(client int, conn net.Conn) {
 	conn.Close()
 
-	if client_sock[client] == conn {
-		client_sock[client] = nil
+	if s.clients[client].conn == conn {
+		s.clients[client].conn = nil
 	}
 
 	dlq_client_cleanup(client)
@@ -1004,11 +1077,11 @@ func readCommandData(conn net.Conn, cmd *AGWPEMessage) (int, error) {
 	return n, nil
 }
 
-func cmd_listen_thread(ctx context.Context, client int) {
+func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 	Assert(client >= 0 && client < MAX_NET_CLIENTS)
 
 	for ctx.Err() == nil {
-		for client_sock[client] == nil {
+		for s.clientConn(client) == nil {
 			if !sleepSecCtx(ctx, 1) { /* Not connected.  Try again later. */
 				return
 			}
@@ -1016,7 +1089,7 @@ func cmd_listen_thread(ctx context.Context, client int) {
 
 		var cmd = new(AGWPEMessage)
 
-		var conn = client_sock[client]
+		var conn = s.clientConn(client)
 		if conn == nil {
 			continue // It went away between the check above and here.
 		}
@@ -1037,7 +1110,7 @@ func cmd_listen_thread(ctx context.Context, client int) {
 				// Hang up rather than leave a client attached to a thread
 				// that has gone, and with connected mode still believing it
 				// is there.
-				detachAGWClient(client, conn)
+				s.detachClient(client, conn)
 
 				return
 			}
@@ -1045,7 +1118,7 @@ func cmd_listen_thread(ctx context.Context, client int) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
 			dw_printf("Closing connection.\n\n")
-			detachAGWClient(client, conn)
+			s.detachClient(client, conn)
 
 			continue
 		}
@@ -1073,7 +1146,7 @@ func cmd_listen_thread(ctx context.Context, client int) {
 		stopClose()
 
 		if ctx.Err() != nil {
-			detachAGWClient(client, conn) // As above.
+			s.detachClient(client, conn) // As above.
 
 			return
 		}
@@ -1083,7 +1156,7 @@ func cmd_listen_thread(ctx context.Context, client int) {
 			dw_printf("\nError getting message data from AGW client application %d: %s\n", client, dataErr)
 			dw_printf("Tried to read %d bytes, got %d.\n", cmd.Header.DataLen, n)
 			dw_printf("Closing connection.\n\n")
-			detachAGWClient(client, conn)
+			s.detachClient(client, conn)
 
 			return
 		}
@@ -1092,48 +1165,48 @@ func cmd_listen_thread(ctx context.Context, client int) {
 		 * print & process message from client.
 		 */
 
-		if debug_client > 0 {
-			debug_print(FROM_CLIENT, client, cmd)
+		if s.debug > 0 {
+			s.debugPrint(FROM_CLIENT, client, cmd)
 		}
 
-		handleClientCommand(client, cmd)
+		s.handleClientCommand(client, cmd)
 	}
-} /* end cmd_listen_thread */
+} /* end cmdListenThread */
 
-// agwClientAccepted takes on a newly accepted connection, putting the per-client
+// clientAccepted takes on a newly accepted connection, putting the per-client
 // state into the shape a new client should find it in.
-func agwClientAccepted(client int, conn net.Conn) {
+func (s *AGWServer) clientAccepted(client int, conn net.Conn) {
 	/*
 	 * The command to change these is actually a toggle, not explicit on or off.
 	 * Make sure they have proper state when we get a new connection.
 	 */
-	enable_send_raw_to_client[client] = false
-	enable_send_monitor_to_client[client] = false
+	s.clients[client].sendRaw = false
+	s.clients[client].sendMonitor = false
 
 	/*
 	 * Whoever had this slot before does not vouch for whoever has it now, so a
 	 * client that has to log in starts logged out.
 	 */
-	client_login_exempt[client].Store(agwClientIsLocal(conn))
-	agwClientLoggedOut(client)
+	s.clients[client].loginExempt.Store(agwClientIsLocal(conn))
+	s.clientLoggedOut(client)
 
 	/*
-	 * Publish the socket last.  cmd_listen_thread is already watching this slot
+	 * Publish the socket last.  cmdListenThread is already watching this slot
 	 * for one, and acts on whatever it finds the moment one appears, so
 	 * anything a command is judged against has to be in place first -
 	 * otherwise a client that gets in quickly enough is judged against the
 	 * state the previous holder of the slot left, and a remote one could find
 	 * itself logged in on the strength of somebody else's login.
 	 */
-	client_sock[client] = conn
+	s.clients[client].conn = conn
 }
 
-// agwClientLoggedOut puts a client back to where one that has not logged in
+// clientLoggedOut puts a client back to where one that has not logged in
 // starts: needing to log in, unless it is exempt by having connected from this
 // machine.  A client on this machine never has to log in, so a login attempt it
 // gets wrong does not take anything away from it.
-func agwClientLoggedOut(client int) {
-	client_logged_in[client].Store(client_login_exempt[client].Load())
+func (s *AGWServer) clientLoggedOut(client int) {
+	s.clients[client].loggedIn.Store(s.clients[client].loginExempt.Load())
 }
 
 // agwClientIsLocal reports whether a client connected from the machine we are
@@ -1160,23 +1233,23 @@ func agwClientIsLocal(conn net.Conn) bool {
 	return addr.IP.IsLoopback()
 }
 
-// agwLoginRequired reports whether a client has to log in before we honour any
-// of its other commands.
-func agwLoginRequired() bool {
-	return len(agwpe_logins) > 0
+// loginRequired reports whether a client has to log in before we honour any of
+// its other commands.
+func (s *AGWServer) loginRequired() bool {
+	return len(s.logins) > 0
 }
 
-// agwMatchLogin looks for credentials from an "Application Login" frame among
+// matchLogin looks for credentials from an "Application Login" frame among
 // those configured, and returns the configured user name that matched.
 //
 // Every set is compared, with no early exit, so how long this takes says
 // nothing about which user names exist.  The name it hands back is our own
 // configured text rather than the client's, so it is safe to print.
-func agwMatchLogin(user string, password string) (string, bool) {
+func (s *AGWServer) matchLogin(user string, password string) (string, bool) {
 	var matched string
 	var accepted bool
 
-	for _, login := range agwpe_logins {
+	for _, login := range s.logins {
 		/* Constant time so a password can't be guessed a character at a time. */
 		var userOK = subtle.ConstantTimeCompare([]byte(user), []byte(login.user)) == 1
 		var passwordOK = subtle.ConstantTimeCompare([]byte(password), []byte(login.password)) == 1
@@ -1228,8 +1301,8 @@ func agwLoginField(field []byte) string {
 // credentials were wrong or the frame was not one we could read, so a client
 // that has logged in cannot pass the socket on to one that cannot.  A client on
 // this machine, which never had to log in, keeps its exemption either way.
-func handleClientLogin(client int, cmd *AGWPEMessage) {
-	if !agwLoginRequired() {
+func (s *AGWServer) handleClientLogin(client int, cmd *AGWPEMessage) {
+	if !s.loginRequired() {
 		return /* Nothing to check it against. */
 	}
 
@@ -1238,35 +1311,35 @@ func handleClientLogin(client int, cmd *AGWPEMessage) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW client application %d sent a malformed login: expected %d bytes of data, got %d.\n",
 			client, 2*AGW_LOGIN_FIELD_LEN, len(cmd.Data))
-		agwClientLoggedOut(client)
+		s.clientLoggedOut(client)
 
 		return
 	}
 
-	var matched, accepted = agwMatchLogin(user, password)
+	var matched, accepted = s.matchLogin(user, password)
 	if !accepted {
 		/* The user name is not echoed back; it is whatever the other end chose to send. */
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW client application %d sent an incorrect user name or password.  Its commands will be ignored.\n", client)
-		agwClientLoggedOut(client)
+		s.clientLoggedOut(client)
 
 		return
 	}
 
-	client_logged_in[client].Store(true)
+	s.clients[client].loggedIn.Store(true)
 
 	text_color_set(DW_COLOR_INFO)
 	dw_printf("AGW client application %d logged in as \"%s\".\n", client, matched)
 }
 
-func handleClientCommand(client int, cmd *AGWPEMessage) {
+func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 	if cmd.Header.DataKind == 'P' { /* Application Login */
-		handleClientLogin(client, cmd)
+		s.handleClientLogin(client, cmd)
 
 		return
 	}
 
-	if agwLoginRequired() && !client_logged_in[client].Load() {
+	if s.loginRequired() && !s.clients[client].loggedIn.Load() {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("AGW client application %d sent command '%c' without logging in first.  Ignored.\n",
 			client, cmd.Header.DataKind)
@@ -1290,7 +1363,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			binary.LittleEndian.PutUint32(reply.Data[0:4], 2005) // Major version
 			binary.LittleEndian.PutUint32(reply.Data[4:8], 127)  // Minor version
 
-			send_to_client(client, reply)
+			s.sendToClient(client, reply)
 		}
 
 	case 'G': /* Ask about radio ports */
@@ -1309,12 +1382,21 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			// No other place cares about total number.
 
+			// A server with no audio configuration - one in a test that did
+			// not set one up - has nothing to describe.  Standing in an empty
+			// configuration reports no ports, which is the truth of it, where
+			// reaching through the nil pointer would take the program out.
+			var cfg = s.audioConfigP
+			if cfg == nil {
+				cfg = new(audio_s)
+			}
+
 			var count = 0
 
 			for j := range MAX_TOTAL_CHANS {
-				if save_audio_config_p.chan_medium[j] == MEDIUM_RADIO ||
-					save_audio_config_p.chan_medium[j] == MEDIUM_IGATE ||
-					save_audio_config_p.chan_medium[j] == MEDIUM_NETTNC {
+				if cfg.chan_medium[j] == MEDIUM_RADIO ||
+					cfg.chan_medium[j] == MEDIUM_IGATE ||
+					cfg.chan_medium[j] == MEDIUM_NETTNC {
 					count++
 				}
 			}
@@ -1323,14 +1405,14 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			fmt.Fprintf(&info, "%d;", count)
 
 			for j := range MAX_TOTAL_CHANS {
-				switch save_audio_config_p.chan_medium[j] {
+				switch cfg.chan_medium[j] {
 				case MEDIUM_RADIO:
 					// Misleading if using stdin or udp.
 					var a = ACHAN2ADEV(j)
 					// If I was really ambitious, some description could be provided.
 					var names = []string{"first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"}
 
-					if save_audio_config_p.adev[a].num_channels == 1 {
+					if cfg.adev[a].num_channels == 1 {
 						fmt.Fprintf(&info, "Port%d %s soundcard mono;", j+1, names[a])
 					} else {
 						var lr = "left"
@@ -1356,7 +1438,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			reply.Data = []byte(info.String())
 			reply.Header.DataLen = uint32(len(reply.Data))
 
-			send_to_client(client, reply)
+			s.sendToClient(client, reply)
 		}
 
 	case 'g': /* Ask about capabilities of a port. */
@@ -1395,7 +1477,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		reply.Data[7] = 0                                  // active_connections
 		binary.LittleEndian.PutUint32(reply.Data[8:12], 1) // how_many_bytes
 
-		send_to_client(client, reply)
+		s.sendToClient(client, reply)
 
 	case 'H': /* Ask about recently heard stations on given port. */
 		/* This should send back 20 'H' frames for the most recently heard stations. */
@@ -1431,11 +1513,11 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'k': /* Ask to start receiving RAW AX25 frames */
 		// Actually it is a toggle so we must be sure to clear it for a new connection.
-		enable_send_raw_to_client[client] = !enable_send_raw_to_client[client]
+		s.clients[client].sendRaw = !s.clients[client].sendRaw
 
 	case 'm': /* Ask to start receiving Monitor frames */
 		// Actually it is a toggle so we must be sure to clear it for a new connection.
-		enable_send_monitor_to_client[client] = !enable_send_monitor_to_client[client]
+		s.clients[client].sendMonitor = !s.clients[client].sendMonitor
 
 	case 'V': /* Transmit UI data frame (with digipeater path) */
 		{
@@ -1577,7 +1659,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			var channel = int(cmd.Header.Portx)
 
-			if agwConnectedModeAllowed(cmd.Header.Portx) {
+			if s.connectedModeAllowed(cmd.Header.Portx) {
 				ok = 1
 
 				dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
@@ -1595,13 +1677,13 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			reply.Header.DataLen = 1
 			reply.Data = []byte{ok}
 
-			send_to_client(client, reply)
+			s.sendToClient(client, reply)
 		}
 
 	case 'x': /* Unregister CallSign  */
 		var channel = int(cmd.Header.Portx)
 
-		if agwConnectedModeAllowed(cmd.Header.Portx) {
+		if s.connectedModeAllowed(cmd.Header.Portx) {
 			dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
@@ -1614,7 +1696,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		/* v: Connect VIA, Start an AX.25 circuit thru digipeaters */
 		/* c: Connection with non-standard PID */
 		{
-			if !agwConnectedModeAllowed(cmd.Header.Portx) {
+			if !s.connectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW connect command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 
@@ -1682,7 +1764,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'D': /* Send Connected Data */
 		{
-			if !agwConnectedModeAllowed(cmd.Header.Portx) {
+			if !s.connectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'D' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 
@@ -1707,7 +1789,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
 		{
-			if !agwConnectedModeAllowed(cmd.Header.Portx) {
+			if !s.connectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'd' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 
@@ -1805,7 +1887,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 			reply.Data = make([]byte, 4)
 			binary.LittleEndian.PutUint32(reply.Data, uint32(n))
 
-			send_to_client(client, reply)
+			s.sendToClient(client, reply)
 		}
 
 	case 'Y': /* How Many Outstanding frames wait for tx for a particular station  */
@@ -1845,7 +1927,7 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 		// We will send a request to it and the result coming out will be used to
 		// send the reply back to the client application.
 		{
-			if !agwConnectedModeAllowed(cmd.Header.Portx) {
+			if !s.connectedModeAllowed(cmd.Header.Portx) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW 'Y' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
 
@@ -1864,6 +1946,6 @@ func handleClientCommand(client int, cmd *AGWPEMessage) {
 	default:
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("--- Unexpected Command from application %d using AGW protocol:\n", client)
-		debug_print(FROM_CLIENT, client, cmd)
+		s.debugPrint(FROM_CLIENT, client, cmd)
 	}
 } /* end handleClientCommand */

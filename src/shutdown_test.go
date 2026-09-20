@@ -58,16 +58,18 @@ func requirePortFree(t *testing.T, port int) {
 func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 	var port = freeTCPPort(t)
 
-	// The listener accepts the probe connection waitUntilListening makes into
-	// the package-global client_sock, and no cmd_listen_thread is running here
-	// to notice it go away again, so put the slots back as they were rather
-	// than leave a socket and a "client attached" state behind for whatever
-	// test runs next.
+	// The listener attaches the probe connection waitUntilListening makes to
+	// this server, and no cmdListenThread is running here to notice it go away
+	// again.  Nothing else can see that, the server being this test's own, but
+	// the socket is real: left alone it sits in CLOSE_WAIT for the rest of the
+	// run, because a net.Conn is only closed by a finalizer if at all.
+	var s = new(AGWServer)
+
 	t.Cleanup(func() {
 		for c := range MAX_NET_CLIENTS {
-			if client_sock[c] != nil {
-				client_sock[c].Close()
-				client_sock[c] = nil
+			var conn = s.clientConn(c)
+			if conn != nil {
+				conn.Close()
 			}
 		}
 	})
@@ -79,7 +81,7 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(stopped)
 
-		server_connect_listen_thread(ctx, port)
+		s.connectListenThread(ctx, port)
 	}()
 
 	waitUntilListening(t, port)
@@ -89,7 +91,7 @@ func TestServerConnectListenThreadStopsWhenCancelled(t *testing.T) {
 	select {
 	case <-stopped:
 	case <-time.After(5 * time.Second):
-		t.Fatal("server_connect_listen_thread did not return after its context was cancelled")
+		t.Fatal("connectListenThread did not return after its context was cancelled")
 	}
 
 	requirePortFree(t, port)
