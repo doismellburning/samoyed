@@ -111,6 +111,15 @@ func FuzzDecodeAPRS(f *testing.F) {
 	// User-defined data that stops before its user ID.
 	f.Add("0>0:{")
 
+	// A general query whose footprint is not the three comma-separated
+	// fields the parser goes on to read.
+	f.Add("0>0:?X?0")
+
+	// A message with nothing after the addressee, and one too short to
+	// hold an "ack" or "rej".
+	f.Add("0>0::000000000:")
+	f.Add("0>0::000000000:ab")
+
 	f.Fuzz(func(t *testing.T, monitor string) {
 		var pp = ax25_from_text(monitor, addrLenient)
 		if pp == nil {

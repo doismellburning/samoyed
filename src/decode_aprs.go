@@ -1792,7 +1792,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		A.g_message_subtype = message_subtype_telem_bits
 
 		telemetryState.telemetry_bit_sense_message(string(addressee), string(message[5:]), quiet)
-	} else if message[0] == '?' {
+	} else if len(message) > 0 && message[0] == '?' {
 		/*
 		 * If first character of message is "?" it is a query directed toward a specific station.
 		 */
@@ -1800,7 +1800,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		A.g_message_subtype = message_subtype_directed_query
 
 		aprs_directed_station_query(A, addressee, message[1:], quiet)
-	} else if bytes.EqualFold(message[:3], []byte("ack")) {
+	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("ack")) {
 		/* ack or rej?  Message number is required for these. */
 		if !bytes.HasPrefix(message, []byte("ack")) {
 			text_color_set(DW_COLOR_ERROR)
@@ -1828,7 +1828,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 		A.g_data_type_desc = fmt.Sprintf("\"%s\" ACKnowledged message number \"%s\" from \"%s\"", A.g_src, A.g_message_number, addressee)
 		A.g_message_subtype = message_subtype_ack
-	} else if bytes.EqualFold(message[:3], []byte("rej")) {
+	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("ERROR: \"%s\" must be lower case \"rej\"\n", message)
@@ -2428,7 +2428,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 	after = bytes.TrimSpace(after)
 
 	var parts = bytes.Split(after, []byte{','})
-	if len(parts) != 3 {
+	if len(parts) == 3 {
 		var lat, latErr = strconv.ParseFloat(string(parts[0]), 64)
 
 		if latErr != nil || lat < -90 || lat > 90 {
@@ -2451,7 +2451,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 			return
 		}
 
-		var radius, radiusErr = strconv.ParseFloat(string(parts[1]), 64)
+		var radius, radiusErr = strconv.ParseFloat(string(parts[2]), 64)
 
 		if radiusErr != nil || radius <= 0 || radius > 9999 {
 			if !A.g_quiet {

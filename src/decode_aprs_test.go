@@ -270,3 +270,58 @@ func Test_decode_aprs_user_defined_without_id(t *testing.T) {
 	var A = decode_aprs(pp, true, "")
 	assert.Equal(t, "User-Defined Data", A.g_data_type_desc)
 }
+
+// A general query may carry a "footprint" of latitude, longitude and radius.
+// The parser used to take the three-field branch when the query had any other
+// number of fields, reading off the end of a shorter one (and never decoding a
+// well-formed footprint at all).
+func Test_decode_aprs_general_query_footprint(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = AX25FromText("Q1TEST>APDW17:?APRS? 42.3714,-71.2083,0050", true)
+	assert.NotNil(t, pp)
+
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "General Query", A.g_data_type_desc)
+	assert.Equal(t, "APRS", A.g_query_type)
+	assert.Equal(t, maybe.Just(42.3714), A.g_footprint_lat)
+	assert.Equal(t, maybe.Just(-71.2083), A.g_footprint_lon)
+	assert.Equal(t, maybe.Just(50.0), A.g_footprint_radius)
+}
+
+// A general query whose footprint is not three comma-separated fields is
+// rejected rather than read off the end (found by fuzzing).
+func Test_decode_aprs_general_query_short_footprint(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = AX25FromText("Q1TEST>APDW17:?APRS?0", true)
+	assert.NotNil(t, pp)
+
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "General Query", A.g_data_type_desc)
+	assert.Equal(t, "APRS", A.g_query_type)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_lat)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_lon)
+	assert.Equal(t, maybe.Nothing[float64](), A.g_footprint_radius)
+}
+
+// The APRS message branches used to index the message text without checking
+// its length, so a message with nothing after the addressee - or one shorter
+// than the "ack"/"rej" they compare against - read off the end (found by
+// fuzzing).
+func Test_decode_aprs_short_message(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	for _, tc := range []struct{ monitor, comment string }{
+		{"Q1TEST>APDW17::Q2TEST   :", ""},
+		{"Q1TEST>APDW17::Q2TEST   :ab", "ab"},
+	} {
+		var pp = AX25FromText(tc.monitor, true)
+		assert.NotNil(t, pp)
+
+		var A = decode_aprs(pp, true, "")
+		assert.Equal(t, message_subtype_message, A.g_message_subtype)
+		assert.Equal(t, "Q2TEST", A.g_addressee)
+		assert.Equal(t, tc.comment, A.g_comment)
+	}
+}
