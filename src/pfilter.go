@@ -24,6 +24,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -926,7 +927,7 @@ func filt_r(pf *pfstate_t) (int, string, error) {
 		return -1, "", newFilterError(pf, "Too many parts for Range filter.")
 	}
 
-	var km = ll_distance_km(dlat, dlon, dlat_decoded, dlon_decoded)
+	var km = latlong.DistanceKm(dlat, dlon, dlat_decoded, dlon_decoded)
 	var sdist = fmt.Sprintf("%.2f km", km)
 
 	if km <= ddist {

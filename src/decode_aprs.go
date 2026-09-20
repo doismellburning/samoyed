@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/ais"
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 )
 
@@ -614,7 +615,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 
 	if len(A.g_maidenhead) > 0 {
 		if A.g_lat.IsNothing() && A.g_lon.IsNothing() {
-			var lat, lon, err = ll_from_grid_square(A.g_maidenhead)
+			var lat, lon, err = latlong.FromGridSquare(A.g_maidenhead)
 			if err == nil {
 				A.g_lat = maybe.Just(lat)
 				A.g_lon = maybe.Just(lon)

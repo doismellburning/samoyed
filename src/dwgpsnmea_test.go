@@ -135,7 +135,7 @@ func Test_dwgpsnmea_gprmc(t *testing.T) {
 	})
 
 	t.Run("unparseable latitude leaves position unknown", func(t *testing.T) {
-		// latitude_from_nmea returns an error for a field it can't parse; that
+		// latlong.LatitudeFromNMEA returns an error for a field it can't parse; that
 		// must not reach the caller as a position, and a sentence carrying one
 		// is as unusable as a sentence with no latitude field at all.
 		var result = dwgpsnmea_gprmc("$GPRMC,003413.710,A,X237.1240,N,07120.8333,W,5.07,291.42,160614,,,A*13", true)

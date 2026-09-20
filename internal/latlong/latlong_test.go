@@ -1,4 +1,7 @@
-package direwolf
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package latlong
 
 import (
 	"fmt"
@@ -69,7 +72,7 @@ func TestLatitudeToNMEA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			str, hem := latitude_to_nmea(tt.lat)
+			str, hem := LatitudeToNMEA(tt.lat)
 			assert.Equal(t, tt.expectedStr, str, "latitude string should match")
 			assert.Equal(t, tt.expectedHem, hem, "hemisphere should match")
 		})
@@ -88,7 +91,7 @@ func TestLatitudeToNMEABounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			str, hem := latitude_to_nmea(tt.lat)
+			str, hem := LatitudeToNMEA(tt.lat)
 			// Should clamp to valid range
 			assert.NotEmpty(t, str, "should return a string even for out of bounds")
 			assert.NotEmpty(t, hem, "should return hemisphere even for out of bounds")
@@ -157,7 +160,7 @@ func TestLongitudeToNMEA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			str, hem := longitude_to_nmea(tt.lon)
+			str, hem := LongitudeToNMEA(tt.lon)
 			assert.Equal(t, tt.expectedStr, str, "longitude string should match")
 			assert.Equal(t, tt.expectedHem, hem, "hemisphere should match")
 		})
@@ -176,7 +179,7 @@ func TestLongitudeToNMEABounds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			str, hem := longitude_to_nmea(tt.lon)
+			str, hem := LongitudeToNMEA(tt.lon)
 			// Should clamp to valid range
 			assert.NotEmpty(t, str, "should return a string even for out of bounds")
 			assert.NotEmpty(t, hem, "should return hemisphere even for out of bounds")
@@ -263,7 +266,7 @@ func TestLatitudeFromNMEA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := latitude_from_nmea(tt.str, tt.hemi)
+			result, err := LatitudeFromNMEA(tt.str, tt.hemi)
 			require.NoError(t, err, "latitude should parse")
 			assert.InDelta(t, tt.expected, result, tt.delta, "latitude should match")
 		})
@@ -298,19 +301,19 @@ func TestLatitudeFromNMEAErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := latitude_from_nmea(tt.str, tt.hemi)
+			_, err := LatitudeFromNMEA(tt.str, tt.hemi)
 			assert.Error(t, err, "should return an error for invalid input")
 		})
 	}
 
 	t.Run("invalid_hemisphere", func(t *testing.T) {
-		var _, err = latitude_from_nmea("4221.6060", 'X')
+		var _, err = LatitudeFromNMEA("4221.6060", 'X')
 		assert.ErrorContains(t, err, "should be N or S",
 			"a hemisphere that is neither N nor S should be reported")
 	})
 
 	t.Run("out_of_range", func(t *testing.T) {
-		var _, err = latitude_from_nmea("9500.0000", 'N')
+		var _, err = LatitudeFromNMEA("9500.0000", 'N')
 		assert.ErrorContains(t, err, "not in range of 0 to 90",
 			"a latitude beyond 90 degrees should be reported")
 	})
@@ -392,7 +395,7 @@ func TestLongitudeFromNMEA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := longitude_from_nmea(tt.str, tt.hemi)
+			result, err := LongitudeFromNMEA(tt.str, tt.hemi)
 			require.NoError(t, err, "longitude should parse")
 			assert.InDelta(t, tt.expected, result, tt.delta, "longitude should match")
 		})
@@ -421,19 +424,19 @@ func TestLongitudeFromNMEAErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := longitude_from_nmea(tt.str, tt.hemi)
+			_, err := LongitudeFromNMEA(tt.str, tt.hemi)
 			assert.Error(t, err, "should return an error for invalid input")
 		})
 	}
 
 	t.Run("out_of_range", func(t *testing.T) {
-		var _, err = longitude_from_nmea("18500.0000", 'E')
+		var _, err = LongitudeFromNMEA("18500.0000", 'E')
 		assert.ErrorContains(t, err, "not in range of 0 to 180",
 			"a longitude beyond 180 degrees should be reported")
 	})
 
 	t.Run("invalid_hemisphere", func(t *testing.T) {
-		var _, err = longitude_from_nmea("15112.5580", 'X')
+		var _, err = LongitudeFromNMEA("15112.5580", 'X')
 		assert.ErrorContains(t, err, "should be E or W",
 			"a hemisphere that is neither E nor W should be reported")
 		// Test passes if it doesn't panic
@@ -458,13 +461,13 @@ func TestNMEARoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Convert to NMEA
-			latStr, latHem := latitude_to_nmea(tt.lat)
-			lonStr, lonHem := longitude_to_nmea(tt.lon)
+			latStr, latHem := LatitudeToNMEA(tt.lat)
+			lonStr, lonHem := LongitudeToNMEA(tt.lon)
 
 			// Convert back
-			lat, latErr := latitude_from_nmea(latStr, latHem[0])
+			lat, latErr := LatitudeFromNMEA(latStr, latHem[0])
 			require.NoError(t, latErr)
-			lon, lonErr := longitude_from_nmea(lonStr, lonHem[0])
+			lon, lonErr := LongitudeFromNMEA(lonStr, lonHem[0])
 			require.NoError(t, lonErr)
 
 			// Check round trip (NMEA has 4 decimal places for minutes, about 0.00002 degree precision)
@@ -550,7 +553,7 @@ func TestGridSquareEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			lat, lon, err := ll_from_grid_square(tt.grid)
+			lat, lon, err := FromGridSquare(tt.grid)
 
 			if tt.expectErr {
 				assert.Error(t, err, "should return error for invalid input")
@@ -633,8 +636,8 @@ func TestCompressedFormatEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			latStr := latitude_to_comp_str(tt.lat)
-			lonStr := longitude_to_comp_str(tt.lon)
+			latStr := LatitudeToCompressedString(tt.lat)
+			lonStr := LongitudeToCompressedString(tt.lon)
 
 			assert.True(t, tt.latCheck(latStr), "latitude compressed format should pass check")
 			assert.True(t, tt.lonCheck(lonStr), "longitude compressed format should pass check")
@@ -658,8 +661,8 @@ func TestCoordinateDistanceSymmetry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d1 := ll_distance_km(tt.lat1, tt.lon1, tt.lat2, tt.lon2)
-			d2 := ll_distance_km(tt.lat2, tt.lon2, tt.lat1, tt.lon1)
+			d1 := DistanceKm(tt.lat1, tt.lon1, tt.lat2, tt.lon2)
+			d2 := DistanceKm(tt.lat2, tt.lon2, tt.lat1, tt.lon1)
 
 			assert.InDelta(t, d1, d2, 0.001, "distance should be symmetric")
 		})
@@ -680,7 +683,7 @@ func TestBearingAntipodal(t *testing.T) {
 		antiLon -= 360.0
 	}
 
-	bearing := ll_bearing_deg(lat, lon, antiLat, antiLon)
+	bearing := BearingDeg(lat, lon, antiLat, antiLon)
 
 	// Bearing to antipode could be any direction (ambiguous), but should be valid
 	assert.GreaterOrEqual(t, bearing, 0.0, "bearing should be >= 0")
@@ -694,8 +697,8 @@ func TestDestinationZeroDistance(t *testing.T) {
 	dist := 0.0
 	bearing := 90.0 // arbitrary
 
-	newLat := ll_dest_lat(lat, lon, dist, bearing)
-	newLon := ll_dest_lon(lat, lon, dist, bearing)
+	newLat := DestLat(lat, lon, dist, bearing)
+	newLon := DestLon(lat, lon, dist, bearing)
 
 	assert.InDelta(t, lat, newLat, 0.0001, "zero distance should return same latitude")
 	assert.InDelta(t, lon, newLon, 0.0001, "zero distance should return same longitude")
@@ -718,7 +721,7 @@ func TestLatitudeBoundaryClamping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := latitude_to_str(tt.lat, 0)
+			result := LatitudeToString(tt.lat, 0)
 			assert.Equal(t, tt.expected, result, "should clamp to valid range")
 		})
 	}
@@ -741,7 +744,7 @@ func TestLongitudeBoundaryClamping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := longitude_to_str(tt.lon, 0)
+			result := LongitudeToString(tt.lon, 0)
 			assert.Equal(t, tt.expected, result, "should clamp to valid range")
 		})
 	}
@@ -753,26 +756,26 @@ func BenchmarkLatitudeConversions(b *testing.B) {
 
 	b.Run("to_str", func(b *testing.B) {
 		for range b.N {
-			_ = latitude_to_str(lat, 0)
+			_ = LatitudeToString(lat, 0)
 		}
 	})
 
 	b.Run("to_comp_str", func(b *testing.B) {
 		for range b.N {
-			_ = latitude_to_comp_str(lat)
+			_ = LatitudeToCompressedString(lat)
 		}
 	})
 
 	b.Run("to_nmea", func(b *testing.B) {
 		for range b.N {
-			_, _ = latitude_to_nmea(lat)
+			_, _ = LatitudeToNMEA(lat)
 		}
 	})
 
 	b.Run("from_nmea", func(b *testing.B) {
 		str := "4221.6060"
 		for range b.N {
-			_, _ = latitude_from_nmea(str, 'N')
+			_, _ = LatitudeFromNMEA(str, 'N')
 		}
 	})
 }
@@ -784,13 +787,13 @@ func BenchmarkDistanceBearing(b *testing.B) {
 
 	b.Run("distance", func(b *testing.B) {
 		for range b.N {
-			_ = ll_distance_km(lat1, lon1, lat2, lon2)
+			_ = DistanceKm(lat1, lon1, lat2, lon2)
 		}
 	})
 
 	b.Run("bearing", func(b *testing.B) {
 		for range b.N {
-			_ = ll_bearing_deg(lat1, lon1, lat2, lon2)
+			_ = BearingDeg(lat1, lon1, lat2, lon2)
 		}
 	})
 
@@ -799,8 +802,8 @@ func BenchmarkDistanceBearing(b *testing.B) {
 
 		bearing := 45.0
 		for range b.N {
-			_ = ll_dest_lat(lat1, lon1, dist, bearing)
-			_ = ll_dest_lon(lat1, lon1, dist, bearing)
+			_ = DestLat(lat1, lon1, dist, bearing)
+			_ = DestLon(lat1, lon1, dist, bearing)
 		}
 	})
 }
@@ -848,7 +851,7 @@ func TestHaversineFormulaAccuracy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			distance := ll_distance_km(tt.lat1, tt.lon1, tt.lat2, tt.lon2)
+			distance := DistanceKm(tt.lat1, tt.lon1, tt.lat2, tt.lon2)
 			assert.InDelta(t, tt.expected, distance, tt.delta,
 				"distance should match known value within tolerance")
 		})
@@ -906,7 +909,7 @@ func TestBearingCalculation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bearing := ll_bearing_deg(tt.lat1, tt.lon1, tt.lat2, tt.lon2)
+			bearing := BearingDeg(tt.lat1, tt.lon1, tt.lat2, tt.lon2)
 			assert.InDelta(t, tt.expected, bearing, tt.delta,
 				"bearing should match expected cardinal direction")
 		})
@@ -919,8 +922,8 @@ func TestSmallAngles(t *testing.T) {
 	lat1, lon1 := 42.0, -71.0
 	lat2, lon2 := 42.0001, -71.0001
 
-	dist := ll_distance_km(lat1, lon1, lat2, lon2)
-	bearing := ll_bearing_deg(lat1, lon1, lat2, lon2)
+	dist := DistanceKm(lat1, lon1, lat2, lon2)
+	bearing := BearingDeg(lat1, lon1, lat2, lon2)
 
 	assert.Greater(t, dist, 0.0, "distance should be positive")
 	assert.Less(t, dist, 1.0, "distance should be very small")
@@ -928,8 +931,8 @@ func TestSmallAngles(t *testing.T) {
 	assert.Less(t, bearing, 360.0, "bearing should be valid")
 
 	// Test round trip
-	newLat := ll_dest_lat(lat1, lon1, dist, bearing)
-	newLon := ll_dest_lon(lat1, lon1, dist, bearing)
+	newLat := DestLat(lat1, lon1, dist, bearing)
+	newLon := DestLon(lat1, lon1, dist, bearing)
 
 	assert.InDelta(t, lat2, newLat, 0.0001, "round trip latitude should match")
 	assert.InDelta(t, lon2, newLon, 0.0001, "round trip longitude should match")
@@ -953,7 +956,7 @@ func TestAmbiguityLevels(t *testing.T) {
 
 	for _, tt := range latTests {
 		t.Run(fmt.Sprintf("lat_ambiguity_%d", tt.ambiguity), func(t *testing.T) {
-			result := latitude_to_str(lat, tt.ambiguity)
+			result := LatitudeToString(lat, tt.ambiguity)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -971,7 +974,7 @@ func TestAmbiguityLevels(t *testing.T) {
 
 	for _, tt := range lonTests {
 		t.Run(fmt.Sprintf("lon_ambiguity_%d", tt.ambiguity), func(t *testing.T) {
-			result := longitude_to_str(lon, tt.ambiguity)
+			result := LongitudeToString(lon, tt.ambiguity)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -982,12 +985,12 @@ func TestNaN(t *testing.T) {
 	nan := math.NaN()
 
 	// These shouldn't panic
-	_ = latitude_to_str(nan, 0)
-	_ = longitude_to_str(nan, 0)
-	_ = latitude_to_comp_str(nan)
-	_ = longitude_to_comp_str(nan)
-	_, _ = latitude_to_nmea(nan)
-	_, _ = longitude_to_nmea(nan)
-	_ = ll_distance_km(nan, 0, 0, 0)
-	_ = ll_bearing_deg(nan, 0, 0, 0)
+	_ = LatitudeToString(nan, 0)
+	_ = LongitudeToString(nan, 0)
+	_ = LatitudeToCompressedString(nan)
+	_ = LongitudeToCompressedString(nan)
+	_, _ = LatitudeToNMEA(nan)
+	_, _ = LongitudeToNMEA(nan)
+	_ = DistanceKm(nan, 0, 0, 0)
+	_ = BearingDeg(nan, 0, 0, 0)
 }

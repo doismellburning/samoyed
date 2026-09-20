@@ -7,6 +7,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +15,7 @@ import (
 // A DTMF sequence can decode to a well-formed pair of letters that is still not
 // a legal Maidenhead locator: the first pair has to be A through R, but "74"
 // keys 'S'.  TTMheadToText is happy with it, so the rejection only comes from
-// ll_from_grid_square, and that used to be dropped on the floor - the position
+// latlong.FromGridSquare, and that used to be dropped on the floor - the position
 // silently stayed at wherever it already was and the caller was told the
 // sequence had parsed.
 func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
@@ -31,7 +32,7 @@ func TestParseLocationRejectsOutOfRangeMaidenhead(t *testing.T) {
 	require.Equal(t, 0, errs, "DTMF should convert without complaint")
 	require.Equal(t, "SS", mh)
 
-	var _, _, err = ll_from_grid_square(mh)
+	var _, _, err = latlong.FromGridSquare(mh)
 	require.Error(t, err, "SS is not a valid Maidenhead locator")
 
 	var state ttParseState

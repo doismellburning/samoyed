@@ -34,6 +34,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/sirupsen/logrus"
 	"github.com/tzneal/coordconv"
@@ -1367,7 +1368,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 				// dw_printf ("Case MHEAD: Resulting text \"%s\".\n", mh);
 				state.locText = mh
 
-				var lat, lon, err = ll_from_grid_square(state.locText)
+				var lat, lon, err = latlong.FromGridSquare(state.locText)
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("%v\n", err)
@@ -1396,7 +1397,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			if errs == 0 {
 				state.locText = mh
 
-				var lat, lon, err = ll_from_grid_square(state.locText)
+				var lat, lon, err = latlong.FromGridSquare(state.locText)
 				if err != nil {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("%v\n", err)
