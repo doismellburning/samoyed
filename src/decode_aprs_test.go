@@ -256,3 +256,17 @@ func Test_decode_aprs_course_speed_without_bearing(t *testing.T) {
 	assert.Equal(t, maybe.Just(0.0), A.g_speed_mph)
 	assert.Empty(t, A.g_comment)
 }
+
+// User-defined data is a user ID and a type after the "{", and an information
+// field that stops before them is user-defined data we know nothing about
+// rather than something to read off the end of.
+func Test_decode_aprs_user_defined_without_id(t *testing.T) {
+	deviceIDData = NewDeviceIDData()
+
+	var pp = ax25_from_text("Q1TEST>APDW17:{", addrLenient)
+	assert.NotNil(t, pp)
+
+	// Must not panic.
+	var A = decode_aprs(pp, true, "")
+	assert.Equal(t, "User-Defined Data", A.g_data_type_desc)
+}
