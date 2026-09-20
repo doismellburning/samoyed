@@ -1174,8 +1174,11 @@ func config_init(fname string, p_audio_config *audio_s,
 
 	p_misc_config.maxframe_extended = AX25_K_MAXFRAME_EXTENDED_DEFAULT /* Max frames to send before ACK.  mod 128 "Window" size. */
 
-	p_misc_config.maxv22 = AX25_N2_RETRY_DEFAULT / 3 /* Send SABME this many times before falling back to SABM. */
-	p_misc_config.v20_addrs = nil                    /* Go directly to v2.0 for stations listed */
+	// Send SABME this many times before falling back to SABM.  Negative means
+	// the config file did not say, and the end of config_init works it out from
+	// whatever RETRY ended up as.
+	p_misc_config.maxv22 = -1
+	p_misc_config.v20_addrs = nil /* Go directly to v2.0 for stations listed */
 	/* without trying v2.2 first. */
 	p_misc_config.v20_count = 0
 	p_misc_config.noxid_addrs = nil /* Don't send XID to these stations. */
@@ -1722,31 +1725,26 @@ func handleNCHANNEL(ps *parseState) bool {
 	}
 
 	var nchan, _ = strconv.Atoi(t)
-	if nchan >= MAX_RADIO_CHANS && nchan < MAX_TOTAL_CHANS {
-		if ps.audio.chan_medium[nchan] == MEDIUM_NONE {
-			ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
-
-			return true
-		}
-	} else {
+	if nchan < MAX_RADIO_CHANS || nchan >= MAX_TOTAL_CHANS {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: NCHANNEL number must be in range of %d to %d.\n", ps.line, MAX_RADIO_CHANS, MAX_TOTAL_CHANS-1)
 
 		return true
 	}
+	if ps.audio.chan_medium[nchan] != MEDIUM_NONE {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: NCHANNEL can't use channel %d because it is already in use.\n", ps.line, nchan)
 
-	t = split("", false)
-	if t == "" {
+		return true
+	}
+
+	var addr = split("", false)
+	if addr == "" {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Line %d: Missing network TNC address for NCHANNEL command.\n", ps.line)
 
 		return true
 	}
-
-	ps.audio.nettnc_addr[nchan] = t
 
 	t = split("", false)
 	if t == "" {
@@ -1763,6 +1761,12 @@ func handleNCHANNEL(ps *parseState) bool {
 
 		return true
 	}
+
+	// Claim the channel only once the whole line has parsed: nettnc_init
+	// attaches to every MEDIUM_NETTNC channel and exits if it cannot, so a
+	// half-read line would otherwise take the program down at startup.
+	ps.audio.chan_medium[nchan] = MEDIUM_NETTNC
+	ps.audio.nettnc_addr[nchan] = addr
 	ps.audio.nettnc_port[nchan] = n
 
 	return false
@@ -2188,10 +2192,17 @@ func handleFIX_BITS(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if BitFixLevel(n) >= BitFixNone && BitFixLevel(n) <= BitFixLevelHighest {
+	// An unreadable level leaves the one already configured; the options after
+	// it on the line are still worth reading.
+	var n, nErr = strconv.Atoi(t)
+	switch {
+	case nErr != nil:
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Value must be numeric for FIX_BITS command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].fix_bits)
+	case BitFixLevel(n) >= BitFixNone && BitFixLevel(n) <= BitFixLevelHighest:
 		ps.audio.achan[ps.channel].fix_bits = BitFixLevel(n)
-	} else {
+	default:
 		ps.audio.achan[ps.channel].fix_bits = DEFAULT_FIX_BITS
 
 		text_color_set(DW_COLOR_ERROR)
@@ -2276,6 +2287,11 @@ func handlePTTDCDCON(ps *parseState) bool {
 		otname = "CON"
 	}
 
+	// Work on a copy of the control and commit it at the end, so that a line
+	// rejected part way through leaves whatever an earlier line configured
+	// rather than a mixture of the two.  ptt_init reads these fields together.
+	var octrl = ps.audio.achan[ps.channel].octrl[ot]
+
 	var t = split("", false)
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
@@ -2302,16 +2318,22 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		var gpio, _ = strconv.Atoi(t)
+		var gpio, gpioErr = strconv.Atoi(t)
+		if gpioErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, otname)
+
+			return true
+		}
 		if gpio < 0 {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.out_gpio_num = -1 * gpio
+			octrl.ptt_invert = true
 		} else {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.out_gpio_num = gpio
+			octrl.ptt_invert = false
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_GPIO
+		octrl.ptt_method = PTT_METHOD_GPIO
 		// #endif
 	} else if strings.EqualFold(t, "GPIOD") {
 		/*
@@ -2338,11 +2360,11 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// While we are here, also allow only the number as used by the gpiod utilities.
 
 		if t[0] == '/' { // Looks like device path.  Use as given.
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = t
+			octrl.out_gpio_name = t
 		} else if unicode.IsDigit(rune(t[0])) { // or if digit, prepend "/dev/gpiochip"
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = "/dev/gpiochip" + t
+			octrl.out_gpio_name = "/dev/gpiochip" + t
 		} else { // otherwise, prepend "/dev/" to the name
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = "/dev/" + t
+			octrl.out_gpio_name = "/dev/" + t
 		}
 
 		t = split("", false)
@@ -2353,16 +2375,23 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		var gpio, _ = strconv.Atoi(t)
-		if gpio < 0 {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
-		} else {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+		var gpio, gpioErr = strconv.Atoi(t)
+		if gpioErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, otname)
+
+			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD
+		if gpio < 0 {
+			octrl.out_gpio_num = -1 * gpio
+			octrl.ptt_invert = true
+		} else {
+			octrl.out_gpio_num = gpio
+			octrl.ptt_invert = false
+		}
+
+		octrl.ptt_method = PTT_METHOD_GPIOD
 		/* TODO KG
 		#else
 			      text_color_set(DW_COLOR_ERROR);
@@ -2383,16 +2412,22 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		var lpt, _ = strconv.Atoi(t)
+		var lpt, lptErr = strconv.Atoi(t)
+		if lptErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: LPT bit number must be numeric for %s.\n", ps.line, otname)
+
+			return true
+		}
 		if lpt < 0 {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_lpt_bit = -1 * lpt
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.ptt_lpt_bit = -1 * lpt
+			octrl.ptt_invert = true
 		} else {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_lpt_bit = lpt
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.ptt_lpt_bit = lpt
+			octrl.ptt_invert = false
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_LPT
+		octrl.ptt_method = PTT_METHOD_LPT
 		/*
 			#else
 				      text_color_set(DW_COLOR_ERROR);
@@ -2410,7 +2445,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		}
 
 		if strings.EqualFold(t, "AUTO") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_model = -1
+			octrl.ptt_model = -1
 		} else {
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
@@ -2429,7 +2464,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 				return true
 			}
 
-			ps.audio.achan[ps.channel].octrl[ot].ptt_model = n
+			octrl.ptt_model = n
 		}
 
 		t = split("", false)
@@ -2440,7 +2475,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = t
+		octrl.ptt_device = t
 
 		// Optional serial port rate for CAT control PTT.
 
@@ -2453,7 +2488,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 				return true
 			}
 			var n, _ = strconv.Atoi(t)
-			ps.audio.achan[ps.channel].octrl[ot].ptt_rate = n
+			octrl.ptt_rate = n
 		}
 
 		t = split("", false)
@@ -2462,23 +2497,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			dw_printf("Config file line %d: %s was not expected after model & port for hamlib.\n", ps.line, t)
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB
-
-		// #else
-		/* TODO KG
-		   #if __WIN32__
-		   	      text_color_set(DW_COLOR_ERROR);
-		   	      dw_printf ("Config file line %d: Windows version of direwolf does not support HAMLIB.\n", ps.line);
-		   	      exit (EXIT_FAILURE);
-		   #else
-		*/
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file line %d: %s with RIG is only available when hamlib support is enabled.\n", ps.line, otname)
-		dw_printf("You must rebuild direwolf with hamlib support.\n")
-		dw_printf("See User Guide for details.\n")
-		// #endif
-
-		//#endif
+		octrl.ptt_method = PTT_METHOD_HAMLIB
 	} else if strings.EqualFold(t, "CM108") {
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
 
@@ -2495,10 +2514,10 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = 3 // All known designs use GPIO 3.
+		octrl.out_gpio_num = 3 // All known designs use GPIO 3.
 		// User can override for special cases.
-		ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false // High for transmit.
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = ""
+		octrl.ptt_invert = false // High for transmit.
+		octrl.ptt_device = ""
 
 		// Try to find PTT device for audio output device.
 		// Simplifiying assumption is that we have one radio per USB Audio Adapter.
@@ -2507,7 +2526,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 		var found_ptt, find_ptt_err = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = found_ptt
+		octrl.ptt_device = found_ptt
 
 		if find_ptt_err != nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -2528,14 +2547,14 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 			if t[0] == '-' {
 				var gpio, _ = strconv.Atoi(t[1:])
-				ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+				octrl.out_gpio_num = -1 * gpio
+				octrl.ptt_invert = true
 			} else if unicode.IsDigit(rune(t[0])) {
 				var gpio, _ = strconv.Atoi(t)
-				ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = gpio
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+				octrl.out_gpio_num = gpio
+				octrl.ptt_invert = false
 			} else if t[0] == '/' {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_device = t
+				octrl.ptt_device = t
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1.\n", ps.line, t)
@@ -2544,15 +2563,15 @@ func handlePTTDCDCON(ps *parseState) bool {
 			}
 		}
 
-		if ps.audio.achan[ps.channel].octrl[ot].out_gpio_num < 1 || ps.audio.achan[ps.channel].octrl[ot].out_gpio_num > 8 {
+		if octrl.out_gpio_num < 1 || octrl.out_gpio_num > 8 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file line %d: CM108 GPIO number %d is not in range of 1 thru 8.\n", ps.line,
-				ps.audio.achan[ps.channel].octrl[ot].out_gpio_num)
+				octrl.out_gpio_num)
 
 			return true
 		}
 
-		if ps.audio.achan[ps.channel].octrl[ot].ptt_device == "" {
+		if octrl.ptt_device == "" {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", ps.line,
 				ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
@@ -2568,7 +2587,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_CM108
+		octrl.ptt_method = PTT_METHOD_CM108
 
 		/* TODO KG
 		#else
@@ -2582,7 +2601,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		*/
 	} else {
 		/* serial port case. */
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = t
+		octrl.ptt_device = t
 
 		t = split("", false)
 		if t == "" {
@@ -2594,17 +2613,17 @@ func handlePTTDCDCON(ps *parseState) bool {
 		}
 
 		if strings.EqualFold(t, "rts") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_RTS
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.ptt_line = PTT_LINE_RTS
+			octrl.ptt_invert = false
 		} else if strings.EqualFold(t, "dtr") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_DTR
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.ptt_line = PTT_LINE_DTR
+			octrl.ptt_invert = false
 		} else if strings.EqualFold(t, "-rts") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_RTS
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.ptt_line = PTT_LINE_RTS
+			octrl.ptt_invert = true
 		} else if strings.EqualFold(t, "-dtr") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_DTR
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.ptt_line = PTT_LINE_DTR
+			octrl.ptt_invert = true
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
@@ -2613,7 +2632,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_SERIAL
+		octrl.ptt_method = PTT_METHOD_SERIAL
 
 		/* In version 1.2, we allow a second one for same serial port. */
 		/* Some interfaces want the two control lines driven with opposite polarity. */
@@ -2622,17 +2641,17 @@ func handlePTTDCDCON(ps *parseState) bool {
 		t = split("", false)
 		if t != "" {
 			if strings.EqualFold(t, "rts") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = false
+				octrl.ptt_line2 = PTT_LINE_RTS
+				octrl.ptt_invert2 = false
 			} else if strings.EqualFold(t, "dtr") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = false
+				octrl.ptt_line2 = PTT_LINE_DTR
+				octrl.ptt_invert2 = false
 			} else if strings.EqualFold(t, "-rts") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = true
+				octrl.ptt_line2 = PTT_LINE_RTS
+				octrl.ptt_invert2 = true
 			} else if strings.EqualFold(t, "-dtr") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = true
+				octrl.ptt_line2 = PTT_LINE_DTR
+				octrl.ptt_invert2 = true
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Expected RTS or DTR after first RTS or DTR.\n",
@@ -2643,13 +2662,16 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 			/* Would not make sense to specify the same one twice. */
 
-			if ps.audio.achan[ps.channel].octrl[ot].ptt_line == ps.audio.achan[ps.channel].octrl[ot].ptt_line2 {
+			if octrl.ptt_line == octrl.ptt_line2 {
 				dw_printf("Config file line %d: Doesn't make sense to specify the some control line twice.\n",
 					ps.line)
 			}
 		} /* end of second serial port control ps.line. */
 	} /* end of serial port case. */
 	/* end of PTT, DCD, CON */
+
+	ps.audio.achan[ps.channel].octrl[ot] = octrl
+
 	return false
 }
 
@@ -2693,7 +2715,13 @@ func handleTXINH(ps *parseState) bool {
 			return true
 		}
 
-		var gpio, _ = strconv.Atoi(t)
+		var gpio, gpioErr = strconv.Atoi(t)
+		if gpioErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Config file line %d: GPIO number must be numeric for %s.\n", ps.line, itname)
+
+			return true
+		}
 		if gpio < 0 {
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].in_gpio_num = -1 * gpio
 			ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].invert = true
@@ -2704,6 +2732,12 @@ func handleTXINH(ps *parseState) bool {
 
 		ps.audio.achan[ps.channel].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 		// #endif
+	} else {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file line %d: Unrecognized input type name \"%s\" for %s command.  GPIO is the only one supported.\n",
+			ps.line, t, itname)
+
+		return true
 	}
 
 	return false
@@ -2732,7 +2766,14 @@ func handleDWAIT(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Delay time must be numeric for DWAIT command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].dwait)
+
+		return false
+	}
 	if n >= 0 && n <= 255 {
 		ps.audio.achan[ps.channel].dwait = n
 	} else {
@@ -2843,7 +2884,14 @@ func handleTXDELAY(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Time must be numeric for TXDELAY command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].txdelay)
+
+		return false
+	}
 	if n >= 0 && n <= 255 {
 		text_color_set(DW_COLOR_ERROR)
 
@@ -2895,7 +2943,14 @@ func handleTXTAIL(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Time must be numeric for TXTAIL command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].txtail)
+
+		return false
+	}
 	if n >= 0 && n <= 255 {
 		if n < 5 {
 			dw_printf("Line %d: Setting TXTAIL that small is a REALLY BAD idea if you want other stations to hear you.\n",
@@ -2981,22 +3036,10 @@ func handleSPEECH(ps *parseState) bool {
 		return true
 	}
 
-	/* See if we can run it. */
+	// Dire Wolf tried running the script here, to report a broken one at
+	// startup.  xmit_speak_it does that every time it speaks instead.
+	ps.audio.tts_script = t
 
-	/*
-	   TODO KG Do we *actually* want to do this...? If so, let's do it when we've ported this to Go...
-
-	   	 if (xmit_speak_it(t, -1, " ") == 0) {
-	   	   if (strlcpy (ps.audio.tts_script, t, sizeof(ps.audio.tts_script)) >= sizeof(ps.audio.tts_script)) {
-	   	     text_color_set(DW_COLOR_ERROR);
-	   	     dw_printf ("Line %d: Script for text-to-speech function is too long.\n", ps.line);
-	   	   }
-	   	 } else {
-	   	   text_color_set(DW_COLOR_ERROR);
-	   	   dw_printf ("Line %d: Error trying to run Text-to-Speech function.\n", ps.line);
-	   	   continue;
-	   	}
-	*/
 	return false
 }
 
@@ -3024,8 +3067,24 @@ func handleFX25TX(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n >= 0 && n < 200 {
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: FEC mode must be numeric for FX25TX command. Keeping %d.\n",
+			ps.line, ps.audio.achan[ps.channel].fx25_strength)
+
+		return false
+	}
+	if n == 0 {
+		// 0 is off: -X 0 enables nothing either, though it cannot switch off
+		// what the config file turned on.  Leaving the channel on LAYER2_FX25
+		// would mean every frame tried FX.25 with no usable mode, complained,
+		// and fell back to AX.25 anyway.
+		ps.audio.achan[ps.channel].fx25_strength = 0
+		if ps.audio.achan[ps.channel].layer2_xmit == LAYER2_FX25 {
+			ps.audio.achan[ps.channel].layer2_xmit = LAYER2_AX25
+		}
+	} else if n > 0 && n < 200 {
 		ps.audio.achan[ps.channel].fx25_strength = n
 		ps.audio.achan[ps.channel].layer2_xmit = LAYER2_FX25
 	} else {
@@ -3065,7 +3124,14 @@ func handleFX25AUTO(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Count must be numeric for FX25AUTO command. Keeping %d.\n",
+			ps.line, ps.audio.fx25_auto_enable)
+
+		return false
+	}
 	if n >= 0 && n < 20 {
 		ps.audio.fx25_auto_enable = n
 	} else {
@@ -3341,7 +3407,13 @@ func handleDEDUPE(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Time must be numeric for DEDUPE command. Keeping %d.\n", ps.line, ps.digi.dedupe_time)
+
+		return false
+	}
 	if n >= 0 && n < 600 {
 		ps.digi.dedupe_time = n
 	} else {
@@ -5247,8 +5319,14 @@ func handleIGTXLIMIT(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
-	if n < 1 {
+	// An unreadable limit leaves that one as it was; the other one on the line
+	// is still worth reading.
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: One minute limit must be numeric for IGTXLIMIT command. Keeping %d.\n",
+			ps.line, ps.igate.tx_limit_1)
+	} else if n < 1 {
 		ps.igate.tx_limit_1 = 1
 	} else if n <= IGATE_TX_LIMIT_1_MAX {
 		ps.igate.tx_limit_1 = n
@@ -5269,7 +5347,14 @@ func handleIGTXLIMIT(ps *parseState) bool {
 		return true
 	}
 
-	n, _ = strconv.Atoi(t)
+	n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: Five minute limit must be numeric for IGTXLIMIT command. Keeping %d.\n",
+			ps.line, ps.igate.tx_limit_5)
+
+		return false
+	}
 	if n < 1 {
 		ps.igate.tx_limit_5 = 1
 	} else if n <= IGATE_TX_LIMIT_5_MAX {
@@ -5295,7 +5380,14 @@ func handleIGMSP(ps *parseState) bool {
 	 */
 	var t = split("", false)
 	if t != "" {
-		var n, _ = strconv.Atoi(t)
+		var n, nErr = strconv.Atoi(t)
+		if nErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Line %d: Number of times must be numeric for IGMSP command. Keeping %d.\n",
+				ps.line, ps.igate.igmsp)
+
+			return false
+		}
 		if n >= 0 && n <= 10 {
 			ps.igate.igmsp = n
 		} else {
@@ -5595,16 +5687,10 @@ func handleNULLMODEM(ps *parseState) bool {
 		dw_printf("Config file: Missing serial port name on line %d.\n", ps.line)
 
 		return true
-	} else {
-		if ps.misc.kiss_serial_port != "" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", ps.line)
-		}
-
-		ps.misc.kiss_serial_port = t
-		ps.misc.kiss_serial_speed = 0
-		ps.misc.kiss_serial_poll = 0
 	}
+
+	var port = t
+	var speed = 0
 
 	t = split("", false)
 	if t != "" {
@@ -5616,8 +5702,20 @@ func handleNULLMODEM(ps *parseState) bool {
 			return true
 		}
 
-		ps.misc.kiss_serial_speed = n
+		speed = n
 	}
+
+	// Commit the line only once all of it has parsed, so that a rejected line
+	// leaves the port configured by an earlier one - and the warning below
+	// describes a replacement that is actually happening.
+	if ps.misc.kiss_serial_port != "" {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Config file: Warning serial port name on line %d replaces earlier value.\n", ps.line)
+	}
+
+	ps.misc.kiss_serial_port = port
+	ps.misc.kiss_serial_speed = speed
+	ps.misc.kiss_serial_poll = 0
 
 	return false
 }
@@ -5714,7 +5812,10 @@ func handleGPSNMEA(ps *parseState) bool {
 		return true
 	}
 
-	ps.misc.gpsnmea_port = t
+	var port = t
+
+	// The standard at one time, for a line that gives no speed.
+	var speed = 4800
 
 	t = split("", false)
 	if t != "" {
@@ -5726,10 +5827,14 @@ func handleGPSNMEA(ps *parseState) bool {
 			return true
 		}
 
-		ps.misc.gpsnmea_speed = n
-	} else {
-		ps.misc.gpsnmea_speed = 4800 // The standard at one time.
+		speed = n
 	}
+
+	// Commit the port only once its speed is known: dwgpsnmea_init opens
+	// whatever port is configured at whatever speed is beside it, so a rejected
+	// line must not leave one without the other.
+	ps.misc.gpsnmea_port = port
+	ps.misc.gpsnmea_speed = speed
 
 	return false
 }
@@ -5751,7 +5856,14 @@ func handleGPSD(ps *parseState) bool {
 
 		t = split("", false)
 		if t != "" {
-			var n, _ = strconv.Atoi(t)
+			var n, nErr = strconv.Atoi(t)
+			if nErr != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Line %d: Port number must be numeric for GPSD. Using default of %d.\n",
+					ps.line, ps.misc.gpsd_port)
+
+				return false
+			}
 			if (n >= MIN_IP_PORT_NUMBER && n <= MAX_IP_PORT_NUMBER) || n == 0 {
 				ps.misc.gpsd_port = n
 			} else {
@@ -6175,7 +6287,13 @@ func handleMAXV22(ps *parseState) bool {
 		return true
 	}
 
-	var n, _ = strconv.Atoi(t)
+	var n, nErr = strconv.Atoi(t)
+	if nErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Line %d: MAXV22 number must be numeric. Ignoring this line.\n", ps.line)
+
+		return false
+	}
 	if n >= 0 && n <= AX25_N2_RETRY_MAX {
 		ps.misc.maxv22 = n
 	} else {

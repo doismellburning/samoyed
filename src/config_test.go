@@ -2,6 +2,7 @@ package direwolf
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -194,9 +195,24 @@ func Test_IsNoCall(t *testing.T) {
 
 // --- config_init helpers ---
 
-// configFromString writes content to a temp config file, runs config_init, and
-// returns the resulting audio and misc config structs.
-func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+// configs is the set of structures config_init fills in, along with what it
+// reported while doing so.
+type configs struct {
+	audio *audio_s
+	digi  *digi_config_s
+	cdigi *cdigi_config_s
+	tt    *tt_config_s
+	igate *igate_config_s
+	misc  *misc_config_s
+
+	// output is everything config_init printed.  A handler that rejects a line
+	// usually has nothing else to show for it, so this is the only way to tell
+	// a line that was reported from one that was quietly ignored.
+	output string
+}
+
+// parseConfig writes content to a temp config file and runs config_init over it.
+func parseConfig(t *testing.T, content string) configs {
 	t.Helper()
 
 	var tmpFile, err = os.CreateTemp(t.TempDir(), "direwolf*.conf")
@@ -205,17 +221,31 @@ func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
 	require.NoError(t, err)
 	require.NoError(t, tmpFile.Close())
 
-	var audioConfig = new(audio_s)
-	var digiConfig digi_config_s
-	var cdigiConfig cdigi_config_s
-	var ttConfig tt_config_s
-	var igateConfig igate_config_s
-	var miscConfig misc_config_s
+	var c = configs{
+		audio:  new(audio_s),
+		digi:   new(digi_config_s),
+		cdigi:  new(cdigi_config_s),
+		tt:     new(tt_config_s),
+		igate:  new(igate_config_s),
+		misc:   new(misc_config_s),
+		output: "",
+	}
 
-	config_init(tmpFile.Name(), audioConfig, &digiConfig, &cdigiConfig,
-		&ttConfig, &igateConfig, &miscConfig)
+	c.output = CaptureOutput(t, func() {
+		config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+	})
 
-	return audioConfig, &miscConfig
+	return c
+}
+
+// configFromString runs config_init over content and returns the resulting
+// audio and misc config structs.
+func configFromString(t *testing.T, content string) (*audio_s, *misc_config_s) {
+	t.Helper()
+
+	var c = parseConfig(t, content)
+
+	return c.audio, c.misc
 }
 
 // --- parse_ll_maybe ---
@@ -430,6 +460,14 @@ func Test_config_init_txdelay(t *testing.T) {
 	t.Run("out-of-range value falls back to default", func(t *testing.T) {
 		var cfg, _ = configFromString(t, "TXDELAY 999\n")
 		assert.Equal(t, DEFAULT_TXDELAY, cfg.achan[0].txdelay)
+	})
+
+	// Regression test: the value went through an Atoi whose error was ignored,
+	// so "TXDELAY abc" read as 0 - in range, and a transmit delay too short for
+	// another station to hear - rather than being rejected.
+	t.Run("unreadable value leaves the configured one alone", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "TXDELAY 20\nTXDELAY abc\n")
+		assert.Equal(t, 20, cfg.achan[0].txdelay)
 	})
 }
 
@@ -1023,4 +1061,3829 @@ func Test_config_init_fix_bits(t *testing.T) {
 		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
 		assert.False(t, cfg.achan[0].passall)
 	})
+
+	// Regression test: the level went through an Atoi whose error was ignored,
+	// so "FIX_BITS abc" read as the 0 returned alongside it.  Zero is a level
+	// FIX_BITS accepts, so a typo silently turned bit fixing off, and the
+	// message about an invalid value was never printed.
+	t.Run("unreadable level leaves the configured one alone", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS 1\nFIX_BITS abc\n")
+		assert.Equal(t, BitFixSingle, cfg.achan[0].fix_bits)
+	})
+
+	// PASSALL is read after the level, so it still applies.
+	t.Run("an unreadable level does not stop PASSALL being read", func(t *testing.T) {
+		var cfg, _ = configFromString(t, "FIX_BITS abc PASSALL\n")
+		assert.Equal(t, DEFAULT_FIX_BITS, cfg.achan[0].fix_bits)
+		assert.True(t, cfg.achan[0].passall)
+	})
+}
+
+// --- config directive coverage ---
+//
+// The config file is the whole of the user interface, and a parse bug in it is
+// silent by nature, so every keyword in configHandlers is expected to have
+// tests: that a valid line sets what it claims to set, that a malformed or
+// out-of-range one is rejected rather than quietly wrapped or clamped, and that
+// a rejected line neither mutates the configuration nor leaks into the next
+// line.
+//
+// directiveTests holds them as a table, Test_config_directives runs it, and
+// Test_config_directive_coverage fails for a keyword with neither an entry here
+// nor a test of its own, so a newly added handler cannot arrive untested.
+
+// directiveCase is one configuration to parse and what it should leave behind.
+type directiveCase struct {
+	name   string
+	config string
+	check  func(a *assert.Assertions, c configs)
+}
+
+func directiveTests() map[string][]directiveCase {
+	return map[string][]directiveCase{
+		"ACHANNELS": {
+			{
+				name:   "two channels makes the second one a radio channel",
+				config: "ACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[0])
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "one channel leaves the second one unused",
+				config: "ACHANNELS 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[0])
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "it applies to the audio device the line follows",
+				config: "ADEVICE1 hw:1,0\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal(2, c.audio.adev[1].num_channels)
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[ADEVFIRSTCHAN(1)])
+					a.Equal(MEDIUM_RADIO, c.audio.chan_medium[ADEVFIRSTCHAN(1)+1])
+				},
+			},
+			{
+				name:   "a count other than 1 or 2 keeps the default",
+				config: "ACHANNELS 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "an unreadable count keeps the default",
+				config: "ACHANNELS two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[1])
+				},
+			},
+			{
+				name:   "a missing count keeps the default and does not eat the next line",
+				config: "ACHANNELS\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_NUM_CHANNELS, c.audio.adev[0].num_channels)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"ARATE": {
+			{
+				name:   "a valid rate is stored",
+				config: "ARATE 48000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(48000, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "no ARATE leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "it applies to the audio device the line follows",
+				config: "ADEVICE1 hw:1,0\nARATE 48000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Equal(48000, c.audio.adev[1].samples_per_sec)
+				},
+			},
+			{
+				name:   "the lowest usable rate is accepted",
+				config: "ARATE 8000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MIN_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "a rate below the minimum keeps the default",
+				config: "ARATE 7999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Contains(c.output, "more reasonable audio sample rate")
+				},
+			},
+			{
+				name:   "a rate beyond the maximum keeps the default",
+				config: "ARATE 192001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+				},
+			},
+			{
+				name:   "an unreadable rate keeps the default",
+				config: "ARATE fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Contains(c.output, "more reasonable audio sample rate")
+				},
+			},
+			{
+				name:   "a missing rate does not eat the next line",
+				config: "ARATE\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SAMPLES_PER_SEC, c.audio.adev[0].samples_per_sec)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"BEACON": {
+			{
+				name:   "the old style line is reported and configures no beacon",
+				config: "MYCALL Q1TEST\nBEACON 0 10 600 \"Hello\"\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.num_beacons)
+					a.Contains(c.output, "Old style 'BEACON' has been replaced")
+				},
+			},
+			{
+				name:   "it does not eat the next line",
+				config: "BEACON 0 10 600 \"Hello\"\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"CBEACON": {
+			{
+				name:   "a custom beacon carries the information part as given",
+				config: "MYCALL Q1TEST\nCBEACON INFO=\">Custom status\"\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_CUSTOM, c.misc.beacon[0].btype)
+					a.Equal(">Custom status", c.misc.beacon[0].custom_info)
+				},
+			},
+		},
+		// Connected mode digipeating needs an internal modem at both ends, so a
+		// network TNC channel is not allowed here even though DIGIPEAT allows one.
+		"CDIGIPEAT": {
+			{
+				name:   "a valid line enables connected mode digipeating",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.False(c.cdigi.has_alias[0][1])
+				},
+			},
+			{
+				name:   "nothing is digipeated by default",
+				config: "MYCALL Q1TEST\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+				},
+			},
+			{
+				name:   "an alias pattern is stored",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q[12]TEST$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.True(c.cdigi.has_alias[0][1])
+					a.NotNil(c.cdigi.alias[0][1])
+				},
+			},
+			{
+				name:   "an unusable alias pattern is rejected and nothing is enabled",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q([12]TEST$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "Invalid alias matching pattern")
+				},
+			},
+			{
+				name:   "a non-numeric channel is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT zero 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "is not allowed for FROM-channel")
+				},
+			},
+			{
+				name:   "a network TNC channel is not allowed",
+				config: "MYCALL Q1TEST\nNCHANNEL 6 localhost 8001\nCDIGIPEAT 0 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "TO-channel must be in range")
+				},
+			},
+			{
+				name:   "anything after the alias is reported",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEAT 0 1 ^Q[12]TEST$ extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "where end of line was expected")
+				},
+			},
+			{
+				name:   "digipeating to a channel with no callsign is switched off again",
+				config: "ACHANNELS 2\nCDIGIPEAT 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Contains(c.output, "MYCALL must be set for transmit channel")
+				},
+			},
+			{
+				name:   "a missing TO-channel does not eat the next line",
+				config: "ACHANNELS 2\nCDIGIPEAT 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.cdigi.enabled[0][1])
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"CDIGIPEATER": {
+			{
+				name:   "the longer name is the same handler as CDIGIPEAT",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nCDIGIPEATER 0 1 ^Q[12]TEST$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.cdigi.enabled[0][1])
+					a.True(c.cdigi.has_alias[0][1])
+				},
+			},
+		},
+		"CON": {
+			{
+				name:   "it configures the connected indicator output",
+				config: "CON /dev/ttyS0 DTR\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_SERIAL, c.audio.achan[0].octrl[OCTYPE_CON].ptt_method)
+					a.Equal(PTT_LINE_DTR, c.audio.achan[0].octrl[OCTYPE_CON].ptt_line)
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "CM108 is rejected for it as well",
+				config: "CON CM108 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_CON].ptt_method)
+					a.Contains(c.output, "only valid for PTT, not CON")
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "CON\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_CON].ptt_method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"DCD": {
+			{
+				name:   "it configures the data carrier detect output, not PTT",
+				config: "DCD /dev/ttyS0 RTS\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_SERIAL, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "a GPIO number is stored for it too",
+				config: "DCD GPIO 24\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Equal(24, c.audio.achan[0].octrl[OCTYPE_DCD].out_gpio_num)
+				},
+			},
+			{
+				// A single CM108 GPIO byte cannot be updated a bit at a time, so only
+				// PTT may use it.
+				name:   "CM108 is rejected for anything but PTT",
+				config: "DCD CM108 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Contains(c.output, "only valid for PTT, not DCD")
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "DCD\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_DCD].ptt_method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"DEDUPE": {
+			{
+				name:   "a valid time is stored",
+				config: "DEDUPE 45\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(45, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "no DEDUPE leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "zero turns duplicate suppression off",
+				config: "DEDUPE 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "an unreasonable time falls back to the default",
+				config: "DEDUPE 600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Contains(c.output, "Unreasonable value for dedupe time")
+				},
+			},
+			{
+				name:   "a negative time falls back to the default",
+				config: "DEDUPE -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+				},
+			},
+			{
+				name:   "a missing time does not eat the next line",
+				config: "DEDUPE\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DEDUPE, c.digi.dedupe_time)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the time went through an Atoi whose error was ignored,
+			// so "DEDUPE abc" read as the 0 returned alongside it - in range, and
+			// duplicate suppression switched off - rather than being rejected.
+			{
+				name:   "an unreadable time keeps the configured one",
+				config: "DEDUPE 45\nDEDUPE abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(45, c.digi.dedupe_time)
+				},
+			},
+		},
+		// A digipeater needs two radio channels and a callsign on the transmit one,
+		// so these lines are longer than most: config_init switches digipeating off
+		// again for a channel that is still NOCALL.
+		"DIGIPEAT": {
+			{
+				name:   "a valid line enables digipeating with both patterns",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.enabled[0][1])
+					a.NotNil(c.digi.alias[0][1])
+					a.NotNil(c.digi.wide[0][1])
+					a.Equal(PREEMPT_OFF, c.digi.preempt[0][1])
+				},
+			},
+			{
+				name:   "nothing is digipeated by default",
+				config: "MYCALL Q1TEST\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+				},
+			},
+			{
+				name:   "TRACE asks for preemptive digipeating",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_TRACE, c.digi.preempt[0][1])
+				},
+			},
+			{
+				name:   "PREEMPT is the same thing under a better name",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ PREEMPT\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_TRACE, c.digi.preempt[0][1])
+				},
+			},
+			{
+				name:   "DROP is accepted and discouraged",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ DROP\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_DROP, c.digi.preempt[0][1])
+					a.Contains(c.output, "DROP option is discouraged")
+				},
+			},
+			{
+				name:   "MARK is accepted and discouraged",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ MARK\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PREEMPT_MARK, c.digi.preempt[0][1])
+					a.Contains(c.output, "MARK option is discouraged")
+				},
+			},
+			{
+				name:   "ATGP takes the alias after the equals sign",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ ATGP=Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q2TEST", c.digi.atgp[0][1])
+				},
+			},
+			{
+				name:   "a non-numeric channel is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT zero 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "is not allowed for FROM-channel")
+				},
+			},
+			{
+				name:   "a channel beyond the last one is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 16 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "TO-channel must be in range")
+				},
+			},
+			{
+				name:   "a channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "TO-channel 1 is not valid")
+				},
+			},
+			{
+				name:   "an unusable pattern is rejected and nothing is digipeated",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE([3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "Invalid alias matching pattern")
+				},
+			},
+			{
+				name:   "anything after the options is reported",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$ TRACE extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.enabled[0][1])
+					a.Contains(c.output, "where end of line was expected")
+				},
+			},
+			{
+				name:   "digipeating a channel with no callsign is switched off again",
+				config: "ACHANNELS 2\nDIGIPEAT 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Contains(c.output, "MYCALL must be set for transmit channel")
+				},
+			},
+			{
+				name:   "a missing TO-channel does not eat the next line",
+				config: "ACHANNELS 2\nDIGIPEAT 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.enabled[0][1])
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"DIGIPEATER": {
+			{
+				name:   "the longer name is the same handler as DIGIPEAT",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nDIGIPEATER 0 1 ^WIDE[3-7]-[1-7]$ ^WIDE[12]-[12]$\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.enabled[0][1])
+					a.NotNil(c.digi.alias[0][1])
+					a.NotNil(c.digi.wide[0][1])
+				},
+			},
+		},
+		"DNSSDNAME": {
+			{
+				name:   "a service name is stored",
+				config: "DNSSDNAME Shack TNC\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Shack TNC", c.misc.dns_sd_name)
+				},
+			},
+			{
+				name:   "no DNSSDNAME leaves the name to be derived later",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.dns_sd_name)
+				},
+			},
+			{
+				name:   "a missing name does not eat the next line",
+				config: "DNSSDNAME\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.dns_sd_name)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"DTMF": {
+			{
+				name:   "the decoder is off by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DTMF_DECODE_OFF, c.audio.achan[0].dtmf_decode)
+				},
+			},
+			{
+				name:   "the directive enables the decoder",
+				config: "DTMF\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].dtmf_decode)
+				},
+			},
+			{
+				name:   "it enables the decoder on the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nDTMF\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DTMF_DECODE_OFF, c.audio.achan[0].dtmf_decode)
+					a.Equal(DTMF_DECODE_ON, c.audio.achan[1].dtmf_decode)
+				},
+			},
+		},
+		"DWAIT": {
+			{
+				name:   "a valid delay is stored",
+				config: "DWAIT 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "no DWAIT leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nDWAIT 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+					a.Equal(20, c.audio.achan[1].dwait)
+				},
+			},
+			{
+				name:   "a delay beyond the byte it is sent in falls back to the default",
+				config: "DWAIT 256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "a negative delay falls back to the default",
+				config: "DWAIT -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+				},
+			},
+			{
+				name:   "a missing delay does not eat the next line",
+				config: "DWAIT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_DWAIT, c.audio.achan[0].dwait)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the value went through an Atoi whose error was
+			// ignored, so an unreadable one read as the 0 it returns alongside it -
+			// which is in range - and silently replaced whatever was configured.
+			{
+				name:   "an unreadable delay leaves the configured one alone",
+				config: "DWAIT 20\nDWAIT abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].dwait)
+				},
+			},
+		},
+		"EMAXFRAME": {
+			{
+				name:   "a valid window size is stored",
+				config: "EMAXFRAME 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(16, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "no EMAXFRAME leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "the largest window we will send is accepted",
+				config: "EMAXFRAME 63\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_MAX, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "a larger window falls back to the default",
+				config: "EMAXFRAME 64\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "a window of no frames at all falls back to the default",
+				config: "EMAXFRAME 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+				},
+			},
+			{
+				name:   "an unreadable window size falls back to the default",
+				config: "EMAXFRAME sixteen\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+					a.Contains(c.output, "Invalid EMAXFRAME value")
+				},
+			},
+			{
+				name:   "a missing window size does not eat the next line",
+				config: "EMAXFRAME\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_EXTENDED_DEFAULT, c.misc.maxframe_extended)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"FULLDUP": {
+			{
+				name:   "ON selects full duplex",
+				config: "FULLDUP ON\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "the keyword is not case sensitive",
+				config: "FULLDUP on\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "OFF selects half duplex",
+				config: "FULLDUP ON\nFULLDUP OFF\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "half duplex by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_FULLDUP, c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nFULLDUP ON\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+					a.True(c.audio.achan[1].fulldup)
+				},
+			},
+			{
+				name:   "anything other than ON or OFF leaves half duplex",
+				config: "FULLDUP maybe\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+				},
+			},
+			{
+				name:   "a missing setting does not eat the next line",
+				config: "FULLDUP\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].fulldup)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"FX25AUTO": {
+			{
+				name:   "a repeat count is stored",
+				config: "FX25AUTO 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "half of the default retry count by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "zero disables the feature",
+				config: "FX25AUTO 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "an unreasonable count falls back to the default",
+				config: "FX25AUTO 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "a negative count falls back to the default",
+				config: "FX25AUTO -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "FX25AUTO\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/2, c.audio.fx25_auto_enable)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the count went through an Atoi whose error was
+			// ignored, so "FX25AUTO abc" read as the 0 returned alongside it and
+			// silently disabled the feature.
+			{
+				name:   "an unreadable count leaves the configured one alone",
+				config: "FX25AUTO 3\nFX25AUTO abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.audio.fx25_auto_enable)
+				},
+			},
+		},
+		"FX25TX": {
+			{
+				name:   "a parity byte count selects FX.25 transmission",
+				config: "FX25TX 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(16, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "AX.25 by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "1 selects the automatic mode",
+				config: "FX25TX 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nFX25TX 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+					a.Equal(LAYER2_FX25, c.audio.achan[1].layer2_xmit)
+				},
+			},
+			{
+				name:   "an unreasonable count falls back to the automatic mode",
+				config: "FX25TX 200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "a missing mode does not eat the next line",
+				config: "FX25TX\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the mode went through an Atoi whose error was
+			// ignored, so "FX25TX abc" read as the 0 returned alongside it and
+			// silently replaced a configured number of parity bytes.
+			{
+				name:   "an unreadable mode leaves the configured one alone",
+				config: "FX25TX 16\nFX25TX abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(16, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_FX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			// Regression test: 0 means off, as it does for the -X command line
+			// option, but the handler still switched the channel to LAYER2_FX25.
+			// Every frame then asked for an FX.25 mode that does not exist,
+			// complained twice and fell back to AX.25.
+			{
+				name:   "zero leaves the channel on AX.25",
+				config: "FX25TX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].fx25_strength)
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "zero turns off what an earlier line turned on",
+				config: "FX25TX 16\nFX25TX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "zero does not disturb a channel transmitting IL2P",
+				config: "IL2PTX 1\nFX25TX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_IL2P, c.audio.achan[0].layer2_xmit)
+				},
+			},
+		},
+		"GPSD": {
+			{
+				name:   "the directive on its own uses the local gpsd on its usual port",
+				config: "GPSD\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.misc.gpsd_host)
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+				},
+			},
+			{
+				name:   "no GPSD means no gpsd",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsd_host)
+				},
+			},
+			{
+				name:   "a host of its own keeps the usual port",
+				config: "GPSD gps.example.com\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("gps.example.com", c.misc.gpsd_host)
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+				},
+			},
+			{
+				name:   "a host and port are both stored",
+				config: "GPSD gps.example.com 2948\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("gps.example.com", c.misc.gpsd_host)
+					a.Equal(2948, c.misc.gpsd_port)
+				},
+			},
+			{
+				name:   "an out-of-range port falls back to the usual one",
+				config: "GPSD gps.example.com 99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+					a.Contains(c.output, "Invalid port number for GPSD")
+				},
+			},
+			// Regression test: the port went through an Atoi whose error was ignored,
+			// and the handler accepts 0 alongside the usual range, so "GPSD host
+			// two-nine-four-seven" configured port 0 and every connection attempt
+			// failed.
+			{
+				name:   "an unreadable port falls back to the usual one",
+				config: "GPSD gps.example.com twentynineoneseven\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("gps.example.com", c.misc.gpsd_host)
+					a.Equal(DEFAULT_GPSD_PORT, c.misc.gpsd_port)
+				},
+			},
+		},
+		"GPSNMEA": {
+			{
+				name:   "a serial port is stored with the traditional speed",
+				config: "GPSNMEA /dev/ttyUSB0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyUSB0", c.misc.gpsnmea_port)
+					a.Equal(4800, c.misc.gpsnmea_speed)
+				},
+			},
+			{
+				name:   "no GPSNMEA means no directly attached receiver",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsnmea_port)
+				},
+			},
+			{
+				name:   "a speed after the port is stored",
+				config: "GPSNMEA /dev/ttyUSB0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(9600, c.misc.gpsnmea_speed)
+				},
+			},
+			{
+				// Regression test: the port was stored before the speed was
+				// read, so a rejected line left a GPS port configured at no
+				// speed at all, which dwgpsnmea_init then tried to open.
+				name:   "an unreadable speed leaves no port configured either",
+				config: "GPSNMEA /dev/ttyUSB0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsnmea_port)
+					a.Zero(c.misc.gpsnmea_speed)
+					a.Contains(c.output, "Invalid speed")
+				},
+			},
+			{
+				name:   "a missing port name does not eat the next line",
+				config: "GPSNMEA\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.gpsnmea_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a rejected line leaves an earlier one alone",
+				config: "GPSNMEA /dev/ttyUSB0 9600\nGPSNMEA /dev/ttyUSB1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyUSB0", c.misc.gpsnmea_port)
+					a.Equal(9600, c.misc.gpsnmea_speed)
+				},
+			},
+		},
+		"IBEACON": {
+			{
+				name:   "an IGate statistics beacon is stored",
+				config: "MYCALL Q1TEST\nIBEACON EVERY=1:00\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_IGATE, c.misc.beacon[0].btype)
+					a.Equal(60, c.misc.beacon[0].every)
+				},
+			},
+		},
+		"ICHANNEL": {
+			{
+				name:   "a virtual channel becomes the IGate channel",
+				config: "ICHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_IGATE, c.audio.chan_medium[6])
+					a.Equal(6, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "there is no IGate channel by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a channel below the virtual range is rejected",
+				config: "ICHANNEL 5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[5])
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a channel beyond the virtual range is rejected",
+				config: "ICHANNEL 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "ICHANNEL six\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a channel already in use is left as it was",
+				config: "NCHANNEL 6 localhost 8001\nICHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Equal(-1, c.audio.igate_vchannel)
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "ICHANNEL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.igate_vchannel)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"IGFILTER": {
+			{
+				name:   "a filter expression is stored as the rest of the line",
+				config: "IGFILTER m/50 t/m\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("m/50 t/m", c.igate.t2_filter)
+				},
+			},
+			{
+				name:   "no IGFILTER means no server side filter",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_filter)
+				},
+			},
+			{
+				name:   "an expression with no filter at all leaves none",
+				config: "IGFILTER\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_filter)
+				},
+			},
+			{
+				// One subscription is sent to the server, so a second line would
+				// otherwise silently replace the first.
+				name:   "a second line is reported and ignored",
+				config: "IGFILTER m/50\nIGFILTER t/m\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("m/50", c.igate.t2_filter)
+					a.Contains(c.output, "IGFILTER already configured")
+				},
+			},
+			{
+				name:   "an expression of only a filter is accepted and warned about",
+				config: "IGFILTER m/50\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("m/50", c.igate.t2_filter)
+					a.Contains(c.output, "rarely needed expert level feature")
+				},
+			},
+			{
+				name:   "an empty line does not eat the next one",
+				config: "IGFILTER\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// MYCALL comes first in each of these: config_init drops the login again if
+		// any radio channel is still NOCALL, since an IGate has to identify itself.
+		"IGLOGIN": {
+			{
+				name:   "a callsign and passcode are stored",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.igate.t2_login)
+					a.Equal("12345", c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "no IGLOGIN leaves no credentials",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_login)
+					a.Empty(c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "a receive-only passcode is just another passcode here",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST-15 -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST-15", c.igate.t2_login)
+					a.Equal("-1", c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "a later line replaces the credentials rather than adding to them",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGLOGIN Q2TEST 54321\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q2TEST", c.igate.t2_login)
+					a.Equal("54321", c.igate.t2_passcode)
+				},
+			},
+			{
+				// igate_init insists on both, so a login with no passcode leaves the
+				// gateway switched off rather than half configured.
+				name:   "a missing passcode leaves nothing to log in with",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_passcode)
+				},
+			},
+			{
+				name:   "a login without a callsign for the channel is dropped again",
+				config: "IGLOGIN Q1TEST 12345\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_login)
+					a.Contains(c.output, "MYCALL must be set for receive channel")
+				},
+			},
+			{
+				name:   "a missing callsign does not eat the next line",
+				config: "IGLOGIN\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_login)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"IGMSP": {
+			{
+				name:   "a count is stored",
+				config: "IGMSP 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.igate.igmsp)
+				},
+			},
+			{
+				name:   "once by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.igmsp)
+				},
+			},
+			{
+				name:   "zero sends no position for the message sender",
+				config: "IGMSP 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.igmsp)
+				},
+			},
+			{
+				name:   "an unreasonable count falls back to once",
+				config: "IGMSP 11\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.igmsp)
+					a.Contains(c.output, "Unreasonable number of times")
+				},
+			},
+			{
+				name:   "a missing count is reported and falls back to once",
+				config: "IGMSP 2\nIGMSP\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.igmsp)
+					a.Contains(c.output, "Missing number of times")
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "IGMSP\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the count went through an Atoi whose error was
+			// ignored, so "IGMSP two" read as the 0 returned alongside it - a valid
+			// count, meaning send no position at all - rather than being rejected.
+			{
+				name:   "an unreadable count keeps the configured one",
+				config: "IGMSP 2\nIGMSP two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.igate.igmsp)
+				},
+			},
+		},
+		"IGSERVER": {
+			{
+				name:   "a server name is stored with the default port",
+				config: "IGSERVER rotate.aprs2.net\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "no IGSERVER leaves no server to gate to",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_server_name)
+				},
+			},
+			{
+				name:   "a port after a colon is split out",
+				config: "IGSERVER rotate.aprs2.net:14579\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(14579, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a port as a separate token is accepted too",
+				config: "IGSERVER rotate.aprs2.net 14579\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(14579, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a bracketed IPv6 address keeps its colons",
+				config: "IGSERVER [2001:db8::1]:14579\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("2001:db8::1", c.igate.t2_server_name)
+					a.Equal(14579, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "an out-of-range port after a colon falls back to the default",
+				config: "IGSERVER rotate.aprs2.net:99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "an unreadable separate port falls back to the default",
+				config: "IGSERVER rotate.aprs2.net fourteen\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a name with a trailing colon and no port keeps the name",
+				config: "IGSERVER rotate.aprs2.net:\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("rotate.aprs2.net", c.igate.t2_server_name)
+					a.Equal(DEFAULT_IGATE_PORT, c.igate.t2_server_port)
+				},
+			},
+			{
+				name:   "a missing server name does not eat the next line",
+				config: "IGSERVER\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.igate.t2_server_name)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"IGTXLIMIT": {
+			{
+				name:   "both limits are stored",
+				config: "IGTXLIMIT 3 10\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.igate.tx_limit_1)
+					a.Equal(10, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "no IGTXLIMIT leaves the defaults",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_DEFAULT, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_DEFAULT, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "a limit of none at all becomes one, since a limit of zero would gate nothing",
+				config: "IGTXLIMIT 0 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.igate.tx_limit_1)
+					a.Equal(1, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "limits that would make no friends are reduced to the maximum",
+				config: "IGTXLIMIT 100 200\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_MAX, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_MAX, c.igate.tx_limit_5)
+					a.Contains(c.output, "You won't make friends")
+				},
+			},
+			{
+				name:   "a missing five minute limit leaves that one at its default",
+				config: "IGTXLIMIT 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_DEFAULT, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "a missing one minute limit does not eat the next line",
+				config: "IGTXLIMIT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_DEFAULT, c.igate.tx_limit_1)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: both limits went through an Atoi whose error was
+			// ignored, and the handler read anything below 1 as 1.  A typo therefore
+			// clamped the gateway to a single transmission per interval without a
+			// word about it.
+			{
+				name:   "an unreadable one minute limit keeps that default, and the five minute one still counts",
+				config: "IGTXLIMIT three 15\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(IGATE_TX_LIMIT_1_DEFAULT, c.igate.tx_limit_1)
+					a.Equal(15, c.igate.tx_limit_5)
+				},
+			},
+			{
+				name:   "an unreadable five minute limit keeps that default only",
+				config: "IGTXLIMIT 3 ten\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(3, c.igate.tx_limit_1)
+					a.Equal(IGATE_TX_LIMIT_5_DEFAULT, c.igate.tx_limit_5)
+				},
+			},
+		},
+		"IGTXVIA": {
+			{
+				name:   "a transmit channel is stored",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.tx_chan)
+					a.Empty(c.igate.tx_via)
+				},
+			},
+			{
+				name:   "no IGTXVIA means nothing is gated to RF",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "a via path is stored with the comma the header needs",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0 WIDE1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(",WIDE1-1", c.igate.tx_via)
+					a.Equal(1, c.igate.max_digi_hops)
+				},
+			},
+			{
+				name:   "the hop count comes from the SSID of a path ending in a digit",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0 WIDE2-2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.igate.max_digi_hops)
+				},
+			},
+			{
+				name:   "an unusable via path is rejected but the channel still stands",
+				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST 12345\nIGTXVIA 0 WIDE1-1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.tx_chan)
+					a.Empty(c.igate.tx_via)
+					a.Contains(c.output, "invalid via path")
+				},
+			},
+			{
+				name:   "a channel beyond the last one is rejected",
+				config: "MYCALL Q1TEST\nIGTXVIA 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "MYCALL Q1TEST\nIGTXVIA zero\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "a transmit channel with no callsign is dropped again",
+				config: "IGLOGIN Q1TEST 12345\nIGTXVIA 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "IGTXVIA\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.igate.tx_chan)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"IL2PTX": {
+			{
+				name:   "with no options it selects IL2P with max FEC, normal polarity and a CRC",
+				config: "IL2PTX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_IL2P, c.audio.achan[0].layer2_xmit)
+					a.Equal(1, c.audio.achan[0].il2p_max_fec)
+					a.Equal(0, c.audio.achan[0].il2p_invert_polarity)
+					a.True(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "AX.25 by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+				},
+			},
+			{
+				name:   "a minus inverts the polarity",
+				config: "IL2PTX -\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+				},
+			},
+			{
+				name:   "a plus is the normal polarity it already had",
+				config: "IL2PTX +\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].il2p_invert_polarity)
+				},
+			},
+			{
+				name:   "0 asks for the weaker FEC",
+				config: "IL2PTX 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].il2p_max_fec)
+				},
+			},
+			{
+				name:   "a lower case c drops the CRC",
+				config: "IL2PTX c\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "options can be run together or given separately",
+				config: "IL2PTX -0c\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+					a.Equal(0, c.audio.achan[0].il2p_max_fec)
+					a.False(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "separate options have the same effect as run-together ones",
+				config: "IL2PTX - 0 c\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+					a.Equal(0, c.audio.achan[0].il2p_max_fec)
+					a.False(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "a later line starts again from the defaults",
+				config: "IL2PTX -0c\nIL2PTX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.audio.achan[0].il2p_invert_polarity)
+					a.Equal(1, c.audio.achan[0].il2p_max_fec)
+					a.True(c.audio.achan[0].il2p_crc)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nIL2PTX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_AX25, c.audio.achan[0].layer2_xmit)
+					a.Equal(LAYER2_IL2P, c.audio.achan[1].layer2_xmit)
+				},
+			},
+			{
+				name:   "an unrecognised option is reported and the rest still apply",
+				config: "IL2PTX x-\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(LAYER2_IL2P, c.audio.achan[0].layer2_xmit)
+					a.Equal(1, c.audio.achan[0].il2p_invert_polarity)
+				},
+			},
+		},
+		"KISSCOPY": {
+			{
+				name:   "the directive turns copying on",
+				config: "KISSCOPY\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.misc.kiss_copy)
+				},
+			},
+			{
+				name:   "off by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.kiss_copy)
+				},
+			},
+		},
+		"LOGDIR": {
+			{
+				name:   "a directory is stored and daily names asked for",
+				config: "LOGDIR /var/log/samoyed\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed", c.misc.log_path)
+					a.True(c.misc.log_daily_names)
+				},
+			},
+			{
+				name:   "no LOGDIR means no logging",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.log_path)
+					a.False(c.misc.log_daily_names)
+				},
+			},
+			{
+				name:   "it replaces an earlier LOGFILE and says so",
+				config: "LOGFILE /var/log/samoyed.log\nLOGDIR /var/log/samoyed\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed", c.misc.log_path)
+					a.True(c.misc.log_daily_names)
+					a.Contains(c.output, "replacing an earlier LOGDIR or LOGFILE")
+				},
+			},
+			{
+				name:   "anything after the directory is reported",
+				config: "LOGDIR /var/log/samoyed extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed", c.misc.log_path)
+					a.Contains(c.output, "should have directory path and nothing more")
+				},
+			},
+			{
+				name:   "a missing directory does not eat the next line",
+				config: "LOGDIR\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.log_path)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"LOGFILE": {
+			{
+				name:   "a file name is stored and daily names turned off",
+				config: "LOGFILE /var/log/samoyed.log\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed.log", c.misc.log_path)
+					a.False(c.misc.log_daily_names)
+				},
+			},
+			{
+				name:   "it replaces an earlier LOGDIR and says so",
+				config: "LOGDIR /var/log/samoyed\nLOGFILE /var/log/samoyed.log\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed.log", c.misc.log_path)
+					a.False(c.misc.log_daily_names)
+					a.Contains(c.output, "replacing an earlier LOGDIR or LOGFILE")
+				},
+			},
+			{
+				name:   "anything after the file name is reported",
+				config: "LOGFILE /var/log/samoyed.log extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/var/log/samoyed.log", c.misc.log_path)
+					a.Contains(c.output, "should have file name and nothing more")
+				},
+			},
+			{
+				name:   "a missing file name does not eat the next line",
+				config: "LOGFILE\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.log_path)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"MAXFRAME": {
+			{
+				name:   "a valid window size is stored",
+				config: "MAXFRAME 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "no MAXFRAME leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "the largest window a modulo 8 sequence number allows is accepted",
+				config: "MAXFRAME 7\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_MAX, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "a window that will not fit a modulo 8 sequence number falls back to the default",
+				config: "MAXFRAME 8\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "a window of no frames at all falls back to the default",
+				config: "MAXFRAME 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+				},
+			},
+			{
+				name:   "an unreadable window size falls back to the default",
+				config: "MAXFRAME two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+					a.Contains(c.output, "Invalid MAXFRAME value")
+				},
+			},
+			{
+				name:   "a missing window size does not eat the next line",
+				config: "MAXFRAME\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_K_MAXFRAME_BASIC_DEFAULT, c.misc.maxframe_basic)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"MAXV22": {
+			{
+				name:   "a valid count is stored",
+				config: "MAXV22 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a third of the retry count by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "zero means never offering v2.2 at all",
+				config: "MAXV22 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a count beyond the retry maximum keeps the default",
+				config: "MAXV22 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a negative count keeps the default",
+				config: "MAXV22 -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "MAXV22\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT/3, c.misc.maxv22)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the count went through an Atoi whose error was
+			// ignored, so "MAXV22 two" read as the 0 returned alongside it - a valid
+			// count, meaning never offer v2.2 - rather than being rejected.
+			{
+				name:   "an unreadable count keeps the configured one",
+				config: "MAXV22 2\nMAXV22 two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxv22)
+				},
+			},
+			// Regression test: config_init set the default to a concrete
+			// AX25_N2_RETRY_DEFAULT/3, which left the "if maxv22 < 0" fallback at the
+			// end of it dead code, so a configured RETRY no longer scaled the number
+			// of SABMEs.  RETRY 12 gave 3 rather than 4, and only looked right
+			// because RETRY's own default is 10.
+			{
+				name:   "with no MAXV22 the count follows the configured retry count",
+				config: "RETRY 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(4, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "an explicit count is not overridden by the retry count",
+				config: "RETRY 12\nMAXV22 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.misc.maxv22)
+				},
+			},
+			{
+				name:   "an unreadable count with nothing configured still follows the retry count",
+				config: "RETRY 12\nMAXV22 two\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(4, c.misc.maxv22)
+					a.Contains(c.output, "Ignoring this line")
+				},
+			},
+		},
+		"NCHANNEL": {
+			{
+				name:   "a virtual channel, address and port are stored",
+				config: "NCHANNEL 6 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NETTNC, c.audio.chan_medium[6])
+					a.Equal("localhost", c.audio.nettnc_addr[6])
+					a.Equal(8001, c.audio.nettnc_port[6])
+				},
+			},
+			{
+				name:   "a channel below the virtual range is rejected",
+				config: "NCHANNEL 5 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[5])
+					a.Empty(c.audio.nettnc_addr[5])
+				},
+			},
+			{
+				name:   "a channel beyond the virtual range is rejected",
+				config: "NCHANNEL 16 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.NotEqual(MEDIUM_NETTNC, c.audio.chan_medium[channel])
+					}
+				},
+			},
+			{
+				name:   "an unreadable channel number is rejected",
+				config: "NCHANNEL six localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					for channel := range MAX_TOTAL_CHANS {
+						a.NotEqual(MEDIUM_NETTNC, c.audio.chan_medium[channel])
+					}
+				},
+			},
+			{
+				name:   "a channel already in use is left as it was",
+				config: "ICHANNEL 6\nNCHANNEL 6 localhost 8001\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_IGATE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "two network TNCs can be configured at once",
+				config: "NCHANNEL 6 localhost 8001\nNCHANNEL 7 192.0.2.1 8002\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.audio.nettnc_addr[6])
+					a.Equal(8001, c.audio.nettnc_port[6])
+					a.Equal("192.0.2.1", c.audio.nettnc_addr[7])
+					a.Equal(8002, c.audio.nettnc_port[7])
+				},
+			},
+			{
+				name:   "a missing channel number does not eat the next line",
+				config: "NCHANNEL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the handler marked the channel MEDIUM_NETTNC and
+			// stored the address before it had read the port, so a line that was
+			// then rejected left a network TNC channel behind with port 0.
+			// nettnc_init attaches to every such channel at startup and exits if it
+			// cannot, so a typo took the whole program down.
+			{
+				name:   "a missing port leaves the channel alone",
+				config: "NCHANNEL 6 localhost\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "an out-of-range port leaves the channel alone",
+				config: "NCHANNEL 6 localhost 99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+					a.Zero(c.audio.nettnc_port[6])
+				},
+			},
+			{
+				name:   "an unreadable port leaves the channel alone",
+				config: "NCHANNEL 6 localhost eightthousandandone\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+					a.Empty(c.audio.nettnc_addr[6])
+				},
+			},
+			{
+				name:   "a missing address leaves the channel alone",
+				config: "NCHANNEL 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(MEDIUM_NONE, c.audio.chan_medium[6])
+				},
+			},
+		},
+		"NOXID": {
+			{
+				name:   "an address is stored",
+				config: "NOXID Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST"}, c.misc.noxid_addrs)
+					a.Equal(1, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "no NOXID means XID is tried with everyone",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.noxid_addrs)
+					a.Equal(0, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "several addresses on one line are all stored",
+				config: "NOXID Q1TEST Q2TEST-5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST-5"}, c.misc.noxid_addrs)
+					a.Equal(2, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "repeated lines are cumulative",
+				config: "NOXID Q1TEST\nNOXID Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST"}, c.misc.noxid_addrs)
+					a.Equal(2, c.misc.noxid_count)
+				},
+			},
+			{
+				name:   "an unusable address is rejected and the rest of the line still counts",
+				config: "NOXID Q1TEST-99 Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q2TEST"}, c.misc.noxid_addrs)
+					a.Equal(1, c.misc.noxid_count)
+					a.Contains(c.output, "Invalid station address for NOXID")
+				},
+			},
+			{
+				name:   "a missing address does not eat the next line",
+				config: "NOXID\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.noxid_addrs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// NULLMODEM and SERIALKISS are the same handler under two names, the second
+		// being the one that says what it does.
+		"NULLMODEM": {
+			{
+				name:   "a port name is stored",
+				config: "NULLMODEM /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(0, c.misc.kiss_serial_speed)
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "no NULLMODEM means no serial KISS port",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+				},
+			},
+			{
+				name:   "a speed after the name is stored",
+				config: "NULLMODEM /dev/ttyS0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(9600, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				// Regression test: the port was stored, and the speed and poll
+				// flag reset, before the speed had been read, so a rejected line
+				// replaced a perfectly good serial KISS port with one at no
+				// speed.
+				name:   "an unreadable speed leaves no port configured either",
+				config: "NULLMODEM /dev/ttyS0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+					a.Zero(c.misc.kiss_serial_speed)
+					a.Contains(c.output, "Invalid speed")
+				},
+			},
+			{
+				name:   "a rejected line leaves an earlier one untouched",
+				config: "SERIALKISSPOLL /dev/rfcomm0\nNULLMODEM /dev/ttyS1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/rfcomm0", c.misc.kiss_serial_port)
+					a.Equal(1, c.misc.kiss_serial_poll)
+					a.Zero(c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "a rejected line does not undo an earlier speed",
+				config: "NULLMODEM /dev/ttyS0 9600\nNULLMODEM /dev/ttyS1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(9600, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				// There is only one serial KISS port, so a second line replaces the
+				// first rather than adding to it.
+				name:   "a second line replaces the first and says so",
+				config: "NULLMODEM /dev/ttyS0\nNULLMODEM /dev/ttyS1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS1", c.misc.kiss_serial_port)
+					a.Contains(c.output, "replaces earlier value")
+				},
+			},
+			{
+				name:   "a missing port name does not eat the next line",
+				config: "NULLMODEM\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"OBEACON": {
+			{
+				name:   "an object beacon is stored with its name",
+				config: "MYCALL Q1TEST\nOBEACON OBJNAME=Q2TEST LAT=42N LONG=71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_OBJECT, c.misc.beacon[0].btype)
+					a.Equal("Q2TEST", c.misc.beacon[0].objname)
+				},
+			},
+			{
+				name:   "a rejected line configures no beacon",
+				config: "MYCALL Q1TEST\nOBEACON OBJNAME=Q2TEST BOGUS=1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.num_beacons)
+				},
+			},
+		},
+		"PACLEN": {
+			{
+				name:   "a valid length is stored",
+				config: "PACLEN 128\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(128, c.misc.paclen)
+				},
+			},
+			{
+				name:   "no PACLEN leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+				},
+			},
+			{
+				name:   "the limits themselves are accepted",
+				config: "PACLEN 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_MIN, c.misc.paclen)
+				},
+			},
+			{
+				name:   "a length longer than an information field can hold keeps the default",
+				config: "PACLEN 9999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+				},
+			},
+			{
+				name:   "a length of nothing at all keeps the default",
+				config: "PACLEN 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+				},
+			},
+			{
+				name:   "an unreadable length keeps the default",
+				config: "PACLEN long\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+					a.Contains(c.output, "Invalid PACLEN value")
+				},
+			},
+			{
+				name:   "a missing length does not eat the next line",
+				config: "PACLEN\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N1_PACLEN_DEFAULT, c.misc.paclen)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"PERSIST": {
+			{
+				name:   "a valid probability is stored",
+				config: "PERSIST 100\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(100, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "no PERSIST leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nPERSIST 100\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+					a.Equal(100, c.audio.achan[1].persist)
+				},
+			},
+			{
+				name:   "a probability below the accepted range falls back to the default",
+				config: "PERSIST 4\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "a probability that would not fit the byte it is sent in falls back to the default",
+				config: "PERSIST 256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "an unreadable probability falls back to the default",
+				config: "PERSIST abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+				},
+			},
+			{
+				name:   "a missing probability does not eat the next line",
+				config: "PERSIST\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_PERSIST, c.audio.achan[0].persist)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// PTT, DCD and CON are one handler, keyed on the keyword; the cases here use
+		// PTT, with the other two covering what differs.
+		"PTT": {
+			{
+				name:   "a serial port and control line are stored",
+				config: "PTT /dev/ttyS0 RTS\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_SERIAL, octrl.ptt_method)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+					a.False(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "nothing keys the radio by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "a minus in front of the control line inverts it",
+				config: "PTT /dev/ttyS0 -DTR\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_LINE_DTR, octrl.ptt_line)
+					a.True(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a second control line on the same port is stored too",
+				config: "PTT /dev/ttyS0 RTS -DTR\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+					a.Equal(PTT_LINE_DTR, octrl.ptt_line2)
+					a.True(octrl.ptt_invert2)
+				},
+			},
+			{
+				name:   "the same control line twice is reported",
+				config: "PTT /dev/ttyS0 RTS RTS\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "control line twice")
+				},
+			},
+			{
+				name:   "something that is neither RTS nor DTR is rejected",
+				config: "PTT /dev/ttyS0 XYZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "Expected RTS or DTR")
+				},
+			},
+			{
+				name:   "a GPIO number is stored",
+				config: "PTT GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_GPIO, octrl.ptt_method)
+					a.Equal(25, octrl.out_gpio_num)
+					a.False(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a negative GPIO number is the same line, active low",
+				config: "PTT GPIO -25\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(25, octrl.out_gpio_num)
+					a.True(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a GPIOD chip name becomes a device path",
+				config: "PTT GPIOD gpiochip3 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_GPIOD, octrl.ptt_method)
+					a.Equal("/dev/gpiochip3", octrl.out_gpio_name)
+					a.Equal(12, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a GPIOD chip number becomes a device path as well",
+				config: "PTT GPIOD 3 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/gpiochip3", c.audio.achan[0].octrl[OCTYPE_PTT].out_gpio_name)
+				},
+			},
+			{
+				name:   "a GPIOD device path is taken as given",
+				config: "PTT GPIOD /dev/gpiochip3 12\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/gpiochip3", c.audio.achan[0].octrl[OCTYPE_PTT].out_gpio_name)
+				},
+			},
+			{
+				name:   "an LPT bit number is stored",
+				config: "PTT LPT 3\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_LPT, octrl.ptt_method)
+					a.Equal(3, octrl.ptt_lpt_bit)
+					a.False(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a negative LPT bit number inverts it",
+				config: "PTT LPT -3\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(3, octrl.ptt_lpt_bit)
+					a.True(octrl.ptt_invert)
+				},
+			},
+			{
+				name:   "a hamlib model, port and rate are stored",
+				config: "PTT RIG 101 /dev/ttyS0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_HAMLIB, octrl.ptt_method)
+					a.Equal(101, octrl.ptt_model)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(9600, octrl.ptt_rate)
+				},
+			},
+			{
+				name:   "AUTO asks hamlib to work the model out",
+				config: "PTT RIG AUTO /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(-1, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_model)
+				},
+			},
+			{
+				name:   "a rig name where the model number belongs is rejected",
+				config: "PTT RIG FT-847 /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "A rig number, not a name")
+				},
+			},
+			{
+				name:   "an unreasonable model number is rejected",
+				config: "PTT RIG 0 /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "Unreasonable model number")
+				},
+			},
+			{
+				name:   "an unreadable CAT rate is rejected",
+				config: "PTT RIG 101 /dev/ttyS0 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "optional number is required here")
+				},
+			},
+			{
+				name:   "a CM108 device and its GPIO bit are stored",
+				config: "PTT CM108 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_CM108, octrl.ptt_method)
+					a.Equal("/dev/hidraw9", octrl.ptt_device)
+					a.Equal(3, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a CM108 GPIO bit outside 1 to 8 is rejected",
+				config: "PTT CM108 9 /dev/hidraw9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Contains(c.output, "is not in range of 1 thru 8")
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nPTT GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[1].octrl[OCTYPE_PTT].ptt_method)
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "PTT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the port kept both halves of the C file's
+			// "#ifdef USE_HAMLIB" and dropped the #ifdef, so a RIG line configured
+			// hamlib PTT and then told the operator that hamlib was not supported
+			// and that they would have to rebuild.  Hamlib is supported.
+			{
+				name:   "a hamlib line does not claim hamlib is unsupported",
+				config: "PTT RIG 101 /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_HAMLIB, c.audio.achan[0].octrl[OCTYPE_PTT].ptt_method)
+					a.NotContains(c.output, "only available when hamlib support is enabled")
+					a.NotContains(c.output, "must rebuild")
+				},
+			},
+			// Regression test: the GPIO, GPIOD and LPT numbers went through an Atoi
+			// whose error was ignored, so a typo configured GPIO line 0 or LPT bit 0
+			// as the transmit control - which is how a station ends up keying
+			// something that isn't the radio, or not keying at all.
+			{
+				name:   "an unreadable GPIO number leaves the radio unkeyed",
+				config: "PTT GPIO twentyfive\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Zero(octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "an unreadable GPIOD line number leaves the radio unkeyed",
+				config: "PTT GPIOD gpiochip3 twelve\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Zero(octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "an unreadable LPT bit number leaves the radio unkeyed",
+				config: "PTT LPT three\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Zero(octrl.ptt_lpt_bit)
+				},
+			},
+			// Regression test: the chip name was stored before the line number had
+			// been read, so a line rejected after that point left this line's chip
+			// beside an earlier line's number and method - a pair that never
+			// appeared in the config file, and which ptt_init hands to
+			// RequestGPIODLine as though it had.
+			{
+				name:   "an unreadable GPIOD line number leaves the earlier chip alone",
+				config: "PTT GPIOD gpiochip3 12\nPTT GPIOD gpiochip9 twelve\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_GPIOD, octrl.ptt_method)
+					a.Equal("/dev/gpiochip3", octrl.out_gpio_name)
+					a.Equal(12, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a missing GPIOD line number leaves the earlier chip alone",
+				config: "PTT GPIOD gpiochip3 12\nPTT GPIOD gpiochip9\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal("/dev/gpiochip3", octrl.out_gpio_name)
+					a.Equal(12, octrl.out_gpio_num)
+				},
+			},
+			{
+				name:   "a GPIOD line with no usable number configures no chip at all",
+				config: "PTT GPIOD gpiochip3 twelve\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_NONE, octrl.ptt_method)
+					a.Empty(octrl.out_gpio_name)
+				},
+			},
+			// Regression test: each branch of the handler stored fields as it read
+			// them, so a line rejected part way through left some of its own values
+			// beside the rest of an earlier line's - a control configuration that
+			// never appeared in the config file, and which ptt_init reads as one.
+			{
+				name:   "a rejected serial line leaves the earlier device and line alone",
+				config: "PTT /dev/ttyS0 RTS\nPTT /dev/ttyS1 XYZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_SERIAL, octrl.ptt_method)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+				},
+			},
+			{
+				name:   "a rejected second control line leaves the first line alone",
+				config: "PTT /dev/ttyS0 RTS\nPTT /dev/ttyS1 DTR XYZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+					a.Equal(PTT_LINE_NONE, octrl.ptt_line2)
+				},
+			},
+			{
+				name:   "a rejected hamlib rate leaves the earlier model and port alone",
+				config: "PTT RIG 101 /dev/ttyS0 9600\nPTT RIG 102 /dev/ttyS1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_HAMLIB, octrl.ptt_method)
+					a.Equal(101, octrl.ptt_model)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(9600, octrl.ptt_rate)
+				},
+			},
+			{
+				name:   "a hamlib line with no port leaves the earlier model alone",
+				config: "PTT RIG 101 /dev/ttyS0\nPTT RIG 102\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(101, octrl.ptt_model)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+				},
+			},
+			{
+				name:   "a rejected CM108 bit leaves the earlier device and bit alone",
+				config: "PTT CM108 /dev/hidraw9\nPTT CM108 9 /dev/hidraw8\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_CM108, octrl.ptt_method)
+					a.Equal("/dev/hidraw9", octrl.ptt_device)
+					a.Equal(3, octrl.out_gpio_num)
+				},
+			},
+		},
+		"REGEN": {
+			{
+				name:   "a valid line turns regeneration on",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nREGEN 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.True(c.digi.regen[0][1])
+				},
+			},
+			{
+				name:   "nothing is regenerated by default",
+				config: "MYCALL Q1TEST\nACHANNELS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.regen[0][1])
+				},
+			},
+			{
+				name:   "a non-numeric channel is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nREGEN zero 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.regen[0][1])
+					a.Contains(c.output, "is not allowed for FROM-channel")
+				},
+			},
+			{
+				name:   "a channel beyond the last radio channel is rejected",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nREGEN 0 6\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "TO-channel must be in range")
+				},
+			},
+			{
+				name:   "a channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nREGEN 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.regen[0][1])
+					a.Contains(c.output, "TO-channel 1 is not valid")
+				},
+			},
+			{
+				name:   "a missing TO-channel does not eat the next line",
+				config: "ACHANNELS 2\nREGEN 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.digi.regen[0][1])
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"RETRY": {
+			{
+				name:   "a valid count is stored",
+				config: "RETRY 5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(5, c.misc.retry)
+				},
+			},
+			{
+				name:   "no RETRY leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+				},
+			},
+			{
+				name:   "the limits themselves are accepted",
+				config: "RETRY 15\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_MAX, c.misc.retry)
+				},
+			},
+			{
+				name:   "a count beyond the range keeps the default",
+				config: "RETRY 16\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+				},
+			},
+			{
+				name:   "never retrying at all is not on offer",
+				config: "RETRY 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+				},
+			},
+			{
+				name:   "an unreadable count keeps the default",
+				config: "RETRY five\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+					a.Contains(c.output, "Invalid RETRY number")
+				},
+			},
+			{
+				name:   "a missing count does not eat the next line",
+				config: "RETRY\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(AX25_N2_RETRY_DEFAULT, c.misc.retry)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"SATGATE": {
+			{
+				name:   "a delay is stored",
+				config: "SATGATE 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "no SATGATE means no delay and no SATgate mode",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "the directive on its own takes the default delay",
+				config: "SATGATE\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SATGATE_DELAY, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "a delay shorter than the minimum falls back to the default",
+				config: "SATGATE 4\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SATGATE_DELAY, c.igate.satgate_delay)
+					a.Contains(c.output, "Unreasonable SATgate delay")
+				},
+			},
+			{
+				name:   "a delay longer than the maximum falls back to the default",
+				config: "SATGATE 31\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_SATGATE_DELAY, c.igate.satgate_delay)
+				},
+			},
+			{
+				name:   "the directive says it is on its way out",
+				config: "SATGATE 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "will be removed in a future version")
+				},
+			},
+		},
+		"SERIALKISS": {
+			{
+				name:   "a port name and speed are stored, as for NULLMODEM",
+				config: "SERIALKISS /dev/ttyS0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(9600, c.misc.kiss_serial_speed)
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "it replaces a port name given under the other name",
+				config: "NULLMODEM /dev/ttyS0\nSERIALKISS /dev/ttyS1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS1", c.misc.kiss_serial_port)
+				},
+			},
+		},
+		"SERIALKISSPOLL": {
+			{
+				name:   "a port name is stored and marked for polling",
+				config: "SERIALKISSPOLL /dev/rfcomm0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/rfcomm0", c.misc.kiss_serial_port)
+					a.Equal(1, c.misc.kiss_serial_poll)
+					a.Equal(0, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "nothing is polled by default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "it takes no speed, so a second token is left for the next directive to trip over",
+				config: "SERIALKISSPOLL /dev/rfcomm0 9600\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/rfcomm0", c.misc.kiss_serial_port)
+					a.Equal(0, c.misc.kiss_serial_speed)
+				},
+			},
+			{
+				name:   "it replaces a port configured for a fixed speed, and stops polling when replaced in turn",
+				config: "SERIALKISSPOLL /dev/rfcomm0\nSERIALKISS /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.kiss_serial_port)
+					a.Equal(0, c.misc.kiss_serial_poll)
+				},
+			},
+			{
+				name:   "a missing port name does not eat the next line",
+				config: "SERIALKISSPOLL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.kiss_serial_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// SMARTBEACONING is not ported yet: the handler only says so.  These cases
+		// pin that down, so that the day it works the tests fail rather than the
+		// operator's tracker quietly not smart beaconing.
+		"SMARTBEACON": {
+			{
+				name:   "the line is skipped and said to be skipped",
+				config: "MYCALL Q1TEST\nSMARTBEACON 60 180 5 1800 15 30 255\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.sb_configured)
+					a.Contains(c.output, "SMARTBEACONING support currently disabled")
+				},
+			},
+			{
+				name:   "it does not eat the next line",
+				config: "SMARTBEACON 60 180 5 1800 15 30 255\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"SMARTBEACONING": {
+			{
+				name:   "the longer name is the same handler, and just as unported",
+				config: "MYCALL Q1TEST\nSMARTBEACONING 60 180 5 1800 15 30 255\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.False(c.misc.sb_configured)
+					a.Contains(c.output, "SMARTBEACONING support currently disabled")
+				},
+			},
+		},
+		"SPEECH": {
+			{
+				name:   "a script name is accepted and does not derail the next line",
+				config: "SPEECH /bin/echo\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a missing script name does not eat the next line",
+				config: "SPEECH\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the port left the assignment commented out, so the
+			// script was read, checked for being present, and thrown away.  xmit
+			// skips speaking when tts_script is empty, so SPEECH did nothing at all.
+			{
+				name:   "the script is stored",
+				config: "SPEECH /bin/echo\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/bin/echo", c.audio.tts_script)
+				},
+			},
+			{
+				name:   "a script name with spaces can be quoted",
+				config: "SPEECH \"/usr/local/bin/say it\"\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/usr/local/bin/say it", c.audio.tts_script)
+				},
+			},
+			{
+				name:   "no SPEECH leaves nothing to speak with",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.tts_script)
+				},
+			},
+			{
+				name:   "a missing script name leaves nothing to speak with",
+				config: "SPEECH\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.audio.tts_script)
+				},
+			},
+		},
+		"TBEACON": {
+			{
+				name:   "a tracker beacon takes its position from the GPS, not the line",
+				config: "MYCALL Q1TEST\nTBEACON EVERY=0:30\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.misc.num_beacons)
+					a.Equal(BEACON_TRACKER, c.misc.beacon[0].btype)
+					a.Equal(30, c.misc.beacon[0].every)
+				},
+			},
+		},
+		"TTAMBIG": {
+			{
+				name:   "a pattern of exactly one x is stored",
+				config: "TTAMBIG B3x\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_AMBIG, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B3x", c.tt.ttlocs[0].pattern)
+				},
+			},
+			{
+				name:   "no TTAMBIG means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "the extra button is optional",
+				config: "TTAMBIG Bx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+				},
+			},
+			{
+				name:   "more than one x is rejected",
+				config: "TTAMBIG B3xx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must end with exactly one x")
+				},
+			},
+			{
+				name:   "a pattern that does not begin with B is rejected",
+				config: "TTAMBIG C3x\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "a missing pattern does not eat the next line",
+				config: "TTAMBIG\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTCMD": {
+			{
+				name:   "the command is the rest of the line",
+				config: "TTCMD /usr/local/bin/ttcmd --verbose\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/usr/local/bin/ttcmd --verbose", c.tt.ttcmd)
+				},
+			},
+			{
+				name:   "no TTCMD means no command is run",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttcmd)
+				},
+			},
+			{
+				name:   "a later line replaces the command",
+				config: "TTCMD /usr/local/bin/first\nTTCMD /usr/local/bin/second\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/usr/local/bin/second", c.tt.ttcmd)
+				},
+			},
+			{
+				name:   "a missing command does not eat the next line",
+				config: "TTCMD\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttcmd)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTCORRAL": {
+			{
+				name:   "a latitude, longitude and offset are stored",
+				config: "TTCORRAL 42^37.14N 71^20.83W 0^0.30\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.InDelta(42.6190, c.tt.corral_lat, 0.001)
+					a.InDelta(-71.3472, c.tt.corral_lon, 0.001)
+					a.InDelta(0.005, c.tt.corral_offset, 0.001)
+					a.Equal(0, c.tt.corral_ambiguity)
+				},
+			},
+			{
+				name:   "no TTCORRAL leaves no corral",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.tt.corral_lat)
+					a.Zero(c.tt.corral_lon)
+				},
+			},
+			{
+				// 1, 2 and 3 in the third field ask for position ambiguity rather
+				// than an offset.
+				name:   "a small whole number is an ambiguity, not an offset",
+				config: "TTCORRAL 42^37.14N 71^20.83W 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(2, c.tt.corral_ambiguity)
+					a.Zero(c.tt.corral_offset)
+				},
+			},
+			{
+				name:   "a missing longitude does not eat the next line",
+				config: "TTCORRAL 42^37.14N\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.tt.corral_lon)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a missing offset does not eat the next line",
+				config: "TTCORRAL 42^37.14N 71^20.83W\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Zero(c.tt.corral_offset)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// Every response starts out as a Morse "?", so a rejected line is one that
+		// leaves that in place.
+		"TTERR": {
+			{
+				name:   "a response method and text are stored against the message",
+				config: "TTERR BAD_CHECKSUM MORSE Checksum error\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("MORSE", c.tt.response[TT_ERROR_BAD_CHECKSUM].method)
+					a.Equal("Checksum error", c.tt.response[TT_ERROR_BAD_CHECKSUM].mtext)
+				},
+			},
+			{
+				name:   "the defaults are a Morse question mark, and R for success",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("MORSE", c.tt.response[TT_ERROR_BAD_CHECKSUM].method)
+					a.Equal("?", c.tt.response[TT_ERROR_BAD_CHECKSUM].mtext)
+					a.Equal("R", c.tt.response[TT_ERROR_OK].mtext)
+				},
+			},
+			{
+				name:   "SPEECH is the other method",
+				config: "TTERR NO_CALL SPEECH No call sign\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("SPEECH", c.tt.response[TT_ERROR_NO_CALL].method)
+					a.Equal("No call sign", c.tt.response[TT_ERROR_NO_CALL].mtext)
+				},
+			},
+			{
+				name:   "the identifier and method are not case sensitive",
+				config: "TTERR no_call speech No call sign\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("SPEECH", c.tt.response[TT_ERROR_NO_CALL].method)
+				},
+			},
+			{
+				name:   "an unknown message identifier is rejected",
+				config: "TTERR NOT_A_MESSAGE MORSE Some text\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "Invalid message identifier")
+				},
+			},
+			{
+				name:   "a method that is neither SPEECH nor MORSE leaves the default",
+				config: "TTERR NO_CALL FLAGS Some text\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("MORSE", c.tt.response[TT_ERROR_NO_CALL].method)
+					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Contains(c.output, "must be SPEECH or MORSE")
+				},
+			},
+			{
+				// The method goes through the AX.25 address parser, which has its
+				// own ideas about length.
+				name:   "a method too long to be an AX.25 address is rejected",
+				config: "TTERR NO_CALL SEMAPHORE Some text\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Contains(c.output, "has more than 6 characters")
+				},
+			},
+			{
+				name:   "a missing response text leaves the default",
+				config: "TTERR NO_CALL SPEECH\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("?", c.tt.response[TT_ERROR_NO_CALL].mtext)
+					a.Contains(c.output, "Missing response text")
+				},
+			},
+			{
+				name:   "a missing identifier does not eat the next line",
+				config: "TTERR\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTGRID": {
+			{
+				name:   "a pattern and the corners of the grid are stored",
+				config: "TTGRID B2xxyy 37^50.00N 81^00.00W 37^59.99N 81^09.99W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_GRID, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B2xxyy", c.tt.ttlocs[0].pattern)
+					a.InDelta(37.8333, c.tt.ttlocs[0].grid.lat0, 0.001)
+					a.InDelta(-81.0, c.tt.ttlocs[0].grid.lon0, 0.001)
+					a.InDelta(37.9998, c.tt.ttlocs[0].grid.lat9, 0.001)
+					a.InDelta(-81.1665, c.tt.ttlocs[0].grid.lon9, 0.001)
+				},
+			},
+			{
+				name:   "a pattern with something other than digits, x and y is reported",
+				config: "TTGRID B2xxzz 42N 71W 43N 72W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "must be B, optional digit, xxx, yyy")
+				},
+			},
+			{
+				name:   "a missing corner leaves no location and does not eat the next line",
+				config: "TTGRID B2xxyy 42N 71W 43N\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTMACRO": {
+			{
+				name:   "a pattern and its expansion are stored",
+				config: "TTMACRO xxyyy B9xx*AB1yyy\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_MACRO, c.tt.ttlocs[0].ttlocType)
+					a.Equal("xxyyy", c.tt.ttlocs[0].pattern)
+					a.Equal("B9xx*AB1yyy", c.tt.ttlocs[0].macro.definition)
+				},
+			},
+			{
+				name:   "no TTMACRO means no macros",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "a callsign in braces is converted to tones",
+				config: "TTMACRO 911 B9AC{Q1TEST}\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.NotContains(c.tt.ttlocs[0].macro.definition, "{")
+					a.Contains(c.tt.ttlocs[0].macro.definition, "AC")
+				},
+			},
+			{
+				name:   "an object name in braces is converted to tones",
+				config: "TTMACRO 912 B9AA{FIRETRUCK}\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.NotContains(c.tt.ttlocs[0].macro.definition, "{")
+				},
+			},
+			{
+				name:   "an unclosed brace is reported",
+				config: "TTMACRO 913 B9AC{Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "is missing matching }")
+				},
+			},
+			{
+				name:   "a pattern with unusable characters is reported and skipped",
+				config: "TTMACRO 9w1 B9\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "pattern can contain only digits")
+					a.Contains(c.output, "Errors found in TTMACRO, skipping")
+				},
+			},
+			{
+				name:   "a variable field in the pattern that the definition never uses is reported",
+				config: "TTMACRO xxyyy B9xx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "is in TTMACRO pattern but is not used in definition")
+				},
+			},
+			{
+				name:   "a missing definition does not eat the next line",
+				config: "TTMACRO 911\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTMGRS": {
+			{
+				name:   "the other name of the same handler asks for MGRS instead",
+				config: "TTMGRS B5xxxyyy 19TCG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_MGRS, c.tt.ttlocs[0].ttlocType)
+					a.Equal("19TCG", c.tt.ttlocs[0].mgrs.zone)
+				},
+			},
+		},
+		"TTMHEAD": {
+			{
+				name:   "a pattern of six digits' worth of x is stored",
+				config: "TTMHEAD B1xxxxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_MHEAD, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B1xxxxxx", c.tt.ttlocs[0].pattern)
+					a.Empty(c.tt.ttlocs[0].mhead.prefix)
+				},
+			},
+			{
+				name:   "no TTMHEAD means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "a prefix makes up the rest of the digits",
+				config: "TTMHEAD B1xxxxxx 326129\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal("326129", c.tt.ttlocs[0].mhead.prefix)
+				},
+			},
+			{
+				name:   "a pattern with anything but x after the button is rejected",
+				config: "TTMHEAD B1xxyyxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "only lower case x")
+				},
+			},
+			{
+				name:   "a prefix that is not 4, 6 or 10 digits is rejected",
+				config: "TTMHEAD B1xxxxxx 32612\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "prefix must be 4, 6, or 10 digits")
+				},
+			},
+			{
+				name:   "a prefix and pattern that do not add up to a locator are rejected",
+				config: "TTMHEAD B1xxxx 3261\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "total of 4, 6, 10, or 12 digits")
+				},
+			},
+			{
+				name:   "a missing pattern does not eat the next line",
+				config: "TTMHEAD\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTOBJ": {
+			{
+				name:   "a receive and transmit channel enable the gateway",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.tt.gateway_enabled)
+					a.Equal(0, c.tt.obj_recv_chan)
+					a.Equal(1, c.tt.obj_xmit_chan)
+					a.Equal(DTMF_DECODE_ON, c.audio.achan[0].dtmf_decode)
+				},
+			},
+			{
+				name:   "no TTOBJ leaves the gateway off",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+				},
+			},
+			{
+				name:   "APP and IG can be asked for instead of a channel",
+				config: "MYCALL Q1TEST\nTTOBJ 0 APP,IG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.tt.obj_send_to_app)
+					a.Equal(1, c.tt.obj_send_to_ig)
+					a.Equal(-1, c.tt.obj_xmit_chan)
+				},
+			},
+			{
+				name:   "a via path is stored",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1 WIDE1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("WIDE1-1", c.tt.obj_xmit_via)
+				},
+			},
+			{
+				name:   "an unusable via path is rejected but the rest of the line stands",
+				config: "MYCALL Q1TEST\nACHANNELS 2\nTTOBJ 0 1 WIDE1-1-1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.tt.gateway_enabled)
+					a.Empty(c.tt.obj_xmit_via)
+					a.Contains(c.output, "invalid via path")
+				},
+			},
+			{
+				name:   "a receive channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nTTOBJ 1 0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Contains(c.output, "DTMF receive channel 1 is not valid")
+				},
+			},
+			{
+				name:   "a transmit channel that is not a radio channel is rejected",
+				config: "MYCALL Q1TEST\nTTOBJ 0 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Contains(c.output, "transmit channel 1 is not valid")
+				},
+			},
+			{
+				name:   "something that is neither a channel, APP nor IG is rejected",
+				config: "MYCALL Q1TEST\nTTOBJ 0 SOMEWHERE\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Contains(c.output, "Expected comma separated list")
+				},
+			},
+			{
+				name:   "a missing transmit destination does not eat the next line",
+				config: "TTOBJ 0\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(0, c.tt.gateway_enabled)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTPOINT": {
+			{
+				name:   "a pattern and its position are stored",
+				config: "TTPOINT B01 37^55.37N 81^7.86W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_POINT, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B01", c.tt.ttlocs[0].pattern)
+					a.InDelta(37.9228, c.tt.ttlocs[0].point.lat, 0.001)
+					a.InDelta(-81.1310, c.tt.ttlocs[0].point.lon, 0.001)
+				},
+			},
+			{
+				name:   "no TTPOINT means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "several points accumulate",
+				config: "TTPOINT B01 37^55.37N 81^7.86W\nTTPOINT B02 42N 71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 2)
+					a.Equal("B02", c.tt.ttlocs[1].pattern)
+				},
+			},
+			{
+				// The pattern is reported but still used, as it is upstream.
+				name:   "a pattern that does not begin with B is reported",
+				config: "TTPOINT C01 42N 71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "a pattern with something other than digits after the B is reported",
+				config: "TTPOINT B0x 42N 71W\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "must be B and digits only")
+				},
+			},
+			{
+				name:   "a missing longitude leaves no location and does not eat the next line",
+				config: "TTPOINT B01 42N\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTSATSQ": {
+			{
+				name:   "a pattern of exactly four x is stored",
+				config: "TTSATSQ B2xxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_SATSQ, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B2xxxx", c.tt.ttlocs[0].pattern)
+				},
+			},
+			{
+				name:   "no TTSATSQ means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "the extra button is optional",
+				config: "TTSATSQ Bxxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+				},
+			},
+			{
+				name:   "a pattern with the wrong number of x is rejected",
+				config: "TTSATSQ B2xxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must end with exactly xxxx")
+				},
+			},
+			{
+				name:   "a pattern that does not begin with B is rejected",
+				config: "TTSATSQ C2xxxx\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "a missing pattern does not eat the next line",
+				config: "TTSATSQ\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// Statuses 1 to 9 start out as the standard APRS ones, so a rejected line is
+		// one that leaves the default in place.
+		"TTSTATUS": {
+			{
+				name:   "a status number and its text are stored",
+				config: "TTSTATUS 2 Emergency\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Emergency", c.tt.status[2])
+				},
+			},
+			{
+				name:   "the defaults are the standard APRS statuses",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/enroute", c.tt.status[2])
+					a.Empty(c.tt.status[0])
+				},
+			},
+			{
+				name:   "the text is the rest of the line, trimmed",
+				config: "TTSTATUS 3   Out for lunch  \n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Out for lunch", c.tt.status[3])
+				},
+			},
+			{
+				name:   "a status number outside 1 to 9 is rejected",
+				config: "TTSTATUS 0 Nothing\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.status[0])
+					a.Contains(c.output, "must be in range of 1 to 9")
+				},
+			},
+			{
+				name:   "an unreadable status number is rejected",
+				config: "TTSTATUS two Emergency\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/enroute", c.tt.status[2])
+					a.Contains(c.output, "must be in range of 1 to 9")
+				},
+			},
+			{
+				name:   "a missing status text leaves the default",
+				config: "TTSTATUS 2\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/enroute", c.tt.status[2])
+					a.Contains(c.output, "Missing status text")
+				},
+			},
+			{
+				name:   "a missing status number does not eat the next line",
+				config: "TTSTATUS\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		// TTUSNG and TTMGRS are one handler, keyed on the keyword.
+		"TTUSNG": {
+			{
+				name:   "a pattern and zone square are stored",
+				config: "TTUSNG B5xxxyyy 19TCG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_USNG, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B5xxxyyy", c.tt.ttlocs[0].pattern)
+					a.Equal("19TCG", c.tt.ttlocs[0].mgrs.zone)
+				},
+			},
+			{
+				name:   "no TTUSNG means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				name:   "a pattern with a different number of x and y is rejected",
+				config: "TTUSNG B5xxyyy 19TCG\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must have 1 to 5 x and same number y")
+				},
+			},
+			{
+				name:   "a zone square that cannot be converted is rejected",
+				config: "TTUSNG B5xxxyyy 99ZZZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid USNG/MGRS zone & square")
+				},
+			},
+			{
+				name:   "anything after the zone square is reported and ignored",
+				config: "TTUSNG B5xxxyyy 19TCG extra\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Contains(c.output, "Unexpected stuff at end ignored")
+				},
+			},
+			{
+				name:   "a missing zone square does not eat the next line",
+				config: "TTUSNG B5xxxyyy\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTUTM": {
+			{
+				name:   "a pattern, zone, scale and offsets are stored",
+				config: "TTUTM B6xxxyyy 19T 10 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_UTM, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B6xxxyyy", c.tt.ttlocs[0].pattern)
+					a.Equal(19, c.tt.ttlocs[0].utm.lzone)
+					a.InDelta(10.0, c.tt.ttlocs[0].utm.scale, 0.001)
+					a.InDelta(300000.0, c.tt.ttlocs[0].utm.x_offset, 0.001)
+					a.InDelta(4500000.0, c.tt.ttlocs[0].utm.y_offset, 0.001)
+				},
+			},
+			{
+				name:   "no TTUTM means no touch tone locations",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+				},
+			},
+			{
+				// The handler converts a sample position to see whether real ones
+				// will convert later.  With no offsets the easting is a few metres,
+				// which is nowhere, so the line would be no use.
+				name:   "a zone with no offsets is rejected as unconvertible",
+				config: "TTUTM B6xxxyyy 19T\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid UTM location")
+				},
+			},
+			{
+				name:   "the southern hemisphere comes from the latitude band",
+				config: "TTUTM B6xxxyyy 19H 10 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal('S', c.tt.ttlocs[0].utm.hemi)
+				},
+			},
+			{
+				name:   "a pattern that does not begin with B leaves no location",
+				config: "TTUTM C6xxxyyy 19T 10 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "must begin with upper case 'B'")
+				},
+			},
+			{
+				name:   "an unreadable scale leaves no location",
+				config: "TTUTM B6xxxyyy 19T ten 300000 4500000\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid scale")
+				},
+			},
+			{
+				name:   "a missing zone does not eat the next line",
+				config: "TTUTM B6xxxyyy\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TTVECTOR": {
+			{
+				name:   "a pattern, origin and scale are stored, with the scale in metres",
+				config: "TTVECTOR B5bbbddd 37^55.37N 81^7.86W 0.01 mi\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.Equal(TTLOC_VECTOR, c.tt.ttlocs[0].ttlocType)
+					a.Equal("B5bbbddd", c.tt.ttlocs[0].pattern)
+					a.InDelta(37.9228, c.tt.ttlocs[0].vector.lat, 0.001)
+					a.InDelta(16.09344, c.tt.ttlocs[0].vector.scale, 0.001)
+				},
+			},
+			{
+				name:   "a pattern without the usual 5bbb is reported",
+				config: "TTVECTOR Bbbbddd 42N 71W 0.01 mi\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Contains(c.output, "would normally contain")
+				},
+			},
+			{
+				name:   "an unrecognised unit falls back to miles",
+				config: "TTVECTOR B5bbbddd 42N 71W 1 furlongs\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Len(c.tt.ttlocs, 1)
+					a.InDelta(1609.344, c.tt.ttlocs[0].vector.scale, 0.001)
+					a.Contains(c.output, "Unrecognized unit")
+				},
+			},
+			{
+				name:   "an unreadable scale leaves no location",
+				config: "TTVECTOR B5bbbddd 42N 71W wide mi\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Contains(c.output, "Invalid scale")
+				},
+			},
+			{
+				name:   "a missing unit leaves no location and does not eat the next line",
+				config: "TTVECTOR B5bbbddd 42N 71W 0.01\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.tt.ttlocs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"TXINH": {
+			{
+				name:   "a GPIO number becomes the transmit inhibit input",
+				config: "TXINH GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal(25, c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
+					a.False(c.audio.achan[0].ictrl[ICTYPE_TXINH].invert)
+				},
+			},
+			{
+				name:   "a negative GPIO number is the same line, active low",
+				config: "TXINH GPIO -25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal(25, c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
+					a.True(c.audio.achan[0].ictrl[ICTYPE_TXINH].invert)
+				},
+			},
+			{
+				name:   "the type name is not case sensitive",
+				config: "TXINH gpio 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+				},
+			},
+			{
+				name:   "no TXINH means nothing can hold off the transmitter",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nTXINH GPIO 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal(PTT_METHOD_GPIO, c.audio.achan[1].ictrl[ICTYPE_TXINH].method)
+				},
+			},
+			{
+				name:   "a missing type name does not eat the next line",
+				config: "TXINH\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			{
+				name:   "a missing GPIO number leaves the input unconfigured",
+				config: "TXINH GPIO\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the number went through an Atoi whose error was
+			// ignored, so "TXINH GPIO ab" configured GPIO 0 as the transmit inhibit
+			// input.  Whatever that pin happens to be doing then decides whether the
+			// station may transmit at all.
+			{
+				name:   "an unreadable GPIO number leaves the input unconfigured",
+				config: "TXINH GPIO twentyfive\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Zero(c.audio.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num)
+				},
+			},
+			// Regression test: an input type other than GPIO fell through the
+			// handler without a word, so a typo left the transmitter with nothing
+			// holding it off and nothing said about it.
+			{
+				name:   "an unrecognised input type is reported",
+				config: "TXINH SERIAL 25\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(PTT_METHOD_NONE, c.audio.achan[0].ictrl[ICTYPE_TXINH].method)
+					a.Contains(c.output, "Unrecognized input type name")
+				},
+			},
+		},
+		"TXTAIL": {
+			{
+				name:   "a valid time is stored",
+				config: "TXTAIL 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "no TXTAIL leaves the default",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "it applies to the current channel only",
+				config: "ACHANNELS 2\nCHANNEL 1\nTXTAIL 20\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+					a.Equal(20, c.audio.achan[1].txtail)
+				},
+			},
+			{
+				name:   "an ill-advised but usable time is still stored, with a warning",
+				config: "TXTAIL 1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(1, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "a time beyond the byte it is sent in falls back to the default",
+				config: "TXTAIL 256\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "a negative time falls back to the default",
+				config: "TXTAIL -1\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+				},
+			},
+			{
+				name:   "a missing time does not eat the next line",
+				config: "TXTAIL\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(DEFAULT_TXTAIL, c.audio.achan[0].txtail)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+			// Regression test: the value went through an Atoi whose error was
+			// ignored, so "TXTAIL abc" read as 0 - in range, and a transmit tail of
+			// nothing at all - rather than being rejected.
+			{
+				name:   "an unreadable time leaves the configured one alone",
+				config: "TXTAIL 20\nTXTAIL abc\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(20, c.audio.achan[0].txtail)
+				},
+			},
+		},
+		"V20": {
+			{
+				name:   "an address is stored",
+				config: "V20 Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST"}, c.misc.v20_addrs)
+					a.Equal(1, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "no V20 means every station is offered v2.2 first",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.v20_addrs)
+					a.Equal(0, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "several addresses on one line are all stored",
+				config: "V20 Q1TEST Q2TEST-5\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST-5"}, c.misc.v20_addrs)
+					a.Equal(2, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "repeated lines are cumulative",
+				config: "V20 Q1TEST\nV20 Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q1TEST", "Q2TEST"}, c.misc.v20_addrs)
+					a.Equal(2, c.misc.v20_count)
+				},
+			},
+			{
+				name:   "an unusable address is rejected and the rest of the line still counts",
+				config: "V20 Q1TEST-99 Q2TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal([]string{"Q2TEST"}, c.misc.v20_addrs)
+					a.Equal(1, c.misc.v20_count)
+					a.Contains(c.output, "Invalid station address for V20")
+				},
+			},
+			{
+				name:   "a missing address does not eat the next line",
+				config: "V20\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.v20_addrs)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+		"WAYPOINT": {
+			{
+				name:   "a serial port is stored",
+				config: "WAYPOINT /dev/ttyS0\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("/dev/ttyS0", c.misc.waypoint_serial_port)
+					a.Empty(c.misc.waypoint_udp_hostname)
+					a.Zero(c.misc.waypoint_formats)
+				},
+			},
+			{
+				name:   "no WAYPOINT means no waypoints are sent anywhere",
+				config: "MYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.waypoint_serial_port)
+					a.Empty(c.misc.waypoint_udp_hostname)
+				},
+			},
+			{
+				name:   "a host and UDP port are split out",
+				config: "WAYPOINT mapper.example.com:8123\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("mapper.example.com", c.misc.waypoint_udp_hostname)
+					a.Equal(8123, c.misc.waypoint_udp_portnum)
+					a.Empty(c.misc.waypoint_serial_port)
+				},
+			},
+			{
+				name:   "a port with no host in front of it means this machine",
+				config: "WAYPOINT :8123\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal("localhost", c.misc.waypoint_udp_hostname)
+					a.Equal(8123, c.misc.waypoint_udp_portnum)
+				},
+			},
+			{
+				name:   "the formats after the device are all enabled",
+				config: "WAYPOINT /dev/ttyS0 NGA\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(WPL_FORMAT_NMEA_GENERIC|WPL_FORMAT_GARMIN|WPL_FORMAT_AIS,
+						c.misc.waypoint_formats)
+				},
+			},
+			{
+				name:   "format letters may be lower case and separated by commas",
+				config: "WAYPOINT /dev/ttyS0 m,k\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(WPL_FORMAT_MAGELLAN|WPL_FORMAT_KENWOOD, c.misc.waypoint_formats)
+				},
+			},
+			{
+				name:   "an unrecognised format letter is reported and the rest still apply",
+				config: "WAYPOINT /dev/ttyS0 NX\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Equal(WPL_FORMAT_NMEA_GENERIC, c.misc.waypoint_formats)
+					a.Contains(c.output, "Invalid output format")
+				},
+			},
+			{
+				name:   "an out-of-range UDP port is rejected",
+				config: "WAYPOINT mapper.example.com:99999\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.waypoint_udp_hostname)
+					a.Zero(c.misc.waypoint_udp_portnum)
+					a.Contains(c.output, "Invalid UDP port number")
+				},
+			},
+			{
+				name:   "a missing device does not eat the next line",
+				config: "WAYPOINT\nMYCALL Q1TEST\n",
+				check: func(a *assert.Assertions, c configs) {
+					a.Empty(c.misc.waypoint_serial_port)
+					a.Equal("Q1TEST", c.audio.mycall[0])
+				},
+			},
+		},
+	}
+}
+
+func Test_config_directives(t *testing.T) {
+	for keyword, cases := range directiveTests() {
+		t.Run(keyword, func(t *testing.T) {
+			for _, tc := range cases {
+				t.Run(tc.name, func(t *testing.T) {
+					tc.check(assert.New(t), parseConfig(t, tc.config))
+				})
+			}
+		})
+	}
+}
+
+// directivesTestedSeparately names the keywords whose tests predate the table,
+// and the test that covers each of them.
+func directivesTestedSeparately() map[string]string {
+	return map[string]string{
+		"AGWLOGIN":    "Test_config_init_agwlogin",
+		"AGWPORT":     "Test_config_init_agwport",
+		"CFILTER":     "Test_config_init_cfilter_syntax_validation",
+		"CHANNEL":     "Test_config_init_channel",
+		"DNSSD":       "Test_config_init_dnssd",
+		"FILTER":      "Test_config_init_filter_syntax_validation",
+		"FIX_BITS":    "Test_config_init_fix_bits",
+		"FRACK":       "Test_config_init_frack",
+		"IL2PVERSION": "Test_config_init_il2pversion",
+		"KISSPORT":    "Test_config_init_kissport",
+		"METRICSPORT": "Test_config_init_metricsport",
+		"MODEM":       "Test_config_init_modem_directive",
+		"MYCALL":      "Test_config_init_mycall",
+		"PBEACON":     "Test_config_init_pbeacon_no_options",
+		"SLOTTIME":    "Test_config_init_slottime",
+		"TXDELAY":     "Test_config_init_txdelay",
+	}
+}
+
+func Test_config_directive_coverage(t *testing.T) {
+	var tested = directivesTestedSeparately()
+	var table = directiveTests()
+
+	for keyword := range configHandlers {
+		if len(table[keyword]) == 0 && tested[keyword] == "" {
+			t.Errorf("directive %s has no tests: give it a directiveTests entry", keyword)
+		}
+	}
+
+	// A name that is not a directive at all comes out of either list, so a
+	// mistyped one cannot sit there looking like coverage while testing nothing.
+	for keyword := range table {
+		assert.Contains(t, configHandlers, keyword,
+			"%s has table tests but is not a directive", keyword)
+	}
+
+	for keyword := range tested {
+		assert.Contains(t, configHandlers, keyword,
+			"%s is listed as tested elsewhere but is not a directive", keyword)
+	}
+
+	// The test named for each of those is a claim about this package, so hold it
+	// to the source: a renamed or deleted test would otherwise leave the
+	// directive looking covered by a test that no longer exists.
+	var sources = packageTestSource(t)
+
+	for keyword, name := range tested {
+		assert.Contains(t, sources, "func "+name+"(t *testing.T)",
+			"%s is listed as tested by %s, which does not exist", keyword, name)
+	}
+}
+
+// packageTestSource returns every _test.go file in this package, concatenated.
+func packageTestSource(t *testing.T) string {
+	t.Helper()
+
+	var names, err = filepath.Glob("*_test.go")
+	require.NoError(t, err)
+	require.NotEmpty(t, names)
+
+	var all strings.Builder
+
+	for _, name := range names {
+		var content, readErr = os.ReadFile(name) //nolint:gosec // The names come from a glob of this package's own directory
+		require.NoError(t, readErr)
+		all.Write(content)
+	}
+
+	return all.String()
 }
