@@ -24,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/spf13/pflag"
 )
@@ -75,8 +76,22 @@ type session struct {
 	ttLength    int // Bytes in info part.
 	ttNext      int // Next sequence to send.
 
-	txQueueLen int // Number in transmit queue.  For flow control.
+	// txQueueLen is how many frames the TNC still holds for this station, as
+	// of the last 'Y' reply.  Nothing until one has arrived, which is not the
+	// same as an empty queue: mistaking it for one disconnects a station
+	// before its farewell has gone out.
+	txQueueLen maybe.Maybe[int]
+
+	// byeDeadline is set when the user says "bye".  The main loop disconnects
+	// once the transmit queue has drained - so we know the farewell arrived -
+	// or once the deadline passes, whichever comes first.  Nothing when no
+	// disconnect is pending.
+	byeDeadline maybe.Maybe[time.Time]
 }
+
+// byeDrainTimeout caps how long a pending "bye" waits for the other station to
+// acknowledge the farewell before we disconnect regardless.
+const byeDrainTimeout = 10 * time.Second
 
 // appServer.sessions is read and written both from the main loop (poll)
 // and from the agwlib callback goroutine (agw_cb_* functions started by agwlib_init),
@@ -256,9 +271,10 @@ func (srv *appServer) poll() {
 func (s *session) poll() {
 	s.mu.Lock()
 	var timingTest = s.ttCount != 0
+	var goodbye = s.byeDeadline.IsJust()
 	s.mu.Unlock()
 
-	if !timingTest {
+	if !timingTest && !goodbye {
 		return
 	}
 
@@ -267,14 +283,53 @@ func (s *session) poll() {
 	agwlib_Y_outstanding_frames_for_station(s.channel, s.localCall, s.addr)
 	direwolf.SLEEP_MS(10)
 
-	s.pollTimingTest()
+	if timingTest {
+		s.pollTimingTest()
+	}
+
+	if goodbye {
+		s.pollBye()
+	}
+}
+
+// pollBye disconnects a station that said "bye", once everything we sent it has
+// been acknowledged - or once it is clear that it never will be.
+func (s *session) pollBye() {
+	s.mu.Lock()
+
+	var deadline, pending = s.byeDeadline.Get()
+	if !pending {
+		s.mu.Unlock()
+
+		return
+	}
+
+	// Only a queue length the TNC has actually reported counts as drained.
+	var drained = s.txQueueLen == maybe.Just(0)
+
+	if !drained && time.Now().Before(deadline) {
+		s.mu.Unlock()
+
+		return // farewell not acknowledged yet.
+	}
+
+	s.byeDeadline = maybe.Nothing[time.Time]()
+
+	s.mu.Unlock()
+
+	agwlib_d_disconnect(s.channel, s.localCall, s.addr)
 }
 
 func (s *session) pollTimingTest() {
 	s.mu.Lock()
 
+	// Unlike the disconnect, the test reads an unreported queue as empty, which
+	// is what it did before there was anything else to read: the worst that
+	// costs it is a first second of frames sent without flow control.
+	var queued = maybe.FromMaybe(0, s.txQueueLen)
+
 	if s.ttNext <= s.ttCount {
-		if s.txQueueLen > 128 {
+		if queued > 128 {
 			s.mu.Unlock()
 
 			return // enough queued up for now.
@@ -304,7 +359,7 @@ func (s *session) pollTimingTest() {
 
 	// All done queuing up the packets.
 	// Wait until they have all been sent and ack'ed by other end.
-	if s.txQueueLen > 0 {
+	if queued > 0 {
 		s.mu.Unlock()
 
 		return // not done yet.
@@ -582,15 +637,19 @@ func cmd_test(s *session, channel byte, call_to Callsign, call_from Callsign, re
 	s.ttCount = count
 }
 
-// cmd_bye disconnects the user.
+// cmd_bye says farewell and hands the disconnect to the main loop, which waits
+// for the outgoing queue to drain before pulling the link down.  We are on the
+// listener goroutine here, and every session on every channel shares it, so
+// waiting for anything at all would freeze the lot of them.
 func cmd_bye(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
-	var greeting = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
+	var farewell = "Thank you folks for kindly droppin' in.  Y'all come on back now, ya hear?\r"
 
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
-	// Ideally we'd want to wait until nothing in the outgoing queue
-	// to that station so we know the message was received.
-	direwolf.SLEEP_SEC(10)
-	agwlib_d_disconnect(channel, call_to, call_from)
+	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(farewell))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.byeDeadline = maybe.Just(time.Now().Add(byeDrainTimeout))
 }
 
 // cmd_help prints help text.
@@ -685,7 +744,7 @@ func agw_cb_Y_outstanding_frames_for_station(channel byte, call_from Callsign, c
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.txQueueLen = frame_count
+	s.txQueueLen = maybe.Just(frame_count)
 } /* end agw_cb_Y_outstanding_frames_for_station */
 
 // BytesCut is strings.Cut for []bytes.
