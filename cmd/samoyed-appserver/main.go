@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -536,12 +537,84 @@ func agw_cb_d_disconnected(channel byte, call_from Callsign, call_to Callsign, d
 // commandHandler implements one connected-mode user command (e.g. "who", "bye").
 type commandHandler func(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte)
 
-var commandTable = map[string]commandHandler{
-	"who":  cmd_who,
-	"test": cmd_test,
-	"bye":  cmd_bye,
-	"help": cmd_help,
-	"?":    cmd_help,
+// command is one user command, along with what "?" and "HELP" say about it.
+type command struct {
+	name    string   // What the user types.  Lower case; input is folded to match.
+	aliases []string // Other names for the same command.
+	usage   string   // Name and arguments, for the command list.
+	summary string   // One line, for the command list.
+	detail  []string // What "HELP <command>" prints.
+	handler commandHandler
+}
+
+// userCommands returns the commands, in the order "?" lists them.  It is a
+// function rather than a package variable so that cmd_help, which is one of the
+// handlers here, can read the table it appears in.
+func userCommands() []command {
+	return []command{
+		{
+			name:    "bye",
+			aliases: nil,
+			usage:   "BYE",
+			summary: "Disconnect.",
+			detail: []string{
+				"BYE",
+				"Say goodbye and hang up.  The link stays up until everything queued",
+				"for you has been acknowledged, so nothing gets cut off.",
+			},
+			handler: cmd_bye,
+		},
+		{
+			name:    "help",
+			aliases: []string{"?"},
+			usage:   "HELP <command>",
+			summary: "Describe one command.",
+			detail: []string{
+				"HELP <command>",
+				"Describe one command.  With nothing after it, or as ?, list them all.",
+			},
+			handler: cmd_help,
+		},
+		{
+			name:    "test",
+			aliases: nil,
+			usage:   "TEST [count [length]]",
+			summary: "Measure throughput.",
+			detail: []string{
+				"TEST [count [length]]",
+				"Send count frames of length bytes each, then report how long it took",
+				"and how close that came to the channel's bit rate.  count defaults to",
+				"1 and length to 256; length is clamped to between 16 and 2048 bytes.",
+			},
+			handler: cmd_test,
+		},
+		{
+			name:    "who",
+			aliases: nil,
+			usage:   "WHO",
+			summary: "List the stations connected now.",
+			detail: []string{
+				"WHO",
+				"List the stations connected to this server, with the channel each one",
+				"came in on and when it connected.",
+			},
+			handler: cmd_who,
+		},
+	}
+}
+
+// lookupCommand finds the command answering to name, which must be lower case,
+// and returns nil if there is not one.
+func lookupCommand(name string) *command {
+	var cmds = userCommands()
+
+	for n := range cmds {
+		if cmds[n].name == name || slices.Contains(cmds[n].aliases, name) {
+			return &cmds[n]
+		}
+	}
+
+	return nil
 }
 
 func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign, data []byte) {
@@ -573,8 +646,8 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		return
 	}
 
-	var handler, ok = commandTable[strings.ToLower(pcmd)]
-	if !ok {
+	var cmd = lookupCommand(strings.ToLower(pcmd))
+	if cmd == nil {
 		// command not recognized.
 		var greeting = "Invalid command. Type ? for list of commands or HELP <command> for details.\r"
 
@@ -583,8 +656,16 @@ func agw_cb_D_connected_data(channel byte, call_from Callsign, call_to Callsign,
 		return
 	}
 
-	handler(s, channel, call_to, call_from, rest)
+	cmd.handler(s, channel, call_to, call_from, rest)
 } /* end agw_cb_D_connected_data */
+
+// sendLines sends one connected-mode frame per line, each ending with the
+// carriage return AX.25 terminals expect.
+func sendLines(channel byte, call_to Callsign, call_from Callsign, lines []string) {
+	for _, line := range lines {
+		agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(line+"\r"))
+	}
+}
 
 // cmd_who lists people currently logged in.
 func cmd_who(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
@@ -652,11 +733,32 @@ func cmd_bye(s *session, channel byte, call_to Callsign, call_from Callsign, res
 	s.byeDeadline = maybe.Just(time.Now().Add(byeDrainTimeout))
 }
 
-// cmd_help prints help text.
+// cmd_help lists the commands, or describes the one named.
 func cmd_help(s *session, channel byte, call_to Callsign, call_from Callsign, rest []byte) {
-	var greeting = "Help not yet available.\r"
+	var _topic, _, _ = BytesCut(bytes.TrimSpace(rest), ' ')
 
-	agwlib_D_send_connected_data(channel, 0xF0, call_to, call_from, []byte(greeting))
+	var topic = strings.ToLower(string(_topic))
+
+	var topicCommand = lookupCommand(topic)
+
+	var lines []string
+
+	switch {
+	case topic == "":
+		lines = append(lines, "Commands:")
+
+		for _, c := range userCommands() {
+			lines = append(lines, fmt.Sprintf("  %-21s %s", c.usage, c.summary))
+		}
+
+		lines = append(lines, "Type HELP <command> for details.")
+	case topicCommand != nil:
+		lines = topicCommand.detail
+	default:
+		lines = []string{fmt.Sprintf("No such command: %s.  Type ? for the list.", topic)}
+	}
+
+	sendLines(channel, call_to, call_from, lines)
 }
 
 /*-------------------------------------------------------------------

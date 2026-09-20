@@ -276,3 +276,70 @@ func TestByeDisconnectsWhenTheStationStopsAcknowledging(t *testing.T) {
 		t.Error("Did not disconnect after the drain timeout expired")
 	}
 }
+
+// TestHelpListsTheCommands covers the "?" that the greeting points at, which
+// used to answer "Help not yet available."
+func TestHelpListsTheCommands(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	connect(t, tnc)
+
+	for _, command := range []string{"?", "help", "HELP"} {
+		var got = sentText(send(t, tnc, command))
+
+		if strings.Contains(got, "not yet available") {
+			t.Errorf("%q still has no help: %q", command, got)
+		}
+
+		for _, c := range userCommands() {
+			if !strings.Contains(got, c.usage) {
+				t.Errorf("%q did not list %q, got %q", command, c.usage, got)
+			}
+		}
+	}
+}
+
+// TestHelpDescribesOneCommand covers "HELP <command>".
+func TestHelpDescribesOneCommand(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	connect(t, tnc)
+
+	for _, c := range userCommands() {
+		var got = sentText(send(t, tnc, "help "+c.name))
+
+		for _, line := range c.detail {
+			if !strings.Contains(got, line) {
+				t.Errorf("HELP %s did not say %q, got %q", c.name, line, got)
+			}
+		}
+	}
+}
+
+// TestHelpRejectsAnUnknownCommand checks we say so rather than silently
+// printing nothing.
+func TestHelpRejectsAnUnknownCommand(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	connect(t, tnc)
+
+	var got = sentText(send(t, tnc, "help wombat"))
+
+	if !strings.Contains(got, "No such command: wombat") {
+		t.Errorf("HELP for an unknown command said %q", got)
+	}
+}
+
+// TestEveryCommandIsDocumented guards against a command being added to the
+// table without anything for "?" and HELP to say about it.
+func TestEveryCommandIsDocumented(t *testing.T) {
+	for _, c := range userCommands() {
+		if c.usage == "" || c.summary == "" || len(c.detail) == 0 {
+			t.Errorf("Command %q is not documented: %+v", c.name, c)
+		}
+
+		if c.handler == nil {
+			t.Errorf("Command %q has no handler", c.name)
+		}
+	}
+}
