@@ -1082,6 +1082,37 @@ func dl_data_request(E *dlq_item_t) {
 		return
 	}
 
+	// Everything below splits the data into pieces of N1 bytes, which only
+	// gets anywhere if a piece can hold something.  XID negotiation takes the
+	// other end's word for N1, and an XID can ask for less than a byte, so
+	// don't take it on trust here.
+
+	// A V2.0 link just splits the data up, so a byte of N1 is enough to make
+	// progress with.  V2.2 segmentation spends a byte of each piece on the
+	// segment header, and another on the original PID in the first piece, so
+	// it needs three before any data fits - and it divides by N1-1, which is
+	// zero for an N1 of one.
+
+	var smallest_usable_n1 = AX25_N1_PACLEN_MIN
+	if S.modulo != 8 {
+		smallest_usable_n1 = 3
+	}
+
+	if S.n1_paclen < smallest_usable_n1 {
+		logrus.WithFields(logrus.Fields{
+			"channel":   S.channel,
+			"peer":      S.addrs[PEERCALL],
+			"len":       E.txdata.len,
+			"n1_paclen": S.n1_paclen,
+			"needed":    smallest_usable_n1,
+		}).Error("Discarding data for a link whose maximum information field is too small to carry anything")
+
+		cdata_delete(E.txdata)
+		E.txdata = nil
+
+		return
+	}
+
 	// Erratum: Don't do V2.2 segmentation for a V2.0 link.
 	// In this case, we can just split it into multiple frames not exceeding the specified max size.
 	// Hopefully the receiving end treats it like a stream and doesn't care about length of each frame.

@@ -252,3 +252,44 @@ func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
 	assert.Equal(t, g_misc_config_p.retry, list_head.n2_retry)
 	assert.Equal(t, modulo_8, list_head.modulo)
 }
+
+// A link can end up with a maximum information field that nothing will fit
+// in: XID negotiation takes the other end's word for it and an XID can ask
+// for less than a byte, and PACLEN 1 is a configuration anyone can write.
+// Segmenting data to fit either used to divide it into pieces of nothing,
+// for ever, or divide by zero.  Refs #683.
+func TestDataRequestForALinkThatCannotCarryAnything(t *testing.T) {
+	const (
+		MY_CALL    = "Q1TEST"
+		THEIR_CALL = "Q2TEST"
+		CHANNEL    = 0
+	)
+
+	var testCases = []struct {
+		name     string
+		modulo   ax25_modulo_t
+		n1Paclen int
+	}{
+		{"a v2.0 link with no room at all", modulo_8, 0},
+		{"a v2.2 link with no room for a segment header", modulo_128, 1},
+		{"a v2.2 link with no room for data behind the header", modulo_128, 2},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			setupTestEnv(t)
+
+			var S = get_link_handle([AX25_MAX_ADDRS]string{OWNCALL: MY_CALL, PEERCALL: THEIR_CALL}, 2, CHANNEL, 0, true)
+			require.NotNil(t, S)
+
+			S.modulo = testCase.modulo
+			S.n1_paclen = testCase.n1Paclen
+
+			var E = newDataRequest(MY_CALL, THEIR_CALL, CHANNEL, []byte("Testing"))
+
+			runWithTimeout(t, "dl_data_request", func() { dl_data_request(E) })
+
+			assert.Nil(t, E.txdata, "data that cannot be sent should have been discarded")
+		})
+	}
+}
