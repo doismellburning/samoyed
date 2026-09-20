@@ -59,6 +59,20 @@ gotest:
 race:
 	go test $(GOTEST_FLAGS) -race $(SRC_DIRS)
 
+# Go fuzzes one target at a time, so each gets its own invocation, and
+# FUZZTIME is therefore per target rather than for the run as a whole.
+# The seed corpus of every target runs under `make test` regardless.
+FUZZTIME = 30s
+
+.PHONY: fuzz
+fuzz:
+	@for pkg in $$(go list $(SRC_DIRS)); do \
+		for target in $$(go test -list '^Fuzz' $$pkg | grep '^Fuzz'); do \
+			echo "Fuzzing $$target in $$pkg for $(FUZZTIME)..."; \
+			go test -run '^$$$$' -fuzz "^$$target\$$$$" -fuzztime $(FUZZTIME) $$pkg || exit 1; \
+		done; \
+	done
+
 # TODO Better output name, non-PHONY target, docs, etc.
 .PHONY: gotest-bin
 gotest-bin:

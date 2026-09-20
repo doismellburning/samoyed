@@ -87,6 +87,21 @@ jobs:
         if-no-files-found: "error"
         compression-level: 0
 
+  # Fuzzing is the same work whatever the runner, and it takes as long as it is
+  # told to, so it gets a job of its own on one runner rather than adding its
+  # time to each of build_and_test's three.
+  fuzz:
+    runs-on: "ubuntu-latest"
+    steps:
+    - uses: "actions/checkout@v7"
+    - uses: "actions/setup-go@v7"
+      with:
+        go-version: "1.27"
+    - name: "Install dependencies"
+      run: "make setup"
+    - name: "Fuzz the packet decoders"
+      run: "make fuzz"
+
   should_release:
     runs-on: "ubuntu-latest"
     outputs:
@@ -103,7 +118,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.ref == 'refs/heads/main' && needs.should_release.outputs.result == 'true')
-    needs: [generate_version, build_and_test, should_release]
+    needs: [generate_version, build_and_test, fuzz, should_release]
     runs-on: "ubuntu-latest"
     permissions:
       contents: "write"
