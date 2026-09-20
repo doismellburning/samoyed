@@ -120,6 +120,10 @@ func FuzzDecodeAPRS(f *testing.F) {
 	f.Add("0>0::000000000:")
 	f.Add("0>0::000000000:ab")
 
+	// A status report too short for the 6 character Maidenhead locator
+	// form, so the 4 character one is tried with exactly 4 bytes.
+	f.Add("Q1TEST>APDW17:>IO91/#  ")
+
 	f.Fuzz(func(t *testing.T, monitor string) {
 		var pp = ax25_from_text(monitor, addrLenient)
 		if pp == nil {
