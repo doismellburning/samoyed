@@ -93,3 +93,51 @@ func Test_ais_to_object_with_course_and_speed(t *testing.T) {
 
 	assert.Equal(t, ";366730000*111111z4221.60N/07103.60Ws090/021", info)
 }
+
+// --- --config-check summary ---
+
+func Test_reportConfigCheck(t *testing.T) {
+	tests := []struct {
+		name     string
+		errors   int
+		warnings int
+		want     string
+	}{
+		{
+			name:     "a clean file says so rather than counting nothing",
+			errors:   0,
+			warnings: 0,
+			want:     "\nConfiguration file dw.conf: no problems found.\n",
+		},
+		{
+			name:     "one of each is singular",
+			errors:   1,
+			warnings: 1,
+			want:     "\nConfiguration file dw.conf: 1 error, 1 warning.\n",
+		},
+		{
+			name:     "several of each are plural",
+			errors:   3,
+			warnings: 2,
+			want:     "\nConfiguration file dw.conf: 3 errors, 2 warnings.\n",
+		},
+		{
+			// Warnings do not fail the check, but they are still worth saying
+			// out loud - so a file with only warnings is not "no problems".
+			name:     "warnings alone are still reported",
+			errors:   0,
+			warnings: 1,
+			want:     "\nConfiguration file dw.conf: 0 errors, 1 warning.\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output = CaptureOutput(t, func() {
+				reportConfigCheck("dw.conf", tt.errors, tt.warnings)
+			})
+
+			assert.Equal(t, tt.want, output)
+		})
+	}
+}

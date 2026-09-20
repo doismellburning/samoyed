@@ -96,6 +96,8 @@ func DirewolfMain(ctx context.Context) {
 
 	var audioStatsInterval = pflag.IntP("audio-stats-interval", "a", 0, "Audio statistics interval in seconds.  0 to disable.")
 	var configFileName = pflag.StringP("config-file", "c", "direwolf.conf", "Configuration file name.")
+	// Long option only - every single letter is taken.
+	var configCheck = pflag.Bool("config-check", false, "Check the configuration file and exit, without starting anything up.  Exit status is non-zero if it has errors in it.")
 	var enablePseudoTerminal = pflag.BoolP("enable-ptty", "p", false, "Enable pseudo terminal for KISS protocol.")
 	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
 300 bps defaults to AFSK tones of 1600 & 1800.
@@ -313,7 +315,20 @@ x = Silence FX.25 information.`)
 	var cdigi_config cdigi_config_s
 	var igate_config igate_config_s
 
-	config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+	var configErrors, configWarnings = config_init(*configFileName, audio_config, &digi_config, &cdigi_config, &dw_tt_config, &igate_config, misc_config)
+
+	if *configCheck {
+		// Checking the configuration file is the whole job here, so stop before
+		// the command line options below override any of it, and well before
+		// anything wants an audio device or a port.
+		reportConfigCheck(*configFileName, configErrors, configWarnings)
+
+		if configErrors > 0 {
+			os.Exit(1)
+		}
+
+		os.Exit(0)
+	}
 
 	if *audioSampleRate != 0 {
 		if *audioSampleRate < MIN_SAMPLES_PER_SEC || *audioSampleRate > MAX_SAMPLES_PER_SEC {
@@ -1313,4 +1328,26 @@ func cleanup() {
 
 	SLEEP_SEC(1)
 	os.Exit(0)
+}
+
+// reportConfigCheck says how a configuration file turned out, for --config-check.
+// config_init has already printed each problem and the full path of the file it
+// read, so this is the summary a script or a person reads at the end.
+func reportConfigCheck(fname string, errors int, warnings int) {
+	if errors == 0 && warnings == 0 {
+		fmt.Printf("\nConfiguration file %s: no problems found.\n", fname)
+
+		return
+	}
+
+	fmt.Printf("\nConfiguration file %s: %s, %s.\n", fname, countOf(errors, "error"), countOf(warnings, "warning"))
+}
+
+// countOf counts things in a way that reads as English.
+func countOf(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, noun)
+	}
+
+	return fmt.Sprintf("%d %ss", n, noun)
 }

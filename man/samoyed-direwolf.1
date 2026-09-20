@@ -27,6 +27,15 @@ RMS Express, and many others.
 Read configuration file from specified location rather than the default locations.
 
 .TP
+.B "--config-check"
+Check the configuration file and exit, without opening audio devices or ports.
+Every problem in the file is reported, not just the first.  The exit status is
+1 if any of them was an error and 0 otherwise; warnings, which are advice about
+settings that were nonetheless obeyed, do not on their own fail the check.
+Options given on the command line are not applied, so what is checked is the
+file.
+
+.TP
 .BI "-l " "logdir"
 Generate daily log files in specified directory.  Use "." for current directory.
 

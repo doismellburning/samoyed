@@ -210,6 +210,11 @@ type configs struct {
 	// usually has nothing else to show for it, so this is the only way to tell
 	// a line that was reported from one that was quietly ignored.
 	output string
+
+	// errors and warnings are config_init's tallies, which are what
+	// --config-check makes its exit status out of.
+	errors   int
+	warnings int
 }
 
 // parseConfig writes content to a temp config file and runs config_init over it.
@@ -230,10 +235,13 @@ func parseConfig(t *testing.T, content string) configs {
 		igate:  new(igate_config_s),
 		misc:   new(misc_config_s),
 		output: "",
+
+		errors:   0,
+		warnings: 0,
 	}
 
 	c.output = CaptureOutput(t, func() {
-		config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
+		c.errors, c.warnings = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
 	})
 
 	return c
@@ -4908,6 +4916,81 @@ func packageTestSource(t *testing.T) string {
 	}
 
 	return all.String()
+}
+
+// --- the tallies --config-check works from ---
+
+func Test_config_init_tallies(t *testing.T) {
+	const clean = "ADEVICE plughw:1,0\nACHANNELS 1\nCHANNEL 0\nMYCALL Q1TEST-1\nMODEM 1200\nAGWPORT 8000\n"
+
+	tests := []struct {
+		name         string
+		config       string
+		wantErrors   int
+		wantWarnings int
+	}{
+		{
+			name:         "a config with nothing wrong with it draws nothing",
+			config:       clean,
+			wantErrors:   0,
+			wantWarnings: 0,
+		},
+		{
+			name:         "a comment and a blank line are not problems",
+			config:       "# a comment\n\n" + clean,
+			wantErrors:   0,
+			wantWarnings: 0,
+		},
+		{
+			name:         "an unrecognised keyword is an error",
+			config:       clean + "NOSUCHKEYWORD 1\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+		},
+		{
+			// The point of the whole exercise: parsing does not stop at the
+			// first problem, so one run tells you about all of them.
+			name:         "every bad line is counted, not just the first",
+			config:       clean + "NOSUCHKEYWORD 1\nAGWPORT\nAGWPORT notanumber\nDWAIT abc\n",
+			wantErrors:   4,
+			wantWarnings: 0,
+		},
+		{
+			name:         "a line with two things wrong with it counts twice",
+			config:       clean + "PBEACON DELAY=1 EVERY=1 LAT=200 LONG=181W SYMBOL=\"igate\"\n",
+			wantErrors:   2,
+			wantWarnings: 0,
+		},
+		{
+			// TXDELAY 3 is obeyed; the lecture that follows it is advice, and
+			// advice must not fail a config check.
+			name:         "advice about a directive that was obeyed is a warning",
+			config:       clean + "TXDELAY 3\n",
+			wantErrors:   0,
+			wantWarnings: 1,
+		},
+		{
+			name:         "a directive that was not obeyed is an error, not a warning",
+			config:       clean + "TXDELAY 999\n",
+			wantErrors:   1,
+			wantWarnings: 0,
+		},
+		{
+			name:         "errors and warnings are counted apart from each other",
+			config:       clean + "TXDELAY 3\nNOSUCHKEYWORD 1\n",
+			wantErrors:   1,
+			wantWarnings: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var c = parseConfig(t, tt.config)
+
+			assert.Equal(t, tt.wantErrors, c.errors, "errors; config_init said:\n%s", c.output)
+			assert.Equal(t, tt.wantWarnings, c.warnings, "warnings; config_init said:\n%s", c.output)
+		})
+	}
 }
 
 // --- rendering a complaint for the person who wrote the config file ---
