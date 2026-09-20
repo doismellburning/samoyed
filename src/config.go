@@ -2287,6 +2287,11 @@ func handlePTTDCDCON(ps *parseState) bool {
 		otname = "CON"
 	}
 
+	// Work on a copy of the control and commit it at the end, so that a line
+	// rejected part way through leaves whatever an earlier line configured
+	// rather than a mixture of the two.  ptt_init reads these fields together.
+	var octrl = ps.audio.achan[ps.channel].octrl[ot]
+
 	var t = split("", false)
 	if t == "" {
 		text_color_set(DW_COLOR_ERROR)
@@ -2321,14 +2326,14 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 		if gpio < 0 {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.out_gpio_num = -1 * gpio
+			octrl.ptt_invert = true
 		} else {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.out_gpio_num = gpio
+			octrl.ptt_invert = false
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_GPIO
+		octrl.ptt_method = PTT_METHOD_GPIO
 		// #endif
 	} else if strings.EqualFold(t, "GPIOD") {
 		/*
@@ -2354,14 +2359,12 @@ func handlePTTDCDCON(ps *parseState) bool {
 		// We will allow the user to specify either the name or full device path.
 		// While we are here, also allow only the number as used by the gpiod utilities.
 
-		var gpio_name string
-
 		if t[0] == '/' { // Looks like device path.  Use as given.
-			gpio_name = t
+			octrl.out_gpio_name = t
 		} else if unicode.IsDigit(rune(t[0])) { // or if digit, prepend "/dev/gpiochip"
-			gpio_name = "/dev/gpiochip" + t
+			octrl.out_gpio_name = "/dev/gpiochip" + t
 		} else { // otherwise, prepend "/dev/" to the name
-			gpio_name = "/dev/" + t
+			octrl.out_gpio_name = "/dev/" + t
 		}
 
 		t = split("", false)
@@ -2380,21 +2383,15 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		// Commit the line only once all of it has parsed.  Storing the chip name
-		// first would leave a rejected line's chip beside the line number and
-		// method of an earlier one, and ptt_init hands that pair to
-		// RequestGPIODLine as though it came from a single line.
-		ps.audio.achan[ps.channel].octrl[ot].out_gpio_name = gpio_name
-
 		if gpio < 0 {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.out_gpio_num = -1 * gpio
+			octrl.ptt_invert = true
 		} else {
-			ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = gpio
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.out_gpio_num = gpio
+			octrl.ptt_invert = false
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_GPIOD
+		octrl.ptt_method = PTT_METHOD_GPIOD
 		/* TODO KG
 		#else
 			      text_color_set(DW_COLOR_ERROR);
@@ -2423,14 +2420,14 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 		if lpt < 0 {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_lpt_bit = -1 * lpt
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.ptt_lpt_bit = -1 * lpt
+			octrl.ptt_invert = true
 		} else {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_lpt_bit = lpt
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.ptt_lpt_bit = lpt
+			octrl.ptt_invert = false
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_LPT
+		octrl.ptt_method = PTT_METHOD_LPT
 		/*
 			#else
 				      text_color_set(DW_COLOR_ERROR);
@@ -2448,7 +2445,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		}
 
 		if strings.EqualFold(t, "AUTO") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_model = -1
+			octrl.ptt_model = -1
 		} else {
 			if !alldigits(t) {
 				text_color_set(DW_COLOR_ERROR)
@@ -2467,7 +2464,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 				return true
 			}
 
-			ps.audio.achan[ps.channel].octrl[ot].ptt_model = n
+			octrl.ptt_model = n
 		}
 
 		t = split("", false)
@@ -2478,7 +2475,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = t
+		octrl.ptt_device = t
 
 		// Optional serial port rate for CAT control PTT.
 
@@ -2491,7 +2488,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 				return true
 			}
 			var n, _ = strconv.Atoi(t)
-			ps.audio.achan[ps.channel].octrl[ot].ptt_rate = n
+			octrl.ptt_rate = n
 		}
 
 		t = split("", false)
@@ -2500,7 +2497,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			dw_printf("Config file line %d: %s was not expected after model & port for hamlib.\n", ps.line, t)
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_HAMLIB
+		octrl.ptt_method = PTT_METHOD_HAMLIB
 	} else if strings.EqualFold(t, "CM108") {
 		/* CM108 - GPIO of USB sound card. case, Linux and Windows only. */
 
@@ -2517,10 +2514,10 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = 3 // All known designs use GPIO 3.
+		octrl.out_gpio_num = 3 // All known designs use GPIO 3.
 		// User can override for special cases.
-		ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false // High for transmit.
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = ""
+		octrl.ptt_invert = false // High for transmit.
+		octrl.ptt_device = ""
 
 		// Try to find PTT device for audio output device.
 		// Simplifiying assumption is that we have one radio per USB Audio Adapter.
@@ -2529,7 +2526,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 		var found_ptt, find_ptt_err = cm108_find_ptt(ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = found_ptt
+		octrl.ptt_device = found_ptt
 
 		if find_ptt_err != nil {
 			text_color_set(DW_COLOR_ERROR)
@@ -2550,14 +2547,14 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 			if t[0] == '-' {
 				var gpio, _ = strconv.Atoi(t[1:])
-				ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = -1 * gpio
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+				octrl.out_gpio_num = -1 * gpio
+				octrl.ptt_invert = true
 			} else if unicode.IsDigit(rune(t[0])) {
 				var gpio, _ = strconv.Atoi(t)
-				ps.audio.achan[ps.channel].octrl[ot].out_gpio_num = gpio
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+				octrl.out_gpio_num = gpio
+				octrl.ptt_invert = false
 			} else if t[0] == '/' {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_device = t
+				octrl.ptt_device = t
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Found \"%s\" when expecting GPIO number or device name like /dev/hidraw1.\n", ps.line, t)
@@ -2566,15 +2563,15 @@ func handlePTTDCDCON(ps *parseState) bool {
 			}
 		}
 
-		if ps.audio.achan[ps.channel].octrl[ot].out_gpio_num < 1 || ps.audio.achan[ps.channel].octrl[ot].out_gpio_num > 8 {
+		if octrl.out_gpio_num < 1 || octrl.out_gpio_num > 8 {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file line %d: CM108 GPIO number %d is not in range of 1 thru 8.\n", ps.line,
-				ps.audio.achan[ps.channel].octrl[ot].out_gpio_num)
+				octrl.out_gpio_num)
 
 			return true
 		}
 
-		if ps.audio.achan[ps.channel].octrl[ot].ptt_device == "" {
+		if octrl.ptt_device == "" {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file line %d: Could not determine USB Audio GPIO PTT device for audio output %s.\n", ps.line,
 				ps.audio.adev[ACHAN2ADEV(ps.channel)].adevice_out)
@@ -2590,7 +2587,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_CM108
+		octrl.ptt_method = PTT_METHOD_CM108
 
 		/* TODO KG
 		#else
@@ -2604,7 +2601,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 		*/
 	} else {
 		/* serial port case. */
-		ps.audio.achan[ps.channel].octrl[ot].ptt_device = t
+		octrl.ptt_device = t
 
 		t = split("", false)
 		if t == "" {
@@ -2616,17 +2613,17 @@ func handlePTTDCDCON(ps *parseState) bool {
 		}
 
 		if strings.EqualFold(t, "rts") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_RTS
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.ptt_line = PTT_LINE_RTS
+			octrl.ptt_invert = false
 		} else if strings.EqualFold(t, "dtr") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_DTR
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = false
+			octrl.ptt_line = PTT_LINE_DTR
+			octrl.ptt_invert = false
 		} else if strings.EqualFold(t, "-rts") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_RTS
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.ptt_line = PTT_LINE_RTS
+			octrl.ptt_invert = true
 		} else if strings.EqualFold(t, "-dtr") {
-			ps.audio.achan[ps.channel].octrl[ot].ptt_line = PTT_LINE_DTR
-			ps.audio.achan[ps.channel].octrl[ot].ptt_invert = true
+			octrl.ptt_line = PTT_LINE_DTR
+			octrl.ptt_invert = true
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Config file line %d: Expected RTS or DTR after %s device name.\n",
@@ -2635,7 +2632,7 @@ func handlePTTDCDCON(ps *parseState) bool {
 			return true
 		}
 
-		ps.audio.achan[ps.channel].octrl[ot].ptt_method = PTT_METHOD_SERIAL
+		octrl.ptt_method = PTT_METHOD_SERIAL
 
 		/* In version 1.2, we allow a second one for same serial port. */
 		/* Some interfaces want the two control lines driven with opposite polarity. */
@@ -2644,17 +2641,17 @@ func handlePTTDCDCON(ps *parseState) bool {
 		t = split("", false)
 		if t != "" {
 			if strings.EqualFold(t, "rts") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = false
+				octrl.ptt_line2 = PTT_LINE_RTS
+				octrl.ptt_invert2 = false
 			} else if strings.EqualFold(t, "dtr") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = false
+				octrl.ptt_line2 = PTT_LINE_DTR
+				octrl.ptt_invert2 = false
 			} else if strings.EqualFold(t, "-rts") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_RTS
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = true
+				octrl.ptt_line2 = PTT_LINE_RTS
+				octrl.ptt_invert2 = true
 			} else if strings.EqualFold(t, "-dtr") {
-				ps.audio.achan[ps.channel].octrl[ot].ptt_line2 = PTT_LINE_DTR
-				ps.audio.achan[ps.channel].octrl[ot].ptt_invert2 = true
+				octrl.ptt_line2 = PTT_LINE_DTR
+				octrl.ptt_invert2 = true
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Config file line %d: Expected RTS or DTR after first RTS or DTR.\n",
@@ -2665,13 +2662,16 @@ func handlePTTDCDCON(ps *parseState) bool {
 
 			/* Would not make sense to specify the same one twice. */
 
-			if ps.audio.achan[ps.channel].octrl[ot].ptt_line == ps.audio.achan[ps.channel].octrl[ot].ptt_line2 {
+			if octrl.ptt_line == octrl.ptt_line2 {
 				dw_printf("Config file line %d: Doesn't make sense to specify the some control line twice.\n",
 					ps.line)
 			}
 		} /* end of second serial port control ps.line. */
 	} /* end of serial port case. */
 	/* end of PTT, DCD, CON */
+
+	ps.audio.achan[ps.channel].octrl[ot] = octrl
+
 	return false
 }
 

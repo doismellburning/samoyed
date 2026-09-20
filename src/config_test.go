@@ -3413,6 +3413,60 @@ func directiveTests() map[string][]directiveCase {
 					a.Empty(octrl.out_gpio_name)
 				},
 			},
+			// Regression test: each branch of the handler stored fields as it read
+			// them, so a line rejected part way through left some of its own values
+			// beside the rest of an earlier line's - a control configuration that
+			// never appeared in the config file, and which ptt_init reads as one.
+			{
+				name:   "a rejected serial line leaves the earlier device and line alone",
+				config: "PTT /dev/ttyS0 RTS\nPTT /dev/ttyS1 XYZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_SERIAL, octrl.ptt_method)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+				},
+			},
+			{
+				name:   "a rejected second control line leaves the first line alone",
+				config: "PTT /dev/ttyS0 RTS\nPTT /dev/ttyS1 DTR XYZ\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(PTT_LINE_RTS, octrl.ptt_line)
+					a.Equal(PTT_LINE_NONE, octrl.ptt_line2)
+				},
+			},
+			{
+				name:   "a rejected hamlib rate leaves the earlier model and port alone",
+				config: "PTT RIG 101 /dev/ttyS0 9600\nPTT RIG 102 /dev/ttyS1 fast\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_HAMLIB, octrl.ptt_method)
+					a.Equal(101, octrl.ptt_model)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+					a.Equal(9600, octrl.ptt_rate)
+				},
+			},
+			{
+				name:   "a hamlib line with no port leaves the earlier model alone",
+				config: "PTT RIG 101 /dev/ttyS0\nPTT RIG 102\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(101, octrl.ptt_model)
+					a.Equal("/dev/ttyS0", octrl.ptt_device)
+				},
+			},
+			{
+				name:   "a rejected CM108 bit leaves the earlier device and bit alone",
+				config: "PTT CM108 /dev/hidraw9\nPTT CM108 9 /dev/hidraw8\n",
+				check: func(a *assert.Assertions, c configs) {
+					var octrl = c.audio.achan[0].octrl[OCTYPE_PTT]
+					a.Equal(PTT_METHOD_CM108, octrl.ptt_method)
+					a.Equal("/dev/hidraw9", octrl.ptt_device)
+					a.Equal(3, octrl.out_gpio_num)
+				},
+			},
 		},
 		"REGEN": {
 			{
