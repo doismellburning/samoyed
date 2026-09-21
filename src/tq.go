@@ -797,12 +797,17 @@ func tq_peek(channel int, prio int) *packet_t {
 		}).Trace("tq_peek: enter critical section")
 	}
 
-	// I don't think we need critical region here.
-	//dw_mutex_lock (&tq_mutex);
+	// Under the mutex like every other reader of the list.  The head pointer
+	// is rewritten by tq_append, lm_data_request, lm_seize_request and
+	// tq_remove, all of which hold tq_mutex, and this runs on the transmit
+	// thread while producers are appending from the KISS, AGW, beacon and
+	// digipeater goroutines - so reading it unguarded is a data race.
+	tq_mutex.Lock()
+
 	var result_p = queue_head[channel][prio]
 	// Just take a peek at the head.  Don't remove it.
 
-	//dw_mutex_unlock (&tq_mutex);
+	tq_mutex.Unlock()
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
