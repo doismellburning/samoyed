@@ -38,8 +38,15 @@ import (
 	"github.com/pkg/term"
 )
 
-// TODO KG var s_debug = 0 /* Enable debug output. */
-/* See dwgpsnmea_init description for values. */
+// s_gpsnmea_debug is how much this file has to say for itself.
+// See dwgpsnmea_init's description for the values.
+//
+// This was a file-scope static in Dire Wolf, as the IGate's own debug level
+// was; the port flattened both into one package variable named s_debug, so
+// whichever of igate_init and dwgpsnmea_init ran last decided the level for
+// both.  DirewolfMain starts the GPS after the IGate, so -dg silently
+// overrode -di.  See issue #674.
+var s_gpsnmea_debug int
 
 var s_save_configp *misc_config_s
 
@@ -86,10 +93,10 @@ var s_gpsnmea_port_fd *term.Term
 func dwgpsnmea_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
 	//dwgps_info_t info;
 	//int e;
-	s_debug = debug
+	s_gpsnmea_debug = debug
 	s_save_configp = pconfig
 
-	if s_debug >= 2 {
+	if s_gpsnmea_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dwgpsnmea_init()\n")
 	}
@@ -150,14 +157,14 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 	// Make buffer considerably larger to be safe.
 	const NMEA_MAX_LEN = 160
 
-	if s_debug >= 2 {
+	if s_gpsnmea_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("read_gpsnmea_thread (%+v)\n", fd)
 	}
 
 	var info = new(dwgps_info_t) /* Zero value is DWFIX_NOT_SEEN, nothing else known. */
 
-	if s_debug >= 2 {
+	if s_gpsnmea_debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dwgps_print("GPSNMEA: ", info)
 	}
@@ -188,7 +195,7 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 
 			info.fix = DWFIX_ERROR
 
-			if s_debug >= 2 {
+			if s_gpsnmea_debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dwgps_print("GPSNMEA: ", info)
 			}
@@ -210,7 +217,7 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 			gps_msg = string(ch)
 		case '\r', '\n':
 			if len(gps_msg) >= 6 && gps_msg[0] == '$' {
-				if s_debug >= 3 {
+				if s_gpsnmea_debug >= 3 {
 					text_color_set(DW_COLOR_DEBUG)
 					dw_printf("%s\n", gps_msg)
 				}
@@ -263,7 +270,7 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 
 						info.timestamp = time.Now()
 
-						if s_debug >= 2 {
+						if s_gpsnmea_debug >= 2 {
 							text_color_set(DW_COLOR_DEBUG)
 							dwgps_print("GPSNMEA: ", info)
 						}
