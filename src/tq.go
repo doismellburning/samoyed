@@ -53,11 +53,24 @@ func tq_is_real_packet(pp *packet_t) bool {
 var tq_mutex sync.Mutex /* Critical section for updating queues. */
 /* Just one for all queues. */
 
-var wake_up_cond [MAX_RADIO_CHANS]*sync.Cond /* Notify transmit thread when queue not empty. */
-
-var wake_up_mutex [MAX_RADIO_CHANS]sync.Mutex /* Required by cond_wait. */
-
-var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
+// wake tells a channel's transmit thread that something was queued.  Each has
+// capacity one and is sent to without blocking, so it latches: a wake-up
+// raised while the transmit thread is not yet waiting is still there when it
+// looks.
+//
+// That is what a sync.Cond could not do, and it is why this is not one.  A
+// Signal delivered while nobody is waiting is simply dropped, so the enqueue
+// paths had to ask whether the transmit thread was waiting before signalling -
+// and between that thread deciding to wait and actually waiting, the answer
+// was no while the truthful answer was "about to be".  The signal was skipped
+// and the queued packet sat there until the next enqueue happened to raise
+// another one.
+//
+// The latch also means a wake-up can arrive when there is nothing to send,
+// left over from a packet since removed.  tq_wait_while_empty re-checks the
+// queue rather than trusting the wake-up, so a stale one costs a lap of its
+// loop and nothing else.
+var wake [MAX_RADIO_CHANS]chan struct{}
 
 /*-------------------------------------------------------------------
  *
@@ -95,7 +108,7 @@ var xmit_thread_is_waiting [MAX_RADIO_CHANS]bool
 
 // TODO KG static struct audio_s *save_audio_config_p;
 
-func tq_init(ctx context.Context, audio_config_p *audio_s) {
+func tq_init(audio_config_p *audio_s) {
 	logrus.Debug("tq_init")
 	save_audio_config_p = audio_config_p
 
@@ -108,51 +121,46 @@ func tq_init(ctx context.Context, audio_config_p *audio_s) {
 		}
 	}
 
-	/*
-	 * Windows and Linux have different wake up methods.
-	 * Put a wrapper around this someday to hide the details.
-	 */
+	// Once a channel has a wake-up channel it keeps it, rather than getting a
+	// fresh one on a later init.  A transmit thread selecting on the old one
+	// would never hear a send to its replacement, and would sit there for
+	// good.  Any wake-up left latched from before describes queues we have
+	// just emptied, so drain it: acting on it would only cost the transmit
+	// thread a lap of its loop, but starting from a clean state is easier to
+	// reason about.
+	//
+	// Under tq_mutex, which is what tq_wait_while_empty holds while it reads
+	// the slot, so a transmit thread cannot catch a half-initialised one.
+	tq_mutex.Lock()
 
 	for c := range MAX_RADIO_CHANS {
-		xmit_thread_is_waiting[c] = false
+		if wake[c] == nil {
+			wake[c] = make(chan struct{}, 1)
+		}
 
-		if audio_config_p.chan_medium[c] == MEDIUM_RADIO {
-			// Once a channel has a condition variable it keeps it, rather
-			// than getting a fresh one on a later init.  A transmit thread
-			// waiting on the old one would not be woken by a signal or a
-			// broadcast to its replacement, and would sit there for good.
-			//
-			// Under the mutex because the cancellation broadcast below reads
-			// this, and an earlier context outliving the init that registered
-			// it can have it running while we are here.
-			wake_up_mutex[c].Lock()
-
-			if wake_up_cond[c] == nil {
-				wake_up_cond[c] = sync.NewCond(&wake_up_mutex[c])
-			}
-
-			wake_up_mutex[c].Unlock()
+		select {
+		case <-wake[c]:
+		default:
 		}
 	}
 
-	// A transmit thread with nothing to send is parked in a condition
-	// variable wait, which no cancellation can reach on its own.  Wake all of
-	// them when ctx is cancelled so each can notice and return.  The broadcast
-	// takes the same mutex tq_wait_while_empty holds while it decides whether
-	// to wait, so a cancellation cannot slip through the gap between that
-	// decision and the wait itself.
-	context.AfterFunc(ctx, func() {
-		for c := range MAX_RADIO_CHANS {
-			wake_up_mutex[c].Lock()
-
-			if wake_up_cond[c] != nil {
-				wake_up_cond[c].Broadcast()
-			}
-
-			wake_up_mutex[c].Unlock()
-		}
-	})
+	tq_mutex.Unlock()
 } /* end tq_init */
+
+// tq_wake_locked tells the channel's transmit thread that something was
+// queued.  The caller holds tq_mutex, and has just put the packet on the list:
+// raising the wake-up under the same lock is what stops it racing the
+// transmit thread's decision about whether to wait.
+//
+// The send does not block.  A wake-up already raised and not yet taken is one
+// the transmit thread has still to act on, and one is as good as two - it
+// re-checks the queue when it wakes, and finds everything queued since.
+func tq_wake_locked(channel int) {
+	select {
+	case wake[channel] <- struct{}{}:
+	default:
+	}
+}
 
 /*-------------------------------------------------------------------
  *
@@ -332,15 +340,11 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
 
+	tq_wake_locked(channel)
+
 	tq_mutex.Unlock()
 
-	logrus.Trace("tq_append: left critical section, about to wake up xmit thread")
-
-	if xmit_thread_is_waiting[channel] {
-		wake_up_mutex[channel].Lock()
-		wake_up_cond[channel].Signal()
-		wake_up_mutex[channel].Unlock()
-	}
+	logrus.Trace("tq_append: left critical section, xmit thread woken")
 } /* end tq_append */
 
 /*-------------------------------------------------------------------
@@ -496,10 +500,6 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
 
-	tq_mutex.Unlock()
-
-	logrus.Trace("lm_data_request: left critical section")
-
 	// Appendix C2a, from the Ax.25 protocol spec, says that a priority frame
 	// will start transmission.  If not already transmitting, normal frames
 	// will pile up until LM-SEIZE Request starts transmission.
@@ -509,13 +509,12 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	//NO!	if (prio == TQ_PRIO_0_HI) {
 
-	logrus.Trace("lm_data_request: about to wake up xmit thread")
-	if xmit_thread_is_waiting[channel] {
-		wake_up_mutex[channel].Lock()
-		wake_up_cond[channel].Signal()
-		wake_up_mutex[channel].Unlock()
-	}
+	tq_wake_locked(channel)
 	//NO!	}
+
+	tq_mutex.Unlock()
+
+	logrus.Trace("lm_data_request: left critical section, xmit thread woken")
 } /* end lm_data_request */
 
 /*-------------------------------------------------------------------
@@ -630,17 +629,11 @@ func lm_seize_request(channel int) {
 
 	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
 
+	tq_wake_locked(channel)
+
 	tq_mutex.Unlock()
 
-	logrus.Trace("lm_seize_request: left critical section")
-
-	logrus.Trace("lm_seize_request: about to wake up xmit thread")
-
-	if xmit_thread_is_waiting[channel] {
-		wake_up_mutex[channel].Lock()
-		wake_up_cond[channel].Signal()
-		wake_up_mutex[channel].Unlock()
-	}
+	logrus.Trace("lm_seize_request: left critical section, xmit thread woken")
 } /* end lm_seize_request */
 
 /*-------------------------------------------------------------------
@@ -662,51 +655,52 @@ func lm_seize_request(channel int) {
  *--------------------------------------------------------------------*/
 
 func tq_wait_while_empty(ctx context.Context, channel int) {
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: enter critical section")
-	}
-
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
-	tq_mutex.Lock()
+	// Wake-ups latch, so one raised between this loop reading the queue and
+	// settling down to wait is still there to be received - which is what
+	// stops a packet queued in that window being left for the next enqueue to
+	// announce.  The price is that a wake-up can describe a packet since
+	// removed, so the queue itself decides when to return and the wake-up
+	// only says when to look again.
+	for {
+		tq_mutex.Lock()
 
-	var is_empty = tq_is_empty(channel)
+		var is_empty = tq_is_empty(channel)
+		var w = wake[channel]
 
-	tq_mutex.Unlock()
+		tq_mutex.Unlock()
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("channel", channel).Trace("tq_wait_while_empty: left critical section")
-		logrus.WithFields(logrus.Fields{
-			"channel":  channel,
-			"is_empty": is_empty,
-		}).Trace("tq_wait_while_empty")
-	}
-
-	if is_empty {
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
-			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: SLEEP - about to call cond wait")
+			logrus.WithFields(logrus.Fields{
+				"channel":  channel,
+				"is_empty": is_empty,
+			}).Trace("tq_wait_while_empty")
 		}
 
-		wake_up_mutex[channel].Lock()
-
-		// tq_init's cancellation broadcast takes this mutex, so checking
-		// here rather than before the lock means we cannot decide to wait
-		// for a broadcast that has already been and gone.
-		if ctx.Err() == nil {
-			xmit_thread_is_waiting[channel] = true
-			wake_up_cond[channel].Wait()
-			xmit_thread_is_waiting[channel] = false
+		if !is_empty {
+			return
 		}
 
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
-			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: WOKE UP - returned from cond wait")
+			logrus.WithField("channel", channel).Trace("tq_wait_while_empty: SLEEP - waiting for a wake-up")
 		}
 
-		wake_up_mutex[channel].Unlock()
-	}
+		select {
+		case <-w:
+			if logrus.IsLevelEnabled(logrus.TraceLevel) {
+				logrus.WithField("channel", channel).Trace("tq_wait_while_empty: WOKE UP")
+			}
+		case <-ctx.Done():
+			// Returning with the queue empty is the point: the caller checks
+			// ctx and stops, rather than waiting for a packet that will never
+			// come.
+			if logrus.IsLevelEnabled(logrus.TraceLevel) {
+				logrus.WithField("channel", channel).Trace("tq_wait_while_empty: cancelled")
+			}
 
-	if logrus.IsLevelEnabled(logrus.TraceLevel) {
-		logrus.WithField("channel", channel).Trace("tq_wait_while_empty returns")
+			return
+		}
 	}
 }
 

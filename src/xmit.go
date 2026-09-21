@@ -163,7 +163,7 @@ func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet boo
 	}
 
 	logrus.Debug("xmit_init: about to call tq_init")
-	tq_init(ctx, p_modem)
+	tq_init(p_modem)
 
 	logrus.Debug("xmit_init: about to create threads")
 

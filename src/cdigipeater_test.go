@@ -50,7 +50,7 @@ func setupCDigipeater(t *testing.T) (*audio_s, *cdigi_config_s) {
 
 	cdigi_count = [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int{}
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	return audioConfig, cdigiConfig
 }

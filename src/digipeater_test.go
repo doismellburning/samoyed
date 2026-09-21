@@ -54,7 +54,7 @@ func setupDigipeater(t *testing.T) *digi_config_s {
 
 	digi_count = [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int{}
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	return digiConfig
 }

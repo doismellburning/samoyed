@@ -53,7 +53,7 @@ func TestDiscardUntransmittableEmptiesTheQueue(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	var xs = new(XmitService)
 
@@ -80,7 +80,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 	dlq_init()
 
 	var xs = new(XmitService)
@@ -114,7 +114,7 @@ func TestXmitUntilEmptyDiscardsWithNoTransmitDevice(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	var xs = new(XmitService)
 	xs.audioOutAvailable[ACHAN2ADEV(channel)] = false
@@ -148,7 +148,7 @@ func TestXmitThreadStopsWhenCancelled(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	tq_init(ctx, audioConfig)
+	tq_init(audioConfig)
 
 	var xs = new(XmitService)
 
@@ -183,7 +183,7 @@ func TestXmitThreadStopsWhenCancelledBeforeStarting(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	tq_init(ctx, audioConfig)
+	tq_init(audioConfig)
 	cancel()
 
 	var xs = new(XmitService)
@@ -309,7 +309,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 
 	require.NoError(t, ptt_init(audioConfig))
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 	dlq_init()
 
 	// Sending a frame serialises it to bits; the capture takes them instead of

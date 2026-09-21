@@ -382,7 +382,7 @@ func setupIGateToRadio(t *testing.T) {
 
 	var audioConfig = igate.audioConfig
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	t.Cleanup(func() {
 		for p := range TQ_NUM_PRIO {

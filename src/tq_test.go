@@ -4,9 +4,11 @@
 package direwolf
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,7 +37,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -90,4 +92,138 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	assert.False(t, strayPeek.Load(), "tq_peek returned a packet that was never queued")
 	require.Equal(t, NUM_PKTS, tq_count(CHANNEL, PRIO, "", "", false),
 		"every packet should still be queued: peeking must not consume")
+}
+
+// TestTqWaitWhileEmptyDoesNotMissAnAppend is a regression test for a lost
+// wake-up.  tq_wait_while_empty decided whether to wait under tq_mutex and
+// then waited on a different mutex, while the enqueue paths signalled only if
+// a flag said the transmit thread was already waiting.  A packet queued
+// between that decision and the wait itself found the flag still false, so no
+// signal was sent and the transmit thread settled down to sleep on a queue
+// that was no longer empty.  Nothing woke it until the next enqueue on that
+// channel happened to signal - on a quiet channel, an arbitrarily delayed
+// transmission.
+//
+// A wake-up now latches rather than being dropped when nobody is yet
+// listening, so a correct implementation passes every round and there is no
+// timing assumption left to flake on.  Each round runs a waiter and its
+// producer as a separate pair of goroutines on every channel at once, so the
+// two are genuinely in flight together.
+//
+// What this reliably catches is the unsynchronised read of the waiting flag,
+// and only under -race: measured against the old implementation it failed 8
+// runs out of 8 with the detector on, and 0 out of 8 with it off.  The lost
+// wake-up itself is a window a few instructions wide and is not hit often
+// enough to test for directly - the same change fixes both, so the detector
+// standing guard over the flag is what keeps them both from coming back.
+// That makes this a make race test in practice rather than a make test one.
+func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
+	const (
+		PRIO      = TQ_PRIO_1_LO
+		CHANNELS  = MAX_RADIO_CHANS
+		ROUNDS    = 128
+		WAKE_WAIT = 5 * time.Second
+	)
+
+	var audioConfig = new(audio_s)
+	for c := range CHANNELS {
+		audioConfig.chan_medium[c] = MEDIUM_RADIO
+	}
+
+	tq_init(audioConfig)
+
+	// Built up front: ax25_new increments an unsynchronised global sequence
+	// counter, which is a separate matter from the queue and would otherwise
+	// be what -race reported.
+	var packets = make([][]*packet_t, CHANNELS)
+	for c := range CHANNELS {
+		packets[c] = make([]*packet_t, 0, ROUNDS)
+
+		for range ROUNDS {
+			packets[c] = append(packets[c], newTestPacket(t))
+		}
+	}
+
+	for round := range ROUNDS {
+		for c := range CHANNELS {
+			require.Equal(t, 0, tq_count(c, -1, "", "", false),
+				"round %d channel %d should start with an empty queue", round, c)
+		}
+
+		// Release every goroutine at once, so the waiters are deciding whether
+		// to wait while the producers are queueing.
+		var start = make(chan struct{})
+
+		var woke = make([]chan struct{}, CHANNELS)
+
+		var wg sync.WaitGroup
+
+		for c := range CHANNELS {
+			woke[c] = make(chan struct{})
+
+			go func() {
+				defer close(woke[c])
+
+				<-start
+
+				tq_wait_while_empty(t.Context(), c)
+			}()
+
+			wg.Go(func() {
+				<-start
+
+				lm_data_request(c, PRIO, packets[c][round])
+			})
+		}
+
+		close(start)
+		wg.Wait()
+
+		for c := range CHANNELS {
+			select {
+			case <-woke[c]:
+			case <-time.After(WAKE_WAIT):
+				t.Fatalf("round %d channel %d: transmit thread still asleep %v after a packet was queued",
+					round, c, WAKE_WAIT)
+			}
+
+			require.NotNil(t, tq_remove(c, PRIO),
+				"round %d channel %d: the queued packet should still be there", round, c)
+		}
+	}
+}
+
+// TestTqWaitWhileEmptyReturnsWhenCancelled covers the other way out of the
+// wait.  A transmit thread parked on an empty queue has to come back when its
+// context is cancelled, or shutdown blocks on a packet that is never coming.
+// This used to need a separate broadcast registered on the context, because
+// nothing else could reach a thread sitting in a condition variable wait.
+func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
+	const CHANNEL = 0
+
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
+
+	tq_init(audioConfig)
+
+	var ctx, cancel = context.WithCancel(t.Context())
+
+	var returned = make(chan struct{})
+
+	go func() {
+		defer close(returned)
+
+		tq_wait_while_empty(ctx, CHANNEL)
+	}()
+
+	cancel()
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("tq_wait_while_empty did not return when its context was cancelled")
+	}
+
+	assert.Equal(t, 0, tq_count(CHANNEL, -1, "", "", false),
+		"cancellation should not have invented a packet")
 }
