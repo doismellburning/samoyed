@@ -344,6 +344,38 @@ func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	assert.Equal(t, MAX_KISS_LEN, kf.kiss_len)
 }
 
+// The TNC does eventually send its closing FEND, and the byte it used to be
+// written to was one past the end of the buffer - which took the whole program
+// down, from anything on the far end of the network connection.  The overlong
+// frame is thrown away, and the collector is left ready for the next one.
+func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
+	expectReceivedFrames(t)
+
+	var kf = new(KISSFrame)
+
+	var output = CaptureOutput(t, func() {
+		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+
+		for range MAX_KISS_LEN + 10 {
+			my_kiss_rec_byte(kf, 'x', 0, nettncTestChannel)
+		}
+
+		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
+	})
+
+	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
+	assert.Equal(t, 0, kf.kiss_len)
+	assert.Equal(t, KS_SEARCHING, kf.state)
+	assert.Nil(t, dlq_remove(), "a fragment of the overlong frame was acted on")
+
+	// And a well formed frame after it still gets through.
+	for _, b := range kissFrameFor(newTestPacket(t)) {
+		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
+	}
+
+	assert.NotNil(t, dlq_remove())
+}
+
 // With the debug option the frames are printed in both the form they arrived
 // in and the form they were decoded to, so that a TNC that is not being
 // understood can be looked at.

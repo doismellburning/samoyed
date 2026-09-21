@@ -521,6 +521,35 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 	assert.Equal(t, MAX_KISS_LEN, kf.kiss_len)
 }
 
+// The client does eventually send its closing FEND, and the byte it used to be
+// written to was one past the end of the buffer - which took the whole program
+// down, from anything that could talk to the KISS port.  The overlong frame is
+// thrown away, and the collector is left ready for the next one.
+func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
+	setupKissProcessMsg(t)
+
+	var kf = new(KISSFrame)
+
+	var overlong = append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MAX_KISS_LEN+10)...)
+
+	var output = CaptureOutput(t, func() {
+		feedKissBytes(kf, 0, append(overlong, FEND))
+	})
+
+	assert.Contains(t, output, "KISS message exceeded maximum length.  Discarding it.")
+	assert.Equal(t, 0, kf.kiss_len)
+	assert.Equal(t, KS_SEARCHING, kf.state)
+	assert.Equal(t, 0, tq_count(0, -1, "", "", false), "a fragment of the overlong frame was acted on")
+
+	// And a well formed frame after it still gets through.
+	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	feedKissBytes(kf, 0, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
+
+	assert.Equal(t, 1, tq_count(0, -1, "", "", false))
+}
+
 // With "-d kn" the frame is shown as it arrived and again as it was decoded,
 // which is the pair a protocol problem shows up in.
 func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
