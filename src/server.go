@@ -1093,7 +1093,12 @@ func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
 		s.debugPrint(TO_CLIENT, client, reply_p)
 	}
 
-	reply_p.Write(conn, binary.LittleEndian)
+	var _, err = reply_p.Write(conn, binary.LittleEndian)
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
+		s.detachClient(client, conn)
+	}
 }
 
 // detachClient hangs up on a client, gives its slot back, and tells the data

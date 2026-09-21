@@ -605,3 +605,28 @@ func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
 	assert.Equal(t, 0, item.client)
 	assert.Nil(t, s.clientConn(0))
 }
+
+// A reply that cannot be delivered hangs up on the client, as the receive and
+// transmit paths already did for the frames they send.  The client's own
+// command thread would notice its connection had gone and detach it too, but
+// only once its read returns; until then this is the one place that knows, and
+// dropping the error left it saying nothing at all.
+func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
+	var s = new(AGWServer)
+
+	var server, client = net.Pipe()
+	client.Close()
+	server.Close() /* So a write fails rather than blocking for a reader. */
+
+	s.clientAccepted(0, server)
+	require.NotNil(t, s.clientConn(0), "nothing attached to detach")
+
+	var version = new(AGWPEMessage)
+	version.Header.DataKind = 'R'
+
+	var item = dlqAppended(func() { s.handleClientCommand(0, version) })
+
+	assert.Nil(t, s.clientConn(0), "the connection we could not write to is still attached")
+	require.NotNil(t, item, "connected mode was not told the client had gone")
+	assert.Equal(t, DLQ_CLIENT_CLEANUP, item._type)
+}
