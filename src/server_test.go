@@ -564,3 +564,44 @@ func TestAGWServer_ClientTableUnderConcurrentUse(t *testing.T) {
 		wg.Wait()
 	})
 }
+
+// --- Detaching a client that has already been replaced ---
+
+// A write that fails on a connection already replaced in its slot must leave
+// the new one alone.  dl_client_cleanup goes by client number, so a cleanup
+// meant for the old connection takes the new client's links and registered
+// callsigns away, while its socket stays attached and it is told nothing.
+func TestDetachClient_StaleConnLeavesItsSuccessorAlone(t *testing.T) {
+	var s = new(AGWServer)
+
+	var first = new(nullConn)
+	first.addr = tcpAddr(t, "192.168.1.10")
+
+	var second = new(nullConn)
+	second.addr = tcpAddr(t, "192.168.1.11")
+
+	s.clientAccepted(0, first)
+	s.clientAccepted(0, second) /* The slot has moved on. */
+
+	var item = dlqAppended(func() { s.detachClient(0, first) })
+
+	assert.Nil(t, item, "cleanup queued against the client that holds the slot now")
+	assert.Equal(t, net.Conn(second), s.clientConn(0), "the newer connection was detached")
+}
+
+// The ordinary case still cleans up, of course.
+func TestDetachClient_AttachedConnIsCleanedUp(t *testing.T) {
+	var s = new(AGWServer)
+
+	var conn = new(nullConn)
+	conn.addr = tcpAddr(t, "192.168.1.10")
+
+	s.clientAccepted(0, conn)
+
+	var item = dlqAppended(func() { s.detachClient(0, conn) })
+
+	require.NotNil(t, item, "no cleanup queued for a client that really has gone")
+	assert.Equal(t, DLQ_CLIENT_CLEANUP, item._type)
+	assert.Equal(t, 0, item.client)
+	assert.Nil(t, s.clientConn(0))
+}

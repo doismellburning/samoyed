@@ -1097,21 +1097,31 @@ func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
 }
 
 // detachClient hangs up on a client, gives its slot back, and tells the data
-// link machinery that it has gone.  The slot is only cleared if it still holds
-// conn, so a newer connection that has already been accepted into it isn't
-// clobbered by a thread on its way out.
+// link machinery that it has gone.
+//
+// Both the giving back and the telling happen only if the slot still holds
+// conn, so a newer connection that has already been accepted into it is
+// neither clobbered nor cleaned up by a thread on its way out.  The cleanup
+// matters as much as the slot: dl_client_cleanup goes by client number, so it
+// cannot tell one holder of a slot from the next, and would take the new
+// client's links and registered callsigns away while leaving its socket
+// attached.  Whoever detached the earlier connection has been through here
+// already and done the cleanup it needed.
 func (s *AGWServer) detachClient(client int, conn net.Conn) {
 	conn.Close()
 
 	s.mu.Lock()
 
-	if s.clients[client].conn == conn {
+	var wasAttached = s.clients[client].conn == conn
+	if wasAttached {
 		s.clients[client].conn = nil
 	}
 
 	s.mu.Unlock()
 
-	dlq_client_cleanup(client)
+	if wasAttached {
+		dlq_client_cleanup(client)
+	}
 }
 
 // readCommandData reads an AGW message's data part, if it has one, into
