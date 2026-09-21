@@ -57,6 +57,7 @@ var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
 var kissNetSvc *KissNetService
+var agwServer *AGWServer
 var mheardDB *MHeardDB
 var xmitSvc *XmitService
 var ttGateway *TTGateway
@@ -208,6 +209,7 @@ x = Silence FX.25 information.`)
 		A_opt_ais_to_obj = true
 	}
 
+	var d_a_opt = 0      /* "-d a" option for AGW client applications.  Can be repeated for more detail. */
 	var d_k_opt = 0      /* "-d k" option for serial port KISS.  Can be repeated for more detail. */
 	var d_n_opt = 0      /* "-d n" option for Network KISS.  Can be repeated for more detail. */
 	var d_t_opt = 0      /* "-d t" option for Tracker.  Can be repeated for more detail. */
@@ -232,7 +234,7 @@ x = Silence FX.25 information.`)
 		for _, p := range *debugStr {
 			switch p {
 			case 'a':
-				server_set_debug(1)
+				d_a_opt++
 			case 'k':
 				d_k_opt++
 				kissserial_set_debug(d_k_opt)
@@ -805,7 +807,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Provide the AGW & KISS socket interfaces for use by a client application.
 	 */
-	server_init(ctx, audio_config, misc_config)
+	agwServer = NewAGWServer(ctx, audio_config, misc_config, d_a_opt)
 	metrics_init(ctx, misc_config)
 	kissNetSvc = NewKissNetService(ctx, misc_config)
 	kissNetSvc.SetDebug(d_n_opt)
@@ -1219,7 +1221,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 	var fbuf = AX25Pack(pp)
 
-	server_send_rec_packet(channel, pp, fbuf)                                          // AGW net protocol
+	agwServer.SendRecPacket(channel, pp, fbuf)                                         // AGW net protocol
 	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)   // KISS TCP
 	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
 	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
@@ -1229,7 +1231,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		if ao_pp != nil {
 			var ao_fbuf = AX25Pack(ao_pp)
 
-			server_send_rec_packet(channel, ao_pp, ao_fbuf)
+			agwServer.SendRecPacket(channel, ao_pp, ao_fbuf)
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)

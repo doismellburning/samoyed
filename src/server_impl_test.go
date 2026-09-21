@@ -31,16 +31,15 @@ func readReplyFrom(conn net.Conn) (*AGWPEMessage, error) {
 	return msg, nil
 }
 
-// setupClientPipe wires client_sock[0] to one end of an in-memory net.Pipe
+// setupClientPipe attaches one end of an in-memory net.Pipe to s as client 0
 // and returns the other end for reading replies.
-func setupClientPipe(t *testing.T) net.Conn {
+func setupClientPipe(t *testing.T, s *AGWServer) net.Conn {
 	t.Helper()
 	var server, client = net.Pipe()
-	client_sock[0] = server
+	s.clients[0].conn = server
 	t.Cleanup(func() {
 		server.Close()
 		client.Close()
-		client_sock[0] = nil
 	})
 
 	return client
@@ -60,12 +59,14 @@ func asyncReply(conn net.Conn) <-chan *AGWPEMessage {
 }
 
 func TestHandleClientCommand_R_VersionReply(t *testing.T) {
-	var client = setupClientPipe(t)
+	var s = new(AGWServer)
+
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'R'
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -77,39 +78,41 @@ func TestHandleClientCommand_R_VersionReply(t *testing.T) {
 }
 
 func TestHandleClientCommand_k_TogglesRawFrames(t *testing.T) {
-	t.Cleanup(func() { enable_send_raw_to_client[0] = false })
+	var s = new(AGWServer)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'k'
 
-	assert.False(t, enable_send_raw_to_client[0])
-	handleClientCommand(0, cmd)
-	assert.True(t, enable_send_raw_to_client[0])
-	handleClientCommand(0, cmd)
-	assert.False(t, enable_send_raw_to_client[0])
+	assert.False(t, s.clients[0].sendRaw)
+	s.handleClientCommand(0, cmd)
+	assert.True(t, s.clients[0].sendRaw)
+	s.handleClientCommand(0, cmd)
+	assert.False(t, s.clients[0].sendRaw)
 }
 
 func TestHandleClientCommand_m_TogglesMonitorFrames(t *testing.T) {
-	t.Cleanup(func() { enable_send_monitor_to_client[0] = false })
+	var s = new(AGWServer)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'm'
 
-	assert.False(t, enable_send_monitor_to_client[0])
-	handleClientCommand(0, cmd)
-	assert.True(t, enable_send_monitor_to_client[0])
-	handleClientCommand(0, cmd)
-	assert.False(t, enable_send_monitor_to_client[0])
+	assert.False(t, s.clients[0].sendMonitor)
+	s.handleClientCommand(0, cmd)
+	assert.True(t, s.clients[0].sendMonitor)
+	s.handleClientCommand(0, cmd)
+	assert.False(t, s.clients[0].sendMonitor)
 }
 
 func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
-	var client = setupClientPipe(t)
+	var s = new(AGWServer)
+
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'g'
 	cmd.Header.Portx = 2
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -129,16 +132,15 @@ func TestHandleClientCommand_g_PortCapabilitiesReply(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_NoPorts(t *testing.T) {
-	var cfg audio_s
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	var s = new(AGWServer)
+	s.audioConfigP = new(audio_s)
 
-	var client = setupClientPipe(t)
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'G'
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -147,18 +149,19 @@ func TestHandleClientCommand_G_NoPorts(t *testing.T) {
 }
 
 func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.adev[0].num_channels = 1
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	var client = setupClientPipe(t)
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'G'
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -167,13 +170,15 @@ func TestHandleClientCommand_G_RadioChannelMono(t *testing.T) {
 }
 
 func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
-	var client = setupClientPipe(t)
+	var s = new(AGWServer)
+
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'y'
 	cmd.Header.Portx = 0
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -185,18 +190,17 @@ func TestHandleClientCommand_y_EmptyQueueReturnsZero(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
-	var cfg audio_s
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	var s = new(AGWServer)
+	s.audioConfigP = new(audio_s)
 
-	var client = setupClientPipe(t)
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'X'
 	cmd.Header.Portx = MAX_RADIO_CHANS // out of range
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -207,19 +211,20 @@ func TestHandleClientCommand_X_InvalidChannelReportsFailure(t *testing.T) {
 }
 
 func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	cfg.chan_medium[0] = MEDIUM_RADIO
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	var client = setupClientPipe(t)
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'X'
 	cmd.Header.Portx = 0
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
@@ -251,8 +256,12 @@ func dlqAppended(f func()) *dlq_item_t {
 // Before the bounds-check fix, data[0] could be read on an empty slice,
 // and the digipeater slice could go out of bounds.
 func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
-	var cfg audio_s
-	save_audio_config_p = &cfg
+	var s = new(AGWServer)
+	s.audioConfigP = new(audio_s)
+
+	// The 'V' handler queues the frame for transmission, and tq_append reads
+	// the audio configuration for itself.
+	save_audio_config_p = new(audio_s)
 	t.Cleanup(func() { save_audio_config_p = nil })
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -262,7 +271,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 		copy(cmd.Header.CallTo[:], "Q2TEST")
 		cmd.Data = rapid.SliceOf(rapid.Byte()).Draw(t, "data")
 		cmd.Header.DataLen = uint32(len(cmd.Data))
-		handleClientCommand(0, cmd)
+		s.handleClientCommand(0, cmd)
 	})
 }
 
@@ -270,8 +279,11 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 // Before the bounds-check fix, cmd.Data[1:cmd.Header.DataLen] would panic
 // when DataLen==0 or DataLen exceeded len(cmd.Data).
 func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
-	var cfg audio_s
-	save_audio_config_p = &cfg
+	var s = new(AGWServer)
+	s.audioConfigP = new(audio_s)
+
+	// As above: a 'K' that survives the bounds checks is queued too.
+	save_audio_config_p = new(audio_s)
 	t.Cleanup(func() { save_audio_config_p = nil })
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -279,7 +291,7 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 		cmd.Header.DataKind = 'K'
 		cmd.Data = rapid.SliceOf(rapid.Byte()).Draw(t, "data")
 		cmd.Header.DataLen = rapid.Uint32().Draw(t, "dataLen")
-		handleClientCommand(0, cmd)
+		s.handleClientCommand(0, cmd)
 	})
 }
 
@@ -287,6 +299,8 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 // Before the fix, the invalid-numDigi else branch fell through to dlq_connect_request,
 // silently treating the malformed frame as a direct connect.
 func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
+	var s = new(AGWServer)
+
 	rapid.Check(t, func(t *rapid.T) {
 		var numDigi = rapid.OneOf(
 			rapid.Just(byte(0)),
@@ -305,7 +319,7 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 		cmd.Data = data
 		cmd.Header.DataLen = uint32(len(data))
 
-		var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+		var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 		if item != nil {
 			t.Errorf("expected no DLQ append for out-of-range numDigi %d, got %+v", numDigi, item)
 		}
@@ -316,6 +330,8 @@ func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 // anything when Portx is not a radio channel.  Before the fix, the DLQ functions
 // would Assert-panic on channel >= MAX_RADIO_CHANS.
 func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T) {
+	var s = new(AGWServer)
+
 	rapid.Check(t, func(t *rapid.T) {
 		var dataKind = rapid.SampledFrom([]byte{'C', 'v', 'c', 'D', 'd', 'Y'}).Draw(t, "dataKind")
 		var portx = rapid.ByteRange(MAX_RADIO_CHANS, 255).Draw(t, "portx")
@@ -326,7 +342,7 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 		copy(cmd.Header.CallFrom[:], "Q1TEST")
 		copy(cmd.Header.CallTo[:], "Q2TEST")
 
-		var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+		var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 		if item != nil {
 			t.Errorf("expected no DLQ append for non-radio Portx %d with command '%c'", portx, dataKind)
 		}
@@ -339,6 +355,8 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 // at the end of each transmitted packet. This null byte sat in the remote's input
 // buffer and appeared as a 0x00 prefix on the next received command.
 func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
+	var s = new(AGWServer)
+
 	var payload = []byte("CMD1\r")
 
 	// The read path appends a null byte for debug printing, while DataLen
@@ -354,7 +372,7 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 	cmd.Data = data
 
-	var got = dlqAppended(func() { handleClientCommand(0, cmd) })
+	var got = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 
 	require.NotNil(t, got, "DLQ_XMIT_DATA_REQUEST item never appeared")
 	require.Equal(t, DLQ_XMIT_DATA_REQUEST, got._type)
@@ -368,6 +386,8 @@ func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {
 // command whose DataLen exceeds len(Data) is rejected without panicking or
 // enqueueing anything.
 func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'D'
 	cmd.Header.Portx = 0
@@ -377,13 +397,15 @@ func TestHandleClientCommand_D_OversizedDataLenNoDLQAppend(t *testing.T) {
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
 	copy(cmd.Header.CallTo[:], "Q2TEST")
 
-	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 	if item != nil {
 		t.Errorf("expected no DLQ append for oversized DataLen, got %+v", item)
 	}
 }
 
 func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
+	var s = new(AGWServer)
+
 	// Encode the via_info payload: num_digi + 7 x 10-byte callsign slots.
 	var via struct {
 		NumDigi byte
@@ -404,7 +426,7 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	cmd.Header.DataLen = uint32(via.NumDigi)*10 + 1 // expected size per protocol
 	cmd.Data = buf.Bytes()[:int(cmd.Header.DataLen)]
 
-	var item = dlqAppended(func() { handleClientCommand(0, cmd) })
+	var item = dlqAppended(func() { s.handleClientCommand(0, cmd) })
 
 	require.NotNil(t, item)
 	assert.Equal(t, DLQ_CONNECT_REQUEST, item._type)
@@ -415,82 +437,123 @@ func TestHandleClientCommand_v_PopulatesDigipeaters(t *testing.T) {
 	assert.Equal(t, "Q4TEST", item.addrs[AX25_REPEATER_1+1])
 }
 
-func TestAgwConnectedModeAllowed_OutOfRange(t *testing.T) {
-	var cfg audio_s
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+func TestConnectedModeAllowed_OutOfRange(t *testing.T) {
+	var s = new(AGWServer)
+	s.audioConfigP = new(audio_s)
 
-	assert.False(t, agwConnectedModeAllowed(MAX_TOTAL_CHANS))
-	assert.False(t, agwConnectedModeAllowed(255))
+	assert.False(t, s.connectedModeAllowed(MAX_TOTAL_CHANS))
+	assert.False(t, s.connectedModeAllowed(255))
 }
 
-func TestAgwConnectedModeAllowed_NilConfig_RadioRange(t *testing.T) {
-	save_audio_config_p = nil
+func TestConnectedModeAllowed_NilConfig_RadioRange(t *testing.T) {
+	var s = new(AGWServer)
 
-	assert.True(t, agwConnectedModeAllowed(0))
-	assert.True(t, agwConnectedModeAllowed(MAX_RADIO_CHANS-1))
+	assert.True(t, s.connectedModeAllowed(0))
+	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS-1))
 }
 
-func TestAgwConnectedModeAllowed_NilConfig_NCHANNELRange(t *testing.T) {
-	save_audio_config_p = nil
+func TestConnectedModeAllowed_NilConfig_NCHANNELRange(t *testing.T) {
+	var s = new(AGWServer)
 
-	assert.False(t, agwConnectedModeAllowed(MAX_RADIO_CHANS))
+	assert.False(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
 }
 
-func TestAgwConnectedModeAllowed_MediumRadio(t *testing.T) {
+// A caller with no server at all is judged as one with no configuration.
+func TestConnectedModeAllowed_NilServer(t *testing.T) {
+	var s *AGWServer
+
+	assert.True(t, s.connectedModeAllowed(0))
+	assert.False(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
+}
+
+func TestConnectedModeAllowed_MediumRadio(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	cfg.chan_medium[0] = MEDIUM_RADIO
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	assert.True(t, agwConnectedModeAllowed(0))
+	assert.True(t, s.connectedModeAllowed(0))
 }
 
-func TestAgwConnectedModeAllowed_MediumNETTNC(t *testing.T) {
+func TestConnectedModeAllowed_MediumNETTNC(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	assert.True(t, agwConnectedModeAllowed(MAX_RADIO_CHANS))
+	assert.True(t, s.connectedModeAllowed(MAX_RADIO_CHANS))
 }
 
-func TestAgwConnectedModeAllowed_MediumIGate(t *testing.T) {
+func TestConnectedModeAllowed_MediumIGate(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	cfg.chan_medium[0] = MEDIUM_IGATE
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	assert.False(t, agwConnectedModeAllowed(0))
+	assert.False(t, s.connectedModeAllowed(0))
 }
 
-func TestAgwConnectedModeAllowed_MediumNone(t *testing.T) {
+func TestConnectedModeAllowed_MediumNone(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	// chan_medium[0] defaults to MEDIUM_NONE
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	assert.False(t, agwConnectedModeAllowed(0))
+	assert.False(t, s.connectedModeAllowed(0))
 }
 
 func TestHandleClientCommand_X_NETTNCChannelReportsSuccess(t *testing.T) {
+	var s = new(AGWServer)
+
 	var cfg audio_s
 	cfg.chan_medium[MAX_RADIO_CHANS] = MEDIUM_NETTNC
-	save_audio_config_p = &cfg
-	t.Cleanup(func() { save_audio_config_p = nil })
+	s.audioConfigP = &cfg
 
-	var client = setupClientPipe(t)
+	var client = setupClientPipe(t, s)
 	var replyCh = asyncReply(client)
 
 	var cmd = new(AGWPEMessage)
 	cmd.Header.DataKind = 'X'
 	cmd.Header.Portx = MAX_RADIO_CHANS
 	copy(cmd.Header.CallFrom[:], "Q1TEST")
-	handleClientCommand(0, cmd)
+	s.handleClientCommand(0, cmd)
 
 	var reply = <-replyCh
 	require.NotNil(t, reply)
 	assert.Equal(t, byte('X'), reply.Header.DataKind)
 	require.Len(t, reply.Data, 1)
 	assert.Equal(t, byte(1), reply.Data[0]) // success
+}
+
+// A server with no audio configuration has nothing to describe, so 'G' reports
+// no ports.  The struct allows a nil configuration and connectedModeAllowed
+// honours that, so this must not be the one place that falls over on it.
+func TestHandleClientCommand_G_NilAudioConfig(t *testing.T) {
+	var s = new(AGWServer)
+	require.Nil(t, s.audioConfigP, "this test is about the nil case")
+
+	var client = setupClientPipe(t, s)
+	var replyCh = asyncReply(client)
+
+	var cmd = new(AGWPEMessage)
+	cmd.Header.DataKind = 'G'
+	s.handleClientCommand(0, cmd)
+
+	var reply = <-replyCh
+	require.NotNil(t, reply)
+	assert.Equal(t, byte('G'), reply.Header.DataKind)
+	assert.Equal(t, "0;", string(reply.Data))
+}
+
+// The debug level has to be in place before the constructor starts the
+// goroutines that consult it, so it is given rather than set afterwards.
+func TestNewAGWServer_TakesTheDebugLevel(t *testing.T) {
+	var mc = new(misc_config_s) /* agwpe_port 0, so no goroutines to stop. */
+
+	assert.Equal(t, 2, NewAGWServer(t.Context(), nil, mc, 2).debug)
+	assert.Equal(t, 0, NewAGWServer(t.Context(), nil, mc, 0).debug)
 }

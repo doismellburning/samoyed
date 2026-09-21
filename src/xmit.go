@@ -930,7 +930,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 
 	// Optionally send confirmation to AGW client app if monitoring enabled.
 
-	server_send_monitored(c, pp, 1)
+	agwServer.SendMonitored(c, pp, 1)
 
 	return nb
 } /* end send_one_frame */
