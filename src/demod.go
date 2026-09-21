@@ -1021,7 +1021,7 @@ func demod_process_sample(channel int, subchan int, sam int) {
 /* Cranking up the input level produces no more than 97 or 98. */
 /* We currently produce a message when this goes over 90. */
 
-func demod_get_audio_level_real(channel int, subchan int) ALevel {
+func demod_get_audio_level(channel int, subchan int) ALevel {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 

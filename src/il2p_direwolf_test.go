@@ -19,8 +19,6 @@ import (
  *--------------------------------------------------------------*/
 
 func Test_IL2P(t *testing.T) {
-	IL2P_TEST = true
-
 	var enable_color = 1
 	TextColorInit(enable_color)
 
@@ -54,8 +52,6 @@ func Test_IL2P(t *testing.T) {
 	// Use same serialize / deserialize functions used on the air.
 
 	test_serdes(t)
-
-	IL2P_TEST = false
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -756,7 +752,8 @@ func test_serdes(t *testing.T) {
 	// Level bit rather than assume the v0.6 fixed size.
 	il2pTestChannelVersion(t, IL2P_VERSION_0_4)
 
-	il2pSerdesRecCount = 0
+	var recorder = il2pLoopback(t)
+	var recCount = 0
 
 	// try combinations of header type, max_fec, polarity, errors.
 
@@ -773,18 +770,30 @@ func test_serdes(t *testing.T) {
 		var channel = 0
 
 		for max_fec := range 2 {
-			//nolint:intrange // il2pSerdesPolarity is a package-level global read by callbacks; a range loop would shadow it with a local.
-			for il2pSerdesPolarity = 0; il2pSerdesPolarity <= 2; il2pSerdesPolarity++ { // 2 means throw in some errors.
-				var num_bits_sent = il2p_send_frame(channel, pp, IL2P_VERSION_0_4, max_fec, il2pSerdesPolarity)
+			for polarity := range 3 { // 2 means throw in some errors.
+				var num_bits_sent = il2p_send_frame(channel, pp, IL2P_VERSION_0_4, max_fec, polarity)
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
 				il2p_rec_bit(0, 0, 0, 0)
+
+				// Whatever came back should be the frame that went out, with
+				// the errors polarity 2 introduced all corrected.
+				for _, frame := range recorder.take() {
+					recCount++
+
+					assert.Equal(t, il2pTestText, string(frame.info))
+
+					if polarity == 2 {
+						assert.Equal(t, BitFixLevel(10), frame.retries)
+					} else {
+						assert.Zero(t, frame.retries)
+					}
+				}
 			}
 		}
 	}
 
-	dw_printf("Serdes receive count = %d\n", il2pSerdesRecCount)
-	// TODO KG Relies on multi_modem_process_rec_packet_fake: assert.True(t, il2pSerdesRecCount == 12)
-	il2pSerdesRecCount = -1 // disable deserialized packet test.
+	dw_printf("Serdes receive count = %d\n", recCount)
+	assert.Equal(t, 6, recCount, "every frame sent should have been received")
 }

@@ -12,12 +12,11 @@ var toneGenCapture func(channel int, data int)
 // tone_gen_put_bit hands one bit to whatever is standing in for the
 // modulator.
 func tone_gen_put_bit(channel int, data int) {
-	switch {
-	case toneGenCapture != nil:
+	if toneGenCapture != nil {
 		toneGenCapture(channel, data)
-	case IL2P_TEST:
-		tone_gen_put_bit_fake(channel, data)
-	default:
-		tone_gen_put_bit_real(channel, data)
+
+		return
 	}
+
+	tone_gen_put_bit_real(channel, data)
 }
