@@ -43,9 +43,9 @@ import (
 //
 // This was a file-scope static in Dire Wolf, as the IGate's own debug level
 // was; the port flattened both into one package variable named s_debug, so
-// whichever of igate_init and dwgpsnmea_init ran last decided the level for
-// both.  DirewolfMain starts the GPS after the IGate, so -dg silently
-// overrode -di.  See issue #674.
+// whichever of the two inits ran last decided the level for both.
+// DirewolfMain starts the GPS after the IGate, so -dg silently overrode -di.
+// See issue #674.
 var s_gpsnmea_debug int
 
 var s_save_configp *misc_config_s

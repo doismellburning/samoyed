@@ -2215,7 +2215,7 @@ func directiveTests() map[string][]directiveCase {
 				},
 			},
 			{
-				// igate_init insists on both, so a login with no passcode leaves the
+				// The IGate insists on both, so a login with no passcode leaves the
 				// gateway switched off rather than half configured.
 				name:   "a missing passcode leaves nothing to log in with",
 				config: "MYCALL Q1TEST\nIGLOGIN Q1TEST\n",

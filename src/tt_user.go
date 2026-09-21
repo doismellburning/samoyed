@@ -779,7 +779,7 @@ func xmit_object_report(i int, first_time bool) {
 	if first_time && save_tt_config_p.obj_send_to_ig > 0 {
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("xmit_object_report (): send to IGate\n");
-		igate_send_rec_packet(save_tt_config_p.obj_recv_chan, pp)
+		igate.sendRecPacket(save_tt_config_p.obj_recv_chan, pp)
 	}
 
 	if !first_time && save_tt_config_p.obj_xmit_chan >= 0 {

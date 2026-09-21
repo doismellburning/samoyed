@@ -799,7 +799,8 @@ x = Silence FX.25 information.`)
 	 */
 	mheardDB = NewMHeardDB(d_m_opt)
 	digipeater_init(audio_config, &digi_config)
-	igate_init(ctx, audio_config, &igate_config, &digi_config, d_i_opt)
+	igate = NewIGate(audio_config, &igate_config, &digi_config, d_i_opt)
+	igate.start(ctx)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(misc_config, d_c_opt)
@@ -1274,7 +1275,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * confidence that it is correct.
 		 */
 		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			igate_send_rec_packet(channel, pp)
+			igate.sendRecPacket(channel, pp)
 		}
 
 		/* Send out a regenerated copy. Applies to all types, not just APRS. */

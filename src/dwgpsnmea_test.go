@@ -276,8 +276,8 @@ func Test_dwgpsnmea_gpgga(t *testing.T) {
 func TestDWGPSNMEAInitLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	var server = setupIGate(t)
 
-	s_debug = 3
-	save_igate_config_p.rx2ig_dedupe_time = 30
+	igate.debugLevel = 3
+	igate.config.rx2ig_dedupe_time = 30
 
 	// No serial port configured, so this does nothing but record the level.
 	require.Equal(t, 0, dwgpsnmea_init(t.Context(), new(misc_config_s), 0))
@@ -285,7 +285,7 @@ func TestDWGPSNMEAInitLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { igate_send_rec_packet(0, pp) })
+	var output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "rx_to_ig_allow? YES", "the IGate stopped reporting at its own debug level")
 

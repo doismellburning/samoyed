@@ -244,7 +244,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
 			dw_printf("\n")
 
-			igate_send_rec_packet(channel, pp)
+			igate.sendRecPacket(channel, pp)
 		} else { // network TNC
 			dw_printf("[%d>nt%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
