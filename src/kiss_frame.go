@@ -639,6 +639,24 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 				return
 			}
 
+			if kf.kiss_len >= MAX_KISS_LEN {
+				/*
+				 * The frame ran past the end of the buffer, so the closing FEND
+				 * has nowhere to go and what we did collect is only the first
+				 * MAX_KISS_LEN bytes of something longer.  Throw it away and go
+				 * back to looking for the next frame, rather than acting on a
+				 * fragment - or writing one past the end of kiss_msg, which is
+				 * what used to happen here.
+				 */
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
+
+				kf.kiss_len = 0
+				kf.state = KS_SEARCHING
+
+				return
+			}
+
 			kf.kiss_msg[kf.kiss_len] = ch
 
 			kf.kiss_len++

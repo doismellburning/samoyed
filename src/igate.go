@@ -1302,7 +1302,11 @@ func maybe_xmit_packet_from_igate(message []byte, to_chan int) {
 		/* includes ssid. Do we want to ignore it? */
 		var via = ax25_get_addr_with_ssid(pp3, n+AX25_REPEATER_1)
 
-		if via == "qAX" || // qAX deprecated. http://www.aprs-is.net/q.aspx
+		// "QAX" rather than "qAX": the addresses come back from the parser
+		// upper-cased, whatever case they arrived in, so the q construct
+		// never matched its own spelling and a packet from a station that
+		// did not identify itself properly went out over the air.
+		if via == "QAX" || // qAX deprecated. http://www.aprs-is.net/q.aspx
 			via == "TCPXX" || // TCPXX deprecated.
 			via == "RFONLY" ||
 			via == "NOGATE" {

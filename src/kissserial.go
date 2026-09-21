@@ -198,16 +198,19 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 
 		kiss_buff = fbuf
 	} else {
-		var stemp []byte
-		var leader = byte((channel << 4) | kiss_cmd)
-		stemp = append([]byte{leader}, fbuf...)
-
+		// Truncating before the frame is assembled, rather than after: the
+		// slicing below used to happen once fbuf had already been copied into
+		// stemp, so the client was told the frame had been truncated and then
+		// handed the whole of it anyway.
 		if flen > AX25_MAX_PACKET_LEN {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
 
 			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
+
+		var leader = byte((channel << 4) | kiss_cmd)
+		var stemp = append([]byte{leader}, fbuf...)
 
 		if kissserial_debug >= 2 {
 			/* AX.25 frame with the CRC removed. */

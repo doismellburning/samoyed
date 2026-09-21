@@ -64,6 +64,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 /*
@@ -128,6 +129,35 @@ func kisspt_init(ctx context.Context, mc *misc_config_s) {
 	logrus.WithField("pt_master_open", pt_master != nil).Debug("end of kisspt_init")
 }
 
+// pollable hands back a *os.File for the same open file as f, in non-blocking
+// mode so that the Go runtime's poller owns it, and closes f.
+//
+// pty.Open issues its ioctls through (*os.File).Fd(), which hands back a
+// descriptor in blocking mode and takes it out of the poller for good.  A
+// descriptor the poller does not own cannot be woken by Close, so the
+// listening goroutine - which spends its life blocked in a read of the master,
+// with nothing obliging the client at the far end to ever send anything -
+// would have no way of ever stopping.  Duplicating rather than setting
+// O_NONBLOCK on f's own descriptor keeps f's eventual finalizer away from the
+// descriptor we go on using.
+func pollable(f *os.File) (*os.File, error) {
+	var fd, dupErr = unix.Dup(int(f.Fd()))
+	if dupErr != nil {
+		return nil, dupErr
+	}
+
+	f.Close()
+
+	var nonblockErr = unix.SetNonblock(fd, true)
+	if nonblockErr != nil {
+		unix.Close(fd)
+
+		return nil, nonblockErr
+	}
+
+	return os.NewFile(uintptr(fd), f.Name()), nil
+}
+
 func kisspt_open_pt() {
 	logrus.Debug("kisspt_open_pt")
 	var ptmx, pts, err = pty.Open()
@@ -138,7 +168,16 @@ func kisspt_open_pt() {
 		return
 	}
 
-	pt_master = ptmx
+	var master, pollableErr = pollable(ptmx)
+	if pollableErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("ERROR - Could not set up pseudo terminal for KISS TNC: %s.\n", pollableErr)
+		pts.Close()
+
+		return
+	}
+
+	pt_master = master
 	pt_slave = pts
 
 	// TODO KG Figure out the right serial settings?

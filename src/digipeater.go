@@ -105,7 +105,7 @@ var dedupeService *DedupeService
 
 var digi_count [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 
-func digipeater_get_count(from_chan, to_chan int) int { //nolint:unused
+func digipeater_get_count(from_chan, to_chan int) int {
 	return (digi_count[from_chan][to_chan])
 }
 
@@ -154,6 +154,12 @@ func digipeater(from_chan int, pp *packet_t) {
 			digipeater_audio_config.chan_medium[from_chan] != MEDIUM_NETTNC) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("APRS digipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+
+		// Saying so and then carrying on meant indexing the per-channel
+		// configuration with the very channel number just called invalid,
+		// which takes the program down rather than rejecting the frame.
+		// cdigipeater has always returned here.
+		return
 	}
 
 	/*

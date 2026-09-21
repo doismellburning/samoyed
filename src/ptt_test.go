@@ -1,12 +1,15 @@
 package direwolf
 
 import (
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 // mockGPIODLine is a test double for gpiodOutputLine that records calls
@@ -486,4 +489,323 @@ func TestPttTermBeforeAudioConfig(t *testing.T) {
 	t.Cleanup(func() { save_audio_config_p = saved })
 
 	require.NotPanics(t, ptt_term)
+}
+
+// The debug level decides how much the PTT code says about what it is doing,
+// which is the only way to tell a miswired interface from a misconfigured one.
+func TestPttSetDebug(t *testing.T) {
+	var orig = ptt_debug_level
+
+	t.Cleanup(func() { ptt_debug_level = orig })
+
+	ptt_set_debug(2)
+
+	assert.Equal(t, 2, ptt_debug_level)
+}
+
+// "-dpp" prints every channel's PTT configuration at start up, and then each
+// change to it.
+func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
+	var orig = ptt_debug_level
+
+	t.Cleanup(func() { ptt_debug_level = orig })
+
+	ptt_set_debug(2)
+
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	useAudioConfig(t, cfg)
+
+	var output = CaptureOutput(t, func() {
+		require.NoError(t, ptt_init(cfg))
+
+		ptt_set_real(OCTYPE_PTT, 0, 1)
+	})
+
+	assert.Contains(t, output, "ch=0, PTT method=")
+	assert.Contains(t, output, "PTT 0 = 1")
+}
+
+// An NCHANNEL is somebody else's TNC on the far end of a socket: there is no
+// PTT hardware here to key, and no configuration for it to look at either.
+func TestPttSetRealNetworkChannel(t *testing.T) {
+	var cfg = new(audio_s)
+	useAudioConfig(t, cfg)
+
+	assert.NotPanics(t, func() { ptt_set_real(OCTYPE_PTT, MAX_RADIO_CHANS, 1) })
+}
+
+// Keying a channel that is not a radio is a mistake worth saying out loud.
+func TestPttSetRealInvalidChannel(t *testing.T) {
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_NONE
+	useAudioConfig(t, cfg)
+
+	var output = CaptureOutput(t, func() { ptt_set_real(OCTYPE_PTT, 0, 1) })
+
+	assert.Contains(t, output, "did not expect invalid channel")
+}
+
+// serialLineChange is one change made to a serial port's control lines.
+type serialLineChange struct {
+	bit int
+	on  bool
+}
+
+// name gives the control line a change was made to the name the configuration
+// calls it by.
+func (c serialLineChange) name() string {
+	switch c.bit {
+	case unix.TIOCM_RTS:
+		return "RTS"
+	case unix.TIOCM_DTR:
+		return "DTR"
+	default:
+		return fmt.Sprintf("unknown line 0x%x", c.bit)
+	}
+}
+
+// captureSerialControlLines collects the changes made to a serial port's
+// control lines rather than letting them reach the port, which neither a
+// pseudo terminal nor a plain file has any of.
+func captureSerialControlLines(t *testing.T) *[]serialLineChange {
+	t.Helper()
+
+	var changes = new([]serialLineChange)
+
+	serialControlCapture = func(bit int, on bool) {
+		*changes = append(*changes, serialLineChange{bit: bit, on: on})
+	}
+
+	t.Cleanup(func() { serialControlCapture = nil })
+
+	return changes
+}
+
+// openTestPTTSerialPort sets up a channel whose PTT is driven by a serial
+// control line, using a file that can be opened in place of a real port, and
+// collects the line changes that would have gone to it.
+func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*audio_s, *[]serialLineChange) {
+	t.Helper()
+
+	var device = filepath.Join(t.TempDir(), "tty")
+	require.NoError(t, os.WriteFile(device, nil, 0o600))
+
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = device
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = line
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line2 = line2
+	useAudioConfig(t, cfg)
+
+	require.NoError(t, ptt_init(cfg))
+
+	t.Cleanup(ptt_term)
+
+	require.NotNil(t, ptt_fd[0][OCTYPE_PTT], "the serial port was not opened")
+
+	// After ptt_init, which sets the initial state off and would otherwise
+	// show up as a change the test did not ask for.
+	return cfg, captureSerialControlLines(t)
+}
+
+// Both control lines a serial port can key with, in both directions, and the
+// second line, which most interfaces drive in the opposite phase.
+func TestPttSetRealSerialLines(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		line  ptt_line_t
+		line2 ptt_line_t
+		keyed []serialLineChange
+		unkey []serialLineChange
+	}{
+		{
+			name: "RTS", line: PTT_LINE_RTS, line2: PTT_LINE_NONE,
+			keyed: []serialLineChange{{unix.TIOCM_RTS, true}},
+			unkey: []serialLineChange{{unix.TIOCM_RTS, false}},
+		},
+		{
+			name: "DTR", line: PTT_LINE_DTR, line2: PTT_LINE_NONE,
+			keyed: []serialLineChange{{unix.TIOCM_DTR, true}},
+			unkey: []serialLineChange{{unix.TIOCM_DTR, false}},
+		},
+		{
+			name: "RTS and DTR", line: PTT_LINE_RTS, line2: PTT_LINE_DTR,
+			keyed: []serialLineChange{{unix.TIOCM_RTS, true}, {unix.TIOCM_DTR, true}},
+			unkey: []serialLineChange{{unix.TIOCM_RTS, false}, {unix.TIOCM_DTR, false}},
+		},
+		{
+			name: "DTR and RTS", line: PTT_LINE_DTR, line2: PTT_LINE_RTS,
+			keyed: []serialLineChange{{unix.TIOCM_DTR, true}, {unix.TIOCM_RTS, true}},
+			unkey: []serialLineChange{{unix.TIOCM_DTR, false}, {unix.TIOCM_RTS, false}},
+		},
+		{
+			name: "neither", line: PTT_LINE_NONE, line2: PTT_LINE_NONE,
+			keyed: nil,
+			unkey: nil,
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var _, changes = openTestPTTSerialPort(t, c.line, c.line2)
+
+			ptt_set_real(OCTYPE_PTT, 0, 1)
+
+			assert.Equal(t, c.keyed, *changes, "keying drove the wrong lines")
+
+			*changes = nil
+
+			ptt_set_real(OCTYPE_PTT, 0, 0)
+
+			assert.Equal(t, c.unkey, *changes, "unkeying drove the wrong lines")
+		})
+	}
+}
+
+// Inverting a line is for an interface wired the other way round: the same
+// request drives the line the other way, and each line inverts on its own.
+func TestPttSetRealSerialInverted(t *testing.T) {
+	for _, c := range []struct {
+		name            string
+		invert, invert2 bool
+		keyed           []serialLineChange
+	}{
+		{
+			name: "neither", invert: false, invert2: false,
+			keyed: []serialLineChange{{unix.TIOCM_RTS, true}, {unix.TIOCM_DTR, true}},
+		},
+		{
+			name: "the first", invert: true, invert2: false,
+			keyed: []serialLineChange{{unix.TIOCM_RTS, false}, {unix.TIOCM_DTR, true}},
+		},
+		{
+			name: "the second", invert: false, invert2: true,
+			keyed: []serialLineChange{{unix.TIOCM_RTS, true}, {unix.TIOCM_DTR, false}},
+		},
+		{
+			name: "both", invert: true, invert2: true,
+			keyed: []serialLineChange{{unix.TIOCM_RTS, false}, {unix.TIOCM_DTR, false}},
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var cfg, changes = openTestPTTSerialPort(t, PTT_LINE_RTS, PTT_LINE_DTR)
+
+			cfg.achan[0].octrl[OCTYPE_PTT].ptt_invert = c.invert
+			cfg.achan[0].octrl[OCTYPE_PTT].ptt_invert2 = c.invert2
+
+			ptt_set_real(OCTYPE_PTT, 0, 1)
+
+			assert.Equal(t, c.keyed, *changes, "keying drove the wrong levels")
+		})
+	}
+}
+
+// The line names, for a failure message that says RTS rather than 0x4.
+func TestSerialLineChangeName(t *testing.T) {
+	assert.Equal(t, "RTS", serialLineChange{bit: unix.TIOCM_RTS, on: true}.name())
+	assert.Equal(t, "DTR", serialLineChange{bit: unix.TIOCM_DTR, on: true}.name())
+	assert.Contains(t, serialLineChange{bit: 0, on: false}.name(), "unknown line")
+}
+
+// The port is closed on the way out, so that a restart can open it again.
+func TestPttTermClosesTheSerialPort(t *testing.T) {
+	openTestPTTSerialPort(t, PTT_LINE_RTS, PTT_LINE_NONE)
+
+	ptt_term()
+
+	assert.Nil(t, ptt_fd[0][OCTYPE_PTT], "the serial port was not closed")
+}
+
+// Two channels keying different lines of the same serial port share the one
+// open device: it cannot be opened twice.
+func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
+	var device = filepath.Join(t.TempDir(), "tty")
+	require.NoError(t, os.WriteFile(device, nil, 0o600))
+
+	var cfg = new(audio_s)
+
+	for _, ch := range []int{0, 1} {
+		cfg.chan_medium[ch] = MEDIUM_RADIO
+		cfg.achan[ch].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
+		cfg.achan[ch].octrl[OCTYPE_PTT].ptt_device = device
+	}
+
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
+	cfg.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
+
+	useAudioConfig(t, cfg)
+
+	require.NoError(t, ptt_init(cfg))
+
+	t.Cleanup(ptt_term)
+
+	assert.Same(t, ptt_fd[0][OCTYPE_PTT], ptt_fd[1][OCTYPE_PTT],
+		"the same device should have been opened once and shared")
+}
+
+// A Windows-style port name is translated, because the configuration file is
+// the same on both and people copy each other's.
+func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = "COM3"
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
+	useAudioConfig(t, cfg)
+
+	var output = CaptureOutput(t, func() { require.NoError(t, ptt_init(cfg)) })
+
+	t.Cleanup(ptt_term)
+
+	assert.Contains(t, output, "to Linux equivalent '/dev/ttyS2'")
+	assert.Equal(t, "/dev/ttyS2", cfg.achan[0].octrl[OCTYPE_PTT].ptt_device)
+}
+
+// COM0 is not a thing; it is treated as COM1 rather than as /dev/ttyS-1.
+func TestPttSetupTranslatesCOM0(t *testing.T) {
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = "com0"
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
+	useAudioConfig(t, cfg)
+
+	CaptureOutput(t, func() { require.NoError(t, ptt_init(cfg)) })
+
+	t.Cleanup(ptt_term)
+
+	assert.Equal(t, "/dev/ttyS0", cfg.achan[0].octrl[OCTYPE_PTT].ptt_device)
+}
+
+// Reading an input line from a channel that is not a radio is the same kind
+// of mistake as keying one.
+func TestGetInputRealInvalidChannel(t *testing.T) {
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_NONE
+	useAudioConfig(t, cfg)
+
+	var result int
+
+	var output = CaptureOutput(t, func() { result = get_input_real(ICTYPE_TXINH, 0) })
+
+	assert.Equal(t, -1, result)
+	assert.Contains(t, output, "did not expect invalid channel")
+}
+
+// A CM108 audio adapter's HID node is owned by root, and the advice about
+// what to do is worth more than the error on its own.  Anything else is not a
+// permission problem, and gets no advice.
+func TestCM108PermissionAdvice(t *testing.T) {
+	var output = CaptureOutput(t, func() {
+		cm108_print_permission_advice("/dev/hidraw0", fs.ErrPermission)
+	})
+
+	assert.NotEmpty(t, output)
+	assert.Contains(t, output, "/dev/hidraw0")
+
+	output = CaptureOutput(t, func() {
+		cm108_print_permission_advice("/dev/hidraw0", fs.ErrNotExist)
+	})
+
+	assert.Empty(t, output, "only a permission problem gets the advice")
 }

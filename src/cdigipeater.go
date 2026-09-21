@@ -68,7 +68,7 @@ var save_cdigi_config_p *cdigi_config_s
 
 var cdigi_count [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int
 
-func cdigipeater_get_count(from_chan int, to_chan int) int { //nolint:unused
+func cdigipeater_get_count(from_chan int, to_chan int) int {
 	return (cdigi_count[from_chan][to_chan])
 }
 
