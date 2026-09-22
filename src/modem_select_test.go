@@ -502,8 +502,8 @@ func TestConfigModem(t *testing.T) {
 		{"MODEM 4800", "4800 8PSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 9600", "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 19200", "19200 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
-		{"MODEM AIS", "39999 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
-		{"MODEM ais", "39999 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM AIS", "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM ais", "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM EAS", "521 EAS 2083/1563 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 50", "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 	}

@@ -1996,6 +1996,7 @@ func handleMODEM(ps *parseState) error {
 		ps.audio.achan[ps.channel].space_freq = 0
 	} else if ps.audio.achan[ps.channel].baud == MAX_BAUD-1 {
 		ps.audio.achan[ps.channel].modem_type = MODEM_AIS
+		ps.audio.achan[ps.channel].baud = 9600
 		ps.audio.achan[ps.channel].mark_freq = 0
 		ps.audio.achan[ps.channel].space_freq = 0
 	} else if ps.audio.achan[ps.channel].baud == MAX_BAUD-2 {
