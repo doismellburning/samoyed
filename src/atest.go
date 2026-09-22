@@ -786,7 +786,7 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 	achan.decimate = *f.decimate
 
 	if *f.upsample != 0 {
-		if *f.upsample < 1 || *f.upsample > 8 {
+		if *f.upsample < 1 || *f.upsample > 4 {
 			return fmt.Errorf("upsample should be between 1 and 4 inclusive, not %d", *f.upsample)
 		}
 

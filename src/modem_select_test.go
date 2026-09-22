@@ -418,7 +418,7 @@ func TestModemOptions(t *testing.T) {
 			args: []string{"-U", "5"},
 			want: map[string]string{
 				"direwolf": "error: crazy value for -U: 5",
-				"atest":    "1200 AFSK 1200/2200 profiles=\"A\" v26=- D=0 U=5 AX25 fx25=0 fec=0 inv=0",
+				"atest":    "error: upsample should be between 1 and 4 inclusive, not 5",
 			},
 		},
 		{
