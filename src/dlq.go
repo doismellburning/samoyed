@@ -21,6 +21,7 @@ package direwolf
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -143,11 +144,17 @@ var dlq_wake_up_chan = make(chan struct{}, 1)
 
 var was_init bool /* was initialization performed? */
 
-var s_new_count = 0    /* To detect memory leak for queue items. */
-var s_delete_count = 0 // TODO:  need to test.
+// The leak counters are atomic because nothing else serialises them: items
+// are made by every receive thread, the AGW server's client goroutines, the
+// beacon and the IGate, and deleted by the receive processing thread, while
+// connected-mode data blocks are made by the AGW server and freed by the link
+// state machine.
 
-var s_cdata_new_count = 0    /* To detect memory leak for connected mode data. */
-var s_cdata_delete_count = 0 // TODO:  need to test.
+var s_new_count atomic.Int64    /* To detect memory leak for queue items. */
+var s_delete_count atomic.Int64 // TODO:  need to test.
+
+var s_cdata_new_count atomic.Int64    /* To detect memory leak for connected mode data. */
+var s_cdata_delete_count atomic.Int64 // TODO:  need to test.
 
 /*-------------------------------------------------------------------
  *
@@ -267,11 +274,12 @@ func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel 
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	var new_count = s_new_count.Add(1)
+	var delete_count = s_delete_count.Load()
 
-	if s_new_count > s_delete_count+50 {
+	if new_count > delete_count+50 {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR:  DLQ memory leak, new=%d, delete=%d\n", s_new_count, s_delete_count)
+		dw_printf("INTERNAL ERROR:  DLQ memory leak, new=%d, delete=%d\n", new_count, delete_count)
 	}
 
 	pnew.nextp = nil
@@ -452,7 +460,7 @@ func dlq_connect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_CONNECT_REQUEST
 	pnew._chan = channel
@@ -499,7 +507,7 @@ func dlq_disconnect_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel 
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_DISCONNECT_REQUEST
 	pnew._chan = channel
@@ -551,7 +559,7 @@ func dlq_outstanding_frames_request(addrs [AX25_MAX_ADDRS]string, num_addr int, 
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_OUTSTANDING_FRAMES_REQUEST
 	pnew._chan = channel
@@ -607,7 +615,7 @@ func dlq_xmit_data_request(addrs [AX25_MAX_ADDRS]string, num_addr int, channel i
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_XMIT_DATA_REQUEST
 	pnew._chan = channel
@@ -661,7 +669,7 @@ func dlq_register_callsign(addr string, channel int, client int) {
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_REGISTER_CALLSIGN
 	pnew._chan = channel
@@ -685,7 +693,7 @@ func dlq_unregister_callsign(addr string, channel int, client int) {
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_UNREGISTER_CALLSIGN
 	pnew._chan = channel
@@ -732,7 +740,7 @@ func dlq_channel_busy(channel int, activity int, status int) {
 
 		/* Allocate a new queue item. */
 		var pnew = new(dlq_item_t)
-		s_new_count++
+		s_new_count.Add(1)
 
 		pnew._type = DLQ_CHANNEL_BUSY
 		pnew._chan = channel
@@ -767,7 +775,7 @@ func dlq_seize_confirm(channel int) {
 
 	/* Allocate a new queue item. */
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	pnew._type = DLQ_SEIZE_CONFIRM
 	pnew._chan = channel
@@ -801,7 +809,7 @@ func dlq_client_cleanup(client int) {
 
 	/* Allocate a new queue item. */
 	var pnew = new(dlq_item_t)
-	s_new_count++
+	s_new_count.Add(1)
 
 	// All we care about is the client number.
 
@@ -952,7 +960,7 @@ func dlq_delete(pitem *dlq_item_t) {
 		return
 	}
 
-	s_delete_count++
+	s_delete_count.Add(1)
 
 	pitem.pp = nil
 
@@ -987,7 +995,7 @@ func dlq_delete(pitem *dlq_item_t) {
  *--------------------------------------------------------------------*/
 
 func cdata_new(pid int, data []byte) *cdata_t {
-	s_cdata_new_count++
+	s_cdata_new_count.Add(1)
 
 	var cdata = new(cdata_t)
 
@@ -1029,7 +1037,7 @@ func cdata_delete(cdata *cdata_t) {
 		return
 	}
 
-	s_cdata_delete_count++
+	s_cdata_delete_count.Add(1)
 
 	cdata.magic = 0
 } /* end cdata_delete */
@@ -1045,9 +1053,12 @@ func cdata_delete(cdata *cdata_t) {
  *--------------------------------------------------------------------*/
 
 func cdata_check_leak() {
-	if s_cdata_delete_count != s_cdata_new_count {
+	var new_count = s_cdata_new_count.Load()
+	var delete_count = s_cdata_delete_count.Load()
+
+	if delete_count != new_count {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal Error, cdata_check_leak, new=%d, delete=%d\n", s_cdata_new_count, s_cdata_delete_count)
+		dw_printf("Internal Error, cdata_check_leak, new=%d, delete=%d\n", new_count, delete_count)
 	}
 } /* end cdata_check_leak */
 
