@@ -552,6 +552,12 @@ func TestDirewolfModemOptionsOverConfig(t *testing.T) {
 		{"MODEM 4800 TUVW\n", []string{"-B", "300"}, "300 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM EAS\n", []string{"-B", "1200"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 1200 E+\n", []string{"-B", "9600", "-P", "+"}, "9600 SCRAMBLE 0/0 profiles=\"+\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+
+		// 0 asks for the automatic choice, over one the configuration file made.
+		{"MODEM 1200 /3\n", []string{}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=3 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 /3\n", []string{"-D", "0"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 9600 *2\n", []string{}, "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=2 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 9600 *2\n", []string{"-U", "0"}, "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 	}
 
 	for _, tt := range tests {

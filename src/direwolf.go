@@ -1356,8 +1356,8 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.profiles = *f.profile
 	}
 
-	if *f.decimate != 0 {
-		if *f.decimate < 1 || *f.decimate > 8 {
+	if f.fs.Changed("decimate") {
+		if *f.decimate < 0 || *f.decimate > 8 {
 			return fmt.Errorf("crazy value for -D: %d", *f.decimate)
 		}
 
@@ -1365,8 +1365,8 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.decimate = *f.decimate
 	}
 
-	if *f.upsample != 0 {
-		if *f.upsample < 1 || *f.upsample > 4 {
+	if f.fs.Changed("upsample") {
+		if *f.upsample < 0 || *f.upsample > 4 {
 			return fmt.Errorf("crazy value for -U: %d", *f.upsample)
 		}
 
