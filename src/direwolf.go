@@ -1391,9 +1391,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 
 	if *f.il2pNormal >= 0 {
 		achan.layer2_xmit = LAYER2_IL2P
-		if *f.il2pNormal > 0 {
-			achan.il2p_max_fec = 1
-		}
+		achan.il2p_max_fec = IfThenElse(*f.il2pNormal > 0, 1, 0)
 
 		if achan.il2p_max_fec == 0 {
 			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -I for best results.\n")
@@ -1404,9 +1402,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 
 	if *f.il2pInverted >= 0 {
 		achan.layer2_xmit = LAYER2_IL2P
-		if *f.il2pInverted > 0 {
-			achan.il2p_max_fec = 1
-		}
+		achan.il2p_max_fec = IfThenElse(*f.il2pInverted > 0, 1, 0)
 
 		if achan.il2p_max_fec == 0 {
 			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -i for best results.\n")

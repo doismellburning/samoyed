@@ -445,8 +445,15 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-I", "0"},
 			want: map[string]string{
-				"direwolf":    "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=1 inv=0",
+				"direwolf":    "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=0 inv=0",
 				"gen_packets": "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=0 inv=0",
+			},
+		},
+		{
+			args: []string{"-i", "0"},
+			want: map[string]string{
+				"direwolf":    "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=0 inv=1",
+				"gen_packets": "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=0 inv=1",
 			},
 		},
 		{
@@ -565,6 +572,10 @@ func TestDirewolfModemOptionsOverConfig(t *testing.T) {
 		{"MODEM 1200 /3\n", []string{"-D", "0"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 9600 *2\n", []string{}, "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=2 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 9600 *2\n", []string{"-U", "0"}, "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+
+		// -I and -i choose the FEC strength whichever way IL2PTX went.
+		{"IL2PTX 0\n", []string{"-I", "1"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=1 inv=0"},
+		{"IL2PTX 1\n", []string{"-I", "0"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=0 inv=0"},
 	}
 
 	for _, tt := range tests {
