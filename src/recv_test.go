@@ -72,7 +72,7 @@ func setupRecvTest(t *testing.T, audioConfig *audio_s, samples []byte) {
 		save_audio_config_p, save_pa = origAudioConfig, origPA
 	})
 
-	multi_modem_init(audioConfig)
+	multi_modem_init(audioConfig, new(radioSink))
 	startRecvTestAudio(t, bytes.NewReader(samples), int32(len(samples)))
 }
 

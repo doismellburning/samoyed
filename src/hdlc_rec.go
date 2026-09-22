@@ -83,6 +83,7 @@ type HDLCReceiver struct {
 	numSubchannel [MAX_RADIO_CHANS]int //TODO1.2 use ptr rather than copy.
 	compositeDCD  [MAX_RADIO_CHANS][MAX_SUBCHANS + 1][MAX_SLICERS]bool
 	audio         *audio_s
+	sink          ReceiveSink
 
 	// Own copy of random number generator so we can get
 	// same predictable results on different operating systems.
@@ -114,16 +115,20 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
  *
  * Purpose:	Call once at the beginning to initialize.
  *
- * Inputs:	None.
+ * Inputs:	pa	- Audio configuration.
+ *
+ *		sink	- Where a change in the channel's data carrier detect
+ *			  state is reported.
  *
  ***********************************************************************************/
 
-func NewHDLCReceiver(pa *audio_s) *HDLCReceiver {
+func NewHDLCReceiver(pa *audio_s, sink ReceiveSink) *HDLCReceiver {
 	//text_color_set(DW_COLOR_DEBUG);
 	//dw_printf ("NewHDLCReceiver (%p) \n", pa);
 
 	var r = new(HDLCReceiver)
 	r.audio = pa
+	r.sink = sink
 	r.randSeed = 1
 
 	for ch := range MAX_RADIO_CHANS {
@@ -706,7 +711,7 @@ func (r *HDLCReceiver) DCDChange(channel int, subchannel int, slice int, state i
 	var newVal = r.DataDetectAny(channel)
 
 	if newVal != old {
-		ptt_set(OCTYPE_DCD, channel, newVal)
+		r.sink.DCDChange(channel, newVal)
 		metrics.SetDCD(channel, newVal != 0)
 	}
 }

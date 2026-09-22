@@ -101,6 +101,25 @@ const PROCESS_AFTER_BITS = 3
 
 var process_age [MAX_RADIO_CHANS]int
 
+// A ReceiveSink is where what the demodulators hear ends up: the data carrier
+// detect state they derive from the incoming signal.
+//
+// radioSink is the sink for a radio channel being listened to for real.
+// samoyed-atest, which decodes a .WAV file to report on what is in it rather
+// than to act on it, has its own.
+type ReceiveSink interface {
+	// DCDChange reports that the decoders for a channel have collectively
+	// started (state 1) or stopped (state 0) seeing data.
+	DCDChange(channel int, state int)
+}
+
+// radioSink is the ReceiveSink for a channel with a radio on the end of it.
+type radioSink struct{}
+
+func (s *radioSink) DCDChange(channel int, state int) {
+	ptt_set(OCTYPE_DCD, channel, state)
+}
+
 /*------------------------------------------------------------------------------
  *
  * Name:	multi_modem_init
@@ -110,20 +129,22 @@ var process_age [MAX_RADIO_CHANS]int
  *
  * Input:	Modem properties structure as filled in from the configuration file.
  *
+ *		sink	- Where the decoders' output goes.
+ *
  * Outputs:
  *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func multi_modem_init(pa *audio_s) {
+func multi_modem_init(pa *audio_s, sink ReceiveSink) {
 	/*
 	 * Save audio configuration for later use.
 	 */
 	save_audio_config_p = pa
 
 	demod_init(save_audio_config_p)
-	hdlcReceiver = NewHDLCReceiver(save_audio_config_p)
+	hdlcReceiver = NewHDLCReceiver(save_audio_config_p, sink)
 
 	for channel := range MAX_RADIO_CHANS {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {

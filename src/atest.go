@@ -106,7 +106,6 @@ var sample_number = -1 /* Sample number from the file. */
 
 var h_opt = false // Hexadecimal display of received packet.
 var d_o_opt = 0   // "-d o" option for DCD output control. */
-var dcd_count = 0
 var dcd_missing_errors = 0
 
 const EXPERIMENT_G = true
@@ -138,6 +137,10 @@ func AtestMain() {
 	ATEST_C = true
 
 	var count [MAX_SUBCHANS]int // Experiments G and H
+
+	// One sink for the whole run, so its DCD counts are of everything
+	// decoded rather than of the file being decoded at the time.
+	var sink = new(atestSink)
 
 	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
@@ -629,7 +632,7 @@ o = DCD output control
 		 * Initialize the AFSK demodulator and HDLC decoder.
 		 * Needs to be done for each file because they could have different sample rates.
 		 */
-		multi_modem_init(my_audio_config)
+		multi_modem_init(my_audio_config, sink)
 
 		packets_decoded_one = 0
 
@@ -694,7 +697,7 @@ o = DCD output control
 	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/float64(elapsed.Seconds()))
 
 	if d_o_opt > 0 {
-		fmt.Printf("DCD count = %d\n", dcd_count)
+		fmt.Printf("DCD count = %d\n", sink.dcdCount)
 		fmt.Printf("DCD missing errors = %d\n", dcd_missing_errors)
 	}
 
@@ -714,7 +717,7 @@ o = DCD output control
 	// as the process is about to end anyway, but the tests all run in one
 	// process: anything after a test that calls this would otherwise get
 	// the fakes - audio samples read from a WAV file that has been closed,
-	// received frames counted instead of queued, PTT going nowhere.
+	// received frames counted instead of queued.
 	ATEST_C = false
 }
 
@@ -886,25 +889,30 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 	*/
 } /* end fake dlq_append */
 
-var dcd_start_seconds [MAX_RADIO_CHANS]float64
+// atestSink is where atest's decoders report what they have heard.  A running
+// Samoyed acts on that - keying a DCD output line - where atest reports on it:
+// with "-d o", the time the channel was busy for.
+type atestSink struct {
+	dcdCount        int
+	dcdStartSeconds [MAX_RADIO_CHANS]float64
+}
 
-func ptt_set_fake(_ int, channel int, ptt_signal int) {
-	// Should only get here for DCD output control.
+func (s *atestSink) DCDChange(channel int, state int) {
 	if d_o_opt > 0 {
 		var t = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 
 		text_color_set(DW_COLOR_INFO)
 
-		if ptt_signal != 0 {
+		if state != 0 {
 			//sec1 = t;
 			//min1 = (int)(sec1 / 60.);
 			//sec1 -= min1 * 60;
 			//dw_printf ("DCD[%d] = ON    %d:%06.3f\n",  channel, min1, sec1);
-			dcd_count++
-			dcd_start_seconds[channel] = t
+			s.dcdCount++
+			s.dcdStartSeconds[channel] = t
 		} else {
-			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - dcd_start_seconds[channel]) * 1000.);
-			var sec1 = dcd_start_seconds[channel]
+			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - s.dcdStartSeconds[channel]) * 1000.);
+			var sec1 = s.dcdStartSeconds[channel]
 			var min1 = (int)(sec1 / 60.)
 			sec1 -= float64(min1 * 60)
 
@@ -912,16 +920,7 @@ func ptt_set_fake(_ int, channel int, ptt_signal int) {
 			var min2 = (int)(sec2 / 60.)
 			sec2 -= float64(min2 * 60)
 
-			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-dcd_start_seconds[channel])*1000.)
+			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-s.dcdStartSeconds[channel])*1000.)
 		}
 	}
 }
-
-func ptt_set(ot int, channel int, ptt_signal int) {
-	if ATEST_C {
-		ptt_set_fake(ot, channel, ptt_signal)
-	} else {
-		ptt_set_real(ot, channel, ptt_signal)
-	}
-}
-

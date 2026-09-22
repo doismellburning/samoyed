@@ -59,7 +59,7 @@ func setupGPIODChannel(t *testing.T, invert bool) *mockGPIODLine {
 func TestPttSetRealGPIOD_Activate(t *testing.T) {
 	var mock = setupGPIODChannel(t, false)
 
-	ptt_set_real(OCTYPE_PTT, 0, 1)
+	ptt_set(OCTYPE_PTT, 0, 1)
 
 	assert.Equal(t, 1, mock.value, "line should be high when PTT is active")
 }
@@ -68,7 +68,7 @@ func TestPttSetRealGPIOD_Activate(t *testing.T) {
 func TestPttSetRealGPIOD_Deactivate(t *testing.T) {
 	var mock = setupGPIODChannel(t, false)
 
-	ptt_set_real(OCTYPE_PTT, 0, 0)
+	ptt_set(OCTYPE_PTT, 0, 0)
 
 	assert.Equal(t, 0, mock.value, "line should be low when PTT is inactive")
 }
@@ -78,7 +78,7 @@ func TestPttSetRealGPIOD_Deactivate(t *testing.T) {
 func TestPttSetRealGPIOD_Invert_Activate(t *testing.T) {
 	var mock = setupGPIODChannel(t, true)
 
-	ptt_set_real(OCTYPE_PTT, 0, 1)
+	ptt_set(OCTYPE_PTT, 0, 1)
 
 	assert.Equal(t, 0, mock.value, "inverted line should be low when PTT is active")
 }
@@ -88,12 +88,12 @@ func TestPttSetRealGPIOD_Invert_Activate(t *testing.T) {
 func TestPttSetRealGPIOD_Invert_Deactivate(t *testing.T) {
 	var mock = setupGPIODChannel(t, true)
 
-	ptt_set_real(OCTYPE_PTT, 0, 0)
+	ptt_set(OCTYPE_PTT, 0, 0)
 
 	assert.Equal(t, 1, mock.value, "inverted line should be high when PTT is inactive")
 }
 
-// TestPttSetRealGPIOD_NilLine verifies that ptt_set_real does not panic when
+// TestPttSetRealGPIOD_NilLine verifies that ptt_set does not panic when
 // the GPIOD line handle has not been initialised.
 func TestPttSetRealGPIOD_NilLine(t *testing.T) {
 	var cfg audio_s
@@ -105,7 +105,7 @@ func TestPttSetRealGPIOD_NilLine(t *testing.T) {
 	t.Cleanup(func() { save_audio_config_p = nil })
 
 	require.NotPanics(t, func() {
-		ptt_set_real(OCTYPE_PTT, 0, 1)
+		ptt_set(OCTYPE_PTT, 0, 1)
 	})
 }
 
@@ -444,13 +444,13 @@ func TestPttInitGPIOThenSet(t *testing.T) {
 	assert.Equal(t, "gpio25_ph11", cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_name,
 		"the node name found while exporting should be remembered")
 
-	ptt_set_real(OCTYPE_PTT, 0, 1)
+	ptt_set(OCTYPE_PTT, 0, 1)
 
 	var on, onErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "value")) //nolint:gosec
 	require.NoError(t, onErr)
 	assert.Equal(t, "1", string(on), "PTT on should drive the line")
 
-	ptt_set_real(OCTYPE_PTT, 0, 0)
+	ptt_set(OCTYPE_PTT, 0, 0)
 
 	var off, offErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "value")) //nolint:gosec
 	require.NoError(t, offErr)
@@ -519,7 +519,7 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 	var output = CaptureOutput(t, func() {
 		require.NoError(t, ptt_init(cfg))
 
-		ptt_set_real(OCTYPE_PTT, 0, 1)
+		ptt_set(OCTYPE_PTT, 0, 1)
 	})
 
 	assert.Contains(t, output, "ch=0, PTT method=")
@@ -532,7 +532,7 @@ func TestPttSetRealNetworkChannel(t *testing.T) {
 	var cfg = new(audio_s)
 	useAudioConfig(t, cfg)
 
-	assert.NotPanics(t, func() { ptt_set_real(OCTYPE_PTT, MAX_RADIO_CHANS, 1) })
+	assert.NotPanics(t, func() { ptt_set(OCTYPE_PTT, MAX_RADIO_CHANS, 1) })
 }
 
 // Keying a channel that is not a radio is a mistake worth saying out loud.
@@ -541,7 +541,7 @@ func TestPttSetRealInvalidChannel(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_NONE
 	useAudioConfig(t, cfg)
 
-	var output = CaptureOutput(t, func() { ptt_set_real(OCTYPE_PTT, 0, 1) })
+	var output = CaptureOutput(t, func() { ptt_set(OCTYPE_PTT, 0, 1) })
 
 	assert.Contains(t, output, "did not expect invalid channel")
 }
@@ -649,13 +649,13 @@ func TestPttSetRealSerialLines(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			var _, changes = openTestPTTSerialPort(t, c.line, c.line2)
 
-			ptt_set_real(OCTYPE_PTT, 0, 1)
+			ptt_set(OCTYPE_PTT, 0, 1)
 
 			assert.Equal(t, c.keyed, *changes, "keying drove the wrong lines")
 
 			*changes = nil
 
-			ptt_set_real(OCTYPE_PTT, 0, 0)
+			ptt_set(OCTYPE_PTT, 0, 0)
 
 			assert.Equal(t, c.unkey, *changes, "unkeying drove the wrong lines")
 		})
@@ -693,7 +693,7 @@ func TestPttSetRealSerialInverted(t *testing.T) {
 			cfg.achan[0].octrl[OCTYPE_PTT].ptt_invert = c.invert
 			cfg.achan[0].octrl[OCTYPE_PTT].ptt_invert2 = c.invert2
 
-			ptt_set_real(OCTYPE_PTT, 0, 1)
+			ptt_set(OCTYPE_PTT, 0, 1)
 
 			assert.Equal(t, c.keyed, *changes, "keying drove the wrong levels")
 		})

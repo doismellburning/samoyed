@@ -1028,7 +1028,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 
 // JWL - save status and new get_ptt function.
 
-func ptt_set_real(ot int, channel int, ptt_signal int) {
+func ptt_set(ot int, channel int, ptt_signal int) {
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
 
