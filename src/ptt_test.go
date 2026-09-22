@@ -404,11 +404,11 @@ func TestGetInputRealGPIO(t *testing.T) {
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name = "gpio7"
 	useAudioConfig(t, cfg)
 
-	assert.Equal(t, 1, get_input_real(ICTYPE_TXINH, 0))
+	assert.Equal(t, 1, get_input(ICTYPE_TXINH, 0))
 
 	cfg.achan[0].ictrl[ICTYPE_TXINH].invert = true
 
-	assert.Equal(t, 0, get_input_real(ICTYPE_TXINH, 0), "invert should flip the value read")
+	assert.Equal(t, 0, get_input(ICTYPE_TXINH, 0), "invert should flip the value read")
 }
 
 // TestGetInputRealGPIONoNode verifies that an input line whose sysfs node is
@@ -422,7 +422,7 @@ func TestGetInputRealGPIONoNode(t *testing.T) {
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name = "gpio7"
 	useAudioConfig(t, cfg)
 
-	assert.Equal(t, -1, get_input_real(ICTYPE_TXINH, 0))
+	assert.Equal(t, -1, get_input(ICTYPE_TXINH, 0))
 }
 
 // TestPttInitGPIOThenSet is a regression test for a GPIO line that never
@@ -474,7 +474,7 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 	require.NoError(t, ptt_init(cfg))
 	assert.Equal(t, "gpio7_pi13", cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name,
 		"the node name found while exporting should be remembered")
-	assert.Equal(t, 1, get_input_real(ICTYPE_TXINH, 0))
+	assert.Equal(t, 1, get_input(ICTYPE_TXINH, 0))
 }
 
 // TestPttTermBeforeAudioConfig covers a stop signal that arrives while we are
@@ -786,7 +786,7 @@ func TestGetInputRealInvalidChannel(t *testing.T) {
 
 	var result int
 
-	var output = CaptureOutput(t, func() { result = get_input_real(ICTYPE_TXINH, 0) })
+	var output = CaptureOutput(t, func() { result = get_input(ICTYPE_TXINH, 0) })
 
 	assert.Equal(t, -1, result)
 	assert.Contains(t, output, "did not expect invalid channel")

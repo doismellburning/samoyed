@@ -1282,7 +1282,7 @@ func cm108_print_permission_advice(name string, err error) {
  *
  * ------------------------------------------------------------------*/
 
-func get_input_real(it int, channel int) int {
+func get_input(it int, channel int) int { //nolint:unparam // ICTYPE_TXINH is the only input type there is so far, but the parameter is how Dire Wolf left room for another.
 	Assert(it >= 0 && it < NUM_ICTYPES)
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
