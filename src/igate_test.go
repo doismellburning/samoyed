@@ -382,11 +382,11 @@ func setupIGateToRadio(t *testing.T) {
 
 	var audioConfig = igate.audioConfig
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	t.Cleanup(func() {
 		for p := range TQ_NUM_PRIO {
-			for tq_remove(0, p) != nil { //revive:disable-line:empty-block
+			for transmitQueue.Remove(0, p) != nil { //revive:disable-line:empty-block
 			}
 		}
 	})
@@ -399,7 +399,7 @@ func TestIGateTransmitFromServer(t *testing.T) {
 
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST-1>APWW10,TCPIP*,qAC,T2TEST:>hello"), 0)
 
-	var sent = tq_remove(0, TQ_PRIO_1_LO)
+	var sent = transmitQueue.Remove(0, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was queued for transmission")
 
 	var info = string(AX25GetInfo(sent))
@@ -418,7 +418,7 @@ func TestIGateTransmitPathSaysNo(t *testing.T) {
 
 			igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,"+via+":>hello"), 0)
 
-			assert.Nil(t, tq_remove(0, TQ_PRIO_1_LO), "a packet with %s in the path was transmitted", via)
+			assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "a packet with %s in the path was transmitted", via)
 		})
 	}
 }
@@ -433,7 +433,7 @@ func TestIGateTransmitUnparseable(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "Could not parse message from server")
-	assert.Nil(t, tq_remove(0, TQ_PRIO_1_LO))
+	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
 }
 
 // IGFILTER on the IGate-to-channel pair narrows what is put on the air.
@@ -444,7 +444,7 @@ func TestIGateTransmitFiltered(t *testing.T) {
 
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:>hello"), 0)
 
-	assert.Nil(t, tq_remove(0, TQ_PRIO_1_LO), "a packet the filter rejected was transmitted")
+	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "a packet the filter rejected was transmitted")
 }
 
 // Having transmitted a message for somebody, we pass along their next
@@ -462,12 +462,12 @@ func TestIGateTransmitCourtesyPosition(t *testing.T) {
 
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
-	assert.NotNil(t, tq_remove(0, TQ_PRIO_1_LO), "the message sender's position was not passed along")
+	assert.NotNil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "the message sender's position was not passed along")
 
 	// Once only: the count is used up.
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST:=4237.14N/07120.83W#"), 0)
 
-	assert.Nil(t, tq_remove(0, TQ_PRIO_1_LO), "the special case should have been used up")
+	assert.Nil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO), "the special case should have been used up")
 }
 
 // Transmitting a message for a station is what arranges for its next position
@@ -480,7 +480,7 @@ func TestIGateTransmitMessageRemembersTheSender(t *testing.T) {
 
 	igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,qAC,T2TEST::Q3TEST   :Hello there"), 0)
 
-	require.NotNil(t, tq_remove(0, TQ_PRIO_1_LO))
+	require.NotNil(t, transmitQueue.Remove(0, TQ_PRIO_1_LO))
 
 	assert.Equal(t, 1, igate.msgCount())
 	assert.Equal(t, 0, igate.pktCount(), "a message is not counted as an other packet")

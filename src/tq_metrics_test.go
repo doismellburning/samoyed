@@ -15,7 +15,7 @@ import (
 
 // newTestPacket builds the frame these tests queue.  The exact contents do not
 // matter to the queue; what matters is that it is a real packet, as opposed to
-// the null wake-up frame lm_seize_request queues.
+// the null wake-up frame TransmitQueue.LMSeizeRequest queues.
 func newTestPacket(t *testing.T) *packet_t {
 	t.Helper()
 
@@ -35,12 +35,12 @@ func newTestPacket(t *testing.T) *packet_t {
 }
 
 // TestTxQueueDepthAgreesWithQueueUnderLock is a regression test for the
-// transmit queue depth gauge.  The depth used to be re-read via tq_count
-// *after* tq_mutex was released, taking the lock a second time - so between an
+// transmit queue depth gauge.  The depth used to be re-read via TransmitQueue.Count
+// *after* the queue's mutex was released, taking the lock a second time - so between an
 // appender releasing the lock and re-taking it to count, any other holder of
 // the lock could see a queue of n packets and a gauge still reporting n-1.
 // Counting and publishing now happen in the same critical section, so anyone
-// holding tq_mutex sees the two agree.
+// holding the queue's mutex sees the two agree.
 //
 // The test hammers the lock while packets are being appended, which is what
 // puts an observer inside that window; a final-state assertion alone does not
@@ -57,7 +57,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -87,10 +87,10 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 		defer close(observerDone)
 
 		for !done.Load() {
-			tq_mutex.Lock()
-			var count = tq_count_locked(CHANNEL, PRIO, "", "", false)
+			transmitQueue.mu.Lock()
+			var count = transmitQueue.countLocked(CHANNEL, PRIO, "", "", false)
 			var gauge, gatherErr = gatherMetricValue("samoyed_tx_queue_depth", labels)
-			tq_mutex.Unlock()
+			transmitQueue.mu.Unlock()
 
 			if gatherErr != nil {
 				return
@@ -111,7 +111,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	for sender := range NUM_SEND {
 		wg.Go(func() {
 			for i := range PER_SENDR {
-				lm_data_request(CHANNEL, PRIO, packets[sender*PER_SENDR+i])
+				transmitQueue.LMDataRequest(CHANNEL, PRIO, packets[sender*PER_SENDR+i])
 			}
 		})
 	}
@@ -123,7 +123,7 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 	assert.False(t, disagreed.Load(),
 		"queue held %d packets but the gauge reported %d", sawCount.Load(), sawGauge.Load())
 
-	var actual = tq_count(CHANNEL, PRIO, "", "", false)
+	var actual = transmitQueue.Count(CHANNEL, PRIO, "", "", false)
 	require.Equal(t, NUM_PKTS, actual, "all packets should be queued")
 
 	assert.InDelta(t, float64(actual), metricValue(t, "samoyed_tx_queue_depth", labels), 0,
@@ -131,8 +131,8 @@ func TestTxQueueDepthAgreesWithQueueUnderLock(t *testing.T) {
 }
 
 // TestTxQueueDepthTracksDrain covers the other half of the maintained queue
-// length: tq_remove decrements it.  The depth is published from a counter kept
-// alongside the list rather than by walking it - tq_remove pops the head in
+// length: TransmitQueue.Remove decrements it.  The depth is published from a counter kept
+// alongside the list rather than by walking it - TransmitQueue.Remove pops the head in
 // constant time, and counting the list there would make draining a long queue
 // quadratic under the one mutex every queue operation contends for - so the
 // counter is state that can drift from the list it describes if a mutation
@@ -148,7 +148,7 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -158,16 +158,16 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	for range NUM_PKTS {
 		var pp = newTestPacket(t)
 
-		lm_data_request(CHANNEL, PRIO, pp)
+		transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
 	}
 
 	assert.InDelta(t, float64(NUM_PKTS), metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"all packets queued")
 
 	for remaining := NUM_PKTS - 1; remaining >= 0; remaining-- {
-		require.NotNil(t, tq_remove(CHANNEL, PRIO))
+		require.NotNil(t, transmitQueue.Remove(CHANNEL, PRIO))
 
-		assert.InDelta(t, float64(tq_count(CHANNEL, PRIO, "", "", false)),
+		assert.InDelta(t, float64(transmitQueue.Count(CHANNEL, PRIO, "", "", false)),
 			metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 			"published depth should match the queue after removing down to %d", remaining)
 		assert.InDelta(t, float64(remaining), metricValue(t, "samoyed_tx_queue_depth", labels), 0,
@@ -175,13 +175,13 @@ func TestTxQueueDepthTracksDrain(t *testing.T) {
 	}
 
 	// Removing from an empty queue must not take the depth negative.
-	assert.Nil(t, tq_remove(CHANNEL, PRIO))
+	assert.Nil(t, transmitQueue.Remove(CHANNEL, PRIO))
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"an empty queue stays at zero")
 }
 
-// TestTxQueueDepthIgnoresSeizeMarker is a regression test: lm_seize_request
-// queues a null frame to wake the transmitter, and tq_count deliberately does
+// TestTxQueueDepthIgnoresSeizeMarker is a regression test: TransmitQueue.LMSeizeRequest
+// queues a null frame to wake the transmitter, and TransmitQueue.Count deliberately does
 // not count it as a packet.  The published depth is maintained separately from
 // the list, so it has to make the same distinction - otherwise ordinary
 // connected-mode acknowledgement reports a packet waiting when there is
@@ -195,16 +195,16 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
 		"priority": strconv.Itoa(PRIO),
 	}
 
-	lm_seize_request(CHANNEL)
+	transmitQueue.LMSeizeRequest(CHANNEL)
 
-	require.Equal(t, 0, tq_count(CHANNEL, PRIO, "", "", false),
+	require.Equal(t, 0, transmitQueue.Count(CHANNEL, PRIO, "", "", false),
 		"the wake-up marker is not a packet")
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"nor should it be published as one")
@@ -212,20 +212,20 @@ func TestTxQueueDepthIgnoresSeizeMarker(t *testing.T) {
 	// A real packet behind it is still counted, and only it.
 	var pp = newTestPacket(t)
 
-	lm_data_request(CHANNEL, PRIO, pp)
+	transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
 
-	require.Equal(t, 1, tq_count(CHANNEL, PRIO, "", "", false))
+	require.Equal(t, 1, transmitQueue.Count(CHANNEL, PRIO, "", "", false))
 	assert.InDelta(t, 1, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"the real packet is counted, the marker still is not")
 
 	// Draining the marker must not take the depth below the real packet count.
-	require.NotNil(t, tq_remove(CHANNEL, PRIO))
-	assert.InDelta(t, float64(tq_count(CHANNEL, PRIO, "", "", false)),
+	require.NotNil(t, transmitQueue.Remove(CHANNEL, PRIO))
+	assert.InDelta(t, float64(transmitQueue.Count(CHANNEL, PRIO, "", "", false)),
 		metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"depth still matches the queue after the marker is taken")
 }
 
-// TestTxQueueDepthResetOnInit covers tq_init: it clears the queues, so the
+// TestTxQueueDepthResetOnInit covers TransmitQueue.Init: it clears the queues, so the
 // published depth has to be cleared with them.  A gauge left at its old value
 // would describe a queue that no longer exists until the next enqueue.
 func TestTxQueueDepthResetOnInit(t *testing.T) {
@@ -237,7 +237,7 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var labels = map[string]string{
 		"channel":  strconv.Itoa(CHANNEL),
@@ -246,10 +246,10 @@ func TestTxQueueDepthResetOnInit(t *testing.T) {
 
 	var pp = newTestPacket(t)
 
-	lm_data_request(CHANNEL, PRIO, pp)
+	transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
 	require.InDelta(t, 1, metricValue(t, "samoyed_tx_queue_depth", labels), 0)
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	assert.InDelta(t, 0, metricValue(t, "samoyed_tx_queue_depth", labels), 0,
 		"re-initialising the queues must clear the published depth too")

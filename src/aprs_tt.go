@@ -480,7 +480,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 		return
 	}
 
-	tq_append(channel, TQ_PRIO_0_HI, pp)
+	transmitQueue.Append(channel, TQ_PRIO_0_HI, pp)
 } /* end Sequence */
 
 /*------------------------------------------------------------------

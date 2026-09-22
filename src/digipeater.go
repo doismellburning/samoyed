@@ -206,7 +206,7 @@ func digipeater(from_chan int, pp *packet_t) {
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
 					dedupeService.Remember(pp, to_chan)
-					tq_append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
+					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
 					digi_count[from_chan][to_chan]++
 				}
 			}
@@ -230,7 +230,7 @@ func digipeater(from_chan int, pp *packet_t) {
 					save_digi_config_p.filter_str[from_chan][to_chan])
 				if result != nil {
 					dedupeService.Remember(pp, to_chan)
-					tq_append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
+					transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
 					digi_count[from_chan][to_chan]++
 				}
 			}
@@ -605,7 +605,7 @@ func digi_regen(from_chan int, pp *packet_t) {
 			var result = ax25_dup(pp)
 			if result != nil {
 				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				tq_append(to_chan, TQ_PRIO_1_LO, result)
+				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
 			}
 		}
 	}

@@ -750,7 +750,7 @@ func dlq_channel_busy(channel int, activity int, status int) {
  * Name:        dlq_seize_confirm
  *
  * Purpose:     Inform data link state machine that the transmitter is on.
- *		This is in response to lm_seize_request.
+ *		This is in response to TransmitQueue.LMSeizeRequest.
  *
  * Inputs:	chan		- Radio channel number.
  *

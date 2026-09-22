@@ -4,7 +4,7 @@ package direwolf
  *
  * Purpose:   	Transmit queued up packets when channel is clear.
  *
- * Description:	Producers of packets to be transmitted call tq_append and then
+ * Description:	Producers of packets to be transmitted call TransmitQueue.Append and then
  *		go merrily on their way, unconcerned about when the packet might
  *		actually get transmitted.
  *
@@ -18,7 +18,7 @@ package direwolf
  *			and create a thread to empty the queue when
  *			the channel is clear.
  *
- *		(2) The application queues up packets by calling tq_append.
+ *		(2) The application queues up packets by calling TransmitQueue.Append.
  *
  *			Packets that are being digipeated should go in the
  *			high priority queue so they will go out first.
@@ -163,7 +163,7 @@ func NewXmitService(ctx context.Context, p_modem *audio_s, debug_xmit_packet boo
 	}
 
 	logrus.Debug("xmit_init: about to call tq_init")
-	tq_init(p_modem)
+	transmitQueue.Init(p_modem)
 
 	logrus.Debug("xmit_init: about to create threads")
 
@@ -352,7 +352,7 @@ func frame_flavor(pp *packet_t) flavor_t {
 // dropping them mid-transmission would be worse than a slightly later exit.
 func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
 	for ctx.Err() == nil {
-		tq_wait_while_empty(ctx, channel)
+		transmitQueue.WaitWhileEmpty(ctx, channel)
 		logrus.WithField("channel", channel).Debug("xmit_thread: woke up")
 
 		// Does this extra loop offer any benefit?
@@ -367,7 +367,7 @@ func (xs *XmitService) xmit_thread(ctx context.Context, channel int) {
 // xmit_thread, so that the decision between the two can be tested: xmit_thread
 // itself never returns.
 func (xs *XmitService) xmit_until_empty(ctx context.Context, channel int) {
-	for tq_peek(channel, TQ_PRIO_0_HI) != nil || tq_peek(channel, TQ_PRIO_1_LO) != nil {
+	for transmitQueue.Peek(channel, TQ_PRIO_0_HI) != nil || transmitQueue.Peek(channel, TQ_PRIO_1_LO) != nil {
 		if !xs.audioOutAvailable[ACHAN2ADEV(channel)] {
 			xs.discard_untransmittable(channel)
 
@@ -384,7 +384,7 @@ func (xs *XmitService) xmit_until_empty(ctx context.Context, channel int) {
 // a half-duplex transmission - to play samples that go nowhere, so a station
 // with no transmit device does not transmit at all.
 //
-// The null frame lm_seize_request queues is not a frame to send but a request
+// The null frame TransmitQueue.LMSeizeRequest queues is not a frame to send but a request
 // for a transmission opportunity, so it is answered here exactly as
 // send_one_frame answers it.  A connected mode session whose acknowledgement
 // can never go out still has to hear that its turn came and take its normal
@@ -403,7 +403,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 
 	for _, prio := range []int{TQ_PRIO_0_HI, TQ_PRIO_1_LO} {
 		for {
-			var pp = tq_remove(channel, prio)
+			var pp = transmitQueue.Remove(channel, prio)
 			if pp == nil {
 				break
 			}
@@ -451,11 +451,11 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 
 	var prio = TQ_PRIO_1_LO
 
-	var pp = tq_remove(channel, TQ_PRIO_0_HI)
+	var pp = transmitQueue.Remove(channel, TQ_PRIO_0_HI)
 	if pp != nil {
 		prio = TQ_PRIO_0_HI
 	} else {
-		pp = tq_remove(channel, TQ_PRIO_1_LO)
+		pp = transmitQueue.Remove(channel, TQ_PRIO_1_LO)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -705,11 +705,11 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		 */
 		prio = TQ_PRIO_1_LO
 
-		pp = tq_peek(channel, TQ_PRIO_0_HI)
+		pp = transmitQueue.Peek(channel, TQ_PRIO_0_HI)
 		if pp != nil {
 			prio = TQ_PRIO_0_HI
 		} else {
-			pp = tq_peek(channel, TQ_PRIO_1_LO)
+			pp = transmitQueue.Peek(channel, TQ_PRIO_1_LO)
 		}
 
 		if pp != nil {
@@ -718,7 +718,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 				done = true // not eligible for bundling.
 
 			case FLAVOR_APRS_NEW, FLAVOR_OTHER:
-				pp = tq_remove(channel, prio)
+				pp = transmitQueue.Remove(channel, prio)
 				logrus.WithFields(logrus.Fields{
 					"t":       time.Since(time_ptt),
 					"channel": channel,
@@ -1228,7 +1228,7 @@ func (xs *XmitService) wait_for_clear_channel(channel int, slottime int, persist
 		 * Wait random time.
 		 * Proceed to transmit sooner if anything shows up in high priority queue.
 		 */
-		for tq_peek(channel, TQ_PRIO_0_HI) == nil {
+		for transmitQueue.Peek(channel, TQ_PRIO_0_HI) == nil {
 			SLEEP_MS(slottime * 10)
 
 			if hdlcReceiver.DataDetectAny(channel) > 0 {

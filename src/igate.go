@@ -1483,7 +1483,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 		var pradio = AX25FromText(radio, true)
 		if pradio != nil {
 			/* This consumes packet so don't reference it again! */
-			tq_append(to_chan, TQ_PRIO_1_LO, pradio)
+			transmitQueue.Append(to_chan, TQ_PRIO_1_LO, pradio)
 			ig.stats.rfXmitPackets++ // Any type of packet.
 			metrics.RecordRFTransmitted()
 

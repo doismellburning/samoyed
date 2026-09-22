@@ -35,7 +35,7 @@ func setupDigipeater(t *testing.T) *digi_config_s {
 
 		for c := range MAX_RADIO_CHANS {
 			for p := range TQ_NUM_PRIO {
-				for tq_remove(c, p) != nil { //revive:disable-line:empty-block
+				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
 				}
 			}
 		}
@@ -54,7 +54,7 @@ func setupDigipeater(t *testing.T) *digi_config_s {
 
 	digi_count = [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int{}
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	return digiConfig
 }
@@ -81,7 +81,7 @@ func TestDigipeaterSameChannel(t *testing.T) {
 
 	digipeater(digiFromChan, pp)
 
-	var sent = tq_remove(digiFromChan, TQ_PRIO_0_HI)
+	var sent = transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>APDW17,Q1TEST*,WIDE2-1:", AX25FormatAddrs(sent))
 
@@ -100,9 +100,9 @@ func TestDigipeaterCrossChannel(t *testing.T) {
 
 	digipeater(digiFromChan, pp)
 
-	assert.Nil(t, tq_remove(digiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
 
-	var sent = tq_remove(digiToChan, TQ_PRIO_1_LO)
+	var sent = transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>APDW17,Q2TEST*,WIDE2-1:", AX25FormatAddrs(sent),
 		"the callsign of the channel it goes out on should have been used")
@@ -122,7 +122,7 @@ func TestDigipeaterRemembersWhatItRepeated(t *testing.T) {
 
 	digipeater(digiFromChan, pp)
 
-	require.NotNil(t, tq_remove(digiFromChan, TQ_PRIO_0_HI))
+	require.NotNil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 
 	assert.True(t, dedupeService.Check(pp, digiFromChan),
 		"the repeated frame was not remembered, so the next copy of it would go out too")
@@ -140,7 +140,7 @@ func TestDigipeaterNotEnabled(t *testing.T) {
 
 	for c := range MAX_RADIO_CHANS {
 		for p := range TQ_NUM_PRIO {
-			assert.Nil(t, tq_remove(c, p), "channel %d repeated a frame with digipeating disabled", c)
+			assert.Nil(t, transmitQueue.Remove(c, p), "channel %d repeated a frame with digipeating disabled", c)
 		}
 	}
 }
@@ -157,7 +157,7 @@ func TestDigipeaterNothingToDo(t *testing.T) {
 
 	digipeater(digiFromChan, pp)
 
-	assert.Nil(t, tq_remove(digiFromChan, TQ_PRIO_0_HI))
+	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 	assert.Zero(t, digipeater_get_count(digiFromChan, digiFromChan))
 }
 
@@ -188,7 +188,7 @@ func TestDigiRegen(t *testing.T) {
 
 	digi_regen(digiFromChan, pp)
 
-	var sent = tq_remove(digiToChan, TQ_PRIO_1_LO)
+	var sent = transmitQueue.Remove(digiToChan, TQ_PRIO_1_LO)
 	require.NotNil(t, sent, "nothing was regenerated")
 	assert.Equal(t, "Q3TEST>APDW17,WIDE2-2:", AX25FormatAddrs(sent),
 		"a regenerated frame goes out exactly as it arrived")
@@ -204,7 +204,7 @@ func TestDigiRegenDisabled(t *testing.T) {
 	digi_regen(digiFromChan, pp)
 
 	for c := range MAX_RADIO_CHANS {
-		assert.Nil(t, tq_remove(c, TQ_PRIO_1_LO))
+		assert.Nil(t, transmitQueue.Remove(c, TQ_PRIO_1_LO))
 	}
 }
 

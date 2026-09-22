@@ -259,7 +259,7 @@ func TestHandleClientCommand_V_ArbitraryDataNoPanic(t *testing.T) {
 	var s = new(AGWServer)
 	s.audioConfigP = new(audio_s)
 
-	// The 'V' handler queues the frame for transmission, and tq_append reads
+	// The 'V' handler queues the frame for transmission, and TransmitQueue.Append reads
 	// the audio configuration for itself.
 	save_audio_config_p = new(audio_s)
 	t.Cleanup(func() { save_audio_config_p = nil })

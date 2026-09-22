@@ -306,10 +306,10 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 	xmitSvc = new(XmitService)
 	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	t.Cleanup(func() {
-		for tq_remove(channel, TQ_PRIO_1_LO) != nil { //revive:disable-line:empty-block
+		for transmitQueue.Remove(channel, TQ_PRIO_1_LO) != nil { //revive:disable-line:empty-block
 		}
 	})
 
@@ -326,10 +326,10 @@ func TestKissSerialClientFrameIsQueuedForTransmission(t *testing.T) {
 		[]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, ax25_get_frame_data(pp)...)))
 	require.NoError(t, writeErr)
 
-	// tq_count rather than tq_peek: the queue is being filled by the
-	// listening goroutine, and only tq_count reads it under the lock.
+	// TransmitQueue.Count rather than TransmitQueue.Peek: the queue is being filled by the
+	// listening goroutine, and only TransmitQueue.Count reads it under the lock.
 	assert.Eventually(t, func() bool {
-		return tq_count(channel, TQ_PRIO_1_LO, "", "", false) > 0
+		return transmitQueue.Count(channel, TQ_PRIO_1_LO, "", "", false) > 0
 	}, 5*time.Second, 10*time.Millisecond, "the frame from the KISS client was not queued for transmission")
 
 	require.NoError(t, client.Close())
