@@ -72,6 +72,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/pkg/term"
 	"github.com/sirupsen/logrus"
@@ -89,7 +90,45 @@ var g_misc_config_p *misc_config_s
 
 var kf *KISSFrame
 
+// serialport_mu guards serialport_fd and serialport_failed, which
+// kissserial_listen_thread (reading, and in the polling case reopening) and
+// kissserial_send_rec_packet (writing from the receive path) share.  Once the
+// listening goroutine is running, go through the functions below rather than
+// touching either directly.
+//
+// Unlike a socket or a pollable *os.File, a *term.Term is a bare descriptor
+// with nothing to stop it being used after it is closed - by which time the
+// number may belong to something else.  So the port is only ever opened and
+// closed by the listening goroutine, which is the only one that reads it, and
+// a write holds the lock throughout so that the port cannot be closed
+// underneath it.
+var serialport_mu sync.Mutex
+
 var serialport_fd *term.Term
+
+// serialport_failed is set when a write to serialport_fd fails.  The sender
+// cannot close the port itself - the listening goroutine may be blocked
+// reading it - so it stops writing to it and leaves the closing to the
+// listener, which does so before its next read.
+var serialport_failed bool
+
+// serialPort returns the open serial port, or nil if there isn't one, and
+// whether a write to it has failed.
+func serialPort() (*term.Term, bool) {
+	serialport_mu.Lock()
+	defer serialport_mu.Unlock()
+
+	return serialport_fd, serialport_failed
+}
+
+// setSerialPort installs fd as the open serial port.
+func setSerialPort(fd *term.Term) {
+	serialport_mu.Lock()
+	defer serialport_mu.Unlock()
+
+	serialport_fd = fd
+	serialport_failed = false
+}
 
 var kissserial_debug = 0 /* Print information flowing from and to client. */
 
@@ -124,6 +163,8 @@ func kissserial_init(ctx context.Context, mc *misc_config_s) {
 	if g_misc_config_p.kiss_serial_port != "" {
 		if g_misc_config_p.kiss_serial_poll == 0 {
 			// Normal case, try to open the serial port at start up time.
+			// Nothing else is running yet, so there is no lock to take.
+			serialport_failed = false
 			serialport_fd = SerialPortOpen(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
 			if serialport_fd != nil {
@@ -143,8 +184,10 @@ func kissserial_init(ctx context.Context, mc *misc_config_s) {
 		}
 	}
 
+	var fd, _ = serialPort()
+
 	logrus.WithFields(logrus.Fields{
-		"serial_port_open": serialport_fd != nil,
+		"serial_port_open": fd != nil,
 		"polling":          g_misc_config_p.kiss_serial_poll,
 	}).Debug("end of kiss_init")
 }
@@ -185,7 +228,8 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 	/*
 	 * Quietly discard if we don't have open connection.
 	 */
-	if serialport_fd == nil {
+	var fd, failed = serialPort()
+	if fd == nil || failed {
 		return
 	}
 
@@ -253,13 +297,23 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 	 *	      command> change CNCA0 EmuBR=yes
 	 */
 
+	serialport_mu.Lock()
+	defer serialport_mu.Unlock()
+
+	// Looked at again now we hold the lock: the listening goroutine may have
+	// given the port up since the check above.
+	if serialport_fd == nil || serialport_failed {
+		return
+	}
+
 	var n = SerialPortWrite(serialport_fd, kiss_buff)
 
 	if n != kiss_len {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application thru serial port.\n\n")
-		serial_port_close(serialport_fd)
-		serialport_fd = nil
+
+		// Not closed here: see serialport_failed.
+		serialport_failed = true
 	}
 } /* kissserial_send_rec_packet */
 
@@ -282,9 +336,12 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
  *--------------------------------------------------------------------*/
 
 // closeSerialPortKISS closes the serial port, if it is open, and forgets it.
-// Nothing reads from it once the listening goroutine has stopped, so it is
-// ours to close on the way out.
+// Only the listening goroutine, the one that reads the port, may call it - or
+// anything else once that goroutine has stopped.
 func closeSerialPortKISS() {
+	serialport_mu.Lock()
+	defer serialport_mu.Unlock()
+
 	if serialport_fd == nil {
 		return
 	}
@@ -292,6 +349,23 @@ func closeSerialPortKISS() {
 	serial_port_close(serialport_fd)
 
 	serialport_fd = nil
+	serialport_failed = false
+}
+
+// giveUpSerialPortIfFailed closes the serial port if a write to it has failed,
+// and says whether it did.  It is the listening goroutine's to call, before it
+// reads: the sender cannot close the port itself.
+func giveUpSerialPortIfFailed() bool {
+	var fd, failed = serialPort()
+	if fd == nil || !failed {
+		return false
+	}
+
+	text_color_set(DW_COLOR_ERROR)
+	dw_printf("\nSerial Port KISS write error. Closing connection.\n\n")
+	closeSerialPortKISS()
+
+	return true
 }
 
 // kissserial_get returns the next byte from the serial port.
@@ -308,7 +382,17 @@ func kissserial_get(ctx context.Context) (byte, error) {
 		/*
 		 * Normal case, was opened at start up time.
 		 */
-		var ch, err = SerialPortGet1(serialport_fd)
+		// In the normal case nothing reopens a port once it is given up.
+		if giveUpSerialPortIfFailed() {
+			return 0, os.ErrClosed
+		}
+
+		var fd, _ = serialPort()
+		if fd == nil {
+			return 0, os.ErrClosed
+		}
+
+		var ch, err = SerialPortGet1(fd)
 
 		if ctx.Err() != nil {
 			return 0, ctx.Err()
@@ -317,8 +401,7 @@ func kissserial_get(ctx context.Context) (byte, error) {
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
-			serial_port_close(serialport_fd)
-			serialport_fd = nil
+			closeSerialPortKISS()
 
 			return ch, err
 		}
@@ -334,9 +417,13 @@ func kissserial_get(ctx context.Context) (byte, error) {
 	 * Polling case.  Wait until device is present and open.
 	 */
 	for ctx.Err() == nil {
-		if serialport_fd != nil {
+		giveUpSerialPortIfFailed()
+
+		var fd, _ = serialPort()
+
+		if fd != nil {
 			// Open, try to read.
-			var ch, err = SerialPortGet1(serialport_fd)
+			var ch, err = SerialPortGet1(fd)
 
 			if ctx.Err() != nil {
 				return 0, ctx.Err()
@@ -348,8 +435,7 @@ func kissserial_get(ctx context.Context) (byte, error) {
 
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
-			serial_port_close(serialport_fd)
-			serialport_fd = nil
+			closeSerialPortKISS()
 		} else {
 			// Not open.  Wait for it to appear and try opening.
 			if !sleepSecCtx(ctx, g_misc_config_p.kiss_serial_poll) {
@@ -359,13 +445,15 @@ func kissserial_get(ctx context.Context) (byte, error) {
 			var _, statErr = os.Stat(g_misc_config_p.kiss_serial_port)
 			if statErr == nil {
 				// It's there now.  Try to open.
-				serialport_fd = SerialPortOpen(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
+				var fd = SerialPortOpen(g_misc_config_p.kiss_serial_port, g_misc_config_p.kiss_serial_speed)
 
-				if serialport_fd != nil {
+				if fd != nil {
 					text_color_set(DW_COLOR_INFO)
 					dw_printf("\nOpened %s for serial port KISS.\n\n", g_misc_config_p.kiss_serial_port)
 
 					kf = new(KISSFrame) // Start with clean state.
+
+					setSerialPort(fd)
 				} else { //nolint:staticcheck
 					// An error message was already displayed.
 				}

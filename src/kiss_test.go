@@ -499,3 +499,43 @@ func TestKissPTSetDebug(t *testing.T) {
 
 	assert.Equal(t, 2, kisspt_debug)
 }
+
+// The receive path writes to the terminal while the listening goroutine reads
+// from it, and the listener gives the terminal up once the client hangs up -
+// under -race this is the regression test for the terminal being shared
+// unguarded between the two.
+func TestKissPTSendWhileListening(t *testing.T) {
+	var origMaster, origSlave, origFrame = pt_master, pt_slave, kisspt_kf
+
+	var client, done = startKissPTListener(t.Context(), t)
+
+	t.Cleanup(func() { pt_master, pt_slave, kisspt_kf = origMaster, origSlave, origFrame })
+
+	var sent = make(chan struct{})
+
+	go func() {
+		defer close(sent)
+
+		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
+
+			kisspt_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		}
+	}()
+
+	require.NoError(t, client.Close())
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("kisspt_listen_thread did not finish after the client closed the terminal")
+	}
+
+	<-sent
+
+	assert.Nil(t, pt_master, "the pseudo terminal was not given up after the client went away")
+}
