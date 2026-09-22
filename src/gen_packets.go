@@ -187,14 +187,12 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		fmt.Printf("Amplitude set to %d%%.\n", *amplitude)
 
 		if *amplitude < 0 || *amplitude > 200 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Amplitude must be in range of 0 to 200, not %d.\n", *amplitude)
 			os.Exit(1)
 		}
 	}
 
 	if *noisyPacketCount > 0 && *packetCount > 0 {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Cannot choose both noisy packets (-n) and noiseless (-N) packets - pick at most one.\n")
 		os.Exit(1)
 	} else if *noisyPacketCount > 0 {
@@ -212,7 +210,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		fmt.Printf("Audio sample rate set to %d samples / second.\n", modem.adev[0].samples_per_sec)
 
 		if modem.adev[0].samples_per_sec < MIN_SAMPLES_PER_SEC || modem.adev[0].samples_per_sec > MAX_SAMPLES_PER_SEC {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable audio sample rate in range of %d - %d, not %d.\n",
 				MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC, *audioSampleRate)
 			os.Exit(1)
@@ -227,7 +224,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	const MIN_LEADING_ZEROS = 8
 	const MAX_LEADING_ZEROS = 12000
 	if *leadingZeros < MIN_LEADING_ZEROS || *leadingZeros > MAX_LEADING_ZEROS {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Leading zeros should be between %d and %d, not %d.\n", MIN_LEADING_ZEROS, MAX_LEADING_ZEROS, *leadingZeros)
 		os.Exit(1)
 	}
@@ -257,7 +253,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		fmt.Printf("Morse code speed set to %d WPM.\n", g_morse_wpm)
 
 		if g_morse_wpm < 5 || g_morse_wpm > 50 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Morse code speed must be in range of 5 to 50 WPM, not %d.\n", g_morse_wpm)
 			os.Exit(1)
 		}
@@ -315,7 +310,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			fmt.Printf("Using V.26 QPSK rather than AFSK.\n")
 
 			if modem.achan[0].baud != 2400 {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", modem.achan[0].baud)
 			}
 		} else if modem.achan[0].baud < 7200 {
@@ -326,7 +320,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			fmt.Printf("Using V.27 8PSK rather than AFSK.\n")
 
 			if modem.achan[0].baud != 4800 {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", modem.achan[0].baud)
 			}
 		} else {
@@ -337,7 +330,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		}
 
 		if modem.achan[0].baud != 100 && (modem.achan[0].baud < MIN_BAUD || modem.achan[0].baud > MAX_BAUD) {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
 			os.Exit(1)
 		}
@@ -349,7 +341,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		fmt.Printf("Mark frequency set to %d Hz.\n", modem.achan[0].mark_freq)
 
 		if modem.achan[0].mark_freq < 300 || modem.achan[0].mark_freq > 3000 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable value in range of 300 - 3000, not %d.\n", *markFrequency)
 			os.Exit(1)
 		}
@@ -362,7 +353,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		fmt.Printf("Space frequency set to %d Hz.\n", modem.achan[0].space_freq)
 
 		if modem.achan[0].space_freq < 300 || modem.achan[0].space_freq > 3000 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Use a more reasonable value in range of 300 - 3000, not %d.\n", *spaceFrequency)
 			os.Exit(1)
 		}
@@ -410,7 +400,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	if modem.achan[0].modem_type == MODEM_QPSK && modem.achan[0].v26_alternative == V26_UNSPECIFIED {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("ERROR: Either -j or -J must be specified when using 2400 bps QPSK.\n")
 		pflag.Usage()
 		os.Exit(1)
@@ -418,7 +407,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if *fx25CheckBytes > 0 {
 		if *il2pNormal >= 0 || *il2pInverted >= 0 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Can't mix -X with -I or -i.\n")
 			os.Exit(1)
 		}
@@ -428,14 +416,12 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	}
 
 	if *il2pNormal >= 0 && *il2pInverted >= 0 {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Can't use both -I and -i at the same time.\n")
 		os.Exit(1)
 	}
 
 	var il2p_version, il2p_version_ok = il2p_parse_version(*il2pVersion)
 	if !il2p_version_ok {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Invalid IL2P version %s.  Expected 0.4, 0.6, or compat.\n", *il2pVersion)
 		os.Exit(1)
 	}
@@ -465,7 +451,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 		modem.achan[0].il2p_invert_polarity = 1 // invert for transmit
 		if modem.achan[0].baud == 1200 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
 		}
 	}
@@ -475,7 +460,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	 */
 
 	if *outputFile == "" {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("ERROR: The -o output file option must be specified.\n")
 		pflag.Usage()
 		os.Exit(1)
@@ -490,7 +474,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var sink = audio_file_open(*outputFile, &modem)
 
 	if sink == nil {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("ERROR - Can't open output file.\n")
 		os.Exit(1)
 	}
@@ -512,7 +495,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 	if len(pflag.Args()) > 0 {
 		if len(pflag.Args()) > 1 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Warning: File(s) beyond the first are ignored.\n")
 		}
 
@@ -529,7 +511,6 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 			input_fp, err = os.Open(arg) //nolint:gosec // We expect to read from a user-supplied file from CLI
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Can't open %s for read: %s\n", arg, err)
 				os.Exit(1)
 			}
@@ -675,7 +656,6 @@ func audio_file_open(fname string, pa *audio_s) *wavFileSink {
 
 	var w, err = wavwrite.Create(fname, format)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("%s\n", err)
 
 		return nil
@@ -707,7 +687,6 @@ func audio_file_close(sink *wavFileSink) int { //nolint:unparam
 	// Close goes back and fixes up the lengths in the header for us.
 	var err = sink.w.Close()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("%s\n", err)
 
 		return (-1)
@@ -736,7 +715,6 @@ func send_packet(str string) {
 		//	X>X:NNNN
 		var pp = AX25FromText(str, true)
 		if pp == nil {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
 
 			return
@@ -756,7 +734,6 @@ func send_packet(str string) {
 	} else {
 		var pp = AX25FromText(str, true)
 		if pp == nil {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\"%s\" is not valid TNC2 monitoring format.\n", str)
 
 			return

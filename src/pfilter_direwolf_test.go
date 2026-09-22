@@ -4,6 +4,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -227,8 +228,7 @@ func Test_pfilter(t *testing.T) {
 	// TODO: to be continued...  directed query ...
 
 	if pftest_error_count > 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nPacket Filtering Test - FAILED!     %d errors\n", pftest_error_count)
+		logrus.Errorf("Packet Filtering Test - FAILED!     %d errors", pftest_error_count)
 		t.Fail()
 	}
 

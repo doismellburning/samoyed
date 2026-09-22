@@ -23,6 +23,8 @@ package direwolf
 import (
 	"math"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 var DCD_CONFIG_AFSK = GenericDCDConfig()
@@ -35,7 +37,6 @@ func TUNE(envvar string, param any, name string, fmt string) {
 	   		char *e = getenv(envvar);				\
 	   		if (e != NULL) {					\
 	   		  param = atof(e);					\
-	   		  text_color_set (DW_COLOR_ERROR);			\
 	   		  dw_printf ("TUNE: " name " = " fmt "\n", param);	\
 	   		} }
 	*/
@@ -249,8 +250,7 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		D.alevel_space_peak = -1
 
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid AFSK demodulator profile = %c\n", profile)
+		logrus.Errorf("Invalid AFSK demodulator profile = %c", profile)
 		os.Exit(1)
 	}
 
@@ -299,13 +299,14 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		// The message is upsetting.  Can we handle this better?
 
 		if D.pre_filter_taps > MAX_FILTER_SIZE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Calculated pre filter size of %d is too large.\n", D.pre_filter_taps)
-			dw_printf("Decrease the audio sample rate or increase the decimation factor.\n")
-			dw_printf("You can use -D2 or -D3, on the command line, to down-sample the audio rate\n")
-			dw_printf("before demodulating.  This greatly decreases the CPU requirements with little\n")
-			dw_printf("impact on the decoding performance.  This is useful for a slow ARM processor,\n")
-			dw_printf("such as with a Raspberry Pi model 1.\n")
+			logrus.Errorf(
+				"Warning: Calculated pre filter size of %d is too large. Decrease the audio sample rate or "+
+					"increase the decimation factor. You can use -D2 or -D3, on the command line, to "+
+					"down-sample the audio rate before demodulating.  This greatly decreases the CPU "+
+					"requirements with little impact on the decoding performance.  This is useful for a slow "+
+					"ARM processor, such as with a Raspberry Pi model 1.",
+				D.pre_filter_taps,
+			)
 
 			D.pre_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
@@ -340,10 +341,11 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (RRC)", "%d")
 
 		if D.lp_filter_taps > MAX_FILTER_SIZE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Calculated RRC low pass filter size of %d is too large.\n", D.lp_filter_taps)
-			dw_printf("Decrease the audio sample rate or increase the decimation factor or\n")
-			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", MAX_FILTER_SIZE)
+			logrus.Errorf(
+				"Calculated RRC low pass filter size of %d is too large. Decrease the audio sample rate or increase the decimation factor or recompile the application with MAX_FILTER_SIZE larger than %d.",
+				D.lp_filter_taps,
+				MAX_FILTER_SIZE,
+			)
 			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 
@@ -355,10 +357,11 @@ func demod_afsk_init(_samples_per_sec int, _baud int, mark_freq int,
 		TUNE("TUNE_LP_FILTER_TAPS", D.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
 		if D.lp_filter_taps > MAX_FILTER_SIZE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Calculated FIR low pass filter size of %d is too large.\n", D.lp_filter_taps)
-			dw_printf("Decrease the audio sample rate or increase the decimation factor or\n")
-			dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n", MAX_FILTER_SIZE)
+			logrus.Errorf(
+				"Calculated FIR low pass filter size of %d is too large. Decrease the audio sample rate or increase the decimation factor or recompile the application with MAX_FILTER_SIZE larger than %d.",
+				D.lp_filter_taps,
+				MAX_FILTER_SIZE,
+			)
 			D.lp_filter_taps = (MAX_FILTER_SIZE - 1) | 1
 		}
 

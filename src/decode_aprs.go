@@ -30,6 +30,7 @@ import (
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 type packet_type_e int
@@ -273,9 +274,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 
 	if !quiet {
 		if atemp == "RFONLY" || atemp == "NOGATE" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("RFONLY and NOGATE must not appear in the destination address field.\n")
-			dw_printf("They should appear only at the end of the digi via path.\n")
+			logrus.Warn("RFONLY and NOGATE must not appear in the destination address field. They should appear only at the end of the digi via path.")
 		}
 	}
 
@@ -285,9 +284,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 		atemp = ax25_get_addr_no_ssid(pp, AX25_REPEATER_1+i)
 		if !quiet {
 			if atemp == "RELAY" || atemp == "WIDE" || atemp == "TRACE" {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("RELAY, TRACE, and WIDE (not WIDEn) are obsolete.\n")
-				dw_printf("Modern digipeaters will not recoginize these.\n")
+				logrus.Warn("RELAY, TRACE, and WIDE (not WIDEn) are obsolete. Modern digipeaters will not recoginize these.")
 			}
 		}
 	}
@@ -343,9 +340,7 @@ func decode_aprs(pp *packet_t, quiet bool, third_party_src string) *decode_aprs_
 	 */
 
 	if !A.g_quiet && bytes.Contains(pinfo, []byte{0}) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("'nul' character found in Information part.  This should never happen with APRS.\n")
-		dw_printf("If this is meant to be APRS, %s is transmitting with defective software.\n", A.g_src)
+		logrus.Warnf("'nul' character found in Information part.  This should never happen with APRS. If this is meant to be APRS, %s is transmitting with defective software.", A.g_src)
 
 		if bytes.HasPrefix(pinfo, []byte("4P")) {
 			dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n")
@@ -589,12 +584,11 @@ func decode_aprs_print(A *decode_aprs_t) {
 	}
 
 	if strings.HasPrefix(stemp, "ERROR") {
-		text_color_set(DW_COLOR_ERROR)
+		logrus.Warn(stemp)
 	} else {
 		text_color_set(DW_COLOR_DECODED)
+		dw_printf("%s\n", stemp)
 	}
-
-	dw_printf("%s\n", stemp)
 
 	/*
 	 * Second line has:
@@ -620,8 +614,7 @@ func decode_aprs_print(A *decode_aprs_t) {
 				A.g_lat = maybe.Just(lat)
 				A.g_lon = maybe.Just(lon)
 			} else if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%v\n", err)
+				logrus.Warnf("%v", err)
 			}
 		}
 
@@ -793,17 +786,13 @@ func decode_aprs_print(A *decode_aprs_t) {
 			var n = len(A.g_comment)
 			for j := range n {
 				if A.g_comment[j] == 0xb0 && (j == 0 || (A.g_comment[j-1])&0x80 == 0) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Character code 0xb0 is probably an attempt at a degree symbol.\n")
-					dw_printf("The correct encoding is 0xc2 0xb0 in UTF-8.\n")
+					logrus.Warn("Character code 0xb0 is probably an attempt at a degree symbol. The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 
 			for j := range n {
 				if A.g_comment[j] == 0xf8 && (j == n-1 || (A.g_comment[j+1]&0xc0) != 0xc0) {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Character code 0xf8 is probably an attempt at a degree symbol.\n")
-					dw_printf("The correct encoding is 0xc2 0xb0 in UTF-8.\n")
+					logrus.Warn("Character code 0xf8 is probably an attempt at a degree symbol. The correct encoding is 0xc2 0xb0 in UTF-8.")
 				}
 			}
 		}
@@ -1289,8 +1278,7 @@ func mic_e_digit(A *decode_aprs_t, c byte, mask int, std_msg *int, cust_msg *int
 	}
 
 	if !A.g_quiet {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid character \"%c\" in MIC-E destination/latitude.\n", c)
+		logrus.Warnf("Invalid character \"%c\" in MIC-E destination/latitude.", c)
 	}
 
 	return (0)
@@ -1310,8 +1298,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	var sizeof_struct_aprs_mic_e_s = 9
 	if len(info) < sizeof_struct_aprs_mic_e_s {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("MIC-E format must have at least %d characters in the information part.\n", sizeof_struct_aprs_mic_e_s)
+			logrus.Warnf("MIC-E format must have at least %d characters in the information part.", sizeof_struct_aprs_mic_e_s)
 		}
 
 		return
@@ -1331,8 +1318,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 	const mic_e_dest_len = 6
 	if len(dest) < mic_e_dest_len {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("MIC-E destination \"%s\" must have %d characters to hold a latitude.\n", dest, mic_e_dest_len)
+			logrus.Warnf("MIC-E destination \"%s\" must have %d characters to hold a latitude.", dest, mic_e_dest_len)
 		}
 
 		return
@@ -1356,8 +1342,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		/* North */
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid MIC-E N/S encoding in 4th character of destination.\n")
+			logrus.Warn("Invalid MIC-E N/S encoding in 4th character of destination.")
 		}
 	}
 
@@ -1375,8 +1360,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		offset = false
 
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid MIC-E Longitude Offset in 5th character of destination.\n")
+			logrus.Warn("Invalid MIC-E Longitude Offset in 5th character of destination.")
 		}
 	}
 
@@ -1400,8 +1384,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		lon = maybe.Just(float64(ch-38) + 110) /* 110 - 179 degrees */
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character 0x%02x for MIC-E Longitude Degrees.\n", ch)
+			logrus.Warnf("Invalid character 0x%02x for MIC-E Longitude Degrees.", ch)
 		}
 	}
 
@@ -1432,8 +1415,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		} else {
 			lon = maybe.Nothing[float64]()
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid character 0x%02x for MIC-E Longitude Minutes.\n", ch)
+				logrus.Warnf("Invalid character 0x%02x for MIC-E Longitude Minutes.", ch)
 			}
 		}
 
@@ -1449,8 +1431,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 			} else {
 				lon = maybe.Nothing[float64]()
 				if !A.g_quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Invalid character 0x%02x for MIC-E Longitude hundredths of Minutes.\n", ch)
+					logrus.Warnf("Invalid character 0x%02x for MIC-E Longitude hundredths of Minutes.", ch)
 				}
 			}
 		}
@@ -1474,8 +1455,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 		lon = maybe.Fmap(func(degrees float64) float64 { return -degrees }, lon)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid MIC-E E/W encoding in 6th character of destination.\n")
+			logrus.Warn("Invalid MIC-E E/W encoding in 6th character of destination.")
 		}
 	}
 
@@ -1488,8 +1468,7 @@ func aprs_mic_e(A *decode_aprs_t, pp *packet_t, info []byte) {
 
 	if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid symbol table code not one of / \\ A-Z 0-9\n")
+			logrus.Warn("Invalid symbol table code not one of / \\ A-Z 0-9")
 		}
 
 		A.g_symbol_table = '/'
@@ -1670,8 +1649,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 	if len(info) < 11 {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("APRS Message must have a minimum of 11 characters for : 9 character addressee :\n")
+			logrus.Warn("APRS Message must have a minimum of 11 characters for : 9 character addressee :")
 		}
 
 		A.g_message_subtype = message_subtype_invalid
@@ -1681,9 +1659,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 	if p.Colon != ':' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("APRS Message must begin with ':' 9 character addressee ':'\n")
-			dw_printf("Spaces must be added to shorter addressee to make 9 characters.\n")
+			logrus.Warn("APRS Message must begin with ':' 9 character addressee ':'. Spaces must be added to shorter addressee to make 9 characters.")
 		}
 
 		A.g_message_subtype = message_subtype_invalid
@@ -1711,9 +1687,7 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	var bad_addressee_re = regexp.MustCompile("[A-Z0-9]+ +-[0-9]")
 
 	if bad_addressee_re.Match(addressee) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Malformed addressee with space between station name and SSID.\n")
-		dw_printf("Please tell message sender this is invalid.\n")
+		logrus.Warn("Malformed addressee with space between station name and SSID. Please tell message sender this is invalid.")
 	}
 
 	A.g_addressee = string(addressee)
@@ -1803,21 +1777,19 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("ack")) {
 		/* ack or rej?  Message number is required for these. */
 		if !bytes.HasPrefix(message, []byte("ack")) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR: \"%s\" must be lower case \"ack\"\n", message)
+			logrus.Warnf("ERROR: \"%s\" must be lower case \"ack\"", message)
 		} else {
 			A.g_message_number = string(message[3:])
 			if len(A.g_message_number) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("ERROR: Message number is missing after \"ack\".\n")
+				logrus.Warn("ERROR: Message number is missing after \"ack\".")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
 		if strings.Contains(A.g_message_number, "\r") {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
-			dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
+			logrus.Warn(
+				"The APRS protocol specification says nothing about a possible carriage return after the message id.  Adding CR might prevent proper interoperability with with other applications.",
+			)
 
 			A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 		}
@@ -1830,21 +1802,19 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 		A.g_message_subtype = message_subtype_ack
 	} else if len(message) >= 3 && bytes.EqualFold(message[:3], []byte("rej")) {
 		if !bytes.HasPrefix(message, []byte("rej")) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR: \"%s\" must be lower case \"rej\"\n", message)
+			logrus.Warnf("ERROR: \"%s\" must be lower case \"rej\"", message)
 		} else {
 			A.g_message_number = string(message[3:])
 			if len(A.g_message_number) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("ERROR: Message number is missing after \"rej\".\n")
+				logrus.Warn("ERROR: Message number is missing after \"rej\".")
 			}
 		}
 
 		// Xastir puts a carriage return on the end.
 		if strings.Contains(A.g_message_number, "\r") {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
-			dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
+			logrus.Warn(
+				"The APRS protocol specification says nothing about a possible carriage return after the message id.  Adding CR might prevent proper interoperability with with other applications.",
+			)
 
 			A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 		}
@@ -1877,17 +1847,16 @@ func aprs_message(A *decode_aprs_t, info []byte, quiet bool) {
 
 			// Xastir puts a carriage return on the end.
 			if strings.Contains(A.g_message_number, "\r") {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("The APRS protocol specification says nothing about a possible carriage return after the\n")
-				dw_printf("message id.  Adding CR might prevent proper interoperability with with other applications.\n")
+				logrus.Warn(
+					"The APRS protocol specification says nothing about a possible carriage return after the message id.  Adding CR might prevent proper interoperability with with other applications.",
+				)
 
 				A.g_message_number = strings.ReplaceAll(A.g_message_number, "\r", "")
 			}
 
 			var mlen = len(A.g_message_number)
 			if mlen < 1 || mlen > 5 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Message number \"%s\" has length outside range of 1 to 5.\n", A.g_message_number)
+				logrus.Warnf("Message number \"%s\" has length outside range of 1 to 5.", A.g_message_number)
 			}
 
 			// TODO: Complain if not alphanumeric.
@@ -2067,8 +2036,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 		// The name ran to the end of the information field, so there is no
 		// live/killed indicator and nowhere for a position to be.
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item name is not followed by the ! or _ that should end it.\n")
+			logrus.Warn("Item name is not followed by the ! or _ that should end it.")
 		}
 
 		A.g_data_type_desc = "Item - name not ended by ! or _"
@@ -2078,8 +2046,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 
 	if len(name) < 3 || len(name) > 9 {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item name \"%s\" is %d characters, not the 3 to 9 required.\n", name, len(name))
+			logrus.Warnf("Item name \"%s\" is %d characters, not the 3 to 9 required.", name, len(name))
 		}
 	}
 
@@ -2093,8 +2060,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 		A.g_data_type_desc = "Killed Item"
 	default:
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item name not followed by ! or _.\n")
+			logrus.Warn("Item name not followed by ! or _.")
 		}
 
 		A.g_data_type_desc = "Object - invalid live/killed"
@@ -2123,8 +2089,7 @@ func aprs_item(A *decode_aprs_t, info []byte) {
 		process_comment(A, info[compressedPositionBytes:])
 	default:
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Item has only %d bytes after the live/killed indicator, too few for a position.\n", len(info))
+			logrus.Warnf("Item has only %d bytes after the live/killed indicator, too few for a position.", len(info))
 		}
 	}
 }
@@ -2260,8 +2225,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
+				logrus.Warnf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9", A.g_symbol_table)
 			}
 
 			A.g_symbol_table = '/'
@@ -2269,8 +2233,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if pm6.Space != ' ' && pm6.Space != 0 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error: Found '%c' instead of space required after symbol code.\n", pm6.Space)
+				logrus.Warnf("Error: Found '%c' instead of space required after symbol code.", pm6.Space)
 			}
 		}
 
@@ -2289,8 +2252,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if A.g_symbol_table != '/' && A.g_symbol_table != '\\' && !unicode.IsUpper(rune(A.g_symbol_table)) && !unicode.IsDigit(rune(A.g_symbol_table)) {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9\n", A.g_symbol_table)
+				logrus.Warnf("Invalid symbol table code '%c' not one of / \\ A-Z 0-9", A.g_symbol_table)
 			}
 
 			A.g_symbol_table = '/'
@@ -2298,8 +2260,7 @@ func aprs_status_report(A *decode_aprs_t, info []byte) {
 
 		if pm4.Space != ' ' && pm4.Space != 0 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error: Found '%c' instead of space required after symbol code.\n", pm4.Space)
+				logrus.Warnf("Error: Found '%c' instead of space required after symbol code.", pm4.Space)
 			}
 		}
 
@@ -2402,8 +2363,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 	var before, after, found = bytes.Cut(info[1:], []byte{'?'})
 	if !found {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("General Query must have ? after the query type.\n")
+			logrus.Warn("General Query must have ? after the query type.")
 		}
 
 		return
@@ -2433,8 +2393,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 
 		if latErr != nil || lat < -90 || lat > 90 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid latitude for General Query footprint.\n")
+				logrus.Warn("Invalid latitude for General Query footprint.")
 			}
 
 			return
@@ -2444,8 +2403,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 
 		if lonErr != nil || lon < -180 || lon > 180 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid longitude for General Query footprint.\n")
+				logrus.Warn("Invalid longitude for General Query footprint.")
 			}
 
 			return
@@ -2455,8 +2413,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 
 		if radiusErr != nil || radius <= 0 || radius > 9999 {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Invalid radius for General Query footprint.\n")
+				logrus.Warn("Invalid radius for General Query footprint.")
 			}
 
 			return
@@ -2471,8 +2428,7 @@ func aprs_general_query(A *decode_aprs_t, info []byte, quiet bool) { //nolint:un
 		A.g_footprint_radius = maybe.Just(radius)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't parse latitude,longitude,radius for General Query footprint.\n")
+			logrus.Warn("Can't parse latitude,longitude,radius for General Query footprint.")
 		}
 
 		return
@@ -2597,8 +2553,7 @@ func aprs_user_defined(A *decode_aprs_t, info []byte) {
 		var aisData, aisErr = ais.Parse(string(info[3:]))
 		if aisErr != nil {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%v\n", aisErr)
+				logrus.Warnf("%v", aisErr)
 			}
 
 			if aisData == nil {
@@ -2704,8 +2659,7 @@ func aprs_positionless_weather_report(A *decode_aprs_t, info []byte) {
 
 	if len(info) <= positionlessWeatherHeaderBytes {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Positionless weather report is too short to hold any weather data.\n")
+			logrus.Warn("Positionless weather report is too short to hold any weather data.")
 		}
 
 		return
@@ -2823,16 +2777,14 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 		A.g_course, wp, found = getwdata(wp, 'c', 3)
 		if !found {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Didn't find wind direction in form c999.\n")
+				logrus.Warn("Didn't find wind direction in form c999.")
 			}
 		}
 
 		A.g_speed_mph, wp, found = getwdata(wp, 's', 3) /* MPH here */
 		if !found {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Didn't find wind speed in form s999.\n")
+				logrus.Warn("Didn't find wind speed in form s999.")
 			}
 		}
 	}
@@ -2866,8 +2818,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 		}
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Didn't find wind gust in form g999.\n")
+			logrus.Warn("Didn't find wind gust in form g999.")
 		}
 	}
 
@@ -2878,8 +2829,7 @@ func weather_data(A *decode_aprs_t, wdata []byte, wind_prefix bool) { //nolint:u
 		}
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Didn't find temperature in form t999.\n")
+			logrus.Warn("Didn't find temperature in form t999.")
 		}
 	}
 
@@ -3216,8 +3166,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 		A.g_lat = maybe.Just(90 - float64((pcpos.Y[0]-33)*91*91*91+(pcpos.Y[1]-33)*91*91+(pcpos.Y[2]-33)*91+(pcpos.Y[3]-33))/380926.0)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in compressed latitude.  Must be in range of '!' to '{'.\n")
+			logrus.Warn("Invalid character in compressed latitude.  Must be in range of '!' to '{'.")
 		}
 
 		A.g_lat = maybe.Nothing[float64]()
@@ -3227,8 +3176,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 		A.g_lon = maybe.Just(-180 + float64((pcpos.X[0]-33)*91*91*91+(pcpos.X[1]-33)*91*91+(pcpos.X[2]-33)*91+(pcpos.X[3]-33))/190463.0)
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in compressed longitude.  Must be in range of '!' to '{'.\n")
+			logrus.Warn("Invalid character in compressed longitude.  Must be in range of '!' to '{'.")
 		}
 
 		A.g_lon = maybe.Nothing[float64]()
@@ -3243,8 +3191,7 @@ func decode_compressed_position(A *decode_aprs_t, pcpos *compressed_position_t) 
 		A.g_symbol_table = pcpos.SymTableId - 'a' + '0'
 	} else {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid symbol table id for compressed position.\n")
+			logrus.Warn("Invalid symbol table id for compressed position.")
 		}
 
 		A.g_symbol_table = '/'
@@ -3315,8 +3262,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64(plat.Deg[0]-'0') * 10
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tens of degrees.\n", plat.Deg[0])
+			logrus.Warnf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tens of degrees.", plat.Deg[0])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3326,8 +3272,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64(plat.Deg[1]-'0') * 1
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for degrees.\n", plat.Deg[1])
+			logrus.Warnf("Invalid character in latitude.  Found '%c' when expecting 0-9 for degrees.", plat.Deg[1])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3339,8 +3284,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-5 for tens of minutes.\n", plat.Minn[0])
+			logrus.Warnf("Invalid character in latitude.  Found '%c' when expecting 0-5 for tens of minutes.", plat.Minn[0])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3352,8 +3296,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for minutes.\n", plat.Minn[1])
+			logrus.Warnf("Invalid character in latitude.  Found '%c' when expecting 0-9 for minutes.", plat.Minn[1])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3361,8 +3304,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	if plat.Dot != '.' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unexpected character \"%c\" found where period expected in latitude.\n", plat.Dot)
+			logrus.Warnf("Unexpected character \"%c\" found where period expected in latitude.", plat.Dot)
 		}
 
 		return maybe.Nothing[float64]()
@@ -3374,8 +3316,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tenths of minutes.\n", plat.HMin[0])
+			logrus.Warnf("Invalid character in latitude.  Found '%c' when expecting 0-9 for tenths of minutes.", plat.HMin[0])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3387,8 +3328,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in latitude.  Found '%c' when expecting 0-9 for hundredths of minutes.\n", plat.HMin[1])
+			logrus.Warnf("Invalid character in latitude.  Found '%c' when expecting 0-9 for hundredths of minutes.", plat.HMin[1])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3401,8 +3341,7 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(result)
 	case 'n':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case n found for latitude hemisphere.  Specification requires upper case N or S.\n")
+			logrus.Warn("Warning: Lower case n found for latitude hemisphere.  Specification requires upper case N or S.")
 		}
 
 		return maybe.Just(result)
@@ -3410,15 +3349,13 @@ func get_latitude_8(p [8]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(-result)
 	case 's':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case s found for latitude hemisphere.  Specification requires upper case N or S.\n")
+			logrus.Warn("Warning: Lower case s found for latitude hemisphere.  Specification requires upper case N or S.")
 		}
 
 		return maybe.Just(-result)
 	default:
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error: '%c' found for latitude hemisphere.  Specification requires upper case N or S.\n", plat.NS)
+			logrus.Warnf("Error: '%c' found for latitude hemisphere.  Specification requires upper case N or S.", plat.NS)
 		}
 
 		return maybe.Nothing[float64]()
@@ -3473,8 +3410,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64((plon.Deg[0])-'0') * 100
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0 or 1 for hundreds of degrees.\n", plon.Deg[0])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0 or 1 for hundreds of degrees.", plon.Deg[0])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3484,8 +3420,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64((plon.Deg[1])-'0') * 10
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tens of degrees.\n", plon.Deg[1])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tens of degrees.", plon.Deg[1])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3495,8 +3430,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		result += float64((plon.Deg[2])-'0') * 1
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for degrees.\n", plon.Deg[2])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0-9 for degrees.", plon.Deg[2])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3507,8 +3441,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 	} else if plon.Minn[0] == ' ' {
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-5 for tens of minutes.\n", plon.Minn[0])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0-5 for tens of minutes.", plon.Minn[0])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3520,8 +3453,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for minutes.\n", plon.Minn[1])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0-9 for minutes.", plon.Minn[1])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3529,8 +3461,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	if plon.Dot != '.' {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unexpected character \"%c\" found where period expected in longitude.\n", plon.Dot)
+			logrus.Warnf("Unexpected character \"%c\" found where period expected in longitude.", plon.Dot)
 		}
 
 		return maybe.Nothing[float64]()
@@ -3542,8 +3473,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tenths of minutes.\n", plon.HMin[0])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0-9 for tenths of minutes.", plon.HMin[0])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3555,8 +3485,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 
 	} else {
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid character in longitude.  Found '%c' when expecting 0-9 for hundredths of minutes.\n", plon.HMin[1])
+			logrus.Warnf("Invalid character in longitude.  Found '%c' when expecting 0-9 for hundredths of minutes.", plon.HMin[1])
 		}
 
 		return maybe.Nothing[float64]()
@@ -3569,8 +3498,7 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(result)
 	case 'e':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case e found for longitude hemisphere.  Specification requires upper case E or W.\n")
+			logrus.Warn("Warning: Lower case e found for longitude hemisphere.  Specification requires upper case E or W.")
 		}
 
 		return maybe.Just(result)
@@ -3578,15 +3506,13 @@ func get_longitude_9(p [9]byte, quiet bool) maybe.Maybe[float64] {
 		return maybe.Just(-result)
 	case 'w':
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Warning: Lower case w found for longitude hemisphere.  Specification requires upper case E or W.\n")
+			logrus.Warn("Warning: Lower case w found for longitude hemisphere.  Specification requires upper case E or W.")
 		}
 
 		return maybe.Just(-result)
 	default:
 		if !quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error: '%c' found for longitude hemisphere.  Specification requires upper case E or W.\n", plon.EW)
+			logrus.Warnf("Error: '%c' found for longitude hemisphere.  Specification requires upper case E or W.", plon.EW)
 		}
 
 		return maybe.Nothing[float64]()
@@ -3678,8 +3604,7 @@ func get_timestamp(A *decode_aprs_t, p [7]byte) time.Time { //nolint:unparam
 		!unicode.IsDigit(rune(p[4])) ||
 		!unicode.IsDigit(rune(p[5])) ||
 		(p[6] != 'z' && p[6] != '/' && p[6] != 'h') { //nolnit:staticcheck
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Timestamp must be 6 digits followed by z, h, or /.\n")
+		logrus.Warn("Timestamp must be 6 digits followed by z, h, or /.")
 
 		return time.Time{}
 	}
@@ -4102,9 +4027,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 	if clen > len(A.g_comment)-1 {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Comment is extremely long, %d characters.\n", clen)
-			dw_printf("Please report this, along with surrounding lines, so we can find the cause.\n")
+			logrus.Warnf("Comment is extremely long, %d characters. Please report this, along with surrounding lines, so we can find the cause.", clen)
 		}
 	}
 
@@ -4164,9 +4087,10 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 		if bytes.HasPrefix(smtemp, []byte("MHz")) {
 			if !A.g_quiet {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Warning: \"%s\" has non-standard capitalization and might not be recognized by some systems.\n", smtemp)
-				dw_printf("For best compatibility, it should be exactly like this: \"MHz\"  (upper,upper,lower case)\n")
+				logrus.Warnf(
+					"Warning: \"%s\" has non-standard capitalization and might not be recognized by some systems. For best compatibility, it should be exactly like this: \"MHz\"  (upper,upper,lower case)",
+					smtemp,
+				)
 			}
 		}
 
@@ -4210,9 +4134,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 			if A.g_tone.IsNothing() {
 				if !A.g_quiet {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Bad CTCSS/PL specification: \"%s\"\n", sttemp)
-					dw_printf("Integer does not correspond to standard tone.\n")
+					logrus.Warnf("Bad CTCSS/PL specification: \"%s\". Integer does not correspond to standard tone.", sttemp)
 				}
 			}
 
@@ -4425,9 +4347,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 			if !A.g_quiet {
 				var good = fmt.Sprintf("%07.3fMHz", x)
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("\"%s\" in comment looks like a frequency in non-standard format.\n", bad)
-				dw_printf("For most systems to recognize it, use exactly this form \"%s\" at beginning of comment.\n", good)
+				logrus.Warnf("\"%s\" in comment looks like a frequency in non-standard format. For most systems to recognize it, use exactly this form \"%s\" at beginning of comment.", bad, good)
 			}
 
 			if A.g_freq.IsNothing() {
@@ -4462,9 +4382,11 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 				if !A.g_quiet {
 					var good = fmt.Sprintf("T%03d", i_ctcss[i])
 
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("\"%s\" in comment looks like it might be a CTCSS tone in non-standard format.\n", bad1)
-					dw_printf("For most systems to recognize it, use exactly this form \"%s\" at near beginning of comment, after any frequency.\n", good)
+					logrus.Warnf(
+						"\"%s\" in comment looks like it might be a CTCSS tone in non-standard format. For most systems to recognize it, use exactly this form \"%s\" at near beginning of comment, after any frequency.",
+						bad1,
+						good,
+					)
 				}
 
 				if A.g_tone.IsNothing() {
@@ -4482,9 +4404,7 @@ func process_comment(A *decode_aprs_t, commentData []byte) {
 
 	if (offset == 6000 || offset == -6000) && freq >= 144 && freq <= 148 {
 		if !A.g_quiet {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("A transmit offset of 6 MHz on the 2 meter band doesn't seem right.\n")
-			dw_printf("Each unit is 10 kHz so you should probably be using \"-060\" or \"+060\"\n")
+			logrus.Warn("A transmit offset of 6 MHz on the 2 meter band doesn't seem right. Each unit is 10 kHz so you should probably be using \"-060\" or \"+060\"")
 		}
 	}
 

@@ -418,14 +418,10 @@ func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 			text_color_set(DW_COLOR_REC)
 			dw_printf("\nSuccess!\n")
 		} else if push_button_result.String() == "123A456B789C*0#D123789" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\n * Time-out failed, otherwise OK *\n")
-			dw_printf("\"%s\"\n", push_button_result.String())
+			logrus.Errorf("* Time-out failed, otherwise OK * \"%s\"", push_button_result.String())
 			os.Exit(1)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\n *** TEST FAILED ***\n")
-			dw_printf("\"%s\"\n", push_button_result.String())
+			logrus.Errorf("*** TEST FAILED *** \"%s\"", push_button_result.String())
 			os.Exit(1)
 		}
 	}

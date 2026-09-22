@@ -247,8 +247,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 		// stemp, so the client was told the frame had been truncated and then
 		// handed the whole of it anyway.
 		if flen > AX25_MAX_PACKET_LEN {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nSerial Port KISS buffer too small.  Truncated.\n\n")
+			logrus.Error("Serial Port KISS buffer too small.  Truncated.")
 
 			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
@@ -309,8 +308,7 @@ func kissserial_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int
 	var n = SerialPortWrite(serialport_fd, kiss_buff)
 
 	if n != kiss_len {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending KISS message to client application thru serial port.\n\n")
+		logrus.Error("Error sending KISS message to client application thru serial port.")
 
 		// Not closed here: see serialport_failed.
 		serialport_failed = true
@@ -361,8 +359,7 @@ func giveUpSerialPortIfFailed() bool {
 		return false
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("\nSerial Port KISS write error. Closing connection.\n\n")
+	logrus.Error("Serial Port KISS write error. Closing connection.")
 	closeSerialPortKISS()
 
 	return true
@@ -399,8 +396,7 @@ func kissserial_get(ctx context.Context) (byte, error) {
 		}
 
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
+			logrus.Error("Serial Port KISS read error. Closing connection.")
 			closeSerialPortKISS()
 
 			return ch, err
@@ -433,8 +429,7 @@ func kissserial_get(ctx context.Context) (byte, error) {
 				return ch, nil
 			}
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nSerial Port KISS read error. Closing connection.\n\n")
+			logrus.Error("Serial Port KISS read error. Closing connection.")
 			closeSerialPortKISS()
 		} else {
 			// Not open.  Wait for it to appear and try opening.

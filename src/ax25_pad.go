@@ -155,6 +155,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 )
 
 const AX25_MAX_REPEATERS = 8
@@ -493,8 +494,7 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 
 	pa, stuff, found = bytes.Cut(stuff, []byte{'>'})
 	if !found {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create packet from text.  No source address\n")
+		logrus.Error("Failed to create packet from text.  No source address")
 
 		return (nil)
 	}
@@ -502,8 +502,7 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 	var addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_SOURCE, string(pa), strictness)
 
 	if !ok {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create packet from text.  Bad source address\n")
+		logrus.Error("Failed to create packet from text.  Bad source address")
 
 		return (nil)
 	}
@@ -522,8 +521,7 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 	addrTemp, ssidTemp, _, ok = ax25_parse_addr(AX25_DESTINATION, string(pa), strictness)
 
 	if !ok {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to create packet from text.  Bad destination address\n")
+		logrus.Error("Failed to create packet from text.  Bad destination address")
 
 		return (nil)
 	}
@@ -568,8 +566,7 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 
 		addrTemp, ssidTemp, heardTemp, ok = ax25_parse_addr(k, string(pa), strictness)
 		if !ok {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Failed to create packet from text.  Bad digipeater address\n")
+			logrus.Error("Failed to create packet from text.  Bad digipeater address")
 
 			return (nil)
 		}
@@ -615,8 +612,7 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 	var info_part []byte
 	for len(pinfo) > 0 {
 		if len(info_part) >= AX25_MAX_INFO_LEN {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Failed to create packet from text. Info part too long (max %d bytes)\n", AX25_MAX_INFO_LEN)
+			logrus.Errorf("Failed to create packet from text. Info part too long (max %d bytes)", AX25_MAX_INFO_LEN)
 
 			return (nil)
 		}
@@ -692,8 +688,7 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
 	 */
 	var flen = len(data)
 	if flen < AX25_MIN_PACKET_LEN || flen > AX25_MAX_PACKET_LEN {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Frame length %d not in allowable range of %d to %d.\n", flen, AX25_MIN_PACKET_LEN, AX25_MAX_PACKET_LEN)
+		logrus.Warnf("Frame length %d not in allowable range of %d to %d.", flen, AX25_MIN_PACKET_LEN, AX25_MAX_PACKET_LEN)
 
 		return (nil)
 	}
@@ -802,16 +797,13 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 	position++ /* Adjust for position_name above. */
 
 	if len(in_addr) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%sAddress \"%s\" is empty.\n", position_name[position], in_addr)
+		logrus.Errorf("%sAddress \"%s\" is empty.", position_name[position], in_addr)
 
 		return out_addr, ssid, heard, false
 	}
 
 	if strictness.strict() && len(in_addr) >= 2 && strings.HasPrefix(in_addr, "qA") {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%sAddress \"%s\" is a \"q-construct\" used for communicating with\n", position_name[position], in_addr)
-		dw_printf("APRS Internet Servers.  It should never appear when going over the radio.\n")
+		logrus.Errorf("%sAddress \"%s\" is a \"q-construct\" used for communicating with APRS Internet Servers.  It should never appear when going over the radio.", position_name[position], in_addr)
 	}
 
 	// dw_printf ("ax25_parse_addr in: %s\n", in_addr);
@@ -824,15 +816,13 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 		}
 
 		if i >= maxlen {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%sAddress is too long. \"%s\" has more than %d characters.\n", position_name[position], in_addr, maxlen)
+			logrus.Errorf("%sAddress is too long. \"%s\" has more than %d characters.", position_name[position], in_addr, maxlen)
 
 			return out_addr, ssid, heard, false
 		}
 
 		if !unicode.IsLetter(p) && !unicode.IsNumber(p) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%sAddress, \"%s\" contains character other than letter or digit in character position %d.\n", position_name[position], in_addr, i)
+			logrus.Errorf("%sAddress, \"%s\" contains character other than letter or digit in character position %d.", position_name[position], in_addr, i)
 
 			return out_addr, ssid, heard, false
 		}
@@ -842,8 +832,7 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 		if strictness.strict() && unicode.IsLower(p) {
 			// Exempt the "qA..." case because it was already mentioned.
 			if strictness != addrStrictLowerCaseWarning || !strings.HasPrefix(in_addr, "qA") {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%sAddress has lower case letters. \"%s\" must be all upper case.\n", position_name[position], in_addr)
+				logrus.Errorf("%sAddress has lower case letters. \"%s\" must be all upper case.", position_name[position], in_addr)
 			}
 
 			// The decode_aprs utility wants to hear about lower case but then
@@ -867,16 +856,14 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 			}
 
 			if i >= 2 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%sSSID is too long. SSID part of \"%s\" has more than 2 characters.\n", position_name[position], in_addr)
+				logrus.Errorf("%sSSID is too long. SSID part of \"%s\" has more than 2 characters.", position_name[position], in_addr)
 
 				return out_addr, ssid, heard, false
 			}
 
 			sstr.WriteRune(p)
 			if strictness.strict() && !unicode.IsDigit(p) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%sSSID must be digits. \"%s\" has letters in SSID.\n", position_name[position], in_addr)
+				logrus.Errorf("%sSSID must be digits. \"%s\" has letters in SSID.", position_name[position], in_addr)
 
 				return out_addr, ssid, heard, false
 			}
@@ -884,15 +871,13 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 
 		var k, kErr = strconv.Atoi(sstr.String())
 		if kErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%sMalformed SSID: \"%s\" could not be parsed.\n", position_name[position], in_addr)
+			logrus.Errorf("%sMalformed SSID: \"%s\" could not be parsed.", position_name[position], in_addr)
 
 			return out_addr, ssid, heard, false
 		}
 
 		if k < 0 || k > 15 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%sSSID out of range. SSID of \"%s\" not in range of 0 to 15.\n", position_name[position], in_addr)
+			logrus.Errorf("%sSSID out of range. SSID of \"%s\" not in range of 0 to 15.", position_name[position], in_addr)
 
 			return out_addr, ssid, heard, false
 		}
@@ -907,8 +892,7 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 		heard = true
 
 		if strictness == addrStrictNoStar {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\"*\" is not allowed at end of address \"%s\" here.\n", in_addr)
+			logrus.Errorf("\"*\" is not allowed at end of address \"%s\" here.", in_addr)
 
 			return out_addr, ssid, heard, false
 		}
@@ -917,8 +901,7 @@ func ax25_parse_addr(position int, in_addr string, strictness addrStrictness) (s
 	}
 
 	if len(in_addr) != 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid character \"%c\" found in %saddress \"%s\".\n", in_addr[0], position_name[position], in_addr)
+		logrus.Errorf("Invalid character \"%c\" found in %saddress \"%s\".", in_addr[0], position_name[position], in_addr)
 
 		return out_addr, ssid, heard, false
 	}
@@ -986,10 +969,7 @@ func ax25_check_addresses(pp *packet_t, strictness addrStrictness) bool {
 	}
 
 	if !all_ok {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n")
-		dw_printf("*** The origin and journey of this packet should receive some scrutiny. ***\n")
-		dw_printf("\n")
+		logrus.Warn("*** The origin and journey of this packet should receive some scrutiny. ***")
 	}
 
 	return all_ok
@@ -1012,8 +992,7 @@ func ax25_check_addresses(pp *packet_t, strictness addrStrictness) bool {
 
 func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
 	if ax25_get_dti(from_pp) != '}' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: ax25_unwrap_third_party: wrong data type.\n")
+		logrus.Error("Internal error: ax25_unwrap_third_party: wrong data type.")
 
 		return (nil)
 	}
@@ -1056,8 +1035,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
 
 	if len(ad) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
+		logrus.Errorf("Set address error!  Station address for position %d is empty!", n)
 	}
 
 	if n >= 0 && n < this_p.num_addr {
@@ -1089,8 +1067,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		 */
 		ax25_insert_addr(this_p, n, ad)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, ax25_set_addr, bad position %d for '%s'\n", n, ad)
+		logrus.Errorf("Internal error, ax25_set_addr, bad position %d for '%s'", n, ad)
 	}
 
 	//dw_printf ("------\n");
@@ -1132,8 +1109,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
 
 	if len(ad) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
+		logrus.Errorf("Set address error!  Station address for position %d is empty!", n)
 	}
 
 	/* Don't do it if we already have the maximum number. */
@@ -1177,8 +1153,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 
 	this_p.num_addr = (-1)
 	if expect != ax25_get_num_addr(this_p) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
+		logrus.Errorf("Internal error ax25_remove_addr expect %d, actual %d", expect, this_p.num_addr)
 	}
 }
 
@@ -1220,8 +1195,7 @@ func ax25_remove_addr(this_p *packet_t, n int) {
 
 	this_p.num_addr = (-1)
 	if expect != ax25_get_num_addr(this_p) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
+		logrus.Errorf("Internal error ax25_remove_addr expect %d, actual %d", expect, this_p.num_addr)
 	}
 }
 
@@ -1314,17 +1288,13 @@ func ax25_get_num_repeaters(this_p *packet_t) int {
 
 func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 	if n < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
-		dw_printf("Address index, %d, is less than zero.\n", n)
+		logrus.Errorf("Internal error detected in ax25_get_addr_with_ssid. Address index, %d, is less than zero.", n)
 
 		return "??????"
 	}
 
 	if n >= this_p.num_addr {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error detected in ax25_get_addr_with_ssid.\n")
-		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
+		logrus.Errorf("Internal error detected in ax25_get_addr_with_ssid. Address index, %d, is too large for number of addresses, %d.", n, this_p.num_addr)
 
 		return "??????"
 	}
@@ -1342,15 +1312,13 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 	var station = sb.String()
 
 	if strings.Contains(station, "\000") {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Station address \"%s\" contains nul character.  AX.25 protocol requires trailing ASCII spaces when less than 6 characters.\n", station)
+		logrus.Warnf("Station address \"%s\" contains nul character.  AX.25 protocol requires trailing ASCII spaces when less than 6 characters.", station)
 	}
 
 	station = strings.TrimRight(station, " ")
 
 	if len(station) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Station address, in position %d, is empty!  This is not a valid AX.25 frame.\n", n)
+		logrus.Warnf("Station address, in position %d, is empty!  This is not a valid AX.25 frame.", n)
 	}
 
 	var ssid = ax25_get_ssid(this_p, n)
@@ -1386,17 +1354,13 @@ func ax25_get_addr_with_ssid(this_p *packet_t, n int) string {
 
 func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 	if n < 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error detected in ax25_get_addr_no_ssid.\n")
-		dw_printf("Address index, %d, is less than zero.\n", n)
+		logrus.Errorf("Internal error detected in ax25_get_addr_no_ssid. Address index, %d, is less than zero.", n)
 
 		return "??????"
 	}
 
 	if n >= this_p.num_addr {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error detected in ax25_get_no_with_ssid.\n")
-		dw_printf("Address index, %d, is too large for number of addresses, %d.\n", n, this_p.num_addr)
+		logrus.Errorf("Internal error detected in ax25_get_no_with_ssid. Address index, %d, is too large for number of addresses, %d.", n, this_p.num_addr)
 
 		return "??????"
 	}
@@ -1414,8 +1378,7 @@ func ax25_get_addr_no_ssid(this_p *packet_t, n int) string {
 	var station = strings.TrimRight(sb.String(), " ")
 
 	if len(station) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Station address, in position %d, is empty!  This is not a valid AX.25 frame.\n", n)
+		logrus.Warnf("Station address, in position %d, is empty!  This is not a valid AX.25 frame.", n)
 	}
 
 	return station
@@ -1440,8 +1403,7 @@ func ax25_get_ssid(this_p *packet_t, n int) int {
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_SSID_MASK) >> SSID_SSID_SHIFT)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: ax25_get_ssid(%d), num_addr=%d\n", n, this_p.num_addr)
+		logrus.Errorf("Internal error: ax25_get_ssid(%d), num_addr=%d", n, this_p.num_addr)
 
 		return (0)
 	}
@@ -1469,8 +1431,7 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
 		this_p.frame_data[n*7+6] = (this_p.frame_data[n*7+6] & ^(byte(SSID_SSID_MASK))) |
 			byte((ssid<<SSID_SSID_SHIFT)&SSID_SSID_MASK)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: ax25_set_ssid(%d,%d), num_addr=%d\n", n, ssid, this_p.num_addr)
+		logrus.Errorf("Internal error: ax25_set_ssid(%d,%d), num_addr=%d", n, ssid, this_p.num_addr)
 	}
 }
 
@@ -1497,8 +1458,7 @@ func ax25_get_h(this_p *packet_t, n int) int {
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: ax25_get_h(%d), num_addr=%d\n", n, this_p.num_addr)
+		logrus.Errorf("Internal error: ax25_get_h(%d), num_addr=%d", n, this_p.num_addr)
 
 		return (0)
 	}
@@ -1525,8 +1485,7 @@ func ax25_set_h(this_p *packet_t, n int) {
 	if n >= 0 && n < this_p.num_addr {
 		this_p.frame_data[n*7+6] |= SSID_H_MASK
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: ax25_set_hd(%d), num_addr=%d\n", n, this_p.num_addr)
+		logrus.Errorf("Internal error: ax25_set_hd(%d), num_addr=%d", n, this_p.num_addr)
 	}
 }
 
@@ -1605,8 +1564,7 @@ func ax25_get_rr(this_p *packet_t, n int) int {
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_RR_MASK) >> SSID_RR_SHIFT)
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: ax25_get_rr(%d), num_addr=%d\n", n, this_p.num_addr)
+		logrus.Errorf("Internal error: ax25_get_rr(%d), num_addr=%d", n, this_p.num_addr)
 
 		return (0)
 	}
@@ -2464,8 +2422,7 @@ func ax25_set_pid(this_p *packet_t, pid byte) {
 	var frame_type = ax25_frame_type_only(this_p)
 
 	if frame_type != frame_type_I && frame_type != frame_type_U_UI {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ax25_set_pid(0x%2x): Packet type is not I or UI.\n", pid)
+		logrus.Errorf("ax25_set_pid(0x%2x): Packet type is not I or UI.", pid)
 
 		return
 	}
@@ -2593,7 +2550,6 @@ func ax25_dedupe_crc(pp *packet_t) uint16 {
 		// Temporary for debugging!
 
 		//  if (pinfo[info_len-1] == ' ') {
-		//    text_color_set(DW_COLOR_ERROR);
 		//    dw_printf ("DEBUG:  ax25_dedupe_crc ignoring trailing space.\n");
 		//  }
 		info = info[:len(info)-1]

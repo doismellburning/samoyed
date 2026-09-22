@@ -53,6 +53,7 @@ import (
 	"unicode"
 	"unsafe"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -258,8 +259,7 @@ o = DCD output control
 
 	var il2p_version, il2p_version_ok = il2p_parse_version(*il2pVersion)
 	if !il2p_version_ok {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid IL2P version %s.  Expected 0.4, 0.6, or compat.\n", *il2pVersion)
+		logrus.Errorf("Invalid IL2P version %s.  Expected 0.4, 0.6, or compat.", *il2pVersion)
 		pflag.Usage()
 		os.Exit(1)
 	}
@@ -400,7 +400,6 @@ o = DCD output control
 	}
 
 	if my_audio_config.achan[0].baud < MIN_BAUD || my_audio_config.achan[0].baud > MAX_BAUD {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
 		os.Exit(1)
 	}
@@ -457,7 +456,6 @@ o = DCD output control
 	my_audio_config.achan[1] = my_audio_config.achan[0]
 
 	if len(pflag.Args()) == 0 {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Specify .WAV file name on command line.\n\n")
 		pflag.Usage()
 		os.Exit(1)
@@ -475,7 +473,6 @@ o = DCD output control
 
 		atestFP, err = os.Open(wavFileName) //nolint:gosec // File path from CLI is expected for this tool
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Couldn't open file %s for read: %s\n", wavFileName, err)
 			// perror ("more info?");
 			os.Exit(1)
@@ -488,48 +485,41 @@ o = DCD output control
 
 		err = binary.Read(atestFP, binary.LittleEndian, &header)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Could not read file header: %s\n", err)
 			os.Exit(1)
 		}
 
 		if string(header.RIFF[:]) != "RIFF" || string(header.WAVE[:]) != "WAVE" {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("This is not a .WAV format file.\n")
 			os.Exit(1)
 		}
 
 		err = binary.Read(atestFP, binary.LittleEndian, &chunk)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Could not read chunk header: %s\n", err)
 			os.Exit(1)
 		}
 
 		for string(chunk.Id[:]) != "fmt " {
 			if chunk.Datasize < 0 {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Invalid chunk datasize %d.\n", chunk.Datasize)
 				os.Exit(1)
 			}
 
 			_, err = atestFP.Seek(int64(chunk.Datasize)+int64(chunk.Datasize%2), io.SeekCurrent)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Could not Seek: %s.\n", err)
 				os.Exit(1)
 			}
 
 			err = binary.Read(atestFP, binary.LittleEndian, &chunk)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Could not find \"fmt \" chunk.\n")
 				os.Exit(1)
 			}
 		}
 
 		if chunk.Datasize != 16 && chunk.Datasize != 18 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Need fmt chunk datasize of 16 or 18.  Found %d.\n", chunk.Datasize)
 			os.Exit(1)
 		}
@@ -543,7 +533,6 @@ o = DCD output control
 
 			_, err = atestFP.Seek(int64(extra), io.SeekCurrent)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Could not Seek: %s.\n", err)
 				os.Exit(1)
 			}
@@ -551,47 +540,40 @@ o = DCD output control
 
 		err = binary.Read(atestFP, binary.LittleEndian, &wav_data)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("WAV file error: Could not read data chunk header: %s\n", err)
 			os.Exit(1)
 		}
 
 		for string(wav_data.Data[:]) != "data" {
 			if wav_data.Datasize < 0 {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Invalid chunk datasize %d.\n", wav_data.Datasize)
 				os.Exit(1)
 			}
 
 			_, err = atestFP.Seek(int64(wav_data.Datasize)+int64(wav_data.Datasize%2), io.SeekCurrent)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Could not Seek: %s.\n", err)
 				os.Exit(1)
 			}
 
 			err = binary.Read(atestFP, binary.LittleEndian, &wav_data)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("WAV file error: Could not find \"data\" chunk.\n")
 				os.Exit(1)
 			}
 		}
 
 		if format.Wformattag != 1 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Sorry, I only understand audio format 1 (PCM).  This file has %d.\n", format.Wformattag)
 			os.Exit(1)
 		}
 
 		if format.Nchannels != 1 && format.Nchannels != 2 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Sorry, I only understand 1 or 2 channels.  This file has %d.\n", format.Nchannels)
 			os.Exit(1)
 		}
 
 		if format.Wbitspersample != 8 && format.Wbitspersample != 16 {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Sorry, I only understand 8 or 16 bits per sample.  This file has %d.\n", format.Wbitspersample)
 			os.Exit(1)
 		}
@@ -694,13 +676,11 @@ o = DCD output control
 	}
 
 	if *errorIfLessThan != -1 && packets_decoded_total < *errorIfLessThan {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("\n * * * TEST FAILED: number decoded is less than %d * * * \n", *errorIfLessThan)
 		os.Exit(1)
 	}
 
 	if *errorIfGreaterThan != -1 && packets_decoded_total > *errorIfGreaterThan {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("\n * * * TEST FAILED: number decoded is greater than %d * * * \n", *errorIfGreaterThan)
 		os.Exit(1)
 	}
@@ -735,8 +715,7 @@ func (s *readerSampleSource) GetByte(_ int) int {
 	s.remaining--
 
 	if errors.Is(err, io.EOF) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected end of file.\n")
+		logrus.Error("Unexpected end of file.")
 
 		return (-1)
 	}

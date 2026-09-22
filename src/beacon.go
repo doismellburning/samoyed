@@ -87,8 +87,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 				case BEACON_OBJECT:
 					/* Object name is required. */
 					if bs.miscConfig.beacon[j].objname == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: OBJNAME is required for OBEACON.\n", bs.miscConfig.beacon[j].lineno)
+						logrus.Errorf("Config file, line %d: OBJNAME is required for OBEACON.", bs.miscConfig.beacon[j].lineno)
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
@@ -99,8 +98,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 				case BEACON_POSITION:
 					/* Location is required. */
 					if bs.miscConfig.beacon[j].lat.IsNothing() || bs.miscConfig.beacon[j].lon.IsNothing() {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: Latitude and longitude are required.\n", bs.miscConfig.beacon[j].lineno)
+						logrus.Errorf("Config file, line %d: Latitude and longitude are required.", bs.miscConfig.beacon[j].lineno)
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
@@ -109,11 +107,13 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
 					if bs.miscConfig.beacon[j].custom_info != "" || bs.miscConfig.beacon[j].custom_infocmd != "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
-						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
-						dw_printf("so it would not make sense to use these with other beacon types which construct\n")
-						dw_printf("the Information field. Perhaps you want to use COMMENT or COMMENTCMD option.\n")
+						logrus.Errorf(
+							"Config file, line %d: INFO or INFOCMD are allowed only for custom beacon. INFO and INFOCMD "+
+								"allow you to specify contents of the Information field so it so it would not make sense to "+
+								"use these with other beacon types which construct the Information field. Perhaps you want "+
+								"to use COMMENT or COMMENTCMD option.",
+							bs.miscConfig.beacon[j].lineno,
+						)
 						// bs.miscConfig.beacon[j].btype = BEACON_IGNORE;
 						continue
 					}
@@ -124,8 +124,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 						var fix = dwgps_read(&gpsinfo)
 						if fix == DWFIX_NOT_INIT {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
+							logrus.Errorf("Config file, line %d: GPS must be configured to use TBEACON.", bs.miscConfig.beacon[j].lineno)
 							bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 							dw_printf("You must specify the source of the GPS data in your configuration file.\n")
@@ -137,11 +136,13 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 					/* INFO and INFOCMD are only for Custom Beacon. */
 
 					if bs.miscConfig.beacon[j].custom_info != "" || bs.miscConfig.beacon[j].custom_infocmd != "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD are allowed only for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
-						dw_printf("INFO and INFOCMD allow you to specify contents of the Information field so it\n")
-						dw_printf("so it would not make sense to use these with other beacon types which construct\n")
-						dw_printf("the Information field. Perhaps you want to use COMMENT or COMMENTCMD option.\n")
+						logrus.Errorf(
+							"Config file, line %d: INFO or INFOCMD are allowed only for custom beacon. INFO and INFOCMD "+
+								"allow you to specify contents of the Information field so it so it would not make sense to "+
+								"use these with other beacon types which construct the Information field. Perhaps you want "+
+								"to use COMMENT or COMMENTCMD option.",
+							bs.miscConfig.beacon[j].lineno,
+						)
 						// bs.miscConfig.beacon[j].btype = BEACON_IGNORE;
 						continue
 					}
@@ -149,8 +150,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 				case BEACON_CUSTOM:
 					/* INFO or INFOCMD is required. */
 					if bs.miscConfig.beacon[j].custom_info == "" && bs.miscConfig.beacon[j].custom_infocmd == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: INFO or INFOCMD is required for custom beacon.\n", bs.miscConfig.beacon[j].lineno)
+						logrus.Errorf("Config file, line %d: INFO or INFOCMD is required for custom beacon.", bs.miscConfig.beacon[j].lineno)
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
 						continue
@@ -161,9 +161,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 					if bs.igateConfig.t2_server_name == "" ||
 						bs.igateConfig.t2_login == "" ||
 						bs.igateConfig.t2_passcode == "" {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured.\n", bs.miscConfig.beacon[j].lineno)
-						dw_printf("IBEACON has been disabled.\n")
+						logrus.Errorf("Config file, line %d: Doesn't make sense to use IBEACON without IGate Configured. IBEACON has been disabled.", bs.miscConfig.beacon[j].lineno)
 
 						bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 
@@ -173,13 +171,11 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 				case BEACON_IGNORE:
 				}
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: MYCALL must be set for beacon on channel %d. \n", bs.miscConfig.beacon[j].lineno, channel)
+				logrus.Errorf("Config file, line %d: MYCALL must be set for beacon on channel %d. ", bs.miscConfig.beacon[j].lineno, channel)
 				bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Config file, line %d: Invalid channel number %d for beacon. \n", bs.miscConfig.beacon[j].lineno, channel)
+			logrus.Errorf("Config file, line %d: Invalid channel number %d for beacon. ", bs.miscConfig.beacon[j].lineno, channel)
 			bs.miscConfig.beacon[j].btype = BEACON_IGNORE
 		}
 	}
@@ -206,8 +202,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 		if slot, slotted := bp.slot.Get(); slotted {
 			if !IS_GOOD(bp.every) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: When using timeslots, there must be a whole number of beacon intervals per hour.\n", bp.lineno)
+				logrus.Errorf("Config file, line %d: When using timeslots, there must be a whole number of beacon intervals per hour.", bp.lineno)
 
 				// Try to make it valid by adjusting up or down.
 
@@ -239,8 +234,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 					}
 				}
 
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Config file, line %d: Time between slotted beacons has been adjusted to %d seconds.\n", bp.lineno, bp.every)
+				logrus.Errorf("Config file, line %d: Time between slotted beacons has been adjusted to %d seconds.", bp.lineno, bp.every)
 			}
 			/*
 			 * Determine when next slot time will arrive.
@@ -702,8 +696,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 	}
 
 	if IsNoCall(mycall) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("MYCALL not set for beacon to chan %d in config file line %d.\n", bp.sendto_chan, bp.lineno)
+		logrus.Errorf("MYCALL not set for beacon to chan %d in config file line %d.", bp.sendto_chan, bp.lineno)
 
 		return
 	}
@@ -754,8 +747,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 		if k == nil {
 			super_comment += string(var_comment)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("xBEACON, config file line %d, COMMENTCMD failure: %s.\n", bp.lineno, k)
+			logrus.Errorf("xBEACON, config file line %d, COMMENTCMD failure: %s.", bp.lineno, k)
 		}
 	}
 
@@ -853,14 +845,12 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 			if k == nil {
 				beacon_text += string(info_part)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("CBEACON, config file line %d, INFOCMD failure: %s.\n", bp.lineno, k)
+				logrus.Errorf("CBEACON, config file line %d, INFOCMD failure: %s.", bp.lineno, k)
 
 				beacon_text = "" // abort!
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal error. custom_info is null.\n")
+			logrus.Error("Internal error. custom_info is null.")
 
 			beacon_text = "" // abort!
 		}
@@ -909,8 +899,6 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 			transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Config file: Failed to parse packet constructed from line %d.\n", bp.lineno)
-		dw_printf("%s\n", beacon_text)
+		logrus.Errorf("Config file: Failed to parse packet constructed from line %d. %s", bp.lineno, beacon_text)
 	}
 } /* end send */

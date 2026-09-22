@@ -55,8 +55,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 
 	var fd, err = term.Open(linuxname, term.RawMode)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not open serial port %s: %s.\n", linuxname, err)
+		logrus.Errorf("ERROR - Could not open serial port %s: %s.", linuxname, err)
 
 		return nil
 	}
@@ -69,8 +68,7 @@ func SerialPortOpen(devicename string, baud int) *term.Term {
 	case 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200:
 		fd.SetSpeed(baud)
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("SerialPortOpen: Unsupported speed %d.  Using 4800.\n", baud)
+		logrus.Errorf("SerialPortOpen: Unsupported speed %d.  Using 4800.", baud)
 		fd.SetSpeed(4800)
 	}
 
@@ -110,7 +108,6 @@ func SerialPortWrite(fd *term.Term, data []byte) int {
 	if written != len(data) || err != nil {
 		// Do we want this message here?
 		// Or rely on caller to check and provide something more meaningful for the usage?
-		//text_color_set(DW_COLOR_ERROR);
 		//dw_printf ("Error writing to serial port. err=%d\n\n", written);
 		return (-1)
 	}

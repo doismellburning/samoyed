@@ -33,6 +33,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -329,7 +330,6 @@ func (mdb *MHeardDB) SaveIS(ptext string) {
 
 	   	if (pp == nil) {
 	   	  if (mheard_debug) {
-	   	    text_color_set(DW_COLOR_ERROR);
 	   	    dw_printf ("mheard SaveIS: Could not parse message from server.\n");
 	   	    dw_printf ("%s\n", ptext);
 	   	  }
@@ -619,8 +619,7 @@ func (mdb *MHeardDB) SetMSP(callsign string, num int) {
 			dw_printf("MSP for %s set to %d\n", callsign, num)
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error: Can't find %s to set MSP.\n", callsign)
+		logrus.Errorf("Internal error: Can't find %s to set MSP.", callsign)
 	}
 } /* end SetMSP */
 

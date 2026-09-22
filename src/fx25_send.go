@@ -1,7 +1,10 @@
 //nolint:gochecknoglobals
 package direwolf
 
-import "github.com/doismellburning/samoyed/internal/fcs"
+import (
+	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
+)
 
 var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendFrame" or "???"
 
@@ -104,8 +107,7 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 	var ctag_num = fx25_pick_mode(fx_mode, dlen)
 
 	if ctag_num < CTAG_MIN || ctag_num > CTAG_MAX {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.\n", channel, fx_mode, dlen)
+		logrus.Errorf("FX.25[%d]: Could not find suitable format for requested %d and data length %d.", channel, fx_mode, dlen)
 
 		return -1, nil, nil
 	}

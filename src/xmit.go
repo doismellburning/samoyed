@@ -394,9 +394,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 	if !xs.saidCannotTransmit[channel] {
 		xs.saidCannotTransmit[channel] = true
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d has no audio output device, so nothing can be transmitted on it.\n", channel)
-		dw_printf("Frames queued for it are discarded, and this is said only once.\n")
+		logrus.Errorf("Channel %d has no audio output device, so nothing can be transmitted on it. Frames queued for it are discarded, and this is said only once.", channel)
 	}
 
 	var confirmed = false
@@ -528,8 +526,7 @@ func (xs *XmitService) xmit_next(ctx context.Context, channel int) {
 			 * Discard the packet.
 			 * Display with ERROR color rather than XMIT color.
 			 */
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Waited too long for clear channel.  Discarding packet below.\n")
+			logrus.Error("Waited too long for clear channel.  Discarding packet below.")
 
 			var stemp = AX25FormatAddrs(pp)
 
@@ -801,8 +798,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 
 		/* Looks like a bug with the RPi audio system. Never an issue with Ubuntu.  */
 		/* This runs over randomly sometimes. TODO:  investigate more fully sometime. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Transmit timing error: PTT is on %d mSec too long.\n", -wait_more.Milliseconds())
+		logrus.Errorf("Transmit timing error: PTT is on %d mSec too long.", -wait_more.Milliseconds())
 	}
 
 	/*
@@ -966,8 +962,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
 	dw_printf("[%d.speech%s] \"%s\"\n", c, ts, string(pinfo))
 
 	if xs.p_modem.tts_script == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text-to-speech script has not been configured.\n")
+		logrus.Error("Text-to-speech script has not been configured.")
 
 		return
 	}
@@ -1005,8 +1000,7 @@ func xmit_speak_it(ctx context.Context, script string, c int, msg string) error 
 
 	var err = cmd.Run()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Failed to run text-to-speech script, %s\n", script)
+		logrus.Errorf("Failed to run text-to-speech script, %s", script)
 
 		var cwd, _ = os.Getwd()
 		dw_printf("CWD = %s\n", cwd)
@@ -1123,8 +1117,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 	if timeToWait.Milliseconds() > 0 {
 		SLEEP_MS(int(timeToWait.Milliseconds()))
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
+		logrus.Error("Oops.  CPU too slow to keep up with DTMF generation.")
 	}
 
 	ptt_set(OCTYPE_PTT, c, 0)

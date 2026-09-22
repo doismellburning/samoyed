@@ -44,8 +44,7 @@ var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
 
 func demod_psk_force_no_decimation(channel int) {
 	if save_audio_config_p.achan[channel].decimate > 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
+		logrus.Errorf("Channel %d: Decimation is not supported for PSK - ignoring.", channel)
 	}
 
 	save_audio_config_p.achan[channel].decimate = 1
@@ -148,22 +147,16 @@ func demod_init(pa *audio_s) {
 						have_plus = 1
 
 						if i+1 != len(profileStr) {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Channel %d: + option must appear at end of demodulator types \"%s\" \n",
-								channel, save_audio_config_p.achan[channel].profiles)
+							logrus.Errorf("Channel %d: + option must appear at end of demodulator types \"%s\" ", channel, save_audio_config_p.achan[channel].profiles)
 						}
 					} else if p == '-' {
 						have_plus = -1
 
 						if i+1 != len(profileStr) {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("Channel %d: - option must appear at end of demodulator types \"%s\" \n",
-								channel, save_audio_config_p.achan[channel].profiles)
+							logrus.Errorf("Channel %d: - option must appear at end of demodulator types \"%s\" ", channel, save_audio_config_p.achan[channel].profiles)
 						}
 					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.\n",
-							channel, save_audio_config_p.achan[channel].profiles)
+						logrus.Errorf("Channel %d: Demodulator types \"%s\" can contain only letters and + - characters.", channel, save_audio_config_p.achan[channel].profiles)
 					}
 				}
 
@@ -261,15 +254,13 @@ func demod_init(pa *audio_s) {
 				 */
 
 				if have_plus != 0 && save_audio_config_p.achan[channel].num_freq > 1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Channel %d: Demodulator + option can't be combined with multiple frequencies.\n", channel)
+					logrus.Errorf("Channel %d: Demodulator + option can't be combined with multiple frequencies.", channel)
 					save_audio_config_p.achan[channel].num_subchan = 1 // Will be set higher later.
 					save_audio_config_p.achan[channel].num_freq = 1
 				}
 
 				if num_letters > 1 && save_audio_config_p.achan[channel].num_freq > 1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.\n", channel)
+					logrus.Errorf("Channel %d: Multiple demodulator types can't be combined with multiple frequencies.", channel)
 
 					save_audio_config_p.achan[channel].profiles = string(save_audio_config_p.achan[channel].profiles[0])
 					num_letters = 1
@@ -321,15 +312,16 @@ func demod_init(pa *audio_s) {
 					save_audio_config_p.achan[channel].num_subchan = num_letters
 
 					if save_audio_config_p.achan[channel].num_subchan != num_letters {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")\n",
-							channel, save_audio_config_p.achan[channel].num_subchan, save_audio_config_p.achan[channel].profiles)
+						logrus.Errorf(
+							"INTERNAL ERROR, chan=%d, num_subchan(%d) != strlen(\"%s\")",
+							channel,
+							save_audio_config_p.achan[channel].num_subchan,
+							save_audio_config_p.achan[channel].profiles,
+						)
 					}
 
 					if save_audio_config_p.achan[channel].num_freq != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-							channel, save_audio_config_p.achan[channel].num_freq)
+						logrus.Errorf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1", channel, save_audio_config_p.achan[channel].num_freq)
 					}
 
 					for d := range save_audio_config_p.achan[channel].num_subchan {
@@ -373,21 +365,15 @@ func demod_init(pa *audio_s) {
 					 * One demodulator feeds multiple slicers, each a subchannel.
 					 */
 					if num_letters != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-							channel, just_letters)
+						logrus.Errorf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1", channel, just_letters)
 					}
 
 					if save_audio_config_p.achan[channel].num_freq != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1\n",
-							channel, save_audio_config_p.achan[channel].num_freq)
+						logrus.Errorf("INTERNAL ERROR, chan=%d, num_freq(%d) != 1", channel, save_audio_config_p.achan[channel].num_freq)
 					}
 
 					if save_audio_config_p.achan[channel].num_freq != save_audio_config_p.achan[channel].num_subchan {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, num_freq(%d) != num_subchan(%d)\n",
-							channel, save_audio_config_p.achan[channel].num_freq, save_audio_config_p.achan[channel].num_subchan)
+						logrus.Errorf("INTERNAL ERROR, chan=%d, num_freq(%d) != num_subchan(%d)", channel, save_audio_config_p.achan[channel].num_freq, save_audio_config_p.achan[channel].num_subchan)
 					}
 
 					var D = &demodulator_state[channel][0]
@@ -421,9 +407,7 @@ func demod_init(pa *audio_s) {
 					 * Can be combined with multiple frequencies.
 					 */
 					if num_letters != 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1\n",
-							channel, save_audio_config_p.achan[channel].profiles)
+						logrus.Errorf("INTERNAL ERROR, chan=%d, strlen(\"%s\") != 1", channel, save_audio_config_p.achan[channel].profiles)
 					}
 
 					save_audio_config_p.achan[channel].num_subchan = save_audio_config_p.achan[channel].num_freq
@@ -474,14 +458,13 @@ func demod_init(pa *audio_s) {
 				// a default.  My current thinking is that we default to direwolf <= 1.5
 				// compatible for version 1.6 and MFJ compatible after that.
 				if save_audio_config_p.achan[channel].v26_alternative == V26_UNSPECIFIED {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Two incompatible versions of 2400 bps QPSK are now available.\n")
-					dw_printf("For compatibility with direwolf <= 1.5, use 'V26A' modem option in config file.\n")
-					dw_printf("For compatibility MFJ-2400 use 'V26B' modem option in config file.\n")
-					dw_printf("Command line options -j and -J can be used for channel 0.\n")
-					dw_printf("For more information, read the Dire Wolf User Guide and\n")
-					dw_printf("2400-4800-PSK-for-APRS-Packet-Radio.pdf.\n")
-					dw_printf("The default is now MFJ-2400 compatibility mode.\n")
+					logrus.Error(
+						"Two incompatible versions of 2400 bps QPSK are now available. For compatibility with " +
+							"direwolf <= 1.5, use 'V26A' modem option in config file. For compatibility MFJ-2400 use " +
+							"'V26B' modem option in config file. Command line options -j and -J can be used for channel " +
+							"0. For more information, read the Dire Wolf User Guide and " +
+							"2400-4800-PSK-for-APRS-Packet-Radio.pdf. The default is now MFJ-2400 compatibility mode.",
+					)
 
 					save_audio_config_p.achan[channel].v26_alternative = V26_DEFAULT
 				}
@@ -767,8 +750,7 @@ func demod_init(pa *audio_s) {
 						ratio)
 
 					if ratio < 3 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("There is little hope of success with such a low ratio.  Use a higher sample rate.\n")
+						logrus.Error("There is little hope of success with such a low ratio.  Use a higher sample rate.")
 					} else if ratio < 5 {
 						dw_printf("This is on the low side for best performance.  Can you use a higher sample rate?\n")
 

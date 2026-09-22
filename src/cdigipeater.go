@@ -22,6 +22,8 @@ package direwolf
 
 import (
 	"regexp"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -113,8 +115,7 @@ func cdigipeater(from_chan int, pp *packet_t) {
 	if from_chan < 0 || from_chan >= MAX_RADIO_CHANS ||
 		(save_audio_config_p.chan_medium[from_chan] != MEDIUM_RADIO &&
 			save_audio_config_p.chan_medium[from_chan] != MEDIUM_NETTNC) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("cdigipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+		logrus.Errorf("cdigipeater: Did not expect to receive on invalid channel %d.", from_chan)
 
 		return
 	}
@@ -224,8 +225,7 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 	if cfilter_str != "" {
 		var result, err = pfilter(from_chan, to_chan, cfilter_str, pp, false)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.Errorf("%s", err)
 		}
 
 		if result != 1 {

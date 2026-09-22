@@ -73,8 +73,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s) (*WaypointSender,
 
 		var conn, err = new(net.Dialer).DialContext(ctx, "udp", addr)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Couldn't create socket for waypoint send to %s: %s\n", addr, err)
+			logrus.Errorf("Couldn't create socket for waypoint send to %s: %s", addr, err)
 		} else {
 			ws.udpSock = conn
 		}
@@ -97,8 +96,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s) (*WaypointSender,
 		}
 
 		if ws.serialPortFd == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Unable to open serial port %s for waypoint output.\n", mc.waypoint_serial_port)
+			logrus.Errorf("Unable to open serial port %s for waypoint output.", mc.waypoint_serial_port)
 		}
 	}
 
@@ -565,8 +563,7 @@ func (ws *WaypointSender) send(sentence []byte) {
 	if ws.udpSock != nil {
 		var n, err = ws.udpSock.Write(final)
 		if n != final_len {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Failed to send waypoint via UDP, err=%s\n", err)
+			logrus.Errorf("Failed to send waypoint via UDP, err=%s", err)
 		}
 	}
 } /* send */

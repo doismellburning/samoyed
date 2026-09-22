@@ -152,8 +152,7 @@ func digipeater(from_chan int, pp *packet_t) {
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
 		(digipeater_audio_config.chan_medium[from_chan] != MEDIUM_RADIO &&
 			digipeater_audio_config.chan_medium[from_chan] != MEDIUM_NETTNC) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("APRS digipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
+		logrus.Errorf("APRS digipeater: Did not expect to receive on invalid channel %d.", from_chan)
 
 		// Saying so and then carrying on meant indexing the per-channel
 		// configuration with the very channel number just called invalid,
@@ -303,8 +302,7 @@ func digipeat_match(
 	if filter_str != "" {
 		var result, err = pfilter(from_chan, to_chan, filter_str, pp, true)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.Errorf("%s", err)
 		}
 
 		if result != 1 {
@@ -448,16 +446,14 @@ func digipeat_match(
 				switch preempt {
 				case PREEMPT_DROP: /* remove all prior */
 					// TODO: deprecate this option.  Result is misleading.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
+					logrus.Error("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					for r2 > AX25_REPEATER_1 {
 						ax25_remove_addr(result, r2-1)
 						r2--
 					}
 				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
+					logrus.Error("The digipeat MARK option will be removed in a future release.  Use PREEMPT for preemptive digipeating.")
 
 					r2--
 					for r2 >= AX25_REPEATER_1 && ax25_get_h(result, r2) == 0 {

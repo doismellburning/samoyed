@@ -76,8 +76,7 @@ func il2p_payload_compute(payload_size int, max_fec int) (*il2p_payload_properti
 			p.parity_symbols_per_block = 8
 		} else {
 			// Should not happen.  But just in case...
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("IL2P parity symbol per payload block error.  small_block_size = %d\n", p.small_block_size)
+			logrus.Errorf("IL2P parity symbol per payload block error.  small_block_size = %d", p.small_block_size)
 
 			return p, -1
 		}
@@ -278,8 +277,7 @@ func il2p_decode_payload(received []byte, payload_size int, max_fec int, symbols
 	}
 
 	if decoded_length != payload_size {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("IL2P Internal error: decoded_length = %d, payload_size = %d\n", decoded_length, payload_size)
+		logrus.Errorf("IL2P Internal error: decoded_length = %d, payload_size = %d", decoded_length, payload_size)
 
 		return nil, -3
 	}

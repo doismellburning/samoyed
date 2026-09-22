@@ -65,6 +65,8 @@ import (
 	"net"
 	"strings"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 const KISS_CMD_DATA_FRAME = 0
@@ -369,8 +371,7 @@ func kiss_unwrap(in []byte) []byte {
 	if len(in) < 2 {
 		/* Need at least the "type indicator" byte and FEND. */
 		/* Probably more. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS message less than minimum length.\n")
+		logrus.Warn("KISS message less than minimum length.")
 
 		return []byte{}
 	}
@@ -378,8 +379,7 @@ func kiss_unwrap(in []byte) []byte {
 	if in[len(in)-1] == FEND {
 		in = in[:len(in)-1] // Ignore last FEND
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS frame should end with FEND.\n")
+		logrus.Warn("KISS frame should end with FEND.")
 	}
 
 	if in[0] == FEND {
@@ -391,8 +391,7 @@ func kiss_unwrap(in []byte) []byte {
 
 	for _, b := range in {
 		if b == FEND {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS frame should not have FEND in the middle.\n")
+			logrus.Warn("KISS frame should not have FEND in the middle.")
 		}
 
 		if escapedMode {
@@ -402,8 +401,7 @@ func kiss_unwrap(in []byte) []byte {
 			case TFEND:
 				buf.WriteByte(FEND)
 			default:
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS protocol error.  Found 0x%02x after FESC.\n", b)
+				logrus.Warnf("KISS protocol error.  Found 0x%02x after FESC.", b)
 			}
 
 			escapedMode = false
@@ -648,8 +646,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 				 * fragment - or writing one past the end of kiss_msg, which is
 				 * what used to happen here.
 				 */
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS message exceeded maximum length.  Discarding it.\n")
+				logrus.Warn("KISS message exceeded maximum length.  Discarding it.")
 
 				kf.kiss_len = 0
 				kf.state = KS_SEARCHING
@@ -688,8 +685,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 			kf.kiss_msg[kf.kiss_len] = ch
 			kf.kiss_len++
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS message exceeded maximum length.\n")
+			logrus.Warn("KISS message exceeded maximum length.")
 		}
 
 		return
@@ -807,17 +803,15 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
 
 		if channel < 0 || channel >= MAX_TOTAL_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid transmit channel %d from KISS client app.\n", channel)
-			dw_printf("\n")
-			dw_printf("Are you using AX.25 for Linux?  It might be trying to use a modified\n")
-			dw_printf("version of KISS which uses the channel field differently than the\n")
-			dw_printf("original KISS protocol specification.  The solution might be to use\n")
-			dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
-			dw_printf("Another way of doing this is pre-loading the \"kiss\" kernel module with CRC disabled:\n")
-			dw_printf("sudo /sbin/modprobe -q mkiss crc_force=1\n")
+			logrus.Warnf(
+				"Invalid transmit channel %d from KISS client app. Are you using AX.25 for Linux?  It might "+
+					"be trying to use a modified version of KISS which uses the channel field differently than "+
+					"the original KISS protocol specification.  The solution might be to use a command like "+
+					"\"kissparms -c 1 -p radio\" to set CRC none mode. Another way of doing this is pre-loading "+
+					"the \"kiss\" kernel module with CRC disabled: sudo /sbin/modprobe -q mkiss crc_force=1",
+				channel,
+			)
 
-			dw_printf("\n")
 			text_color_set(DW_COLOR_DEBUG)
 			kiss_debug_print(FROM_CLIENT, "", kiss_msg)
 
@@ -828,8 +822,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 
 		var pp = AX25FromFrame(kiss_msg[1:], alevel)
 		if pp == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR - Invalid KISS data frame from client app.\n")
+			logrus.Warn("ERROR - Invalid KISS data frame from client app.")
 		} else {
 			/* How can we determine if it is an original or repeated message? */
 			/* If there is at least one digipeater in the frame, AND */
@@ -846,8 +839,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 
 	case KISS_CMD_TXDELAY: /* 1 = TXDELAY */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for TXDELAY command.\n")
+			logrus.Warn("KISS ERROR: Missing value for TXDELAY command.")
 
 			return
 		}
@@ -856,18 +848,14 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("KISS protocol set TXDELAY = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
 
 		if kiss_msg[1] < 10 || kiss_msg[1] >= 100 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Are you sure you want such an extreme value for TXDELAY?\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			logrus.Warn("Are you sure you want such an extreme value for TXDELAY? Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.")
 		}
 
 		xmitSvc.SetTxdelay(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_PERSISTENCE: /* 2 = Persistence */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for PERSISTENCE command.\n")
+			logrus.Warn("KISS ERROR: Missing value for PERSISTENCE command.")
 
 			return
 		}
@@ -876,18 +864,14 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("KISS protocol set Persistence = %d, channel %d\n", kiss_msg[1], channel)
 
 		if kiss_msg[1] < 5 || kiss_msg[1] > 250 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Are you sure you want such an extreme value for PERSIST?\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			logrus.Warn("Are you sure you want such an extreme value for PERSIST? Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.")
 		}
 
 		xmitSvc.SetPersist(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_SLOTTIME: /* 3 = SlotTime */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for SLOTTIME command.\n")
+			logrus.Warn("KISS ERROR: Missing value for SLOTTIME command.")
 
 			return
 		}
@@ -896,18 +880,14 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("KISS protocol set SlotTime = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
 
 		if kiss_msg[1] < 2 || kiss_msg[1] > 50 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Are you sure you want such an extreme value for SLOTTIME?\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			logrus.Warn("Are you sure you want such an extreme value for SLOTTIME? Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.")
 		}
 
 		xmitSvc.SetSlottime(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_TXTAIL: /* 4 = TXtail */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for TXTAIL command.\n")
+			logrus.Warn("KISS ERROR: Missing value for TXTAIL command.")
 
 			return
 		}
@@ -916,18 +896,16 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("KISS protocol set TXtail = %d (*10mS units = %d mS), channel %d\n", kiss_msg[1], kiss_msg[1]*10, channel)
 
 		if kiss_msg[1] < 5 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Setting TXTAIL so low is asking for trouble.  You probably don't want to do this.\n")
-			dw_printf("Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\"\n")
-			dw_printf("section, to understand what this means.\n")
+			logrus.Warn(
+				"Setting TXTAIL so low is asking for trouble.  You probably don't want to do this. Read the Dire Wolf User Guide, \"Radio Channel - Transmit Timing\" section, to understand what this means.",
+			)
 		}
 
 		xmitSvc.SetTxtail(channel, int(kiss_msg[1]))
 
 	case KISS_CMD_FULLDUPLEX: /* 5 = FullDuplex */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for FULLDUPLEX command.\n")
+			logrus.Warn("KISS ERROR: Missing value for FULLDUPLEX command.")
 
 			return
 		}
@@ -939,8 +917,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 
 	case KISS_CMD_SET_HARDWARE: /* 6 = TNC specific */
 		if len(kiss_msg) < 2 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS ERROR: Missing value for SET HARDWARE command.\n")
+			logrus.Warn("KISS ERROR: Missing value for SET HARDWARE command.")
 
 			return
 		}
@@ -955,8 +932,7 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 		dw_printf("KISS protocol end KISS mode - Ignored.\n")
 
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS Invalid command %d\n", cmd)
+		logrus.Warnf("KISS Invalid command %d", cmd)
 		kiss_debug_print(FROM_CLIENT, "", kiss_msg)
 
 		text_color_set(DW_COLOR_INFO)
@@ -1067,27 +1043,23 @@ func kiss_set_hardware(channel int, command []byte, debug int, kps *kissport_sta
 	if found {
 		if bytes.Equal(cmd, []byte("TNC")) { /* TNC - Identify software version. */
 			if len(value) > 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS Set Hardware TNC: Did not expect a parameter.\n")
+				logrus.Warn("KISS Set Hardware TNC: Did not expect a parameter.")
 			}
 
 			var response = fmt.Sprintf("DIREWOLF %d.%d", MAJOR_VERSION, MINOR_VERSION)
 			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else if bytes.Equal(cmd, []byte("TXBUF")) { /* TXBUF - Number of bytes in transmit queue. */
 			if len(value) > 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS Set Hardware TXBUF: Did not expect a parameter.\n")
+				logrus.Warn("KISS Set Hardware TXBUF: Did not expect a parameter.")
 			}
 
 			var n = transmitQueue.Count(channel, -1, "", "", true)
 			var response = fmt.Sprintf("TXBUF:%d", n)
 			sendfun(channel, KISS_CMD_SET_HARDWARE, []byte(response), len(response), kps, client)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS Set Hardware unrecognized command: %s.\n", cmd)
+			logrus.Warnf("KISS Set Hardware unrecognized command: %s.", cmd)
 		}
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("KISS Set Hardware \"%s\" expected the form COMMAND:[parameter[,parameter...]]\n", command)
+		logrus.Warnf("KISS Set Hardware \"%s\" expected the form COMMAND:[parameter[,parameter...]]", command)
 	}
 } /* end kiss_set_hardware */

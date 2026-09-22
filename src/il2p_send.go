@@ -1,6 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "github.com/sirupsen/logrus"
+
 var number_of_il2p_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "il2p_send_frame"
 
 /*-------------------------------------------------------------
@@ -55,8 +57,7 @@ func il2p_send_frame(channel int, pp *packet_t, version il2p_version_t, max_fec 
 
 	var encoded, elen = il2p_encode_frame(pp, version, max_fec, il2p_crc_enabled(channel))
 	if elen <= 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("IL2P: Unable to encode frame into IL2P.\n")
+		logrus.Error("IL2P: Unable to encode frame into IL2P.")
 
 		return (-1)
 	}

@@ -7,7 +7,6 @@ type dw_color_e int
 
 const (
 	DW_COLOR_INFO    dw_color_e = iota /* black */
-	DW_COLOR_ERROR                     /* red */
 	DW_COLOR_REC                       /* green */
 	DW_COLOR_DECODED                   /* blue */
 	DW_COLOR_XMIT                      /* magenta */

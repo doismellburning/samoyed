@@ -164,8 +164,7 @@ func multi_modem_init(pa *audio_s, sink ReceiveSink) {
 	for channel := range MAX_RADIO_CHANS {
 		if save_audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			if save_audio_config_p.achan[channel].baud <= 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Internal multi_modem_init error, channel=%d\n", channel)
+				logrus.Errorf("Internal multi_modem_init error, channel=%d", channel)
 				save_audio_config_p.achan[channel].baud = DEFAULT_BAUD
 			}
 
@@ -234,12 +233,16 @@ func multi_modem_process_sample(channel int, audio_sample int) {
 
 	if save_audio_config_p.achan[channel].num_subchan <= 0 || save_audio_config_p.achan[channel].num_subchan > MAX_SUBCHANS ||
 		save_audio_config_p.achan[channel].num_slicers <= 0 || save_audio_config_p.achan[channel].num_slicers > MAX_SLICERS {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR!  Something is seriously wrong in multi_modem_process_sample\n")
-		dw_printf("channel = %d, num_subchan = %d [max %d], num_slicers = %d [max %d]\n", channel,
-			save_audio_config_p.achan[channel].num_subchan, MAX_SUBCHANS,
-			save_audio_config_p.achan[channel].num_slicers, MAX_SLICERS)
-		dw_printf("Please report this message and include a copy of your configuration file.\n")
+		logrus.Errorf(
+			"ERROR!  Something is seriously wrong in multi_modem_process_sample channel = %d, "+
+				"num_subchan = %d [max %d], num_slicers = %d [max %d]. Please report this message and "+
+				"include a copy of your configuration file.",
+			channel,
+			save_audio_config_p.achan[channel].num_subchan,
+			MAX_SUBCHANS,
+			save_audio_config_p.achan[channel].num_slicers,
+			MAX_SLICERS,
+		)
 		os.Exit(1)
 	}
 
@@ -303,8 +306,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 	case MODEM_AIS:
 		var nmea, err = ais.ToNMEA(fbuf)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%v\n", err)
+			logrus.Errorf("%v", err)
 
 			return
 		}
@@ -336,8 +338,7 @@ func multi_modem_process_rec_frame(channel int, subchan int, slice int, fbuf []b
 
 func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, retries BitFixLevel, fec_type fec_type_t) {
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected internal problem in multi_modem_process_rec_packet_real\n")
+		logrus.Error("Unexpected internal problem in multi_modem_process_rec_packet_real")
 
 		return /* oops!  why would it fail? */
 	}
@@ -534,8 +535,7 @@ func pick_best_candidate(channel int) {
 	}
 
 	if best_score == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unexpected internal problem in pick_best_candidate.  How can best score be zero?\n")
+		logrus.Error("Unexpected internal problem in pick_best_candidate.  How can best score be zero?")
 	}
 
 	/*

@@ -11,6 +11,7 @@ import (
 	"math/bits"
 
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 )
 
 type FX25RecState int
@@ -285,15 +286,13 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s, s
 				sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("FX.25[%d.%d]: Bad FCS for AX.25 frame.\n", channel, slice)
+				logrus.Warnf("FX.25[%d.%d]: Bad FCS for AX.25 frame.", channel, slice)
 				fx_hex_dump(F.block[:F.dlen])
 				fx_hex_dump(frame_buf[:frame_len])
 			}
 		} else {
 			// Most likely cause is defective sender software.
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.\n", channel, slice)
+			logrus.Warnf("FX.25[%d.%d]: AX.25 frame is shorter than minimum length.", channel, slice)
 			fx_hex_dump(F.block[:F.dlen])
 
 			if frame_len > 0 {
@@ -301,8 +300,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s, s
 			}
 		}
 	} else if fx25_get_debug() >= 2 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FX.25[%d.%d]: FEC failed.  Too many errors.\n", channel, slice)
+		logrus.Warnf("FX.25[%d.%d]: FEC failed.  Too many errors.", channel, slice)
 	}
 }
 
@@ -342,8 +340,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 	var olen = 0         // Number of good bits in oacc.
 
 	if pin[0] != 0x7e {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("FX.25[%d.%d] error: Data section did not start with 0x7e.\n", channel, slice)
+		logrus.Warnf("FX.25[%d.%d] error: Data section did not start with 0x7e.", channel, slice)
 		fx_hex_dump(pin[:ilen])
 
 		return nil
@@ -363,8 +360,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 			pat_det |= dbit << 7
 
 			if pat_det == 0xfe {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.\n", channel, slice)
+				logrus.Warnf("FX.25[%d.%d]: Invalid AX.25 frame - Seven '1' bits in a row.", channel, slice)
 				fx_hex_dump(pin[i:ilen])
 
 				return nil
@@ -378,8 +374,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 					if olen == 7 {
 						return frame_buf // Whole number of bytes in result including CRC
 					} else {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.\n", channel, slice)
+						logrus.Warnf("FX.25[%d.%d]: Invalid AX.25 frame - Not a whole number of bytes.", channel, slice)
 						fx_hex_dump(pin[i:ilen])
 
 						return nil
@@ -400,8 +395,7 @@ func my_unstuff(channel int, subchannel int, slice int, pin []byte, ilen int) []
 		}
 	} /* end of loop on all bits in block */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.\n", channel, slice)
+	logrus.Warnf("FX.25[%d.%d]: Invalid AX.25 frame - Terminating flag not found.", channel, slice)
 	fx_hex_dump(pin[:ilen])
 
 	return nil // Should never fall off the end.

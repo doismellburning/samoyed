@@ -25,6 +25,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -381,8 +382,7 @@ func tt_user_heard(callsign string, ssid int, overlay rune, symbol rune, loc_tex
 	 * are a future possibility.
 	 */
 	if callsign == "" {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("APRStt tone sequence did not include callsign / object name.\n")
+		logrus.Error("APRStt tone sequence did not include callsign / object name.")
 
 		return (TT_ERROR_NO_CALL)
 	}
@@ -747,8 +747,7 @@ func xmit_object_report(i int, first_time bool) {
 	var pp = AX25FromText(stemp, true)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\"%s\"\n", stemp)
+		logrus.Errorf("\"%s\"", stemp)
 
 		return
 	}

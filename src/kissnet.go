@@ -264,13 +264,13 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 							// A client app might think it is attached to a traditional TNC.
 							// It might try sending commands over and over again trying to get the TNC into KISS mode.
 							// We recognize this attempt and send it something to keep it happy.
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("KISS TCP: Something unexpected from client application.\n")
-							dw_printf("Is client app treating this like an old TNC with command mode?\n")
-							dw_printf("This can be caused by the application sending commands to put a\n")
-							dw_printf("traditional TNC into KISS mode.  It is usually a harmless warning.\n")
-							dw_printf("For best results, configure for a KISS-only TNC to avoid this.\n")
-							dw_printf("In the case of APRSISCE/32, use \"Simply(KISS)\" rather than \"KISS.\"\n")
+							logrus.Warn(
+								"KISS TCP: Something unexpected from client application. Is client app treating this like " +
+									"an old TNC with command mode? This can be caused by the application sending commands to " +
+									"put a traditional TNC into KISS mode.  It is usually a harmless warning. For best results, " +
+									"configure for a KISS-only TNC to avoid this. In the case of APRSISCE/32, use " +
+									"\"Simply(KISS)\" rather than \"KISS.\"",
+							)
 
 							if kns.debug > 0 {
 								kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
@@ -317,8 +317,7 @@ func (kns *KissNetService) SendRecPacket(channel int, kiss_cmd int, fbuf []byte,
 
 						var _, err = conn.Write(kiss_buff)
 						if err != nil {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("\nError %s sending message to KISS client application %d on port %d.  Closing connection.\n\n", err, client, kps.tcp_port)
+							logrus.Errorf("Error %s sending message to KISS client application %d on port %d.  Closing connection.", err, client, kps.tcp_port)
 							conn.Close()
 							kps.detachClientIfCurrent(client, conn)
 						}
@@ -392,8 +391,7 @@ func (kns *KissNetService) Copy(_msg []byte, channel int, cmd int, from_kps *kis
 
 							var _, err = conn.Write(kiss_buff)
 							if err != nil {
-								text_color_set(DW_COLOR_ERROR)
-								dw_printf("\nError %s copying message to KISS TCP port %d client %d application.  Closing connection.\n\n", err, kps.tcp_port, client)
+								logrus.Errorf("Error %s copying message to KISS TCP port %d client %d application.  Closing connection.", err, kps.tcp_port, client)
 								conn.Close()
 								kps.detachClientIfCurrent(client, conn)
 							}

@@ -11,6 +11,8 @@ package direwolf
 
 import (
 	"math/bits"
+
+	"github.com/sirupsen/logrus"
 )
 
 type IL2PState int
@@ -163,8 +165,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 						}
 					} else { // Error.
 						if il2p_get_debug() >= 1 {
-							text_color_set(DW_COLOR_ERROR)
-							dw_printf("IL2P header INVALID.\n")
+							logrus.Warn("IL2P header INVALID.")
 						}
 
 						F.state = IL2P_SEARCHING
@@ -244,8 +245,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 					ax25_hex_dump(pp)
 				} else {
 					// Most likely too many FEC errors.
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("FAILED to construct frame in il2p_rec_bit.\n")
+					logrus.Warn("FAILED to construct frame in il2p_rec_bit.")
 				}
 			}
 
@@ -254,8 +254,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				var frame_data = ax25_get_frame_data(pp)
 				if !il2p_crc_check(frame_data, F.scrc[:]) {
 					if il2p_get_debug() >= 1 {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("IL2P trailing CRC mismatch.\n")
+						logrus.Warn("IL2P trailing CRC mismatch.")
 					}
 					pp = nil
 				}

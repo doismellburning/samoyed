@@ -174,16 +174,14 @@ func kisspt_open_pt() {
 	logrus.Debug("kisspt_open_pt")
 	var ptmx, pts, err = pty.Open()
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not create pseudo terminal for KISS TNC: %s.\n", err)
+		logrus.Errorf("ERROR - Could not create pseudo terminal for KISS TNC: %s.", err)
 
 		return
 	}
 
 	var master, pollableErr = pollable(ptmx)
 	if pollableErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Could not set up pseudo terminal for KISS TNC: %s.\n", pollableErr)
+		logrus.Errorf("ERROR - Could not set up pseudo terminal for KISS TNC: %s.", pollableErr)
 		pts.Close()
 
 		return
@@ -224,7 +222,6 @@ func kisspt_open_pt() {
 	var flags = C.fcntl(fd, C.F_GETFL, 0)
 	e = C.fcntl(fd, C.F_SETFL, flags|C.O_NONBLOCK)
 	if e != 0 {
-		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Can't set pseudo terminal to nonblocking, fcntl returns %d, errno = %d\n", e, errno)
 		panic("pt fcntl")
 	}
@@ -243,7 +240,6 @@ func kisspt_open_pt() {
 	var pt_slave_fd = C.open(pt_slave_name, C.O_RDWR|C.O_NOCTTY)
 
 	if pt_slave_fd < 0 {
-		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Can't open %s\n", pt_slave_name)
 		panic("")
 		return -1
@@ -327,8 +323,7 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
 		var stemp []byte
 
 		if flen > AX25_MAX_PACKET_LEN {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
+			logrus.Error("Pseudo Terminal KISS buffer too small.  Truncated.")
 
 			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
 		}
@@ -356,9 +351,7 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
 	var n, err = master.Write(kiss_buff)
 
 	if n != len(kiss_buff) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			master.Name(), len(kiss_buff), n, err)
+		logrus.Errorf("Error sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s", master.Name(), len(kiss_buff), n, err)
 	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
@@ -459,8 +452,7 @@ func kisspt_get(ctx context.Context) (byte, error) {
 			return ch[0], nil
 		}
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", pt_slave.Name(), err)
+			logrus.Errorf("Error receiving KISS message from client application.  Closing %s. %s", pt_slave.Name(), err)
 
 			closeKissPTIfCurrent(master)
 

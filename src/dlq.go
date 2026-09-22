@@ -248,8 +248,7 @@ func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel 
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR:  dlq_rec_frame nil packet pointer. Please report this!\n")
+		logrus.Error("INTERNAL ERROR:  dlq_rec_frame nil packet pointer. Please report this!")
 
 		return
 	}
@@ -270,8 +269,7 @@ func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel 
 	s_new_count++
 
 	if s_new_count > s_delete_count+50 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR:  DLQ memory leak, new=%d, delete=%d\n", s_new_count, s_delete_count)
+		logrus.Errorf("INTERNAL ERROR:  DLQ memory leak, new=%d, delete=%d", s_new_count, s_delete_count)
 	}
 
 	pnew.nextp = nil
@@ -406,11 +404,12 @@ func append_to_queue(pnew *dlq_item_t) {
 	 */
 
 	if queue_length > 10 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Received frame queue is out of control. Length=%d.\n", queue_length)
-		dw_printf("Reader thread is probably frozen.\n")
-		dw_printf("This can be caused by using a pseudo terminal (direwolf -p) where another\n")
-		dw_printf("application is not reading the frames from the other side.\n")
+		logrus.Errorf(
+			"Received frame queue is out of control. Length=%d. Reader thread is probably frozen. This "+
+				"can be caused by using a pseudo terminal (direwolf -p) where another application is not "+
+				"reading the frames from the other side.",
+			queue_length,
+		)
 	}
 } /* end append_to_queue */
 
@@ -946,8 +945,7 @@ func dlq_remove() *dlq_item_t {
 
 func dlq_delete(pitem *dlq_item_t) {
 	if pitem == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: dlq_delete()  given nil pointer.\n")
+		logrus.Error("INTERNAL ERROR: dlq_delete()  given nil pointer.")
 
 		return
 	}
@@ -1016,15 +1014,13 @@ func cdata_new(pid int, data []byte) *cdata_t {
 
 func cdata_delete(cdata *cdata_t) {
 	if cdata == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: cdata_delete()  given nil pointer.\n")
+		logrus.Error("INTERNAL ERROR: cdata_delete()  given nil pointer.")
 
 		return
 	}
 
 	if cdata.magic != TXDATA_MAGIC {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: cdata_delete()  given corrupted data.\n")
+		logrus.Error("INTERNAL ERROR: cdata_delete()  given corrupted data.")
 
 		return
 	}
@@ -1046,8 +1042,7 @@ func cdata_delete(cdata *cdata_t) {
 
 func cdata_check_leak() {
 	if s_cdata_delete_count != s_cdata_new_count {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal Error, cdata_check_leak, new=%d, delete=%d\n", s_cdata_new_count, s_cdata_delete_count)
+		logrus.Errorf("Internal Error, cdata_check_leak, new=%d, delete=%d", s_cdata_new_count, s_cdata_delete_count)
 	}
 } /* end cdata_check_leak */
 

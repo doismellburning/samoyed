@@ -62,6 +62,8 @@ import (
 	"math"
 	"os"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 var DCD_CONFIG_PSK = &DCDConfig{
@@ -75,7 +77,6 @@ var DCD_CONFIG_PSK = &DCDConfig{
 	char *e = getenv(envvar);				\
 	if (e != NULL) {					\
 	  param = atof(e);					\
-	  text_color_set (DW_COLOR_ERROR);			\
 	  dw_printf ("TUNE: " name " = " fmt "\n", param);	\
 	} }
 */
@@ -175,8 +176,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		default: //nolint: gocritic
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid demodulator profile %c for BPSK.  Valid choices are L, M, N, O.  Using default.\n", profile)
+			logrus.Errorf("Invalid demodulator profile %c for BPSK.  Valid choices are L, M, N, O.  Using default.", profile)
 
 			fallthrough
 
@@ -251,8 +251,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		default: //nolint: gocritic
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid demodulator profile %c for v.26 QPSK.  Valid choices are P, Q, R, S.  Using default.\n", profile)
+			logrus.Errorf("Invalid demodulator profile %c for v.26 QPSK.  Valid choices are P, Q, R, S.  Using default.", profile)
 
 			fallthrough
 
@@ -334,8 +333,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			D.pll_searching_inertia = 0.50
 
 		default: //nolint: gocritic
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Invalid demodulator profile %c for v.27 8PSK.  Valid choices are T, U, V, W.  Using default.\n", profile)
+			logrus.Errorf("Invalid demodulator profile %c for v.27 8PSK.  Valid choices are T, U, V, W.  Using default.", profile)
 
 			fallthrough
 
@@ -444,29 +442,29 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 	TUNE("TUNE_LP_FILTER_TAPS", D.u.psk.lp_filter_taps, "lp_filter_taps (FIR)", "%d")
 
 	if D.u.psk.pre_filter_taps > MAX_FILTER_SIZE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Calculated pre filter size of %d is too large.\n", D.u.psk.pre_filter_taps)
-		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
-		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
-			MAX_FILTER_SIZE)
+		logrus.Errorf(
+			"Calculated pre filter size of %d is too large. Decrease the audio sample rate or increase the baud rate or recompile the application with MAX_FILTER_SIZE larger than %d.",
+			D.u.psk.pre_filter_taps,
+			MAX_FILTER_SIZE,
+		)
 		os.Exit(1)
 	}
 
 	if D.u.psk.delay_line_taps > MAX_FILTER_SIZE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Calculated delay line size of %d is too large.\n", D.u.psk.delay_line_taps)
-		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
-		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
-			MAX_FILTER_SIZE)
+		logrus.Errorf(
+			"Calculated delay line size of %d is too large. Decrease the audio sample rate or increase the baud rate or recompile the application with MAX_FILTER_SIZE larger than %d.",
+			D.u.psk.delay_line_taps,
+			MAX_FILTER_SIZE,
+		)
 		os.Exit(1)
 	}
 
 	if D.u.psk.lp_filter_taps > MAX_FILTER_SIZE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Calculated low pass filter size of %d is too large.\n", D.u.psk.lp_filter_taps)
-		dw_printf("Decrease the audio sample rate or increase the baud rate or\n")
-		dw_printf("recompile the application with MAX_FILTER_SIZE larger than %d.\n",
-			MAX_FILTER_SIZE)
+		logrus.Errorf(
+			"Calculated low pass filter size of %d is too large. Decrease the audio sample rate or increase the baud rate or recompile the application with MAX_FILTER_SIZE larger than %d.",
+			D.u.psk.lp_filter_taps,
+			MAX_FILTER_SIZE,
+		)
 		os.Exit(1)
 	}
 
@@ -488,8 +486,7 @@ func demod_psk_init(modem_type modem_t, v26_alt v26_e, _samples_per_sec int, bps
 			#endif
 		*/
 		if f1 <= 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Prefilter of %.0f to %.0f Hz doesn't make sense.\n", f1, f2)
+			logrus.Errorf("Prefilter of %.0f to %.0f Hz doesn't make sense.", f1, f2)
 			f1 = 10
 		}
 

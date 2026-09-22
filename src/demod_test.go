@@ -4,6 +4,7 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -96,11 +97,18 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		assert.Equal(t, MAX_SUBCHANS, audioConfig.achan[channel].num_subchan)
 		assert.Equal(t, tc.want, audioConfig.achan[channel].profiles)
 
-		var entry = hook.LastEntry()
+		// BPSK's Q is also reported as an invalid profile, once per
+		// demodulator, so look for the entry rather than taking the last one.
+		var entry *logrus.Entry
+
+		for _, e := range hook.AllEntries() {
+			if strings.Contains(e.Message, "More demodulator types than there are demodulators") {
+				entry = e
+			}
+		}
 
 		require.NotNil(t, entry, "an overlong PSK profile list must be reported")
 		assert.Equal(t, logrus.ErrorLevel, entry.Level)
-		assert.Contains(t, entry.Message, "More demodulator types than there are demodulators")
 
 		hook.Reset()
 	}

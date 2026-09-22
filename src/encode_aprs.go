@@ -22,6 +22,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/latlong"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /*------------------------------------------------------------------
@@ -53,8 +54,7 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 	copy(presult.Lat[:], latlong.LatitudeToString(dlat, ambiguity))
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
+		logrus.Error("Symbol table identifier is not one of / \\ 0-9 A-Z")
 	}
 
 	presult.SymTableId = symtab
@@ -62,8 +62,7 @@ func normal_position(symtab byte, symbol byte, dlat float64, dlong float64, ambi
 	copy(presult.Lon[:], latlong.LongitudeToString(dlong, ambiguity))
 
 	if symbol < '!' || symbol > '~' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol code is not in range of ! to ~\n")
+		logrus.Error("Symbol code is not in range of ! to ~")
 	}
 
 	presult.SymbolCode = symbol
@@ -116,8 +115,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	var presult = new(compressed_position_t)
 
 	if symtab != '/' && symtab != '\\' && !unicode.IsDigit(rune(symtab)) && !unicode.IsUpper(rune(symtab)) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol table identifier is not one of / \\ 0-9 A-Z\n")
+		logrus.Error("Symbol table identifier is not one of / \\ 0-9 A-Z")
 	}
 
 	/*
@@ -134,8 +132,7 @@ func compressed_position(symtab byte, symbol byte, dlat float64, dlong float64,
 	copy(presult.X[:], latlong.LongitudeToCompressedString(dlong))
 
 	if symbol < '!' || symbol > '~' {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Symbol code is not in range of ! to ~\n")
+		logrus.Error("Symbol code is not in range of ! to ~")
 	}
 
 	presult.SymbolCode = symbol

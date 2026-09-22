@@ -5,22 +5,26 @@ import (
 	"os"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // CaptureOutput runs command with stdout redirected, and returns what it wrote
 // there.  Much of the codebase prints via dw_printf, i.e. straight to stdout,
-// so this is how a test gets hold of it.
+// so this is how a test gets hold of it.  logrus goes to stdout too once
+// DirewolfMain has set it up, so its output is captured alongside.
 // Note that any of the Dire Wolf colour formatting totally screws this for reasons I don't yet understand.
 // See also what happens if you pipe output to a pager...
 func CaptureOutput(t *testing.T, command func()) string {
 	t.Helper()
 
 	var oldStdout = os.Stdout
+	var oldLogOutput = logrus.StandardLogger().Out
 
 	defer func() {
 		os.Stdout = oldStdout
+		logrus.SetOutput(oldLogOutput)
 	}()
 
 	var r, w, pipeErr = os.Pipe()
@@ -30,6 +34,7 @@ func CaptureOutput(t *testing.T, command func()) string {
 	defer r.Close()
 
 	os.Stdout = w
+	logrus.SetOutput(w)
 
 	// Drain the pipe while the command is still filling it.  A pipe holds only
 	// so much - 64 KiB on Linux - so a command that writes more than that
@@ -49,9 +54,10 @@ func CaptureOutput(t *testing.T, command func()) string {
 
 	command()
 
-	w.Close()
-
 	os.Stdout = oldStdout
+	logrus.SetOutput(oldLogOutput)
+
+	w.Close()
 
 	var result = <-done
 

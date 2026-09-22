@@ -7,8 +7,6 @@ package direwolf
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -35,36 +33,6 @@ func stderrIdentity(t *testing.T) string {
 	require.NoError(t, unix.Fstat(unix.Stderr, &stat))
 
 	return fmt.Sprintf("%v:%v", stat.Dev, stat.Ino)
-}
-
-// captureStdout collects what fn prints via dw_printf, which goes to stdout.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-
-	var oldStdout = os.Stdout
-
-	defer func() {
-		os.Stdout = oldStdout
-	}()
-
-	var reader, writer, err = os.Pipe()
-
-	require.NoError(t, err)
-
-	os.Stdout = writer
-
-	fn()
-
-	os.Stdout = oldStdout
-
-	require.NoError(t, writer.Close())
-
-	var out, readErr = io.ReadAll(reader)
-
-	require.NoError(t, readErr)
-	require.NoError(t, reader.Close())
-
-	return string(out)
 }
 
 func TestCaptureStderrFDCapturesNativeWrites(t *testing.T) {
@@ -226,7 +194,7 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 	}
 
 	// The noise itself goes nowhere, whether the call worked...
-	var out = captureStdout(t, func() {
+	var out = CaptureOutput(t, func() {
 		require.NoError(t, quietPortAudio(noisy))
 	})
 
@@ -234,7 +202,7 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 
 	// ...or not: printing is the caller's, after its own error message, so the
 	// explanation follows the failure rather than preceding it.
-	out = captureStdout(t, func() {
+	out = CaptureOutput(t, func() {
 		require.Error(t, quietPortAudio(func() error {
 			_ = noisy()
 
@@ -245,12 +213,12 @@ func TestQuietPortAudioHoldsBackNoiseUntilSomethingIsReported(t *testing.T) {
 	assert.NotContains(t, out, "cannot find card")
 
 	// What was kept is there for that caller...
-	out = captureStdout(t, printAudioBackendNoise)
+	out = CaptureOutput(t, printAudioBackendNoise)
 
 	assert.Contains(t, out, "cannot find card")
 
 	// ...but only once, so a later unrelated failure doesn't repeat it.
-	out = captureStdout(t, printAudioBackendNoise)
+	out = CaptureOutput(t, printAudioBackendNoise)
 
 	assert.NotContains(t, out, "cannot find card")
 }
@@ -267,7 +235,7 @@ func TestQuietPortAudioKeepsTheMostRecentNoise(t *testing.T) {
 		}))
 	}
 
-	var out = captureStdout(t, printAudioBackendNoise)
+	var out = CaptureOutput(t, printAudioBackendNoise)
 
 	assert.Contains(t, out, "second")
 	assert.NotContains(t, out, "first")

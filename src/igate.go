@@ -499,8 +499,7 @@ func (ig *IGate) sendRecPacket(channel int, recv_pp *packet_t) {
 		ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS] != "" {
 		var result, err = pfilter(channel, MAX_TOTAL_CHANS, ig.digiConfig.filter_str[channel][MAX_TOTAL_CHANS], recv_pp, true)
 		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("%s\n", err)
+			logrus.Errorf("%s", err)
 		}
 
 		if result != 1 {
@@ -816,7 +815,6 @@ func (ig *IGate) sendMsgToServer(imsg string) {
 	// TODO KG Truncate if > IGATE_MAX_MSG?
 	/*
 		if len(imsg)+2 > IGATE_MAX_MSG {
-			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Rx IGate: Too long. Truncating.\n")
 			stemp_len = IGATE_MAX_MSG - 2
 		}
@@ -835,8 +833,7 @@ func (ig *IGate) sendMsgToServer(imsg string) {
 
 	var _, err = ig.sock.Write([]byte(imsg)) // TODO KG Should imsg just be a []byte?
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending to IGate server.  Closing connection.\n\n")
+		logrus.Error("Error sending to IGate server.  Closing connection.")
 		ig.sock.Close()
 		ig.sock = nil
 	}
@@ -904,8 +901,7 @@ func (ig *IGate) get1ch(ctx context.Context) (byte, bool) {
 			return ch[0], true
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError reading from IGate server.  Closing connection.\n\n")
+		logrus.Error("Error reading from IGate server.  Closing connection.")
 		conn.Close()
 
 		if ig.sock == conn {
@@ -1019,9 +1015,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 
 			if bytes.Contains(message, []byte{0}) {
 				// Invalid.  Either drop it or pass it along as-is.  Don't change.
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("'nul' character found in packet from IS.  This should never happen.\n")
-				dw_printf("The source station is probably transmitting with defective software.\n")
+				logrus.Warn("'nul' character found in packet from IS.  This should never happen. The source station is probably transmitting with defective software.")
 
 				//if (strcmp((char*)pinfo, "4P") == 0) {
 				//  dw_printf("The TM-D710 will do this intermittently.  A firmware upgrade is needed to fix it.\n");
@@ -1090,9 +1084,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 					var spectrum = "APRS-IS"
 					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)
-					dw_printf("%s\n", message)
+					logrus.Warnf("ICHANNEL %d: Could not parse message from APRS-IS server. %s", ichan, message)
 				}
 			} // end ICHANNEL option
 		}
@@ -1306,9 +1298,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 	 */
 	var pp3 = AX25FromText(string(message), false)
 	if pp3 == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tx IGate: Could not parse message from server.\n")
-		dw_printf("%s\n", message)
+		logrus.Warnf("Tx IGate: Could not parse message from server. %s", message)
 
 		return
 	}
@@ -1401,8 +1391,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 		if ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan] != "" {
 			var result, err = pfilter(MAX_TOTAL_CHANS, to_chan, ig.digiConfig.filter_str[MAX_TOTAL_CHANS][to_chan], pp3, true)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("%s\n", err)
+				logrus.Errorf("%s", err)
 			}
 
 			if result != 1 {
@@ -1497,11 +1486,7 @@ func (ig *IGate) maybeXmitPacketFromIGate(message []byte, to_chan int) {
 
 			ig.igToTxRemember(pp3, ig.config.tx_chan, 0) // correct. version before encapsulating it.
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Received invalid packet from IGate.\n")
-			dw_printf("%s\n", payload)
-			dw_printf("Will not attempt to transmit third party packet.\n")
-			dw_printf("%s\n", radio)
+			logrus.Warnf("Received invalid packet from IGate. %s. Will not attempt to transmit third party packet. %s", payload, radio)
 		}
 	}
 } /* end maybeXmitPacketFromIGate */
@@ -2005,15 +1990,13 @@ func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
 	}
 
 	if count_1 >= ig.config.tx_limit_1*increase_limit {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tx IGate: Already transmitted maximum of %d packets in 1 minute.\n", ig.config.tx_limit_1)
+		logrus.Errorf("Tx IGate: Already transmitted maximum of %d packets in 1 minute.", ig.config.tx_limit_1)
 
 		return false
 	}
 
 	if count_5 >= ig.config.tx_limit_5*increase_limit {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tx IGate: Already transmitted maximum of %d packets in 5 minutes.\n", ig.config.tx_limit_5)
+		logrus.Errorf("Tx IGate: Already transmitted maximum of %d packets in 5 minutes.", ig.config.tx_limit_5)
 
 		return false
 	}

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,8 +39,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	rec += string(pinfo)
 
 	if in != rec {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Text/internal/text error-1 %s -> %s\n", in, rec)
+		logrus.Errorf("Text/internal/text error-1 %s -> %s", in, rec)
 	}
 
 	/*
@@ -61,12 +61,7 @@ func digipeater_test(t *testing.T, in, out string) {
 	rec += string(pinfo)
 
 	if in != rec {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf(
-			"internal/frame/internal/text error-2 %s -> %s\n",
-			in,
-			rec,
-		)
+		logrus.Errorf("internal/frame/internal/text error-2 %s -> %s", in, rec)
 	}
 
 	/*
@@ -347,8 +342,7 @@ func Test_Digipeater(t *testing.T) {
 	if digipeaterTestFailed == 0 {
 		dw_printf("SUCCESS -- All digipeater tests passed.\n")
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - %d digipeater tests failed.\n", digipeaterTestFailed)
+		logrus.Errorf("ERROR - %d digipeater tests failed.", digipeaterTestFailed)
 		t.Fail()
 	}
 } /* end main */

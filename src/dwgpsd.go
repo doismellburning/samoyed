@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/sirupsen/logrus"
 )
 
 /* Knots per meter/second. */
@@ -138,9 +139,7 @@ func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
 
 	var conn, connErr = new(net.Dialer).DialContext(dialCtx, "tcp", addr)
 	if connErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to connect to GPSD stream at %s.\n", addr)
-		dw_printf("%v\n", connErr)
+		logrus.WithError(connErr).Errorf("Unable to connect to GPSD stream at %s.", addr)
 
 		return -1
 	}
@@ -149,9 +148,7 @@ func dwgpsd_init(ctx context.Context, pconfig *misc_config_s, debug int) int {
 
 	var _, writeErr = conn.Write([]byte("?WATCH={\"enable\":true,\"json\":true}\n"))
 	if writeErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start GPSD watch at %s.\n", addr)
-		dw_printf("%v\n", writeErr)
+		logrus.WithError(writeErr).Errorf("Unable to start GPSD watch at %s.", addr)
 
 		conn.Close()
 
@@ -229,10 +226,7 @@ func read_gpsd_thread(ctx context.Context, conn net.Conn) {
 
 	/* Lost connection to gpsd, e.g. it was stopped or the network dropped. */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("------------------------------------------\n")
-	dw_printf("GPSD: Lost communication with gpsd server.\n")
-	dw_printf("------------------------------------------\n")
+	logrus.Error("GPSD: Lost communication with gpsd server.")
 
 	info.fix = DWFIX_ERROR
 

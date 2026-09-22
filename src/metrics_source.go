@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
+	"github.com/sirupsen/logrus"
 )
 
 // fecTypeLabel converts a fec_type_t into the Prometheus label value used for
@@ -92,8 +93,7 @@ func metrics_init(ctx context.Context, mc *misc_config_s) {
 
 	var errCh, startErr = metrics.Start(ctx, mc.metrics_port)
 	if startErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to start Prometheus metrics endpoint on port %d: %v\n", mc.metrics_port, startErr)
+		logrus.Errorf("Unable to start Prometheus metrics endpoint on port %d: %v", mc.metrics_port, startErr)
 
 		return
 	}
@@ -101,8 +101,7 @@ func metrics_init(ctx context.Context, mc *misc_config_s) {
 	go func() {
 		var err = <-errCh
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Prometheus metrics endpoint on port %d stopped: %v\n", mc.metrics_port, err)
+			logrus.Errorf("Prometheus metrics endpoint on port %d stopped: %v", mc.metrics_port, err)
 		}
 	}()
 

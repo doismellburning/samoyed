@@ -347,8 +347,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 
 			var err = s.writeToClient(client, conn, agwpe_msg)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("\nError sending message to AGW client application.  Closing connection.\n\n")
+				logrus.Error("Error sending message to AGW client application.  Closing connection.")
 				s.detachClient(client, conn)
 			}
 		}
@@ -453,8 +452,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 
 			var err = s.writeToClient(client, conn, agwpe_msg)
 			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
+				logrus.Errorf("Error sending message to AGW client application %d (%s).  Closing connection.", client, err)
 				s.detachClient(client, conn)
 			}
 		}
@@ -726,8 +724,7 @@ func (s *AGWServer) RecConnData(channel int, client int, remote_call string, own
 	copy(reply.Header.CallTo[:], []byte(own_call))
 
 	if len(data) > AX25_MAX_INFO_LEN {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid length %d for connected data to client %d.\n", len(data), client)
+		logrus.Errorf("Invalid length %d for connected data to client %d.", len(data), client)
 		data = data[:AX25_MAX_INFO_LEN]
 	}
 
@@ -1009,8 +1006,7 @@ func (s *AGWServer) connectListenThread(ctx context.Context, server_port int) {
 	logrus.WithField("port", server_port).Debug("Binding to port")
 	var listener, listenErr = new(net.ListenConfig).Listen(ctx, "tcp", fmt.Sprintf(":%d", server_port))
 	if listenErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("connect_listen_thread: Listen failed: %s", listenErr)
+		logrus.Errorf("connect_listen_thread: Listen failed: %s", listenErr)
 
 		return
 	}
@@ -1095,8 +1091,7 @@ func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
 	var ph = reply_p.Header
 
 	if ph.DataLen > 4096 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid data length %d for AGW protocol message to client %d.\n", ph.DataLen, client)
+		logrus.Errorf("Invalid data length %d for AGW protocol message to client %d.", ph.DataLen, client)
 		s.debugPrint(TO_CLIENT, client, reply_p)
 	}
 
@@ -1106,8 +1101,7 @@ func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
 
 	var err = s.writeToClient(client, conn, reply_p)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
+		logrus.Errorf("Error sending message to AGW client application %d (%s).  Closing connection.", client, err)
 		s.detachClient(client, conn)
 	}
 }
@@ -1210,9 +1204,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 				return
 			}
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError getting message header from AGW client application %d: %s\n", client, readErr)
-			dw_printf("Closing connection.\n\n")
+			logrus.Errorf("Error getting message header from AGW client application %d: %s. Closing connection.", client, readErr)
 			s.detachClient(client, conn)
 
 			continue
@@ -1222,9 +1214,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 		 * Take some precautions to guard against bad data which could cause problems later.
 		 */
 		if cmd.Header.Portx >= MAX_TOTAL_CHANS {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nInvalid port number, %d, in command '%c', from AGW client application %d.\n",
-				cmd.Header.Portx, cmd.Header.DataKind, client)
+			logrus.Warnf("Invalid port number, %d, in command '%c', from AGW client application %d.", cmd.Header.Portx, cmd.Header.DataKind, client)
 			cmd.Header.Portx = 0 // avoid subscript out of bounds, try to keep going.
 		}
 
@@ -1247,10 +1237,7 @@ func (s *AGWServer) cmdListenThread(ctx context.Context, client int) {
 		}
 
 		if n != int(cmd.Header.DataLen) || dataErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError getting message data from AGW client application %d: %s\n", client, dataErr)
-			dw_printf("Tried to read %d bytes, got %d.\n", cmd.Header.DataLen, n)
-			dw_printf("Closing connection.\n\n")
+			logrus.Errorf("Error getting message data from AGW client application %d: %s. Tried to read %d bytes, got %d. Closing connection.", client, dataErr, cmd.Header.DataLen, n)
 			s.detachClient(client, conn)
 
 			return
@@ -1417,9 +1404,7 @@ func (s *AGWServer) handleClientLogin(client int, cmd *AGWPEMessage) {
 
 	var user, password, ok = parseAGWLogin(cmd.Data)
 	if !ok {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("AGW client application %d sent a malformed login: expected %d bytes of data, got %d.\n",
-			client, 2*AGW_LOGIN_FIELD_LEN, len(cmd.Data))
+		logrus.Warnf("AGW client application %d sent a malformed login: expected %d bytes of data, got %d.", client, 2*AGW_LOGIN_FIELD_LEN, len(cmd.Data))
 		s.clientLoggedOut(client)
 
 		return
@@ -1428,8 +1413,7 @@ func (s *AGWServer) handleClientLogin(client int, cmd *AGWPEMessage) {
 	var matched, accepted = s.matchLogin(user, password)
 	if !accepted {
 		/* The user name is not echoed back; it is whatever the other end chose to send. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("AGW client application %d sent an incorrect user name or password.  Its commands will be ignored.\n", client)
+		logrus.Warnf("AGW client application %d sent an incorrect user name or password.  Its commands will be ignored.", client)
 		s.clientLoggedOut(client)
 
 		return
@@ -1449,9 +1433,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 	}
 
 	if s.loginRequired() && !s.isLoggedIn(client) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("AGW client application %d sent command '%c' without logging in first.  Ignored.\n",
-			client, cmd.Header.DataKind)
+		logrus.Warnf("AGW client application %d sent command '%c' without logging in first.  Ignored.", client, cmd.Header.DataKind)
 
 		return
 	}
@@ -1641,8 +1623,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			stemp.WriteString(ByteArrayToString(cmd.Header.CallTo[:]))
 
 			if len(cmd.Data) < 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'V' message too short to contain digipeater count.\n")
+				logrus.Warn("AGW 'V' message too short to contain digipeater count.")
 
 				break
 			}
@@ -1650,8 +1631,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var ndigi = int(cmd.Data[0])
 
 			if len(cmd.Data) < 1+10*ndigi {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'V' message too short for %d digipeaters.\n", ndigi)
+				logrus.Warnf("AGW 'V' message too short for %d digipeaters.", ndigi)
 
 				break
 			}
@@ -1675,8 +1655,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var pp = AX25FromText(stemp.String(), true)
 
 			if pp == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create frame from AGW 'V' message.\n")
+				logrus.Warn("Failed to create frame from AGW 'V' message.")
 
 				break
 			}
@@ -1726,8 +1705,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			// - Use second one instead?
 			// - Error message if a mismatch?
 			if cmd.Header.DataLen < 1 || int(cmd.Header.DataLen) > len(cmd.Data) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'K' message has invalid data length %d.\n", cmd.Header.DataLen)
+				logrus.Warnf("AGW 'K' message has invalid data length %d.", cmd.Header.DataLen)
 
 				break
 			}
@@ -1736,8 +1714,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var pp = AX25FromFrame(cmd.Data[1:cmd.Header.DataLen], alevel)
 
 			if pp == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create frame from AGW 'K' message.\n")
+				logrus.Warn("Failed to create frame from AGW 'K' message.")
 			} else {
 				/* How can we determine if it is an original or repeated message? */
 				/* If there is at least one digipeater in the frame, AND */
@@ -1773,8 +1750,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 
 				dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
+				logrus.Warnf("AGW protocol error.  Register callsign for invalid channel %d.", channel)
 
 				ok = 0
 			}
@@ -1795,8 +1771,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		if s.connectedModeAllowed(cmd.Header.Portx) {
 			dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
+			logrus.Warnf("AGW protocol error.  Unregister callsign for invalid channel %d.", channel)
 		}
 	/* No response is expected. */
 
@@ -1806,8 +1781,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		/* c: Connection with non-standard PID */
 		{
 			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW connect command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+				logrus.Warnf("AGW connect command on unsupported channel %d ignored.", cmd.Header.Portx)
 
 				break
 			}
@@ -1830,9 +1804,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 
 			if cmd.Header.DataKind == 'v' {
 				if len(cmd.Data) < 1 {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("\n")
-					dw_printf("AGW client, connect via, has invalid payload: too short\n")
+					logrus.Warn("AGW client, connect via, has invalid payload: too short")
 
 					break
 				}
@@ -1843,14 +1815,11 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 					var expectedLen = uint32(numDigi)*10 + 1
 					if cmd.Header.DataLen != expectedLen && cmd.Header.DataLen != expectedLen+1 {
 						// I'm getting 1 more than expected from AGWterminal.
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("AGW client, connect via, has data len, %d when %d expected.\n", cmd.Header.DataLen, expectedLen)
+						logrus.Warnf("AGW client, connect via, has data len, %d when %d expected.", cmd.Header.DataLen, expectedLen)
 					}
 
 					if len(cmd.Data) < 1+10*numDigi {
-						text_color_set(DW_COLOR_ERROR)
-						dw_printf("\n")
-						dw_printf("AGW client, connect via, payload too short for %d digipeaters.\n", numDigi)
+						logrus.Warnf("AGW client, connect via, payload too short for %d digipeaters.", numDigi)
 
 						break
 					}
@@ -1860,9 +1829,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 						num_calls++
 					}
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("\n")
-					dw_printf("AGW client, connect via, has invalid number of digipeaters = %d\n", numDigi)
+					logrus.Warnf("AGW client, connect via, has invalid number of digipeaters = %d", numDigi)
 
 					break
 				}
@@ -1874,15 +1841,13 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 	case 'D': /* Send Connected Data */
 		{
 			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'D' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+				logrus.Warnf("AGW 'D' command on unsupported channel %d ignored.", cmd.Header.Portx)
 
 				break
 			}
 
 			if int(cmd.Header.DataLen) > len(cmd.Data) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'D' message has invalid data length %d.\n", cmd.Header.DataLen)
+				logrus.Warnf("AGW 'D' message has invalid data length %d.", cmd.Header.DataLen)
 
 				break
 			}
@@ -1899,8 +1864,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
 		{
 			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'd' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+				logrus.Warnf("AGW 'd' command on unsupported channel %d ignored.", cmd.Header.Portx)
 
 				break
 			}
@@ -1959,8 +1923,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			var pp = AX25FromText(stemp, true)
 
 			if pp == nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create frame from AGW 'M' message.\n")
+				logrus.Warn("Failed to create frame from AGW 'M' message.")
 
 				break
 			}
@@ -2037,8 +2000,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		// send the reply back to the client application.
 		{
 			if !s.connectedModeAllowed(cmd.Header.Portx) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("AGW 'Y' command on unsupported channel %d ignored.\n", cmd.Header.Portx)
+				logrus.Warnf("AGW 'Y' command on unsupported channel %d ignored.", cmd.Header.Portx)
 
 				break
 			}
@@ -2053,8 +2015,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		}
 
 	default:
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("--- Unexpected Command from application %d using AGW protocol:\n", client)
+		logrus.Warnf("--- Unexpected Command from application %d using AGW protocol:", client)
 		s.debugPrint(FROM_CLIENT, client, cmd)
 	}
 } /* end handleClientCommand */

@@ -279,14 +279,14 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	// Error if trying to transmit to a radio channel which was not configured.
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] == MEDIUM_NONE {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
-		dw_printf("This is probably a client application error, not a problem with direwolf.\n")
-		dw_printf("Are you using AX.25 for Linux?  It might be trying to use a modified\n")
-		dw_printf("version of KISS which uses the port field differently than the\n")
-		dw_printf("original KISS protocol specification.  The solution might be to use\n")
-		dw_printf("a command like \"kissparms -c 1 -p radio\" to set CRC none mode.\n")
-		dw_printf("\n")
+		logrus.Warnf(
+			"ERROR - Request to transmit on invalid radio channel %d. This is probably a client "+
+				"application error, not a problem with direwolf. Are you using AX.25 for Linux?  It might "+
+				"be trying to use a modified version of KISS which uses the port field differently than the "+
+				"original KISS protocol specification.  The solution might be to use a command like "+
+				"\"kissparms -c 1 -p radio\" to set CRC none mode.",
+			channel,
+		)
 
 		return
 	}
@@ -315,9 +315,7 @@ func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	 */
 
 	if ax25_is_aprs(pp) && tq.Count(channel, prio, "", "", false) > 100 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
-		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
+		logrus.Errorf("Transmit packet queue for channel %d is too long.  Discarding packet. Perhaps the channel is so busy there is no opportunity to send.", channel)
 
 		return
 	}
@@ -467,9 +465,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 	}
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
-		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
+		logrus.Errorf("ERROR - Request to transmit on unsupported channel %d. Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.", channel)
 
 		return
 	}
@@ -479,9 +475,7 @@ func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 	 */
 
 	if tq.Count(channel, prio, "", "", false) > 250 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Transmit packet queue for channel %d is extremely long.\n", channel)
-		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
+		logrus.Errorf("Warning: Transmit packet queue for channel %d is extremely long. Perhaps the channel is so busy there is no opportunity to send.", channel)
 	}
 
 	logrus.Trace("lm_data_request: enter critical section")
@@ -594,9 +588,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	}
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
-		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
+		logrus.Errorf("ERROR - Request to transmit on unsupported channel %d. Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.", channel)
 
 		return
 	}

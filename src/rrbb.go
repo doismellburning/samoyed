@@ -1,6 +1,8 @@
 //nolint:gochecknoglobals
 package direwolf
 
+import "github.com/sirupsen/logrus"
+
 /********************************************************************************
  *
  * Purpose:	Raw Received Bit Buffer.
@@ -77,8 +79,7 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
 	new_count++
 
 	if new_count > delete_count+100 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("MEMORY LEAK, rrbb_new, new_count=%d, delete_count=%d\n", new_count, delete_count)
+		logrus.Errorf("MEMORY LEAK, rrbb_new, new_count=%d, delete_count=%d", new_count, delete_count)
 	}
 
 	rrbb_clear(result, is_scrambled, descram_state, prev_descram)

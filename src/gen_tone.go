@@ -245,13 +245,11 @@ func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nol
 		/* 16 bit sound sample must fit in range of -32768 .. +32767. */
 
 		if s < -32768 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+			logrus.Error("gen_tone_init: Excessive amplitude is being clipped.")
 
 			s = -32768
 		} else if s > 32767 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+			logrus.Error("gen_tone_init: Excessive amplitude is being clipped.")
 
 			s = 32767
 		}
@@ -355,8 +353,7 @@ static const float sq[8] = { 0,	.7071,	1,	.7071,	0,	-.7071,	-1,	-.7071	};
 
 func tone_gen_put_bit_real(channel int, dat int) {
 	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
+		logrus.Errorf("Invalid channel %d for tone generation.", channel)
 
 		return
 	}
@@ -551,9 +548,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			tg.PutSample(sam)
 
 		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR: achan[%d].modem_type = %d\n",
-				tg.channel, audioConfig.achan[tg.channel].modem_type)
+			logrus.Errorf("INTERNAL ERROR: achan[%d].modem_type = %d", tg.channel, audioConfig.achan[tg.channel].modem_type)
 			os.Exit(1)
 		}
 
@@ -573,8 +568,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 func gen_tone_put_sample(channel int, a int, sam int) { //nolint:unparam
 	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
+		logrus.Errorf("Invalid channel %d for tone generation.", channel)
 
 		return
 	}
@@ -599,12 +593,10 @@ func (tg *ToneGenerator) PutSample(sam int) {
 	// transmit audio level.
 
 	if sam < -32767 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Audio sample %d clipped to -32767.\n", sam)
+		logrus.Errorf("Warning: Audio sample %d clipped to -32767.", sam)
 		sam = -32767
 	} else if sam > 32767 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Warning: Audio sample %d clipped to +32767.\n", sam)
+		logrus.Errorf("Warning: Audio sample %d clipped to +32767.", sam)
 		sam = 32767
 	}
 
@@ -648,8 +640,7 @@ func (tg *ToneGenerator) PutSample(sam int) {
 // gen_tone_flush pushes out whatever the channel's samples are waiting in.
 func gen_tone_flush(channel int) {
 	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
+		logrus.Errorf("Invalid channel %d for tone generation.", channel)
 
 		return
 	}
@@ -663,8 +654,7 @@ func (tg *ToneGenerator) Flush() {
 
 func gen_tone_put_quiet_ms(channel int, time_ms int) {
 	if toneGenerators[channel] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for tone generation.\n", channel)
+		logrus.Errorf("Invalid channel %d for tone generation.", channel)
 
 		return
 	}

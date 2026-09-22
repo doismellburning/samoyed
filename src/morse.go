@@ -10,6 +10,8 @@ package direwolf
 import (
 	"math"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -230,8 +232,7 @@ func morse_tone(channel int, tu int, wpm int) {
 	var a = ACHAN2ADEV(channel) /* device for channel. */
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+		logrus.Errorf("Invalid channel %d for sending Morse Code.", channel)
 
 		return
 	}
@@ -279,8 +280,7 @@ func morse_quiet(channel int, tu int, wpm int) {
 	var sam = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+		logrus.Errorf("Invalid channel %d for sending Morse Code.", channel)
 
 		return
 	}
@@ -314,8 +314,7 @@ func morse_quiet_ms(channel int, ms int) {
 	var sam = 0
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Invalid channel %d for sending Morse Code.\n", channel)
+		logrus.Errorf("Invalid channel %d for sending Morse Code.", channel)
 
 		return
 	}

@@ -864,12 +864,11 @@ outerLoop:
 // rtfm points at the documentation.  It is a trailer on someone else's
 // complaint rather than a complaint of its own, so it is not counted.
 func rtfm() {
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("See online documentation:\n")
-	dw_printf("    stable release:    https://github.com/wb2osz/direwolf/tree/master/doc\n")
-	dw_printf("    development version:    https://github.com/wb2osz/direwolf/tree/dev/doc\n")
-	dw_printf("    additional topics:    https://github.com/wb2osz/direwolf-doc\n")
-	dw_printf("    general APRS info:    https://how.aprs.works\n")
+	logrus.WithField("detail",
+		"stable release:    https://github.com/wb2osz/direwolf/tree/master/doc; development "+
+			"version:    https://github.com/wb2osz/direwolf/tree/dev/doc; additional topics:    "+
+			"https://github.com/wb2osz/direwolf-doc; general APRS info:    https://how.aprs.works").
+		Error("See online documentation:")
 }
 
 // parseState holds the mutable parsing context threaded through config_init.
@@ -965,8 +964,7 @@ func (ps *parseState) report(err error) {
 // file: a capital letter to start and a full stop to finish, unless the
 // complaint already ends in punctuation of its own.
 func (ps *parseState) printProblem(msg string) {
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("%s\n", asSentence(msg))
+	logrus.Errorf("%s", asSentence(msg))
 }
 
 // asSentence renders an error string as a sentence.
@@ -2359,7 +2357,6 @@ func handlePTTDCDCON(ps *parseState) error {
 
 		/* TODO KG
 		   #if __WIN32__
-		   	      text_color_set(DW_COLOR_ERROR);
 		   	      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", ps.line, otname);
 		   #else
 		*/
@@ -2385,7 +2382,6 @@ func handlePTTDCDCON(ps *parseState) error {
 	} else if strings.EqualFold(t, "GPIOD") {
 		/*
 			#if __WIN32__
-				      text_color_set(DW_COLOR_ERROR);
 				      dw_printf ("Config file line %d: %s with GPIOD is only available on Linux.\n", ps.line, otname);
 			#else
 		*/
@@ -2431,7 +2427,6 @@ func handlePTTDCDCON(ps *parseState) error {
 		octrl.ptt_method = PTT_METHOD_GPIOD
 		/* TODO KG
 		#else
-			      text_color_set(DW_COLOR_ERROR);
 			      dw_printf ("Application was not built with optional support for GPIOD.\n");
 			      dw_printf ("Install packages gpiod and libgpiod-dev, remove 'build' subdirectory, then rebuild.\n");
 		#endif // USE_GPIOD
@@ -2461,7 +2456,6 @@ func handlePTTDCDCON(ps *parseState) error {
 		octrl.ptt_method = PTT_METHOD_LPT
 		/*
 			#else
-				      text_color_set(DW_COLOR_ERROR);
 				      dw_printf ("Config file line %d: %s with LPT is only available on x86 Linux.\n", ps.line, otname);
 			#endif
 		*/
@@ -2597,7 +2591,6 @@ func handlePTTDCDCON(ps *parseState) error {
 
 		/* TODO KG
 		#else
-			      text_color_set(DW_COLOR_ERROR);
 			      dw_printf ("Config file line %d: %s with CM108 is only available when USB Audio GPIO support is enabled.\n", ps.line, otname);
 			      dw_printf ("You must rebuild direwolf with CM108 Audio Adapter GPIO PTT support.\n");
 			      dw_printf ("See Interface Guide for details.\n");
@@ -2690,7 +2683,6 @@ func handleTXINH(ps *parseState) error {
 	if strings.EqualFold(t, "GPIO") {
 		/* TODO KG
 		#if __WIN32__
-			      text_color_set(DW_COLOR_ERROR);
 			      dw_printf ("Config file line %d: %s with GPIO is only available on Linux.\n", ps.line, itname);
 		#else
 		*/
@@ -5461,7 +5453,6 @@ func handleSMARTBEACON(ps *parseState) error {
 	   	        ps.misc.sb_configured = 1;						\
 	   	        continue;									\
 	   	      }											\
-	   	      text_color_set(DW_COLOR_ERROR);							\
 	   	      dw_printf ("Line %d: Missing %s for SmartBeaconing.\n", ps.line, name);		\
 	   	      continue;										\
 	   	    }											\
@@ -5470,7 +5461,6 @@ func handleSMARTBEACON(ps *parseState) error {
 	   	      ps.misc.sbvar = n;								\
 	   	    }											\
 	   	    else {										\
-	   	      text_color_set(DW_COLOR_ERROR);							\
 	                 dw_printf ("Line %d: Invalid %s for SmartBeaconing. Using default %d %s.\n",	\
 	   			ps.line, name, ps.misc.sbvar, unit);				\
 	      	    }
@@ -5480,7 +5470,6 @@ func handleSMARTBEACON(ps *parseState) error {
 	   #define SB_TIME(name,sbvar,minn,maxx,unit)  							\
 	   	    t = split("", false);									\
 	   	    if (t == "") {									\
-	   	      text_color_set(DW_COLOR_ERROR);							\
 	   	      dw_printf ("Line %d: Missing %s for SmartBeaconing.\n", ps.line, name);		\
 	   	      continue;										\
 	   	    }											\
@@ -5489,7 +5478,6 @@ func handleSMARTBEACON(ps *parseState) error {
 	   	      ps.misc.sbvar = n;								\
 	   	    }											\
 	   	    else {										\
-	   	      text_color_set(DW_COLOR_ERROR);							\
 	                 dw_printf ("Line %d: Invalid %s for SmartBeaconing. Using default %d %s.\n",	\
 	   			ps.line, name, ps.misc.sbvar, unit);				\
 	      	    }

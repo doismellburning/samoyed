@@ -51,8 +51,7 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 			return n
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
+		logrus.Error("Unable to send IL2p frame.  Falling back to regular AX.25.")
 		// Not sure if we should fall back to AX.25 or not here.
 	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
 		var fbuf = AX25Pack(pp)
@@ -62,8 +61,7 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 			return n
 		}
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Unable to send FX.25.  Falling back to regular AX.25.\n")
+		logrus.Error("Unable to send FX.25.  Falling back to regular AX.25.")
 		// Definitely need to fall back to AX.25 here because
 		// the FX.25 frame length is so limited.
 	}

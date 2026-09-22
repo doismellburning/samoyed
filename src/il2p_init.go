@@ -54,8 +54,7 @@ func il2p_init(il2p_debug int) {
 
 		Tab[i].rs = init_rs_char(Tab[i].symsize, Tab[i].genpoly, Tab[i].fcs, Tab[i].prim, Tab[i].nroots)
 		if Tab[i].rs == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("IL2P internal error: init_rs_char failed!\n")
+			logrus.Error("IL2P internal error: init_rs_char failed!")
 			os.Exit(1)
 		}
 	}

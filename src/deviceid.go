@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -103,8 +104,7 @@ func NewDeviceIDData() *DeviceIDData {
 	}
 
 	if fp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not open any of these file locations:\n")
+		logrus.Error("Could not open any of these file locations:")
 
 		for _, location := range search_locations {
 			dw_printf("    %s\n", location)
@@ -226,8 +226,7 @@ func (d *DeviceIDData) deviceid_decode_dest(dest string) string {
 	var device = "UNKNOWN vendor/model"
 
 	if d == nil || len(d.ptocalls) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("deviceid_decode_dest called without any deviceid data.\n")
+		logrus.Error("deviceid_decode_dest called without any deviceid data.")
 
 		return device
 	}
@@ -307,8 +306,7 @@ func (d *DeviceIDData) deviceid_decode_mice(comment string) (string, string) {
 	}
 
 	if d == nil || len(d.ptocalls) == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("deviceid_decode_mice called without any deviceid data.\n")
+		logrus.Error("deviceid_decode_mice called without any deviceid data.")
 
 		return trimmed, device
 	}

@@ -71,8 +71,6 @@ func Test_XID(t *testing.T) {
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
 
-	text_color_set(DW_COLOR_ERROR)
-
 	assert.Equal(t, 1, n)
 	assert.Equal(t, maybe.Just(false), param.full_duplex)
 	assert.Equal(t, srej_single, param.srej)
@@ -105,8 +103,6 @@ func Test_XID(t *testing.T) {
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
 
-	text_color_set(DW_COLOR_ERROR)
-
 	assert.Equal(t, maybe.Just(true), param2.full_duplex)
 	assert.Equal(t, srej_none, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
@@ -130,8 +126,6 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
@@ -157,8 +151,6 @@ func Test_XID(t *testing.T) {
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
 
-	text_color_set(DW_COLOR_ERROR)
-
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_multi, param2.srej)
 	assert.Equal(t, modulo_128, param2.modulo)
@@ -183,8 +175,6 @@ func Test_XID(t *testing.T) {
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
 
-	text_color_set(DW_COLOR_ERROR)
-
 	assert.Equal(t, maybe.Just(false), param2.full_duplex)
 	assert.Equal(t, srej_single, param2.srej)
 	assert.Equal(t, modulo_8, param2.modulo)
@@ -200,8 +190,6 @@ func Test_XID(t *testing.T) {
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("%d: %s\n", 0, desc)
-
-	text_color_set(DW_COLOR_ERROR)
 
 	assert.Equal(t, maybe.Nothing[bool](), param2.full_duplex)
 	assert.Equal(t, srej_not_specified, param2.srej)

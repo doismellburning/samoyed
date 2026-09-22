@@ -628,7 +628,6 @@ x = Silence FX.25 information.`)
 
 	var err = audio_open(ctx, audio_config)
 	if err < 0 {
-		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
 		SLEEP_SEC(5)
 		pflag.Usage()
@@ -707,7 +706,6 @@ x = Silence FX.25 information.`)
 			case 'p':
 				transmitCalibrationType = p // Set PTT only
 			default:
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Invalid option '%c' for -x. Must be a, m, s, or p.\n", p)
 				text_color_set(DW_COLOR_INFO)
 				os.Exit(1)
@@ -715,7 +713,6 @@ x = Silence FX.25 information.`)
 		}
 
 		if transmitCalibrationChannel < 0 || transmitCalibrationChannel >= MAX_RADIO_CHANS {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Invalid channel %d for -x. \n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
 			os.Exit(1)
@@ -729,7 +726,6 @@ x = Silence FX.25 information.`)
 				// is still the PTT test a receive-only station wants.
 				if transmitCalibrationType != 'p' &&
 					!audio_transmit_available(ACHAN2ADEV(transmitCalibrationChannel)) {
-					text_color_set(DW_COLOR_ERROR)
 					fmt.Printf("Channel %d has no audio output device, so calibration tones cannot be sent.\n", transmitCalibrationChannel)
 					fmt.Printf("Use -x p to key PTT without audio.\n")
 					text_color_set(DW_COLOR_INFO)
@@ -781,13 +777,11 @@ x = Silence FX.25 information.`)
 				text_color_set(DW_COLOR_INFO)
 				os.Exit(0)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("\nMark/Space frequencies not defined for channel %d. Cannot calibrate using this modem type.\n", transmitCalibrationChannel)
 				text_color_set(DW_COLOR_INFO)
 				os.Exit(1)
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("\nChannel %d is not configured as a radio channel.\n", transmitCalibrationChannel)
 			text_color_set(DW_COLOR_INFO)
 			os.Exit(1)
@@ -834,8 +828,7 @@ x = Silence FX.25 information.`)
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config)
 	if waypointErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("%v\n", waypointErr)
+		logrus.Errorf("%v", waypointErr)
 		os.Exit(1)
 	}
 	waypointSender.SetDebug(d_w_opt)
@@ -866,8 +859,7 @@ x = Silence FX.25 information.`)
 	// what ends the process then.
 	var a = <-adev_failed
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Terminating after audio device %d input failure.\n", a)
+	logrus.Errorf("Terminating after audio device %d input failure.", a)
 	os.Exit(1)
 }
 

@@ -40,6 +40,8 @@ package direwolf
 import (
 	"math/bits"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 const EXIT_FAILURE = 1
@@ -153,8 +155,7 @@ func FX25Init(debug_level int) {
 	for i := range FX25_NTAB {
 		fx25Tab[i].rs = init_rs_char(fx25Tab[i].symsize, fx25Tab[i].genpoly, fx25Tab[i].fcs, fx25Tab[i].prim, fx25Tab[i].nroots)
 		if fx25Tab[i].rs == nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("FX.25 internal error: init_rs_char failed!\n")
+			logrus.Error("FX.25 internal error: init_rs_char failed!")
 			os.Exit(EXIT_FAILURE)
 		}
 	}

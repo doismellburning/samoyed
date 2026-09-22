@@ -474,8 +474,7 @@ func (g *TTGateway) Sequence(ctx context.Context, channel int, msg string) {
 	var pp = AX25FromText(audible_response, false)
 
 	if pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error. Couldn't make frame from \"%s\"\n", audible_response)
+		logrus.Errorf("Internal error. Couldn't make frame from \"%s\"", audible_response)
 
 		return
 	}
@@ -560,8 +559,7 @@ func (g *TTGateway) parseFields(state *ttParseState, msg string) int {
 				return (err)
 			}
 		default:
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Field does not start with A, B, C, or digit: \"%s\"\n", e)
+			logrus.Warnf("Field does not start with A, B, C, or digit: \"%s\"", e)
 
 			return (TT_ERROR_D_MSG)
 		}
@@ -655,8 +653,7 @@ func (g *TTGateway) expandMacro(state *ttParseState, e string) int {
 	} else {
 		/* Send reject sound. */
 		/* Does not match any macro definitions. */
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Tone sequence did not match any pattern\n")
+		logrus.Warn("Tone sequence did not match any pattern")
 
 		return (TT_ERROR_MACRO_NOMATCH)
 	}
@@ -705,16 +702,14 @@ func checksum_not_ok(str string, length int, found rune) int {
 		} else if c >= 'A' && c <= 'D' {
 			sum += int(c-'A') + 10
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("aprs_tt: checksum: bad character \"%c\" in checksum calculation!\n", c)
+			logrus.Errorf("aprs_tt: checksum: bad character \"%c\" in checksum calculation!", c)
 		}
 	}
 
 	var expected = rune('0' + (sum % 10))
 
 	if expected != found {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Bad checksum for \"%.*s\".  Expected %c but received %c.\n", length, str, expected, found)
+		logrus.Warnf("Bad checksum for \"%.*s\".  Expected %c but received %c.", length, str, expected, found)
 
 		return (TT_ERROR_BAD_CHECKSUM)
 	}
@@ -838,8 +833,7 @@ func (g *TTGateway) parseCallsign(state *ttParseState, e string) int {
 		return (0)
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone callsign not valid: \"%s\"\n", e)
+	logrus.Warnf("Touch tone callsign not valid: \"%s\"", e)
 
 	return (TT_ERROR_INVALID_CALL)
 }
@@ -901,8 +895,7 @@ func (g *TTGateway) parseObjectName(state *ttParseState, e string) int {
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone object name not valid: \"%s\"\n", e)
+	logrus.Warnf("Touch tone object name not valid: \"%s\"", e)
 
 	return (TT_ERROR_INVALID_OBJNAME)
 } /* end parseObjectName */
@@ -1007,8 +1000,7 @@ func (g *TTGateway) parseSymbol(state *ttParseState, e string) int {
 		}
 	}
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Touch tone symbol not valid: \"%s\"\n", e)
+	logrus.Warnf("Touch tone symbol not valid: \"%s\"", e)
 
 	return (TT_ERROR_INVALID_SYMBOL)
 } /* end parseSymbol */
@@ -1072,8 +1064,7 @@ func (g *TTGateway) parseAprstt3Call(state *ttParseState, e string) int {
 
 					state.callsign = _call
 				} else {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Couldn't find full callsign for suffix \"%s\"\n", suffix)
+					logrus.Warnf("Couldn't find full callsign for suffix \"%s\"", suffix)
 
 					return (TT_ERROR_SUFFIX_NO_CALL) /* Don't know this user. */
 				}
@@ -1173,14 +1164,12 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_VECTOR:
 			if len(bstr) != 3 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Bearing \"%s\" should be 3 digits.\n", bstr)
+				logrus.Warnf("Bearing \"%s\" should be 3 digits.", bstr)
 				// return error code?
 			}
 
 			if len(dstr) < 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Distance \"%s\" should 1 or more digits.\n", dstr)
+				logrus.Warnf("Distance \"%s\" should 1 or more digits.", dstr)
 				// return error code?
 			}
 
@@ -1207,15 +1196,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_GRID:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing X coordinate.\n")
+				logrus.Warn("Missing X coordinate.")
 
 				xstr = "0"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing Y coordinate.\n")
+				logrus.Warn("Missing Y coordinate.")
 
 				ystr = "0"
 			}
@@ -1257,15 +1244,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_UTM:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing X coordinate.\n")
+				logrus.Warn("Missing X coordinate.")
 				/* Avoid divide by zero later.  Put in middle of range. */
 				xstr = "5"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Missing Y coordinate.\n")
+				logrus.Warn("Missing Y coordinate.")
 				/* Avoid divide by zero later.  Put in middle of range. */
 				ystr = "5"
 			}
@@ -1300,8 +1285,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				// dw_printf ("DEBUG: from UTM, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Conversion from UTM failed:\n%s\n\n", geoErr)
+				logrus.Warnf("Conversion from UTM failed:\n%s", geoErr)
 			}
 
 			state.dao[2] = e[0]
@@ -1309,15 +1293,13 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_MGRS, TTLOC_USNG:
 			if len(xstr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("MGRS/USNG: Missing X (easting) coordinate.\n")
+				logrus.Warn("MGRS/USNG: Missing X (easting) coordinate.")
 				/* Should not be possible to get here. Fake it and carry on. */
 				xstr = "5"
 			}
 
 			if len(ystr) == 0 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("MGRS/USNG: Missing Y (northing) coordinate.\n")
+				logrus.Warn("MGRS/USNG: Missing Y (northing) coordinate.")
 				/* Should not be possible to get here. Fake it and carry on. */
 				ystr = "5"
 			}
@@ -1339,8 +1321,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				// dw_printf ("DEBUG: from MGRS/USNG, latitude = %.6f, longitude = %.6f\n", state.latitude, state.longitude);
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Conversion from MGRS/USNG failed:\n%s\n\n", convertErr)
+				logrus.Warnf("Conversion from MGRS/USNG failed:\n%s", convertErr)
 			}
 
 			state.dao[2] = e[0]
@@ -1352,9 +1333,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 			stemp += xstr
 
 			if len(stemp) != 4 && len(stemp) != 6 && len(stemp) != 10 && len(stemp) != 12 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"\n",
-					g.config.ttlocs[ipat].mhead.prefix, xstr)
+				logrus.Warnf("Expected total of 4, 6, 10, or 12 digits for the Maidenhead Locator \"%s\" + \"%s\"", g.config.ttlocs[ipat].mhead.prefix, xstr)
 
 				return (TT_ERROR_INVALID_MHEAD)
 			}
@@ -1370,8 +1349,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				var lat, lon, err = latlong.FromGridSquare(state.locText)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("%v\n", err)
+					logrus.Warnf("%v", err)
 
 					return (TT_ERROR_INVALID_MHEAD)
 				}
@@ -1385,8 +1363,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_SATSQ:
 			if len(xstr) != 4 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected 4 digits for the Satellite Square.\n")
+				logrus.Warn("Expected 4 digits for the Satellite Square.")
 
 				return (TT_ERROR_INVALID_SATSQ)
 			}
@@ -1399,8 +1376,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 				var lat, lon, err = latlong.FromGridSquare(state.locText)
 				if err != nil {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("%v\n", err)
+					logrus.Warnf("%v", err)
 
 					return (TT_ERROR_INVALID_SATSQ)
 				}
@@ -1414,8 +1390,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 		case TTLOC_AMBIG:
 			if len(xstr) != 1 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Expected 1 digits for the position ambiguity.\n")
+				logrus.Warn("Expected 1 digits for the position ambiguity.")
 
 				return (TT_ERROR_INVALID_LOC)
 			}
@@ -1432,8 +1407,7 @@ func (g *TTGateway) parseLocation(state *ttParseState, e string) int {
 
 	/* Does not match any location specification. */
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Received location \"%s\" does not match any definitions.\n", e)
+	logrus.Warnf("Received location \"%s\" does not match any definitions.", e)
 
 	/* Send reject sound. */
 
@@ -1659,8 +1633,7 @@ func raw_tt_data_to_app(channel int, msg string) {
 
 		dlq_rec_frame(channel, -1, 0, pp, alevel, fec_type_none, RETRY_NONE, "tt")
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Could not convert \"%s\" into APRS packet.\n", raw_tt_msg)
+		logrus.Errorf("Could not convert \"%s\" into APRS packet.", raw_tt_msg)
 	}
 }
 

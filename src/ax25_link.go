@@ -544,8 +544,7 @@ func AX25MODULO(n int, m ax25_modulo_t) int {
 		var pc, file, line, _ = runtime.Caller(1)
 		var _func = runtime.FuncForPC(pc).Name()
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR: %d modulo %d, %s, %s, %d\n", n, m, file, _func, line)
+		logrus.Errorf("INTERNAL ERROR: %d modulo %d, %s, %s, %d", n, m, file, _func, line)
 		m = 8
 	}
 	// Use masking, rather than % operator, so negative numbers are handled properly.
@@ -1134,9 +1133,7 @@ func dl_data_request(E *dlq_item_t) {
 		}
 
 		if num_frames != DIVROUNDUP(E.txdata.len, S.n1_paclen) || remaining_len != 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, num frames = %d, remaining len = %d\n",
-				E.txdata.len, S.n1_paclen, num_frames, remaining_len)
+			logrus.Errorf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, num frames = %d, remaining len = %d", E.txdata.len, S.n1_paclen, num_frames, remaining_len)
 		}
 
 		cdata_delete(E.txdata)
@@ -1211,9 +1208,7 @@ func dl_data_request(E *dlq_item_t) {
 	var nseg_to_follow = DIVROUNDUP(E.txdata.len+1, S.n1_paclen-1)
 
 	if nseg_to_follow < 2 || nseg_to_follow > 128 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, number of segments = %d\n",
-			E.txdata.len, S.n1_paclen, nseg_to_follow)
+		logrus.Errorf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, number of segments = %d", E.txdata.len, S.n1_paclen, nseg_to_follow)
 		cdata_delete(E.txdata)
 		E.txdata = nil
 
@@ -1238,9 +1233,7 @@ func dl_data_request(E *dlq_item_t) {
 	var seglen = min(S.n1_paclen-2, remaining_len)
 
 	if seglen < 1 || seglen > S.n1_paclen-2 || seglen > remaining_len || seglen > len(first_segment.segdata) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d\n",
-			E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
+		logrus.Errorf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d", E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
 		cdata_delete(E.txdata)
 		E.txdata = nil
 
@@ -1272,9 +1265,7 @@ func dl_data_request(E *dlq_item_t) {
 		seglen = min(S.n1_paclen-1, remaining_len)
 
 		if seglen < 1 || seglen > S.n1_paclen-1 || seglen > remaining_len || seglen > len(subsequent_segment.segdata) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d\n",
-				E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
+			logrus.Errorf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, segment length = %d, number to follow = %d", E.txdata.len, S.n1_paclen, seglen, nseg_to_follow)
 			cdata_delete(E.txdata)
 			E.txdata = nil
 
@@ -1298,9 +1289,14 @@ func dl_data_request(E *dlq_item_t) {
 	}
 
 	if remaining_len != 0 || orig_offset != E.txdata.len {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR, Segmentation data length = %d, N1 = %d, remaining length = %d (not 0), orig offset = %d (not %d)\n",
-			E.txdata.len, S.n1_paclen, remaining_len, orig_offset, E.txdata.len)
+		logrus.Errorf(
+			"INTERNAL ERROR, Segmentation data length = %d, N1 = %d, remaining length = %d (not 0), orig offset = %d (not %d)",
+			E.txdata.len,
+			S.n1_paclen,
+			remaining_len,
+			orig_offset,
+			E.txdata.len,
+		)
 	}
 
 	cdata_delete(E.txdata)
@@ -1516,8 +1512,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 		if S != nil {
 			reversed_addrs = true
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Can't get outstanding frames for %s . %s, chan %d\n", E.addrs[OWNCALL], E.addrs[PEERCALL], E._chan)
+			logrus.Errorf("Can't get outstanding frames for %s . %s, chan %d", E.addrs[OWNCALL], E.addrs[PEERCALL], E._chan)
 			agwServer.OutstandingFramesReply(E._chan, E.client, E.addrs[OWNCALL], E.addrs[PEERCALL], 0)
 
 			return
@@ -1718,30 +1713,26 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
 			S.ra_following = int(dataBytes[0] & 0x7f)
 			S.ra_buff = cdata_new(int(dataBytes[1]), dataBytes[2:])
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Not first segment in ready state.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Reassembler Protocol Error Z: Not first segment in ready state.", S.stream_id)
 		}
 	} else {
 		// Reassembling data state
 		if pid != AX25_PID_SEGMENTATION_FRAGMENT {
 			agwServer.RecConnData(S.channel, S.client, S.addrs[PEERCALL], S.addrs[OWNCALL], pid, dataBytes)
 
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Not segment in reassembling state.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Reassembler Protocol Error Z: Not segment in reassembling state.", S.stream_id)
 			cdata_delete(S.ra_buff)
 			S.ra_buff = nil
 
 			return
 		} else if dataBytes[0]&0x80 > 0 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: First segment in reassembling state.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Reassembler Protocol Error Z: First segment in reassembling state.", S.stream_id)
 			cdata_delete(S.ra_buff)
 			S.ra_buff = nil
 
 			return
 		} else if (dataBytes[0] & 0x7f) != byte(S.ra_following-1) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments out of sequence.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Reassembler Protocol Error Z: Segments out of sequence.", S.stream_id)
 			cdata_delete(S.ra_buff)
 			S.ra_buff = nil
 
@@ -1915,8 +1906,7 @@ func lm_seize_confirm(E *dlq_item_t) {
 
 func lm_data_indication(E *dlq_item_t) {
 	if E.pp == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal Error, packet pointer is null.\n")
+		logrus.Error("Internal Error, packet pointer is null.")
 
 		return
 	}
@@ -2016,20 +2006,17 @@ func lm_data_indication(E *dlq_item_t) {
 	switch ftype {
 	case frame_type_I:
 		if cr != cr_cmd {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error S: %s must be COMMAND.\n", S.stream_id, desc)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error S: %s must be COMMAND.", S.stream_id, desc)
 		}
 
 	case frame_type_S_RR, frame_type_S_RNR, frame_type_S_REJ:
 		if cr != cr_cmd && cr != cr_res {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error: %s must be COMMAND or RESPONSE.\n", S.stream_id, desc)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error: %s must be COMMAND or RESPONSE.", S.stream_id, desc)
 		}
 
 	case frame_type_U_SABME, frame_type_U_SABM, frame_type_U_DISC:
 		if cr != cr_cmd {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error: %s must be COMMAND.\n", S.stream_id, desc)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error: %s must be COMMAND.", S.stream_id, desc)
 		}
 
 		// Erratum: The AX.25 spec is not clear about whether SREJ should be command, response, or both.
@@ -2037,14 +2024,12 @@ func lm_data_indication(E *dlq_item_t) {
 
 	case frame_type_S_SREJ, frame_type_U_DM, frame_type_U_UA, frame_type_U_FRMR:
 		if cr != cr_res {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error: %s must be RESPONSE.\n", S.stream_id, desc)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error: %s must be RESPONSE.", S.stream_id, desc)
 		}
 
 	case frame_type_U_XID, frame_type_U_TEST:
 		if cr != cr_cmd && cr != cr_res {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error: %s must be COMMAND or RESPONSE.\n", S.stream_id, desc)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error: %s must be COMMAND or RESPONSE.", S.stream_id, desc)
 		}
 
 	case frame_type_U_UI:
@@ -2319,8 +2304,7 @@ func i_frame(S *ax25_dlsm_t, cr cmdres_t, p int, nr int, ns int, pid int, info [
 			}
 		} else { // Bad information length.
 			// Wouldn't even get to CRC check if not octet aligned.
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.\n", S.stream_id, len(info), AX25_MAX_INFO_LEN)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error O: Information part length, %d, not in range of 0 thru %d.", S.stream_id, len(info), AX25_MAX_INFO_LEN)
 
 			establish_data_link(S)
 			S.layer_3_initiated = false
@@ -2533,8 +2517,8 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		S.reject_exception = true
 
 		if s_debug_retry {
-			text_color_set(DW_COLOR_ERROR) // make it more noticeable.
-			dw_printf("sending REJ, SREJ not enabled case, V(R)=%d", S.vr)
+			// make it more noticeable.
+			logrus.WithField("vr", S.vr).Debug("sending REJ, SREJ not enabled case")
 		}
 
 		var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_REJ, S.modulo, nr, f, nil)
@@ -2546,8 +2530,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		// This is normally enabled for v2.2 but XID can be used to change that.
 		// First we save the current frame so we can retrieve it later after getting the fill in.
 		if S.modulo != 128 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR: Should not be sending SREJ in basic (modulo 8) mode.\n")
+			logrus.Error("INTERNAL ERROR: Should not be sending SREJ in basic (modulo 8) mode.")
 		}
 
 		// TODO KG #if 1
@@ -2685,7 +2668,6 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		   	    int i;
 		   	    int allow_f1 = 1;
 
-		   text_color_set(DW_COLOR_ERROR);
 		   dw_printf ("%s:%d, zero exceptions, V(R)=%d, N(S)=%d\n", __func__, __LINE__, S.vr, ns);
 
 		   	    for (i = S.vr; i != ns; i = AX25MODULO(i+1, S.modulo)) {
@@ -2709,14 +2691,12 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		   	    int ask_resend_count = 0;
 		   	    int first;
 
-		   text_color_set(DW_COLOR_ERROR);
 		   dw_printf ("%s:%d, %d srej exceptions, V(R)=%d, N(S)=%d\n", __func__, __LINE__, selective_reject_exception(S), S.vr, ns);
 
 		   	    first = AX25MODULO(ns - 1, S.modulo);
 		   	    while (S.rxdata_by_ns[first] == nil) {
 		   	      if (first == AX25MODULO(S.vr - 1, S.modulo)) {
 		   	        //  Oops!  Went too far.  This I frame was already processed.
-		   		text_color_set(DW_COLOR_ERROR);
 		   	        dw_printf ("INTERNAL ERROR calculating what to put in SREJ, %s line %d\n", __func__, __LINE__);
 		   	        dw_printf ("V(R)=%d, N(S)=%d, SREJ exception=%d, first=%d, ask_resend_count=%d\n", S.vr, ns, selective_reject_exception(S), first, ask_resend_count);
 		   		int k;
@@ -2843,8 +2823,7 @@ func is_ns_in_window(S *ax25_dlsm_t, ns int) bool {
 
 func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 	if count <= 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("send_srej_frames INTERNAL ERROR, count=%d\n", count)
+		logrus.Errorf("send_srej_frames INTERNAL ERROR, count=%d", count)
 
 		return
 	}
@@ -2876,27 +2855,22 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 	// Something is wrong!  We ask for more than the window size.
 
 	if count > S.k_maxframe {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR - Extreme number of SREJ\n")
-		dw_printf("state=%d, count=%d, k=%d, V(R)=%d\n", S.state, count, S.k_maxframe, S.vr)
-
-		dw_printf("resend[]=")
-
-		for i := range count {
-			dw_printf(" %d", resend[i])
-		}
-
-		dw_printf("\n")
-
-		dw_printf("rxdata_by_ns[]=")
+		var held []int
 
 		for i := range 128 {
 			if S.rxdata_by_ns[i] != nil {
-				dw_printf(" %d", i)
+				held = append(held, i)
 			}
 		}
 
-		dw_printf("\n")
+		logrus.WithFields(logrus.Fields{
+			"state":        S.state,
+			"count":        count,
+			"k":            S.k_maxframe,
+			"vr":           S.vr,
+			"resend":       resend[:count],
+			"rxdata_by_ns": held,
+		}).Error("INTERNAL ERROR - Extreme number of SREJ")
 	}
 
 	var cr = cr_res // SREJ is always response.
@@ -2908,8 +2882,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 
 		for i := 1; i < count; i++ { // skip first one
 			if resend[i] < 0 || resend[i] >= int(S.modulo) {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR, additional nr=%d, modulo=%d\n", resend[i], S.modulo)
+				logrus.Errorf("INTERNAL ERROR, additional nr=%d, modulo=%d", resend[i], S.modulo)
 			}
 
 			// There is also a form to specify a range but I don't
@@ -2938,8 +2911,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		}
 
 		if nr < 0 || nr >= int(S.modulo) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR, nr=%d, modulo=%d\n", nr, S.modulo)
+			logrus.Errorf("INTERNAL ERROR, nr=%d, modulo=%d", nr, S.modulo)
 			nr = AX25MODULO(nr, S.modulo)
 		}
 
@@ -2970,8 +2942,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		}
 
 		if nr < 0 || nr >= int(S.modulo) {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("INTERNAL ERROR, nr=%d, modulo=%d\n", nr, S.modulo)
+			logrus.Errorf("INTERNAL ERROR, nr=%d, modulo=%d", nr, S.modulo)
 			nr = AX25MODULO(nr, S.modulo)
 		}
 
@@ -3560,8 +3531,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 
 	case state_4_timer_recovery:
 		if s_debug_timers {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("state 4 timer recovery, srej_frame nr=%d, f=%d\n", nr, f)
+			logrus.Debugf("state 4 timer recovery, srej_frame nr=%d, f=%d", nr, f)
 		}
 
 		S.peer_receiver_busy = false
@@ -3587,8 +3557,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 				SET_VA(S, nr)
 
 				if s_debug_timers {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("state 4 timer recovery, srej_frame set v(a)= %d\n", S.va)
+					logrus.Debugf("state 4 timer recovery, srej_frame set v(a)= %d", S.va)
 				}
 			}
 
@@ -3604,7 +3573,6 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 				SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
 				enter_new_state(S, state_3_connected)
 
-				// text_color_set(DW_COLOR_ERROR);
 				// dw_printf ("state 4 timer recovery, go to state 3 \n");
 			} else {
 				// Erratum: Difference between two AX.25 revisions.
@@ -3612,7 +3580,6 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 				// #if 1	// This is from the original protocol spec.
 				// Resend I frame with N(S) equal to the N(R) in the SREJ.
 
-				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("state 4 timer recovery, send requested frame(s) \n");
 				var num_resent = resend_for_srej(S, nr, info)
 				if num_resent > 0 {
@@ -3677,8 +3644,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 		num_resent++
 	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Stream %d: INTERNAL ERROR for SREJ.  I frame for N(S)=%d is not available.\n", S.stream_id, i_frame_ns)
+		logrus.Errorf("Stream %d: INTERNAL ERROR for SREJ.  I frame for N(S)=%d is not available.", S.stream_id, i_frame_ns)
 	}
 
 	// Multi-SREJ if there is an information part.
@@ -3707,8 +3673,7 @@ func resend_for_srej(S *ax25_dlsm_t, nr int, info []byte) int {
 
 			num_resent++
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: INTERNAL ERROR for Multi-SREJ.  I frame for N(S)=%d is not available.\n", S.stream_id, i_frame_ns)
+			logrus.Errorf("Stream %d: INTERNAL ERROR for Multi-SREJ.  I frame for N(S)=%d is not available.", S.stream_id, i_frame_ns)
 		}
 	}
 
@@ -3884,8 +3849,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 			clear_exception_conditions(S)
 
 			if s_debug_protocol_errors {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Stream %d: AX.25 Protocol Error F: Data Link reset; i.e. SABM(e) received in state %d.\n", S.stream_id, S.state)
+				logrus.Warnf("Stream %d: AX.25 Protocol Error F: Data Link reset; i.e. SABM(e) received in state %d.", S.stream_id, S.state)
 			}
 
 			if S.vs != S.va {
@@ -4084,8 +4048,7 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 
 	case state_3_connected, state_4_timer_recovery:
 		if s_debug_protocol_errors {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error E: DM received in state %d.\n", S.stream_id, S.state)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error E: DM received in state %d.", S.stream_id, S.state)
 		}
 		// dl disconnect *indication*
 		text_color_set(DW_COLOR_INFO)
@@ -4198,8 +4161,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		// "Unexpected UA in states 3, 4, or 5."	We are in state 0 here.
 		// "UA received without F=1 when SABM or DISC was sent P=1."
 		if s_debug_protocol_errors {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error C: Unexpected UA in state %d.\n", S.stream_id, S.state)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error C: Unexpected UA in state %d.", S.stream_id, S.state)
 		}
 
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
@@ -4294,8 +4256,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			enter_new_state(S, state_3_connected)
 		} else {
 			if s_debug_protocol_errors {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Stream %d: AX.25 Protocol Error D: UA received without F=1 when SABM or DISC was sent P=1.\n", S.stream_id)
+				logrus.Warnf("Stream %d: AX.25 Protocol Error D: UA received without F=1 when SABM or DISC was sent P=1.", S.stream_id)
 			}
 			// stay in current state, either 1 or 5.
 		}
@@ -4311,16 +4272,14 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			enter_new_state(S, state_0_disconnected)
 		} else {
 			if s_debug_protocol_errors {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Stream %d: AX.25 Protocol Error D: UA received without F=1 when SABM or DISC was sent P=1.\n", S.stream_id)
+				logrus.Warnf("Stream %d: AX.25 Protocol Error D: UA received without F=1 when SABM or DISC was sent P=1.", S.stream_id)
 			}
 			// stay in same state.
 		}
 
 	case state_3_connected, state_4_timer_recovery:
 		if s_debug_protocol_errors {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error C: Unexpected UA in state %d.\n", S.stream_id, S.state)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error C: Unexpected UA in state %d.", S.stream_id, S.state)
 		}
 
 		establish_data_link(S)
@@ -4380,8 +4339,7 @@ func frmr_frame(S *ax25_dlsm_t) {
 
 	case state_3_connected, state_4_timer_recovery:
 		if s_debug_protocol_errors {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error K: FRMR not expected in state %d.\n", S.stream_id, S.state)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error K: FRMR not expected in state %d.", S.stream_id, S.state)
 		}
 
 		set_version_2_0(S) // Erratum: FRMR can only be sent by v2.0.
@@ -4548,12 +4506,10 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 					transmitQueue.LMDataRequest(S.channel, TQ_PRIO_1_LO, pp)
 				}
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Stream %d: AX.25 Protocol Error MDL-A: XID command without P=1.\n", S.stream_id)
+				logrus.Warnf("Stream %d: AX.25 Protocol Error MDL-A: XID command without P=1.", S.stream_id)
 			}
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error MDL-B: Unexpected XID response.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error MDL-B: Unexpected XID response.", S.stream_id)
 		}
 
 	case mdl_state_1_negotiating:
@@ -4587,8 +4543,7 @@ func xid_frame(S *ax25_dlsm_t, cr cmdres_t, pf int, info []byte) {
 				   #endif
 				*/
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Stream %d: AX.25 Protocol Error MDL-D: XID response without F=1.\n", S.stream_id)
+				logrus.Warnf("Stream %d: AX.25 Protocol Error MDL-D: XID response without F=1.", S.stream_id)
 			}
 		} else { //nolint:staticcheck
 			// Not expecting to receive a command when I sent one.
@@ -4717,7 +4672,7 @@ func dl_timer_expiry() {
 
 // Make timer start, stop, expiry a different color to stand out.
 
-const DW_COLOR_DEBUG_TIMER = DW_COLOR_ERROR
+const DW_COLOR_DEBUG_TIMER = DW_COLOR_DEBUG
 
 func t1_expiry(S *ax25_dlsm_t) {
 	if s_debug_timers {
@@ -4805,18 +4760,15 @@ func t1_expiry(S *ax25_dlsm_t) {
 			// Erratum: 2006 version, page 103, is missing yes/no labels on decision blocks.
 			if S.va != S.vs {
 				if s_debug_protocol_errors {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Stream %d: AX.25 Protocol Error I: %d timeouts: unacknowledged sent data.\n", S.stream_id, S.n2_retry)
+					logrus.Warnf("Stream %d: AX.25 Protocol Error I: %d timeouts: unacknowledged sent data.", S.stream_id, S.n2_retry)
 				}
 			} else if S.peer_receiver_busy {
 				if s_debug_protocol_errors {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Stream %d: AX.25 Protocol Error U: %d timeouts: extended peer busy condition.\n", S.stream_id, S.n2_retry)
+					logrus.Warnf("Stream %d: AX.25 Protocol Error U: %d timeouts: extended peer busy condition.", S.stream_id, S.n2_retry)
 				}
 			} else {
 				if s_debug_protocol_errors {
-					text_color_set(DW_COLOR_ERROR)
-					dw_printf("Stream %d: AX.25 Protocol Error T: %d timeouts: no response to enquiry.\n", S.stream_id, S.n2_retry)
+					logrus.Warnf("Stream %d: AX.25 Protocol Error T: %d timeouts: no response to enquiry.", S.stream_id, S.n2_retry)
 				}
 			}
 
@@ -4934,8 +4886,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 	case mdl_state_1_negotiating:
 		S.mdl_rc++
 		if S.mdl_rc > S.n2_retry {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error MDL-C: Management retry limit exceeded.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error MDL-C: Management retry limit exceeded.", S.stream_id)
 			S.mdl_state = mdl_state_0_ready
 		} else {
 			// No response.  Ask again.
@@ -4972,8 +4923,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 
 func nr_error_recovery(S *ax25_dlsm_t) {
 	if s_debug_protocol_errors {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Stream %d: AX.25 Protocol Error J: N(r) sequence error.\n", S.stream_id)
+		logrus.Warnf("Stream %d: AX.25 Protocol Error J: N(r) sequence error.", S.stream_id)
 	}
 
 	establish_data_link(S)
@@ -5099,8 +5049,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
 	var cmd = cr_cmd
 
 	if s_debug_retry {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n****** TRANSMIT ENQUIRY   RR/RNR cmd P=1 ****** state=%d, rc=%d\n\n", S.state, S.rc)
+		logrus.Debugf("****** TRANSMIT ENQUIRY   RR/RNR cmd P=1 ****** state=%d, rc=%d", S.state, S.rc)
 	}
 
 	// This is the ONLY place that we send RR/RNR *command* with P=1.
@@ -5163,8 +5112,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 	var nr = S.vr
 
 	if s_debug_retry {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n****** ENQUIRY RESPONSE  F=%d ******\n\n", f)
+		logrus.Debugf("****** ENQUIRY RESPONSE  F=%d ******", f)
 	}
 
 	// #if 1			// Detour 1
@@ -5183,8 +5131,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 		} else if S.srej_enable == srej_single || S.srej_enable == srej_multi {
 			// SREJ is enabled. This is based on X.25 2.4.6.11.
 			if S.modulo != 128 {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("INTERNAL ERROR: enquiry response should not be sending SREJ for modulo 8.\n")
+				logrus.Error("INTERNAL ERROR: enquiry response should not be sending SREJ for modulo 8.")
 			}
 
 			// Suppose we received I frames with N(S) of 0, 3, 7.
@@ -5232,8 +5179,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			// And when we look at what happens when RR response, F=1 is received in state 4, it is
 			// effectively REJ when N(R) is not the same as V(S).
 			if s_debug_retry {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("\n****** ENQUIRY RESPONSE srej not enbled, sending RR resp F=%d ******\n\n", f)
+				logrus.Debugf("****** ENQUIRY RESPONSE srej not enbled, sending RR resp F=%d ******", f)
 			}
 
 			var pp = ax25_s_frame(S.addrs, S.num_addr, cr, frame_type_S_RR, S.modulo, nr, f, nil)
@@ -5295,21 +5241,18 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 	// Here we just a local variable instead of messing with it.
 	// This should be equivalent but safer.
 	if s_debug_misc {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("invoke_retransmission(): starting with %d, state=%d, rc=%d, \n", nr_input, S.state, S.rc)
+		logrus.Debugf("invoke_retransmission(): starting with %d, state=%d, rc=%d, ", nr_input, S.state, S.rc)
 	}
 
 	// I don't think we should be here if SREJ is enabled.
 	// TODO: Figure out why this happens occasionally.
 
 	//	if (S.srej_enable != srej_none) {
-	//	  text_color_set(DW_COLOR_ERROR);
 	//	  dw_printf ("Internal Error, Did not expect to be here when SREJ enabled.  %s %s %d\n", __FILE__, __func__, __LINE__);
 	//	}
 
 	if S.txdata_by_ns[nr_input] == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal Error, Can't resend starting with N(S) = %d.  It is not available.\n", nr_input)
+		logrus.Errorf("Internal Error, Can't resend starting with N(S) = %d.  It is not available.", nr_input)
 
 		return
 	}
@@ -5337,8 +5280,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 
 			sent_count++
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Internal Error, state=%d, need to retransmit N(S) = %d for REJ but it is not available.\n", S.state, local_vs)
+			logrus.Errorf("Internal Error, state=%d, need to retransmit N(S) = %d for REJ but it is not available.", S.state, local_vs)
 		}
 
 		local_vs = AX25MODULO(local_vs+1, S.modulo)
@@ -5348,8 +5290,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 	}
 
 	if sent_count == 0 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal Error, Nothing to retransmit. N(R)=%d\n", nr_input)
+		logrus.Errorf("Internal Error, Nothing to retransmit. N(R)=%d", nr_input)
 	}
 } /* end invoke_retransmission */
 
@@ -5422,8 +5363,7 @@ func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr cm
 		enquiry_response(S, frame_type, f)
 	} else if cr == cr_res && pf == 1 {
 		if s_debug_protocol_errors {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Stream %d: AX.25 Protocol Error A: F=1 received but P=1 not outstanding.\n", S.stream_id)
+			logrus.Warnf("Stream %d: AX.25 Protocol Error A: F=1 received but P=1 not outstanding.", S.stream_id)
 		}
 	}
 } /* end check_need_for_response */
@@ -5576,7 +5516,6 @@ func select_t1_value(S *ax25_dlsm_t) {
 	/* TODO KG
 	#else
 		if (S.t1v < 0.99 || S.t1v > 30) {
-		  text_color_set(DW_COLOR_ERROR);
 		  dw_printf ("INTERNAL ERROR?  Stream %d: select_t1_value, rc = %d, t1 remaining = %.3f, old srt = %.3f, new srt = %.3f, Extreme new t1v = %.3f\n",
 			S.stream_id, S.rc, S.t1_remaining_when_last_stopped, old_srt, S.srt, S.t1v);
 		}
@@ -5833,10 +5772,7 @@ func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
 		var pc, _, __LINE__, _ = runtime.Caller(1)
 		var __func__ = runtime.FuncForPC(pc).Name()
 
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\n")
-		dw_printf(">>> NEW STATE = %d, previously %d, called from %s %d <<<\n", new_state, S.state, __func__, __LINE__)
-		dw_printf("\n")
+		logrus.Debugf(">>> NEW STATE = %d, previously %d, called from %s %d <<<", new_state, S.state, __func__, __LINE__)
 	}
 
 	Assert(new_state >= 0 && new_state <= 5)

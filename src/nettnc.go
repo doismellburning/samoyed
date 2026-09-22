@@ -14,6 +14,8 @@ import (
 	"os"
 	"strconv"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 type NetTNC struct {
@@ -195,10 +197,9 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 		 */
 		var conn = nt.getSock()
 		if conn == nil {
-			text_color_set(DW_COLOR_ERROR)
 			// I'm using the term "attach" here, in an attempt to
 			// avoid confusion with the AX.25 connect.
-			dw_printf("Attempting to reattach to network TNC...\n")
+			logrus.Error("Attempting to reattach to network TNC...")
 
 			var newConn, connErr = new(net.Dialer).DialContext(ctx, "tcp", net.JoinHostPort(nt.host, strconv.Itoa(nt.port)))
 			if connErr == nil {
@@ -225,8 +226,7 @@ func (nt *NetTNC) listenThread(ctx context.Context, channel int) {
 			}
 
 			if readErr != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Lost communication with network TNC. Will try to reattach.\n")
+				logrus.Error("Lost communication with network TNC. Will try to reattach.")
 				nt.closeSockIfCurrent(conn)
 
 				if !sleepSecCtx(ctx, 5) {
@@ -311,8 +311,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				 * fragment - or writing one past the end of kiss_msg, which is
 				 * what used to happen here.
 				 */
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("KISS frame from network TNC exceeded maximum length.  Discarding it.\n")
+				logrus.Warn("KISS frame from network TNC exceeded maximum length.  Discarding it.")
 
 				kf.kiss_len = 0
 				kf.state = KS_SEARCHING
@@ -357,8 +356,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 				var spectrum = "Network TNC"
 				dlq_rec_frame(channel_override, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create packet object for KISS frame from channel %d network TNC.\n", channel_override)
+				logrus.Warnf("Failed to create packet object for KISS frame from channel %d network TNC.", channel_override)
 			}
 
 			kf.state = KS_SEARCHING
@@ -370,8 +368,7 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 			kf.kiss_msg[kf.kiss_len] = b
 			kf.kiss_len++
 		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("KISS frame from network TNC exceeded maximum length.\n")
+			logrus.Warn("KISS frame from network TNC exceeded maximum length.")
 		}
 
 		return
@@ -399,16 +396,14 @@ func my_kiss_rec_byte(kf *KISSFrame, b byte, debug int, channel_override int) {
 func nettnc_send_packet(channel int, pp *packet_t) {
 	var nt = s_net_tncs[channel]
 	if nt == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
+		logrus.Errorf("Not connected to network TNC for channel %d. Discarding packet.", channel)
 
 		return
 	}
 
 	var conn = nt.getSock()
 	if conn == nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Not connected to network TNC for channel %d. Discarding packet.\n", channel)
+		logrus.Errorf("Not connected to network TNC for channel %d. Discarding packet.", channel)
 
 		return
 	}
@@ -426,8 +421,7 @@ func nettnc_send_packet(channel int, pp *packet_t) {
 
 	var _, err = conn.Write(kiss_buff)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError %v sending packet to KISS Network TNC for channel %d.  Closing connection.\n\n", err, channel)
+		logrus.Errorf("Error %v sending packet to KISS Network TNC for channel %d.  Closing connection.", err, channel)
 		nt.closeSockIfCurrent(conn)
 	}
 

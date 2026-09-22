@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 type PacketLogger struct {
@@ -72,9 +74,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
 				// Specified directory exists.
 				pl.logPath = path
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Log file location \"%s\" is not a directory.\n", path)
-				dw_printf("Using current working directory \".\" instead.\n")
+				logrus.Errorf("Log file location \"%s\" is not a directory. Using current working directory \".\" instead.", path)
 
 				pl.logPath = "."
 			}
@@ -89,10 +89,7 @@ func NewPacketLogger(daily_names bool, path string) *PacketLogger {
 				dw_printf("Log file location \"%s\" has been created.\n", path)
 				pl.logPath = path
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Failed to create log file location \"%s\".\n", path)
-				dw_printf("%s\n", mkdirErr)
-				dw_printf("Using current working directory \".\" instead.\n")
+				logrus.WithError(mkdirErr).Errorf("Failed to create log file location \"%s\". Using current working directory \".\" instead.", path)
 
 				pl.logPath = "."
 			}
@@ -171,9 +168,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 				pl.logFp = f
 				pl.openFname = fname
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't open log file \"%s\" for write.\n", full_path)
-				dw_printf("%s\n", openErr)
+				logrus.WithError(openErr).Errorf("Can't open log file \"%s\" for write.", full_path)
 
 				pl.openFname = ""
 
@@ -204,9 +199,7 @@ func (pl *PacketLogger) Write(channel int, A *decode_aprs_t, pp *packet_t, aleve
 			if openErr == nil {
 				pl.logFp = f
 			} else {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Can't open log file \"%s\" for write.\n", pl.logPath)
-				dw_printf("%s\n", openErr)
+				logrus.WithError(openErr).Errorf("Can't open log file \"%s\" for write.", pl.logPath)
 
 				pl.logPath = ""
 

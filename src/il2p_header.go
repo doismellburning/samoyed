@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*--------------------------------------------------------------------------------
@@ -434,8 +436,7 @@ func il2p_type_1_header(pp *packet_t, fec_level int) ([]byte, int) {
 
 func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 	if GET_HDR_TYPE(hdr) != 1 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("IL2P Internal error.  Should not be here: il2p_decode_header_type_1, when header type is 0.\n")
+		logrus.Error("IL2P Internal error.  Should not be here: il2p_decode_header_type_1, when header type is 0.")
 
 		return (nil)
 	}
@@ -481,7 +482,6 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 				// This can pop up sporadically when receiving random noise.
 				// Would be better to show only when debug is enabled but variable not available here.
 				// TODO: For now we will just suppress it.
-				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("IL2P: Invalid character '%c' in destination address '%s'\n", addrs[AX25_DESTINATION][i], addrs[AX25_DESTINATION]);
 			}
 
@@ -504,7 +504,6 @@ func il2p_decode_header_type_1(hdr []byte, num_sym_changed int) *packet_t {
 				// This can pop up sporadically when receiving random noise.
 				// Would be better to show only when debug is enabled but variable not available here.
 				// TODO: For now we will just suppress it.
-				//text_color_set(DW_COLOR_ERROR);
 				//dw_printf ("IL2P: Invalid character '%c' in source address '%s'\n", addrs[AX25_SOURCE][i], addrs[AX25_SOURCE]);
 			}
 
