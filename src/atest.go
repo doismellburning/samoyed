@@ -91,7 +91,6 @@ var wav_data atest_wav_data_t
 var atestFP *os.File
 var atestBuf *bufio.Reader
 var e_o_f bool
-var packets_decoded_one = 0
 
 var my_audio_config *audio_s
 
@@ -106,7 +105,6 @@ var sample_number = -1 /* Sample number from the file. */
 
 var h_opt = false // Hexadecimal display of received packet.
 var d_o_opt = 0   // "-d o" option for DCD output control. */
-var dcd_missing_errors = 0
 
 const EXPERIMENT_G = true
 const EXPERIMENT_H = true
@@ -634,7 +632,7 @@ o = DCD output control
 		 */
 		multi_modem_init(my_audio_config, sink)
 
-		packets_decoded_one = 0
+		sink.packetsDecoded = 0
 
 		atestBuf = bufio.NewReader(atestFP)
 
@@ -686,8 +684,8 @@ o = DCD output control
 			}
 		}
 
-		fmt.Printf("%d from %s\n", packets_decoded_one, wavFileName)
-		packets_decoded_total += packets_decoded_one
+		fmt.Printf("%d from %s\n", sink.packetsDecoded, wavFileName)
+		packets_decoded_total += sink.packetsDecoded
 
 		atestFP.Close()
 	}
@@ -698,7 +696,7 @@ o = DCD output control
 
 	if d_o_opt > 0 {
 		fmt.Printf("DCD count = %d\n", sink.dcdCount)
-		fmt.Printf("DCD missing errors = %d\n", dcd_missing_errors)
+		fmt.Printf("DCD missing errors = %d\n", sink.dcdMissingErrors)
 	}
 
 	if *errorIfLessThan != -1 && packets_decoded_total < *errorIfLessThan {
@@ -713,11 +711,10 @@ o = DCD output control
 		os.Exit(1)
 	}
 
-	// Put the real functions back.  For the command this changes nothing,
+	// Put the real audio input back.  For the command this changes nothing,
 	// as the process is about to end anyway, but the tests all run in one
-	// process: anything after a test that calls this would otherwise get
-	// the fakes - audio samples read from a WAV file that has been closed,
-	// received frames counted instead of queued.
+	// process: anything after a test that calls this would otherwise read
+	// its audio samples from a WAV file that has been closed.
 	ATEST_C = false
 }
 
@@ -759,11 +756,11 @@ func audio_get(a int) int {
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	packets_decoded_one++
+func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+	s.packetsDecoded++
 
 	if hdlcReceiver.DataDetectAny(channel) == 0 {
-		dcd_missing_errors++
+		s.dcdMissingErrors++
 	}
 
 	var stemp = AX25FormatAddrs(pp)
@@ -790,7 +787,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("\n")
-	dw_printf("DECODED[%d] ", packets_decoded_one)
+	dw_printf("DECODED[%d] ", s.packetsDecoded)
 
 	/* Insert time stamp relative to start of file. */
 
@@ -887,14 +884,19 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 			}
 		#endif
 	*/
-} /* end fake dlq_append */
+} /* end RecFrame */
 
 // atestSink is where atest's decoders report what they have heard.  A running
-// Samoyed acts on that - keying a DCD output line - where atest reports on it:
-// with "-d o", the time the channel was busy for.
+// Samoyed acts on that - queueing the frame for the receive thread, keying a
+// DCD output line - where atest reports on it: the frame, and with "-d o", the
+// time the channel was busy for.
 type atestSink struct {
-	dcdCount        int
-	dcdStartSeconds [MAX_RADIO_CHANS]float64
+	// packetsDecoded counts the frames decoded from the file being read;
+	// AtestMain clears it between files.
+	packetsDecoded   int
+	dcdMissingErrors int
+	dcdCount         int
+	dcdStartSeconds  [MAX_RADIO_CHANS]float64
 }
 
 func (s *atestSink) DCDChange(channel int, state int) {

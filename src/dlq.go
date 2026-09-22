@@ -243,7 +243,7 @@ func dlq_discard_wake_up_locked() {
  *
  *--------------------------------------------------------------------*/
 
-func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
 	logrus.WithField("channel", channel).Debug("dlq_rec_frame")
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS) // TOTAL to include virtual channels.
 
@@ -289,14 +289,6 @@ func dlq_rec_frame_real(channel int, subchannel int, slice int, pp *packet_t, al
 
 	append_to_queue(pnew)
 } /* end dlq_rec_frame */
-
-func dlq_rec_frame(channel int, subchannel int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	if ATEST_C {
-		dlq_rec_frame_fake(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
-	} else {
-		dlq_rec_frame_real(channel, subchannel, slice, pp, alevel, fec_type, retries, spectrum)
-	}
-}
 
 /*-------------------------------------------------------------------
  *

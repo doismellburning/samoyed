@@ -101,13 +101,17 @@ const PROCESS_AFTER_BITS = 3
 
 var process_age [MAX_RADIO_CHANS]int
 
-// A ReceiveSink is where what the demodulators hear ends up: the data carrier
-// detect state they derive from the incoming signal.
+// A ReceiveSink is where what the demodulators hear ends up: the frames they
+// decode, and the data carrier detect state they derive from the incoming
+// signal.
 //
 // radioSink is the sink for a radio channel being listened to for real.
 // samoyed-atest, which decodes a .WAV file to report on what is in it rather
 // than to act on it, has its own.
 type ReceiveSink interface {
+	// RecFrame hands over a frame that has been decoded successfully.
+	RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string)
+
 	// DCDChange reports that the decoders for a channel have collectively
 	// started (state 1) or stopped (state 0) seeing data.
 	DCDChange(channel int, state int)
@@ -116,9 +120,19 @@ type ReceiveSink interface {
 // radioSink is the ReceiveSink for a channel with a radio on the end of it.
 type radioSink struct{}
 
+func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+	dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+}
+
 func (s *radioSink) DCDChange(channel int, state int) {
 	ptt_set(OCTYPE_DCD, channel, state)
 }
+
+// receiveSink is where this file sends the frames it decodes.  multi_modem_init
+// sets it, the same way it saves the audio configuration, because a frame
+// arrives by way of several files' worth of decoding that have no reason to
+// carry it along.
+var receiveSink ReceiveSink
 
 /*------------------------------------------------------------------------------
  *
@@ -142,6 +156,7 @@ func multi_modem_init(pa *audio_s, sink ReceiveSink) {
 	 * Save audio configuration for later use.
 	 */
 	save_audio_config_p = pa
+	receiveSink = sink
 
 	demod_init(save_audio_config_p)
 	hdlcReceiver = NewHDLCReceiver(save_audio_config_p, sink)
@@ -352,7 +367,7 @@ func multi_modem_process_rec_packet_real(channel int, subchan int, slice int, pp
 
 		if !drop_it {
 			recordRadioFrame(channel, fec_type, retries)
-			dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
+			receiveSink.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, "")
 		}
 
 		return
@@ -564,7 +579,7 @@ func pick_best_candidate(channel int) {
 	} else {
 		Assert(candidate[channel][j][k].packet_p != nil)
 		recordRadioFrame(channel, candidate[channel][j][k].fec_type, candidate[channel][j][k].retries)
-		dlq_rec_frame(channel, j, k,
+		receiveSink.RecFrame(channel, j, k,
 			candidate[channel][j][k].packet_p,
 			candidate[channel][j][k].alevel,
 			candidate[channel][j][k].fec_type,
