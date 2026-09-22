@@ -49,7 +49,14 @@ func modemResultOf(a *achan_param_s) modemResult {
 func direwolfModemOptions(t *testing.T, args ...string) (modemResult, error) {
 	t.Helper()
 
-	var audio, _ = configFromString(t, "")
+	return direwolfModemOptionsOver(t, "", args...)
+}
+
+// direwolfModemOptionsOver applies args over the modem the configuration file config gives.
+func direwolfModemOptionsOver(t *testing.T, config string, args ...string) (modemResult, error) {
+	t.Helper()
+
+	var audio, _ = configFromString(t, config)
 	var fs = pflag.NewFlagSet("direwolf", pflag.ContinueOnError)
 	var f = addDirewolfModemFlags(fs)
 	var parseErr = fs.Parse(args)
@@ -511,6 +518,41 @@ func TestConfigModem(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.line, func(t *testing.T) {
 			assert.Equal(t, tt.want, configModem(t, tt.line).String())
+		})
+	}
+}
+
+// TestDirewolfModemOptionsOverConfig checks what direwolf's options leave
+// of a modem the configuration file set up.
+func TestDirewolfModemOptionsOverConfig(t *testing.T) {
+	var tests = []struct {
+		config string
+		args   []string
+		want   string
+	}{
+		// A demodulator profile belongs to the modem it was chosen for, so
+		// one that picks another modem starts afresh.
+		{"MODEM 1200 E+\n", []string{}, "1200 AFSK 1200/2200 profiles=\"E+\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "300"}, "300 AFSK 1600/1800 profiles=\"E+\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "2400"}, "2400 QPSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "4800"}, "4800 8PSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "9600"}, "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "AIS"}, "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "EAS"}, "521 EAS 2083/1563 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-g"}, "1200 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-k"}, "1200 BPSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-j"}, "2400 QPSK 0/0 profiles=\"\" v26=A D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-J"}, "2400 QPSK 0/0 profiles=\"\" v26=B D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 2400 PQRS\n", []string{"-B", "1200"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 4800 TUVW\n", []string{"-B", "300"}, "300 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM EAS\n", []string{"-B", "1200"}, "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 1200 E+\n", []string{"-B", "9600", "-P", "+"}, "9600 SCRAMBLE 0/0 profiles=\"+\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+	}
+
+	for _, tt := range tests {
+		t.Run(strings.TrimSpace(tt.config)+" "+strings.Join(tt.args, " "), func(t *testing.T) {
+			var r, err = direwolfModemOptionsOver(t, tt.config, tt.args...)
+			assert.Equal(t, tt.want, describe(r, err))
 		})
 	}
 }

@@ -1254,6 +1254,12 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
 		/* that need to be kept in sync.  Maybe it could be a common function someday. */
 
+		// The profile belongs to the modem it was chosen for.  AFSK keeps
+		// an AFSK one, and every other modem starts afresh.
+		if achan.baud < 1800 && achan.modem_type != MODEM_AFSK {
+			achan.profiles = ""
+		}
+
 		if achan.baud < 600 {
 			achan.modem_type = MODEM_AFSK
 			achan.mark_freq = 1600 // Typical for HF SSB.
@@ -1265,16 +1271,18 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		} else if achan.baud < 3600 {
 			achan.modem_type = MODEM_QPSK
 			achan.mark_freq = 0
-
 			achan.space_freq = 0
+			achan.profiles = ""
+
 			if achan.baud != 2400 {
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", achan.baud)
 			}
 		} else if achan.baud < 7200 {
 			achan.modem_type = MODEM_8PSK
 			achan.mark_freq = 0
-
 			achan.space_freq = 0
+			achan.profiles = ""
+
 			if achan.baud != 4800 {
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", achan.baud)
 			}
@@ -1283,6 +1291,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 			achan.baud = 9600
 			achan.mark_freq = 0
 			achan.space_freq = 0
+			achan.profiles = ""
 		} else if achan.baud == 0xEA5EA5 {
 			achan.modem_type = MODEM_EAS
 			achan.baud = 521 // Actually 520.83 but we have an integer field here.
@@ -1294,6 +1303,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 			achan.modem_type = MODEM_SCRAMBLE
 			achan.mark_freq = 0
 			achan.space_freq = 0
+			achan.profiles = ""
 		}
 
 		if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
@@ -1307,6 +1317,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.modem_type = MODEM_SCRAMBLE
 		achan.mark_freq = 0
 		achan.space_freq = 0
+		achan.profiles = ""
 	}
 
 	if *f.bpsk {
@@ -1315,6 +1326,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.modem_type = MODEM_BPSK
 		achan.mark_freq = 0
 		achan.space_freq = 0
+		achan.profiles = ""
 	}
 
 	if *f.direwolf15compat {
@@ -1325,6 +1337,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.mark_freq = 0
 		achan.space_freq = 0
 		achan.baud = 2400
+		achan.profiles = ""
 	}
 
 	if *f.mfj2400compat {
@@ -1335,6 +1348,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.mark_freq = 0
 		achan.space_freq = 0
 		achan.baud = 2400
+		achan.profiles = ""
 	}
 
 	if *f.profile != "" {
