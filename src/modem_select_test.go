@@ -288,9 +288,17 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-B", "ais"},
 			want: map[string]string{
-				"direwolf":    "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): ais",
-				"atest":       "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): ais",
-				"gen_packets": "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): ais",
+				"direwolf":    "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
+				"atest":       "9600 AIS 0/0 profiles=\" \" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"gen_packets": "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+			},
+		},
+		{
+			args: []string{"-B", "eas"},
+			want: map[string]string{
+				"direwolf":    "521 EAS 2083/1563 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
+				"atest":       "521 EAS 2083/1563 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"gen_packets": "521 EAS 2083/1563 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
 		},
 		{

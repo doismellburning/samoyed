@@ -795,9 +795,9 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 
 	// Hacks for the magic strings
 	var bitrate, bitrateParseErr = strconv.Atoi(*f.bitrate)
-	if *f.bitrate == "AIS" {
+	if strings.EqualFold(*f.bitrate, "AIS") {
 		bitrate = 0xA15A15
-	} else if *f.bitrate == "EAS" {
+	} else if strings.EqualFold(*f.bitrate, "EAS") {
 		bitrate = 0xEA5EA5
 	} else if bitrateParseErr != nil {
 		return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", *f.bitrate)
