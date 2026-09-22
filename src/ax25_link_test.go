@@ -36,7 +36,7 @@ func TestNegotiationResponseFillsInDefaults(t *testing.T) {
 	setupTestEnv(t)
 
 	// Distinct from the 3000 mSec default so the two branches can be told apart.
-	g_misc_config_p.frack = 5
+	ax25Link.miscConfig.frack = 5
 
 	var S = newNegotiationTestLink()
 
@@ -75,7 +75,7 @@ func TestNegotiationResponseBoundsWhatTheOtherStationAsksFor(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			setupTestEnv(t)
 
-			g_misc_config_p.frack = 5
+			ax25Link.miscConfig.frack = 5
 
 			var S = newNegotiationTestLink()
 
@@ -159,7 +159,7 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 		CHANNEL    = 1
 	)
 
-	setupTestEnv(t) // Leaves reg_callsign_list empty, so nothing is registered.
+	setupTestEnv(t) // Leaves ax25Link.regCallsignList empty, so nothing is registered.
 
 	var hook = test.NewGlobal()
 
@@ -180,7 +180,7 @@ func TestIgnoredConnectRequestIsLogged(t *testing.T) {
 
 	receiveFrame(t, pp, CHANNEL)
 
-	assert.Nil(t, list_head, "an unregistered callsign gets no link state machine")
+	assert.Nil(t, ax25Link.listHead, "an unregistered callsign gets no link state machine")
 
 	var entry = hook.LastEntry()
 
@@ -245,12 +245,12 @@ func TestDataRequestForALinkThatWasNeverConnected(t *testing.T) {
 
 	runWithTimeout(t, "dl_data_request", func() { dl_data_request(E) })
 
-	require.NotNil(t, list_head, "the request should have made a link")
-	assert.Equal(t, g_misc_config_p.paclen, list_head.n1_paclen,
+	require.NotNil(t, ax25Link.listHead, "the request should have made a link")
+	assert.Equal(t, ax25Link.miscConfig.paclen, ax25Link.listHead.n1_paclen,
 		"a new link should start out able to carry what this station is configured for")
-	assert.Equal(t, g_misc_config_p.maxframe_basic, list_head.k_maxframe)
-	assert.Equal(t, g_misc_config_p.retry, list_head.n2_retry)
-	assert.Equal(t, modulo_8, list_head.modulo)
+	assert.Equal(t, ax25Link.miscConfig.maxframe_basic, ax25Link.listHead.k_maxframe)
+	assert.Equal(t, ax25Link.miscConfig.retry, ax25Link.listHead.n2_retry)
+	assert.Equal(t, modulo_8, ax25Link.listHead.modulo)
 }
 
 // A link can end up with a maximum information field that nothing will fit

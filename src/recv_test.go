@@ -312,8 +312,8 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 
 	kissNetSvc = NewKissNetService(t.Context(), miscConfig)
 
-	list_head = nil
-	reg_callsign_list = nil
+	ax25Link.listHead = nil
+	ax25Link.regCallsignList = nil
 
 	dataLinkQueue.Init()
 
@@ -321,8 +321,8 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	// retrying its connection, or the frames it queued, would turn up
 	// there.  This runs last, once recv_process has stopped.
 	t.Cleanup(func() {
-		list_head = nil
-		reg_callsign_list = nil
+		ax25Link.listHead = nil
+		ax25Link.regCallsignList = nil
 
 		for c := range MAX_RADIO_CHANS {
 			for p := range TQ_NUM_PRIO {

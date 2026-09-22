@@ -153,8 +153,8 @@ func setupTestEnv(t *testing.T) {
 
 	ax25_link_init(miscConfig, 1)
 
-	list_head = nil
-	reg_callsign_list = nil // Clear registered callsigns
+	ax25Link.listHead = nil
+	ax25Link.regCallsignList = nil // Clear registered callsigns
 }
 
 // Helper to set up environment with v2.2 support enabled
@@ -176,8 +176,8 @@ func setupTestEnvV22(t *testing.T) {
 
 	ax25_link_init(miscConfig, 1)
 
-	list_head = nil
-	reg_callsign_list = nil // Clear registered callsigns
+	ax25Link.listHead = nil
+	ax25Link.regCallsignList = nil // Clear registered callsigns
 }
 
 // Helper to initiate a connect request
@@ -220,10 +220,10 @@ func establishConnection(t *testing.T, myCall, theirCall string, channel int) *a
 
 	receiveFrame(t, pp, channel)
 
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_3_connected, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
 
-	return list_head
+	return ax25Link.listHead
 }
 
 // ============================================================================
@@ -269,14 +269,14 @@ func TestAX25LinkConnectedBasic(t *testing.T) {
 	lm_data_indication(E)
 
 	// And now we should be connected!
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_3_connected, list_head.state, "%+v", list_head)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_3_connected, ax25Link.listHead.state, "%+v", ax25Link.listHead)
 
 	// Verify state variables initialized
-	assert.Equal(t, 0, list_head.vs, "V(S) should be 0")
-	assert.Equal(t, 0, list_head.vr, "V(R) should be 0")
-	assert.Equal(t, 0, list_head.va, "V(A) should be 0")
-	assert.Equal(t, ax25_modulo_t(8), list_head.modulo, "Should be modulo 8")
+	assert.Equal(t, 0, ax25Link.listHead.vs, "V(S) should be 0")
+	assert.Equal(t, 0, ax25Link.listHead.vr, "V(R) should be 0")
+	assert.Equal(t, 0, ax25Link.listHead.va, "V(A) should be 0")
+	assert.Equal(t, ax25_modulo_t(8), ax25Link.listHead.modulo, "Should be modulo 8")
 }
 
 // SABME/UA Exchange (Modulo 128)
@@ -293,8 +293,8 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
 	// Should be in awaiting v2.2 connection state
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_5_awaiting_v22_connection, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
 
 	// Receive UA response (accepting v2.2)
 	var addrs [AX25_MAX_ADDRS]string
@@ -306,8 +306,8 @@ func TestAX25LinkSABMEConnection(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should now be connected with modulo 128
-	assert.Equal(t, state_3_connected, list_head.state)
-	assert.Equal(t, ax25_modulo_t(128), list_head.modulo, "Should be modulo 128 for v2.2")
+	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
+	assert.Equal(t, ax25_modulo_t(128), ax25Link.listHead.modulo, "Should be modulo 128 for v2.2")
 }
 
 // Connection Rejected with DM
@@ -332,8 +332,8 @@ func TestAX25LinkConnectionRejectedWithDM(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should return to disconnected state
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_0_disconnected, list_head.state, "Should be disconnected after DM")
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_0_disconnected, ax25Link.listHead.state, "Should be disconnected after DM")
 }
 
 // Normal DISC/UA Exchange
@@ -405,7 +405,7 @@ func TestAX25LinkDISCInDisconnectedState(t *testing.T) {
 
 	// Should respond with DM and remain disconnected (no state machine created)
 	// The frame processing should not crash
-	// list_head should still be nil as no connection was established
+	// ax25Link.listHead should still be nil as no connection was established
 }
 
 // ============================================================================
@@ -560,13 +560,13 @@ func TestAX25LinkIncomingSABM(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Should now be connected
-	if assert.NotNil(t, list_head, "Should have created state machine for incoming connection") {
-		assert.Equal(t, state_3_connected, list_head.state)
+	if assert.NotNil(t, ax25Link.listHead, "Should have created state machine for incoming connection") {
+		assert.Equal(t, state_3_connected, ax25Link.listHead.state)
 
 		// Verify state variables initialized
-		assert.Equal(t, 0, list_head.vs, "V(S) should be 0")
-		assert.Equal(t, 0, list_head.vr, "V(R) should be 0")
-		assert.Equal(t, 0, list_head.va, "V(A) should be 0")
+		assert.Equal(t, 0, ax25Link.listHead.vs, "V(S) should be 0")
+		assert.Equal(t, 0, ax25Link.listHead.vr, "V(R) should be 0")
+		assert.Equal(t, 0, ax25Link.listHead.va, "V(A) should be 0")
 	}
 }
 
@@ -816,8 +816,8 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	// Initiate connection (sends SABM, enters awaiting connection)
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_1_awaiting_connection, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 
 	// Receive SABM from peer (collision)
 	// Per the protocol, we send UA but stay in state 1 waiting for peer's UA
@@ -828,7 +828,7 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Still in state 1 - we sent UA but still waiting for their UA
-	assert.Equal(t, state_1_awaiting_connection, list_head.state)
+	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 
 	// Now receive the UA from peer (completing the collision resolution)
 	addrs[OWNCALL] = THEIR_CALL
@@ -837,7 +837,7 @@ func TestAX25LinkSABMCollision(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Now should be connected
-	assert.Equal(t, state_3_connected, list_head.state)
+	assert.Equal(t, state_3_connected, ax25Link.listHead.state)
 }
 
 // Timer recovery state entry on receiving poll
@@ -890,7 +890,7 @@ func TestAX25LinkSREJFrame(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var S = list_head
+	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
 	assert.Equal(t, ax25_modulo_t(128), S.modulo)
 
@@ -967,7 +967,7 @@ func TestAX25LinkWindowSizeMod128(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var S = list_head
+	var S = ax25Link.listHead
 	assert.Equal(t, ax25_modulo_t(128), S.modulo)
 
 	// Default k=32 for modulo 128
@@ -1001,8 +1001,8 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 	// Initiate v2.2 connection
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_5_awaiting_v22_connection, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
 
 	// Receive FRMR (peer doesn't understand SABME)
 	var addrs [AX25_MAX_ADDRS]string
@@ -1015,8 +1015,8 @@ func TestAX25LinkFRMRResponse(t *testing.T) {
 
 	// Should fall back to v2.0 and retry with SABM
 	// State should be awaiting connection (v2.0)
-	assert.Equal(t, state_1_awaiting_connection, list_head.state)
-	assert.Equal(t, ax25_modulo_t(8), list_head.modulo, "Should fall back to modulo 8")
+	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
+	assert.Equal(t, ax25_modulo_t(8), ax25Link.listHead.modulo, "Should fall back to modulo 8")
 }
 
 // ============================================================================
@@ -1253,8 +1253,8 @@ func TestAX25LinkSABMDISCCollision(t *testing.T) {
 	// Initiate connection
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
 
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_1_awaiting_connection, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 
 	// Receive DISC while awaiting connection
 	var addrs [AX25_MAX_ADDRS]string
@@ -1264,7 +1264,7 @@ func TestAX25LinkSABMDISCCollision(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Protocol sends DM but stays in awaiting connection state
-	assert.Equal(t, state_1_awaiting_connection, list_head.state)
+	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 }
 
 // Unexpected UA in connected state triggers link reset
@@ -1386,7 +1386,7 @@ func TestAX25LinkXIDFrameConnected(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var S = list_head
+	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
 
 	// Receive XID command
@@ -1533,7 +1533,7 @@ func TestAX25LinkModulo128WrapAround(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var S = list_head
+	var S = ax25Link.listHead
 	assert.Equal(t, ax25_modulo_t(128), S.modulo)
 
 	// Test sequence wrap from 127 to 0
@@ -1623,8 +1623,8 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 
 	// Establish a v2.2 (modulo 128) connection via SABME/UA exchange.
 	initiateConnect(t, MY_CALL, THEIR_CALL, CHANNEL)
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_5_awaiting_v22_connection, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_5_awaiting_v22_connection, ax25Link.listHead.state)
 
 	var addrs [AX25_MAX_ADDRS]string
 	addrs[OWNCALL] = THEIR_CALL
@@ -1632,7 +1632,7 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var S = list_head
+	var S = ax25Link.listHead
 	assert.Equal(t, state_3_connected, S.state)
 	assert.Equal(t, ax25_modulo_t(128), S.modulo)
 
@@ -1701,7 +1701,7 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var link1 = list_head
+	var link1 = ax25Link.listHead
 	assert.NotNil(t, link1)
 	assert.Equal(t, state_3_connected, link1.state)
 
@@ -1714,9 +1714,9 @@ func TestAX25LinkMultipleConcurrentLinks(t *testing.T) {
 	receiveFrame(t, pp, CHANNEL)
 
 	// Both links should exist
-	assert.NotNil(t, list_head)
+	assert.NotNil(t, ax25Link.listHead)
 	// The new link is at the head
-	var link2 = list_head
+	var link2 = ax25Link.listHead
 	assert.Equal(t, state_3_connected, link2.state)
 
 	// Original link should still be connected
@@ -1742,7 +1742,7 @@ func TestAX25LinkIsolation(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var link1 = list_head
+	var link1 = ax25Link.listHead
 
 	// Establish second connection
 	initiateConnect(t, "STA1", "STA3", CHANNEL)
@@ -1752,7 +1752,7 @@ func TestAX25LinkIsolation(t *testing.T) {
 	pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var link2 = list_head
+	var link2 = ax25Link.listHead
 
 	// Modify state on link2
 	link2.vs = 5
@@ -2050,7 +2050,7 @@ func TestAX25LinkSetVersion22(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_res, frame_type_U_UA, 1, 0, nil)
 	receiveFrame(t, pp, CHANNEL)
 
-	var S = list_head
+	var S = ax25Link.listHead
 
 	// Should be v2.2
 	assert.Equal(t, srej_single, S.srej_enable)
@@ -2080,8 +2080,8 @@ func TestAX25LinkConnectRequestTypes(t *testing.T) {
 
 	dl_connect_request(E)
 
-	assert.NotNil(t, list_head)
-	assert.Equal(t, state_1_awaiting_connection, list_head.state)
+	assert.NotNil(t, ax25Link.listHead)
+	assert.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 }
 
 // Disconnect request handling
