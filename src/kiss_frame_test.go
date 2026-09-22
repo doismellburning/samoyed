@@ -184,6 +184,32 @@ func Test_kiss_process_msg_port_channel_overrides_the_frame(t *testing.T) {
 	assert.Equal(t, 0, tq_count(0, TQ_PRIO_1_LO, "", "", false))
 }
 
+// A KISS TCP port's channel comes from the configuration rather than a
+// nibble, so nothing bounds it to the channel table.  The validity check used
+// to go on to ask whether an out-of-range channel was the IGate's - indexing
+// the table with the very channel it had just found to be out of range.
+func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
+	setupKissProcessMsg(t)
+
+	var _, sendfun = recordingSendfun()
+
+	var kps = new(kissport_status_s)
+	kps.channel = MAX_TOTAL_CHANS
+
+	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	var output string
+
+	assert.NotPanics(t, func() {
+		output = CaptureOutput(t, func() {
+			kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, kps, 0, sendfun)
+		})
+	})
+
+	assert.Contains(t, output, "Invalid transmit channel 16 from KISS client app")
+}
+
 // Bytes that are not an AX.25 frame cannot be transmitted, and are reported
 // rather than passed on.
 func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
