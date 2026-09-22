@@ -61,6 +61,7 @@ package direwolf
 import (
 	"context"
 	"os"
+	"sync"
 
 	"github.com/creack/pty"
 	"github.com/sirupsen/logrus"
@@ -76,6 +77,17 @@ var kisspt_kf *KISSFrame
 /*
  * These are for a Linux pseudo terminal.
  */
+
+// pt_master_mu guards pt_master, which kisspt_listen_thread (reading, and
+// giving the terminal up on a read error or on the way out) and
+// kisspt_send_rec_packet (writing from the receive path) share.  Once the
+// listening goroutine is running, go through ptMaster and closeKissPT rather
+// than touching pt_master directly.
+//
+// The lock covers the variable, not the I/O: pt_master is in the runtime
+// poller, so a write racing a Close gets os.ErrClosed rather than a
+// descriptor that has since been reused.
+var pt_master_mu sync.Mutex
 
 var pt_master *os.File /* File descriptor for my end. */
 var pt_slave *os.File  /* Pseudo terminal slave */
@@ -126,7 +138,7 @@ func kisspt_init(ctx context.Context, mc *misc_config_s) {
 		}
 	}
 
-	logrus.WithField("pt_master_open", pt_master != nil).Debug("end of kisspt_init")
+	logrus.WithField("pt_master_open", ptMaster() != nil).Debug("end of kisspt_init")
 }
 
 // pollable hands back a *os.File for the same open file as f, in non-blocking
@@ -298,7 +310,8 @@ func kisspt_open_pt() {
  *--------------------------------------------------------------------*/
 
 func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kps *kissport_status_s, client int) {
-	if pt_master == nil {
+	var master = ptMaster()
+	if master == nil {
 		return
 	}
 
@@ -340,12 +353,12 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
 		}
 	}
 
-	var n, err = pt_master.Write(kiss_buff)
+	var n, err = master.Write(kiss_buff)
 
 	if n != len(kiss_buff) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			pt_master.Name(), len(kiss_buff), n, err)
+			master.Name(), len(kiss_buff), n, err)
 	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
@@ -428,8 +441,13 @@ func kisspt_get(ctx context.Context) (byte, error) {
 
 		// TODO KG Check rc == -1
 		*/
+		var master = ptMaster()
+		if master == nil {
+			return 0, os.ErrClosed
+		}
+
 		var ch = make([]byte, 1)
-		var n, err = pt_master.Read(ch)
+		var n, err = master.Read(ch)
 
 		if ctx.Err() != nil {
 			closeKissPT() // Ours to close: nothing will read from it again.
@@ -444,11 +462,7 @@ func kisspt_get(ctx context.Context) (byte, error) {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", pt_slave.Name(), err)
 
-			pt_master.Close()
-
-			pt_master = nil
-
-			os.Remove(TMP_KISSTNC_SYMLINK)
+			closeKissPTIfCurrent(master)
 
 			return 0, err
 		}
@@ -473,7 +487,17 @@ func kisspt_get(ctx context.Context) (byte, error) {
 // closeKissPT closes the pseudo terminal, if it is open, and forgets it,
 // along with the symlink that points at its far end.
 func closeKissPT() {
-	if pt_master == nil {
+	closeKissPTIfCurrent(ptMaster())
+}
+
+// closeKissPTIfCurrent is closeKissPT, but only if master is still the open
+// pseudo terminal, so that giving up one we read an error from cannot close
+// anything that has taken its place.
+func closeKissPTIfCurrent(master *os.File) {
+	pt_master_mu.Lock()
+	defer pt_master_mu.Unlock()
+
+	if master == nil || pt_master != master {
 		return
 	}
 
@@ -484,6 +508,14 @@ func closeKissPT() {
 	os.Remove(TMP_KISSTNC_SYMLINK)
 }
 
+// ptMaster returns our end of the pseudo terminal, or nil if it is not open.
+func ptMaster() *os.File {
+	pt_master_mu.Lock()
+	defer pt_master_mu.Unlock()
+
+	return pt_master
+}
+
 func kisspt_listen_thread(ctx context.Context) {
 	logrus.Debug("kisspt_listen_thread")
 
@@ -492,7 +524,7 @@ func kisspt_listen_thread(ctx context.Context) {
 	// otherwise never return.  Armed once here rather than around each read:
 	// this goroutine reads one byte at a time, and the pseudo terminal is
 	// never reopened underneath it.
-	defer closeOnDone(ctx, pt_master)()
+	defer closeOnDone(ctx, ptMaster())()
 
 	// Nothing else tears the pseudo terminal down - cleanup has no teardown
 	// for it - so it is ours to close whenever we stop, including when a
