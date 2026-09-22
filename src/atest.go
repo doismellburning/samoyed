@@ -81,16 +81,12 @@ type atest_wav_data_t struct {
 	Datasize int32
 }
 
-var ATEST_C = false
-
 var header atest_header_t
 var chunk atest_chunk_t
 var format atest_format_t
 var wav_data atest_wav_data_t
 
 var atestFP *os.File
-var atestBuf *bufio.Reader
-var e_o_f bool
 
 var my_audio_config *audio_s
 
@@ -132,8 +128,6 @@ func atestFixBits(n int) (BitFixLevel, bool, bool) {
 }
 
 func AtestMain() {
-	ATEST_C = true
-
 	var count [MAX_SUBCHANS]int // Experiments G and H
 
 	// One sink for the whole run, so its DCD counts are of everything
@@ -634,14 +628,14 @@ o = DCD output control
 
 		sink.packetsDecoded = 0
 
-		atestBuf = bufio.NewReader(atestFP)
+		var src = newReaderSampleSource(atestFP, wav_data.Datasize)
 
-		e_o_f = false
+		var e_o_f = false
 		for !e_o_f {
 			for c := range my_audio_config.adev[0].num_channels {
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
-				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
+				var audio_sample = demod_get_sample(ACHAN2ADEV(c), src)
 
 				if audio_sample >= 256*256 {
 					e_o_f = true
@@ -710,46 +704,46 @@ o = DCD output control
 		fmt.Printf("\n * * * TEST FAILED: number decoded is greater than %d * * * \n", *errorIfGreaterThan)
 		os.Exit(1)
 	}
-
-	// Put the real audio input back.  For the command this changes nothing,
-	// as the process is about to end anyway, but the tests all run in one
-	// process: anything after a test that calls this would otherwise read
-	// its audio samples from a WAV file that has been closed.
-	ATEST_C = false
 }
 
 /*
- * Simulate sample from the audio device.
+ * Sample data from a .WAV file, in place of the audio device.
  */
 
-func audio_get_fake(_ int) int {
-	if wav_data.Datasize <= 0 {
-		e_o_f = true
+// readerSampleSource hands out up to nbytes of sample data read from r - for
+// atest, the "data" chunk of an open .WAV file.  A file shorter than its header
+// claims therefore ends at whichever of the two comes first.
+type readerSampleSource struct {
+	r         *bufio.Reader
+	remaining int32
+}
 
+func newReaderSampleSource(r io.Reader, nbytes int32) *readerSampleSource {
+	var s = new(readerSampleSource)
+	s.r = bufio.NewReader(r)
+	s.remaining = nbytes
+
+	return s
+}
+
+func (s *readerSampleSource) GetByte(_ int) int {
+	if s.remaining <= 0 {
 		return (-1)
 	}
 
-	var data, err = atestBuf.ReadByte()
-	wav_data.Datasize--
+	var data, err = s.r.ReadByte()
+	s.remaining--
 
 	if errors.Is(err, io.EOF) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected end of file.\n")
 
-		e_o_f = true
+		return (-1)
 	}
 
 	// TODO KG Better error handling
 
 	return int(data)
-}
-
-func audio_get(a int) int {
-	if ATEST_C {
-		return audio_get_fake(a)
-	} else {
-		return audio_get_real(a)
-	}
 }
 
 /*

@@ -49,11 +49,6 @@ func Test_atest_basic_1(t *testing.T) {
 
 	os.Stdout = oldStdout
 
-	// Decoding switches audio input, received frames, PTT and input lines
-	// to fakes.  The tests all run in one process, so anything left
-	// switched on here is switched on for everything that follows.
-	assert.False(t, ATEST_C, "the atest fakes should not be left in place")
-
 	var outputBytes, _ = io.ReadAll(r)
 
 	var outputString = string(outputBytes)
@@ -147,8 +142,6 @@ func Test_atest_extraChunks(t *testing.T) {
 	w.Close()
 
 	os.Stdout = oldStdout
-
-	assert.False(t, ATEST_C, "the atest fakes should not be left in place")
 
 	var outputBytes, _ = io.ReadAll(r)
 
