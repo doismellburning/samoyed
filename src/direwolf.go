@@ -1296,6 +1296,10 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 			achan.mark_freq = 0
 			achan.space_freq = 0
 		}
+
+		if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
+			return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
+		}
 	}
 
 	if *f.g3ruh {

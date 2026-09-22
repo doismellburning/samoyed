@@ -297,7 +297,7 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-B", "50"},
 			want: map[string]string{
-				"direwolf":    "50 AFSK 1600/1800 profiles=\"\" v26=- D=3 U=0 AX25 fx25=0 fec=1 inv=0",
+				"direwolf":    "error: use a more reasonable bit rate in range of 100 - 40000",
 				"atest":       "error: use a more reasonable bit rate in range of 100 - 40000",
 				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
 			},
@@ -305,7 +305,7 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-B", "50000"},
 			want: map[string]string{
-				"direwolf":    "50000 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
+				"direwolf":    "error: use a more reasonable bit rate in range of 100 - 40000",
 				"atest":       "error: use a more reasonable bit rate in range of 100 - 40000",
 				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
 			},
