@@ -802,8 +802,11 @@ func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client
 
 		/* Verify that the radio channel number is valid. */
 		/* Any sort of medium should be OK here. */
+		// Dire Wolf also excused MEDIUM_IGATE here, which could only ever
+		// matter for an out-of-range channel - and indexed chan_medium with
+		// it to find out.  An in-range IGate channel is not MEDIUM_NONE.
 
-		if (channel < 0 || channel >= MAX_TOTAL_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE) && save_audio_config_p.chan_medium[channel] != MEDIUM_IGATE {
+		if channel < 0 || channel >= MAX_TOTAL_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Invalid transmit channel %d from KISS client app.\n", channel)
 			dw_printf("\n")

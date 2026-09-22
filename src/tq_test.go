@@ -227,3 +227,23 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	assert.Equal(t, 0, tq_count(CHANNEL, -1, "", "", false),
 		"cancellation should not have invented a packet")
 }
+
+// TestTqAppendOutOfRangeChannel is a regression test for tq_append indexing
+// chan_medium, to see whether the channel belongs to the IGate or a network
+// TNC, before it had checked the channel was in range at all - so the request
+// the bounds check exists to reject panicked before reaching it.
+func TestTqAppendOutOfRangeChannel(t *testing.T) {
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[0] = MEDIUM_RADIO
+
+	tq_init(audioConfig)
+
+	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
+		assert.NotPanics(t, func() {
+			tq_append(channel, TQ_PRIO_1_LO, newTestPacket(t))
+		}, "channel %d", channel)
+	}
+
+	assert.Equal(t, 0, tq_count(0, -1, "", "", false),
+		"an out-of-range request should not have landed on a real channel")
+}

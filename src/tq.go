@@ -227,6 +227,14 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	#endif
 	*/
 
+	// Checked before chan_medium is consulted below: the radio channel check
+	// further down would reject this too, but only after indexing with it.
+	if channel < 0 || channel >= MAX_TOTAL_CHANS {
+		logrus.WithField("channel", channel).Error("Request to transmit on out-of-range channel")
+
+		return
+	}
+
 	// New in 1.7 - A channel can be assigned to the IGate rather than a radio.
 	// New in 1.8: Assign a channel to external network TNC.
 	// Send somewhere else, rather than the transmit queue.
