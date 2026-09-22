@@ -426,7 +426,7 @@ func TestKissNetListenFails(t *testing.T) {
 // deliberately not the transmit queue.
 //
 // A service's listening goroutines outlive the test that started them - there
-// is nothing to wait on - and tq_init writes the queue's globals without
+// is nothing to wait on - and TransmitQueue.Init writes the queue's fields without
 // holding its lock, so a later test initialising the queue would race with
 // anything one of these goroutines had put on it.  Hence the end-to-end tests
 // here exercise commands that are answered rather than transmitted; a client's

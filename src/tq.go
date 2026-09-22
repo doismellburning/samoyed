@@ -5,7 +5,7 @@ package direwolf
  *
  * Purpose:   	Transmit queue - hold packets for transmission until the channel is clear.
  *
- * Description:	Producers of packets to be transmitted call tq_append and then
+ * Description:	Producers of packets to be transmitted call Append and then
  *		go merrily on their way, unconcerned about when the packet might
  *		actually get transmitted.
  *
@@ -31,50 +31,77 @@ const TQ_NUM_PRIO = 2 /* Number of priorities. */
 const TQ_PRIO_0_HI = 0
 const TQ_PRIO_1_LO = 1
 
-var queue_head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
+// TransmitQueue holds the packets waiting for each radio channel's transmit
+// thread, one queue per channel and priority.
+type TransmitQueue struct {
+	mu sync.Mutex /* Critical section for updating queues. */
+	/* Just one for all queues. */
 
-// Number of packets in each queue, maintained alongside queue_head and guarded
-// by the same mutex.  tq_remove pops the head in constant time, so counting the
-// list to publish the depth would make draining a long queue quadratic, under
-// the one mutex every queue operation contends for.
-//
-// This counts what tq_count counts - real packets - so the null frame
-// lm_seize_request queues to wake the transmitter is excluded.  Counting it
-// would report a packet waiting when there is nothing to send, turning
-// ordinary connected-mode acknowledgement into an apparent backlog.
-var queue_len [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+	head [MAX_RADIO_CHANS][TQ_NUM_PRIO]*packet_t /* Head of linked list for each queue. */
+
+	// Number of packets in each queue, maintained alongside head and guarded
+	// by the same mutex.  Remove pops the head in constant time, so counting
+	// the list to publish the depth would make draining a long queue
+	// quadratic, under the one mutex every queue operation contends for.
+	//
+	// This counts what Count counts - real packets - so the null frame
+	// LMSeizeRequest queues to wake the transmitter is excluded.  Counting it
+	// would report a packet waiting when there is nothing to send, turning
+	// ordinary connected-mode acknowledgement into an apparent backlog.
+	length [MAX_RADIO_CHANS][TQ_NUM_PRIO]int
+
+	// wake tells a channel's transmit thread that something was queued.  Each
+	// has capacity one and is sent to without blocking, so it latches: a
+	// wake-up raised while the transmit thread is not yet waiting is still
+	// there when it looks.
+	//
+	// That is what a sync.Cond could not do, and it is why this is not one.  A
+	// Signal delivered while nobody is waiting is simply dropped, so the
+	// enqueue paths had to ask whether the transmit thread was waiting before
+	// signalling - and between that thread deciding to wait and actually
+	// waiting, the answer was no while the truthful answer was "about to be".
+	// The signal was skipped and the queued packet sat there until the next
+	// enqueue happened to raise another one.
+	//
+	// The latch also means a wake-up can arrive when there is nothing to send,
+	// left over from a packet since removed.  WaitWhileEmpty re-checks the
+	// queue rather than trusting the wake-up, so a stale one costs a lap of its
+	// loop and nothing else.
+	//
+	// Made once, in NewTransmitQueue, and never replaced: a transmit thread
+	// selecting on an old channel would never hear a send to its replacement,
+	// and would sit there for good.
+	wake [MAX_RADIO_CHANS]chan struct{}
+
+	audioConfig *audio_s
+}
+
+// transmitQueue is the queue every producer - KISS, AGW, beacon, digipeater,
+// IGate, APRStt, the connected-mode link - hands its packets to, and the
+// transmit threads take them from.  It exists from package initialisation, so
+// it is never nil; Init must still be called before anything is queued.
+var transmitQueue = NewTransmitQueue()
+
+// NewTransmitQueue returns an empty queue, with no audio configuration yet.
+func NewTransmitQueue() *TransmitQueue {
+	var tq = new(TransmitQueue)
+
+	for c := range MAX_RADIO_CHANS {
+		tq.wake[c] = make(chan struct{}, 1)
+	}
+
+	return tq
+}
 
 // tq_is_real_packet reports whether a queue entry is a real packet rather than
-// lm_seize_request's null wake-up frame, matching tq_count_locked's own test.
+// LMSeizeRequest's null wake-up frame, matching countLocked's own test.
 func tq_is_real_packet(pp *packet_t) bool {
 	return ax25_get_num_addr(pp) >= AX25_MIN_ADDRS
 }
 
-var tq_mutex sync.Mutex /* Critical section for updating queues. */
-/* Just one for all queues. */
-
-// wake tells a channel's transmit thread that something was queued.  Each has
-// capacity one and is sent to without blocking, so it latches: a wake-up
-// raised while the transmit thread is not yet waiting is still there when it
-// looks.
-//
-// That is what a sync.Cond could not do, and it is why this is not one.  A
-// Signal delivered while nobody is waiting is simply dropped, so the enqueue
-// paths had to ask whether the transmit thread was waiting before signalling -
-// and between that thread deciding to wait and actually waiting, the answer
-// was no while the truthful answer was "about to be".  The signal was skipped
-// and the queued packet sat there until the next enqueue happened to raise
-// another one.
-//
-// The latch also means a wake-up can arrive when there is nothing to send,
-// left over from a packet since removed.  tq_wait_while_empty re-checks the
-// queue rather than trusting the wake-up, so a stale one costs a lap of its
-// loop and nothing else.
-var wake [MAX_RADIO_CHANS]chan struct{}
-
 /*-------------------------------------------------------------------
  *
- * Name:        tq_init
+ * Name:        Init
  *
  * Purpose:     Initialize the transmit queue.
  *
@@ -106,69 +133,44 @@ var wake [MAX_RADIO_CHANS]chan struct{}
  *
  *--------------------------------------------------------------------*/
 
-// TODO KG static struct audio_s *save_audio_config_p;
-
-func tq_init(audio_config_p *audio_s) {
+func (tq *TransmitQueue) Init(audio_config_p *audio_s) {
 	logrus.Debug("tq_init")
-	save_audio_config_p = audio_config_p
+	tq.audioConfig = audio_config_p
 
 	for c := range MAX_RADIO_CHANS {
 		for p := range TQ_NUM_PRIO {
-			queue_head[c][p] = nil
-			queue_len[c][p] = 0
+			tq.head[c][p] = nil
+			tq.length[c][p] = 0
 
 			metrics.SetTxQueueDepth(c, p, 0)
 		}
 	}
 
-	// Once a channel has a wake-up channel it keeps it, rather than getting a
-	// fresh one on a later init.  A transmit thread selecting on the old one
-	// would never hear a send to its replacement, and would sit there for
-	// good.  Any wake-up left latched from before describes queues we have
-	// just emptied, so drain it: acting on it would only cost the transmit
-	// thread a lap of its loop, but starting from a clean state is easier to
-	// reason about.
+	// Any wake-up left latched from before describes queues we have just
+	// emptied, so drain it: acting on it would only cost the transmit thread
+	// a lap of its loop, but starting from a clean state is easier to reason
+	// about.
 	//
-	// Under tq_mutex, which is what tq_wait_while_empty holds while it reads
-	// the slot, so a transmit thread cannot catch a half-initialised one.
-	tq_mutex.Lock()
+	// Under mu, like the enqueue paths that raise it.
+	tq.mu.Lock()
 
 	for c := range MAX_RADIO_CHANS {
-		if wake[c] == nil {
-			wake[c] = make(chan struct{}, 1)
-		}
-
 		select {
-		case <-wake[c]:
+		case <-tq.wake[c]:
 		default:
 		}
 	}
 
-	tq_mutex.Unlock()
-} /* end tq_init */
-
-// tq_wake_locked tells the channel's transmit thread that something was
-// queued.  The caller holds tq_mutex, and has just put the packet on the list:
-// raising the wake-up under the same lock is what stops it racing the
-// transmit thread's decision about whether to wait.
-//
-// The send does not block.  A wake-up already raised and not yet taken is one
-// the transmit thread has still to act on, and one is as good as two - it
-// re-checks the queue when it wakes, and finds everything queued since.
-func tq_wake_locked(channel int) {
-	select {
-	case wake[channel] <- struct{}{}:
-	default:
-	}
-}
+	tq.mu.Unlock()
+} /* end Init */
 
 /*-------------------------------------------------------------------
  *
- * Name:        tq_append
+ * Name:        Append
  *
  * Purpose:     Add an APRS packet to the end of the specified transmit queue.
  *
- * 		Connected mode is a little different.  Use lm_data_request instead.
+ * 		Connected mode is a little different.  Use LMDataRequest instead.
  *
  * Inputs:	channel	- Channel, 0 is first.
  *
@@ -195,11 +197,11 @@ func tq_wake_locked(channel int) {
  *		Two channels can share one audio output device.
  *
  * IMPORTANT!	Don't make an further references to the packet object after
- *		giving it to tq_append.
+ *		giving it to Append.
  *
  *--------------------------------------------------------------------*/
 
-func tq_append(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) Append(channel int, prio int, pp *packet_t) {
 	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -239,12 +241,12 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	// New in 1.8: Assign a channel to external network TNC.
 	// Send somewhere else, rather than the transmit queue.
 
-	if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE ||
-		save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+	if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE ||
+		tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
 		var ts string // optional time stamp.
 
-		if save_audio_config_p.timestamp_format != "" {
-			var formattedTime, _ = strftime.Format(save_audio_config_p.timestamp_format, time.Now())
+		if tq.audioConfig.timestamp_format != "" {
+			var formattedTime, _ = strftime.Format(tq.audioConfig.timestamp_format, time.Now())
 			ts = " " + formattedTime // space after channel.
 		}
 
@@ -254,7 +256,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 		text_color_set(DW_COLOR_XMIT)
 
-		if save_audio_config_p.chan_medium[channel] == MEDIUM_IGATE {
+		if tq.audioConfig.chan_medium[channel] == MEDIUM_IGATE {
 			dw_printf("[%d>is%s] ", channel, ts)
 			dw_printf("%s", stemp) /* stations followed by : */
 			AX25SafePrint(pinfo, !ax25_is_aprs(pp))
@@ -276,7 +278,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	// Normal case - put in queue for radio transmission.
 	// Error if trying to transmit to a radio channel which was not configured.
 
-	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] == MEDIUM_NONE {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] == MEDIUM_NONE {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on invalid radio channel %d.\n", channel)
 		dw_printf("This is probably a client application error, not a problem with direwolf.\n")
@@ -312,7 +314,7 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	 * Limit was 20.  Changed to 100 in version 1.2 as a workaround.
 	 */
 
-	if ax25_is_aprs(pp) && tq_count(channel, prio, "", "", false) > 100 {
+	if ax25_is_aprs(pp) && tq.Count(channel, prio, "", "", false) > 100 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Transmit packet queue for channel %d is too long.  Discarding packet.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
@@ -322,14 +324,14 @@ func tq_append(channel int, prio int, pp *packet_t) {
 
 	logrus.Trace("tq_append: enter critical section")
 
-	tq_mutex.Lock()
+	tq.mu.Lock()
 
-	if queue_head[channel][prio] == nil {
-		queue_head[channel][prio] = pp
+	if tq.head[channel][prio] == nil {
+		tq.head[channel][prio] = pp
 	} else {
 		var pnext *packet_t
 
-		var plast = queue_head[channel][prio]
+		var plast = tq.head[channel][prio]
 		for {
 			pnext = ax25_get_nextp(plast)
 			if pnext == nil {
@@ -343,25 +345,25 @@ func tq_append(channel int, prio int, pp *packet_t) {
 	}
 
 	if tq_is_real_packet(pp) {
-		queue_len[channel][prio]++
+		tq.length[channel][prio]++
 	}
 
-	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+	metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
 
-	tq_wake_locked(channel)
+	tq.wakeLocked(channel)
 
-	tq_mutex.Unlock()
+	tq.mu.Unlock()
 
 	logrus.Trace("tq_append: left critical section, xmit thread woken")
-} /* end tq_append */
+} /* end Append */
 
 /*-------------------------------------------------------------------
  *
- * Name:        lm_data_request
+ * Name:        LMDataRequest
  *
  * Purpose:     Add an AX.25 frame to the end of the specified transmit queue.
  *
- *		Use tq_append instead for APRS.
+ *		Use Append instead for APRS.
  *
  * Inputs:	channel	- Channel, 0 is first.
  *
@@ -423,13 +425,13 @@ func tq_append(channel int, prio int, pp *packet_t) {
  *		Two channels can share one audio output device.
  *
  * IMPORTANT!	Don't make an further references to the packet object after
- *		giving it to lm_data_request.
+ *		giving it to LMDataRequest.
  *
  *--------------------------------------------------------------------*/
 
-// TODO: FIXME:  this is a copy of tq_append.  Need to fine tune and explain why.
+// TODO: FIXME:  this is a copy of Append.  Need to fine tune and explain why.
 
-func lm_data_request(channel int, prio int, pp *packet_t) {
+func (tq *TransmitQueue) LMDataRequest(channel int, prio int, pp *packet_t) {
 	Assert(prio >= 0 && prio < TQ_NUM_PRIO)
 
 	if pp == nil {
@@ -457,14 +459,14 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	#endif
 	*/
 
-	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+	if channel >= 0 && channel < MAX_TOTAL_CHANS && tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
 		// For NETTNC channels, just yeet out the packet and let the external TNC handle it - we don't have enough info to do much else
-		tq_append(channel, prio, pp)
+		tq.Append(channel, prio, pp)
 
 		return
 	}
 
-	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
 		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
@@ -476,7 +478,7 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	 * Is transmit queue out of control?
 	 */
 
-	if tq_count(channel, prio, "", "", false) > 250 {
+	if tq.Count(channel, prio, "", "", false) > 250 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Warning: Transmit packet queue for channel %d is extremely long.\n", channel)
 		dw_printf("Perhaps the channel is so busy there is no opportunity to send.\n")
@@ -484,12 +486,12 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	logrus.Trace("lm_data_request: enter critical section")
 
-	tq_mutex.Lock()
+	tq.mu.Lock()
 
-	if queue_head[channel][prio] == nil {
-		queue_head[channel][prio] = pp
+	if tq.head[channel][prio] == nil {
+		tq.head[channel][prio] = pp
 	} else {
-		var plast = queue_head[channel][prio]
+		var plast = tq.head[channel][prio]
 		for {
 			var pnext = ax25_get_nextp(plast)
 			if pnext == nil {
@@ -503,10 +505,10 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 	}
 
 	if tq_is_real_packet(pp) {
-		queue_len[channel][prio]++
+		tq.length[channel][prio]++
 	}
 
-	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+	metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
 
 	// Appendix C2a, from the Ax.25 protocol spec, says that a priority frame
 	// will start transmission.  If not already transmitting, normal frames
@@ -517,17 +519,17 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
 
 	//NO!	if (prio == TQ_PRIO_0_HI) {
 
-	tq_wake_locked(channel)
+	tq.wakeLocked(channel)
 	//NO!	}
 
-	tq_mutex.Unlock()
+	tq.mu.Unlock()
 
 	logrus.Trace("lm_data_request: left critical section, xmit thread woken")
-} /* end lm_data_request */
+} /* end LMDataRequest */
 
 /*-------------------------------------------------------------------
  *
- * Name:        lm_seize_request
+ * Name:        LMSeizeRequest
  *
  * Purpose:     Force start of transmit even if transmit queue is empty.
  *
@@ -578,20 +580,20 @@ func lm_data_request(channel int, prio int, pp *packet_t) {
  *
  *--------------------------------------------------------------------*/
 
-func lm_seize_request(channel int) {
+func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	var prio = TQ_PRIO_1_LO
 
 	logrus.WithField("channel", channel).Debug("lm_seize_request")
 
-	if channel >= 0 && channel < MAX_TOTAL_CHANS && save_audio_config_p.chan_medium[channel] == MEDIUM_NETTNC {
+	if channel >= 0 && channel < MAX_TOTAL_CHANS && tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
 		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
-		// See lm_data_request for the rationale for allowing MEDIUM_NETTNC.
+		// See LMDataRequest for the rationale for allowing MEDIUM_NETTNC.
 		dlq_seize_confirm(channel)
 
 		return
 	}
 
-	if channel < 0 || channel >= MAX_RADIO_CHANS || save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
+	if channel < 0 || channel >= MAX_RADIO_CHANS || tq.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("ERROR - Request to transmit on unsupported channel %d.\n", channel)
 		dw_printf("Connected packet mode requires MEDIUM_RADIO or MEDIUM_NETTNC.\n")
@@ -613,12 +615,12 @@ func lm_seize_request(channel int) {
 
 	logrus.Trace("lm_seize_request: enter critical section")
 
-	tq_mutex.Lock()
+	tq.mu.Lock()
 
-	if queue_head[channel][prio] == nil {
-		queue_head[channel][prio] = pp
+	if tq.head[channel][prio] == nil {
+		tq.head[channel][prio] = pp
 	} else {
-		var plast = queue_head[channel][prio]
+		var plast = tq.head[channel][prio]
 		for {
 			var pnext = ax25_get_nextp(plast)
 			if pnext == nil {
@@ -632,21 +634,21 @@ func lm_seize_request(channel int) {
 	}
 
 	if tq_is_real_packet(pp) {
-		queue_len[channel][prio]++
+		tq.length[channel][prio]++
 	}
 
-	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+	metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
 
-	tq_wake_locked(channel)
+	tq.wakeLocked(channel)
 
-	tq_mutex.Unlock()
+	tq.mu.Unlock()
 
 	logrus.Trace("lm_seize_request: left critical section, xmit thread woken")
-} /* end lm_seize_request */
+} /* end LMSeizeRequest */
 
 /*-------------------------------------------------------------------
  *
- * Name:        tq_wait_while_empty
+ * Name:        WaitWhileEmpty
  *
  * Purpose:     Sleep while the transmit queue is empty rather than
  *		polling periodically.
@@ -662,7 +664,7 @@ func lm_seize_request(channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_wait_while_empty(ctx context.Context, channel int) {
+func (tq *TransmitQueue) WaitWhileEmpty(ctx context.Context, channel int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
 	// Wake-ups latch, so one raised between this loop reading the queue and
@@ -672,12 +674,12 @@ func tq_wait_while_empty(ctx context.Context, channel int) {
 	// removed, so the queue itself decides when to return and the wake-up
 	// only says when to look again.
 	for {
-		tq_mutex.Lock()
+		tq.mu.Lock()
 
-		var is_empty = tq_is_empty(channel)
-		var w = wake[channel]
+		var is_empty = tq.isEmptyLocked(channel)
+		var w = tq.wake[channel]
 
-		tq_mutex.Unlock()
+		tq.mu.Unlock()
 
 		if logrus.IsLevelEnabled(logrus.TraceLevel) {
 			logrus.WithFields(logrus.Fields{
@@ -714,7 +716,7 @@ func tq_wait_while_empty(ctx context.Context, channel int) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        tq_remove
+ * Name:        Remove
  *
  * Purpose:     Remove a packet from the head of the specified transmit queue.
  *
@@ -726,32 +728,32 @@ func tq_wait_while_empty(ctx context.Context, channel int) {
  *
  *--------------------------------------------------------------------*/
 
-func tq_remove(channel int, prio int) *packet_t {
+func (tq *TransmitQueue) Remove(channel int, prio int) *packet_t {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
 			"prio":    prio,
 		}).Trace("tq_remove: enter critical section")
 	}
-	tq_mutex.Lock()
+	tq.mu.Lock()
 
 	var result_p *packet_t
 
-	if queue_head[channel][prio] == nil {
+	if tq.head[channel][prio] == nil {
 		result_p = nil
 	} else {
-		result_p = queue_head[channel][prio]
-		queue_head[channel][prio] = ax25_get_nextp(result_p)
+		result_p = tq.head[channel][prio]
+		tq.head[channel][prio] = ax25_get_nextp(result_p)
 		ax25_set_nextp(result_p, nil)
 
 		if tq_is_real_packet(result_p) {
-			queue_len[channel][prio]--
+			tq.length[channel][prio]--
 		}
 	}
 
-	metrics.SetTxQueueDepth(channel, prio, queue_len[channel][prio])
+	metrics.SetTxQueueDepth(channel, prio, tq.length[channel][prio])
 
-	tq_mutex.Unlock()
+	tq.mu.Unlock()
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
@@ -771,11 +773,11 @@ func tq_remove(channel int, prio int) *packet_t {
 	   #endif
 	*/
 	return (result_p)
-} /* end tq_remove */
+} /* end Remove */
 
 /*-------------------------------------------------------------------
  *
- * Name:        tq_peek
+ * Name:        Peek
  *
  * Purpose:     Take a peek at the next frame in the queue but don't remove it.
  *
@@ -787,11 +789,11 @@ func tq_remove(channel int, prio int) *packet_t {
  *
  *		The packet stays in the queue and belongs to it, so the caller
  *		may inspect it but must not modify it or retain the pointer
- *		beyond the decision of whether to tq_remove it.
+ *		beyond the decision of whether to Remove it.
  *
  *--------------------------------------------------------------------*/
 
-func tq_peek(channel int, prio int) *packet_t {
+func (tq *TransmitQueue) Peek(channel int, prio int) *packet_t {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
@@ -800,16 +802,16 @@ func tq_peek(channel int, prio int) *packet_t {
 	}
 
 	// Under the mutex like every other reader of the list.  The head pointer
-	// is rewritten by tq_append, lm_data_request, lm_seize_request and
-	// tq_remove, all of which hold tq_mutex, and this runs on the transmit
+	// is rewritten by Append, LMDataRequest, LMSeizeRequest and Remove, all
+	// of which hold mu, and this runs on the transmit
 	// thread while producers are appending from the KISS, AGW, beacon and
 	// digipeater goroutines - so reading it unguarded is a data race.
-	tq_mutex.Lock()
+	tq.mu.Lock()
 
-	var result_p = queue_head[channel][prio]
+	var result_p = tq.head[channel][prio]
 	// Just take a peek at the head.  Don't remove it.
 
-	tq_mutex.Unlock()
+	tq.mu.Unlock()
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
@@ -829,37 +831,11 @@ func tq_peek(channel int, prio int) *packet_t {
 	   #endif
 	*/
 	return (result_p)
-} /* end tq_peek */
+} /* end Peek */
 
 /*-------------------------------------------------------------------
  *
- * Name:        tq_is_empty
- *
- * Purpose:     Test if queues for specified channel are empty.
- *
- * Inputs:	channel		Channel
- *
- * Returns:	True if nothing in the queue.
- *
- *--------------------------------------------------------------------*/
-
-func tq_is_empty(channel int) bool {
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-
-	for p := range TQ_NUM_PRIO {
-		Assert(p >= 0 && p < TQ_NUM_PRIO)
-
-		if queue_head[channel][p] != nil {
-			return false
-		}
-	}
-
-	return true
-} /* end tq_is_empty */
-
-/*-------------------------------------------------------------------
- *
- * Name:        tq_count
+ * Name:        Count
  *
  * Purpose:     Return count of the number of packets (or bytes) in the specified transmit queue.
  *		This is used only for queries from KISS or AWG client applications.
@@ -881,7 +857,7 @@ func tq_is_empty(channel int) bool {
 
 //#define DEBUG2 1
 
-func tq_count(channel int, prio int, source string, dest string, bytes bool) int {
+func (tq *TransmitQueue) Count(channel int, prio int, source string, dest string, bytes bool) int {
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
 			"channel": channel,
@@ -892,15 +868,15 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 		}).Trace("tq_count")
 	}
 	if prio == -1 {
-		return (tq_count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq_count(channel, TQ_PRIO_1_LO, source, dest, bytes))
+		return (tq.Count(channel, TQ_PRIO_0_HI, source, dest, bytes) + tq.Count(channel, TQ_PRIO_1_LO, source, dest, bytes))
 	}
 
 	// Don't want lists being rearranged while we are traversing them.
 
-	tq_mutex.Lock()
-	defer tq_mutex.Unlock()
+	tq.mu.Lock()
+	defer tq.mu.Unlock()
 
-	var n = tq_count_locked(channel, prio, source, dest, bytes)
+	var n = tq.countLocked(channel, prio, source, dest, bytes)
 
 	if logrus.IsLevelEnabled(logrus.TraceLevel) {
 		logrus.WithFields(logrus.Fields{
@@ -914,25 +890,67 @@ func tq_count(channel int, prio int, source string, dest string, bytes bool) int
 	}
 
 	return (n)
-} /* end tq_count */
+} /* end Count */
 
-// tq_count_locked is tq_count's traversal, for callers that already hold
-// tq_mutex.  Counting a queue and publishing that count have to happen under
+// wakeLocked tells the channel's transmit thread that something was queued.
+// The caller holds mu, and has just put the packet on the list: raising the
+// wake-up under the same lock is what stops it racing the transmit thread's
+// decision about whether to wait.
+//
+// The send does not block.  A wake-up already raised and not yet taken is one
+// the transmit thread has still to act on, and one is as good as two - it
+// re-checks the queue when it wakes, and finds everything queued since.
+func (tq *TransmitQueue) wakeLocked(channel int) {
+	select {
+	case tq.wake[channel] <- struct{}{}:
+	default:
+	}
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        isEmptyLocked
+ *
+ * Purpose:     Test if queues for specified channel are empty.
+ *
+ * Inputs:	channel		Channel
+ *
+ * Returns:	True if nothing in the queue.
+ *
+ *		The caller holds mu.
+ *
+ *--------------------------------------------------------------------*/
+
+func (tq *TransmitQueue) isEmptyLocked(channel int) bool {
+	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	for p := range TQ_NUM_PRIO {
+		Assert(p >= 0 && p < TQ_NUM_PRIO)
+
+		if tq.head[channel][p] != nil {
+			return false
+		}
+	}
+
+	return true
+} /* end isEmptyLocked */
+
+// countLocked is Count's traversal, for callers that already hold mu.  Counting a queue and publishing that count have to happen under
 // the same lock acquisition: two separately-locked operations can straddle
 // another goroutine's enqueue and publish observations out of order, leaving
 // the gauge describing a queue depth that never existed.
-func tq_count_locked(channel int, prio int, source string, dest string, bytes bool) int {
+func (tq *TransmitQueue) countLocked(channel int, prio int, source string, dest string, bytes bool) int {
 	// Array bounds check.  FIXME: TODO:  should have internal error instead of dying.
 
 	if channel < 0 || channel >= MAX_RADIO_CHANS || prio < 0 || prio >= TQ_NUM_PRIO {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("INTERNAL ERROR - tq_count_locked(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
+		dw_printf("INTERNAL ERROR - countLocked(%d, %d, \"%s\", \"%s\", %t)\n", channel, prio, source, dest, bytes)
 
 		return (0)
 	}
 
 	var n = 0 // Result.  Number of bytes or packets.
-	var pp = queue_head[channel][prio]
+	var pp = tq.head[channel][prio]
 
 	for pp != nil {
 		if ax25_get_num_addr(pp) >= AX25_MIN_ADDRS {
@@ -972,6 +990,6 @@ func tq_count_locked(channel int, prio int, source string, dest string, bytes bo
 	}
 
 	return (n)
-} /* end tq_count_locked */
+} /* end countLocked */
 
 /* end tq.c */

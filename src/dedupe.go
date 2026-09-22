@@ -147,7 +147,7 @@ func NewDedupeService(ttl time.Duration) *DedupeService {
  *			+ anything digipeated
  *
  *		The easiest way to catch all cases is to call dedup_remember()
- *		from inside tq_append().
+ *		from inside TransmitQueue.Append().
  *
  *		But I don't think that is the right approach.
  *		When acting as a KISS TNC, we should just shovel everything
@@ -156,7 +156,7 @@ func NewDedupeService(ttl time.Duration) *DedupeService {
  *		it's responsible for those decisions.
  *
  *		My current thinking is that dedupe_remember() should be
- *		called BEFORE tq_append() in the digipeater case.
+ *		called BEFORE TransmitQueue.Append() in the digipeater case.
  *
  *		We should also capture our own beacon transmissions.
  *

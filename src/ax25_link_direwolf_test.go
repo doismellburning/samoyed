@@ -140,7 +140,7 @@ func setupTestEnv(t *testing.T) {
 
 	var audioConfig = new(audio_s)
 	require.NoError(t, ptt_init(audioConfig))
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode
@@ -163,7 +163,7 @@ func setupTestEnvV22(t *testing.T) {
 
 	var audioConfig = new(audio_s)
 	require.NoError(t, ptt_init(audioConfig))
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var miscConfig = new(misc_config_s)
 	// Set proper defaults for connected mode

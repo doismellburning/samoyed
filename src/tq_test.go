@@ -15,9 +15,9 @@ import (
 )
 
 // TestTqPeekUnderConcurrentAppend is a regression test for a data race.
-// tq_peek used to read queue_head without holding tq_mutex, on the strength of
+// TransmitQueue.Peek used to read the queue's head without holding the queue's mutex, on the strength of
 // a comment saying a critical region was not needed.  Every other reader and
-// writer of that head pointer holds the mutex, and tq_peek runs on the
+// writer of that head pointer holds the mutex, and TransmitQueue.Peek runs on the
 // transmit thread while producers append from the KISS, AGW, beacon and
 // digipeater goroutines, so the unguarded read raced with every enqueue.
 //
@@ -37,7 +37,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -66,7 +66,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 		defer close(appendDone)
 
 		for _, pp := range packets {
-			lm_data_request(CHANNEL, PRIO, pp)
+			transmitQueue.LMDataRequest(CHANNEL, PRIO, pp)
 		}
 	})
 
@@ -78,7 +78,7 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 			default:
 			}
 
-			var pp = tq_peek(CHANNEL, PRIO)
+			var pp = transmitQueue.Peek(CHANNEL, PRIO)
 			if pp != nil && !queued[pp] {
 				strayPeek.Store(true)
 
@@ -90,12 +90,12 @@ func TestTqPeekUnderConcurrentAppend(t *testing.T) {
 	wg.Wait()
 
 	assert.False(t, strayPeek.Load(), "tq_peek returned a packet that was never queued")
-	require.Equal(t, NUM_PKTS, tq_count(CHANNEL, PRIO, "", "", false),
+	require.Equal(t, NUM_PKTS, transmitQueue.Count(CHANNEL, PRIO, "", "", false),
 		"every packet should still be queued: peeking must not consume")
 }
 
 // TestTqWaitWhileEmptyDoesNotMissAnAppend is a regression test for a lost
-// wake-up.  tq_wait_while_empty decided whether to wait under tq_mutex and
+// wake-up.  TransmitQueue.WaitWhileEmpty decided whether to wait under the queue's mutex and
 // then waited on a different mutex, while the enqueue paths signalled only if
 // a flag said the transmit thread was already waiting.  A packet queued
 // between that decision and the wait itself found the flag still false, so no
@@ -130,7 +130,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 		audioConfig.chan_medium[c] = MEDIUM_RADIO
 	}
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	// Built up front: ax25_new increments an unsynchronised global sequence
 	// counter, which is a separate matter from the queue and would otherwise
@@ -146,7 +146,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 
 	for round := range ROUNDS {
 		for c := range CHANNELS {
-			require.Equal(t, 0, tq_count(c, -1, "", "", false),
+			require.Equal(t, 0, transmitQueue.Count(c, -1, "", "", false),
 				"round %d channel %d should start with an empty queue", round, c)
 		}
 
@@ -166,13 +166,13 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 
 				<-start
 
-				tq_wait_while_empty(t.Context(), c)
+				transmitQueue.WaitWhileEmpty(t.Context(), c)
 			}()
 
 			wg.Go(func() {
 				<-start
 
-				lm_data_request(c, PRIO, packets[c][round])
+				transmitQueue.LMDataRequest(c, PRIO, packets[c][round])
 			})
 		}
 
@@ -187,7 +187,7 @@ func TestTqWaitWhileEmptyDoesNotMissAnAppend(t *testing.T) {
 					round, c, WAKE_WAIT)
 			}
 
-			require.NotNil(t, tq_remove(c, PRIO),
+			require.NotNil(t, transmitQueue.Remove(c, PRIO),
 				"round %d channel %d: the queued packet should still be there", round, c)
 		}
 	}
@@ -204,7 +204,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[CHANNEL] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
@@ -213,7 +213,7 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 	go func() {
 		defer close(returned)
 
-		tq_wait_while_empty(ctx, CHANNEL)
+		transmitQueue.WaitWhileEmpty(ctx, CHANNEL)
 	}()
 
 	cancel()
@@ -224,11 +224,11 @@ func TestTqWaitWhileEmptyReturnsWhenCancelled(t *testing.T) {
 		t.Fatal("tq_wait_while_empty did not return when its context was cancelled")
 	}
 
-	assert.Equal(t, 0, tq_count(CHANNEL, -1, "", "", false),
+	assert.Equal(t, 0, transmitQueue.Count(CHANNEL, -1, "", "", false),
 		"cancellation should not have invented a packet")
 }
 
-// TestTqAppendOutOfRangeChannel is a regression test for tq_append indexing
+// TestTqAppendOutOfRangeChannel is a regression test for TransmitQueue.Append indexing
 // chan_medium, to see whether the channel belongs to the IGate or a network
 // TNC, before it had checked the channel was in range at all - so the request
 // the bounds check exists to reject panicked before reaching it.
@@ -236,14 +236,14 @@ func TestTqAppendOutOfRangeChannel(t *testing.T) {
 	var audioConfig = new(audio_s)
 	audioConfig.chan_medium[0] = MEDIUM_RADIO
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
 		assert.NotPanics(t, func() {
-			tq_append(channel, TQ_PRIO_1_LO, newTestPacket(t))
+			transmitQueue.Append(channel, TQ_PRIO_1_LO, newTestPacket(t))
 		}, "channel %d", channel)
 	}
 
-	assert.Equal(t, 0, tq_count(0, -1, "", "", false),
+	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false),
 		"an out-of-range request should not have landed on a real channel")
 }

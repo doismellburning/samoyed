@@ -32,7 +32,7 @@ func setupCDigipeater(t *testing.T) (*audio_s, *cdigi_config_s) {
 
 		for c := range MAX_RADIO_CHANS {
 			for p := range TQ_NUM_PRIO {
-				for tq_remove(c, p) != nil { //revive:disable-line:empty-block
+				for transmitQueue.Remove(c, p) != nil { //revive:disable-line:empty-block
 				}
 			}
 		}
@@ -50,7 +50,7 @@ func setupCDigipeater(t *testing.T) (*audio_s, *cdigi_config_s) {
 
 	cdigi_count = [MAX_RADIO_CHANS][MAX_RADIO_CHANS]int{}
 
-	tq_init(audioConfig)
+	transmitQueue.Init(audioConfig)
 
 	return audioConfig, cdigiConfig
 }
@@ -192,7 +192,7 @@ func TestCDigipeaterSameChannel(t *testing.T) {
 
 	cdigipeater(cdigiFromChan, pp)
 
-	var sent = tq_remove(cdigiFromChan, TQ_PRIO_0_HI)
+	var sent = transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for transmission")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q1TEST*:", AX25FormatAddrs(sent))
 
@@ -212,9 +212,9 @@ func TestCDigipeaterCrossChannel(t *testing.T) {
 
 	cdigipeater(cdigiFromChan, pp)
 
-	assert.Nil(t, tq_remove(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
+	assert.Nil(t, transmitQueue.Remove(cdigiFromChan, TQ_PRIO_0_HI), "it should not have gone out on the channel it arrived on")
 
-	var sent = tq_remove(cdigiToChan, TQ_PRIO_0_HI)
+	var sent = transmitQueue.Remove(cdigiToChan, TQ_PRIO_0_HI)
 	require.NotNil(t, sent, "the repeated frame was not queued for the other channel")
 	assert.Equal(t, "Q3TEST>Q4TEST,Q2TEST*:", AX25FormatAddrs(sent))
 
@@ -232,7 +232,7 @@ func TestCDigipeaterNotEnabled(t *testing.T) {
 	cdigipeater(cdigiFromChan, pp)
 
 	for c := range MAX_RADIO_CHANS {
-		assert.Nil(t, tq_remove(c, TQ_PRIO_0_HI), "channel %d repeated a frame with digipeating disabled", c)
+		assert.Nil(t, transmitQueue.Remove(c, TQ_PRIO_0_HI), "channel %d repeated a frame with digipeating disabled", c)
 	}
 
 	assert.Zero(t, cdigipeater_get_count(cdigiFromChan, cdigiFromChan))
@@ -266,7 +266,7 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 	var pp = AX25FromText("Q3TEST>Q4TEST,Q1TEST:hello", true)
 	require.NotNil(t, pp)
 
-	// A network TNC channel has no transmit queue of its own - tq_append
+	// A network TNC channel has no transmit queue of its own - TransmitQueue.Append
 	// hands the frame straight to the TNC - so the count is what says it was
 	// repeated rather than turned away.
 	CaptureOutput(t, func() { cdigipeater(cdigiFromChan, pp) })

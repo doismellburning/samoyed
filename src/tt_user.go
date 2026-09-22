@@ -786,7 +786,7 @@ func xmit_object_report(i int, first_time bool) {
 		/* Remember it so we don't digipeat our own. */
 		dedupeService.Remember(pp, save_tt_config_p.obj_xmit_chan)
 
-		tq_append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
+		transmitQueue.Append(save_tt_config_p.obj_xmit_chan, TQ_PRIO_1_LO, pp)
 	}
 }
 
