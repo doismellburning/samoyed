@@ -93,9 +93,9 @@ func attachTestNetTNC(ctx context.Context, t *testing.T) (net.Conn, <-chan net.C
 func expectReceivedFrames(t *testing.T) {
 	t.Helper()
 
-	t.Cleanup(dlq_init)
+	t.Cleanup(dataLinkQueue.Init)
 
-	dlq_init()
+	dataLinkQueue.Init()
 }
 
 // kissFrameFor wraps a packet's on-air bytes the way a KISS TNC would before
@@ -135,7 +135,7 @@ func TestNetTNCReceivedFrameReachesTheQueue(t *testing.T) {
 	var item *dlq_item_t
 
 	require.Eventually(t, func() bool {
-		item = dlq_remove()
+		item = dataLinkQueue.Remove()
 
 		return item != nil
 	}, 10*time.Second, 10*time.Millisecond, "the frame from the network TNC never reached the received queue")
@@ -238,7 +238,7 @@ func TestNetTNCReattachesAfterTheTNCGoesAway(t *testing.T) {
 	require.NoError(t, writeErr)
 
 	require.Eventually(t, func() bool {
-		return dlq_remove() != nil
+		return dataLinkQueue.Remove() != nil
 	}, 10*time.Second, 10*time.Millisecond, "nothing was heard on the reattached connection")
 }
 
@@ -279,7 +279,7 @@ func TestNetTNCNoiseBeforeAFrameIsIgnored(t *testing.T) {
 		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
 	}
 
-	var item = dlq_remove()
+	var item = dataLinkQueue.Remove()
 	require.NotNil(t, item, "the frame after the noise was not decoded")
 	assert.Equal(t, ax25_get_frame_data(pp), ax25_get_frame_data(item.pp))
 }
@@ -294,7 +294,7 @@ func TestNetTNCEmptyFramesAreNotFrames(t *testing.T) {
 		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
 	}
 
-	assert.Nil(t, dlq_remove(), "an empty KISS frame was taken for a received frame")
+	assert.Nil(t, dataLinkQueue.Remove(), "an empty KISS frame was taken for a received frame")
 }
 
 // A frame too short to be AX.25 cannot be made into a packet, and is reported
@@ -311,7 +311,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "Failed to create packet object for KISS frame from channel 3 network TNC")
-	assert.Nil(t, dlq_remove())
+	assert.Nil(t, dataLinkQueue.Remove())
 }
 
 // A TNC that never sends a FEND would otherwise fill the frame buffer without
@@ -353,14 +353,14 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 	assert.Contains(t, output, "KISS frame from network TNC exceeded maximum length.  Discarding it.")
 	assert.Equal(t, 0, kf.kiss_len)
 	assert.Equal(t, KS_SEARCHING, kf.state)
-	assert.Nil(t, dlq_remove(), "a fragment of the overlong frame was acted on")
+	assert.Nil(t, dataLinkQueue.Remove(), "a fragment of the overlong frame was acted on")
 
 	// And a well formed frame after it still gets through.
 	for _, b := range kissFrameFor(newTestPacket(t)) {
 		my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
 	}
 
-	assert.NotNil(t, dlq_remove())
+	assert.NotNil(t, dataLinkQueue.Remove())
 }
 
 // With the debug option the frames are printed in both the form they arrived

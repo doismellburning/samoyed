@@ -121,7 +121,7 @@ type ReceiveSink interface {
 type radioSink struct{}
 
 func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	dlq_rec_frame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
+	dataLinkQueue.RecFrame(channel, subchan, slice, pp, alevel, fec_type, retries, spectrum)
 }
 
 func (s *radioSink) DCDChange(channel int, state int) {

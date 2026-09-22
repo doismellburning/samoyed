@@ -588,7 +588,7 @@ func (tq *TransmitQueue) LMSeizeRequest(channel int) {
 	if channel >= 0 && channel < MAX_TOTAL_CHANS && tq.audioConfig.chan_medium[channel] == MEDIUM_NETTNC {
 		// MEDIUM_NETTNC: no internal modem to seize; confirm the channel immediately.
 		// See LMDataRequest for the rationale for allowing MEDIUM_NETTNC.
-		dlq_seize_confirm(channel)
+		dataLinkQueue.SeizeConfirm(channel)
 
 		return
 	}

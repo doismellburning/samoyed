@@ -1647,7 +1647,7 @@ func TestAX25LinkV22SegmentationDataContent(t *testing.T) {
 	//   seg 3 (last):   [0x00, 'F']
 	S.n1_paclen = 4
 
-	var txdata = cdata_new(0xF0, []byte{'A', 'B', 'C', 'D', 'E', 'F'})
+	var txdata = dataLinkQueue.NewCData(0xF0, []byte{'A', 'B', 'C', 'D', 'E', 'F'})
 	var E = new(dlq_item_t)
 	E._type = DLQ_XMIT_DATA_REQUEST
 	E._chan = CHANNEL

@@ -71,7 +71,7 @@ package direwolf
  *
  *					The difference is that app_process_rec_frame
  *					is no longer called directly.  Instead
- *					the frame is appended to a queue with dlq_rec_frame.
+ *					the frame is appended to a queue with dataLinkQueue.RecFrame.
  *
  *					Received frames can now be processed one at
  *					a time and we don't need to worry about later
@@ -185,7 +185,7 @@ func recv_adev_thread(ctx context.Context, a int, failed chan<- int, src SampleS
 		} // for c is just 0 or 0 then 1
 
 		/* When a complete frame is accumulated, */
-		/* dlq_rec_frame, is called. */
+		/* dataLinkQueue.RecFrame, is called. */
 
 		/* recv_process, below, drains the queue. */
 	} // while !eof on audio stream
@@ -207,7 +207,7 @@ func recv_process(ctx context.Context) {
 	for ctx.Err() == nil {
 		var timeout_value = ax25_link_get_next_timer_expiry()
 
-		var timed_out = dlq_wait_while_empty(ctx, timeout_value)
+		var timed_out = dataLinkQueue.WaitWhileEmpty(ctx, timeout_value)
 
 		if ctx.Err() != nil {
 			// Cancelled rather than woken by an item, so there is nothing
@@ -218,7 +218,7 @@ func recv_process(ctx context.Context) {
 		if timed_out {
 			dl_timer_expiry()
 		} else {
-			var pitem = dlq_remove()
+			var pitem = dataLinkQueue.Remove()
 
 			if pitem != nil {
 				switch pitem._type {
@@ -260,7 +260,7 @@ func recv_process(ctx context.Context) {
 					dl_client_cleanup(pitem)
 				}
 
-				dlq_delete(pitem)
+				dataLinkQueue.Delete(pitem)
 			} else {
 				logrus.Debug("recv_process: spurious wakeup. (Temp debugging message - not a problem if only occasional.)")
 			}

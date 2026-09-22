@@ -904,7 +904,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 			var alevel ALevel
-			dlq_rec_frame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
+			dataLinkQueue.RecFrame(bp.sendto_chan, 0, 0, pp, alevel, fec_type_none, 0, "")
 		default:
 			transmitQueue.Append(bp.sendto_chan, TQ_PRIO_1_LO, pp)
 		}

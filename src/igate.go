@@ -1088,7 +1088,7 @@ func (ig *IGate) recvThread(ctx context.Context) {
 					var slice = 0
 					var fec_type = fec_type_none
 					var spectrum = "APRS-IS"
-					dlq_rec_frame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
+					dataLinkQueue.RecFrame(ichan, subchan, slice, pp3, alevel, fec_type, RETRY_NONE, spectrum)
 				} else {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("ICHANNEL %d: Could not parse message from APRS-IS server.\n", ichan)

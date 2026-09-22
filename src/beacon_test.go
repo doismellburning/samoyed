@@ -29,12 +29,12 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 	var gpsinfo = new(dwgps_info_t)
 	gpsinfo.fix = DWFIX_2D
 
-	for dlq_remove() != nil {
+	for dataLinkQueue.Remove() != nil {
 	}
 
 	bs.send(t.Context(), 0, gpsinfo)
 
-	var item = dlq_remove()
+	var item = dataLinkQueue.Remove()
 	if item != nil {
 		t.Errorf("transmitted %s", AX25FormatAddrs(item.pp)+string(AX25GetInfo(item.pp)))
 	}
