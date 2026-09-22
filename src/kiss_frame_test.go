@@ -108,7 +108,7 @@ func setupKissProcessMsg(t *testing.T) *XmitService {
 	xmitSvc = new(XmitService)
 	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	return xmitSvc
 }

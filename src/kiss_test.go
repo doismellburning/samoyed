@@ -327,7 +327,7 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 	xmitSvc = new(XmitService)
 	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
 
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	t.Cleanup(func() {
 		for tq_remove(channel, TQ_PRIO_1_LO) != nil { //revive:disable-line:empty-block

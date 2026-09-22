@@ -316,7 +316,7 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	mheardDB = NewMHeardDB(0)
 
 	require.NoError(t, ptt_init(audioConfig))
-	tq_init(t.Context(), audioConfig)
+	tq_init(audioConfig)
 
 	var miscConfig = new(misc_config_s)
 	miscConfig.paclen = AX25_N1_PACLEN_DEFAULT
