@@ -661,7 +661,7 @@ x = Silence FX.25 information.`)
 	 * Note:  This is not the same as a volume control you would see on the screen.
 	 * It is the range of the digital sound representation.
 	 */
-	gen_tone_init(audio_config, audio_amplitude, false)
+	gen_tone_init(audio_config, audio_amplitude, audioDeviceSink{})
 	morse_init(audio_config, audio_amplitude)
 
 	/*

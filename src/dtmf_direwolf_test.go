@@ -18,8 +18,16 @@ func Test_dtmf(t *testing.T) {
 	// Let's try to set up audio?
 	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1
 	my_audio_config.adev[ACHAN2ADEV(c)].bits_per_sample = 8
-	gen_tone_init(&my_audio_config, 100, false)
+	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
 	require.NoError(t, ptt_init(&my_audio_config))
+
+	// A decoded button raises the channel's DCD, which goes to the HDLC
+	// receiver; nothing here wants to hear about it.
+	var origReceiver = hdlcReceiver
+
+	t.Cleanup(func() { hdlcReceiver = origReceiver })
+
+	hdlcReceiver = NewHDLCReceiver(&my_audio_config, new(discardReceiveSink))
 
 	dtmf_init(&my_audio_config, 50)
 
@@ -95,3 +103,11 @@ func Test_dtmf(t *testing.T) {
 
 	push_button_test(c, '?', 0)
 }
+
+// discardReceiveSink is a ReceiveSink that ignores whatever it is told.
+type discardReceiveSink struct{}
+
+func (discardReceiveSink) RecFrame(int, int, int, *packet_t, ALevel, fec_type_t, BitFixLevel, string) {
+}
+
+func (discardReceiveSink) DCDChange(int, int) {}

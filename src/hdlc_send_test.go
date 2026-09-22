@@ -289,13 +289,13 @@ func TestPreambleIsFlagsForAX25(t *testing.T) {
 func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 
-	// The flush goes to a file rather than to an audio device, there being
-	// no device open here.
-	var origGenPackets = GEN_PACKETS
+	var sink = new(flushCountingSink)
 
-	t.Cleanup(func() { GEN_PACKETS = origGenPackets })
+	var origAudioConfig, origGenerators = save_audio_config_p, toneGenerators
 
-	GEN_PACKETS = true
+	t.Cleanup(func() { save_audio_config_p, toneGenerators = origAudioConfig, origGenerators })
+
+	gen_tone_init(audioConfig, 100, sink)
 
 	var sent int
 
@@ -305,6 +305,21 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	assert.Equal(t, 2*8, sent, "finishing does not change what goes out")
 	assert.Equal(t, []byte{hdlcFlag, hdlcFlag}, packLSBFirst(t, nrziDecode(bits)))
+	assert.Equal(t, 1, sink.flushes, "the end of the transmission should be flushed out")
+}
+
+// flushCountingSink discards the samples it is given, and counts how often it
+// is asked to push them out.
+type flushCountingSink struct {
+	flushes int
+}
+
+func (s *flushCountingSink) Put(int, uint8) int { return 0 }
+
+func (s *flushCountingSink) Flush(int) int {
+	s.flushes++
+
+	return 0
 }
 
 // IL2P has its own filler pattern, sent MSB first and without NRZI.
@@ -525,11 +540,9 @@ func setupEASSendTest(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 	audioConfig.achan[hdlcSendTestChannel].modem_type = MODEM_EAS
 
-	var origAudioConfig, origGenPackets, origWAV = save_audio_config_p, GEN_PACKETS, genPacketsWAV
+	var origAudioConfig, origGenerators = save_audio_config_p, toneGenerators
 
-	t.Cleanup(func() {
-		save_audio_config_p, GEN_PACKETS, genPacketsWAV = origAudioConfig, origGenPackets, origWAV
-	})
+	t.Cleanup(func() { save_audio_config_p, toneGenerators = origAudioConfig, origGenerators })
 
 	// Samples go to a file rather than to an audio device.
 	var w, err = wavwrite.Create(filepath.Join(t.TempDir(), "eas.wav"), wavwrite.Format{
@@ -541,8 +554,5 @@ func setupEASSendTest(t *testing.T) {
 
 	t.Cleanup(func() { w.Close() })
 
-	GEN_PACKETS = true
-	genPacketsWAV = w
-
-	gen_tone_init(audioConfig, 100, true)
+	gen_tone_init(audioConfig, 100, newWAVFileSink(w))
 }

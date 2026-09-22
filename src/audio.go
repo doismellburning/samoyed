@@ -1547,7 +1547,7 @@ func audio_open(ctx context.Context, pa *audio_s) int {
 			// transmit, but receiving is still useful and is all that some
 			// setups - a receive-only IGate, a machine with a capture device
 			// but nothing to play through - ever wanted.  Warn and carry on
-			// rather than refusing to start.  audio_flush_real discards
+			// rather than refusing to start.  audio_flush discards
 			// anything the transmit path produces while outputStream and
 			// udp_out_sock are both nil.
 			adev[a].outbufSizeInBytes = bufSizeInBytes
@@ -1584,7 +1584,7 @@ func audio_open(ctx context.Context, pa *audio_s) int {
 			case AUDIO_OUT_TYPE_SOUNDCARD:
 				/*
 				 * Soundcard - blocking write mode.
-				 * audio_flush_real fills the typed output buffer and calls Write() to
+				 * audio_flush fills the typed output buffer and calls Write() to
 				 * send it to PortAudio. The stream is started lazily on first write
 				 * and stopped in audio_wait to avoid underflows during idle periods.
 				 */
@@ -1670,7 +1670,7 @@ func audio_open(ctx context.Context, pa *audio_s) int {
 				}
 
 				// Output stream is opened but NOT started here.
-				// It will be started lazily on first write in audio_flush_real
+				// It will be started lazily on first write in audio_flush
 				// and stopped in audio_wait, to avoid underflows during idle periods.
 			}
 
@@ -1855,6 +1855,18 @@ func audio_get(a int) int {
 	return (n)
 } /* end audio_get */
 
+// audioDeviceSink is the AudioSink for the audio device that audio_open
+// opened.
+type audioDeviceSink struct{}
+
+func (audioDeviceSink) Put(adev int, c uint8) int {
+	return audio_put(adev, c)
+}
+
+func (audioDeviceSink) Flush(adev int) int {
+	return audio_flush(adev)
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        audio_put
@@ -1876,7 +1888,7 @@ func audio_get(a int) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_put_real(a int, c uint8) int {
+func audio_put(a int, c uint8) int {
 	/* Should never be full at this point. */
 	Assert(adev[a].outbufLen < adev[a].outbufSizeInBytes)
 
@@ -1904,7 +1916,7 @@ func audio_put_real(a int, c uint8) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_flush_real(a int) int {
+func audio_flush(a int) int {
 	if adev[a].outbufLen == 0 {
 		return 0
 	}

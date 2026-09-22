@@ -159,7 +159,7 @@ func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_confi
 	/* Push out the final partial buffer! */
 
 	if finish {
-		audio_flush(ACHAN2ADEV(channel))
+		gen_tone_flush(channel)
 	}
 
 	return (number_of_bits_sent[channel])
@@ -300,7 +300,7 @@ func eas_send(channel int, str []byte, repeat int, txdelay int, txtail int) int 
 
 	gen_tone_put_quiet_ms(channel, txtail)
 
-	audio_flush(ACHAN2ADEV(channel))
+	gen_tone_flush(channel)
 
 	var elapsed = txdelay + int(float64(bytes_sent)*8*1.92) + (gaps_sent * gap) + txtail
 
