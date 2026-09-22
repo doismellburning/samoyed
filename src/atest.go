@@ -277,6 +277,8 @@ o = DCD output control
 		os.Exit(1)
 	}
 
+	atestSingleSlicer(&my_audio_config.achan[0])
+
 	my_audio_config.achan[1] = my_audio_config.achan[0]
 
 	if len(pflag.Args()) == 0 {
@@ -843,7 +845,7 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 		achan.baud = 9600
 		achan.mark_freq = 0
 		achan.space_freq = 0
-		achan.profiles = " " // avoid getting default later.
+		achan.profiles = ""
 	} else if achan.baud == 0xEA5EA5 {
 		achan.modem_type = MODEM_EAS
 		achan.baud = 521 // Actually 520.83 but we have an integer field here.
@@ -855,7 +857,7 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 		achan.modem_type = MODEM_SCRAMBLE
 		achan.mark_freq = 0
 		achan.space_freq = 0
-		achan.profiles = " " // avoid getting default later.
+		achan.profiles = ""
 	}
 
 	if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
@@ -870,7 +872,7 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 		achan.modem_type = MODEM_SCRAMBLE
 		achan.mark_freq = 0
 		achan.space_freq = 0
-		achan.profiles = " " // avoid getting default later.
+		achan.profiles = ""
 	}
 
 	if *f.bpsk {
@@ -946,4 +948,14 @@ func atestDefaultAudio() *audio_s {
 	}
 
 	return audio
+}
+
+// atestSingleSlicer gives G3RUH and AIS a single slicer, unless -P asked for
+// something else, where direwolf gives them several by default ("+").
+// That is how atest has always decoded them, and what the expected decode
+// counts in test-scripts were measured with.
+func atestSingleSlicer(achan *achan_param_s) {
+	if achan.profiles == "" && (achan.modem_type == MODEM_SCRAMBLE || achan.modem_type == MODEM_AIS) {
+		achan.profiles = "-"
+	}
 }
