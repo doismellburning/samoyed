@@ -201,7 +201,7 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-B", "100"},
 			want: map[string]string{
-				"direwolf":    "100 AFSK 1600/1800 profiles=\"\" v26=- D=3 U=0 AX25 fx25=0 fec=1 inv=0",
+				"direwolf":    "100 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "100 AFSK 1600/1800 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 				"gen_packets": "100 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
@@ -209,7 +209,7 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-B", "300"},
 			want: map[string]string{
-				"direwolf":    "300 AFSK 1600/1800 profiles=\"\" v26=- D=3 U=0 AX25 fx25=0 fec=1 inv=0",
+				"direwolf":    "300 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "300 AFSK 1600/1800 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 				"gen_packets": "300 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
@@ -329,7 +329,7 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-B", "300", "-k"},
 			want: map[string]string{
-				"direwolf":    "300 BPSK 0/0 profiles=\"\" v26=- D=3 U=0 AX25 fx25=0 fec=1 inv=0",
+				"direwolf":    "300 BPSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "300 BPSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 				"gen_packets": "300 BPSK 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},

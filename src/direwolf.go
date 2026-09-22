@@ -1258,7 +1258,6 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 			achan.modem_type = MODEM_AFSK
 			achan.mark_freq = 1600 // Typical for HF SSB.
 			achan.space_freq = 1800
-			achan.decimate = 3 // Reduce CPU load.
 		} else if achan.baud < 1800 {
 			achan.modem_type = MODEM_AFSK
 			achan.mark_freq = DEFAULT_MARK_FREQ
