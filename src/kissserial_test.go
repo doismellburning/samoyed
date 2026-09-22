@@ -61,11 +61,12 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) <-chan struct{} {
 	t.Helper()
 
-	var origConfig, origFrame, origFD, origDebug = g_misc_config_p, kf, serialport_fd, kissserial_debug
+	var origConfig, origFrame, origFD, origFailed, origDebug = g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug
 
 	g_misc_config_p = mc
 	kf = new(KISSFrame)
 	serialport_fd = nil
+	serialport_failed = false
 
 	if mc.kiss_serial_poll == 0 {
 		serialport_fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
@@ -87,7 +88,7 @@ func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) <-cha
 			t.Error("kissserial_listen_thread did not finish")
 		}
 
-		g_misc_config_p, kf, serialport_fd, kissserial_debug = origConfig, origFrame, origFD, origDebug
+		g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug = origConfig, origFrame, origFD, origFailed, origDebug
 	})
 
 	return done
@@ -96,22 +97,17 @@ func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) <-cha
 // openKissSerialPort opens the serial port KISS TNC's port on a pseudo
 // terminal and hands back the client end of the wire, with no listening
 // goroutine running.
-//
-// The sending path and that goroutine share the port handle with no
-// synchronisation - the goroutine gives the port up on a read error while the
-// receive path may be part-way through writing to it - so a test of one keeps
-// away from the other.
 func openKissSerialPort(t *testing.T) *os.File {
 	t.Helper()
 
 	var name, client = newTestSerialDevice(t)
 
-	var origConfig, origFrame, origFD, origDebug = g_misc_config_p, kf, serialport_fd, kissserial_debug
+	var origConfig, origFrame, origFD, origFailed, origDebug = g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug
 
 	t.Cleanup(func() {
 		closeSerialPortKISS()
 
-		g_misc_config_p, kf, serialport_fd, kissserial_debug = origConfig, origFrame, origFD, origDebug
+		g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug = origConfig, origFrame, origFD, origFailed, origDebug
 	})
 
 	g_misc_config_p = new(misc_config_s)
@@ -119,6 +115,7 @@ func openKissSerialPort(t *testing.T) *os.File {
 	kf = new(KISSFrame)
 
 	serialport_fd = SerialPortOpen(name, 0)
+	serialport_failed = false
 	require.NotNil(t, serialport_fd, "could not open %s", name)
 
 	return client
@@ -227,8 +224,9 @@ func TestKissSerialSendRecPacket(t *testing.T) {
 }
 
 // A port that has gone away cannot be written to, so it is given up rather
-// than written to again on the next received frame.
-func TestKissSerialSendRecPacketWriteErrorClosesThePort(t *testing.T) {
+// than written to again on the next received frame.  The closing is left to
+// the listening goroutine, which may be blocked reading the port.
+func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 	var client = openKissSerialPort(t)
 
 	require.NoError(t, client.Close())
@@ -238,7 +236,21 @@ func TestKissSerialSendRecPacketWriteErrorClosesThePort(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
-	assert.Nil(t, serialport_fd, "the serial port was not given up after the write error")
+	assert.True(t, serialport_failed, "the serial port was not given up after the write error")
+
+	output = CaptureOutput(t, func() {
+		kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+	})
+
+	assert.Empty(t, output, "the serial port was written to again after the write error")
+
+	output = CaptureOutput(t, func() {
+		assert.True(t, giveUpSerialPortIfFailed())
+	})
+
+	assert.Contains(t, output, "Serial Port KISS write error. Closing connection.")
+	assert.Nil(t, serialport_fd, "the listener did not close the failed serial port")
+	assert.False(t, serialport_failed)
 }
 
 // A length of -1 says the caller has built the bytes itself - the fake command
@@ -464,4 +476,46 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
+}
+
+// The receive path writes to the port while the listening goroutine reads from
+// it, and either may give the port up on an error.  The client hanging up
+// part-way through sets both off at once: the listener's read fails, and so do
+// the writes, and neither may trip over the other - under -race this is the
+// regression test for the port handle being shared unguarded.
+func TestKissSerialSendWhileListening(t *testing.T) {
+	var name, client = newTestSerialDevice(t)
+
+	var mc = new(misc_config_s)
+	mc.kiss_serial_port = name
+
+	var done = startKissSerial(t.Context(), t, mc)
+
+	var sent = make(chan struct{})
+
+	go func() {
+		defer close(sent)
+
+		for {
+			select {
+			case <-done:
+				return
+			default:
+			}
+
+			kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		}
+	}()
+
+	require.NoError(t, client.Close())
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("kissserial_listen_thread did not finish after the client went away")
+	}
+
+	<-sent
+
+	assert.Nil(t, serialport_fd, "the serial port was not given up after the client went away")
 }
