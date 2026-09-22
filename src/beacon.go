@@ -870,13 +870,13 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 			var last_minutes = 30
 
 			var stuff = fmt.Sprintf("<IGATE,MSG_CNT=%d,PKT_CNT=%d,DIR_CNT=%d,LOC_CNT=%d,RF_CNT=%d,UPL_CNT=%d,DNL_CNT=%d",
-				igate_get_msg_cnt(),
-				igate_get_pkt_cnt(),
+				igate.msgCount(),
+				igate.pktCount(),
 				mheardDB.Count(0, last_minutes),
 				mheardDB.Count(bs.igateConfig.max_digi_hops, last_minutes),
 				mheardDB.Count(8, last_minutes),
-				igate_get_upl_cnt(),
-				igate_get_dnl_cnt())
+				igate.uplinkCount(),
+				igate.downlinkCount())
 
 			beacon_text += stuff
 		}
@@ -900,7 +900,7 @@ func (bs *BeaconService) send(ctx context.Context, j int, gpsinfo *dwgps_info_t)
 			text_color_set(DW_COLOR_XMIT)
 			dw_printf("[ig] %s\n", beacon_text)
 
-			igate_send_rec_packet(-1, pp) // Channel -1 to avoid RF>IS filtering.
+			igate.sendRecPacket(-1, pp) // Channel -1 to avoid RF>IS filtering.
 		case SENDTO_RECV:
 			/* Simulated reception from radio. */
 			var alevel ALevel

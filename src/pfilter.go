@@ -34,7 +34,20 @@ import (
  * These are set by init function.
  */
 
-// TODO KG var save_igate_config_p *igate_config_s
+// pfilter_igate_config_p is the IGate configuration pfilter_init was given.
+// An "i" filter takes its default hop count from it.
+//
+// This was a file-scope static in Dire Wolf, as igate.c's identically named
+// save_igate_config_p was; the port flattened both into a single package
+// variable that the two inits took turns assigning.  pfilter.go keeps its own
+// so that it holds what pfilter_init was handed and nothing else.  See issue
+// #674.
+//
+// Nothing guarantees it has been set: pfilter_validate runs while the config
+// file is still being read, before pfilter_init, so every read of it needs a
+// nil check and a sensible default.
+var pfilter_igate_config_p *igate_config_s
+
 var pfilter_debug = 0
 
 /*-------------------------------------------------------------------
@@ -54,7 +67,7 @@ var pfilter_debug = 0
 
 func pfilter_init(p_igate_config *igate_config_s, debug_level int) {
 	pfilter_debug = debug_level
-	save_igate_config_p = p_igate_config
+	pfilter_igate_config_p = p_igate_config
 }
 
 type token_type_t int
@@ -1226,8 +1239,8 @@ func filt_i(pf *pfstate_t) (int, error) {
 	// TODO KG: This was unused in the original C, but I think that was accidental given all the context here
 	var heardtime = 180 //nolint:ineffassign,wastedassign
 	var maxhops = 0     // from IGTXVIA config.
-	if save_igate_config_p != nil {
-		maxhops = save_igate_config_p.max_digi_hops
+	if pfilter_igate_config_p != nil {
+		maxhops = pfilter_igate_config_p.max_digi_hops
 	}
 	var dlat maybe.Maybe[float64]
 	var dlon maybe.Maybe[float64]
