@@ -49,7 +49,13 @@ deb: cmds
 	rm -rf $(DEB_STAGING)
 
 .PHONY: test
-test: gotest test-scripts
+# The Go tests spend most of their time waiting on the clock (audio played out
+# in real time, reconnect back-offs) while the scripts are CPU-bound decoding,
+# so running the two side by side takes about as long as the slower of them
+# rather than both - roughly 70s down to 50s. The -j2 is here rather than
+# left to the caller so that a plain `make test`, as CI runs it, gets it too.
+test:
+	$(MAKE) -j2 gotest test-scripts
 
 .PHONY: gotest
 gotest:
