@@ -164,6 +164,17 @@ type AGWServer struct {
 	// below rather than touching the table directly.
 	mu      sync.Mutex
 	clients [MAX_NET_CLIENTS]agwClient
+
+	// writeMu serialises the writes to each client slot's socket.  An AGW
+	// message goes out as a header and then its data, in two writes, and the
+	// receive path, every channel's transmit thread, the touch tone gateway
+	// and the client's own command thread can all be sending one to the same
+	// client at once; unserialised, one message's header can land between
+	// another's header and data, and the client never finds a message
+	// boundary again.  There is one per slot, not one for the table, so a
+	// client that has stopped reading holds up only the writes aimed at
+	// itself.  Go through writeToClient rather than taking these directly.
+	writeMu [MAX_NET_CLIENTS]sync.Mutex
 }
 
 // agwClient is what the server remembers about one of its client slots.  A
@@ -334,7 +345,7 @@ func (s *AGWServer) SendRecPacket(channel int, pp *packet_t, fbuf []byte) {
 				s.debugPrint(TO_CLIENT, client, agwpe_msg)
 			}
 
-			var _, err = agwpe_msg.Write(conn, binary.LittleEndian)
+			var err = s.writeToClient(client, conn, agwpe_msg)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application.  Closing connection.\n\n")
@@ -440,7 +451,7 @@ func (s *AGWServer) SendMonitored(channel int, pp *packet_t, own_xmit int) {
 				s.debugPrint(TO_CLIENT, client, agwpe_msg)
 			}
 
-			var _, err = agwpe_msg.Write(conn, binary.LittleEndian)
+			var err = s.writeToClient(client, conn, agwpe_msg)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
@@ -1093,12 +1104,23 @@ func (s *AGWServer) sendToClient(client int, reply_p *AGWPEMessage) {
 		s.debugPrint(TO_CLIENT, client, reply_p)
 	}
 
-	var _, err = reply_p.Write(conn, binary.LittleEndian)
+	var err = s.writeToClient(client, conn, reply_p)
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\nError sending message to AGW client application %d (%s).  Closing connection.\n\n", client, err)
 		s.detachClient(client, conn)
 	}
+}
+
+// writeToClient sends msg, header and data, to conn, the socket attached to
+// client, with no other message to that client able to come between the two.
+func (s *AGWServer) writeToClient(client int, conn net.Conn, msg *AGWPEMessage) error {
+	s.writeMu[client].Lock()
+	defer s.writeMu[client].Unlock()
+
+	var _, err = msg.Write(conn, binary.LittleEndian)
+
+	return err
 }
 
 // detachClient hangs up on a client, gives its slot back, and tells the data

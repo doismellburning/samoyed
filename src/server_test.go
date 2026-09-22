@@ -4,6 +4,9 @@
 package direwolf
 
 import (
+	"bytes"
+	"encoding/binary"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -629,4 +632,119 @@ func TestSendToClient_WriteErrorDetachesTheClient(t *testing.T) {
 	assert.Nil(t, s.clientConn(0), "the connection we could not write to is still attached")
 	require.NotNil(t, item, "connected mode was not told the client had gone")
 	assert.Equal(t, DLQ_CLIENT_CLEANUP, item._type)
+}
+
+// --- Writes to one client from more than one goroutine ---
+
+// gatedConn records everything written to it.  The first write it is given -
+// the header of the first message - is held until release is closed, so a
+// test can put a second writer to work while the first is halfway through its
+// message.
+type gatedConn struct {
+	net.Conn
+
+	addr net.Addr
+
+	mu      sync.Mutex
+	written []byte
+	writes  int
+
+	firstWrite chan struct{} // Closed once the first write has been recorded.
+	release    chan struct{} // Closing it lets the first write return.
+}
+
+func newGatedConn(addr net.Addr) *gatedConn {
+	var c = new(gatedConn)
+	c.addr = addr
+	c.firstWrite = make(chan struct{})
+	c.release = make(chan struct{})
+
+	return c
+}
+
+func (c *gatedConn) Write(b []byte) (int, error) {
+	c.mu.Lock()
+	c.written = append(c.written, b...)
+	c.writes++
+	var first = c.writes == 1
+	c.mu.Unlock()
+
+	if first {
+		close(c.firstWrite)
+		<-c.release
+	}
+
+	return len(b), nil
+}
+
+func (c *gatedConn) Close() error         { return nil }
+func (c *gatedConn) RemoteAddr() net.Addr { return c.addr }
+
+func (c *gatedConn) writeCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return c.writes
+}
+
+// An AGW message goes out as a header and then its data, in two writes, so two
+// goroutines writing to the same client at once can put one message's header
+// between the other's header and data.  The client then takes that header as
+// data, and every message after it is misframed.  Here a channel's transmit
+// thread is sending a 'T' own-transmitted monitor frame when the client's own
+// command thread answers it with an 'R'.  Refs #694.
+func TestAGWServer_ConcurrentWritesToAClientKeepTheirFraming(t *testing.T) {
+	var s = new(AGWServer)
+
+	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
+	require.NotNil(t, pp)
+
+	var conn = newGatedConn(tcpAddr(t, "192.168.1.10"))
+
+	s.clientAccepted(0, conn)
+
+	var monitorToggle = new(AGWPEMessage)
+	monitorToggle.Header.DataKind = 'm'
+	s.handleClientCommand(0, monitorToggle)
+
+	var version = new(AGWPEMessage)
+	version.Header.DataKind = 'R'
+
+	var wg sync.WaitGroup
+
+	wg.Go(func() { s.SendMonitored(0, pp, 1) }) /* The transmit thread. */
+
+	<-conn.firstWrite /* 'T' has its header out and is about to send its data. */
+
+	wg.Go(func() { s.handleClientCommand(0, version) }) /* The client's command thread. */
+
+	/*
+	 * Give the reply every chance to reach the socket.  Unserialised, it gets
+	 * there straight away; serialised, it cannot until the first message is
+	 * finished, so the wait is only ever this long when all is well.
+	 */
+	var deadline = time.Now().Add(100 * time.Millisecond)
+	for conn.writeCount() == 1 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+
+	close(conn.release)
+	wg.Wait()
+
+	var stream = bytes.NewReader(conn.written)
+
+	var kinds []byte
+
+	for stream.Len() > 0 {
+		var msg = new(AGWPEMessage)
+		require.NoError(t, binary.Read(stream, binary.LittleEndian, &msg.Header), "stream ends partway through a header")
+
+		msg.Data = make([]byte, msg.Header.DataLen)
+		var _, err = io.ReadFull(stream, msg.Data)
+		require.NoError(t, err, "stream ends partway through the data of a '%c'", msg.Header.DataKind)
+
+		kinds = append(kinds, msg.Header.DataKind)
+	}
+
+	assert.ElementsMatch(t, []byte{'T', 'R'}, kinds, "the messages read back are not the ones that were sent")
 }
