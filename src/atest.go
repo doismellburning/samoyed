@@ -818,11 +818,7 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 	/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
 	/* that need to be kept in sync.  Maybe it could be a common function someday. */
 
-	if achan.baud == 100 { // What was this for?
-		achan.modem_type = MODEM_AFSK
-		achan.mark_freq = 1615
-		achan.space_freq = 1785
-	} else if achan.baud < 600 { // e.g. HF SSB packet
+	if achan.baud < 600 { // e.g. HF SSB packet
 		achan.modem_type = MODEM_AFSK
 		achan.mark_freq = 1600
 		achan.space_freq = 1800

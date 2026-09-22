@@ -202,8 +202,8 @@ func TestModemOptions(t *testing.T) {
 			args: []string{"-B", "100"},
 			want: map[string]string{
 				"direwolf":    "100 AFSK 1600/1800 profiles=\"\" v26=- D=3 U=0 AX25 fx25=0 fec=1 inv=0",
-				"atest":       "100 AFSK 1615/1785 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
-				"gen_packets": "100 AFSK 1615/1785 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"atest":       "100 AFSK 1600/1800 profiles=\"A\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"gen_packets": "100 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
 		},
 		{

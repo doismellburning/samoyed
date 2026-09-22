@@ -719,11 +719,7 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 		// We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c,
 		// that need to be kept in sync.  Maybe it could be a common function someday.
 
-		if achan.baud == 100 { // What was this for?
-			achan.modem_type = MODEM_AFSK
-			achan.mark_freq = 1615
-			achan.space_freq = 1785
-		} else if achan.baud == 0xEA5EA5 {
+		if achan.baud == 0xEA5EA5 {
 			achan.baud = 521 // Fine tuned later. 520.83333
 			// Proper fix is to make this float.
 			achan.modem_type = MODEM_EAS
@@ -773,7 +769,7 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
 		}
 
-		if achan.baud != 100 && (achan.baud < MIN_BAUD || achan.baud > MAX_BAUD) {
+		if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
 			return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
 		}
 	}
