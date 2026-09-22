@@ -137,50 +137,9 @@ func AtestMain() {
 	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
 
-	my_audio_config = new(audio_s)
+	my_audio_config = atestDefaultAudio()
 
-	/*
-	 * First apply defaults.
-	 */
-
-	my_audio_config.adev[0].num_channels = DEFAULT_NUM_CHANNELS
-	my_audio_config.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
-	my_audio_config.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
-
-	for channel := range MAX_RADIO_CHANS {
-		my_audio_config.achan[channel].modem_type = MODEM_AFSK
-
-		my_audio_config.achan[channel].mark_freq = DEFAULT_MARK_FREQ
-		my_audio_config.achan[channel].space_freq = DEFAULT_SPACE_FREQ
-		my_audio_config.achan[channel].baud = DEFAULT_BAUD
-
-		my_audio_config.achan[channel].profiles = "A"
-
-		my_audio_config.achan[channel].num_freq = 1
-		my_audio_config.achan[channel].offset = 0
-
-		my_audio_config.achan[channel].fix_bits = RETRY_NONE
-
-		my_audio_config.achan[channel].sanity_test = SANITY_APRS
-		// my_audio_config.achan[channel].sanity_test = SANITY_AX25;
-		// my_audio_config.achan[channel].sanity_test = SANITY_NONE;
-	}
-
-	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
-300 bps defaults to AFSK tones of 1600 & 1800.
-1200 bps uses AFSK tones of 1200 & 2200.
-2400 bps uses QPSK based on V.26 standard.
-4800 bps uses 8PSK based on V.27 standard.
-9600 bps and up uses K9NG/G3RUH standard.
-AIS for ship Automatic Identification System.
-EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
-	var g3ruh = pflag.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
-	var bpsk = pflag.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
-	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
-	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
-	var modemProfile = pflag.StringP("modem-profile", "P", "", "Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
-	var decimate = pflag.IntP("decimate", "D", 0, "Divide audio sample rate by n. 0 is auto-select.")
-	var upsample = pflag.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
+	var modemFlags = addAtestModemFlags(pflag.CommandLine)
 	var fixBits = pflag.IntP("fix-bits", "F", 0, fmt.Sprintf(`Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.
 1 = Try to fix only a single bit.
@@ -250,12 +209,6 @@ o = DCD output control
 		}
 	}
 
-	if *decimate < 0 || *decimate > 8 {
-		fmt.Fprintf(os.Stderr, "Decimate should be between 0 and 8 inclusive, not %d.\n", *decimate)
-		pflag.Usage()
-		os.Exit(1)
-	}
-
 	var il2p_version, il2p_version_ok = il2p_parse_version(*il2pVersion)
 	if !il2p_version_ok {
 		text_color_set(DW_COLOR_ERROR)
@@ -266,18 +219,6 @@ o = DCD output control
 
 	for channel := range MAX_RADIO_CHANS {
 		my_audio_config.achan[channel].il2p_version = il2p_version
-	}
-
-	my_audio_config.achan[0].decimate = *decimate
-
-	if *upsample != 0 {
-		if *upsample < 1 || *upsample > 8 {
-			fmt.Fprintf(os.Stderr, "Upsample should be between 1 and 4 inclusive, not %d.\n", *upsample)
-			pflag.Usage()
-			os.Exit(1)
-		}
-
-		my_audio_config.achan[0].upsample = *upsample
 	}
 
 	var fixBitsLevel, fixBitsPassall, fixBitsValid = atestFixBits(*fixBits)
@@ -328,130 +269,12 @@ o = DCD output control
 		h_opt = true
 	}
 
-	// Hacks for the magic strings
-	var bitrate, bitrateParseErr = strconv.Atoi(*bitrateStr)
-	if *bitrateStr == "AIS" {
-		bitrate = 0xA15A15
-	} else if *bitrateStr == "EAS" {
-		bitrate = 0xEA5EA5
-	} else if bitrateParseErr != nil {
-		fmt.Fprintf(os.Stderr, "Invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s\n", *bitrateStr)
+	var modemErr = modemFlags.apply(&my_audio_config.achan[0])
+	if modemErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
 		pflag.Usage()
 		os.Exit(1)
-	}
-
-	/*
-	 * Set modem type based on data rate.
-	 * (Could be overridden by -g, -j, or -J later.)
-	 */
-	/*    300 implies 1600/1800 AFSK. */
-	/*    1200 implies 1200/2200 AFSK. */
-	/*    2400 implies V.26 QPSK. */
-	/*    4800 implies V.27 8PSK. */
-	/*    9600 implies G3RUH baseband scrambled. */
-
-	my_audio_config.achan[0].baud = bitrate
-
-	/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
-	/* that need to be kept in sync.  Maybe it could be a common function someday. */
-
-	if my_audio_config.achan[0].baud == 100 { // What was this for?
-		my_audio_config.achan[0].modem_type = MODEM_AFSK
-		my_audio_config.achan[0].mark_freq = 1615
-		my_audio_config.achan[0].space_freq = 1785
-	} else if my_audio_config.achan[0].baud < 600 { // e.g. HF SSB packet
-		my_audio_config.achan[0].modem_type = MODEM_AFSK
-		my_audio_config.achan[0].mark_freq = 1600
-		my_audio_config.achan[0].space_freq = 1800
-		// Previously we had a "D" which was fine tuned for 300 bps.
-		// In v1.7, it's not clear if we should use "B" or just stick with "A".
-	} else if my_audio_config.achan[0].baud < 1800 { // common 1200
-		my_audio_config.achan[0].modem_type = MODEM_AFSK
-		my_audio_config.achan[0].mark_freq = DEFAULT_MARK_FREQ
-		my_audio_config.achan[0].space_freq = DEFAULT_SPACE_FREQ
-	} else if my_audio_config.achan[0].baud < 3600 {
-		my_audio_config.achan[0].modem_type = MODEM_QPSK
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].profiles = ""
-	} else if my_audio_config.achan[0].baud < 7200 {
-		my_audio_config.achan[0].modem_type = MODEM_8PSK
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].profiles = ""
-	} else if my_audio_config.achan[0].baud == 0xA15A15 { // Hack for different use of 9600
-		my_audio_config.achan[0].modem_type = MODEM_AIS
-		my_audio_config.achan[0].baud = 9600
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].profiles = " " // avoid getting default later.
-	} else if my_audio_config.achan[0].baud == 0xEA5EA5 {
-		my_audio_config.achan[0].modem_type = MODEM_EAS
-		my_audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
-		// Will make more precise in afsk demod init.
-		my_audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
-		my_audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
-		my_audio_config.achan[0].profiles = "A"
-	} else {
-		my_audio_config.achan[0].modem_type = MODEM_SCRAMBLE
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].profiles = " " // avoid getting default later.
-	}
-
-	if my_audio_config.achan[0].baud < MIN_BAUD || my_audio_config.achan[0].baud > MAX_BAUD {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
-		os.Exit(1)
-	}
-
-	/*
-	 * -g option means force g3RUH regardless of speed.
-	 */
-
-	if *g3ruh {
-		my_audio_config.achan[0].modem_type = MODEM_SCRAMBLE
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].profiles = " " // avoid getting default later.
-	}
-
-	if *bpsk {
-		my_audio_config.achan[0].modem_type = MODEM_BPSK
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].profiles = ""
-	}
-
-	/*
-	 * We have two different incompatible flavors of V.26.
-	 */
-	if *direwolf15compat {
-		// V.26 compatible with earlier versions of direwolf.
-		//   Example:   -B 2400 -j    or simply   -j
-		my_audio_config.achan[0].v26_alternative = V26_A
-		my_audio_config.achan[0].modem_type = MODEM_QPSK
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].baud = 2400
-		my_audio_config.achan[0].profiles = ""
-	}
-
-	if *mfj2400compat {
-		// V.26 compatible with MFJ and maybe others.
-		//   Example:   -B 2400 -J     or simply   -J
-		my_audio_config.achan[0].v26_alternative = V26_B
-		my_audio_config.achan[0].modem_type = MODEM_QPSK
-		my_audio_config.achan[0].mark_freq = 0
-		my_audio_config.achan[0].space_freq = 0
-		my_audio_config.achan[0].baud = 2400
-		my_audio_config.achan[0].profiles = ""
-	}
-
-	// Needs to be after -B, -j, -J.
-	if *modemProfile != "" {
-		fmt.Printf("Demodulator profile set to \"%s\"\n", *modemProfile)
-		my_audio_config.achan[0].profiles = *modemProfile
 	}
 
 	my_audio_config.achan[1] = my_audio_config.achan[0]
@@ -919,4 +742,212 @@ func (s *atestSink) DCDChange(channel int, state int) {
 			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-s.dcdStartSeconds[channel])*1000.)
 		}
 	}
+}
+
+// atestModemFlags are the command line options that set up the demodulator.
+type atestModemFlags struct {
+	bitrate          *string
+	g3ruh            *bool
+	bpsk             *bool
+	direwolf15compat *bool
+	mfj2400compat    *bool
+	profile          *string
+	decimate         *int
+	upsample         *int
+}
+
+func addAtestModemFlags(fs *pflag.FlagSet) *atestModemFlags {
+	var f = new(atestModemFlags)
+	f.bitrate = fs.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
+300 bps defaults to AFSK tones of 1600 & 1800.
+1200 bps uses AFSK tones of 1200 & 2200.
+2400 bps uses QPSK based on V.26 standard.
+4800 bps uses 8PSK based on V.27 standard.
+9600 bps and up uses K9NG/G3RUH standard.
+AIS for ship Automatic Identification System.
+EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
+	f.g3ruh = fs.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
+	f.bpsk = fs.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
+	f.direwolf15compat = fs.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
+	f.mfj2400compat = fs.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
+	f.profile = fs.StringP("modem-profile", "P", "", "Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
+	f.decimate = fs.IntP("decimate", "D", 0, "Divide audio sample rate by n. 0 is auto-select.")
+	f.upsample = fs.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
+
+	return f
+}
+
+// apply sets up achan from the options, once they have been parsed.
+func (f *atestModemFlags) apply(achan *achan_param_s) error {
+	if *f.decimate < 0 || *f.decimate > 8 {
+		return fmt.Errorf("decimate should be between 0 and 8 inclusive, not %d", *f.decimate)
+	}
+
+	achan.decimate = *f.decimate
+
+	if *f.upsample != 0 {
+		if *f.upsample < 1 || *f.upsample > 8 {
+			return fmt.Errorf("upsample should be between 1 and 4 inclusive, not %d", *f.upsample)
+		}
+
+		achan.upsample = *f.upsample
+	}
+
+	// Hacks for the magic strings
+	var bitrate, bitrateParseErr = strconv.Atoi(*f.bitrate)
+	if *f.bitrate == "AIS" {
+		bitrate = 0xA15A15
+	} else if *f.bitrate == "EAS" {
+		bitrate = 0xEA5EA5
+	} else if bitrateParseErr != nil {
+		return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", *f.bitrate)
+	}
+
+	/*
+	 * Set modem type based on data rate.
+	 * (Could be overridden by -g, -j, or -J later.)
+	 */
+	/*    300 implies 1600/1800 AFSK. */
+	/*    1200 implies 1200/2200 AFSK. */
+	/*    2400 implies V.26 QPSK. */
+	/*    4800 implies V.27 8PSK. */
+	/*    9600 implies G3RUH baseband scrambled. */
+
+	achan.baud = bitrate
+
+	/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
+	/* that need to be kept in sync.  Maybe it could be a common function someday. */
+
+	if achan.baud == 100 { // What was this for?
+		achan.modem_type = MODEM_AFSK
+		achan.mark_freq = 1615
+		achan.space_freq = 1785
+	} else if achan.baud < 600 { // e.g. HF SSB packet
+		achan.modem_type = MODEM_AFSK
+		achan.mark_freq = 1600
+		achan.space_freq = 1800
+		// Previously we had a "D" which was fine tuned for 300 bps.
+		// In v1.7, it's not clear if we should use "B" or just stick with "A".
+	} else if achan.baud < 1800 { // common 1200
+		achan.modem_type = MODEM_AFSK
+		achan.mark_freq = DEFAULT_MARK_FREQ
+		achan.space_freq = DEFAULT_SPACE_FREQ
+	} else if achan.baud < 3600 {
+		achan.modem_type = MODEM_QPSK
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.profiles = ""
+	} else if achan.baud < 7200 {
+		achan.modem_type = MODEM_8PSK
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.profiles = ""
+	} else if achan.baud == 0xA15A15 { // Hack for different use of 9600
+		achan.modem_type = MODEM_AIS
+		achan.baud = 9600
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.profiles = " " // avoid getting default later.
+	} else if achan.baud == 0xEA5EA5 {
+		achan.modem_type = MODEM_EAS
+		achan.baud = 521 // Actually 520.83 but we have an integer field here.
+		// Will make more precise in afsk demod init.
+		achan.mark_freq = 2083  // Actually 2083.3 - logic 1.
+		achan.space_freq = 1563 // Actually 1562.5 - logic 0.
+		achan.profiles = "A"
+	} else {
+		achan.modem_type = MODEM_SCRAMBLE
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.profiles = " " // avoid getting default later.
+	}
+
+	if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
+		return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
+	}
+
+	/*
+	 * -g option means force g3RUH regardless of speed.
+	 */
+
+	if *f.g3ruh {
+		achan.modem_type = MODEM_SCRAMBLE
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.profiles = " " // avoid getting default later.
+	}
+
+	if *f.bpsk {
+		achan.modem_type = MODEM_BPSK
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.profiles = ""
+	}
+
+	/*
+	 * We have two different incompatible flavors of V.26.
+	 */
+	if *f.direwolf15compat {
+		// V.26 compatible with earlier versions of direwolf.
+		//   Example:   -B 2400 -j    or simply   -j
+		achan.v26_alternative = V26_A
+		achan.modem_type = MODEM_QPSK
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.baud = 2400
+		achan.profiles = ""
+	}
+
+	if *f.mfj2400compat {
+		// V.26 compatible with MFJ and maybe others.
+		//   Example:   -B 2400 -J     or simply   -J
+		achan.v26_alternative = V26_B
+		achan.modem_type = MODEM_QPSK
+		achan.mark_freq = 0
+		achan.space_freq = 0
+		achan.baud = 2400
+		achan.profiles = ""
+	}
+
+	// Needs to be after -B, -j, -J.
+	if *f.profile != "" {
+		fmt.Printf("Demodulator profile set to \"%s\"\n", *f.profile)
+		achan.profiles = *f.profile
+	}
+
+	return nil
+}
+
+// atestDefaultAudio is the audio configuration atest starts from, before its options.
+func atestDefaultAudio() *audio_s {
+	var audio = new(audio_s)
+
+	/*
+	 * First apply defaults.
+	 */
+
+	audio.adev[0].num_channels = DEFAULT_NUM_CHANNELS
+	audio.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC
+	audio.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE
+
+	for channel := range MAX_RADIO_CHANS {
+		audio.achan[channel].modem_type = MODEM_AFSK
+
+		audio.achan[channel].mark_freq = DEFAULT_MARK_FREQ
+		audio.achan[channel].space_freq = DEFAULT_SPACE_FREQ
+		audio.achan[channel].baud = DEFAULT_BAUD
+
+		audio.achan[channel].profiles = "A"
+
+		audio.achan[channel].num_freq = 1
+		audio.achan[channel].offset = 0
+
+		audio.achan[channel].fix_bits = RETRY_NONE
+
+		audio.achan[channel].sanity_test = SANITY_APRS
+		// audio.achan[channel].sanity_test = SANITY_AX25;
+		// audio.achan[channel].sanity_test = SANITY_NONE;
+	}
+
+	return audio
 }
