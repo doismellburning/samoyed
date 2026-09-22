@@ -5,7 +5,6 @@ package direwolf
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -103,7 +102,8 @@ func DirewolfMain(ctx context.Context) {
 	// Long option only - every single letter is taken.
 	var configCheck = pflag.Bool("config-check", false, "Check the configuration file and exit, without starting anything up.  Exit status is non-zero if it has errors in it.")
 	var enablePseudoTerminal = pflag.BoolP("enable-ptty", "p", false, "Enable pseudo terminal for KISS protocol.")
-	var modemFlags = addDirewolfModemFlags(pflag.CommandLine)
+	var modemFlags = addModemFlags(pflag.CommandLine, true)
+	var layer2Flags = addLayer2TxFlags(pflag.CommandLine, "IL2PVERSION")
 	var transmitCalibration = pflag.StringP("transmit-calibration", "x", "", `Send Xmit level calibration tones.
 a = Alternating mark/space tones.
 m = Steady mark tone (e.g. 1200Hz).
@@ -356,6 +356,10 @@ x = Silence FX.25 information.`)
 	}
 
 	var modemErr = modemFlags.apply(&audio_config.achan[0])
+	if modemErr == nil {
+		modemErr = layer2Flags.apply(&audio_config.achan[0])
+	}
+
 	if modemErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
@@ -1193,169 +1197,4 @@ func countOf(n int, noun string) string {
 	}
 
 	return fmt.Sprintf("%d %ss", n, noun)
-}
-
-// direwolfModemFlags are the command line options that set up channel 0's
-// modem, overriding whatever the configuration file said.
-type direwolfModemFlags struct {
-	fs               *pflag.FlagSet
-	bitrate          *string
-	g3ruh            *bool
-	bpsk             *bool
-	direwolf15compat *bool
-	mfj2400compat    *bool
-	profile          *string
-	decimate         *int
-	upsample         *int
-	fx25CheckBytes   *int
-	il2pNormal       *int
-	il2pInverted     *int
-}
-
-func addDirewolfModemFlags(fs *pflag.FlagSet) *direwolfModemFlags {
-	var f = new(direwolfModemFlags)
-	f.fs = fs
-	f.bitrate = fs.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
-300 bps defaults to AFSK tones of 1600 & 1800.
-1200 bps uses AFSK tones of 1200 & 2200.
-2400 bps uses QPSK based on V.26 standard.
-4800 bps uses 8PSK based on V.27 standard.
-9600 bps and up uses K9NG/G3RUH standard.
-AIS for ship Automatic Identification System.
-EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
-	f.g3ruh = fs.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
-	f.bpsk = fs.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
-	f.direwolf15compat = fs.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
-	f.mfj2400compat = fs.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
-	f.profile = fs.StringP("modem-profile", "P", "", "Select the modem type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
-	f.decimate = fs.IntP("decimate", "D", 0, "Divide audio sample rate by n for channel 0. 0 is auto-select.")
-	f.upsample = fs.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
-	f.fx25CheckBytes = fs.IntP("fx25-check-bytes", "X", 0, "1 to enable FX.25 transmit.  16, 32, 64 for specific number of check bytes.")
-	f.il2pNormal = fs.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see IL2PVERSION).")
-	f.il2pInverted = fs.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see IL2PVERSION).")
-
-	return f
-}
-
-// apply sets up achan from the options, once they have been parsed.
-func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
-	if f.fs.Changed("bitrate") {
-		var err = achan.setModem(*f.bitrate)
-		if err != nil {
-			return err
-		}
-
-		if achan.modem_type == MODEM_QPSK && achan.baud != 2400 {
-			fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", achan.baud)
-		}
-
-		if achan.modem_type == MODEM_8PSK && achan.baud != 4800 {
-			fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", achan.baud)
-		}
-	}
-
-	if *f.g3ruh {
-		// Force G3RUH mode, overriding default for speed.
-		//   Example:   -B 2400 -g
-		achan.modem_type = MODEM_SCRAMBLE
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	}
-
-	if *f.bpsk {
-		// Force BPSK mode, overriding default for speed.
-		//   Example:   -B 300 -k
-		achan.modem_type = MODEM_BPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	}
-
-	if *f.direwolf15compat {
-		// V.26 compatible with earlier versions of direwolf.
-		//   Example:   -B 2400 -j    or simply   -j
-		achan.v26_alternative = V26_A
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.baud = 2400
-		achan.profiles = ""
-	}
-
-	if *f.mfj2400compat {
-		// V.26 compatible with MFJ and maybe others.
-		//   Example:   -B 2400 -J     or simply   -J
-		achan.v26_alternative = V26_B
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.baud = 2400
-		achan.profiles = ""
-	}
-
-	if *f.profile != "" {
-		/* -P for modem profile. */
-		achan.profiles = *f.profile
-	}
-
-	if f.fs.Changed("decimate") {
-		if *f.decimate < 0 || *f.decimate > 8 {
-			return fmt.Errorf("crazy value for -D: %d", *f.decimate)
-		}
-
-		// Reduce audio sampling rate to reduce CPU requirements.
-		achan.decimate = *f.decimate
-	}
-
-	if f.fs.Changed("upsample") {
-		if *f.upsample < 0 || *f.upsample > 4 {
-			return fmt.Errorf("crazy value for -U: %d", *f.upsample)
-		}
-
-		// Increase G3RUH audio sampling rate to improve performance.
-		// The value is normally determined automatically based on audio
-		// sample rate and baud.  This allows override for experimentation.
-		achan.upsample = *f.upsample
-	}
-
-	if *f.fx25CheckBytes > 0 {
-		if *f.il2pNormal >= 0 || *f.il2pInverted >= 0 {
-			return errors.New("can't mix -X with -I or -i")
-		}
-
-		achan.fx25_strength = *f.fx25CheckBytes
-		achan.layer2_xmit = LAYER2_FX25
-	}
-
-	if *f.il2pNormal >= 0 && *f.il2pInverted >= 0 {
-		return errors.New("can't use both -I and -i at the same time")
-	}
-
-	if *f.il2pNormal >= 0 {
-		achan.layer2_xmit = LAYER2_IL2P
-		achan.il2p_max_fec = IfThenElse(*f.il2pNormal > 0, 1, 0)
-
-		if achan.il2p_max_fec == 0 {
-			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -I for best results.\n")
-		}
-
-		achan.il2p_invert_polarity = 0 // normal
-	}
-
-	if *f.il2pInverted >= 0 {
-		achan.layer2_xmit = LAYER2_IL2P
-		achan.il2p_max_fec = IfThenElse(*f.il2pInverted > 0, 1, 0)
-
-		if achan.il2p_max_fec == 0 {
-			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -i for best results.\n")
-		}
-
-		achan.il2p_invert_polarity = 1 // invert for transmit
-		if achan.baud == 1200 {
-			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
-		}
-	}
-
-	return nil
 }

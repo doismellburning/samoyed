@@ -58,13 +58,17 @@ func direwolfModemOptionsOver(t *testing.T, config string, args ...string) (mode
 
 	var audio, _ = configFromString(t, config)
 	var fs = pflag.NewFlagSet("direwolf", pflag.ContinueOnError)
-	var f = addDirewolfModemFlags(fs)
+	var modem = addModemFlags(fs, true)
+	var layer2 = addLayer2TxFlags(fs, "IL2PVERSION")
 	var parseErr = fs.Parse(args)
 	if parseErr != nil {
 		return modemResult{}, parseErr
 	}
 
-	var err = f.apply(&audio.achan[0])
+	var err = modem.apply(&audio.achan[0])
+	if err == nil {
+		err = layer2.apply(&audio.achan[0])
+	}
 
 	return modemResultOf(&audio.achan[0]), err
 }
@@ -75,7 +79,7 @@ func atestModemOptions(t *testing.T, args ...string) (modemResult, error) {
 
 	var audio = atestDefaultAudio()
 	var fs = pflag.NewFlagSet("atest", pflag.ContinueOnError)
-	var f = addAtestModemFlags(fs)
+	var f = addModemFlags(fs, true)
 	var parseErr = fs.Parse(args)
 	if parseErr != nil {
 		return modemResult{}, parseErr
@@ -378,14 +382,14 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-D", "9"},
 			want: map[string]string{
-				"direwolf": "error: crazy value for -D: 9",
+				"direwolf": "error: decimate should be between 0 and 8 inclusive, not 9",
 				"atest":    "error: decimate should be between 0 and 8 inclusive, not 9",
 			},
 		},
 		{
 			args: []string{"-D", "-1"},
 			want: map[string]string{
-				"direwolf": "error: crazy value for -D: -1",
+				"direwolf": "error: decimate should be between 0 and 8 inclusive, not -1",
 				"atest":    "error: decimate should be between 0 and 8 inclusive, not -1",
 			},
 		},
@@ -399,15 +403,15 @@ func TestModemOptions(t *testing.T) {
 		{
 			args: []string{"-U", "5"},
 			want: map[string]string{
-				"direwolf": "error: crazy value for -U: 5",
-				"atest":    "error: upsample should be between 1 and 4 inclusive, not 5",
+				"direwolf": "error: upsample should be between 0 and 4 inclusive, not 5",
+				"atest":    "error: upsample should be between 0 and 4 inclusive, not 5",
 			},
 		},
 		{
 			args: []string{"-U", "9"},
 			want: map[string]string{
-				"direwolf": "error: crazy value for -U: 9",
-				"atest":    "error: upsample should be between 1 and 4 inclusive, not 9",
+				"direwolf": "error: upsample should be between 0 and 4 inclusive, not 9",
+				"atest":    "error: upsample should be between 0 and 4 inclusive, not 9",
 			},
 		},
 		{

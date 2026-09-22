@@ -47,12 +47,12 @@ import (
 	"io"
 	"math"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
 	"unsafe"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
@@ -139,7 +139,7 @@ func AtestMain() {
 
 	my_audio_config = atestDefaultAudio()
 
-	var modemFlags = addAtestModemFlags(pflag.CommandLine)
+	var modemFlags = addModemFlags(pflag.CommandLine, true)
 	var fixBits = pflag.IntP("fix-bits", "F", 0, fmt.Sprintf(`Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.
 1 = Try to fix only a single bit.
@@ -746,112 +746,6 @@ func (s *atestSink) DCDChange(channel int, state int) {
 	}
 }
 
-// atestModemFlags are the command line options that set up the demodulator.
-type atestModemFlags struct {
-	bitrate          *string
-	g3ruh            *bool
-	bpsk             *bool
-	direwolf15compat *bool
-	mfj2400compat    *bool
-	profile          *string
-	decimate         *int
-	upsample         *int
-}
-
-func addAtestModemFlags(fs *pflag.FlagSet) *atestModemFlags {
-	var f = new(atestModemFlags)
-	f.bitrate = fs.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
-300 bps defaults to AFSK tones of 1600 & 1800.
-1200 bps uses AFSK tones of 1200 & 2200.
-2400 bps uses QPSK based on V.26 standard.
-4800 bps uses 8PSK based on V.27 standard.
-9600 bps and up uses K9NG/G3RUH standard.
-AIS for ship Automatic Identification System.
-EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
-	f.g3ruh = fs.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
-	f.bpsk = fs.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
-	f.direwolf15compat = fs.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
-	f.mfj2400compat = fs.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
-	f.profile = fs.StringP("modem-profile", "P", "", "Select the demodulator type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
-	f.decimate = fs.IntP("decimate", "D", 0, "Divide audio sample rate by n. 0 is auto-select.")
-	f.upsample = fs.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
-
-	return f
-}
-
-// apply sets up achan from the options, once they have been parsed.
-func (f *atestModemFlags) apply(achan *achan_param_s) error {
-	if *f.decimate < 0 || *f.decimate > 8 {
-		return fmt.Errorf("decimate should be between 0 and 8 inclusive, not %d", *f.decimate)
-	}
-
-	achan.decimate = *f.decimate
-
-	if *f.upsample != 0 {
-		if *f.upsample < 1 || *f.upsample > 4 {
-			return fmt.Errorf("upsample should be between 1 and 4 inclusive, not %d", *f.upsample)
-		}
-
-		achan.upsample = *f.upsample
-	}
-
-	var modemErr = achan.setModem(*f.bitrate)
-	if modemErr != nil {
-		return modemErr
-	}
-
-	/*
-	 * -g option means force g3RUH regardless of speed.
-	 */
-
-	if *f.g3ruh {
-		achan.modem_type = MODEM_SCRAMBLE
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	}
-
-	if *f.bpsk {
-		achan.modem_type = MODEM_BPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	}
-
-	/*
-	 * We have two different incompatible flavors of V.26.
-	 */
-	if *f.direwolf15compat {
-		// V.26 compatible with earlier versions of direwolf.
-		//   Example:   -B 2400 -j    or simply   -j
-		achan.v26_alternative = V26_A
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.baud = 2400
-		achan.profiles = ""
-	}
-
-	if *f.mfj2400compat {
-		// V.26 compatible with MFJ and maybe others.
-		//   Example:   -B 2400 -J     or simply   -J
-		achan.v26_alternative = V26_B
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.baud = 2400
-		achan.profiles = ""
-	}
-
-	// Needs to be after -B, -j, -J.
-	if *f.profile != "" {
-		fmt.Printf("Demodulator profile set to \"%s\"\n", *f.profile)
-		achan.profiles = *f.profile
-	}
-
-	return nil
-}
-
 // atestDefaultAudio is the audio configuration atest starts from, before its options.
 func atestDefaultAudio() *audio_s {
 	var audio = new(audio_s)
@@ -893,5 +787,7 @@ func atestDefaultAudio() *audio_s {
 func atestSingleSlicer(achan *achan_param_s) {
 	if achan.profiles == "" && (achan.modem_type == MODEM_SCRAMBLE || achan.modem_type == MODEM_AIS) {
 		achan.profiles = "-"
+
+		logrus.WithField("profiles", achan.profiles).Info("Decoding with a single slicer")
 	}
 }

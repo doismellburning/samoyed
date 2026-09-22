@@ -659,40 +659,21 @@ func (sink *wavFileSink) Flush(_ int) int {
 
 // genPacketsModemFlags are the command line options that set up the modulator.
 type genPacketsModemFlags struct {
-	bitrate          *string
-	bitrateOverride  *string
-	g3ruh            *bool
-	bpsk             *bool
-	direwolf15compat *bool
-	mfj2400compat    *bool
-	mark             *int
-	space            *int
-	fx25CheckBytes   *int
-	il2pNormal       *int
-	il2pInverted     *int
-	il2pVersion      *string
+	modem           *modemFlags
+	layer2          *layer2TxFlags
+	bitrateOverride *string
+	mark            *int
+	space           *int
+	il2pVersion     *string
 }
 
 func addGenPacketsModemFlags(fs *pflag.FlagSet) *genPacketsModemFlags {
 	var f = new(genPacketsModemFlags)
-	f.bitrate = fs.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits / second for data.  Proper modem automatically selected for speed.
-300 bps defaults to AFSK tones of 1600 & 1800.
-1200 bps uses AFSK tones of 1200 & 2200.
-2400 bps uses QPSK based on V.26 standard.
-4800 bps uses 8PSK based on V.27 standard.
-9600 bps and up uses K9NG/G3RUH standard.
-AIS for ship Automatic Identification System.
-EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
-	f.bitrateOverride = fs.StringP("bitrate-override", "b", "", "Bits / second for data.")
-	f.g3ruh = fs.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
-	f.bpsk = fs.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
-	f.direwolf15compat = fs.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
-	f.mfj2400compat = fs.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
+	f.modem = addModemFlags(fs, false)
+	f.layer2 = addLayer2TxFlags(fs, "--il2p-version")
+	f.bitrateOverride = fs.StringP("bitrate-override", "b", "", "Bits / second for data, keeping the modem -B chose.")
 	f.mark = fs.IntP("mark", "m", 0, "Mark frequency.")
 	f.space = fs.IntP("space", "s", 0, "Space frequency.")
-	f.fx25CheckBytes = fs.IntP("fx25-check-bytes", "X", 0, "1 to enable FX.25 transmit.  16, 32, 64 for specific number of check bytes.")
-	f.il2pNormal = fs.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see --il2p-version).")
-	f.il2pInverted = fs.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see --il2p-version).")
 	f.il2pVersion = fs.String("il2p-version", "0.6", `IL2P version to transmit.
     0.6     - 16 parity symbols per payload block, that bit reserved.  (default)
     0.4     - The header FEC Level bit says which FEC level is in use.
@@ -703,55 +684,28 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 
 // apply sets up achan from the options, once they have been parsed.
 func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
-	if *f.bitrate != "" {
-		var err = achan.setModem(*f.bitrate)
-		if err != nil {
-			return err
-		}
-
-		fmt.Printf("Data rate set to %d bits / second.\n", achan.baud)
-
-		switch achan.modem_type {
-		case MODEM_QPSK:
-			fmt.Printf("Using V.26 QPSK rather than AFSK.\n")
-
-			if achan.baud != 2400 {
-				text_color_set(DW_COLOR_ERROR)
-				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", achan.baud)
-			}
-		case MODEM_8PSK:
-			fmt.Printf("Using V.27 8PSK rather than AFSK.\n")
-
-			if achan.baud != 4800 {
-				text_color_set(DW_COLOR_ERROR)
-				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", achan.baud)
-			}
-		case MODEM_SCRAMBLE:
-			text_color_set(DW_COLOR_INFO)
-			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
-		default:
-		}
+	var err = f.modem.apply(achan)
+	if err != nil {
+		return err
 	}
 
 	// These must be processed after -B option.
 	if *f.mark > 0 {
-		achan.mark_freq = *f.mark
-		fmt.Printf("Mark frequency set to %d Hz.\n", achan.mark_freq)
-
-		if achan.mark_freq < 300 || achan.mark_freq > 3000 {
+		if *f.mark < 300 || *f.mark > 3000 {
 			return fmt.Errorf("use a more reasonable mark frequency in range of 300 - 3000, not %d", *f.mark)
 		}
+
+		achan.mark_freq = *f.mark
+		logrus.WithField("mark", achan.mark_freq).Info("Mark frequency set")
 	}
 
 	if *f.space > 0 {
-		achan.space_freq = *f.space
-
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Space frequency set to %d Hz.\n", achan.space_freq)
-
-		if achan.space_freq < 300 || achan.space_freq > 3000 {
+		if *f.space < 300 || *f.space > 3000 {
 			return fmt.Errorf("use a more reasonable space frequency in range of 300 - 3000, not %d", *f.space)
 		}
+
+		achan.space_freq = *f.space
+		logrus.WithField("space", achan.space_freq).Info("Space frequency set")
 	}
 
 	if *f.bitrateOverride != "" {
@@ -761,55 +715,13 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 		}
 
 		achan.baud = bitrateOverride
-		fmt.Printf("Data rate set to %d bits / second.\n", achan.baud)
+		logrus.WithField("bitrate", achan.baud).Info("Data rate set")
 	}
 
-	if *f.g3ruh { /* -g for g3ruh scrambling */
-		achan.modem_type = MODEM_SCRAMBLE
-		achan.mark_freq = 0
-		achan.space_freq = 0
-
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Using G3RUH mode regardless of bit rate.\n")
-	}
-
-	if *f.bpsk { /* -k for BPSK */
-		achan.modem_type = MODEM_BPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-	}
-
-	if *f.direwolf15compat { /* -j V.26 compatible with earlier direwolf. */
-		achan.v26_alternative = V26_A
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.baud = 2400
-	}
-
-	if *f.mfj2400compat { /* -J V.26 compatible with MFJ-2400. */
-		achan.v26_alternative = V26_B
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.baud = 2400
-	}
-
+	// The demodulator falls back on a default V.26 alternative, with a warning;
+	// gen_packets makes the recording, so insists on being told.
 	if achan.modem_type == MODEM_QPSK && achan.v26_alternative == V26_UNSPECIFIED {
 		return errors.New("either -j or -J must be specified when using 2400 bps QPSK")
-	}
-
-	if *f.fx25CheckBytes > 0 {
-		if *f.il2pNormal >= 0 || *f.il2pInverted >= 0 {
-			return errors.New("can't mix -X with -I or -i")
-		}
-
-		achan.fx25_strength = *f.fx25CheckBytes
-		achan.layer2_xmit = LAYER2_FX25
-	}
-
-	if *f.il2pNormal >= 0 && *f.il2pInverted >= 0 {
-		return errors.New("can't use both -I and -i at the same time")
 	}
 
 	var il2p_version, il2p_version_ok = il2p_parse_version(*f.il2pVersion)
@@ -819,35 +731,7 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 
 	achan.il2p_version = il2p_version
 
-	if *f.il2pNormal >= 0 {
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Using IL2P normal polarity.\n")
-
-		achan.layer2_xmit = LAYER2_IL2P
-		if *f.il2pNormal > 0 {
-			achan.il2p_max_fec = 1
-		}
-
-		achan.il2p_invert_polarity = 0 // normal
-	}
-
-	if *f.il2pInverted >= 0 {
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Using IL2P inverted polarity.\n")
-
-		achan.layer2_xmit = LAYER2_IL2P
-		if *f.il2pInverted > 0 {
-			achan.il2p_max_fec = 1
-		}
-
-		achan.il2p_invert_polarity = 1 // invert for transmit
-		if achan.baud == 1200 {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
-		}
-	}
-
-	return nil
+	return f.layer2.apply(achan)
 }
 
 // genPacketsDefaultAudio is the audio configuration gen_packets starts from, before its options.
