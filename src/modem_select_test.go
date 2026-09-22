@@ -251,7 +251,7 @@ func TestModemOptions(t *testing.T) {
 			want: map[string]string{
 				"direwolf":    "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "9600 SCRAMBLE 0/0 profiles=\" \" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
-				"gen_packets": "9600 SCRAMBLE 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"gen_packets": "9600 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
 		},
 		{
@@ -259,7 +259,7 @@ func TestModemOptions(t *testing.T) {
 			want: map[string]string{
 				"direwolf":    "19200 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "19200 SCRAMBLE 0/0 profiles=\" \" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
-				"gen_packets": "19200 SCRAMBLE 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"gen_packets": "19200 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
 		},
 		{
@@ -323,7 +323,7 @@ func TestModemOptions(t *testing.T) {
 			want: map[string]string{
 				"direwolf":    "1200 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "1200 SCRAMBLE 0/0 profiles=\" \" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
-				"gen_packets": "1200 SCRAMBLE 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+				"gen_packets": "1200 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
 		},
 		{

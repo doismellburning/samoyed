@@ -766,6 +766,8 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 			}
 		} else {
 			achan.modem_type = MODEM_SCRAMBLE
+			achan.mark_freq = 0
+			achan.space_freq = 0
 
 			text_color_set(DW_COLOR_INFO)
 			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
@@ -809,6 +811,8 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 
 	if *f.g3ruh { /* -g for g3ruh scrambling */
 		achan.modem_type = MODEM_SCRAMBLE
+		achan.mark_freq = 0
+		achan.space_freq = 0
 
 		text_color_set(DW_COLOR_INFO)
 		fmt.Printf("Using G3RUH mode regardless of bit rate.\n")
