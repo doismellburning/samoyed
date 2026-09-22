@@ -704,11 +704,13 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 // apply sets up achan from the options, once they have been parsed.
 func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 	if *f.bitrate != "" {
-		var bitrate int
-		if *f.bitrate == "EAS" {
-			bitrate = 0xEA5EA5 // Special case handled below
-		} else {
-			bitrate, _ = strconv.Atoi(*f.bitrate)
+		var bitrate, bitrateParseErr = strconv.Atoi(*f.bitrate)
+		if *f.bitrate == "AIS" {
+			bitrate = 0xA15A15 // Special cases handled below
+		} else if *f.bitrate == "EAS" {
+			bitrate = 0xEA5EA5
+		} else if bitrateParseErr != nil {
+			return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", *f.bitrate)
 		}
 
 		achan.baud = bitrate
@@ -727,6 +729,11 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 			achan.modem_type = MODEM_EAS
 			achan.mark_freq = 2083 // Ideally these should be floating point.
 			achan.space_freq = 1563
+		} else if achan.baud == 0xA15A15 {
+			achan.baud = 9600
+			achan.modem_type = MODEM_AIS
+			achan.mark_freq = 0
+			achan.space_freq = 0
 		} else if achan.baud < 600 {
 			achan.modem_type = MODEM_AFSK
 			achan.mark_freq = 1600 // Typical for HF SSB

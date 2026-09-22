@@ -267,7 +267,7 @@ func TestModemOptions(t *testing.T) {
 			want: map[string]string{
 				"direwolf":    "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0",
 				"atest":       "9600 AIS 0/0 profiles=\" \" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
-				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
+				"gen_packets": "9600 AIS 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
 			},
 		},
 		{
@@ -283,7 +283,7 @@ func TestModemOptions(t *testing.T) {
 			want: map[string]string{
 				"direwolf":    "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): ais",
 				"atest":       "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): ais",
-				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
+				"gen_packets": "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): ais",
 			},
 		},
 		{
@@ -291,7 +291,7 @@ func TestModemOptions(t *testing.T) {
 			want: map[string]string{
 				"direwolf":    "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): fish",
 				"atest":       "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): fish",
-				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
+				"gen_packets": "error: invalid bitrate (should be an integer or 'AIS' or 'EAS'): fish",
 			},
 		},
 		{
