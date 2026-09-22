@@ -415,6 +415,30 @@ func TestModemOptions(t *testing.T) {
 			},
 		},
 		{
+			args: []string{"-B", "300", "-b", "250"},
+			want: map[string]string{
+				"gen_packets": "250 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=0 inv=0",
+			},
+		},
+		{
+			args: []string{"-b", "fish"},
+			want: map[string]string{
+				"gen_packets": "error: invalid bitrate fish",
+			},
+		},
+		{
+			args: []string{"-b", "-300"},
+			want: map[string]string{
+				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
+			},
+		},
+		{
+			args: []string{"-b", "1000000"},
+			want: map[string]string{
+				"gen_packets": "error: use a more reasonable bit rate in range of 100 - 40000",
+			},
+		},
+		{
 			args: []string{"-X", "16"},
 			want: map[string]string{
 				"direwolf":    "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 FX25 fx25=16 fec=1 inv=0",

@@ -709,9 +709,13 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 	}
 
 	if *f.bitrateOverride != "" {
-		var bitrateOverride, _ = strconv.Atoi(*f.bitrateOverride)
-		if bitrateOverride == 0 {
+		var bitrateOverride, err = strconv.Atoi(*f.bitrateOverride)
+		if err != nil {
 			return fmt.Errorf("invalid bitrate %s", *f.bitrateOverride)
+		}
+
+		if bitrateOverride < MIN_BAUD || bitrateOverride > MAX_BAUD {
+			return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
 		}
 
 		achan.baud = bitrateOverride
