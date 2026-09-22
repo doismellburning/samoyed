@@ -1072,7 +1072,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 	 */
 
 	// #ifndef TEST
-	dlq_channel_busy(channel, ot, ptt_signal)
+	dataLinkQueue.ChannelBusy(channel, ot, ptt_signal)
 	// #endif
 
 	/*

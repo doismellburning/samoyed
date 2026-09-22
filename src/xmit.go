@@ -409,7 +409,7 @@ func (xs *XmitService) discard_untransmittable(channel int) {
 			}
 
 			if ax25_is_null_frame(pp) {
-				dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the
+				dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the
 				// Data-link State machine, that the transmission opportunity has arrived."
 
 				confirmed = true
@@ -647,7 +647,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 
 	// Inform data link state machine that we are now transmitting.
 
-	dlq_seize_confirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
+	dataLinkQueue.SeizeConfirm(channel) // C4.2.  "This primitive indicates, to the Data-link State
 	// machine, that the transmission opportunity has arrived."
 
 	var pre_flags = xs.msToBits(xs.txdelay[channel]*10, channel) / 8
@@ -666,7 +666,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 
 	SLEEP_MS(10) // Give data link state machine a chance to
 	// to stuff more frames into the transmit queue,
-	// in response to dlq_seize_confirm, so
+	// in response to dataLinkQueue.SeizeConfirm, so
 	// we don't run off the end too soon.
 
 	logrus.WithFields(logrus.Fields{
@@ -846,12 +846,12 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 		// I think the solution is to send back a seize confirm here.
 		// It shouldn't hurt if we send it redundantly.
 		// Added for 1.5 beta test 4.
-		dlq_seize_confirm(c) // C4.2.  "This primitive indicates, to the Data-link State
+		dataLinkQueue.SeizeConfirm(c) // C4.2.  "This primitive indicates, to the Data-link State
 		// machine, that the transmission opportunity has arrived."
 
 		SLEEP_MS(10) // Give data link state machine a chance to
 		// to stuff more frames into the transmit queue,
-		// in response to dlq_seize_confirm, so
+		// in response to dataLinkQueue.SeizeConfirm, so
 		// we don't run off the end too soon.
 
 		return (0)

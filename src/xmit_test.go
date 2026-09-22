@@ -81,7 +81,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 	audioConfig.chan_medium[channel] = MEDIUM_RADIO
 
 	transmitQueue.Init(audioConfig)
-	dlq_init()
+	dataLinkQueue.Init()
 
 	var xs = new(XmitService)
 
@@ -94,7 +94,7 @@ func TestDiscardUntransmittableAnswersSeizeRequest(t *testing.T) {
 
 	var confirmed = false
 
-	for item := dlq_remove(); item != nil; item = dlq_remove() {
+	for item := dataLinkQueue.Remove(); item != nil; item = dataLinkQueue.Remove() {
 		if item._type == DLQ_SEIZE_CONFIRM && item._chan == channel {
 			confirmed = true
 		}
@@ -291,7 +291,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 			}
 		}
 
-		dlq_init()
+		dataLinkQueue.Init()
 	})
 
 	var audioConfig = new(audio_s)
@@ -310,7 +310,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	require.NoError(t, ptt_init(audioConfig))
 
 	transmitQueue.Init(audioConfig)
-	dlq_init()
+	dataLinkQueue.Init()
 
 	// Sending a frame serialises it to bits; the capture takes them instead of
 	// the modulator.  The device itself still has to be there, though: the
@@ -399,7 +399,7 @@ func TestSendOneFrameNullFrame(t *testing.T) {
 
 	var confirmed = false
 
-	for item := dlq_remove(); item != nil; item = dlq_remove() {
+	for item := dataLinkQueue.Remove(); item != nil; item = dataLinkQueue.Remove() {
 		if item._type == DLQ_SEIZE_CONFIRM {
 			confirmed = true
 		}

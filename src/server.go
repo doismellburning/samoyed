@@ -1147,7 +1147,7 @@ func (s *AGWServer) detachClient(client int, conn net.Conn) {
 	s.mu.Unlock()
 
 	if wasAttached {
-		dlq_client_cleanup(client)
+		dataLinkQueue.ClientCleanup(client)
 	}
 }
 
@@ -1771,7 +1771,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			if s.connectedModeAllowed(cmd.Header.Portx) {
 				ok = 1
 
-				dlq_register_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+				dataLinkQueue.RegisterCallsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("AGW protocol error.  Register callsign for invalid channel %d.\n", channel)
@@ -1793,7 +1793,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 		var channel = int(cmd.Header.Portx)
 
 		if s.connectedModeAllowed(cmd.Header.Portx) {
-			dlq_unregister_callsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
+			dataLinkQueue.UnregisterCallsign(ByteArrayToString(cmd.Header.CallFrom[:]), channel, client)
 		} else {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("AGW protocol error.  Unregister callsign for invalid channel %d.\n", channel)
@@ -1868,7 +1868,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 				}
 			}
 
-			dlq_connect_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
+			dataLinkQueue.ConnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(pid))
 		}
 
 	case 'D': /* Send Connected Data */
@@ -1893,7 +1893,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
-			dlq_xmit_data_request(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
+			dataLinkQueue.XmitDataRequest(callsigns, num_calls, int(cmd.Header.Portx), client, int(cmd.Header.PID), cmd.Data[:cmd.Header.DataLen])
 		}
 
 	case 'd': /* Disconnect, Terminate an AX.25 Connection */
@@ -1911,7 +1911,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
-			dlq_disconnect_request(callsigns, num_calls, int(cmd.Header.Portx), client)
+			dataLinkQueue.DisconnectRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
 
 	case 'M': /* Send UNPROTO Information (no digipeater path) */
@@ -2049,7 +2049,7 @@ func (s *AGWServer) handleClientCommand(client int, cmd *AGWPEMessage) {
 			callsigns[AX25_SOURCE] = ByteArrayToString(cmd.Header.CallFrom[:])
 			callsigns[AX25_DESTINATION] = ByteArrayToString(cmd.Header.CallTo[:])
 
-			dlq_outstanding_frames_request(callsigns, num_calls, int(cmd.Header.Portx), client)
+			dataLinkQueue.OutstandingFramesRequest(callsigns, num_calls, int(cmd.Header.Portx), client)
 		}
 
 	default:

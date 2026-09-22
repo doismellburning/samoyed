@@ -237,17 +237,17 @@ func TestHandleClientCommand_X_ValidRadioChannelReportsSuccess(t *testing.T) {
 // dlqAppended clears the DLQ, calls f, returns the first item appended
 // during f (or nil if nothing was appended), then restores the original queue.
 func dlqAppended(f func()) *dlq_item_t {
-	dlq_mutex.Lock()
-	var savedHead = dlq_queue_head
-	dlq_queue_head = nil
-	dlq_mutex.Unlock()
+	dataLinkQueue.mu.Lock()
+	var savedHead = dataLinkQueue.head
+	dataLinkQueue.head = nil
+	dataLinkQueue.mu.Unlock()
 
 	f()
 
-	dlq_mutex.Lock()
-	var newItem = dlq_queue_head
-	dlq_queue_head = savedHead
-	dlq_mutex.Unlock()
+	dataLinkQueue.mu.Lock()
+	var newItem = dataLinkQueue.head
+	dataLinkQueue.head = savedHead
+	dataLinkQueue.mu.Unlock()
 
 	return newItem
 }
@@ -296,7 +296,7 @@ func TestHandleClientCommand_K_ArbitraryDataLenNoPanic(t *testing.T) {
 }
 
 // Property: 'v' handler with numDigi outside [1,7] must not enqueue a connect request.
-// Before the fix, the invalid-numDigi else branch fell through to dlq_connect_request,
+// Before the fix, the invalid-numDigi else branch fell through to dataLinkQueue.ConnectRequest,
 // silently treating the malformed frame as a direct connect.
 func TestHandleClientCommand_v_InvalidNumDigiNoDLQAppend(t *testing.T) {
 	var s = new(AGWServer)
@@ -351,7 +351,7 @@ func TestHandleClientCommand_ConnectedMode_NonRadioPortxNoDLQAppend(t *testing.T
 
 // TestAGWPEConnectedDataNoTrailingNull is a regression test for a bug where the
 // debug null byte appended to cmd.Data was included in the data passed to
-// dlq_xmit_data_request, causing the remote station to receive an extra 0x00 byte
+// dataLinkQueue.XmitDataRequest, causing the remote station to receive an extra 0x00 byte
 // at the end of each transmitted packet. This null byte sat in the remote's input
 // buffer and appeared as a 0x00 prefix on the next received command.
 func TestAGWPEConnectedDataNoTrailingNull(t *testing.T) {

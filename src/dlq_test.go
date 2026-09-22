@@ -10,7 +10,7 @@ import (
 )
 
 func TestCDataNew_Empty(t *testing.T) {
-	var cdata = cdata_new(1, nil)
+	var cdata = NewDataLinkQueue().NewCData(1, nil)
 
 	assert.Empty(t, cdata.data)
 }
@@ -18,7 +18,7 @@ func TestCDataNew_Empty(t *testing.T) {
 func TestCDataNew(t *testing.T) {
 	// Because sometimes I didn't manage to get the copy right(!)
 	var testData = []byte("badger")
-	var cdata = cdata_new(1, testData)
+	var cdata = NewDataLinkQueue().NewCData(1, testData)
 
 	assert.Equal(t, cdata.data, testData)
 }
@@ -31,13 +31,13 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 	// Whether a sender finds itself alone is a matter of timing, so try
 	// the same thing a few times over.
 	for range 20 {
-		dlq_init()
+		var q = NewDataLinkQueue()
 
 		// Get the receive thread as far as actually waiting.
 		var waited = make(chan bool, 1)
 
 		go func() {
-			waited <- dlq_wait_while_empty(t.Context(), time.Now().Add(time.Minute))
+			waited <- q.WaitWhileEmpty(t.Context(), time.Now().Add(time.Minute))
 		}()
 
 		time.Sleep(20 * time.Millisecond)
@@ -47,7 +47,7 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 		// there - which is what makes the senders below prove anything.
 		select {
 		case <-waited:
-			t.Fatal("dlq_wait_while_empty returned with an empty queue")
+			t.Fatal("WaitWhileEmpty returned with an empty queue")
 		default:
 		}
 
@@ -67,7 +67,7 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 
 				<-start
 
-				append_to_queue(new(dlq_item_t))
+				q.appendItem(new(dlq_item_t))
 			}()
 		}
 
@@ -83,7 +83,7 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 		select {
 		case <-appended:
 		case <-time.After(10 * time.Second):
-			t.Fatal("append_to_queue blocked with nobody waiting")
+			t.Fatal("appendItem blocked with nobody waiting")
 		}
 
 		select {
@@ -94,7 +94,7 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 		}
 
 		var count int
-		for item := dlq_remove(); item != nil; item = dlq_remove() {
+		for item := q.Remove(); item != nil; item = q.Remove() {
 			count++
 		}
 
@@ -105,16 +105,16 @@ func TestDLQAppendDoesNotBlockWhenNobodyIsWaiting(t *testing.T) {
 // A wake-up belonging to an item that has since been removed must not cut
 // the next wait short, or a timer expiry gets skipped.
 func TestDLQStaleWakeUpDoesNotCutShortTheNextWait(t *testing.T) {
-	dlq_init()
+	var q = NewDataLinkQueue()
 
-	append_to_queue(new(dlq_item_t))
+	q.appendItem(new(dlq_item_t))
 
-	assert.NotNil(t, dlq_remove())
+	assert.NotNil(t, q.Remove())
 
 	var wait = 100 * time.Millisecond
 	var start = time.Now()
 
-	assert.True(t, dlq_wait_while_empty(t.Context(), time.Now().Add(wait)), "Expected a timeout with an empty queue")
+	assert.True(t, q.WaitWhileEmpty(t.Context(), time.Now().Add(wait)), "Expected a timeout with an empty queue")
 	assert.GreaterOrEqual(t, time.Since(start), wait)
 }
 
@@ -122,14 +122,14 @@ func TestDLQStaleWakeUpDoesNotCutShortTheNextWait(t *testing.T) {
 // its life, so a cancellation has to reach it there rather than waiting for an
 // item that is never coming.
 func TestDLQWaitReturnsWhenCancelled(t *testing.T) {
-	dlq_init()
+	var q = NewDataLinkQueue()
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
 	var returned = make(chan bool, 1)
 
 	go func() {
-		returned <- dlq_wait_while_empty(ctx, time.Time{}) // No timeout at all.
+		returned <- q.WaitWhileEmpty(ctx, time.Time{}) // No timeout at all.
 	}()
 
 	// Nothing has been queued, so a waiter that returns now did so because of
@@ -140,6 +140,55 @@ func TestDLQWaitReturnsWhenCancelled(t *testing.T) {
 	case timed_out := <-returned:
 		assert.False(t, timed_out, "Cancellation is not a timeout")
 	case <-time.After(time.Second):
-		t.Fatal("dlq_wait_while_empty did not return after its context was cancelled")
+		t.Fatal("WaitWhileEmpty did not return after its context was cancelled")
 	}
+}
+
+// Items are queued from every receive thread, the AGW server's client
+// goroutines, the beacon and the IGate, and deleted by the receive processing
+// thread, so the leak accounting has to stand up to all of them at once - as
+// does the count of connected-mode data blocks, which the AGW server makes and
+// the link state machine frees.
+func TestDLQLeakCountersAreSafeForConcurrentUse(t *testing.T) {
+	var q = NewDataLinkQueue()
+
+	const workers = 4
+	const perWorker = 50
+
+	var wg sync.WaitGroup
+
+	for range workers {
+		wg.Go(func() {
+			for range perWorker {
+				q.SeizeConfirm(0)
+			}
+		})
+
+		wg.Go(func() {
+			for range perWorker {
+				q.DeleteCData(q.NewCData(0xF0, []byte("Testing")))
+			}
+		})
+	}
+
+	wg.Go(func() {
+		for n := 0; n < workers*perWorker; {
+			var item = q.Remove()
+			if item == nil {
+				continue
+			}
+
+			q.Delete(item)
+			n++
+		}
+	})
+
+	wg.Wait()
+
+	// Every increment has to land: one lost to a race is a leak reported
+	// that never happened, or a real one hidden.
+	assert.Equal(t, int64(workers*perWorker), q.newCount.Load())
+	assert.Equal(t, int64(workers*perWorker), q.deleteCount.Load())
+	assert.Equal(t, int64(workers*perWorker), q.cdataNewCount.Load())
+	assert.Equal(t, int64(workers*perWorker), q.cdataDeleteCount.Load())
 }
