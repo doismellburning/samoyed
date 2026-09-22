@@ -180,31 +180,77 @@ const AX25_K_MAXFRAME_EXTENDED_MIN = 1
 const AX25_K_MAXFRAME_EXTENDED_DEFAULT = 32
 const AX25_K_MAXFRAME_EXTENDED_MAX = 63 // In theory 127 but I'm restricting as explained in SREJ handling.
 
-// Debug switches for different types of information.
-// Should have command line options instead of changing source and recompiling.
+// AX25Link is the connected-mode data link: every link state machine, the
+// callsigns registered for incoming connections, and the configuration and
+// debug switches they run with.
+type AX25Link struct {
+	/*
+	 * Configuration settings from file or command line.
+	 */
 
-var s_debug_protocol_errors = false // Less serious Protocol errors.
-// Useful for debugging but unnecessarily alarming other times.
-// Was it intentially left on for release 1.6?
+	miscConfig *misc_config_s
 
-var s_debug_client_app = false // Interaction with client application.
-// dl_connect_request, dl_data_request, dl_data_indication, etc.
+	// Debug switches for different types of information.
+	// Should have command line options instead of changing source and recompiling.
 
-var s_debug_radio = false // Received frames and channel busy status.
-// lm_data_indication, lm_channel_busy
+	debugProtocolErrors bool // Less serious Protocol errors.
+	// Useful for debugging but unnecessarily alarming other times.
+	// Was it intentially left on for release 1.6?
 
-var s_debug_variables = false // Variables, state changes.
+	debugClientApp bool // Interaction with client application.
+	// dl_connect_request, dl_data_request, dl_data_indication, etc.
 
-var s_debug_retry = false // Related to lost I frames, REJ, SREJ, timeout, resending.
+	debugRadio bool // Received frames and channel busy status.
+	// lm_data_indication, lm_channel_busy
 
-var s_debug_timers = false // Timer details.
+	debugVariables bool // Variables, state changes.
 
-var s_debug_link_handle = false // Create data link state machine or pick existing one,
-// based on my address, peer address, client app index, and radio channel.
+	debugRetry bool // Related to lost I frames, REJ, SREJ, timeout, resending.
 
-var s_debug_stats = false // Statistics when connection is closed.
+	debugTimers bool // Timer details.
 
-var s_debug_misc = false // Anything left over that might be interesting.
+	debugLinkHandle bool // Create data link state machine or pick existing one,
+	// based on my address, peer address, client app index, and radio channel.
+
+	debugStats bool // Statistics when connection is closed.
+
+	debugMisc bool // Anything left over that might be interesting.
+
+	/*
+	 * List of current state machines for each link.
+	 * There is potential many client apps, each with multiple links
+	 * connected all at the same time.
+	 *
+	 * Everything coming thru here should be from a single thread.
+	 * The Data Link Queue should serialize all processing.
+	 * Therefore, we don't have to worry about critical regions.
+	 */
+
+	listHead *ax25_dlsm_t
+
+	/*
+	 * Registered callsigns for incoming connections.
+	 */
+
+	regCallsignList *reg_callsign_t
+
+	nextStreamID int // Assigned to each new link state machine.
+
+	// Last DCD and PTT status reported for each channel, by lm_channel_busy.
+	dcdStatus [MAX_TOTAL_CHANS]int
+	pttStatus [MAX_TOTAL_CHANS]int
+}
+
+// ax25Link is the one data link every connected-mode request and received
+// frame goes through.  It exists from package initialisation, so it is never
+// nil; ax25_link_init must still be called before it is used.
+var ax25Link = NewAX25Link()
+
+// NewAX25Link returns a data link with no links, no registered callsigns, no
+// configuration yet, and debugging off.
+func NewAX25Link() *AX25Link {
+	return new(AX25Link)
+}
 
 /*
  * AX.25 data link state machine.
@@ -239,7 +285,7 @@ const PEERCALL = AX25_DESTINATION
 // Multiply FRACK by 2*m+1, where m is number of digipeaters.
 
 func INIT_T1V_SRT(S *ax25_dlsm_t) {
-	S.t1v = time.Duration(g_misc_config_p.frack*(2*(S.num_addr-2)+1)) * time.Second
+	S.t1v = time.Duration(ax25Link.miscConfig.frack*(2*(S.num_addr-2)+1)) * time.Second
 	S.srt = S.t1v / 2
 }
 
@@ -450,21 +496,7 @@ type ax25_dlsm_t struct {
 
 }
 
-/*
- * List of current state machines for each link.
- * There is potential many client apps, each with multiple links
- * connected all at the same time.
- *
- * Everything coming thru here should be from a single thread.
- * The Data Link Queue should serialize all processing.
- * Therefore, we don't have to worry about critical regions.
- */
-
-var list_head *ax25_dlsm_t
-
-/*
- * Registered callsigns for incoming connections.
- */
+// A callsign registered for incoming connections.
 
 type reg_callsign_t struct {
 	callsign string
@@ -473,14 +505,12 @@ type reg_callsign_t struct {
 	next     *reg_callsign_t
 }
 
-var reg_callsign_list *reg_callsign_t
-
 // Use these, rather than setting variables directly, to make debug out easier.
 
 func SET_VS(S *ax25_dlsm_t, n int) {
 	S.vs = (n)
 
-	if s_debug_variables {
+	if ax25Link.debugVariables {
 		text_color_set(DW_COLOR_DEBUG)
 		var pc, _, __LINE__, _ = runtime.Caller(1)
 		var __func__ = runtime.FuncForPC(pc).Name()
@@ -500,7 +530,7 @@ func SET_VA(S *ax25_dlsm_t, n int) {
 	var pc, _, __LINE__, _ = runtime.Caller(1)
 	var __func__ = runtime.FuncForPC(pc).Name()
 
-	if s_debug_variables {
+	if ax25Link.debugVariables {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("V(A) = %d at %s %d\n", S.va, __func__, __LINE__)
 	}
@@ -518,7 +548,7 @@ func SET_VA(S *ax25_dlsm_t, n int) {
 func SET_VR(S *ax25_dlsm_t, n int) {
 	S.vr = (n)
 
-	if s_debug_variables {
+	if ax25Link.debugVariables {
 		text_color_set(DW_COLOR_DEBUG)
 		var pc, _, __LINE__, _ = runtime.Caller(1)
 		var __func__ = runtime.FuncForPC(pc).Name()
@@ -531,7 +561,7 @@ func SET_VR(S *ax25_dlsm_t, n int) {
 func SET_RC(S *ax25_dlsm_t, n int) {
 	S.rc = (n)
 
-	if s_debug_variables {
+	if ax25Link.debugVariables {
 		text_color_set(DW_COLOR_DEBUG)
 		var pc, _, __LINE__, _ = runtime.Caller(1)
 		var __func__ = runtime.FuncForPC(pc).Name()
@@ -560,12 +590,6 @@ func WITHIN_WINDOW_SIZE(x *ax25_dlsm_t) bool { // TODO int is fake
 	return (x.vs != AX25MODULO(x.va+x.k_maxframe, x.modulo))
 }
 
-/*
- * Configuration settings from file or command line.
- */
-
-// TODO KG Static global fun // var g_misc_config_p *misc_config_s
-
 /*-------------------------------------------------------------------
  *
  * Name:        ax25_link_init
@@ -585,29 +609,29 @@ func ax25_link_init(pconfig *misc_config_s, debug int) {
 	/*
 	 * Save parameters for later use.
 	 */
-	g_misc_config_p = pconfig
+	ax25Link.miscConfig = pconfig
 
 	if debug >= 1 { // Only single level so far.
-		s_debug_protocol_errors = true // Less serious Protocol errors.
+		ax25Link.debugProtocolErrors = true // Less serious Protocol errors.
 
-		s_debug_client_app = true // Interaction with client application.
+		ax25Link.debugClientApp = true // Interaction with client application.
 		// dl_connect_request, dl_data_request, dl_data_indication, etc.
 
-		s_debug_radio = true // Received frames and channel busy status.
+		ax25Link.debugRadio = true // Received frames and channel busy status.
 		// lm_data_indication, lm_channel_busy
 
-		s_debug_variables = true // Variables, state changes.
+		ax25Link.debugVariables = true // Variables, state changes.
 
-		s_debug_retry = true // Related to lost I frames, REJ, SREJ, timeout, resending.
+		ax25Link.debugRetry = true // Related to lost I frames, REJ, SREJ, timeout, resending.
 
-		s_debug_link_handle = true // Create data link state machine or pick existing one,
+		ax25Link.debugLinkHandle = true // Create data link state machine or pick existing one,
 		// based on my address, peer address, client app index, and radio channel.
 
-		s_debug_stats = true // Statistics when connection is closed.
+		ax25Link.debugStats = true // Statistics when connection is closed.
 
-		s_debug_misc = true // Anything left over that might be interesting.
+		ax25Link.debugMisc = true // Anything left over that might be interesting.
 
-		s_debug_timers = true // Timer details.
+		ax25Link.debugTimers = true // Timer details.
 	}
 } /* end ax25_link_init */
 
@@ -655,10 +679,8 @@ func ax25_link_init(pconfig *misc_config_s, debug int) {
  *
  *------------------------------------------------------------------------------*/
 
-var next_stream_id = 0
-
 func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, client int, create bool) *ax25_dlsm_t {
-	if s_debug_link_handle {
+	if ax25Link.debugLinkHandle {
 		text_color_set(DW_COLOR_DECODED)
 		dw_printf("get_link_handle (%s>%s, chan=%d, client=%d, create=%t)\n",
 			addrs[AX25_SOURCE], addrs[AX25_DESTINATION], channel, client, create)
@@ -668,11 +690,11 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 
 	if client == -1 { // from the radio.
 		// address order is reversed for compare.
-		for p := list_head; p != nil; p = p.next {
+		for p := ax25Link.listHead; p != nil; p = p.next {
 			if p.channel == channel &&
 				addrs[AX25_DESTINATION] == p.addrs[OWNCALL] &&
 				addrs[AX25_SOURCE] == p.addrs[PEERCALL] {
-				if s_debug_link_handle {
+				if ax25Link.debugLinkHandle {
 					text_color_set(DW_COLOR_DECODED)
 					dw_printf("get_link_handle returns existing stream id %d for incoming.\n", p.stream_id)
 				}
@@ -681,12 +703,12 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 			}
 		}
 	} else { // from client app
-		for p := list_head; p != nil; p = p.next {
+		for p := ax25Link.listHead; p != nil; p = p.next {
 			if p.channel == channel &&
 				p.client == client &&
 				addrs[AX25_SOURCE] == p.addrs[OWNCALL] &&
 				addrs[AX25_DESTINATION] == p.addrs[PEERCALL] {
-				if s_debug_link_handle {
+				if ax25Link.debugLinkHandle {
 					text_color_set(DW_COLOR_DECODED)
 					dw_printf("get_link_handle returns existing stream id %d for outgoing.\n", p.stream_id)
 				}
@@ -699,7 +721,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	// Could not find existing.  Should we create a new one?
 
 	if !create {
-		if s_debug_link_handle {
+		if ax25Link.debugLinkHandle {
 			text_color_set(DW_COLOR_DECODED)
 			dw_printf("get_link_handle: Search failed. Do not create new.\n")
 		}
@@ -714,7 +736,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	if client == -1 { // from the radio.
 		var found *reg_callsign_t
 
-		for r := reg_callsign_list; r != nil && found == nil; r = r.next {
+		for r := ax25Link.regCallsignList; r != nil && found == nil; r = r.next {
 			if addrs[AX25_DESTINATION] == r.callsign && channel == r.channel {
 				found = r
 				incoming_for_client = r.client
@@ -722,7 +744,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 		}
 
 		if found == nil {
-			if s_debug_link_handle {
+			if ax25Link.debugLinkHandle {
 				text_color_set(DW_COLOR_DECODED)
 				dw_printf("get_link_handle: not for me.  Ignore it.\n")
 			}
@@ -736,8 +758,8 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	var p = new(ax25_dlsm_t)
 
 	p.start_time = time.Now()
-	p.stream_id = next_stream_id
-	next_stream_id++
+	p.stream_id = ax25Link.nextStreamID
+	ax25Link.nextStreamID++
 
 	// Start out as a v2.0 link rather than with the parameters all at zero.
 	// A connect request, incoming or outgoing, sets the version again once it
@@ -773,10 +795,10 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 	p.t1_remaining_when_last_stopped = -999 // Invalid, don't use.
 
 	// No need for critical region because this should all be in one thread.
-	p.next = list_head
-	list_head = p
+	p.next = ax25Link.listHead
+	ax25Link.listHead = p
 
-	if s_debug_link_handle {
+	if ax25Link.debugLinkHandle {
 		text_color_set(DW_COLOR_DECODED)
 		dw_printf("get_link_handle returns NEW stream id %d\n", p.stream_id)
 	}
@@ -791,7 +813,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 //
 //	Incoming:
 //
-//		Requests from the client application.  Set s_debug_client_app for debugging.
+//		Requests from the client application.  Set ax25Link.debugClientApp for debugging.
 //
 //			dl_connect_request
 //			dl_disconnect_request
@@ -804,13 +826,13 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
 // 			dl_unregister_callsign		- Unregister callsigns(s) ...
 //			dl_client_cleanup		- Clean up after client which has disappeared.
 //
-//		Stuff from the radio channel.  Set s_debug_radio for debugging.
+//		Stuff from the radio channel.  Set ax25Link.debugRadio for debugging.
 //
 //			lm_data_indication		- Received frame.
 //			lm_channel_busy			- Change in PTT or DCD.
 //			lm_seize_confirm		- We have started to transmit.
 //
-//		Timer expiration.  Set s_debug_timers for debugging.
+//		Timer expiration.  Set ax25Link.debugTimers for debugging.
 //
 //			dl_timer_expiry
 //
@@ -851,7 +873,7 @@ func get_link_handle(addrs [AX25_MAX_ADDRS]string, num_addr int, channel int, cl
  *------------------------------------------------------------------------------*/
 
 func dl_connect_request(E *dlq_item_t) {
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_connect_request ()\n")
 	}
@@ -869,13 +891,13 @@ func dl_connect_request(E *dlq_item_t) {
 		// See if destination station is in list for v2.0 only.
 
 		var old_version = false
-		for n := 0; n < g_misc_config_p.v20_count && !old_version; n++ {
-			if E.addrs[AX25_DESTINATION] == g_misc_config_p.v20_addrs[n] {
+		for n := 0; n < ax25Link.miscConfig.v20_count && !old_version; n++ {
+			if E.addrs[AX25_DESTINATION] == ax25Link.miscConfig.v20_addrs[n] {
 				old_version = true
 			}
 		}
 
-		if old_version || g_misc_config_p.maxv22 == 0 { // Don't attempt v2.2.
+		if old_version || ax25Link.miscConfig.maxv22 == 0 { // Don't attempt v2.2.
 			set_version_2_0(S)
 
 			establish_data_link(S)
@@ -929,7 +951,7 @@ func dl_connect_request(E *dlq_item_t) {
  *------------------------------------------------------------------------------*/
 
 func dl_disconnect_request(E *dlq_item_t) {
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_disconnect_request ()\n")
 	}
@@ -1068,7 +1090,7 @@ func dl_data_request(E *dlq_item_t) {
 
 	var S = get_link_handle(E.addrs, E.num_addr, E._chan, E.client, ok_to_create)
 
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_data_request (\"")
 		AX25SafePrint(E.txdata.data[:E.txdata.len], true)
@@ -1381,7 +1403,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
  * Inputs:	E	- Event from the queue.
  *			  The caller will free it.
  *
- * Outputs:	New item is pushed on the head of the reg_callsign_list.
+ * Outputs:	New item is pushed on the head of ax25Link.regCallsignList.
  *		We don't bother checking for duplicates so the most recent wins.
  *
  * Description:	The data link state machine does not use MYCALL from the APRS configuration.
@@ -1395,7 +1417,7 @@ func data_request_good_size(S *ax25_dlsm_t, txdata *cdata_t) {
  *------------------------------------------------------------------------------*/
 
 func dl_register_callsign(E *dlq_item_t) {
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_register_callsign (%s, chan=%d, client=%d)\n", E.addrs[0], E._chan, E.client)
 	}
@@ -1404,25 +1426,25 @@ func dl_register_callsign(E *dlq_item_t) {
 	r.callsign = E.addrs[0]
 	r.channel = E._chan
 	r.client = E.client
-	r.next = reg_callsign_list
+	r.next = ax25Link.regCallsignList
 
-	reg_callsign_list = r
+	ax25Link.regCallsignList = r
 } /* end dl_register_callsign */
 
 func dl_unregister_callsign(E *dlq_item_t) {
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_unregister_callsign (%s, chan=%d, client=%d)\n", E.addrs[0], E._chan, E.client)
 	}
 
 	var prev *reg_callsign_t
 
-	var r = reg_callsign_list
+	var r = ax25Link.regCallsignList
 	for r != nil {
 		if r.callsign == E.addrs[0] && r.channel == E._chan && r.client == E.client {
-			if r == reg_callsign_list {
-				reg_callsign_list = r.next
-				r = reg_callsign_list
+			if r == ax25Link.regCallsignList {
+				ax25Link.regCallsignList = r.next
+				r = ax25Link.regCallsignList
 			} else {
 				prev.next = r.next
 				r = prev.next
@@ -1496,7 +1518,7 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
 	const ok_to_create = false // must exist already.
 	var reversed_addrs bool
 
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("dl_outstanding_frames_request ( to %s )\n", E.addrs[PEERCALL])
 	}
@@ -1576,19 +1598,19 @@ func dl_outstanding_frames_request(E *dlq_item_t) {
  *------------------------------------------------------------------------------*/
 
 func dl_client_cleanup(E *dlq_item_t) {
-	if s_debug_client_app {
+	if ax25Link.debugClientApp {
 		text_color_set(DW_COLOR_INFO)
 		dw_printf("dl_client_cleanup (%d)\n", E.client)
 	}
 
 	var dlprev *ax25_dlsm_t
 
-	var S = list_head
+	var S = ax25Link.listHead
 	for S != nil {
 		// Look for corruption or double freeing.
 
 		if S.client == E.client {
-			if s_debug_stats {
+			if ax25Link.debugStats {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("%d  I frames received\n", S.count_recv_frame_type[frame_type_I])
 
@@ -1610,7 +1632,7 @@ func dl_client_cleanup(E *dlq_item_t) {
 				dw_printf("%d  peak retry count\n", S.peak_rc_value)
 			}
 
-			if s_debug_client_app {
+			if ax25Link.debugClientApp {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("dl_client_cleanup: remove %s>%s\n", S.addrs[AX25_SOURCE], S.addrs[AX25_DESTINATION])
 			}
@@ -1643,9 +1665,9 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 			// Take S out of list.
 
-			if S == list_head { // first one on list.
-				list_head = S.next
-				S = list_head
+			if S == ax25Link.listHead { // first one on list.
+				ax25Link.listHead = S.next
+				S = ax25Link.listHead
 			} else { // not the first one.
 				dlprev.next = S.next
 				S = dlprev.next
@@ -1659,7 +1681,7 @@ func dl_client_cleanup(E *dlq_item_t) {
 	/*
 	 * If there are no link state machines (streams) remaining, there should be no txdata items still allocated.
 	 */
-	if list_head == nil {
+	if ax25Link.listHead == nil {
 		dataLinkQueue.CheckCDataLeak()
 	}
 
@@ -1669,12 +1691,12 @@ func dl_client_cleanup(E *dlq_item_t) {
 
 	var rcprev *reg_callsign_t
 
-	var r = reg_callsign_list
+	var r = ax25Link.regCallsignList
 	for r != nil {
 		if r.client == E.client {
-			if r == reg_callsign_list {
-				reg_callsign_list = r.next
-				r = reg_callsign_list
+			if r == ax25Link.regCallsignList {
+				ax25Link.regCallsignList = r.next
+				r = ax25Link.regCallsignList
 			} else {
 				rcprev.next = r.next
 				r = rcprev.next
@@ -1785,9 +1807,6 @@ func dl_data_indication(S *ax25_dlsm_t, pid int, dataBytes []byte) {
  *
  *------------------------------------------------------------------------------*/
 
-var dcd_status [MAX_TOTAL_CHANS]int
-var ptt_status [MAX_TOTAL_CHANS]int
-
 func lm_channel_busy(E *dlq_item_t) {
 	Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
 	Assert(E.activity == OCTYPE_PTT || E.activity == OCTYPE_DCD)
@@ -1795,33 +1814,33 @@ func lm_channel_busy(E *dlq_item_t) {
 
 	switch E.activity {
 	case OCTYPE_DCD:
-		if s_debug_radio {
+		if ax25Link.debugRadio {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("lm_channel_busy: DCD chan %d = %d\n", E._chan, E.status)
 		}
 
-		dcd_status[E._chan] = E.status
+		ax25Link.dcdStatus[E._chan] = E.status
 
 	case OCTYPE_PTT:
-		if s_debug_radio {
+		if ax25Link.debugRadio {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("lm_channel_busy: PTT chan %d = %d\n", E._chan, E.status)
 		}
 
-		ptt_status[E._chan] = E.status
+		ax25Link.pttStatus[E._chan] = E.status
 
 	default:
 		// Nothing to be done
 	}
 
-	var busy = (dcd_status[E._chan] | ptt_status[E._chan]) > 0
+	var busy = (ax25Link.dcdStatus[E._chan] | ax25Link.pttStatus[E._chan]) > 0
 
 	/*
 	 * We know if the given radio channel is busy or not.
 	 * This must be applied to all data link state machines associated with that radio channel.
 	 */
 
-	for S := list_head; S != nil; S = S.next {
+	for S := ax25Link.listHead; S != nil; S = S.next {
 		if E._chan == S.channel {
 			if busy && !S.radio_channel_busy {
 				S.radio_channel_busy = true
@@ -1859,7 +1878,7 @@ func lm_channel_busy(E *dlq_item_t) {
 func lm_seize_confirm(E *dlq_item_t) {
 	Assert(E._chan >= 0 && E._chan < MAX_TOTAL_CHANS)
 
-	for S := list_head; S != nil; S = S.next {
+	for S := ax25Link.listHead; S != nil; S = S.next {
 		if E._chan == S.channel {
 			switch S.state {
 			case state_0_disconnected, state_1_awaiting_connection, state_2_awaiting_release, state_5_awaiting_v22_connection:
@@ -1934,7 +1953,7 @@ func lm_data_indication(E *dlq_item_t) {
 	}
 
 	if any_unused_digi {
-		if s_debug_radio {
+		if ax25Link.debugRadio {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("lm_data_indication (%d, %s>%s) - ignore due to unused digi address.\n", E._chan, E.addrs[AX25_SOURCE], E.addrs[AX25_DESTINATION])
 		}
@@ -1948,7 +1967,7 @@ func lm_data_indication(E *dlq_item_t) {
 		E.addrs[n] = ax25_get_addr_with_ssid(E.pp, n)
 	}
 
-	if s_debug_radio {
+	if ax25Link.debugRadio {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("lm_data_indication (%d, %s>%s)\n", E._chan, E.addrs[AX25_SOURCE], E.addrs[AX25_DESTINATION])
 	}
@@ -2445,7 +2464,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 		SET_VR(S, AX25MODULO(S.vr+1, S.modulo))
 		S.reject_exception = false
 
-		if s_debug_client_app {
+		if ax25Link.debugClientApp {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, \"", ns, S.vr)
 			AX25SafePrint(info, true)
@@ -2464,7 +2483,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 		for S.rxdata_by_ns[S.vr] != nil {
 			// dl_data_indication - send connected data to client application.
-			if s_debug_client_app {
+			if ax25Link.debugClientApp {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("call dl_data_indication(), N(S)=%d, V(R)=%d, data=\"", ns, S.vr)
 				AX25SafePrint(S.rxdata_by_ns[S.vr].data[:S.rxdata_by_ns[S.vr].len], true)
@@ -2532,7 +2551,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 		S.reject_exception = true
 
-		if s_debug_retry {
+		if ax25Link.debugRetry {
 			text_color_set(DW_COLOR_ERROR) // make it more noticeable.
 			dw_printf("sending REJ, SREJ not enabled case, V(R)=%d", S.vr)
 		}
@@ -2566,7 +2585,7 @@ func i_frame_continued(S *ax25_dlsm_t, p int, ns int, pid int, info []byte) {
 
 			S.rxdata_by_ns[ns] = dataLinkQueue.NewCData(pid, info)
 
-			if s_debug_misc {
+			if ax25Link.debugMisc {
 				dw_printf("save to rxdata_by_ns N(S)=%d, V(R)=%d, \"", ns, S.vr)
 				AX25SafePrint(info, true)
 				dw_printf("\"\n")
@@ -2807,7 +2826,7 @@ func is_ns_in_window(S *ax25_dlsm_t, ns int) bool {
 
 	var result = adjusted_vr < adjusted_ns && adjusted_ns < adjusted_vrpk
 
-	if s_debug_retry {
+	if ax25Link.debugRetry {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("is_ns_in_window,  V(R) %d < N(S) %d < V(R)+k %d, returns %t\n", S.vr, ns, S.vr+GENEROUS_K, result)
 	}
@@ -2849,7 +2868,7 @@ func send_srej_frames(S *ax25_dlsm_t, resend []int, count int, allow_f1 bool) {
 		return
 	}
 
-	if s_debug_retry {
+	if ax25Link.debugRetry {
 		text_color_set(DW_COLOR_INFO)
 		//dw_printf ("state=%d, count=%d, k=%d, V(R)=%d, SREJ exception=%d\n", S.state, count, S.k_maxframe, S.vr, selective_reject_exception(S));
 		dw_printf("send_srej_frames s_debug_retry: state=%d, count=%d, k=%d, V(R)=%d\n", S.state, count, S.k_maxframe, S.vr)
@@ -3077,7 +3096,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 			// dw_printf ("rr_rnr_frame (), line %d, state=%d, good nr=%d, calling check_i_frame_ackd\n", __LINE__, S.state, nr);
 			check_i_frame_ackd(S, nr)
 		} else {
-			if s_debug_retry {
+			if ax25Link.debugRetry {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("rr_rnr_frame (), state=%d, bad nr, calling nr_error_recovery\n", S.state)
 			}
@@ -3091,7 +3110,7 @@ func rr_rnr_frame(S *ax25_dlsm_t, ready bool, cr cmdres_t, pf int, nr int) {
 
 		if cr == cr_res && pf == 1 {
 			// RR/RNR Response with F==1.
-			if s_debug_retry {
+			if ax25Link.debugRetry {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("rr_rnr_frame (), Response, f=%d, state=%d, good nr, calling check_i_frame_ackd\n", pf, S.state)
 			}
@@ -3559,7 +3578,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 		}
 
 	case state_4_timer_recovery:
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("state 4 timer recovery, srej_frame nr=%d, f=%d\n", nr, f)
 		}
@@ -3586,7 +3605,7 @@ func srej_frame(S *ax25_dlsm_t, cr cmdres_t, f int, nr int, info []byte) { //nol
 				// Erratum:  2006 version tests "P".  Original has "F."
 				SET_VA(S, nr)
 
-				if s_debug_timers {
+				if ax25Link.debugTimers {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("state 4 timer recovery, srej_frame set v(a)= %d\n", S.va)
 				}
@@ -3883,7 +3902,7 @@ func sabm_e_frame(S *ax25_dlsm_t, extended bool, p int) {
 
 			clear_exception_conditions(S)
 
-			if s_debug_protocol_errors {
+			if ax25Link.debugProtocolErrors {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Stream %d: AX.25 Protocol Error F: Data Link reset; i.e. SABM(e) received in state %d.\n", S.stream_id, S.state)
 			}
@@ -4083,7 +4102,7 @@ func dm_frame(S *ax25_dlsm_t, f int) {
 		// otherwise keep current state.
 
 	case state_3_connected, state_4_timer_recovery:
-		if s_debug_protocol_errors {
+		if ax25Link.debugProtocolErrors {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error E: DM received in state %d.\n", S.stream_id, S.state)
 		}
@@ -4197,7 +4216,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		// Erratum: flow chart says errors C and D.  Neither one really makes sense.
 		// "Unexpected UA in states 3, 4, or 5."	We are in state 0 here.
 		// "UA received without F=1 when SABM or DISC was sent P=1."
-		if s_debug_protocol_errors {
+		if ax25Link.debugProtocolErrors {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error C: Unexpected UA in state %d.\n", S.stream_id, S.state)
 		}
@@ -4293,7 +4312,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			SET_RC(S, 0) // My enhancement.  See Erratum note in select_t1_value.
 			enter_new_state(S, state_3_connected)
 		} else {
-			if s_debug_protocol_errors {
+			if ax25Link.debugProtocolErrors {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Stream %d: AX.25 Protocol Error D: UA received without F=1 when SABM or DISC was sent P=1.\n", S.stream_id)
 			}
@@ -4310,7 +4329,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 			STOP_T1(S)
 			enter_new_state(S, state_0_disconnected)
 		} else {
-			if s_debug_protocol_errors {
+			if ax25Link.debugProtocolErrors {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Stream %d: AX.25 Protocol Error D: UA received without F=1 when SABM or DISC was sent P=1.\n", S.stream_id)
 			}
@@ -4318,7 +4337,7 @@ func ua_frame(S *ax25_dlsm_t, f int) {
 		}
 
 	case state_3_connected, state_4_timer_recovery:
-		if s_debug_protocol_errors {
+		if ax25Link.debugProtocolErrors {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error C: Unexpected UA in state %d.\n", S.stream_id, S.state)
 		}
@@ -4379,7 +4398,7 @@ func frmr_frame(S *ax25_dlsm_t) {
 		// Ignore it.  Keep current state.
 
 	case state_3_connected, state_4_timer_recovery:
-		if s_debug_protocol_errors {
+		if ax25Link.debugProtocolErrors {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error K: FRMR not expected in state %d.\n", S.stream_id, S.state)
 		}
@@ -4661,7 +4680,7 @@ func dl_timer_expiry() {
 	//	- is not paused.
 	//	- expiration time has arrived or passed.
 
-	for p := list_head; p != nil; p = p.next {
+	for p := ax25Link.listHead; p != nil; p = p.next {
 		if !p.t1_exp.IsZero() && p.t1_paused_at.IsZero() && !p.t1_exp.After(now) {
 			p.t1_exp = time.Time{}
 			p.t1_paused_at = time.Time{}
@@ -4670,14 +4689,14 @@ func dl_timer_expiry() {
 		}
 	}
 
-	for p := list_head; p != nil; p = p.next {
+	for p := ax25Link.listHead; p != nil; p = p.next {
 		if !p.t3_exp.IsZero() && !p.t3_exp.After(now) {
 			p.t3_exp = time.Time{}
 			t3_expiry(p)
 		}
 	}
 
-	for p := list_head; p != nil; p = p.next {
+	for p := ax25Link.listHead; p != nil; p = p.next {
 		if !p.tm201_exp.IsZero() && p.tm201_paused_at.IsZero() && !p.tm201_exp.After(now) {
 			p.tm201_exp = time.Time{}
 			p.tm201_paused_at = time.Time{}
@@ -4720,7 +4739,7 @@ func dl_timer_expiry() {
 const DW_COLOR_DEBUG_TIMER = DW_COLOR_ERROR
 
 func t1_expiry(S *ax25_dlsm_t) {
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var now = time.Now()
 
 		text_color_set(DW_COLOR_DEBUG_TIMER)
@@ -4735,7 +4754,7 @@ func t1_expiry(S *ax25_dlsm_t) {
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
 		// MAXV22 hack.
 		// If we already sent the maximum number of SABME, fall back to v2.0 SABM.
-		if S.state == state_5_awaiting_v22_connection && S.rc == g_misc_config_p.maxv22 {
+		if S.state == state_5_awaiting_v22_connection && S.rc == ax25Link.miscConfig.maxv22 {
 			set_version_2_0(S)
 			enter_new_state(S, state_1_awaiting_connection)
 		}
@@ -4804,17 +4823,17 @@ func t1_expiry(S *ax25_dlsm_t) {
 		if S.rc == S.n2_retry {
 			// Erratum: 2006 version, page 103, is missing yes/no labels on decision blocks.
 			if S.va != S.vs {
-				if s_debug_protocol_errors {
+				if ax25Link.debugProtocolErrors {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Stream %d: AX.25 Protocol Error I: %d timeouts: unacknowledged sent data.\n", S.stream_id, S.n2_retry)
 				}
 			} else if S.peer_receiver_busy {
-				if s_debug_protocol_errors {
+				if ax25Link.debugProtocolErrors {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Stream %d: AX.25 Protocol Error U: %d timeouts: extended peer busy condition.\n", S.stream_id, S.n2_retry)
 				}
 			} else {
-				if s_debug_protocol_errors {
+				if ax25Link.debugProtocolErrors {
 					text_color_set(DW_COLOR_ERROR)
 					dw_printf("Stream %d: AX.25 Protocol Error T: %d timeouts: no response to enquiry.\n", S.stream_id, S.n2_retry)
 				}
@@ -4882,7 +4901,7 @@ func t1_expiry(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func t3_expiry(S *ax25_dlsm_t) {
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var now = time.Now()
 
 		text_color_set(DW_COLOR_DEBUG_TIMER)
@@ -4919,7 +4938,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
 	var p = 1
 	var nopid = 0
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var now = time.Now()
 
 		text_color_set(DW_COLOR_DEBUG_TIMER)
@@ -4971,7 +4990,7 @@ func tm201_expiry(S *ax25_dlsm_t) {
  *------------------------------------------------------------------------------*/
 
 func nr_error_recovery(S *ax25_dlsm_t) {
-	if s_debug_protocol_errors {
+	if ax25Link.debugProtocolErrors {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Stream %d: AX.25 Protocol Error J: N(r) sequence error.\n", S.stream_id)
 	}
@@ -5098,7 +5117,7 @@ func transmit_enquiry(S *ax25_dlsm_t) {
 	var nr = S.vr
 	var cmd = cr_cmd
 
-	if s_debug_retry {
+	if ax25Link.debugRetry {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\n****** TRANSMIT ENQUIRY   RR/RNR cmd P=1 ****** state=%d, rc=%d\n\n", S.state, S.rc)
 	}
@@ -5162,7 +5181,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 	var cr = cr_res // Response, not command as seen in flow chart.
 	var nr = S.vr
 
-	if s_debug_retry {
+	if ax25Link.debugRetry {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("\n****** ENQUIRY RESPONSE  F=%d ******\n\n", f)
 	}
@@ -5231,7 +5250,7 @@ func enquiry_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, f int) {
 			// However, I can't seem to find that buried in X.25 2.4.5.9.
 			// And when we look at what happens when RR response, F=1 is received in state 4, it is
 			// effectively REJ when N(R) is not the same as V(S).
-			if s_debug_retry {
+			if ax25Link.debugRetry {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("\n****** ENQUIRY RESPONSE srej not enbled, sending RR resp F=%d ******\n\n", f)
 			}
@@ -5294,7 +5313,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 	// to original value before returning.
 	// Here we just a local variable instead of messing with it.
 	// This should be equivalent but safer.
-	if s_debug_misc {
+	if ax25Link.debugMisc {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("invoke_retransmission(): starting with %d, state=%d, rc=%d, \n", nr_input, S.state, S.rc)
 	}
@@ -5324,7 +5343,7 @@ func invoke_retransmission(S *ax25_dlsm_t, nr_input int) {
 			var nr = S.vr
 			var p = 0
 
-			if s_debug_misc {
+			if ax25Link.debugMisc {
 				text_color_set(DW_COLOR_INFO)
 				dw_printf("invoke_retransmission(): Resending N(S) = %d\n", ns)
 			}
@@ -5390,7 +5409,7 @@ func check_i_frame_ackd(S *ax25_dlsm_t, nr int) {
 		START_T3(S)
 		select_t1_value(S)
 	} else if nr != S.va {
-		if s_debug_misc {
+		if ax25Link.debugMisc {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("check_i_frame_ackd n(r)=%d, v(a)=%d,  Set v(a) to new value %d\n", nr, S.va, nr)
 		}
@@ -5421,7 +5440,7 @@ func check_need_for_response(S *ax25_dlsm_t, frame_type ax25_frame_type_t, cr cm
 		var f = 1
 		enquiry_response(S, frame_type, f)
 	} else if cr == cr_res && pf == 1 {
-		if s_debug_protocol_errors {
+		if ax25Link.debugProtocolErrors {
 			text_color_set(DW_COLOR_ERROR)
 			dw_printf("Stream %d: AX.25 Protocol Error A: F=1 received but P=1 not outstanding.\n", S.stream_id)
 		}
@@ -5550,7 +5569,7 @@ func select_t1_value(S *ax25_dlsm_t) {
 		}
 	}
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Stream %d: select_t1_value, rc = %d, t1 remaining = %.3f, old srt = %.3f, new srt = %.3f, new t1v = %.3f\n",
 			S.stream_id, S.rc, S.t1_remaining_when_last_stopped.Seconds(), old_srt.Seconds(), S.srt.Seconds(), S.t1v.Seconds())
@@ -5570,7 +5589,7 @@ func select_t1_value(S *ax25_dlsm_t) {
 	// TODO: Add some instrumentation to record where this was called from and all the values in the printf below.
 
 	// TODO KG #if 1
-	if S.t1v < 250*time.Millisecond || S.t1v > 2*time.Duration(g_misc_config_p.frack*(2*(S.num_addr-2)+1))*time.Second {
+	if S.t1v < 250*time.Millisecond || S.t1v > 2*time.Duration(ax25Link.miscConfig.frack*(2*(S.num_addr-2)+1))*time.Second {
 		INIT_T1V_SRT(S)
 	}
 	/* TODO KG
@@ -5595,9 +5614,9 @@ func select_t1_value(S *ax25_dlsm_t) {
 func set_version_2_0(S *ax25_dlsm_t) {
 	S.srej_enable = srej_none
 	S.modulo = 8
-	S.n1_paclen = g_misc_config_p.paclen
-	S.k_maxframe = g_misc_config_p.maxframe_basic
-	S.n2_retry = g_misc_config_p.retry
+	S.n1_paclen = ax25Link.miscConfig.paclen
+	S.k_maxframe = ax25Link.miscConfig.maxframe_basic
+	S.n2_retry = ax25Link.miscConfig.retry
 } /* end set_version_2_0 */
 
 /*------------------------------------------------------------------------------
@@ -5610,9 +5629,9 @@ func set_version_2_2(S *ax25_dlsm_t) {
 	S.srej_enable = srej_single // Start with single.
 	// Can be increased to multi with XID exchange.
 	S.modulo = 128
-	S.n1_paclen = g_misc_config_p.paclen
-	S.k_maxframe = g_misc_config_p.maxframe_extended
-	S.n2_retry = g_misc_config_p.retry
+	S.n1_paclen = ax25Link.miscConfig.paclen
+	S.k_maxframe = ax25Link.miscConfig.maxframe_extended
+	S.n2_retry = ax25Link.miscConfig.retry
 } /* end set_version_2_2 */
 
 /*------------------------------------------------------------------------------
@@ -5658,7 +5677,7 @@ func is_good_nr(S *ax25_dlsm_t, nr int) bool {
 
 	var result = adjusted_va <= adjusted_nr && adjusted_nr <= adjusted_vs
 
-	if s_debug_misc {
+	if ax25Link.debugMisc {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("is_good_nr,  V(a) %d <= nr %d <= V(s) %d, returns %t\n", S.va, nr, S.vs, result)
 	}
@@ -5687,7 +5706,7 @@ func is_good_nr(S *ax25_dlsm_t, nr int) bool {
  *------------------------------------------------------------------------------*/
 
 func i_frame_pop_off_queue(S *ax25_dlsm_t) {
-	if s_debug_misc { //nolint:staticcheck
+	if ax25Link.debugMisc { //nolint:staticcheck
 		// text_color_set(DW_COLOR_DEBUG);
 		// dw_printf ("i_frame_pop_off_queue () state=%d\n", S.state);
 	}
@@ -5696,7 +5715,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 	// or is empty an expected situation?
 
 	if S.i_frame_queue == nil {
-		if s_debug_misc { //nolint:staticcheck
+		if ax25Link.debugMisc { //nolint:staticcheck
 			// TODO: add different switch for I frame queue.
 			// text_color_set(DW_COLOR_DEBUG);
 			// dw_printf ("i_frame_pop_off_queue () queue is empty get out, line %d\n", __LINE__);
@@ -5709,7 +5728,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 
 	switch S.state {
 	case state_1_awaiting_connection, state_5_awaiting_v22_connection:
-		if s_debug_misc { //nolint:staticcheck
+		if ax25Link.debugMisc { //nolint:staticcheck
 			// text_color_set(DW_COLOR_DEBUG);
 			// dw_printf ("i_frame_pop_off_queue () line %d\n", __LINE__);
 		}
@@ -5724,7 +5743,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 		// is backwards, so it is implemented as documented.
 
 		if S.layer_3_initiated {
-			if s_debug_misc { //nolint:staticcheck
+			if ax25Link.debugMisc { //nolint:staticcheck
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("i_frame_pop_off_queue () discarding due to L3 init. line %d\n", __LINE__);
 			}
@@ -5734,7 +5753,7 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 		}
 
 	case state_3_connected, state_4_timer_recovery:
-		if s_debug_misc { //nolint:staticcheck
+		if ax25Link.debugMisc { //nolint:staticcheck
 			// text_color_set(DW_COLOR_DEBUG);
 			// dw_printf ("i_frame_pop_off_queue () state %d, line %d\n", S.state, __LINE__);
 		}
@@ -5751,14 +5770,14 @@ func i_frame_pop_off_queue(S *ax25_dlsm_t) {
 			var nr = S.vr
 			var p = 0
 
-			if s_debug_misc || s_debug_radio { //nolint:staticcheck
+			if ax25Link.debugMisc || ax25Link.debugRadio { //nolint:staticcheck
 				// dw_printf ("i_frame_pop_off_queue () ns=%d, queue for transmit \"", ns);
 				// AX25SafePrint (txdata.data, txdata.len, 1);
 				// dw_printf ("\"\n");
 			}
 			var pp = ax25_i_frame(S.addrs, S.num_addr, cr, S.modulo, nr, ns, p, txdata.pid, txdata.data[:txdata.len])
 
-			if s_debug_misc { //nolint:staticcheck
+			if ax25Link.debugMisc { //nolint:staticcheck
 				// text_color_set(DW_COLOR_DEBUG);
 				// dw_printf ("calling lm_data_request for I frame, %s line %d\n", __func__, __LINE__);
 			}
@@ -5829,7 +5848,7 @@ func discard_i_queue(S *ax25_dlsm_t) {
 // TODO:  requeuing???
 
 func enter_new_state(S *ax25_dlsm_t, new_state dlsm_state_e) {
-	if s_debug_variables {
+	if ax25Link.debugVariables {
 		var pc, _, __LINE__, _ = runtime.Caller(1)
 		var __func__ = runtime.FuncForPC(pc).Name()
 
@@ -5872,7 +5891,7 @@ func mdl_negotiate_request(S *ax25_dlsm_t) {
 	// Rather than wasting time, sending XID repeatedly until giving up, we have a workaround.
 	// The configuration file can contain a list of stations known not to respond to XID.
 	// Obviously this applies only to v2.2 because XID was not part of v2.0.
-	if slices.Contains(g_misc_config_p.noxid_addrs, S.addrs[PEERCALL]) {
+	if slices.Contains(ax25Link.miscConfig.noxid_addrs, S.addrs[PEERCALL]) {
 		return
 	}
 
@@ -5923,7 +5942,7 @@ func initiate_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 	// specified for PACLEN or offer the maximum
 	// that we can handle, AX25_N1_PACLEN_MAX?
 	param.window_size_rx = maybe.Just(S.k_maxframe)
-	param.ack_timer = maybe.Just(g_misc_config_p.frack * 1000)
+	param.ack_timer = maybe.Just(ax25Link.miscConfig.frack * 1000)
 	param.retries = maybe.Just(S.n2_retry)
 }
 
@@ -6007,7 +6026,7 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
 	// digipeaters will be added in locally at each end on top of this exchanged value.
 
 	if timer, ok := param.ack_timer.Get(); ok {
-		param.ack_timer = maybe.Just(max(timer, g_misc_config_p.frack*1000))
+		param.ack_timer = maybe.Just(max(timer, ax25Link.miscConfig.frack*1000))
 	} else {
 		param.ack_timer = maybe.Just(3000) // not specified, set default.
 	}
@@ -6074,7 +6093,7 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 func START_T1(S *ax25_dlsm_t) {
 	var now = time.Now()
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var pc, _, from_line, _ = runtime.Caller(1)
 		var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6105,7 +6124,7 @@ func STOP_T1(S *ax25_dlsm_t) {
 
 	// Normally this would be at the top but we don't know time remaining at that point.
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var pc, _, from_line, _ = runtime.Caller(1)
 		var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6125,7 +6144,7 @@ func STOP_T1(S *ax25_dlsm_t) {
 func IS_T1_RUNNING(S *ax25_dlsm_t) bool {
 	var result = !S.t1_exp.IsZero()
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("is_t1_running?  returns %t\n", result)
 	}
@@ -6142,7 +6161,7 @@ func PAUSE_T1(S *ax25_dlsm_t) {
 
 		S.t1_paused_at = now
 
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			var pc, _, from_line, _ = runtime.Caller(1)
 			var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6150,7 +6169,7 @@ func PAUSE_T1(S *ax25_dlsm_t) {
 			dw_printf("Paused T1 with %.3f still remaining, [now=%.3f] from %s %d\n", S.t1_exp.Sub(now).Seconds(), now.Sub(S.start_time).Seconds(), from_func, from_line)
 		}
 	} else {
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("T1 error: Didn't expect pause when already paused.\n")
 		}
@@ -6169,7 +6188,7 @@ func RESUME_T1(S *ax25_dlsm_t) {
 		S.t1_exp = S.t1_exp.Add(paused_for)
 		S.t1_paused_at = time.Time{}
 
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Resumed T1 after pausing for %.3f sec, %.3f still remaining, [now=%.3f]\n", paused_for.Seconds(), S.t1_exp.Sub(now).Seconds(), now.Sub(S.start_time).Seconds())
 		}
@@ -6185,7 +6204,7 @@ func RESUME_T1(S *ax25_dlsm_t) {
 func START_T3(S *ax25_dlsm_t) {
 	var now = time.Now()
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var pc, _, from_line, _ = runtime.Caller(1)
 		var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6197,7 +6216,7 @@ func START_T3(S *ax25_dlsm_t) {
 }
 
 func STOP_T3(S *ax25_dlsm_t) {
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var now = time.Now()
 		var pc, _, from_line, _ = runtime.Caller(1)
 		var from_func = runtime.FuncForPC(pc).Name()
@@ -6221,7 +6240,7 @@ func STOP_T3(S *ax25_dlsm_t) {
 func START_TM201(S *ax25_dlsm_t) {
 	var now = time.Now()
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var pc, _, from_line, _ = runtime.Caller(1)
 		var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6240,7 +6259,7 @@ func START_TM201(S *ax25_dlsm_t) {
 func STOP_TM201(S *ax25_dlsm_t) {
 	var now = time.Now()
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		var pc, _, from_line, _ = runtime.Caller(1)
 		var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6260,7 +6279,7 @@ func PAUSE_TM201(S *ax25_dlsm_t) {
 
 		S.tm201_paused_at = now
 
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			var pc, _, from_line, _ = runtime.Caller(1)
 			var from_func = runtime.FuncForPC(pc).Name()
 
@@ -6268,7 +6287,7 @@ func PAUSE_TM201(S *ax25_dlsm_t) {
 			dw_printf("Paused TM201 with %.3f still remaining, [now=%.3f] from %s %d\n", S.tm201_exp.Sub(now).Seconds(), now.Sub(S.start_time).Seconds(), from_func, from_line)
 		}
 	} else {
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("TM201 error: Didn't expect pause when already paused.\n")
 		}
@@ -6287,7 +6306,7 @@ func RESUME_TM201(S *ax25_dlsm_t) {
 		S.tm201_exp = S.tm201_exp.Add(paused_for)
 		S.tm201_paused_at = time.Time{}
 
-		if s_debug_timers {
+		if ax25Link.debugTimers {
 			text_color_set(DW_COLOR_DEBUG)
 			dw_printf("Resumed TM201 after pausing for %.3f sec, %.3f still remaining, [now=%.3f]\n", paused_for.Seconds(), S.tm201_exp.Sub(now).Seconds(), now.Sub(S.start_time).Seconds())
 		}
@@ -6297,7 +6316,7 @@ func RESUME_TM201(S *ax25_dlsm_t) {
 func ax25_link_get_next_timer_expiry() time.Time {
 	var tnext time.Time
 
-	for p := list_head; p != nil; p = p.next {
+	for p := ax25Link.listHead; p != nil; p = p.next {
 		// Consider if running and not paused.
 		if !p.t1_exp.IsZero() && p.t1_paused_at.IsZero() {
 			if tnext.IsZero() {
@@ -6324,7 +6343,7 @@ func ax25_link_get_next_timer_expiry() time.Time {
 		}
 	}
 
-	if s_debug_timers {
+	if ax25Link.debugTimers {
 		text_color_set(DW_COLOR_DEBUG)
 
 		if tnext.IsZero() {

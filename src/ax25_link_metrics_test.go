@@ -53,8 +53,8 @@ func TestAX25LinkFirstTryConnectIsNotARetry(t *testing.T) {
 
 	lm_data_indication(E)
 
-	require.NotNil(t, list_head)
-	require.Equal(t, state_3_connected, list_head.state, "%+v", list_head)
+	require.NotNil(t, ax25Link.listHead)
+	require.Equal(t, state_3_connected, ax25Link.listHead.state, "%+v", ax25Link.listHead)
 
 	assert.InDelta(t, before, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a first-try connect is not a retry")
@@ -82,13 +82,13 @@ func TestAX25LinkT1ExpiryCountsARetry(t *testing.T) {
 
 	dl_connect_request(E)
 
-	require.NotNil(t, list_head)
-	require.Equal(t, state_1_awaiting_connection, list_head.state)
+	require.NotNil(t, ax25Link.listHead)
+	require.Equal(t, state_1_awaiting_connection, ax25Link.listHead.state)
 
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
 	// No UA came back, so T1 expires and the SABM is sent again.
-	t1_expiry(list_head)
+	t1_expiry(ax25Link.listHead)
 
 	assert.InDelta(t, before+1, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a retransmitted SABM is a retry")
@@ -129,12 +129,12 @@ func TestAX25LinkT3ExpiryIsNotARetry(t *testing.T) {
 
 	lm_data_indication(E)
 
-	require.NotNil(t, list_head)
-	require.Equal(t, state_3_connected, list_head.state)
+	require.NotNil(t, ax25Link.listHead)
+	require.Equal(t, state_3_connected, ax25Link.listHead.state)
 
 	var before = metricValue(t, "samoyed_ax25_link_retries_total", labels)
 
-	t3_expiry(list_head)
+	t3_expiry(ax25Link.listHead)
 
 	assert.InDelta(t, before, metricValue(t, "samoyed_ax25_link_retries_total", labels), 0,
 		"a T3 keepalive poll is not a retry")
