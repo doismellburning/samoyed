@@ -795,73 +795,9 @@ func (f *atestModemFlags) apply(achan *achan_param_s) error {
 		achan.upsample = *f.upsample
 	}
 
-	// Hacks for the magic strings
-	var bitrate, bitrateParseErr = strconv.Atoi(*f.bitrate)
-	if strings.EqualFold(*f.bitrate, "AIS") {
-		bitrate = 0xA15A15
-	} else if strings.EqualFold(*f.bitrate, "EAS") {
-		bitrate = 0xEA5EA5
-	} else if bitrateParseErr != nil {
-		return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", *f.bitrate)
-	}
-
-	/*
-	 * Set modem type based on data rate.
-	 * (Could be overridden by -g, -j, or -J later.)
-	 */
-	/*    300 implies 1600/1800 AFSK. */
-	/*    1200 implies 1200/2200 AFSK. */
-	/*    2400 implies V.26 QPSK. */
-	/*    4800 implies V.27 8PSK. */
-	/*    9600 implies G3RUH baseband scrambled. */
-
-	achan.baud = bitrate
-
-	/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
-	/* that need to be kept in sync.  Maybe it could be a common function someday. */
-
-	if achan.baud < 600 { // e.g. HF SSB packet
-		achan.modem_type = MODEM_AFSK
-		achan.mark_freq = 1600
-		achan.space_freq = 1800
-		// Previously we had a "D" which was fine tuned for 300 bps.
-		// In v1.7, it's not clear if we should use "B" or just stick with "A".
-	} else if achan.baud < 1800 { // common 1200
-		achan.modem_type = MODEM_AFSK
-		achan.mark_freq = DEFAULT_MARK_FREQ
-		achan.space_freq = DEFAULT_SPACE_FREQ
-	} else if achan.baud < 3600 {
-		achan.modem_type = MODEM_QPSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	} else if achan.baud < 7200 {
-		achan.modem_type = MODEM_8PSK
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	} else if achan.baud == 0xA15A15 { // Hack for different use of 9600
-		achan.modem_type = MODEM_AIS
-		achan.baud = 9600
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	} else if achan.baud == 0xEA5EA5 {
-		achan.modem_type = MODEM_EAS
-		achan.baud = 521 // Actually 520.83 but we have an integer field here.
-		// Will make more precise in afsk demod init.
-		achan.mark_freq = 2083  // Actually 2083.3 - logic 1.
-		achan.space_freq = 1563 // Actually 1562.5 - logic 0.
-		achan.profiles = "A"
-	} else {
-		achan.modem_type = MODEM_SCRAMBLE
-		achan.mark_freq = 0
-		achan.space_freq = 0
-		achan.profiles = ""
-	}
-
-	if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
-		return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
+	var modemErr = achan.setModem(*f.bitrate)
+	if modemErr != nil {
+		return modemErr
 	}
 
 	/*

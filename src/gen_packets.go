@@ -704,74 +704,32 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 // apply sets up achan from the options, once they have been parsed.
 func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 	if *f.bitrate != "" {
-		var bitrate, bitrateParseErr = strconv.Atoi(*f.bitrate)
-		if strings.EqualFold(*f.bitrate, "AIS") {
-			bitrate = 0xA15A15 // Special cases handled below
-		} else if strings.EqualFold(*f.bitrate, "EAS") {
-			bitrate = 0xEA5EA5
-		} else if bitrateParseErr != nil {
-			return fmt.Errorf("invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s", *f.bitrate)
+		var err = achan.setModem(*f.bitrate)
+		if err != nil {
+			return err
 		}
 
-		achan.baud = bitrate
 		fmt.Printf("Data rate set to %d bits / second.\n", achan.baud)
 
-		// We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c,
-		// that need to be kept in sync.  Maybe it could be a common function someday.
-
-		if achan.baud == 0xEA5EA5 {
-			achan.baud = 521 // Fine tuned later. 520.83333
-			// Proper fix is to make this float.
-			achan.modem_type = MODEM_EAS
-			achan.mark_freq = 2083 // Ideally these should be floating point.
-			achan.space_freq = 1563
-			achan.profiles = "A"
-		} else if achan.baud == 0xA15A15 {
-			achan.baud = 9600
-			achan.modem_type = MODEM_AIS
-			achan.mark_freq = 0
-			achan.space_freq = 0
-		} else if achan.baud < 600 {
-			achan.modem_type = MODEM_AFSK
-			achan.mark_freq = 1600 // Typical for HF SSB
-			achan.space_freq = 1800
-		} else if achan.baud < 1800 {
-			achan.modem_type = MODEM_AFSK
-			achan.mark_freq = DEFAULT_MARK_FREQ
-			achan.space_freq = DEFAULT_SPACE_FREQ
-		} else if achan.baud < 3600 {
-			achan.modem_type = MODEM_QPSK
-			achan.mark_freq = 0
-			achan.space_freq = 0
-
+		switch achan.modem_type {
+		case MODEM_QPSK:
 			fmt.Printf("Using V.26 QPSK rather than AFSK.\n")
 
 			if achan.baud != 2400 {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", achan.baud)
 			}
-		} else if achan.baud < 7200 {
-			achan.modem_type = MODEM_8PSK
-			achan.mark_freq = 0
-			achan.space_freq = 0
-
+		case MODEM_8PSK:
 			fmt.Printf("Using V.27 8PSK rather than AFSK.\n")
 
 			if achan.baud != 4800 {
 				text_color_set(DW_COLOR_ERROR)
 				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", achan.baud)
 			}
-		} else {
-			achan.modem_type = MODEM_SCRAMBLE
-			achan.mark_freq = 0
-			achan.space_freq = 0
-
+		case MODEM_SCRAMBLE:
 			text_color_set(DW_COLOR_INFO)
 			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
-		}
-
-		if achan.baud < MIN_BAUD || achan.baud > MAX_BAUD {
-			return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
+		default:
 		}
 	}
 

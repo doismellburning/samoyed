@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1961,64 +1962,15 @@ func handleMODEM(ps *parseState) error {
 		return fmt.Errorf("line %d: Missing data transmission speed for MODEM command", ps.line)
 	}
 
-	var n int
-	if strings.EqualFold(t, "AIS") {
-		n = MAX_BAUD - 1 // Hack - See special case later.
-	} else if strings.EqualFold(t, "EAS") {
-		n = MAX_BAUD - 2 // Hack - See special case later.
-	} else {
-		n, _ = strconv.Atoi(t)
-	}
+	var modemErr = ps.audio.achan[ps.channel].setModem(t)
 
-	if n >= MIN_BAUD && n <= MAX_BAUD {
-		ps.audio.achan[ps.channel].baud = n
-		if n != 300 && n != 1200 && n != 2400 && n != 4800 && n != 9600 && n != 19200 && n != MAX_BAUD-1 && n != MAX_BAUD-2 {
-			ps.warnf("line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?", ps.line, n)
-		}
-	} else {
-		ps.audio.achan[ps.channel].baud = DEFAULT_BAUD
+	var rate, rateErr = strconv.Atoi(t) // Not if it was AIS or EAS.
+	if modemErr != nil {
+		_ = ps.audio.achan[ps.channel].setModem(strconv.Itoa(DEFAULT_BAUD))
 
-		ps.errorf("line %d: Unreasonable data rate. Using %d bits per second", ps.line, ps.audio.achan[ps.channel].baud)
-	}
-
-	/* Set defaults based on speed. */
-	/* Should be same as -B command line option in direwolf.c. */
-
-	/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
-	/* that need to be kept in sync.  Maybe it could be a common function someday. */
-
-	if ps.audio.achan[ps.channel].baud < 600 {
-		ps.audio.achan[ps.channel].modem_type = MODEM_AFSK
-		ps.audio.achan[ps.channel].mark_freq = 1600
-		ps.audio.achan[ps.channel].space_freq = 1800
-	} else if ps.audio.achan[ps.channel].baud < 1800 {
-		ps.audio.achan[ps.channel].modem_type = MODEM_AFSK
-		ps.audio.achan[ps.channel].mark_freq = DEFAULT_MARK_FREQ
-		ps.audio.achan[ps.channel].space_freq = DEFAULT_SPACE_FREQ
-	} else if ps.audio.achan[ps.channel].baud < 3600 {
-		ps.audio.achan[ps.channel].modem_type = MODEM_QPSK
-		ps.audio.achan[ps.channel].mark_freq = 0
-		ps.audio.achan[ps.channel].space_freq = 0
-	} else if ps.audio.achan[ps.channel].baud < 7200 {
-		ps.audio.achan[ps.channel].modem_type = MODEM_8PSK
-		ps.audio.achan[ps.channel].mark_freq = 0
-		ps.audio.achan[ps.channel].space_freq = 0
-	} else if ps.audio.achan[ps.channel].baud == MAX_BAUD-1 {
-		ps.audio.achan[ps.channel].modem_type = MODEM_AIS
-		ps.audio.achan[ps.channel].baud = 9600
-		ps.audio.achan[ps.channel].mark_freq = 0
-		ps.audio.achan[ps.channel].space_freq = 0
-	} else if ps.audio.achan[ps.channel].baud == MAX_BAUD-2 {
-		ps.audio.achan[ps.channel].modem_type = MODEM_EAS
-		ps.audio.achan[ps.channel].baud = 521 // Actually 520.83 but we have an integer field here.
-		// Will make more precise in afsk demod init.
-		ps.audio.achan[ps.channel].mark_freq = 2083  // Actually 2083.3 - logic 1.
-		ps.audio.achan[ps.channel].space_freq = 1563 // Actually 1562.5 - logic 0.
-		ps.audio.achan[ps.channel].profiles = "A"
-	} else {
-		ps.audio.achan[ps.channel].modem_type = MODEM_SCRAMBLE
-		ps.audio.achan[ps.channel].mark_freq = 0
-		ps.audio.achan[ps.channel].space_freq = 0
+		ps.errorf("line %d: Unreasonable data rate. Using %d bits per second", ps.line, DEFAULT_BAUD)
+	} else if rateErr == nil && !slices.Contains([]int{300, 1200, 2400, 4800, 9600, 19200}, rate) {
+		ps.warnf("line %d: Warning: Non-standard data rate of %d bits per second.  Are you sure?", ps.line, rate)
 	}
 
 	/* Get any options. */
@@ -2033,7 +1985,7 @@ func handleMODEM(ps *parseState) error {
 		/* old style */
 		ps.errorf("line %d: Old style (pre version 1.2) format will no longer be supported in next version", ps.line)
 
-		n, _ = strconv.Atoi(t)
+		var n, _ = strconv.Atoi(t)
 		/* Originally the upper limit was 3000. */
 		/* Version 1.0 increased to 5000 because someone */
 		/* wanted to use 2400/4800 Hz AFSK. */

@@ -115,35 +115,6 @@ func configModem(t *testing.T, line string) modemResult {
 	return modemResultOf(&audio.achan[0])
 }
 
-func modemName(m modem_t) string {
-	switch m {
-	case MODEM_AFSK:
-		return "AFSK"
-	case MODEM_BASEBAND:
-		return "BASEBAND"
-	case MODEM_SCRAMBLE:
-		return "SCRAMBLE"
-	case MODEM_QPSK:
-		return "QPSK"
-	case MODEM_8PSK:
-		return "8PSK"
-	case MODEM_OFF:
-		return "OFF"
-	case MODEM_16_QAM:
-		return "16QAM"
-	case MODEM_64_QAM:
-		return "64QAM"
-	case MODEM_AIS:
-		return "AIS"
-	case MODEM_EAS:
-		return "EAS"
-	case MODEM_BPSK:
-		return "BPSK"
-	default:
-		return fmt.Sprintf("modem_t(%d)", int(m))
-	}
-}
-
 func layer2Name(l layer2_t) string {
 	switch l {
 	case LAYER2_AX25:
@@ -173,7 +144,7 @@ func v26Name(v v26_e) string {
 // String gives a modemResult on one line, so a table of them reads easily.
 func (r modemResult) String() string {
 	return fmt.Sprintf("%d %s %d/%d profiles=%q v26=%s D=%d U=%d %s fx25=%d fec=%d inv=%d",
-		r.baud, modemName(r.modem), r.mark, r.space, r.profiles, v26Name(r.v26),
+		r.baud, r.modem, r.mark, r.space, r.profiles, v26Name(r.v26),
 		r.decimate, r.upsample, layer2Name(r.layer2), r.fx25, r.il2pFEC, r.il2pInv)
 }
 
@@ -542,6 +513,8 @@ func TestConfigModem(t *testing.T) {
 		{"MODEM EAS 0:0", "521 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM EAS 1600:1800", "521 AFSK 1600/1800 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM EAS B", "521 EAS 2083/1563 profiles=\"B\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM 39999", "39999 SCRAMBLE 0/0 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
+		{"MODEM fish", "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 		{"MODEM 50", "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 AX25 fx25=0 fec=1 inv=0"},
 	}
 
