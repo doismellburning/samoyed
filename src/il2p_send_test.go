@@ -18,8 +18,13 @@ func TestIL2PSendFrameCRCDefaultMatchesEnabled(t *testing.T) {
 
 	require.True(t, il2p_crc_enabled(0), "il2p_crc_enabled should default to true with nil config")
 
-	IL2P_TEST = true
-	t.Cleanup(func() { IL2P_TEST = false })
+	// Only the bit count matters here, so throw the bits away rather than
+	// looking for an audio device that isn't there.
+	var savedCapture = toneGenCapture
+	t.Cleanup(func() { toneGenCapture = savedCapture })
+
+	toneGenCapture = func(_ int, _ int) {}
+
 	il2p_init(0)
 
 	var addrs [AX25_MAX_ADDRS]string

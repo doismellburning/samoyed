@@ -75,12 +75,8 @@ func TestIL2PChannelVersionDefault(t *testing.T) {
 func TestIL2POnAirVersions(t *testing.T) {
 	il2p_init(0)
 
-	IL2P_TEST = true
-	t.Cleanup(func() { IL2P_TEST = false })
-	t.Cleanup(func() { il2pSerdesRecCount = -1 })
-
-	// The receive callback checks the information part against il2pTestText.
-	// Build the frame directly rather than from text: the IL2P header cannot
+	// Check the information part of whatever arrives against il2pTestText, so
+	// build the frame directly rather than from text: the IL2P header cannot
 	// represent every combination of the AX.25 address C bits, and a frame
 	// that changes shape in flight fails the trailing CRC check.
 	var addrs [AX25_MAX_ADDRS]string
@@ -119,21 +115,19 @@ func TestIL2POnAirVersions(t *testing.T) {
 		t.Run(testDatum.name, func(t *testing.T) {
 			il2pTestChannelVersion(t, testDatum.rx_version)
 
-			// Start the receiver from scratch, in case a mismatch left it
-			// part way through gathering a payload.
-			il2p_context[0][0][0] = nil
-
-			il2pSerdesRecCount = 0
-			il2pSerdesPolarity = 0
+			var recorder = il2pLoopback(t)
 
 			require.Positive(t, il2p_send_frame(0, pp, testDatum.tx_version, testDatum.max_fec, 0))
 
 			il2p_rec_bit(0, 0, 0, 0) // Extra bit to flush the state machine.
 
+			var received = recorder.take()
+
 			if testDatum.received {
-				assert.Equal(t, 1, il2pSerdesRecCount)
+				require.Len(t, received, 1)
+				assert.Equal(t, il2pTestText, string(received[0].info))
 			} else {
-				assert.Equal(t, 0, il2pSerdesRecCount)
+				assert.Empty(t, received)
 			}
 		})
 	}
