@@ -1922,6 +1922,15 @@ func handleMYCALL(ps *parseState) error {
 	return nil
 }
 
+// dropEASProfile clears the demodulator profile EAS brings with it, for a
+// MODEM option that swaps EAS for another modem, which should have its own
+// default instead.
+func (achan *achan_param_s) dropEASProfile() {
+	if achan.modem_type == MODEM_EAS {
+		achan.profiles = ""
+	}
+}
+
 // handleMODEM handles the MODEM keyword.
 func handleMODEM(ps *parseState) error {
 	/*
@@ -2005,7 +2014,7 @@ func handleMODEM(ps *parseState) error {
 		// Will make more precise in afsk demod init.
 		ps.audio.achan[ps.channel].mark_freq = 2083  // Actually 2083.3 - logic 1.
 		ps.audio.achan[ps.channel].space_freq = 1563 // Actually 1562.5 - logic 0.
-		// ? strlcpy (p_audio_config.achan[channel].profiles, "A", sizeof(p_audio_config.achan[channel].profiles));
+		ps.audio.achan[ps.channel].profiles = "A"
 	} else {
 		ps.audio.achan[ps.channel].modem_type = MODEM_SCRAMBLE
 		ps.audio.achan[ps.channel].mark_freq = 0
@@ -2134,8 +2143,10 @@ func handleMODEM(ps *parseState) error {
 				ps.audio.achan[ps.channel].space_freq = space
 
 				if ps.audio.achan[ps.channel].mark_freq == 0 && ps.audio.achan[ps.channel].space_freq == 0 {
+					ps.audio.achan[ps.channel].dropEASProfile()
 					ps.audio.achan[ps.channel].modem_type = MODEM_SCRAMBLE
 				} else {
+					ps.audio.achan[ps.channel].dropEASProfile()
 					ps.audio.achan[ps.channel].modem_type = MODEM_AFSK
 
 					if ps.audio.achan[ps.channel].mark_freq < 300 || ps.audio.achan[ps.channel].mark_freq > 5000 {
@@ -2171,10 +2182,12 @@ func handleMODEM(ps *parseState) error {
 					ps.audio.achan[ps.channel].offset = 50
 				}
 			} else if strings.EqualFold(t, "BPSK") { /* Force BPSK modem (1 bit/symbol, carrier 1800 Hz). */
+				ps.audio.achan[ps.channel].dropEASProfile()
 				ps.audio.achan[ps.channel].modem_type = MODEM_BPSK
 				ps.audio.achan[ps.channel].mark_freq = 0
 				ps.audio.achan[ps.channel].space_freq = 0
 			} else if strings.EqualFold(t, "G3RUH") { /* Force G3RUH modem regardless of default for speed. New in 1.6. */
+				ps.audio.achan[ps.channel].dropEASProfile()
 				ps.audio.achan[ps.channel].modem_type = MODEM_SCRAMBLE
 				ps.audio.achan[ps.channel].mark_freq = 0
 				ps.audio.achan[ps.channel].space_freq = 0

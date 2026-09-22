@@ -725,6 +725,7 @@ func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
 			achan.modem_type = MODEM_EAS
 			achan.mark_freq = 2083 // Ideally these should be floating point.
 			achan.space_freq = 1563
+			achan.profiles = "A"
 		} else if achan.baud == 0xA15A15 {
 			achan.baud = 9600
 			achan.modem_type = MODEM_AIS
