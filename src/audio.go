@@ -1721,7 +1721,15 @@ func audio_open(ctx context.Context, pa *audio_s) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_get_real(a int) int {
+// audioDeviceSource is the SampleSource for the audio device that audio_open
+// opened.
+type audioDeviceSource struct{}
+
+func (audioDeviceSource) GetByte(adev int) int {
+	return audio_get(adev)
+}
+
+func audio_get(a int) int {
 	Assert(adev[a].inbufSizeInBytes >= 100 && adev[a].inbufSizeInBytes <= 32768)
 
 	switch adev[a].g_audio_in_type {

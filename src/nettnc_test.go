@@ -88,25 +88,12 @@ func attachTestNetTNC(ctx context.Context, t *testing.T) (net.Conn, <-chan net.C
 	return nextTestNetTNCConn(t, conns), conns
 }
 
-// expectReceivedFrames empties the received queue, and arranges for frames to
-// actually reach it.
-//
-// AtestMain sets ATEST_C, which sends every received frame to atest's own
-// accounting instead of the queue.  It puts it back on the way out, so this is
-// belt and braces - but recv_test.go says which it wants for the same reason: a
-// test that cares which it gets should not depend on what ran before it.
+// expectReceivedFrames empties the received queue, so that a test sees only the
+// frames it put there itself.
 func expectReceivedFrames(t *testing.T) {
 	t.Helper()
 
-	var orig = ATEST_C
-
-	t.Cleanup(func() {
-		ATEST_C = orig
-
-		dlq_init()
-	})
-
-	ATEST_C = false
+	t.Cleanup(dlq_init)
 
 	dlq_init()
 }

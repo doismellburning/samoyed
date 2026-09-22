@@ -102,6 +102,8 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  *
  *		pa		- Address of structure of type audio_s.
  *
+ *		src		- Where the audio samples come from.
+ *
  *
  * Returns:     A channel reporting the number of any audio device whose
  *		input failed.  There is no point in going on without audio,
@@ -109,7 +111,7 @@ var save_pa *audio_s /* Keep pointer to audio configuration for later use. */
  *
  *----------------------------------------------------------------*/
 
-func recv_init(ctx context.Context, pa *audio_s) <-chan int {
+func recv_init(ctx context.Context, pa *audio_s, src SampleSource) <-chan int {
 	save_pa = pa
 
 	// Buffered so that a failing device thread can report and finish even
@@ -118,7 +120,7 @@ func recv_init(ctx context.Context, pa *audio_s) <-chan int {
 
 	for a := range MAX_ADEVS {
 		if pa.adev[a].defined > 0 {
-			go recv_adev_thread(ctx, a, failed)
+			go recv_adev_thread(ctx, a, failed, src)
 		}
 	}
 
@@ -133,7 +135,7 @@ func recv_init(ctx context.Context, pa *audio_s) <-chan int {
 // that would mean tearing the device down underneath the demodulator.  A
 // device delivering samples at all therefore stops promptly; one that has gone
 // quiet without failing outright holds the goroutine until it says something.
-func recv_adev_thread(ctx context.Context, a int, failed chan<- int) {
+func recv_adev_thread(ctx context.Context, a int, failed chan<- int, src SampleSource) {
 	/* This audio device can have one (mono) or two (stereo) channels. */
 	/* Find number of the first channel and number of channels. */
 	var first_chan = ADEVFIRSTCHAN(a)
@@ -145,7 +147,7 @@ func recv_adev_thread(ctx context.Context, a int, failed chan<- int) {
 	var eof = false
 	for !eof && ctx.Err() == nil {
 		for c := range num_chan {
-			var audio_sample = demod_get_sample(a)
+			var audio_sample = demod_get_sample(a, src)
 
 			if audio_sample >= 256*256 {
 				eof = true

@@ -81,17 +81,12 @@ type atest_wav_data_t struct {
 	Datasize int32
 }
 
-var ATEST_C = false
-
 var header atest_header_t
 var chunk atest_chunk_t
 var format atest_format_t
 var wav_data atest_wav_data_t
 
 var atestFP *os.File
-var atestBuf *bufio.Reader
-var e_o_f bool
-var packets_decoded_one = 0
 
 var my_audio_config *audio_s
 
@@ -106,8 +101,6 @@ var sample_number = -1 /* Sample number from the file. */
 
 var h_opt = false // Hexadecimal display of received packet.
 var d_o_opt = 0   // "-d o" option for DCD output control. */
-var dcd_count = 0
-var dcd_missing_errors = 0
 
 const EXPERIMENT_G = true
 const EXPERIMENT_H = true
@@ -135,9 +128,11 @@ func atestFixBits(n int) (BitFixLevel, bool, bool) {
 }
 
 func AtestMain() {
-	ATEST_C = true
-
 	var count [MAX_SUBCHANS]int // Experiments G and H
+
+	// One sink for the whole run, so its DCD counts are of everything
+	// decoded rather than of the file being decoded at the time.
+	var sink = new(atestSink)
 
 	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
@@ -629,18 +624,18 @@ o = DCD output control
 		 * Initialize the AFSK demodulator and HDLC decoder.
 		 * Needs to be done for each file because they could have different sample rates.
 		 */
-		multi_modem_init(my_audio_config)
+		multi_modem_init(my_audio_config, sink)
 
-		packets_decoded_one = 0
+		sink.packetsDecoded = 0
 
-		atestBuf = bufio.NewReader(atestFP)
+		var src = newReaderSampleSource(atestFP, wav_data.Datasize)
 
-		e_o_f = false
+		var e_o_f = false
 		for !e_o_f {
 			for c := range my_audio_config.adev[0].num_channels {
 				/* This reads either 1 or 2 bytes depending on */
 				/* bits per sample.  */
-				var audio_sample = demod_get_sample(ACHAN2ADEV(c))
+				var audio_sample = demod_get_sample(ACHAN2ADEV(c), src)
 
 				if audio_sample >= 256*256 {
 					e_o_f = true
@@ -683,8 +678,8 @@ o = DCD output control
 			}
 		}
 
-		fmt.Printf("%d from %s\n", packets_decoded_one, wavFileName)
-		packets_decoded_total += packets_decoded_one
+		fmt.Printf("%d from %s\n", sink.packetsDecoded, wavFileName)
+		packets_decoded_total += sink.packetsDecoded
 
 		atestFP.Close()
 	}
@@ -694,8 +689,8 @@ o = DCD output control
 	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/float64(elapsed.Seconds()))
 
 	if d_o_opt > 0 {
-		fmt.Printf("DCD count = %d\n", dcd_count)
-		fmt.Printf("DCD missing errors = %d\n", dcd_missing_errors)
+		fmt.Printf("DCD count = %d\n", sink.dcdCount)
+		fmt.Printf("DCD missing errors = %d\n", sink.dcdMissingErrors)
 	}
 
 	if *errorIfLessThan != -1 && packets_decoded_total < *errorIfLessThan {
@@ -709,34 +704,41 @@ o = DCD output control
 		fmt.Printf("\n * * * TEST FAILED: number decoded is greater than %d * * * \n", *errorIfGreaterThan)
 		os.Exit(1)
 	}
-
-	// Put the real functions back.  For the command this changes nothing,
-	// as the process is about to end anyway, but the tests all run in one
-	// process: anything after a test that calls this would otherwise get
-	// the fakes - audio samples read from a WAV file that has been closed,
-	// received frames counted instead of queued, PTT going nowhere.
-	ATEST_C = false
 }
 
 /*
- * Simulate sample from the audio device.
+ * Sample data from a .WAV file, in place of the audio device.
  */
 
-func audio_get_fake(_ int) int {
-	if wav_data.Datasize <= 0 {
-		e_o_f = true
+// readerSampleSource hands out up to nbytes of sample data read from r - for
+// atest, the "data" chunk of an open .WAV file.  A file shorter than its header
+// claims therefore ends at whichever of the two comes first.
+type readerSampleSource struct {
+	r         *bufio.Reader
+	remaining int32
+}
 
+func newReaderSampleSource(r io.Reader, nbytes int32) *readerSampleSource {
+	var s = new(readerSampleSource)
+	s.r = bufio.NewReader(r)
+	s.remaining = nbytes
+
+	return s
+}
+
+func (s *readerSampleSource) GetByte(_ int) int {
+	if s.remaining <= 0 {
 		return (-1)
 	}
 
-	var data, err = atestBuf.ReadByte()
-	wav_data.Datasize--
+	var data, err = s.r.ReadByte()
+	s.remaining--
 
 	if errors.Is(err, io.EOF) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unexpected end of file.\n")
 
-		e_o_f = true
+		return (-1)
 	}
 
 	// TODO KG Better error handling
@@ -744,23 +746,15 @@ func audio_get_fake(_ int) int {
 	return int(data)
 }
 
-func audio_get(a int) int {
-	if ATEST_C {
-		return audio_get_fake(a)
-	} else {
-		return audio_get_real(a)
-	}
-}
-
 /*
  * This is called when we have a good frame.
  */
 
-func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
-	packets_decoded_one++
+func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, alevel ALevel, fec_type fec_type_t, retries BitFixLevel, spectrum string) {
+	s.packetsDecoded++
 
 	if hdlcReceiver.DataDetectAny(channel) == 0 {
-		dcd_missing_errors++
+		s.dcdMissingErrors++
 	}
 
 	var stemp = AX25FormatAddrs(pp)
@@ -787,7 +781,7 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 
 	text_color_set(DW_COLOR_DEBUG)
 	dw_printf("\n")
-	dw_printf("DECODED[%d] ", packets_decoded_one)
+	dw_printf("DECODED[%d] ", s.packetsDecoded)
 
 	/* Insert time stamp relative to start of file. */
 
@@ -884,27 +878,37 @@ func dlq_rec_frame_fake(channel int, subchan int, slice int, pp *packet_t, aleve
 			}
 		#endif
 	*/
-} /* end fake dlq_append */
+} /* end RecFrame */
 
-var dcd_start_seconds [MAX_RADIO_CHANS]float64
+// atestSink is where atest's decoders report what they have heard.  A running
+// Samoyed acts on that - queueing the frame for the receive thread, keying a
+// DCD output line - where atest reports on it: the frame, and with "-d o", the
+// time the channel was busy for.
+type atestSink struct {
+	// packetsDecoded counts the frames decoded from the file being read;
+	// AtestMain clears it between files.
+	packetsDecoded   int
+	dcdMissingErrors int
+	dcdCount         int
+	dcdStartSeconds  [MAX_RADIO_CHANS]float64
+}
 
-func ptt_set_fake(_ int, channel int, ptt_signal int) {
-	// Should only get here for DCD output control.
+func (s *atestSink) DCDChange(channel int, state int) {
 	if d_o_opt > 0 {
 		var t = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
 
 		text_color_set(DW_COLOR_INFO)
 
-		if ptt_signal != 0 {
+		if state != 0 {
 			//sec1 = t;
 			//min1 = (int)(sec1 / 60.);
 			//sec1 -= min1 * 60;
 			//dw_printf ("DCD[%d] = ON    %d:%06.3f\n",  channel, min1, sec1);
-			dcd_count++
-			dcd_start_seconds[channel] = t
+			s.dcdCount++
+			s.dcdStartSeconds[channel] = t
 		} else {
-			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - dcd_start_seconds[channel]) * 1000.);
-			var sec1 = dcd_start_seconds[channel]
+			//dw_printf ("DCD[%d] = off   %d:%06.3f   %3.0f\n",  channel, min, sec, (t - s.dcdStartSeconds[channel]) * 1000.);
+			var sec1 = s.dcdStartSeconds[channel]
 			var min1 = (int)(sec1 / 60.)
 			sec1 -= float64(min1 * 60)
 
@@ -912,27 +916,7 @@ func ptt_set_fake(_ int, channel int, ptt_signal int) {
 			var min2 = (int)(sec2 / 60.)
 			sec2 -= float64(min2 * 60)
 
-			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-dcd_start_seconds[channel])*1000.)
+			dw_printf("DCD[%d]  %d:%06.3f - %d:%06.3f =  %3.0f\n", channel, min1, sec1, min2, sec2, (t-s.dcdStartSeconds[channel])*1000.)
 		}
-	}
-}
-
-func ptt_set(ot int, channel int, ptt_signal int) {
-	if ATEST_C {
-		ptt_set_fake(ot, channel, ptt_signal)
-	} else {
-		ptt_set_real(ot, channel, ptt_signal)
-	}
-}
-
-func get_input_fake(it int, channel int) int {
-	return -1
-}
-
-func get_input(it int, channel int) int {
-	if ATEST_C {
-		return get_input_fake(it, channel)
-	} else {
-		return get_input_real(it, channel)
 	}
 }

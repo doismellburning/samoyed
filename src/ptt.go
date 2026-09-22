@@ -1028,7 +1028,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 
 // JWL - save status and new get_ptt function.
 
-func ptt_set_real(ot int, channel int, ptt_signal int) {
+func ptt_set(ot int, channel int, ptt_signal int) {
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
 
@@ -1282,7 +1282,7 @@ func cm108_print_permission_advice(name string, err error) {
  *
  * ------------------------------------------------------------------*/
 
-func get_input_real(it int, channel int) int {
+func get_input(it int, channel int) int { //nolint:unparam // ICTYPE_TXINH is the only input type there is so far, but the parameter is how Dire Wolf left room for another.
 	Assert(it >= 0 && it < NUM_ICTYPES)
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 
