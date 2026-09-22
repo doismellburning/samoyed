@@ -1377,7 +1377,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 	}
 
 	if *f.fx25CheckBytes > 0 {
-		if *f.il2pNormal != -1 || *f.il2pInverted != -1 {
+		if *f.il2pNormal >= 0 || *f.il2pInverted >= 0 {
 			return errors.New("can't mix -X with -I or -i")
 		}
 
@@ -1385,7 +1385,7 @@ func (f *direwolfModemFlags) apply(achan *achan_param_s) error {
 		achan.layer2_xmit = LAYER2_FX25
 	}
 
-	if *f.il2pNormal != -1 && *f.il2pInverted != -1 {
+	if *f.il2pNormal >= 0 && *f.il2pInverted >= 0 {
 		return errors.New("can't use both -I and -i at the same time")
 	}
 

@@ -478,9 +478,16 @@ func TestModemOptions(t *testing.T) {
 			},
 		},
 		{
+			args: []string{"-I", "1", "-i", "-2"},
+			want: map[string]string{
+				"direwolf":    "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=1 inv=0",
+				"gen_packets": "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 IL2P fx25=0 fec=1 inv=0",
+			},
+		},
+		{
 			args: []string{"-X", "16", "-I", "-2"},
 			want: map[string]string{
-				"direwolf":    "error: can't mix -X with -I or -i",
+				"direwolf":    "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 FX25 fx25=16 fec=1 inv=0",
 				"gen_packets": "1200 AFSK 1200/2200 profiles=\"\" v26=- D=0 U=0 FX25 fx25=16 fec=0 inv=0",
 			},
 		},
