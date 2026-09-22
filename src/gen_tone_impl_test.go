@@ -34,7 +34,7 @@ func TestNewToneGeneratorAFSK(t *testing.T) {
 	var samplesPerSec = 44100
 	var audioConfig = newTestAudioConfig(channel, MODEM_AFSK, baud, markFreq, spaceFreq, samplesPerSec)
 
-	var tg = NewToneGenerator(channel, audioConfig)
+	var tg = NewToneGenerator(channel, audioConfig, nil)
 
 	require.NotNil(t, tg)
 	assert.Equal(t, channel, tg.channel)
@@ -50,7 +50,7 @@ func TestNewToneGeneratorBPSK(t *testing.T) {
 	var channel = 0
 	var audioConfig = newTestAudioConfig(channel, MODEM_BPSK, 2400, 0, 0, 44100)
 
-	var tg = NewToneGenerator(channel, audioConfig)
+	var tg = NewToneGenerator(channel, audioConfig, nil)
 
 	require.NotNil(t, tg)
 	// BPSK forces mark_freq to 1800 and mirrors it into space_freq.
@@ -70,8 +70,8 @@ func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
 	audioConfig.achan[chan1].mark_freq = 1200
 	audioConfig.achan[chan1].space_freq = 2200
 
-	var tg0 = NewToneGenerator(chan0, audioConfig)
-	var tg1 = NewToneGenerator(chan1, audioConfig)
+	var tg0 = NewToneGenerator(chan0, audioConfig, nil)
+	var tg1 = NewToneGenerator(chan1, audioConfig, nil)
 
 	// Mutating one channel's accumulator directly (rather than going through
 	// PutBit, which requires a live audio device) confirms the two instances

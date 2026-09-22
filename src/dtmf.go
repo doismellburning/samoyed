@@ -249,7 +249,7 @@ func dtmf_sample(c int, input float64) rune {
 				_tmpIntBool = 1
 			}
 
-			dcd_change(c, MAX_SUBCHANS, 0, _tmpIntBool)
+			hdlcReceiver.DCDChange(c, MAX_SUBCHANS, 0, _tmpIntBool)
 
 			/* Reset timeout timer. */
 			if decoded != ' ' {
@@ -330,7 +330,7 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
 
 	push_button(channel, ' ', txtail)
 
-	audio_flush(ACHAN2ADEV(channel))
+	gen_tone_flush(channel)
 
 	return (txdelay +
 		int(1000.0*float64(len(str))/float64(speed)+0.5) +

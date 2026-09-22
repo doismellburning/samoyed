@@ -94,12 +94,12 @@ func pll_dcd_each_symbol2(dcdConfig *DCDConfig, D *demodulator_state_s, channel 
 	if s >= dcdConfig.DCD_THRESH_ON {
 		if D.slicer[slice].data_detect == 0 {
 			D.slicer[slice].data_detect = 1
-			dcd_change(channel, subchan, slice, D.slicer[slice].data_detect)
+			hdlcReceiver.DCDChange(channel, subchan, slice, D.slicer[slice].data_detect)
 		}
 	} else if s <= dcdConfig.DCD_THRESH_OFF {
 		if D.slicer[slice].data_detect != 0 {
 			D.slicer[slice].data_detect = 0
-			dcd_change(channel, subchan, slice, D.slicer[slice].data_detect)
+			hdlcReceiver.DCDChange(channel, subchan, slice, D.slicer[slice].data_detect)
 		}
 	}
 }

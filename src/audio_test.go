@@ -228,7 +228,7 @@ func Test_audioFlushReal_UDP_sendsBytes(t *testing.T) {
 	copy(dev.outbuf, testData)
 	dev.outbufLen = len(testData)
 
-	var result = audio_flush_real(0)
+	var result = audio_flush(0)
 	assert.Equal(t, 0, result)
 	assert.Equal(t, 0, dev.outbufLen, "output buffer should be cleared after flush")
 
@@ -326,7 +326,7 @@ func Test_audioFlushReal_UDP_emptyBuffer_isNoop(t *testing.T) {
 	dev.outbufLen = 0
 
 	// Should return 0 without attempting a write.
-	assert.Equal(t, 0, audio_flush_real(0))
+	assert.Equal(t, 0, audio_flush(0))
 }
 
 func Test_audioUDPSilenceKeepalive_chunkSizeAndCleanShutdown(t *testing.T) {
@@ -451,8 +451,8 @@ func Test_audioOpen_stdinOnly_hasNoOutputDevice(t *testing.T) {
 
 	// Whatever the transmit path produces on the open device is discarded,
 	// not written anywhere, and does not upset the buffer bookkeeping.
-	require.Equal(t, 0, audio_put_real(0, 42))
-	assert.Equal(t, -1, audio_flush_real(0))
+	require.Equal(t, 0, audio_put(0, 42))
+	assert.Equal(t, -1, audio_flush(0))
 	assert.Equal(t, 0, adev[0].outbufLen)
 
 	// Closing must not release a PortAudio reference this open never took.

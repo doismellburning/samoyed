@@ -64,15 +64,10 @@ import (
 
 const MY_RAND_MAX = 0x7fffffff
 
-var GEN_PACKETS = false // Switch between fakes and reals at runtime
-
 var modem audio_s
 var g_morse_wpm = 0 /* Send morse code at this speed. */
 var g_add_noise = false
 var g_noise_level float64 = 0
-
-// Created in audio_file_open, used by audio_put_fake, closed in audio_file_close.
-var genPacketsWAV *wavwrite.Writer
 
 var genPacketsRandSeed int32 = 1
 
@@ -89,7 +84,6 @@ func genPacketsRand() int32 {
 }
 
 func GenPacketsMain() {
-	GEN_PACKETS = true // Use the _fake functions
 	/*
 	 * Set up default values for the modem.
 	 */
@@ -493,15 +487,15 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		os.Exit(1)
 	}
 
-	var err = audio_file_open(*outputFile, &modem)
+	var sink = audio_file_open(*outputFile, &modem)
 
-	if err < 0 {
+	if sink == nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("ERROR - Can't open output file.\n")
 		os.Exit(1)
 	}
 
-	gen_tone_init(&modem, *amplitude/2, true)
+	gen_tone_init(&modem, *amplitude/2, sink)
 	morse_init(&modem, *amplitude/2)
 	dtmf_init(&modem, *amplitude/2)
 
@@ -554,7 +548,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 			send_packet(str)
 		}
 
-		audio_file_close()
+		audio_file_close(sink)
 
 		return
 	}
@@ -579,7 +573,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		for speed_error := -variable_speed_max_error; speed_error <= variable_speed_max_error+0.001; speed_error += variable_speed_increment {
 			// Baud is int so we get some roundoff.  Make it real?
 			modem.achan[0].baud = int(float64(normal_speed) * (1. + speed_error/100.))
-			gen_tone_init(&modem, *amplitude/2, true)
+			gen_tone_init(&modem, *amplitude/2, sink)
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error)
 			send_packet(stemp)
@@ -631,7 +625,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		}
 	}
 
-	audio_file_close()
+	audio_file_close(sink)
 }
 
 /*------------------------------------------------------------------
@@ -650,11 +644,11 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
  *					bits_per_sample
  *				If zero, reasonable defaults will be provided.
  *
- * Returns:     0 for success, -1 for failure.
+ * Returns:     Where to send the samples, or nil for failure.
  *
  *----------------------------------------------------------------*/
 
-func audio_file_open(fname string, pa *audio_s) int {
+func audio_file_open(fname string, pa *audio_s) *wavFileSink {
 	/*
 	 * Fill in defaults for any missing values.
 	 */
@@ -684,13 +678,10 @@ func audio_file_open(fname string, pa *audio_s) int {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("%s\n", err)
 
-		return (-1)
+		return nil
 	}
 
-	genPacketsWAV = w
-	noiseSample16Pending = false
-
-	return (0)
+	return newWAVFileSink(w)
 } /* end audio_open */
 
 /*------------------------------------------------------------------
@@ -708,17 +699,13 @@ func audio_file_open(fname string, pa *audio_s) int {
  *
  *----------------------------------------------------------------*/
 
-func audio_file_close() int { //nolint:unparam
-	if genPacketsWAV == nil {
+func audio_file_close(sink *wavFileSink) int { //nolint:unparam
+	if sink == nil {
 		return (-1)
 	}
 
-	var w = genPacketsWAV
-
-	genPacketsWAV = nil
-
 	// Close goes back and fixes up the lengths in the header for us.
-	var err = w.Close()
+	var err = sink.w.Close()
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("%s\n", err)
@@ -810,9 +797,27 @@ func send_packet(str string) {
 	}
 }
 
+// wavFileSink is the AudioSink for gen_packets: it writes the samples to the
+// .WAV file audio_file_open created, with noise added when asked for.
+type wavFileSink struct {
+	w *wavwrite.Writer
+
+	// Half of a 16 bit sample, waiting for its upper byte before noise can be
+	// added to it and it can be written out.
+	sample16        int16
+	sample16Pending bool
+}
+
+func newWAVFileSink(w *wavwrite.Writer) *wavFileSink {
+	var sink = new(wavFileSink)
+	sink.w = w
+
+	return sink
+}
+
 /*------------------------------------------------------------------
  *
- * Name:        audio_put
+ * Name:        Put
  *
  * Purpose:     Send one byte to the audio output file.
  *
@@ -826,23 +831,17 @@ func send_packet(str string) {
  *
  *----------------------------------------------------------------*/
 
-// Half of a 16 bit sample, waiting for its upper byte before noise can be
-// added to it and it can be written out.
-var sample16 int16
-
-var noiseSample16Pending bool
-
-func audio_put_fake(_ int, c uint8) int {
+func (sink *wavFileSink) Put(_ int, c uint8) int {
 	if g_add_noise {
-		if !noiseSample16Pending {
-			sample16 = int16(c) /* save lower byte. */
-			noiseSample16Pending = true
+		if !sink.sample16Pending {
+			sink.sample16 = int16(c) /* save lower byte. */
+			sink.sample16Pending = true
 
 			return int(c)
 		} else {
-			sample16 |= int16(c) << 8 /* insert upper byte. */
-			noiseSample16Pending = false
-			var s = int32(sample16) // sign extend.
+			sink.sample16 |= int16(c) << 8 /* insert upper byte. */
+			sink.sample16Pending = false
+			var s = int32(sink.sample16) // sign extend.
 
 			/* Add random noise to the signal. */
 			/* r should be in range of -1 .. +1. */
@@ -859,7 +858,7 @@ func audio_put_fake(_ int, c uint8) int {
 				s = -32767
 			}
 
-			var n, writeErr = genPacketsWAV.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
+			var n, writeErr = sink.w.Write([]byte{byte(s & 0xff), byte(s>>8) & 0xff})
 			if writeErr != nil {
 				return -1
 			}
@@ -867,43 +866,16 @@ func audio_put_fake(_ int, c uint8) int {
 			return n
 		}
 	} else {
-		var writeErr = genPacketsWAV.WriteByte(c)
+		var writeErr = sink.w.WriteByte(c)
 		if writeErr != nil {
 			return -1
 		}
 
 		return 1
 	}
-} /* end audio_put */
+} /* end Put */
 
-func audio_put(a int, c uint8) int { //nolint:unparam
-	if GEN_PACKETS {
-		return audio_put_fake(a, c)
-	} else {
-		return audio_put_real(a, c)
-	}
-}
-
-func audio_flush_fake(a int) int {
+// Flush has nothing to do: the file is written as the samples arrive.
+func (sink *wavFileSink) Flush(_ int) int {
 	return 0
-}
-
-func audio_flush(a int) int {
-	if GEN_PACKETS {
-		return audio_flush_fake(a)
-	} else {
-		return audio_flush_real(a)
-	}
-}
-
-// To keep dtmf.c happy.
-func dcd_change_fake(channel int, subchan int, slice int, state int) {
-}
-
-func dcd_change(channel int, subchan int, slice int, state int) {
-	if GEN_PACKETS {
-		dcd_change_fake(channel, subchan, slice, state)
-	} else {
-		hdlcReceiver.DCDChange(channel, subchan, slice, state)
-	}
 }

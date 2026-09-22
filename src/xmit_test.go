@@ -281,10 +281,10 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 
 	const channel = 0
 
-	var origAudio, origToneGen, origADev, origGenPackets = save_audio_config_p, toneGenCapture, adev[0], GEN_PACKETS
+	var origAudio, origToneGen, origGenerators, origADev = save_audio_config_p, toneGenCapture, toneGenerators, adev[0]
 
 	t.Cleanup(func() {
-		save_audio_config_p, toneGenCapture, adev[0], GEN_PACKETS = origAudio, origToneGen, origADev, origGenPackets
+		save_audio_config_p, toneGenCapture, toneGenerators, adev[0] = origAudio, origToneGen, origGenerators, origADev
 
 		for p := range TQ_NUM_PRIO {
 			for transmitQueue.Remove(channel, p) != nil { //revive:disable-line:empty-block
@@ -323,9 +323,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	adev[0].outbufSizeInBytes = 4096
 	adev[0].outbuf = make([]byte, adev[0].outbufSizeInBytes)
 
-	// gen_packets leaves its fakes switched on behind it, and they write to a
-	// .WAV file that only it has opened.
-	GEN_PACKETS = false
+	gen_tone_init(audioConfig, 100, audioDeviceSink{})
 
 	var xs = new(XmitService)
 	xs.p_modem = audioConfig

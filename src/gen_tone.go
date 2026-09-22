@@ -41,12 +41,24 @@ const PHASE_SHIFT_45 = (uint(32) << 24)
 
 var toneGenerators [MAX_RADIO_CHANS]*ToneGenerator
 
+// An AudioSink is where the samples the tone generator makes go: one byte of
+// sample data at a time, then a flush at the end of a transmission to push out
+// whatever is still waiting.  Both return -1 for any type of error.
+//
+// audioDeviceSink is the one a running Samoyed uses; samoyed-gen-packets writes
+// a .WAV file instead.
+type AudioSink interface {
+	Put(adev int, c uint8) int
+	Flush(adev int) int
+}
+
 // ToneGenerator holds the direct digital synthesis (DDS) state used to
 // generate AFSK/PSK/etc. tones for one radio channel.
 type ToneGenerator struct {
 	channel     int
 	adevIndex   int
 	audioConfig *audio_s
+	sink        AudioSink // Where the samples go.
 
 	ticksPerSample    int /* Same for both channels of same soundcard */
 	ticksPerBit       int /* because they have same sample rate. */
@@ -96,16 +108,19 @@ type ToneGenerator struct {
  *					space_freq
  *					samples_per_sec
  *
+ *		sink			- Where the generated samples go.
+ *
  * Description:	 Calculate various constants for use by the direct digital synthesis
  * 		audio tone generation, for one channel.
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *audio_s, sink AudioSink) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
 		audioConfig: audioConfig,
+		sink:        sink,
 	}
 
 	var a = tg.adevIndex
@@ -197,8 +212,9 @@ func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
  *
  *				  100% uses the full 16 bit sample range of +-32k.
  *
- *		gen_packets	- True if being called from "gen_packets" utility
- *				  rather than the "direwolf" application.
+ *		sink		- Where the generated samples go: the audio device
+ *				  for the "direwolf" application, a .WAV file for
+ *				  the "gen_packets" utility.
  *
  * Returns:     0 for success.
  *              -1 for failure.
@@ -208,11 +224,8 @@ func NewToneGenerator(channel int, audioConfig *audio_s) *ToneGenerator {
  *
  *----------------------------------------------------------------*/
 
-func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //nolint:unparam
-	logrus.WithFields(logrus.Fields{
-		"amp":         amp,
-		"gen_packets": gen_packets,
-	}).Debug("gen_tone_init")
+func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nolint:unparam
+	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
 	/*
 	 * Save away modem parameters for later use.
@@ -221,7 +234,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, gen_packets bool) int { //n
 
 	for channel := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-			toneGenerators[channel] = NewToneGenerator(channel, audio_config_p)
+			toneGenerators[channel] = NewToneGenerator(channel, audio_config_p, sink)
 		}
 	}
 
@@ -598,38 +611,54 @@ func (tg *ToneGenerator) PutSample(sam int) {
 	if audioConfig.adev[a].num_channels == 1 {
 		/* Mono */
 		if audioConfig.adev[a].bits_per_sample == 8 {
-			audio_put(a, uint8(((sam+32768)>>8)&0xff))
+			tg.sink.Put(a, uint8(((sam+32768)>>8)&0xff))
 		} else {
-			audio_put(a, uint8(sam&0xff))
-			audio_put(a, uint8((sam>>8)&0xff))
+			tg.sink.Put(a, uint8(sam&0xff))
+			tg.sink.Put(a, uint8((sam>>8)&0xff))
 		}
 	} else {
 		if tg.channel == ADEVFIRSTCHAN(a) {
 			/* Stereo, left channel. */
 			if audioConfig.adev[a].bits_per_sample == 8 {
-				audio_put(a, uint8(((sam+32768)>>8)&0xff))
-				audio_put(a, 0)
+				tg.sink.Put(a, uint8(((sam+32768)>>8)&0xff))
+				tg.sink.Put(a, 0)
 			} else {
-				audio_put(a, uint8(sam&0xff))
-				audio_put(a, uint8((sam>>8)&0xff))
+				tg.sink.Put(a, uint8(sam&0xff))
+				tg.sink.Put(a, uint8((sam>>8)&0xff))
 
-				audio_put(a, 0)
-				audio_put(a, 0)
+				tg.sink.Put(a, 0)
+				tg.sink.Put(a, 0)
 			}
 		} else {
 			/* Stereo, right channel. */
 			if audioConfig.adev[a].bits_per_sample == 8 {
-				audio_put(a, 0)
-				audio_put(a, uint8(((sam+32768)>>8)&0xff))
+				tg.sink.Put(a, 0)
+				tg.sink.Put(a, uint8(((sam+32768)>>8)&0xff))
 			} else {
-				audio_put(a, 0)
-				audio_put(a, 0)
+				tg.sink.Put(a, 0)
+				tg.sink.Put(a, 0)
 
-				audio_put(a, uint8(sam&0xff))
-				audio_put(a, uint8((sam>>8)&0xff))
+				tg.sink.Put(a, uint8(sam&0xff))
+				tg.sink.Put(a, uint8((sam>>8)&0xff))
 			}
 		}
 	}
+}
+
+// gen_tone_flush pushes out whatever the channel's samples are waiting in.
+func gen_tone_flush(channel int) {
+	if toneGenerators[channel] == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Invalid channel %d for tone generation.\n", channel)
+
+		return
+	}
+
+	toneGenerators[channel].Flush()
+}
+
+func (tg *ToneGenerator) Flush() {
+	tg.sink.Flush(tg.adevIndex)
 }
 
 func gen_tone_put_quiet_ms(channel int, time_ms int) {
@@ -677,7 +706,7 @@ func GenToneMain() {
 	my_audio_config.chan_medium[0] = MEDIUM_RADIO // TODO KG ??
 
 	audio_open(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, false)
+	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
 
 	for range 2 {
 		for range my_audio_config.achan[0].baud * 2 {
@@ -699,7 +728,7 @@ func GenToneMain() {
 	my_audio_config.adev[0].num_channels = 2
 
 	audio_open(context.Background(), &my_audio_config)
-	gen_tone_init(&my_audio_config, 100, false)
+	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
 
 	for range 4 {
 		for range my_audio_config.achan[0].baud * 2 {
