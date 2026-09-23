@@ -102,21 +102,8 @@ func DirewolfMain(ctx context.Context) {
 	// Long option only - every single letter is taken.
 	var configCheck = pflag.Bool("config-check", false, "Check the configuration file and exit, without starting anything up.  Exit status is non-zero if it has errors in it.")
 	var enablePseudoTerminal = pflag.BoolP("enable-ptty", "p", false, "Enable pseudo terminal for KISS protocol.")
-	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
-300 bps defaults to AFSK tones of 1600 & 1800.
-1200 bps uses AFSK tones of 1200 & 2200.
-2400 bps uses QPSK based on V.26 standard.
-4800 bps uses 8PSK based on V.27 standard.
-9600 bps and up uses K9NG/G3RUH standard.
-AIS for ship Automatic Identification System.
-EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
-	var g3ruh = pflag.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
-	var bpsk = pflag.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
-	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
-	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
-	var modemProfile = pflag.StringP("modem-profile", "P", "", "Select the modem type such as D (default for 300 bps), E+ (default for 1200 bps), PQRS for 2400 bps, etc.")
-	var decimate = pflag.IntP("decimate", "D", 0, "Divide audio sample rate by n for channel 0. 0 is auto-select.")
-	var upsample = pflag.IntP("upsample", "U", 0, "Upsample for G3RUH to improve performance when the sample rate to baud ratio is low.")
+	var modemFlags = addModemFlags(pflag.CommandLine, true)
+	var layer2Flags = addLayer2TxFlags(pflag.CommandLine, "IL2PVERSION")
 	var transmitCalibration = pflag.StringP("transmit-calibration", "x", "", `Send Xmit level calibration tones.
 a = Alternating mark/space tones.
 m = Steady mark tone (e.g. 1200Hz).
@@ -156,9 +143,6 @@ x = Silence FX.25 information.`)
 	var errorRateStr = pflag.StringP("error-rate", "E", "", "Error rate percentage for clobbering frames - transmitted frames by default, prefix with R to affect received frames")
 	var timestampFormat = pflag.StringP("timestamp-format", "T", "", "Precede received frames with 'strftime' format time stamp.")
 	var bitErrorRate = pflag.Float64P("bit-error-rate", "e", 0.0, "Receive Bit Error Rate (BER).")
-	var fx25CheckBytes = pflag.IntP("fx25-check-bytes", "X", 0, "1 to enable FX.25 transmit.  16, 32, 64 for specific number of check bytes.")
-	var il2pNormal = pflag.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see IL2PVERSION).")
-	var il2pInverted = pflag.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see IL2PVERSION).")
 	var aisToAPRS = pflag.BoolP("ais-to-aprs", "A", false, "Convert AIS positions to APRS Object Reports.")
 
 	var showVersion = pflag.BoolP("version", "V", false, "Show version.")
@@ -371,101 +355,16 @@ x = Silence FX.25 information.`)
 		audio_config.adev[0].bits_per_sample = *bitsPerSample
 	}
 
-	if pflag.Lookup("bitrate").Changed {
-		var bitrate, bitrateParseErr = strconv.Atoi(*bitrateStr)
-		if *bitrateStr == "AIS" {
-			bitrate = 0xA15A15
-		} else if *bitrateStr == "EAS" {
-			bitrate = 0xEA5EA5
-		} else if bitrateParseErr != nil {
-			fmt.Fprintf(os.Stderr, "Invalid bitrate (should be an integer or 'AIS' or 'EAS'): %s\n", *bitrateStr)
-			pflag.Usage()
-			os.Exit(1)
-		}
-
-		audio_config.achan[0].baud = bitrate
-
-		/* We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c, */
-		/* that need to be kept in sync.  Maybe it could be a common function someday. */
-
-		if audio_config.achan[0].baud < 600 {
-			audio_config.achan[0].modem_type = MODEM_AFSK
-			audio_config.achan[0].mark_freq = 1600 // Typical for HF SSB.
-			audio_config.achan[0].space_freq = 1800
-			audio_config.achan[0].decimate = 3 // Reduce CPU load.
-		} else if audio_config.achan[0].baud < 1800 {
-			audio_config.achan[0].modem_type = MODEM_AFSK
-			audio_config.achan[0].mark_freq = DEFAULT_MARK_FREQ
-			audio_config.achan[0].space_freq = DEFAULT_SPACE_FREQ
-		} else if audio_config.achan[0].baud < 3600 {
-			audio_config.achan[0].modem_type = MODEM_QPSK
-			audio_config.achan[0].mark_freq = 0
-
-			audio_config.achan[0].space_freq = 0
-			if audio_config.achan[0].baud != 2400 {
-				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", audio_config.achan[0].baud)
-			}
-		} else if audio_config.achan[0].baud < 7200 {
-			audio_config.achan[0].modem_type = MODEM_8PSK
-			audio_config.achan[0].mark_freq = 0
-
-			audio_config.achan[0].space_freq = 0
-			if audio_config.achan[0].baud != 4800 {
-				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", audio_config.achan[0].baud)
-			}
-		} else if audio_config.achan[0].baud == 0xA15A15 {
-			audio_config.achan[0].modem_type = MODEM_AIS
-			audio_config.achan[0].baud = 9600
-			audio_config.achan[0].mark_freq = 0
-			audio_config.achan[0].space_freq = 0
-		} else if audio_config.achan[0].baud == 0xEA5EA5 {
-			audio_config.achan[0].modem_type = MODEM_EAS
-			audio_config.achan[0].baud = 521 // Actually 520.83 but we have an integer field here.
-			// Will make more precise in afsk demod init.
-			audio_config.achan[0].mark_freq = 2083  // Actually 2083.3 - logic 1.
-			audio_config.achan[0].space_freq = 1563 // Actually 1562.5 - logic 0.
-			audio_config.achan[0].profiles = "A"
-		} else {
-			audio_config.achan[0].modem_type = MODEM_SCRAMBLE
-			audio_config.achan[0].mark_freq = 0
-			audio_config.achan[0].space_freq = 0
-		}
+	var modemErr = modemFlags.apply(&audio_config.achan[0])
+	if modemErr == nil {
+		modemErr = layer2Flags.apply(&audio_config.achan[0])
 	}
 
-	if *g3ruh {
-		// Force G3RUH mode, overriding default for speed.
-		//   Example:   -B 2400 -g
-		audio_config.achan[0].modem_type = MODEM_SCRAMBLE
-		audio_config.achan[0].mark_freq = 0
-		audio_config.achan[0].space_freq = 0
-	}
-
-	if *bpsk {
-		// Force BPSK mode, overriding default for speed.
-		//   Example:   -B 300 -k
-		audio_config.achan[0].modem_type = MODEM_BPSK
-		audio_config.achan[0].mark_freq = 0
-		audio_config.achan[0].space_freq = 0
-	}
-
-	if *direwolf15compat {
-		// V.26 compatible with earlier versions of direwolf.
-		//   Example:   -B 2400 -j    or simply   -j
-		audio_config.achan[0].v26_alternative = V26_A
-		audio_config.achan[0].modem_type = MODEM_QPSK
-		audio_config.achan[0].mark_freq = 0
-		audio_config.achan[0].space_freq = 0
-		audio_config.achan[0].baud = 2400
-	}
-
-	if *mfj2400compat {
-		// V.26 compatible with MFJ and maybe others.
-		//   Example:   -B 2400 -J     or simply   -J
-		audio_config.achan[0].v26_alternative = V26_B
-		audio_config.achan[0].modem_type = MODEM_QPSK
-		audio_config.achan[0].mark_freq = 0
-		audio_config.achan[0].space_freq = 0
-		audio_config.achan[0].baud = 2400
+	if modemErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
+		pflag.Usage()
+		os.Exit(1)
 	}
 
 	if *audioStatsInterval > 0 {
@@ -474,33 +373,6 @@ x = Silence FX.25 information.`)
 		}
 
 		audio_config.statistics_interval = *audioStatsInterval
-	}
-
-	if *modemProfile != "" {
-		/* -P for modem profile. */
-		audio_config.achan[0].profiles = *modemProfile
-	}
-
-	if *decimate != 0 {
-		if *decimate < 1 || *decimate > 8 {
-			fmt.Printf("Crazy value for -D. \n")
-			os.Exit(1)
-		}
-
-		// Reduce audio sampling rate to reduce CPU requirements.
-		audio_config.achan[0].decimate = *decimate
-	}
-
-	if *upsample != 0 {
-		if *upsample < 1 || *upsample > 4 {
-			fmt.Printf("Crazy value for -U. \n")
-			os.Exit(1)
-		}
-
-		// Increase G3RUH audio sampling rate to improve performance.
-		// The value is normally determined automatically based on audio
-		// sample rate and baud.  This allows override for experimentation.
-		audio_config.achan[0].upsample = *upsample
 	}
 
 	audio_config.timestamp_format = *timestampFormat
@@ -552,50 +424,6 @@ x = Silence FX.25 information.`)
 	}
 
 	audio_config.recv_ber = *bitErrorRate
-
-	if *fx25CheckBytes > 0 {
-		if *il2pNormal != -1 || *il2pInverted != -1 {
-			fmt.Printf("Can't mix -X with -I or -i.\n")
-			os.Exit(1)
-		}
-
-		audio_config.achan[0].fx25_strength = *fx25CheckBytes
-		audio_config.achan[0].layer2_xmit = LAYER2_FX25
-	}
-
-	if *il2pNormal != -1 && *il2pInverted != -1 {
-		fmt.Printf("Can't use both -I and -i at the same time.\n")
-		os.Exit(1)
-	}
-
-	if *il2pNormal >= 0 {
-		audio_config.achan[0].layer2_xmit = LAYER2_IL2P
-		if *il2pNormal > 0 {
-			audio_config.achan[0].il2p_max_fec = 1
-		}
-
-		if audio_config.achan[0].il2p_max_fec == 0 {
-			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -I for best results.\n")
-		}
-
-		audio_config.achan[0].il2p_invert_polarity = 0 // normal
-	}
-
-	if *il2pInverted >= 0 {
-		audio_config.achan[0].layer2_xmit = LAYER2_IL2P
-		if *il2pInverted > 0 {
-			audio_config.achan[0].il2p_max_fec = 1
-		}
-
-		if audio_config.achan[0].il2p_max_fec == 0 {
-			fmt.Printf("It is highly recommended that 1, rather than 0, is used with -i for best results.\n")
-		}
-
-		audio_config.achan[0].il2p_invert_polarity = 1 // invert for transmit
-		if audio_config.achan[0].baud == 1200 {
-			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
-		}
-	}
 
 	// Done parsing, let's start doing!
 

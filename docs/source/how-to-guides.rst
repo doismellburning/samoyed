@@ -19,6 +19,19 @@ Decode packet data from audio
     $ samoyed-atest --bitrate 300 data.wav
 
 
+Pick a modem on the command line
+--------------------------------
+
+``samoyed-direwolf``, ``samoyed-atest`` and ``samoyed-gen_packets`` take the
+same modem options, starting with ``-B``/``--bitrate``, and a ``MODEM`` line in
+the configuration file picks the same modem from the same speed - so audio made
+with one can be decoded with the others using the same options.  ``--help``
+lists them.
+
+In ``samoyed-direwolf`` these options override the configuration file for
+channel 0.
+
+
 Check a config file without starting up
 ---------------------------------------
 
@@ -294,8 +307,8 @@ that do not:
 
 ``0.4``
     The header bit says which FEC level is in use, on transmit and receive.
-    Needed to receive a v0.4 station sending the weaker FEC (Dire Wolf's
-    ``-I 0``, or ``IL2PTX 0`` here), at the cost of no longer reading v0.6.
+    Needed to receive a v0.4 station sending the weaker FEC (``-I 0`` or
+    ``IL2PTX 0``), at the cost of no longer reading v0.6.
 
 ``compat``
     Transmit v0.4, receive v0.6.  With the maximum FEC that ``IL2PTX 1``

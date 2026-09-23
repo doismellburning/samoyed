@@ -52,6 +52,7 @@ package direwolf
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -84,44 +85,14 @@ func genPacketsRand() int32 {
 }
 
 func GenPacketsMain() {
-	/*
-	 * Set up default values for the modem.
-	 */
-
-	modem.adev[0].defined = 1
-	modem.adev[0].num_channels = DEFAULT_NUM_CHANNELS       /* -2 stereo */
-	modem.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC /* -r option */
-	modem.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE /* -8 for 8 instead of 16 bits */
-
-	for channel := range MAX_RADIO_CHANS {
-		modem.achan[channel].modem_type = MODEM_AFSK         /* change with -g */
-		modem.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
-		modem.achan[channel].space_freq = DEFAULT_SPACE_FREQ /* -s option */
-		modem.achan[channel].baud = DEFAULT_BAUD             /* -b option */
-	}
-
-	modem.chan_medium[0] = MEDIUM_RADIO
+	modem = *genPacketsDefaultAudio()
 
 	/*
 	 * Set up other default values.
 	 */
 	var packet_count = 0
 
-	var bitrateStr = pflag.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits / second for data.  Proper modem automatically selected for speed.
-300 bps defaults to AFSK tones of 1600 & 1800.
-1200 bps uses AFSK tones of 1200 & 2200.
-2400 bps uses QPSK based on V.26 standard.
-4800 bps uses 8PSK based on V.27 standard.
-9600 bps and up uses K9NG/G3RUH standard.
-AIS for ship Automatic Identification System.
-EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
-	var bitrateOverrideStr = pflag.StringP("bitrate-override", "b", "", "Bits / second for data.")
-	var g3ruh = pflag.BoolP("g3ruh", "g", false, "Use G3RUH modem rather than default for data rate.")
-	var bpsk = pflag.BoolP("bpsk", "k", false, "Use BPSK modem rather than default for data rate.")
-	var direwolf15compat = pflag.BoolP("direwolf-15-compat", "j", false, "2400 bps QPSK compatible with direwolf <= 1.5.")
-	var mfj2400compat = pflag.BoolP("mfj-2400-compat", "J", false, "2400 bps QPSK compatible with MFJ-2400.")
-	var markFrequency = pflag.IntP("mark", "m", 0, "Mark frequency.")
-	var spaceFrequency = pflag.IntP("space", "s", 0, "Space frequency.")
+	var modemFlags = addGenPacketsModemFlags(pflag.CommandLine)
 	var noisyPacketCount = pflag.IntP("noisy-packet-count", "n", 0, "Generate specified number of frames with increasing noise.")
 	var packetCount = pflag.IntP("packet-count", "N", 0, "Generate specified number of frames.")
 	var amplitude = pflag.IntP("amplitude", "a", 50, "Signal amplitude in range of 0 - 200%.") // 100% is actually half of the digital signal range so we have some headroom for adding noise, etc.
@@ -132,14 +103,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 	var twoSoundChannels = pflag.BoolP("two-sound-channels", "2", false, "2 channels (stereo) audio rather than one channel.")
 	var outputFile = pflag.StringP("output-file", "o", "", "Send output to .wav file.")
 	var morseWPM = pflag.IntP("morse-wpm", "M", 0, "Send Morse at this speed.")
-	var fx25CheckBytes = pflag.IntP("fx25-check-bytes", "X", 0, "1 to enable FX.25 transmit.  16, 32, 64 for specific number of check bytes.")
-	var il2pNormal = pflag.IntP("il2p", "I", -1, "Enable IL2P transmit.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see --il2p-version).")
-	var il2pInverted = pflag.IntP("il2p-inverted", "i", -1, "Enable IL2P transmit, inverted polarity.  n=1 is recommended.  0 asks for weaker FEC, which only v0.4 has (see --il2p-version).")
 	var variableSpeedStr = pflag.StringP("variable-speed", "v", "", "max[,incr] Variable speed with specified maximum error and increment.")
-	var il2pVersion = pflag.String("il2p-version", "0.6", `IL2P version to transmit.
-    0.6     - 16 parity symbols per payload block, that bit reserved.  (default)
-    0.4     - The header FEC Level bit says which FEC level is in use.
-    compat  - Same as 0.4.`)
 	var help = pflag.BoolP("help", "h", false, "Display help text.")
 
 	pflag.Usage = func() {
@@ -275,199 +239,12 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 		}
 	}
 
-	if *bitrateStr != "" {
-		var bitrate int
-		if *bitrateStr == "EAS" {
-			bitrate = 0xEA5EA5 // Special case handled below
-		} else {
-			bitrate, _ = strconv.Atoi(*bitrateStr)
-		}
-
-		modem.achan[0].baud = bitrate
-		fmt.Printf("Data rate set to %d bits / second.\n", modem.achan[0].baud)
-
-		// We have similar logic in direwolf.c, config.c, gen_packets.c, and atest.c,
-		// that need to be kept in sync.  Maybe it could be a common function someday.
-
-		if modem.achan[0].baud == 100 { // What was this for?
-			modem.achan[0].modem_type = MODEM_AFSK
-			modem.achan[0].mark_freq = 1615
-			modem.achan[0].space_freq = 1785
-		} else if modem.achan[0].baud == 0xEA5EA5 {
-			modem.achan[0].baud = 521 // Fine tuned later. 520.83333
-			// Proper fix is to make this float.
-			modem.achan[0].modem_type = MODEM_EAS
-			modem.achan[0].mark_freq = 2083 // Ideally these should be floating point.
-			modem.achan[0].space_freq = 1563
-		} else if modem.achan[0].baud < 600 {
-			modem.achan[0].modem_type = MODEM_AFSK
-			modem.achan[0].mark_freq = 1600 // Typical for HF SSB
-			modem.achan[0].space_freq = 1800
-		} else if modem.achan[0].baud < 1800 {
-			modem.achan[0].modem_type = MODEM_AFSK
-			modem.achan[0].mark_freq = DEFAULT_MARK_FREQ
-			modem.achan[0].space_freq = DEFAULT_SPACE_FREQ
-		} else if modem.achan[0].baud < 3600 {
-			modem.achan[0].modem_type = MODEM_QPSK
-			modem.achan[0].mark_freq = 0
-			modem.achan[0].space_freq = 0
-
-			fmt.Printf("Using V.26 QPSK rather than AFSK.\n")
-
-			if modem.achan[0].baud != 2400 {
-				text_color_set(DW_COLOR_ERROR)
-				fmt.Printf("Bit rate should be standard 2400 rather than specified %d.\n", modem.achan[0].baud)
-			}
-		} else if modem.achan[0].baud < 7200 {
-			modem.achan[0].modem_type = MODEM_8PSK
-			modem.achan[0].mark_freq = 0
-			modem.achan[0].space_freq = 0
-
-			fmt.Printf("Using V.27 8PSK rather than AFSK.\n")
-
-			if modem.achan[0].baud != 4800 {
-				text_color_set(DW_COLOR_ERROR)
-				fmt.Printf("Bit rate should be standard 4800 rather than specified %d.\n", modem.achan[0].baud)
-			}
-		} else {
-			modem.achan[0].modem_type = MODEM_SCRAMBLE
-
-			text_color_set(DW_COLOR_INFO)
-			fmt.Printf("Using scrambled baseband signal rather than AFSK.\n")
-		}
-
-		if modem.achan[0].baud != 100 && (modem.achan[0].baud < MIN_BAUD || modem.achan[0].baud > MAX_BAUD) {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Use a more reasonable bit rate in range of %d - %d.\n", MIN_BAUD, MAX_BAUD)
-			os.Exit(1)
-		}
-	}
-
-	// These must be processed after -B option.
-	if *markFrequency > 0 {
-		modem.achan[0].mark_freq = *markFrequency
-		fmt.Printf("Mark frequency set to %d Hz.\n", modem.achan[0].mark_freq)
-
-		if modem.achan[0].mark_freq < 300 || modem.achan[0].mark_freq > 3000 {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Use a more reasonable value in range of 300 - 3000, not %d.\n", *markFrequency)
-			os.Exit(1)
-		}
-	}
-
-	if *spaceFrequency > 0 {
-		modem.achan[0].space_freq = *spaceFrequency
-
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Space frequency set to %d Hz.\n", modem.achan[0].space_freq)
-
-		if modem.achan[0].space_freq < 300 || modem.achan[0].space_freq > 3000 {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Use a more reasonable value in range of 300 - 3000, not %d.\n", *spaceFrequency)
-			os.Exit(1)
-		}
-	}
-
-	if *bitrateOverrideStr != "" {
-		var bitrateOverride, _ = strconv.Atoi(*bitrateOverrideStr)
-		if bitrateOverride == 0 {
-			fmt.Fprintf(os.Stderr, "Invalid bitrate %s\n", *bitrateOverrideStr)
-			pflag.Usage()
-			os.Exit(1)
-		}
-
-		modem.achan[0].baud = bitrateOverride
-		fmt.Printf("Data rate set to %d bits / second.\n", modem.achan[0].baud)
-	}
-
-	if *g3ruh { /* -g for g3ruh scrambling */
-		modem.achan[0].modem_type = MODEM_SCRAMBLE
-
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Using G3RUH mode regardless of bit rate.\n")
-	}
-
-	if *bpsk { /* -k for BPSK */
-		modem.achan[0].modem_type = MODEM_BPSK
-		modem.achan[0].mark_freq = 0
-		modem.achan[0].space_freq = 0
-	}
-
-	if *direwolf15compat { /* -j V.26 compatible with earlier direwolf. */
-		modem.achan[0].v26_alternative = V26_A
-		modem.achan[0].modem_type = MODEM_QPSK
-		modem.achan[0].mark_freq = 0
-		modem.achan[0].space_freq = 0
-		modem.achan[0].baud = 2400
-	}
-
-	if *mfj2400compat { /* -J V.26 compatible with MFJ-2400. */
-		modem.achan[0].v26_alternative = V26_B
-		modem.achan[0].modem_type = MODEM_QPSK
-		modem.achan[0].mark_freq = 0
-		modem.achan[0].space_freq = 0
-		modem.achan[0].baud = 2400
-	}
-
-	if modem.achan[0].modem_type == MODEM_QPSK && modem.achan[0].v26_alternative == V26_UNSPECIFIED {
+	var modemErr = modemFlags.apply(&modem.achan[0])
+	if modemErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("ERROR: Either -j or -J must be specified when using 2400 bps QPSK.\n")
+		fmt.Fprintf(os.Stderr, "%s\n", modemErr)
 		pflag.Usage()
 		os.Exit(1)
-	}
-
-	if *fx25CheckBytes > 0 {
-		if *il2pNormal >= 0 || *il2pInverted >= 0 {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Can't mix -X with -I or -i.\n")
-			os.Exit(1)
-		}
-
-		modem.achan[0].fx25_strength = *fx25CheckBytes
-		modem.achan[0].layer2_xmit = LAYER2_FX25
-	}
-
-	if *il2pNormal >= 0 && *il2pInverted >= 0 {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Can't use both -I and -i at the same time.\n")
-		os.Exit(1)
-	}
-
-	var il2p_version, il2p_version_ok = il2p_parse_version(*il2pVersion)
-	if !il2p_version_ok {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("Invalid IL2P version %s.  Expected 0.4, 0.6, or compat.\n", *il2pVersion)
-		os.Exit(1)
-	}
-
-	modem.achan[0].il2p_version = il2p_version
-
-	if *il2pNormal >= 0 {
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Using IL2P normal polarity.\n")
-
-		modem.achan[0].layer2_xmit = LAYER2_IL2P
-		if *il2pNormal > 0 {
-			modem.achan[0].il2p_max_fec = 1
-		}
-
-		modem.achan[0].il2p_invert_polarity = 0 // normal
-	}
-
-	if *il2pInverted >= 0 {
-		text_color_set(DW_COLOR_INFO)
-		fmt.Printf("Using IL2P inverted polarity.\n")
-
-		modem.achan[0].layer2_xmit = LAYER2_IL2P
-		if *il2pInverted > 0 {
-			modem.achan[0].il2p_max_fec = 1
-		}
-
-		modem.achan[0].il2p_invert_polarity = 1 // invert for transmit
-		if modem.achan[0].baud == 1200 {
-			text_color_set(DW_COLOR_ERROR)
-			fmt.Printf("Using -i with 1200 bps is a bad idea.  Use -I instead.\n")
-		}
 	}
 
 	/*
@@ -878,4 +655,110 @@ func (sink *wavFileSink) Put(_ int, c uint8) int {
 // Flush has nothing to do: the file is written as the samples arrive.
 func (sink *wavFileSink) Flush(_ int) int {
 	return 0
+}
+
+// genPacketsModemFlags are the command line options that set up the modulator.
+type genPacketsModemFlags struct {
+	modem           *modemFlags
+	layer2          *layer2TxFlags
+	bitrateOverride *string
+	mark            *int
+	space           *int
+	il2pVersion     *string
+}
+
+func addGenPacketsModemFlags(fs *pflag.FlagSet) *genPacketsModemFlags {
+	var f = new(genPacketsModemFlags)
+	f.modem = addModemFlags(fs, false)
+	f.layer2 = addLayer2TxFlags(fs, "--il2p-version")
+	f.bitrateOverride = fs.StringP("bitrate-override", "b", "", "Bits / second for data, keeping the modem -B chose.")
+	f.mark = fs.IntP("mark", "m", 0, "Mark frequency.")
+	f.space = fs.IntP("space", "s", 0, "Space frequency.")
+	f.il2pVersion = fs.String("il2p-version", "0.6", `IL2P version to transmit.
+    0.6     - 16 parity symbols per payload block, that bit reserved.  (default)
+    0.4     - The header FEC Level bit says which FEC level is in use.
+    compat  - Same as 0.4.`)
+
+	return f
+}
+
+// apply sets up achan from the options, once they have been parsed.
+func (f *genPacketsModemFlags) apply(achan *achan_param_s) error {
+	var err = f.modem.apply(achan)
+	if err != nil {
+		return err
+	}
+
+	// These must be processed after -B option.
+	if *f.mark > 0 {
+		if *f.mark < 300 || *f.mark > 3000 {
+			return fmt.Errorf("use a more reasonable mark frequency in range of 300 - 3000, not %d", *f.mark)
+		}
+
+		achan.mark_freq = *f.mark
+		logrus.WithField("mark", achan.mark_freq).Info("Mark frequency set")
+	}
+
+	if *f.space > 0 {
+		if *f.space < 300 || *f.space > 3000 {
+			return fmt.Errorf("use a more reasonable space frequency in range of 300 - 3000, not %d", *f.space)
+		}
+
+		achan.space_freq = *f.space
+		logrus.WithField("space", achan.space_freq).Info("Space frequency set")
+	}
+
+	if *f.bitrateOverride != "" {
+		var bitrateOverride, err = strconv.Atoi(*f.bitrateOverride)
+		if err != nil {
+			return fmt.Errorf("invalid bitrate %s", *f.bitrateOverride)
+		}
+
+		if bitrateOverride < MIN_BAUD || bitrateOverride > MAX_BAUD {
+			return fmt.Errorf("use a more reasonable bit rate in range of %d - %d", MIN_BAUD, MAX_BAUD)
+		}
+
+		achan.baud = bitrateOverride
+		logrus.WithField("bitrate", achan.baud).Info("Data rate set")
+	}
+
+	// The demodulator falls back on a default V.26 alternative, with a warning;
+	// gen_packets makes the recording, so insists on being told.
+	if achan.modem_type == MODEM_QPSK && achan.v26_alternative == V26_UNSPECIFIED {
+		return errors.New("either -j or -J must be specified when using 2400 bps QPSK")
+	}
+
+	var il2p_version, il2p_version_ok = il2p_parse_version(*f.il2pVersion)
+	if !il2p_version_ok {
+		return fmt.Errorf("invalid IL2P version %s.  Expected 0.4, 0.6, or compat", *f.il2pVersion)
+	}
+
+	achan.il2p_version = il2p_version
+
+	return f.layer2.apply(achan)
+}
+
+// genPacketsDefaultAudio is the audio configuration gen_packets starts from, before its options.
+func genPacketsDefaultAudio() *audio_s {
+	var audio = new(audio_s)
+
+	/*
+	 * Set up default values for the modem.
+	 */
+
+	audio.adev[0].defined = 1
+	audio.adev[0].num_channels = DEFAULT_NUM_CHANNELS       /* -2 stereo */
+	audio.adev[0].samples_per_sec = DEFAULT_SAMPLES_PER_SEC /* -r option */
+	audio.adev[0].bits_per_sample = DEFAULT_BITS_PER_SAMPLE /* -8 for 8 instead of 16 bits */
+
+	for channel := range MAX_RADIO_CHANS {
+		audio.achan[channel].modem_type = MODEM_AFSK         /* change with -g */
+		audio.achan[channel].mark_freq = DEFAULT_MARK_FREQ   /* -m option */
+		audio.achan[channel].space_freq = DEFAULT_SPACE_FREQ /* -s option */
+		audio.achan[channel].baud = DEFAULT_BAUD             /* -b option */
+	}
+
+	audio.chan_medium[0] = MEDIUM_RADIO
+
+	return audio
 }
