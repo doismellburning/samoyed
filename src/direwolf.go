@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -436,7 +437,12 @@ x = Silence FX.25 information.`)
 	TextColorInit(*textColor)
 	printVersion(false)
 
-	go wait_for_shutdown(ctx)
+	go resetSignalsOnCancel(ctx)
+
+	// A stop can arrive at any point from here on.  Startup checks for one
+	// before each step that acquires something, and stops there rather than
+	// carrying on behind a teardown that has already finished with it.
+	stopIfCancelled(ctx)
 
 	/*
 	 * Open the audio source
@@ -455,6 +461,8 @@ x = Silence FX.25 information.`)
 	}
 
 	var err = audio_open(ctx, audio_config)
+	stopIfCancelled(ctx)
+
 	if err < 0 {
 		text_color_set(DW_COLOR_ERROR)
 		fmt.Printf("Pointless to continue without audio device.\n")
@@ -476,6 +484,7 @@ x = Silence FX.25 information.`)
 	 * I put it here so channel properties would come out in right order.
 	 */
 	nettnc_init(ctx, audio_config)
+	stopIfCancelled(ctx)
 
 	/*
 	 * Initialize the touch tone decoder & APRStt gateway.
@@ -499,6 +508,8 @@ x = Silence FX.25 information.`)
 	var xmitErr error
 
 	xmitSvc, xmitErr = NewXmitService(ctx, audio_config, d_p_opt)
+	stopIfCancelled(ctx)
+
 	if xmitErr != nil {
 		logrus.WithError(xmitErr).Error("Could not set up transmit")
 		os.Exit(1)
@@ -578,7 +589,7 @@ x = Silence FX.25 information.`)
 						audio_config.achan[transmitCalibrationChannel].space_freq,
 						transmitCalibrationChannel)
 
-					for n > 0 {
+					for n > 0 && ctx.Err() == nil {
 						tone_gen_put_bit(transmitCalibrationChannel, n&1)
 						n--
 					}
@@ -586,7 +597,7 @@ x = Silence FX.25 information.`)
 					fmt.Printf("\nSending mark calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].mark_freq, transmitCalibrationChannel)
 
-					for n > 0 {
+					for n > 0 && ctx.Err() == nil {
 						tone_gen_put_bit(transmitCalibrationChannel, 1)
 
 						n--
@@ -595,18 +606,19 @@ x = Silence FX.25 information.`)
 					fmt.Printf("\nSending space calibration tone (%dHz) on channel %d.\nPress control-C to terminate.\n",
 						audio_config.achan[transmitCalibrationChannel].space_freq, transmitCalibrationChannel)
 
-					for n > 0 {
+					for n > 0 && ctx.Err() == nil {
 						tone_gen_put_bit(transmitCalibrationChannel, 0)
 
 						n--
 					}
 				case 'p': // Silence - set PTT only: -x p
 					fmt.Printf("\nSending silence (Set PTT only) on channel %d.\nPress control-C to terminate.\n", transmitCalibrationChannel)
-					SLEEP_SEC(max_duration)
+					sleepSecCtx(ctx, max_duration)
 				}
 
 				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
+				stopIfCancelled(ctx)
 				os.Exit(0)
 			} else {
 				text_color_set(DW_COLOR_ERROR)
@@ -629,6 +641,7 @@ x = Silence FX.25 information.`)
 	digipeater_init(audio_config, &digi_config)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, d_i_opt)
 	igate.start(ctx)
+	stopIfCancelled(ctx)
 	cdigipeater_init(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(misc_config, d_c_opt)
@@ -647,12 +660,15 @@ x = Silence FX.25 information.`)
 		dns_sd_announce(ctx, misc_config)
 	}
 
+	stopIfCancelled(ctx)
+
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
 	kissPT = NewKissPT(ctx, misc_config, d_k_opt)
 	kissSerial = NewKissSerial(ctx, misc_config, d_k_opt)
 	kiss_frame_init(audio_config)
+	stopIfCancelled(ctx)
 
 	/*
 	 * Open port for communication with GPS.
@@ -661,6 +677,8 @@ x = Silence FX.25 information.`)
 
 	var waypointErr error
 	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config)
+	stopIfCancelled(ctx)
+
 	if waypointErr != nil {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("%v\n", waypointErr)
@@ -678,6 +696,7 @@ x = Silence FX.25 information.`)
 	beaconService = NewBeaconService(audio_config, misc_config, &igate_config)
 	beaconService.SetDebug(d_t_opt)
 	beaconService.Start(ctx)
+	stopIfCancelled(ctx)
 
 	/*
 	 * Get sound samples and decode them.
@@ -688,15 +707,24 @@ x = Silence FX.25 information.`)
 
 	go recv_process(ctx)
 
-	// recv_process runs until it is cancelled, so we sit here until an audio
-	// device input fails.  There is no point in going on without audio.  A
-	// cancellation does not arrive here at all: wait_for_shutdown, above, is
-	// what ends the process then.
-	var a = <-adev_failed
+	// Startup is done, so we sit here until we are asked to stop or an audio
+	// device input fails.  There is no point in going on without audio.
+	select {
+	case <-ctx.Done():
+		cleanup()
+	case a := <-adev_failed:
+		// Our own stop can look like a device failing, if it closes the
+		// device under a reader.
+		stopIfCancelled(ctx)
 
-	text_color_set(DW_COLOR_ERROR)
-	dw_printf("Terminating after audio device %d input failure.\n", a)
-	os.Exit(1)
+		logrus.WithField("adev", a).Error("Terminating after audio device input failure")
+
+		// Nothing else will release what startup acquired - a keyed PTT
+		// above all - so do it on the way out, and whether or not a stop
+		// arrives in the meantime.
+		teardown()
+		os.Exit(1)
+	}
 }
 
 /*-------------------------------------------------------------------
@@ -1137,37 +1165,63 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	}
 } /* end app_process_rec_packet */
 
-// wait_for_shutdown tears the application down once ctx is cancelled.
+// resetSignalsOnCancel puts the default disposition back on the stop signals
+// once ctx is cancelled.
+//
+// Stopping is the one thing a second signal should be able to cut short,
+// whether that is the rest of a startup step or the teardown after it.  The
+// handler that cancelled ctx is still installed - the caller's stop function
+// is deferred behind a DirewolfMain that cleanup never returns from - so
+// without this, a supervisor that lost patience with us would have to reach
+// for SIGKILL.  Putting the default disposition back means its second SIGTERM
+// ends us instead.
+func resetSignalsOnCancel(ctx context.Context) {
+	<-ctx.Done()
+
+	signal.Reset(os.Interrupt, syscall.SIGTERM)
+}
+
+// stopIfCancelled tears the application down, and does not return, if ctx
+// has been cancelled.
+//
+// DirewolfMain owns the teardown, and calls this between the startup steps
+// that acquire something, so that the teardown runs once startup has either
+// finished or stopped - never alongside it, releasing a PTT that startup is
+// yet to open.
+func stopIfCancelled(ctx context.Context) {
+	if ctx.Err() != nil {
+		cleanup()
+	}
+}
+
+// teardownOnce keeps the teardown to one run, however many ways there turn out
+// to be of asking for it.
+var teardownOnce sync.Once
+
+// teardown releases what startup acquired.
+func teardown() {
+	teardownOnce.Do(func() {
+		text_color_set(DW_COLOR_INFO)
+		logrus.Info("QRT")
+		if packetLogger != nil {
+			packetLogger.Close()
+		}
+		ptt_term()
+		dwgps_term()
+
+		if waypointSender != nil {
+			waypointSender.Close()
+		}
+	})
+}
+
+// cleanup releases what startup acquired and ends the process after a stop.
 //
 // The goroutines started during startup take the same context and wind
 // themselves up, but they are not waited for: cleanup gives them a moment and
 // then ends the process.
-func wait_for_shutdown(ctx context.Context) {
-	<-ctx.Done()
-
-	// Shutting down is the one thing a second signal should be able to cut
-	// short.  The handler that cancelled ctx is still installed - the caller's
-	// stop function is deferred behind a DirewolfMain that cleanup never
-	// returns from - so without this, a supervisor that lost patience with us
-	// would have to reach for SIGKILL.  Putting the default disposition back
-	// means its second SIGTERM ends us instead.
-	signal.Reset(os.Interrupt, syscall.SIGTERM)
-
-	cleanup()
-}
-
 func cleanup() {
-	text_color_set(DW_COLOR_INFO)
-	logrus.Info("QRT")
-	if packetLogger != nil {
-		packetLogger.Close()
-	}
-	ptt_term()
-	dwgps_term()
-
-	if waypointSender != nil {
-		waypointSender.Close()
-	}
+	teardown()
 
 	// A moment for the goroutines that took the same context to notice it and
 	// put their own resources down before the process goes away underneath

@@ -101,6 +101,12 @@ func nettnc_init(ctx context.Context, pa *audio_s) {
 
 			var e = nettnc_attach(ctx, i, pa.nettnc_addr[i], pa.nettnc_port[i])
 			if e < 0 {
+				// A stop that cut the connection short is not a failure to
+				// connect: go back and let the caller tear down.
+				if ctx.Err() != nil {
+					return
+				}
+
 				os.Exit(1)
 			}
 		}
