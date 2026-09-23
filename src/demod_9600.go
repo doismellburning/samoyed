@@ -36,16 +36,33 @@ func push_sample(val float64, buff []float64, size int) {
 	buff[0] = val
 }
 
-/* FIR filter kernel. */
-
+// FIR filter kernel.
+//
+// This is where the demodulators spend most of their time, and a single
+// running sum makes every addition wait for the one before it. Four
+// independent sums let the CPU overlap them. The result can differ from a
+// strictly left-to-right sum in the last bits; upstream Dire Wolf builds with
+// -ffast-math, which reorders this sum anyway.
 func convolve(data, filter []float64, filter_size int) float64 {
-	var sum = 0.0
+	// Reslicing to the same length lets the compiler drop the bounds checks.
+	data = data[:filter_size]
+	filter = filter[:filter_size]
 
-	for j := range filter_size {
-		sum += filter[j] * data[j]
+	var s0, s1, s2, s3 float64
+
+	var j = 0
+	for ; j+4 <= filter_size; j += 4 {
+		s0 += filter[j] * data[j]
+		s1 += filter[j+1] * data[j+1]
+		s2 += filter[j+2] * data[j+2]
+		s3 += filter[j+3] * data[j+3]
 	}
 
-	return (sum)
+	for ; j < filter_size; j++ {
+		s0 += filter[j] * data[j]
+	}
+
+	return (s0 + s1) + (s2 + s3)
 }
 
 // Automatic Gain control - used when we have a single slicer.
