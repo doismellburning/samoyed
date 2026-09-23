@@ -49,28 +49,23 @@ func newTestSerialDevice(t *testing.T) (string, *os.File) {
 	return name, client
 }
 
-// startKissSerial does what kissserial_init does for a configured serial port
-// - open it, if it is not the polling case, and run the listening goroutine
-// against ctx - but hands back a channel that is closed once that goroutine
-// has finished.
+// startKissSerial does what NewKissSerial does for a configured serial port -
+// open it, if it is not the polling case, and run the listening goroutine
+// against ctx - but also hands back a channel that is closed once that
+// goroutine has finished.
 //
 // The port cannot be closed out from under a blocked read, so the goroutine
-// ends when the far end of the wire goes away.  The globals it clears on the
-// way out are put back only once it has, which is also the happens-before edge
-// the race detector wants.
-func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) <-chan struct{} {
+// ends when the far end of the wire goes away.  Waiting for that channel is
+// also the happens-before edge the race detector wants before a test looks at
+// what the goroutine left behind.
+func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) (*KissSerial, <-chan struct{}) {
 	t.Helper()
 
-	var origConfig, origFrame, origFD, origFailed, origDebug = g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug
-
-	g_misc_config_p = mc
-	kf = new(KISSFrame)
-	serialport_fd = nil
-	serialport_failed = false
+	var ks = newKissSerial(mc, 0)
 
 	if mc.kiss_serial_poll == 0 {
-		serialport_fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
-		require.NotNil(t, serialport_fd, "could not open %s", mc.kiss_serial_port)
+		ks.fd = SerialPortOpen(mc.kiss_serial_port, mc.kiss_serial_speed)
+		require.NotNil(t, ks.fd, "could not open %s", mc.kiss_serial_port)
 	}
 
 	var done = make(chan struct{})
@@ -78,47 +73,39 @@ func startKissSerial(ctx context.Context, t *testing.T, mc *misc_config_s) <-cha
 	go func() {
 		defer close(done)
 
-		kissserial_listen_thread(ctx)
+		ks.listenThread(ctx)
 	}()
 
 	t.Cleanup(func() {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
-			t.Error("kissserial_listen_thread did not finish")
+			t.Error("KissSerial.listenThread did not finish")
 		}
-
-		g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug = origConfig, origFrame, origFD, origFailed, origDebug
 	})
 
-	return done
+	return ks, done
 }
 
-// openKissSerialPort opens the serial port KISS TNC's port on a pseudo
-// terminal and hands back the client end of the wire, with no listening
+// openKissSerialPort opens a serial port KISS TNC's port on a pseudo terminal
+// and hands back the TNC and the client end of the wire, with no listening
 // goroutine running.
-func openKissSerialPort(t *testing.T) *os.File {
+func openKissSerialPort(t *testing.T, debug int) (*KissSerial, *os.File) {
 	t.Helper()
 
 	var name, client = newTestSerialDevice(t)
 
-	var origConfig, origFrame, origFD, origFailed, origDebug = g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug
+	var mc = new(misc_config_s)
+	mc.kiss_serial_port = name
 
-	t.Cleanup(func() {
-		closeSerialPortKISS()
+	var ks = newKissSerial(mc, debug)
 
-		g_misc_config_p, kf, serialport_fd, serialport_failed, kissserial_debug = origConfig, origFrame, origFD, origFailed, origDebug
-	})
+	t.Cleanup(ks.closePort)
 
-	g_misc_config_p = new(misc_config_s)
-	g_misc_config_p.kiss_serial_port = name
-	kf = new(KISSFrame)
+	ks.fd = SerialPortOpen(name, 0)
+	require.NotNil(t, ks.fd, "could not open %s", name)
 
-	serialport_fd = SerialPortOpen(name, 0)
-	serialport_failed = false
-	require.NotNil(t, serialport_fd, "could not open %s", name)
-
-	return client
+	return ks, client
 }
 
 // readSerialKissFrame reads one whole KISS frame - everything up to and
@@ -172,51 +159,52 @@ func readSerialText(t *testing.T, client *os.File, want int) string {
 // Without KISSPORT in the configuration there is no serial TNC at all, and
 // nothing for the sending path to write to.
 func TestKissSerialNoPortConfigured(t *testing.T) {
-	var origConfig, origFrame, origFD = g_misc_config_p, kf, serialport_fd
+	var ks = NewKissSerial(t.Context(), new(misc_config_s), 0)
 
-	t.Cleanup(func() { g_misc_config_p, kf, serialport_fd = origConfig, origFrame, origFD })
-
-	serialport_fd = nil
-
-	kissserial_init(t.Context(), new(misc_config_s))
-
-	assert.Nil(t, serialport_fd)
-	assert.NotNil(t, kf, "the frame decoder state should be ready even with no port")
+	assert.Nil(t, ks.fd)
+	assert.NotNil(t, ks.kf, "the frame decoder state should be ready even with no port")
 
 	// With no port, sending to the client is a no-op rather than a crash.
 	assert.NotPanics(t, func() {
-		kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+	})
+}
+
+// Before startup has got as far as the serial port - or in a program that
+// never sets one up - there is no KissSerial at all, and the receive paths
+// that send to it must not trip over that.
+func TestKissSerialNilSendRecPacket(t *testing.T) {
+	var ks *KissSerial
+
+	assert.NotPanics(t, func() {
+		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
 	})
 }
 
 // A device that is not there, and no polling asked for, is reported once and
 // then left alone - there is no listening goroutine to start.
 func TestKissSerialDeviceNotThere(t *testing.T) {
-	var origConfig, origFrame, origFD = g_misc_config_p, kf, serialport_fd
-
-	t.Cleanup(func() { g_misc_config_p, kf, serialport_fd = origConfig, origFrame, origFD })
-
-	serialport_fd = nil
+	var ks *KissSerial
 
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = "/dev/there-is-no-such-serial-port"
 
-	var output = CaptureOutput(t, func() { kissserial_init(t.Context(), mc) })
+	var output = CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, 0) })
 
 	assert.Contains(t, output, "Could not open serial port /dev/there-is-no-such-serial-port")
-	assert.Nil(t, serialport_fd)
+	assert.Nil(t, ks.fd)
 }
 
 // A frame received over the radio reaches the client as KISS: the channel and
 // command in the first byte, then the frame, wrapped in FENDs.
 func TestKissSerialSendRecPacket(t *testing.T) {
-	var client = openKissSerialPort(t)
+	var ks, client = openKissSerialPort(t, 0)
 
 	const channel = 2
 
 	var frame = []byte{'h', 'i', FEND, FESC}
 
-	kissserial_send_rec_packet(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	ks.SendRecPacket(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 
 	assert.Equal(t,
 		[]byte{FEND, channel << 4, 'h', 'i', FESC, TFEND, FESC, TFESC, FEND},
@@ -227,38 +215,38 @@ func TestKissSerialSendRecPacket(t *testing.T) {
 // than written to again on the next received frame.  The closing is left to
 // the listening goroutine, which may be blocked reading the port.
 func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
-	var client = openKissSerialPort(t)
+	var ks, client = openKissSerialPort(t, 0)
 
 	require.NoError(t, client.Close())
 
 	var output = CaptureOutput(t, func() {
-		kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
-	assert.True(t, serialport_failed, "the serial port was not given up after the write error")
+	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
 	output = CaptureOutput(t, func() {
-		kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
 
 	output = CaptureOutput(t, func() {
-		assert.True(t, giveUpSerialPortIfFailed())
+		assert.True(t, ks.giveUpPortIfFailed())
 	})
 
 	assert.Contains(t, output, "Serial Port KISS write error. Closing connection.")
-	assert.Nil(t, serialport_fd, "the listener did not close the failed serial port")
-	assert.False(t, serialport_failed)
+	assert.Nil(t, ks.fd, "the listener did not close the failed serial port")
+	assert.False(t, ks.failed)
 }
 
 // A length of -1 says the caller has built the bytes itself - the fake command
 // prompt - and they go out as they are, with no framing or escaping added.
 func TestKissSerialSendRecPacketText(t *testing.T) {
-	var client = openKissSerialPort(t)
+	var ks, client = openKissSerialPort(t, 0)
 
-	kissserial_send_rec_packet(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+	ks.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 
 	assert.Equal(t, "\r\ncmd:", readSerialText(t, client, len("\r\ncmd:")))
 }
@@ -267,7 +255,7 @@ func TestKissSerialSendRecPacketText(t *testing.T) {
 // that is told the frame was truncated and then handed the whole thing anyway
 // has been told a lie about bytes it cannot parse.
 func TestKissSerialSendRecPacketTruncates(t *testing.T) {
-	var client = openKissSerialPort(t)
+	var ks, client = openKissSerialPort(t, 0)
 
 	var frame = make([]byte, AX25_MAX_PACKET_LEN+10)
 	for i := range frame {
@@ -279,7 +267,7 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	var got = drainKissFrame(t, client)
 
 	var output = CaptureOutput(t, func() {
-		kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 	})
 
 	assert.Contains(t, output, "Truncated")
@@ -362,17 +350,17 @@ func TestKissSerialReadErrorClosesThePort(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var done = startKissSerial(t.Context(), t, mc)
+	var ks, done = startKissSerial(t.Context(), t, mc)
 
 	require.NoError(t, client.Close())
 
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("kissserial_listen_thread did not finish after the client went away")
+		t.Fatal("KissSerial.listenThread did not finish after the client went away")
 	}
 
-	assert.Nil(t, serialport_fd, "the serial port was not given up after the read error")
+	assert.Nil(t, ks.fd, "the serial port was not given up after the read error")
 }
 
 // Bluetooth is the reason for the polling option: the device turns up when the
@@ -386,7 +374,7 @@ func TestKissSerialPollsForTheDeviceToAppear(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var done = startKissSerial(ctx, t, mc)
+	var _, done = startKissSerial(ctx, t, mc)
 
 	var name, client = newTestSerialDevice(t)
 	require.NoError(t, os.Symlink(name, device))
@@ -444,7 +432,7 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var done = startKissSerial(ctx, t, mc)
+	var _, done = startKissSerial(ctx, t, mc)
 
 	cancel()
 
@@ -458,12 +446,10 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 // With "-d k" the traffic is printed, so that a client application that is not
 // being understood can be looked at.
 func TestKissSerialDebugPrints(t *testing.T) {
-	var client = openKissSerialPort(t)
-
-	kissserial_set_debug(2)
+	var ks, client = openKissSerialPort(t, 2)
 
 	var output = CaptureOutput(t, func() {
-		kissserial_send_rec_packet(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		ks.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 
 		readSerialKissFrame(t, client)
 	})
@@ -472,7 +458,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
 
 	output = CaptureOutput(t, func() {
-		kissserial_send_rec_packet(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+		ks.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 	})
 
 	assert.Contains(t, output, "Fake command prompt")
@@ -489,7 +475,7 @@ func TestKissSerialSendWhileListening(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = name
 
-	var done = startKissSerial(t.Context(), t, mc)
+	var ks, done = startKissSerial(t.Context(), t, mc)
 
 	var sent = make(chan struct{})
 
@@ -503,7 +489,7 @@ func TestKissSerialSendWhileListening(t *testing.T) {
 			default:
 			}
 
-			kissserial_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+			ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 		}
 	}()
 
@@ -512,10 +498,10 @@ func TestKissSerialSendWhileListening(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("kissserial_listen_thread did not finish after the client went away")
+		t.Fatal("KissSerial.listenThread did not finish after the client went away")
 	}
 
 	<-sent
 
-	assert.Nil(t, serialport_fd, "the serial port was not given up after the client went away")
+	assert.Nil(t, ks.fd, "the serial port was not given up after the client went away")
 }
