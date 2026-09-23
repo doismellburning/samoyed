@@ -1109,16 +1109,7 @@ func dl_data_request(E *dlq_item_t) {
 	// other end's word for N1, and an XID can ask for less than a byte, so
 	// don't take it on trust here.
 
-	// A V2.0 link just splits the data up, so a byte of N1 is enough to make
-	// progress with.  V2.2 segmentation spends a byte of each piece on the
-	// segment header, and another on the original PID in the first piece, so
-	// it needs three before any data fits - and it divides by N1-1, which is
-	// zero for an N1 of one.
-
-	var smallest_usable_n1 = AX25_N1_PACLEN_MIN
-	if S.modulo != 8 {
-		smallest_usable_n1 = 3
-	}
+	var smallest_usable_n1 = smallestUsableN1(S.modulo)
 
 	if S.n1_paclen < smallest_usable_n1 {
 		logrus.WithFields(logrus.Fields{
@@ -6051,8 +6042,12 @@ func negotiation_response(S *ax25_dlsm_t, param *xid_param_s) {
  * Description:	Take set of parameters which we have agreed upon and apply
  *		to the running configuration.
  *
- * TODO:	Should do some checking here in case other station
- *		sends something crazy.
+ *		Both ways in - the XID command we answer, and the XID response
+ *		to one we sent - come through here, and the response is not
+ *		bounded by negotiation_response first, so anything the other
+ *		station sends that makes no sense is brought into range here.
+ *		What was specified is written back into param as applied, so
+ *		an XID response built from it says what we now run with.
  *
  *------------------------------------------------------------------------------*/
 
@@ -6061,18 +6056,76 @@ func complete_negotiation(S *ax25_dlsm_t, param *xid_param_s) {
 		S.srej_enable = param.srej
 	}
 
-	if param.modulo != modulo_unknown {
+	switch param.modulo {
+	case modulo_8, modulo_128:
 		// Disaster if aren't agreeing on this.
 		S.modulo = param.modulo
+	case modulo_unknown:
+	default:
+		// Not one we implement, so keep what we have.
+		warnXIDOutOfRange(S, "modulo", int(param.modulo), int(S.modulo))
+		param.modulo = S.modulo
 	}
 
-	S.n1_paclen = maybe.FromMaybe(S.n1_paclen, param.i_field_length_rx)
-	S.k_maxframe = maybe.FromMaybe(S.k_maxframe, param.window_size_rx)
+	// Bounded by what segmentation needs with the modulus now in force, even
+	// if only the modulus changed.
+	var n1Min = smallestUsableN1(S.modulo)
+	if length, ok := param.i_field_length_rx.Get(); ok {
+		S.n1_paclen = min(max(length, n1Min), AX25_N1_PACLEN_MAX)
+		if S.n1_paclen != length {
+			warnXIDOutOfRange(S, "i_field_length_rx", length, S.n1_paclen)
+		}
+		param.i_field_length_rx = maybe.Just(S.n1_paclen)
+	} else {
+		S.n1_paclen = min(max(S.n1_paclen, n1Min), AX25_N1_PACLEN_MAX)
+	}
+
+	// Bounded by the modulus now in force, even if only the modulus changed.
+	var kMin, kMax = AX25_K_MAXFRAME_BASIC_MIN, AX25_K_MAXFRAME_BASIC_MAX
+	if S.modulo == modulo_128 {
+		kMin, kMax = AX25_K_MAXFRAME_EXTENDED_MIN, AX25_K_MAXFRAME_EXTENDED_MAX
+	}
+	if window, ok := param.window_size_rx.Get(); ok {
+		S.k_maxframe = min(max(window, kMin), kMax)
+		if S.k_maxframe != window {
+			warnXIDOutOfRange(S, "window_size_rx", window, S.k_maxframe)
+		}
+		param.window_size_rx = maybe.Just(S.k_maxframe)
+	} else {
+		S.k_maxframe = min(max(S.k_maxframe, kMin), kMax)
+	}
+
 	S.n2_retry = maybe.FromMaybe(S.n2_retry, param.retries)
 
 	if timer, ok := param.ack_timer.Get(); ok {
 		S.t1v = time.Duration(timer) * time.Millisecond
 	}
+}
+
+// smallestUsableN1 is the least N1 that data can be sent with.  A V2.0
+// (modulo 8) link just splits the data up, so a byte of N1 is enough to make
+// progress with.  V2.2 segmentation spends a byte of each piece on the segment
+// header, and another on the original PID in the first piece, so it needs
+// three before any data fits - and it divides by N1-1, which is zero for an
+// N1 of one.
+func smallestUsableN1(modulo ax25_modulo_t) int {
+	if modulo == modulo_8 {
+		return AX25_N1_PACLEN_MIN
+	}
+
+	return 3
+}
+
+// warnXIDOutOfRange says that the other station's XID asked for a value we
+// cannot use, and what we are using instead.
+func warnXIDOutOfRange(S *ax25_dlsm_t, parameter string, asked int, using int) {
+	logrus.WithFields(logrus.Fields{
+		"channel":   S.channel,
+		"peer":      S.addrs[PEERCALL],
+		"parameter": parameter,
+		"asked":     asked,
+		"using":     using,
+	}).Warn("XID parameter from the other station is out of range, using the nearest we can")
 }
 
 //###################################################################################

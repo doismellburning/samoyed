@@ -147,6 +147,145 @@ func TestCompleteNegotiationAppliesOnlyWhatTheResponseSpecifies(t *testing.T) {
 	assert.Equal(t, 5, S.n2_retry)
 }
 
+// Numbers from the other station that make no sense are brought into range on
+// both ways into complete_negotiation: the XID command we answer, and the XID
+// response to one we sent, which skips negotiation_response altogether.
+// Each is logged as a warning, except where negotiation_response has already
+// taken the lesser of what was asked and what we can do, which is just
+// negotiation. Regression test for issue #688.
+func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
+	var paths = []struct {
+		name    string
+		apply   func(S *ax25_dlsm_t, param *xid_param_s)
+		command bool
+	}{
+		{"command", negotiation_response, true},
+		{"response", complete_negotiation, false},
+	}
+
+	var tests = []struct {
+		name       string
+		modulo     ax25_modulo_t
+		length     int
+		window     int
+		wantModulo ax25_modulo_t
+		wantLength int
+		wantWindow int
+		parameter  string
+		// negotiation_response brings it into range before it gets to
+		// complete_negotiation, so a command draws no warning.
+		negotiated bool
+	}{
+		{"I field too short", modulo_8, 0, 4, modulo_8, AX25_N1_PACLEN_MIN, 4, "i_field_length_rx", false},
+		{"I field negative", modulo_8, -8, 4, modulo_8, AX25_N1_PACLEN_MIN, 4, "i_field_length_rx", false},
+		{"I field too short for modulo 128", modulo_128, 2, 4, modulo_128, 3, 4, "i_field_length_rx", false},
+		{"I field too long", modulo_8, 8000, 4, modulo_8, AX25_N1_PACLEN_MAX, 4, "i_field_length_rx", true},
+		{"window too wide for modulo 8", modulo_8, 256, 127, modulo_8, 256, AX25_K_MAXFRAME_BASIC_MAX, "window_size_rx", true},
+		{"window too wide for modulo 128", modulo_128, 256, 127, modulo_128, 256, AX25_K_MAXFRAME_EXTENDED_MAX, "window_size_rx", true},
+		{"window closed", modulo_8, 256, 0, modulo_8, 256, AX25_K_MAXFRAME_BASIC_MIN, "window_size_rx", false},
+		{"window closed modulo 128", modulo_128, 256, 0, modulo_128, 256, AX25_K_MAXFRAME_EXTENDED_MIN, "window_size_rx", false},
+		{"modulo we don't implement", 16, 256, 4, modulo_8, 256, 4, "modulo", false},
+	}
+
+	for _, path := range paths {
+		for _, tc := range tests {
+			t.Run(path.name+"/"+tc.name, func(t *testing.T) {
+				setupTestEnv(t)
+
+				var hook = test.NewGlobal()
+
+				t.Cleanup(hook.Reset)
+
+				var S = newNegotiationTestLink()
+
+				var param = new(xid_param_s)
+				param.srej = srej_none
+				param.modulo = tc.modulo
+				param.i_field_length_rx = maybe.Just(tc.length)
+				param.window_size_rx = maybe.Just(tc.window)
+
+				path.apply(S, param)
+
+				assert.Equal(t, tc.wantModulo, S.modulo)
+				assert.Equal(t, tc.wantLength, S.n1_paclen)
+				assert.Equal(t, tc.wantWindow, S.k_maxframe)
+
+				var warnings []*logrus.Entry
+				for _, entry := range hook.AllEntries() {
+					if entry.Level == logrus.WarnLevel {
+						warnings = append(warnings, entry)
+					}
+				}
+
+				if path.command && tc.negotiated {
+					assert.Empty(t, warnings)
+				} else if assert.Len(t, warnings, 1) {
+					assert.Equal(t, tc.parameter, warnings[0].Data["parameter"])
+				}
+			})
+		}
+	}
+}
+
+// Answering an XID command, what we send back is what we now run with, so the
+// two ends agree - not the nonsense the other station asked for.
+func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {
+	setupTestEnv(t)
+
+	var S = newNegotiationTestLink()
+
+	var param = new(xid_param_s)
+	param.srej = srej_none
+	param.modulo = 16
+	param.i_field_length_rx = maybe.Just(0)
+	param.window_size_rx = maybe.Just(0)
+
+	negotiation_response(S, param)
+
+	assert.Equal(t, S.modulo, param.modulo)
+	assert.Equal(t, maybe.Just(S.n1_paclen), param.i_field_length_rx)
+	assert.Equal(t, maybe.Just(S.k_maxframe), param.window_size_rx)
+}
+
+// A response that moves the link to modulo 8 but leaves the window size out
+// must not keep a window wider than modulo 8 can hold.
+func TestCompleteNegotiationNarrowsTheWindowToTheNewModulo(t *testing.T) {
+	setupTestEnv(t)
+
+	var S = newNegotiationTestLink()
+	S.modulo = modulo_128
+	S.k_maxframe = 32
+
+	var param, _, status = xid_parse(nil)
+	assert.Equal(t, 1, status)
+
+	param.modulo = modulo_8
+
+	complete_negotiation(S, param)
+
+	assert.Equal(t, modulo_8, S.modulo)
+	assert.Equal(t, AX25_K_MAXFRAME_BASIC_MAX, S.k_maxframe)
+}
+
+// A response that moves the link to modulo 128 but leaves the I field length
+// out must not keep an N1 too small for V2.2 segmentation to send anything.
+func TestCompleteNegotiationRaisesN1ToTheNewModulo(t *testing.T) {
+	setupTestEnv(t)
+
+	var S = newNegotiationTestLink()
+	S.n1_paclen = 1
+
+	var param, _, status = xid_parse(nil)
+	assert.Equal(t, 1, status)
+
+	param.modulo = modulo_128
+
+	complete_negotiation(S, param)
+
+	assert.Equal(t, modulo_128, S.modulo)
+	assert.Equal(t, 3, S.n1_paclen)
+}
+
 // A SABM addressed to a callsign no client has registered goes unanswered - we
 // are not the station it was sent to - but it used to go unremarked as well, so
 // an operator who had set MYCALL and expected connected mode to work saw
