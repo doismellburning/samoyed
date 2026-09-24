@@ -4,6 +4,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -135,4 +136,104 @@ func Test_run_verboseExplainsTheDecision(t *testing.T) {
 		var exitStatus, _, _ = runWith(opts, positionPacket+"\n")
 		assert.Equal(t, 0, exitStatus)
 	}, "b/Q1TEST returns TRUE")
+}
+
+func TestMain(m *testing.M) {
+	testutils.RunMainIfAsked(main)
+
+	os.Exit(m.Run())
+}
+
+func Test_main(t *testing.T) {
+	var input = positionPacket + "\n" + messagePacket + "\n"
+
+	var result = testutils.RunMain(t, input, "t/m")
+	var exitStatus, out = result.Status, result.Stdout
+
+	assert.Equal(t, 0, exitStatus)
+	assert.Contains(t, out, "DROP\t"+positionPacket+"\n")
+	assert.Contains(t, out, "PASS\t"+messagePacket+"\n")
+}
+
+// assertVerdicts checks stdout has the verdict wanted, or, when none is wanted,
+// that no packet was given one at all.  Other things can turn up there - a
+// warning about the device identifier data, say - so it needn't be empty.
+func assertVerdicts(t *testing.T, want string, out string) {
+	t.Helper()
+
+	if want == "" {
+		assert.NotContains(t, out, "PASS")
+		assert.NotContains(t, out, "DROP")
+	} else {
+		assert.Contains(t, out, want)
+	}
+}
+
+// assertErrors checks stderr has the error wanted, or, when none is, that there
+// are none.  Warnings can turn up there - about a data file this machine
+// doesn't have installed, say - so it needn't be empty.
+func assertErrors(t *testing.T, want string, errOut string) {
+	t.Helper()
+
+	if want != "" {
+		assert.Contains(t, errOut, want)
+
+		return
+	}
+
+	for line := range strings.Lines(errOut) {
+		if !strings.Contains(line, "level=warning") {
+			assert.Fail(t, "unexpected error output", "%s", errOut)
+
+			return
+		}
+	}
+}
+
+func Test_main_options(t *testing.T) {
+	var testCases = map[string]struct {
+		args   []string
+		status int
+		out    string
+		errOut string
+	}{
+		"validate": {
+			[]string{"--validate", "t/m & ! d/WIDE*"}, 0, "", "",
+		},
+		"verbose": {
+			[]string{"-vv", "t/m"}, 0, "PASS", "",
+		},
+		"connected mode": {
+			[]string{"-c", "--from-channel", "1", "--to-channel", "2", "b/Q1TEST"}, 0, "PASS\t" + messagePacket, "",
+		},
+		"not for connected mode": {
+			[]string{"-c", "t/m"}, 1, "", "Only b, d, v, and u specifications are allowed",
+		},
+		"help": {
+			[]string{"--help"}, 0, "", "tries a packet filter expression out on packets",
+		},
+		"no filter": {
+			nil, 1, "", "Expected exactly one filter expression, got 0.",
+		},
+		"two filters": {
+			[]string{"t/m", "b/Q1TEST"}, 1, "", "Expected exactly one filter expression, got 2.",
+		},
+		"from channel out of range": {
+			[]string{"--from-channel", "-1", "t/m"}, 1, "", "--from-channel must be between 0 and",
+		},
+		"to channel out of range": {
+			[]string{"--to-channel", "9999", "t/m"}, 1, "", "--to-channel must be between 0 and",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var result = testutils.RunMain(t, messagePacket+"\n", tc.args...)
+			var exitStatus, out, errOut = result.Status, result.Stdout, result.Stderr
+
+			assert.Equal(t, tc.status, exitStatus, "stdout: %s\nstderr: %s", out, errOut)
+			assertVerdicts(t, tc.out, out)
+			assertErrors(t, tc.errOut, errOut)
+		})
+	}
 }
