@@ -81,16 +81,7 @@ type atest_wav_data_t struct {
 	Datasize int32
 }
 
-var header atest_header_t
-var chunk atest_chunk_t
-var format atest_format_t
-var wav_data atest_wav_data_t
-
-var atestFP *os.File
-
 var my_audio_config *audio_s
-
-var space_gain [MAX_SUBCHANS]float64
 
 var sample_number = -1 /* Sample number from the file. */
 /* Incremented only for channel 0. */
@@ -129,6 +120,7 @@ func atestFixBits(n int) (BitFixLevel, bool, bool) {
 
 func AtestMain() {
 	var count [MAX_SUBCHANS]int // Experiments G and H
+	var space_gain [MAX_SUBCHANS]float64
 
 	// One sink for the whole run, so its DCD counts are of everything
 	// decoded rather than of the file being decoded at the time.
@@ -296,9 +288,12 @@ o = DCD output control
 	var packets_decoded_total = 0
 
 	for _, wavFileName := range pflag.Args() {
-		var err error
+		var header atest_header_t
+		var chunk atest_chunk_t
+		var format atest_format_t
+		var wav_data atest_wav_data_t
 
-		atestFP, err = os.Open(wavFileName) //nolint:gosec // File path from CLI is expected for this tool
+		var atestFP, err = os.Open(wavFileName) //nolint:gosec // File path from CLI is expected for this tool
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
 			fmt.Printf("Couldn't open file %s for read: %s\n", wavFileName, err)
