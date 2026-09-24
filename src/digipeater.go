@@ -408,7 +408,12 @@ func (d *Digipeater) match(
 
 		/* If using multiple radio channels, they */
 		/* could have different calls. */
-		ax25_set_addr(result, r, mycall_xmit)
+		var err = ax25_set_addr(result, r, mycall_xmit)
+		if err != nil {
+			logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+			return nil
+		}
 		ax25_set_h(result, r)
 
 		return (result)
@@ -460,7 +465,12 @@ func (d *Digipeater) match(
 	if alias.MatchString(repeater) {
 		var result = ax25_dup(pp)
 
-		ax25_set_addr(result, r, mycall_xmit)
+		var err = ax25_set_addr(result, r, mycall_xmit)
+		if err != nil {
+			logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+			return nil
+		}
 		ax25_set_h(result, r)
 
 		return (result)
@@ -485,7 +495,12 @@ func (d *Digipeater) match(
 			if repeater2 == mycall_rec || alias.MatchString(repeater2) {
 				var result = ax25_dup(pp)
 
-				ax25_set_addr(result, r2, mycall_xmit)
+				var err = ax25_set_addr(result, r2, mycall_xmit)
+				if err != nil {
+					logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+					return nil
+				}
 				ax25_set_h(result, r2)
 
 				switch preempt {
@@ -495,7 +510,12 @@ func (d *Digipeater) match(
 					dw_printf("The digipeat DROP option will be removed in a future release.  Use PREEMPT for preemptive digipeating.\n")
 
 					for r2 > AX25_REPEATER_1 {
-						ax25_remove_addr(result, r2-1)
+						var err = ax25_remove_addr(result, r2-1)
+						if err != nil {
+							logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+							return nil
+						}
 						r2--
 					}
 				case PREEMPT_MARK: // TODO: deprecate this option.  Result is misleading.
@@ -519,7 +539,12 @@ func (d *Digipeater) match(
 				// PREEMPT which is more descriptive?
 				default:
 					for r2 > AX25_REPEATER_1 && ax25_get_h(result, r2-1) == 0 {
-						ax25_remove_addr(result, r2-1)
+						var err = ax25_remove_addr(result, r2-1)
+						if err != nil {
+							logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+							return nil
+						}
 						r2--
 					}
 				}
@@ -555,7 +580,12 @@ func (d *Digipeater) match(
 				// First, remove any already used digipeaters.
 
 				for ax25_get_num_addr(result) >= 3 && ax25_get_h(result, AX25_REPEATER_1) == 1 {
-					ax25_remove_addr(result, AX25_REPEATER_1)
+					var err = ax25_remove_addr(result, AX25_REPEATER_1)
+					if err != nil {
+						logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+						return nil
+					}
 
 					r--
 				}
@@ -569,7 +599,12 @@ func (d *Digipeater) match(
 
 				// Insert own call at beginning and mark it used.
 
-				ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
+				var err = ax25_insert_addr(result, AX25_REPEATER_1, mycall_xmit)
+				if err != nil {
+					logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+					return nil
+				}
 				ax25_set_h(result, AX25_REPEATER_1)
 
 				return (result)
@@ -589,7 +624,12 @@ func (d *Digipeater) match(
 		if ssid == 1 {
 			var result = ax25_dup(pp)
 
-			ax25_set_addr(result, r, mycall_xmit)
+			var err = ax25_set_addr(result, r, mycall_xmit)
+			if err != nil {
+				logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+				return nil
+			}
 			ax25_set_h(result, r)
 
 			return (result)
@@ -601,7 +641,12 @@ func (d *Digipeater) match(
 			ax25_set_ssid(result, r, ssid-1) // should be at least 1
 
 			if ax25_get_num_repeaters(pp) < AX25_MAX_REPEATERS {
-				ax25_insert_addr(result, r, mycall_xmit)
+				var err = ax25_insert_addr(result, r, mycall_xmit)
+				if err != nil {
+					logrus.WithError(err).Error("Digipeater: Not repeating, could not update the path")
+
+					return nil
+				}
 				ax25_set_h(result, r)
 			}
 

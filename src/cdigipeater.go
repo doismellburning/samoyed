@@ -22,6 +22,8 @@ package direwolf
 
 import (
 	"regexp"
+
+	"github.com/sirupsen/logrus"
 )
 
 /*
@@ -256,7 +258,12 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 
 		/* If using multiple radio channels, they could have different calls. */
 
-		ax25_set_addr(result, r, mycall_xmit)
+		var err = ax25_set_addr(result, r, mycall_xmit)
+		if err != nil {
+			logrus.WithError(err).Error("Connected digipeater: Not repeating, could not update the path")
+
+			return nil
+		}
 		ax25_set_h(result, r)
 
 		return (result)
@@ -269,7 +276,12 @@ func cdigipeat_match(from_chan int, pp *packet_t, mycall_rec string, mycall_xmit
 		if alias.MatchString(repeater) {
 			var result = ax25_dup(pp)
 
-			ax25_set_addr(result, r, mycall_xmit)
+			var err = ax25_set_addr(result, r, mycall_xmit)
+			if err != nil {
+				logrus.WithError(err).Error("Connected digipeater: Not repeating, could not update the path")
+
+				return nil
+			}
 			ax25_set_h(result, r)
 
 			return (result)

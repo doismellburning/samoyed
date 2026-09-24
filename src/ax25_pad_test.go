@@ -146,3 +146,52 @@ func TestMustAX25FromText(t *testing.T) {
 
 	assert.PanicsWithValue(t, "not an AX.25 packet: Q1TEST", func() { MustAX25FromText("Q1TEST") })
 }
+
+// Regression tests for #687: the address mutators only checked their position
+// against AX25_MAX_ADDRS, so a position past the packet's own addresses sliced
+// beyond the end of the frame and panicked.  They now report it instead, and
+// leave the packet as it was.
+
+const addrMutatorTestPacket = "Q1TEST>APDW17,WIDE1-1:!4237.14N/07120.83W#"
+
+func Test_ax25_insert_addr_past_end(t *testing.T) {
+	var pp = MustAX25FromText(addrMutatorTestPacket)
+
+	for _, n := range []int{AX25_SOURCE, 4, 9, AX25_MAX_ADDRS} {
+		require.Error(t, ax25_insert_addr(pp, n, "Q2TEST"), "position %d", n)
+	}
+
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1:", AX25FormatAddrs(pp))
+}
+
+func Test_ax25_insert_addr_append(t *testing.T) {
+	var pp = MustAX25FromText(addrMutatorTestPacket)
+
+	require.NoError(t, ax25_insert_addr(pp, 3, "Q2TEST"))
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1,Q2TEST:", AX25FormatAddrs(pp))
+}
+
+func Test_ax25_remove_addr_past_end(t *testing.T) {
+	var pp = MustAX25FromText(addrMutatorTestPacket)
+
+	for _, n := range []int{AX25_SOURCE, 3, 5, 9, AX25_MAX_ADDRS} {
+		require.Error(t, ax25_remove_addr(pp, n), "position %d", n)
+	}
+
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1:", AX25FormatAddrs(pp))
+}
+
+func Test_ax25_set_addr_past_end(t *testing.T) {
+	var pp = MustAX25FromText(addrMutatorTestPacket)
+
+	for _, n := range []int{-1, 4, 9, AX25_MAX_ADDRS} {
+		require.Error(t, ax25_set_addr(pp, n, "Q2TEST"), "position %d", n)
+	}
+
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1:", AX25FormatAddrs(pp))
+
+	// One past the end appends, and an existing position is replaced.
+	require.NoError(t, ax25_set_addr(pp, 3, "Q2TEST"))
+	require.NoError(t, ax25_set_addr(pp, AX25_REPEATER_1, "Q3TEST"))
+	assert.Equal(t, "Q1TEST>APDW17,Q3TEST,Q2TEST:", AX25FormatAddrs(pp))
+}

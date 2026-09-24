@@ -155,6 +155,7 @@ import (
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/fcs"
+	"github.com/sirupsen/logrus"
 )
 
 const AX25_MAX_REPEATERS = 8
@@ -520,7 +521,12 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_SOURCE, addrTemp)
+	var err = ax25_set_addr(this_p, AX25_SOURCE, addrTemp)
+	if err != nil {
+		logrus.WithError(err).WithField("position", "source").Error("Failed to create packet from text")
+
+		return (nil)
+	}
 	ax25_set_h(this_p, AX25_SOURCE) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
 	ax25_set_ssid(this_p, AX25_SOURCE, ssidTemp)
 
@@ -540,7 +546,12 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 		return (nil)
 	}
 
-	ax25_set_addr(this_p, AX25_DESTINATION, addrTemp)
+	err = ax25_set_addr(this_p, AX25_DESTINATION, addrTemp)
+	if err != nil {
+		logrus.WithError(err).WithField("position", "destination").Error("Failed to create packet from text")
+
+		return (nil)
+	}
 	ax25_set_h(this_p, AX25_DESTINATION) // c/r in this position // TODO KG Shouldn't we only do this if heardTemp is true?
 	ax25_set_ssid(this_p, AX25_DESTINATION, ssidTemp)
 
@@ -586,7 +597,12 @@ func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 			return (nil)
 		}
 
-		ax25_set_addr(this_p, k, addrTemp)
+		err = ax25_set_addr(this_p, k, addrTemp)
+		if err != nil {
+			logrus.WithError(err).WithField("position", "digipeater").Error("Failed to create packet from text")
+
+			return (nil)
+		}
 		ax25_set_ssid(this_p, k, ssidTemp)
 
 		// Does it have an "*" at the end?
@@ -1058,12 +1074,15 @@ func ax25_unwrap_third_party(from_pp *packet_t) *packet_t {
  *
  * TODO:  	AX25FromText could use this.
  *
- * Returns:	None.
+ * Returns:	An error, leaving the packet unchanged, if n is neither an
+ *		existing position nor one past the last.
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_set_addr(this_p *packet_t, n int, ad string) {
-	Assert(n >= 0 && n < AX25_MAX_ADDRS)
+func ax25_set_addr(this_p *packet_t, n int, ad string) error {
+	if n < 0 || n > ax25_get_num_addr(this_p) {
+		return fmt.Errorf("ax25_set_addr: bad position %d for '%s', num_addr=%d", n, ad, this_p.num_addr)
+	}
 
 	//dw_printf ("ax25_set_addr (%d, %s) num_addr=%d\n", n, ad, this_p.num_addr);
 
@@ -1072,7 +1091,7 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		dw_printf("Set address error!  Station address for position %d is empty!\n", n)
 	}
 
-	if n >= 0 && n < this_p.num_addr {
+	if n < this_p.num_addr {
 		//dw_printf ("ax25_set_addr , existing case\n");
 		/*
 		 * Set existing address position.
@@ -1094,21 +1113,15 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
 		}
 
 		ax25_set_ssid(this_p, n, ssidTemp)
-	} else if n == this_p.num_addr {
-		//dw_printf ("ax25_set_addr , appending case\n");
-		/*
-		 * One beyond last position, process as insert.
-		 */
-		ax25_insert_addr(this_p, n, ad)
-	} else {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, ax25_set_addr, bad position %d for '%s'\n", n, ad)
+
+		return nil
 	}
 
-	//dw_printf ("------\n");
-	//dw_printf ("dump after ax25_set_addr (%d, %s)\n", n, ad);
-	//ax25_hex_dump (this_p);
-	//dw_printf ("------\n");
+	//dw_printf ("ax25_set_addr , appending case\n");
+	/*
+	 * One beyond last position, process as insert.
+	 */
+	return ax25_insert_addr(this_p, n, ad)
 }
 
 /*------------------------------------------------------------------------------
@@ -1129,17 +1142,20 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) {
  *
  *		ad	- Address with optional dash and substation id.
  *
- * Bugs:	Little validity or bounds checking is performed.  Be careful.
+ *		  Must be a repeater position no further than one past
+ *		  the last address.
  *
  * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
- * Returns:	None.
+ * Returns:	An error, leaving the packet unchanged, if n is out of range.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_insert_addr(this_p *packet_t, n int, ad string) {
-	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
+func ax25_insert_addr(this_p *packet_t, n int, ad string) error {
+	if n < AX25_REPEATER_1 || n >= AX25_MAX_ADDRS || n > ax25_get_num_addr(this_p) {
+		return fmt.Errorf("ax25_insert_addr: bad position %d for '%s', num_addr=%d", n, ad, this_p.num_addr)
+	}
 
 	//dw_printf ("ax25_insert_addr (%d, %s)\n", n, ad);
 
@@ -1152,7 +1168,7 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 	/* Should probably return success/fail code but currently the caller doesn't care. */
 
 	if this_p.num_addr >= AX25_MAX_ADDRS {
-		return
+		return nil
 	}
 
 	CLEAR_LAST_ADDR_FLAG(this_p)
@@ -1192,6 +1208,8 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
+
+	return nil
 }
 
 /*------------------------------------------------------------------------------
@@ -1203,18 +1221,19 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) {
  *
  * Inputs:	n	- Index of address.   Use the symbols
  *			  AX25_REPEATER1, AX25_REPEATER2, etc.
- *
- * Bugs:	Little validity or bounds checking is performed.  Be careful.
+ *			  Must be an existing repeater position.
  *
  * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
- * Returns:	None.
+ * Returns:	An error, leaving the packet unchanged, if n is out of range.
  *
  *
  *------------------------------------------------------------------------------*/
 
-func ax25_remove_addr(this_p *packet_t, n int) {
-	Assert(n >= AX25_REPEATER_1 && n < AX25_MAX_ADDRS)
+func ax25_remove_addr(this_p *packet_t, n int) error {
+	if n < AX25_REPEATER_1 || n >= ax25_get_num_addr(this_p) {
+		return fmt.Errorf("ax25_remove_addr: bad position %d, num_addr=%d", n, this_p.num_addr)
+	}
 
 	/* Shift those beyond to fill this position. */
 
@@ -1235,6 +1254,8 @@ func ax25_remove_addr(this_p *packet_t, n int) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Internal error ax25_remove_addr expect %d, actual %d\n", expect, this_p.num_addr)
 	}
+
+	return nil
 }
 
 /*------------------------------------------------------------------------------
