@@ -1,6 +1,5 @@
 // Test fixture for the Dire Wolf demodulators.
 
-//nolint:gochecknoglobals
 package direwolf
 
 /*-------------------------------------------------------------------
@@ -81,18 +80,6 @@ type atest_wav_data_t struct {
 	Datasize int32
 }
 
-var my_audio_config *audio_s
-
-var sample_number = -1 /* Sample number from the file. */
-/* Incremented only for channel 0. */
-/* Use to print timestamp, relative to beginning */
-/* of file, when frame was decoded. */
-
-// command line options.
-
-var h_opt = false // Hexadecimal display of received packet.
-var d_o_opt = 0   // "-d o" option for DCD output control. */
-
 const EXPERIMENT_G = true
 const EXPERIMENT_H = true
 
@@ -125,11 +112,13 @@ func AtestMain() {
 	// One sink for the whole run, so its DCD counts are of everything
 	// decoded rather than of the file being decoded at the time.
 	var sink = new(atestSink)
+	sink.sampleNumber = -1
 
 	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
 
-	my_audio_config = atestDefaultAudio()
+	var my_audio_config = atestDefaultAudio()
+	sink.audio = my_audio_config
 
 	var modemFlags = addModemFlags(pflag.CommandLine, true)
 	var fixBits = pflag.IntP("fix-bits", "F", 0, fmt.Sprintf(`Amount of effort to try fixing frames with an invalid CRC.
@@ -191,7 +180,7 @@ o = DCD output control
 		case "x":
 			d_x_opt++
 		case "o":
-			d_o_opt++
+			sink.debugDCD++
 		case "2":
 			d_2_opt++
 		default:
@@ -257,9 +246,7 @@ o = DCD output control
 	my_audio_config.recv_ber = *bitErrorRate
 
 	// Options from atest.c
-	if *hexDisplay {
-		h_opt = true
-	}
+	sink.hexDisplay = *hexDisplay
 
 	var modemErr = modemFlags.apply(&my_audio_config.achan[0])
 	if modemErr != nil {
@@ -464,7 +451,7 @@ o = DCD output control
 				}
 
 				if c == 0 {
-					sample_number++
+					sink.sampleNumber++
 				}
 
 				if decode_only == 0 && c != 0 {
@@ -508,7 +495,7 @@ o = DCD output control
 
 	fmt.Printf("%d packets decoded in %.3f seconds.  %.1f x realtime\n", packets_decoded_total, elapsed.Seconds(), total_filetime/float64(elapsed.Seconds()))
 
-	if d_o_opt > 0 {
+	if sink.debugDCD > 0 {
 		fmt.Printf("DCD count = %d\n", sink.dcdCount)
 		fmt.Printf("DCD missing errors = %d\n", sink.dcdMissingErrors)
 	}
@@ -605,7 +592,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 
 	/* Insert time stamp relative to start of file. */
 
-	var sec = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
+	var sec = float64(s.sampleNumber) / float64(s.audio.adev[0].samples_per_sec)
 	var minutes = int(sec / 60.)
 	sec -= float64(minutes * 60)
 
@@ -637,7 +624,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		dw_printf("%s audio level = %s   IL2P  %s\n", heard, alevel_text, spectrum)
 	default:
 		//case fec_type_none:
-		if my_audio_config.achan[channel].fix_bits == RETRY_NONE && !my_audio_config.achan[channel].passall {
+		if s.audio.achan[channel].fix_bits == RETRY_NONE && !s.audio.achan[channel].passall {
 			// No fix_bits or passall specified.
 			dw_printf("%s audio level = %s     %s\n", heard, alevel_text, spectrum)
 		} else {
@@ -656,11 +643,11 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 		text_color_set(DW_COLOR_DEBUG)
 	}
 
-	if my_audio_config.achan[channel].num_subchan > 1 && my_audio_config.achan[channel].num_slicers == 1 {
+	if s.audio.achan[channel].num_subchan > 1 && s.audio.achan[channel].num_slicers == 1 {
 		dw_printf("[%d.%d] ", channel, subchan)
-	} else if my_audio_config.achan[channel].num_subchan == 1 && my_audio_config.achan[channel].num_slicers > 1 {
+	} else if s.audio.achan[channel].num_subchan == 1 && s.audio.achan[channel].num_slicers > 1 {
 		dw_printf("[%d.%d] ", channel, slice)
-	} else if my_audio_config.achan[channel].num_subchan > 1 && my_audio_config.achan[channel].num_slicers > 1 {
+	} else if s.audio.achan[channel].num_subchan > 1 && s.audio.achan[channel].num_slicers > 1 {
 		dw_printf("[%d.%d.%d] ", channel, subchan, slice)
 	} else {
 		dw_printf("[%d] ", channel)
@@ -674,7 +661,7 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 	 * -h option for hexadecimal display.  (new in 1.6)
 	 */
 
-	if h_opt {
+	if s.hexDisplay {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("------\n")
 		ax25_hex_dump(pp)
@@ -705,6 +692,14 @@ func (s *atestSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 // DCD output line - where atest reports on it: the frame, and with "-d o", the
 // time the channel was busy for.
 type atestSink struct {
+	audio      *audio_s
+	hexDisplay bool // -h
+	debugDCD   int  // -d o
+
+	// sampleNumber is the number of the sample being decoded, counted on
+	// channel 0 across every file, for the time a frame was decoded at.
+	sampleNumber int
+
 	// packetsDecoded counts the frames decoded from the file being read;
 	// AtestMain clears it between files.
 	packetsDecoded   int
@@ -714,8 +709,8 @@ type atestSink struct {
 }
 
 func (s *atestSink) DCDChange(channel int, state int) {
-	if d_o_opt > 0 {
-		var t = float64(sample_number) / float64(my_audio_config.adev[0].samples_per_sec)
+	if s.debugDCD > 0 {
+		var t = float64(s.sampleNumber) / float64(s.audio.adev[0].samples_per_sec)
 
 		text_color_set(DW_COLOR_INFO)
 
