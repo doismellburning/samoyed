@@ -20,8 +20,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.h
-
 // Properties of the radio channels.
 
 // static struct audio_s          *save_audio_config_p;
@@ -314,7 +312,7 @@ func demod_init(pa *audio_s) {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 
-				dw_printf(", Tx %s", layer2_tx[(save_audio_config_p.achan[channel].layer2_xmit)])
+				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
 				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 					dw_printf(", DTMF decoder enabled")
@@ -532,7 +530,7 @@ func demod_init(pa *audio_s) {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 
-				dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
+				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
 				if save_audio_config_p.achan[channel].v26_alternative == V26_B {
 					dw_printf(", compatible with MFJ-2400")
@@ -597,7 +595,7 @@ func demod_init(pa *audio_s) {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 
-				dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
+				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
 				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 					dw_printf(", DTMF decoder enabled")
@@ -651,7 +649,7 @@ func demod_init(pa *audio_s) {
 					dw_printf(" / %d", save_audio_config_p.achan[channel].decimate)
 				}
 
-				dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
+				dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
 				if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 					dw_printf(", DTMF decoder enabled")
@@ -762,7 +760,7 @@ func demod_init(pa *audio_s) {
 						save_audio_config_p.achan[channel].profiles,
 						save_audio_config_p.adev[ACHAN2ADEV(channel)].samples_per_sec,
 						save_audio_config_p.achan[channel].upsample)
-					dw_printf(", Tx %s", layer2_tx[(int)(save_audio_config_p.achan[channel].layer2_xmit)])
+					dw_printf(", Tx %s", save_audio_config_p.achan[channel].layer2_xmit)
 
 					if save_audio_config_p.achan[channel].dtmf_decode != DTMF_DECODE_OFF {
 						dw_printf(", DTMF decoder enabled")
