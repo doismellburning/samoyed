@@ -56,3 +56,31 @@ func Test_dedupe_check_empty_history_not_duplicate(t *testing.T) {
 
 	assert.False(t, ds.Check(pp, 0), "nothing has been remembered, so no duplicates")
 }
+
+// The digipeater checks and remembers from the receive thread, while APRStt
+// object reports remember from the audio thread that decoded the tones, so
+// the history is shared between goroutines.  Run under -race.
+func Test_dedupe_concurrent_remember_and_check(t *testing.T) {
+	var ds = NewDedupeService(30 * time.Second)
+
+	var pp = AX25FromText("Q1TEST>APRS:test packet", true)
+	require.NotNil(t, pp)
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for range 100 {
+			ds.Remember(pp, 0)
+		}
+	}()
+
+	for range 100 {
+		ds.Check(pp, 0)
+	}
+
+	<-done
+
+	assert.True(t, ds.Check(pp, 0))
+}

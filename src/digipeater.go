@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -46,7 +45,7 @@ import (
  * Information required for digipeating.
  *
  * The configuration file reader fills in this information
- * and it is passed to digipeater_init at application start up time.
+ * and it is passed to NewDigipeater at application start up time.
  */
 
 const DEFAULT_DEDUPE = 30
@@ -90,28 +89,19 @@ type digi_config_s struct {
 	// Sort of like digipeating but passed along unchanged.
 }
 
-/*
- * Keep pointer to configuration options.
- * Set by digipeater_init and used later.
- */
-
-var digipeater_audio_config *audio_s
-var save_digi_config_p *digi_config_s
-var dedupeService *DedupeService
-
-/*
- * Maintain count of packets digipeated for each combination of from/to channel.
- */
-
-var digi_count [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
-
-func digipeater_get_count(from_chan, to_chan int) int {
-	return (digi_count[from_chan][to_chan])
+// Digipeater is the APRS digipeater: the configuration it was started with,
+// the duplicate suppression it shares with APRStt object reports, and a count
+// of packets digipeated for each combination of from/to channel.
+type Digipeater struct {
+	audioConfig *audio_s
+	config      *digi_config_s
+	dedupe      *DedupeService
+	count       [MAX_TOTAL_CHANS][MAX_TOTAL_CHANS]int
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	digipeater_init
+ * Name:	NewDigipeater
  *
  * Purpose:	Initialize with stuff from configuration file.
  *
@@ -119,22 +109,38 @@ func digipeater_get_count(from_chan, to_chan int) int {
  *
  *		p_digi_config	- Digipeater configuration details.
  *
- * Outputs:	Save pointers to configuration for later use.
- *
  * Description:	Called once at application startup time.
  *
  *------------------------------------------------------------------------------*/
 
-func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
-	digipeater_audio_config = p_audio_config
-	save_digi_config_p = p_digi_config
+func NewDigipeater(p_audio_config *audio_s, p_digi_config *digi_config_s) *Digipeater {
+	var d = new(Digipeater)
+	d.audioConfig = p_audio_config
+	d.config = p_digi_config
+	d.dedupe = NewDedupeService(time.Duration(p_digi_config.dedupe_time) * time.Second)
 
-	dedupeService = NewDedupeService(time.Duration(p_digi_config.dedupe_time) * time.Second)
+	return d
+}
+
+func (d *Digipeater) GetCount(from_chan, to_chan int) int {
+	return d.count[from_chan][to_chan]
+}
+
+// Remember records a packet we are transmitting ourselves, so that the
+// digipeater will not repeat it when it is heard again.  It does nothing on a
+// nil receiver, so a caller need not check whether the digipeater has been
+// started yet.
+func (d *Digipeater) Remember(pp *packet_t, channel int) {
+	if d == nil {
+		return
+	}
+
+	d.dedupe.Remember(pp, channel)
 }
 
 /*------------------------------------------------------------------------------
  *
- * Name:	digipeater
+ * Name:	Digipeat
  *
  * Purpose:	Re-transmit packet if it matches the rules.
  *
@@ -147,11 +153,11 @@ func digipeater_init(p_audio_config *audio_s, p_digi_config *digi_config_s) {
  *
  *------------------------------------------------------------------------------*/
 
-func digipeater(from_chan int, pp *packet_t) {
+func (d *Digipeater) Digipeat(from_chan int, pp *packet_t) {
 	// Network TNC is OK for UI frames where we don't care about timing.
 	if from_chan < 0 || from_chan >= MAX_TOTAL_CHANS ||
-		(digipeater_audio_config.chan_medium[from_chan] != MEDIUM_RADIO &&
-			digipeater_audio_config.chan_medium[from_chan] != MEDIUM_NETTNC) {
+		(d.audioConfig.chan_medium[from_chan] != MEDIUM_RADIO &&
+			d.audioConfig.chan_medium[from_chan] != MEDIUM_NETTNC) {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("APRS digipeater: Did not expect to receive on invalid channel %d.\n", from_chan)
 
@@ -196,18 +202,18 @@ func digipeater(from_chan int, pp *packet_t) {
 	 */
 
 	for to_chan := range MAX_TOTAL_CHANS {
-		if save_digi_config_p.enabled[from_chan][to_chan] {
+		if d.config.enabled[from_chan][to_chan] {
 			if to_chan == from_chan {
-				var result = digipeat_match(from_chan, pp, digipeater_audio_config.mycall[from_chan],
-					digipeater_audio_config.mycall[to_chan],
-					save_digi_config_p.alias[from_chan][to_chan], save_digi_config_p.wide[from_chan][to_chan],
-					to_chan, save_digi_config_p.preempt[from_chan][to_chan],
-					save_digi_config_p.atgp[from_chan][to_chan],
-					save_digi_config_p.filter_str[from_chan][to_chan])
+				var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
+					d.audioConfig.mycall[to_chan],
+					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
+					to_chan, d.config.preempt[from_chan][to_chan],
+					d.config.atgp[from_chan][to_chan],
+					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
-					dedupeService.Remember(pp, to_chan)
+					d.dedupe.Remember(pp, to_chan)
 					transmitQueue.Append(to_chan, TQ_PRIO_0_HI, result) //  High priority queue.
-					digi_count[from_chan][to_chan]++
+					d.count[from_chan][to_chan]++
 				}
 			}
 		}
@@ -220,27 +226,64 @@ func digipeater(from_chan int, pp *packet_t) {
 	 */
 
 	for to_chan := range MAX_TOTAL_CHANS {
-		if save_digi_config_p.enabled[from_chan][to_chan] {
+		if d.config.enabled[from_chan][to_chan] {
 			if to_chan != from_chan {
-				var result = digipeat_match(from_chan, pp, digipeater_audio_config.mycall[from_chan],
-					digipeater_audio_config.mycall[to_chan],
-					save_digi_config_p.alias[from_chan][to_chan], save_digi_config_p.wide[from_chan][to_chan],
-					to_chan, save_digi_config_p.preempt[from_chan][to_chan],
-					save_digi_config_p.atgp[from_chan][to_chan],
-					save_digi_config_p.filter_str[from_chan][to_chan])
+				var result = d.match(from_chan, pp, d.audioConfig.mycall[from_chan],
+					d.audioConfig.mycall[to_chan],
+					d.config.alias[from_chan][to_chan], d.config.wide[from_chan][to_chan],
+					to_chan, d.config.preempt[from_chan][to_chan],
+					d.config.atgp[from_chan][to_chan],
+					d.config.filter_str[from_chan][to_chan])
 				if result != nil {
-					dedupeService.Remember(pp, to_chan)
+					d.dedupe.Remember(pp, to_chan)
 					transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result) // Low priority queue.
-					digi_count[from_chan][to_chan]++
+					d.count[from_chan][to_chan]++
 				}
 			}
 		}
 	}
-} /* end digipeater */
+} /* end Digipeat */
 
 /*------------------------------------------------------------------------------
  *
- * Name:	digipeat_match
+ * Name:	Regen
+ *
+ * Purpose:	Send regenerated copy of what we received.
+ *
+ * Inputs:	chan	- Radio channel where it was received.
+ *
+ * 		pp	- Packet object.
+ *
+ * Returns:	None.
+ *
+ * Description:	TODO...
+ *
+ *		Initial reports were favorable.
+ *		Should document what this is all about if there is still interest...
+ *
+ *------------------------------------------------------------------------------*/
+
+func (d *Digipeater) Regen(from_chan int, pp *packet_t) {
+	/*
+		packet_t result;
+	*/
+
+	Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
+
+	for to_chan := range MAX_TOTAL_CHANS {
+		if d.config.regen[from_chan][to_chan] {
+			var result = ax25_dup(pp)
+			if result != nil {
+				// TODO:  if AX.25 and has been digipeated, put in HI queue?
+				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
+			}
+		}
+	}
+} /* end Regen */
+
+/*------------------------------------------------------------------------------
+ *
+ * Name:	match
  *
  * Purpose:	A simple digipeater for APRS.
  *
@@ -285,7 +328,7 @@ func digipeater(from_chan int, pp *packet_t) {
  *
  *------------------------------------------------------------------------------*/
 
-func digipeat_match(
+func (d *Digipeater) match(
 	from_chan int,
 	pp *packet_t,
 	mycall_rec string,
@@ -396,7 +439,7 @@ func digipeat_match(
 	 *
 	 */
 
-	if dedupeService.Check(pp, to_chan) {
+	if d.dedupe.Check(pp, to_chan) {
 		//#if DEBUG
 		/* Might be useful if people are wondering why */
 		/* some are not repeated.  Might also cause confusion. */
@@ -572,41 +615,3 @@ func digipeat_match(
 
 	return (nil)
 }
-
-/*------------------------------------------------------------------------------
- *
- * Name:	digi_regen
- *
- * Purpose:	Send regenerated copy of what we received.
- *
- * Inputs:	chan	- Radio channel where it was received.
- *
- * 		pp	- Packet object.
- *
- * Returns:	None.
- *
- * Description:	TODO...
- *
- *		Initial reports were favorable.
- *		Should document what this is all about if there is still interest...
- *
- *------------------------------------------------------------------------------*/
-
-func digi_regen(from_chan int, pp *packet_t) {
-	/*
-		packet_t result;
-	*/
-
-	// dw_printf ("digi_regen()\n");
-	Assert(from_chan >= 0 && from_chan < MAX_TOTAL_CHANS)
-
-	for to_chan := range MAX_TOTAL_CHANS {
-		if save_digi_config_p.regen[from_chan][to_chan] {
-			var result = ax25_dup(pp)
-			if result != nil {
-				// TODO:  if AX.25 and has been digipeated, put in HI queue?
-				transmitQueue.Append(to_chan, TQ_PRIO_1_LO, result)
-			}
-		}
-	}
-} /* end dig_regen */

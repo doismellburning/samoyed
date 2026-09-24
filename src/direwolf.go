@@ -62,6 +62,7 @@ var kissPT *KissPT
 var kissSerial *KissSerial
 var agwServer *AGWServer
 var mheardDB *MHeardDB
+var aprsDigipeater *Digipeater
 var xmitSvc *XmitService
 var ttGateway *TTGateway
 var hdlcReceiver *HDLCReceiver
@@ -638,7 +639,7 @@ x = Silence FX.25 information.`)
 	 * Initialize the digipeater and IGate functions.
 	 */
 	mheardDB = NewMHeardDB(d_m_opt)
-	digipeater_init(audio_config, &digi_config)
+	aprsDigipeater = NewDigipeater(audio_config, &digi_config)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, d_i_opt)
 	igate.start(ctx)
 	stopIfCancelled(ctx)
@@ -1139,7 +1140,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		/* Initial feedback was positive but it fell by the wayside. */
 		/* Should follow up with testers and either document this or clean out the clutter. */
 
-		digi_regen(channel, pp)
+		aprsDigipeater.Regen(channel, pp)
 
 		/*
 		 * Send to APRS digipeater.
@@ -1149,7 +1150,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 		 * confidence that it is correct.
 		 */
 		if ax25_is_aprs(pp) && (retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p) {
-			digipeater(channel, pp)
+			aprsDigipeater.Digipeat(channel, pp)
 		}
 
 		/*

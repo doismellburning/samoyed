@@ -507,6 +507,36 @@ func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 	assert.True(t, igate.igToTxAllow(pp, 1))
 }
 
+// The transmit history is remembered into by the digipeater from the receive
+// thread, by APRStt object reports from an audio thread, and by the IGate's own
+// APRS-IS to RF path, which also consults it.  Run under -race.
+func TestIGToTxHistoryConcurrent(t *testing.T) {
+	setupIGate(t)
+
+	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
+	require.NotNil(t, pp)
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for range 100 {
+			igate.igToTxRemember(pp, 0, 1)
+		}
+	}()
+
+	CaptureOutput(t, func() {
+		for range 100 {
+			igate.igToTxAllow(pp, 0)
+		}
+	})
+
+	<-done
+
+	CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
+}
+
 // A repeated "message" is a retry that did not get an ack, so it is not
 // treated as a duplicate to be suppressed.
 func TestIGToTxAllowKeepsDuplicateMessages(t *testing.T) {
