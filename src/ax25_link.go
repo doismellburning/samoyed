@@ -1670,13 +1670,6 @@ func dl_client_cleanup(E *dlq_item_t) {
 	}
 
 	/*
-	 * If there are no link state machines (streams) remaining, there should be no txdata items still allocated.
-	 */
-	if ax25Link.listHead == nil {
-		dataLinkQueue.CheckCDataLeak()
-	}
-
-	/*
 	 * Remove registered callsigns for this client.
 	 */
 

@@ -21,7 +21,6 @@ package direwolf
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -148,18 +147,6 @@ type DataLinkQueue struct {
 	// selecting on an old channel would never hear a send to its
 	// replacement.
 	wake chan struct{}
-
-	// The leak counters are atomic because nothing else serialises them:
-	// items are made by every receive thread, the AGW server's client
-	// goroutines, the beacon and the IGate, and deleted by the receive
-	// processing thread, while connected-mode data blocks are made by the
-	// AGW server and freed by the link state machine.
-
-	newCount    atomic.Int64 /* To detect memory leak for queue items. */
-	deleteCount atomic.Int64 // TODO:  need to test.
-
-	cdataNewCount    atomic.Int64 /* To detect memory leak for connected mode data. */
-	cdataDeleteCount atomic.Int64 // TODO:  need to test.
 }
 
 // dataLinkQueue is the queue the receive threads, client applications and
@@ -266,13 +253,6 @@ func (q *DataLinkQueue) RecFrame(channel int, subchannel int, slice int, pp *pac
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	var new_count = q.newCount.Add(1)
-	var delete_count = q.deleteCount.Load()
-
-	if new_count > delete_count+50 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("INTERNAL ERROR:  DLQ memory leak, new=%d, delete=%d\n", new_count, delete_count)
-	}
 
 	pnew.nextp = nil
 	pnew._type = DLQ_REC_FRAME
@@ -328,7 +308,6 @@ func (q *DataLinkQueue) ConnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr in
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_CONNECT_REQUEST
 	pnew._chan = channel
@@ -375,7 +354,6 @@ func (q *DataLinkQueue) DisconnectRequest(addrs [AX25_MAX_ADDRS]string, num_addr
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_DISCONNECT_REQUEST
 	pnew._chan = channel
@@ -427,7 +405,6 @@ func (q *DataLinkQueue) OutstandingFramesRequest(addrs [AX25_MAX_ADDRS]string, n
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_OUTSTANDING_FRAMES_REQUEST
 	pnew._chan = channel
@@ -483,7 +460,6 @@ func (q *DataLinkQueue) XmitDataRequest(addrs [AX25_MAX_ADDRS]string, num_addr i
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_XMIT_DATA_REQUEST
 	pnew._chan = channel
@@ -537,7 +513,6 @@ func (q *DataLinkQueue) RegisterCallsign(addr string, channel int, client int) {
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_REGISTER_CALLSIGN
 	pnew._chan = channel
@@ -561,7 +536,6 @@ func (q *DataLinkQueue) UnregisterCallsign(addr string, channel int, client int)
 	/* Allocate a new queue item. */
 
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_UNREGISTER_CALLSIGN
 	pnew._chan = channel
@@ -608,7 +582,6 @@ func (q *DataLinkQueue) ChannelBusy(channel int, activity int, status int) {
 
 		/* Allocate a new queue item. */
 		var pnew = new(dlq_item_t)
-		q.newCount.Add(1)
 
 		pnew._type = DLQ_CHANNEL_BUSY
 		pnew._chan = channel
@@ -643,7 +616,6 @@ func (q *DataLinkQueue) SeizeConfirm(channel int) {
 
 	/* Allocate a new queue item. */
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	pnew._type = DLQ_SEIZE_CONFIRM
 	pnew._chan = channel
@@ -677,7 +649,6 @@ func (q *DataLinkQueue) ClientCleanup(client int) {
 
 	/* Allocate a new queue item. */
 	var pnew = new(dlq_item_t)
-	q.newCount.Add(1)
 
 	// All we care about is the client number.
 
@@ -824,8 +795,6 @@ func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
 		return
 	}
 
-	q.deleteCount.Add(1)
-
 	pitem.pp = nil
 
 	if pitem.txdata != nil {
@@ -859,8 +828,6 @@ func (q *DataLinkQueue) Delete(pitem *dlq_item_t) {
  *--------------------------------------------------------------------*/
 
 func (q *DataLinkQueue) NewCData(pid int, data []byte) *cdata_t {
-	q.cdataNewCount.Add(1)
-
 	var cdata = new(cdata_t)
 
 	cdata.magic = TXDATA_MAGIC
@@ -901,30 +868,8 @@ func (q *DataLinkQueue) DeleteCData(cdata *cdata_t) {
 		return
 	}
 
-	q.cdataDeleteCount.Add(1)
-
 	cdata.magic = 0
 } /* end DeleteCData */
-
-/*-------------------------------------------------------------------
- *
- * Name:        CheckCDataLeak
- *
- * Purpose:     Check for memory leak of cdata items.
- *
- * Description:	This is called when we expect no outstanding allocations.
- *
- *--------------------------------------------------------------------*/
-
-func (q *DataLinkQueue) CheckCDataLeak() {
-	var new_count = q.cdataNewCount.Load()
-	var delete_count = q.cdataDeleteCount.Load()
-
-	if delete_count != new_count {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal Error, cdata_check_leak, new=%d, delete=%d\n", new_count, delete_count)
-	}
-} /* end CheckCDataLeak */
 
 /*-------------------------------------------------------------------
  *
