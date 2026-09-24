@@ -274,7 +274,6 @@ func GenPacketsMain() {
 
 	gen_tone_init(&modem, *amplitude/2, sink)
 	morse_init(&modem, *amplitude/2)
-	dtmf_init(&modem)
 
 	// One per channel, kept for the whole run, so the NRZI line level carries
 	// over from one packet to the next as it does on the air.

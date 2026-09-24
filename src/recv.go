@@ -141,6 +141,15 @@ func recv_adev_thread(ctx context.Context, a int, failed chan<- int, src SampleS
 	var first_chan = ADEVFIRSTCHAN(a)
 	var num_chan = save_pa.adev[a].num_channels
 
+	// Only this goroutine drives its channels' touch tone decoders.
+	var dtmfDecoders = make([]*DTMFDecoder, num_chan)
+
+	for c := range num_chan {
+		if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
+			dtmfDecoders[c] = NewDTMFDecoder(first_chan+c, save_pa.adev[a].samples_per_sec)
+		}
+	}
+
 	/*
 	 * Get sound samples and decode them.
 	 */
@@ -176,8 +185,8 @@ func recv_adev_thread(ctx context.Context, a int, failed chan<- int, src SampleS
 			/* channel.  This shouldn't be a problem unless we have multiple */
 			/* sequences arriving at the same instant. */
 
-			if save_pa.achan[first_chan+c].dtmf_decode != DTMF_DECODE_OFF {
-				var tt = dtmf_sample(first_chan+c, float64(audio_sample)/16384.)
+			if dtmfDecoders[c] != nil {
+				var tt = dtmfDecoders[c].Sample(float64(audio_sample) / 16384.)
 				if tt != ' ' {
 					ttGateway.Button(first_chan+c, tt)
 				}

@@ -13,9 +13,6 @@ func Test_dtmf(t *testing.T) {
 
 	var my_audio_config audio_s
 
-	my_audio_config.adev[ACHAN2ADEV(c)].samples_per_sec = sampleRate
-	my_audio_config.achan[c].dtmf_decode = DTMF_DECODE_ON
-
 	// A decoded button raises the channel's DCD, which goes to the HDLC
 	// receiver; nothing here wants to hear about it.
 	var origReceiver = hdlcReceiver
@@ -24,7 +21,7 @@ func Test_dtmf(t *testing.T) {
 
 	hdlcReceiver = NewHDLCReceiver(&my_audio_config, new(discardReceiveSink))
 
-	dtmf_init(&my_audio_config)
+	var decoder = NewDTMFDecoder(c, sampleRate)
 
 	var result strings.Builder
 
@@ -32,9 +29,9 @@ func Test_dtmf(t *testing.T) {
 		for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
 			/* Make sure it is insensitive to signal amplitude. */
 			/* (Uncomment each of below when testing.) */
-			var x = dtmf_sample(c, dtmf)
-			//x = dtmf_sample (c, dtmf * 1000);
-			//x = dtmf_sample (c, dtmf * 0.001);
+			var x = decoder.Sample(dtmf)
+			//x = decoder.Sample (dtmf * 1000);
+			//x = decoder.Sample (dtmf * 0.001);
 
 			if x != ' ' && x != '.' {
 				result.WriteRune(x)
