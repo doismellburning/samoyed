@@ -13,6 +13,7 @@ package direwolf
 
 import (
 	"strings"
+	"sync/atomic"
 	"unicode"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -928,7 +929,9 @@ func demod_get_sample(a int, src SampleSource) int {
  *
  *--------------------------------------------------------------------*/
 
-var mute_input [MAX_RADIO_CHANS]int
+// mute_input is written by ptt_set on the transmit thread and read for every
+// sample on the audio thread, hence atomic.
+var mute_input [MAX_RADIO_CHANS]atomic.Bool
 
 // New in 1.7.
 // A few people have a really bad audio cross talk situation where they receive their own transmissions.
@@ -940,7 +943,7 @@ var mute_input [MAX_RADIO_CHANS]int
 
 func demod_mute_input(channel int, mute_during_xmit int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	mute_input[channel] = mute_during_xmit
+	mute_input[channel].Store(mute_during_xmit != 0)
 }
 
 func demod_process_sample(channel int, subchan int, sam int) {
@@ -948,7 +951,7 @@ func demod_process_sample(channel int, subchan int, sam int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
-	if mute_input[channel] != 0 {
+	if mute_input[channel].Load() {
 		sam = 0
 	}
 
