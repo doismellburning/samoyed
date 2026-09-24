@@ -182,6 +182,58 @@ naming a bit inversion that worked, and are left out of the frame metrics
 described below.
 
 
+Use the only sound card where nothing else has chosen one
+---------------------------------------------------------
+
+Samoyed opens the system's default audio device when the configuration does not
+name one, and on a machine where that default means something - a Mac or a
+Windows box, where it is the device named in the sound settings, or Linux with
+PulseAudio, PipeWire or JACK running, where it is the device chosen in the sound
+server - that is what you get, and there is nothing to configure.
+
+Linux without a sound server has no such choice to follow.  ALSA's ``default``
+comes from ``defaults.pcm.card 0`` in ``alsa.conf``, so it is card 0 whatever
+card 0 happens to be - typically the built-in audio of a headless machine whose
+radio is on the USB interface plugged into it.  There, and only there, Samoyed
+looks for the one sound card that can capture, transmits through that same card
+when it can also play, and says which card it settled on:
+
+.. code::
+
+    Automatically selected the only audio device available: USB Audio CODEC: USB Audio (hw:1,0)
+    Audio device for both receive and transmit: USB Audio CODEC: USB Audio (hw:1,0)  (channel 0)
+
+``ADEVICE auto`` asks for the same thing explicitly, and reads more clearly in a
+configuration file than leaving the line out.
+
+Detection only acts on an unambiguous answer.  It stands aside, leaving the
+device where it always was, when:
+
+- a sound server is running.  Its default is a choice already made, and it is
+  followed rather than second-guessed, so configure the card there or name it in
+  ``ADEVICE``;
+
+- more than one card can serve that direction.  Transmit is the usual case: a Pi
+  with a USB interface also has its headphone jack, so the card being received on
+  is used for transmit rather than picking between the two;
+
+- the card cannot be opened as configured - it is busy, or does not do mono, or
+  does not do the configured sample rate.  ALSA's ``default`` converts whatever
+  it is given, so it remains the better bet;
+
+- the configuration defines more than one audio device.  That configuration is
+  choosing devices by hand, and the card detection would find is probably the one
+  another ``ADEVICE`` already names.
+
+Anything named in the configuration is used as named, and anything that is not a
+sound card - ``stdin``, ``udp:``, a UDP transmit destination - is untouched.
+Where only one side is left at the default it is the only side detected, so
+
+.. code::
+
+    ADEVICE udp:7355 auto     # Receive from an SDR, transmit through the only card
+
+
 Receive without an audio output device
 --------------------------------------
 
