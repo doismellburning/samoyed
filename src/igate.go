@@ -1872,9 +1872,6 @@ No, we sent it recently by the digipeating function (note "bydigi=1").
 const IG2TX_DEDUPE_TIME = 60 * time.Second /* Do not send duplicate within 60 seconds. */
 const IG2TX_HISTORY_MAX = 50               /* Remember the last 50 sent from server to radio. */
 
-/* Ideally this should be a critical region because */
-/* it is being written by two threads but I'm not that concerned. */
-
 // ig2txEntry is one packet that went out over the air.  channel is which
 // radio channel it went out on - duplicate detection is separate for each -
 // and bydigi says whether the digipeater sent it rather than the IGate, which
@@ -1887,14 +1884,22 @@ type ig2txEntry struct {
 }
 
 // ig2txHistory is a ring of the last IG2TX_HISTORY_MAX of those, oldest
-// overwritten first.
+// overwritten first.  mu guards the rest: the digipeater remembers into it from
+// the receive thread, APRStt object reports from the audio thread that decoded
+// them, and the IGate's APRS-IS to RF path remembers and consults it from its
+// own goroutine.
 type ig2txHistory struct {
+	mu         sync.Mutex
 	entries    [IG2TX_HISTORY_MAX]ig2txEntry
 	insertNext int
 }
 
 func (h *ig2txHistory) reset() {
-	*h = ig2txHistory{} //nolint:exhaustruct_v5
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.entries = [IG2TX_HISTORY_MAX]ig2txEntry{}
+	h.insertNext = 0
 
 	for n := range h.entries {
 		// Not a channel, so an empty slot is not a match for channel 0.
@@ -1905,6 +1910,9 @@ func (h *ig2txHistory) reset() {
 func (ig *IGate) igToTxRemember(pp *packet_t, channel int, bydigi int) {
 	var now = time.Now()
 	var crc = ax25_dedupe_crc(pp)
+
+	ig.ig2tx.mu.Lock()
+	defer ig.ig2tx.mu.Unlock()
 
 	if ig.debugLevel >= 3 {
 		var src = ax25_get_addr_with_ssid(pp, AX25_SOURCE)
@@ -1943,6 +1951,9 @@ func (ig *IGate) igToTxAllow(pp *packet_t, channel int) bool {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("ig_to_tx_allow? ch%d %d \"%s>%s:%s\"\n", channel, crc, src, dest, string(pinfo))
 	}
+
+	ig.ig2tx.mu.Lock()
+	defer ig.ig2tx.mu.Unlock()
 
 	/* Consider transmissions on this channel only by either digi or IGate. */
 
