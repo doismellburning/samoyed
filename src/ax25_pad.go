@@ -1516,17 +1516,14 @@ func ax25_set_ssid(this_p *packet_t, n int, ssid int) {
  * Inputs:	n	- Index of address.   Use the symbols
  *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
  *
- * Bugs:	No bounds checking is performed.  Be careful.
- *
  * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
- * Returns:	True or false.
+ * Returns:	True or false.  False, after reporting it, for a position
+ *		the packet doesn't have.
  *
  *------------------------------------------------------------------------------*/
 
 func ax25_get_h(this_p *packet_t, n int) int {
-	Assert(n >= 0 && n < this_p.num_addr)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_H_MASK) >> SSID_H_SHIFT)
 	} else {
@@ -1628,13 +1625,12 @@ func ax25_get_first_not_repeated(this_p *packet_t) int {
  *		n	- Index of address.   Use the symbols
  *			  AX25_DESTINATION, AX25_SOURCE, AX25_REPEATER1, etc.
  *
- * Returns:	0, 1, 2, or 3.
+ * Returns:	0, 1, 2, or 3.  0, after reporting it, for a position the
+ *		packet doesn't have.
  *
  *------------------------------------------------------------------------------*/
 
 func ax25_get_rr(this_p *packet_t, n int) int {
-	Assert(n >= 0 && n < this_p.num_addr)
-
 	if n >= 0 && n < this_p.num_addr {
 		return int((this_p.frame_data[n*7+6] & SSID_RR_MASK) >> SSID_RR_SHIFT)
 	} else {

@@ -204,3 +204,14 @@ func Test_ax25_insert_addr_full(t *testing.T) {
 	require.Error(t, ax25_insert_addr(pp, AX25_REPEATER_1, "Q2TEST"))
 	assert.Equal(t, full, AX25FormatAddrs(pp))
 }
+
+// ax25_get_h and ax25_get_rr already report an out-of-range position and
+// return 0, but asserted on it first, so the report was never reached.
+func Test_ax25_get_h_rr_out_of_range(t *testing.T) {
+	var pp = MustAX25FromText(addrMutatorTestPacket)
+
+	for _, n := range []int{-1, 3, AX25_MAX_ADDRS} {
+		assert.Equal(t, 0, ax25_get_h(pp, n), "position %d", n)
+		assert.Equal(t, 0, ax25_get_rr(pp, n), "position %d", n)
+	}
+}
