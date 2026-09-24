@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	direwolf "github.com/doismellburning/samoyed/src"
@@ -368,4 +370,101 @@ func Test_HexEmpty(t *testing.T) {
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "no hexadecimal digits")
+}
+
+func Test_UnsupportedCommands(t *testing.T) {
+	var testCases = map[string]struct {
+		command byte
+		want    string
+	}{
+		"XKISS data": {0x0c, "Command 12 (XKISS data) is an XKISS extension, which is not supported."},
+		"XKISS poll": {0x0e, "Command 14 (XKISS poll) is an XKISS extension, which is not supported."},
+		"invalid":    {0x07, "command 7 (invalid)"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var output, problems = dumpCaptureOutput(t, direwolf.KissEncapsulate([]byte{tc.command}), false)
+
+			assert.Equal(t, 1, problems)
+			assert.Contains(t, output, tc.want)
+		})
+	}
+}
+
+// runMainEnv, when set, has the test binary run main with the arguments it
+// holds instead of the tests, so a test can see main exit.
+const runMainEnv = "SAMOYED_KISSDUMP_RUN_MAIN"
+
+func TestMain(m *testing.M) {
+	if args, ok := os.LookupEnv(runMainEnv); ok {
+		os.Args = append([]string{"kissdump"}, strings.Fields(args)...)
+
+		main()
+		os.Exit(0)
+	}
+
+	os.Exit(m.Run())
+}
+
+// runMain runs main in a process of its own with capture on stdin, returning
+// what it printed to stdout and stderr, and its exit status.
+func runMain(t *testing.T, capture []byte, args ...string) (string, int) {
+	t.Helper()
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0]) //nolint:gosec
+	cmd.Env = append(os.Environ(), runMainEnv+"="+strings.Join(args, " "))
+	cmd.Stdin = bytes.NewReader(capture)
+
+	var out, err = cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+
+		return string(out), exitErr.ExitCode()
+	}
+
+	return string(out), 0
+}
+
+func Test_main(t *testing.T) {
+	var capture = testCapture(t, "Q1TEST>APDW17:>Testing")
+
+	t.Run("raw", func(t *testing.T) {
+		var out, status = runMain(t, capture)
+
+		assert.Equal(t, 0, status)
+		assert.Contains(t, out, "Q1TEST>APDW17:")
+		assert.Contains(t, out, "Status Report")
+		assert.Contains(t, out, "1 frame, 0 problems.")
+	})
+
+	t.Run("hex", func(t *testing.T) {
+		var out, status = runMain(t, []byte(fmt.Sprintf("% x\n", capture)), "--hex")
+
+		assert.Equal(t, 0, status)
+		assert.Contains(t, out, "Q1TEST>APDW17:")
+		assert.Contains(t, out, "1 frame, 0 problems.")
+	})
+
+	t.Run("problems", func(t *testing.T) {
+		var out, status = runMain(t, direwolf.KissEncapsulate([]byte{0x07}))
+
+		assert.Equal(t, 1, status)
+		assert.Contains(t, out, "1 problem.")
+	})
+
+	t.Run("unexpected argument", func(t *testing.T) {
+		var out, status = runMain(t, nil, "capture.bin")
+
+		assert.Equal(t, 1, status)
+		assert.Contains(t, out, `Unexpected argument "capture.bin" - the capture is read from stdin.`)
+	})
+
+	t.Run("help", func(t *testing.T) {
+		var out, status = runMain(t, nil, "--help")
+
+		assert.Equal(t, 0, status)
+		assert.Contains(t, out, "decodes a captured KISS byte stream")
+	})
 }
