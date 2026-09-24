@@ -173,7 +173,7 @@ func read_gpsnmea_thread(ctx context.Context, fd *term.Term) {
 
 	var gps_msg string
 
-	// As in kissserial_get, a cancellation is noticed between sentences
+	// As in KissSerial.get, a cancellation is noticed between sentences
 	// rather than during one: the port is read directly rather than through
 	// something the runtime can interrupt, so closing it would not get this
 	// goroutine back - and this port can be shared with the waypoint sender
