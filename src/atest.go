@@ -310,6 +310,10 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		}
 	}
 
+	if wav_data.Datasize < 0 {
+		return AtestFileResult{}, fmt.Errorf("WAV file error: Invalid data chunk datasize %d", wav_data.Datasize)
+	}
+
 	if format.Wformattag != 1 {
 		return AtestFileResult{}, fmt.Errorf("sorry, I only understand audio format 1 (PCM).  This file has %d", format.Wformattag)
 	}

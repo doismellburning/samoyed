@@ -158,7 +158,16 @@ func atestTestOptions() *AtestOptions {
 // Byte offsets of fields in the file buildWAVWithExtraChunks builds.
 const (
 	extraChunksSampleRateOffset = 36
+	extraChunksDataSizeOffset   = 64
 )
+
+// withInt32At returns a copy of wav with v written at offset.
+func withInt32At(wav []byte, offset int, v int32) []byte {
+	var out = bytes.Clone(wav)
+	binary.LittleEndian.PutUint32(out[offset:], uint32(v))
+
+	return out
+}
 
 // Test_atest_decodeWAVTruncatedFmt checks that a "fmt " chunk that ends early
 // is reported as such, rather than whatever its missing fields make it look
@@ -171,4 +180,17 @@ func Test_atest_decodeWAVTruncatedFmt(t *testing.T) {
 
 	var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav[:extraChunksSampleRateOffset]), "truncated.wav")
 	assert.ErrorContains(t, decodeErr, "fmt")
+}
+
+// Test_atest_decodeWAVNegativeDataSize checks that a data chunk claiming a
+// negative size is an error, rather than decoding as no audio lasting a
+// negative time.
+func Test_atest_decodeWAVNegativeDataSize(t *testing.T) {
+	var atest, err = NewAtest(atestTestOptions())
+	require.NoError(t, err)
+
+	var wav = withInt32At(buildWAVWithExtraChunks(t), extraChunksDataSizeOffset, -2)
+
+	var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav), "negative.wav")
+	assert.Error(t, decodeErr)
 }
