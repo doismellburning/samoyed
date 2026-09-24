@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,40 @@ import (
 )
 
 // newAtest is the Atest main sets up for a bare "samoyed-atest <file>".
+// runMainEnv, when set, has the test binary run main with the arguments it
+// holds instead of the tests, so a test can see main exit.
+const runMainEnv = "SAMOYED_ATEST_RUN_MAIN"
+
+func TestMain(m *testing.M) {
+	if args, ok := os.LookupEnv(runMainEnv); ok {
+		os.Args = append([]string{"atest"}, strings.Fields(args)...)
+
+		main()
+		os.Exit(0)
+	}
+
+	os.Exit(m.Run())
+}
+
+// runMain runs main in a process of its own, returning what it printed to
+// stdout and stderr, and its exit status.
+func runMain(t *testing.T, args ...string) (string, int) {
+	t.Helper()
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0]) //nolint:gosec
+	cmd.Env = append(os.Environ(), runMainEnv+"="+strings.Join(args, " "))
+
+	var out, err = cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+
+		return string(out), exitErr.ExitCode()
+	}
+
+	return string(out), 0
+}
+
 func newAtest(t *testing.T) *direwolf.Atest {
 	t.Helper()
 
@@ -88,4 +123,55 @@ func Test_run_reportsDCD(t *testing.T) {
 
 	assert.Equal(t, 0, exitStatus)
 	assert.Contains(t, out.String(), "DCD count = ")
+}
+
+func Test_main_decodes(t *testing.T) {
+	var f = genPackets(t)
+
+	var testCases = map[string]struct {
+		args   []string
+		status int
+		want   string
+	}{
+		"plain":         {[]string{f}, 0, "4 packets decoded"},
+		"in range":      {[]string{"-L", "4", "-G", "4", f}, 0, "4 packets decoded"},
+		"too few":       {[]string{"-L", "5", f}, 1, "TEST FAILED: number decoded is less than 5"},
+		"DCD":           {[]string{"-d", "o", f}, 0, "DCD count = "},
+		"right channel": {[]string{"-1", f}, 0, "packets decoded"},
+		"both channels": {[]string{"-2", "-d", "x", "-d", "2", f}, 0, "packets decoded"},
+		"missing wav":   {[]string{f + ".missing"}, 1, "couldn't open file"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var out, status = runMain(t, tc.args...)
+
+			assert.Equal(t, tc.status, status, out)
+			assert.Contains(t, out, tc.want)
+		})
+	}
+}
+
+func Test_main_badArguments(t *testing.T) {
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"help":              {[]string{"--help"}, "decodes AX.25 frames from audio recordings"},
+		"no files":          {nil, "Specify .WAV file name on command line."},
+		"unknown debug":     {[]string{"-d", "q", "x.wav"}, "Unrecognised debug flag: q"},
+		"too many channels": {[]string{"-0", "-1", "x.wav"}, "Exactly one of left/right/both channels must be selected."},
+		"bad IL2P version":  {[]string{"--il2p-version", "9", "x.wav"}, "invalid IL2P version 9"},
+		"bad fix bits":      {[]string{"-F", "99", "x.wav"}, "fix bits should be between"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var out, status = runMain(t, tc.args...)
+
+			assert.Equal(t, 1, status)
+			assert.Contains(t, out, tc.want)
+			assert.Contains(t, out, "Usage:")
+		})
+	}
 }
