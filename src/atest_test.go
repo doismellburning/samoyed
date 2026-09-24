@@ -180,3 +180,65 @@ func Test_atest_fixBits(t *testing.T) {
 		assert.LessOrEqual(t, level, BitFixLevelHighest, "-F %d level in range", testCase.arg)
 	}
 }
+
+// Test_atest_newAtestRejects covers the options NewAtest turns down, which
+// used to be reported and exited on in the middle of parsing the command line.
+func Test_atest_newAtestRejects(t *testing.T) {
+	var testCases = map[string]func(*AtestOptions){
+		"fix bits":     func(o *AtestOptions) { o.FixBits = int(BitFixPassall) + 1 },
+		"il2p version": func(o *AtestOptions) { o.IL2PVersion = "0.5" },
+		"channel":      func(o *AtestOptions) { o.DecodeOnly = 3 },
+	}
+
+	for name, modify := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var opts = atestTestOptions()
+			modify(opts)
+
+			var _, err = NewAtest(opts)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// Test_atest_decodeWAVErrors checks that a file DecodeWAV can't make sense of
+// comes back as an error rather than ending the program.
+func Test_atest_decodeWAVErrors(t *testing.T) {
+	var atest, err = NewAtest(atestTestOptions())
+	require.NoError(t, err)
+
+	var wav = buildWAVWithExtraChunks(t)
+
+	var testCases = map[string][]byte{
+		"empty":     {},
+		"not RIFF":  append([]byte("RIFX"), wav[4:]...),
+		"truncated": wav[:20],
+	}
+
+	for name, data := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var _, err = atest.DecodeWAV(bytes.NewReader(data), name)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// Test_atest_decodeWAV decodes a file without going through the command line.
+func Test_atest_decodeWAV(t *testing.T) {
+	var atest, err = NewAtest(atestTestOptions())
+	require.NoError(t, err)
+
+	var result, decodeErr = atest.DecodeWAV(bytes.NewReader(buildWAVWithExtraChunks(t)), "extra_chunks.wav")
+	require.NoError(t, decodeErr)
+
+	assert.Equal(t, 0, result.PacketsDecoded)
+	assert.InDelta(t, 0.1, result.Seconds, 1e-9)
+}
+
+// atestTestOptions are atest's options with nothing given on the command line.
+func atestTestOptions() *AtestOptions {
+	var opts = new(AtestOptions)
+	opts.IL2PVersion = "0.6"
+
+	return opts
+}
