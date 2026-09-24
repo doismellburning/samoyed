@@ -4,11 +4,14 @@
 package main
 
 import (
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -134,4 +137,104 @@ func Test_run_verboseExplainsTheDecision(t *testing.T) {
 		var exitStatus, _, _ = runWith(opts, positionPacket+"\n")
 		assert.Equal(t, 0, exitStatus)
 	}, "b/Q1TEST returns TRUE")
+}
+
+// runMainEnv, when set, has the test binary run main with the arguments it
+// holds, one per line, instead of the tests, so a test can see main exit.
+const runMainEnv = "SAMOYED_PFTEST_RUN_MAIN"
+
+func TestMain(m *testing.M) {
+	if args, ok := os.LookupEnv(runMainEnv); ok {
+		os.Args = []string{"pftest"}
+		if args != "" {
+			os.Args = append(os.Args, strings.Split(args, "\n")...)
+		}
+
+		main()
+		os.Exit(0)
+	}
+
+	os.Exit(m.Run())
+}
+
+// runMain runs main in a process of its own with input on stdin, returning
+// its exit status and what it printed to stdout and stderr.
+func runMain(t *testing.T, input string, args ...string) (int, string, string) {
+	t.Helper()
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0]) //nolint:gosec
+	cmd.Env = append(os.Environ(), runMainEnv+"="+strings.Join(args, "\n"))
+	cmd.Stdin = strings.NewReader(input)
+
+	var out, errOut strings.Builder
+
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+
+	var err = cmd.Run()
+	if err != nil {
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+
+		return exitErr.ExitCode(), out.String(), errOut.String()
+	}
+
+	return 0, out.String(), errOut.String()
+}
+
+func Test_main(t *testing.T) {
+	var input = positionPacket + "\n" + messagePacket + "\n"
+
+	var exitStatus, out, _ = runMain(t, input, "t/m")
+
+	assert.Equal(t, 0, exitStatus)
+	assert.Contains(t, out, "DROP\t"+positionPacket+"\n")
+	assert.Contains(t, out, "PASS\t"+messagePacket+"\n")
+}
+
+func Test_main_options(t *testing.T) {
+	var testCases = map[string]struct {
+		args   []string
+		status int
+		out    string
+		errOut string
+	}{
+		"validate": {
+			[]string{"--validate", "t/m & ! d/WIDE*"}, 0, "", "",
+		},
+		"verbose": {
+			[]string{"-vv", "t/m"}, 0, "PASS", "",
+		},
+		"connected mode": {
+			[]string{"-c", "--from-channel", "1", "--to-channel", "2", "b/Q1TEST"}, 0, "PASS\t" + messagePacket, "",
+		},
+		"not for connected mode": {
+			[]string{"-c", "t/m"}, 1, "", "Only b, d, v, and u specifications are allowed",
+		},
+		"help": {
+			[]string{"--help"}, 0, "", "tries a packet filter expression out on packets",
+		},
+		"no filter": {
+			nil, 1, "", "Expected exactly one filter expression, got 0.",
+		},
+		"two filters": {
+			[]string{"t/m", "b/Q1TEST"}, 1, "", "Expected exactly one filter expression, got 2.",
+		},
+		"from channel out of range": {
+			[]string{"--from-channel", "-1", "t/m"}, 1, "", "--from-channel must be between 0 and",
+		},
+		"to channel out of range": {
+			[]string{"--to-channel", "9999", "t/m"}, 1, "", "--to-channel must be between 0 and",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var exitStatus, out, errOut = runMain(t, messagePacket+"\n", tc.args...)
+
+			assert.Equal(t, tc.status, exitStatus, "stdout: %s\nstderr: %s", out, errOut)
+			assert.Contains(t, out, tc.out)
+			assert.Contains(t, errOut, tc.errOut)
+		})
+	}
 }
