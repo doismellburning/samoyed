@@ -20,6 +20,7 @@ var digipeaterTestWideRegexp *regexp.Regexp
 var digipeaterTestConfigATGP = "HOP"
 var digipeaterTestFailed = 0
 var preempt = PREEMPT_OFF
+var digipeaterTestDigi *Digipeater
 
 func digipeater_test(t *testing.T, in, out string) {
 	t.Helper()
@@ -78,12 +79,12 @@ func digipeater_test(t *testing.T, in, out string) {
 
 	//TODO:										  	             Add filtering to test.
 	//											             V
-	var result = digipeat_match(0, pp, digipeaterTestMyCall, digipeaterTestMyCall, digipeaterTestAliasRegexp, digipeaterTestWideRegexp, 0, preempt, digipeaterTestConfigATGP, "")
+	var result = digipeaterTestDigi.match(0, pp, digipeaterTestMyCall, digipeaterTestMyCall, digipeaterTestAliasRegexp, digipeaterTestWideRegexp, 0, preempt, digipeaterTestConfigATGP, "")
 
 	var xmit string
 
 	if result != nil {
-		dedupeService.Remember(result, 0)
+		digipeaterTestDigi.Remember(result, 0)
 		xmit = AX25FormatAddrs(result)
 		pinfo = AX25GetInfo(result)
 		xmit += string(pinfo)
@@ -102,7 +103,8 @@ func digipeater_test(t *testing.T, in, out string) {
 func Test_Digipeater(t *testing.T) {
 	digipeaterTestMyCall = "WB2OSZ-9"
 
-	dedupeService = NewDedupeService(100 * time.Millisecond)
+	digipeaterTestDigi = new(Digipeater)
+	digipeaterTestDigi.dedupe = NewDedupeService(100 * time.Millisecond)
 
 	/*
 	 * Compile the patterns.
