@@ -193,8 +193,8 @@ func hdlc_rec2_init(p_audio_config *audio_s) {
  * Purpose:	Extract HDLC frame from a stream of bits.
  *
  * Inputs:	block 		- Handle for bit array.
- *				  This will be deallocated so the caller
- *				  must not hold on to the address.
+ *				  Ownership passes to this function, so the
+ *				  caller must not reuse it for the next frame.
  *
  * Description:	The other (original) hdlc decoder took one bit at a time
  *		right out of the demodulator.
@@ -236,7 +236,6 @@ func hdlc_rec2_block(block *rrbb_t) {
 	var ok = try_decode(block, channel, subchan, slice, alevel, retry_cfg, passall && (fix_bits == RETRY_NONE))
 	if ok {
 		logrus.Trace("Got it the first time.")
-		rrbb_delete(block)
 
 		return
 	}
@@ -246,8 +245,6 @@ func hdlc_rec2_block(block *rrbb_t) {
 	 * See if we can "fix" it.
 	 */
 	if try_to_fix_quick_now(block, channel, subchan, slice, alevel) {
-		rrbb_delete(block)
-
 		return
 	}
 
@@ -257,8 +254,6 @@ func hdlc_rec2_block(block *rrbb_t) {
 		/* needs to be a minimum number of whole octets. */
 		try_decode(block, channel, subchan, slice, alevel, retry_cfg, true)
 	}
-
-	rrbb_delete(block)
 } /* end hdlc_rec2_block */
 
 /***********************************************************************************

@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /********************************************************************************
@@ -13,9 +12,6 @@ package direwolf
  * Version 1.3:	Store as bytes rather than packing 8 bits per byte.
  *
  *******************************************************************************/
-
-var new_count = 0
-var delete_count = 0
 
 /*
  * Maximum number of bits in AX.25 frame excluding the flags.
@@ -73,13 +69,6 @@ func rrbb_new(channel int, subchannel int, slice int, is_scrambled bool, descram
 	result.channel = channel
 	result.subchannel = subchannel
 	result.slice = slice
-
-	new_count++
-
-	if new_count > delete_count+100 {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("MEMORY LEAK, rrbb_new, new_count=%d, delete_count=%d\n", new_count, delete_count)
-	}
 
 	rrbb_clear(result, is_scrambled, descram_state, prev_descram)
 
@@ -207,24 +196,6 @@ func rrbb_get_bit(b *rrbb_t, ind int) byte {
 //
 //	b.data[di] ^= masks[mi];
 //}
-
-/***********************************************************************************
- *
- * Name:	rrbb_delete
- *
- * Purpose:	Note that the caller is finished with a bit array.
- *
- * Inputs:	Handle for bit array.
- *
- * Description:	Go's garbage collector does the freeing; all that is left to do
- *		here is keep the count that rrbb_new compares against, so the
- *		"MEMORY LEAK" warning still means something.
- *
- ***********************************************************************************/
-
-func rrbb_delete(_ *rrbb_t) {
-	delete_count++
-}
 
 /***********************************************************************************
  *

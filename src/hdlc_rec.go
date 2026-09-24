@@ -566,7 +566,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 
 			rrbb_set_audio_level(s.rrbb, alevel)
 			hdlc_rec2_block(s.rrbb)
-			/* Now owned by someone else who will free it. */
+			/* Handed off to hdlc_rec2_block. */
 			s.rrbb = nil
 
 			s.rrbb = rrbb_new(channel, subchannel, slice, is_scrambled, s.lfsr, s.prevDescram) /* Allocate a new one. */
