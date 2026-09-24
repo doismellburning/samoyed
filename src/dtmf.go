@@ -15,8 +15,8 @@ package direwolf
  *---------------------------------------------------------------*/
 
 import (
+	"iter"
 	"math"
-	"os"
 	"strings"
 	"unicode"
 
@@ -350,7 +350,6 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
  * Inputs:	channel	- Radio channel number.
  *
  *		button	- One of 0-9, A-D, *, #.  Others result in silence.
- *			  '?' is a special case used only for unit testing.
  *
  *		ms	- Duration in milliseconds.
  *			  Use 50 ms for tone and 50 ms of silence for max rate of 10 per second.
@@ -359,80 +358,48 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
  *
  *----------------------------------------------------------------*/
 
-// test_mode
-var push_button_result strings.Builder
-
-func push_button_raw(channel int, button rune, ms int, test_mode bool) {
-	var fa, fb int
-
-	var i = strings.IndexRune(dtmfKeys, unicode.ToUpper(button))
-	if i >= 0 {
-		var tones = dtmfTones()
-
-		fa = tones[i/4]
-		fb = tones[4+i%4]
-	}
-
-	if button == '?' { /* check result */
-		Assert(test_mode)
-
-		if push_button_result.String() == "123A456B789C*0#D123$789$" {
-			text_color_set(DW_COLOR_REC)
-			dw_printf("\nSuccess!\n")
-		} else if push_button_result.String() == "123A456B789C*0#D123789" {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\n * Time-out failed, otherwise OK *\n")
-			dw_printf("\"%s\"\n", push_button_result.String())
-			os.Exit(1)
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\n *** TEST FAILED ***\n")
-			dw_printf("\"%s\"\n", push_button_result.String())
-			os.Exit(1)
-		}
-	}
-
-	//dw_printf ("push_button (%d, '%c', %d), fa=%.0f, fb=%.0f. %d samples\n", channel, button, ms, fa, fb, (ms*dd[channel].sample_rate)/1000);
-
-	var dtmf float64 // Audio.  Sum of two sine waves.
-	var phasea, phaseb float64
-
-	for range (ms * dd[channel].sample_rate) / 1000 {
-		// This could be more efficient with a precomputed sine wave table
-		// but I'm not that worried about it.
-		// With a Raspberry Pi, model 2, default 1200 receiving takes about 14% of one CPU core.
-		// When transmitting tones, it briefly shoots up to about 33%.
-		if fa > 0 && fb > 0 {
-			dtmf = float64(math.Sin(float64(phasea)) + math.Sin(float64(phaseb)))
-			phasea += 2.0 * float64(math.Pi) * float64(fa) / float64(dd[channel].sample_rate)
-			phaseb += 2.0 * float64(math.Pi) * float64(fb) / float64(dd[channel].sample_rate)
-		} else {
-			dtmf = 0
-		}
-
-		if test_mode {
-			/* Make sure it is insensitive to signal amplitude. */
-			/* (Uncomment each of below when testing.) */
-			var x = dtmf_sample(0, dtmf)
-			//x = dtmf_sample (0, dtmf * 1000);
-			//x = dtmf_sample (0, dtmf * 0.001);
-
-			if x != ' ' && x != '.' {
-				push_button_result.WriteRune(x)
-			}
-		} else {
-			// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
-			// Amplitude of 100 would use full +-32k range.
-			var sam = int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
-			gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
-		}
-	}
-}
-
 func push_button(channel int, button rune, ms int) {
-	push_button_raw(channel, button, ms, false)
+	for dtmf := range dtmfButtonSamples(button, ms, dd[channel].sample_rate) {
+		// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
+		// Amplitude of 100 would use full +-32k range.
+		var sam = int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
+		gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
+	}
 }
 
-func push_button_test(channel int, button rune, ms int) { //nolint:unparam
-	push_button_raw(channel, button, ms, true)
+// dtmfButtonSamples is ms milliseconds of audio at sampleRate for button: the
+// sum of its two sine waves, so in the range +-2.0, or silence for anything
+// that isn't a button.
+func dtmfButtonSamples(button rune, ms int, sampleRate int) iter.Seq[float64] {
+	return func(yield func(float64) bool) {
+		var fa, fb int
+
+		var i = strings.IndexRune(dtmfKeys, unicode.ToUpper(button))
+		if i >= 0 {
+			var tones = dtmfTones()
+
+			fa = tones[i/4]
+			fb = tones[4+i%4]
+		}
+
+		var phasea, phaseb float64
+
+		for range (ms * sampleRate) / 1000 {
+			// This could be more efficient with a precomputed sine wave table
+			// but I'm not that worried about it.
+			// With a Raspberry Pi, model 2, default 1200 receiving takes about 14% of one CPU core.
+			// When transmitting tones, it briefly shoots up to about 33%.
+			var dtmf float64 // Audio.  Sum of two sine waves.
+
+			if fa > 0 && fb > 0 {
+				dtmf = math.Sin(phasea) + math.Sin(phaseb)
+				phasea += 2.0 * math.Pi * float64(fa) / float64(sampleRate)
+				phaseb += 2.0 * math.Pi * float64(fb) / float64(sampleRate)
+			}
+
+			if !yield(dtmf) {
+				return
+			}
+		}
+	}
 }
