@@ -227,6 +227,52 @@ func TestNegotiationBoundsWhatMakesNoSense(t *testing.T) {
 	}
 }
 
+// A closed window on the wire, not just in a hand-built xid_param_s, is opened
+// to the least there is rather than thrown wide: xid_parse used to put 127 in
+// place of anything out of range, which complete_negotiation then narrowed to
+// the widest window the modulus allows.
+func TestNegotiationOpensAParsedClosedWindowToTheLeast(t *testing.T) {
+	var paths = []struct {
+		name  string
+		cr    cmdres_t
+		apply func(S *ax25_dlsm_t, param *xid_param_s)
+	}{
+		{"command", cr_cmd, negotiation_response},
+		{"response", cr_res, complete_negotiation},
+	}
+
+	for _, path := range paths {
+		t.Run(path.name, func(t *testing.T) {
+			setupTestEnv(t)
+
+			var hook = test.NewGlobal()
+
+			t.Cleanup(hook.Reset)
+
+			var sent = new(xid_param_s)
+			sent.srej = srej_none
+			sent.modulo = modulo_8
+			sent.window_size_rx = maybe.Just(0)
+
+			var param, _, status = xid_parse(xid_encode(sent, path.cr))
+			require.Equal(t, 1, status)
+
+			var S = newNegotiationTestLink()
+
+			path.apply(S, param)
+
+			assert.Equal(t, AX25_K_MAXFRAME_BASIC_MIN, S.k_maxframe)
+
+			var entry = hook.LastEntry()
+			if assert.NotNil(t, entry) {
+				assert.Equal(t, logrus.WarnLevel, entry.Level)
+				assert.Equal(t, "window_size_rx", entry.Data["parameter"])
+				assert.Equal(t, 0, entry.Data["asked"])
+			}
+		})
+	}
+}
+
 // Answering an XID command, what we send back is what we now run with, so the
 // two ends agree - not the nonsense the other station asked for.
 func TestNegotiationResponseSendsBackWhatItApplied(t *testing.T) {

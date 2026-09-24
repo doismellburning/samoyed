@@ -314,8 +314,9 @@ func xid_parse(info []byte) (*xid_param_s, string, int) {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("XID error: Window Size Rx, %d, is not in range of 1 thru 127.\n", pval)
 
-				result.window_size_rx = maybe.Just(127)
-				// Let the caller deal with modulo 8 consideration.
+				// Left as it is for complete_negotiation to bound for
+				// the modulus in force - putting 127 in its place would
+				// throw a closed window wide open.
 			}
 
 			//continue here with more error checking.
