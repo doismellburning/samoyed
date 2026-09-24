@@ -1147,7 +1147,8 @@ func ax25_set_addr(this_p *packet_t, n int, ad string) error {
  *
  * Assumption:	AX25FromText or AX25FromFrame was called first.
  *
- * Returns:	An error, leaving the packet unchanged, if n is out of range.
+ * Returns:	An error, leaving the packet unchanged, if n is out of range
+ *		or the packet already has the maximum number of addresses.
  *
  *
  *------------------------------------------------------------------------------*/
@@ -1165,10 +1166,9 @@ func ax25_insert_addr(this_p *packet_t, n int, ad string) error {
 	}
 
 	/* Don't do it if we already have the maximum number. */
-	/* Should probably return success/fail code but currently the caller doesn't care. */
 
 	if this_p.num_addr >= AX25_MAX_ADDRS {
-		return nil
+		return fmt.Errorf("ax25_insert_addr: no room for '%s', already have %d addresses", ad, this_p.num_addr)
 	}
 
 	CLEAR_LAST_ADDR_FLAG(this_p)

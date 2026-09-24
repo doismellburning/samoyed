@@ -239,3 +239,23 @@ func TestDigipeaterRemember(t *testing.T) {
 	assert.Nil(t, transmitQueue.Remove(digiFromChan, TQ_PRIO_0_HI))
 	assert.Zero(t, digi.GetCount(digiFromChan, digiFromChan))
 }
+
+// Regression test for #687: with ATGP set, a path already carrying all eight
+// repeaters, none of them used, left no room to insert our call.  The insert
+// quietly did nothing, but the first repeater was still marked as used, so the
+// frame went out claiming HOP7-6 had repeated it.  It should not be repeated.
+func TestDigipeatMatchATGPFullPath(t *testing.T) {
+	var digi, _ = setupDigipeater(t)
+
+	var pp = MustAX25FromText("Q1TEST>APRS,HOP7-7,WIDE1-1,WIDE1-1,WIDE1-1,WIDE1-1,WIDE1-1,WIDE1-1,WIDE1-1:stuff")
+	require.Equal(t, AX25_MAX_ADDRS, ax25_get_num_addr(pp))
+
+	var wide = regexp.MustCompile("^WIDE[1-7]-[1-7]$|^HOP[1-7]-[1-7]$")
+	var alias = regexp.MustCompile("^Q9TEST$")
+
+	var result = digi.match(0, pp, "Q2TEST", "Q2TEST", alias, wide, 0, PREEMPT_OFF, "HOP", "")
+
+	if result != nil {
+		t.Errorf("transmitted %s, want nothing", AX25FormatAddrs(result))
+	}
+}

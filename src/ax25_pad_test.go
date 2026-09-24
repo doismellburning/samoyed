@@ -195,3 +195,12 @@ func Test_ax25_set_addr_past_end(t *testing.T) {
 	require.NoError(t, ax25_set_addr(pp, AX25_REPEATER_1, "Q3TEST"))
 	assert.Equal(t, "Q1TEST>APDW17,Q3TEST,Q2TEST:", AX25FormatAddrs(pp))
 }
+
+func Test_ax25_insert_addr_full(t *testing.T) {
+	const full = "Q1TEST>APRS,Q2TEST,Q3TEST,Q4TEST,Q5TEST,Q6TEST,Q7TEST,Q8TEST,Q9TEST:"
+
+	var pp = MustAX25FromText(full)
+
+	require.Error(t, ax25_insert_addr(pp, AX25_REPEATER_1, "Q2TEST"))
+	assert.Equal(t, full, AX25FormatAddrs(pp))
+}
