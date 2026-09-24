@@ -194,3 +194,27 @@ func Test_atest_decodeWAVNegativeDataSize(t *testing.T) {
 	var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav), "negative.wav")
 	assert.Error(t, decodeErr)
 }
+
+// Test_atest_decodeWAVSampleRate checks that a sample rate the demodulators
+// can't work with is an error, as it is from the configuration file, rather
+// than something to divide by.
+func Test_atest_decodeWAVSampleRate(t *testing.T) {
+	var testCases = map[string]int32{
+		"zero":     0,
+		"negative": -8000,
+		"too low":  MIN_SAMPLES_PER_SEC - 1,
+		"too high": MAX_SAMPLES_PER_SEC + 1,
+	}
+
+	for name, rate := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var atest, err = NewAtest(atestTestOptions())
+			require.NoError(t, err)
+
+			var wav = withInt32At(buildWAVWithExtraChunks(t), extraChunksSampleRateOffset, rate)
+
+			var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav), name+".wav")
+			assert.ErrorContains(t, decodeErr, "sample rate")
+		})
+	}
+}

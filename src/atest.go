@@ -326,6 +326,10 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		return AtestFileResult{}, fmt.Errorf("sorry, I only understand 8 or 16 bits per sample.  This file has %d", format.Wbitspersample)
 	}
 
+	if format.Nsamplespersec < MIN_SAMPLES_PER_SEC || format.Nsamplespersec > MAX_SAMPLES_PER_SEC {
+		return AtestFileResult{}, fmt.Errorf("sorry, I only understand sample rates from %d to %d.  This file has %d", MIN_SAMPLES_PER_SEC, MAX_SAMPLES_PER_SEC, format.Nsamplespersec)
+	}
+
 	var audio = a.audio
 
 	audio.adev[0].samples_per_sec = int(format.Nsamplespersec)
