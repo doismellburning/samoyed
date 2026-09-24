@@ -9,6 +9,7 @@ COVERAGE_FILE = cover.out
 GOLANGCI_LINT_VERSION = v2.13.2
 GOVULNCHECK_VERSION = v1.8.0
 GOTEST_FLAGS = # Anything extra you'd like to pass to `go test`, e.g. `-v`
+GOTEST_RACE = -race # Set empty to test the uninstrumented build that actually ships
 
 .PHONY: all
 all: $(CMDS) test
@@ -53,11 +54,7 @@ test: gotest test-scripts
 
 .PHONY: gotest
 gotest:
-	go test $(GOTEST_FLAGS) -cover -coverpkg=./cmd/...,./internal/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
-
-.PHONY: race
-race:
-	go test $(GOTEST_FLAGS) -race $(SRC_DIRS)
+	go test $(GOTEST_FLAGS) $(GOTEST_RACE) -cover -coverpkg=./cmd/...,./internal/...,./src/... -coverprofile $(COVERAGE_FILE) $(SRC_DIRS)  # TODO Construct coverpkg from $SRC_DIRS
 
 # Go fuzzes one target at a time, so each gets its own invocation, and
 # FUZZTIME is therefore per target rather than for the run as a whole.

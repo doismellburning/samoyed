@@ -57,7 +57,11 @@ jobs:
     - run: "make stats"
     - run: "make cmds"
     - run: "make test"
-    - run: "make race"
+    # `make test` runs under the race detector, so also run the uninstrumented
+    # build that actually ships, whose timing differs - once is enough.
+    - name: "Test without race detector"
+      if: "matrix.runner == 'ubuntu-latest'"
+      run: "make gotest GOTEST_RACE="
     - run: "make coveragereport"
     - run: "make check"
     - name: "Ensure nothing got fixed (i.e. everything was already fine)"
