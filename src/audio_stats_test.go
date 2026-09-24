@@ -48,7 +48,7 @@ func setTestAudioLevels(t *testing.T) {
 	var saved [MAX_RADIO_CHANS]savedLevel
 
 	for ch := range MAX_RADIO_CHANS {
-		var D = &demodulator_state[ch][0]
+		var D = &demodulators[ch].states[0]
 
 		saved[ch] = savedLevel{num_slicers: D.num_slicers, peak: D.alevel_rec_peak, valley: D.alevel_rec_valley}
 
@@ -60,7 +60,7 @@ func setTestAudioLevels(t *testing.T) {
 
 	t.Cleanup(func() {
 		for ch := range MAX_RADIO_CHANS {
-			var D = &demodulator_state[ch][0]
+			var D = &demodulators[ch].states[0]
 
 			D.num_slicers = saved[ch].num_slicers
 			D.alevel_rec_peak = saved[ch].peak

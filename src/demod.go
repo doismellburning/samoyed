@@ -26,16 +26,36 @@ var layer2_tx = []string{"AX.25", "FX.25", "IL2P"} // TODO KG Copied from audio.
 
 // static struct audio_s          *save_audio_config_p;
 
-// Current state of all the decoders.
+// A Demodulator is one radio channel's receive side: the state of each of its
+// subchannels' demodulators, and whether its input is muted while it transmits.
+//
+// It is driven by its audio device's goroutine; the mute is the exception, set
+// by ptt_set on the transmit thread, hence atomic.
+type Demodulator struct {
+	channel int
+	states  [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
+	muted   atomic.Bool
+}
 
-var demodulator_state [MAX_RADIO_CHANS][MAX_SUBCHANS]demodulator_state_s
+// demodulators holds every channel's Demodulator, built at package
+// initialisation so the receive paths that ask for audio levels never find
+// one nil.
+var demodulators = newDemodulators()
+
+func newDemodulators() [MAX_RADIO_CHANS]*Demodulator {
+	var d [MAX_RADIO_CHANS]*Demodulator
+
+	for channel := range d {
+		d[channel] = new(Demodulator)
+		d[channel].channel = channel
+	}
+
+	return d
+}
 
 // audioLevelDecimation is how many audio samples pass between pushes of the
 // received audio level to the metrics endpoint: ~10Hz at a 44.1kHz sample rate.
 const audioLevelDecimation = 4410
-
-var sample_sum [MAX_RADIO_CHANS][MAX_SUBCHANS]int
-var sample_count [MAX_RADIO_CHANS][MAX_SUBCHANS]int
 
 /*
  * PSK is always demodulated at the full sample rate; the decimating path was
@@ -68,7 +88,7 @@ func demod_psk_force_no_decimation(channel int) {
 
 // capProfiles limits a channel's demodulator types to the number of
 // demodulators there is room for.  Each letter is a demodulator of its own and
-// demodulator_state is a fixed MAX_SUBCHANS wide, so a longer list would run
+// the demodulator state is a fixed MAX_SUBCHANS wide, so a longer list would run
 // off the end of it - which Dire Wolf left to an assert over the subchannel
 // index, taking the whole program down at startup.  Say which channel asked
 // for what instead, and use as many as there are.
@@ -336,7 +356,7 @@ func demod_init(pa *audio_s) {
 					for d := range save_audio_config_p.achan[channel].num_subchan {
 						Assert(d >= 0 && d < MAX_SUBCHANS)
 
-						var D = &demodulator_state[channel][d]
+						var D = &demodulators[channel].states[d]
 
 						var profile = save_audio_config_p.achan[channel].profiles[d]
 						var mark = save_audio_config_p.achan[channel].mark_freq
@@ -391,7 +411,7 @@ func demod_init(pa *audio_s) {
 							channel, save_audio_config_p.achan[channel].num_freq, save_audio_config_p.achan[channel].num_subchan)
 					}
 
-					var D = &demodulator_state[channel][0]
+					var D = &demodulators[channel].states[0]
 
 					/* I'm not happy about putting this hack here. */
 					/* This belongs in demod_afsk_init but it doesn't have access to the audio config. */
@@ -432,7 +452,7 @@ func demod_init(pa *audio_s) {
 					for d := range save_audio_config_p.achan[channel].num_freq {
 						Assert(d >= 0 && d < MAX_SUBCHANS)
 
-						var D = &demodulator_state[channel][d]
+						var D = &demodulators[channel].states[d]
 
 						var profile = save_audio_config_p.achan[channel].profiles[0]
 
@@ -528,7 +548,7 @@ func demod_init(pa *audio_s) {
 
 				for d := range save_audio_config_p.achan[channel].num_subchan {
 					Assert(d >= 0 && d < MAX_SUBCHANS)
-					var D = &demodulator_state[channel][d]
+					var D = &demodulators[channel].states[d]
 					var profile = save_audio_config_p.achan[channel].profiles[d]
 
 					//text_color_set(DW_COLOR_DEBUG);
@@ -587,7 +607,7 @@ func demod_init(pa *audio_s) {
 
 				for d := range save_audio_config_p.achan[channel].num_subchan {
 					Assert(d >= 0 && d < MAX_SUBCHANS)
-					var D = &demodulator_state[channel][d]
+					var D = &demodulators[channel].states[d]
 					var profile = save_audio_config_p.achan[channel].profiles[d]
 
 					//text_color_set(DW_COLOR_DEBUG);
@@ -641,7 +661,7 @@ func demod_init(pa *audio_s) {
 
 				for d := range save_audio_config_p.achan[channel].num_subchan {
 					Assert(d >= 0 && d < MAX_SUBCHANS)
-					var D = &demodulator_state[channel][d]
+					var D = &demodulators[channel].states[d]
 					var profile = save_audio_config_p.achan[channel].profiles[d]
 
 					demod_psk_init(save_audio_config_p.achan[channel].modem_type,
@@ -750,7 +770,7 @@ func demod_init(pa *audio_s) {
 
 					dw_printf(".\n")
 
-					var D = &demodulator_state[channel][0] // first subchannel
+					var D = &demodulators[channel].states[0] // first subchannel
 
 					save_audio_config_p.achan[channel].num_subchan = 1
 					save_audio_config_p.achan[channel].num_slicers = 1
@@ -929,10 +949,6 @@ func demod_get_sample(a int, src SampleSource) int {
  *
  *--------------------------------------------------------------------*/
 
-// mute_input is written by ptt_set on the transmit thread and read for every
-// sample on the audio thread, hence atomic.
-var mute_input [MAX_RADIO_CHANS]atomic.Bool
-
 // New in 1.7.
 // A few people have a really bad audio cross talk situation where they receive their own transmissions.
 // It usually doesn't cause a problem but it is confusing to look at.
@@ -943,19 +959,31 @@ var mute_input [MAX_RADIO_CHANS]atomic.Bool
 
 func demod_mute_input(channel int, mute_during_xmit int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-	mute_input[channel].Store(mute_during_xmit != 0)
+	demodulators[channel].Mute(mute_during_xmit != 0)
+}
+
+// Mute silences the channel's input, or stops silencing it.
+func (d *Demodulator) Mute(mute bool) {
+	d.muted.Store(mute)
 }
 
 func demod_process_sample(channel int, subchan int, sam int) {
-	//int k;
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	demodulators[channel].ProcessSample(subchan, sam)
+}
+
+// ProcessSample hands one audio sample, in the range -32768 to 32767, to the
+// subchannel's demodulator.
+func (d *Demodulator) ProcessSample(subchan int, sam int) {
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
 
-	if mute_input[channel].Load() {
+	var channel = d.channel
+
+	if d.muted.Load() {
 		sam = 0
 	}
 
-	var D = &demodulator_state[channel][subchan]
+	var D = &d.states[subchan]
 
 	/* Scale to nice number, actually -2.0 to +2.0 for extra headroom */
 
@@ -1005,13 +1033,16 @@ func demod_process_sample(channel int, subchan int, sam int) {
 
 	case MODEM_AFSK, MODEM_EAS:
 		if save_audio_config_p.achan[channel].decimate > 1 {
-			sample_sum[channel][subchan] += sam
+			D.decimate_sum += sam
 
-			sample_count[channel][subchan]++
-			if sample_count[channel][subchan] >= save_audio_config_p.achan[channel].decimate {
-				demod_afsk_process_sample(channel, subchan, sample_sum[channel][subchan]/save_audio_config_p.achan[channel].decimate, D)
-				sample_sum[channel][subchan] = 0
-				sample_count[channel][subchan] = 0
+			D.decimate_count++
+			if D.decimate_count >= save_audio_config_p.achan[channel].decimate {
+				var decimated = D.decimate_sum / save_audio_config_p.achan[channel].decimate
+
+				D.decimate_sum = 0
+				D.decimate_count = 0
+
+				demod_afsk_process_sample(channel, subchan, decimated, D)
 			}
 		} else {
 			demod_afsk_process_sample(channel, subchan, sam, D)
@@ -1030,7 +1061,7 @@ func demod_process_sample(channel int, subchan int, sam int) {
 		*/
 		demod_9600_process_sample(channel, sam, save_audio_config_p.achan[channel].upsample, D)
 	} /* switch modem_type */
-} /* end demod_process_sample */
+} /* end ProcessSample */
 
 /* Doesn't seem right.  Need to revisit this. */
 /* Resulting scale is 0 to almost 100. */
@@ -1039,17 +1070,26 @@ func demod_process_sample(channel int, subchan int, sam int) {
 
 func demod_get_audio_level(channel int, subchan int) ALevel {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	return demodulators[channel].AudioLevel(subchan)
+}
+
+// AudioLevel reports the received audio level the subchannel's demodulator
+// has seen, and for AFSK its mark and space amplitudes.
+func (d *Demodulator) AudioLevel(subchan int) ALevel {
 	Assert(subchan >= 0 && subchan < MAX_SUBCHANS)
+
+	var channel = d.channel
 
 	/* We have to consider two different cases here. */
 	/* N demodulators, each with own slicer and HDLC decoder. */
 	/* Single demodulator, multiple slicers each with own HDLC decoder. */
 
-	if demodulator_state[channel][0].num_slicers > 1 {
+	if d.states[0].num_slicers > 1 {
 		subchan = 0
 	}
 
-	var D = &demodulator_state[channel][subchan]
+	var D = &d.states[subchan]
 	var alevel ALevel
 
 	// Take half of peak-to-peak for received audio level.
