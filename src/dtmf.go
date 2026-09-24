@@ -18,6 +18,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"unicode"
 
 	"github.com/sirupsen/logrus"
 )
@@ -26,7 +27,15 @@ const DTMF_TIMEOUT_SEC = 5 /* for normal operation. */
 
 const NUM_TONES = 8
 
-var DTMF_TONES = [NUM_TONES]int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
+// dtmfKeys is the keypad, a row at a time: the button at row r and column c
+// is dtmfKeys[r*4+c].
+const dtmfKeys = "123A456B789C*0#D"
+
+// dtmfTones are the frequencies, in Hz, of the four keypad rows and then the
+// four columns.
+func dtmfTones() [NUM_TONES]int {
+	return [NUM_TONES]int{697, 770, 852, 941, 1209, 1336, 1477, 1633}
+}
 
 /*
  * Current state of the DTMF decoding.
@@ -95,18 +104,18 @@ func dtmf_init(p_audio_config *audio_s, amp int) {
 			logrus.WithField("channel", c).Debug("dtmf_init")
 			D.block_size = (205 * D.sample_rate) / 8000
 
-			for j := range NUM_TONES {
+			for j, tone := range dtmfTones() {
 				// Why do some insist on rounding k to the nearest integer?
 				// That would move the filter center frequency away from ideal.
 				// What is to be gained?
 				// More consistent results for all the tones when k is not rounded off.
-				var k = float64(D.block_size) * float64(DTMF_TONES[j]) / float64(D.sample_rate)
+				var k = float64(D.block_size) * float64(tone) / float64(D.sample_rate)
 
 				D.coef[j] = float64(2.0 * math.Cos(2.0*math.Pi*float64(k)/float64(D.block_size)))
 
 				Assert(D.coef[j] > 0.0 && D.coef[j] < 2.0)
 				logrus.WithFields(logrus.Fields{
-					"freq": DTMF_TONES[j],
+					"freq": tone,
 					"k":    k,
 					"coef": D.coef[j],
 				}).Debug("DTMF tone filter")
@@ -227,13 +236,8 @@ func dtmf_sample(c int, input float64) rune {
 			logrus.WithField("output", output).Trace("dtmf_sample tone outputs")
 		}
 
-		var rc2char = []rune{'1', '2', '3', 'A',
-			'4', '5', '6', 'B',
-			'7', '8', '9', 'C',
-			'*', '0', '#', 'D'}
-
 		if row >= 0 && col >= 0 {
-			decoded = rc2char[row*4+col]
+			decoded = rune(dtmfKeys[row*4+col])
 		} else {
 			decoded = ' '
 		}
@@ -361,57 +365,15 @@ var push_button_result strings.Builder
 func push_button_raw(channel int, button rune, ms int, test_mode bool) {
 	var fa, fb int
 
-	switch button {
-	case '1':
-		fa = DTMF_TONES[0]
-		fb = DTMF_TONES[4]
-	case '2':
-		fa = DTMF_TONES[0]
-		fb = DTMF_TONES[5]
-	case '3':
-		fa = DTMF_TONES[0]
-		fb = DTMF_TONES[6]
-	case 'a', 'A':
-		fa = DTMF_TONES[0]
-		fb = DTMF_TONES[7]
-	case '4':
-		fa = DTMF_TONES[1]
-		fb = DTMF_TONES[4]
-	case '5':
-		fa = DTMF_TONES[1]
-		fb = DTMF_TONES[5]
-	case '6':
-		fa = DTMF_TONES[1]
-		fb = DTMF_TONES[6]
-	case 'b', 'B':
-		fa = DTMF_TONES[1]
-		fb = DTMF_TONES[7]
-	case '7':
-		fa = DTMF_TONES[2]
-		fb = DTMF_TONES[4]
-	case '8':
-		fa = DTMF_TONES[2]
-		fb = DTMF_TONES[5]
-	case '9':
-		fa = DTMF_TONES[2]
-		fb = DTMF_TONES[6]
-	case 'c', 'C':
-		fa = DTMF_TONES[2]
-		fb = DTMF_TONES[7]
-	case '*':
-		fa = DTMF_TONES[3]
-		fb = DTMF_TONES[4]
-	case '0':
-		fa = DTMF_TONES[3]
-		fb = DTMF_TONES[5]
-	case '#':
-		fa = DTMF_TONES[3]
-		fb = DTMF_TONES[6]
-	case 'd', 'D':
-		fa = DTMF_TONES[3]
-		fb = DTMF_TONES[7]
+	var i = strings.IndexRune(dtmfKeys, unicode.ToUpper(button))
+	if i >= 0 {
+		var tones = dtmfTones()
 
-	case '?': /* check result */
+		fa = tones[i/4]
+		fb = tones[4+i%4]
+	}
+
+	if button == '?' { /* check result */
 		Assert(test_mode)
 
 		if push_button_result.String() == "123A456B789C*0#D123$789$" {
