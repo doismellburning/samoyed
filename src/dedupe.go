@@ -75,6 +75,7 @@ package direwolf
  *------------------------------------------------------------------*/
 
 import (
+	"sync"
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/metrics"
@@ -98,8 +99,13 @@ type historyEntry struct {
 
 type DedupeService struct {
 	historyTime time.Duration /* Number of seconds to keep information */
-	insertNext  int           /* Index, in array below, where next item should be stored. */
-	history     [HISTORY_MAX]historyEntry
+
+	// mu guards insertNext and history: the digipeater checks and remembers
+	// from the receive thread, APRStt object reports remember from the audio
+	// thread that decoded them.
+	mu         sync.Mutex
+	insertNext int /* Index, in array below, where next item should be stored. */
+	history    [HISTORY_MAX]historyEntry
 }
 
 /*------------------------------------------------------------------------------
@@ -163,6 +169,7 @@ func NewDedupeService(ttl time.Duration) *DedupeService {
  *------------------------------------------------------------------------------*/
 
 func (ds *DedupeService) Remember(pp *packet_t, channel int) {
+	ds.mu.Lock()
 	ds.history[ds.insertNext].time_stamp = time.Now()
 	ds.history[ds.insertNext].checksum = ax25_dedupe_crc(pp)
 	ds.history[ds.insertNext].xmit_channel = channel
@@ -171,6 +178,7 @@ func (ds *DedupeService) Remember(pp *packet_t, channel int) {
 	if ds.insertNext >= HISTORY_MAX {
 		ds.insertNext = 0
 	}
+	ds.mu.Unlock()
 
 	/* If we send something by digipeater, we don't */
 	/* want to do it again if it comes from APRS-IS. */
@@ -197,6 +205,9 @@ func (ds *DedupeService) Remember(pp *packet_t, channel int) {
 func (ds *DedupeService) Check(pp *packet_t, channel int) bool {
 	var crc = ax25_dedupe_crc(pp)
 	var now = time.Now()
+
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
 
 	for _, h := range ds.history {
 		if h.checksum != crc {
