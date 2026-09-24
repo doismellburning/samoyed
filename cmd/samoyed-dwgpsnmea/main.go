@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 
@@ -20,23 +21,26 @@ func show(format string, m maybe.Maybe[float64]) string {
 }
 
 func main() {
-	os.Exit(run())
-}
-
-// run is main's body, so that a deferred cleanup still happens on the way out.
-func run() int {
-	var gpsPort = "COM22"
-
-	if len(os.Args) > 1 {
-		gpsPort = os.Args[1]
-	}
-
 	// GPS reading runs in a goroutine of its own, which this stops when the
 	// user interrupts us.  Taking the signal this way also takes away the
-	// default "an interrupt ends the process", so the loop below has to end
+	// default "an interrupt ends the process", so the loop in run has to end
 	// on it too.
 	var ctx, stop = signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
+
+	var status = run(ctx, os.Args[1:], os.Stdout)
+
+	stop()
+	os.Exit(status)
+}
+
+// run is main's body, reading from the GPS receiver on the port named by the
+// first of args and reporting to out until ctx is cancelled.
+func run(ctx context.Context, args []string, out io.Writer) int {
+	var gpsPort = "COM22"
+
+	if len(args) > 0 {
+		gpsPort = args[0]
+	}
 
 	direwolf.DWGPSInit(ctx, gpsPort, 3)
 
@@ -45,22 +49,22 @@ func run() int {
 
 		switch fix {
 		case int(direwolf.DWFIX_2D), int(direwolf.DWFIX_3D):
-			fmt.Printf("%s  %s", show("%.6f", lat), show("%.6f", lon))
-			fmt.Printf("  %s knots  %s degrees", show("%.1f", speedKnots), show("%.0f", track))
+			fmt.Fprintf(out, "%s  %s", show("%.6f", lat), show("%.6f", lon))
+			fmt.Fprintf(out, "  %s knots  %s degrees", show("%.1f", speedKnots), show("%.0f", track))
 
 			if fix == int(direwolf.DWFIX_3D) {
-				fmt.Printf("  altitude = %s meters", show("%.1f", altitude))
+				fmt.Fprintf(out, "  altitude = %s meters", show("%.1f", altitude))
 			}
 
-			fmt.Printf("\n")
+			fmt.Fprintf(out, "\n")
 		case int(direwolf.DWFIX_NOT_SEEN), int(direwolf.DWFIX_NO_FIX):
-			fmt.Printf("Location currently not available.\n")
+			fmt.Fprintf(out, "Location currently not available.\n")
 		case int(direwolf.DWFIX_NOT_INIT):
-			fmt.Printf("GPS Init failed.\n")
+			fmt.Fprintf(out, "GPS Init failed.\n")
 
 			return 1
 		default:
-			fmt.Printf("ERROR getting GPS information.\n")
+			fmt.Fprintf(out, "ERROR getting GPS information.\n")
 		}
 
 		if !direwolf.SleepSecCtx(ctx, 3) {
