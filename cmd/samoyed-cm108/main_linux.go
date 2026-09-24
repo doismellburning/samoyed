@@ -110,6 +110,13 @@ func main() {
 		return
 	}
 
+	cm108_print_inventory(things)
+}
+
+// cm108_print_inventory lists the USB audio adapters and other HID devices
+// found, marking those whose GPIO can be used for PTT, and suggests udev rules
+// to give the adapters stable names.  There must be at least one.
+func cm108_print_inventory(things []*direwolf.CM108Thing) {
 	/////////////////////////////////////////////
 	//                Linux
 	/////////////////////////////////////////////
