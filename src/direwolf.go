@@ -105,7 +105,7 @@ func DirewolfMain(ctx context.Context) {
 	// Long option only - every single letter is taken.
 	var configCheck = pflag.Bool("config-check", false, "Check the configuration file and exit, without starting anything up.  Exit status is non-zero if it has errors in it.")
 	var enablePseudoTerminal = pflag.BoolP("enable-ptty", "p", false, "Enable pseudo terminal for KISS protocol.")
-	var modemFlags = addModemFlags(pflag.CommandLine, true)
+	var modemFlags = AddModemFlags(pflag.CommandLine, true)
 	var layer2Flags = addLayer2TxFlags(pflag.CommandLine, "IL2PVERSION")
 	var transmitCalibration = pflag.StringP("transmit-calibration", "x", "", `Send Xmit level calibration tones.
 a = Alternating mark/space tones.

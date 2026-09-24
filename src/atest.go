@@ -110,7 +110,7 @@ func atestFixBits(n int) (BitFixLevel, bool, bool) {
 // counts as the test passing.
 type AtestOptions struct {
 	// Modem is the modem chosen by -B, -g, -k, -j, -J, -P, -D and -U.
-	Modem *modemFlags
+	Modem *ModemFlags
 
 	// FixBits is the -F level, from BitFixNone up to BitFixPassall.
 	FixBits int
@@ -413,7 +413,7 @@ func AtestMain() {
 	TextColorInit(1)
 	text_color_set(DW_COLOR_INFO)
 
-	var modemFlags = addModemFlags(pflag.CommandLine, true)
+	var modemFlags = AddModemFlags(pflag.CommandLine, true)
 	var fixBits = pflag.IntP("fix-bits", "F", 0, fmt.Sprintf(`Amount of effort to try fixing frames with an invalid CRC.
 0 (default) = consider only correct frames.
 1 = Try to fix only a single bit.
