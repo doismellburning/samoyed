@@ -766,6 +766,9 @@ type adev_s struct {
 	// Stops the silence-keepalive goroutine (UDP output only), see
 	// audioUDPSilenceKeepalive.
 	silenceStopCh chan struct{}
+
+	// Sample rate and error statistics, reported every statistics_interval.
+	stats AudioStats
 }
 
 var adev [MAX_ADEVS]*adev_s
@@ -1762,7 +1765,7 @@ func audio_get(a int) int {
 			dw_printf("If receiving is fine and strange things happen when transmitting, it is probably RF energy\n")
 			dw_printf("getting into your audio or digital wiring.\n")
 
-			audio_stats(a,
+			adev[a].stats.record(a,
 				save_audio_config_p.adev[a].num_channels,
 				0,
 				save_audio_config_p.statistics_interval)
@@ -1782,7 +1785,7 @@ func audio_get(a int) int {
 				adev[a].inbufLen = n
 				adev[a].inbufNext = 0
 
-				audio_stats(a,
+				adev[a].stats.record(a,
 					save_audio_config_p.adev[a].num_channels,
 					n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 					save_audio_config_p.statistics_interval)
@@ -1810,7 +1813,7 @@ func audio_get(a int) int {
 				adev[a].inbufLen = 0
 				adev[a].inbufNext = 0
 
-				audio_stats(a,
+				adev[a].stats.record(a,
 					save_audio_config_p.adev[a].num_channels,
 					0,
 					save_audio_config_p.statistics_interval)
@@ -1821,7 +1824,7 @@ func audio_get(a int) int {
 			adev[a].inbufLen = n
 			adev[a].inbufNext = 0
 
-			audio_stats(a,
+			adev[a].stats.record(a,
 				save_audio_config_p.adev[a].num_channels,
 				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 				save_audio_config_p.statistics_interval)
@@ -1846,7 +1849,7 @@ func audio_get(a int) int {
 				return -1
 			}
 
-			audio_stats(a,
+			adev[a].stats.record(a,
 				save_audio_config_p.adev[a].num_channels,
 				n/(save_audio_config_p.adev[a].num_channels*save_audio_config_p.adev[a].bits_per_sample/8),
 				save_audio_config_p.statistics_interval)
