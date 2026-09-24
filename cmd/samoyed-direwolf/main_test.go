@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bufio"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,6 +118,71 @@ func TestSignalShutsDownCleanly(t *testing.T) {
 			}
 
 			require.Contains(t, printed(), "QRT", "%s ended the process without running cleanup", signal)
+		})
+	}
+}
+
+// TestSignalDuringStartupStopsStartup covers a stop that arrives while startup
+// is still acquiring things.  The teardown used to run as soon as the signal
+// did, alongside a startup that carried on regardless, so a PTT could be
+// released before it was opened and then opened with nothing left to release
+// it.  Startup has to stop at the signal and the teardown has to come after
+// it: nothing startup does may appear once the teardown has begun.
+func TestSignalDuringStartupStopsStartup(t *testing.T) {
+	var binary = buildDirewolf(t)
+
+	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
+		t.Run(signal.String(), func(t *testing.T) {
+			var dir = t.TempDir()
+
+			var configName = filepath.Join(dir, "direwolf.conf")
+			require.NoError(t, os.WriteFile(configName, []byte(shutdownTestConfig), 0o600))
+
+			var audio, audioWriter, pipeErr = os.Pipe()
+			require.NoError(t, pipeErr)
+
+			t.Cleanup(func() { audio.Close(); audioWriter.Close() })
+
+			var cmd = exec.CommandContext(t.Context(), binary, "-c", configName, "-t", "0", "-L", filepath.Join(dir, "packets.log"), "-") //nolint:gosec
+			cmd.Stdin = audio
+
+			// Read the output as it comes, rather than polling a file for it,
+			// so that the signal lands while startup is still under way.
+			var stdout, stdoutErr = cmd.StdoutPipe()
+			require.NoError(t, stdoutErr)
+
+			cmd.Stderr = cmd.Stdout
+
+			require.NoError(t, cmd.Start())
+
+			var output strings.Builder
+
+			var scanner = bufio.NewScanner(stdout)
+
+			// The configuration file is read after the signal handler is
+			// installed and before anything is acquired.
+			for scanner.Scan() {
+				output.WriteString(scanner.Text() + "\n")
+
+				if strings.HasPrefix(scanner.Text(), "Reading config file") {
+					break
+				}
+			}
+
+			require.NoError(t, cmd.Process.Signal(signal))
+
+			for scanner.Scan() {
+				output.WriteString(scanner.Text() + "\n")
+			}
+
+			require.NoError(t, cmd.Wait(), "%s did not shut the process down cleanly: %s", signal, output.String())
+
+			var printed = output.String()
+
+			var _, afterTeardown, tornDown = strings.Cut(printed, "QRT")
+			require.True(t, tornDown, "%s ended the process without running cleanup: %s", signal, printed)
+			require.NotContains(t, afterTeardown, startupComplete, "Startup carried on behind the teardown: %s", printed)
+			require.NotContains(t, afterTeardown, "QRT", "Cleanup ran more than once: %s", printed)
 		})
 	}
 }

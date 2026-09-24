@@ -406,6 +406,25 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 	assert.Nil(t, s_net_tncs[0], "a radio channel should not have been attached to as a network TNC")
 }
 
+// A stop that arrives while a network TNC is being connected to cuts the
+// connection short, and nettnc_init goes back to its caller to tear down
+// rather than exiting as though the TNC could not be reached.
+func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
+	var orig = s_net_tncs
+
+	t.Cleanup(func() { s_net_tncs = orig })
+
+	var ctx, cancel = context.WithCancel(t.Context())
+	cancel()
+
+	var audioConfig = new(audio_s)
+	audioConfig.chan_medium[nettncTestChannel] = MEDIUM_NETTNC
+	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
+	audioConfig.nettnc_port[nettncTestChannel] = freeTCPPort(t)
+
+	CaptureOutput(t, func() { nettnc_init(ctx, audioConfig) })
+}
+
 // readFullFrom fills buf from conn, which a single Read is not obliged to do.
 func readFullFrom(conn net.Conn, buf []byte) (int, error) {
 	var got int
