@@ -110,6 +110,12 @@ type KISSFrame struct {
 
 	noise     [MAX_NOISE_LEN]byte
 	noise_len int
+
+	// OnMessage, when set, takes each complete message (FEND and escapes
+	// removed, first byte the channel and command) in place of the TNC's
+	// own handling.  cmd/samoyed-kissutil, a client rather than a TNC, uses
+	// it to print what the TNC sends.
+	OnMessage func(kiss_msg []byte)
 }
 
 type fromto_t int
@@ -259,14 +265,6 @@ func (kps *kissport_status_s) connAndFrame(client int) (net.Conn, *KISSFrame) {
 
 	return kps.client_sock[client], kps.kf[client]
 }
-
-var KISSUTIL = false // Dynamic replacement for the old #define
-
-// KissutilKissProcessMsg is set by cmd/samoyed-kissutil to handle messages
-// from the TNC when running in KISSUTIL mode. It lives here, rather than
-// kissutil calling back in some other way, because kiss_process_msg needs a
-// hook into kissutil's behaviour without src depending on cmd/samoyed-kissutil.
-var KissutilKissProcessMsg func(kiss_msg []byte) //nolint:gochecknoglobals
 
 /*-------------------------------------------------------------------
  *
@@ -502,27 +500,37 @@ func kiss_debug_print(fromto fromto_t, special string, pmsg []byte) {
 
 	text_color_set(DW_COLOR_DEBUG)
 
-	if KISSUTIL {
-		dw_printf("From KISS TNC:\n")
-	} else {
-		dw_printf("\n")
+	dw_printf("\n")
 
-		if special == "" {
-			if pmsg[0] == FEND {
-				/* Skip over FEND if present. */
-				pmsg = pmsg[1:]
-			}
-
-			dw_printf("%s %s %s KISS client application, channel %d, total length = %d\n",
-				prefix[fromto], function[pmsg[0]&0xf], direction[fromto],
-				(pmsg[0]>>4)&0xf, len(pmsg))
-		} else {
-			dw_printf("%s %s %s KISS client application, total length = %d\n",
-				prefix[fromto], special, direction[fromto],
-				len(pmsg))
+	if special == "" {
+		if pmsg[0] == FEND {
+			/* Skip over FEND if present. */
+			pmsg = pmsg[1:]
 		}
+
+		dw_printf("%s %s %s KISS client application, channel %d, total length = %d\n",
+			prefix[fromto], function[pmsg[0]&0xf], direction[fromto],
+			(pmsg[0]>>4)&0xf, len(pmsg))
+	} else {
+		dw_printf("%s %s %s KISS client application, total length = %d\n",
+			prefix[fromto], special, direction[fromto],
+			len(pmsg))
 	}
 
+	HexDump(pmsg)
+}
+
+// kf_debug_print is kiss_debug_print for a byte collected by KissRecByte:
+// when kf belongs to kissutil, what arrives is from the TNC, not a client.
+func kf_debug_print(kf *KISSFrame, special string, pmsg []byte) {
+	if kf.OnMessage == nil {
+		kiss_debug_print(FROM_CLIENT, special, pmsg)
+
+		return
+	}
+
+	text_color_set(DW_COLOR_DEBUG)
+	dw_printf("From KISS TNC:\n")
 	HexDump(pmsg)
 }
 
@@ -584,7 +592,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 			/* Start of frame.  But first print any collected noise for debugging. */
 			if kf.noise_len > 0 {
 				if debug > 0 {
-					kiss_debug_print(FROM_CLIENT, "Rejected Noise", kf.noise[:kf.noise_len])
+					kf_debug_print(kf, "Rejected Noise", kf.noise[:kf.noise_len])
 				}
 
 				kf.noise_len = 0
@@ -606,7 +614,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 
 		if ch == '\r' {
 			if debug > 0 {
-				kiss_debug_print(FROM_CLIENT, "Rejected Noise", kf.noise[:kf.noise_len])
+				kf_debug_print(kf, "Rejected Noise", kf.noise[:kf.noise_len])
 			}
 
 			/* Try to appease client app by sending something back. */
@@ -662,7 +670,7 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 			kf.kiss_len++
 			if debug > 0 {
 				/* As received over the wire from client app. */
-				kiss_debug_print(FROM_CLIENT, "", kf.kiss_msg[:kf.kiss_len])
+				kf_debug_print(kf, "", kf.kiss_msg[:kf.kiss_len])
 			}
 
 			var unwrapped = kiss_unwrap(kf.kiss_msg[:kf.kiss_len])
@@ -677,7 +685,11 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 				HexDump(unwrapped[1:])
 			}
 
-			kiss_process_msg(unwrapped, debug, kps, client, sendfun)
+			if kf.OnMessage != nil {
+				kf.OnMessage(unwrapped)
+			} else {
+				kiss_process_msg(unwrapped, debug, kps, client, sendfun)
+			}
 
 			kf.state = KS_SEARCHING
 
@@ -723,15 +735,6 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 // This is used only by the TNC side.
 
 func kiss_process_msg(kiss_msg []byte, debug int, kps *kissport_status_s, client int, sendfun kiss_sendfun) {
-	// Temporary for now
-	if KISSUTIL {
-		if KissutilKissProcessMsg != nil {
-			KissutilKissProcessMsg(kiss_msg)
-		}
-
-		return
-	}
-
 	// New in 1.7:
 	// We can have KISS TCP ports which convey only a single radio channel.
 	// This is to allow operation by applications which only know how to talk to single radio TNCs.

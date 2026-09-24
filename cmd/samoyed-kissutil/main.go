@@ -92,9 +92,6 @@ func main() {
 	direwolf.TextColorInit(0) // Turn off text color.
 	// It could interfere with trying to pipe stdout to some other application.
 
-	direwolf.KISSUTIL = true                                    // Change behaviour of kiss_process_msg
-	direwolf.KissutilKissProcessMsg = kissutil_kiss_process_msg // Handle messages from the TNC side.
-
 	/*
 	 * Extract command line args.
 	 */
@@ -428,7 +425,8 @@ func tnc_listen_net() {
 	/*
 	 * Print what we get from TNC.
 	 */
-	var kstate direwolf.KISSFrame
+	var kstate = new(direwolf.KISSFrame)
+	kstate.OnMessage = kissutil_kiss_process_msg
 
 	for {
 		var data = make([]byte, 4096)
@@ -441,7 +439,7 @@ func tnc_listen_net() {
 
 		for j := range length {
 			// Feed in one byte at a time.
-			// kiss_process_msg is called when a complete frame has been accumulated.
+			// kissutil_kiss_process_msg is called when a complete frame has been accumulated.
 
 			// When verbose is specified, we get debug output like this:
 			//
@@ -456,7 +454,7 @@ func tnc_listen_net() {
 				_verbose = 1
 			}
 
-			direwolf.KissRecByte(&kstate, data[j], _verbose, nil, 0, nil)
+			direwolf.KissRecByte(kstate, data[j], _verbose, nil, 0, nil)
 		}
 	}
 } /* end tnc_listen_net */
@@ -487,7 +485,8 @@ func tnc_listen_serial() {
 	/*
 	 * Read and print.
 	 */
-	var kstate direwolf.KISSFrame
+	var kstate = new(direwolf.KISSFrame)
+	kstate.OnMessage = kissutil_kiss_process_msg
 
 	for {
 		var ch, err = direwolf.SerialPortGet1(serial_fd)
@@ -497,14 +496,14 @@ func tnc_listen_serial() {
 		}
 
 		// Feed in one byte at a time.
-		// kiss_process_msg is called when a complete frame has been accumulated.
+		// kissutil_kiss_process_msg is called when a complete frame has been accumulated.
 
 		var _verbose = 0
 		if verbose {
 			_verbose = 1
 		}
 
-		direwolf.KissRecByte(&kstate, ch, _verbose, nil, 0, nil)
+		direwolf.KissRecByte(kstate, ch, _verbose, nil, 0, nil)
 	}
 } /* end tnc_listen_serial */
 

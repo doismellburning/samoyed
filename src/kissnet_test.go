@@ -435,10 +435,10 @@ func TestKissNetListenFails(t *testing.T) {
 func setupKissNetTNC(t *testing.T) {
 	t.Helper()
 
-	var origAudio, origXmit, origKissNet, origKissutil = save_audio_config_p, xmitSvc, kissNetSvc, KISSUTIL
+	var origAudio, origXmit, origKissNet = save_audio_config_p, xmitSvc, kissNetSvc
 
 	t.Cleanup(func() {
-		save_audio_config_p, xmitSvc, kissNetSvc, KISSUTIL = origAudio, origXmit, origKissNet, origKissutil
+		save_audio_config_p, xmitSvc, kissNetSvc = origAudio, origXmit, origKissNet
 	})
 
 	var audioConfig = new(audio_s)
@@ -446,7 +446,6 @@ func setupKissNetTNC(t *testing.T) {
 
 	kiss_frame_init(audioConfig)
 
-	KISSUTIL = false
 	xmitSvc = new(XmitService)
 }
 
