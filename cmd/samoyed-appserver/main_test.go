@@ -10,6 +10,8 @@ import (
 	"errors"
 	"io"
 	"net"
+	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,6 +20,8 @@ import (
 	"time"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // fakeTNC stands in for the socket to the TNC: agwlib writes frames into it and
@@ -493,4 +497,141 @@ func TestTimingTestSummaryIsInSeconds(t *testing.T) {
 	if rate <= 0 {
 		t.Errorf("Summary reported a rate of %s bytes/sec", summary[2])
 	}
+}
+
+// The main loop's poll only asks the TNC about sessions with something
+// waiting on the answer - here, a goodbye.
+func TestPollAsksAboutSessionsWithWorkInHand(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	connect(t, tnc)
+
+	srv.poll()
+	assert.Empty(t, tnc.frames(t), "nothing to ask about yet")
+
+	send(t, tnc, "bye")
+
+	srv.poll()
+
+	var asked bool
+
+	for _, f := range tnc.frames(t) {
+		if f.kind == 'Y' && f.callTo == testTheirCall {
+			asked = true
+		}
+	}
+
+	assert.True(t, asked, "should ask how much is still to go to the station")
+}
+
+// runMainEnv, when set, has the test binary run main with the arguments it
+// holds instead of the tests, since main exits or never returns.
+const runMainEnv = "SAMOYED_APPSERVER_RUN_MAIN"
+
+func TestMain(m *testing.M) {
+	if args, ok := os.LookupEnv(runMainEnv); ok {
+		os.Args = append([]string{"appserver"}, strings.Fields(args)...)
+
+		main()
+		os.Exit(0)
+	}
+
+	os.Exit(m.Run())
+}
+
+func mainCommand(t *testing.T, args ...string) *exec.Cmd {
+	t.Helper()
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0]) //nolint:gosec
+	cmd.Env = append(os.Environ(), runMainEnv+"="+strings.Join(args, " "))
+
+	return cmd
+}
+
+func TestMainRefusesBadArguments(t *testing.T) {
+	var ln, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp4", "127.0.0.1:0")
+	require.NoError(t, listenErr)
+
+	var _, gone, splitErr = net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, splitErr)
+
+	// Nothing is listening once this is closed.
+	require.NoError(t, ln.Close())
+
+	var testCases = map[string]struct {
+		args []string
+		want string
+	}{
+		"no callsign":   {nil, "Exactly one argument required (MYCALL)"},
+		"two callsigns": {[]string{"Q1TEST", "Q2TEST"}, "Exactly one argument required (MYCALL)"},
+		"long callsign": {[]string{"Q1TESTTOOLONG"}, "Callsign Q1TESTTOOLONG too long"},
+		"no TNC":        {[]string{"-h", "127.0.0.1", "-p", gone, "Q1TEST"}, "Could not attach to network TNC"},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var out, err = mainCommand(t, tc.args...).CombinedOutput()
+
+			var exitErr *exec.ExitError
+			require.ErrorAs(t, err, &exitErr)
+			assert.Equal(t, 1, exitErr.ExitCode())
+			assert.Contains(t, string(out), tc.want)
+		})
+	}
+}
+
+func TestMainHelp(t *testing.T) {
+	var out, err = mainCommand(t, "--help").CombinedOutput()
+	require.NoError(t, err)
+
+	assert.Contains(t, string(out), "Simple application server for connected mode AX.25")
+}
+
+// On attaching to the TNC, main asks what ports it has, and registers its
+// callsign on each.
+func TestMainRegistersOnEachPort(t *testing.T) {
+	var ln, listenErr = new(net.ListenConfig).Listen(t.Context(), "tcp4", "127.0.0.1:0")
+	require.NoError(t, listenErr)
+
+	defer ln.Close()
+
+	var _, port, splitErr = net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, splitErr)
+
+	var cmd = mainCommand(t, "-h", "127.0.0.1", "-p", port, "q1test")
+
+	require.NoError(t, cmd.Start())
+
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	})
+
+	var tnc, acceptErr = ln.Accept()
+	require.NoError(t, acceptErr)
+
+	defer tnc.Close()
+
+	require.NoError(t, tnc.SetDeadline(time.Now().Add(10*time.Second)))
+
+	var h = new(AGWPEHeader)
+
+	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
+	assert.Equal(t, byte('G'), h.DataKind)
+
+	var ports = "2;Port1 first;Port2 second;"
+
+	var reply = new(AGWPEHeader)
+	reply.DataKind = 'G'
+	reply.DataLen = uint32(len(ports))
+
+	require.NoError(t, binary.Write(tnc, binary.LittleEndian, reply))
+
+	var _, writeErr = tnc.Write([]byte(ports))
+	require.NoError(t, writeErr)
+
+	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
+	assert.Equal(t, byte('X'), h.DataKind)
+	assert.Equal(t, byte(0), h.Portx)
+	assert.Equal(t, testMyCall, h.CallFrom, "the callsign should be upper cased")
 }
