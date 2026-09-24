@@ -98,6 +98,12 @@ type XmitService struct {
 	/* Whether we have said that a channel cannot transmit, so we say it once. */
 	saidCannotTransmit [MAX_RADIO_CHANS]bool
 
+	/*
+	 * Each channel's HDLC state, which carries over from one transmission
+	 * to the next.  Only that channel's xmit_thread touches it.
+	 */
+	hdlcSenders [MAX_RADIO_CHANS]*HDLCSender
+
 	p_modem *audio_s
 }
 
@@ -237,6 +243,16 @@ func (xs *XmitService) SetFulldup(channel int, value bool) {
 	if channel >= 0 && channel < MAX_RADIO_CHANS {
 		xs.fulldup[channel] = value
 	}
+}
+
+// hdlcSender is channel's HDLCSender, made on first use.  Only the channel's
+// own xmit_thread asks for it, so there is nothing to lock.
+func (xs *XmitService) hdlcSender(channel int) *HDLCSender {
+	if xs.hdlcSenders[channel] == nil {
+		xs.hdlcSenders[channel] = NewHDLCSender(channel, xs.p_modem)
+	}
+
+	return xs.hdlcSenders[channel]
 }
 
 /*-------------------------------------------------------------------
@@ -653,7 +669,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	var pre_flags = xs.msToBits(xs.txdelay[channel]*10, channel) / 8
 
 	/* Total number of bits in transmission including all flags and bit stuffing. */
-	var num_bits = layer2_preamble_postamble(channel, pre_flags, false, xs.p_modem)
+	var num_bits = xs.hdlcSender(channel).SendPreamblePostamble(pre_flags, false)
 
 	logrus.WithFields(logrus.Fields{
 		"t":         time.Since(time_ptt),
@@ -749,7 +765,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 	 */
 
 	var post_flags = xs.msToBits(xs.txtail[channel]*10, channel) / 8
-	nb = layer2_preamble_postamble(channel, post_flags, true, xs.p_modem)
+	nb = xs.hdlcSender(channel).SendPreamblePostamble(post_flags, true)
 	num_bits += nb
 	logrus.WithFields(logrus.Fields{
 		"t":          time.Since(time_ptt),
@@ -924,7 +940,7 @@ func (xs *XmitService) send_one_frame(c int, p int, pp *packet_t) int {
 		}
 	}
 
-	var nb = layer2_send_frame(c, pp, send_invalid_fcs2, xs.p_modem)
+	var nb = xs.hdlcSender(c).SendFrame(pp, send_invalid_fcs2)
 
 	metrics.RecordFrameTransmitted(c)
 

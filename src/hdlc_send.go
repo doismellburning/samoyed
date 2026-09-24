@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 import (
@@ -6,21 +5,44 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hdlc_send_frame" or "hdlc_send_flags"
+// HDLCSender turns frames into the bits one radio channel sends.  It holds
+// what has to carry over from one byte, or one frame, to the next: the NRZI
+// line level and the run of ones that decides when to bit stuff.  Each
+// channel wants its own, and only one goroutine may drive it at a time.
+type HDLCSender struct {
+	channel     int
+	audioConfig *audio_s
+
+	bitsSent int // Count number of bits sent by SendFrame or SendPreamblePostamble.
+
+	// Count number of "1" bits to keep track of when we need to break up a
+	// long run by "bit stuffing."
+	stuff int
+
+	nrziOutput int // The level the line was last left at.
+}
+
+// NewHDLCSender makes an HDLCSender for channel, sending the layer 2
+// protocol audioConfig says to use there.
+func NewHDLCSender(channel int, audioConfig *audio_s) *HDLCSender {
+	var s = new(HDLCSender)
+	s.channel = channel
+	s.audioConfig = audioConfig
+
+	return s
+}
 
 /*-------------------------------------------------------------
  *
- * Name:	layer2_send_frame
+ * Name:	SendFrame (layer2_send_frame in Dire Wolf)
  *
  * Purpose:	Convert frames to a stream of bits.
  *		Originally this was for AX.25 only, hence the file name.
  *		Over time, FX.25 and IL2P were shoehorned in.
  *
- * Inputs:	channel	- Audio channel number, 0 = first.
+ * Inputs:	pp	- Packet object.
  *
- *		pp	- Packet object.
- *
- *		bad_fcs	- Append an invalid FCS for testing purposes.
+ *		badFCS	- Append an invalid FCS for testing purposes.
  *			  Applies only to regular AX.25.
  *
  * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
@@ -44,9 +66,11 @@ var number_of_bits_sent [MAX_RADIO_CHANS]int // Count number of bits sent by "hd
  *
  *--------------------------------------------------------------*/
 
-func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *audio_s) int {
-	if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
-		var n = il2p_send_frame(channel, pp, audio_config_p.achan[channel].il2p_version, audio_config_p.achan[channel].il2p_max_fec, audio_config_p.achan[channel].il2p_invert_polarity)
+func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
+	var achan = &s.audioConfig.achan[s.channel]
+
+	if achan.layer2_xmit == LAYER2_IL2P { //nolint:staticcheck
+		var n = il2p_send_frame(s.channel, pp, achan.il2p_version, achan.il2p_max_fec, achan.il2p_invert_polarity)
 		if n > 0 {
 			return n
 		}
@@ -54,10 +78,10 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Unable to send IL2p frame.  Falling back to regular AX.25.\n")
 		// Not sure if we should fall back to AX.25 or not here.
-	} else if audio_config_p.achan[channel].layer2_xmit == LAYER2_FX25 {
+	} else if achan.layer2_xmit == LAYER2_FX25 {
 		var fbuf = AX25Pack(pp)
 
-		var n = FX25SendFrame(channel, fbuf, audio_config_p.achan[channel].fx25_strength)
+		var n = FX25SendFrame(s.channel, fbuf, achan.fx25_strength)
 		if n > 0 {
 			return n
 		}
@@ -70,55 +94,20 @@ func layer2_send_frame(channel int, pp *packet_t, bad_fcs bool, audio_config_p *
 
 	var fbuf = AX25Pack(pp)
 
-	return (ax25_only_hdlc_send_frame(channel, fbuf, bad_fcs))
-}
-
-func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
-	number_of_bits_sent[channel] = 0
-
-	logrus.WithFields(logrus.Fields{
-		"channel": channel,
-		"flen":    len(fbuf),
-		"bad_fcs": bad_fcs,
-	}).Debug("hdlc_send_frame")
-
-	send_control_nrzi(channel, 0x7e) /* Start frame */
-
-	for j := range fbuf {
-		send_data_nrzi(channel, fbuf[j])
-	}
-
-	var frameFCS = fcs.Calc(fbuf)
-
-	if bad_fcs {
-		/* For testing only - Simulate a frame getting corrupted along the way. */
-		send_data_nrzi(channel, byte(^frameFCS)&0xff)
-		send_data_nrzi(channel, byte((^frameFCS)>>8)&0xff)
-	} else {
-		send_data_nrzi(channel, byte(frameFCS)&0xff)
-		send_data_nrzi(channel, byte(frameFCS>>8)&0xff)
-	}
-
-	send_control_nrzi(channel, 0x7e) /* End frame */
-
-	return (number_of_bits_sent[channel])
+	return s.sendAX25Frame(fbuf, badFCS)
 }
 
 /*-------------------------------------------------------------
  *
- * Name:	layer2_preamble_postamble
+ * Name:	SendPreamblePostamble (layer2_preamble_postamble in Dire Wolf)
  *
  * Purpose:	Send filler pattern before and after the frame.
  *		For HDLC it is 01111110, for IL2P 01010101.
  *
- * Inputs:	channel	- Audio channel number, 0 = first.
- *
- *		nbytes	- Number of bytes to send.
+ * Inputs:	nbytes	- Number of bytes to send.
  *
  *		finish	- True for end of transmission.
  *			  This causes the last audio buffer to be flushed.
- *
- *		audio_config_p - Configuration for audio and modems.
  *
  * Outputs:	Bits are shipped out by calling tone_gen_put_bit().
  *
@@ -134,11 +123,11 @@ func ax25_only_hdlc_send_frame(channel int, fbuf []byte, bad_fcs bool) int {
  *
  *--------------------------------------------------------------*/
 
-func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_config_p *audio_s) int {
-	number_of_bits_sent[channel] = 0
+func (s *HDLCSender) SendPreamblePostamble(nbytes int, finish bool) int {
+	s.bitsSent = 0
 
 	logrus.WithFields(logrus.Fields{
-		"channel": channel,
+		"channel": s.channel,
 		"nbytes":  nbytes,
 		"finish":  finish,
 	}).Debug("layer2_preamble_postamble")
@@ -148,37 +137,71 @@ func layer2_preamble_postamble(channel int, nbytes int, finish bool, audio_confi
 	// For AX.25, it is the 01111110 "flag" pattern with NRZI and no bit stuffing.
 	// For IL2P, it is 01010101 without NRZI.
 
+	var achan = &s.audioConfig.achan[s.channel]
+
 	for range nbytes {
-		if audio_config_p.achan[channel].layer2_xmit == LAYER2_IL2P {
-			send_byte_msb_first(channel, IL2P_PREAMBLE, audio_config_p.achan[channel].il2p_invert_polarity)
+		if achan.layer2_xmit == LAYER2_IL2P {
+			s.sendByteMSBFirst(IL2P_PREAMBLE, achan.il2p_invert_polarity)
 		} else {
-			send_control_nrzi(channel, 0x7e)
+			s.sendControlNRZI(0x7e)
 		}
 	}
 
 	/* Push out the final partial buffer! */
 
 	if finish {
-		gen_tone_flush(channel)
+		gen_tone_flush(s.channel)
 	}
 
-	return (number_of_bits_sent[channel])
+	return s.bitsSent
+}
+
+// sendAX25Frame is ax25_only_hdlc_send_frame in Dire Wolf.
+func (s *HDLCSender) sendAX25Frame(fbuf []byte, badFCS bool) int {
+	s.bitsSent = 0
+
+	logrus.WithFields(logrus.Fields{
+		"channel": s.channel,
+		"flen":    len(fbuf),
+		"bad_fcs": badFCS,
+	}).Debug("hdlc_send_frame")
+
+	s.sendControlNRZI(0x7e) /* Start frame */
+
+	for j := range fbuf {
+		s.sendDataNRZI(fbuf[j])
+	}
+
+	var frameFCS = fcs.Calc(fbuf)
+
+	if badFCS {
+		/* For testing only - Simulate a frame getting corrupted along the way. */
+		s.sendDataNRZI(byte(^frameFCS) & 0xff)
+		s.sendDataNRZI(byte((^frameFCS)>>8) & 0xff)
+	} else {
+		s.sendDataNRZI(byte(frameFCS) & 0xff)
+		s.sendDataNRZI(byte(frameFCS>>8) & 0xff)
+	}
+
+	s.sendControlNRZI(0x7e) /* End frame */
+
+	return s.bitsSent
 }
 
 // The next one is only for IL2P.  No NRZI.
 // MSB first, opposite of AX.25.
 
-func send_byte_msb_first(channel int, x int, polarity int) {
+func (s *HDLCSender) sendByteMSBFirst(x int, polarity int) {
 	for range 8 {
 		var dbit = 0
 		if (x & 0x80) != 0 {
 			dbit = 1
 		}
 
-		tone_gen_put_bit(channel, (dbit^polarity)&1)
+		tone_gen_put_bit(s.channel, (dbit^polarity)&1)
 
 		x <<= 1
-		number_of_bits_sent[channel]++
+		s.bitsSent++
 	}
 }
 
@@ -186,32 +209,27 @@ func send_byte_msb_first(channel int, x int, polarity int) {
 // All bits are sent NRZI.
 // Data (non flags) use bit stuffing.
 
-var stuff [MAX_RADIO_CHANS]int // Count number of "1" bits to keep track of when we
-// need to break up a long run by "bit stuffing."
-// Needs to be array because we could be transmitting
-// on multiple channels at the same time.
-
-func send_control_nrzi(channel int, x byte) {
+func (s *HDLCSender) sendControlNRZI(x byte) {
 	for range 8 {
-		send_bit_nrzi(channel, x&1 != 0)
+		s.sendBitNRZI(x&1 != 0)
 		x >>= 1
 	}
 
-	stuff[channel] = 0
+	s.stuff = 0
 }
 
-func send_data_nrzi(channel int, x byte) {
+func (s *HDLCSender) sendDataNRZI(x byte) {
 	for range 8 {
-		send_bit_nrzi(channel, x&1 != 0)
+		s.sendBitNRZI(x&1 != 0)
 
 		if x&1 > 0 {
-			stuff[channel]++
-			if stuff[channel] == 5 {
-				send_bit_nrzi(channel, false)
-				stuff[channel] = 0
+			s.stuff++
+			if s.stuff == 5 {
+				s.sendBitNRZI(false)
+				s.stuff = 0
 			}
 		} else {
-			stuff[channel] = 0
+			s.stuff = 0
 		}
 
 		x >>= 1
@@ -224,16 +242,14 @@ func send_data_nrzi(channel int, x byte) {
  * data 0 bit -> invert signal.
  */
 
-var nrziBitOutput [MAX_RADIO_CHANS]int
-
-func send_bit_nrzi(channel int, b bool) {
+func (s *HDLCSender) sendBitNRZI(b bool) {
 	if !b {
-		nrziBitOutput[channel] = 1 - nrziBitOutput[channel]
+		s.nrziOutput = 1 - s.nrziOutput
 	}
 
-	tone_gen_put_bit(channel, nrziBitOutput[channel])
+	tone_gen_put_bit(s.channel, s.nrziOutput)
 
-	number_of_bits_sent[channel]++
+	s.bitsSent++
 }
 
 //  The rest of this is for EAS SAME.

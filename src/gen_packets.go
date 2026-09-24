@@ -276,6 +276,13 @@ func GenPacketsMain() {
 	morse_init(&modem, *amplitude/2)
 	dtmf_init(&modem, *amplitude/2)
 
+	// One per channel, kept for the whole run, so the NRZI line level carries
+	// over from one packet to the next as it does on the air.
+	var hdlcSenders = make([]*HDLCSender, MAX_RADIO_CHANS)
+	for c := range hdlcSenders {
+		hdlcSenders[c] = NewHDLCSender(c, &modem)
+	}
+
 	// We don't have -d or -q options here.
 	// Just use the default of minimal information.
 
@@ -322,7 +329,7 @@ func GenPacketsMain() {
 
 			text_color_set(DW_COLOR_REC)
 			fmt.Printf("%s", str)
-			send_packet(str)
+			send_packet(hdlcSenders, str)
 		}
 
 		audio_file_close(sink)
@@ -353,7 +360,7 @@ func GenPacketsMain() {
 			gen_tone_init(&modem, *amplitude/2, sink)
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error)
-			send_packet(stemp)
+			send_packet(hdlcSenders, stemp)
 		}
 	} else if packet_count > 0 {
 		/*
@@ -382,23 +389,23 @@ func GenPacketsMain() {
 			}
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  %04d of %04d", i, packet_count)
-			send_packet(stemp)
+			send_packet(hdlcSenders, stemp)
 		}
 	} else {
 		// This should send a total of 6.
 		// Note that sticking in the user defined type {DE is optional.
 		if modem.achan[0].modem_type == MODEM_EAS {
-			send_packet("X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
-			send_packet("X>X-2:{DENNNN")
-			send_packet("X>X:NNNN")
+			send_packet(hdlcSenders, "X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
+			send_packet(hdlcSenders, "X>X-2:{DENNNN")
+			send_packet(hdlcSenders, "X>X:NNNN")
 		} else {
 			/*
 			 * Builtin default 4 packets.
 			 */
-			send_packet("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  1 of 4")
-			send_packet("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  2 of 4")
-			send_packet("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  3 of 4")
-			send_packet("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  4 of 4")
+			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  1 of 4")
+			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  2 of 4")
+			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  3 of 4")
+			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  4 of 4")
 		}
 	}
 
@@ -493,7 +500,7 @@ func audio_file_close(sink *wavFileSink) int { //nolint:unparam
 	return (0)
 } /* end audio_close */
 
-func send_packet(str string) {
+func send_packet(hdlcSenders []*HDLCSender, str string) {
 	if g_morse_wpm > 0 {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
@@ -567,9 +574,9 @@ func send_packet(str string) {
 				gen_tone_put_sample(c, 0, 0)
 			}
 
-			layer2_preamble_postamble(c, 32, false, &modem)
-			layer2_send_frame(c, pp, false, &modem)
-			layer2_preamble_postamble(c, 2, true, &modem)
+			hdlcSenders[c].SendPreamblePostamble(32, false)
+			hdlcSenders[c].SendFrame(pp, false)
+			hdlcSenders[c].SendPreamblePostamble(2, true)
 		}
 	}
 }
