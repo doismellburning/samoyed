@@ -1,13 +1,68 @@
+// SPDX-FileCopyrightText: The Samoyed Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 package main
 
 import (
+	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	direwolf "github.com/doismellburning/samoyed/src"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_TT2Text(t *testing.T) {
 	// From `man tt2text`
 	direwolf.AssertOutputContains(t, func() { tt2text("2A22A2223A33A33340A00122223333") }, "ABCDEFG 0123")
 	direwolf.AssertOutputContains(t, func() { tt2text("2A22A2223A33A33340A00122223333") }, "A2A222D3D3334 00122223333")
+}
+
+// runMainEnv, when set, has the test binary run main with the arguments it
+// holds instead of the tests, so a test can see main exit.
+const runMainEnv = "SAMOYED_TT2TEXT_RUN_MAIN"
+
+func TestMain(m *testing.M) {
+	if args, ok := os.LookupEnv(runMainEnv); ok {
+		os.Args = append([]string{"tt2text"}, strings.Fields(args)...)
+
+		main()
+		os.Exit(0)
+	}
+
+	os.Exit(m.Run())
+}
+
+// runMain runs main in a process of its own, returning what it printed to
+// stdout and stderr, and its exit status.
+func runMain(t *testing.T, args ...string) (string, int) {
+	t.Helper()
+
+	var cmd = exec.CommandContext(t.Context(), os.Args[0]) //nolint:gosec
+	cmd.Env = append(os.Environ(), runMainEnv+"="+strings.Join(args, " "))
+
+	var out, err = cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+
+		return string(out), exitErr.ExitCode()
+	}
+
+	return string(out), 0
+}
+
+func Test_main(t *testing.T) {
+	// Arguments are run together, so spaces can break up a long sequence.
+	var out, status = runMain(t, "2A22A2223A33A33340", "A00122223333")
+
+	assert.Equal(t, 0, status)
+	assert.Contains(t, out, "ABCDEFG 0123")
+
+	out, status = runMain(t)
+
+	assert.Equal(t, 1, status)
+	assert.Contains(t, out, "Supply button sequence on command line.")
 }
