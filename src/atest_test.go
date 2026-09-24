@@ -154,3 +154,21 @@ func atestTestOptions() *AtestOptions {
 
 	return opts
 }
+
+// Byte offsets of fields in the file buildWAVWithExtraChunks builds.
+const (
+	extraChunksSampleRateOffset = 36
+)
+
+// Test_atest_decodeWAVTruncatedFmt checks that a "fmt " chunk that ends early
+// is reported as such, rather than whatever its missing fields make it look
+// like.
+func Test_atest_decodeWAVTruncatedFmt(t *testing.T) {
+	var atest, err = NewAtest(atestTestOptions())
+	require.NoError(t, err)
+
+	var wav = buildWAVWithExtraChunks(t)
+
+	var _, decodeErr = atest.DecodeWAV(bytes.NewReader(wav[:extraChunksSampleRateOffset]), "truncated.wav")
+	assert.ErrorContains(t, decodeErr, "fmt")
+}

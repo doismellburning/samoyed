@@ -273,7 +273,10 @@ func (a *Atest) DecodeWAV(r io.ReadSeeker, name string) (AtestFileResult, error)
 		return AtestFileResult{}, fmt.Errorf("WAV file error: Need fmt chunk datasize of 16 or 18.  Found %d", chunk.Datasize)
 	}
 
-	binary.Read(r, binary.LittleEndian, &format)
+	err = binary.Read(r, binary.LittleEndian, &format)
+	if err != nil {
+		return AtestFileResult{}, fmt.Errorf("WAV file error: Could not read fmt chunk: %w", err)
+	}
 
 	// KG If Datasize > sizeof(format), skip until the actual data
 	var formatSize = int32(unsafe.Sizeof(format))
