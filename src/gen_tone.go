@@ -59,6 +59,7 @@ type ToneGenerator struct {
 	adevIndex   int
 	audioConfig *audio_s
 	sink        AudioSink // Where the samples go.
+	amplitude   int       // 0 .. 100, for DTMF; the rest use sine_table.
 
 	ticksPerSample    int /* Same for both channels of same soundcard */
 	ticksPerBit       int /* because they have same sample rate. */
@@ -108,6 +109,9 @@ type ToneGenerator struct {
  *					space_freq
  *					samples_per_sec
  *
+ *		amp			- Signal amplitude on scale of 0 .. 100, for
+ *					  the tones SendDTMF makes.
+ *
  *		sink			- Where the generated samples go.
  *
  * Description:	 Calculate various constants for use by the direct digital synthesis
@@ -115,12 +119,13 @@ type ToneGenerator struct {
  *
  *----------------------------------------------------------------*/
 
-func NewToneGenerator(channel int, audioConfig *audio_s, sink AudioSink) *ToneGenerator {
+func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink) *ToneGenerator {
 	var tg = &ToneGenerator{ //nolint:exhaustruct_v5
 		channel:     channel,
 		adevIndex:   ACHAN2ADEV(channel),
 		audioConfig: audioConfig,
 		sink:        sink,
+		amplitude:   amp,
 	}
 
 	var a = tg.adevIndex
@@ -234,7 +239,7 @@ func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nol
 
 	for channel := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
-			toneGenerators[channel] = NewToneGenerator(channel, audio_config_p, sink)
+			toneGenerators[channel] = NewToneGenerator(channel, audio_config_p, amp, sink)
 		}
 	}
 

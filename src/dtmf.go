@@ -58,8 +58,6 @@ type dd_s struct { /* Separate for each audio channel. */
 
 var dd [MAX_RADIO_CHANS]dd_s
 
-var s_amplitude int = 100 // range of 0 .. 100
-
 /*------------------------------------------------------------------
  *
  * Name:        dtmf_init
@@ -78,17 +76,11 @@ var s_amplitude int = 100 // range of 0 .. 100
  *			In version 1.2, we can have multiple soundcards
  *			with potentially different sample rates.
  *
- *		amp		- Signal amplitude, for transmit, on scale of 0 .. 100.
- *
- *				  100 will produce maximum amplitude of +-32k samples.
- *
  * Returns:     None.
  *
  *----------------------------------------------------------------*/
 
-func dtmf_init(p_audio_config *audio_s, amp int) {
-	s_amplitude = amp
-
+func dtmf_init(p_audio_config *audio_s) {
 	/*
 	 * Pick a suitable processing block size.
 	 * Larger = narrower bandwidth, slower response.
@@ -322,34 +314,43 @@ func dtmf_sample(c int, input float64) rune {
  *--------------------------------------------------------------------*/
 
 func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int {
-	// Length of tone or gap between.
-	var len_ms = int((500.0 / float64(speed)) + 0.5)
-
-	push_button(channel, ' ', txdelay)
-
-	for _, p := range str {
-		push_button(channel, p, len_ms)
-		push_button(channel, ' ', len_ms)
+	if toneGenerators[channel] == nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Invalid channel %d for tone generation.\n", channel)
+	} else {
+		toneGenerators[channel].SendDTMF(str, speed, txdelay, txtail)
 	}
-
-	push_button(channel, ' ', txtail)
-
-	gen_tone_flush(channel)
 
 	return (txdelay +
 		int(1000.0*float64(len(str))/float64(speed)+0.5) +
 		txtail)
 } /* end dtmf_send */
 
+// SendDTMF generates the tones for str, as dtmf_send describes, on the
+// generator's channel.
+func (tg *ToneGenerator) SendDTMF(str string, speed int, txdelay int, txtail int) {
+	// Length of tone or gap between.
+	var len_ms = int((500.0 / float64(speed)) + 0.5)
+
+	tg.pushButton(' ', txdelay)
+
+	for _, p := range str {
+		tg.pushButton(p, len_ms)
+		tg.pushButton(' ', len_ms)
+	}
+
+	tg.pushButton(' ', txtail)
+
+	tg.Flush()
+}
+
 /*------------------------------------------------------------------
  *
- * Name:        push_button
+ * Name:        pushButton
  *
  * Purpose:     Generate DTMF tone for a button push.
  *
- * Inputs:	channel	- Radio channel number.
- *
- *		button	- One of 0-9, A-D, *, #.  Others result in silence.
+ * Inputs:	button	- One of 0-9, A-D, *, #.  Others result in silence.
  *
  *		ms	- Duration in milliseconds.
  *			  Use 50 ms for tone and 50 ms of silence for max rate of 10 per second.
@@ -358,12 +359,13 @@ func dtmf_send(channel int, str string, speed int, txdelay int, txtail int) int 
  *
  *----------------------------------------------------------------*/
 
-func push_button(channel int, button rune, ms int) {
-	for dtmf := range dtmfButtonSamples(button, ms, dd[channel].sample_rate) {
+func (tg *ToneGenerator) pushButton(button rune, ms int) {
+	var sampleRate = tg.audioConfig.adev[tg.adevIndex].samples_per_sec
+
+	for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
 		// 'dtmf' can be in range of +-2.0 because it is sum of two sine waves.
 		// Amplitude of 100 would use full +-32k range.
-		var sam = int(dtmf * 16383.0 * float64(s_amplitude) / 100.0)
-		gen_tone_put_sample(channel, ACHAN2ADEV(channel), sam)
+		tg.PutSample(int(dtmf * 16383.0 * float64(tg.amplitude) / 100.0))
 	}
 }
 

@@ -24,7 +24,7 @@ func Test_dtmf(t *testing.T) {
 
 	hdlcReceiver = NewHDLCReceiver(&my_audio_config, new(discardReceiveSink))
 
-	dtmf_init(&my_audio_config, 50)
+	dtmf_init(&my_audio_config)
 
 	var result strings.Builder
 

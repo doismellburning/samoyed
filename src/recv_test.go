@@ -189,7 +189,7 @@ func TestRecvAdevThreadDecodesTouchTonesWhenConfigured(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
-	dtmf_init(audioConfig, 50)
+	dtmf_init(audioConfig)
 
 	var origGateway = ttGateway
 
@@ -216,7 +216,7 @@ func TestRecvAdevThreadIgnoresTouchTonesWhenNotConfigured(t *testing.T) {
 
 	var src = setupRecvTest(t, audioConfig, dtmfSamples(t, '1', 250, audioConfig.adev[0].samples_per_sec))
 
-	dtmf_init(audioConfig, 50)
+	dtmf_init(audioConfig)
 
 	var origGateway = ttGateway
 
