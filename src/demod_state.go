@@ -129,6 +129,14 @@ type demodulator_state_s struct {
 	alevel_metric_countdown int
 
 	/*
+	 * AFSK decimation: the running sum of the input samples since the
+	 * last one handed on, and how many there have been.
+	 */
+
+	decimate_sum   int
+	decimate_count int
+
+	/*
 	 * Outputs from the mark and space amplitude detection,
 	 * used as inputs to the FIR lowpass filters.
 	 * Kernel for the lowpass filters.

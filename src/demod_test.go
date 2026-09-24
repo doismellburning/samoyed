@@ -105,3 +105,37 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 		hook.Reset()
 	}
 }
+
+// ptt_set mutes a half duplex channel's input from the transmit thread while
+// the audio thread is reading the flag for every sample, so the flag has to be
+// safe to share between them.  Run under -race.
+func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
+	var channel = 0
+	var audioConfig = newTestAudioConfig(channel, MODEM_OFF, 1200, 1200, 2200, 44100)
+
+	var savedConfig = save_audio_config_p
+
+	t.Cleanup(func() {
+		save_audio_config_p = savedConfig
+
+		demod_mute_input(channel, 0)
+	})
+
+	save_audio_config_p = audioConfig
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for i := range 1000 {
+			demod_mute_input(channel, i%2)
+		}
+	}()
+
+	for range 1000 {
+		demod_process_sample(channel, 0, 1000)
+	}
+
+	<-done
+}

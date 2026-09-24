@@ -613,3 +613,10 @@ func Test_adev_param_validate(t *testing.T) {
 	adev.num_channels = 3
 	require.EqualError(t, adev.validate(), "number of audio channels (ACHANNELS) must be 1 or 2, not 3")
 }
+
+func TestLayer2String(t *testing.T) {
+	assert.Equal(t, "AX.25", LAYER2_AX25.String())
+	assert.Equal(t, "FX.25", LAYER2_FX25.String())
+	assert.Equal(t, "IL2P", LAYER2_IL2P.String())
+	assert.Equal(t, "layer2_t(7)", layer2_t(7).String())
+}

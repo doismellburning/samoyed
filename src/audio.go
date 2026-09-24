@@ -164,6 +164,20 @@ const (
 	LAYER2_IL2P
 )
 
+// String names the layer 2 protocol as the channel summary at startup shows it.
+func (l layer2_t) String() string {
+	switch l {
+	case LAYER2_AX25:
+		return "AX.25"
+	case LAYER2_FX25:
+		return "FX.25"
+	case LAYER2_IL2P:
+		return "IL2P"
+	default:
+		return fmt.Sprintf("layer2_t(%d)", int(l))
+	}
+}
+
 type v26_e int
 
 const (
@@ -222,7 +236,7 @@ type achan_param_s struct {
 	/* Might try MFJ-2400 / CCITT v.26 / Bell 201 someday. */
 	/* No modem.  Might want this for DTMF only channel. */
 
-	layer2_xmit layer2_t // Must keep in sync with layer2_tx, below.
+	layer2_xmit layer2_t
 
 	// IL2P - New for version 1.7.
 	// New layer 2 with FEC.  Much less overhead than FX.25 but no longer backward compatible.
