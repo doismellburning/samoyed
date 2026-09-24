@@ -659,7 +659,7 @@ func (sink *wavFileSink) Flush(_ int) int {
 
 // genPacketsModemFlags are the command line options that set up the modulator.
 type genPacketsModemFlags struct {
-	modem           *modemFlags
+	modem           *ModemFlags
 	layer2          *layer2TxFlags
 	bitrateOverride *string
 	mark            *int
@@ -669,7 +669,7 @@ type genPacketsModemFlags struct {
 
 func addGenPacketsModemFlags(fs *pflag.FlagSet) *genPacketsModemFlags {
 	var f = new(genPacketsModemFlags)
-	f.modem = addModemFlags(fs, false)
+	f.modem = AddModemFlags(fs, false)
 	f.layer2 = addLayer2TxFlags(fs, "--il2p-version")
 	f.bitrateOverride = fs.StringP("bitrate-override", "b", "", "Bits / second for data, keeping the modem -B chose.")
 	f.mark = fs.IntP("mark", "m", 0, "Mark frequency.")

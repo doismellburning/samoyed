@@ -122,10 +122,10 @@ func (achan *achan_param_s) setModem(bitrate string) error {
 	return nil
 }
 
-// modemFlags are the command line options that choose a channel's modem:
+// ModemFlags are the command line options that choose a channel's modem:
 // -B, -g, -k, -j and -J, and for a program that receives, the demodulator's
 // -P, -D and -U too.
-type modemFlags struct {
+type ModemFlags struct {
 	fs               *pflag.FlagSet
 	bitrate          *string
 	g3ruh            *bool
@@ -140,8 +140,11 @@ type modemFlags struct {
 	upsample *int
 }
 
-func addModemFlags(fs *pflag.FlagSet, receive bool) *modemFlags {
-	var f = new(modemFlags)
+// AddModemFlags adds the modem options to fs, with the demodulator's as well
+// for a program that receives.  AtestOptions.Modem and the like take the
+// result, to set up a channel once fs has been parsed.
+func AddModemFlags(fs *pflag.FlagSet, receive bool) *ModemFlags {
+	var f = new(ModemFlags)
 	f.fs = fs
 	f.bitrate = fs.StringP("bitrate", "B", strconv.Itoa(DEFAULT_BAUD), `Bits/second for data.  Proper modem automatically selected for speed.
 300 bps defaults to AFSK tones of 1600 & 1800.
@@ -167,7 +170,7 @@ EAS for Emergency Alert System (EAS) Specific Area Message Encoding (SAME).`)
 }
 
 // apply sets up achan from the options, once they have been parsed.
-func (f *modemFlags) apply(achan *achan_param_s) error {
+func (f *ModemFlags) apply(achan *achan_param_s) error {
 	if f.fs.Changed("bitrate") {
 		var err = achan.setModem(*f.bitrate)
 		if err != nil {
@@ -268,7 +271,7 @@ func (f *modemFlags) apply(achan *achan_param_s) error {
 }
 
 // anyChanged says whether any of the options were given.
-func (f *modemFlags) anyChanged() bool {
+func (f *ModemFlags) anyChanged() bool {
 	return slices.ContainsFunc([]string{"bitrate", "g3ruh", "bpsk", "direwolf-15-compat", "mfj-2400-compat", "modem-profile", "decimate", "upsample"}, f.fs.Changed)
 }
 
