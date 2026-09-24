@@ -773,7 +773,7 @@ func xmit_object_report(i int, first_time bool) {
 		agwServer.SendRecPacket(save_tt_config_p.obj_recv_chan, pp, fbuf)
 		kissNetSvc.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
 		kissSerial.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
-		kisspt_send_rec_packet(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
+		kissPT.SendRecPacket(save_tt_config_p.obj_recv_chan, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)
 	}
 
 	if first_time && save_tt_config_p.obj_send_to_ig > 0 {

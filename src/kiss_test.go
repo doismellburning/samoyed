@@ -60,50 +60,46 @@ func rawTerminal(t *testing.T, f *os.File) {
 	require.NoError(t, ioctlErr)
 }
 
-// startKissPTListener does what kisspt_init does for an enabled pseudo
-// terminal - open it and run the listening goroutine against ctx - but hands
-// back a channel that is closed once that goroutine has finished.
+// startKissPTListener does what NewKissPT does for an enabled pseudo terminal
+// - open it and run the listening goroutine against ctx - but also hands back
+// the far end of the terminal and a channel that is closed once that goroutine
+// has finished.
 //
-// The terminal lives in package globals which the goroutine clears on its way
-// out, so a test has to be able to tell when it has gone before putting them
-// back; waiting on the channel is also the happens-before edge that keeps the
-// race detector quiet.
-func startKissPTListener(ctx context.Context, t *testing.T) (*os.File, <-chan struct{}) {
+// The goroutine gives the terminal up on its way out, so a test has to be able
+// to tell when it has gone before looking at what it left behind; waiting on
+// the channel is also the happens-before edge that keeps the race detector
+// quiet.
+func startKissPTListener(ctx context.Context, t *testing.T, debug int) (*KissPT, *os.File, <-chan struct{}) {
 	t.Helper()
 
-	kisspt_kf = new(KISSFrame)
+	var kp = newKissPT(debug)
 
-	kisspt_open_pt()
+	kp.openPT()
 
-	require.NotNil(t, pt_master, "no pseudo terminal was opened for the KISS TNC")
+	require.NotNil(t, kp.master, "no pseudo terminal was opened for the KISS TNC")
 
-	rawTerminal(t, pt_slave)
+	rawTerminal(t, kp.slave)
 
 	var done = make(chan struct{})
 
 	go func() {
 		defer close(done)
 
-		kisspt_listen_thread(ctx)
+		kp.listenThread(ctx)
 	}()
 
-	return pt_slave, done
+	return kp, kp.slave, done
 }
 
-// startKissPT brings up the pseudo terminal KISS TNC, with its listening
-// goroutine running until the test ends, and hands back the far end of the
-// pseudo terminal - what a client application would open.
-//
-// Everything here lives in package globals, so they are saved and put back
-// once the goroutine has stopped, however the test finishes.
-func startKissPT(t *testing.T) *os.File {
+// startKissPT brings up a pseudo terminal KISS TNC, with its listening
+// goroutine running until the test ends, and hands back the TNC and the far
+// end of the pseudo terminal - what a client application would open.
+func startKissPT(t *testing.T, debug int) (*KissPT, *os.File) {
 	t.Helper()
-
-	var origMaster, origSlave, origFrame, origDebug = pt_master, pt_slave, kisspt_kf, kisspt_debug
 
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var client, done = startKissPTListener(ctx, t)
+	var kp, client, done = startKissPTListener(ctx, t, debug)
 
 	t.Cleanup(func() {
 		cancel()
@@ -111,13 +107,11 @@ func startKissPT(t *testing.T) *os.File {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
-			t.Error("kisspt_listen_thread did not finish after its context was cancelled")
+			t.Error("KissPT.listenThread did not finish after its context was cancelled")
 		}
-
-		pt_master, pt_slave, kisspt_kf, kisspt_debug = origMaster, origSlave, origFrame, origDebug
 	})
 
-	return client
+	return kp, client
 }
 
 // readKissFrame reads one whole KISS frame - everything up to and including
@@ -216,18 +210,24 @@ func readKissText(t *testing.T, client *os.File, want int) string {
 // A TNC nobody asked for should not be there: without -p there is no pseudo
 // terminal, and nothing for the sending path to write to.
 func TestKissPTNotEnabled(t *testing.T) {
-	var origMaster, origFrame = pt_master, kisspt_kf
+	var kp = NewKissPT(t.Context(), new(misc_config_s), 0)
 
-	t.Cleanup(func() { pt_master, kisspt_kf = origMaster, origFrame })
-
-	kisspt_init(t.Context(), new(misc_config_s))
-
-	assert.Nil(t, pt_master, "a pseudo terminal was opened although KISS pt was not enabled")
-	assert.NotNil(t, kisspt_kf, "the frame decoder state should be ready even with no terminal")
+	assert.Nil(t, kp.ptMaster(), "a pseudo terminal was opened although KISS pt was not enabled")
+	assert.NotNil(t, kp.kf, "the frame decoder state should be ready even with no terminal")
 
 	// With no terminal, sending to the client is a no-op rather than a crash.
 	assert.NotPanics(t, func() {
-		kisspt_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
+	})
+}
+
+// The receive paths send to the pseudo terminal whether or not startup has got
+// as far as setting it up, so a TNC that was never built is a no-op too.
+func TestKissPTNilSendRecPacket(t *testing.T) {
+	var kp *KissPT
+
+	assert.NotPanics(t, func() {
+		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("nowhere to go"), 13, nil, -1)
 	})
 }
 
@@ -236,7 +236,7 @@ func TestKissPTNotEnabled(t *testing.T) {
 // restart.  The symlink is what saves that, so it has to point at the terminal
 // we actually opened.
 func TestKissPTSymlinkPointsAtTheTerminal(t *testing.T) {
-	var client = startKissPT(t)
+	var _, client = startKissPT(t, 0)
 
 	var target, err = os.Readlink(TMP_KISSTNC_SYMLINK)
 	require.NoError(t, err, "no symlink was created for the KISS TNC")
@@ -247,13 +247,13 @@ func TestKissPTSymlinkPointsAtTheTerminal(t *testing.T) {
 // A frame received over the radio reaches the client as KISS: the channel and
 // command in the first byte, then the frame, wrapped in FENDs.
 func TestKissPTSendRecPacket(t *testing.T) {
-	var client = startKissPT(t)
+	var kp, client = startKissPT(t, 0)
 
 	const channel = 3
 
 	var frame = []byte("some received frame")
 
-	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	kp.SendRecPacket(channel, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 
 	var want = KissEncapsulate(append([]byte{byte(channel<<4 | KISS_CMD_DATA_FRAME)}, frame...))
 
@@ -263,11 +263,11 @@ func TestKissPTSendRecPacket(t *testing.T) {
 // FEND and FESC in the frame contents would otherwise look like framing to the
 // client, so they are escaped on the way out.
 func TestKissPTSendRecPacketEscapes(t *testing.T) {
-	var client = startKissPT(t)
+	var kp, client = startKissPT(t, 0)
 
 	var frame = []byte{FEND, 'a', FESC, 'b'}
 
-	kisspt_send_rec_packet(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+	kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 
 	assert.Equal(t,
 		[]byte{FEND, 0x00, FESC, TFEND, 'a', FESC, TFESC, 'b', FEND},
@@ -277,9 +277,9 @@ func TestKissPTSendRecPacketEscapes(t *testing.T) {
 // A length of -1 says the caller has built the bytes itself - the fake command
 // prompt - and they go out as they are, with no framing or escaping added.
 func TestKissPTSendRecPacketText(t *testing.T) {
-	var client = startKissPT(t)
+	var kp, client = startKissPT(t, 0)
 
-	kisspt_send_rec_packet(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+	kp.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 
 	assert.Equal(t, "\r\ncmd:", readKissText(t, client, len("\r\ncmd:")))
 }
@@ -288,7 +288,7 @@ func TestKissPTSendRecPacketText(t *testing.T) {
 // user is told, because silently passing it would hand the client something it
 // cannot parse.
 func TestKissPTSendRecPacketTruncates(t *testing.T) {
-	var client = startKissPT(t)
+	var kp, client = startKissPT(t, 0)
 
 	var frame = make([]byte, AX25_MAX_PACKET_LEN+10)
 	for i := range frame {
@@ -300,7 +300,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	var got = drainKissFrame(t, client)
 
 	var output = CaptureOutput(t, func() {
-		kisspt_send_rec_packet(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
+		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 	})
 
 	assert.Contains(t, output, "Truncated")
@@ -334,7 +334,7 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 		}
 	})
 
-	var client = startKissPT(t)
+	var _, client = startKissPT(t, 0)
 
 	var pp = newTestPacket(t)
 
@@ -355,7 +355,7 @@ func TestKissPTClientFrameIsQueuedForTransmission(t *testing.T) {
 // things like "KISS ON\r" over and over until it gets an answer.  Answering
 // with a command prompt is what stops it.
 func TestKissPTAnswersCommandModeNoise(t *testing.T) {
-	var client = startKissPT(t)
+	var _, client = startKissPT(t, 0)
 
 	var _, writeErr = client.WriteString("KISS ON\r")
 	require.NoError(t, writeErr)
@@ -366,7 +366,7 @@ func TestKissPTAnswersCommandModeNoise(t *testing.T) {
 // "RESTART" is answered with a pair of FENDs instead - an empty KISS frame -
 // because that is what the applications sending it are waiting for.
 func TestKissPTAnswersRestart(t *testing.T) {
-	var client = startKissPT(t)
+	var _, client = startKissPT(t, 0)
 
 	var _, writeErr = client.WriteString("restart\r")
 	require.NoError(t, writeErr)
@@ -385,13 +385,9 @@ func TestKissPTAnswersRestart(t *testing.T) {
 // listening goroutine below stayed in its read for the life of the process,
 // however the context was cancelled.
 func TestKissPTStopsWhenCancelled(t *testing.T) {
-	var origMaster, origSlave, origFrame = pt_master, pt_slave, kisspt_kf
-
 	var ctx, cancel = context.WithCancel(t.Context())
 
-	var client, done = startKissPTListener(ctx, t)
-
-	t.Cleanup(func() { pt_master, pt_slave, kisspt_kf = origMaster, origSlave, origFrame })
+	var kp, client, done = startKissPTListener(ctx, t, 0)
 
 	cancel()
 
@@ -400,10 +396,10 @@ func TestKissPTStopsWhenCancelled(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("kisspt_listen_thread did not finish after its context was cancelled")
+		t.Fatal("KissPT.listenThread did not finish after its context was cancelled")
 	}
 
-	assert.Nil(t, pt_master, "the pseudo terminal was still open after cancellation")
+	assert.Nil(t, kp.master, "the pseudo terminal was still open after cancellation")
 
 	// And the client's end goes with it.
 	require.NoError(t, client.SetReadDeadline(time.Now().Add(5*time.Second)))
@@ -412,27 +408,23 @@ func TestKissPTStopsWhenCancelled(t *testing.T) {
 	assert.Error(t, readErr, "the client end of the pseudo terminal was not closed")
 }
 
-// closeKissPT is called from more than one place on the way out - the
-// listening goroutine has it registered twice over - so it has to cope with
-// the terminal already being gone.
-func TestCloseKissPTTwice(t *testing.T) {
-	var origMaster, origSlave = pt_master, pt_slave
+// closePT is called from more than one place on the way out - the listening
+// goroutine has it registered twice over - so it has to cope with the terminal
+// already being gone.
+func TestKissPTCloseTwice(t *testing.T) {
+	var kp = newKissPT(0)
 
-	t.Cleanup(func() {
-		closeKissPT()
+	t.Cleanup(kp.closePT)
 
-		pt_master, pt_slave = origMaster, origSlave
-	})
-
-	// Opened without kisspt_init, so there is no goroutine reading from the
+	// Opened without NewKissPT, so there is no goroutine reading from the
 	// terminal we are closing underneath it.
-	kisspt_open_pt()
-	require.NotNil(t, pt_master)
+	kp.openPT()
+	require.NotNil(t, kp.master)
 
-	closeKissPT()
-	assert.Nil(t, pt_master)
+	kp.closePT()
+	assert.Nil(t, kp.master)
 
-	assert.NotPanics(t, closeKissPT)
+	assert.NotPanics(t, kp.closePT)
 
 	// The symlink is a promise that there is a TNC on the other end, so it
 	// goes when the terminal does.
@@ -444,21 +436,17 @@ func TestCloseKissPTTwice(t *testing.T) {
 // master gets EIO once no process holds the slave - so the TNC gives it up
 // rather than spinning on an error forever.
 func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
-	var origMaster, origSlave, origFrame = pt_master, pt_slave, kisspt_kf
-
-	var client, done = startKissPTListener(t.Context(), t)
-
-	t.Cleanup(func() { pt_master, pt_slave, kisspt_kf = origMaster, origSlave, origFrame })
+	var kp, client, done = startKissPTListener(t.Context(), t, 0)
 
 	require.NoError(t, client.Close())
 
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("kisspt_listen_thread did not finish after the client closed the terminal")
+		t.Fatal("KissPT.listenThread did not finish after the client closed the terminal")
 	}
 
-	assert.Nil(t, pt_master, "the pseudo terminal was not given up after the client went away")
+	assert.Nil(t, kp.master, "the pseudo terminal was not given up after the client went away")
 
 	var _, statErr = os.Lstat(TMP_KISSTNC_SYMLINK)
 	assert.ErrorIs(t, statErr, os.ErrNotExist, "the symlink outlived the pseudo terminal")
@@ -467,12 +455,10 @@ func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 // With "-d k" the traffic in both directions is printed, so that a client
 // application that is not being understood can be looked at.
 func TestKissPTDebugPrintsBothDirections(t *testing.T) {
-	var client = startKissPT(t)
-
-	kisspt_set_debug(2)
+	var kp, client = startKissPT(t, 2)
 
 	var output = CaptureOutput(t, func() {
-		kisspt_send_rec_packet(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+		kp.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 
 		readKissFrame(t, client)
 	})
@@ -482,7 +468,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
 	output = CaptureOutput(t, func() {
-		kisspt_send_rec_packet(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
+		kp.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 
 		readKissText(t, client, len("\r\ncmd:"))
 	})
@@ -490,26 +476,12 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	assert.Contains(t, output, "Fake command prompt")
 }
 
-func TestKissPTSetDebug(t *testing.T) {
-	var orig = kisspt_debug
-
-	t.Cleanup(func() { kisspt_debug = orig })
-
-	kisspt_set_debug(2)
-
-	assert.Equal(t, 2, kisspt_debug)
-}
-
 // The receive path writes to the terminal while the listening goroutine reads
 // from it, and the listener gives the terminal up once the client hangs up -
 // under -race this is the regression test for the terminal being shared
 // unguarded between the two.
 func TestKissPTSendWhileListening(t *testing.T) {
-	var origMaster, origSlave, origFrame = pt_master, pt_slave, kisspt_kf
-
-	var client, done = startKissPTListener(t.Context(), t)
-
-	t.Cleanup(func() { pt_master, pt_slave, kisspt_kf = origMaster, origSlave, origFrame })
+	var kp, client, done = startKissPTListener(t.Context(), t, 0)
 
 	var sent = make(chan struct{})
 
@@ -523,7 +495,7 @@ func TestKissPTSendWhileListening(t *testing.T) {
 			default:
 			}
 
-			kisspt_send_rec_packet(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
+			kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 		}
 	}()
 
@@ -532,10 +504,10 @@ func TestKissPTSendWhileListening(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("kisspt_listen_thread did not finish after the client closed the terminal")
+		t.Fatal("KissPT.listenThread did not finish after the client closed the terminal")
 	}
 
 	<-sent
 
-	assert.Nil(t, pt_master, "the pseudo terminal was not given up after the client went away")
+	assert.Nil(t, kp.master, "the pseudo terminal was not given up after the client went away")
 }

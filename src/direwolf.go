@@ -57,6 +57,7 @@ var packetLogger *PacketLogger
 var telemetryState = NewTelemetryState()
 var beaconService *BeaconService
 var kissNetSvc *KissNetService
+var kissPT *KissPT
 var kissSerial *KissSerial
 var agwServer *AGWServer
 var mheardDB *MHeardDB
@@ -222,7 +223,6 @@ x = Silence FX.25 information.`)
 				d_a_opt++
 			case 'k':
 				d_k_opt++
-				kisspt_set_debug(d_k_opt)
 			case 'n':
 				d_n_opt++
 				// kiss_net_set_debug called after NewKissNetService below
@@ -650,7 +650,7 @@ x = Silence FX.25 information.`)
 	/*
 	 * Create a pseudo terminal and KISS TNC emulator.
 	 */
-	kisspt_init(ctx, misc_config)
+	kissPT = NewKissPT(ctx, misc_config, d_k_opt)
 	kissSerial = NewKissSerial(ctx, misc_config, d_k_opt)
 	kiss_frame_init(audio_config)
 
@@ -1053,7 +1053,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 	agwServer.SendRecPacket(channel, pp, fbuf)                                       // AGW net protocol
 	kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS TCP
 	kissSerial.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1) // KISS serial port
-	kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)   // KISS pseudo terminal
+	kissPT.SendRecPacket(channel, KISS_CMD_DATA_FRAME, fbuf, len(fbuf), nil, -1)     // KISS pseudo terminal
 
 	if A_opt_ais_to_obj && len(ais_obj_packet) != 0 {
 		var ao_pp = AX25FromText(ais_obj_packet, true)
@@ -1063,7 +1063,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 			agwServer.SendRecPacket(channel, ao_pp, ao_fbuf)
 			kissNetSvc.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 			kissSerial.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
-			kisspt_send_rec_packet(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
+			kissPT.SendRecPacket(channel, KISS_CMD_DATA_FRAME, ao_fbuf, len(ao_fbuf), nil, -1)
 		}
 	}
 

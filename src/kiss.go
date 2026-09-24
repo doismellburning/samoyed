@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -68,29 +67,32 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-/*
- * Accumulated KISS frame and state of decoder.
- */
+// KissPT is a virtual KISS TNC on a pseudo terminal: the terminal, the state
+// of the frame being decoded from it, and how much to say about the traffic.
+type KissPT struct {
+	debug int /* Print information flowing from and to client. */
 
-var kisspt_kf *KISSFrame
+	// kf is the accumulated KISS frame and state of the decoder.  Only the
+	// listening goroutine touches it once that is running.
+	kf *KISSFrame
 
-/*
- * These are for a Linux pseudo terminal.
- */
+	// mu guards master, which listenThread (reading, and giving the terminal
+	// up on a read error or on the way out) and SendRecPacket (writing from
+	// the receive path) share.  Once the listening goroutine is running, go
+	// through ptMaster and closePT rather than touching master directly.
+	//
+	// The lock covers the field, not the I/O: master is in the runtime
+	// poller, so a write racing a Close gets os.ErrClosed rather than a
+	// descriptor that has since been reused.
+	mu sync.Mutex
 
-// pt_master_mu guards pt_master, which kisspt_listen_thread (reading, and
-// giving the terminal up on a read error or on the way out) and
-// kisspt_send_rec_packet (writing from the receive path) share.  Once the
-// listening goroutine is running, go through ptMaster and closeKissPT rather
-// than touching pt_master directly.
-//
-// The lock covers the variable, not the I/O: pt_master is in the runtime
-// poller, so a write racing a Close gets os.ErrClosed rather than a
-// descriptor that has since been reused.
-var pt_master_mu sync.Mutex
+	master *os.File /* File descriptor for my end. */
 
-var pt_master *os.File /* File descriptor for my end. */
-var pt_slave *os.File  /* Pseudo terminal slave */
+	// slave is the pseudo terminal's far end, what a client application
+	// opens.  Set by openPT before the listening goroutine starts, and not
+	// changed after.
+	slave *os.File
+}
 
 /*
  * Symlink to pseudo terminal name which changes.
@@ -98,20 +100,25 @@ var pt_slave *os.File  /* Pseudo terminal slave */
 
 const TMP_KISSTNC_SYMLINK = "/tmp/kisstnc"
 
-var kisspt_debug = 0 /* Print information flowing from and to client. */
+// newKissPT builds a KissPT with nothing opened or started.
+func newKissPT(debug int) *KissPT {
+	var kp = new(KissPT)
+	kp.debug = debug
+	kp.kf = new(KISSFrame)
 
-func kisspt_set_debug(n int) {
-	kisspt_debug = n
+	return kp
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        kisspt_init
+ * Name:        NewKissPT
  *
  * Purpose:     Set up a pseudo terminal acting as a virtual KISS TNC.
  *
  *
- * Inputs:
+ * Inputs:	mc		- Configuration; enable_kiss_pt says whether to.
+ *
+ *		debug		- Print information flowing from and to client.
  *
  * Outputs:
  *
@@ -122,23 +129,24 @@ func kisspt_set_debug(n int) {
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_init(ctx context.Context, mc *misc_config_s) {
-	/*
-	 * This reads messages from client.
-	 */
-	pt_master = nil
-
-	kisspt_kf = new(KISSFrame)
+func NewKissPT(ctx context.Context, mc *misc_config_s, debug int) *KissPT {
+	var kp = newKissPT(debug)
 
 	if mc.enable_kiss_pt {
-		kisspt_open_pt()
+		// Nothing else is running yet, so there is no lock to take.
+		kp.openPT()
 
-		if pt_master != nil {
-			go kisspt_listen_thread(ctx)
+		/*
+		 * This reads messages from client.
+		 */
+		if kp.master != nil {
+			go kp.listenThread(ctx)
 		}
 	}
 
-	logrus.WithField("pt_master_open", ptMaster() != nil).Debug("end of kisspt_init")
+	logrus.WithField("pt_master_open", kp.ptMaster() != nil).Debug("end of NewKissPT")
+
+	return kp
 }
 
 // pollable hands back a *os.File for the same open file as f, in non-blocking
@@ -170,8 +178,104 @@ func pollable(f *os.File) (*os.File, error) {
 	return os.NewFile(uintptr(fd), f.Name()), nil
 }
 
-func kisspt_open_pt() {
-	logrus.Debug("kisspt_open_pt")
+/*-------------------------------------------------------------------
+ *
+ * Name:        SendRecPacket
+ *
+ * Purpose:     Send a received packet or text string to the client app.
+ *
+ * Inputs:	chan		- Channel number where packet was received.
+ *				  0 = first, 1 = second if any.
+ *
+ *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
+ *				  KISS_CMD_SET_HARDWARE when responding to a query.
+ *
+ *		pp		- Identifier for packet object.
+ *
+ *		fbuf		- Address of raw received frame buffer
+ *				  or a text string.
+ *
+ *		flen		- Length of raw received frame not including the FCS
+ *				  or -1 for a text string.
+ *
+ *		kps, client	- Not used for pseudo terminal.
+ *				  Here so that 3 related functions all have
+ *				  the same parameter list.
+ *
+ * Description:	Send message to client.
+ *		We really don't care if anyone is listening or not.
+ *		I don't even know if we can find out.
+ *
+ *		Safe on a nil receiver, so the receive paths need no guard
+ *		before startup has got as far as the pseudo terminal.
+ *
+ *--------------------------------------------------------------------*/
+
+func (kp *KissPT) SendRecPacket(channel int, kiss_cmd int, fbuf []byte, flen int, kps *kissport_status_s, client int) {
+	if kp == nil {
+		return
+	}
+
+	var master = kp.ptMaster()
+	if master == nil {
+		return
+	}
+
+	var kiss_buff []byte
+
+	if flen < 0 {
+		if kp.debug > 0 {
+			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
+		}
+
+		kiss_buff = fbuf
+	} else {
+		var stemp []byte
+
+		if flen > AX25_MAX_PACKET_LEN {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
+
+			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
+		}
+
+		stemp = []byte{byte((channel << 4) | kiss_cmd)}
+		stemp = append(stemp, fbuf...)
+
+		if kp.debug >= 2 {
+			/* AX.25 frame with the CRC removed. */
+			text_color_set(DW_COLOR_DEBUG)
+			dw_printf("\n")
+			dw_printf("Packet content before adding KISS framing and any escapes:\n")
+			HexDump(fbuf)
+		}
+
+		kiss_buff = KissEncapsulate(stemp)
+
+		/* This has KISS framing and escapes for sending to client app. */
+
+		if kp.debug > 0 {
+			kiss_debug_print(TO_CLIENT, "", kiss_buff)
+		}
+	}
+
+	var n, err = master.Write(kiss_buff)
+
+	if n != len(kiss_buff) {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
+			master.Name(), len(kiss_buff), n, err)
+	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
+		text_color_set(DW_COLOR_INFO)
+		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
+		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
+	}
+} /* SendRecPacket */
+
+// openPT opens the pseudo terminal and points the symlink at it.  It is for
+// before the listening goroutine starts, so it takes no lock.
+func (kp *KissPT) openPT() {
+	logrus.Debug("KissPT.openPT")
 	var ptmx, pts, err = pty.Open()
 	if err != nil {
 		text_color_set(DW_COLOR_ERROR)
@@ -189,8 +293,8 @@ func kisspt_open_pt() {
 		return
 	}
 
-	pt_master = master
-	pt_slave = pts
+	kp.master = master
+	kp.slave = pts
 
 	// TODO KG Figure out the right serial settings?
 
@@ -231,7 +335,7 @@ func kisspt_open_pt() {
 	*/
 
 	text_color_set(DW_COLOR_INFO)
-	dw_printf("Virtual KISS TNC is available on %s\n", pt_slave.Name())
+	dw_printf("Virtual KISS TNC is available on %s\n", kp.slave.Name())
 
 	// Sample code shows this. Why would we open it here?
 	// On Ubuntu, the slave side disappears after a few
@@ -262,11 +366,11 @@ func kisspt_open_pt() {
 
 	// TODO: Is this removed when application exits?
 
-	var symlinkErr = os.Symlink(pt_slave.Name(), TMP_KISSTNC_SYMLINK)
+	var symlinkErr = os.Symlink(kp.slave.Name(), TMP_KISSTNC_SYMLINK)
 	if symlinkErr == nil {
 		logrus.WithFields(logrus.Fields{
 			"symlink": TMP_KISSTNC_SYMLINK,
-			"device":  pt_slave.Name(),
+			"device":  kp.slave.Name(),
 		}).Debug("Created KISS TNC symlink")
 	} else {
 		// The symlink is a convenience, so the application's configuration
@@ -274,105 +378,17 @@ func kisspt_open_pt() {
 		// TNC is usable without it.
 		logrus.WithError(symlinkErr).WithFields(logrus.Fields{
 			"symlink": TMP_KISSTNC_SYMLINK,
-			"device":  pt_slave.Name(),
+			"device":  kp.slave.Name(),
 		}).Error("Could not create the KISS TNC symlink; use the device directly")
 	}
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:        kisspt_send_rec_packet
- *
- * Purpose:     Send a received packet or text string to the client app.
- *
- * Inputs:	chan		- Channel number where packet was received.
- *				  0 = first, 1 = second if any.
- *
- *		kiss_cmd	- Usually KISS_CMD_DATA_FRAME but we can also have
- *				  KISS_CMD_SET_HARDWARE when responding to a query.
- *
- *		pp		- Identifier for packet object.
- *
- *		fbuf		- Address of raw received frame buffer
- *				  or a text string.
- *
- *		flen		- Length of raw received frame not including the FCS
- *				  or -1 for a text string.
- *
- *		kps, client	- Not used for pseudo terminal.
- *				  Here so that 3 related functions all have
- *				  the same parameter list.
- *
- * Description:	Send message to client.
- *		We really don't care if anyone is listening or not.
- *		I don't even know if we can find out.
- *
- *--------------------------------------------------------------------*/
-
-func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kps *kissport_status_s, client int) {
-	var master = ptMaster()
-	if master == nil {
-		return
-	}
-
-	var kiss_buff []byte
-
-	if flen < 0 {
-		if kisspt_debug > 0 {
-			kiss_debug_print(TO_CLIENT, "Fake command prompt", fbuf)
-		}
-
-		kiss_buff = fbuf
-	} else {
-		var stemp []byte
-
-		if flen > AX25_MAX_PACKET_LEN {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nPseudo Terminal KISS buffer too small.  Truncated.\n\n")
-
-			fbuf = fbuf[:AX25_MAX_PACKET_LEN]
-		}
-
-		stemp = []byte{byte((channel << 4) | kiss_cmd)}
-		stemp = append(stemp, fbuf...)
-
-		if kisspt_debug >= 2 {
-			/* AX.25 frame with the CRC removed. */
-			text_color_set(DW_COLOR_DEBUG)
-			dw_printf("\n")
-			dw_printf("Packet content before adding KISS framing and any escapes:\n")
-			HexDump(fbuf)
-		}
-
-		kiss_buff = KissEncapsulate(stemp)
-
-		/* This has KISS framing and escapes for sending to client app. */
-
-		if kisspt_debug > 0 {
-			kiss_debug_print(TO_CLIENT, "", kiss_buff)
-		}
-	}
-
-	var n, err = master.Write(kiss_buff)
-
-	if n != len(kiss_buff) {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("\nError sending KISS message to client application on pseudo terminal.  fd=%s, len=%d, write returned %d, err = %s\n\n",
-			master.Name(), len(kiss_buff), n, err)
-	} else if err != nil /* TODO KG Need to test real behaviour here: && errno == EWOULDBLOCK */ {
-		text_color_set(DW_COLOR_INFO)
-		dw_printf("KISS SEND - Discarding message because no one is listening.\n")
-		dw_printf("This happens when you use the -p option and don't read from the pseudo terminal.\n")
-	}
-} /* kisspt_send_rec_packet */
-
-/*-------------------------------------------------------------------
- *
- * Name:        kisspt_get
+ * Name:        get
  *
  * Purpose:     Read one byte from the KISS client app.
  *
- * Global In:	pt_master_fd
  *
  * Returns:	(byte, nil) on success, or (0, error) on failure.
  *		The caller should stop processing and return on a non-nil error.
@@ -385,7 +401,7 @@ func kisspt_send_rec_packet(channel int, kiss_cmd int, fbuf []byte, flen int, kp
  *
  *--------------------------------------------------------------------*/
 
-func kisspt_get(ctx context.Context) (byte, error) {
+func (kp *KissPT) get(ctx context.Context) (byte, error) {
 	for ctx.Err() == nil {
 		/*
 		 * Since the beginning we've always had a couple annoying problems with
@@ -441,7 +457,7 @@ func kisspt_get(ctx context.Context) (byte, error) {
 
 		// TODO KG Check rc == -1
 		*/
-		var master = ptMaster()
+		var master = kp.ptMaster()
 		if master == nil {
 			return 0, os.ErrClosed
 		}
@@ -450,7 +466,7 @@ func kisspt_get(ctx context.Context) (byte, error) {
 		var n, err = master.Read(ch)
 
 		if ctx.Err() != nil {
-			closeKissPT() // Ours to close: nothing will read from it again.
+			kp.closePT() // Ours to close: nothing will read from it again.
 
 			return 0, ctx.Err()
 		}
@@ -460,9 +476,9 @@ func kisspt_get(ctx context.Context) (byte, error) {
 		}
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", pt_slave.Name(), err)
+			dw_printf("\nError receiving KISS message from client application.  Closing %s. %s\n\n", kp.slave.Name(), err)
 
-			closeKissPTIfCurrent(master)
+			kp.closePTIfCurrent(master)
 
 			return 0, err
 		}
@@ -473,69 +489,67 @@ func kisspt_get(ctx context.Context) (byte, error) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        kisspt_listen_thread
+ * Name:        listenThread
  *
- * Purpose:     Read messages from serial port KISS client application.
- *
- * Global In:
+ * Purpose:     Read messages from pseudo terminal KISS client application.
  *
  * Description:	Reads bytes from the KISS client app and
  *		sends them to KissRecByte for processing.
  *
  *--------------------------------------------------------------------*/
 
-// closeKissPT closes the pseudo terminal, if it is open, and forgets it,
-// along with the symlink that points at its far end.
-func closeKissPT() {
-	closeKissPTIfCurrent(ptMaster())
+// closePT closes the pseudo terminal, if it is open, and forgets it, along
+// with the symlink that points at its far end.
+func (kp *KissPT) closePT() {
+	kp.closePTIfCurrent(kp.ptMaster())
 }
 
-// closeKissPTIfCurrent is closeKissPT, but only if master is still the open
-// pseudo terminal, so that giving up one we read an error from cannot close
-// anything that has taken its place.
-func closeKissPTIfCurrent(master *os.File) {
-	pt_master_mu.Lock()
-	defer pt_master_mu.Unlock()
+// closePTIfCurrent is closePT, but only if master is still the open pseudo
+// terminal, so that giving up one we read an error from cannot close anything
+// that has taken its place.
+func (kp *KissPT) closePTIfCurrent(master *os.File) {
+	kp.mu.Lock()
+	defer kp.mu.Unlock()
 
-	if master == nil || pt_master != master {
+	if master == nil || kp.master != master {
 		return
 	}
 
-	pt_master.Close()
+	kp.master.Close()
 
-	pt_master = nil
+	kp.master = nil
 
 	os.Remove(TMP_KISSTNC_SYMLINK)
 }
 
 // ptMaster returns our end of the pseudo terminal, or nil if it is not open.
-func ptMaster() *os.File {
-	pt_master_mu.Lock()
-	defer pt_master_mu.Unlock()
+func (kp *KissPT) ptMaster() *os.File {
+	kp.mu.Lock()
+	defer kp.mu.Unlock()
 
-	return pt_master
+	return kp.master
 }
 
-func kisspt_listen_thread(ctx context.Context) {
-	logrus.Debug("kisspt_listen_thread")
+func (kp *KissPT) listenThread(ctx context.Context) {
+	logrus.Debug("KissPT.listenThread")
 
 	// Nothing obliges the client at the other end of the pseudo terminal to
 	// send anything, so closing the master is what ends a read that would
 	// otherwise never return.  Armed once here rather than around each read:
 	// this goroutine reads one byte at a time, and the pseudo terminal is
 	// never reopened underneath it.
-	defer closeOnDone(ctx, ptMaster())()
+	defer closeOnDone(ctx, kp.ptMaster())()
 
 	// Nothing else tears the pseudo terminal down - cleanup has no teardown
 	// for it - so it is ours to close whenever we stop, including when a
 	// cancellation arrives before we ever get as far as a read.
-	defer closeKissPT()
+	defer kp.closePT()
 
 	for ctx.Err() == nil {
-		var ch, err = kisspt_get(ctx)
+		var ch, err = kp.get(ctx)
 		if err != nil {
 			return
 		}
-		KissRecByte(kisspt_kf, ch, kisspt_debug, nil, -1, kisspt_send_rec_packet)
+		KissRecByte(kp.kf, ch, kp.debug, nil, -1, kp.SendRecPacket)
 	}
 }
