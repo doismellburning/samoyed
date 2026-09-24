@@ -85,10 +85,10 @@ func recordingSendfun() (*[]sentToClient, kiss_sendfun) {
 func setupKissProcessMsg(t *testing.T) *XmitService {
 	t.Helper()
 
-	var origAudio, origXmit, origKissNet, origKissutil = save_audio_config_p, xmitSvc, kissNetSvc, KISSUTIL
+	var origAudio, origXmit, origKissNet = save_audio_config_p, xmitSvc, kissNetSvc
 
 	t.Cleanup(func() {
-		save_audio_config_p, xmitSvc, kissNetSvc, KISSUTIL = origAudio, origXmit, origKissNet, origKissutil
+		save_audio_config_p, xmitSvc, kissNetSvc = origAudio, origXmit, origKissNet
 
 		for c := range MAX_RADIO_CHANS {
 			for p := range TQ_NUM_PRIO {
@@ -104,7 +104,6 @@ func setupKissProcessMsg(t *testing.T) *XmitService {
 
 	kiss_frame_init(audioConfig)
 
-	KISSUTIL = false
 	xmitSvc = new(XmitService)
 	kissNetSvc = NewKissNetService(t.Context(), new(misc_config_s))
 
@@ -343,28 +342,6 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
 }
 
-// kissutil is a client, not a TNC, so it takes the message for itself rather
-// than trying to transmit it.
-func Test_kiss_process_msg_kissutil(t *testing.T) {
-	setupKissProcessMsg(t)
-
-	var origHook = KissutilKissProcessMsg
-
-	t.Cleanup(func() { KissutilKissProcessMsg = origHook })
-
-	var got []byte
-
-	KISSUTIL = true
-	KissutilKissProcessMsg = func(msg []byte) { got = msg }
-
-	var _, sendfun = recordingSendfun()
-
-	kiss_process_msg([]byte{KISS_CMD_DATA_FRAME, 'h', 'i'}, 0, nil, -1, sendfun)
-
-	assert.Equal(t, []byte{KISS_CMD_DATA_FRAME, 'h', 'i'}, got)
-	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false), "kissutil should not be transmitting")
-}
-
 // "Set hardware" is the one command with an answer: the human readable
 // question-and-answer form fldigi established, which several applications
 // already speak.
@@ -592,6 +569,35 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 
 	assert.Contains(t, output, "<<< Data frame from KISS client application, channel 0")
 	assert.Contains(t, output, "Packet content after removing KISS framing")
+}
+
+// kissutil is a client, not a TNC, so a collector with OnMessage hands each
+// message over rather than trying to transmit it.
+func Test_KissRecByte_OnMessage(t *testing.T) {
+	setupKissProcessMsg(t)
+
+	var got []byte
+
+	var kf = new(KISSFrame)
+	kf.OnMessage = func(msg []byte) { got = msg }
+
+	feedKissBytes(kf, 0, KissEncapsulate([]byte{KISS_CMD_DATA_FRAME, 'h', 'i'}))
+
+	assert.Equal(t, []byte{KISS_CMD_DATA_FRAME, 'h', 'i'}, got)
+	assert.Equal(t, 0, transmitQueue.Count(0, -1, "", "", false), "kissutil should not be transmitting")
+}
+
+// What kissutil collects came from the TNC, so its debug output says so.
+func Test_KissRecByte_OnMessage_debug(t *testing.T) {
+	var kf = new(KISSFrame)
+	kf.OnMessage = func([]byte) {}
+
+	var output = CaptureOutput(t, func() {
+		feedKissBytes(kf, 1, KissEncapsulate([]byte{KISS_CMD_DATA_FRAME, 'h', 'i'}))
+	})
+
+	assert.Contains(t, output, "From KISS TNC:")
+	assert.NotContains(t, output, "KISS client application")
 }
 
 // kiss_unwrap takes the escapes and framing back out, complaining about
