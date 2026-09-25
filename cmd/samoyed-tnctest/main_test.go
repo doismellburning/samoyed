@@ -63,24 +63,33 @@ func resetState(t *testing.T) {
 	t.Helper()
 
 	var saved = struct {
-		usingTCP   [MAX_TNC]bool
-		sock       [MAX_TNC]net.Conn
-		serial     [MAX_TNC]*term.Term
-		busy       [MAX_TNC]bool
-		address    [MAX_TNC]string
-		prompt     [MAX_TNC]bool
-		lastRecSeq [MAX_TNC]int
-		width      int
+		usingTCP [MAX_TNC]bool
+		sock     [MAX_TNC]net.Conn
+		serial   [MAX_TNC]*term.Term
+		address  [MAX_TNC]string
+		width    int
 	}{
-		tnctest_using_tcp, tnctest_server_sock, tnctest_serial_fd, busy,
-		tnc_address, have_cmd_prompt, last_rec_seq, column_width,
+		tnctest_using_tcp, tnctest_server_sock, tnctest_serial_fd, tnc_address, column_width,
 	}
 
 	tnc_address = [MAX_TNC]string{"DW0", "DW1"}
 
+	// Each TNC's state starts afresh, as it would in a run of its own.
+	var clearState = func() {
+		for j := range MAX_TNC {
+			busy[j].Store(false)
+			have_cmd_prompt[j].Store(false)
+			last_rec_seq[j].Store(0)
+		}
+	}
+
+	clearState()
+
 	t.Cleanup(func() {
-		tnctest_using_tcp, tnctest_server_sock, tnctest_serial_fd, busy = saved.usingTCP, saved.sock, saved.serial, saved.busy
-		tnc_address, have_cmd_prompt, last_rec_seq, column_width = saved.address, saved.prompt, saved.lastRecSeq, saved.width
+		tnctest_using_tcp, tnctest_server_sock, tnctest_serial_fd = saved.usingTCP, saved.sock, saved.serial
+		tnc_address, column_width = saved.address, saved.width
+
+		clearState()
 	})
 }
 
@@ -90,21 +99,21 @@ func Test_process_rec_data(t *testing.T) {
 	// The answering end counts what is sent to it...
 	process_rec_data(1, "0001 send data\r")
 	process_rec_data(1, "0002 send data\r")
-	assert.Equal(t, 2, last_rec_seq[1])
+	assert.Equal(t, int64(2), last_rec_seq[1].Load())
 
 	// ...and the calling end counts the replies.
 	process_rec_data(0, "0001 reply\r")
-	assert.Equal(t, 1, last_rec_seq[0])
+	assert.Equal(t, int64(1), last_rec_seq[0].Load())
 
 	// Each only counts its own half of the conversation.
 	process_rec_data(0, "0003 send data\r")
 	process_rec_data(1, "0002 reply\r")
-	assert.Equal(t, 1, last_rec_seq[0])
-	assert.Equal(t, 2, last_rec_seq[1])
+	assert.Equal(t, int64(1), last_rec_seq[0].Load())
+	assert.Equal(t, int64(2), last_rec_seq[1].Load())
 
 	// Pieces of the alphabet test segmentation, and don't count.
 	process_rec_data(0, "ABCDE\r")
-	assert.Equal(t, 1, last_rec_seq[0])
+	assert.Equal(t, int64(1), last_rec_seq[0].Load())
 
 	assert.Panics(t, func() { process_rec_data(0, "Something else") })
 }
@@ -254,7 +263,7 @@ func Test_tnc_commands_serial(t *testing.T) {
 
 	var tnc = serialTNC(t, 0)
 
-	have_cmd_prompt[0] = true
+	have_cmd_prompt[0].Store(true)
 
 	tnc_connect(0, 1)
 	assert.Equal(t, "connect TNC1\r", readUntil(t, tnc, "\r"))
@@ -272,6 +281,42 @@ func Test_tnc_commands_serial(t *testing.T) {
 
 // main takes hours over a full run, and its TNC goroutines exit the process
 // when a TNC goes away, so it runs on its own.
+func Test_main_connects(t *testing.T) {
+	var ln0, port0 = testutils.Listen(t)
+	var ln1, port1 = testutils.Listen(t)
+
+	var p = testutils.StartMain(t, "127.0.0.1:"+port0+"=Caller", "127.0.0.1:"+port1+"=Answerer")
+
+	var tnc0 = testutils.Accept(t, ln0)
+	var tnc1 = testutils.Accept(t, ln1)
+
+	// Each TNC is asked for raw frames and to register its callsign.
+	for i, tnc := range []net.Conn{tnc0, tnc1} {
+		assert.Equal(t, byte('k'), readHeader(t, tnc).DataKind)
+
+		var register = readHeader(t, tnc)
+		assert.Equal(t, byte('X'), register.DataKind)
+		assert.Equal(t, []string{"DW0", "DW1"}[i], callsign(register.CallFrom))
+	}
+
+	p.WaitFor(t, "Andiamo!")
+
+	// The first then calls the second.
+	var connect = readHeader(t, tnc0)
+	assert.Equal(t, byte('C'), connect.DataKind)
+	assert.Equal(t, "DW0", callsign(connect.CallFrom))
+	assert.Equal(t, "DW1", callsign(connect.CallTo))
+
+	// The first end reports the connection.
+	var connected = new(direwolf.AGWPEHeader)
+	connected.DataKind = 'C'
+	copy(connected.CallFrom[:], "DW1")
+
+	require.NoError(t, binary.Write(tnc0, binary.LittleEndian, connected))
+
+	p.WaitFor(t, "*** Connected to DW1")
+}
+
 func Test_main_badArguments(t *testing.T) {
 	var gone = "127.0.0.1:" + testutils.UnusedPort(t)
 

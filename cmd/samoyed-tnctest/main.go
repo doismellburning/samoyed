@@ -48,6 +48,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -77,7 +78,7 @@ var tnctest_server_sock [MAX_TNC]net.Conn /* File descriptor for AGW socket inte
 
 var tnctest_serial_fd [MAX_TNC]*term.Term /* Serial port handle. */
 
-var busy [MAX_TNC]bool /* True when TNC busy and can't accept more data. */
+var busy [MAX_TNC]atomic.Bool /* True when TNC busy and can't accept more data. */
 /* For serial port, this is set by XON / XOFF characters. */
 
 const XOFF byte = 0x13
@@ -92,13 +93,17 @@ var tnc_address [MAX_TNC]string /* Name of the TNC used in the frames.  Original
  * Current state for each TNC.
  */
 
-var is_connected [MAX_TNC]int = [MAX_TNC]int{-1, -1} /* -1 = not yet available. */
+// The state of each TNC is kept by its own goroutine and watched by main, so
+// it is atomic.  A TNC's goroutine sets up its connection before it first sets
+// is_connected, so main seeing it set can use the connection.
+
+var is_connected [MAX_TNC]atomic.Int32 /* -1 = not yet available, as main starts it. */
 /* 0 = not connected. */
 /* 1 = not connected. */
 
-var have_cmd_prompt [MAX_TNC]bool /* Set if "cmd:" was the last thing seen. */
+var have_cmd_prompt [MAX_TNC]atomic.Bool /* Set if "cmd:" was the last thing seen. */
 
-var last_rec_seq [MAX_TNC]int /* Each data packet will contain a sequence number. */
+var last_rec_seq [MAX_TNC]atomic.Int64 /* Each data packet will contain a sequence number. */
 /* This is used to verify that all have been */
 /* received in the correct order. */
 
@@ -132,6 +137,10 @@ func main() {
 	}
 
 	column_width = LINE_WIDTH / num_tnc
+
+	for j := range MAX_TNC {
+		is_connected[j].Store(-1)
+	}
 
 	var hostname [MAX_TNC]string
 	var port [MAX_TNC]string
@@ -189,7 +198,7 @@ func main() {
 		ready = true
 
 		for j := range num_tnc {
-			if is_connected[j] < 0 {
+			if is_connected[j].Load() < 0 {
 				ready = false
 			}
 		}
@@ -214,7 +223,7 @@ func main() {
 		ready = true
 
 		for j := range num_tnc {
-			if is_connected[j] <= 0 {
+			if is_connected[j].Load() <= 0 {
 				ready = false
 			}
 		}
@@ -259,30 +268,30 @@ func main() {
 	 * Hang around until we get last expected reply or there is too much time with no activity.
 	 */
 
-	var last0 = last_rec_seq[0]
-	var last1 = last_rec_seq[1]
+	var last0 = int(last_rec_seq[0].Load())
+	var last1 = int(last_rec_seq[1].Load())
 	var no_activity = 0
 	var INACTIVE_TIMEOUT = 120
 
-	for last_rec_seq[0] != max_count && no_activity < INACTIVE_TIMEOUT {
+	for int(last_rec_seq[0].Load()) != max_count && no_activity < INACTIVE_TIMEOUT {
 		direwolf.SLEEP_MS(1000)
 
 		no_activity++
 
-		if last_rec_seq[0] > last0 {
-			last0 = last_rec_seq[0]
+		if seq := int(last_rec_seq[0].Load()); seq > last0 {
+			last0 = seq
 			no_activity = 0
 		}
 
-		if last_rec_seq[1] > last1 {
-			last1 = last_rec_seq[1]
+		if seq := int(last_rec_seq[1].Load()); seq > last1 {
+			last1 = seq
 			no_activity = 0
 		}
 	}
 
 	var errors = 0
 
-	if last_rec_seq[0] == max_count {
+	if int(last_rec_seq[0].Load()) == max_count {
 		fmt.Printf("Got last expected reply.\n")
 	} else {
 		fmt.Printf("ERROR: Timeout - No incoming activity for %d seconds.\n", no_activity)
@@ -293,8 +302,8 @@ func main() {
 	/*
 	 * Did we get all expected replies?
 	 */
-	if last_rec_seq[0] != max_count {
-		fmt.Printf("ERROR: Last received reply was %d when we were expecting %d.\n", last_rec_seq[0], max_count)
+	if last := int(last_rec_seq[0].Load()); last != max_count {
+		fmt.Printf("ERROR: Last received reply was %d when we were expecting %d.\n", last, max_count)
 
 		errors++
 	}
@@ -313,7 +322,7 @@ func main() {
 		ready = true
 
 		for j := range num_tnc {
-			if is_connected[j] != 0 {
+			if is_connected[j].Load() != 0 {
 				ready = false
 			}
 		}
@@ -365,11 +374,11 @@ func process_rec_data(my_index int, data string) {
 
 	if strings.HasPrefix(after, "send") {
 		if my_index > 0 {
-			last_rec_seq[my_index]++
+			var expected = int(last_rec_seq[my_index].Add(1))
 
 			var n, _ = strconv.Atoi(before)
-			if n != last_rec_seq[my_index] {
-				fmt.Printf("%*s%s: Received %d when %d was expected (%s).\n", my_index*column_width, "", tnc_address[my_index], n, last_rec_seq[my_index], data)
+			if n != expected {
+				fmt.Printf("%*s%s: Received %d when %d was expected (%s).\n", my_index*column_width, "", tnc_address[my_index], n, expected, data)
 				direwolf.SLEEP_MS(10000)
 				fmt.Printf("TEST FAILED!\n")
 				os.Exit(1)
@@ -377,11 +386,11 @@ func process_rec_data(my_index int, data string) {
 		}
 	} else if strings.HasPrefix(after, "reply") {
 		if my_index == 0 {
-			last_rec_seq[my_index]++
+			var expected = int(last_rec_seq[my_index].Add(1))
 
 			var n, _ = strconv.Atoi(before)
-			if n != last_rec_seq[my_index] {
-				fmt.Printf("%*s%s: Received %d when %d was expected.\n", my_index*column_width, "", tnc_address[my_index], n, last_rec_seq[my_index])
+			if n != expected {
+				fmt.Printf("%*s%s: Received %d when %d was expected.\n", my_index*column_width, "", tnc_address[my_index], n, expected)
 				direwolf.SLEEP_MS(10000)
 				fmt.Printf("TEST FAILED!\n")
 				os.Exit(1)
@@ -469,7 +478,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 	 */
 	fmt.Printf("TNC %d now available.  %s on %s, port %s\n",
 		my_index, description, hostname, port)
-	is_connected[my_index] = 0
+	is_connected[my_index].Store(0)
 
 	/*
 	 * Print what we get from TNC.
@@ -503,7 +512,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 		switch mon_cmd.DataKind {
 		case 'C': // AX.25 Connection Received
 			fmt.Printf("%*s[R %.3f] *** Connected to %s ***\n", my_index*column_width, "", time.Since(start_time).Seconds(), mon_cmd.CallFrom)
-			is_connected[my_index] = 1
+			is_connected[my_index].Store(1)
 		case 'D': // Connected AX.25 Data
 			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), data)
 
@@ -535,7 +544,7 @@ func tnc_thread_net(my_index int, hostname string, port string, description stri
 			}
 		case 'd': // Disconnected
 			fmt.Printf("%*s[R %.3f] *** Disconnected from %s ***\n", my_index*column_width, "", time.Since(start_time).Seconds(), mon_cmd.CallFrom)
-			is_connected[my_index] = 0
+			is_connected[my_index].Store(0)
 		case 'y': // Outstanding frames waiting on a Port
 			fmt.Printf("%*s[R %.3f] *** Outstanding frames waiting %d ***\n", my_index*column_width, "", time.Since(start_time).Seconds(), 123) // TODO
 		default:
@@ -602,7 +611,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 	/* Success. */
 
 	fmt.Printf("TNC %d now available.  %s on %s\n", my_index, description, port)
-	is_connected[my_index] = 0
+	is_connected[my_index].Store(0)
 
 	/*
 	 * Read and print.
@@ -623,10 +632,10 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 				done = true
 			} else if b == XOFF {
 				fmt.Printf("%*s[R %.3f] <XOFF>\n", my_index*column_width, "", time.Since(start_time).Seconds())
-				busy[my_index] = true
+				busy[my_index].Store(true)
 			} else if b == XON {
 				fmt.Printf("%*s[R %.3f] <XON>\n", my_index*column_width, "", time.Since(start_time).Seconds())
-				busy[my_index] = false
+				busy[my_index].Store(false)
 			} else if unicode.IsPrint(rune(b)) {
 				buffer = append(buffer, b)
 			} else {
@@ -636,9 +645,9 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 
 			if string(buffer) == "cmd:" {
 				done = true
-				have_cmd_prompt[my_index] = true
+				have_cmd_prompt[my_index].Store(true)
 			} else {
-				have_cmd_prompt[my_index] = false
+				have_cmd_prompt[my_index].Store(false)
 			}
 		}
 
@@ -648,11 +657,11 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 			fmt.Printf("%*s[R %.3f] %s\n", my_index*column_width, "", time.Since(start_time).Seconds(), result)
 
 			if result == "*** CONNECTED" {
-				is_connected[my_index] = 1
+				is_connected[my_index].Store(1)
 			}
 
 			if result == "*** DISCONNECTED" {
-				is_connected[my_index] = 0
+				is_connected[my_index].Store(0)
 			}
 
 			if result == "Not while connected" {
@@ -661,7 +670,7 @@ func tnc_thread_serial(my_index int, port string, description string, tnc_addres
 				// the two have got out of step and the run is not testing what
 				// it thinks it is.
 				panic(fmt.Sprintf("TNC %d refused a command as \"Not while connected\", but we think it is %s",
-					my_index, map[int]string{0: "disconnected", 1: "connected"}[is_connected[my_index]]))
+					my_index, map[int32]string{0: "disconnected", 1: "connected"}[is_connected[my_index].Load()]))
 			}
 
 			process_rec_data(my_index, result)
@@ -691,7 +700,7 @@ func tnc_connect(from int, to int) {
 
 		binary.Write(tnctest_server_sock[from], binary.LittleEndian, cmd)
 	} else {
-		if !have_cmd_prompt[from] {
+		if !have_cmd_prompt[from].Load() {
 			var cmd string
 
 			direwolf.SLEEP_MS(1500)
@@ -722,7 +731,7 @@ func tnc_disconnect(from int, to int) {
 
 		binary.Write(tnctest_server_sock[from], binary.LittleEndian, cmd)
 	} else {
-		if !have_cmd_prompt[from] {
+		if !have_cmd_prompt[from].Load() {
 			var cmd string
 
 			direwolf.SLEEP_MS(1500)
@@ -798,7 +807,7 @@ func tnc_send_data(from int, to int, data string) {
 		// The assumption is that we are in CONVERSE mode.
 		// The data should be terminated by carriage return.
 		var timeout = 600 // 60 sec.  I've seen it take more than 20.
-		for timeout > 0 && busy[from] {
+		for timeout > 0 && busy[from].Load() {
 			direwolf.SLEEP_MS(100)
 
 			timeout--
