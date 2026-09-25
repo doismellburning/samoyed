@@ -1,19 +1,14 @@
-//nolint:gochecknoglobals
 package direwolf
 
 import "github.com/doismellburning/samoyed/internal/fcs"
 
-var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendFrame" or "???"
-
 /*-------------------------------------------------------------
  *
- * Name:	FX25SendFrame
+ * Name:	sendFX25Frame (fx25_send_frame in Dire Wolf)
  *
  * Purpose:	Convert HDLC frames to a stream of bits.
  *
- * Inputs:	channel	- Audio channel number, 0 = first.
- *
- *		fbuf	- Frame buffer address.
+ * Inputs:	fbuf	- Frame buffer address.
  *
  *		fx_mode	- Normally, this would be 16, 32, or 64 for the desired number
  *			  of check bytes.  The shortest format, adequate for the
@@ -44,24 +39,24 @@ var fx25BitsSent [MAX_RADIO_CHANS]int // Count number of bits sent by "FX25SendF
  *
  *--------------------------------------------------------------*/
 
-func FX25SendFrame(channel int, fbuf []byte, fx_mode int) int {
-	var ctag_num, data, check = fx25_encode_frame(channel, fbuf, fx_mode)
+func (s *HDLCSender) sendFX25Frame(fbuf []byte, fx_mode int) int {
+	var ctag_num, data, check = fx25_encode_frame(s.channel, fbuf, fx_mode)
 	if ctag_num < CTAG_MIN {
 		return (-1)
 	}
 
-	fx25BitsSent[channel] = 0
+	s.bitsSent = 0
 
 	var ctag_value = fx25_get_ctag_value(ctag_num)
 
 	for k := range 8 {
-		send_bytes(channel, []byte{byte(ctag_value>>(k*8)) & 0xff})
+		s.sendFX25Bytes([]byte{byte(ctag_value>>(k*8)) & 0xff})
 	}
 
-	send_bytes(channel, data)
-	send_bytes(channel, check)
+	s.sendFX25Bytes(data)
+	s.sendFX25Bytes(check)
 
-	return fx25BitsSent[channel]
+	return s.bitsSent
 }
 
 /*-------------------------------------------------------------
@@ -70,7 +65,7 @@ func FX25SendFrame(channel int, fbuf []byte, fx_mode int) int {
  *
  * Purpose:	Wrap an AX.25 frame up as an FX.25 codeblock.
  *
- * Inputs:	channel, fx_mode - As for FX25SendFrame.
+ * Inputs:	channel, fx_mode - As for sendFX25Frame.
  *
  *		fbuf	- Frame buffer, without the FCS.
  *
@@ -148,29 +143,29 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 	return ctag_num, data[:k_data_radio], check[:nroots]
 }
 
-func send_bytes(channel int, b []byte) {
+func (s *HDLCSender) sendFX25Bytes(b []byte) {
 	for _, x := range b {
 		for range 8 {
-			send_bit(channel, int(x&0x01))
+			s.sendFX25Bit(x&0x01 != 0)
 			x >>= 1
 		}
 	}
 }
 
 /*
- * NRZI encoding.
+ * NRZI encoding, as sendBitNRZI, but with the line level FX.25 left it at.
  * data 1 bit -> no change.
  * data 0 bit -> invert signal.
  */
-var sendBitOutput [MAX_RADIO_CHANS]int
 
-func send_bit(channel int, b int) {
-	if b == 0 {
-		sendBitOutput[channel] = 1 - sendBitOutput[channel]
+func (s *HDLCSender) sendFX25Bit(b bool) {
+	if !b {
+		s.fx25NRZIOutput = 1 - s.fx25NRZIOutput
 	}
 
-	tone_gen_put_bit(channel, sendBitOutput[channel])
-	fx25BitsSent[channel]++
+	tone_gen_put_bit(s.channel, s.fx25NRZIOutput)
+
+	s.bitsSent++
 }
 
 /*-------------------------------------------------------------

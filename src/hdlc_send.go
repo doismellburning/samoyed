@@ -20,6 +20,10 @@ type HDLCSender struct {
 	stuff int
 
 	nrziOutput int // The level the line was last left at.
+
+	// The level FX.25 last left the line at.  Dire Wolf keeps this apart
+	// from nrziOutput, in fx25_send.c rather than hdlc_send.c, and so do we.
+	fx25NRZIOutput int
 }
 
 // NewHDLCSender makes an HDLCSender for channel, sending the layer 2
@@ -81,7 +85,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
 	} else if achan.layer2_xmit == LAYER2_FX25 {
 		var fbuf = AX25Pack(pp)
 
-		var n = FX25SendFrame(s.channel, fbuf, achan.fx25_strength)
+		var n = s.sendFX25Frame(fbuf, achan.fx25_strength)
 		if n > 0 {
 			return n
 		}
