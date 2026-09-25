@@ -6,6 +6,7 @@ package main
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -52,6 +53,21 @@ func TestProcessFromTNCFollowsASession(t *testing.T) {
 	// What it sends is taken as a command.
 	process_from_tnc(fromTNC('D', 0, testTheirCall, testMyCall, "help\r"))
 	assert.Contains(t, sentText(tnc.frames(t)), "WHO")
+
+	// The TNC says how much is still waiting to go to the station, as a
+	// 32-bit little-endian count.
+	process_from_tnc(fromTNC('Y', 0, testMyCall, testTheirCall, "\x03\x01\x00\x00"))
+
+	s.mu.Lock()
+	assert.Equal(t, maybe.Just(259), s.txQueueLen)
+	s.mu.Unlock()
+
+	// One too short to hold a count is ignored.
+	process_from_tnc(fromTNC('Y', 0, testMyCall, testTheirCall, "\x05"))
+
+	s.mu.Lock()
+	assert.Equal(t, maybe.Just(259), s.txQueueLen)
+	s.mu.Unlock()
 
 	// Things the appserver has no use for are ignored.
 	for _, kind := range []byte{'R', 'g', 'K', 'U', 'y', '?'} {

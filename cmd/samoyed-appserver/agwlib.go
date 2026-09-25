@@ -63,7 +63,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 
 	direwolf "github.com/doismellburning/samoyed/src"
 )
@@ -297,9 +296,14 @@ func process_from_tnc(cmd *AGWPECommand) {
 	case 'U': // Received AX.25 frame in monitor format. (Enabled with 'm' command.)
 	case 'y': // Outstanding frames waiting on a Port
 	case 'Y': // How many frames waiting for transmit for a particular station
-		var dataStr = string(cmd.Data)
+		// The count is a 32-bit little-endian integer, like the header's.
+		if len(cmd.Data) < 4 {
+			fmt.Printf("Outstanding frame count from network TNC is %d bytes, not 4.\n", len(cmd.Data))
 
-		var frameCount, _ = strconv.Atoi(dataStr)
+			return
+		}
+
+		var frameCount = int(binary.LittleEndian.Uint32(cmd.Data))
 
 		agw_cb_Y_outstanding_frames_for_station(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, frameCount)
 	default:
