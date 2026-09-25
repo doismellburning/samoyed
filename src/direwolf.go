@@ -488,9 +488,9 @@ x = Silence FX.25 information.`)
 	stopIfCancelled(ctx)
 
 	/*
-	 * Initialize the touch tone decoder & APRStt gateway.
+	 * Initialize the APRStt gateway.  Each audio device's receive thread
+	 * makes the touch tone decoders for its own channels.
 	 */
-	dtmf_init(audio_config, audio_amplitude)
 	ttGateway = NewTTGateway(&dw_tt_config, aprstt_debug)
 	tt_user_init(audio_config, &dw_tt_config)
 

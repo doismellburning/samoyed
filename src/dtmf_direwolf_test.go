@@ -1,25 +1,17 @@
 package direwolf
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 func Test_dtmf(t *testing.T) {
-	var c = 0 // radio channel.
+	const c = 0 // radio channel.
+	const sampleRate = 44100
+
 	var my_audio_config audio_s
-
-	my_audio_config.adev[ACHAN2ADEV(c)].defined = 1
-	my_audio_config.adev[ACHAN2ADEV(c)].samples_per_sec = 44100
-	my_audio_config.chan_medium[c] = MEDIUM_RADIO
-	my_audio_config.achan[c].dtmf_decode = DTMF_DECODE_ON
-
-	// Let's try to set up audio?
-	my_audio_config.adev[ACHAN2ADEV(c)].num_channels = 1
-	my_audio_config.adev[ACHAN2ADEV(c)].bits_per_sample = 8
-	gen_tone_init(&my_audio_config, 100, audioDeviceSink{})
-	require.NoError(t, ptt_init(&my_audio_config))
 
 	// A decoded button raises the channel's DCD, which goes to the HDLC
 	// receiver; nothing here wants to hear about it.
@@ -29,7 +21,23 @@ func Test_dtmf(t *testing.T) {
 
 	hdlcReceiver = NewHDLCReceiver(&my_audio_config, new(discardReceiveSink))
 
-	dtmf_init(&my_audio_config, 50)
+	var decoder = NewDTMFDecoder(c, sampleRate)
+
+	var result strings.Builder
+
+	var push_button_test = func(_ int, button rune, ms int) {
+		for dtmf := range dtmfButtonSamples(button, ms, sampleRate) {
+			/* Make sure it is insensitive to signal amplitude. */
+			/* (Uncomment each of below when testing.) */
+			var x = decoder.Sample(dtmf)
+			//x = decoder.Sample (dtmf * 1000);
+			//x = decoder.Sample (dtmf * 0.001);
+
+			if x != ' ' && x != '.' {
+				result.WriteRune(x)
+			}
+		}
+	}
 
 	dw_printf("\nFirst, check all button tone pairs. \n\n")
 	/* Max auto dialing rate is 10 per second. */
@@ -101,7 +109,8 @@ func Test_dtmf(t *testing.T) {
 
 	/* Check for expected results. */
 
-	push_button_test(c, '?', 0)
+	require.NotEqual(t, "123A456B789C*0#D123789", result.String(), "Time-out failed, otherwise OK")
+	require.Equal(t, "123A456B789C*0#D123$789$", result.String())
 }
 
 // discardReceiveSink is a ReceiveSink that ignores whatever it is told.
