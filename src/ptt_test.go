@@ -31,26 +31,20 @@ func (m *mockGPIODLine) Close() error {
 	return nil
 }
 
-// setupGPIODChannel wires save_audio_config_p and gpiod_line for channel 0 OCTYPE_PTT,
-// returning the mock so the caller can inspect it.  The test's Cleanup restores
-// both globals to a safe state.
+// setupGPIODChannel installs a PTT whose channel 0 OCTYPE_PTT is a GPIOD line,
+// returning the mock standing in for the line so the caller can inspect it.
 func setupGPIODChannel(t *testing.T, invert bool) *mockGPIODLine {
 	t.Helper()
-
-	var mock = new(mockGPIODLine)
-	gpiod_line[0][OCTYPE_PTT] = mock
 
 	var cfg audio_s
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIOD
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 0
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_invert = invert
-	save_audio_config_p = &cfg
+	useAudioConfig(t, &cfg)
 
-	t.Cleanup(func() {
-		gpiod_line[0][OCTYPE_PTT] = nil
-		save_audio_config_p = nil
-	})
+	var mock = new(mockGPIODLine)
+	pttControl.gpiodLine[0][OCTYPE_PTT] = mock
 
 	return mock
 }
@@ -99,10 +93,7 @@ func TestPttSetRealGPIOD_NilLine(t *testing.T) {
 	var cfg audio_s
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIOD
-	save_audio_config_p = &cfg
-	gpiod_line[0][OCTYPE_PTT] = nil
-
-	t.Cleanup(func() { save_audio_config_p = nil })
+	useAudioConfig(t, &cfg)
 
 	require.NotPanics(t, func() {
 		ptt_set(OCTYPE_PTT, 0, 1)
@@ -119,7 +110,7 @@ func TestPttTermGPIOD(t *testing.T) {
 	ptt_term()
 
 	assert.True(t, mock.closed, "ptt_term should close the line handle")
-	assert.Nil(t, gpiod_line[0][OCTYPE_PTT], "ptt_term should nil the line handle")
+	assert.Nil(t, pttControl.gpiodLine[0][OCTYPE_PTT], "ptt_term should nil the line handle")
 }
 
 // useFakeGPIOSysfs points the sysfs GPIO interface at a temporary directory
@@ -156,20 +147,23 @@ func writeFakeGPIONode(t *testing.T, dir string, name string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name, "value"), []byte("0"), 0o600))
 }
 
-// useAudioConfig installs cfg as the saved configuration for the duration of
+// useAudioConfig installs a PTT for cfg, not yet set up, for the duration of
 // the test.
 func useAudioConfig(t *testing.T, cfg *audio_s) {
 	t.Helper()
 
-	save_audio_config_p = cfg
+	var saved = pttControl
 
-	t.Cleanup(func() { save_audio_config_p = nil })
+	pttControl = new(PTT)
+	pttControl.audioConfig = cfg
+
+	t.Cleanup(func() { pttControl = saved })
 }
 
 // TestGetAccessToGPIOMissing verifies that an absent GPIO node is reported to
 // the caller rather than ending the process.
 func TestGetAccessToGPIOMissing(t *testing.T) {
-	var err = get_access_to_gpio(filepath.Join(t.TempDir(), "export"))
+	var err = new(PTT).getAccessToGPIO(filepath.Join(t.TempDir(), "export"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -180,7 +174,7 @@ func TestGetAccessToGPIOPresent(t *testing.T) {
 	var dir = useFakeGPIOSysfs(t)
 	writeFakeGPIOExport(t, dir)
 
-	require.NoError(t, get_access_to_gpio(filepath.Join(dir, "export")))
+	require.NoError(t, new(PTT).getAccessToGPIO(filepath.Join(dir, "export")))
 }
 
 // TestExportGPIOOutput verifies that exporting an output line writes the line
@@ -195,7 +189,7 @@ func TestExportGPIOOutput(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	useAudioConfig(t, cfg)
 
-	require.NoError(t, export_gpio(0, OCTYPE_PTT, false, 1))
+	require.NoError(t, pttControl.exportGPIO(0, OCTYPE_PTT, false, 1))
 
 	var exported, readErr = os.ReadFile(filepath.Join(dir, "export")) //nolint:gosec
 	require.NoError(t, readErr)
@@ -218,7 +212,7 @@ func TestExportGPIOOutputInverted(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	useAudioConfig(t, cfg)
 
-	require.NoError(t, export_gpio(0, OCTYPE_PTT, true, 1))
+	require.NoError(t, pttControl.exportGPIO(0, OCTYPE_PTT, true, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -237,7 +231,7 @@ func TestExportGPIOInput(t *testing.T) {
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num = 7
 	useAudioConfig(t, cfg)
 
-	require.NoError(t, export_gpio(0, ICTYPE_TXINH, false, 0))
+	require.NoError(t, pttControl.exportGPIO(0, ICTYPE_TXINH, false, 0))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio7", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -256,7 +250,7 @@ func TestExportGPIOSuffixedNode(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	useAudioConfig(t, cfg)
 
-	require.NoError(t, export_gpio(0, OCTYPE_PTT, false, 1))
+	require.NoError(t, pttControl.exportGPIO(0, OCTYPE_PTT, false, 1))
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25_ph11", "direction")) //nolint:gosec
 	require.NoError(t, dirErr)
@@ -274,7 +268,7 @@ func TestExportGPIONoSuchNode(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	useAudioConfig(t, cfg)
 
-	var err = export_gpio(0, OCTYPE_PTT, false, 1)
+	var err = pttControl.exportGPIO(0, OCTYPE_PTT, false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gpio number 25")
@@ -290,7 +284,7 @@ func TestExportGPIONoSysfs(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
 	useAudioConfig(t, cfg)
 
-	var err = export_gpio(0, OCTYPE_PTT, false, 1)
+	var err = pttControl.exportGPIO(0, OCTYPE_PTT, false, 1)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -349,7 +343,7 @@ func TestPttInitGPIODRequestFailure(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "/dev/samoyed-no-such-gpiochip")
-	assert.Nil(t, gpiod_line[0][OCTYPE_PTT], "a line that could not be requested should not be recorded")
+	assert.Nil(t, pttControl.gpiodLine[0][OCTYPE_PTT], "a line that could not be requested should not be recorded")
 }
 
 // TestPttInitRollsBackOnFailure verifies that a failure part way through
@@ -373,7 +367,7 @@ func TestPttInitRollsBackOnFailure(t *testing.T) {
 	useAudioConfig(t, cfg)
 
 	require.Error(t, ptt_init(cfg))
-	assert.Nil(t, ptt_fd[0][OCTYPE_PTT], "a serial port opened before the failure should be closed again")
+	assert.Nil(t, pttControl.fd[0][OCTYPE_PTT], "a serial port opened before the failure should be closed again")
 }
 
 // TestPttInitSerialOpenFailure verifies that a serial port we cannot open is
@@ -482,11 +476,11 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 // dereference the audio configuration that audio_open had not installed yet,
 // so a stop during startup panicked instead of shutting down.
 func TestPttTermBeforeAudioConfig(t *testing.T) {
-	var saved = save_audio_config_p
+	var saved = pttControl
 
-	save_audio_config_p = nil
+	pttControl = nil
 
-	t.Cleanup(func() { save_audio_config_p = saved })
+	t.Cleanup(func() { pttControl = saved })
 
 	require.NotPanics(t, ptt_term)
 }
@@ -603,7 +597,7 @@ func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*au
 
 	t.Cleanup(ptt_term)
 
-	require.NotNil(t, ptt_fd[0][OCTYPE_PTT], "the serial port was not opened")
+	require.NotNil(t, pttControl.fd[0][OCTYPE_PTT], "the serial port was not opened")
 
 	// After ptt_init, which sets the initial state off and would otherwise
 	// show up as a change the test did not ask for.
@@ -713,7 +707,7 @@ func TestPttTermClosesTheSerialPort(t *testing.T) {
 
 	ptt_term()
 
-	assert.Nil(t, ptt_fd[0][OCTYPE_PTT], "the serial port was not closed")
+	assert.Nil(t, pttControl.fd[0][OCTYPE_PTT], "the serial port was not closed")
 }
 
 // Two channels keying different lines of the same serial port share the one
@@ -739,7 +733,7 @@ func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
 
 	t.Cleanup(ptt_term)
 
-	assert.Same(t, ptt_fd[0][OCTYPE_PTT], ptt_fd[1][OCTYPE_PTT],
+	assert.Same(t, pttControl.fd[0][OCTYPE_PTT], pttControl.fd[1][OCTYPE_PTT],
 		"the same device should have been opened once and shared")
 }
 

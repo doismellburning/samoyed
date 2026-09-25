@@ -63,6 +63,7 @@ var kissSerial *KissSerial
 var agwServer *AGWServer
 var mheardDB *MHeardDB
 var aprsDigipeater *Digipeater
+var pttControl *PTT
 var xmitSvc *XmitService
 var ttGateway *TTGateway
 var hdlcReceiver *HDLCReceiver
