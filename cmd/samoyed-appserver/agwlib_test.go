@@ -100,3 +100,16 @@ func TestPortInformationRejectsBadDescriptions(t *testing.T) {
 
 	assert.Equal(t, []tncFrame{{kind: 'X', channel: 1, callFrom: testMyCall, callTo: Callsign{}, data: ""}}, tnc.frames(t))
 }
+
+// A connection report that isn't one of the two expected is ignored, however
+// short it is.
+func TestProcessFromTNCUnexpectedConnection(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	for _, data := range []string{"*** CONNECTED", "", "Something else entirely, and long"} {
+		process_from_tnc(fromTNC('C', 0, testTheirCall, testMyCall, data))
+	}
+
+	assert.Nil(t, srv.findSession(0, testTheirCall))
+	assert.Empty(t, tnc.frames(t))
+}

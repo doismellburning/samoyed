@@ -58,6 +58,7 @@ package main
  *---------------------------------------------------------------*/
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -260,10 +261,10 @@ func process_from_tnc(cmd *AGWPECommand) {
 		// agw_cb_C_connection_received (cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, data_len, cmd.data);
 		// TODO:  compute session id
 		// There are two different cases to consider here.
-		if string(cmd.Data[:24]) == "*** CONNECTED To Station" {
+		if bytes.HasPrefix(cmd.Data, []byte("*** CONNECTED To Station")) {
 			// Incoming: Other station initiated the connect request.
 			on_C_connection_received(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, true, cmd.Data)
-		} else if string(cmd.Data[:26]) == "*** CONNECTED With Station" {
+		} else if bytes.HasPrefix(cmd.Data, []byte("*** CONNECTED With Station")) {
 			// Outgoing: Other station accepted my connect request.
 			on_C_connection_received(cmd.Header.Portx, cmd.Header.CallFrom, cmd.Header.CallTo, false, cmd.Data)
 		} else { //nolint:staticcheck
