@@ -137,3 +137,12 @@ func Test_ax25_frame_with_no_pid(t *testing.T) {
 		ax25_dedupe_crc(pp)
 	})
 }
+
+func TestMustAX25FromText(t *testing.T) {
+	var pp = MustAX25FromText("Q1TEST>APDW17,WIDE1-1:>Testing")
+
+	assert.Equal(t, "Q1TEST>APDW17,WIDE1-1:", AX25FormatAddrs(pp))
+	assert.Equal(t, ">Testing", string(AX25GetInfo(pp)))
+
+	assert.PanicsWithValue(t, "not an AX.25 packet: Q1TEST", func() { MustAX25FromText("Q1TEST") })
+}

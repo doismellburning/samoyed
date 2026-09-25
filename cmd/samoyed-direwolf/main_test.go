@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,21 +32,6 @@ KISSPORT 0
 // startupComplete is the last thing printed before the receive loop takes over,
 // so a test that has seen it knows the signal handler is installed.
 const startupComplete = `Log file is`
-
-// buildDirewolf builds the command under test, since the point of the test is
-// what a signal does to the process rather than to a function call.
-func buildDirewolf(t *testing.T) string {
-	t.Helper()
-
-	var binary = filepath.Join(t.TempDir(), "samoyed-direwolf")
-
-	var build = exec.CommandContext(t.Context(), "go", "build", "-o", binary, ".") //nolint:gosec
-
-	var out, err = build.CombinedOutput()
-	require.NoError(t, err, "Building the command failed: %s", out)
-
-	return binary
-}
 
 // startDirewolf starts the built command and waits for it to finish starting
 // up.  It returns the running process and a function that reads back whatever
@@ -99,7 +85,7 @@ func startDirewolf(t *testing.T, binary string) (*exec.Cmd, func() string) {
 // disposition, so the process was killed outright and cleanup - which is what
 // unkeys a CM108 or hamlib PTT - never ran.
 func TestSignalShutsDownCleanly(t *testing.T) {
-	var binary = buildDirewolf(t)
+	var binary = testutils.BuildCommand(t)
 
 	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
@@ -129,7 +115,7 @@ func TestSignalShutsDownCleanly(t *testing.T) {
 // it.  Startup has to stop at the signal and the teardown has to come after
 // it: nothing startup does may appear once the teardown has begun.
 func TestSignalDuringStartupStopsStartup(t *testing.T) {
-	var binary = buildDirewolf(t)
+	var binary = testutils.BuildCommand(t)
 
 	for _, signal := range []syscall.Signal{syscall.SIGINT, syscall.SIGTERM} {
 		t.Run(signal.String(), func(t *testing.T) {
