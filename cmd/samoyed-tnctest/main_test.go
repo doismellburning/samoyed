@@ -147,8 +147,8 @@ func readHeader(t *testing.T, r io.Reader) direwolf.AGWPEHeader {
 	return header
 }
 
-func callsign(b [10]byte) string {
-	return strings.TrimRight(string(b[:]), "\x00")
+func callsign(c direwolf.AGWPECallsign) string {
+	return c.String()
 }
 
 func Test_tnc_commands_net(t *testing.T) {
@@ -314,7 +314,7 @@ func Test_main_connects(t *testing.T) {
 
 	require.NoError(t, binary.Write(tnc0, binary.LittleEndian, connected))
 
-	p.WaitFor(t, "*** Connected to DW1")
+	p.WaitFor(t, "*** Connected to DW1 ***")
 }
 
 func Test_main_badArguments(t *testing.T) {

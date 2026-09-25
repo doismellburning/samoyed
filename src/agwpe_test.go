@@ -6,6 +6,7 @@ package direwolf
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,4 +55,13 @@ func TestAGWPEMessageWriteRoundTrip(t *testing.T) {
 	_, err = buf.Read(gotData)
 	require.NoError(t, err)
 	assert.Equal(t, payload, gotData)
+}
+
+// A callsign formats without the NUL padding of its fixed-width field.
+func TestAGWPECallsignString(t *testing.T) {
+	var c AGWPECallsign
+	copy(c[:], "Q1TEST-1")
+
+	assert.Equal(t, "Q1TEST-1", c.String())
+	assert.Equal(t, "Connected to Q1TEST-1 ***", fmt.Sprintf("Connected to %s ***", c))
 }

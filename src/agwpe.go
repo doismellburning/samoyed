@@ -5,6 +5,14 @@ import (
 	"io"
 )
 
+// AGWPECallsign is a callsign as an AGWPE header carries it, padded out with
+// NULs.  String trims the padding, so it formats as the callsign with %s.
+type AGWPECallsign [10]byte
+
+func (c AGWPECallsign) String() string {
+	return ByteArrayToString(c[:])
+}
+
 type AGWPEHeader struct {
 	Portx        byte
 	Reserved1    byte
@@ -14,8 +22,8 @@ type AGWPEHeader struct {
 	Reserved4    byte
 	PID          byte
 	Reserved5    byte
-	CallFrom     [10]byte
-	CallTo       [10]byte
+	CallFrom     AGWPECallsign
+	CallTo       AGWPECallsign
 	DataLen      uint32
 	UserReserved [4]byte
 }
