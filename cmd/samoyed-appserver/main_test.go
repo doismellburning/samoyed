@@ -589,4 +589,8 @@ func TestMainRegistersOnEachPort(t *testing.T) {
 	assert.Equal(t, byte('X'), h.DataKind)
 	assert.Equal(t, byte(0), h.Portx)
 	assert.Equal(t, testMyCall, h.CallFrom, "the callsign should be upper cased")
+
+	require.NoError(t, binary.Read(tnc, binary.LittleEndian, h))
+	assert.Equal(t, byte('X'), h.DataKind)
+	assert.Equal(t, byte(1), h.Portx, "and on the second port too")
 }

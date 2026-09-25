@@ -64,6 +64,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 
 	direwolf "github.com/doismellburning/samoyed/src"
 )
@@ -283,14 +284,19 @@ func process_from_tnc(cmd *AGWPECommand) {
 		// Data part should be fields separated by semicolon.
 		// First field is number of ports (we call them channels).
 		// Other fields are of the form "Port99 comment" where first is number 1.
-		var num_chan = 1 // FIXME: FIXME: actually parse it.
+		// The ports themselves are what matter, and the TNC can leave gaps
+		// in the numbering, so the count is not needed.
+		var fields = strings.Split(strings.TrimRight(string(cmd.Data), "\x00"), ";")
 
-		var chans = make([]string, 2)
+		var chans []string
 
-		chans[0] = "Port1 blah blah"
-		chans[1] = "Port2 blah blah"
-		agw_cb_G_port_information(num_chan, chans)
-		// TODO: Maybe fill in more someday.
+		for _, field := range fields[1:] {
+			if field != "" {
+				chans = append(chans, field)
+			}
+		}
+
+		agw_cb_G_port_information(len(chans), chans)
 
 	case 'g': // Reply to capabilities of a port.
 	case 'K': // Received AX.25 frame in raw format. (Enabled with 'k' command.)

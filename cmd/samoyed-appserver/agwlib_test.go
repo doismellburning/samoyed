@@ -93,12 +93,44 @@ func TestProcessFromTNCOutgoingConnection(t *testing.T) {
 	tnc.frames(t)
 }
 
+// The TNC's list of ports is answered by registering our callsign on each.
+// It can leave gaps in the numbering, and "Port1" is channel 0.
+func TestProcessFromTNCPortInformation(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	process_from_tnc(fromTNC('G', 0, Callsign{}, Callsign{}, "2;Port1 first soundcard mono;Port3 second soundcard mono;"))
+
+	assert.Equal(t, []tncFrame{
+		{kind: 'X', channel: 0, callFrom: testMyCall, callTo: Callsign{}, data: ""},
+		{kind: 'X', channel: 2, callFrom: testMyCall, callTo: Callsign{}, data: ""},
+	}, tnc.frames(t))
+}
+
+// The list came from the TNC, so anything in it that isn't a port we can have
+// is skipped, however short.
 func TestPortInformationRejectsBadDescriptions(t *testing.T) {
 	var tnc = newTestServer(t)
 
-	agw_cb_G_port_information(3, []string{"Port2 second", "Wibble wobble", "Port99 too far"})
+	agw_cb_G_port_information(10, []string{
+		"Port2 second", "Wibble wobble", "Port99 too far", "Port0 before the first",
+		"Port", "P", "", "Portx unnumbered", "Port+3 signed", "port16 last",
+	})
 
-	assert.Equal(t, []tncFrame{{kind: 'X', channel: 1, callFrom: testMyCall, callTo: Callsign{}, data: ""}}, tnc.frames(t))
+	assert.Equal(t, []tncFrame{
+		{kind: 'X', channel: 1, callFrom: testMyCall, callTo: Callsign{}, data: ""},
+		{kind: 'X', channel: 15, callFrom: testMyCall, callTo: Callsign{}, data: ""},
+	}, tnc.frames(t))
+}
+
+// An empty or malformed list registers nothing.
+func TestProcessFromTNCEmptyPortInformation(t *testing.T) {
+	var tnc = newTestServer(t)
+
+	for _, data := range []string{"0;", "", ";;;"} {
+		process_from_tnc(fromTNC('G', 0, Callsign{}, Callsign{}, data))
+	}
+
+	assert.Empty(t, tnc.frames(t))
 }
 
 // A connection report that isn't one of the two expected is ignored, however
