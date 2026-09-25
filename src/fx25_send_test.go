@@ -77,20 +77,39 @@ func TestFX25FrameTooLargeSendsNothing(t *testing.T) {
 	assert.Empty(t, bits)
 }
 
-// Each sender has its own FX.25 line level: sending on one channel must not
-// change what the next bit on another looks like.
-func TestHDLCSendersKeepTheirOwnFX25LineLevel(t *testing.T) {
-	var other = NewHDLCSender(1, nil)
+// FX.25 and AX.25 go out on the same line, so a codeblock has to start from
+// the level whatever went before it left the line at, or its first bit is
+// received inverted.
+func TestFX25FrameCarriesOnFromTheLineLevelBeforeIt(t *testing.T) {
+	FX25Init(0)
 
-	toneGenCapture = func(int, int) {}
+	// A frame and its FCS always hold an even number of zeros, so it takes
+	// a stuffed zero to leave the line at 1, where starting the codeblock
+	// afresh from 0 would show.
+	var before = []byte{hdlcSixtyOne, 'Q', '1', 'T', 'E', 'S', 'T'}
+	var fbuf = []byte{'Q', '2', 'T', 'E', 'S', 'T'}
 
-	other.sendFX25Bit(false)
+	var ctagNum, data, check = fx25_encode_frame(hdlcSendTestChannel, append([]byte{}, fbuf...), 16)
+	require.GreaterOrEqual(t, ctagNum, CTAG_MIN)
+
+	var beforeLen int
 
 	var bits = captureBits(t, nil, func(s *HDLCSender) {
-		s.sendFX25Bit(false)
-		s.sendFX25Bit(true)
+		beforeLen = s.sendAX25Frame(before, false)
+		s.sendFX25Frame(fbuf, 16)
 	})
 
-	assert.Equal(t, 1, other.fx25NRZIOutput, "the other sender's zero should have inverted its own line")
-	assert.Equal(t, []int{1, 1}, bits, "this sender's line should start where it was, not where the other left it")
+	require.Equal(t, 1, bits[beforeLen-1], "the frame before should leave the line at 1")
+
+	var ctagValue = fx25_get_ctag_value(ctagNum)
+
+	var expected []byte
+	for k := range 8 {
+		expected = append(expected, byte(ctagValue>>(k*8)))
+	}
+
+	expected = append(expected, data...)
+	expected = append(expected, check...)
+
+	assert.Equal(t, expected, packLSBFirst(t, nrziDecode(bits)[beforeLen:]))
 }

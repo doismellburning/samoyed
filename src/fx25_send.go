@@ -143,29 +143,16 @@ func fx25_encode_frame(channel int, fbuf []byte, fx_mode int) (int, []byte, []by
 	return ctag_num, data[:k_data_radio], check[:nroots]
 }
 
+// sendFX25Bytes sends NRZI, with no stuffing: the codeblock was stuffed before
+// it was encoded.  It shares the line level with AX.25, since the receiver
+// sees only the one line.
 func (s *HDLCSender) sendFX25Bytes(b []byte) {
 	for _, x := range b {
 		for range 8 {
-			s.sendFX25Bit(x&0x01 != 0)
+			s.sendBitNRZI(x&0x01 != 0)
 			x >>= 1
 		}
 	}
-}
-
-/*
- * NRZI encoding, as sendBitNRZI, but with the line level FX.25 left it at.
- * data 1 bit -> no change.
- * data 0 bit -> invert signal.
- */
-
-func (s *HDLCSender) sendFX25Bit(b bool) {
-	if !b {
-		s.fx25NRZIOutput = 1 - s.fx25NRZIOutput
-	}
-
-	tone_gen_put_bit(s.channel, s.fx25NRZIOutput)
-
-	s.bitsSent++
 }
 
 /*-------------------------------------------------------------
