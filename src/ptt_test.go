@@ -32,10 +32,12 @@ func (m *mockGPIODLine) Close() error {
 }
 
 // testPTT is a PTT for cfg that has not been set up, so that a test can drive
-// one part of it at a time.
-func testPTT(cfg *audio_s) *PTT {
+// one part of it at a time.  GPIO goes through gpioSysfsDir, which a test
+// points at a temporary directory standing in for /sys/class/gpio.
+func testPTT(cfg *audio_s, gpioSysfsDir string) *PTT {
 	var p = new(PTT)
 	p.audioConfig = cfg
+	p.gpioSysfsDir = gpioSysfsDir
 
 	return p
 }
@@ -52,7 +54,7 @@ func setupGPIODChannel(t *testing.T, invert bool) (*PTT, *mockGPIODLine) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 0
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_invert = invert
 
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	var mock = new(mockGPIODLine)
 	p.gpiodLine[0][OCTYPE_PTT] = mock
@@ -124,7 +126,7 @@ func TestPttSetRealGPIOD_NilLine(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIOD
 
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	require.NotPanics(t, func() {
 		p.Set(OCTYPE_PTT, 0, 1)
@@ -140,22 +142,6 @@ func TestPttTermGPIOD(t *testing.T) {
 
 	assert.True(t, mock.closed, "Term should close the line handle")
 	assert.Nil(t, p.gpiodLine[0][OCTYPE_PTT], "Term should nil the line handle")
-}
-
-// useFakeGPIOSysfs points the sysfs GPIO interface at a temporary directory
-// for the duration of the test, so the GPIO paths can be exercised on a
-// machine whose kernel does not offer the real one.
-func useFakeGPIOSysfs(t *testing.T) string {
-	t.Helper()
-
-	var dir = t.TempDir()
-	var saved = gpio_sysfs_dir
-
-	gpio_sysfs_dir = dir
-
-	t.Cleanup(func() { gpio_sysfs_dir = saved })
-
-	return dir
 }
 
 // writeFakeGPIOExport creates the "export" file that a kernel with the sysfs
@@ -179,7 +165,7 @@ func writeFakeGPIONode(t *testing.T, dir string, name string) {
 // TestGetAccessToGPIOMissing verifies that an absent GPIO node is reported to
 // the caller rather than ending the process.
 func TestGetAccessToGPIOMissing(t *testing.T) {
-	var err = testPTT(new(audio_s)).getAccessToGPIO(filepath.Join(t.TempDir(), "export"))
+	var err = testPTT(new(audio_s), t.TempDir()).getAccessToGPIO(filepath.Join(t.TempDir(), "export"))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -187,23 +173,23 @@ func TestGetAccessToGPIOMissing(t *testing.T) {
 
 // TestGetAccessToGPIOPresent verifies that a node we can stat is accepted.
 func TestGetAccessToGPIOPresent(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 
-	require.NoError(t, testPTT(new(audio_s)).getAccessToGPIO(filepath.Join(dir, "export")))
+	require.NoError(t, testPTT(new(audio_s), dir).getAccessToGPIO(filepath.Join(dir, "export")))
 }
 
 // TestExportGPIOOutput verifies that exporting an output line writes the line
 // number to "export" and leaves the line low, i.e. off.
 func TestExportGPIOOutput(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25")
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, false, 1))
 
@@ -219,14 +205,14 @@ func TestExportGPIOOutput(t *testing.T) {
 // TestExportGPIOOutputInverted verifies that an inverted output line starts
 // high, which is still off.
 func TestExportGPIOOutputInverted(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25")
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, true, 1))
 
@@ -238,14 +224,14 @@ func TestExportGPIOOutputInverted(t *testing.T) {
 // TestExportGPIOInput verifies that an input line is set to "in" and takes its
 // number from the input rather than the output configuration.
 func TestExportGPIOInput(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio7")
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num = 7
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	require.NoError(t, p.exportGPIO(0, ICTYPE_TXINH, false, 0))
 
@@ -257,14 +243,14 @@ func TestExportGPIOInput(t *testing.T) {
 // TestExportGPIOSuffixedNode verifies the CubieBoard-style node names, where
 // GPIO 25 appears as something like gpio25_ph11.
 func TestExportGPIOSuffixedNode(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25_ph11")
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	require.NoError(t, p.exportGPIO(0, OCTYPE_PTT, false, 1))
 
@@ -276,13 +262,13 @@ func TestExportGPIOSuffixedNode(t *testing.T) {
 // TestExportGPIONoSuchNode verifies that a line that never appears under
 // /sys/class/gpio is reported rather than ending the process.
 func TestExportGPIONoSuchNode(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	var err = p.exportGPIO(0, OCTYPE_PTT, false, 1)
 
@@ -293,12 +279,12 @@ func TestExportGPIONoSuchNode(t *testing.T) {
 // TestExportGPIONoSysfs verifies that a system without the sysfs GPIO
 // interface is reported rather than ending the process.
 func TestExportGPIONoSysfs(t *testing.T) {
-	useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	var err = p.exportGPIO(0, OCTYPE_PTT, false, 1)
 
@@ -310,13 +296,13 @@ func TestExportGPIONoSysfs(t *testing.T) {
 // cannot set up, rather than ending the process, which is what made the
 // function untestable.
 func TestPttInitGPIONoSysfs(t *testing.T) {
-	useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var _, err = NewPTT(cfg, 0)
+	var _, err = newPTT(cfg, 0, dir)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -325,7 +311,7 @@ func TestPttInitGPIONoSysfs(t *testing.T) {
 // TestPttInitGPIO verifies that a GPIO channel that can be set up leaves the
 // line off and reports no error.
 func TestPttInitGPIO(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25")
 
@@ -333,7 +319,7 @@ func TestPttInitGPIO(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var _, err = NewPTT(cfg, 0)
+	var _, err = newPTT(cfg, 0, dir)
 	require.NoError(t, err)
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
@@ -351,7 +337,7 @@ func TestPttInitGPIODRequestFailure(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_name = "/dev/samoyed-no-such-gpiochip"
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 17
 
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	var err = p.init()
 
@@ -379,7 +365,7 @@ func TestPttInitRollsBackOnFailure(t *testing.T) {
 	cfg.achan[1].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIOD
 	cfg.achan[1].octrl[OCTYPE_PTT].out_gpio_name = "/dev/samoyed-no-such-gpiochip"
 
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	require.Error(t, p.init())
 	assert.Nil(t, p.fd[0][OCTYPE_PTT], "a serial port opened before the failure should be closed again")
@@ -393,7 +379,7 @@ func TestPttInitSerialOpenFailure(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = filepath.Join(t.TempDir(), "no-such-tty")
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
-	var _, err = NewPTT(cfg, 0)
+	var _, err = newPTT(cfg, 0, t.TempDir())
 	require.NoError(t, err)
 	assert.Equal(t, PTT_METHOD_NONE, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
 }
@@ -401,7 +387,7 @@ func TestPttInitSerialOpenFailure(t *testing.T) {
 // TestGetInputRealGPIO verifies that an input line's value is read from sysfs,
 // and that invert flips it.
 func TestGetInputRealGPIO(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio7")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gpio7", "value"), []byte("1"), 0o600))
@@ -410,7 +396,7 @@ func TestGetInputRealGPIO(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name = "gpio7"
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	assert.Equal(t, 1, p.GetInput(ICTYPE_TXINH, 0))
 
@@ -422,13 +408,13 @@ func TestGetInputRealGPIO(t *testing.T) {
 // TestGetInputRealGPIONoNode verifies that an input line whose sysfs node is
 // missing reports an error rather than ending the process.
 func TestGetInputRealGPIONoNode(t *testing.T) {
-	useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name = "gpio7"
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, dir)
 
 	assert.Equal(t, -1, p.GetInput(ICTYPE_TXINH, 0))
 }
@@ -438,7 +424,7 @@ func TestGetInputRealGPIONoNode(t *testing.T) {
 // the configured line number, but kept that to itself, so Set built its
 // path from an empty name and could not open anything.
 func TestPttInitGPIOThenSet(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio25_ph11")
 
@@ -446,7 +432,7 @@ func TestPttInitGPIOThenSet(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p, err = NewPTT(cfg, 0)
+	var p, err = newPTT(cfg, 0, dir)
 	require.NoError(t, err)
 	assert.Equal(t, "gpio25_ph11", cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_name,
 		"the node name found while exporting should be remembered")
@@ -467,7 +453,7 @@ func TestPttInitGPIOThenSet(t *testing.T) {
 // TestPttInitGPIOInputThenGet is the same regression on the input side, where
 // GetInput reads the node that exportGPIO found.
 func TestPttInitGPIOInputThenGet(t *testing.T) {
-	var dir = useFakeGPIOSysfs(t)
+	var dir = t.TempDir()
 	writeFakeGPIOExport(t, dir)
 	writeFakeGPIONode(t, dir, "gpio7_pi13")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gpio7_pi13", "value"), []byte("1"), 0o600))
@@ -476,7 +462,7 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num = 7
-	var p, err = NewPTT(cfg, 0)
+	var p, err = newPTT(cfg, 0, dir)
 	require.NoError(t, err)
 	assert.Equal(t, "gpio7_pi13", cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name,
 		"the node name found while exporting should be remembered")
@@ -499,7 +485,7 @@ func TestPttNilBeforeStartup(t *testing.T) {
 // The debug level decides how much the PTT code says about what it is doing,
 // which is the only way to tell a miswired interface from a misconfigured one.
 func TestNewPTTDebug(t *testing.T) {
-	var p, err = NewPTT(new(audio_s), 2)
+	var p, err = newPTT(new(audio_s), 2, t.TempDir())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, p.debugLevel)
@@ -512,7 +498,7 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 
 	var output = CaptureOutput(t, func() {
-		var p, err = NewPTT(cfg, 2)
+		var p, err = newPTT(cfg, 2, t.TempDir())
 		require.NoError(t, err)
 
 		p.Set(OCTYPE_PTT, 0, 1)
@@ -526,7 +512,7 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 // PTT hardware here to key, and no configuration for it to look at either.
 func TestPttSetRealNetworkChannel(t *testing.T) {
 	var cfg = new(audio_s)
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	assert.NotPanics(t, func() { p.Set(OCTYPE_PTT, MAX_RADIO_CHANS, 1) })
 }
@@ -535,7 +521,7 @@ func TestPttSetRealNetworkChannel(t *testing.T) {
 func TestPttSetRealInvalidChannel(t *testing.T) {
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_NONE
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	var output = CaptureOutput(t, func() { p.Set(OCTYPE_PTT, 0, 1) })
 
@@ -593,14 +579,14 @@ func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*PT
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = device
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = line
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line2 = line2
-	var p, err = NewPTT(cfg, 0)
+	var p, err = newPTT(cfg, 0, t.TempDir())
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
 
 	require.NotNil(t, p.fd[0][OCTYPE_PTT], "the serial port was not opened")
 
-	// After NewPTT, which sets the initial state off and would otherwise
+	// After newPTT, which sets the initial state off and would otherwise
 	// show up as a change the test did not ask for.
 	return p, cfg, captureSerialControlLines(t)
 }
@@ -728,7 +714,7 @@ func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 	cfg.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
 
-	var p, err = NewPTT(cfg, 0)
+	var p, err = newPTT(cfg, 0, t.TempDir())
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
@@ -751,7 +737,7 @@ func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
 	var output = CaptureOutput(t, func() {
 		var err error
 
-		p, err = NewPTT(cfg, 0)
+		p, err = newPTT(cfg, 0, t.TempDir())
 		require.NoError(t, err)
 	})
 
@@ -774,7 +760,7 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 	CaptureOutput(t, func() {
 		var err error
 
-		p, err = NewPTT(cfg, 0)
+		p, err = newPTT(cfg, 0, t.TempDir())
 		require.NoError(t, err)
 	})
 
@@ -788,7 +774,7 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 func TestGetInputRealInvalidChannel(t *testing.T) {
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_NONE
-	var p = testPTT(cfg)
+	var p = testPTT(cfg, t.TempDir())
 
 	var result int
 

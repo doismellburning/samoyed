@@ -1,4 +1,4 @@
-//nolint:gochecknoglobals,funcorder // funcorder: kept in Dire Wolf's order for now, to keep the diff that gathers the globals readable.
+//nolint:funcorder // Kept in Dire Wolf's order for now, to keep the diff that gathers the globals readable.
 package direwolf
 
 /*------------------------------------------------------------------
@@ -175,6 +175,9 @@ func octypeName(ot int) string {
 	}
 }
 
+// defaultGPIOSysfsDir is the root of the sysfs GPIO user interface.
+const defaultGPIOSysfsDir = "/sys/class/gpio"
+
 // gpiodOutputLine is the subset of gpiocdev.Line used for PTT output control.
 // The interface exists to allow dependency injection in tests.
 type gpiodOutputLine interface {
@@ -190,6 +193,11 @@ type gpiodOutputLine interface {
 type PTT struct {
 	audioConfig *audio_s
 	debugLevel  int
+
+	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
+	// a test can point it at a fake tree and exercise the GPIO paths without
+	// a kernel that offers the real one.
+	gpioSysfsDir string
 
 	/* Serial port handle or fd.  */
 	/* Could be the same for two channels */
@@ -224,11 +232,6 @@ type PTT struct {
  *------------------------------------------------------------------*/
 
 const MAX_GROUPS = 50
-
-// gpio_sysfs_dir is the root of the sysfs GPIO user interface.  It is a
-// variable rather than a constant so that a test can point it at a fake tree
-// and exercise the GPIO paths without a kernel that offers the real one.
-var gpio_sysfs_dir = "/sys/class/gpio"
 
 func (p *PTT) getAccessToGPIO(path string) error {
 	/*
@@ -329,14 +332,14 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 		gpio_name = p.audioConfig.achan[ch].ictrl[ot].in_gpio_name
 	}
 
-	var gpio_export_path = gpio_sysfs_dir + "/export"
+	var gpio_export_path = p.gpioSysfsDir + "/export"
 
 	var accessErr = p.getAccessToGPIO(gpio_export_path)
 	if accessErr != nil {
 		return accessErr
 	}
 
-	var fd, err = os.OpenFile(gpio_export_path, os.O_WRONLY, 0)
+	var fd, err = os.OpenFile(gpio_export_path, os.O_WRONLY, 0) //nolint:gosec
 	if err != nil {
 		// Not expected.  Above should have obtained permission.
 		return fmt.Errorf("permissions do not allow access to GPIO: %w", err)
@@ -409,17 +412,17 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 
 	if p.debugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Contents of %s:\n", gpio_sysfs_dir)
+		dw_printf("Contents of %s:\n", p.gpioSysfsDir)
 	}
 
-	var dirEntries, readDirErr = os.ReadDir(gpio_sysfs_dir)
+	var dirEntries, readDirErr = os.ReadDir(p.gpioSysfsDir)
 
 	var ok = false
 
 	if readDirErr != nil {
 		// Something went wrong.  Fill in the simple expected name and keep going.
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR! Could not get directory listing for %s\n", gpio_sysfs_dir)
+		dw_printf("ERROR! Could not get directory listing for %s\n", p.gpioSysfsDir)
 
 		gpio_name = fmt.Sprintf("gpio%d", gpio_num)
 		ok = true
@@ -472,14 +475,14 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 
 	if p.debugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, gpio_sysfs_dir, gpio_name)
+		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, p.gpioSysfsDir, gpio_name)
 	}
 
 	/*
 	 * Set output direction and initial state
 	 */
 
-	var gpio_direction_path = fmt.Sprintf("%s/%s/direction", gpio_sysfs_dir, gpio_name)
+	var gpio_direction_path = fmt.Sprintf("%s/%s/direction", p.gpioSysfsDir, gpio_name)
 
 	accessErr = p.getAccessToGPIO(gpio_direction_path)
 	if accessErr != nil {
@@ -523,7 +526,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	 * Do it once here, rather than each time we want to use it.
 	 */
 
-	var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, gpio_name)
+	var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, gpio_name)
 
 	return p.getAccessToGPIO(gpio_value_path)
 }
@@ -581,9 +584,16 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  *--------------------------------------------------------------------*/
 
 func NewPTT(audio_config_p *audio_s, debug int) (*PTT, error) {
+	return newPTT(audio_config_p, debug, defaultGPIOSysfsDir)
+}
+
+// newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
+// test can supply a fake one.
+func newPTT(audio_config_p *audio_s, debug int, gpioSysfsDir string) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
 	p.debugLevel = debug
+	p.gpioSysfsDir = gpioSysfsDir
 
 	var err = p.init()
 	if err != nil {
@@ -739,7 +749,7 @@ func (p *PTT) setup() error {
 	}
 
 	if using_gpio {
-		var accessErr = p.getAccessToGPIO(gpio_sysfs_dir + "/export")
+		var accessErr = p.getAccessToGPIO(p.gpioSysfsDir + "/export")
 		if accessErr != nil {
 			return accessErr
 		}
@@ -1168,7 +1178,7 @@ func (p *PTT) Set(ot int, channel int, ptt_signal int) {
 	 */
 
 	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, p.audioConfig.achan[channel].octrl[ot].out_gpio_name)
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.audioConfig.achan[channel].octrl[ot].out_gpio_name)
 
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
@@ -1331,7 +1341,7 @@ func (p *PTT) GetInput(it int, channel int) int {
 	}
 
 	if p.audioConfig.achan[channel].ictrl[it].method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, p.audioConfig.achan[channel].ictrl[it].in_gpio_name)
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.audioConfig.achan[channel].ictrl[it].in_gpio_name)
 
 		// No need to check access first: this runs on every transmit attempt,
 		// export_gpio checked it at startup, and the open below reports the
