@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -189,7 +190,7 @@ func TestKissSerialDeviceNotThere(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_serial_port = "/dev/there-is-no-such-serial-port"
 
-	var output = CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, 0) })
+	var output = testutils.CaptureOutput(t, func() { ks = NewKissSerial(t.Context(), mc, 0) })
 
 	assert.Contains(t, output, "Could not open serial port /dev/there-is-no-such-serial-port")
 	assert.Nil(t, ks.fd)
@@ -219,20 +220,20 @@ func TestKissSerialSendRecPacketWriteErrorGivesUpThePort(t *testing.T) {
 
 	require.NoError(t, client.Close())
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 	})
 
 	assert.Contains(t, output, "Error sending KISS message to client application thru serial port")
 	assert.True(t, ks.failed, "the serial port was not given up after the write error")
 
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 	})
 
 	assert.Empty(t, output, "the serial port was written to again after the write error")
 
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		assert.True(t, ks.giveUpPortIfFailed())
 	})
 
@@ -266,7 +267,7 @@ func TestKissSerialSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		ks.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 	})
 
@@ -448,7 +449,7 @@ func TestKissSerialPollingStopsWhenCancelled(t *testing.T) {
 func TestKissSerialDebugPrints(t *testing.T) {
 	var ks, client = openKissSerialPort(t, 2)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		ks.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 
 		readSerialKissFrame(t, client)
@@ -457,7 +458,7 @@ func TestKissSerialDebugPrints(t *testing.T) {
 	assert.Contains(t, output, "Packet content before adding KISS framing")
 	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
 
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		ks.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 	})
 

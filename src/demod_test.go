@@ -6,6 +6,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestDemodInitRejectsPSKDecimation(t *testing.T) {
 		audioConfig.achan[channel].decimate = 3
 		audioConfig.achan[channel].num_freq = 1
 
-		AssertOutputContains(t, func() {
+		testutils.AssertOutputContains(t, func() {
 			demod_init(audioConfig)
 		}, "Decimation is not supported for PSK")
 

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -428,7 +429,7 @@ func TestIGateTransmitPathSaysNo(t *testing.T) {
 func TestIGateTransmitUnparseable(t *testing.T) {
 	setupIGateToRadio(t)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		igate.maybeXmitPacketFromIGate([]byte("this is not a packet"), 0)
 	})
 
@@ -499,7 +500,7 @@ func TestIGToTxAllowDropsDuplicates(t *testing.T) {
 
 	igate.igToTxRemember(pp, 0, 0)
 
-	var output = CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
+	var output = testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
 
 	assert.Contains(t, output, "Drop duplicate packet transmitted recently")
 
@@ -526,7 +527,7 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 		}
 	}()
 
-	CaptureOutput(t, func() {
+	testutils.CaptureOutput(t, func() {
 		for range 100 {
 			igate.igToTxAllow(pp, 0)
 		}
@@ -534,7 +535,7 @@ func TestIGToTxHistoryConcurrent(t *testing.T) {
 
 	<-done
 
-	CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
+	testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(pp, 0)) })
 }
 
 // A repeated "message" is a retry that did not get an ack, so it is not
@@ -570,7 +571,7 @@ func TestIGToTxAllowRateLimits(t *testing.T) {
 	var next = AX25FromText("Q2TEST>APWW10:>one too many", true)
 	require.NotNil(t, next)
 
-	var output = CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(next, 0)) })
+	var output = testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(next, 0)) })
 
 	assert.Contains(t, output, "maximum of 2 packets in 1 minute")
 }
@@ -593,7 +594,7 @@ func TestIGToTxAllowFiveMinuteLimit(t *testing.T) {
 	var next = AX25FromText("Q2TEST>APWW10:>one too many", true)
 	require.NotNil(t, next)
 
-	var output = CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(next, 0)) })
+	var output = testutils.CaptureOutput(t, func() { assert.False(t, igate.igToTxAllow(next, 0)) })
 
 	assert.Contains(t, output, "maximum of 3 packets in 5 minutes")
 }
@@ -695,7 +696,7 @@ func TestIGateSatgateDelaysDirectPackets(t *testing.T) {
 	var pp = AX25FromText("Q2TEST>APDW17,WIDE1-1:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "SATgate mode, delay packet heard directly")
 	assert.NotNil(t, igate.dpQueueHead, "the packet was not put on the delay queue")
@@ -757,7 +758,7 @@ func TestIGateSatgateQueueKeepsOrder(t *testing.T) {
 		var pp = AX25FromText(text, true)
 		require.NotNil(t, pp)
 
-		CaptureOutput(t, func() { igate.satgateDelayPacket(pp, 0) })
+		testutils.CaptureOutput(t, func() { igate.satgateDelayPacket(pp, 0) })
 	}
 
 	require.NotNil(t, igate.dpQueueHead)
@@ -779,7 +780,7 @@ func TestIGateDebugOutput(t *testing.T) {
 	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "[rx>ig]")
 	assert.Contains(t, output, "rx_to_ig_allow? YES")
@@ -788,7 +789,7 @@ func TestIGateDebugOutput(t *testing.T) {
 	readFromIGate(t, server)
 
 	// And the second time round, why it was dropped.
-	output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+	output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "rx_to_ig_allow? NO. Seen")
 	assert.Contains(t, output, "Drop duplicate of same packet seen recently")
@@ -803,7 +804,7 @@ func TestIGateToRadioDebugOutput(t *testing.T) {
 	var pp = AX25FromText("Q2TEST>APWW10:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		assert.True(t, igate.igToTxAllow(pp, 0))
 
 		igate.igToTxRemember(pp, 0, 0)
@@ -816,7 +817,7 @@ func TestIGateToRadioDebugOutput(t *testing.T) {
 	assert.Contains(t, output, "ig_to_tx_allow? NO. Duplicate sent")
 
 	// And a packet turned away for its path.
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		igate.maybeXmitPacketFromIGate([]byte("Q2TEST>APWW10,NOGATE:>hello"), 0)
 	})
 
@@ -843,7 +844,7 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 			var pp = AX25FromText(c.text, true)
 			require.NotNil(t, pp)
 
-			var output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+			var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 			assert.Contains(t, output, c.expect)
 		})
@@ -855,7 +856,7 @@ func TestIGateSendRecPacketDebugOutput(t *testing.T) {
 	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "was rejected by filter")
 }

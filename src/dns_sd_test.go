@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/brutella/dnssd"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -44,7 +45,7 @@ func TestDNSSDAnnounceUsesConfiguredName(t *testing.T) {
 	mc.kiss_port[0] = 8001
 	mc.dns_sd_name = "Q1TEST TNC"
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		dns_sd_announce(cancelledContext(t), mc)
 	})
 
@@ -58,7 +59,7 @@ func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 	var mc = new(misc_config_s)
 	mc.kiss_port[0] = 8002
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		dns_sd_announce(cancelledContext(t), mc)
 	})
 
@@ -70,7 +71,7 @@ func TestDNSSDAnnounceDefaultsName(t *testing.T) {
 func TestDNSSDAnnounceRejectsPortZero(t *testing.T) {
 	var mc = new(misc_config_s)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		dns_sd_announce(cancelledContext(t), mc)
 	})
 

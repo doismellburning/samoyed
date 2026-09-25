@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -497,7 +498,7 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		var p, err = newPTT(cfg, 2, t.TempDir())
 		require.NoError(t, err)
 
@@ -523,7 +524,7 @@ func TestPttSetRealInvalidChannel(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_NONE
 	var p = testPTT(cfg, t.TempDir())
 
-	var output = CaptureOutput(t, func() { p.Set(OCTYPE_PTT, 0, 1) })
+	var output = testutils.CaptureOutput(t, func() { p.Set(OCTYPE_PTT, 0, 1) })
 
 	assert.Contains(t, output, "did not expect invalid channel")
 }
@@ -747,7 +748,7 @@ func TestPttLPTOpenFailure(t *testing.T) {
 	var p = testPTT(cfg, t.TempDir())
 	p.lptPortPath = filepath.Join(t.TempDir(), "no-such-port")
 
-	var output = CaptureOutput(t, func() { require.NoError(t, p.init()) })
+	var output = testutils.CaptureOutput(t, func() { require.NoError(t, p.init()) })
 
 	assert.Contains(t, output, "Can't open")
 	assert.Equal(t, PTT_METHOD_NONE, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
@@ -791,7 +792,7 @@ func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
 
 	var p *PTT
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		var err error
 
 		p, err = newPTT(cfg, 0, t.TempDir())
@@ -814,7 +815,7 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 
 	var p *PTT
 
-	CaptureOutput(t, func() {
+	testutils.CaptureOutput(t, func() {
 		var err error
 
 		p, err = newPTT(cfg, 0, t.TempDir())
@@ -835,7 +836,7 @@ func TestGetInputRealInvalidChannel(t *testing.T) {
 
 	var result int
 
-	var output = CaptureOutput(t, func() { result = p.GetInput(ICTYPE_TXINH, 0) })
+	var output = testutils.CaptureOutput(t, func() { result = p.GetInput(ICTYPE_TXINH, 0) })
 
 	assert.Equal(t, -1, result)
 	assert.Contains(t, output, "did not expect invalid channel")
@@ -845,14 +846,14 @@ func TestGetInputRealInvalidChannel(t *testing.T) {
 // what to do is worth more than the error on its own.  Anything else is not a
 // permission problem, and gets no advice.
 func TestCM108PermissionAdvice(t *testing.T) {
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		cm108_print_permission_advice("/dev/hidraw0", fs.ErrPermission)
 	})
 
 	assert.NotEmpty(t, output)
 	assert.Contains(t, output, "/dev/hidraw0")
 
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		cm108_print_permission_advice("/dev/hidraw0", fs.ErrNotExist)
 	})
 

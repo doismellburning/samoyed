@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
-	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,7 +22,7 @@ func Test_main(t *testing.T) {
 	var output string
 
 	testutils.WithStdin(t, input, func() {
-		output = direwolf.CaptureOutput(t, main)
+		output = testutils.CaptureOutput(t, main)
 	})
 
 	require.Contains(t, output, "# A comment is echoed back\n\n")

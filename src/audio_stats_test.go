@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -97,7 +98,7 @@ func audioStatsPastFirstReport(t *testing.T, stats *[MAX_ADEVS]AudioStats, adev 
 func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 1, 44100, 0)
 		stats[0].record(0, 1, 44100, -1)
 	})
@@ -111,7 +112,7 @@ func TestAudioStatsIntervalOffDoesNothing(t *testing.T) {
 func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 1, 44100, 100)
 	})
 
@@ -130,7 +131,7 @@ func TestAudioStatsFirstCallStartsCollecting(t *testing.T) {
 func TestAudioStatsCountsSamplesAndErrors(t *testing.T) {
 	var stats = newTestAudioStats(t)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 1, 0, 100) // Starts collecting.
 		stats[0].record(0, 1, 1000, 100)
 		stats[0].record(0, 1, 500, 100)
@@ -151,7 +152,7 @@ func TestAudioStatsSuppressesFirstReport(t *testing.T) {
 	stats[0].record(0, 1, 44100, audioStatsTestInterval)
 	audioStatsRewind(&stats[0])
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 1, 44100, audioStatsTestInterval)
 	})
 
@@ -167,7 +168,7 @@ func TestAudioStatsReportsSampleRate(t *testing.T) {
 
 	audioStatsRewind(&stats[0])
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 1, 441000, audioStatsTestInterval)
 	})
 
@@ -183,7 +184,7 @@ func TestAudioStatsReportsErrorCount(t *testing.T) {
 	stats[0].record(0, 1, 0, audioStatsTestInterval)
 	audioStatsRewind(&stats[0])
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 1, 0, audioStatsTestInterval)
 	})
 
@@ -198,7 +199,7 @@ func TestAudioStatsReportsBothChannels(t *testing.T) {
 
 	audioStatsRewind(&stats[0])
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[0].record(0, 2, 441000, audioStatsTestInterval)
 	})
 
@@ -213,7 +214,7 @@ func TestAudioStatsSecondDeviceIsIndependent(t *testing.T) {
 	stats[0].record(0, 1, 44100, audioStatsTestInterval) // Device 0 only just starts collecting.
 	audioStatsRewind(&stats[1])
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		stats[1].record(1, 1, 220500, audioStatsTestInterval)
 	})
 

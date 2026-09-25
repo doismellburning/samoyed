@@ -4,6 +4,7 @@
 package testutils
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -30,4 +31,16 @@ func TestWithStdin(t *testing.T) {
 
 	assert.Equal(t, input, string(got))
 	assert.Same(t, oldStdin, os.Stdin, "stdin should be put back")
+}
+
+// Output longer than a pipe will hold - 64 KiB on Linux - used to wedge the
+// command against a pipe nobody was reading from until it returned.
+func Test_CaptureOutput_more_than_a_pipe_holds(t *testing.T) {
+	var expected = strings.Repeat("x", 256*1024)
+
+	assert.Equal(t, expected, CaptureOutput(t, func() { fmt.Print(expected) }))
+}
+
+func Test_CaptureOutput_nothing_at_all(t *testing.T) {
+	assert.Empty(t, CaptureOutput(t, func() {}))
 }

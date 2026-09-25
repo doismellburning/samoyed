@@ -10,6 +10,7 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/ais"
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -133,7 +134,7 @@ func Test_reportConfigCheck(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var output = CaptureOutput(t, func() {
+			var output = testutils.CaptureOutput(t, func() {
 				reportConfigCheck("dw.conf", tt.errors, tt.warnings)
 			})
 

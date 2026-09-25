@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -299,7 +300,7 @@ func TestKissPTSendRecPacketTruncates(t *testing.T) {
 	// is longer than the terminal will hold.
 	var got = drainKissFrame(t, client)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kp.SendRecPacket(0, KISS_CMD_DATA_FRAME, frame, len(frame), nil, -1)
 	})
 
@@ -457,7 +458,7 @@ func TestKissPTClientHangingUpClosesTheTerminal(t *testing.T) {
 func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	var kp, client = startKissPT(t, 2)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kp.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 
 		readKissFrame(t, client)
@@ -467,7 +468,7 @@ func TestKissPTDebugPrintsBothDirections(t *testing.T) {
 	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		kp.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 
 		readKissText(t, client, len("\r\ncmd:"))

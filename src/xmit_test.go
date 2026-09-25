@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -343,7 +344,7 @@ func TestSendOneFrame(t *testing.T) {
 
 	var bits int
 
-	var output = CaptureOutput(t, func() { bits = xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
+	var output = testutils.CaptureOutput(t, func() { bits = xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
 
 	assert.Positive(t, bits, "nothing was sent")
 	assert.Contains(t, output, "[0L] Q1TEST>Q2TEST:hello")
@@ -361,7 +362,7 @@ func TestSendOneFrameNonAPRS(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_SABM, 0, 0, nil)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
+	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
 
 	assert.Contains(t, output, "[0H]")
 	assert.Contains(t, output, "(SABM")
@@ -383,7 +384,7 @@ func TestSendOneFrameXID(t *testing.T) {
 	var pp = ax25_u_frame(addrs, 2, cr_cmd, frame_type_U_XID, 0, 0, info)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
+	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_0_HI, pp) })
 
 	assert.Contains(t, output, "(XID")
 	assert.Contains(t, output, "Half-Duplex", "the XID parameters should be shown decoded")
@@ -418,7 +419,7 @@ func TestSendOneFrameDeliberateBadFCS(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
+	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
 
 	assert.Contains(t, output, "Intentionally sending invalid CRC")
 }
@@ -433,7 +434,7 @@ func TestSendOneFrameDebugHexDump(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
+	var output = testutils.CaptureOutput(t, func() { xs.send_one_frame(0, TQ_PRIO_1_LO, pp) })
 
 	assert.Contains(t, output, "------")
 }
@@ -451,7 +452,7 @@ func TestXmitAX25FramesBundles(t *testing.T) {
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
 
-	var output = CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
 
 	assert.Contains(t, output, ":first")
 	assert.Contains(t, output, ":second", "the queued frame should have shared the transmission")
@@ -471,7 +472,7 @@ func TestXmitAX25FramesDoesNotBundleDigipeated(t *testing.T) {
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, digipeated)
 
-	var output = CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 7) })
 
 	assert.Contains(t, output, ":first")
 	assert.NotContains(t, output, ":repeated")
@@ -491,7 +492,7 @@ func TestXmitAX25FramesRespectsMaxBundle(t *testing.T) {
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, second)
 
-	var output = CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 1) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 1) })
 
 	assert.NotContains(t, output, ":second")
 	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO))
@@ -518,7 +519,7 @@ func TestXmitAX25FramesTakesHighPriorityFirst(t *testing.T) {
 	transmitQueue.Append(0, TQ_PRIO_1_LO, low)
 	transmitQueue.Append(0, TQ_PRIO_0_HI, high)
 
-	CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 2) })
+	testutils.CaptureOutput(t, func() { xs.xmit_ax25_frames(0, TQ_PRIO_1_LO, first, 2) })
 
 	assert.Nil(t, transmitQueue.Peek(0, TQ_PRIO_0_HI), "the high priority frame should have gone first")
 	assert.NotNil(t, transmitQueue.Peek(0, TQ_PRIO_1_LO), "and used up the bundle, leaving the low priority one")
@@ -541,7 +542,7 @@ func TestXmitSpeech(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
 
 	assert.Contains(t, output, `[0.speech] "Hello there"`)
 
@@ -558,7 +559,7 @@ func TestXmitSpeechWithoutAScript(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>SPEECH:Hello there", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_speech(t.Context(), 0, pp) })
 
 	assert.Contains(t, output, "Text-to-speech script has not been configured")
 }
@@ -568,7 +569,7 @@ func TestXmitSpeechWithoutAScript(t *testing.T) {
 func TestXmitSpeakItScriptFails(t *testing.T) {
 	var err error
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		err = xmit_speak_it(t.Context(), filepath.Join(t.TempDir(), "no-such-script"), 0, "hello")
 	})
 
@@ -593,7 +594,7 @@ func TestXmitNextDoesNotBundleBehindADigipeatedFrame(t *testing.T) {
 	transmitQueue.Append(0, TQ_PRIO_0_HI, digipeated)
 	transmitQueue.Append(0, TQ_PRIO_1_LO, other)
 
-	var output = CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
 	assert.Contains(t, output, ":repeated")
 	assert.NotContains(t, output, ":other")
@@ -614,7 +615,7 @@ func TestXmitNextBundlesOrdinaryFrames(t *testing.T) {
 		transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 	}
 
-	var output = CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
 	assert.Contains(t, output, ":first")
 	assert.Contains(t, output, ":second")
@@ -634,7 +635,7 @@ func TestXmitNextReleasesAudioOutDev(t *testing.T) {
 
 	transmitQueue.Append(0, TQ_PRIO_1_LO, pp)
 
-	CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
+	testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
 	require.True(t, xs.audioOutDevMutex[ACHAN2ADEV(0)].TryLock(),
 		"the audio output device is still locked after the transmission")
@@ -650,7 +651,7 @@ func TestXmitMorse(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>MORSE:HI", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.xmit_morse(0, pp, MORSE_DEFAULT_WPM) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_morse(0, pp, MORSE_DEFAULT_WPM) })
 
 	assert.Contains(t, output, `[0.morse] "HI"`)
 }
@@ -663,7 +664,7 @@ func TestXmitDTMF(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>DTMF:12", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { xs.xmit_dtmf(0, pp, 10) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_dtmf(0, pp, 10) })
 
 	assert.Contains(t, output, `[0.dtmf] "12"`)
 }
@@ -684,7 +685,7 @@ func timeXmitNext(t *testing.T, xs *XmitService, text string) (time.Duration, st
 
 	var started = time.Now()
 
-	var output = CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
+	var output = testutils.CaptureOutput(t, func() { xs.xmit_next(t.Context(), 0) })
 
 	return time.Since(started), output
 }
