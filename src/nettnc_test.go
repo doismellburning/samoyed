@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -175,7 +176,7 @@ func TestNetTNCSendPacketNoTNC(t *testing.T) {
 
 	s_net_tncs[nettncTestChannel] = nil
 
-	var output = CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
+	var output = testutils.CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
 
 	assert.Contains(t, output, "Not connected to network TNC for channel 3")
 }
@@ -191,7 +192,7 @@ func TestNetTNCSendPacketNotConnected(t *testing.T) {
 	nt.host = "127.0.0.1"
 	s_net_tncs[nettncTestChannel] = nt
 
-	var output = CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
+	var output = testutils.CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
 
 	assert.Contains(t, output, "Not connected to network TNC for channel 3")
 }
@@ -213,7 +214,7 @@ func TestNetTNCSendPacketWriteErrorClosesTheConnection(t *testing.T) {
 
 	require.NoError(t, there.Close())
 
-	var output = CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
+	var output = testutils.CaptureOutput(t, func() { nettnc_send_packet(nettncTestChannel, newTestPacket(t)) })
 
 	assert.Contains(t, output, "sending packet to KISS Network TNC for channel 3")
 	assert.Nil(t, nt.getSock(), "the connection was not given up after the write failed")
@@ -304,7 +305,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range KissEncapsulate([]byte{0, 'n', 'o', 't', ' ', 'a', 'x', '2', '5'}) {
 			my_kiss_rec_byte(kf, b, 0, nettncTestChannel)
 		}
@@ -319,7 +320,7 @@ func TestNetTNCUndecodableFrameIsReported(t *testing.T) {
 func TestNetTNCOverlongFrameIsReported(t *testing.T) {
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
 
 		for range MAX_KISS_LEN + 10 {
@@ -340,7 +341,7 @@ func TestNetTNCOverlongFrameWithClosingFENDIsDiscarded(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		my_kiss_rec_byte(kf, FEND, 0, nettncTestChannel)
 
 		for range MAX_KISS_LEN + 10 {
@@ -371,7 +372,7 @@ func TestNetTNCDebugPrints(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		for _, b := range kissFrameFor(newTestPacket(t)) {
 			my_kiss_rec_byte(kf, b, 2, nettncTestChannel)
 		}
@@ -396,7 +397,7 @@ func TestNetTNCInitAttachesNetworkChannels(t *testing.T) {
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 	audioConfig.nettnc_port[nettncTestChannel] = port
 
-	var output = CaptureOutput(t, func() { nettnc_init(t.Context(), audioConfig) })
+	var output = testutils.CaptureOutput(t, func() { nettnc_init(t.Context(), audioConfig) })
 
 	assert.Contains(t, output, fmt.Sprintf("Channel %d: Network TNC 127.0.0.1 %d", nettncTestChannel, port))
 
@@ -422,7 +423,7 @@ func TestNetTNCInitReturnsWhenCancelled(t *testing.T) {
 	audioConfig.nettnc_addr[nettncTestChannel] = "127.0.0.1"
 	audioConfig.nettnc_port[nettncTestChannel] = freeTCPPort(t)
 
-	CaptureOutput(t, func() { nettnc_init(ctx, audioConfig) })
+	testutils.CaptureOutput(t, func() { nettnc_init(ctx, audioConfig) })
 }
 
 // readFullFrom fills buf from conn, which a single Read is not obliged to do.

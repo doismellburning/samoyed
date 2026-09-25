@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/creack/pty"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/pkg/term"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,7 @@ func openTestSerialPort(t *testing.T, baud int) (*term.Term, *os.File) {
 func TestSerialPortOpenNonexistentDevice(t *testing.T) {
 	var fd *term.Term
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		fd = SerialPortOpen("/dev/there-is-no-such-serial-port", 9600)
 	})
 
@@ -47,7 +48,7 @@ func TestSerialPortOpenNonexistentDevice(t *testing.T) {
 
 // A speed we know about is set without comment.
 func TestSerialPortOpenSupportedSpeed(t *testing.T) {
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		openTestSerialPort(t, 9600)
 	})
 
@@ -57,7 +58,7 @@ func TestSerialPortOpenSupportedSpeed(t *testing.T) {
 // A speed of 0 means "leave whatever the device already had alone", which is
 // not the same thing as an unsupported speed.
 func TestSerialPortOpenSpeedZeroLeavesItAlone(t *testing.T) {
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		openTestSerialPort(t, 0)
 	})
 
@@ -68,7 +69,7 @@ func TestSerialPortOpenSpeedZeroLeavesItAlone(t *testing.T) {
 func TestSerialPortOpenUnsupportedSpeed(t *testing.T) {
 	var fd *term.Term
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		fd, _ = openTestSerialPort(t, 1234)
 	})
 

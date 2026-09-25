@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -285,7 +286,7 @@ func TestDWGPSNMEAInitLeavesTheIGateDebugLevelAlone(t *testing.T) {
 	var pp = AX25FromText("Q2TEST>APDW17:>hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
+	var output = testutils.CaptureOutput(t, func() { igate.sendRecPacket(0, pp) })
 
 	assert.Contains(t, output, "rx_to_ig_allow? YES", "the IGate stopped reporting at its own debug level")
 

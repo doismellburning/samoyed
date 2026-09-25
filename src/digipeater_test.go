@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -161,7 +162,7 @@ func TestDigipeaterInvalidChannel(t *testing.T) {
 	require.NotNil(t, pp)
 
 	for _, channel := range []int{-1, MAX_TOTAL_CHANS} {
-		var output = CaptureOutput(t, func() { digi.Digipeat(channel, pp) })
+		var output = testutils.CaptureOutput(t, func() { digi.Digipeat(channel, pp) })
 
 		assert.Contains(t, output, "Did not expect to receive on invalid channel")
 	}

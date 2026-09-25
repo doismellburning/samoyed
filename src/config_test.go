@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -244,7 +245,7 @@ func parseConfig(t *testing.T, content string) configs {
 		fatal:    false,
 	}
 
-	c.output = CaptureOutput(t, func() {
+	c.output = testutils.CaptureOutput(t, func() {
 		var report = config_init(tmpFile.Name(), c.audio, c.digi, c.cdigi, c.tt, c.igate, c.misc)
 		c.errors, c.warnings, c.fatal = report.errors, report.warnings, report.fatal
 	})

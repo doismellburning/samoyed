@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -155,7 +156,7 @@ func Test_kiss_process_msg_invalid_channel(t *testing.T) {
 	var pp = AX25FromText("Q1TEST>Q2TEST:hello", true)
 	require.NotNil(t, pp)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kiss_process_msg(append([]byte{0x80 | KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, nil, -1, sendfun)
 	})
 
@@ -201,7 +202,7 @@ func Test_kiss_process_msg_port_channel_out_of_range(t *testing.T) {
 	var output string
 
 	assert.NotPanics(t, func() {
-		output = CaptureOutput(t, func() {
+		output = testutils.CaptureOutput(t, func() {
 			kiss_process_msg(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...), 0, kps, 0, sendfun)
 		})
 	})
@@ -216,7 +217,7 @@ func Test_kiss_process_msg_undecodable_data_frame(t *testing.T) {
 
 	var _, sendfun = recordingSendfun()
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kiss_process_msg([]byte{KISS_CMD_DATA_FRAME, 'n', 'o'}, 0, nil, -1, sendfun)
 	})
 
@@ -260,7 +261,7 @@ func Test_kiss_process_msg_extreme_timing_parameters(t *testing.T) {
 		{"TXTAIL", []byte{KISS_CMD_TXTAIL, 1}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = CaptureOutput(t, func() { kiss_process_msg(c.msg, 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { kiss_process_msg(c.msg, 0, nil, -1, sendfun) })
 
 			assert.Contains(t, output, "Radio Channel - Transmit Timing")
 		})
@@ -289,7 +290,7 @@ func Test_kiss_process_msg_missing_parameter(t *testing.T) {
 		{"SET HARDWARE", KISS_CMD_SET_HARDWARE},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			var output = CaptureOutput(t, func() { kiss_process_msg([]byte{c.cmd}, 0, nil, -1, sendfun) })
+			var output = testutils.CaptureOutput(t, func() { kiss_process_msg([]byte{c.cmd}, 0, nil, -1, sendfun) })
 
 			assert.Contains(t, output, "KISS ERROR")
 		})
@@ -305,7 +306,7 @@ func Test_kiss_process_msg_end_kiss(t *testing.T) {
 
 	var _, sendfun = recordingSendfun()
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kiss_process_msg([]byte{KISS_CMD_END_KISS}, 0, nil, -1, sendfun)
 	})
 
@@ -320,7 +321,7 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 
 	var _, sendfun = recordingSendfun()
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kiss_process_msg([]byte{7}, 0, nil, -1, sendfun)
 	})
 
@@ -328,14 +329,14 @@ func Test_kiss_process_msg_unsupported_commands(t *testing.T) {
 	assert.Contains(t, output, `Use "-d kn" option`)
 	assert.NotContains(t, output, "XKISS")
 
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		kiss_process_msg([]byte{XKISS_CMD_DATA}, 0, nil, -1, sendfun)
 	})
 
 	assert.Contains(t, output, `"XKISS" protocol which is not supported`)
 	assert.Contains(t, output, "Winlink Express")
 
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		kiss_process_msg([]byte{XKISS_CMD_POLL}, 0, nil, -1, sendfun)
 	})
 
@@ -398,7 +399,7 @@ func Test_kiss_set_hardware_malformed(t *testing.T) {
 		{"TNC", "expected the form COMMAND:"},
 	} {
 		t.Run(c.command, func(t *testing.T) {
-			var output = CaptureOutput(t, func() {
+			var output = testutils.CaptureOutput(t, func() {
 				kiss_set_hardware(0, []byte(c.command), 0, nil, -1, sendfun)
 			})
 
@@ -490,7 +491,7 @@ func Test_KissRecByte_noise_is_printed(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 1, append([]byte("junk"), FEND))
 	})
 
@@ -516,7 +517,7 @@ func Test_KissRecByte_overlong_frame(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 0, append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MAX_KISS_LEN+10)...))
 	})
 
@@ -535,7 +536,7 @@ func Test_KissRecByte_overlong_frame_closing_fend(t *testing.T) {
 
 	var overlong = append([]byte{FEND}, bytes.Repeat([]byte{'x'}, MAX_KISS_LEN+10)...)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 0, append(overlong, FEND))
 	})
 
@@ -563,7 +564,7 @@ func Test_KissRecByte_debug_prints_both_forms(t *testing.T) {
 
 	var kf = new(KISSFrame)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 2, KissEncapsulate(append([]byte{KISS_CMD_DATA_FRAME}, ax25_get_frame_data(pp)...)))
 	})
 
@@ -592,7 +593,7 @@ func Test_KissRecByte_OnMessage_debug(t *testing.T) {
 	var kf = new(KISSFrame)
 	kf.OnMessage = func([]byte) {}
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		feedKissBytes(kf, 1, KissEncapsulate([]byte{KISS_CMD_DATA_FRAME, 'h', 'i'}))
 	})
 
@@ -605,7 +606,7 @@ func Test_KissRecByte_OnMessage_debug(t *testing.T) {
 // what it was given.
 
 func Test_kiss_unwrap_too_short(t *testing.T) {
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		assert.Empty(t, kiss_unwrap([]byte{FEND}))
 	})
 
@@ -615,7 +616,7 @@ func Test_kiss_unwrap_too_short(t *testing.T) {
 func Test_kiss_unwrap_no_trailing_fend(t *testing.T) {
 	var unwrapped []byte
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		unwrapped = kiss_unwrap([]byte{FEND, 0x00, 'h', 'i'})
 	})
 
@@ -624,7 +625,7 @@ func Test_kiss_unwrap_no_trailing_fend(t *testing.T) {
 }
 
 func Test_kiss_unwrap_fend_in_the_middle(t *testing.T) {
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kiss_unwrap([]byte{FEND, 0x00, FEND, 'h', FEND})
 	})
 
@@ -636,7 +637,7 @@ func Test_kiss_unwrap_fend_in_the_middle(t *testing.T) {
 func Test_kiss_unwrap_bad_escape(t *testing.T) {
 	var unwrapped []byte
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		unwrapped = kiss_unwrap([]byte{0x00, FESC, 'x', 'y', FEND})
 	})
 

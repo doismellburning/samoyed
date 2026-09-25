@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -239,7 +240,7 @@ func TestKissNetSendRecPacketToOneClient(t *testing.T) {
 func TestKissNetSendRecPacketText(t *testing.T) {
 	var kns, clients = newAttachedKissNet(t, -1, false, 1)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kns.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 	})
 
@@ -341,7 +342,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 
 	kns.SetDebug(2)
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		kns.SendRecPacket(1, KISS_CMD_DATA_FRAME, []byte("hello"), 5, nil, -1)
 
 		readKissNetFrame(t, clients[0])
@@ -351,7 +352,7 @@ func TestKissNetDebugPrints(t *testing.T) {
 	assert.Contains(t, output, ">>> Data frame to KISS client application, channel 1")
 
 	// And the fake command prompt, which is not a KISS frame at all, says so.
-	output = CaptureOutput(t, func() {
+	output = testutils.CaptureOutput(t, func() {
 		kns.SendRecPacket(0, 0, []byte("\r\ncmd:"), -1, nil, -1)
 	})
 
@@ -367,7 +368,7 @@ func TestKissNetDisabled(t *testing.T) {
 	var kps = new(kissport_status_s)
 	kps.channel = -1
 
-	var output = CaptureOutput(t, func() { kns.initOne(t.Context(), kps) })
+	var output = testutils.CaptureOutput(t, func() { kns.initOne(t.Context(), kps) })
 
 	assert.Contains(t, output, "Disabled KISS network client port")
 }

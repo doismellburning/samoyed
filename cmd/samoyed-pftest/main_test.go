@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
 )
@@ -62,7 +63,7 @@ func Test_run_reportsAnUnparseableLine(t *testing.T) {
 	// not the output under test here.
 	var exitStatus, out, errOut = 0, "", ""
 
-	direwolf.CaptureOutput(t, func() {
+	testutils.CaptureOutput(t, func() {
 		exitStatus, out, errOut = runWith(defaultOptions("b/Q1TEST"), "this is not a packet\n"+positionPacket+"\n")
 	})
 
@@ -130,7 +131,7 @@ func Test_run_verboseExplainsTheDecision(t *testing.T) {
 
 	// The filter engine's debug output goes to stdout, not to the writer run
 	// prints verdicts to.
-	direwolf.AssertOutputContains(t, func() {
+	testutils.AssertOutputContains(t, func() {
 		var exitStatus, _, _ = runWith(opts, positionPacket+"\n")
 		assert.Equal(t, 0, exitStatus)
 	}, "b/Q1TEST returns TRUE")

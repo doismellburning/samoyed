@@ -3,6 +3,7 @@ package direwolf
 import (
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -352,7 +353,7 @@ func Test_PfilterMonitorLine_unparseablePacket(t *testing.T) {
 	// on stdout, so let it.
 	var pass, err = false, error(nil)
 
-	CaptureOutput(t, func() { pass, err = PfilterMonitorLine(0, 0, "b/Q1TEST", true, "this is not a packet") })
+	testutils.CaptureOutput(t, func() { pass, err = PfilterMonitorLine(0, 0, "b/Q1TEST", true, "this is not a packet") })
 
 	assert.False(t, pass)
 	require.Error(t, err)
@@ -369,7 +370,7 @@ func Test_PfilterMonitorLine_igateFilterWithNothingHeard(t *testing.T) {
 
 	var verdicts []bool
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		verdicts = pfilterMonitorLines(t, MAX_TOTAL_CHANS, 0, "i/60/0/51.5/-0.1/50", true, packets)
 	})
 
@@ -419,7 +420,7 @@ func Test_PfilterValidate(t *testing.T) {
 
 		defer PfilterStandaloneInit(0)
 
-		var output = CaptureOutput(t, func() {
+		var output = testutils.CaptureOutput(t, func() {
 			require.NoError(t, PfilterValidate(0, 0, "b/Q1TEST", true))
 		})
 
@@ -432,7 +433,7 @@ func Test_PfilterStandaloneInit_debugLevelExplainsTheDecision(t *testing.T) {
 
 	defer PfilterStandaloneInit(0)
 
-	AssertOutputContains(t, func() {
+	testutils.AssertOutputContains(t, func() {
 		var _, err = PfilterMonitorLine(0, 0, "b/Q1TEST", true, pfilterTestPositionPacket)
 		require.NoError(t, err)
 	}, "b/Q1TEST returns TRUE")

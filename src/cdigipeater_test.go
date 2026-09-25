@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -172,7 +173,7 @@ func TestCDigipeatMatchFilterError(t *testing.T) {
 
 	var result *packet_t
 
-	var output = CaptureOutput(t, func() {
+	var output = testutils.CaptureOutput(t, func() {
 		result = cdigipeat_match(cdigiFromChan, pp, "Q1TEST", "Q2TEST", false, nil, cdigiToChan, "z/nonsense")
 	})
 
@@ -249,7 +250,7 @@ func TestCDigipeaterInvalidChannel(t *testing.T) {
 	require.NotNil(t, pp)
 
 	for _, channel := range []int{-1, 2, MAX_RADIO_CHANS} {
-		var output = CaptureOutput(t, func() { cdigipeater(channel, pp) })
+		var output = testutils.CaptureOutput(t, func() { cdigipeater(channel, pp) })
 
 		assert.Contains(t, output, "Did not expect to receive on invalid channel")
 	}
@@ -269,7 +270,7 @@ func TestCDigipeaterNetworkTNCChannel(t *testing.T) {
 	// A network TNC channel has no transmit queue of its own - TransmitQueue.Append
 	// hands the frame straight to the TNC - so the count is what says it was
 	// repeated rather than turned away.
-	CaptureOutput(t, func() { cdigipeater(cdigiFromChan, pp) })
+	testutils.CaptureOutput(t, func() { cdigipeater(cdigiFromChan, pp) })
 
 	assert.Equal(t, 1, cdigipeater_get_count(cdigiFromChan, cdigiFromChan),
 		"a network TNC channel should digipeat")
