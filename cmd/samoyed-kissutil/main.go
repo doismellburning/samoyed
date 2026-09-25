@@ -156,16 +156,17 @@ func main() {
 
 	using_tcp = unicode.IsDigit(rune(port[0]))
 
+	// Attach to the TNC before listening to it, so that it is there to send
+	// to by the time anything is read from the input.
 	if using_tcp {
-		go tnc_listen_net()
+		server_sock = tnc_connect_net()
+
+		go tnc_listen_net(server_sock)
 	} else {
-		go tnc_listen_serial()
+		serial_fd = tnc_open_serial()
+
+		go tnc_listen_serial(serial_fd)
 	}
-
-	// Give the threads a little while to open the TNC connection before trying to use it.
-	// This was a problem when the transmit queue already existed when starting up.
-
-	direwolf.SLEEP_MS(500)
 
 	/*
 	 * Process keyboard or other input source.
@@ -395,23 +396,18 @@ func send_to_kiss_tnc(channel int, cmd int, data []byte) {
 
 /*-------------------------------------------------------------------
  *
- * Name:        tnc_listen_net
+ * Name:        tnc_connect_net
  *
  * Purpose:     Connect to KISS TNC via TCP port.
- *		Print everything it sends to us.
  *
  * Global In:	host
  *		port
  *
- * Global Out:	server_sock	- Needed to send to the TNC.
+ * Returns:	The connection, needed to send to the TNC.
  *
  *--------------------------------------------------------------------*/
 
-func tnc_listen_net() {
-	/*
-	 * Connect to network KISS TNC.
-	 */
-
+func tnc_connect_net() net.Conn {
 	// For the IGate we would loop around and try to reconnect if the TNC
 	// goes away.  We should probably do the same here.
 	var conn, connErr = new(net.Dialer).DialContext(context.Background(), "tcp", net.JoinHostPort(hostname, port))
@@ -420,8 +416,18 @@ func tnc_listen_net() {
 		os.Exit(1)
 	}
 
-	server_sock = conn
+	return conn
+}
 
+/*-------------------------------------------------------------------
+ *
+ * Name:        tnc_listen_net
+ *
+ * Purpose:     Print everything the KISS TNC on conn sends to us.
+ *
+ *--------------------------------------------------------------------*/
+
+func tnc_listen_net(conn net.Conn) {
 	/*
 	 * Print what we get from TNC.
 	 */
@@ -431,7 +437,7 @@ func tnc_listen_net() {
 	for {
 		var data = make([]byte, 4096)
 
-		var length, err = server_sock.Read(data)
+		var length, err = conn.Read(data)
 		if err != nil {
 			fmt.Printf("Read error from TCP KISS TNC (%s).  Terminating.\n", err)
 			os.Exit(1)
@@ -461,27 +467,38 @@ func tnc_listen_net() {
 
 /*-------------------------------------------------------------------
  *
- * Name:        tnc_listen_serial
+ * Name:        tnc_open_serial
  *
  * Purpose:     Connect to KISS TNC via serial port.
- *		Print everything it sends to us.
  *
  * Global In:	port
  *		serial_speed
  *
- * Global Out:	serial_fd	- Need for sending to the TNC.
+ * Returns:	The serial port, needed for sending to the TNC.
  *
  *--------------------------------------------------------------------*/
 
-func tnc_listen_serial() {
-	serial_fd = direwolf.SerialPortOpen(port, serial_speed)
+func tnc_open_serial() *term.Term {
+	var fd = direwolf.SerialPortOpen(port, serial_speed)
 
-	if serial_fd == nil {
+	if fd == nil {
 		fmt.Printf("Unable to connect to KISS TNC serial port %s.\n", port)
 		// More detail such as "permission denied" or "no such device"
 		os.Exit(1)
 	}
 
+	return fd
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        tnc_listen_serial
+ *
+ * Purpose:     Print everything the KISS TNC on serial port fd sends to us.
+ *
+ *--------------------------------------------------------------------*/
+
+func tnc_listen_serial(fd *term.Term) {
 	/*
 	 * Read and print.
 	 */
@@ -489,7 +506,7 @@ func tnc_listen_serial() {
 	kstate.OnMessage = kissutil_kiss_process_msg
 
 	for {
-		var ch, err = direwolf.SerialPortGet1(serial_fd)
+		var ch, err = direwolf.SerialPortGet1(fd)
 		if err != nil {
 			fmt.Printf("Read error from serial port KISS TNC: %s.\n", err)
 			os.Exit(1)

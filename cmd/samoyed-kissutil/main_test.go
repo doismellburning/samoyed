@@ -231,9 +231,32 @@ func Test_timestamp_filename(t *testing.T) {
 	assert.Regexp(t, `^\d{8}-\d{6}-\d{3}$`, timestamp_filename())
 }
 
-// main starts goroutines that exit the process when the TNC goes away, so
-// these run it as a process of its own, against a TNC played by the test.
-//
+// main starts goroutines that exit the process when the TNC goes away, so it
+// runs as a process of its own here, against a TNC played by the test.
+func Test_main_endToEnd(t *testing.T) {
+	var ln, port = testutils.Listen(t)
+
+	var p = testutils.StartMain(t, "-h", "127.0.0.1", "-p", port)
+
+	var tnc = testutils.Accept(t, ln)
+
+	var _, writeErr = p.Stdin.WriteString("Q1TEST>APDW17:>Outbound\n")
+	require.NoError(t, writeErr)
+
+	var want = direwolf.KissEncapsulate(append([]byte{0x00}, direwolf.AX25Pack(direwolf.MustAX25FromText("Q1TEST>APDW17:>Outbound"))...))
+
+	assert.Equal(t, want, readKISS(t, tnc, len(want)))
+
+	var _, replyErr = tnc.Write(direwolf.KissEncapsulate(append([]byte{0x10}, direwolf.AX25Pack(direwolf.MustAX25FromText("Q2TEST>APDW17:>Inbound"))...)))
+	require.NoError(t, replyErr)
+
+	p.WaitFor(t, "[1] Q2TEST>APDW17:>Inbound")
+
+	// Stdin running out is the end of it.
+	require.NoError(t, p.Stdin.Close())
+	assert.Equal(t, 0, p.Wait())
+}
+
 // Losing the TNC, or never reaching it, ends the process with an error.
 func Test_main_withoutATNC(t *testing.T) {
 	t.Run("goes away", func(t *testing.T) {
