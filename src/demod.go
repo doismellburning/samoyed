@@ -28,7 +28,7 @@ import (
 // subchannels' demodulators, and whether its input is muted while it transmits.
 //
 // It is driven by its audio device's goroutine; the mute is the exception, set
-// by ptt_set on the transmit thread, hence atomic.
+// by PTT.Set on the transmit thread, hence atomic.
 type Demodulator struct {
 	channel int
 	states  [MAX_SUBCHANS]demodulator_state_s // One per subchannel.
@@ -953,7 +953,7 @@ func demod_get_sample(a int, src SampleSource) int {
 // "half duplex" setting applied only to the transmit logic.  i.e. wait for clear channel before sending.
 // Receiving was still active.
 // I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
-// This is called from ptt_set for half duplex.
+// This is called from PTT.Set for half duplex.
 
 func demod_mute_input(channel int, mute_during_xmit int) {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)

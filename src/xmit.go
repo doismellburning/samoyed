@@ -645,7 +645,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		"channel": channel,
 		"speed":   xs.bits_per_sec[channel],
 	}).Debug("xmit_thread: Turn on PTT now")
-	ptt_set(OCTYPE_PTT, channel, 1)
+	pttControl.Set(OCTYPE_PTT, channel, 1)
 
 	// Inform data link state machine that we are now transmitting.
 
@@ -815,7 +815,7 @@ func (xs *XmitService) xmit_ax25_frames(channel int, prio int, pp *packet_t, max
 		"duration_ms": durationMS,
 	}).Debug("xmit_thread: Turn off PTT now")
 
-	ptt_set(OCTYPE_PTT, channel, 0)
+	pttControl.Set(OCTYPE_PTT, channel, 0)
 } /* end xmit_ax25_frames */
 
 /*-------------------------------------------------------------------
@@ -977,7 +977,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
 	/*
 	 * Turn on transmitter.
 	 */
-	ptt_set(OCTYPE_PTT, c, 1)
+	pttControl.Set(OCTYPE_PTT, c, 1)
 
 	/*
 	 * Invoke the speech-to-text script.
@@ -989,7 +989,7 @@ func (xs *XmitService) xmit_speech(ctx context.Context, c int, pp *packet_t) {
 	 * Turn off transmitter.
 	 */
 
-	ptt_set(OCTYPE_PTT, c, 0)
+	pttControl.Set(OCTYPE_PTT, c, 0)
 } /* end xmit_speech */
 
 /* Broken out into separate function so configuration can validate it. */
@@ -1059,7 +1059,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.morse%s] \"%s\"\n", c, ts, string(pinfo))
 
-	ptt_set(OCTYPE_PTT, c, 1)
+	pttControl.Set(OCTYPE_PTT, c, 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1076,7 +1076,7 @@ func (xs *XmitService) xmit_morse(c int, pp *packet_t, wpm int) {
 		SLEEP_MS(int(timeToWait.Milliseconds()))
 	}
 
-	ptt_set(OCTYPE_PTT, c, 0)
+	pttControl.Set(OCTYPE_PTT, c, 0)
 } /* end xmit_morse */
 
 /*-------------------------------------------------------------------
@@ -1109,7 +1109,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 	text_color_set(DW_COLOR_XMIT)
 	dw_printf("[%d.dtmf%s] \"%s\"\n", c, ts, string(pinfo))
 
-	ptt_set(OCTYPE_PTT, c, 1)
+	pttControl.Set(OCTYPE_PTT, c, 1)
 	var start_ptt = time.Now()
 
 	// make txdelay at least 300 and txtail at least 250 ms.
@@ -1129,7 +1129,7 @@ func (xs *XmitService) xmit_dtmf(c int, pp *packet_t, speed int) {
 		dw_printf("Oops.  CPU too slow to keep up with DTMF generation.\n")
 	}
 
-	ptt_set(OCTYPE_PTT, c, 0)
+	pttControl.Set(OCTYPE_PTT, c, 0)
 } /* end xmit_dtmf */
 
 /*-------------------------------------------------------------------

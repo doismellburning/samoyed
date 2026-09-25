@@ -588,7 +588,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
-				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 1)
+				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 1)
 
 				switch transmitCalibrationType {
 				default:
@@ -625,7 +625,7 @@ x = Silence FX.25 information.`)
 					sleepSecCtx(ctx, max_duration)
 				}
 
-				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 0)
+				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx)
 				os.Exit(0)
@@ -1215,7 +1215,7 @@ func teardown() {
 		if packetLogger != nil {
 			packetLogger.Close()
 		}
-		ptt_term()
+		pttControl.Term()
 		dwgps_term()
 
 		if waypointSender != nil {

@@ -1445,21 +1445,6 @@ func (p *PTT) Term() {
 	}
 }
 
-// ptt_set, get_input and ptt_term are what the rest of the package calls, and
-// hand on to pttControl.
-
-func ptt_set(ot int, channel int, ptt_signal int) {
-	pttControl.Set(ot, channel, ptt_signal)
-}
-
-func get_input(it int, channel int) int {
-	return pttControl.GetInput(it, channel)
-}
-
-func ptt_term() {
-	pttControl.Term()
-}
-
 /*
  * Quick stand-alone test for above.
  *

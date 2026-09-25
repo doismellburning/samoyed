@@ -106,7 +106,7 @@ func TestDemodInitCapsProfileLettersForPSK(t *testing.T) {
 	}
 }
 
-// ptt_set mutes a half duplex channel's input from the transmit thread while
+// PTT.Set mutes a half duplex channel's input from the transmit thread while
 // the audio thread is reading the flag for every sample, so the flag has to be
 // safe to share between them.  Run under -race.
 func TestDemodMuteInputConcurrentWithProcessSample(t *testing.T) {
