@@ -432,6 +432,18 @@ func AX25FromText(monitor string, strict bool) *packet_t {
 	return ax25_from_text(monitor, IfThenElse(strict, addrStrict, addrLenient))
 }
 
+// MustAX25FromText is AX25FromText, strictly, for text known to be a valid
+// packet, such as a constant in a test.  Like regexp.MustCompile, it panics if
+// the text isn't one.
+func MustAX25FromText(monitor string) *packet_t {
+	var pp = AX25FromText(monitor, true)
+	if pp == nil {
+		panic("not an AX.25 packet: " + monitor)
+	}
+
+	return pp
+}
+
 func ax25_from_text(monitor string, strictness addrStrictness) *packet_t {
 	/*
 	 * Tearing it apart is destructive so make our own copy first.
