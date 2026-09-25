@@ -125,7 +125,7 @@ func (s *radioSink) RecFrame(channel int, subchan int, slice int, pp *packet_t, 
 }
 
 func (s *radioSink) DCDChange(channel int, state int) {
-	ptt_set(OCTYPE_DCD, channel, state)
+	pttControl.Set(OCTYPE_DCD, channel, state)
 }
 
 // receiveSink is where this file sends the frames it decodes.  multi_modem_init

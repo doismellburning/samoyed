@@ -2312,7 +2312,7 @@ func handlePTTDCDCON(ps *parseState) error {
 
 	// Work on a copy of the control and commit it at the end, so that a line
 	// rejected part way through leaves whatever an earlier line configured
-	// rather than a mixture of the two.  ptt_init reads these fields together.
+	// rather than a mixture of the two.  NewPTT reads these fields together.
 	var octrl = ps.audio.achan[ps.channel].octrl[ot]
 
 	var t = split("", false)

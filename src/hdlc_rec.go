@@ -753,7 +753,7 @@ func (r *HDLCReceiver) DataDetectAny(channel int) int {
 		}
 	}
 
-	if get_input(ICTYPE_TXINH, channel) == 1 {
+	if pttControl.GetInput(ICTYPE_TXINH, channel) == 1 {
 		return (1)
 	}
 

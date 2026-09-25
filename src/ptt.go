@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -161,343 +160,66 @@ func DTR_OFF(fd uintptr) {
 
 const LPT_IO_ADDR = 0x378
 
-// TODO KG static struct audio_s *save_audio_config_p;	/* Save config information for later use. */
+// octypeName is the name of an output control type, for messages.
+func octypeName(ot int) string {
+	switch ot {
+	case OCTYPE_PTT:
+		return "PTT"
+	case OCTYPE_DCD:
+		return "DCD"
+	case OCTYPE_CON:
+		return "CON"
+	default:
+		return fmt.Sprintf("octype %d", ot)
+	}
+}
 
-var ptt_debug_level = 0
+// defaultGPIOSysfsDir is the root of the sysfs GPIO user interface.
+const defaultGPIOSysfsDir = "/sys/class/gpio"
 
-func ptt_set_debug(debug int) {
-	ptt_debug_level = debug
+// defaultLPTPortPath is the device giving access to I/O ports, through which
+// the parallel printer port is reached.
+const defaultLPTPortPath = "/dev/port"
+
+// gpiodOutputLine is the subset of gpiocdev.Line used for PTT output control.
+// The interface exists to allow dependency injection in tests.
+type gpiodOutputLine interface {
+	SetValue(value int) error
+	Close() error
+}
+
+// PTT drives the output control lines - PTT, DCD and the connected indicator -
+// and reads the input lines, for every radio channel.
+//
+// Its methods are safe to call on a nil *PTT, which does nothing: DCD and the
+// connected indicator reach for it whether or not startup has got that far.
+type PTT struct {
+	audioConfig *audio_s
+	debugLevel  int
+
+	// gpioSysfsDir is a field rather than always defaultGPIOSysfsDir so that
+	// a test can point it at a fake tree and exercise the GPIO paths without
+	// a kernel that offers the real one.
+	gpioSysfsDir string
+
+	// lptPortPath is a field rather than always defaultLPTPortPath for the
+	// same reason: a test can stand an ordinary file in for the I/O ports.
+	lptPortPath string
+
+	/* Serial port handle or fd.  */
+	/* Could be the same for two channels */
+	/* if using both RTS and DTR. */
+	fd [MAX_RADIO_CHANS][NUM_OCTYPES]*os.File
+
+	rig [MAX_RADIO_CHANS][NUM_OCTYPES]*goHamlib.Rig
+
+	/* GPIOD line handles, one per channel/output-type combination. */
+	gpiodLine [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:	get_access_to_gpio
- *
- * Purpose:	Try to get access to the GPIO device.
- *
- * Inputs:	path		- Path to device node.
- *					/sys/class/gpio/export
- *					/sys/class/gpio/unexport
- *					/sys/class/gpio/gpio??/direction
- *					/sys/class/gpio/gpio??/value
- *
- * Description:	First see if we have access thru the usual uid/gid/mode method.
- *		If that fails, we try a hack where we use "sudo chmod ..." to open up access.
- *		That requires that sudo be configured to work without a password.
- *		That's the case for 'pi' user in Raspbian but not not be for other boards / operating systems.
- *
- * Debug:	Use the "-doo" command line option.
- *
- *------------------------------------------------------------------*/
-
-const MAX_GROUPS = 50
-
-// gpio_sysfs_dir is the root of the sysfs GPIO user interface.  It is a
-// variable rather than a constant so that a test can point it at a fake tree
-// and exercise the GPIO paths without a kernel that offers the real one.
-var gpio_sysfs_dir = "/sys/class/gpio"
-
-func get_access_to_gpio(path string) error {
-	/*
-	 * Does path even exist?
-	 */
-	var _, err = os.Stat(path)
-	if err != nil {
-		return fmt.Errorf("can't get properties of %s: %w"+
-			" (this system is not configured with the GPIO user interface;"+
-			" use a different method for PTT control)", path, err)
-	}
-
-	var my_uid = os.Geteuid()
-	var my_gid = os.Getegid()
-
-	var my_groups, groupsErr = os.Getgroups()
-	if groupsErr != nil {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Getgroups() failed to get supplementary groups, err=%s\n", groupsErr)
-	}
-
-	if ptt_debug_level >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		// TODO KG dw_printf("%s: uid=%d, gid=%d, mode=o%o\n", path, finfo.st_uid, finfo.st_gid, finfo.st_mode)
-		dw_printf("my uid=%d, gid=%d, supplementary groups=", my_uid, my_gid)
-
-		for _, g := range my_groups {
-			dw_printf(" %d", g)
-		}
-
-		dw_printf("\n")
-	}
-
-	/*
-	 * Do we have permission to access it?
-	 *
-	 * On Debian 7 (Wheezy) we see this:
-	 *
-	 *	$ ls -l /sys/class/gpio/export
-	 *	--w------- 1 root root 4096 Feb 27 12:31 /sys/class/gpio/export
-	 *
-	 *
-	 * Only root can write to it.
-	 * Our work-around is change the protection so that everyone can write.
-	 * This requires that the current user can use sudo without a password.
-	 * This has been the case for the predefined "pi" user but can be a problem
-	 * when people add new user names.
-	 * Other operating systems could have different default configurations.
-	 *
-	 * A better solution is available in Debian 8 (Jessie).  The group is now "gpio"
-	 * so anyone in that group can now write to it.
-	 *
-	 *	$ ls -l /sys/class/gpio/export
-	 *	-rwxrwx--- 1 root gpio 4096 Mar  4 21:12 /sys/class/gpio/export
-	 *
-	 *
-	 * First see if we can access it by the usual file protection rules.
-	 * If not, we will try the "sudo chmod go+rw ..." hack.
-	 *
-	 */
-
-	// TODO KG I don't love what was here, but I need to figure out what (if anything) I want to replace it with
-
-	return nil
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:	export_gpio
- *
- * Purpose:	Tell the GPIO subsystem to export a GPIO line for
- * 		us to use, and set the initial state of the GPIO.
- *
- * Inputs:	ch		- Radio Channel.
- *		ot		- Output type.
- *		invert:		- Is the GPIO active low?
- *		direction:	- 0 for input, 1 for output
- *
- * Outputs:	out_gpio_name	- in the audio configuration structure.
- *		in_gpio_name
- *
- *------------------------------------------------------------------*/
-
-func export_gpio(ch int, ot int, invert bool, direction int) error {
-	// Raspberry Pi was easy.  GPIO 24 has the name gpio24.
-	// Others, such as the Cubieboard, take a little more effort.
-	// The name might be gpio24_ph11 meaning connector H, pin 11.
-	// When we "export" GPIO number, we will store the corresponding
-	// device name for future use when we want to access it.
-	var gpio_num int
-	var gpio_name string
-
-	if direction > 0 {
-		gpio_num = save_audio_config_p.achan[ch].octrl[ot].out_gpio_num
-		gpio_name = save_audio_config_p.achan[ch].octrl[ot].out_gpio_name
-	} else {
-		gpio_num = save_audio_config_p.achan[ch].ictrl[ot].in_gpio_num
-		gpio_name = save_audio_config_p.achan[ch].ictrl[ot].in_gpio_name
-	}
-
-	var gpio_export_path = gpio_sysfs_dir + "/export"
-
-	var accessErr = get_access_to_gpio(gpio_export_path)
-	if accessErr != nil {
-		return accessErr
-	}
-
-	var fd, err = os.OpenFile(gpio_export_path, os.O_WRONLY, 0)
-	if err != nil {
-		// Not expected.  Above should have obtained permission.
-		return fmt.Errorf("permissions do not allow access to GPIO: %w", err)
-	}
-
-	var stemp = strconv.Itoa(gpio_num)
-
-	var n, writeErr = fd.WriteString(stemp)
-	if n != len(stemp) || writeErr != nil { //nolint: staticcheck
-		/* TODO KG Figure out write errs here
-
-		// Ignore EBUSY error which seems to mean the device node already exists.
-		if err != EBUSY {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error writing \"%s\" to %s, errno=%d\n", stemp, gpio_export_path, e)
-			dw_printf("%s\n", strerror(e))
-
-			if e == 22 {
-				// It appears that error 22 occurs when sysfs gpio is not available.
-				// (See https://github.com/wb2osz/direwolf/issues/503)
-				//
-				// The solution might be to use the new gpiod approach.
-
-				dw_printf("It looks like gpio with sysfs is not supported on this operating system.\n")
-				dw_printf("Rather than the following form, in the configuration file,\n")
-				dw_printf("    PTT GPIO  %s\n", stemp)
-				dw_printf("try using gpiod form instead.  e.g.\n")
-				dw_printf("    PTT GPIOD  gpiochip0  %s\n", stemp)
-				dw_printf("You can get a list of gpio chip names and corresponding I/O lines with \"gpioinfo\" command.\n")
-			}
-			os.Exit(1)
-		}
-		*/
-	}
-	/* Wait for udev to adjust permissions after enabling GPIO. */
-	/* https://github.com/wb2osz/direwolf/issues/176 */
-	SLEEP_MS(250)
-	fd.Close()
-
-	/*
-	 *	Added in release 1.4.
-	 *
-	 *	On the RPi, the device path for GPIO number XX is simply /sys/class/gpio/gpioXX.
-	 *
-	 *	There was a report that it is different for the CubieBoard.  For instance
-	 *	GPIO 61 has gpio61_pi13 in the path.  This indicates connector "i" pin 13.
-	 *	https://github.com/cubieplayer/Cubian/wiki/GPIO-Introduction
-	 *
-	 *	For another similar single board computer, we find the same thing:
-	 *	https://www.olimex.com/wiki/A20-OLinuXino-LIME#GPIO_under_Linux
-	 *
-	 *	How should we deal with this?  Some possibilities:
-	 *
-	 *	(1) The user might explicitly mention the name in direwolf.conf.
-	 *	(2) We might be able to find the names in some system device config file.
-	 *	(3) Get a directory listing of /sys/class/gpio then search for a
-	 *		matching name.  Suppose we wanted GPIO 61.  First look for an exact
-	 *		match to "gpio61".  If that is not found, look for something
-	 *		matching the pattern "gpio61_*".
-	 *
-	 *	We are finally implementing the third choice.
-	 */
-
-	/*
-	 * Then we have the Odroid board with GPIO numbers starting around 480.
-	 * Can we simply use those numbers?
-	 * Apparently, the export names look like GPIOX.17
-	 * https://wiki.odroid.com/odroid-c4/hardware/expansion_connectors#gpio_map_for_wiringpi_library
-	 */
-
-	if ptt_debug_level >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Contents of %s:\n", gpio_sysfs_dir)
-	}
-
-	var dirEntries, readDirErr = os.ReadDir(gpio_sysfs_dir)
-
-	var ok = false
-
-	if readDirErr != nil {
-		// Something went wrong.  Fill in the simple expected name and keep going.
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("ERROR! Could not get directory listing for %s\n", gpio_sysfs_dir)
-
-		gpio_name = fmt.Sprintf("gpio%d", gpio_num)
-		ok = true
-	} else {
-		if ptt_debug_level >= 2 {
-			text_color_set(DW_COLOR_DEBUG)
-
-			for _, entry := range dirEntries {
-				dw_printf("\t%s\n", entry.Name())
-			}
-		}
-
-		// Look for exact name gpioNN
-
-		var lookfor = fmt.Sprintf("gpio%d", gpio_num)
-
-		for _, entry := range dirEntries {
-			if lookfor == entry.Name() {
-				gpio_name = entry.Name()
-				ok = true
-			}
-		}
-
-		// If not found, Look for gpioNN_*
-
-		lookfor = fmt.Sprintf("gpio%d_", gpio_num)
-
-		for _, entry := range dirEntries {
-			if strings.HasPrefix(entry.Name(), lookfor) {
-				gpio_name = entry.Name()
-				ok = true
-			}
-		}
-	}
-
-	/*
-	 * We should now have the corresponding node name.
-	 */
-	if !ok {
-		return fmt.Errorf("could not find path for gpio number %d", gpio_num)
-	}
-
-	// Remember it: everything that drives or reads the line afterwards builds
-	// its path from the node name, not from the number.
-	if direction > 0 {
-		save_audio_config_p.achan[ch].octrl[ot].out_gpio_name = gpio_name
-	} else {
-		save_audio_config_p.achan[ch].ictrl[ot].in_gpio_name = gpio_name
-	}
-
-	if ptt_debug_level >= 2 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, gpio_sysfs_dir, gpio_name)
-	}
-
-	/*
-	 * Set output direction and initial state
-	 */
-
-	var gpio_direction_path = fmt.Sprintf("%s/%s/direction", gpio_sysfs_dir, gpio_name)
-
-	accessErr = get_access_to_gpio(gpio_direction_path)
-	if accessErr != nil {
-		return accessErr
-	}
-
-	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0) //nolint:gosec
-	if err != nil {
-		return fmt.Errorf("error opening %s: %w", gpio_direction_path, err)
-	}
-
-	var gpio_val string
-
-	if direction != 0 {
-		if invert {
-			gpio_val = "high"
-		} else {
-			gpio_val = "low"
-		}
-	} else {
-		gpio_val = "in"
-	}
-
-	n, writeErr = fd.WriteString(gpio_val)
-	if writeErr != nil {
-		fd.Close()
-
-		return fmt.Errorf("error writing initial state to %s: %w", gpio_direction_path, writeErr)
-	}
-
-	if n != len(gpio_val) {
-		fd.Close()
-
-		return fmt.Errorf("error writing initial state to %s: wrote %d of %d bytes", gpio_direction_path, n, len(gpio_val))
-	}
-
-	fd.Close()
-
-	/*
-	 * Make sure that we have access to 'value'.
-	 * Do it once here, rather than each time we want to use it.
-	 */
-
-	var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, gpio_name)
-
-	return get_access_to_gpio(gpio_value_path)
-}
-
-/*-------------------------------------------------------------------
- *
- * Name:        ptt_init
+ * Name:        NewPTT
  *
  * Purpose:    	Open serial port(s) used for PTT signals and set to proper state.
  *
@@ -536,40 +258,461 @@ func export_gpio(ch int, ot int, invert bool, direction int) error {
  *					>= 3 for specific radio model.
  *					-1 guess at what is out there.  (AUTO option in config file.)
  *
- * Outputs:	Remember required information for future use.
+ *		debug			- "-d o" level: 1 reports each change of an
+ *					  output, 2 also the configuration and GPIO detail.
+ *
+ * Outputs:	A PTT that remembers what it needs for future use, or an error
+ *		if the hardware could not be set up, in which case whatever had
+ *		been set up before the failure has been released again.
  *
  * Description:
  *
  *--------------------------------------------------------------------*/
 
-var ptt_fd [MAX_RADIO_CHANS][NUM_OCTYPES]*os.File
-
-/* Serial port handle or fd.  */
-/* Could be the same for two channels */
-/* if using both RTS and DTR. */
-var rig [MAX_RADIO_CHANS][NUM_OCTYPES]*goHamlib.Rig
-
-// gpiodOutputLine is the subset of gpiocdev.Line used for PTT output control.
-// The interface exists to allow dependency injection in tests.
-type gpiodOutputLine interface {
-	SetValue(value int) error
-	Close() error
+func NewPTT(audio_config_p *audio_s, debug int) (*PTT, error) {
+	return newPTT(audio_config_p, debug, defaultGPIOSysfsDir)
 }
 
-/* GPIOD line handles, one per channel/output-type combination. */
-var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
+// newPTT is NewPTT with the root of the sysfs GPIO interface given, so that a
+// test can supply a fake one.
+func newPTT(audio_config_p *audio_s, debug int, gpioSysfsDir string) (*PTT, error) {
+	var p = new(PTT)
+	p.audioConfig = audio_config_p
+	p.debugLevel = debug
+	p.gpioSysfsDir = gpioSysfsDir
+	p.lptPortPath = defaultLPTPortPath
 
-var otnames [NUM_OCTYPES]string
+	var err = p.init()
+	if err != nil {
+		return nil, err
+	}
 
-func ptt_init(audio_config_p *audio_s) error {
-	var err = ptt_setup(audio_config_p)
+	return p, nil
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Set
+ *
+ * Purpose:    	Turn output control line on or off.
+ *		Originally this was just for PTT, hence the name.
+ *		Now that it is more general purpose, it should
+ *		probably be renamed something like octrl_set.
+ *
+ * Inputs:	ot		- Output control type:
+ *				   OCTYPE_PTT, OCTYPE_DCD, OCTYPE_FUTURE
+ *
+ *		channel		- channel, 0 .. (number of channels)-1
+ *
+ *		ptt_signal	- 1 for transmit, 0 for receive.
+ *
+ *
+ * Assumption:	The PTT came from NewPTT.
+ *
+ * Description:	Set the RTS or DTR line or GPIO pin.
+ *		More positive output corresponds to 1 unless invert is set.
+ *
+ *--------------------------------------------------------------------*/
+
+// JWL - save status and new get_ptt function.
+
+func (p *PTT) Set(ot int, channel int, ptt_signal int) {
+	if p == nil {
+		return
+	}
+
+	var ptt = ptt_signal
+	var ptt2 = ptt_signal
+
+	Assert(ot >= 0 && ot < NUM_OCTYPES)
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+
+	if channel >= MAX_RADIO_CHANS {
+		return // NCHANNEL: no physical PTT hardware to drive
+	}
+
+	if p.debugLevel >= 1 {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("%s %d = %d\n", octypeName(ot), channel, ptt_signal)
+	}
+
+	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
+
+	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Internal error, PTT.Set ( %s, %d, %d ), did not expect invalid channel.\n", octypeName(ot), channel, ptt)
+
+		return
+	}
+
+	// New in 1.7.
+	// A few people have a really bad audio cross talk situation where they receive their own transmissions.
+	// It usually doesn't cause a problem but it is confusing to look at.
+	// "half duplex" setting applied only to the transmit logic.  i.e. wait for clear channel before sending.
+	// Receiving was still active.
+	// I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
+
+	// #ifndef TEST
+	if ot == OCTYPE_PTT && !p.audioConfig.achan[channel].fulldup {
+		demod_mute_input(channel, ptt_signal)
+	}
+	// #endif
+
+	/*
+	 * The data link state machine has an interest in activity on the radio channel.
+	 * This is a very convenient place to get that information.
+	 */
+
+	// #ifndef TEST
+	dataLinkQueue.ChannelBusy(channel, ot, ptt_signal)
+	// #endif
+
+	/*
+	 * Inverted output?
+	 */
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_invert {
+		ptt = 1 - ptt
+	}
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_invert2 {
+		ptt2 = 1 - ptt2
+	}
+
+	/*
+	 * Using serial port?
+	 */
+	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_SERIAL &&
+		p.fd[channel][ot] != nil {
+		switch p.audioConfig.achan[channel].octrl[ot].ptt_line {
+		case PTT_LINE_RTS:
+			if ptt != 0 {
+				RTS_ON(p.fd[channel][ot].Fd())
+			} else {
+				RTS_OFF(p.fd[channel][ot].Fd())
+			}
+		case PTT_LINE_DTR:
+			if ptt != 0 {
+				DTR_ON(p.fd[channel][ot].Fd())
+			} else {
+				DTR_OFF(p.fd[channel][ot].Fd())
+			}
+		case PTT_LINE_NONE:
+		}
+
+		/*
+		 * Second serial port control line?  Typically driven with opposite phase but could be in phase.
+		 */
+
+		switch p.audioConfig.achan[channel].octrl[ot].ptt_line2 {
+		case PTT_LINE_RTS:
+			if ptt2 != 0 {
+				RTS_ON(p.fd[channel][ot].Fd())
+			} else {
+				RTS_OFF(p.fd[channel][ot].Fd())
+			}
+		case PTT_LINE_DTR:
+			if ptt2 != 0 {
+				DTR_ON(p.fd[channel][ot].Fd())
+			} else {
+				DTR_OFF(p.fd[channel][ot].Fd())
+			}
+		case PTT_LINE_NONE:
+		}
+		/* else neither one */
+	}
+
+	/*
+	 * Using GPIO?
+	 */
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIO {
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.audioConfig.achan[channel].octrl[ot].out_gpio_name)
+
+		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, octypeName(ot))
+			dw_printf("%s\n", err)
+
+			return
+		}
+		defer fd.Close()
+
+		var stemp = strconv.Itoa(ptt)
+
+		var _, writeErr = fd.WriteString(stemp)
+		if writeErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Error setting GPIO %d for %s\n", p.audioConfig.achan[channel].octrl[ot].out_gpio_num, octypeName(ot))
+			dw_printf("%s\n", writeErr)
+		}
+	}
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
+		if p.gpiodLine[channel][ot] != nil {
+			var err = p.gpiodLine[channel][ot].SetValue(ptt)
+			if err != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, octypeName(ot), err)
+			} else if p.debugLevel >= 1 {
+				text_color_set(DW_COLOR_DEBUG)
+				dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d\n",
+					p.audioConfig.achan[channel].octrl[ot].out_gpio_name,
+					p.audioConfig.achan[channel].octrl[ot].out_gpio_num, ptt)
+			}
+		}
+	}
+
+	/*
+	 * Using parallel printer port?
+	 */
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_LPT &&
+		p.fd[channel][ot] != nil {
+		p.fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
+
+		var lpt_data = make([]byte, 1)
+		var n, readErr = p.fd[channel][ot].Read(lpt_data)
+
+		if readErr != nil || n != 1 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Error reading current state of LPT for channel %d %s\n", channel, octypeName(ot))
+			dw_printf("%s\n", readErr)
+		}
+
+		if ptt != 0 {
+			lpt_data[0] |= byte(1 << p.audioConfig.achan[channel].octrl[ot].ptt_lpt_bit)
+		} else {
+			lpt_data[0] &= ^byte(1 << p.audioConfig.achan[channel].octrl[ot].ptt_lpt_bit)
+		}
+
+		p.fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
+
+		var _, writeErr = p.fd[channel][ot].Write(lpt_data)
+		if writeErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Error writing to LPT for channel %d %s\n", channel, octypeName(ot))
+			dw_printf("%s\n", writeErr)
+		}
+	}
+
+	/*
+	 * Using hamlib?
+	 */
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
+		if p.rig[channel][ot] != nil {
+			var onoff = goHamlib.RIG_PTT_OFF
+			if ptt != 0 {
+				onoff = goHamlib.RIG_PTT_ON
+			}
+
+			var retcode = p.rig[channel][ot].SetPtt(goHamlib.VFOCurrent, onoff)
+			if retcode != nil {
+				text_color_set(DW_COLOR_ERROR)
+				dw_printf("Hamlib error: SetPtt command for channel %d %s\n", channel, octypeName(ot))
+				dw_printf("%s\n", retcode)
+			}
+		} else {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Hamlib: Can't use SetPtt for channel %d %s because rig open failed.\n", channel, octypeName(ot))
+		}
+	}
+
+	/*
+	 * Using CM108 USB Audio adapter GPIO?
+	 */
+
+	if p.audioConfig.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
+		var err = CM108SetGPIOPin(p.audioConfig.achan[channel].octrl[ot].ptt_device,
+			p.audioConfig.achan[channel].octrl[ot].out_gpio_num, ptt)
+		if err != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("ERROR:  %s for channel %d has failed: %v\n", octypeName(ot), channel, err)
+			dw_printf("See User Guide for troubleshooting tips.\n")
+		}
+	}
+} /* end Set */
+
+/*-------------------------------------------------------------------
+ *
+ * Name:	cm108_print_permission_advice
+ *
+ * Purpose:	Explain how to fix the permissions on a CM108 HID, for the
+ *		errors where that is the likely cause.
+ *
+ * Inputs:	name	- Device name, e.g. /dev/hidraw2.
+ *
+ *		err	- Error returned by one of the CM108 functions.
+ *			  Nothing is printed unless it is a permission problem.
+ *
+ *------------------------------------------------------------------*/
+
+func cm108_print_permission_advice(name string, err error) {
+	if !errors.Is(err, fs.ErrPermission) {
+		return
+	}
+
+	text_color_set(DW_COLOR_ERROR)
+
+	for _, line := range CM108PermissionAdvice(name) {
+		dw_printf("%s\n", line)
+	}
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:	GetInput
+ *
+ * Purpose:	Read the value of an input line
+ *
+ * Inputs:	it	- Input type (ICTYPE_TCINH supported so far)
+ * 		channel	- Audio channel number
+ *
+ * Outputs:	0 = inactive, 1 = active, -1 = error
+ *
+ * ------------------------------------------------------------------*/
+
+func (p *PTT) GetInput(it int, channel int) int {
+	Assert(it >= 0 && it < NUM_ICTYPES)
+	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	if p == nil {
+		return -1 /* Not set up, so no method. */
+	}
+
+	if p.audioConfig.chan_medium[channel] != MEDIUM_RADIO {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Internal error, PTT.GetInput ( %d, %d ), did not expect invalid channel.\n", it, channel)
+
+		return -1
+	}
+
+	if p.audioConfig.achan[channel].ictrl[it].method == PTT_METHOD_GPIO {
+		var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, p.audioConfig.achan[channel].ictrl[it].in_gpio_name)
+
+		// No need to check access first: this runs on every transmit attempt,
+		// export_gpio checked it at startup, and the open below reports the
+		// same thing once rather than twice.
+		var fd, openErr = os.Open(gpio_value_path) //nolint:gosec
+		if openErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Error opening %s to check input.\n", gpio_value_path)
+			dw_printf("%s\n", openErr)
+
+			return -1
+		}
+
+		var vtemp = make([]byte, 1)
+
+		var _, readErr = fd.Read(vtemp)
+		if readErr != nil {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("Error getting GPIO %d value\n", p.audioConfig.achan[channel].ictrl[it].in_gpio_num)
+			dw_printf("%s\n", readErr)
+		}
+
+		fd.Close()
+
+		var v, parseErr = strconv.Atoi(string(vtemp))
+		if parseErr != nil {
+			dw_printf("Error parsing return value (%s) from GPIO %d: %s\n", vtemp, p.audioConfig.achan[channel].ictrl[it].in_gpio_num, parseErr)
+
+			return -1
+		}
+
+		if !p.audioConfig.achan[channel].ictrl[it].invert {
+			if v == 0 {
+				return 0
+			} else {
+				return 1
+			}
+		} else {
+			if v == 0 {
+				return 1
+			} else {
+				return 0
+			}
+		}
+	}
+
+	return -1 /* Method was none, or something went wrong */
+}
+
+/*-------------------------------------------------------------------
+ *
+ * Name:        Term
+ *
+ * Purpose:    	Make sure PTT and others are turned off when we exit.
+ *
+ * Inputs:	none
+ *
+ * Description:
+ *
+ *--------------------------------------------------------------------*/
+
+func (p *PTT) Term() {
+	// A stop signal can arrive while we are still starting up, and the
+	// shutdown path runs this on its way out.  Nothing has been keyed if the
+	// PTT has not been made yet, so there is nothing to release.
+	if p == nil {
+		return
+	}
+
+	for n := range MAX_RADIO_CHANS {
+		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+			for ot := range NUM_OCTYPES {
+				p.Set(ot, n, 0)
+			}
+		}
+	}
+
+	for n := range MAX_RADIO_CHANS {
+		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+			for ot := range NUM_OCTYPES {
+				if p.fd[n][ot] != nil {
+					p.fd[n][ot].Close()
+					p.fd[n][ot] = nil
+				}
+			}
+		}
+	}
+
+	for n := range MAX_RADIO_CHANS {
+		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+			for ot := range NUM_OCTYPES {
+				if p.gpiodLine[n][ot] != nil {
+					p.gpiodLine[n][ot].Close()
+					p.gpiodLine[n][ot] = nil
+				}
+			}
+		}
+	}
+
+	for n := range MAX_RADIO_CHANS {
+		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
+			for ot := range NUM_OCTYPES {
+				if p.rig[n][ot] != nil {
+					p.rig[n][ot].Close()   //nolint:errcheck
+					p.rig[n][ot].Cleanup() //nolint:errcheck
+					p.rig[n][ot] = nil
+				}
+			}
+		}
+	}
+}
+
+// init sets up the hardware, and on a failure releases whatever it had set up.
+func (p *PTT) init() error {
+	var err = p.setup()
 	if err != nil {
 		// Setting up is incremental, so a failure can come after serial ports
-		// have been opened or GPIOD lines requested, and the caller has no
-		// handle on those - they live in this file's globals.  Put them back
-		// before reporting, so a caller that carries on, or tries again, is
-		// not left with open descriptors and hardware we no longer track.
-		ptt_term()
+		// have been opened or GPIOD lines requested, and the caller never gets
+		// the PTT that holds them.  Put them back before reporting, so a
+		// caller that carries on, or tries again, is not left with open
+		// descriptors and hardware nobody tracks.
+		p.Term()
 
 		return err
 	}
@@ -577,22 +720,18 @@ func ptt_init(audio_config_p *audio_s) error {
 	return nil
 }
 
-// ptt_setup does the work of ptt_init, stopping at the first failure.  Call
-// ptt_init rather than this: it is the one that tidies up after a failure.
-func ptt_setup(audio_config_p *audio_s) error {
-	save_audio_config_p = audio_config_p
-
-	otnames[OCTYPE_PTT] = "PTT"
-	otnames[OCTYPE_DCD] = "DCD"
-	otnames[OCTYPE_CON] = "CON"
+// setup does the work of init, stopping at the first failure.  Call init
+// rather than this: it is the one that tidies up after a failure.
+func (p *PTT) setup() error {
+	var audio_config_p = p.audioConfig
 
 	for ch := range MAX_RADIO_CHANS {
 		for ot := range NUM_OCTYPES {
-			if ptt_debug_level >= 2 {
+			if p.debugLevel >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%t\n",
 					ch,
-					otnames[ot],
+					octypeName(ot),
 					audio_config_p.achan[ch].octrl[ot].ptt_method,
 					audio_config_p.achan[ch].octrl[ot].ptt_device,
 					audio_config_p.achan[ch].octrl[ot].ptt_line,
@@ -621,7 +760,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 						var n, _ = strconv.Atoi(audio_config_p.achan[ch].octrl[ot].ptt_device[3:])
 
 						text_color_set(DW_COLOR_INFO)
-						dw_printf("Converted %s device '%s'", audio_config_p.achan[ch].octrl[ot].ptt_device, otnames[ot])
+						dw_printf("Converted %s device '%s'", audio_config_p.achan[ch].octrl[ot].ptt_device, octypeName(ot))
 
 						if n < 1 {
 							n = 1
@@ -647,7 +786,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 
 							for ; k >= 0; k-- {
 								if audio_config_p.achan[ch].octrl[ot].ptt_device == audio_config_p.achan[j].octrl[k].ptt_device {
-									fd = ptt_fd[j][k]
+									fd = p.fd[j][k]
 									same_device_used = true
 								}
 							}
@@ -662,7 +801,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 					}
 
 					if openErr == nil {
-						ptt_fd[ch][ot] = fd
+						p.fd[ch][ot] = fd
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("ERROR can't open device %s for channel %d PTT control.\n",
@@ -675,9 +814,9 @@ func ptt_setup(audio_config_p *audio_s) error {
 
 					/*
 					 * Set initial state off.
-					 * ptt_set will invert output signal if appropriate.
+					 * Set will invert output signal if appropriate.
 					 */
-					ptt_set(ot, ch, 0)
+					p.Set(ot, ch, 0)
 				} /* if serial method. */
 			} /* for each output type. */
 		} /* if channel valid. */
@@ -694,7 +833,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 	var using_gpio = false
 
 	for ch := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
 					using_gpio = true
@@ -710,14 +849,14 @@ func ptt_setup(audio_config_p *audio_s) error {
 	}
 
 	if using_gpio {
-		var accessErr = get_access_to_gpio(gpio_sysfs_dir + "/export")
+		var accessErr = p.getAccessToGPIO(p.gpioSysfsDir + "/export")
 		if accessErr != nil {
 			return accessErr
 		}
 	}
 	// GPIOD
 	for ch := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
 					var chip_name = audio_config_p.achan[ch].octrl[ot].out_gpio_name
@@ -727,17 +866,17 @@ func ptt_setup(audio_config_p *audio_s) error {
 					var line, lineErr = RequestGPIODLine(chip_name, line_number, initialState)
 					if lineErr != nil {
 						return fmt.Errorf("can't request GPIOD line %d on %s for channel %d %s: %w",
-							line_number, chip_name, ch, otnames[ot], lineErr)
+							line_number, chip_name, ch, octypeName(ot), lineErr)
 					}
 
-					gpiod_line[ch][ot] = line
+					p.gpiodLine[ch][ot] = line
 
-					if ptt_debug_level >= 2 {
+					if p.debugLevel >= 2 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("GPIOD init OK. Chip: %s line: %d\n", chip_name, line_number)
 					}
-					// Set initial state off.  ptt_set will invert output signal if appropriate.
-					ptt_set(ot, ch, 0)
+					// Set initial state off.  Set will invert output signal if appropriate.
+					p.Set(ot, ch, 0)
 				}
 			}
 		}
@@ -748,20 +887,20 @@ func ptt_setup(audio_config_p *audio_s) error {
 	 */
 
 	for ch := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
 			// output control type, PTT, DCD, CON, ...
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-					var exportErr = export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
+					var exportErr = p.exportGPIO(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
 					if exportErr != nil {
-						return fmt.Errorf("channel %d %s: %w", ch, otnames[ot], exportErr)
+						return fmt.Errorf("channel %d %s: %w", ch, octypeName(ot), exportErr)
 					}
 				}
 			}
 			// input control type
 			for it := range NUM_ICTYPES {
 				if audio_config_p.achan[ch].ictrl[it].method == PTT_METHOD_GPIO {
-					var exportErr = export_gpio(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
+					var exportErr = p.exportGPIO(ch, it, audio_config_p.achan[ch].ictrl[it].invert, 0)
 					if exportErr != nil {
 						return fmt.Errorf("channel %d input %d: %w", ch, it, exportErr)
 					}
@@ -779,7 +918,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 	 */
 
 	for ch := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_LPT {
 					/* Can't open the same device more than once so we */
@@ -798,7 +937,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 
 							for ; k >= 0; k-- {
 								if audio_config_p.achan[ch].octrl[ot].ptt_device == audio_config_p.achan[j].octrl[k].ptt_device {
-									fd = ptt_fd[j][k]
+									fd = p.fd[j][k]
 									same_device_used = true
 								}
 							}
@@ -806,14 +945,14 @@ func ptt_setup(audio_config_p *audio_s) error {
 					}
 
 					if !same_device_used {
-						fd, openErr = os.Open("/dev/port")
+						fd, openErr = os.OpenFile(p.lptPortPath, os.O_RDWR, 0)
 					}
 
-					if openErr != nil {
-						ptt_fd[ch][ot] = fd
+					if openErr == nil {
+						p.fd[ch][ot] = fd
 					} else {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("ERROR - Can't open /dev/port for parallel printer port PTT control.\n")
+						dw_printf("ERROR - Can't open %s for parallel printer port PTT control.\n", p.lptPortPath)
 						dw_printf("%s\n", openErr)
 						dw_printf("You probably don't have adequate permissions to access I/O ports.\n")
 						dw_printf("Either run direwolf as root or change these permissions:\n")
@@ -827,16 +966,16 @@ func ptt_setup(audio_config_p *audio_s) error {
 
 					/*
 					 * Set initial state off.
-					 * ptt_set will invert output signal if appropriate.
+					 * Set will invert output signal if appropriate.
 					 */
-					ptt_set(ot, ch, 0)
+					p.Set(ot, ch, 0)
 				} /* if parallel printer port method. */
 			} /* for each output type */
 		} /* if valid channel. */
 	} /* For each channel. */
 
 	for ch := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[ch] == MEDIUM_RADIO {
+		if p.audioConfig.chan_medium[ch] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
 					if ot == OCTYPE_PTT {
@@ -919,8 +1058,8 @@ func ptt_setup(audio_config_p *audio_s) error {
 							return fmt.Errorf("hamlib rig open for channel %d: %w", ch, openErr)
 						}
 
-						// Successful.  Later code should check for rig[ch][ot] not nil.
-						rig[ch][ot] = r
+						// Successful.  Later code should check for p.rig[ch][ot] not nil.
+						p.rig[ch][ot] = r
 					} else {
 						text_color_set(DW_COLOR_ERROR)
 						dw_printf("HAMLIB can only be used for PTT.  Not DCD or other output.\n")
@@ -946,11 +1085,11 @@ func ptt_setup(audio_config_p *audio_s) error {
 						device,
 						audio_config_p.achan[ch].octrl[ot].out_gpio_num,
 						ch,
-						otnames[ot])
+						octypeName(ot))
 
 					if device == "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Warning: No CM108 HID found for channel %d %s.  Specify one in the config file.\n", ch, otnames[ot])
+						dw_printf("Warning: No CM108 HID found for channel %d %s.  Specify one in the config file.\n", ch, octypeName(ot))
 
 						continue
 					}
@@ -1000,413 +1139,327 @@ func ptt_setup(audio_config_p *audio_s) error {
 	}
 
 	return nil
-} /* end ptt_setup */
+} /* end setup */
 
 /*-------------------------------------------------------------------
  *
- * Name:        ptt_set
+ * Name:	get_access_to_gpio
  *
- * Purpose:    	Turn output control line on or off.
- *		Originally this was just for PTT, hence the name.
- *		Now that it is more general purpose, it should
- *		probably be renamed something like octrl_set.
+ * Purpose:	Try to get access to the GPIO device.
  *
- * Inputs:	ot		- Output control type:
- *				   OCTYPE_PTT, OCTYPE_DCD, OCTYPE_FUTURE
+ * Inputs:	path		- Path to device node.
+ *					/sys/class/gpio/export
+ *					/sys/class/gpio/unexport
+ *					/sys/class/gpio/gpio??/direction
+ *					/sys/class/gpio/gpio??/value
  *
- *		channel		- channel, 0 .. (number of channels)-1
+ * Description:	First see if we have access thru the usual uid/gid/mode method.
+ *		If that fails, we try a hack where we use "sudo chmod ..." to open up access.
+ *		That requires that sudo be configured to work without a password.
+ *		That's the case for 'pi' user in Raspbian but not not be for other boards / operating systems.
  *
- *		ptt_signal	- 1 for transmit, 0 for receive.
- *
- *
- * Assumption:	ptt_init was called first.
- *
- * Description:	Set the RTS or DTR line or GPIO pin.
- *		More positive output corresponds to 1 unless invert is set.
- *
- *--------------------------------------------------------------------*/
-
-// JWL - save status and new get_ptt function.
-
-func ptt_set(ot int, channel int, ptt_signal int) {
-	var ptt = ptt_signal
-	var ptt2 = ptt_signal
-
-	Assert(ot >= 0 && ot < NUM_OCTYPES)
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
-
-	if channel >= MAX_RADIO_CHANS {
-		return // NCHANNEL: no physical PTT hardware to drive
-	}
-
-	if ptt_debug_level >= 1 {
-		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("%s %d = %d\n", otnames[ot], channel, ptt_signal)
-	}
-
-	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
-
-	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, ptt_set ( %s, %d, %d ), did not expect invalid channel.\n", otnames[ot], channel, ptt)
-
-		return
-	}
-
-	// New in 1.7.
-	// A few people have a really bad audio cross talk situation where they receive their own transmissions.
-	// It usually doesn't cause a problem but it is confusing to look at.
-	// "half duplex" setting applied only to the transmit logic.  i.e. wait for clear channel before sending.
-	// Receiving was still active.
-	// I think the simplest solution is to mute/unmute the audio input at this point if not full duplex.
-
-	// #ifndef TEST
-	if ot == OCTYPE_PTT && !save_audio_config_p.achan[channel].fulldup {
-		demod_mute_input(channel, ptt_signal)
-	}
-	// #endif
-
-	/*
-	 * The data link state machine has an interest in activity on the radio channel.
-	 * This is a very convenient place to get that information.
-	 */
-
-	// #ifndef TEST
-	dataLinkQueue.ChannelBusy(channel, ot, ptt_signal)
-	// #endif
-
-	/*
-	 * Inverted output?
-	 */
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_invert {
-		ptt = 1 - ptt
-	}
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_invert2 {
-		ptt2 = 1 - ptt2
-	}
-
-	/*
-	 * Using serial port?
-	 */
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_SERIAL &&
-		ptt_fd[channel][ot] != nil {
-		switch save_audio_config_p.achan[channel].octrl[ot].ptt_line {
-		case PTT_LINE_RTS:
-			if ptt != 0 {
-				RTS_ON(ptt_fd[channel][ot].Fd())
-			} else {
-				RTS_OFF(ptt_fd[channel][ot].Fd())
-			}
-		case PTT_LINE_DTR:
-			if ptt != 0 {
-				DTR_ON(ptt_fd[channel][ot].Fd())
-			} else {
-				DTR_OFF(ptt_fd[channel][ot].Fd())
-			}
-		case PTT_LINE_NONE:
-		}
-
-		/*
-		 * Second serial port control line?  Typically driven with opposite phase but could be in phase.
-		 */
-
-		switch save_audio_config_p.achan[channel].octrl[ot].ptt_line2 {
-		case PTT_LINE_RTS:
-			if ptt2 != 0 {
-				RTS_ON(ptt_fd[channel][ot].Fd())
-			} else {
-				RTS_OFF(ptt_fd[channel][ot].Fd())
-			}
-		case PTT_LINE_DTR:
-			if ptt2 != 0 {
-				DTR_ON(ptt_fd[channel][ot].Fd())
-			} else {
-				DTR_OFF(ptt_fd[channel][ot].Fd())
-			}
-		case PTT_LINE_NONE:
-		}
-		/* else neither one */
-	}
-
-	/*
-	 * Using GPIO?
-	 */
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, save_audio_config_p.achan[channel].octrl[ot].out_gpio_name)
-
-		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
-		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, otnames[ot])
-			dw_printf("%s\n", err)
-
-			return
-		}
-		defer fd.Close()
-
-		var stemp = strconv.Itoa(ptt)
-
-		var _, writeErr = fd.WriteString(stemp)
-		if writeErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error setting GPIO %d for %s\n", save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, otnames[ot])
-			dw_printf("%s\n", writeErr)
-		}
-	}
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_GPIOD {
-		if gpiod_line[channel][ot] != nil {
-			var err = gpiod_line[channel][ot].SetValue(ptt)
-			if err != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, otnames[ot], err)
-			} else if ptt_debug_level >= 1 {
-				text_color_set(DW_COLOR_DEBUG)
-				dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d\n",
-					save_audio_config_p.achan[channel].octrl[ot].out_gpio_name,
-					save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt)
-			}
-		}
-	}
-
-	/*
-	 * Using parallel printer port?
-	 */
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_LPT &&
-		ptt_fd[channel][ot] != nil {
-		ptt_fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
-
-		var lpt_data = make([]byte, 1)
-		var n, readErr = ptt_fd[channel][ot].Read(lpt_data)
-
-		if readErr != nil || n != 1 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error reading current state of LPT for channel %d %s\n", channel, otnames[ot])
-			dw_printf("%s\n", readErr)
-		}
-
-		if ptt != 0 {
-			lpt_data[0] |= byte(1 << save_audio_config_p.achan[channel].octrl[ot].ptt_lpt_bit)
-		} else {
-			lpt_data[0] &= ^byte(1 << save_audio_config_p.achan[channel].octrl[ot].ptt_lpt_bit)
-		}
-
-		ptt_fd[channel][ot].Seek(LPT_IO_ADDR, io.SeekStart)
-
-		var _, writeErr = ptt_fd[channel][ot].Write(lpt_data)
-		if writeErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error writing to LPT for channel %d %s\n", channel, otnames[ot])
-			dw_printf("%s\n", writeErr)
-		}
-	}
-
-	/*
-	 * Using hamlib?
-	 */
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_HAMLIB {
-		if rig[channel][ot] != nil {
-			var onoff = goHamlib.RIG_PTT_OFF
-			if ptt != 0 {
-				onoff = goHamlib.RIG_PTT_ON
-			}
-
-			var retcode = rig[channel][ot].SetPtt(goHamlib.VFOCurrent, onoff)
-			if retcode != nil {
-				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Hamlib error: SetPtt command for channel %d %s\n", channel, otnames[ot])
-				dw_printf("%s\n", retcode)
-			}
-		} else {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Hamlib: Can't use SetPtt for channel %d %s because rig open failed.\n", channel, otnames[ot])
-		}
-	}
-
-	/*
-	 * Using CM108 USB Audio adapter GPIO?
-	 */
-
-	if save_audio_config_p.achan[channel].octrl[ot].ptt_method == PTT_METHOD_CM108 {
-		var err = CM108SetGPIOPin(save_audio_config_p.achan[channel].octrl[ot].ptt_device,
-			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt)
-		if err != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR:  %s for channel %d has failed: %v\n", otnames[ot], channel, err)
-			dw_printf("See User Guide for troubleshooting tips.\n")
-		}
-	}
-} /* end ptt_set */
-
-/*-------------------------------------------------------------------
- *
- * Name:	cm108_print_permission_advice
- *
- * Purpose:	Explain how to fix the permissions on a CM108 HID, for the
- *		errors where that is the likely cause.
- *
- * Inputs:	name	- Device name, e.g. /dev/hidraw2.
- *
- *		err	- Error returned by one of the CM108 functions.
- *			  Nothing is printed unless it is a permission problem.
+ * Debug:	Use the "-doo" command line option.
  *
  *------------------------------------------------------------------*/
 
-func cm108_print_permission_advice(name string, err error) {
-	if !errors.Is(err, fs.ErrPermission) {
-		return
+const MAX_GROUPS = 50
+
+func (p *PTT) getAccessToGPIO(path string) error {
+	/*
+	 * Does path even exist?
+	 */
+	var _, err = os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("can't get properties of %s: %w"+
+			" (this system is not configured with the GPIO user interface;"+
+			" use a different method for PTT control)", path, err)
 	}
 
-	text_color_set(DW_COLOR_ERROR)
+	var my_uid = os.Geteuid()
+	var my_gid = os.Getegid()
 
-	for _, line := range CM108PermissionAdvice(name) {
-		dw_printf("%s\n", line)
+	var my_groups, groupsErr = os.Getgroups()
+	if groupsErr != nil {
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("Getgroups() failed to get supplementary groups, err=%s\n", groupsErr)
 	}
+
+	if p.debugLevel >= 2 {
+		text_color_set(DW_COLOR_DEBUG)
+		// TODO KG dw_printf("%s: uid=%d, gid=%d, mode=o%o\n", path, finfo.st_uid, finfo.st_gid, finfo.st_mode)
+		dw_printf("my uid=%d, gid=%d, supplementary groups=", my_uid, my_gid)
+
+		for _, g := range my_groups {
+			dw_printf(" %d", g)
+		}
+
+		dw_printf("\n")
+	}
+
+	/*
+	 * Do we have permission to access it?
+	 *
+	 * On Debian 7 (Wheezy) we see this:
+	 *
+	 *	$ ls -l /sys/class/gpio/export
+	 *	--w------- 1 root root 4096 Feb 27 12:31 /sys/class/gpio/export
+	 *
+	 *
+	 * Only root can write to it.
+	 * Our work-around is change the protection so that everyone can write.
+	 * This requires that the current user can use sudo without a password.
+	 * This has been the case for the predefined "pi" user but can be a problem
+	 * when people add new user names.
+	 * Other operating systems could have different default configurations.
+	 *
+	 * A better solution is available in Debian 8 (Jessie).  The group is now "gpio"
+	 * so anyone in that group can now write to it.
+	 *
+	 *	$ ls -l /sys/class/gpio/export
+	 *	-rwxrwx--- 1 root gpio 4096 Mar  4 21:12 /sys/class/gpio/export
+	 *
+	 *
+	 * First see if we can access it by the usual file protection rules.
+	 * If not, we will try the "sudo chmod go+rw ..." hack.
+	 *
+	 */
+
+	// TODO KG I don't love what was here, but I need to figure out what (if anything) I want to replace it with
+
+	return nil
 }
 
 /*-------------------------------------------------------------------
  *
- * Name:	get_input
+ * Name:	export_gpio
  *
- * Purpose:	Read the value of an input line
+ * Purpose:	Tell the GPIO subsystem to export a GPIO line for
+ * 		us to use, and set the initial state of the GPIO.
  *
- * Inputs:	it	- Input type (ICTYPE_TCINH supported so far)
- * 		channel	- Audio channel number
+ * Inputs:	ch		- Radio Channel.
+ *		ot		- Output type.
+ *		invert:		- Is the GPIO active low?
+ *		direction:	- 0 for input, 1 for output
  *
- * Outputs:	0 = inactive, 1 = active, -1 = error
+ * Outputs:	out_gpio_name	- in the audio configuration structure.
+ *		in_gpio_name
  *
- * ------------------------------------------------------------------*/
+ *------------------------------------------------------------------*/
 
-func get_input(it int, channel int) int { //nolint:unparam // ICTYPE_TXINH is the only input type there is so far, but the parameter is how Dire Wolf left room for another.
-	Assert(it >= 0 && it < NUM_ICTYPES)
-	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
+	// Raspberry Pi was easy.  GPIO 24 has the name gpio24.
+	// Others, such as the Cubieboard, take a little more effort.
+	// The name might be gpio24_ph11 meaning connector H, pin 11.
+	// When we "export" GPIO number, we will store the corresponding
+	// device name for future use when we want to access it.
+	var gpio_num int
+	var gpio_name string
 
-	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
-		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, get_input ( %d, %d ), did not expect invalid channel.\n", it, channel)
-
-		return -1
+	if direction > 0 {
+		gpio_num = p.audioConfig.achan[ch].octrl[ot].out_gpio_num
+		gpio_name = p.audioConfig.achan[ch].octrl[ot].out_gpio_name
+	} else {
+		gpio_num = p.audioConfig.achan[ch].ictrl[ot].in_gpio_num
+		gpio_name = p.audioConfig.achan[ch].ictrl[ot].in_gpio_name
 	}
 
-	if save_audio_config_p.achan[channel].ictrl[it].method == PTT_METHOD_GPIO {
-		var gpio_value_path = fmt.Sprintf("%s/%s/value", gpio_sysfs_dir, save_audio_config_p.achan[channel].ictrl[it].in_gpio_name)
+	var gpio_export_path = p.gpioSysfsDir + "/export"
 
-		// No need to check access first: this runs on every transmit attempt,
-		// export_gpio checked it at startup, and the open below reports the
-		// same thing once rather than twice.
-		var fd, openErr = os.Open(gpio_value_path) //nolint:gosec
-		if openErr != nil {
+	var accessErr = p.getAccessToGPIO(gpio_export_path)
+	if accessErr != nil {
+		return accessErr
+	}
+
+	var fd, err = os.OpenFile(gpio_export_path, os.O_WRONLY, 0) //nolint:gosec
+	if err != nil {
+		// Not expected.  Above should have obtained permission.
+		return fmt.Errorf("permissions do not allow access to GPIO: %w", err)
+	}
+
+	var stemp = strconv.Itoa(gpio_num)
+
+	var n, writeErr = fd.WriteString(stemp)
+	if n != len(stemp) || writeErr != nil { //nolint: staticcheck
+		/* TODO KG Figure out write errs here
+
+		// Ignore EBUSY error which seems to mean the device node already exists.
+		if err != EBUSY {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error opening %s to check input.\n", gpio_value_path)
-			dw_printf("%s\n", openErr)
+			dw_printf("Error writing \"%s\" to %s, errno=%d\n", stemp, gpio_export_path, e)
+			dw_printf("%s\n", strerror(e))
 
-			return -1
+			if e == 22 {
+				// It appears that error 22 occurs when sysfs gpio is not available.
+				// (See https://github.com/wb2osz/direwolf/issues/503)
+				//
+				// The solution might be to use the new gpiod approach.
+
+				dw_printf("It looks like gpio with sysfs is not supported on this operating system.\n")
+				dw_printf("Rather than the following form, in the configuration file,\n")
+				dw_printf("    PTT GPIO  %s\n", stemp)
+				dw_printf("try using gpiod form instead.  e.g.\n")
+				dw_printf("    PTT GPIOD  gpiochip0  %s\n", stemp)
+				dw_printf("You can get a list of gpio chip names and corresponding I/O lines with \"gpioinfo\" command.\n")
+			}
+			os.Exit(1)
+		}
+		*/
+	}
+	/* Wait for udev to adjust permissions after enabling GPIO. */
+	/* https://github.com/wb2osz/direwolf/issues/176 */
+	SLEEP_MS(250)
+	fd.Close()
+
+	/*
+	 *	Added in release 1.4.
+	 *
+	 *	On the RPi, the device path for GPIO number XX is simply /sys/class/gpio/gpioXX.
+	 *
+	 *	There was a report that it is different for the CubieBoard.  For instance
+	 *	GPIO 61 has gpio61_pi13 in the path.  This indicates connector "i" pin 13.
+	 *	https://github.com/cubieplayer/Cubian/wiki/GPIO-Introduction
+	 *
+	 *	For another similar single board computer, we find the same thing:
+	 *	https://www.olimex.com/wiki/A20-OLinuXino-LIME#GPIO_under_Linux
+	 *
+	 *	How should we deal with this?  Some possibilities:
+	 *
+	 *	(1) The user might explicitly mention the name in direwolf.conf.
+	 *	(2) We might be able to find the names in some system device config file.
+	 *	(3) Get a directory listing of /sys/class/gpio then search for a
+	 *		matching name.  Suppose we wanted GPIO 61.  First look for an exact
+	 *		match to "gpio61".  If that is not found, look for something
+	 *		matching the pattern "gpio61_*".
+	 *
+	 *	We are finally implementing the third choice.
+	 */
+
+	/*
+	 * Then we have the Odroid board with GPIO numbers starting around 480.
+	 * Can we simply use those numbers?
+	 * Apparently, the export names look like GPIOX.17
+	 * https://wiki.odroid.com/odroid-c4/hardware/expansion_connectors#gpio_map_for_wiringpi_library
+	 */
+
+	if p.debugLevel >= 2 {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Contents of %s:\n", p.gpioSysfsDir)
+	}
+
+	var dirEntries, readDirErr = os.ReadDir(p.gpioSysfsDir)
+
+	var ok = false
+
+	if readDirErr != nil {
+		// Something went wrong.  Fill in the simple expected name and keep going.
+		text_color_set(DW_COLOR_ERROR)
+		dw_printf("ERROR! Could not get directory listing for %s\n", p.gpioSysfsDir)
+
+		gpio_name = fmt.Sprintf("gpio%d", gpio_num)
+		ok = true
+	} else {
+		if p.debugLevel >= 2 {
+			text_color_set(DW_COLOR_DEBUG)
+
+			for _, entry := range dirEntries {
+				dw_printf("\t%s\n", entry.Name())
+			}
 		}
 
-		var vtemp = make([]byte, 1)
+		// Look for exact name gpioNN
 
-		var _, readErr = fd.Read(vtemp)
-		if readErr != nil {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error getting GPIO %d value\n", save_audio_config_p.achan[channel].ictrl[it].in_gpio_num)
-			dw_printf("%s\n", readErr)
+		var lookfor = fmt.Sprintf("gpio%d", gpio_num)
+
+		for _, entry := range dirEntries {
+			if lookfor == entry.Name() {
+				gpio_name = entry.Name()
+				ok = true
+			}
 		}
 
+		// If not found, Look for gpioNN_*
+
+		lookfor = fmt.Sprintf("gpio%d_", gpio_num)
+
+		for _, entry := range dirEntries {
+			if strings.HasPrefix(entry.Name(), lookfor) {
+				gpio_name = entry.Name()
+				ok = true
+			}
+		}
+	}
+
+	/*
+	 * We should now have the corresponding node name.
+	 */
+	if !ok {
+		return fmt.Errorf("could not find path for gpio number %d", gpio_num)
+	}
+
+	// Remember it: everything that drives or reads the line afterwards builds
+	// its path from the node name, not from the number.
+	if direction > 0 {
+		p.audioConfig.achan[ch].octrl[ot].out_gpio_name = gpio_name
+	} else {
+		p.audioConfig.achan[ch].ictrl[ot].in_gpio_name = gpio_name
+	}
+
+	if p.debugLevel >= 2 {
+		text_color_set(DW_COLOR_DEBUG)
+		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, p.gpioSysfsDir, gpio_name)
+	}
+
+	/*
+	 * Set output direction and initial state
+	 */
+
+	var gpio_direction_path = fmt.Sprintf("%s/%s/direction", p.gpioSysfsDir, gpio_name)
+
+	accessErr = p.getAccessToGPIO(gpio_direction_path)
+	if accessErr != nil {
+		return accessErr
+	}
+
+	fd, err = os.OpenFile(gpio_direction_path, os.O_WRONLY, 0) //nolint:gosec
+	if err != nil {
+		return fmt.Errorf("error opening %s: %w", gpio_direction_path, err)
+	}
+
+	var gpio_val string
+
+	if direction != 0 {
+		if invert {
+			gpio_val = "high"
+		} else {
+			gpio_val = "low"
+		}
+	} else {
+		gpio_val = "in"
+	}
+
+	n, writeErr = fd.WriteString(gpio_val)
+	if writeErr != nil {
 		fd.Close()
 
-		var v, parseErr = strconv.Atoi(string(vtemp))
-		if parseErr != nil {
-			dw_printf("Error parsing return value (%s) from GPIO %d: %s\n", vtemp, save_audio_config_p.achan[channel].ictrl[it].in_gpio_num, parseErr)
-
-			return -1
-		}
-
-		if !save_audio_config_p.achan[channel].ictrl[it].invert {
-			if v == 0 {
-				return 0
-			} else {
-				return 1
-			}
-		} else {
-			if v == 0 {
-				return 1
-			} else {
-				return 0
-			}
-		}
+		return fmt.Errorf("error writing initial state to %s: %w", gpio_direction_path, writeErr)
 	}
 
-	return -1 /* Method was none, or something went wrong */
-}
+	if n != len(gpio_val) {
+		fd.Close()
 
-/*-------------------------------------------------------------------
- *
- * Name:        ptt_term
- *
- * Purpose:    	Make sure PTT and others are turned off when we exit.
- *
- * Inputs:	none
- *
- * Description:
- *
- *--------------------------------------------------------------------*/
-
-func ptt_term() {
-	// A stop signal can arrive while we are still starting up, and the
-	// shutdown path runs this on its way out.  Nothing has been keyed if
-	// audio_open has not installed the configuration yet, so there is nothing
-	// to release - and reading the channels out of a nil configuration would
-	// panic rather than shut down.
-	if save_audio_config_p == nil {
-		return
+		return fmt.Errorf("error writing initial state to %s: wrote %d of %d bytes", gpio_direction_path, n, len(gpio_val))
 	}
 
-	for n := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
-				ptt_set(ot, n, 0)
-			}
-		}
-	}
+	fd.Close()
 
-	for n := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
-				if ptt_fd[n][ot] != nil {
-					ptt_fd[n][ot].Close()
-					ptt_fd[n][ot] = nil
-				}
-			}
-		}
-	}
+	/*
+	 * Make sure that we have access to 'value'.
+	 * Do it once here, rather than each time we want to use it.
+	 */
 
-	for n := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
-				if gpiod_line[n][ot] != nil {
-					gpiod_line[n][ot].Close()
-					gpiod_line[n][ot] = nil
-				}
-			}
-		}
-	}
+	var gpio_value_path = fmt.Sprintf("%s/%s/value", p.gpioSysfsDir, gpio_name)
 
-	for n := range MAX_RADIO_CHANS {
-		if save_audio_config_p.chan_medium[n] == MEDIUM_RADIO {
-			for ot := range NUM_OCTYPES {
-				if rig[n][ot] != nil {
-					rig[n][ot].Close()   //nolint:errcheck
-					rig[n][ot].Cleanup() //nolint:errcheck
-					rig[n][ot] = nil
-				}
-			}
-		}
-	}
+	return p.getAccessToGPIO(gpio_value_path)
 }
 
 /*
@@ -1435,7 +1488,7 @@ func PTTTestMain() error {
 
 	/* initialize - both off */
 
-	var initErr = ptt_init(&my_audio_config)
+	var p, initErr = NewPTT(&my_audio_config, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1449,9 +1502,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
@@ -1459,19 +1512,19 @@ func PTTTestMain() error {
 
 	channel = 1
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
-	ptt_term()
+	p.Term()
 
 	/* Same thing again but invert RTS. */
 
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
-	initErr = ptt_init(&my_audio_config)
+	p, initErr = NewPTT(&my_audio_config, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1482,9 +1535,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
@@ -1492,13 +1545,13 @@ func PTTTestMain() error {
 
 	channel = 1
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
-	ptt_term()
+	p.Term()
 
 	/* Test GPIO */
 
@@ -1512,7 +1565,7 @@ func PTTTestMain() error {
 
 	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
 
-	initErr = ptt_init(&my_audio_config)
+	p, initErr = NewPTT(&my_audio_config, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1521,13 +1574,13 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
-	ptt_term()
+	p.Term()
 	// #endif
 
 	/* Parallel printer port. */

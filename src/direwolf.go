@@ -63,6 +63,7 @@ var kissSerial *KissSerial
 var agwServer *AGWServer
 var mheardDB *MHeardDB
 var aprsDigipeater *Digipeater
+var pttControl *PTT
 var xmitSvc *XmitService
 var ttGateway *TTGateway
 var hdlcReceiver *HDLCReceiver
@@ -241,7 +242,6 @@ x = Silence FX.25 information.`)
 				d_p_opt = true // TODO: packet dump for xmit side.
 			case 'o':
 				d_o_opt++
-				ptt_set_debug(d_o_opt)
 			case 'i':
 				d_i_opt++
 			case 'm':
@@ -503,18 +503,25 @@ x = Silence FX.25 information.`)
 	morse_init(audio_config, audio_amplitude)
 
 	/*
+	 * Push to Talk (PTT) control.
+	 */
+
+	var pttErr error
+
+	pttControl, pttErr = NewPTT(audio_config, d_o_opt)
+	stopIfCancelled(ctx)
+
+	if pttErr != nil {
+		logrus.WithError(pttErr).Error("Could not set up PTT")
+		os.Exit(1)
+	}
+
+	/*
 	 * Initialize the transmit queue.
 	 */
 
-	var xmitErr error
-
-	xmitSvc, xmitErr = NewXmitService(ctx, audio_config, d_p_opt)
+	xmitSvc = NewXmitService(ctx, audio_config, d_p_opt)
 	stopIfCancelled(ctx)
-
-	if xmitErr != nil {
-		logrus.WithError(xmitErr).Error("Could not set up transmit")
-		os.Exit(1)
-	}
 
 	/*
 	 * If -x N option specified, transmit calibration tones for transmitter
@@ -580,7 +587,7 @@ x = Silence FX.25 information.`)
 				var n = audio_config.achan[transmitCalibrationChannel].baud * max_duration
 
 				text_color_set(DW_COLOR_INFO)
-				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 1)
+				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 1)
 
 				switch transmitCalibrationType {
 				default:
@@ -617,7 +624,7 @@ x = Silence FX.25 information.`)
 					sleepSecCtx(ctx, max_duration)
 				}
 
-				ptt_set(OCTYPE_PTT, transmitCalibrationChannel, 0)
+				pttControl.Set(OCTYPE_PTT, transmitCalibrationChannel, 0)
 				text_color_set(DW_COLOR_INFO)
 				stopIfCancelled(ctx)
 				os.Exit(0)
@@ -1207,7 +1214,7 @@ func teardown() {
 		if packetLogger != nil {
 			packetLogger.Close()
 		}
-		ptt_term()
+		pttControl.Term()
 		dwgps_term()
 
 		if waypointSender != nil {

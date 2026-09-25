@@ -21,7 +21,6 @@ import (
 
 	"github.com/doismellburning/samoyed/internal/maybe"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_AX25_Link(t *testing.T) {
@@ -139,7 +138,7 @@ func setupTestEnv(t *testing.T) {
 	t.Helper()
 
 	var audioConfig = new(audio_s)
-	require.NoError(t, ptt_init(audioConfig))
+	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)
 
 	var miscConfig = new(misc_config_s)
@@ -162,7 +161,7 @@ func setupTestEnvV22(t *testing.T) {
 	t.Helper()
 
 	var audioConfig = new(audio_s)
-	require.NoError(t, ptt_init(audioConfig))
+	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)
 
 	var miscConfig = new(misc_config_s)

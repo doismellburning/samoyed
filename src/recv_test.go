@@ -287,7 +287,7 @@ func setupRecvProcessTest(t *testing.T, frack int) {
 	packetLogger = NewPacketLogger(false, "")
 	mheardDB = NewMHeardDB(0)
 
-	require.NoError(t, ptt_init(audioConfig))
+	usePTT(t, audioConfig)
 	transmitQueue.Init(audioConfig)
 
 	var miscConfig = new(misc_config_s)
