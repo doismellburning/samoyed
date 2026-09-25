@@ -18,22 +18,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Properties of the digitized sound stream & modem.
-
-// TODO KG static struct audio_s *save_audio_config_p = nil;
-
 /*
  * 8 bit samples are unsigned bytes in range of 0 .. 255.
  *
  * 16 bit samples are signed short in range of -32768 .. +32767.
  */
 
-/* Constants after initialization. */
-
 // TODO KG Also defined in morse.go: const TICKS_PER_CYCLE = (256.0 * 256.0 * 256.0 * 256.0)
-
-var sine_table [256]int16 // Shared by every channel; built once from the single
-// global amplitude percentage passed to gen_tone_init.
 
 const PHASE_SHIFT_180 = (uint(128) << 24)
 const PHASE_SHIFT_90 = (uint(64) << 24)
@@ -59,7 +50,9 @@ type ToneGenerator struct {
 	adevIndex   int
 	audioConfig *audio_s
 	sink        AudioSink // Where the samples go.
-	amplitude   int       // 0 .. 100, for DTMF; the rest use sine_table.
+	amplitude   int       // 0 .. 100, for DTMF; the rest use sineTable.
+
+	sineTable [256]int16 // One cycle, scaled to the amplitude asked for.
 
 	ticksPerSample    int /* Same for both channels of same soundcard */
 	ticksPerBit       int /* because they have same sample rate. */
@@ -109,8 +102,9 @@ type ToneGenerator struct {
  *					space_freq
  *					samples_per_sec
  *
- *		amp			- Signal amplitude on scale of 0 .. 100, for
- *					  the tones SendDTMF makes.
+ *		amp			- Signal amplitude on scale of 0 .. 100.
+ *
+ *				  100% uses the full 16 bit sample range of +-32k.
  *
  *		sink			- Where the generated samples go.
  *
@@ -126,6 +120,7 @@ func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink
 		audioConfig: audioConfig,
 		sink:        sink,
 		amplitude:   amp,
+		sineTable:   newSineTable(amp),
 	}
 
 	var a = tg.adevIndex
@@ -196,6 +191,35 @@ func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink
 	return tg
 }
 
+// newSineTable makes one cycle of a sine wave, amp percent of the full 16 bit
+// sample range, clipping anything that would not fit.
+func newSineTable(amp int) [256]int16 {
+	var table [256]int16
+
+	for j := range 256 {
+		var a = (float64(j) / 256.0) * (2.0 * math.Pi)
+		var s = int(math.Sin(a) * 32767 * float64(amp) / 100.0)
+
+		/* 16 bit sound sample must fit in range of -32768 .. +32767. */
+
+		if s < -32768 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+
+			s = -32768
+		} else if s > 32767 {
+			text_color_set(DW_COLOR_ERROR)
+			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
+
+			s = 32767
+		}
+
+		table[j] = int16(s)
+	}
+
+	return table
+}
+
 /*------------------------------------------------------------------
  *
  * Name:        gen_tone_init
@@ -232,36 +256,10 @@ func NewToneGenerator(channel int, audioConfig *audio_s, amp int, sink AudioSink
 func gen_tone_init(audio_config_p *audio_s, amp int, sink AudioSink) int { //nolint:unparam
 	logrus.WithField("amp", amp).Debug("gen_tone_init")
 
-	/*
-	 * Save away modem parameters for later use.
-	 */
-	save_audio_config_p = audio_config_p
-
 	for channel := range MAX_RADIO_CHANS {
 		if audio_config_p.chan_medium[channel] == MEDIUM_RADIO {
 			toneGenerators[channel] = NewToneGenerator(channel, audio_config_p, amp, sink)
 		}
-	}
-
-	for j := range 256 {
-		var a = (float64(j) / 256.0) * (2.0 * math.Pi)
-		var s = int(math.Sin(a) * 32767 * float64(amp) / 100.0)
-
-		/* 16 bit sound sample must fit in range of -32768 .. +32767. */
-
-		if s < -32768 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
-
-			s = -32768
-		} else if s > 32767 {
-			text_color_set(DW_COLOR_ERROR)
-			dw_printf("gen_tone_init: Excessive amplitude is being clipped.\n")
-
-			s = 32767
-		}
-
-		sine_table[j] = int16(s)
 	}
 
 	return (0)
@@ -342,8 +340,15 @@ func interpol8(oldv float64, newv float64, bc float64) float64 { //nolint:unused
 	//return (rrc * newv + (1.0f - bc) * oldv);	// 55 on 11/7
 }
 
-var gray2phase_v26 []uint = []uint{0, 1, 3, 2}
-var gray2phase_v27 []uint = []uint{1, 0, 2, 3, 6, 7, 5, 4}
+// Gray code to phase shift, in units of 90 degrees for V.26 (QPSK) and 45
+// degrees for V.27 (8PSK).
+func gray2phaseV26(dibit int) uint {
+	return [4]uint{0, 1, 3, 2}[dibit]
+}
+
+func gray2phaseV27(tribit int) uint {
+	return [8]uint{1, 0, 2, 3, 6, 7, 5, 4}[tribit]
+}
 
 // #define PSKIQ 1  // not ready for prime time yet.
 /* PSKIQ
@@ -407,7 +412,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 		var dibit = (tg.saveBit << 1) | dat
 
-		var symbol = gray2phase_v26[dibit] // 0 .. 3 for QPSK.
+		var symbol = gray2phaseV26(dibit) // 0 .. 3 for QPSK.
 		/*
 			#if PSKIQ
 				  // One phase shift unit is 45 degrees.
@@ -444,7 +449,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 
 		var tribit = (tg.saveBit << 1) | dat
 
-		var symbol = gray2phase_v27[tribit]
+		var symbol = gray2phaseV27(tribit)
 		tg.tonePhase += symbol * PHASE_SHIFT_45
 
 		tg.saveBit = 0
@@ -480,7 +485,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			}
 
 			tg.tonePhase += change
-			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)
 
 		case MODEM_EAS:
@@ -490,12 +495,12 @@ func (tg *ToneGenerator) PutBit(dat int) {
 			}
 
 			tg.tonePhase += change
-			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)
 
 		case MODEM_BPSK:
 			tg.tonePhase += tg.f1ChangePerSample
-			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)
 
 		case MODEM_QPSK:
@@ -533,12 +538,12 @@ func (tg *ToneGenerator) PutBit(dat int) {
 				#endif
 				#else
 			*/
-			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)
 
 		case MODEM_8PSK:
 			tg.tonePhase += tg.f1ChangePerSample
-			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)
 
 		case MODEM_BASEBAND, MODEM_SCRAMBLE, MODEM_AIS:
@@ -552,7 +557,7 @@ func (tg *ToneGenerator) PutBit(dat int) {
 				}
 			}
 
-			sam = int(sine_table[(tg.tonePhase>>24)&0xff])
+			sam = int(tg.sineTable[(tg.tonePhase>>24)&0xff])
 			tg.PutSample(sam)
 
 		default:

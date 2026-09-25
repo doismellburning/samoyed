@@ -306,9 +306,9 @@ func TestPostambleFlushesTheAudioWhenItIsTheEndOfTheTransmission(t *testing.T) {
 
 	var sink = new(flushCountingSink)
 
-	var origAudioConfig, origGenerators = save_audio_config_p, toneGenerators
+	var origGenerators = toneGenerators
 
-	t.Cleanup(func() { save_audio_config_p, toneGenerators = origAudioConfig, origGenerators })
+	t.Cleanup(func() { toneGenerators = origGenerators })
 
 	gen_tone_init(audioConfig, 100, sink)
 
@@ -555,9 +555,9 @@ func setupEASSendTest(t *testing.T) {
 	var audioConfig = newHDLCSendTestConfig(LAYER2_AX25)
 	audioConfig.achan[hdlcSendTestChannel].modem_type = MODEM_EAS
 
-	var origAudioConfig, origGenerators = save_audio_config_p, toneGenerators
+	var origGenerators = toneGenerators
 
-	t.Cleanup(func() { save_audio_config_p, toneGenerators = origAudioConfig, origGenerators })
+	t.Cleanup(func() { toneGenerators = origGenerators })
 
 	// Samples go to a file rather than to an audio device.
 	var w, err = wavwrite.Create(filepath.Join(t.TempDir(), "eas.wav"), wavwrite.Format{

@@ -82,3 +82,16 @@ func TestToneGeneratorsAreIndependentPerChannel(t *testing.T) {
 	assert.Equal(t, 42, tg0.bitLenAcc)
 	assert.Zero(t, tg1.bitLenAcc)
 }
+
+func TestToneGeneratorSineTableFollowsAmplitude(t *testing.T) {
+	var audioConfig = newTestAudioConfig(0, MODEM_AFSK, 1200, 1200, 2200, 44100)
+
+	var full = NewToneGenerator(0, audioConfig, 100, nil)
+	var half = NewToneGenerator(0, audioConfig, 50, nil)
+
+	// A quarter of the way round is the peak.
+	assert.Equal(t, int16(32767), full.sineTable[64])
+	assert.Equal(t, int16(16383), half.sineTable[64])
+	assert.Zero(t, full.sineTable[0])
+	assert.Equal(t, int16(-32767), full.sineTable[192])
+}
