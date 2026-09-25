@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /*------------------------------------------------------------------
@@ -93,19 +92,23 @@ const (
  * The world will come crumbling down.
  */
 
-var translate = [10][4]rune{
-	/*	 A	 B	 C	 D  */
-	/*	---	---	---	--- */
-	/* 0 */ {' ', 0, 0, 0},
-	/* 1 */ {0, 0, 0, 0},
-	/* 2 */ {'A', 'B', 'C', 0},
-	/* 3 */ {'D', 'E', 'F', 0},
-	/* 4 */ {'G', 'H', 'I', 0},
-	/* 5 */ {'J', 'K', 'L', 0},
-	/* 6 */ {'M', 'N', 'O', 0},
-	/* 7 */ {'P', 'Q', 'R', 'S'},
-	/* 8 */ {'T', 'U', 'V', 0},
-	/* 9 */ {'W', 'X', 'Y', 'Z'}}
+// ttTranslate is the keypad: the letters on each button, in the order the
+// multi-press and two-key encodings number them.
+func ttTranslate() [10][4]rune {
+	return [10][4]rune{
+		/*	 A	 B	 C	 D  */
+		/*	---	---	---	--- */
+		/* 0 */ {' ', 0, 0, 0},
+		/* 1 */ {0, 0, 0, 0},
+		/* 2 */ {'A', 'B', 'C', 0},
+		/* 3 */ {'D', 'E', 'F', 0},
+		/* 4 */ {'G', 'H', 'I', 0},
+		/* 5 */ {'J', 'K', 'L', 0},
+		/* 6 */ {'M', 'N', 'O', 0},
+		/* 7 */ {'P', 'Q', 'R', 'S'},
+		/* 8 */ {'T', 'U', 'V', 0},
+		/* 9 */ {'W', 'X', 'Y', 'Z'}}
+}
 
 /*
  * This is for the new 10 character fixed length callsigns for APRStt 3.
@@ -120,35 +123,43 @@ var translate = [10][4]rune{
  * The column is a two bit code packed into the last 4 digits.
  */
 
-var call10encoding = [10][4]rune{
-	/*	 0	 1	 2	 3  */
-	/*	---	---	---	--- */
-	/* 0 */ {'0', ' ', 0, 0},
-	/* 1 */ {'1', 'Q', 'Z', 0},
-	/* 2 */ {'2', 'A', 'B', 'C'},
-	/* 3 */ {'3', 'D', 'E', 'F'},
-	/* 4 */ {'4', 'G', 'H', 'I'},
-	/* 5 */ {'5', 'J', 'K', 'L'},
-	/* 6 */ {'6', 'M', 'N', 'O'},
-	/* 7 */ {'7', 'P', 'R', 'S'},
-	/* 8 */ {'8', 'T', 'U', 'V'},
-	/* 9 */ {'9', 'W', 'X', 'Y'}}
+// ttCall10Encoding is the old keypad layout of APRStt 3's fixed-length
+// callsigns, with Q and Z on the 1 button.
+func ttCall10Encoding() [10][4]rune {
+	return [10][4]rune{
+		/*	 0	 1	 2	 3  */
+		/*	---	---	---	--- */
+		/* 0 */ {'0', ' ', 0, 0},
+		/* 1 */ {'1', 'Q', 'Z', 0},
+		/* 2 */ {'2', 'A', 'B', 'C'},
+		/* 3 */ {'3', 'D', 'E', 'F'},
+		/* 4 */ {'4', 'G', 'H', 'I'},
+		/* 5 */ {'5', 'J', 'K', 'L'},
+		/* 6 */ {'6', 'M', 'N', 'O'},
+		/* 7 */ {'7', 'P', 'R', 'S'},
+		/* 8 */ {'8', 'T', 'U', 'V'},
+		/* 9 */ {'9', 'W', 'X', 'Y'}}
+}
 
 /*
  * Special satellite 4 digit gridsquares to cover "99.99% of the world's population."
  */
 
-var grid = [10][10]string{
-	{"AP", "BP", "AO", "BO", "CO", "DO", "EO", "FO", "GO", "OJ"}, // 0 - Canada
-	{"CN", "DN", "EN", "FN", "GN", "CM", "DM", "EM", "FM", "OI"}, // 1 - USA
-	{"DL", "EL", "FL", "DK", "EK", "FK", "EJ", "FJ", "GJ", "PI"}, // 2 - C. America
-	{"FI", "GI", "HI", "FH", "GH", "HH", "FG", "GG", "FF", "GF"}, // 3 - S. America
-	{"JP", "IO", "JO", "KO", "IN", "JN", "KN", "IM", "JM", "KM"}, // 4 - Europe
-	{"LO", "MO", "NO", "OO", "PO", "QO", "RO", "LN", "MN", "NN"}, // 5 - Russia
-	{"ON", "PN", "QN", "OM", "PM", "QM", "OL", "PL", "OK", "PK"}, // 6 - Japan, China
-	{"LM", "MM", "NM", "LL", "ML", "NL", "LK", "MK", "NK", "LJ"}, // 7 - India
-	{"PH", "QH", "OG", "PG", "QG", "OF", "PF", "QF", "RF", "RE"}, // 8 - Aus / NZ
-	{"IL", "IK", "IJ", "JJ", "JI", "JH", "JG", "KG", "JF", "KF"}} // 9 - Africa
+// ttSatsqGrid holds the gridsquares a satellite gridsquare's first two digits
+// stand for.
+func ttSatsqGrid() [10][10]string {
+	return [10][10]string{
+		{"AP", "BP", "AO", "BO", "CO", "DO", "EO", "FO", "GO", "OJ"}, // 0 - Canada
+		{"CN", "DN", "EN", "FN", "GN", "CM", "DM", "EM", "FM", "OI"}, // 1 - USA
+		{"DL", "EL", "FL", "DK", "EK", "FK", "EJ", "FJ", "GJ", "PI"}, // 2 - C. America
+		{"FI", "GI", "HI", "FH", "GH", "HH", "FG", "GG", "FF", "GF"}, // 3 - S. America
+		{"JP", "IO", "JO", "KO", "IN", "JN", "KN", "IM", "JM", "KM"}, // 4 - Europe
+		{"LO", "MO", "NO", "OO", "PO", "QO", "RO", "LN", "MN", "NN"}, // 5 - Russia
+		{"ON", "PN", "QN", "OM", "PM", "QM", "OL", "PL", "OK", "PK"}, // 6 - Japan, China
+		{"LM", "MM", "NM", "LL", "ML", "NL", "LK", "MK", "NK", "LJ"}, // 7 - India
+		{"PH", "QH", "OG", "PG", "QG", "OF", "PF", "QF", "RF", "RE"}, // 8 - Aus / NZ
+		{"IL", "IK", "IJ", "JJ", "JI", "JH", "JG", "KG", "JF", "KF"}} // 9 - Africa
+}
 
 /*------------------------------------------------------------------
  *
@@ -170,6 +181,8 @@ var grid = [10][10]string{
 
 // TTTextToMultipress converts text to the multi-press representation.
 func TTTextToMultipress(text string, quiet bool) (string, int) {
+	var translate = ttTranslate()
+
 	var buttons strings.Builder
 	var lastButton rune
 	var haveButtons bool
@@ -270,6 +283,8 @@ func TTTextToMultipress(text string, quiet bool) (string, int) {
 
 // TTTextToTwoKey converts text to the two-key representation.
 func TTTextToTwoKey(text string, quiet bool) (string, int) {
+	var translate = ttTranslate()
+
 	var buttons strings.Builder
 	var errors = 0
 
@@ -342,6 +357,8 @@ func TTTextToTwoKey(text string, quiet bool) (string, int) {
 // TODO:  need to test this.
 
 func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
+	var translate = ttTranslate()
+
 	var errors = 0
 
 	var buttons string
@@ -406,6 +423,8 @@ func tt_letter_to_two_digits(c rune, quiet bool) (string, int) {
 
 // TTTextToCall10 converts text to the 10 character callsign format.
 func TTTextToCall10(text string, quiet bool) (string, int) {
+	var call10encoding = ttCall10Encoding()
+
 	var errors = 0
 
 	/* Quick validity check. */
@@ -502,6 +521,8 @@ func TTTextToCall10(text string, quiet bool) (string, int) {
 
 // TTTextToSatsq converts a Special Satellite Gridsquare to the 4 digit DTMF representation.
 func TTTextToSatsq(text string, quiet bool) (string, int) {
+	var grid = ttSatsqGrid()
+
 	var errors = 0
 
 	/* Quick validity check. */
@@ -646,6 +667,8 @@ func tt_text_to_ascii2d(text string, quiet bool) (string, int) { //nolint:unpara
 
 // TTMultipressToText converts the multi-press representation to text.
 func TTMultipressToText(buttons string, quiet bool) (string, int) {
+	var translate = ttTranslate()
+
 	var text strings.Builder
 	var errors = 0
 
@@ -733,6 +756,8 @@ func TTMultipressToText(buttons string, quiet bool) (string, int) {
 
 // TTTwoKeyToText converts the two-key representation to text.
 func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
+	var translate = ttTranslate()
+
 	var errors = 0
 	var text strings.Builder
 
@@ -811,6 +836,8 @@ func TTTwoKeyToText(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
+	var translate = ttTranslate()
+
 	var text string
 	var errors = 0
 
@@ -874,6 +901,8 @@ func tt_two_digits_to_letter(buttons string, quiet bool) (string, int) {
 
 // TTCall10ToText converts the fixed length 10 digit callsign to text.
 func TTCall10ToText(buttons string, quiet bool) (string, int) {
+	var call10encoding = ttCall10Encoding()
+
 	var text strings.Builder
 	var errors = 0
 
@@ -958,6 +987,8 @@ func TTCall10ToText(buttons string, quiet bool) (string, int) {
  *----------------------------------------------------------------*/
 
 func tt_call5_suffix_to_text(buttons string, quiet bool) (string, int) {
+	var call10encoding = ttCall10Encoding()
+
 	var text strings.Builder
 	var errors = 0
 
@@ -1051,13 +1082,16 @@ type mhpairType struct {
 	max_ch   rune
 }
 
-var mhpair = [MAXMHPAIRS]mhpairType{
-	{"first", 'A', 'R'},
-	{"second", '0', '9'},
-	{"third", 'A', 'X'},
-	{"fourth", '0', '9'},
-	{"fifth", 'A', 'X'},
-	{"sixth", '0', '9'},
+// ttMheadPairs describes each character pair of a Maidenhead locator.
+func ttMheadPairs() [MAXMHPAIRS]mhpairType {
+	return [MAXMHPAIRS]mhpairType{
+		{"first", 'A', 'R'},
+		{"second", '0', '9'},
+		{"third", 'A', 'X'},
+		{"fourth", '0', '9'},
+		{"fifth", 'A', 'X'},
+		{"sixth", '0', '9'},
+	}
 }
 
 // TTMheadToText converts the DTMF representation to a Maidenhead Grid Square Locator.
@@ -1150,6 +1184,8 @@ func TTMheadToText(buttons string, quiet bool) (string, int) {
 
 // TTTextToMhead converts a normal text Maidenhead Grid Square Locator to the DTMF representation.
 func TTTextToMhead(text string, quiet bool) (string, int) {
+	var mhpair = ttMheadPairs()
+
 	var errors = 0
 	var buttons string
 
@@ -1234,6 +1270,8 @@ func TTTextToMhead(text string, quiet bool) (string, int) {
 
 // TTSatsqToText converts the DTMF representation to a satellite gridsquare.
 func TTSatsqToText(buttons string, quiet bool) (string, int) {
+	var grid = ttSatsqGrid()
+
 	var errors = 0
 
 	/* Validity check. */
