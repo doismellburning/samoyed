@@ -1449,7 +1449,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 	pttControl.Set(ot, channel, ptt_signal)
 }
 
-func get_input(it int, channel int) int { //nolint:unparam // ICTYPE_TXINH is the only input type there is so far, but the parameter is how Dire Wolf left room for another.
+func get_input(it int, channel int) int {
 	return pttControl.GetInput(it, channel)
 }
 
