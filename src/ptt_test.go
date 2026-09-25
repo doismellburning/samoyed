@@ -65,7 +65,7 @@ func setupGPIODChannel(t *testing.T, invert bool) (*PTT, *mockGPIODLine) {
 func usePTT(t *testing.T, cfg *audio_s) {
 	t.Helper()
 
-	var p, err = NewPTT(cfg)
+	var p, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 
 	var saved = pttControl
@@ -316,7 +316,7 @@ func TestPttInitGPIONoSysfs(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var _, err = NewPTT(cfg)
+	var _, err = NewPTT(cfg, 0)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -333,7 +333,7 @@ func TestPttInitGPIO(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var _, err = NewPTT(cfg)
+	var _, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
@@ -393,7 +393,7 @@ func TestPttInitSerialOpenFailure(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = filepath.Join(t.TempDir(), "no-such-tty")
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
-	var _, err = NewPTT(cfg)
+	var _, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 	assert.Equal(t, PTT_METHOD_NONE, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
 }
@@ -446,7 +446,7 @@ func TestPttInitGPIOThenSet(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p, err = NewPTT(cfg)
+	var p, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 	assert.Equal(t, "gpio25_ph11", cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_name,
 		"the node name found while exporting should be remembered")
@@ -476,7 +476,7 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num = 7
-	var p, err = NewPTT(cfg)
+	var p, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 	assert.Equal(t, "gpio7_pi13", cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name,
 		"the node name found while exporting should be remembered")
@@ -498,30 +498,21 @@ func TestPttNilBeforeStartup(t *testing.T) {
 
 // The debug level decides how much the PTT code says about what it is doing,
 // which is the only way to tell a miswired interface from a misconfigured one.
-func TestPttSetDebug(t *testing.T) {
-	var orig = ptt_debug_level
+func TestNewPTTDebug(t *testing.T) {
+	var p, err = NewPTT(new(audio_s), 2)
+	require.NoError(t, err)
 
-	t.Cleanup(func() { ptt_debug_level = orig })
-
-	ptt_set_debug(2)
-
-	assert.Equal(t, 2, ptt_debug_level)
+	assert.Equal(t, 2, p.debugLevel)
 }
 
-// "-dpp" prints every channel's PTT configuration at start up, and then each
+// "-doo" prints every channel's PTT configuration at start up, and then each
 // change to it.
 func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
-	var orig = ptt_debug_level
-
-	t.Cleanup(func() { ptt_debug_level = orig })
-
-	ptt_set_debug(2)
-
 	var cfg = new(audio_s)
 	cfg.chan_medium[0] = MEDIUM_RADIO
 
 	var output = CaptureOutput(t, func() {
-		var p, err = NewPTT(cfg)
+		var p, err = NewPTT(cfg, 2)
 		require.NoError(t, err)
 
 		p.Set(OCTYPE_PTT, 0, 1)
@@ -602,7 +593,7 @@ func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*PT
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = device
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = line
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line2 = line2
-	var p, err = NewPTT(cfg)
+	var p, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
@@ -737,7 +728,7 @@ func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 	cfg.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
 
-	var p, err = NewPTT(cfg)
+	var p, err = NewPTT(cfg, 0)
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
@@ -760,7 +751,7 @@ func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
 	var output = CaptureOutput(t, func() {
 		var err error
 
-		p, err = NewPTT(cfg)
+		p, err = NewPTT(cfg, 0)
 		require.NoError(t, err)
 	})
 
@@ -783,7 +774,7 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 	CaptureOutput(t, func() {
 		var err error
 
-		p, err = NewPTT(cfg)
+		p, err = NewPTT(cfg, 0)
 		require.NoError(t, err)
 	})
 

@@ -161,12 +161,6 @@ func DTR_OFF(fd uintptr) {
 
 const LPT_IO_ADDR = 0x378
 
-var ptt_debug_level = 0
-
-func ptt_set_debug(debug int) {
-	ptt_debug_level = debug
-}
-
 // octypeName is the name of an output control type, for messages.
 func octypeName(ot int) string {
 	switch ot {
@@ -195,6 +189,7 @@ type gpiodOutputLine interface {
 // connected indicator reach for it whether or not startup has got that far.
 type PTT struct {
 	audioConfig *audio_s
+	debugLevel  int
 
 	/* Serial port handle or fd.  */
 	/* Could be the same for two channels */
@@ -255,7 +250,7 @@ func (p *PTT) getAccessToGPIO(path string) error {
 		dw_printf("Getgroups() failed to get supplementary groups, err=%s\n", groupsErr)
 	}
 
-	if ptt_debug_level >= 2 {
+	if p.debugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		// TODO KG dw_printf("%s: uid=%d, gid=%d, mode=o%o\n", path, finfo.st_uid, finfo.st_gid, finfo.st_mode)
 		dw_printf("my uid=%d, gid=%d, supplementary groups=", my_uid, my_gid)
@@ -412,7 +407,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 	 * https://wiki.odroid.com/odroid-c4/hardware/expansion_connectors#gpio_map_for_wiringpi_library
 	 */
 
-	if ptt_debug_level >= 2 {
+	if p.debugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Contents of %s:\n", gpio_sysfs_dir)
 	}
@@ -429,7 +424,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 		gpio_name = fmt.Sprintf("gpio%d", gpio_num)
 		ok = true
 	} else {
-		if ptt_debug_level >= 2 {
+		if p.debugLevel >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
 
 			for _, entry := range dirEntries {
@@ -475,7 +470,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 		p.audioConfig.achan[ch].ictrl[ot].in_gpio_name = gpio_name
 	}
 
-	if ptt_debug_level >= 2 {
+	if p.debugLevel >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("Path for gpio number %d is %s/%s\n", gpio_num, gpio_sysfs_dir, gpio_name)
 	}
@@ -574,6 +569,9 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  *					>= 3 for specific radio model.
  *					-1 guess at what is out there.  (AUTO option in config file.)
  *
+ *		debug			- "-d o" level: 1 reports each change of an
+ *					  output, 2 also the configuration and GPIO detail.
+ *
  * Outputs:	A PTT that remembers what it needs for future use, or an error
  *		if the hardware could not be set up, in which case whatever had
  *		been set up before the failure has been released again.
@@ -582,9 +580,10 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  *
  *--------------------------------------------------------------------*/
 
-func NewPTT(audio_config_p *audio_s) (*PTT, error) {
+func NewPTT(audio_config_p *audio_s, debug int) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
+	p.debugLevel = debug
 
 	var err = p.init()
 	if err != nil {
@@ -618,7 +617,7 @@ func (p *PTT) setup() error {
 
 	for ch := range MAX_RADIO_CHANS {
 		for ot := range NUM_OCTYPES {
-			if ptt_debug_level >= 2 {
+			if p.debugLevel >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%t\n",
 					ch,
@@ -762,7 +761,7 @@ func (p *PTT) setup() error {
 
 					p.gpiodLine[ch][ot] = line
 
-					if ptt_debug_level >= 2 {
+					if p.debugLevel >= 2 {
 						text_color_set(DW_COLOR_DEBUG)
 						dw_printf("GPIOD init OK. Chip: %s line: %d\n", chip_name, line_number)
 					}
@@ -1073,7 +1072,7 @@ func (p *PTT) Set(ot int, channel int, ptt_signal int) {
 		return // NCHANNEL: no physical PTT hardware to drive
 	}
 
-	if ptt_debug_level >= 1 {
+	if p.debugLevel >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("%s %d = %d\n", octypeName(ot), channel, ptt_signal)
 	}
@@ -1197,7 +1196,7 @@ func (p *PTT) Set(ot int, channel int, ptt_signal int) {
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
 				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, octypeName(ot), err)
-			} else if ptt_debug_level >= 1 {
+			} else if p.debugLevel >= 1 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d\n",
 					p.audioConfig.achan[channel].octrl[ot].out_gpio_name,
@@ -1471,7 +1470,7 @@ func PTTTestMain() error {
 
 	/* initialize - both off */
 
-	var p, initErr = NewPTT(&my_audio_config)
+	var p, initErr = NewPTT(&my_audio_config, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1507,7 +1506,7 @@ func PTTTestMain() error {
 
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
-	p, initErr = NewPTT(&my_audio_config)
+	p, initErr = NewPTT(&my_audio_config, 0)
 	if initErr != nil {
 		return initErr
 	}
@@ -1548,7 +1547,7 @@ func PTTTestMain() error {
 
 	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
 
-	p, initErr = NewPTT(&my_audio_config)
+	p, initErr = NewPTT(&my_audio_config, 0)
 	if initErr != nil {
 		return initErr
 	}

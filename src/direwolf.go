@@ -242,7 +242,6 @@ x = Silence FX.25 information.`)
 				d_p_opt = true // TODO: packet dump for xmit side.
 			case 'o':
 				d_o_opt++
-				ptt_set_debug(d_o_opt)
 			case 'i':
 				d_i_opt++
 			case 'm':
@@ -509,7 +508,7 @@ x = Silence FX.25 information.`)
 
 	var pttErr error
 
-	pttControl, pttErr = NewPTT(audio_config)
+	pttControl, pttErr = NewPTT(audio_config, d_o_opt)
 	stopIfCancelled(ctx)
 
 	if pttErr != nil {
