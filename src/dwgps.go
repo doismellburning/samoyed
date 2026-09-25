@@ -86,7 +86,18 @@ var s_dwgps_debug = 0 /* Enable debug output. */
  * A critical region to avoid inconsistency between fields.
  */
 
-var s_dwgps_info = new(dwgps_info_t)
+var s_dwgps_info = newUninitialisedGPSInfo()
+
+// newUninitialisedGPSInfo is what dwgps_read reports before any GPS receiver
+// has been opened: a fix of DWFIX_NOT_INIT, which the reader goroutines
+// replace with DWFIX_NOT_SEEN once they are running.  One that stays is how a
+// caller tells that no GPS was configured, or that it couldn't be opened.
+func newUninitialisedGPSInfo() *dwgps_info_t {
+	var info = new(dwgps_info_t)
+	info.fix = DWFIX_NOT_INIT
+
+	return info
+}
 
 var s_gps_mutex sync.Mutex
 
@@ -116,7 +127,7 @@ var s_gps_mutex sync.Mutex
  *--------------------------------------------------------------------*/
 
 func dwgps_init(ctx context.Context, pconfig *misc_config_s, debug int) {
-	dwgps_set_data(new(dwgps_info_t)) // Init the global
+	dwgps_set_data(newUninitialisedGPSInfo()) // Init the global
 
 	s_dwgps_debug = debug
 

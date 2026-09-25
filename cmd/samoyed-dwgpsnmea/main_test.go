@@ -7,6 +7,7 @@ package main
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -81,4 +82,18 @@ func Test_run_reportsAFix(t *testing.T) {
 	assert.Equal(t, 0, status)
 	assert.Contains(t, out.String(), "42.618750  -71.347212")
 	assert.Contains(t, out.String(), "altitude = 33.5 meters")
+}
+
+func Test_run_withoutAReceiver(t *testing.T) {
+	var ctx, cancel = context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+
+	var missing = filepath.Join(t.TempDir(), "missing")
+
+	var out strings.Builder
+
+	var status = run(ctx, []string{missing}, &out)
+
+	assert.Equal(t, 1, status)
+	assert.Equal(t, "GPS Init failed.\n", out.String())
 }
