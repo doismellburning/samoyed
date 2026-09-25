@@ -177,6 +177,10 @@ func octypeName(ot int) string {
 // defaultGPIOSysfsDir is the root of the sysfs GPIO user interface.
 const defaultGPIOSysfsDir = "/sys/class/gpio"
 
+// defaultLPTPortPath is the device giving access to I/O ports, through which
+// the parallel printer port is reached.
+const defaultLPTPortPath = "/dev/port"
+
 // gpiodOutputLine is the subset of gpiocdev.Line used for PTT output control.
 // The interface exists to allow dependency injection in tests.
 type gpiodOutputLine interface {
@@ -197,6 +201,10 @@ type PTT struct {
 	// a test can point it at a fake tree and exercise the GPIO paths without
 	// a kernel that offers the real one.
 	gpioSysfsDir string
+
+	// lptPortPath is a field rather than always defaultLPTPortPath for the
+	// same reason: a test can stand an ordinary file in for the I/O ports.
+	lptPortPath string
 
 	/* Serial port handle or fd.  */
 	/* Could be the same for two channels */
@@ -272,6 +280,7 @@ func newPTT(audio_config_p *audio_s, debug int, gpioSysfsDir string) (*PTT, erro
 	p.audioConfig = audio_config_p
 	p.debugLevel = debug
 	p.gpioSysfsDir = gpioSysfsDir
+	p.lptPortPath = defaultLPTPortPath
 
 	var err = p.init()
 	if err != nil {
@@ -936,14 +945,14 @@ func (p *PTT) setup() error {
 					}
 
 					if !same_device_used {
-						fd, openErr = os.Open("/dev/port")
+						fd, openErr = os.OpenFile(p.lptPortPath, os.O_RDWR, 0)
 					}
 
-					if openErr != nil {
+					if openErr == nil {
 						p.fd[ch][ot] = fd
 					} else {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("ERROR - Can't open /dev/port for parallel printer port PTT control.\n")
+						dw_printf("ERROR - Can't open %s for parallel printer port PTT control.\n", p.lptPortPath)
 						dw_printf("%s\n", openErr)
 						dw_printf("You probably don't have adequate permissions to access I/O ports.\n")
 						dw_printf("Either run direwolf as root or change these permissions:\n")

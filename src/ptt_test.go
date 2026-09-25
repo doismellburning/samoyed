@@ -697,6 +697,63 @@ func TestPttTermClosesTheSerialPort(t *testing.T) {
 	assert.Nil(t, p.fd[0][OCTYPE_PTT], "the serial port was not closed")
 }
 
+// A parallel port PTT keys its bit of the port's data register, leaving the
+// others alone.  Regression test for the port never being used at all: setup
+// kept the handle only when opening it failed, and opened it read-only, so
+// the write that keys the bit could not have worked either.
+func TestPttLPTKeysItsBit(t *testing.T) {
+	var port = filepath.Join(t.TempDir(), "port")
+
+	var contents = make([]byte, LPT_IO_ADDR+1)
+	contents[LPT_IO_ADDR] = 0x01 // another channel's bit, already on
+	require.NoError(t, os.WriteFile(port, contents, 0o600))
+
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_LPT
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_lpt_bit = 3
+
+	var p = testPTT(cfg, t.TempDir())
+	p.lptPortPath = port
+
+	require.NoError(t, p.init())
+
+	t.Cleanup(p.Term)
+
+	require.NotNil(t, p.fd[0][OCTYPE_PTT], "the port was not kept")
+	assert.Equal(t, PTT_METHOD_LPT, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
+
+	var dataRegister = func() byte {
+		var b, err = os.ReadFile(port) //nolint:gosec
+		require.NoError(t, err)
+
+		return b[LPT_IO_ADDR]
+	}
+
+	p.Set(OCTYPE_PTT, 0, 1)
+	assert.Equal(t, byte(0x09), dataRegister(), "keying should set bit 3 and leave bit 0")
+
+	p.Set(OCTYPE_PTT, 0, 0)
+	assert.Equal(t, byte(0x01), dataRegister(), "unkeying should clear bit 3 and leave bit 0")
+}
+
+// A parallel port that cannot be opened is not fatal: the channel falls back
+// to no PTT method, as a serial port does, rather than keeping a nil handle.
+func TestPttLPTOpenFailure(t *testing.T) {
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_LPT
+
+	var p = testPTT(cfg, t.TempDir())
+	p.lptPortPath = filepath.Join(t.TempDir(), "no-such-port")
+
+	var output = CaptureOutput(t, func() { require.NoError(t, p.init()) })
+
+	assert.Contains(t, output, "Can't open")
+	assert.Equal(t, PTT_METHOD_NONE, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
+	assert.Nil(t, p.fd[0][OCTYPE_PTT])
+}
+
 // Two channels keying different lines of the same serial port share the one
 // open device: it cannot be opened twice.
 func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
