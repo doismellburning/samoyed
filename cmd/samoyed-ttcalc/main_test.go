@@ -72,16 +72,22 @@ func Test_connect_to_server(t *testing.T) {
 func sendMonitored(t *testing.T, conn net.Conn, channel byte, monitor string) {
 	t.Helper()
 
-	var frame = append([]byte{channel << 4}, direwolf.AX25Pack(direwolf.MustAX25FromText(monitor))...)
+	sendRaw(t, conn, channel, append([]byte{channel << 4}, direwolf.AX25Pack(direwolf.MustAX25FromText(monitor))...))
+}
+
+// sendRaw sends a TNC's report of hearing data, which ought to be a KISS
+// command byte followed by an AX.25 frame, on channel.
+func sendRaw(t *testing.T, conn net.Conn, channel byte, data []byte) {
+	t.Helper()
 
 	var header = new(direwolf.AGWPEHeader)
 	header.Portx = channel
 	header.DataKind = 'K'
-	header.DataLen = uint32(len(frame))
+	header.DataLen = uint32(len(data))
 
 	require.NoError(t, binary.Write(conn, binary.LittleEndian, header))
 
-	var _, err = conn.Write(frame)
+	var _, err = conn.Write(data)
 	require.NoError(t, err)
 }
 
@@ -109,6 +115,14 @@ func Test_main(t *testing.T) {
 	// Something other than touch tones is only printed.
 	sendMonitored(t, tnc, 1, "Q1TEST>APDW17:>Not for the calculator")
 	p.WaitFor(t, "[1] Q1TEST>APDW17:>Not for the calculator")
+
+	// What's heard off the air need not be AX.25, or anything at all, and
+	// is reported and skipped.
+	sendRaw(t, tnc, 1, []byte{0x10, 0x01, 0x02})
+	p.WaitFor(t, "[1] Invalid AX.25 frame from server.")
+
+	sendRaw(t, tnc, 1, nil)
+	p.WaitFor(t, "[1] Empty frame from server.")
 
 	// A touch tone sequence is worked out, and the answer sent back to be
 	// spoken on the channel it was heard on.
