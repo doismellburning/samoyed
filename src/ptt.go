@@ -535,7 +535,7 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
 
 /*-------------------------------------------------------------------
  *
- * Name:        ptt_init
+ * Name:        NewPTT
  *
  * Purpose:    	Open serial port(s) used for PTT signals and set to proper state.
  *
@@ -574,21 +574,24 @@ func (p *PTT) exportGPIO(ch int, ot int, invert bool, direction int) error {
  *					>= 3 for specific radio model.
  *					-1 guess at what is out there.  (AUTO option in config file.)
  *
- * Outputs:	pttControl, a PTT that remembers what it needs for future use,
- *		or an error if the hardware could not be set up, in which case
- *		whatever had been set up before the failure has been released again.
+ * Outputs:	A PTT that remembers what it needs for future use, or an error
+ *		if the hardware could not be set up, in which case whatever had
+ *		been set up before the failure has been released again.
  *
  * Description:
  *
  *--------------------------------------------------------------------*/
 
-func ptt_init(audio_config_p *audio_s) error {
+func NewPTT(audio_config_p *audio_s) (*PTT, error) {
 	var p = new(PTT)
 	p.audioConfig = audio_config_p
 
-	pttControl = p
+	var err = p.init()
+	if err != nil {
+		return nil, err
+	}
 
-	return p.init()
+	return p, nil
 }
 
 // init sets up the hardware, and on a failure releases whatever it had set up.
@@ -596,10 +599,10 @@ func (p *PTT) init() error {
 	var err = p.setup()
 	if err != nil {
 		// Setting up is incremental, so a failure can come after serial ports
-		// have been opened or GPIOD lines requested, and the caller has no
-		// handle on those.  Put them back before reporting, so a caller that
-		// carries on, or tries again, is not left with open descriptors and
-		// hardware nobody tracks.
+		// have been opened or GPIOD lines requested, and the caller never gets
+		// the PTT that holds them.  Put them back before reporting, so a
+		// caller that carries on, or tries again, is not left with open
+		// descriptors and hardware nobody tracks.
 		p.Term()
 
 		return err
@@ -1046,7 +1049,7 @@ func (p *PTT) setup() error {
  *		ptt_signal	- 1 for transmit, 0 for receive.
  *
  *
- * Assumption:	ptt_init was called first.
+ * Assumption:	The PTT came from NewPTT.
  *
  * Description:	Set the RTS or DTR line or GPIO pin.
  *		More positive output corresponds to 1 unless invert is set.
@@ -1483,7 +1486,7 @@ func PTTTestMain() error {
 
 	/* initialize - both off */
 
-	var initErr = ptt_init(&my_audio_config)
+	var p, initErr = NewPTT(&my_audio_config)
 	if initErr != nil {
 		return initErr
 	}
@@ -1497,9 +1500,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
@@ -1507,19 +1510,19 @@ func PTTTestMain() error {
 
 	channel = 1
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
-	ptt_term()
+	p.Term()
 
 	/* Same thing again but invert RTS. */
 
 	my_audio_config.achan[0].octrl[OCTYPE_PTT].ptt_invert = true
 
-	initErr = ptt_init(&my_audio_config)
+	p, initErr = NewPTT(&my_audio_config)
 	if initErr != nil {
 		return initErr
 	}
@@ -1530,9 +1533,9 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
@@ -1540,13 +1543,13 @@ func PTTTestMain() error {
 
 	channel = 1
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
-	ptt_term()
+	p.Term()
 
 	/* Test GPIO */
 
@@ -1560,7 +1563,7 @@ func PTTTestMain() error {
 
 	dw_printf("Try GPIO %d a few times...\n", my_audio_config.achan[0].octrl[OCTYPE_PTT].out_gpio_num)
 
-	initErr = ptt_init(&my_audio_config)
+	p, initErr = NewPTT(&my_audio_config)
 	if initErr != nil {
 		return initErr
 	}
@@ -1569,13 +1572,13 @@ func PTTTestMain() error {
 
 	channel = 0
 	for range 3 {
-		ptt_set(OCTYPE_PTT, channel, 1)
+		p.Set(OCTYPE_PTT, channel, 1)
 		SLEEP_SEC(1)
-		ptt_set(OCTYPE_PTT, channel, 0)
+		p.Set(OCTYPE_PTT, channel, 0)
 		SLEEP_SEC(1)
 	}
 
-	ptt_term()
+	p.Term()
 	// #endif
 
 	/* Parallel printer port. */

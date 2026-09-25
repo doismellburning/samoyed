@@ -60,18 +60,23 @@ func setupGPIODChannel(t *testing.T, invert bool) (*PTT, *mockGPIODLine) {
 	return p, mock
 }
 
-// initPTT runs ptt_init on cfg and returns the PTT it made, putting back the
-// one that was there before once the test is done.
-func initPTT(t *testing.T, cfg *audio_s) (*PTT, error) {
+// usePTT makes a PTT for cfg the one the rest of the package keys, for the
+// duration of the test.
+func usePTT(t *testing.T, cfg *audio_s) {
 	t.Helper()
+
+	var p, err = NewPTT(cfg)
+	require.NoError(t, err)
 
 	var saved = pttControl
 
-	t.Cleanup(func() { pttControl = saved })
+	pttControl = p
 
-	var err = ptt_init(cfg)
+	t.Cleanup(func() {
+		p.Term()
 
-	return pttControl, err
+		pttControl = saved
+	})
 }
 
 // TestPttSetRealGPIOD_Activate verifies that PTT-active drives the line high.
@@ -301,7 +306,7 @@ func TestExportGPIONoSysfs(t *testing.T) {
 	assert.Contains(t, err.Error(), "GPIO user interface")
 }
 
-// TestPttInitGPIONoSysfs verifies that ptt_init reports a GPIO channel it
+// TestPttInitGPIONoSysfs verifies that NewPTT reports a GPIO channel it
 // cannot set up, rather than ending the process, which is what made the
 // function untestable.
 func TestPttInitGPIONoSysfs(t *testing.T) {
@@ -311,7 +316,7 @@ func TestPttInitGPIONoSysfs(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var _, err = initPTT(t, cfg)
+	var _, err = NewPTT(cfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GPIO user interface")
@@ -328,7 +333,7 @@ func TestPttInitGPIO(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var _, err = initPTT(t, cfg)
+	var _, err = NewPTT(cfg)
 	require.NoError(t, err)
 
 	var direction, dirErr = os.ReadFile(filepath.Join(dir, "gpio25", "direction")) //nolint:gosec
@@ -388,7 +393,7 @@ func TestPttInitSerialOpenFailure(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_SERIAL
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = filepath.Join(t.TempDir(), "no-such-tty")
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
-	var _, err = initPTT(t, cfg)
+	var _, err = NewPTT(cfg)
 	require.NoError(t, err)
 	assert.Equal(t, PTT_METHOD_NONE, cfg.achan[0].octrl[OCTYPE_PTT].ptt_method)
 }
@@ -441,7 +446,7 @@ func TestPttInitGPIOThenSet(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_GPIO
 	cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_num = 25
-	var p, err = initPTT(t, cfg)
+	var p, err = NewPTT(cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "gpio25_ph11", cfg.achan[0].octrl[OCTYPE_PTT].out_gpio_name,
 		"the node name found while exporting should be remembered")
@@ -471,7 +476,7 @@ func TestPttInitGPIOInputThenGet(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].method = PTT_METHOD_GPIO
 	cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_num = 7
-	var p, err = initPTT(t, cfg)
+	var p, err = NewPTT(cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "gpio7_pi13", cfg.achan[0].ictrl[ICTYPE_TXINH].in_gpio_name,
 		"the node name found while exporting should be remembered")
@@ -516,7 +521,7 @@ func TestPttSetupDebugPrintsTheConfiguration(t *testing.T) {
 	cfg.chan_medium[0] = MEDIUM_RADIO
 
 	var output = CaptureOutput(t, func() {
-		var p, err = initPTT(t, cfg)
+		var p, err = NewPTT(cfg)
 		require.NoError(t, err)
 
 		p.Set(OCTYPE_PTT, 0, 1)
@@ -597,14 +602,14 @@ func openTestPTTSerialPort(t *testing.T, line ptt_line_t, line2 ptt_line_t) (*PT
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_device = device
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = line
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line2 = line2
-	var p, err = initPTT(t, cfg)
+	var p, err = NewPTT(cfg)
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
 
 	require.NotNil(t, p.fd[0][OCTYPE_PTT], "the serial port was not opened")
 
-	// After ptt_init, which sets the initial state off and would otherwise
+	// After NewPTT, which sets the initial state off and would otherwise
 	// show up as a change the test did not ask for.
 	return p, cfg, captureSerialControlLines(t)
 }
@@ -732,7 +737,7 @@ func TestPttSetupSharesOneSerialPortBetweenChannels(t *testing.T) {
 	cfg.achan[0].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_RTS
 	cfg.achan[1].octrl[OCTYPE_PTT].ptt_line = PTT_LINE_DTR
 
-	var p, err = initPTT(t, cfg)
+	var p, err = NewPTT(cfg)
 	require.NoError(t, err)
 
 	t.Cleanup(p.Term)
@@ -755,7 +760,7 @@ func TestPttSetupTranslatesCOMPortNames(t *testing.T) {
 	var output = CaptureOutput(t, func() {
 		var err error
 
-		p, err = initPTT(t, cfg)
+		p, err = NewPTT(cfg)
 		require.NoError(t, err)
 	})
 
@@ -778,7 +783,7 @@ func TestPttSetupTranslatesCOM0(t *testing.T) {
 	CaptureOutput(t, func() {
 		var err error
 
-		p, err = initPTT(t, cfg)
+		p, err = NewPTT(cfg)
 		require.NoError(t, err)
 	})
 

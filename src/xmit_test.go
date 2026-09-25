@@ -307,7 +307,7 @@ func setupXmitTransmission(t *testing.T) *XmitService {
 	audioConfig.achan[channel].space_freq = 2200
 	audioConfig.achan[channel].octrl[OCTYPE_PTT].ptt_method = PTT_METHOD_NONE
 
-	require.NoError(t, ptt_init(audioConfig))
+	usePTT(t, audioConfig)
 
 	transmitQueue.Init(audioConfig)
 	dataLinkQueue.Init()

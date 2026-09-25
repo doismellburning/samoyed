@@ -353,7 +353,7 @@ type achan_param_s struct {
 		/* originally, gpio number NN was assumed to simply */
 		/* have the name gpioNN but this turned out not to be */
 		/* the case for CubieBoard where it was longer. */
-		/* This is filled in by ptt_init so we don't have to */
+		/* This is filled in by NewPTT so we don't have to */
 		/* recalculate it each time we access it. */
 		/* Also GPIO chip name for GPIOD method. Looks like 'gpiochip4' */
 
@@ -383,7 +383,7 @@ type achan_param_s struct {
 		/* originally, gpio number NN was assumed to simply */
 		/* have the name gpioNN but this turned out not to be */
 		/* the case for CubieBoard where it was longer. */
-		/* This is filled in by ptt_init so we don't have to */
+		/* This is filled in by NewPTT so we don't have to */
 		/* recalculate it each time we access it. */
 
 		invert bool /* true = active low */
