@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/doismellburning/samoyed/internal/testutils"
 	direwolf "github.com/doismellburning/samoyed/src"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -358,4 +359,65 @@ func Test_HexEmpty(t *testing.T) {
 
 	assert.Equal(t, 1, problems)
 	assert.Contains(t, output, "no hexadecimal digits")
+}
+
+// Test_XKISS covers polling; data is the other XKISS command.
+func Test_XKISSData(t *testing.T) {
+	var output, problems = dumpCaptureOutput(t, []byte{direwolf.FEND, direwolf.XKISS_CMD_DATA, direwolf.FEND}, false)
+
+	assert.Equal(t, 1, problems)
+	assert.Contains(t, output, "Command 12 (XKISS data) is an XKISS extension, which is not supported.")
+}
+
+func TestMain(m *testing.M) {
+	testutils.RunMainIfAsked(main)
+
+	os.Exit(m.Run())
+}
+
+func Test_main(t *testing.T) {
+	var capture = testCapture(t, "Q1TEST>APDW17:>Testing")
+
+	t.Run("raw", func(t *testing.T) {
+		var result = testutils.RunMain(t, string(capture))
+		var out, status = result.Output(), result.Status
+
+		assert.Equal(t, 0, status)
+		assert.Contains(t, out, "Q1TEST>APDW17:")
+		assert.Contains(t, out, "Status Report")
+		assert.Contains(t, out, "1 frame, 0 problems.")
+	})
+
+	t.Run("hex", func(t *testing.T) {
+		var result = testutils.RunMain(t, fmt.Sprintf("% x\n", capture), "--hex")
+		var out, status = result.Output(), result.Status
+
+		assert.Equal(t, 0, status)
+		assert.Contains(t, out, "Q1TEST>APDW17:")
+		assert.Contains(t, out, "1 frame, 0 problems.")
+	})
+
+	t.Run("problems", func(t *testing.T) {
+		var result = testutils.RunMain(t, string(direwolf.KissEncapsulate([]byte{0x07})))
+		var out, status = result.Output(), result.Status
+
+		assert.Equal(t, 1, status)
+		assert.Contains(t, out, "1 problem.")
+	})
+
+	t.Run("unexpected argument", func(t *testing.T) {
+		var result = testutils.RunMain(t, "", "capture.bin")
+		var out, status = result.Output(), result.Status
+
+		assert.Equal(t, 1, status)
+		assert.Contains(t, out, `Unexpected argument "capture.bin" - the capture is read from stdin.`)
+	})
+
+	t.Run("help", func(t *testing.T) {
+		var result = testutils.RunMain(t, "", "--help")
+		var out, status = result.Output(), result.Status
+
+		assert.Equal(t, 0, status)
+		assert.Contains(t, out, "decodes a captured KISS byte stream")
+	})
 }
