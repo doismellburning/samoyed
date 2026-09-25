@@ -81,7 +81,7 @@ func (s *HDLCSender) SendFrame(pp *packet_t, badFCS bool) int {
 	} else if achan.layer2_xmit == LAYER2_FX25 {
 		var fbuf = AX25Pack(pp)
 
-		var n = FX25SendFrame(s.channel, fbuf, achan.fx25_strength)
+		var n = s.sendFX25Frame(fbuf, achan.fx25_strength)
 		if n > 0 {
 			return n
 		}
