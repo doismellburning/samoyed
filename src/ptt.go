@@ -169,6 +169,20 @@ func ptt_set_debug(debug int) {
 	ptt_debug_level = debug
 }
 
+// octypeName is the name of an output control type, for messages.
+func octypeName(ot int) string {
+	switch ot {
+	case OCTYPE_PTT:
+		return "PTT"
+	case OCTYPE_DCD:
+		return "DCD"
+	case OCTYPE_CON:
+		return "CON"
+	default:
+		return fmt.Sprintf("octype %d", ot)
+	}
+}
+
 /*-------------------------------------------------------------------
  *
  * Name:	get_access_to_gpio
@@ -559,8 +573,6 @@ type gpiodOutputLine interface {
 /* GPIOD line handles, one per channel/output-type combination. */
 var gpiod_line [MAX_RADIO_CHANS][NUM_OCTYPES]gpiodOutputLine
 
-var otnames [NUM_OCTYPES]string
-
 func ptt_init(audio_config_p *audio_s) error {
 	var err = ptt_setup(audio_config_p)
 	if err != nil {
@@ -582,17 +594,13 @@ func ptt_init(audio_config_p *audio_s) error {
 func ptt_setup(audio_config_p *audio_s) error {
 	save_audio_config_p = audio_config_p
 
-	otnames[OCTYPE_PTT] = "PTT"
-	otnames[OCTYPE_DCD] = "DCD"
-	otnames[OCTYPE_CON] = "CON"
-
 	for ch := range MAX_RADIO_CHANS {
 		for ot := range NUM_OCTYPES {
 			if ptt_debug_level >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("ch=%d, %s method=%d, device=%s, line=%d, name=%s, gpio=%d, lpt_bit=%d, invert=%t\n",
 					ch,
-					otnames[ot],
+					octypeName(ot),
 					audio_config_p.achan[ch].octrl[ot].ptt_method,
 					audio_config_p.achan[ch].octrl[ot].ptt_device,
 					audio_config_p.achan[ch].octrl[ot].ptt_line,
@@ -621,7 +629,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 						var n, _ = strconv.Atoi(audio_config_p.achan[ch].octrl[ot].ptt_device[3:])
 
 						text_color_set(DW_COLOR_INFO)
-						dw_printf("Converted %s device '%s'", audio_config_p.achan[ch].octrl[ot].ptt_device, otnames[ot])
+						dw_printf("Converted %s device '%s'", audio_config_p.achan[ch].octrl[ot].ptt_device, octypeName(ot))
 
 						if n < 1 {
 							n = 1
@@ -727,7 +735,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 					var line, lineErr = RequestGPIODLine(chip_name, line_number, initialState)
 					if lineErr != nil {
 						return fmt.Errorf("can't request GPIOD line %d on %s for channel %d %s: %w",
-							line_number, chip_name, ch, otnames[ot], lineErr)
+							line_number, chip_name, ch, octypeName(ot), lineErr)
 					}
 
 					gpiod_line[ch][ot] = line
@@ -754,7 +762,7 @@ func ptt_setup(audio_config_p *audio_s) error {
 				if audio_config_p.achan[ch].octrl[ot].ptt_method == PTT_METHOD_GPIO {
 					var exportErr = export_gpio(ch, ot, audio_config_p.achan[ch].octrl[ot].ptt_invert, 1)
 					if exportErr != nil {
-						return fmt.Errorf("channel %d %s: %w", ch, otnames[ot], exportErr)
+						return fmt.Errorf("channel %d %s: %w", ch, octypeName(ot), exportErr)
 					}
 				}
 			}
@@ -946,11 +954,11 @@ func ptt_setup(audio_config_p *audio_s) error {
 						device,
 						audio_config_p.achan[ch].octrl[ot].out_gpio_num,
 						ch,
-						otnames[ot])
+						octypeName(ot))
 
 					if device == "" {
 						text_color_set(DW_COLOR_ERROR)
-						dw_printf("Warning: No CM108 HID found for channel %d %s.  Specify one in the config file.\n", ch, otnames[ot])
+						dw_printf("Warning: No CM108 HID found for channel %d %s.  Specify one in the config file.\n", ch, octypeName(ot))
 
 						continue
 					}
@@ -1041,14 +1049,14 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 
 	if ptt_debug_level >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dw_printf("%s %d = %d\n", otnames[ot], channel, ptt_signal)
+		dw_printf("%s %d = %d\n", octypeName(ot), channel, ptt_signal)
 	}
 
 	Assert(channel >= 0 && channel < MAX_TOTAL_CHANS)
 
 	if save_audio_config_p.chan_medium[channel] != MEDIUM_RADIO {
 		text_color_set(DW_COLOR_ERROR)
-		dw_printf("Internal error, ptt_set ( %s, %d, %d ), did not expect invalid channel.\n", otnames[ot], channel, ptt)
+		dw_printf("Internal error, ptt_set ( %s, %d, %d ), did not expect invalid channel.\n", octypeName(ot), channel, ptt)
 
 		return
 	}
@@ -1140,7 +1148,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 		var fd, err = os.OpenFile(gpio_value_path, os.O_WRONLY, 0) //nolint:gosec
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, otnames[ot])
+			dw_printf("Error opening %s to set %s signal.\n", gpio_value_path, octypeName(ot))
 			dw_printf("%s\n", err)
 
 			return
@@ -1152,7 +1160,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 		var _, writeErr = fd.WriteString(stemp)
 		if writeErr != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error setting GPIO %d for %s\n", save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, otnames[ot])
+			dw_printf("Error setting GPIO %d for %s\n", save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, octypeName(ot))
 			dw_printf("%s\n", writeErr)
 		}
 	}
@@ -1162,7 +1170,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 			var err = gpiod_line[channel][ot].SetValue(ptt)
 			if err != nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, otnames[ot], err)
+				dw_printf("Error setting GPIOD for channel %d %s: %v\n", channel, octypeName(ot), err)
 			} else if ptt_debug_level >= 1 {
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("PTT_METHOD_GPIOD chip: %s line: %d ptt: %d\n",
@@ -1185,7 +1193,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 
 		if readErr != nil || n != 1 {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error reading current state of LPT for channel %d %s\n", channel, otnames[ot])
+			dw_printf("Error reading current state of LPT for channel %d %s\n", channel, octypeName(ot))
 			dw_printf("%s\n", readErr)
 		}
 
@@ -1200,7 +1208,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 		var _, writeErr = ptt_fd[channel][ot].Write(lpt_data)
 		if writeErr != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Error writing to LPT for channel %d %s\n", channel, otnames[ot])
+			dw_printf("Error writing to LPT for channel %d %s\n", channel, octypeName(ot))
 			dw_printf("%s\n", writeErr)
 		}
 	}
@@ -1219,12 +1227,12 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 			var retcode = rig[channel][ot].SetPtt(goHamlib.VFOCurrent, onoff)
 			if retcode != nil {
 				text_color_set(DW_COLOR_ERROR)
-				dw_printf("Hamlib error: SetPtt command for channel %d %s\n", channel, otnames[ot])
+				dw_printf("Hamlib error: SetPtt command for channel %d %s\n", channel, octypeName(ot))
 				dw_printf("%s\n", retcode)
 			}
 		} else {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("Hamlib: Can't use SetPtt for channel %d %s because rig open failed.\n", channel, otnames[ot])
+			dw_printf("Hamlib: Can't use SetPtt for channel %d %s because rig open failed.\n", channel, octypeName(ot))
 		}
 	}
 
@@ -1237,7 +1245,7 @@ func ptt_set(ot int, channel int, ptt_signal int) {
 			save_audio_config_p.achan[channel].octrl[ot].out_gpio_num, ptt)
 		if err != nil {
 			text_color_set(DW_COLOR_ERROR)
-			dw_printf("ERROR:  %s for channel %d has failed: %v\n", otnames[ot], channel, err)
+			dw_printf("ERROR:  %s for channel %d has failed: %v\n", octypeName(ot), channel, err)
 			dw_printf("See User Guide for troubleshooting tips.\n")
 		}
 	}
