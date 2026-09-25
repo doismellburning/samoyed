@@ -342,7 +342,7 @@ func agwlib_X_register_callsign(channel byte, call_from Callsign) error {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_x_unregister_callsign(channel byte, call_from Callsign) error { //nolint:unused
+func agwlib_x_unregister_callsign(channel byte, call_from Callsign) error {
 	var h = new(AGWPEHeader)
 
 	h.Portx = channel
@@ -387,7 +387,7 @@ func agwlib_G_ask_port_information() error {
  *
  *--------------------------------------------------------------------*/
 
-func agwlib_C_connect(channel byte, call_from Callsign, call_to Callsign) error { //nolint:unused
+func agwlib_C_connect(channel byte, call_from Callsign, call_to Callsign) error {
 	var h = new(AGWPEHeader)
 
 	h.Portx = channel
