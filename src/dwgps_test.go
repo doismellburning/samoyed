@@ -30,9 +30,7 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 			var gps = NewGPS(context.Background(), config, 0)
 
-			var info GPSInfo
-
-			assert.Equal(t, DWFIX_NOT_INIT, gps.Read(&info))
+			assert.Equal(t, DWFIX_NOT_INIT, gps.Read().Fix)
 		})
 	}
 }
@@ -42,12 +40,10 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
 	var gps *GPS
 
-	var info GPSInfo
-	info.Lat = maybe.Just(1.0)
+	var info = gps.Read()
 
-	assert.Equal(t, DWFIX_NOT_INIT, gps.Read(&info))
 	assert.Equal(t, DWFIX_NOT_INIT, info.Fix)
-	assert.True(t, info.Lat.IsNothing(), "a stale position leaked through a nil GPS")
+	assert.True(t, info.Lat.IsNothing(), "a nil GPS reported a position")
 
 	gps.Term()
 }
@@ -64,10 +60,7 @@ func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 
 	gps.setData(report)
 
-	var info GPSInfo
-
-	assert.Equal(t, DWFIX_3D, gps.Read(&info))
-	assert.Equal(t, *report, info)
+	assert.Equal(t, *report, gps.Read())
 }
 
 // The reader goroutines set while beacons read; run under -race.
@@ -89,9 +82,7 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 
 	wg.Go(func() {
 		for range 1000 {
-			var info GPSInfo
-
-			gps.Read(&info)
+			var info = gps.Read()
 
 			// The two halves of one report always arrive together.
 			assert.Equal(t, info.Lat, info.Lon)

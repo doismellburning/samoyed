@@ -231,19 +231,17 @@ func TestGPSTermLeavesAnotherGPSsGpsdConnectionAlone(t *testing.T) {
 
 	// Let gps1's reader finish reporting its lost connection before carrying
 	// on, so it isn't still printing once the test is over.
-	require.Eventually(t, func() bool { return gps1.Read(new(GPSInfo)) == DWFIX_ERROR },
+	require.Eventually(t, func() bool { return gps1.Read().Fix == DWFIX_ERROR },
 		5*time.Second, 10*time.Millisecond, "gps1's reader never noticed it had been shut down")
 
 	var _, writeErr = server2.Write([]byte(`{"class":"TPV","mode":3,"lat":42.6,"lon":-71.3,"altMSL":33.5}` + "\n"))
 	require.NoError(t, writeErr)
 
-	var info = new(GPSInfo)
-
 	var fix GPSFix
 
 	var deadline = time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		fix = gps2.Read(info)
+		fix = gps2.Read().Fix
 		if fix == DWFIX_3D || fix == DWFIX_ERROR {
 			break
 		}

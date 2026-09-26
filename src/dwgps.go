@@ -134,43 +134,32 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 	return g
 } /* end NewGPS */
 
-/*-------------------------------------------------------------------
- *
- * Name:        Read
- *
- * Purpose:     Return most recent location data available.
- *
- * Outputs:	gpsinfo		- Structure with latitude, longitude, etc.
- *
- * Returns:	Position fix quality.  Same as in structure.
- *
- *
- *--------------------------------------------------------------------*/
+// Read returns the most recent location data available.  Its Fix says how
+// far the rest of it can be trusted.
+func (g *GPS) Read() GPSInfo {
+	var gpsinfo GPSInfo
 
-func (g *GPS) Read(gpsinfo *GPSInfo) GPSFix {
 	if g == nil {
-		var none GPSInfo
-		none.Fix = DWFIX_NOT_INIT
-		*gpsinfo = none
+		gpsinfo.Fix = DWFIX_NOT_INIT
 
-		return gpsinfo.Fix
+		return gpsinfo
 	}
 
 	g.mu.Lock()
 
-	*gpsinfo = g.info
+	gpsinfo = g.info
 
 	g.mu.Unlock()
 
 	if g.debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("gps_read: ", gpsinfo)
+		dwgps_print("gps_read: ", &gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
 	// or should we leave that up to the caller?
 
-	return (gpsinfo.Fix)
+	return gpsinfo
 }
 
 /*-------------------------------------------------------------------

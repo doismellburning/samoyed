@@ -122,9 +122,7 @@ func NewBeaconService(pmodem *audio_s, pconfig *misc_config_s, pigate *igate_con
 
 				case BEACON_TRACKER:
 					{
-						var gpsinfo GPSInfo
-
-						var fix = bs.gps.Read(&gpsinfo)
+						var fix = bs.gps.Read().Fix
 						if fix == DWFIX_NOT_INIT {
 							text_color_set(DW_COLOR_ERROR)
 							dw_printf("Config file, line %d: GPS must be configured to use TBEACON.\n", bs.miscConfig.beacon[j].lineno)
@@ -388,7 +386,8 @@ func (bs *BeaconService) thread(ctx context.Context) {
 		var gpsinfo GPSInfo
 
 		if number_of_tbeacons > 0 {
-			var fix = bs.gps.Read(&gpsinfo)
+			gpsinfo = bs.gps.Read()
+			var fix = gpsinfo.Fix
 			var my_speed_mph = maybe.Fmap(DW_KNOTS_TO_MPH, gpsinfo.SpeedKnots)
 
 			if bs.trackerDebugLevel >= 1 {
