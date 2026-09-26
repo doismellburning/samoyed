@@ -398,7 +398,7 @@ type GPRMCResult struct {
 	Lon    maybe.Maybe[float64]
 	Knots  maybe.Maybe[float64]
 	Course maybe.Maybe[float64]
-	Fix    dwfix_t
+	Fix    GPSFix
 }
 
 func dwgpsnmea_gprmc(sentence string, quiet bool) *GPRMCResult {
@@ -573,7 +573,7 @@ type GPGGAResult struct {
 	Lon maybe.Maybe[float64]
 	Alt maybe.Maybe[float64]
 	Sat maybe.Maybe[int]
-	Fix dwfix_t
+	Fix GPSFix
 }
 
 func dwgpsnmea_gpgga(sentence string, quiet bool) *GPGGAResult {

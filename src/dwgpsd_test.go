@@ -239,7 +239,7 @@ func TestGPSTermLeavesAnotherGPSsGpsdConnectionAlone(t *testing.T) {
 
 	var info = new(dwgps_info_t)
 
-	var fix dwfix_t
+	var fix GPSFix
 
 	var deadline = time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {

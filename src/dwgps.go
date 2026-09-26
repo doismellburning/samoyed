@@ -50,15 +50,16 @@ import (
  *
  */
 
-type dwfix_t int
+// GPSFix is how good a position dwgps_info_t holds: one of the DWFIX_* values.
+type GPSFix int
 
 const (
-	DWFIX_NOT_INIT dwfix_t = -2
-	DWFIX_ERROR    dwfix_t = -1
-	DWFIX_NOT_SEEN dwfix_t = 0
-	DWFIX_NO_FIX   dwfix_t = 1
-	DWFIX_2D       dwfix_t = 2
-	DWFIX_3D       dwfix_t = 3
+	DWFIX_NOT_INIT GPSFix = -2
+	DWFIX_ERROR    GPSFix = -1
+	DWFIX_NOT_SEEN GPSFix = 0
+	DWFIX_NO_FIX   GPSFix = 1
+	DWFIX_2D       GPSFix = 2
+	DWFIX_3D       GPSFix = 3
 )
 
 // dwgps_info_t is the most recent position report from a GPS receiver.  Its
@@ -66,7 +67,7 @@ const (
 // clearing.
 type dwgps_info_t struct {
 	timestamp   time.Time            /* When last updated.  System time. */
-	fix         dwfix_t              /* Quality of position fix. */
+	fix         GPSFix               /* Quality of position fix. */
 	dlat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
 	dlon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
 	speed_knots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
@@ -146,7 +147,7 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
  *
  *--------------------------------------------------------------------*/
 
-func (g *GPS) Read(gpsinfo *dwgps_info_t) dwfix_t {
+func (g *GPS) Read(gpsinfo *dwgps_info_t) GPSFix {
 	if g == nil {
 		var none dwgps_info_t
 		none.fix = DWFIX_NOT_INIT

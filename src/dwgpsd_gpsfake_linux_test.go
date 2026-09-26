@@ -100,7 +100,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	var info = new(dwgps_info_t)
 
-	var fix dwfix_t
+	var fix GPSFix
 
 	// gpsd emits several TPV reports per cycle as each NMEA sentence arrives:
 	// a 2D-only one from $GPRMC, then a 3D one still without altitude, then

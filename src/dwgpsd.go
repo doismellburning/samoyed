@@ -299,7 +299,7 @@ func parse_gpsd_tpv(line []byte) (*gpsdTPV, error) {
 }
 
 func apply_gpsd_tpv(info *dwgps_info_t, report *gpsdTPV) {
-	var newFix dwfix_t
+	var newFix GPSFix
 
 	switch {
 	case report.Mode >= 3:
