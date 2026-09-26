@@ -67,21 +67,31 @@ const MY_RAND_MAX = 0x7fffffff
 
 var modem audio_s
 var g_morse_wpm = 0 /* Send morse code at this speed. */
-var g_add_noise = false
-var g_noise_level float64 = 0
-
-var genPacketsRandSeed int32 = 1
-
+// genPacketsPRNG is the pseudo-random number generator from Dire Wolf's
+// gen_packets.c, which both the quiet time between frames and the noise added
+// to the samples draw from, in turn.
+//
 // Although the tests in `test-scripts` all call `atest` with an acceptable *range* of packets, the only way I could get
 // them all to pass was by reimplementing this exact PRNG from Dire Wolf's gen_packets.c - all my attempts to use Go's
 // `math/rand` resulted in decodes that would fall outside of the acceptable range. It's far from impossible that I
 // somehow screwed up my use of `math/rand`, but I think it more likely that the tests depend on this exact PRNG
 // implementation, which I should address at some point. /KG
 // Yep, if seed is 1, tests pass; if seed is 2, test96f64 decodes 68 not 71+; if seed is 3 then test96f16 decodes 62 not 63+ /KG
-func genPacketsRand() int32 {
-	genPacketsRandSeed = int32((uint32(genPacketsRandSeed)*1103515245 + 12345) & MY_RAND_MAX)
+type genPacketsPRNG struct {
+	seed int32
+}
 
-	return genPacketsRandSeed
+func newGenPacketsPRNG() *genPacketsPRNG {
+	var r = new(genPacketsPRNG)
+	r.seed = 1
+
+	return r
+}
+
+func (r *genPacketsPRNG) next() int32 {
+	r.seed = int32((uint32(r.seed)*1103515245 + 12345) & MY_RAND_MAX)
+
+	return r.seed
 }
 
 func GenPacketsMain() {
@@ -91,6 +101,7 @@ func GenPacketsMain() {
 	 * Set up other default values.
 	 */
 	var packet_count = 0
+	var addNoise = false
 
 	var modemFlags = addGenPacketsModemFlags(pflag.CommandLine)
 	var noisyPacketCount = pflag.IntP("noisy-packet-count", "n", 0, "Generate specified number of frames with increasing noise.")
@@ -163,10 +174,10 @@ func GenPacketsMain() {
 		os.Exit(1)
 	} else if *noisyPacketCount > 0 {
 		packet_count = *noisyPacketCount
-		g_add_noise = true
+		addNoise = true
 	} else if *packetCount > 0 {
 		packet_count = *packetCount
-		g_add_noise = false
+		addNoise = false
 	}
 
 	if *audioSampleRate != DEFAULT_SAMPLES_PER_SEC {
@@ -272,6 +283,10 @@ func GenPacketsMain() {
 		os.Exit(1)
 	}
 
+	var rand = newGenPacketsPRNG()
+	sink.addNoise = addNoise
+	sink.rand = rand
+
 	gen_tone_init(&modem, *amplitude/2, sink)
 
 	// The IL2P encoder reads the channel's version and CRC setting from here.
@@ -330,7 +345,7 @@ func GenPacketsMain() {
 
 			text_color_set(DW_COLOR_REC)
 			fmt.Printf("%s", str)
-			send_packet(hdlcSenders, str)
+			send_packet(hdlcSenders, rand, str)
 		}
 
 		audio_file_close(sink)
@@ -361,7 +376,7 @@ func GenPacketsMain() {
 			gen_tone_init(&modem, *amplitude/2, sink)
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:, speed %+0.1f%%  The quick brown fox jumps over the lazy dog!", speed_error)
-			send_packet(hdlcSenders, stemp)
+			send_packet(hdlcSenders, rand, stemp)
 		}
 	} else if packet_count > 0 {
 		/*
@@ -372,41 +387,41 @@ func GenPacketsMain() {
 		for i := 1; i <= packet_count; i++ {
 			if modem.achan[0].baud < 600 {
 				/* e.g. 300 bps AFSK - About 2/3 should be decoded properly. */
-				g_noise_level = float64(*amplitude) * .0048 * (float64(i) / float64(packet_count))
+				sink.noiseLevel = float64(*amplitude) * .0048 * (float64(i) / float64(packet_count))
 			} else if modem.achan[0].baud < 1800 {
 				/* e.g. 1200 bps AFSK - About 2/3 should be decoded properly. */
-				g_noise_level = float64(*amplitude) * .0023 * (float64(i) / float64(packet_count))
+				sink.noiseLevel = float64(*amplitude) * .0023 * (float64(i) / float64(packet_count))
 			} else if modem.achan[0].baud < 3600 {
 				/* e.g. 2400 bps QPSK - T.B.D. */
-				g_noise_level = float64(*amplitude) * .0015 * (float64(i) / float64(packet_count))
+				sink.noiseLevel = float64(*amplitude) * .0015 * (float64(i) / float64(packet_count))
 			} else if modem.achan[0].baud < 7200 {
 				/* e.g. 4800 bps - T.B.D. */
-				g_noise_level = float64(*amplitude) * .0007 * (float64(i) / float64(packet_count))
+				sink.noiseLevel = float64(*amplitude) * .0007 * (float64(i) / float64(packet_count))
 			} else {
 				/* e.g. 9600 */
-				g_noise_level = 0.33 * (float64(*amplitude) / 200.0) * (float64(i) / float64(packet_count))
+				sink.noiseLevel = 0.33 * (float64(*amplitude) / 200.0) * (float64(i) / float64(packet_count))
 				// temp test
-				// g_noise_level = 0.20 * (amplitude / 200.0) * (float64(i) / float64(packet_count));
+				// sink.noiseLevel = 0.20 * (amplitude / 200.0) * (float64(i) / float64(packet_count));
 			}
 
 			var stemp = fmt.Sprintf("WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  %04d of %04d", i, packet_count)
-			send_packet(hdlcSenders, stemp)
+			send_packet(hdlcSenders, rand, stemp)
 		}
 	} else {
 		// This should send a total of 6.
 		// Note that sticking in the user defined type {DE is optional.
 		if modem.achan[0].modem_type == MODEM_EAS {
-			send_packet(hdlcSenders, "X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
-			send_packet(hdlcSenders, "X>X-2:{DENNNN")
-			send_packet(hdlcSenders, "X>X:NNNN")
+			send_packet(hdlcSenders, rand, "X>X-3:{DEZCZC-WXR-RWT-033019-033017-033015-033013-033011-025011-025017-033007-033005-033003-033001-025009-025027-033009+0015-1691525-KGYX/NWS-")
+			send_packet(hdlcSenders, rand, "X>X-2:{DENNNN")
+			send_packet(hdlcSenders, rand, "X>X:NNNN")
 		} else {
 			/*
 			 * Builtin default 4 packets.
 			 */
-			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  1 of 4")
-			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  2 of 4")
-			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  3 of 4")
-			send_packet(hdlcSenders, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  4 of 4")
+			send_packet(hdlcSenders, rand, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  1 of 4")
+			send_packet(hdlcSenders, rand, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  2 of 4")
+			send_packet(hdlcSenders, rand, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  3 of 4")
+			send_packet(hdlcSenders, rand, "WB2OSZ-15>TEST:,The quick brown fox jumps over the lazy dog!  4 of 4")
 		}
 	}
 
@@ -501,7 +516,7 @@ func audio_file_close(sink *wavFileSink) int { //nolint:unparam
 	return (0)
 } /* end audio_close */
 
-func send_packet(hdlcSenders []*HDLCSender, str string) {
+func send_packet(hdlcSenders []*HDLCSender, rand *genPacketsPRNG, str string) {
 	if g_morse_wpm > 0 {
 		// Why not use the destination field instead of command line option?
 		// For one thing, this is not in TNC-2 monitor format.
@@ -569,7 +584,7 @@ func send_packet(hdlcSenders []*HDLCSender, str string) {
 			// Then throw in a random amount of time so that receiving
 			// DPLL will need to adjust to a new phase.
 
-			var n = int(float64(samples_per_symbol) * (32 + float64(genPacketsRand())/float64(MY_RAND_MAX)))
+			var n = int(float64(samples_per_symbol) * (32 + float64(rand.next())/float64(MY_RAND_MAX)))
 
 			for range n {
 				gen_tone_put_sample(c, 0, 0)
@@ -586,6 +601,12 @@ func send_packet(hdlcSenders []*HDLCSender, str string) {
 // .WAV file audio_file_open created, with noise added when asked for.
 type wavFileSink struct {
 	w *wavwrite.Writer
+
+	// Noise is added to each sample when addNoise is set, at noiseLevel,
+	// drawing on rand.
+	addNoise   bool
+	noiseLevel float64
+	rand       *genPacketsPRNG
 
 	// Half of a 16 bit sample, waiting for its upper byte before noise can be
 	// added to it and it can be written out.
@@ -617,7 +638,7 @@ func newWAVFileSink(w *wavwrite.Writer) *wavFileSink {
  *----------------------------------------------------------------*/
 
 func (sink *wavFileSink) Put(_ int, c uint8) int {
-	if g_add_noise {
+	if sink.addNoise {
 		if !sink.sample16Pending {
 			sink.sample16 = int16(c) /* save lower byte. */
 			sink.sample16Pending = true
@@ -631,9 +652,9 @@ func (sink *wavFileSink) Put(_ int, c uint8) int {
 			/* Add random noise to the signal. */
 			/* r should be in range of -1 .. +1. */
 
-			var r = (float64(genPacketsRand()) - float64(MY_RAND_MAX)/2.0) / (float64(MY_RAND_MAX) / 2.0)
+			var r = (float64(sink.rand.next()) - float64(MY_RAND_MAX)/2.0) / (float64(MY_RAND_MAX) / 2.0)
 
-			s += int32(5 * r * g_noise_level * 32767)
+			s += int32(5 * r * sink.noiseLevel * 32767)
 
 			if s > 32767 {
 				s = 32767
