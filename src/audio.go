@@ -773,6 +773,12 @@ type adev_s struct {
 
 var adev [MAX_ADEVS]*adev_s
 
+// save_audio_config_p is the audio configuration, shared by the subsystems
+// that have not yet been given their own copy.  In Dire Wolf each of those
+// files had a static of its own; audio_open sets it first, and the other
+// init functions that still write it set it to the same config.
+var save_audio_config_p *audio_s
+
 // portaudioMu guards portaudioRefCount and ensures Initialize/Terminate are
 // correctly paired even if audio_open/audio_close are called concurrently.
 var portaudioMu sync.Mutex

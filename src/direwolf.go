@@ -64,6 +64,7 @@ var kissSerial *KissSerial
 var agwServer *AGWServer
 var mheardDB *MHeardDB
 var aprsDigipeater *Digipeater
+var connectedDigipeater *ConnectedDigipeater
 var pttControl *PTT
 var xmitSvc *XmitService
 var ttGateway *TTGateway
@@ -651,7 +652,7 @@ x = Silence FX.25 information.`)
 	igate = NewIGate(audio_config, &igate_config, &digi_config, d_i_opt)
 	igate.start(ctx)
 	stopIfCancelled(ctx)
-	cdigipeater_init(audio_config, &cdigi_config)
+	connectedDigipeater = NewConnectedDigipeater(audio_config, &cdigi_config)
 	pfilter_init(&igate_config, d_f_opt)
 	ax25_link_init(misc_config, d_c_opt)
 
@@ -1168,7 +1169,7 @@ func app_process_rec_packet(ctx context.Context, channel int, subchan int, slice
 
 		if channel < MAX_RADIO_CHANS {
 			if retries == RETRY_NONE || fec_type == fec_type_fx25 || fec_type == fec_type_il2p {
-				cdigipeater(channel, pp)
+				connectedDigipeater.Digipeat(channel, pp)
 			}
 		}
 	}
