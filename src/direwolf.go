@@ -685,7 +685,7 @@ x = Silence FX.25 information.`)
 	gpsReceiver = NewGPS(ctx, misc_config, d_g_opt)
 
 	var waypointErr error
-	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config)
+	waypointSender, waypointErr = NewWaypointSender(ctx, misc_config, gpsReceiver)
 	stopIfCancelled(ctx)
 
 	if waypointErr != nil {

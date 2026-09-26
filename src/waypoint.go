@@ -47,6 +47,9 @@ type WaypointSender struct {
  *		  ->waypoint_formats	- Set of formats enabled.
  *					  If none set, default to generic & Kenwood here.
  *
+ *		gps			- The GPS, whose serial port we share if it is
+ *					  the same device.  May be nil.
+ *
  * Description:	First to see if this is shared with GPS input.
  *		If not, open serial port.
  *		In version 1.6 UDP is added.  It is possible to use both.
@@ -56,7 +59,7 @@ type WaypointSender struct {
  *
  *---------------------------------------------------------------*/
 
-func NewWaypointSender(ctx context.Context, mc *misc_config_s) (*WaypointSender, error) {
+func NewWaypointSender(ctx context.Context, mc *misc_config_s, gps *GPS) (*WaypointSender, error) {
 	logrus.WithFields(logrus.Fields{
 		"serial_device": mc.waypoint_serial_port,
 		"formats":       mc.waypoint_formats,
@@ -87,7 +90,7 @@ func NewWaypointSender(ctx context.Context, mc *misc_config_s) (*WaypointSender,
 	 * If that fails, do own serial port open.
 	 */
 	if serialRequested {
-		ws.serialPortFd = dwgpsnmea_get_fd(mc.waypoint_serial_port, 4800)
+		ws.serialPortFd = gps.sharedNMEAPort(mc.waypoint_serial_port, 4800)
 
 		if ws.serialPortFd == nil {
 			ws.serialPortFd = SerialPortOpen(mc.waypoint_serial_port, 4800)

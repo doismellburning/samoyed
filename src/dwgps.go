@@ -87,6 +87,8 @@ type GPS struct {
 
 	mu   sync.Mutex
 	info dwgps_info_t
+
+	nmea gpsnmeaPort // The GPSNMEA receiver's serial port, if one was opened.
 }
 
 /*-------------------------------------------------------------------
