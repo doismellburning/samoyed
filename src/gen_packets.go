@@ -275,11 +275,10 @@ func GenPacketsMain() {
 		os.Exit(1)
 	}
 
-	var sink = audio_file_open(*outputFile, &modem)
-
-	if sink == nil {
+	var sink, sinkErr = audio_file_open(*outputFile, &modem)
+	if sinkErr != nil {
 		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("ERROR - Can't open output file.\n")
+		fmt.Printf("ERROR - Can't open output file: %s\n", sinkErr)
 		os.Exit(1)
 	}
 
@@ -348,7 +347,7 @@ func GenPacketsMain() {
 			send_packet(hdlcSenders, rand, str)
 		}
 
-		audio_file_close(sink)
+		genPacketsClose(sink)
 
 		return
 	}
@@ -425,7 +424,17 @@ func GenPacketsMain() {
 		}
 	}
 
-	audio_file_close(sink)
+	genPacketsClose(sink)
+}
+
+// genPacketsClose finishes the .WAV file, or exits if it can't.
+func genPacketsClose(sink *wavFileSink) {
+	var err = audio_file_close(sink)
+	if err != nil {
+		text_color_set(DW_COLOR_ERROR)
+		fmt.Printf("%s\n", err)
+		os.Exit(1)
+	}
 }
 
 /*------------------------------------------------------------------
@@ -444,11 +453,11 @@ func GenPacketsMain() {
  *					bits_per_sample
  *				If zero, reasonable defaults will be provided.
  *
- * Returns:     Where to send the samples, or nil for failure.
+ * Returns:     Where to send the samples.
  *
  *----------------------------------------------------------------*/
 
-func audio_file_open(fname string, pa *audio_s) *wavFileSink {
+func audio_file_open(fname string, pa *audio_s) (*wavFileSink, error) {
 	/*
 	 * Fill in defaults for any missing values.
 	 */
@@ -475,13 +484,10 @@ func audio_file_open(fname string, pa *audio_s) *wavFileSink {
 
 	var w, err = wavwrite.Create(fname, format)
 	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("%s\n", err)
-
-		return nil
+		return nil, err
 	}
 
-	return newWAVFileSink(w)
+	return newWAVFileSink(w), nil
 } /* end audio_open */
 
 /*------------------------------------------------------------------
@@ -490,30 +496,14 @@ func audio_file_open(fname string, pa *audio_s) *wavFileSink {
  *
  * Purpose:     Close the audio output file.
  *
- * Returns:     Normally non-negative.
- *              -1 for any type of error.
- *
- *
  * Description:	Must go back to beginning of file and fill in the
  *		size of the data.
  *
  *----------------------------------------------------------------*/
 
-func audio_file_close(sink *wavFileSink) int { //nolint:unparam
-	if sink == nil {
-		return (-1)
-	}
-
+func audio_file_close(sink *wavFileSink) error {
 	// Close goes back and fixes up the lengths in the header for us.
-	var err = sink.w.Close()
-	if err != nil {
-		text_color_set(DW_COLOR_ERROR)
-		fmt.Printf("%s\n", err)
-
-		return (-1)
-	}
-
-	return (0)
+	return sink.w.Close()
 } /* end audio_close */
 
 func send_packet(hdlcSenders []*HDLCSender, rand *genPacketsPRNG, str string) {
