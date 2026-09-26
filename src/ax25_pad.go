@@ -150,7 +150,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -234,8 +233,6 @@ const SSID_SSID_SHIFT = 1
 const SSID_LAST_MASK = 0x01
 
 type packet_t struct {
-	seq int /* unique sequence number for debugging. */
-
 	release_time time.Time /* When to release from the SATgate mode delay queue. */
 
 	nextp *packet_t /* Pointer to next in queue. */
@@ -313,8 +310,6 @@ type ALevel struct {
 	//float ms_ratio;	// TODO: take out after temporary investigation.
 }
 
-var last_seq_num atomic.Int64
-
 // addrStrictness says how fussy ax25_parse_addr should be about an address.
 type addrStrictness int
 
@@ -367,11 +362,8 @@ func isxdigit(b byte) bool {
  *------------------------------------------------------------------------------*/
 
 func ax25_new() *packet_t {
-	var seq = last_seq_num.Add(1)
-
 	var this_p = new(packet_t)
 
-	this_p.seq = int(seq)
 	this_p.num_addr = (-1)
 
 	return (this_p)
@@ -740,13 +732,9 @@ func AX25FromFrame(data []byte, alevel ALevel) *packet_t {
  *------------------------------------------------------------------------------*/
 
 func ax25_dup(copy_from *packet_t) *packet_t {
-	var this_p = ax25_new()
-
-	var save_seq = this_p.seq
+	var this_p = new(packet_t)
 
 	*this_p = *copy_from
-
-	this_p.seq = save_seq
 
 	return (this_p)
 }
