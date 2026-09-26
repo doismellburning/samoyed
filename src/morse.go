@@ -194,7 +194,7 @@ func (tg *ToneGenerator) morseTone(tu int, wpm int) {
 	// How much to advance phase for each audio sample.
 	var f1_change_per_sample = (int)(((MORSE_TONE * TICKS_PER_CYCLE) / float64(samplesPerSec)) + 0.5)
 
-	var nsamples = (int)((TIME_UNITS_TO_MS(tu, wpm) * float64(samplesPerSec/1000.)) + 0.5)
+	var nsamples = (int)((TIME_UNITS_TO_MS(tu, wpm) * float64(samplesPerSec) / 1000.) + 0.5)
 
 	for range nsamples {
 		tone_phase += f1_change_per_sample
@@ -233,11 +233,7 @@ func (tg *ToneGenerator) morseQuiet(tu int, wpm int) {
  *--------------------------------------------------------------------*/
 
 func (tg *ToneGenerator) morseQuietMs(ms int) {
-	var nsamples = int(float64(ms*tg.audioConfig.adev[tg.adevIndex].samples_per_sec/1000.) + 0.5)
-
-	for range nsamples {
-		tg.PutSample(0)
-	}
+	tg.PutQuietMs(ms)
 } /* end morseQuietMs */
 
 /*-------------------------------------------------------------------
