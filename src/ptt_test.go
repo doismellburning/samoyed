@@ -5,7 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/doismellburning/samoyed/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -696,6 +698,74 @@ func TestPttTermClosesTheSerialPort(t *testing.T) {
 	p.Term()
 
 	assert.Nil(t, p.fd[0][OCTYPE_PTT], "the serial port was not closed")
+}
+
+// Term can run while another goroutine is still keying: the cleanup after a
+// stop signal puts the hardware down while the transmit and receive threads
+// are winding up.  Regression test for Term closing and clearing the handles
+// with nothing to stop Set using them at the same time: a Set is held part
+// way through driving the port, and Term has to wait for it.
+func TestPttTermWaitsForSet(t *testing.T) {
+	var device = filepath.Join(t.TempDir(), "tty")
+	require.NoError(t, os.WriteFile(device, nil, 0o600))
+
+	// The connected indicator, rather than PTT or DCD, because keying it
+	// neither mutes the demodulator nor tells the data link state machine.
+	var cfg = new(audio_s)
+	cfg.chan_medium[0] = MEDIUM_RADIO
+	cfg.achan[0].octrl[OCTYPE_CON].ptt_method = PTT_METHOD_SERIAL
+	cfg.achan[0].octrl[OCTYPE_CON].ptt_device = device
+	cfg.achan[0].octrl[OCTYPE_CON].ptt_line = PTT_LINE_RTS
+
+	var p, err = newPTT(cfg, 0, t.TempDir())
+	require.NoError(t, err)
+	require.NotNil(t, p.fd[0][OCTYPE_CON], "the serial port was not opened")
+
+	// The first change to the control lines is held until the test lets it
+	// go.  Any after it, such as Term's own unkeying, pass straight through.
+	var inSet = make(chan struct{})
+	var release = make(chan struct{})
+	var held atomic.Bool
+
+	serialControlCapture = func(int, bool) {
+		if held.CompareAndSwap(false, true) {
+			close(inSet)
+			<-release
+		}
+	}
+
+	t.Cleanup(func() { serialControlCapture = nil })
+
+	var setDone = make(chan struct{})
+
+	go func() {
+		defer close(setDone)
+
+		p.Set(OCTYPE_CON, 0, 1)
+	}()
+
+	<-inSet
+
+	var termDone = make(chan struct{})
+
+	go func() {
+		defer close(termDone)
+
+		p.Term()
+	}()
+
+	select {
+	case <-termDone:
+		close(release)
+		t.Fatal("Term closed the port while a Set was still driving it")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(release)
+	<-setDone
+	<-termDone
+
+	assert.Nil(t, p.fd[0][OCTYPE_CON], "the serial port was not closed")
 }
 
 // A parallel port PTT keys its bit of the port's data register, leaving the

@@ -125,6 +125,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	goHamlib "github.com/xylo04/goHamlib"
@@ -205,6 +206,12 @@ type PTT struct {
 	// lptPortPath is a field rather than always defaultLPTPortPath for the
 	// same reason: a test can stand an ordinary file in for the I/O ports.
 	lptPortPath string
+
+	// mu guards the handles below.  Set reads them from the transmit and
+	// receive threads while Term, run by the shutdown path, closes and
+	// clears them.  Set takes it for reading, so channels can still key at
+	// the same time, and Term for writing.
+	mu sync.RWMutex
 
 	/* Serial port handle or fd.  */
 	/* Could be the same for two channels */
@@ -321,6 +328,14 @@ func (p *PTT) Set(ot int, channel int, ptt_signal int) {
 		return
 	}
 
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	p.set(ot, channel, ptt_signal)
+}
+
+// set is Set for a caller that already holds p.mu, for reading or writing.
+func (p *PTT) set(ot int, channel int, ptt_signal int) {
 	var ptt = ptt_signal
 	var ptt2 = ptt_signal
 
@@ -660,10 +675,13 @@ func (p *PTT) Term() {
 		return
 	}
 
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	for n := range MAX_RADIO_CHANS {
 		if p.audioConfig.chan_medium[n] == MEDIUM_RADIO {
 			for ot := range NUM_OCTYPES {
-				p.Set(ot, n, 0)
+				p.set(ot, n, 0)
 			}
 		}
 	}
