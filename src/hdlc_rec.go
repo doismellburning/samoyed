@@ -75,6 +75,8 @@ type hdlcState struct {
 
 	easFieldsAfterPlus int /* Number of "-" characters after the "+". */
 
+	fx25 *fx25Receiver /* FX.25 decoder fed the same data bits. */
+
 	il2p *il2pReceiver /* IL2P decoder fed the same raw bits. */
 }
 
@@ -108,6 +110,7 @@ func newHDLCState(r *HDLCReceiver, channel int, subchannel int, slice int, scram
 
 	s.rrbb = rrbb_new(channel, subchannel, slice, scrambled, s.lfsr, s.prevDescram)
 
+	s.fx25 = newFX25Receiver(channel, subchannel, slice, fx25_deliver_frame)
 	s.il2p = newIL2PReceiver(channel, subchannel, slice)
 
 	return s
@@ -452,7 +455,7 @@ func (s *hdlcState) recBitNew(raw bool, is_scrambled bool,
 	// Don't waste time on this if AIS.  EAS does not get this far.
 
 	if r.audio.achan[channel].modem_type != MODEM_AIS {
-		FX25RecBit(channel, subchannel, slice, IfThenElse(dbit, 1, 0))
+		s.fx25.recBit(IfThenElse(dbit, 1, 0))
 		s.il2p.recBit(IfThenElse(raw, 1, 0)) // Note: skip NRZI.
 	}
 

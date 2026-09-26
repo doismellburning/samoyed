@@ -78,9 +78,11 @@ func fxTestReceive(block []byte) ([][]byte, []int) {
 		derrors = append(derrors, d)
 	}
 
+	var rx = newFX25Receiver(0, 0, 0, collect)
+
 	for _, b := range block {
 		for imask := byte(0x01); imask != 0; imask <<= 1 {
-			fx25_rec_bit(0, 0, 0, int(b&imask), collect)
+			rx.recBit(int(b & imask))
 		}
 	}
 
