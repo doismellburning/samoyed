@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /********************************************************************************
@@ -21,7 +20,12 @@ const (
 	FX_CHECK
 )
 
-type fx_context_s struct {
+// fx25Receiver is the FX.25 receive state for one slicer of one demodulator
+// ("subchannel") of one channel.
+type fx25Receiver struct {
+	channel, subchannel, slice int
+	sink                       fx25_frame_sink // Where each extracted frame goes.
+
 	state        FX25RecState
 	accum        uint64 // Accumulate bits for matching to correlation tag.
 	ctag_num     int    // Correlation tag number, CTAG_MIN to CTAG_MAX if approx. match found.
@@ -34,37 +38,40 @@ type fx_context_s struct {
 	block        [FX25_BLOCK_SIZE + 1]byte
 }
 
-var fx_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*fx_context_s
+func newFX25Receiver(channel int, subchannel int, slice int, sink fx25_frame_sink) *fx25Receiver {
+	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	Assert(slice >= 0 && slice < MAX_SLICERS)
+
+	var F = new(fx25Receiver)
+	F.channel = channel
+	F.subchannel = subchannel
+	F.slice = slice
+	F.sink = sink
+
+	return F
+}
 
 /***********************************************************************************
  *
- * Name:        FX25RecBit
+ * Name:        fx25Receiver.recBit
  *
  * Purpose:     Extract FX.25 codeblocks from a stream of bits.
  *		In a completely integrated AX.25 / FX.25 receive system,
  *		this would see the same bit stream as hdlcReceiver.RecBit.
  *
- * Inputs:      channel    - Channel number.
- *
- *              subchannel - This allows multiple demodulators per channel.
- *
- *              slice   - Allows multiple slicers per demodulator (subchannel).
- *
- *              dbit	- Data bit after NRZI and any descrambling.
+ * Inputs:      dbit	- Data bit after NRZI and any descrambling.
  *			  Any non-zero value is logic '1'.
  *
  * Description: This is called once for each received bit.
- *              For each valid frame, process_rec_frame() is called for further processing.
+ *              Each valid frame is handed to the receiver's sink, which in
+ *              normal operation is fx25_deliver_frame.
  *		It can gather multiple candidates from different parallel demodulators
  *		("subchannels") and slicers, then decide which one is the best.
  *
  ***********************************************************************************/
 
 const FENCE = 0x55 // to detect buffer overflow.
-
-func FX25RecBit(channel int, subchannel int, slice int, dbit int) {
-	fx25_rec_bit(channel, subchannel, slice, dbit, fx25_deliver_frame)
-}
 
 // fx25_frame_sink is handed each AX.25 frame, with the FCS removed, extracted
 // from the received bit stream, along with the number of bytes that the FEC
@@ -79,22 +86,11 @@ func fx25_deliver_frame(channel int, subchannel int, slice int, frame []byte, de
 	multi_modem_process_rec_frame(channel, subchannel, slice, frame, alevel, BitFixLevel(derrors), 1)
 }
 
-// fx25_rec_bit is FX25RecBit with the frame delivery separated out, so that
-// tests can collect frames rather than feed them to the receive path.
-//
 // Note that the sink is called before the state machine is reset, so that
-// fx25_rec_busy still reports reception in progress during delivery.
-func fx25_rec_bit(channel int, subchannel int, slice int, dbit int, sink fx25_frame_sink) {
-	// Allocate context blocks only as needed.
-	var F = fx_context[channel][subchannel][slice]
-	if F == nil {
-		Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-		Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-		Assert(slice >= 0 && slice < MAX_SLICERS)
-
-		F = new(fx_context_s)
-		fx_context[channel][subchannel][slice] = F
-	}
+// HDLCReceiver.fx25Busy still reports reception in progress during delivery.
+func (F *fx25Receiver) recBit(dbit int) {
+	var channel = F.channel
+	var slice = F.slice
 
 	// State machine to identify correlation tag then gather appropriate number of data and check bytes.
 
@@ -156,7 +152,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int, sink fx25_fr
 
 			F.clen++
 			if F.clen >= F.nroots {
-				process_rs_block(channel, subchannel, slice, F, sink) // see below
+				F.processRSBlock() // see below
 
 				F.ctag_num = -1
 				F.accum = 0
@@ -168,7 +164,7 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int, sink fx25_fr
 
 /***********************************************************************************
  *
- * Name:        fx25_rec_busy
+ * Name:        HDLCReceiver.fx25Busy
  *
  * Purpose:     Is FX.25 reception currently in progress?
  *
@@ -189,18 +185,21 @@ func fx25_rec_bit(channel int, subchannel int, slice int, dbit int, sink fx25_fr
  *
  ***********************************************************************************/
 
-func fx25_rec_busy(channel int) bool {
+func (r *HDLCReceiver) fx25Busy(channel int) bool {
 	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+
+	if r == nil {
+		return false
+	}
 
 	// This could be a little faster if we knew number of
 	// subchannels and slicers but it is probably insignificant.
 
-	for i := range MAX_SUBCHANS {
-		for j := range MAX_SLICERS {
-			if fx_context[channel][i][j] != nil {
-				if fx_context[channel][i][j].state != FX_TAG {
-					return true
-				}
+	for sub := range MAX_SUBCHANS {
+		for slice := range MAX_SLICERS {
+			var s = r.slicer[channel][sub][slice]
+			if s != nil && s.fx25.busy() {
+				return true
 			}
 		}
 	}
@@ -208,16 +207,19 @@ func fx25_rec_busy(channel int) bool {
 	return false
 }
 
+// busy reports whether an FX.25 codeblock is part way through being received.
+func (F *fx25Receiver) busy() bool {
+	return F.state != FX_TAG
+}
+
 /***********************************************************************************
  *
- * Name:	process_rs_block
+ * Name:	fx25Receiver.processRSBlock
  *
  * Purpose:     After the correlation tag was detected and the appropriate number
  *		of data and check bytes are accumulated, this performs the processing
  *
- * Inputs:	channel, subchannel, slice
- *
- *		F.ctag_num	- Correlation tag number  (index into table)
+ * Inputs:	F.ctag_num	- Correlation tag number  (index into table)
  *
  *		F.dlen		- Number of "data" bytes.
  *
@@ -237,7 +239,11 @@ func fx25_rec_busy(channel int) bool {
  *
  ***********************************************************************************/
 
-func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s, sink fx25_frame_sink) {
+func (F *fx25Receiver) processRSBlock() {
+	var channel = F.channel
+	var subchannel = F.subchannel
+	var slice = F.slice
+
 	if fx25_get_debug() >= 3 {
 		text_color_set(DW_COLOR_DEBUG)
 		dw_printf("FX.25[%d.%d]: Received RS codeblock.\n", channel, slice)
@@ -282,7 +288,7 @@ func process_rs_block(channel int, subchannel int, slice int, F *fx_context_s, s
 					fx_hex_dump(frame_buf[:frame_len])
 				}
 
-				sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
+				F.sink(channel, subchannel, slice, frame_buf[:frame_len-2], derrors) /* len-2 to remove FCS. */
 			} else {
 				// Most likely cause is defective sender software.
 				text_color_set(DW_COLOR_ERROR)

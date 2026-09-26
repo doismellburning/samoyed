@@ -1,4 +1,3 @@
-//nolint:gochecknoglobals
 package direwolf
 
 /********************************************************************************
@@ -21,7 +20,11 @@ const IL2P_PAYLOAD IL2PState = 2
 const IL2P_DECODE IL2PState = 3
 const IL2P_CRC IL2PState = 4
 
-type il2p_context_s struct {
+// il2pReceiver is the IL2P receive state for one slicer of one demodulator
+// ("subchannel") of one channel.
+type il2pReceiver struct {
+	channel, subchannel, slice int
+
 	state IL2PState
 
 	acc uint // Accumulate most recent 24 bits for sync word matching. Lower 8 bits are also used for accumulating bytes for the header and payload.
@@ -46,21 +49,26 @@ type il2p_context_s struct {
 	corrected int // Number of symbols corrected by RS FEC.
 }
 
-var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
+func newIL2PReceiver(channel int, subchannel int, slice int) *il2pReceiver {
+	Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
+	Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
+	Assert(slice >= 0 && slice < MAX_SLICERS)
+
+	var F = new(il2pReceiver)
+	F.channel = channel
+	F.subchannel = subchannel
+	F.slice = slice
+
+	return F
+}
 
 /***********************************************************************************
  *
- * Name:        il2p_rec_bit
+ * Name:        il2pReceiver.recBit
  *
  * Purpose:     Extract IL2P packets from a stream of bits.
  *
- * Inputs:      channel    - Channel number.
- *
- *              subchannel - This allows multiple demodulators per channel.
- *
- *              slice   - Allows multiple slicers per demodulator (subchannel).
- *
- *              dbit	- One bit from the received data stream.
+ * Inputs:      dbit	- One bit from the received data stream.
  *
  * Description: This is called once for each received bit.
  *              For each valid packet, process_rec_frame() is called for further processing.
@@ -69,17 +77,10 @@ var il2p_context [MAX_RADIO_CHANS][MAX_SUBCHANS][MAX_SLICERS]*il2p_context_s
  *
  ***********************************************************************************/
 
-func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
-	// Allocate context blocks only as needed.
-	var F = il2p_context[channel][subchannel][slice]
-	if F == nil {
-		Assert(channel >= 0 && channel < MAX_RADIO_CHANS)
-		Assert(subchannel >= 0 && subchannel < MAX_SUBCHANS)
-		Assert(slice >= 0 && slice < MAX_SLICERS)
-
-		F = new(il2p_context_s)
-		il2p_context[channel][subchannel][slice] = F
-	}
+func (F *il2pReceiver) recBit(dbit int) {
+	var channel = F.channel
+	var subchannel = F.subchannel
+	var slice = F.slice
 
 	// Accumulate most recent 24 bits received.  Most recent is LSB.
 
@@ -245,7 +246,7 @@ func il2p_rec_bit(channel int, subchannel int, slice int, dbit int) {
 				} else {
 					// Most likely too many FEC errors.
 					text_color_set(DW_COLOR_ERROR)
-					dw_printf("FAILED to construct frame in il2p_rec_bit.\n")
+					dw_printf("FAILED to construct frame in il2pReceiver.recBit.\n")
 				}
 			}
 

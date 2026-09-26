@@ -775,7 +775,7 @@ func test_serdes(t *testing.T) {
 				dw_printf("%d bits sent.\n", num_bits_sent)
 
 				// Need extra bit at end to flush out state machine.
-				il2p_rec_bit(0, 0, 0, 0)
+				recorder.flush()
 
 				// Whatever came back should be the frame that went out, with
 				// the errors polarity 2 introduced all corrected.

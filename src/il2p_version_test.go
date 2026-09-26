@@ -119,7 +119,7 @@ func TestIL2POnAirVersions(t *testing.T) {
 
 			require.Positive(t, NewHDLCSender(0, nil).sendIL2PFrame(pp, testDatum.tx_version, testDatum.max_fec, 0))
 
-			il2p_rec_bit(0, 0, 0, 0) // Extra bit to flush the state machine.
+			recorder.flush() // Extra bit to flush the state machine.
 
 			var received = recorder.take()
 
