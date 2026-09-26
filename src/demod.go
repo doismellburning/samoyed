@@ -61,13 +61,13 @@ const audioLevelDecimation = 4410
  * configuration asked for decimation.
  */
 
-func demod_psk_force_no_decimation(channel int) {
-	if save_audio_config_p.achan[channel].decimate > 1 {
+func demod_psk_force_no_decimation(channel int, achan *achan_param_s) {
+	if achan.decimate > 1 {
 		text_color_set(DW_COLOR_ERROR)
 		dw_printf("Channel %d: Decimation is not supported for PSK - ignoring.\n", channel)
 	}
 
-	save_audio_config_p.achan[channel].decimate = 1
+	achan.decimate = 1
 }
 
 /*------------------------------------------------------------------
@@ -518,7 +518,7 @@ func demod_init(pa *audio_s) {
 				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				demod_psk_force_no_decimation(channel)
+				demod_psk_force_no_decimation(channel, &save_audio_config_p.achan[channel])
 
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, QPSK, %s, %d sample rate",
@@ -583,7 +583,7 @@ func demod_init(pa *audio_s) {
 				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				demod_psk_force_no_decimation(channel)
+				demod_psk_force_no_decimation(channel, &save_audio_config_p.achan[channel])
 
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, 8PSK, %s, %d sample rate",
@@ -637,7 +637,7 @@ func demod_init(pa *audio_s) {
 				save_audio_config_p.achan[channel].profiles = capProfiles(channel, save_audio_config_p.achan[channel].profiles)
 				save_audio_config_p.achan[channel].num_subchan = len(save_audio_config_p.achan[channel].profiles)
 
-				demod_psk_force_no_decimation(channel)
+				demod_psk_force_no_decimation(channel, &save_audio_config_p.achan[channel])
 
 				text_color_set(DW_COLOR_DEBUG)
 				dw_printf("Channel %d: %d bps, BPSK, %s, %d sample rate",
