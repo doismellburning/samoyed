@@ -26,9 +26,7 @@ func assertObjectReport(t *testing.T, callsign string, firstTime bool, expected 
 		return
 	}
 
-	// encode_object formats the time in its own zone, so a local time gives the
-	// same report whatever zone the test runs in.
-	tt_user[i].last_heard = time.Date(2026, 9, 26, 6, 28, 0, 0, time.Local) //nolint:gosmopolitan
+	tt_user[i].last_heard = time.Date(2026, 9, 26, 6, 28, 0, 0, time.UTC)
 
 	assert.Equal(t, expected, object_report_text(i, firstTime))
 }

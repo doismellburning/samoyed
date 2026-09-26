@@ -614,7 +614,7 @@ func encode_object(name string, compressed bool, thyme time.Time, lat float64, l
 
 	var timestamp string
 	if !thyme.IsZero() {
-		timestamp = thyme.Format("020304z")
+		timestamp = thyme.UTC().Format("021504z")
 	} else {
 		timestamp = "111111z"
 	}
