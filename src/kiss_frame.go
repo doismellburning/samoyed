@@ -618,12 +618,16 @@ func KissRecByte(kf *KISSFrame, ch byte, debug int,
 			}
 
 			/* Try to appease client app by sending something back. */
-			if strings.EqualFold("restart\r", string(kf.noise[:kf.noise_len])) ||
-				strings.EqualFold("reset\r", string(kf.noise[:kf.noise_len])) {
-				// first 2 parameters don't matter when length is -1 indicating text.
-				sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
-			} else {
-				sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
+			// A caller with nothing to send with - cmd/samoyed-kissutil, a
+			// client hearing a TNC's banner - is no TNC to answer as.
+			if sendfun != nil {
+				if strings.EqualFold("restart\r", string(kf.noise[:kf.noise_len])) ||
+					strings.EqualFold("reset\r", string(kf.noise[:kf.noise_len])) {
+					// first 2 parameters don't matter when length is -1 indicating text.
+					sendfun(0, 0, []byte("\xc0\xc0"), -1, kps, client)
+				} else {
+					sendfun(0, 0, []byte("\r\ncmd:"), -1, kps, client)
+				}
 			}
 
 			kf.noise_len = 0

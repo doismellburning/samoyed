@@ -601,6 +601,28 @@ func Test_KissRecByte_OnMessage_debug(t *testing.T) {
 	assert.NotContains(t, output, "KISS client application")
 }
 
+// kissutil has nothing to send with, and a TNC's banner, or one still in
+// command mode, puts lines of text outside any frame.  The command prompt a
+// TNC would answer with is not a client's to give, so the text is only
+// noise, and the frame after it still arrives.
+func Test_KissRecByte_noise_without_sendfun(t *testing.T) {
+	var got []byte
+
+	var kf = new(KISSFrame)
+	kf.OnMessage = func(msg []byte) { got = msg }
+
+	var data = append([]byte("cmd:\rRESTART\r"), KissEncapsulate([]byte{KISS_CMD_DATA_FRAME, 'h', 'i'})...)
+
+	var output = testutils.CaptureOutput(t, func() {
+		for _, b := range data {
+			KissRecByte(kf, b, 1, nil, -1, nil)
+		}
+	})
+
+	assert.Contains(t, output, "RESTART.", "the noise is still shown under -v")
+	assert.Equal(t, []byte{KISS_CMD_DATA_FRAME, 'h', 'i'}, got)
+}
+
 // kiss_unwrap takes the escapes and framing back out, complaining about
 // anything malformed but carrying on - a live TNC has to do something with
 // what it was given.
