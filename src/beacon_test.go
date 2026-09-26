@@ -27,7 +27,7 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 	}
 
 	var gpsinfo = new(GPSInfo)
-	gpsinfo.fix = DWFIX_2D
+	gpsinfo.Fix = DWFIX_2D
 
 	for dataLinkQueue.Remove() != nil {
 	}
@@ -48,21 +48,21 @@ func Test_send_tracker_without_a_position_transmits_nothing(t *testing.T) {
 func Test_trackerPosition_needs_more_than_a_fix(t *testing.T) {
 	var gpsinfo = new(GPSInfo)
 
-	gpsinfo.fix = DWFIX_2D
+	gpsinfo.Fix = DWFIX_2D
 	var _, _, havePosition = trackerPosition(gpsinfo)
 	assert.False(t, havePosition, "a fix on its own is not a position")
 
-	gpsinfo.dlat = maybe.Just(42.3601)
+	gpsinfo.Lat = maybe.Just(42.3601)
 	_, _, havePosition = trackerPosition(gpsinfo)
 	assert.False(t, havePosition, "half a position is not a position")
 
-	gpsinfo.dlon = maybe.Just(-71.0589)
+	gpsinfo.Lon = maybe.Just(-71.0589)
 	var dlat, dlon, complete = trackerPosition(gpsinfo)
 	assert.True(t, complete)
 	assert.InDelta(t, 42.3601, dlat, 0.000001)
 	assert.InDelta(t, -71.0589, dlon, 0.000001)
 
-	gpsinfo.fix = DWFIX_NO_FIX
+	gpsinfo.Fix = DWFIX_NO_FIX
 	_, _, havePosition = trackerPosition(gpsinfo)
 	assert.False(t, havePosition, "a stale position without a fix is not a position")
 }

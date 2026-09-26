@@ -222,7 +222,7 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 			// who has seen DWFIX_ERROR can still be handed it to share.
 			gps.nmea.closeIfCurrent(fd)
 
-			info.fix = DWFIX_ERROR
+			info.Fix = DWFIX_ERROR
 
 			if debug >= 2 {
 				text_color_set(DW_COLOR_DEBUG)
@@ -262,8 +262,8 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 						dw_printf("GPSNMEA: Error parsing $GPRMC sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
-						info.speed_knots = f.Knots.Or(info.speed_knots)
-						info.track = f.Course.Or(info.track)
+						info.SpeedKnots = f.Knots.Or(info.SpeedKnots)
+						info.Track = f.Course.Or(info.Track)
 					}
 				} else if strings.HasPrefix(gps_msg, "$GPGGA") || strings.HasPrefix(gps_msg, "$GNGGA") {
 					var f = dwgpsnmea_gpgga(gps_msg, false)
@@ -274,11 +274,11 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 						dw_printf("GPSNMEA: Error parsing $GPGGA sentence.\n")
 						dw_printf("%s\n", gps_msg)
 					} else {
-						info.dlat = f.Lat.Or(info.dlat)
-						info.dlon = f.Lon.Or(info.dlon)
-						info.altitude = f.Alt.Or(info.altitude)
+						info.Lat = f.Lat.Or(info.Lat)
+						info.Lon = f.Lon.Or(info.Lon)
+						info.Altitude = f.Alt.Or(info.Altitude)
 
-						if f.Fix != info.fix { // Print change in location fix.
+						if f.Fix != info.Fix { // Print change in location fix.
 							text_color_set(DW_COLOR_INFO)
 
 							switch f.Fix {
@@ -291,10 +291,10 @@ func read_gpsnmea_thread(ctx context.Context, gps *GPS, fd *term.Term, debug int
 							default:
 							}
 
-							info.fix = f.Fix
+							info.Fix = f.Fix
 						}
 
-						info.timestamp = time.Now()
+						info.Timestamp = time.Now()
 
 						if debug >= 2 {
 							text_color_set(DW_COLOR_DEBUG)

@@ -109,7 +109,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	var deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		fix = gps.Read(info)
-		if fix >= DWFIX_3D && info.altitude.IsJust() {
+		if fix >= DWFIX_3D && info.Altitude.IsJust() {
 			break
 		}
 
@@ -117,9 +117,9 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	}
 
 	require.GreaterOrEqual(t, fix, DWFIX_3D, "never got a 3D location fix from gpsd")
-	require.True(t, info.altitude.IsJust(), "never got an altitude from gpsd")
+	require.True(t, info.Altitude.IsJust(), "never got an altitude from gpsd")
 
-	assert.InDelta(t, 42.6187, maybe.FromJust(info.dlat), 0.001)
-	assert.InDelta(t, -71.3472, maybe.FromJust(info.dlon), 0.001)
-	assert.InDelta(t, 33.5, maybe.FromJust(info.altitude), 0.001)
+	assert.InDelta(t, 42.6187, maybe.FromJust(info.Lat), 0.001)
+	assert.InDelta(t, -71.3472, maybe.FromJust(info.Lon), 0.001)
+	assert.InDelta(t, 33.5, maybe.FromJust(info.Altitude), 0.001)
 }

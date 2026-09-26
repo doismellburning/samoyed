@@ -66,13 +66,13 @@ const (
 // zero value is "nothing heard yet", so a freshly declared one needs no
 // clearing.
 type GPSInfo struct {
-	timestamp   time.Time            /* When last updated.  System time. */
-	fix         GPSFix               /* Quality of position fix. */
-	dlat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
-	dlon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
-	speed_knots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
-	track       maybe.Maybe[float64] /* What is difference between track and course? */
-	altitude    maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
+	Timestamp  time.Time            /* When last updated.  System time. */
+	Fix        GPSFix               /* Quality of position fix. */
+	Lat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
+	Lon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
+	SpeedKnots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
+	Track      maybe.Maybe[float64] /* What is difference between track and course? */
+	Altitude   maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
 }
 
 // GPS holds the most recent position report from whichever GPS receivers
@@ -122,7 +122,7 @@ type GPS struct {
 func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 	var g = new(GPS)
 	g.debug = debug
-	g.info.fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
+	g.info.Fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
 
 	dwgpsnmea_init(ctx, g, pconfig, debug)
 
@@ -150,10 +150,10 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 func (g *GPS) Read(gpsinfo *GPSInfo) GPSFix {
 	if g == nil {
 		var none GPSInfo
-		none.fix = DWFIX_NOT_INIT
+		none.Fix = DWFIX_NOT_INIT
 		*gpsinfo = none
 
-		return gpsinfo.fix
+		return gpsinfo.Fix
 	}
 
 	g.mu.Lock()
@@ -170,7 +170,7 @@ func (g *GPS) Read(gpsinfo *GPSInfo) GPSFix {
 	// TODO: Should we check timestamp and complain if very stale?
 	// or should we leave that up to the caller?
 
-	return (gpsinfo.fix)
+	return (gpsinfo.Fix)
 }
 
 /*-------------------------------------------------------------------
@@ -189,10 +189,10 @@ func (g *GPS) Read(gpsinfo *GPSInfo) GPSFix {
 func dwgps_print(msg string, gpsinfo *GPSInfo) {
 	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
 		msg,
-		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
-		formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
-		formatMaybeFloat("%.0f", gpsinfo.track), formatMaybeFloat("%.1f", gpsinfo.speed_knots),
-		formatMaybeFloat("%.0f", gpsinfo.altitude))
+		gpsinfo.Timestamp.Format(time.RFC3339), gpsinfo.Fix,
+		formatMaybeFloat("%.6f", gpsinfo.Lat), formatMaybeFloat("%.6f", gpsinfo.Lon),
+		formatMaybeFloat("%.0f", gpsinfo.Track), formatMaybeFloat("%.1f", gpsinfo.SpeedKnots),
+		formatMaybeFloat("%.0f", gpsinfo.Altitude))
 } /* end dwgps_print */
 
 // formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.

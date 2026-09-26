@@ -213,7 +213,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 
 		apply_gpsd_tpv(info, report)
 
-		info.timestamp = time.Now()
+		info.Timestamp = time.Now()
 
 		if debug >= 2 {
 			text_color_set(DW_COLOR_DEBUG)
@@ -234,7 +234,7 @@ func read_gpsd_thread(ctx context.Context, gps *GPS, conn net.Conn, debug int) {
 	dw_printf("GPSD: Lost communication with gpsd server.\n")
 	dw_printf("------------------------------------------\n")
 
-	info.fix = DWFIX_ERROR
+	info.Fix = DWFIX_ERROR
 
 	if debug >= 2 {
 		text_color_set(DW_COLOR_DEBUG)
@@ -310,7 +310,7 @@ func apply_gpsd_tpv(info *GPSInfo, report *gpsdTPV) {
 		newFix = DWFIX_NO_FIX
 	}
 
-	if newFix != info.fix {
+	if newFix != info.Fix {
 		text_color_set(DW_COLOR_INFO)
 
 		switch newFix {
@@ -324,15 +324,15 @@ func apply_gpsd_tpv(info *GPSInfo, report *gpsdTPV) {
 		}
 	}
 
-	info.fix = newFix
+	info.Fix = newFix
 
 	if newFix < DWFIX_2D {
 		/* Keep the last known location; it's better than totally lost. */
 		return
 	}
 
-	info.dlat = maybe.FromPointer(report.Lat).Or(info.dlat)
-	info.dlon = maybe.FromPointer(report.Lon).Or(info.dlon)
+	info.Lat = maybe.FromPointer(report.Lat).Or(info.Lat)
+	info.Lon = maybe.FromPointer(report.Lon).Or(info.Lon)
 
 	/*
 	 * gpsd doesn't repeat every field on every TPV report - one derived from
@@ -343,15 +343,15 @@ func apply_gpsd_tpv(info *GPSInfo, report *gpsdTPV) {
 	 * is Nothing.
 	 */
 
-	info.track = maybe.FromPointer(report.Track).Or(info.track)
+	info.Track = maybe.FromPointer(report.Track).Or(info.Track)
 
 	var knots = maybe.Fmap(func(mps float64) float64 { return mps * MPS_TO_KNOTS }, maybe.FromPointer(report.Speed))
-	info.speed_knots = knots.Or(info.speed_knots)
+	info.SpeedKnots = knots.Or(info.SpeedKnots)
 
 	if newFix >= DWFIX_3D {
-		info.altitude = maybe.FromPointer(report.AltMSL).
+		info.Altitude = maybe.FromPointer(report.AltMSL).
 			Or(maybe.FromPointer(report.Alt)).
-			Or(info.altitude)
+			Or(info.Altitude)
 	}
 	/* Otherwise keep last known altitude when we downgrade from 3D to 2D fix. */
 	/* Caller knows altitude is outdated if info.fix == DWFIX_2D. */

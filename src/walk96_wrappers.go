@@ -25,5 +25,5 @@ func DWGPSRead(gps *GPS) (fix int, lat maybe.Maybe[float64], lon maybe.Maybe[flo
 	var info GPSInfo
 	var f = gps.Read(&info)
 
-	return int(f), info.dlat, info.dlon, info.speed_knots, info.track, info.altitude
+	return int(f), info.Lat, info.Lon, info.SpeedKnots, info.Track, info.Altitude
 }
