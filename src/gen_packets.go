@@ -273,7 +273,9 @@ func GenPacketsMain() {
 	}
 
 	gen_tone_init(&modem, *amplitude/2, sink)
-	morse_init(&modem, *amplitude/2)
+
+	// The IL2P encoder reads the channel's version and CRC setting from here.
+	save_audio_config_p = &modem
 
 	// One per channel, kept for the whole run, so the NRZI line level carries
 	// over from one packet to the next as it does on the air.

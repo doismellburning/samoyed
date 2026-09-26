@@ -502,7 +502,6 @@ x = Silence FX.25 information.`)
 	 * It is the range of the digital sound representation.
 	 */
 	gen_tone_init(audio_config, audio_amplitude, audioDeviceSink{})
-	morse_init(audio_config, audio_amplitude)
 
 	/*
 	 * Push to Talk (PTT) control.
