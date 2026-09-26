@@ -95,6 +95,7 @@ func Test_main_badArguments(t *testing.T) {
 		"noisy and noiseless": {[]string{"-o", wav, "-n", "1", "-N", "1"}, "Cannot choose both noisy packets", false},
 		"bad amplitude":       {[]string{"-o", wav, "-a", "201"}, "amplitude must be in range of 0 to 200", true},
 		"bad Morse speed":     {[]string{"-o", wav, "-M", "51"}, "morse code speed must be in range", true},
+		"bad variable speed":  {[]string{"-o", wav, "-v", "x"}, "Invalid variable speed x", true},
 		"no speed increment":  {[]string{"-o", wav, "-v", "5,0"}, "variable speed increment must be more than 0", false},
 		"bad mark":            {[]string{"-o", wav, "-m", "10"}, "more reasonable mark frequency", true},
 		"bad output file":     {[]string{"-o", filepath.Join(dir, "missing", "out.wav")}, "no such file or directory", true},

@@ -96,9 +96,17 @@ func main() {
 	if *variableSpeedStr != "" {
 		var maxError, increment, found = strings.Cut(*variableSpeedStr, ",")
 
-		variableSpeedMaxError, _ = strconv.ParseFloat(maxError, 64)
-		if found {
-			variableSpeedIncrement, _ = strconv.ParseFloat(increment, 64)
+		var err error
+
+		variableSpeedMaxError, err = strconv.ParseFloat(maxError, 64)
+		if err == nil && found {
+			variableSpeedIncrement, err = strconv.ParseFloat(increment, 64)
+		}
+
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Invalid variable speed %s: %s\n", *variableSpeedStr, err)
+			pflag.Usage()
+			os.Exit(1)
 		}
 	}
 
