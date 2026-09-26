@@ -16,6 +16,8 @@ package direwolf
  *
  * API:		NewGPS		Connect to data stream at start up time.
  *
+ *		NewGPSNMEA	Same, for just a serial port.
+ *
  *		GPS.Read	Return most recent location to application.
  *
  *		dwgps_print	Print contents of structure for debugging.
@@ -133,6 +135,16 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 
 	return g
 } /* end NewGPS */
+
+// NewGPSNMEA starts reading NMEA sentences from the GPS receiver on the
+// serial port named port, leaving its speed as it is and not using gpsd.  It
+// is NewGPS for a standalone tool with nothing else to configure.
+func NewGPSNMEA(ctx context.Context, port string, debug int) *GPS {
+	var config misc_config_s
+	config.gpsnmea_port = port
+
+	return NewGPS(ctx, &config, debug)
+}
 
 // Read returns the most recent location data available.  Its Fix says how
 // far the rest of it can be trusted.
