@@ -5,6 +5,7 @@
 package direwolf
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/doismellburning/samoyed/internal/maybe"
@@ -70,4 +71,39 @@ func TestObjectReportCarriesFrequency(t *testing.T) {
 	require.GreaterOrEqual(t, i, 0, "the user should have been recorded")
 
 	assert.Contains(t, users.objectReportText(i, true), "146.955MHz T074 ")
+}
+
+// The receive processing goroutine records users as their tone sequences
+// arrive, while the TTOBJ receive channel's audio goroutine polls the same
+// table, through Button's idle ticks, to send the object reports it has
+// scheduled.  Nothing ordered the two, so they raced on the table.
+func TestUserTableIsSafeFromBothGoroutines(t *testing.T) {
+	var my_audio_config audio_s
+
+	my_audio_config.mycall[0] = "Q1TEST-15"
+
+	var my_tt_config tt_config_s
+
+	my_tt_config.retain_time = 20
+	my_tt_config.num_xmits = 1
+	my_tt_config.obj_xmit_chan = -1 // Keep the reports off the transmit queue.
+
+	var gw = NewTTGateway(&my_audio_config, &my_tt_config, 0)
+
+	var done = make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		for range 100 * 39 {
+			gw.Button(0, '.')
+		}
+	}()
+
+	for i := range 100 {
+		require.Equal(t, 0, gw.users.heard(fmt.Sprintf("Q%dTEST", i%10), 12, 'J', 'A', "",
+			maybe.Just(37.25), maybe.Just(-71.75), maybe.Just(0), "", "", "", ' ', ""))
+	}
+
+	<-done
 }

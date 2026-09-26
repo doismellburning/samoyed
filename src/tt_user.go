@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -109,10 +110,17 @@ type tt_user_s struct {
 }
 
 // ttUsers is the APRStt gateway's table of recently heard users.
+//
+// The receive processing goroutine records users as their tone sequences
+// arrive, and the audio goroutine of the TTOBJ receive channel polls the
+// table to send the object reports it has scheduled, so mu guards user.
+// The reports are sent with it released.
 type ttUsers struct {
 	audioConfig *audio_s
 	ttConfig    *tt_config_s
-	user        [MAX_TT_USERS]tt_user_s
+
+	mu   sync.Mutex
+	user [MAX_TT_USERS]tt_user_s
 }
 
 // newTTUsers makes an empty user table.  audioConfig supplies the mycall
@@ -198,6 +206,9 @@ func (u *ttUsers) search(callsign string, overlay rune) int {
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) threeCharSuffixSearch(suffix string) (string, int) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	/*
 	 * Look for suffix in list of known calls.
 	 */
@@ -385,6 +396,9 @@ func (u *ttUsers) heard(callsign string, ssid int, overlay rune, symbol rune, lo
 // report transmissions, and returns the report to send straight away.
 func (u *ttUsers) record(callsign string, ssid int, overlay rune, symbol rune, loc_text string, latitude maybe.Maybe[float64],
 	longitude maybe.Maybe[float64], ambiguity maybe.Maybe[int], freq string, ctcss string, comment string, mic_e rune, dao string) string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	/*
 	 * Is it someone new or a returning user?
 	 */
@@ -521,6 +535,9 @@ func (u *ttUsers) background() {
 // dueReports returns the object reports whose transmission time has come,
 // scheduling the next of each, and purges users not heard for too long.
 func (u *ttUsers) dueReports(now time.Time) []string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	var reports []string
 
 	// text_color_set(DW_COLOR_DEBUG);
@@ -656,7 +673,7 @@ func (u *ttUsers) sendObjectReport(stemp string, first_time bool) {
  * Name:        objectReportText
  *
  * Purpose:     Build the text form of the object report packet for
- *		sendObjectReport.
+ *		sendObjectReport.  u.mu must be held.
  *
  * Inputs:      i	   - Index into user table.
  *
@@ -940,6 +957,9 @@ func (u *ttUsers) setenv(i int) {
  *----------------------------------------------------------------*/
 
 func (u *ttUsers) dump() {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
 	var now = time.Now()
 
 	dw_printf("call   ov suf lsthrd xmit nxt cor  lat    long freq     ctcss m comment\n")
