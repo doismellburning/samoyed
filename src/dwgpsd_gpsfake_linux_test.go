@@ -98,9 +98,7 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 
 	t.Cleanup(gps.Term)
 
-	var info = new(dwgps_info_t)
-
-	var fix dwfix_t
+	var info GPSInfo
 
 	// gpsd emits several TPV reports per cycle as each NMEA sentence arrives:
 	// a 2D-only one from $GPRMC, then a 3D one still without altitude, then
@@ -108,18 +106,18 @@ func Test_dwgpsd_against_real_gpsfake(t *testing.T) {
 	// for that last one rather than just the first 3D report.
 	var deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		fix = gps.Read(info)
-		if fix >= DWFIX_3D && info.altitude.IsJust() {
+		info = gps.Read()
+		if info.Fix >= DWFIX_3D && info.Altitude.IsJust() {
 			break
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	require.GreaterOrEqual(t, fix, DWFIX_3D, "never got a 3D location fix from gpsd")
-	require.True(t, info.altitude.IsJust(), "never got an altitude from gpsd")
+	require.GreaterOrEqual(t, info.Fix, DWFIX_3D, "never got a 3D location fix from gpsd")
+	require.True(t, info.Altitude.IsJust(), "never got an altitude from gpsd")
 
-	assert.InDelta(t, 42.6187, maybe.FromJust(info.dlat), 0.001)
-	assert.InDelta(t, -71.3472, maybe.FromJust(info.dlon), 0.001)
-	assert.InDelta(t, 33.5, maybe.FromJust(info.altitude), 0.001)
+	assert.InDelta(t, 42.6187, maybe.FromJust(info.Lat), 0.001)
+	assert.InDelta(t, -71.3472, maybe.FromJust(info.Lon), 0.001)
+	assert.InDelta(t, 33.5, maybe.FromJust(info.Altitude), 0.001)
 }

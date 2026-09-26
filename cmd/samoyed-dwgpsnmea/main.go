@@ -42,24 +42,24 @@ func run(ctx context.Context, args []string, out io.Writer) int {
 		gpsPort = args[0]
 	}
 
-	var gps = direwolf.DWGPSInit(ctx, gpsPort, 3)
+	var gps = direwolf.NewGPSNMEA(ctx, gpsPort, 3)
 
 	for ctx.Err() == nil {
-		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead(gps)
+		var info = gps.Read()
 
-		switch fix {
-		case int(direwolf.DWFIX_2D), int(direwolf.DWFIX_3D):
-			fmt.Fprintf(out, "%s  %s", show("%.6f", lat), show("%.6f", lon))
-			fmt.Fprintf(out, "  %s knots  %s degrees", show("%.1f", speedKnots), show("%.0f", track))
+		switch info.Fix {
+		case direwolf.DWFIX_2D, direwolf.DWFIX_3D:
+			fmt.Fprintf(out, "%s  %s", show("%.6f", info.Lat), show("%.6f", info.Lon))
+			fmt.Fprintf(out, "  %s knots  %s degrees", show("%.1f", info.SpeedKnots), show("%.0f", info.Track))
 
-			if fix == int(direwolf.DWFIX_3D) {
-				fmt.Fprintf(out, "  altitude = %s meters", show("%.1f", altitude))
+			if info.Fix == direwolf.DWFIX_3D {
+				fmt.Fprintf(out, "  altitude = %s meters", show("%.1f", info.Altitude))
 			}
 
 			fmt.Fprintf(out, "\n")
-		case int(direwolf.DWFIX_NOT_SEEN), int(direwolf.DWFIX_NO_FIX):
+		case direwolf.DWFIX_NOT_SEEN, direwolf.DWFIX_NO_FIX:
 			fmt.Fprintf(out, "Location currently not available.\n")
-		case int(direwolf.DWFIX_NOT_INIT):
+		case direwolf.DWFIX_NOT_INIT:
 			fmt.Fprintf(out, "GPS Init failed.\n")
 
 			return 1

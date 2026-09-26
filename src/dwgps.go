@@ -16,6 +16,8 @@ package direwolf
  *
  * API:		NewGPS		Connect to data stream at start up time.
  *
+ *		NewGPSNMEA	Same, for just a serial port.
+ *
  *		GPS.Read	Return most recent location to application.
  *
  *		dwgps_print	Print contents of structure for debugging.
@@ -50,28 +52,29 @@ import (
  *
  */
 
-type dwfix_t int
+// GPSFix is how good a position GPSInfo holds: one of the DWFIX_* values.
+type GPSFix int
 
 const (
-	DWFIX_NOT_INIT dwfix_t = -2
-	DWFIX_ERROR    dwfix_t = -1
-	DWFIX_NOT_SEEN dwfix_t = 0
-	DWFIX_NO_FIX   dwfix_t = 1
-	DWFIX_2D       dwfix_t = 2
-	DWFIX_3D       dwfix_t = 3
+	DWFIX_NOT_INIT GPSFix = -2
+	DWFIX_ERROR    GPSFix = -1
+	DWFIX_NOT_SEEN GPSFix = 0
+	DWFIX_NO_FIX   GPSFix = 1
+	DWFIX_2D       GPSFix = 2
+	DWFIX_3D       GPSFix = 3
 )
 
-// dwgps_info_t is the most recent position report from a GPS receiver.  Its
+// GPSInfo is the most recent position report from a GPS receiver.  Its
 // zero value is "nothing heard yet", so a freshly declared one needs no
 // clearing.
-type dwgps_info_t struct {
-	timestamp   time.Time            /* When last updated.  System time. */
-	fix         dwfix_t              /* Quality of position fix. */
-	dlat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
-	dlon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
-	speed_knots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
-	track       maybe.Maybe[float64] /* What is difference between track and course? */
-	altitude    maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
+type GPSInfo struct {
+	Timestamp  time.Time            /* When last updated.  System time. */
+	Fix        GPSFix               /* Quality of position fix. */
+	Lat        maybe.Maybe[float64] /* Latitude.  Valid if fix >= 2. */
+	Lon        maybe.Maybe[float64] /* Longitude. Valid if fix >= 2. */
+	SpeedKnots maybe.Maybe[float64] /* libgps uses meters/sec but we use GPS usual knots. */
+	Track      maybe.Maybe[float64] /* What is difference between track and course? */
+	Altitude   maybe.Maybe[float64] /* meters above mean sea level. Valid if fix == 3. */
 }
 
 // GPS holds the most recent position report from whichever GPS receivers
@@ -86,7 +89,7 @@ type GPS struct {
 	debug int /* >= 1 show results from Read.  Set once by NewGPS. */
 
 	mu   sync.Mutex
-	info dwgps_info_t
+	info GPSInfo
 
 	nmea gpsnmeaPort // The GPSNMEA receiver's serial port, if one was opened.
 	gpsd gpsdClient  // The connection to gpsd, if one was made.
@@ -121,7 +124,7 @@ type GPS struct {
 func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 	var g = new(GPS)
 	g.debug = debug
-	g.info.fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
+	g.info.Fix = DWFIX_NOT_INIT // The reader goroutines replace it with DWFIX_NOT_SEEN once they are running.
 
 	dwgpsnmea_init(ctx, g, pconfig, debug)
 
@@ -133,43 +136,42 @@ func NewGPS(ctx context.Context, pconfig *misc_config_s, debug int) *GPS {
 	return g
 } /* end NewGPS */
 
-/*-------------------------------------------------------------------
- *
- * Name:        Read
- *
- * Purpose:     Return most recent location data available.
- *
- * Outputs:	gpsinfo		- Structure with latitude, longitude, etc.
- *
- * Returns:	Position fix quality.  Same as in structure.
- *
- *
- *--------------------------------------------------------------------*/
+// NewGPSNMEA starts reading NMEA sentences from the GPS receiver on the
+// serial port named port, leaving its speed as it is and not using gpsd.  It
+// is NewGPS for a standalone tool with nothing else to configure.
+func NewGPSNMEA(ctx context.Context, port string, debug int) *GPS {
+	var config misc_config_s
+	config.gpsnmea_port = port
 
-func (g *GPS) Read(gpsinfo *dwgps_info_t) dwfix_t {
+	return NewGPS(ctx, &config, debug)
+}
+
+// Read returns the most recent location data available.  Its Fix says how
+// far the rest of it can be trusted.
+func (g *GPS) Read() GPSInfo {
+	var gpsinfo GPSInfo
+
 	if g == nil {
-		var none dwgps_info_t
-		none.fix = DWFIX_NOT_INIT
-		*gpsinfo = none
+		gpsinfo.Fix = DWFIX_NOT_INIT
 
-		return gpsinfo.fix
+		return gpsinfo
 	}
 
 	g.mu.Lock()
 
-	*gpsinfo = g.info
+	gpsinfo = g.info
 
 	g.mu.Unlock()
 
 	if g.debug >= 1 {
 		text_color_set(DW_COLOR_DEBUG)
-		dwgps_print("gps_read: ", gpsinfo)
+		dwgps_print("gps_read: ", &gpsinfo)
 	}
 
 	// TODO: Should we check timestamp and complain if very stale?
 	// or should we leave that up to the caller?
 
-	return (gpsinfo.fix)
+	return gpsinfo
 }
 
 /*-------------------------------------------------------------------
@@ -185,13 +187,13 @@ func (g *GPS) Read(gpsinfo *dwgps_info_t) dwfix_t {
  *
  *--------------------------------------------------------------------*/
 
-func dwgps_print(msg string, gpsinfo *dwgps_info_t) {
+func dwgps_print(msg string, gpsinfo *GPSInfo) {
 	dw_printf("%stime=%s fix=%d lat=%s lon=%s trk=%s spd=%s alt=%s\n",
 		msg,
-		gpsinfo.timestamp.Format(time.RFC3339), gpsinfo.fix,
-		formatMaybeFloat("%.6f", gpsinfo.dlat), formatMaybeFloat("%.6f", gpsinfo.dlon),
-		formatMaybeFloat("%.0f", gpsinfo.track), formatMaybeFloat("%.1f", gpsinfo.speed_knots),
-		formatMaybeFloat("%.0f", gpsinfo.altitude))
+		gpsinfo.Timestamp.Format(time.RFC3339), gpsinfo.Fix,
+		formatMaybeFloat("%.6f", gpsinfo.Lat), formatMaybeFloat("%.6f", gpsinfo.Lon),
+		formatMaybeFloat("%.0f", gpsinfo.Track), formatMaybeFloat("%.1f", gpsinfo.SpeedKnots),
+		formatMaybeFloat("%.0f", gpsinfo.Altitude))
 } /* end dwgps_print */
 
 // formatMaybeFloat renders m with the given verb, or as "unknown" for Nothing.
@@ -233,7 +235,7 @@ func (g *GPS) Term() {
  *
  *--------------------------------------------------------------------*/
 
-func (g *GPS) setData(gpsinfo *dwgps_info_t) {
+func (g *GPS) setData(gpsinfo *GPSInfo) {
 	/* Debug print is handled by the two callers so */
 	/* we can distinguish the source. */
 	g.mu.Lock()

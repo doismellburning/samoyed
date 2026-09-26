@@ -87,7 +87,7 @@ func Test_walk96(t *testing.T) {
 	MYCALL, sequence = "Q1TEST-9", 0
 
 	var output = testutils.CaptureOutput(t, func() {
-		walk96(int(direwolf.DWFIX_3D), 42.61875, -71.347212,
+		walk96(42.61875, -71.347212,
 			maybe.Just(5.07), maybe.Just(291.42), maybe.Just(33.5))
 	})
 
@@ -106,7 +106,7 @@ func Test_walk96(t *testing.T) {
 
 	// The next report carries the next sequence number.
 	output = testutils.CaptureOutput(t, func() {
-		walk96(int(direwolf.DWFIX_3D), 42.61875, -71.347212,
+		walk96(42.61875, -71.347212,
 			maybe.Nothing[float64](), maybe.Nothing[float64](), maybe.Nothing[float64]())
 	})
 

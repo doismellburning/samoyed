@@ -105,26 +105,26 @@ func Test_parse_gpsd_tpv(t *testing.T) {
 				assert.InDelta(t, tt.wantLat, *report.Lat, 0.00001)
 			}
 
-			var info = new(dwgps_info_t)
+			var info = new(GPSInfo)
 			apply_gpsd_tpv(info, report)
 
 			if tt.checkAlt {
-				assert.InDelta(t, tt.wantAlt, maybe.FromJust(info.altitude), 0.001)
+				assert.InDelta(t, tt.wantAlt, maybe.FromJust(info.Altitude), 0.001)
 			}
 
 			if tt.checkSpd {
-				assert.InDelta(t, tt.wantSpeed, maybe.FromJust(info.speed_knots), 0.001)
+				assert.InDelta(t, tt.wantSpeed, maybe.FromJust(info.SpeedKnots), 0.001)
 			}
 		})
 	}
 }
 
 func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
-	var info = new(dwgps_info_t)
-	info.fix = DWFIX_3D
-	info.dlat = maybe.Just(42.0)
-	info.dlon = maybe.Just(-71.0)
-	info.altitude = maybe.Just(10.0)
+	var info = new(GPSInfo)
+	info.Fix = DWFIX_3D
+	info.Lat = maybe.Just(42.0)
+	info.Lon = maybe.Just(-71.0)
+	info.Altitude = maybe.Just(10.0)
 
 	var report, err = parse_gpsd_tpv([]byte(`{"class":"TPV","mode":1}`))
 	require.NoError(t, err)
@@ -132,16 +132,16 @@ func Test_apply_gpsd_tpv_no_fix_keeps_last_location(t *testing.T) {
 
 	apply_gpsd_tpv(info, report)
 
-	assert.Equal(t, DWFIX_NO_FIX, info.fix)
-	assert.InDelta(t, 42.0, maybe.FromJust(info.dlat), 0.00001)
-	assert.InDelta(t, -71.0, maybe.FromJust(info.dlon), 0.00001)
-	assert.InDelta(t, 10.0, maybe.FromJust(info.altitude), 0.00001)
+	assert.Equal(t, DWFIX_NO_FIX, info.Fix)
+	assert.InDelta(t, 42.0, maybe.FromJust(info.Lat), 0.00001)
+	assert.InDelta(t, -71.0, maybe.FromJust(info.Lon), 0.00001)
+	assert.InDelta(t, 10.0, maybe.FromJust(info.Altitude), 0.00001)
 }
 
 func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
-	var info = new(dwgps_info_t)
-	info.fix = DWFIX_3D
-	info.altitude = maybe.Just(123.0)
+	var info = new(GPSInfo)
+	info.Fix = DWFIX_3D
+	info.Altitude = maybe.Just(123.0)
 
 	var report, err = parse_gpsd_tpv([]byte(`{"class":"TPV","mode":2,"lat":1.0,"lon":2.0}`))
 	require.NoError(t, err)
@@ -149,23 +149,23 @@ func Test_apply_gpsd_tpv_2d_keeps_last_altitude(t *testing.T) {
 
 	apply_gpsd_tpv(info, report)
 
-	assert.Equal(t, DWFIX_2D, info.fix)
-	assert.InDelta(t, 123.0, maybe.FromJust(info.altitude), 0.00001)
+	assert.Equal(t, DWFIX_2D, info.Fix)
+	assert.InDelta(t, 123.0, maybe.FromJust(info.Altitude), 0.00001)
 }
 
 func Test_dwgps_info_zero_value_is_nothing_known(t *testing.T) {
-	var info dwgps_info_t
+	var info GPSInfo
 
-	assert.Equal(t, DWFIX_NOT_SEEN, info.fix)
-	assert.Equal(t, maybe.Nothing[float64](), info.dlat)
-	assert.Equal(t, maybe.Nothing[float64](), info.dlon)
-	assert.Equal(t, maybe.Nothing[float64](), info.speed_knots)
-	assert.Equal(t, maybe.Nothing[float64](), info.track)
-	assert.Equal(t, maybe.Nothing[float64](), info.altitude)
+	assert.Equal(t, DWFIX_NOT_SEEN, info.Fix)
+	assert.Equal(t, maybe.Nothing[float64](), info.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), info.Lon)
+	assert.Equal(t, maybe.Nothing[float64](), info.SpeedKnots)
+	assert.Equal(t, maybe.Nothing[float64](), info.Track)
+	assert.Equal(t, maybe.Nothing[float64](), info.Altitude)
 }
 
 func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
-	var info = new(dwgps_info_t)
+	var info = new(GPSInfo)
 
 	// A 2D report from $GPRMC alone carries neither altitude nor, when
 	// stationary, a track.
@@ -174,10 +174,10 @@ func Test_apply_gpsd_tpv_absent_fields_are_nothing(t *testing.T) {
 
 	apply_gpsd_tpv(info, report)
 
-	assert.Equal(t, maybe.Just(42.0), info.dlat)
-	assert.Equal(t, maybe.Nothing[float64](), info.track)
-	assert.Equal(t, maybe.Nothing[float64](), info.speed_knots)
-	assert.Equal(t, maybe.Nothing[float64](), info.altitude)
+	assert.Equal(t, maybe.Just(42.0), info.Lat)
+	assert.Equal(t, maybe.Nothing[float64](), info.Track)
+	assert.Equal(t, maybe.Nothing[float64](), info.SpeedKnots)
+	assert.Equal(t, maybe.Nothing[float64](), info.Altitude)
 }
 
 // fakeGpsd listens as a gpsd would, returning a configuration pointing at it
@@ -231,19 +231,17 @@ func TestGPSTermLeavesAnotherGPSsGpsdConnectionAlone(t *testing.T) {
 
 	// Let gps1's reader finish reporting its lost connection before carrying
 	// on, so it isn't still printing once the test is over.
-	require.Eventually(t, func() bool { return gps1.Read(new(dwgps_info_t)) == DWFIX_ERROR },
+	require.Eventually(t, func() bool { return gps1.Read().Fix == DWFIX_ERROR },
 		5*time.Second, 10*time.Millisecond, "gps1's reader never noticed it had been shut down")
 
 	var _, writeErr = server2.Write([]byte(`{"class":"TPV","mode":3,"lat":42.6,"lon":-71.3,"altMSL":33.5}` + "\n"))
 	require.NoError(t, writeErr)
 
-	var info = new(dwgps_info_t)
-
-	var fix dwfix_t
+	var fix GPSFix
 
 	var deadline = time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		fix = gps2.Read(info)
+		fix = gps2.Read().Fix
 		if fix == DWFIX_3D || fix == DWFIX_ERROR {
 			break
 		}

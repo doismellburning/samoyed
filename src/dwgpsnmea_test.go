@@ -338,15 +338,13 @@ func TestSharedNMEAPortAfterReceiverIsLost(t *testing.T) {
 
 	require.NoError(t, master.Close())
 
-	var info = new(dwgps_info_t)
-
 	var deadline = time.Now().Add(5 * time.Second)
-	for gps.Read(info) != DWFIX_ERROR && time.Now().Before(deadline) {
+	for gps.Read().Fix != DWFIX_ERROR && time.Now().Before(deadline) {
 		_ = gps.sharedNMEAPort(name, 4800)
 
 		time.Sleep(time.Millisecond)
 	}
 
-	require.Equal(t, DWFIX_ERROR, gps.Read(info), "the reader never noticed the receiver had gone")
+	require.Equal(t, DWFIX_ERROR, gps.Read().Fix, "the reader never noticed the receiver had gone")
 	assert.Nil(t, gps.sharedNMEAPort(name, 4800), "a closed port is not shared")
 }

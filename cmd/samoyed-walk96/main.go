@@ -56,7 +56,7 @@ func main() {
 	defer stop()
 
 	var debug_gps = 0
-	var gps = direwolf.DWGPSInit(ctx, gpsSerialPort, debug_gps)
+	var gps = direwolf.NewGPSNMEA(ctx, gpsSerialPort, debug_gps)
 
 	// Wait for sample before reading.  An interrupt cuts the wait short, and
 	// the loop below then does nothing, so we carry on to leaving KISS mode
@@ -68,16 +68,16 @@ func main() {
 			break
 		}
 
-		var fix, lat, lon, speedKnots, track, altitude = direwolf.DWGPSRead(gps)
+		var info = gps.Read()
 
 		// A fix is reported before the position fields are, so a receiver can
 		// claim a 3D fix while gpsd has yet to report a latitude at all.
-		var latitude, haveLat = lat.Get()
-		var longitude, haveLon = lon.Get()
+		var latitude, haveLat = info.Lat.Get()
+		var longitude, haveLon = info.Lon.Get()
 
-		if fix > int(direwolf.DWFIX_2D) && haveLat && haveLon {
-			walk96(fix, latitude, longitude, speedKnots, track, altitude)
-		} else if fix < 0 {
+		if info.Fix > direwolf.DWFIX_2D && haveLat && haveLon {
+			walk96(latitude, longitude, info.SpeedKnots, info.Track, info.Altitude)
+		} else if info.Fix < 0 {
 			fmt.Printf("Can't communicate with GPS receiver.\n")
 			os.Exit(1)
 		} else {
@@ -100,8 +100,7 @@ var sequence = 0
 
 /* Should be called once per second. */
 
-//nolint:unparam // fix is reported alongside the rest of the GPS reading.
-func walk96(fix int, lat float64, lon float64, knots maybe.Maybe[float64], course maybe.Maybe[float64],
+func walk96(lat float64, lon float64, knots maybe.Maybe[float64], course maybe.Maybe[float64],
 	alt maybe.Maybe[float64],
 ) {
 	sequence++

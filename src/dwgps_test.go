@@ -30,9 +30,7 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 
 			var gps = NewGPS(context.Background(), config, 0)
 
-			var info dwgps_info_t
-
-			assert.Equal(t, DWFIX_NOT_INIT, gps.Read(&info))
+			assert.Equal(t, DWFIX_NOT_INIT, gps.Read().Fix)
 		})
 	}
 }
@@ -42,12 +40,10 @@ func TestDWGPSReadWithoutAReceiver(t *testing.T) {
 func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
 	var gps *GPS
 
-	var info dwgps_info_t
-	info.dlat = maybe.Just(1.0)
+	var info = gps.Read()
 
-	assert.Equal(t, DWFIX_NOT_INIT, gps.Read(&info))
-	assert.Equal(t, DWFIX_NOT_INIT, info.fix)
-	assert.True(t, info.dlat.IsNothing(), "a stale position leaked through a nil GPS")
+	assert.Equal(t, DWFIX_NOT_INIT, info.Fix)
+	assert.True(t, info.Lat.IsNothing(), "a nil GPS reported a position")
 
 	gps.Term()
 }
@@ -55,19 +51,16 @@ func TestDWGPSNilReadsAsNotInitialised(t *testing.T) {
 func TestDWGPSReadReturnsWhatWasSet(t *testing.T) {
 	var gps = new(GPS)
 
-	var report = new(dwgps_info_t)
-	report.timestamp = time.Now()
-	report.fix = DWFIX_3D
-	report.dlat = maybe.Just(42.6)
-	report.dlon = maybe.Just(-71.3)
-	report.altitude = maybe.Just(33.5)
+	var report = new(GPSInfo)
+	report.Timestamp = time.Now()
+	report.Fix = DWFIX_3D
+	report.Lat = maybe.Just(42.6)
+	report.Lon = maybe.Just(-71.3)
+	report.Altitude = maybe.Just(33.5)
 
 	gps.setData(report)
 
-	var info dwgps_info_t
-
-	assert.Equal(t, DWFIX_3D, gps.Read(&info))
-	assert.Equal(t, *report, info)
+	assert.Equal(t, *report, gps.Read())
 }
 
 // The reader goroutines set while beacons read; run under -race.
@@ -78,10 +71,10 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 
 	wg.Go(func() {
 		for i := range 1000 {
-			var report = new(dwgps_info_t)
-			report.fix = DWFIX_2D
-			report.dlat = maybe.Just(float64(i))
-			report.dlon = maybe.Just(float64(i))
+			var report = new(GPSInfo)
+			report.Fix = DWFIX_2D
+			report.Lat = maybe.Just(float64(i))
+			report.Lon = maybe.Just(float64(i))
 
 			gps.setData(report)
 		}
@@ -89,12 +82,10 @@ func TestDWGPSConcurrentSetAndRead(t *testing.T) {
 
 	wg.Go(func() {
 		for range 1000 {
-			var info dwgps_info_t
-
-			gps.Read(&info)
+			var info = gps.Read()
 
 			// The two halves of one report always arrive together.
-			assert.Equal(t, info.dlat, info.dlon)
+			assert.Equal(t, info.Lat, info.Lon)
 		}
 	})
 
