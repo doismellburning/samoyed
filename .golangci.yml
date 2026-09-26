@@ -38,6 +38,8 @@ linters:
               desc: Dummy deny because we need a non-empty list
     exhaustive:
       default-signifies-exhaustive: true  # Soften the check for now...
+    funcorder:
+      struct-method: false  # Keeping exported methods ahead of unexported ones means moving code about for no change in meaning
     gocognit:
       min-complexity: 300  # I sure wish this could be lower
     goconst:
